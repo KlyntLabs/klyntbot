@@ -15,10 +15,16 @@ mod cli_handlers {
 
 #[tokio::main]
 async fn main() {
-    // Initialize tracing
-    init_tracing(false);
-
     let cli = Cli::parse();
+
+    // Initialize tracing based on command context
+    // Chat mode suppresses INFO logs for a clean REPL experience
+    let log_level = match &cli.command {
+        Some(Commands::Serve { verbose: true, .. }) => "debug",
+        Some(Commands::Chat { .. }) => "warn",
+        _ => "info",
+    };
+    init_tracing(log_level);
 
     let result = match cli.command {
         Some(Commands::Chat {
@@ -27,12 +33,7 @@ async fn main() {
             no_markdown,
         }) => cli_handlers::handle_chat(message, session, !no_markdown).await,
 
-        Some(Commands::Serve { port, verbose }) => {
-            if verbose {
-                init_tracing(true);
-            }
-            cli_handlers::handle_serve(port).await
-        }
+        Some(Commands::Serve { port, .. }) => cli_handlers::handle_serve(port).await,
 
         Some(Commands::Init) => handle_init().await,
 
@@ -71,15 +72,11 @@ async fn main() {
     }
 }
 
-/// Initialize tracing/logging
-fn init_tracing(verbose: bool) {
+/// Initialize tracing/logging with the given level (e.g. "info", "warn", "debug")
+fn init_tracing(level: &str) {
     use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
-    let filter = if verbose {
-        EnvFilter::new("klyntbot=debug,info")
-    } else {
-        EnvFilter::new("klyntbot=info")
-    };
+    let filter = EnvFilter::new(format!("klyntbot={}", level));
 
     tracing_subscriber::registry()
         .with(filter)

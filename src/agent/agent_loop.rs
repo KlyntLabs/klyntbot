@@ -23,7 +23,6 @@ use crate::tools::{
 };
 use futures_util::StreamExt;
 use std::collections::HashMap;
-use std::io::{self, Write};
 
 use super::{ContextBuilder, SubagentManager};
 
@@ -455,6 +454,9 @@ impl AgentLoop {
     }
 
     /// Run a single streaming iteration.
+    ///
+    /// Content is accumulated silently (no stdout output) so the caller
+    /// can decide how to render it (e.g. markdown formatting).
     async fn run_streaming_iteration(
         &self,
         messages: &mut Vec<Message>,
@@ -472,10 +474,8 @@ impl AgentLoop {
         while let Some(chunk_result) = stream.next().await {
             let chunk = chunk_result?;
 
-            // Accumulate and print content in real-time
+            // Accumulate content (display is handled by the caller)
             if let Some(content) = chunk.content {
-                print!("{}", content);
-                io::stdout().flush().ok();
                 accumulated_content.push_str(&content);
             }
 
@@ -545,7 +545,6 @@ impl AgentLoop {
         }
 
         if !accumulated_content.is_empty() {
-            println!(); // New line after streaming output
             Ok(IterationOutcome::FinalContent(accumulated_content))
         } else {
             Ok(IterationOutcome::Empty)
@@ -561,7 +560,7 @@ impl AgentLoop {
         } else {
             content.clone()
         };
-        info!("Processing direct message: {}", preview);
+        debug!("Processing direct message: {}", preview);
 
         // Get or create session
         let mut session_manager = self.session_manager.write().await;

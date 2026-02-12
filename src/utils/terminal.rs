@@ -169,9 +169,9 @@ impl Spinner {
 
     /// Stops the spinner and clears the line
     pub fn stop(&mut self) {
-        if let Some(running) = Arc::get_mut(&mut self.running) {
-            *running.get_mut().unwrap() = false;
-        }
+        // Set the flag via Mutex::lock (not Arc::get_mut, which fails when
+        // the spinner thread still holds a clone of the Arc).
+        *self.running.lock().unwrap() = false;
 
         if let Some(handle) = self.thread_handle.take() {
             let _ = handle.join();

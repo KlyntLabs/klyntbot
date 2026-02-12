@@ -12,24 +12,27 @@ use std::sync::Arc;
 pub async fn handle_chat(
     message: Option<String>,
     session: String,
-    render_markdown: bool,
+    _render_markdown: bool, // Markdown always rendered for best UX
 ) -> Result<()> {
-    println!("klyntbot chat mode");
-    println!("Session: {}", session);
-
     // Load config
     let config = crate::config::load()?;
+    let model = config.agents.defaults.model.clone();
+
+    // Clean startup header
+    println!(
+        "\n  {} {}",
+        colorize("klyntbot", BOLD),
+        colorize(&format!("· {}", model), DIM)
+    );
 
     // Initialize LLM provider
     let provider = crate::providers::create_provider(&config)?;
-    tracing::info!("Provider ready: {}", provider.name());
 
     // Create a minimal message bus (not used in CLI mode, but required for AgentLoop)
     let bus = Arc::new(MessageBus::new(10));
 
     // Initialize agent loop
     let agent_loop = Arc::new(AgentLoop::new(bus, provider, config).await?);
-    tracing::info!("Agent loop initialized");
 
     // Session key for CLI
     let session_key = format!("cli:{}", session);
@@ -45,12 +48,7 @@ pub async fn handle_chat(
         match agent_loop.process_direct(msg, session_key).await {
             Ok(response) => {
                 spinner.stop();
-                let formatted = if render_markdown {
-                    MarkdownRenderer::render(&response)
-                } else {
-                    response
-                };
-                println!("\n{}", draw_box(&formatted, Some("klyntbot")));
+                println!("\n{}\n", MarkdownRenderer::render(&response));
             }
             Err(e) => {
                 spinner.stop();
@@ -180,7 +178,6 @@ pub async fn handle_chat(
                                 let _ = editor.add_history_entry(&message);
 
                                 // Process the multi-line message
-                                println!();
                                 let mut spinner = Spinner::new("thinking");
                                 spinner.start();
 
@@ -190,13 +187,7 @@ pub async fn handle_chat(
                                 {
                                     Ok(response) => {
                                         spinner.stop();
-                                        let formatted = if render_markdown {
-                                            MarkdownRenderer::render(&response)
-                                        } else {
-                                            response
-                                        };
-                                        println!("\n{}", draw_box(&formatted, Some("klyntbot")));
-                                        println!();
+                                        println!("\n{}\n", MarkdownRenderer::render(&response));
                                     }
                                     Err(e) => {
                                         spinner.stop();
@@ -224,7 +215,7 @@ pub async fn handle_chat(
                         break;
                     }
 
-                    // Process the message
+                    // Process the message with spinner + markdown rendering
                     let mut spinner = Spinner::new("thinking");
                     spinner.start();
 
@@ -234,13 +225,7 @@ pub async fn handle_chat(
                     {
                         Ok(response) => {
                             spinner.stop();
-                            let formatted = if render_markdown {
-                                MarkdownRenderer::render(&response)
-                            } else {
-                                response
-                            };
-                            println!("\n{}", draw_box(&formatted, Some("klyntbot")));
-                            println!();
+                            println!("\n{}\n", MarkdownRenderer::render(&response));
                         }
                         Err(e) => {
                             spinner.stop();
