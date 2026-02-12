@@ -1,10 +1,10 @@
-# klyntbot-cron
+# scheduling
 
 **Cron job scheduling service.**
 
 ## Overview
 
-`klyntbot-cron` provides scheduled task execution for klyntbot:
+`scheduling` provides scheduled task execution for klyntbot:
 - Three schedule types: `at` (one-time), `every` (interval), `cron` (expression)
 - Job persistence across restarts
 - Async execution with Tokio timers
@@ -15,7 +15,7 @@
 ### Schedule Types
 
 ```rust
-use klyntbot_cron::{CronSchedule, CronJob, CronPayload};
+use scheduling::{CronSchedule, CronJob, CronPayload};
 use chrono::Utc;
 
 // One-time execution at specific timestamp
@@ -31,7 +31,7 @@ let cron_schedule = CronSchedule::Cron("0 9 * * *".into());  // Daily at 9am
 ### Creating Jobs
 
 ```rust
-use klyntbot_cron::{CronService, CronJob, CronPayload};
+use scheduling::{CronService, CronJob, CronPayload};
 
 let cron_service = CronService::new(jobs_path).await?;
 
@@ -57,7 +57,7 @@ cron_service.add_job(job).await?;
 ### Job Execution
 
 ```rust
-use klyntbot_cron::CronService;
+use scheduling::CronService;
 
 // Start cron service (runs in background)
 let cron_service = CronService::new(jobs_path).await?;
@@ -89,13 +89,13 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-klyntbot-cron.workspace = true
+scheduling.workspace = true
 ```
 
 Example:
 
 ```rust
-use klyntbot_cron::{CronService, CronJob, CronSchedule, CronPayload};
+use scheduling::{CronService, CronJob, CronSchedule, CronPayload};
 use std::path::PathBuf;
 
 #[tokio::main]
@@ -238,7 +238,7 @@ pub enum CronJobState {
 
 ## Dependencies
 
-- `klyntbot-core` — Error types, shared types
+- `common` — Error types, shared types
 - `tokio` — Async runtime and timers
 - `chrono` — Date/time handling
 - `serde`, `serde_json` — Serialization
@@ -249,4 +249,4 @@ pub enum CronJobState {
 ## See Also
 
 - [klyntbot Architecture](../../docs/ARCHITECTURE.md)
-- [Cron Tool](../klyntbot-tools/README.md)
+- [Cron Tool](../tools/README.md)

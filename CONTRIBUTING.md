@@ -19,19 +19,19 @@ Thank you for your interest in contributing to klyntbot! This guide covers the w
 Klyntbot uses a Cargo workspace with 11 crates organized in dependency layers:
 
 ```
-Layer 0: klyntbot-core          (foundation types)
-Layer 1: klyntbot-config, klyntbot-bus
-Layer 2: klyntbot-providers, klyntbot-session, klyntbot-cron
-Layer 3: klyntbot-tools
-Layer 4: klyntbot-channels, klyntbot-heartbeat
-Layer 5: klyntbot-agent
-Layer 6: klyntbot-cli
+Layer 0: common          (foundation types)
+Layer 1: config, bus
+Layer 2: providers, session, scheduling
+Layer 3: tools
+Layer 4: channels, heartbeat
+Layer 5: agent
+Layer 6: cli
 Layer 7: klyntbot (facade + binary)
 ```
 
 **Key principle**: Dependencies flow upward only (no cycles).
 
-See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture documentation.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for complete details.
 
 ---
 
@@ -63,13 +63,13 @@ cargo clippy --workspace --all-targets --all-features
 
 ```bash
 # Build specific crate
-cargo build -p klyntbot-agent
+cargo build -p agent
 
 # Test specific crate
-cargo test -p klyntbot-tools
+cargo test -p tools
 
 # Check specific crate
-cargo check -p klyntbot-providers
+cargo check -p providers
 ```
 
 ---
@@ -82,14 +82,14 @@ Identify which crate to modify:
 
 | Change Type | Crate |
 |-------------|-------|
-| Error types, shared types | `klyntbot-core` |
-| Configuration schema | `klyntbot-config` |
-| Message bus logic | `klyntbot-bus` |
-| LLM provider | `klyntbot-providers` |
-| Tool implementation | `klyntbot-tools` |
-| Chat platform integration | `klyntbot-channels` |
-| Agent loop, memory, skills | `klyntbot-agent` |
-| CLI commands | `klyntbot-cli` |
+| Error types, shared types | `common` |
+| Configuration schema | `config` |
+| Message bus logic | `bus` |
+| LLM provider | `providers` |
+| Tool implementation | `tools` |
+| Chat platform integration | `channels` |
+| Agent loop, memory, skills | `agent` |
+| CLI commands | `cli` |
 
 ### Branch Naming
 
@@ -133,7 +133,7 @@ test(agent): add tests for skill loading
 cargo test --workspace
 
 # Specific crate
-cargo test -p klyntbot-agent
+cargo test -p agent
 
 # Specific test
 cargo test --test agent_loop_tests
@@ -154,7 +154,7 @@ cargo test test_session_persistence
 ### Writing Tests
 
 ```rust
-// Unit test in klyntbot-tools/src/filesystem.rs
+// Unit test in tools/src/filesystem.rs
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -308,12 +308,12 @@ Describe how you tested these changes.
 
 ### Adding a New Tool
 
-1. **Create tool implementation** in `klyntbot-tools/src/my_tool.rs`:
+1. **Create tool implementation** in `tools/src/my_tool.rs`:
 
 ```rust
 use async_trait::async_trait;
 use serde_json::Value;
-use klyntbot_core::Result;
+use common::Result;
 use super::{Tool, RoutingContext};
 
 pub struct MyTool;
@@ -358,7 +358,7 @@ mod tests {
 }
 ```
 
-2. **Register tool** in `klyntbot-tools/src/registry.rs`:
+2. **Register tool** in `tools/src/registry.rs`:
 
 ```rust
 pub fn create_tool_registry(...) -> ToolRegistry {
@@ -380,23 +380,23 @@ async fn test_my_tool_integration() {
 
 ### Adding a New Provider
 
-1. **Implement `LlmProvider`** in `klyntbot-providers/src/my_provider.rs`
-2. **Register in provider registry** in `klyntbot-providers/src/registry.rs`
-3. **Add config schema** in `klyntbot-config/src/schema.rs`
+1. **Implement `LlmProvider`** in `providers/src/my_provider.rs`
+2. **Register in provider registry** in `providers/src/registry.rs`
+3. **Add config schema** in `config/src/schema.rs`
 4. **Add tests**
 
 See [ARCHITECTURE.md - Extension Points](docs/ARCHITECTURE.md#extension-points) for details.
 
 ### Adding a New Channel
 
-1. **Implement `Channel` trait** in `klyntbot-channels/src/my_channel.rs`
-2. **Add to channel manager** in `klyntbot-channels/src/manager.rs`
-3. **Add config schema** in `klyntbot-config/src/schema.rs`
+1. **Implement `Channel` trait** in `channels/src/my_channel.rs`
+2. **Add to channel manager** in `channels/src/manager.rs`
+3. **Add config schema** in `config/src/schema.rs`
 4. **Add integration test**
 
 ### Adding a New CLI Command
 
-1. **Add command enum** in `klyntbot-cli/src/commands.rs`:
+1. **Add command enum** in `cli/src/commands.rs`:
 
 ```rust
 #[derive(Subcommand)]
@@ -409,7 +409,7 @@ pub enum Commands {
 }
 ```
 
-2. **Add handler** in `klyntbot-cli/src/my_command.rs`:
+2. **Add handler** in `cli/src/my_command.rs`:
 
 ```rust
 pub async fn handle_my_command(option: String) -> Result<()> {
@@ -428,9 +428,9 @@ pub async fn handle_my_command(option: String) -> Result<()> {
 
 ```rust
 // ✅ Use crate-specific imports
-use klyntbot_core::{Result, KlyntbotError};
-use klyntbot_config::Config;
-use klyntbot_providers::create_provider;
+use common::{Result, KlyntbotError};
+use config::Config;
+use providers::create_provider;
 
 // ❌ Don't use crate:: for other crates
 use crate::providers::create_provider;  // Wrong!
@@ -445,7 +445,7 @@ use crate::providers::create_provider;  // Wrong!
 ### Error Handling
 
 ```rust
-// ✅ Use klyntbot_core::Result
+// ✅ Use common::Result
 pub fn do_something() -> Result<String> {
     Err(ToolError::ExecutionFailed("Failed".into()).into())
 }
@@ -483,8 +483,7 @@ If adding optional functionality:
 
 ## Getting Help
 
-- **Documentation**: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
-- **Migration Guide**: [docs/MIGRATION.md](docs/MIGRATION.md)
+- **Architecture**: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - **Issues**: [GitHub Issues](https://github.com/KlyntLabs/klyntbot/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/KlyntLabs/klyntbot/discussions)
 

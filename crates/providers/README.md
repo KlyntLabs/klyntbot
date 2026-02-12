@@ -1,10 +1,10 @@
-# klyntbot-providers
+# providers
 
 **LLM provider abstraction and implementations.**
 
 ## Overview
 
-`klyntbot-providers` provides a unified interface for LLM providers:
+`providers` provides a unified interface for LLM providers:
 - `LlmProvider` trait for provider implementations
 - OpenAI-compatible HTTP client (no LiteLLM dependency)
 - Provider registry with auto-detection
@@ -18,7 +18,7 @@ Supports 12+ providers through a single HTTP interface.
 ### LlmProvider Trait
 
 ```rust
-use klyntbot_providers::{LlmProvider, Message, LlmResponse, ChatParams};
+use providers::{LlmProvider, Message, LlmResponse, ChatParams};
 use async_trait::async_trait;
 
 #[async_trait]
@@ -40,8 +40,8 @@ pub trait LlmProvider: Send + Sync {
 ### Message Types
 
 ```rust
-use klyntbot_providers::Message;
-use klyntbot_core::MessageRole;
+use providers::Message;
+use common::MessageRole;
 
 pub struct Message {
     pub role: MessageRole,
@@ -67,8 +67,8 @@ pub struct LlmResponse {
 ### Creating a Provider
 
 ```rust
-use klyntbot_providers::create_provider;
-use klyntbot_config::Config;
+use providers::create_provider;
+use config::Config;
 
 let config = Config::default();
 let provider = create_provider("claude-sonnet-4-5", &config)?;
@@ -116,15 +116,15 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-klyntbot-providers.workspace = true
+providers.workspace = true
 ```
 
 Example:
 
 ```rust
-use klyntbot_providers::{create_provider, Message, ChatParams};
-use klyntbot_config::Config;
-use klyntbot_core::MessageRole;
+use providers::{create_provider, Message, ChatParams};
+use config::Config;
+use common::MessageRole;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -203,7 +203,7 @@ while let Some(chunk) = stream.next().await {
 For audio transcription (e.g., Telegram voice messages):
 
 ```rust
-use klyntbot_providers::TranscriptionProvider;
+use providers::TranscriptionProvider;
 
 let transcriber = TranscriptionProvider::new(&config)?;
 let text = transcriber.transcribe(audio_bytes, "whisper-large-v3").await?;
@@ -219,8 +219,8 @@ let text = transcriber.transcribe(audio_bytes, "whisper-large-v3").await?;
 
 ## Dependencies
 
-- `klyntbot-core` — Error types, shared types
-- `klyntbot-config` — Configuration loading
+- `common` — Error types, shared types
+- `config` — Configuration loading
 - `async-trait` — Async trait support
 - `reqwest` — HTTP client
 - `serde`, `serde_json` — Serialization

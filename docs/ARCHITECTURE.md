@@ -27,7 +27,7 @@ Klyntbot is structured as a Cargo workspace with 11 crates organized into 8 depe
 
 ### Design Philosophy
 
-1. **Foundation first** — `klyntbot-core` contains only zero-dependency types and errors
+1. **Foundation first** — `common` contains only zero-dependency types and errors
 2. **One-way dependencies** — Dependencies flow upward through layers (no cycles)
 3. **Trait-based extensibility** — Adding providers, tools, or channels means implementing a trait
 4. **Explicit is better** — Handler traits make dependencies visible in type signatures
@@ -41,17 +41,17 @@ Klyntbot is structured as a Cargo workspace with 11 crates organized into 8 depe
 klyntbot/
 ├── Cargo.toml              ← workspace root
 ├── crates/
-│   ├── klyntbot-core/      ← Layer 0: Foundation types
-│   ├── klyntbot-config/    ← Layer 1: Configuration
-│   ├── klyntbot-bus/       ← Layer 1: Message bus
-│   ├── klyntbot-providers/ ← Layer 2: LLM providers
-│   ├── klyntbot-session/   ← Layer 2: Session persistence
-│   ├── klyntbot-cron/      ← Layer 2: Scheduling
-│   ├── klyntbot-tools/     ← Layer 3: Tool system
-│   ├── klyntbot-channels/  ← Layer 4: Chat platforms
-│   ├── klyntbot-heartbeat/ ← Layer 4: Periodic wake-up
-│   ├── klyntbot-agent/     ← Layer 5: Agent orchestration
-│   └── klyntbot-cli/       ← Layer 6: Command-line interface
+│   ├── common/      ← Layer 0: Foundation types
+│   ├── config/    ← Layer 1: Configuration
+│   ├── bus/       ← Layer 1: Message bus
+│   ├── providers/ ← Layer 2: LLM providers
+│   ├── session/   ← Layer 2: Session persistence
+│   ├── scheduling/      ← Layer 2: Scheduling
+│   ├── tools/     ← Layer 3: Tool system
+│   ├── channels/  ← Layer 4: Chat platforms
+│   ├── heartbeat/ ← Layer 4: Periodic wake-up
+│   ├── agent/     ← Layer 5: Agent orchestration
+│   └── cli/       ← Layer 6: Command-line interface
 ├── src/
 │   ├── lib.rs              ← Layer 7: Re-export facade
 │   └── main.rs             ← Binary entry point
@@ -63,17 +63,17 @@ klyntbot/
 
 | Crate | Lines | Files | Description |
 |-------|-------|-------|-------------|
-| `klyntbot-core` | ~515 | 4 | Error types, shared types, utilities |
-| `klyntbot-config` | ~1,646 | 2 | Configuration schema and loader |
-| `klyntbot-bus` | ~458 | 2 | Async message bus |
-| `klyntbot-providers` | ~1,355 | 4 | LLM provider abstraction |
-| `klyntbot-session` | ~479 | 1 | Session persistence |
-| `klyntbot-cron` | ~1,284 | 2 | Cron scheduling service |
-| `klyntbot-tools` | ~1,892 | 7 | Tool trait + implementations |
-| `klyntbot-channels` | ~3,306 | 8 | Channel trait + platform impls |
-| `klyntbot-heartbeat` | ~229 | 1 | Heartbeat service |
-| `klyntbot-agent` | ~2,286 | 5 | Agent loop and orchestration |
-| `klyntbot-cli` | ~1,849 | 9 | CLI commands and REPL |
+| `common` | ~515 | 4 | Error types, shared types, utilities |
+| `config` | ~1,646 | 2 | Configuration schema and loader |
+| `bus` | ~458 | 2 | Async message bus |
+| `providers` | ~1,355 | 4 | LLM provider abstraction |
+| `session` | ~479 | 1 | Session persistence |
+| `scheduling` | ~1,284 | 2 | Cron scheduling service |
+| `tools` | ~1,892 | 7 | Tool trait + implementations |
+| `channels` | ~3,306 | 8 | Channel trait + platform impls |
+| `heartbeat` | ~229 | 1 | Heartbeat service |
+| `agent` | ~2,286 | 5 | Agent loop and orchestration |
+| `cli` | ~1,849 | 9 | CLI commands and REPL |
 | **Total** | **~15,299** | **45** | |
 
 ---
@@ -84,37 +84,37 @@ klyntbot/
 
 ```
 Layer 0 (Foundation):
-    klyntbot-core
+    common
         │
         ├─────────────────────────────────┐
         │                                 │
 Layer 1 (Data):
-    klyntbot-config              klyntbot-bus
+    config              bus
         │                                 │
         ├─────────────────────────────────┘
         │
         ├─────────────────┬───────────────┬───────────────┐
         │                 │               │               │
 Layer 2 (Services):
-    klyntbot-providers  klyntbot-session  klyntbot-cron  │
+    providers  session  scheduling  │
         │                 │               │               │
         └─────────────────┴───────────────┴───────────────┘
         │
 Layer 3 (Capabilities):
-    klyntbot-tools
+    tools
         │
         ├─────────────────────────────────┐
         │                                 │
 Layer 4 (Platforms):
-    klyntbot-channels          klyntbot-heartbeat
+    channels          heartbeat
         │                                 │
         └─────────────────┬───────────────┘
                           │
 Layer 5 (Orchestration):
-    klyntbot-agent
+    agent
         │
 Layer 6 (UI):
-    klyntbot-cli
+    cli
         │
 Layer 7 (Binary):
     klyntbot (facade + bin)
@@ -122,7 +122,7 @@ Layer 7 (Binary):
 
 ### Dependency Rules
 
-1. **Foundation layer** (`klyntbot-core`) has no internal dependencies
+1. **Foundation layer** (`common`) has no internal dependencies
 2. **Data layer** crates depend only on core
 3. **Service layer** crates depend on core + data layer
 4. **Capability layer** (`tools`) depends on services it needs
@@ -139,10 +139,10 @@ Layer 7 (Binary):
 
 ### Error Handling
 
-All errors flow through `klyntbot-core`:
+All errors flow through `common`:
 
 ```rust
-// In klyntbot-core/src/error.rs
+// In common/src/error.rs
 pub enum KlyntbotError {
     Tool(ToolError),
     Provider(ProviderError),
@@ -159,7 +159,7 @@ pub type Result<T> = std::result::Result<T, KlyntbotError>;
 Each domain error has automatic `From` conversions:
 
 ```rust
-// In klyntbot-providers
+// In providers
 pub fn call_llm(...) -> Result<LlmResponse> {
     let resp = reqwest::get(url).await?;  // reqwest::Error → ProviderError → KlyntbotError
     Ok(...)
@@ -168,7 +168,7 @@ pub fn call_llm(...) -> Result<LlmResponse> {
 
 ### Shared Types
 
-Core types in `klyntbot-core`:
+Core types in `common`:
 
 ```rust
 // Message roles
@@ -191,11 +191,11 @@ Four primary extension traits:
 
 | Trait | Crate | Purpose |
 |-------|-------|---------|
-| `LlmProvider` | `klyntbot-providers` | Add LLM provider implementations |
-| `Tool` | `klyntbot-tools` | Add new agent tools |
-| `Channel` | `klyntbot-channels` | Add chat platform integrations |
-| `SpawnHandler` | `klyntbot-tools` | Abstraction for subagent spawning |
-| `CronHandler` | `klyntbot-tools` | Abstraction for cron job management |
+| `LlmProvider` | `providers` | Add LLM provider implementations |
+| `Tool` | `tools` | Add new agent tools |
+| `Channel` | `channels` | Add chat platform integrations |
+| `SpawnHandler` | `tools` | Abstraction for subagent spawning |
+| `CronHandler` | `tools` | Abstraction for cron job management |
 
 ---
 
@@ -203,11 +203,11 @@ Four primary extension traits:
 
 ### Adding a New LLM Provider
 
-**1. Implement the `LlmProvider` trait in `klyntbot-providers`:**
+**1. Implement the `LlmProvider` trait in `providers`:**
 
 ```rust
-// In klyntbot-providers/src/my_provider.rs
-use klyntbot_core::Result;
+// In providers/src/my_provider.rs
+use common::Result;
 use async_trait::async_trait;
 
 pub struct MyProvider {
@@ -226,7 +226,7 @@ impl LlmProvider for MyProvider {
 **2. Register in the provider registry:**
 
 ```rust
-// In klyntbot-providers/src/registry.rs
+// In providers/src/registry.rs
 pub fn detect_provider(model: &str, config: &Config) -> Result<DynProvider> {
     if model.contains("my-model") {
         return Ok(Arc::new(MyProvider::new(config)?));
@@ -235,10 +235,10 @@ pub fn detect_provider(model: &str, config: &Config) -> Result<DynProvider> {
 }
 ```
 
-**3. Add configuration in `klyntbot-config`:**
+**3. Add configuration in `config`:**
 
 ```rust
-// In klyntbot-config/src/schema.rs
+// In config/src/schema.rs
 pub struct ProvidersConfig {
     pub my_provider: Option<ProviderApiConfig>,
     // ... existing providers
@@ -247,11 +247,11 @@ pub struct ProvidersConfig {
 
 ### Adding a New Tool
 
-**1. Implement the `Tool` trait in `klyntbot-tools`:**
+**1. Implement the `Tool` trait in `tools`:**
 
 ```rust
-// In klyntbot-tools/src/my_tool.rs
-use klyntbot_core::Result;
+// In tools/src/my_tool.rs
+use common::Result;
 use async_trait::async_trait;
 use serde_json::Value;
 
@@ -284,7 +284,7 @@ impl Tool for MyTool {
 **2. Register the tool:**
 
 ```rust
-// In klyntbot-tools/src/registry.rs
+// In tools/src/registry.rs
 pub fn create_tool_registry(...) -> ToolRegistry {
     let mut registry = ToolRegistry::new();
     registry.register(Arc::new(MyTool));
@@ -295,12 +295,12 @@ pub fn create_tool_registry(...) -> ToolRegistry {
 
 ### Adding a New Channel
 
-**1. Implement the `Channel` trait in `klyntbot-channels`:**
+**1. Implement the `Channel` trait in `channels`:**
 
 ```rust
-// In klyntbot-channels/src/my_channel.rs
-use klyntbot_core::Result;
-use klyntbot_bus::{InboundMessage, OutboundMessage};
+// In channels/src/my_channel.rs
+use common::Result;
+use bus::{InboundMessage, OutboundMessage};
 use async_trait::async_trait;
 use tokio::sync::mpsc;
 
@@ -323,7 +323,7 @@ impl Channel for MyChannel {
 **2. Add to channel manager:**
 
 ```rust
-// In klyntbot-channels/src/manager.rs
+// In channels/src/manager.rs
 pub async fn start_channels(config: &Config, bus: &MessageBus) -> Result<Vec<DynChannel>> {
     let mut channels = vec![];
 
@@ -337,7 +337,7 @@ pub async fn start_channels(config: &Config, bus: &MessageBus) -> Result<Vec<Dyn
 **3. Add configuration:**
 
 ```rust
-// In klyntbot-config/src/schema.rs
+// In config/src/schema.rs
 pub struct ChannelsConfig {
     pub my_channel: MyChannelConfig,
     // ... existing channels
@@ -359,8 +359,8 @@ members = ["crates/*"]
 
 [workspace.dependencies]
 # Internal crates
-klyntbot-core = { path = "crates/klyntbot-core" }
-klyntbot-config = { path = "crates/klyntbot-config" }
+common = { path = "crates/common" }
+config = { path = "crates/config" }
 # ... all workspace crates
 
 # External dependencies (version pinned)
@@ -372,15 +372,15 @@ serde = { version = "1.0", features = ["derive"] }
 Individual crates inherit versions:
 
 ```toml
-# Example: crates/klyntbot-tools/Cargo.toml
+# Example: crates/tools/Cargo.toml
 [package]
-name = "klyntbot-tools"
+name = "tools"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
-klyntbot-core.workspace = true
-klyntbot-bus.workspace = true
+common.workspace = true
+bus.workspace = true
 tokio.workspace = true
 async-trait.workspace = true
 ```
@@ -389,7 +389,7 @@ async-trait.workspace = true
 
 | Feature | Crate | Purpose |
 |---------|-------|---------|
-| `email` | `klyntbot-channels` | Email channel (IMAP/SMTP) |
+| `email` | `channels` | Email channel (IMAP/SMTP) |
 
 Feature propagation from root:
 
@@ -397,20 +397,20 @@ Feature propagation from root:
 # Root Cargo.toml
 [features]
 default = ["email"]
-email = ["klyntbot-channels/email"]
+email = ["channels/email"]
 ```
 
 ### Compilation Parallelism
 
 With 11 crates in 8 layers, the compiler can parallelize:
 
-- **Layer 0**: `klyntbot-core` (first, serial)
-- **Layer 1**: `klyntbot-config` + `klyntbot-bus` (parallel)
-- **Layer 2**: `klyntbot-providers` + `klyntbot-session` + `klyntbot-cron` (parallel)
-- **Layer 3**: `klyntbot-tools` (serial)
-- **Layer 4**: `klyntbot-channels` + `klyntbot-heartbeat` (parallel)
-- **Layer 5**: `klyntbot-agent` (serial)
-- **Layer 6**: `klyntbot-cli` (serial)
+- **Layer 0**: `common` (first, serial)
+- **Layer 1**: `config` + `bus` (parallel)
+- **Layer 2**: `providers` + `session` + `scheduling` (parallel)
+- **Layer 3**: `tools` (serial)
+- **Layer 4**: `channels` + `heartbeat` (parallel)
+- **Layer 5**: `agent` (serial)
+- **Layer 6**: `cli` (serial)
 - **Layer 7**: `klyntbot` facade (serial)
 
 **Critical path**: 8 serial steps, but each step is smaller than the original monolith.
@@ -419,19 +419,19 @@ With 11 crates in 8 layers, the compiler can parallelize:
 
 | Changed Crate | Recompiles |
 |---------------|------------|
-| `klyntbot-core` | All (foundation) |
-| `klyntbot-config` | 6 crates |
-| `klyntbot-bus` | 6 crates |
-| `klyntbot-providers` | 5 crates |
-| `klyntbot-tools` | 4 crates |
-| `klyntbot-channels` | 2 crates (channels, cli) |
-| `klyntbot-session` | 3 crates |
-| `klyntbot-cron` | 3 crates |
-| `klyntbot-heartbeat` | 2 crates |
-| `klyntbot-agent` | 2 crates (agent, cli) |
-| `klyntbot-cli` | 1 crate (cli only) |
+| `common` | All (foundation) |
+| `config` | 6 crates |
+| `bus` | 6 crates |
+| `providers` | 5 crates |
+| `tools` | 4 crates |
+| `channels` | 2 crates (channels, cli) |
+| `session` | 3 crates |
+| `scheduling` | 3 crates |
+| `heartbeat` | 2 crates |
+| `agent` | 2 crates (agent, cli) |
+| `cli` | 1 crate (cli only) |
 
-**Key win**: Changing `telegram.rs` only recompiles `klyntbot-channels` and `klyntbot-cli`.
+**Key win**: Changing `telegram.rs` only recompiles `channels` and `cli`.
 
 ---
 
@@ -442,7 +442,7 @@ With 11 crates in 8 layers, the compiler can parallelize:
 Each crate has inline `#[cfg(test)] mod tests` for crate-internal testing:
 
 ```rust
-// In klyntbot-core/src/error.rs
+// In common/src/error.rs
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -454,7 +454,7 @@ mod tests {
 }
 ```
 
-Run with: `cargo test -p klyntbot-core`
+Run with: `cargo test -p common`
 
 ### Integration Tests
 
@@ -480,9 +480,9 @@ Run with: `cargo test --workspace`
 | `channel_tests.rs` | `tests/` | Cross-crate channel integration |
 | `integration_tests.rs` | `tests/` | Full-stack integration |
 | `mock_provider.rs` | `tests/` | Shared test helper |
-| Provider unit tests | `klyntbot-providers` | Provider-internal |
-| Agent unit tests | `klyntbot-agent` | Agent-internal |
-| Skills unit tests | `klyntbot-agent` | Skills-internal |
+| Provider unit tests | `providers` | Provider-internal |
+| Agent unit tests | `agent` | Agent-internal |
+| Skills unit tests | `agent` | Skills-internal |
 
 ---
 
@@ -492,10 +492,10 @@ Run with: `cargo test --workspace`
 
 **Problem**: `SpawnTool` needs to call `SubagentManager`, but `SubagentManager` depends on the entire `AgentLoop` which depends on all tools (circular dependency).
 
-**Solution**: Define a trait in `klyntbot-tools`:
+**Solution**: Define a trait in `tools`:
 
 ```rust
-// In klyntbot-tools/src/spawn.rs
+// In tools/src/spawn.rs
 #[async_trait]
 pub trait SpawnHandler: Send + Sync {
     async fn spawn(&self, task: String, label: Option<String>, ...) -> String;
@@ -506,10 +506,10 @@ pub struct SpawnTool {
 }
 ```
 
-Implement the trait in `klyntbot-agent`:
+Implement the trait in `agent`:
 
 ```rust
-// In klyntbot-agent/src/subagent.rs
+// In agent/src/subagent.rs
 impl SpawnHandler for SubagentManager {
     async fn spawn(&self, task: String, ...) -> String {
         // Implementation
@@ -520,7 +520,7 @@ impl SpawnHandler for SubagentManager {
 Inject at construction:
 
 ```rust
-// In klyntbot-agent/src/agent_loop.rs
+// In agent/src/agent_loop.rs
 let spawn_tool = SpawnTool::new(Some(Arc::clone(&subagent_mgr) as Arc<dyn SpawnHandler>));
 ```
 
@@ -532,15 +532,15 @@ The root `klyntbot` crate re-exports all public types for backward compatibility
 
 ```rust
 // In klyntbot/src/lib.rs
-pub use klyntbot_core::{KlyntbotError, Result, ChannelName, ChatId, MessageRole};
-pub use klyntbot_config::Config;
-pub use klyntbot_bus::{InboundMessage, OutboundMessage, MessageBus};
-pub use klyntbot_providers::{LlmProvider, create_provider};
-pub use klyntbot_tools::{Tool, ToolRegistry};
-pub use klyntbot_channels::{Channel, ChannelManager};
-pub use klyntbot_agent::{AgentLoop, ContextBuilder, MemoryStore};
-pub use klyntbot_session::SessionManager;
-pub use klyntbot_cron::CronService;
+pub use common::{KlyntbotError, Result, ChannelName, ChatId, MessageRole};
+pub use config::Config;
+pub use bus::{InboundMessage, OutboundMessage, MessageBus};
+pub use providers::{LlmProvider, create_provider};
+pub use tools::{Tool, ToolRegistry};
+pub use channels::{Channel, ChannelManager};
+pub use agent::{AgentLoop, ContextBuilder, MemoryStore};
+pub use session::SessionManager;
+pub use scheduling::CronService;
 ```
 
 Existing code using `use klyntbot::AgentLoop` works unchanged.
@@ -549,8 +549,8 @@ Existing code using `use klyntbot::AgentLoop` works unchanged.
 
 For any cross-layer interaction where direct dependencies would create cycles:
 
-1. Define a trait in the **lower layer** (e.g., `klyntbot-tools`)
-2. Implement the trait in the **higher layer** (e.g., `klyntbot-agent`)
+1. Define a trait in the **lower layer** (e.g., `tools`)
+2. Implement the trait in the **higher layer** (e.g., `agent`)
 3. Inject the implementation as `Arc<dyn Trait>` at construction time
 
 This keeps dependencies flowing upward while allowing runtime polymorphism.
@@ -586,7 +586,7 @@ They all depend on `config` and `core`, making them Layer 2.
 
 Tools need access to **services** (providers for transcription, bus for messaging, cron for scheduling). Placing tools above services allows them to depend on what they need without creating cycles.
 
-### Why separate `klyntbot-bus` from `klyntbot-core`?
+### Why separate `bus` from `common`?
 
 `bus` depends on `tokio::sync::mpsc` and `chrono`, which are not needed by `core`. Keeping `core` dependency-light makes it fast to compile and easy to use in other contexts.
 
@@ -599,13 +599,13 @@ Tools need access to **services** (providers for transcription, bus for messagin
 cargo build --workspace
 
 # Build a specific crate
-cargo build -p klyntbot-agent
+cargo build -p agent
 
 # Run all tests
 cargo test --workspace
 
 # Run tests for a specific crate
-cargo test -p klyntbot-tools
+cargo test -p tools
 
 # Check for errors without building
 cargo check --workspace

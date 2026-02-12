@@ -1,10 +1,10 @@
-# klyntbot-cli
+# cli
 
 **Command-line interface and REPL.**
 
 ## Overview
 
-`klyntbot-cli` provides the CLI commands and interactive REPL for klyntbot:
+`cli` provides the CLI commands and interactive REPL for klyntbot:
 - Command parsing with `clap`
 - Interactive chat REPL with history
 - Gateway server mode
@@ -16,7 +16,7 @@
 ### CLI Commands
 
 ```rust
-use klyntbot_cli::{Cli, Commands};
+use cli::{Cli, Commands};
 use clap::Parser;
 
 let cli = Cli::parse();
@@ -50,7 +50,7 @@ match cli.command {
 ### Chat REPL
 
 ```rust
-use klyntbot_cli::handle_chat;
+use cli::handle_chat;
 
 // Interactive mode with history
 // Supports:
@@ -73,7 +73,7 @@ handle_chat(None).await?;
 ### Gateway Server
 
 ```rust
-use klyntbot_cli::handle_serve;
+use cli::handle_serve;
 
 // Start all enabled channels
 handle_serve(Some(8080)).await?;
@@ -89,7 +89,7 @@ handle_serve(Some(8080)).await?;
 ### Status Command
 
 ```rust
-use klyntbot_cli::handle_status;
+use cli::handle_status;
 
 handle_status().await?;
 
@@ -104,7 +104,7 @@ handle_status().await?;
 ### Init Command
 
 ```rust
-use klyntbot_cli::handle_init;
+use cli::handle_init;
 
 handle_init().await?;
 
@@ -132,11 +132,11 @@ As a library:
 
 ```toml
 [dependencies]
-klyntbot-cli.workspace = true
+cli.workspace = true
 ```
 
 ```rust
-use klyntbot_cli::{Cli, Commands};
+use cli::{Cli, Commands};
 use clap::Parser;
 
 #[tokio::main]
@@ -145,7 +145,7 @@ async fn main() -> Result<()> {
 
     match cli.command {
         Commands::Chat { message } => {
-            klyntbot_cli::handle_chat(message).await?;
+            cli::handle_chat(message).await?;
         }
         _ => {}
     }
@@ -309,16 +309,16 @@ Help: Check token in config.channels.telegram.token
 
 ## Dependencies
 
-- `klyntbot-core` — Error types
-- `klyntbot-config` — Configuration
-- `klyntbot-bus` — Message bus
-- `klyntbot-providers` — LLM providers
-- `klyntbot-agent` — Agent loop
-- `klyntbot-channels` — Channel manager
-- `klyntbot-cron` — Cron service
-- `klyntbot-heartbeat` — Heartbeat service
-- `klyntbot-session` — Session manager
-- `klyntbot-tools` — Tool registry
+- `common` — Error types
+- `config` — Configuration
+- `bus` — Message bus
+- `providers` — LLM providers
+- `agent` — Agent loop
+- `channels` — Channel manager
+- `scheduling` — Cron service
+- `heartbeat` — Heartbeat service
+- `session` — Session manager
+- `tools` — Tool registry
 - `clap` — CLI argument parsing
 - `rustyline` — REPL with history
 - `tokio` — Async runtime

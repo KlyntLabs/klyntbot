@@ -8,7 +8,7 @@
   <p>
     <a href="https://github.com/KlyntLabs/klyntbot/releases"><img src="https://img.shields.io/github/v/release/KlyntLabs/klyntbot?style=flat-square&color=blue" alt="Release"></a>
     <img src="https://img.shields.io/badge/rust-1.75+-orange?style=flat-square&logo=rust" alt="Rust">
-    <img src="https://img.shields.io/badge/tests-242%20passed-brightgreen?style=flat-square" alt="Tests">
+    <img src="https://img.shields.io/badge/tests-330%20passed-brightgreen?style=flat-square" alt="Tests">
     <img src="https://img.shields.io/badge/clippy-0%20warnings-brightgreen?style=flat-square" alt="Clippy">
     <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License"></a>
   </p>
@@ -604,16 +604,16 @@ cargo build --release
 ### Testing
 
 ```bash
-# Run all 242 tests
-cargo test
+# Run all 330 tests across workspace
+cargo test --workspace
 
-# Unit tests only
-cargo test --lib
+# Test specific crate
+cargo test -p tools
+cargo test -p agent
 
 # Specific test suite
 cargo test --test integration_tests
 cargo test --test agent_loop_tests
-cargo test --test skills_tests
 
 # With output
 cargo test -- --nocapture
@@ -626,77 +626,77 @@ cargo clippy --all-targets --all-features
 cargo fmt --check
 ```
 
-### Project structure
-
-Klyntbot is organized as a Cargo workspace with 11 crates:
+### Project Structure
 
 ```
 klyntbot/
   Cargo.toml                    # Workspace root
-  crates/
-    klyntbot-core/              # Foundation types and errors
-    klyntbot-config/            # Configuration schema and loader
-    klyntbot-bus/               # Async message bus
-    klyntbot-providers/         # LLM provider abstraction
-    klyntbot-session/           # Session persistence (JSONL + cache)
-    klyntbot-cron/              # Cron scheduling service
-    klyntbot-tools/             # Tool trait and implementations
-    klyntbot-channels/          # Chat platform integrations
-    klyntbot-heartbeat/         # Periodic wake-up service
-    klyntbot-agent/             # Agent loop and orchestration
-    klyntbot-cli/               # CLI commands and REPL
+  crates/                       # 11 focused workspace crates
+    common/              # Foundation types and errors
+    config/            # Configuration schema and loader
+    bus/               # Async message bus
+    providers/         # LLM provider abstraction
+    session/           # Session persistence (JSONL + cache)
+    scheduling/              # Cron scheduling service
+    tools/             # Tool trait and implementations
+    channels/          # Chat platform integrations
+    heartbeat/         # Periodic wake-up service
+    agent/             # Agent loop and orchestration
+    cli/               # CLI commands and REPL
   src/
-    lib.rs                      # Re-export facade (backward compatibility)
+    lib.rs                      # Re-export facade
     main.rs                     # Binary entry point
   workspace/                    # Default workspace templates
   skills/                       # Built-in skill definitions
   tests/                        # Integration tests
-  docs/                         # Architecture and design docs
+  docs/                         # Architecture documentation
 ```
 
-See [Architecture Documentation](docs/ARCHITECTURE.md) for detailed crate descriptions and dependency graph.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the complete dependency graph and design patterns.
 
-### Code metrics
+### Code Metrics
 
 | Metric | Value |
 |--------|-------|
-| Source lines | 16,300 |
-| Test lines | 2,436 |
-| Test cases | 242 |
-| Modules | 12 |
-| Error types | 7 |
-| Tools | 10 |
-| Providers | 12 |
-| Channels | 9 (6 ready, 3 planned) |
+| Workspace crates | 11 |
+| Source lines | ~16,700 |
+| Test cases | 330 |
+| Clippy warnings | 0 |
+| Tools | 9 |
+| Providers | 12+ |
+| Channels | 6 ready, 3 planned |
 
 ---
 
-## Documentation
+## Workspace Structure
 
-### Architecture & Development
+Klyntbot is organized as a Cargo workspace with 11 focused crates:
 
-- **[Architecture Guide](docs/ARCHITECTURE.md)** — Workspace structure, crate dependencies, design patterns, and extension points
-- **[Migration Guide](docs/MIGRATION.md)** — Migrating from monolith to workspace, import changes, and common issues
-- **[Contributing Guide](CONTRIBUTING.md)** — Development workflow, testing strategy, and contribution guidelines
-- **[Usage Examples](docs/EXAMPLES.md)** — Practical examples for workspace development, adding tools/providers/channels
+```
+crates/
+├── common/         → Foundation types and error handling
+├── config/         → Configuration schema and file I/O
+├── bus/            → Async message bus
+├── providers/      → LLM provider abstraction (12+ providers)
+├── session/        → Session persistence (JSONL + cache)
+├── scheduling/     → Cron job scheduling
+├── tools/          → Tool implementations (9 tools)
+├── channels/       → Chat platform integrations (6 platforms)
+├── heartbeat/      → Periodic wake-up service
+├── agent/          → Agent orchestration
+└── cli/            → CLI commands and REPL
+```
 
-### Crate Documentation
+**Key Benefits**:
+- **Parallel compilation** — Multiple crates compile simultaneously (222% CPU efficiency)
+- **Faster incremental builds** — Changes to one crate only recompile dependents
+- **Clear boundaries** — Each crate has focused responsibility
+- **Zero circular dependencies** — Enforced by Cargo
 
-Each crate has detailed documentation in its README:
-
-| Crate | Purpose |
-|-------|---------|
-| [klyntbot-core](crates/klyntbot-core/README.md) | Foundation types and error handling |
-| [klyntbot-config](crates/klyntbot-config/README.md) | Configuration schema and file I/O |
-| [klyntbot-bus](crates/klyntbot-bus/README.md) | Async message bus for channel ↔ agent communication |
-| [klyntbot-providers](crates/klyntbot-providers/README.md) | LLM provider abstraction and implementations |
-| [klyntbot-session](crates/klyntbot-session/README.md) | Conversation session persistence |
-| [klyntbot-cron](crates/klyntbot-cron/README.md) | Cron job scheduling service |
-| [klyntbot-tools](crates/klyntbot-tools/README.md) | Tool trait and all tool implementations |
-| [klyntbot-channels](crates/klyntbot-channels/README.md) | Channel trait and chat platform integrations |
-| [klyntbot-heartbeat](crates/klyntbot-heartbeat/README.md) | Periodic agent wake-up service |
-| [klyntbot-agent](crates/klyntbot-agent/README.md) | Agent loop, memory, skills, and subagents |
-| [klyntbot-cli](crates/klyntbot-cli/README.md) | Command-line interface and REPL |
+**Documentation**:
+- [Architecture Guide](docs/ARCHITECTURE.md) — Detailed workspace architecture and dependency graph
+- [Build Optimization](docs/BUILD_OPTIMIZATION.md) — Performance analysis and build metrics
+- [Contributing Guide](CONTRIBUTING.md) — Development workflow and guidelines
 
 ---
 

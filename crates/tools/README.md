@@ -1,10 +1,10 @@
-# klyntbot-tools
+# tools
 
 **Tool trait and implementations for agent capabilities.**
 
 ## Overview
 
-`klyntbot-tools` provides the tool system for klyntbot:
+`tools` provides the tool system for klyntbot:
 - `Tool` trait for extensible capabilities
 - 10 built-in tool implementations
 - Handler traits for dependency inversion
@@ -16,7 +16,7 @@
 ### Tool Trait
 
 ```rust
-use klyntbot_tools::Tool;
+use tools::Tool;
 use async_trait::async_trait;
 use serde_json::Value;
 
@@ -47,7 +47,7 @@ pub trait Tool: Send + Sync {
 ### Tool Registry
 
 ```rust
-use klyntbot_tools::{ToolRegistry, DynTool};
+use tools::{ToolRegistry, DynTool};
 
 // Create registry
 let mut registry = ToolRegistry::new();
@@ -68,7 +68,7 @@ let tools: Vec<String> = registry.list();
 ### Filesystem Tools
 
 ```rust
-use klyntbot_tools::{ReadFileTool, WriteFileTool, EditFileTool, ListDirTool};
+use tools::{ReadFileTool, WriteFileTool, EditFileTool, ListDirTool};
 
 // Read file
 let read_tool = ReadFileTool::new(Some("/workspace"));
@@ -109,7 +109,7 @@ let listing = list_tool.execute(
 ### Shell Tool
 
 ```rust
-use klyntbot_tools::ExecTool;
+use tools::ExecTool;
 
 let exec_tool = ExecTool::new(60);  // 60 second timeout
 let output = exec_tool.execute(
@@ -126,7 +126,7 @@ let output = exec_tool.execute(
 ### Web Tools
 
 ```rust
-use klyntbot_tools::{WebSearchTool, WebFetchTool};
+use tools::{WebSearchTool, WebFetchTool};
 
 // Search the web
 let search_tool = WebSearchTool::new(api_key);
@@ -152,13 +152,13 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-klyntbot-tools.workspace = true
+tools.workspace = true
 ```
 
 Example:
 
 ```rust
-use klyntbot_tools::{ToolRegistry, ReadFileTool, WriteFileTool, ExecTool};
+use tools::{ToolRegistry, ReadFileTool, WriteFileTool, ExecTool};
 use std::sync::Arc;
 
 fn create_tools(workspace: &str) -> ToolRegistry {
@@ -212,7 +212,7 @@ pub struct SpawnTool {
 }
 ```
 
-**Usage**: Implemented by `SubagentManager` in `klyntbot-agent`.
+**Usage**: Implemented by `SubagentManager` in `agent`.
 
 ### CronHandler
 
@@ -229,7 +229,7 @@ pub struct CronTool {
 }
 ```
 
-**Usage**: Implemented by `CronService` in `klyntbot-cron`.
+**Usage**: Implemented by `CronService` in `scheduling`.
 
 ## Safety Features
 
@@ -325,8 +325,8 @@ Used for:
 
 ## Dependencies
 
-- `klyntbot-core` — Error types, shared types
-- `klyntbot-bus` — Message sending (MessageTool)
+- `common` — Error types, shared types
+- `bus` — Message sending (MessageTool)
 - `async-trait` — Async trait support
 - `tokio` — Async runtime
 - `serde_json` — JSON handling
@@ -339,5 +339,5 @@ Used for:
 ## See Also
 
 - [klyntbot Architecture](../../docs/ARCHITECTURE.md)
-- [Agent Loop](../klyntbot-agent/README.md)
+- [Agent Loop](../agent/README.md)
 - [Extending klyntbot](../../docs/ARCHITECTURE.md#extension-points)

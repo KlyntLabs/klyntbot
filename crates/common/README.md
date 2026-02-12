@@ -1,10 +1,10 @@
-# klyntbot-core
+# common
 
 **Foundation types and error handling for klyntbot.**
 
 ## Overview
 
-`klyntbot-core` is the foundational layer of klyntbot's workspace architecture. It provides:
+`common` is the foundational layer of klyntbot's workspace architecture. It provides:
 - Unified error types used across all crates
 - Shared type definitions (channels, sessions, messages)
 - Pure utility functions (no I/O dependencies)
@@ -16,7 +16,7 @@ This crate has no internal dependencies (only depends on standard external crate
 ### Error Types
 
 ```rust
-use klyntbot_core::{KlyntbotError, Result};
+use common::{KlyntbotError, Result};
 
 // Top-level error enum with automatic conversions
 pub enum KlyntbotError {
@@ -44,7 +44,7 @@ pub type Result<T> = std::result::Result<T, KlyntbotError>;
 ### Shared Types
 
 ```rust
-use klyntbot_core::{ChannelName, ChatId, SessionKey, MessageRole};
+use common::{ChannelName, ChatId, SessionKey, MessageRole};
 
 // Channel identification
 pub enum ChannelName {
@@ -78,7 +78,7 @@ pub enum MessageRole {
 ### Utility Functions
 
 ```rust
-use klyntbot_core::utils::{truncate_output, expand_path, format_error};
+use common::utils::{truncate_output, expand_path, format_error};
 
 // Terminal formatting helpers
 pub fn format_error(msg: &str) -> String;
@@ -97,13 +97,13 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-klyntbot-core.workspace = true
+common.workspace = true
 ```
 
 Example:
 
 ```rust
-use klyntbot_core::{Result, KlyntbotError, ChannelName, ChatId};
+use common::{Result, KlyntbotError, ChannelName, ChatId};
 
 fn process_message(channel: ChannelName, chat_id: ChatId) -> Result<String> {
     if chat_id.0.is_empty() {
@@ -119,7 +119,7 @@ fn process_message(channel: ChannelName, chat_id: ChatId) -> Result<String> {
 All domain errors automatically convert to `KlyntbotError`:
 
 ```rust
-use klyntbot_core::{Result, ToolError, ProviderError};
+use common::{Result, ToolError, ProviderError};
 
 fn call_tool() -> Result<String> {
     Err(ToolError::ExecutionFailed("Tool crashed".into()).into())

@@ -1,10 +1,10 @@
-# klyntbot-bus
+# bus
 
 **Async message bus for channel ↔ agent communication.**
 
 ## Overview
 
-`klyntbot-bus` provides the message passing infrastructure for klyntbot:
+`bus` provides the message passing infrastructure for klyntbot:
 - Inbound messages from channels to agent
 - Outbound messages from agent to channels
 - Asynchronous MPSC queues with backpressure
@@ -15,8 +15,8 @@
 ### Message Types
 
 ```rust
-use klyntbot_bus::{InboundMessage, OutboundMessage};
-use klyntbot_core::{ChannelName, ChatId};
+use bus::{InboundMessage, OutboundMessage};
+use common::{ChannelName, ChatId};
 
 // Messages from channels TO agent
 pub struct InboundMessage {
@@ -40,7 +40,7 @@ pub struct OutboundMessage {
 ### Message Bus
 
 ```rust
-use klyntbot_bus::MessageBus;
+use bus::MessageBus;
 use tokio::sync::mpsc;
 
 // Create message bus
@@ -71,14 +71,14 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-klyntbot-bus.workspace = true
+bus.workspace = true
 ```
 
 Example:
 
 ```rust
-use klyntbot_bus::{MessageBus, InboundMessage, OutboundMessage};
-use klyntbot_core::{ChannelName, ChatId};
+use bus::{MessageBus, InboundMessage, OutboundMessage};
+use common::{ChannelName, ChatId};
 
 #[tokio::main]
 async fn main() {
@@ -163,7 +163,7 @@ Channels can send:
 
 ## Dependencies
 
-- `klyntbot-core` — Error types, shared types
+- `common` — Error types, shared types
 - `tokio` — Async runtime and MPSC channels
 - `serde`, `serde_json` — Serialization
 - `chrono` — Timestamps
@@ -171,4 +171,4 @@ Channels can send:
 ## See Also
 
 - [klyntbot Architecture](../../docs/ARCHITECTURE.md)
-- [Channel Development](../klyntbot-channels/README.md)
+- [Channel Development](../channels/README.md)

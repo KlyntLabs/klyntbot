@@ -1,10 +1,10 @@
-# klyntbot-agent
+# agent
 
 **Core agent orchestration and loop.**
 
 ## Overview
 
-`klyntbot-agent` is the brain of klyntbot:
+`agent` is the brain of klyntbot:
 - Agent loop (receive → think → act → respond)
 - Context building with memory and skills
 - Memory store (long-term + daily notes)
@@ -16,9 +16,9 @@
 ### Agent Loop
 
 ```rust
-use klyntbot_agent::AgentLoop;
-use klyntbot_config::Config;
-use klyntbot_bus::MessageBus;
+use agent::AgentLoop;
+use config::Config;
+use bus::MessageBus;
 
 // Create agent
 let config = Config::load()?;
@@ -65,7 +65,7 @@ agent.start(inbound_rx, outbound_tx).await?;
 ### Context Builder
 
 ```rust
-use klyntbot_agent::ContextBuilder;
+use agent::ContextBuilder;
 
 let context = ContextBuilder::new(workspace, config);
 
@@ -88,7 +88,7 @@ let messages = context.build_context(
 ### Memory Store
 
 ```rust
-use klyntbot_agent::MemoryStore;
+use agent::MemoryStore;
 
 let memory = MemoryStore::new(workspace);
 
@@ -118,7 +118,7 @@ workspace/
 ### Skill Manager
 
 ```rust
-use klyntbot_agent::SkillManager;
+use agent::SkillManager;
 
 let skills = SkillManager::new(workspace)?;
 
@@ -151,7 +151,7 @@ workspace/skills/
 ### Subagent Manager
 
 ```rust
-use klyntbot_agent::SubagentManager;
+use agent::SubagentManager;
 
 let subagent_mgr = SubagentManager::new(config.clone());
 
@@ -173,15 +173,15 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-klyntbot-agent.workspace = true
+agent.workspace = true
 ```
 
 Example:
 
 ```rust
-use klyntbot_agent::AgentLoop;
-use klyntbot_config::Config;
-use klyntbot_bus::MessageBus;
+use agent::AgentLoop;
+use config::Config;
+use bus::MessageBus;
 use std::path::PathBuf;
 
 #[tokio::main]
@@ -266,7 +266,7 @@ If agent exceeds limit, loop stops and returns error message.
 
 ## Handler Implementations
 
-`SubagentManager` implements `SpawnHandler` from `klyntbot-tools`:
+`SubagentManager` implements `SpawnHandler` from `tools`:
 
 ```rust
 impl SpawnHandler for SubagentManager {
@@ -277,7 +277,7 @@ impl SpawnHandler for SubagentManager {
 }
 ```
 
-`AgentLoop` implements `CronHandler` from `klyntbot-tools`:
+`AgentLoop` implements `CronHandler` from `tools`:
 
 ```rust
 impl CronHandler for AgentLoop {
@@ -297,13 +297,13 @@ impl CronHandler for AgentLoop {
 
 ## Dependencies
 
-- `klyntbot-core` — Error types, shared types
-- `klyntbot-bus` — Message bus integration
-- `klyntbot-config` — Configuration loading
-- `klyntbot-providers` — LLM calls
-- `klyntbot-session` — Session persistence
-- `klyntbot-tools` — Tool registry and execution
-- `klyntbot-cron` — Cron job management
+- `common` — Error types, shared types
+- `bus` — Message bus integration
+- `config` — Configuration loading
+- `providers` — LLM calls
+- `session` — Session persistence
+- `tools` — Tool registry and execution
+- `scheduling` — Cron job management
 - `tokio` — Async runtime
 - `serde_yaml` — Skill YAML parsing
 - `chrono` — Timestamps

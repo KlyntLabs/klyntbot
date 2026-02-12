@@ -1,10 +1,10 @@
-# klyntbot-session
+# session
 
 **Conversation session persistence and management.**
 
 ## Overview
 
-`klyntbot-session` manages conversation history:
+`session` manages conversation history:
 - Per-channel, per-user session storage
 - JSONL file format for persistence
 - In-memory LRU cache for active sessions
@@ -16,8 +16,8 @@
 ### Session Management
 
 ```rust
-use klyntbot_session::{SessionManager, SessionKey};
-use klyntbot_core::{ChannelName, ChatId};
+use session::{SessionManager, SessionKey};
+use common::{ChannelName, ChatId};
 
 // Create session manager
 let session_dir = PathBuf::from("~/.klyntbot/sessions");
@@ -99,14 +99,14 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-klyntbot-session.workspace = true
+session.workspace = true
 ```
 
 Example:
 
 ```rust
-use klyntbot_session::{SessionManager, SessionKey};
-use klyntbot_core::{ChannelName, ChatId, MessageRole};
+use session::{SessionManager, SessionKey};
+use common::{ChannelName, ChatId, MessageRole};
 use std::path::PathBuf;
 
 #[tokio::main]
@@ -187,7 +187,7 @@ cli_user_test.jsonl
 
 ## Dependencies
 
-- `klyntbot-core` — Error types, shared types
+- `common` — Error types, shared types
 - `serde`, `serde_json` — Serialization
 - `tokio` — Async file I/O
 - `chrono` — Timestamps
@@ -196,4 +196,4 @@ cli_user_test.jsonl
 ## See Also
 
 - [klyntbot Architecture](../../docs/ARCHITECTURE.md)
-- [Agent Loop](../klyntbot-agent/README.md)
+- [Agent Loop](../agent/README.md)

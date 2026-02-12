@@ -1,10 +1,10 @@
-# klyntbot-channels
+# channels
 
 **Channel trait and chat platform integrations.**
 
 ## Overview
 
-`klyntbot-channels` provides chat platform integrations for klyntbot:
+`channels` provides chat platform integrations for klyntbot:
 - `Channel` trait for platform implementations
 - 6 ready channels + 3 planned
 - Async WebSocket and HTTP transports
@@ -16,8 +16,8 @@
 ### Channel Trait
 
 ```rust
-use klyntbot_channels::Channel;
-use klyntbot_bus::{InboundMessage, OutboundMessage};
+use channels::Channel;
+use bus::{InboundMessage, OutboundMessage};
 use async_trait::async_trait;
 
 #[async_trait]
@@ -44,9 +44,9 @@ pub trait Channel: Send + Sync {
 ### Channel Manager
 
 ```rust
-use klyntbot_channels::{ChannelManager, start_channels};
-use klyntbot_config::Config;
-use klyntbot_bus::MessageBus;
+use channels::{ChannelManager, start_channels};
+use config::Config;
+use bus::MessageBus;
 
 // Start all enabled channels
 let config = Config::load()?;
@@ -64,18 +64,18 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-klyntbot-channels.workspace = true
+channels.workspace = true
 
 # Optional: email channel
-klyntbot-channels = { workspace = true, features = ["email"] }
+channels = { workspace = true, features = ["email"] }
 ```
 
 Example:
 
 ```rust
-use klyntbot_channels::telegram::TelegramChannel;
-use klyntbot_config::Config;
-use klyntbot_bus::MessageBus;
+use channels::telegram::TelegramChannel;
+use config::Config;
+use bus::MessageBus;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -278,7 +278,7 @@ email = ["dep:async-imap", "dep:lettre", "dep:mail-parser", "dep:native-tls", "d
 
 Build without email:
 ```bash
-cargo build --no-default-features -p klyntbot-channels
+cargo build --no-default-features -p channels
 ```
 
 ## Design Principles
@@ -291,10 +291,10 @@ cargo build --no-default-features -p klyntbot-channels
 
 ## Dependencies
 
-- `klyntbot-core` — Error types, shared types
-- `klyntbot-bus` — Message bus integration
-- `klyntbot-config` — Configuration loading
-- `klyntbot-providers` — Transcription (Telegram voice)
+- `common` — Error types, shared types
+- `bus` — Message bus integration
+- `config` — Configuration loading
+- `providers` — Transcription (Telegram voice)
 - `async-trait` — Async trait support
 - `tokio`, `tokio-tungstenite` — Async runtime and WebSocket
 - `reqwest` — HTTP client

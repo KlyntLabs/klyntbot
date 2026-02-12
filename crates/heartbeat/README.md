@@ -1,10 +1,10 @@
-# klyntbot-heartbeat
+# heartbeat
 
 **Periodic agent wake-up service.**
 
 ## Overview
 
-`klyntbot-heartbeat` provides scheduled agent wake-ups for proactive tasks:
+`heartbeat` provides scheduled agent wake-ups for proactive tasks:
 - Configurable interval (default: 1 hour)
 - Reads `HEARTBEAT.md` for actionable tasks
 - Sends wake-up messages to agent
@@ -15,7 +15,7 @@
 ### Heartbeat Service
 
 ```rust
-use klyntbot_heartbeat::HeartbeatService;
+use heartbeat::HeartbeatService;
 use std::time::Duration;
 
 // Create heartbeat service
@@ -58,14 +58,14 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-klyntbot-heartbeat.workspace = true
+heartbeat.workspace = true
 ```
 
 Example:
 
 ```rust
-use klyntbot_heartbeat::HeartbeatService;
-use klyntbot_bus::MessageBus;
+use heartbeat::HeartbeatService;
+use bus::MessageBus;
 use std::time::Duration;
 use std::path::PathBuf;
 
@@ -205,12 +205,12 @@ If not configured, heartbeat defaults to 1 hour.
 
 ## Dependencies
 
-- `klyntbot-core` — Error types
+- `common` — Error types
 - `tokio` — Async runtime and timers
 - `tracing` — Logging
 
 ## See Also
 
 - [klyntbot Architecture](../../docs/ARCHITECTURE.md)
-- [Cron Service](../klyntbot-cron/README.md)
-- [Agent Loop](../klyntbot-agent/README.md)
+- [Cron Service](../scheduling/README.md)
+- [Agent Loop](../agent/README.md)

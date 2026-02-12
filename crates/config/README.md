@@ -1,10 +1,10 @@
-# klyntbot-config
+# config
 
 **Configuration schema and file I/O for klyntbot.**
 
 ## Overview
 
-`klyntbot-config` handles all configuration management for klyntbot:
+`config` handles all configuration management for klyntbot:
 - Configuration schema definition
 - JSON file loading and saving
 - Environment variable overrides
@@ -15,7 +15,7 @@
 ### Configuration Schema
 
 ```rust
-use klyntbot_config::{Config, Secret};
+use config::{Config, Secret};
 
 // Top-level config structure
 pub struct Config {
@@ -42,7 +42,7 @@ pub struct Secret<T> {
 ### Loading Configuration
 
 ```rust
-use klyntbot_config::{load, load_with_env_overrides};
+use config::{load, load_with_env_overrides};
 
 // Load from default location (~/.klyntbot/config.json)
 let config = load()?;
@@ -62,7 +62,7 @@ export ANTHROPIC_API_KEY="sk-ant-..."  # Direct provider key
 ### Saving Configuration
 
 ```rust
-use klyntbot_config::save;
+use config::save;
 
 let mut config = Config::default();
 config.agents.defaults.model = "claude-sonnet-4-5".into();
@@ -73,7 +73,7 @@ save(&config)?;  // Saves to ~/.klyntbot/config.json
 ### Path Utilities
 
 ```rust
-use klyntbot_config::{config_dir, config_path};
+use config::{config_dir, config_path};
 
 // Get config directory path
 let dir = config_dir();  // ~/.klyntbot/
@@ -85,7 +85,7 @@ let path = config_path();  // ~/.klyntbot/config.json
 ### Secret Masking
 
 ```rust
-use klyntbot_config::Secret;
+use config::Secret;
 use serde_json::to_string;
 
 let api_key = Secret::new("sk-ant-secret123".to_string());
@@ -103,13 +103,13 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-klyntbot-config.workspace = true
+config.workspace = true
 ```
 
 Example:
 
 ```rust
-use klyntbot_config::{load, Config};
+use config::{load, Config};
 
 fn main() -> Result<()> {
     let config = load()?;
@@ -177,7 +177,7 @@ The loader checks paths in order:
 
 ## Dependencies
 
-- `klyntbot-core` — Error types
+- `common` — Error types
 - `serde`, `serde_json` — Serialization
 - `dirs` — Home directory resolution
 - `shellexpand` — Tilde expansion in paths
