@@ -24,10 +24,10 @@ Klyntbot is a Rust AI agent framework — a single binary that connects to 6+ ch
 ### Workspace layout (11 crates in 8 dependency layers)
 
 ```
-Layer 0: common        — Error types (KlyntbotError with 7 variants), MessageRole, ChannelName, ChatId, SessionKey
+Layer 0: common        — Error types (KlyntbotError with 10 variants), MessageRole, ChannelName, ChatId, SessionKey
 Layer 1: config, bus   — Config schema (camelCase JSON serde), async message bus (tokio::mpsc)
 Layer 2: providers, session, scheduling — LLM HTTP client, JSONL session persistence, cron service
-Layer 3: tools         — Tool trait + 9 implementations (file I/O, shell, web, message, spawn, cron)
+Layer 3: tools         — Tool trait + 10 implementations (file I/O ×4, shell, web ×2, message, spawn, cron)
 Layer 4: channels, heartbeat — Chat platform integrations (Telegram, Discord, WhatsApp, Slack, Email, QQ)
 Layer 5: agent         — Agent loop, context builder, memory store, skill manager, subagent manager
 Layer 6: cli           — Clap-derived CLI, REPL, command handlers
@@ -48,9 +48,9 @@ Dependencies flow strictly upward. No circular dependencies — enforced by Carg
 
 | Trait | Defined in | Purpose |
 |-------|-----------|---------|
-| `Tool` | `tools` | `fn name()`, `fn parameters() -> Value`, `async fn execute()` |
-| `LlmProvider` | `providers` | `async fn complete()` |
-| `Channel` | `channels` | `async fn start()`, `fn name()` |
+| `Tool` | `tools` | `fn name()`, `fn description()`, `fn parameters() -> Value`, `async fn execute()` |
+| `LlmProvider` | `providers` | `async fn chat()`, `async fn chat_stream()`, `fn name()`, `fn default_model()` |
+| `Channel` | `channels` | `async fn start()`, `async fn stop()`, `async fn send()`, `fn name()`, `fn is_allowed()` |
 | `SpawnHandler` | `tools` | Dependency inversion for subagent spawning |
 | `CronHandler` | `tools` | Dependency inversion for cron job management |
 
@@ -61,3 +61,31 @@ Dependencies flow strictly upward. No circular dependencies — enforced by Carg
 - Tests: Unit tests as `#[cfg(test)] mod tests` inline in each crate. Integration tests in `tests/` use the facade crate. Shared mock provider in `tests/mock_provider.rs`.
 - Commits: Conventional format — `feat(providers): add streaming`, `fix(channels): handle rate limits`.
 - Zero clippy warnings policy.
+
+## CLI Subcommands
+
+```bash
+klyntbot chat "message"          # One-shot chat (or omit message for REPL)
+klyntbot chat --session my-sess  # Resume a named session
+klyntbot serve --port 8080       # Start HTTP server (default port from config)
+klyntbot init                    # Interactive setup wizard
+klyntbot status [--verbose]      # Show agent/config status
+klyntbot channels list|start|stop
+klyntbot cron list|add|remove
+klyntbot config validate|show|set
+klyntbot skills list|info
+```
+
+## Environment Variables
+
+Config can be overridden via `KLYNTBOT_` prefix with `__` as nesting separator:
+
+```bash
+KLYNTBOT_AGENTS__DEFAULTS__MODEL=gpt-4o
+KLYNTBOT_PROVIDERS__ANTHROPIC__API_KEY=sk-...
+KLYNTBOT_TOOLS__RESTRICT_TO_WORKSPACE=true
+```
+
+## Skills
+
+Built-in skills live in `skills/` as `SKILL.md` files (summarize, skill-creator, github, tmux, weather, cron). The `SkillManager` in the agent crate discovers and loads them at runtime.
