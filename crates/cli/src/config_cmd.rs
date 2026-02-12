@@ -126,7 +126,8 @@ pub fn get_config_value<'a>(json: &'a serde_json::Value, key: &str) -> Option<&'
     Some(current)
 }
 
-/// Set a config value by dot-notation path
+/// Set a config value by dot-notation path.
+/// Creates intermediate objects if they don't exist (needed for minimal config files).
 pub fn set_config_value(
     json: &mut serde_json::Value,
     key: &str,
@@ -138,12 +139,16 @@ pub fn set_config_value(
         return Ok(false);
     }
 
-    // Navigate to the parent object
+    // Navigate to the parent object, creating intermediate objects as needed
     let mut current = json;
     for part in &parts[..parts.len() - 1] {
-        current = current
-            .get_mut(part)
-            .ok_or_else(|| anyhow::anyhow!("Key path '{}' not found", part))?;
+        if current.get(part).is_none() {
+            current
+                .as_object_mut()
+                .ok_or_else(|| anyhow::anyhow!("Cannot navigate into non-object at '{}'", part))?
+                .insert(part.to_string(), serde_json::Value::Object(Default::default()));
+        }
+        current = current.get_mut(part).unwrap();
     }
 
     // Set the final value
@@ -153,5 +158,63 @@ pub fn set_config_value(
         Ok(true)
     } else {
         Err(anyhow::anyhow!("Cannot set value on non-object"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_config_value_simple() {
+        let json = serde_json::json!({"a": {"b": 42}});
+        assert_eq!(get_config_value(&json, "a.b"), Some(&serde_json::json!(42)));
+    }
+
+    #[test]
+    fn test_get_config_value_missing() {
+        let json = serde_json::json!({"a": 1});
+        assert_eq!(get_config_value(&json, "a.b.c"), None);
+    }
+
+    #[test]
+    fn test_set_config_value_existing_path() {
+        let mut json = serde_json::json!({"a": {"b": 1}});
+        let result = set_config_value(&mut json, "a.b", serde_json::json!(99)).unwrap();
+        assert!(result);
+        assert_eq!(json["a"]["b"], 99);
+    }
+
+    #[test]
+    fn test_set_config_value_creates_intermediate_objects() {
+        // Minimal config file — no channels key at all
+        let mut json = serde_json::json!({
+            "agents": {"defaults": {"model": "openai/gpt-4"}}
+        });
+
+        let result = set_config_value(
+            &mut json,
+            "channels.telegram.enabled",
+            serde_json::json!(true),
+        )
+        .unwrap();
+
+        assert!(result);
+        assert_eq!(json["channels"]["telegram"]["enabled"], true);
+    }
+
+    #[test]
+    fn test_set_config_value_deeply_nested_creation() {
+        let mut json = serde_json::json!({});
+
+        let result = set_config_value(
+            &mut json,
+            "a.b.c.d",
+            serde_json::json!("deep"),
+        )
+        .unwrap();
+
+        assert!(result);
+        assert_eq!(json["a"]["b"]["c"]["d"], "deep");
     }
 }

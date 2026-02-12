@@ -3,6 +3,8 @@
 use std::fs;
 use std::path::PathBuf;
 
+use serde_json::Value;
+
 use super::schema::{Config, Secret};
 use common::{ConfigError, Result};
 
@@ -37,7 +39,7 @@ pub fn load() -> Result<Config> {
     Ok(Config::default())
 }
 
-/// Save configuration to file
+/// Save configuration to file, writing only fields that differ from defaults.
 pub fn save(config: &Config) -> Result<()> {
     let path = config_path()?;
 
@@ -46,11 +48,45 @@ pub fn save(config: &Config) -> Result<()> {
         fs::create_dir_all(parent).map_err(ConfigError::Io)?;
     }
 
-    let content = serde_json::to_string_pretty(config).map_err(ConfigError::Json)?;
+    let full = serde_json::to_value(config).map_err(ConfigError::Json)?;
+    let default = serde_json::to_value(Config::default()).map_err(ConfigError::Json)?;
+    let minimal = diff_json(&full, &default);
+
+    let content = serde_json::to_string_pretty(&minimal).map_err(ConfigError::Json)?;
 
     fs::write(&path, content).map_err(ConfigError::Io)?;
 
     Ok(())
+}
+
+/// Recursively diff two JSON values, returning only fields that differ from the default.
+fn diff_json(actual: &Value, default: &Value) -> Value {
+    match (actual, default) {
+        (Value::Object(actual_map), Value::Object(default_map)) => {
+            let mut result = serde_json::Map::new();
+            for (key, val) in actual_map {
+                match default_map.get(key) {
+                    Some(default_val) if val == default_val => {} // skip unchanged
+                    Some(default_val) => {
+                        let diff = diff_json(val, default_val);
+                        if !is_empty_object(&diff) {
+                            result.insert(key.clone(), diff);
+                        }
+                    }
+                    None => {
+                        // Key not in defaults — keep it
+                        result.insert(key.clone(), val.clone());
+                    }
+                }
+            }
+            Value::Object(result)
+        }
+        _ => actual.clone(), // Leaf values that differ (caller already checked inequality)
+    }
+}
+
+fn is_empty_object(v: &Value) -> bool {
+    matches!(v, Value::Object(m) if m.is_empty())
 }
 
 /// Load configuration from environment variables
@@ -521,5 +557,116 @@ mod tests {
         assert!(json.contains("\"apiKey\""));
         assert!(!json.contains("max_tokens")); // Should not have snake_case
         assert!(!json.contains("api_key")); // Should not have snake_case
+    }
+
+    #[test]
+    fn test_save_minimal_default_config() {
+        // Config::default() should diff to an empty object
+        let config = Config::default();
+        let full = serde_json::to_value(&config).unwrap();
+        let default = serde_json::to_value(Config::default()).unwrap();
+        let minimal = diff_json(&full, &default);
+
+        assert_eq!(minimal, serde_json::json!({}));
+    }
+
+    #[test]
+    fn test_save_minimal_with_provider() {
+        // Only the configured provider and changed model should appear
+        let mut config = Config::default();
+        config.agents.defaults.model = "openai/gpt-4".to_string();
+        config.providers.openai.api_key = Secret::new("sk-test-123".to_string());
+
+        let full = serde_json::to_value(&config).unwrap();
+        let default = serde_json::to_value(Config::default()).unwrap();
+        let minimal = diff_json(&full, &default);
+
+        let obj = minimal.as_object().unwrap();
+
+        // Only agents and providers should be present
+        assert_eq!(obj.len(), 2);
+        assert!(obj.contains_key("agents"));
+        assert!(obj.contains_key("providers"));
+
+        // Only openai should be under providers
+        let providers = obj["providers"].as_object().unwrap();
+        assert_eq!(providers.len(), 1);
+        assert!(providers.contains_key("openai"));
+
+        // No other channels, providers, tools, or gateway
+        assert!(!obj.contains_key("channels"));
+        assert!(!obj.contains_key("tools"));
+        assert!(!obj.contains_key("gateway"));
+    }
+
+    #[test]
+    fn test_save_minimal_round_trip() {
+        // Save minimal, load back, verify all defaults restored
+        let mut config = Config::default();
+        config.agents.defaults.model = "openai/gpt-4".to_string();
+        config.providers.openai.api_key = Secret::new("sk-test-key".to_string());
+        config.channels.telegram.enabled = true;
+        config.channels.telegram.token = Secret::new("bot-token".to_string());
+
+        let full = serde_json::to_value(&config).unwrap();
+        let default = serde_json::to_value(Config::default()).unwrap();
+        let minimal = diff_json(&full, &default);
+
+        // Serialize to string and parse back
+        let json_str = serde_json::to_string_pretty(&minimal).unwrap();
+        let loaded: Config = serde_json::from_str(&json_str).unwrap();
+
+        // Non-default values preserved
+        assert_eq!(loaded.agents.defaults.model, "openai/gpt-4");
+        assert_eq!(loaded.providers.openai.api_key.expose(), "sk-test-key");
+        assert!(loaded.channels.telegram.enabled);
+        assert_eq!(loaded.channels.telegram.token.expose(), "bot-token");
+
+        // Defaults restored for omitted fields
+        assert_eq!(loaded.agents.defaults.max_tokens, 8192);
+        assert_eq!(loaded.agents.defaults.temperature, 0.7);
+        assert_eq!(loaded.providers.anthropic.api_key.expose(), "");
+        assert!(!loaded.channels.discord.enabled);
+        assert_eq!(loaded.tools.exec.timeout, 60);
+        assert_eq!(loaded.gateway.port, 18790);
+    }
+
+    #[test]
+    fn test_diff_json_preserves_non_defaults() {
+        let default = serde_json::json!({
+            "a": 1,
+            "b": { "c": 2, "d": 3 },
+            "e": "hello"
+        });
+        let actual = serde_json::json!({
+            "a": 1,
+            "b": { "c": 99, "d": 3 },
+            "e": "hello",
+            "f": "new"
+        });
+
+        let diff = diff_json(&actual, &default);
+
+        // "a" and "e" are unchanged — should be omitted
+        assert!(diff.get("a").is_none());
+        assert!(diff.get("e").is_none());
+
+        // "b.c" changed — should be present
+        assert_eq!(diff["b"]["c"], 99);
+        // "b.d" unchanged — should be omitted from b
+        assert!(diff["b"].get("d").is_none());
+
+        // "f" is new — should be present
+        assert_eq!(diff["f"], "new");
+    }
+
+    #[test]
+    fn test_diff_json_empty_objects_pruned() {
+        // When all children match defaults, the parent object should be pruned
+        let default = serde_json::json!({"a": {"b": 1, "c": 2}});
+        let actual = serde_json::json!({"a": {"b": 1, "c": 2}});
+
+        let diff = diff_json(&actual, &default);
+        assert_eq!(diff, serde_json::json!({}));
     }
 }
