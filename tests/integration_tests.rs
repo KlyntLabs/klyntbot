@@ -392,7 +392,7 @@ async fn test_skills_availability() {
     let skill_file = available_skill_dir.join("SKILL.md");
     let skill_content = r#"---
 description: An available test skill
-metadata: '{"nanobot":{"triggers":["test"]}}'
+metadata: '{"klyntbot":{"triggers":["test"]}}'
 ---
 
 # Available Test Skill
@@ -405,7 +405,7 @@ metadata: '{"nanobot":{"triggers":["test"]}}'
     let unavailable_file = unavailable_skill_dir.join("SKILL.md");
     let unavailable_content = r#"---
 description: An unavailable test skill
-metadata: '{"nanobot":{"requires":{"bins":["nonexistent_binary_xyz_12345"]}}}'
+metadata: '{"klyntbot":{"requires":{"bins":["nonexistent_binary_xyz_12345"]}}}'
 ---
 
 # Unavailable Test Skill
@@ -435,14 +435,14 @@ metadata: '{"nanobot":{"requires":{"bins":["nonexistent_binary_xyz_12345"]}}}'
     );
 }
 
-/// Test backward compatibility - old nanobot config still deserializes
+/// Test backward compatibility - minimal config still deserializes
 #[test]
-fn test_backward_compat_nanobot_config() {
+fn test_backward_compat_minimal_config() {
     use klyntbot::config::Config;
 
-    // Simulate an old nanobot config.json with only original fields
+    // Simulate a minimal config.json with only basic fields
     let old_config_json = r#"{
-        "workspacePath": "~/nanobot",
+        "workspacePath": "~/.klyntbot/workspace",
         "agents": {
             "defaults": {
                 "model": "anthropic/claude-opus-4-5",

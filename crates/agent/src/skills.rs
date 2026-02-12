@@ -170,20 +170,20 @@ impl SkillManager {
             .unwrap_or("1.0")
             .to_string();
 
-        // Parse nanobot metadata if present
-        let nanobot_meta = metadata
+        // Parse klyntbot metadata if present
+        let skill_meta = metadata
             .get("metadata")
             .and_then(|v| v.as_str())
             .and_then(|s| serde_json::from_str::<serde_json::Value>(s).ok())
-            .and_then(|v| v.get("nanobot").cloned());
+            .and_then(|v| v.get("klyntbot").cloned());
 
-        let always = nanobot_meta
+        let always = skill_meta
             .as_ref()
             .and_then(|m| m.get("always"))
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 
-        let triggers: Vec<String> = nanobot_meta
+        let triggers: Vec<String> = skill_meta
             .as_ref()
             .and_then(|m| m.get("triggers"))
             .and_then(|v| v.as_array())
@@ -195,7 +195,7 @@ impl SkillManager {
             })
             .unwrap_or_default();
 
-        let requires_bins: Vec<String> = nanobot_meta
+        let requires_bins: Vec<String> = skill_meta
             .as_ref()
             .and_then(|m| m.get("requires"))
             .and_then(|r| r.get("bins"))
@@ -208,7 +208,7 @@ impl SkillManager {
             })
             .unwrap_or_default();
 
-        let requires_env: Vec<String> = nanobot_meta
+        let requires_env: Vec<String> = skill_meta
             .as_ref()
             .and_then(|m| m.get("requires"))
             .and_then(|r| r.get("env"))

@@ -233,7 +233,7 @@ async fn main() -> Result<()> {
 ```markdown
 ---
 description: "Your skill description"
-metadata: '{"nanobot": {"requires": {"bins": ["tool"]}, "always": false}}'
+metadata: '{"klyntbot": {"requires": {"bins": ["tool"]}, "always": false}}'
 ---
 
 # Skill Name

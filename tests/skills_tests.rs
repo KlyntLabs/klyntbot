@@ -39,7 +39,7 @@ async fn test_workspace_skills_override() {
     let skill_content = r#"---
 description: A custom test skill
 version: "1.0"
-metadata: '{"nanobot":{"always":false,"triggers":["test"],"requires":{"bins":["bash"],"env":[]}}}'
+metadata: '{"klyntbot":{"always":false,"triggers":["test"],"requires":{"bins":["bash"],"env":[]}}}'
 ---
 
 # Custom Test Skill
@@ -76,7 +76,7 @@ async fn test_skill_metadata_parsing() {
     let skill_content = r#"---
 description: Test metadata parsing
 version: "2.0"
-metadata: '{"nanobot":{"always":true,"triggers":["meta","test"],"requires":{"bins":["bash","curl"],"env":["TEST_VAR"]}}}'
+metadata: '{"klyntbot":{"always":true,"triggers":["meta","test"],"requires":{"bins":["bash","curl"],"env":["TEST_VAR"]}}}'
 ---
 
 # Metadata Test Skill
@@ -144,7 +144,7 @@ async fn test_skill_requirement_checking() {
     let skill_file = req_skill_dir.join("SKILL.md");
     let skill_content = r#"---
 description: Testing requirement checking
-metadata: '{"nanobot":{"requires":{"bins":["bash","this_binary_definitely_does_not_exist_xyz123"]}}}'
+metadata: '{"klyntbot":{"requires":{"bins":["bash","this_binary_definitely_does_not_exist_xyz123"]}}}'
 ---
 
 # Requirements Test
@@ -183,7 +183,7 @@ async fn test_skill_always_loaded() {
         &always_file,
         r#"---
 description: Always loaded skill
-metadata: '{"nanobot":{"always":true}}'
+metadata: '{"klyntbot":{"always":true}}'
 ---
 
 # Always Loaded
@@ -231,7 +231,7 @@ async fn test_skill_summary_generation() {
     let skill_file = test_skill_dir.join("SKILL.md");
     let skill_content = r#"---
 description: Test summary generation
-metadata: '{"nanobot":{"triggers":["summary"]}}'
+metadata: '{"klyntbot":{"triggers":["summary"]}}'
 ---
 
 # Summary Test
@@ -359,7 +359,7 @@ async fn test_skill_triggers() {
     let skill_file = trigger_skill_dir.join("SKILL.md");
     let skill_content = r#"---
 description: Trigger test skill
-metadata: '{"nanobot":{"triggers":["weather","forecast","temperature"]}}'
+metadata: '{"klyntbot":{"triggers":["weather","forecast","temperature"]}}'
 ---
 
 # Trigger Test

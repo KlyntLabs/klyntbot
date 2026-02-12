@@ -3,7 +3,7 @@
 
   <h1>klyntbot</h1>
 
-  <p><strong>A high-performance AI agent framework, rewritten in Rust.</strong></p>
+  <p><strong>A high-performance AI agent framework, built with Rust.</strong></p>
 
   <p>
     <a href="https://github.com/KlyntLabs/klyntbot/releases"><img src="https://img.shields.io/github/v/release/KlyntLabs/klyntbot?style=flat-square&color=blue" alt="Release"></a>
@@ -18,8 +18,7 @@
     <a href="#features">Features</a> &middot;
     <a href="#benchmarks">Benchmarks</a> &middot;
     <a href="#channels">Channels</a> &middot;
-    <a href="#architecture">Architecture</a> &middot;
-    <a href="#migration-from-nanobot">Migration</a>
+    <a href="#architecture">Architecture</a>
   </p>
 </div>
 
@@ -27,32 +26,32 @@
 
 ## Why klyntbot
 
-[nanobot](https://github.com/HKUDS/nanobot) proved that a full-featured AI agent can be built in under 4,000 lines of Python. klyntbot takes that same architecture and rewrites it ground-up in Rust to solve the problems that Python cannot:
+A full-featured AI agent framework that connects to 6+ chat platforms, executes tools, manages persistent memory, and schedules tasks — all from a single binary.
 
-- **Python's import chain** adds 180ms+ before a single line of your code runs. klyntbot starts in **5.8ms**.
-- **LiteLLM alone** consumes **155 MB** of RAM just to import. klyntbot's entire process idles at **8.7 MB**.
-- **pip install** pulls in 60+ packages totaling 194 MB. klyntbot is a **single 10 MB binary** with zero runtime dependencies.
-- **The GIL** limits Python to one thread of execution. klyntbot uses **tokio** for true multi-threaded async I/O.
+- **Multi-channel** — Telegram, Discord, WhatsApp, Slack, Email, QQ — all running simultaneously with independent conversation history.
+- **Tool-equipped** — 9 built-in tools: file I/O, shell execution, web search/fetch, message routing, background subagents, and cron scheduling.
+- **Memory-aware** — Long-term memory (`MEMORY.md`), daily notes, and extensible skills that persist across sessions and restarts.
+- **Fast and lightweight** — Starts in **5.8ms**, idles at **8.7 MB** RAM, ships as a **single 10 MB binary** with zero runtime dependencies.
+- **Async-native** — Built on Tokio for true multi-threaded async I/O. Channels, agent loop, cron, and heartbeat run as independent tasks.
 
-The result is the same agent -- same tools, same channels, same config format -- running with dramatically fewer resources. Deploy it on a $5 VPS, a Raspberry Pi, or a container with a 20 MB image.
+Deploy it on a $5 VPS, a Raspberry Pi, or a container with a 20 MB image.
 
 ---
 
 ## Benchmarks
 
-All measurements taken on Apple M-series, comparing klyntbot v0.1.0 (Rust) against nanobot v0.1.3 (Python 3.13):
+Measured on Apple M-series (klyntbot v0.1.0):
 
-| Metric | nanobot (Python) | klyntbot (Rust) | Delta |
-|--------|:---:|:---:|:---:|
-| **Startup time** | 186.5 ms | 5.8 ms | **32x faster** |
-| **Memory (CLI)** | 14.6 MB | 8.3 MB | **1.8x less** |
-| **Memory (full import)** | 155 MB | 8.7 MB | **17.8x less** |
-| **Install size** | 194 MB (site-packages) | 10 MB (single binary) | **19.4x smaller** |
-| **Runtime deps** | 60+ Python packages | 0 | **Zero-dep** |
-| **Test suite** | ~30 tests | 242 tests | **8x coverage** |
-| **Clippy warnings** | N/A | 0 | Clean |
+| Metric | Value |
+|--------|:-----:|
+| **Startup time** | 5.8 ms |
+| **Memory (idle)** | 8.7 MB |
+| **Binary size** | 10 MB |
+| **Runtime dependencies** | 0 |
+| **Test cases** | 330 |
+| **Clippy warnings** | 0 |
 
-> The memory difference comes from eliminating LiteLLM (155 MB on import). klyntbot replaces it with a ~400-line OpenAI-compatible HTTP client that handles all 12+ providers directly via `reqwest`.
+> klyntbot uses a ~400-line OpenAI-compatible HTTP client that handles all 12+ providers directly via `reqwest` — no external LLM routing library needed.
 
 ---
 
@@ -366,7 +365,7 @@ Run with any OpenAI-compatible server (vLLM, Ollama, LM Studio):
 |----------|-----------|
 | `tokio::mpsc` for message bus | Bounded channels with backpressure. Single consumer (agent loop) preserves message ordering. |
 | `reqwest` for LLM calls | Direct OpenAI-compatible HTTP. No LiteLLM overhead. All 12+ providers use the same `/v1/chat/completions` endpoint format. |
-| `serde` for config | Compile-time schema validation via derive macros. camelCase JSON serialization matches nanobot's config format exactly. |
+| `serde` for config | Compile-time schema validation via derive macros. camelCase JSON serialization for consistent config format. |
 | `thiserror` for errors | 7 error types (Tool, Provider, Channel, Session, Config, Cron, Klyntbot) with automatic `From` conversions. |
 | `Arc<dyn Trait>` for tools/providers | Runtime polymorphism with shared ownership across async tasks. `Send + Sync` bounds enforced at compile time. |
 | Feature-gated channels | Email deps (IMAP, SMTP, TLS) are optional. Minimal builds exclude unused channel code. |
@@ -408,7 +407,7 @@ export KLYNTBOT_TOOLS__RESTRICT_TO_WORKSPACE=true
 
 ## Configuration
 
-Config file: `~/.klyntbot/config.json` (also reads `~/.nanobot/config.json` as fallback for migration)
+Config file: `~/.klyntbot/config.json`
 
 <details>
 <summary><strong>Full config reference</strong></summary>
@@ -502,7 +501,7 @@ Add skills to `~/.klyntbot/workspace/skills/your-skill/SKILL.md`:
 ```markdown
 ---
 description: "Your skill description"
-metadata: '{"nanobot": {"requires": {"bins": ["your-tool"]}, "always": false}}'
+metadata: '{"klyntbot": {"requires": {"bins": ["your-tool"]}, "always": false}}'
 ---
 
 # Skill Name
@@ -544,45 +543,6 @@ For production deployments:
 ```
 
 Recommended: `chmod 600 ~/.klyntbot/config.json` to protect API keys.
-
----
-
-## Migration from nanobot
-
-klyntbot is designed as a drop-in replacement for nanobot. The config format, workspace layout, session format, and CLI commands are compatible.
-
-### Steps
-
-```bash
-# klyntbot reads nanobot's config as fallback
-# Existing ~/.nanobot/config.json works without changes
-
-# Or copy explicitly
-cp ~/.nanobot/config.json ~/.klyntbot/config.json
-
-# Sessions, memory, and skills carry over
-# Same workspace directory structure
-```
-
-### What stays the same
-
-- Config JSON format (camelCase field names, identical schema)
-- Session JSONL files (readable by both)
-- Workspace directory layout (AGENTS.md, SOUL.md, memory/, skills/)
-- Tool names and parameter schemas
-- Cron job format
-- Skill file format (YAML frontmatter + markdown)
-
-### What changes
-
-| Area | nanobot | klyntbot |
-|------|---------|----------|
-| Binary | `nanobot` | `klyntbot` |
-| Config path | `~/.nanobot/` | `~/.klyntbot/` (reads both) |
-| Install | `pip install nanobot-ai` | Single binary download |
-| LLM routing | LiteLLM library | Direct HTTP (same API format) |
-| Commands | `nanobot agent` / `nanobot gateway` | `klyntbot chat` / `klyntbot serve` |
-| Runtime | Python 3.11+ | None (statically linked) |
 
 ---
 
@@ -695,30 +655,28 @@ crates/
 
 **Documentation**:
 - [Architecture Guide](docs/ARCHITECTURE.md) — Detailed workspace architecture and dependency graph
-- [Build Optimization](docs/BUILD_OPTIMIZATION.md) — Performance analysis and build metrics
 - [Contributing Guide](CONTRIBUTING.md) — Development workflow and guidelines
 
 ---
 
 ## Background
 
-klyntbot exists because of a straightforward observation: AI agents spend 99% of their wall-clock time waiting for network I/O (LLM API calls, channel WebSockets, web fetches). Python's overhead -- import time, GIL contention, memory footprint -- adds nothing during that wait. A systems language eliminates that overhead entirely while preserving the same architecture.
+AI agents spend 99% of their wall-clock time waiting for network I/O — LLM API calls, channel WebSockets, web fetches. klyntbot is built around this observation: a systems language eliminates runtime overhead entirely while keeping the architecture clean and extensible.
 
-The rewrite preserves nanobot's core insight: a useful AI agent doesn't need 430,000 lines of code. It needs a message bus, a tool registry, a context builder, and clean abstractions for providers and channels. klyntbot implements all of this in 16,300 lines of Rust with 242 tests, zero Clippy warnings, and a 10 MB binary.
+A useful AI agent doesn't need hundreds of thousands of lines of code. It needs a message bus, a tool registry, a context builder, and clean abstractions for providers and channels. klyntbot implements all of this in ~16,700 lines of Rust with 330 tests, zero Clippy warnings, and a 10 MB binary.
 
 ### Design principles
 
-1. **Feature parity first** -- Every nanobot feature has a corresponding klyntbot implementation. No features were cut for the rewrite.
+1. **Minimal by design** -- Every feature earns its place. No bloat, no unnecessary abstractions.
 2. **Zero-friction deployment** -- Download one binary, run `klyntbot init`, start chatting. No runtime, no package manager, no virtual environments.
-3. **Config compatibility** -- klyntbot reads nanobot's `config.json` without changes. Migration is copying a binary.
-4. **Async-native** -- All I/O runs on tokio. Channels, agent loop, cron, and heartbeat operate as independent async tasks.
-5. **Trait-based extensibility** -- Adding a new provider, channel, or tool means implementing a trait. The registry pattern handles the rest.
+3. **Async-native** -- All I/O runs on Tokio. Channels, agent loop, cron, and heartbeat operate as independent async tasks.
+4. **Trait-based extensibility** -- Adding a new provider, channel, or tool means implementing a trait. The registry pattern handles the rest.
+5. **Safety-first** -- Command deny patterns, workspace sandboxing, output truncation, and access control at every layer.
 
 ---
 
 ## Acknowledgments
 
-- [nanobot](https://github.com/HKUDS/nanobot) by HKUDS -- the original Python implementation that proved an agent framework can be ultra-lightweight
 - [Anthropic](https://anthropic.com) -- Claude API
 - The Rust ecosystem -- `tokio`, `serde`, `reqwest`, `clap`, `thiserror`, and the many crates that make this possible
 

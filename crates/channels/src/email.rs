@@ -337,7 +337,7 @@ impl EmailChannel {
             subjects
                 .get(to)
                 .cloned()
-                .unwrap_or_else(|| "nanobot reply".to_string())
+                .unwrap_or_else(|| "klyntbot reply".to_string())
         };
 
         let subject = self.reply_subject(&base_subject);
@@ -398,7 +398,7 @@ impl EmailChannel {
     /// Generate reply subject with configured prefix
     fn reply_subject(&self, base_subject: &str) -> String {
         let subject = if base_subject.is_empty() {
-            "nanobot reply"
+            "klyntbot reply"
         } else {
             base_subject
         };

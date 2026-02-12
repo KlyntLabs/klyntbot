@@ -146,4 +146,3 @@ fn call_provider() -> Result<String> {
 ## See Also
 
 - [klyntbot Architecture](../../docs/ARCHITECTURE.md)
-- [Migration Guide](../../docs/MIGRATION.md)

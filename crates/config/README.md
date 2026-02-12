@@ -161,11 +161,9 @@ fn main() -> Result<()> {
 }
 ```
 
-### Fallback Paths
+### Config Path
 
-The loader checks paths in order:
-1. `~/.klyntbot/config.json`
-2. `~/.nanobot/config.json` (for migration compatibility)
+Default location: `~/.klyntbot/config.json`
 
 ## Design Principles
 
@@ -173,7 +171,6 @@ The loader checks paths in order:
 2. **Serde derive** — Automatic serialization with camelCase
 3. **Secret protection** — API keys never logged or displayed
 4. **Environment overrides** — Config can be overridden without file edits
-5. **Fallback compatibility** — Support nanobot config location
 
 ## Dependencies
 

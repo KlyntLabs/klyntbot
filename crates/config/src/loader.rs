@@ -33,50 +33,8 @@ pub fn load() -> Result<Config> {
         return Ok(config);
     }
 
-    // Fallback: try nanobot config
-    let nanobot_path = dirs::home_dir()
-        .ok_or_else(|| ConfigError::Invalid("Unable to determine home directory".to_string()))?
-        .join(".nanobot")
-        .join("config.json");
-
-    if nanobot_path.exists() {
-        eprintln!("Migrating config from ~/.nanobot/config.json to ~/.klyntbot/config.json");
-        let content = fs::read_to_string(&nanobot_path).map_err(ConfigError::Io)?;
-
-        // Parse and migrate
-        let mut data: serde_json::Value = serde_json::from_str(&content).map_err(|e| {
-            eprintln!("Failed to parse nanobot config, using defaults: {}", e);
-            ConfigError::Invalid(format!("Nanobot config parse error: {}", e))
-        })?;
-
-        // Migrate: tools.exec.restrictToWorkspace -> tools.restrictToWorkspace
-        migrate_config(&mut data);
-
-        let config: Config = serde_json::from_value(data)
-            .map_err(|e| ConfigError::Invalid(format!("Failed to migrate config: {}", e)))?;
-
-        // Save migrated config to klyntbot path
-        if let Err(e) = save(&config) {
-            eprintln!("Failed to save migrated config: {}", e);
-        }
-
-        return Ok(config);
-    }
-
-    // Neither exists
+    // Config not found, use defaults
     Ok(Config::default())
-}
-
-fn migrate_config(data: &mut serde_json::Value) {
-    if let Some(tools) = data.get_mut("tools").and_then(|v| v.as_object_mut()) {
-        if let Some(exec) = tools.get_mut("exec").and_then(|v| v.as_object_mut()) {
-            if let Some(rtw) = exec.remove("restrictToWorkspace") {
-                if !tools.contains_key("restrictToWorkspace") {
-                    tools.insert("restrictToWorkspace".to_string(), rtw);
-                }
-            }
-        }
-    }
 }
 
 /// Save configuration to file

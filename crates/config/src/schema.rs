@@ -261,7 +261,7 @@ fn default_discord_gateway_url() -> String {
 }
 
 fn default_discord_intents() -> u32 {
-    37377 // Same as Python nanobot
+    37377 // GUILD_MESSAGES | DIRECT_MESSAGES | MESSAGE_CONTENT
 }
 
 /// WhatsApp channel configuration
