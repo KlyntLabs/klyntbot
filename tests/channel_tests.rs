@@ -134,7 +134,7 @@ async fn test_outbound_dispatch_routing() {
 /// Test concurrent message handling
 #[tokio::test]
 async fn test_concurrent_message_handling() {
-    let mut bus = MessageBus::new(100);
+    let bus = MessageBus::new(100);
     let bus = Arc::new(bus);
 
     // Send multiple messages concurrently
@@ -156,7 +156,7 @@ async fn test_concurrent_message_handling() {
 
     // Get a new bus instance with receiver for consumption
     let mut bus_for_rx = MessageBus::new(100);
-    let mut inbound_rx = bus_for_rx.take_inbound_rx().unwrap();
+    let inbound_rx = bus_for_rx.take_inbound_rx().unwrap();
 
     // Move messages from original bus to new one
     // Note: This test has a design issue - we can't easily move messages between buses

@@ -1,90 +1,114 @@
-[package]
-name = "klyntbot"
+[workspace]
+resolver = "2"
+members = [
+    "crates/klyntbot-core",
+    "crates/klyntbot-config",
+    "crates/klyntbot-bus",
+    "crates/klyntbot-providers",
+    "crates/klyntbot-session",
+    "crates/klyntbot-cron",
+    "crates/klyntbot-tools",
+    "crates/klyntbot-channels",
+    "crates/klyntbot-heartbeat",
+    "crates/klyntbot-agent",
+    "crates/klyntbot-cli",
+]
+
+[workspace.package]
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.75"
+license = "MIT"
 
-[features]
-default = ["email"]
-email = ["dep:async-imap", "dep:lettre", "dep:mail-parser", "dep:native-tls", "dep:tokio-native-tls"]
+[workspace.dependencies]
+# Internal workspace crates
+klyntbot-core = { path = "crates/klyntbot-core" }
+klyntbot-config = { path = "crates/klyntbot-config" }
+klyntbot-bus = { path = "crates/klyntbot-bus" }
+klyntbot-providers = { path = "crates/klyntbot-providers" }
+klyntbot-session = { path = "crates/klyntbot-session" }
+klyntbot-cron = { path = "crates/klyntbot-cron" }
+klyntbot-tools = { path = "crates/klyntbot-tools" }
+klyntbot-channels = { path = "crates/klyntbot-channels" }
+klyntbot-heartbeat = { path = "crates/klyntbot-heartbeat" }
+klyntbot-agent = { path = "crates/klyntbot-agent" }
+klyntbot-cli = { path = "crates/klyntbot-cli" }
 
-[dependencies]
-# Async runtime
+# Shared external dependencies (version pinned at workspace level)
 tokio = { version = "1.49.0", features = ["rt-multi-thread", "macros", "time", "sync", "io-util", "net", "signal", "fs", "process"] }
 async-trait = "0.1.89"
-
-# CLI
-clap = { version = "4.5.57", features = ["derive"] }
-
-# Serialization
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.149"
-
-# HTTP client (for LLM providers)
 reqwest = { version = "0.13.2", features = ["json", "rustls", "multipart", "stream"] }
-
-# WebSocket
 tokio-tungstenite = { version = "0.28.0", features = ["rustls-tls-native-roots"] }
-
-# Logging
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
-
-# Error handling
 thiserror = "2.0.18"
 anyhow = "1.0.101"
-
-# Date/Time
 chrono = { version = "0.4.43", features = ["serde"] }
-
-# UUID
 uuid = { version = "1.20.0", features = ["v4", "serde"] }
-
-# Path manipulation
 dirs = "6.0.0"
-
-# Cron parsing
 cron = "0.15.0"
-
-# REPL/prompt
+clap = { version = "4.5.57", features = ["derive"] }
 rustyline = "17.0.2"
-
-# Base64 encoding
 base64 = "0.22.1"
-
-# Regex
 regex = "1.11.2"
-
-# Path expansion
 shellexpand = "3.1.0"
-
-# YAML parsing for skills
 serde_yaml = "0.9.34"
-
-# HTML parsing and extraction
 scraper = "0.22.0"
 html2text = "0.13.1"
-
-# URL parsing
 url = "2.5.4"
-
-# Binary lookup
 which = "7.0.0"
-
-# MIME type detection
 mime_guess = "2.0.5"
 urlencoding = "2.1"
 futures-util = "0.3.31"
+tempfile = "3.14"
 
-# Email dependencies (optional, enabled by default via "email" feature)
-async-imap = { version = "0.11.2", default-features = false, features = ["runtime-tokio"], optional = true }
-lettre = { version = "0.11.19", features = ["tokio1-native-tls"], optional = true }
-mail-parser = { version = "0.11.1", optional = true }
-native-tls = { version = "0.2.13", optional = true }
-tokio-native-tls = { version = "0.3", optional = true }
+# Optional email dependencies
+async-imap = { version = "0.11.2", default-features = false, features = ["runtime-tokio"] }
+lettre = { version = "0.11.19", features = ["tokio1-native-tls"] }
+mail-parser = "0.11.1"
+native-tls = "0.2.13"
+tokio-native-tls = "0.3"
+
+# Root klyntbot crate (facade + binary)
+[package]
+name = "klyntbot"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[features]
+default = ["email"]
+email = ["klyntbot-channels/email"]
+
+[dependencies]
+# Re-export all workspace crates
+klyntbot-core.workspace = true
+klyntbot-config.workspace = true
+klyntbot-bus.workspace = true
+klyntbot-providers.workspace = true
+klyntbot-session.workspace = true
+klyntbot-cron.workspace = true
+klyntbot-tools.workspace = true
+klyntbot-channels.workspace = true
+klyntbot-heartbeat.workspace = true
+klyntbot-agent.workspace = true
+klyntbot-cli.workspace = true
+
+# Binary-specific dependencies
+clap.workspace = true
+tokio.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
 
 [dev-dependencies]
-tempfile = "3.14"
+tempfile.workspace = true
+async-trait.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
 
 [profile.release]
 opt-level = 3

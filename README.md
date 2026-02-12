@@ -628,28 +628,33 @@ cargo fmt --check
 
 ### Project structure
 
+Klyntbot is organized as a Cargo workspace with 11 crates:
+
 ```
 klyntbot/
+  Cargo.toml                    # Workspace root
+  crates/
+    klyntbot-core/              # Foundation types and errors
+    klyntbot-config/            # Configuration schema and loader
+    klyntbot-bus/               # Async message bus
+    klyntbot-providers/         # LLM provider abstraction
+    klyntbot-session/           # Session persistence (JSONL + cache)
+    klyntbot-cron/              # Cron scheduling service
+    klyntbot-tools/             # Tool trait and implementations
+    klyntbot-channels/          # Chat platform integrations
+    klyntbot-heartbeat/         # Periodic wake-up service
+    klyntbot-agent/             # Agent loop and orchestration
+    klyntbot-cli/               # CLI commands and REPL
   src/
-    main.rs                     # Entry point, CLI dispatch
-    lib.rs                      # Library public API
-    error.rs                    # Unified error types (7 enums)
-    agent/                      # Agent loop, context, memory, skills, subagents
-    bus/                        # Async message bus (tokio::mpsc)
-    channels/                   # Chat platform integrations
-    cli/                        # CLI commands (clap derive)
-    config/                     # Config schema + loader
-    cron/                       # Scheduled job service
-    heartbeat/                  # Periodic wake-up service
-    providers/                  # LLM provider abstraction + registry
-    session/                    # Session persistence (JSONL + LRU cache)
-    tools/                      # Tool implementations
-    utils/                      # Path helpers, terminal formatting
+    lib.rs                      # Re-export facade (backward compatibility)
+    main.rs                     # Binary entry point
   workspace/                    # Default workspace templates
   skills/                       # Built-in skill definitions
   tests/                        # Integration tests
-  docs/                         # Architecture, PRD, design docs
+  docs/                         # Architecture and design docs
 ```
+
+See [Architecture Documentation](docs/ARCHITECTURE.md) for detailed crate descriptions and dependency graph.
 
 ### Code metrics
 
@@ -663,6 +668,35 @@ klyntbot/
 | Tools | 10 |
 | Providers | 12 |
 | Channels | 9 (6 ready, 3 planned) |
+
+---
+
+## Documentation
+
+### Architecture & Development
+
+- **[Architecture Guide](docs/ARCHITECTURE.md)** — Workspace structure, crate dependencies, design patterns, and extension points
+- **[Migration Guide](docs/MIGRATION.md)** — Migrating from monolith to workspace, import changes, and common issues
+- **[Contributing Guide](CONTRIBUTING.md)** — Development workflow, testing strategy, and contribution guidelines
+- **[Usage Examples](docs/EXAMPLES.md)** — Practical examples for workspace development, adding tools/providers/channels
+
+### Crate Documentation
+
+Each crate has detailed documentation in its README:
+
+| Crate | Purpose |
+|-------|---------|
+| [klyntbot-core](crates/klyntbot-core/README.md) | Foundation types and error handling |
+| [klyntbot-config](crates/klyntbot-config/README.md) | Configuration schema and file I/O |
+| [klyntbot-bus](crates/klyntbot-bus/README.md) | Async message bus for channel ↔ agent communication |
+| [klyntbot-providers](crates/klyntbot-providers/README.md) | LLM provider abstraction and implementations |
+| [klyntbot-session](crates/klyntbot-session/README.md) | Conversation session persistence |
+| [klyntbot-cron](crates/klyntbot-cron/README.md) | Cron job scheduling service |
+| [klyntbot-tools](crates/klyntbot-tools/README.md) | Tool trait and all tool implementations |
+| [klyntbot-channels](crates/klyntbot-channels/README.md) | Channel trait and chat platform integrations |
+| [klyntbot-heartbeat](crates/klyntbot-heartbeat/README.md) | Periodic agent wake-up service |
+| [klyntbot-agent](crates/klyntbot-agent/README.md) | Agent loop, memory, skills, and subagents |
+| [klyntbot-cli](crates/klyntbot-cli/README.md) | Command-line interface and REPL |
 
 ---
 

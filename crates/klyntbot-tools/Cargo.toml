@@ -1,0 +1,26 @@
+[package]
+name = "klyntbot-tools"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+klyntbot-core.workspace = true
+klyntbot-bus.workspace = true
+klyntbot-cron.workspace = true
+async-trait.workspace = true
+serde_json = { workspace = true }
+tokio = { workspace = true }
+reqwest = { workspace = true }
+tracing.workspace = true
+regex.workspace = true
+shellexpand.workspace = true
+scraper.workspace = true
+html2text.workspace = true
+url.workspace = true
+urlencoding.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+tokio = { workspace = true, features = ["macros", "test-util"] }

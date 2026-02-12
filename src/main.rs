@@ -1,16 +1,16 @@
 use clap::Parser;
 
-use klyntbot::cli::{Cli, Commands};
+use klyntbot_cli::{Cli, Commands};
 
 // Import CLI handlers
 mod cli_handlers {
-    pub use klyntbot::cli::chat::handle_chat;
-    pub use klyntbot::cli::serve::handle_serve;
-    pub use klyntbot::cli::status::{handle_brief_status, handle_status};
-    pub use klyntbot::cli::channels::handle_channels;
-    pub use klyntbot::cli::cron::handle_cron;
-    pub use klyntbot::cli::config_cmd::handle_config;
-    pub use klyntbot::cli::skills::handle_skills;
+    pub use klyntbot_cli::chat::handle_chat;
+    pub use klyntbot_cli::serve::handle_serve;
+    pub use klyntbot_cli::status::{handle_brief_status, handle_status};
+    pub use klyntbot_cli::channels::handle_channels;
+    pub use klyntbot_cli::cron::handle_cron;
+    pub use klyntbot_cli::config_cmd::handle_config;
+    pub use klyntbot_cli::skills::handle_skills;
 }
 
 #[tokio::main]
@@ -54,7 +54,7 @@ async fn main() {
     };
 
     if let Err(e) = result {
-        use klyntbot::utils::terminal::display_error;
+        use klyntbot_core::utils::terminal::display_error;
 
         // Display structured error
         let error_msg = display_error(
@@ -86,7 +86,7 @@ fn init_tracing(level: &str) {
 
 /// Handle init command
 async fn handle_init() -> anyhow::Result<()> {
-    use klyntbot::cli::run_wizard;
+    use klyntbot_cli::run_wizard;
 
     // Run the interactive wizard
     run_wizard().await?;
