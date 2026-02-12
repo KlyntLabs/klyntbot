@@ -186,7 +186,7 @@ impl AgentLoop {
     /// Process a single inbound message
     async fn process_message(&self, msg: InboundMessage) -> Result<()> {
         // Handle system messages (subagent results)
-        if msg.channel == "system" {
+        if msg.channel.as_str() == "system" {
             return self.process_system_message(msg).await;
         }
 
@@ -204,7 +204,7 @@ impl AgentLoop {
         // Get or create session
         let session_key = msg.session_key();
         let mut session_manager = self.session_manager.write().await;
-        let session = session_manager.get_or_create(&session_key)?;
+        let session = session_manager.get_or_create(session_key.as_str())?;
 
         // Add user message to session
         session.add_message("user", &msg.content);
@@ -216,7 +216,7 @@ impl AgentLoop {
         drop(session_manager);
 
         // Update tool contexts
-        self.update_tool_contexts(&msg.channel, &msg.chat_id).await;
+        self.update_tool_contexts(msg.channel.as_str(), msg.chat_id.as_str()).await;
 
         // Build messages for LLM
         let context_builder = self.context_builder.read().await;
@@ -226,7 +226,7 @@ impl AgentLoop {
             Some(msg.media.clone())
         };
         let messages = context_builder
-            .build_messages(history, &msg.content, media, &msg.channel, &msg.chat_id)
+            .build_messages(history, &msg.content, media, msg.channel.as_str(), msg.chat_id.as_str())
             .await;
 
         drop(context_builder);
@@ -235,7 +235,7 @@ impl AgentLoop {
         let response_content = self.run_agent_loop(messages, false).await?;
 
         // Save assistant response to session
-        self.save_to_session(&session_key, &response_content).await;
+        self.save_to_session(session_key.as_str(), &response_content).await;
 
         // Send response
         let out_msg = OutboundMessage::new(msg.channel, msg.chat_id, response_content);
@@ -252,7 +252,7 @@ impl AgentLoop {
         if msg.sender_id == "telegram_reset" && msg.content == "__RESET_SESSION__" {
             let mut session_manager = self.session_manager.write().await;
             let session_to_save = {
-                if let Ok(session) = session_manager.get_or_create(&msg.chat_id) {
+                if let Ok(session) = session_manager.get_or_create(msg.chat_id.as_str()) {
                     session.clear();
                     Some(session.clone())
                 } else {
@@ -269,7 +269,7 @@ impl AgentLoop {
         }
 
         // The chat_id contains the original "channel:chat_id" to route back to
-        let parts: Vec<&str> = msg.chat_id.split(':').collect();
+        let parts: Vec<&str> = msg.chat_id.as_str().split(':').collect();
         if parts.len() != 2 {
             warn!("Invalid system message chat_id format: {}", msg.chat_id);
             return Ok(());
@@ -316,7 +316,7 @@ impl AgentLoop {
         let response_content = self.run_agent_loop(messages, false).await?;
 
         // Save assistant response to session
-        self.save_to_session(&session_key, &response_content).await;
+        self.save_to_session(session_key.as_str(), &response_content).await;
 
         // Publish response to origin channel
         let out_msg = OutboundMessage::new(
