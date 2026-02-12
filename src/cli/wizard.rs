@@ -120,9 +120,13 @@ fn print_completion(_config: &Config) {
     println!("\n{}", draw_separator());
     println!();
 
+    let config_path_str = config::config_path()
+        .map(|p| p.display().to_string())
+        .unwrap_or_else(|_| "~/.klyntbot/config.json".to_string());
+
     let completion_text = format!(
         "Your AI assistant is ready to use.\n\nTry it out:\n  klyntbot chat\n  klyntbot chat \"Hello!\"\n\nGet help:\n  klyntbot --help\n  klyntbot status\n\nConfig: {}",
-        config::config_path().display()
+        config_path_str
     );
 
     println!("{}", draw_box(&completion_text, Some("Setup Complete!")));
@@ -276,7 +280,7 @@ fn setup_workspace(config: &Config) -> Result<()> {
     println!("  {} Initialized memory directory", status_success());
 
     // Create config directories
-    let config_dir = config::config_dir();
+    let config_dir = config::config_dir()?;
     std::fs::create_dir_all(config_dir.join("sessions"))?;
     std::fs::create_dir_all(config_dir.join("cron"))?;
     std::fs::create_dir_all(config_dir.join("media"))?;

@@ -4,17 +4,22 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+use crate::types::{ChannelName, ChatId, SessionKey};
+
+/// Maximum message content size (64 KB)
+pub const MAX_MESSAGE_SIZE: usize = 65536;
+
 /// Message received from a chat channel
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InboundMessage {
     /// Channel name (telegram, discord, slack, whatsapp, etc.)
-    pub channel: String,
+    pub channel: ChannelName,
 
     /// User identifier
     pub sender_id: String,
 
     /// Chat/channel identifier
-    pub chat_id: String,
+    pub chat_id: ChatId,
 
     /// Message text content
     pub content: String,
@@ -35,9 +40,9 @@ pub struct InboundMessage {
 impl InboundMessage {
     /// Create a new inbound message
     pub fn new(
-        channel: impl Into<String>,
+        channel: impl Into<ChannelName>,
         sender_id: impl Into<String>,
-        chat_id: impl Into<String>,
+        chat_id: impl Into<ChatId>,
         content: impl Into<String>,
     ) -> Self {
         Self {
@@ -52,8 +57,20 @@ impl InboundMessage {
     }
 
     /// Get the session key for this message (channel:chat_id)
-    pub fn session_key(&self) -> String {
-        format!("{}:{}", self.channel, self.chat_id)
+    pub fn session_key(&self) -> SessionKey {
+        SessionKey::new(&self.channel, &self.chat_id)
+    }
+
+    /// Validate message size. Returns an error string if the message is too large.
+    pub fn validate(&self) -> std::result::Result<(), String> {
+        if self.content.len() > MAX_MESSAGE_SIZE {
+            return Err(format!(
+                "Message content too large: {} bytes (max {})",
+                self.content.len(),
+                MAX_MESSAGE_SIZE
+            ));
+        }
+        Ok(())
     }
 }
 
@@ -61,10 +78,10 @@ impl InboundMessage {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OutboundMessage {
     /// Channel name
-    pub channel: String,
+    pub channel: ChannelName,
 
     /// Chat/channel identifier
-    pub chat_id: String,
+    pub chat_id: ChatId,
 
     /// Message text content
     pub content: String,
@@ -85,8 +102,8 @@ pub struct OutboundMessage {
 impl OutboundMessage {
     /// Create a new outbound message
     pub fn new(
-        channel: impl Into<String>,
-        chat_id: impl Into<String>,
+        channel: impl Into<ChannelName>,
+        chat_id: impl Into<ChatId>,
         content: impl Into<String>,
     ) -> Self {
         Self {

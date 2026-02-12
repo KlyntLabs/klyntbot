@@ -9,7 +9,7 @@ use tokio::process::Command;
 use tokio::time::timeout;
 use tracing::{debug, warn};
 
-use super::Tool;
+use super::{Tool, RoutingContext};
 use crate::error::{Result, ToolError};
 
 /// Tool to execute shell commands
@@ -37,6 +37,16 @@ impl ExecTool {
             r">\s*/dev/sd",                    // write to disk
             r"\b(shutdown|reboot|poweroff)\b", // system power
             r":\(\)\s*\{.*\};\s*:",            // fork bomb
+            r"\bcurl\s+.*\|\s*(sh|bash)\b",    // curl pipe to shell
+            r"\bwget\s+.*\|\s*(sh|bash)\b",    // wget pipe to shell
+            r"\bnc\s+-[el]",                    // netcat listeners
+            r"\bchmod\s+[0-7]*777\b",          // world-writable permissions
+            r"\bchown\s+root\b",               // chown to root
+            r"\bsudo\b",                        // sudo commands
+            r"\bsu\s+-\b",                      // switch user
+            r"\b(iptables|firewall-cmd)\b",    // firewall changes
+            r"\bcrontab\s+-[re]\b",            // crontab edit/remove
+            r"\bpasswd\b",                     // password changes
         ];
 
         let compiled_deny = deny_patterns
@@ -55,6 +65,11 @@ impl ExecTool {
 
     /// Guard command for safety
     fn guard_command(&self, command: &str, cwd: &Path) -> std::result::Result<(), String> {
+        const MAX_COMMAND_LENGTH: usize = 4096;
+        if command.len() > MAX_COMMAND_LENGTH {
+            return Err("Command exceeds maximum length".to_string());
+        }
+
         let cmd = command.trim();
         let lower = cmd.to_lowercase();
 
@@ -145,7 +160,7 @@ impl Tool for ExecTool {
         })
     }
 
-    async fn execute(&self, args: Value) -> Result<String> {
+    async fn execute(&self, args: Value, _ctx: &RoutingContext) -> Result<String> {
         let command = args
             .get("command")
             .and_then(|v| v.as_str())
@@ -241,6 +256,11 @@ impl Tool for ExecTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tools::RoutingContext;
+
+    fn test_ctx() -> RoutingContext {
+        RoutingContext::new("cli".into(), "test".into())
+    }
 
     #[tokio::test]
     async fn test_exec_tool_simple_command() {
@@ -250,7 +270,7 @@ mod tests {
             "command": "echo 'Hello, World!'"
         });
 
-        let result = tool.execute(args).await.unwrap();
+        let result = tool.execute(args, &test_ctx()).await.unwrap();
         assert!(result.contains("Hello, World!"));
     }
 
@@ -266,7 +286,7 @@ mod tests {
                 "command": cmd
             });
 
-            let result = tool.execute(args).await;
+            let result = tool.execute(args, &test_ctx()).await;
             assert!(result.is_err());
             let err = result.unwrap_err();
             assert!(err.to_string().contains("blocked by safety guard"));
@@ -281,7 +301,7 @@ mod tests {
             "command": "shutdown -h now"
         });
 
-        let result = tool.execute(args).await;
+        let result = tool.execute(args, &test_ctx()).await;
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(err.to_string().contains("blocked by safety guard"));
@@ -295,7 +315,7 @@ mod tests {
             "command": "dd if=/dev/zero of=/tmp/test"
         });
 
-        let result = tool.execute(args).await;
+        let result = tool.execute(args, &test_ctx()).await;
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(err.to_string().contains("blocked by safety guard"));
@@ -312,7 +332,7 @@ mod tests {
             "command": "ls ../"
         });
 
-        let result = tool.execute(args).await;
+        let result = tool.execute(args, &test_ctx()).await;
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(err.to_string().contains("path traversal detected"));
@@ -329,7 +349,7 @@ mod tests {
             "command": "pwd"
         });
 
-        let result = tool.execute(args).await.unwrap();
+        let result = tool.execute(args, &test_ctx()).await.unwrap();
         let temp_path = temp_dir.path().to_string_lossy();
         assert!(result.contains(&*temp_path));
     }
@@ -347,7 +367,7 @@ mod tests {
             }
         });
 
-        let result = tool.execute(args).await.unwrap();
+        let result = tool.execute(args, &test_ctx()).await.unwrap();
         // Should capture error output
         assert!(!result.is_empty());
     }
@@ -364,7 +384,7 @@ mod tests {
             }
         });
 
-        let result = tool.execute(args).await;
+        let result = tool.execute(args, &test_ctx()).await;
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(err.to_string().contains("timed out"));
@@ -398,7 +418,7 @@ mod tests {
             }
         });
 
-        let result = tool.execute(args).await.unwrap();
+        let result = tool.execute(args, &test_ctx()).await.unwrap();
 
         // Should be truncated if over 10000 chars
         if result.len() > 10000 {

@@ -6,6 +6,7 @@ use reqwest::Client;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{Mutex, RwLock};
@@ -27,7 +28,7 @@ pub struct DiscordChannel {
     config: DiscordConfig,
     client: Client,
     seq: Arc<RwLock<Option<i64>>>,
-    running: Arc<RwLock<bool>>,
+    running: Arc<AtomicBool>,
     typing_tasks: Arc<RwLock<HashMap<String, JoinHandle<()>>>>,
 }
 
@@ -43,7 +44,7 @@ impl DiscordChannel {
             config,
             client,
             seq: Arc::new(RwLock::new(None)),
-            running: Arc::new(RwLock::new(false)),
+            running: Arc::new(AtomicBool::new(false)),
             typing_tasks: Arc::new(RwLock::new(HashMap::new())),
         })
     }
@@ -63,7 +64,7 @@ impl DiscordChannel {
 
         // Read messages
         while let Some(msg) = read.next().await {
-            if !*self.running.read().await {
+            if !self.running.load(Ordering::SeqCst) {
                 break;
             }
 
@@ -115,7 +116,7 @@ impl DiscordChannel {
                                     heartbeat_task = Some(tokio::spawn(async move {
                                         loop {
                                             sleep(Duration::from_secs_f64(interval_secs)).await;
-                                            if !*running.read().await {
+                                            if !running.load(Ordering::SeqCst) {
                                                 break;
                                             }
                                             let current_seq = *seq.read().await;
@@ -135,7 +136,7 @@ impl DiscordChannel {
                                     let identify = json!({
                                         "op": 2,
                                         "d": {
-                                            "token": self.config.token,
+                                            "token": self.config.token.expose(),
                                             "intents": self.config.intents as i64,
                                             "properties": {
                                                 "os": "klyntbot",
@@ -224,7 +225,7 @@ impl DiscordChannel {
         self.stop_typing(&channel_id).await;
 
         let client = self.client.clone();
-        let token = self.config.token.clone();
+        let token = self.config.token.expose().clone();
         let running = self.running.clone();
         let channel_id_clone = channel_id.clone();
 
@@ -235,7 +236,7 @@ impl DiscordChannel {
                 format!("Bot {}", token).parse().unwrap(),
             )]);
 
-            while *running.read().await {
+            while running.load(Ordering::SeqCst) {
                 let _ = client.post(&url).headers(headers.clone()).send().await;
                 sleep(Duration::from_secs(8)).await;
             }
@@ -434,7 +435,7 @@ impl DiscordChannel {
             let response = self
                 .client
                 .post(&url)
-                .header("Authorization", format!("Bot {}", self.config.token))
+                .header("Authorization", format!("Bot {}", self.config.token.expose()))
                 .json(&payload)
                 .send()
                 .await;
@@ -498,7 +499,7 @@ impl Channel for DiscordChannel {
     }
 
     async fn start(&self, bus: Arc<MessageBus>) -> Result<()> {
-        *self.running.write().await = true;
+        self.running.store(true, Ordering::SeqCst);
 
         super::reconnect_loop("Discord", &self.running, || self.gateway_loop(bus.clone())).await;
 
@@ -512,7 +513,7 @@ impl Channel for DiscordChannel {
     }
 
     async fn stop(&self) -> Result<()> {
-        *self.running.write().await = false;
+        self.running.store(false, Ordering::SeqCst);
 
         // Stop all typing tasks
         let tasks: Vec<_> = self.typing_tasks.write().await.drain().collect();
@@ -524,7 +525,7 @@ impl Channel for DiscordChannel {
     }
 
     async fn send(&self, msg: &OutboundMessage) -> Result<()> {
-        self.send_message_rest(&msg.chat_id, &msg.content, msg.reply_to.as_deref())
+        self.send_message_rest(msg.chat_id.as_str(), &msg.content, msg.reply_to.as_deref())
             .await
     }
 

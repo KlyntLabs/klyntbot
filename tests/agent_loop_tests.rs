@@ -205,7 +205,6 @@ async fn test_agent_loop_session_persistence() {
     let temp_dir = TempDir::new().unwrap();
     std::env::set_var("HOME", temp_dir.path());
 
-    let bus = Arc::new(MessageBus::new(10));
     let provider = Arc::new(MockProvider::with_responses(vec![
         klyntbot::providers::types::LlmResponse {
             content: Some("I remember you said hello!".to_string()),
@@ -224,18 +223,23 @@ async fn test_agent_loop_session_persistence() {
         .unwrap()
         .to_string();
 
-    let agent_loop = AgentLoop::new(bus.clone(), provider.clone(), config.clone())
-        .await
-        .unwrap();
+    // First agent loop
+    {
+        let bus = Arc::new(MessageBus::new(10));
+        let agent_loop = AgentLoop::new(bus, provider.clone(), config.clone())
+            .await
+            .unwrap();
 
-    // First message
-    let _ = agent_loop
-        .process_direct("Hello!".to_string(), "test:session5".to_string())
-        .await
-        .unwrap();
+        // First message
+        let _ = agent_loop
+            .process_direct("Hello!".to_string(), "test:session5".to_string())
+            .await
+            .unwrap();
+    }
 
-    // Create a new agent loop (simulating restart)
-    let agent_loop2 = AgentLoop::new(bus, provider.clone(), config).await.unwrap();
+    // Create a new agent loop with a new bus (simulating restart)
+    let bus2 = Arc::new(MessageBus::new(10));
+    let agent_loop2 = AgentLoop::new(bus2, provider.clone(), config).await.unwrap();
 
     // Second message - should have access to session history
     let response = agent_loop2

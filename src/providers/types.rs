@@ -8,6 +8,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use crate::error::Result;
+use crate::types::MessageRole;
 
 /// Streaming chunk from LLM
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -40,6 +41,34 @@ pub struct ToolCallDelta {
 /// Stream type alias
 pub type LlmStream = Pin<Box<dyn Stream<Item = Result<LlmStreamChunk>> + Send>>;
 
+/// Parameters for chat completion requests
+#[derive(Debug, Clone)]
+pub struct ChatParams {
+    pub model: String,
+    pub temperature: Option<f32>,
+    pub max_tokens: Option<u32>,
+}
+
+impl ChatParams {
+    pub fn new(model: impl Into<String>) -> Self {
+        Self {
+            model: model.into(),
+            temperature: None,
+            max_tokens: None,
+        }
+    }
+
+    pub fn with_temperature(mut self, temp: f32) -> Self {
+        self.temperature = Some(temp);
+        self
+    }
+
+    pub fn with_max_tokens(mut self, tokens: u32) -> Self {
+        self.max_tokens = Some(tokens);
+        self
+    }
+}
+
 /// Trait for LLM providers
 #[async_trait]
 pub trait LlmProvider: Send + Sync {
@@ -48,7 +77,7 @@ pub trait LlmProvider: Send + Sync {
         &self,
         messages: &[Message],
         tools: Option<&[Value]>,
-        model: Option<&str>,
+        params: &ChatParams,
     ) -> Result<LlmResponse>;
 
     /// Send a streaming chat completion request
@@ -57,10 +86,10 @@ pub trait LlmProvider: Send + Sync {
         &self,
         messages: &[Message],
         tools: Option<&[Value]>,
-        model: Option<&str>,
+        params: &ChatParams,
     ) -> Result<LlmStream> {
         // Default: call chat() and emit a single chunk
-        let response = self.chat(messages, tools, model).await?;
+        let response = self.chat(messages, tools, params).await?;
 
         let chunk = LlmStreamChunk {
             content: response.content,
@@ -263,6 +292,16 @@ impl Message {
             tool_call_id: tool_call_id.into(),
             name: name.into(),
             content: content.into(),
+        }
+    }
+
+    /// Get the role of this message
+    pub fn role(&self) -> MessageRole {
+        match self {
+            Message::System { .. } => MessageRole::System,
+            Message::User { .. } => MessageRole::User,
+            Message::Assistant { .. } => MessageRole::Assistant,
+            Message::Tool { .. } => MessageRole::Tool,
         }
     }
 }

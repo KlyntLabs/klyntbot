@@ -1,9 +1,9 @@
 //! Chat channel implementations for various platforms.
 
 use async_trait::async_trait;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::RwLock;
 use tokio::time::sleep;
 use tracing::{error, info};
 
@@ -73,18 +73,19 @@ pub fn check_allowlist(allow_from: &[String], sender_id: &str) -> bool {
 
 /// Helper for reconnection loop pattern used by channels.
 /// Automatically retries on error with a 5-second delay.
+#[tracing::instrument(skip(running, connect))]
 pub async fn reconnect_loop<F, Fut>(
     name: &str,
-    running: &Arc<RwLock<bool>>,
+    running: &Arc<AtomicBool>,
     mut connect: F,
 ) where
     F: FnMut() -> Fut,
     Fut: std::future::Future<Output = Result<()>>,
 {
-    while *running.read().await {
+    while running.load(Ordering::SeqCst) {
         if let Err(e) = connect().await {
             error!("{} error: {}", name, e);
-            if *running.read().await {
+            if running.load(Ordering::SeqCst) {
                 info!("Reconnecting to {} in 5 seconds...", name);
                 sleep(Duration::from_secs(5)).await;
             }

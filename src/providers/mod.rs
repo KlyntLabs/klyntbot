@@ -9,9 +9,9 @@ pub use openai_compat::OpenAiCompatProvider;
 pub use registry::{ProviderRegistry, ProviderSpec, PROVIDERS};
 pub use transcription::TranscriptionProvider;
 pub use types::{
-    tool_calls_to_messages, ContentPart, DynProvider, FunctionCall, ImageUrl, LlmProvider,
-    LlmResponse, LlmStream, LlmStreamChunk, Message, ToolCall, ToolCallDelta, ToolCallMessage,
-    Usage, UserContent,
+    tool_calls_to_messages, ChatParams, ContentPart, DynProvider, FunctionCall, ImageUrl,
+    LlmProvider, LlmResponse, LlmStream, LlmStreamChunk, Message, ToolCall, ToolCallDelta,
+    ToolCallMessage, Usage, UserContent,
 };
 
 use std::sync::Arc;
@@ -54,10 +54,10 @@ pub fn create_provider(config: &Config) -> Result<DynProvider> {
             continue;
         }
         if let Some(spec) =
-            ProviderRegistry::find_gateway(Some(name), Some(&pc.api_key), pc.api_base.as_deref())
+            ProviderRegistry::find_gateway(Some(name), Some(pc.api_key.expose()), pc.api_base.as_deref())
         {
             let api_base = pc.api_base.as_deref().unwrap_or(spec.default_api_base);
-            let provider = OpenAiCompatProvider::new(api_base, &pc.api_key, model)?;
+            let provider = OpenAiCompatProvider::new(api_base, pc.api_key.expose(), model)?;
             info!(
                 "Provider initialized: {} (gateway: {})",
                 spec.label(),
@@ -74,7 +74,7 @@ pub fn create_provider(config: &Config) -> Result<DynProvider> {
         }
         if let Some(spec) = ProviderRegistry::find_by_name(name) {
             let api_base = pc.api_base.as_deref().unwrap_or(spec.default_api_base);
-            let provider = OpenAiCompatProvider::new(api_base, &pc.api_key, model)?;
+            let provider = OpenAiCompatProvider::new(api_base, pc.api_key.expose(), model)?;
             info!("Provider initialized: {} (model: {})", spec.label(), model);
             return Ok(Arc::new(provider));
         }
@@ -107,7 +107,7 @@ fn try_create_from_spec(spec: &ProviderSpec, config: &Config, model: &str) -> Op
 
     let api_base = pc.api_base.as_deref().unwrap_or(spec.default_api_base);
 
-    match OpenAiCompatProvider::new(api_base, &pc.api_key, model) {
+    match OpenAiCompatProvider::new(api_base, pc.api_key.expose(), model) {
         Ok(provider) => {
             info!("Provider initialized: {} (model: {})", spec.label(), model);
             Some(Arc::new(provider))

@@ -5,22 +5,18 @@ use serde_json::Value;
 use tokio::sync::mpsc;
 use tracing::debug;
 
-use super::{Tool, ToolContext};
+use super::{Tool, RoutingContext};
 use crate::bus::OutboundMessage;
 use crate::error::{Result, ToolError};
 
 /// Tool to send messages to channels
 pub struct MessageTool {
     outbound_tx: mpsc::Sender<OutboundMessage>,
-    context: ToolContext,
 }
 
 impl MessageTool {
-    pub fn new(outbound_tx: mpsc::Sender<OutboundMessage>, context: ToolContext) -> Self {
-        Self {
-            outbound_tx,
-            context,
-        }
+    pub fn new(outbound_tx: mpsc::Sender<OutboundMessage>) -> Self {
+        Self { outbound_tx }
     }
 }
 
@@ -55,48 +51,24 @@ impl Tool for MessageTool {
         })
     }
 
-    async fn execute(&self, args: Value) -> Result<String> {
+    async fn execute(&self, args: Value, ctx: &RoutingContext) -> Result<String> {
         let content = args
             .get("content")
             .and_then(|v| v.as_str())
             .ok_or_else(|| ToolError::InvalidParams("missing 'content' parameter".to_string()))?;
 
-        // Get current context
-        let (ctx_channel, ctx_chat_id) = self.context.get();
-
+        // Use provided context or optional overrides from args
         let channel = args
             .get("channel")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string())
-            .or_else(|| {
-                if !ctx_channel.is_empty() {
-                    Some(ctx_channel.clone())
-                } else {
-                    None
-                }
-            })
-            .ok_or_else(|| {
-                ToolError::ExecutionFailed(
-                    "No channel specified and no current context".to_string(),
-                )
-            })?;
+            .unwrap_or_else(|| ctx.channel.as_str().to_string());
 
         let chat_id = args
             .get("chat_id")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string())
-            .or_else(|| {
-                if !ctx_chat_id.is_empty() {
-                    Some(ctx_chat_id.clone())
-                } else {
-                    None
-                }
-            })
-            .ok_or_else(|| {
-                ToolError::ExecutionFailed(
-                    "No chat_id specified and no current context".to_string(),
-                )
-            })?;
+            .unwrap_or_else(|| ctx.chat_id.as_str().to_string());
 
         debug!("Sending message to {}:{}", channel, chat_id);
 
@@ -108,10 +80,5 @@ impl Tool for MessageTool {
             .map_err(|_| ToolError::ExecutionFailed("Failed to send message to bus".to_string()))?;
 
         Ok("Message sent successfully".to_string())
-    }
-
-    /// IMPORTANT: This method is called by AgentLoop before processing
-    fn set_context(&self, channel: &str, chat_id: &str) {
-        self.context.set(channel, chat_id);
     }
 }

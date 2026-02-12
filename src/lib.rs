@@ -11,6 +11,7 @@ pub mod heartbeat;
 pub mod providers;
 pub mod session;
 pub mod tools;
+pub mod types;
 pub mod utils;
 
 // Re-export commonly used types
@@ -26,6 +27,7 @@ pub use providers::{
 };
 pub use session::{Session, SessionManager};
 pub use tools::{DynTool, Tool};
+pub use types::{ChannelName, ChatId, MessageRole, SessionKey};
 
 /// Version information
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

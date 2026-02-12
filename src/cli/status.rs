@@ -5,7 +5,7 @@ use crate::utils::terminal::*;
 
 /// Handle brief status (no-args command)
 pub async fn handle_brief_status() -> Result<()> {
-    let config_path = crate::config::config_path();
+    let config_path = crate::config::config_path()?;
     let exists = config_path.exists();
 
     println!("klyntbot v{}", env!("CARGO_PKG_VERSION"));
@@ -55,7 +55,7 @@ pub async fn handle_brief_status() -> Result<()> {
 
 /// Handle status command
 pub async fn handle_status(verbose: bool) -> Result<()> {
-    let config_path = crate::config::config_path();
+    let config_path = crate::config::config_path()?;
     let exists = config_path.exists();
 
     // Version header

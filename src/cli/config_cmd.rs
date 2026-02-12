@@ -29,7 +29,7 @@ pub async fn handle_config(cmd: ConfigCommands) -> Result<()> {
             }
         }
         ConfigCommands::Set { key, value } => {
-            let config_path = crate::config::config_path();
+            let config_path = crate::config::config_path()?;
             let content = std::fs::read_to_string(&config_path)?;
             let mut json: serde_json::Value = serde_json::from_str(&content)?;
 
@@ -54,7 +54,7 @@ pub async fn handle_config(cmd: ConfigCommands) -> Result<()> {
             }
         }
         ConfigCommands::Edit => {
-            let config_path = crate::config::config_path();
+            let config_path = crate::config::config_path()?;
 
             // Get editor from environment
             let editor = std::env::var("EDITOR").unwrap_or_else(|_| {
@@ -89,7 +89,7 @@ pub async fn handle_config(cmd: ConfigCommands) -> Result<()> {
             }
         }
         ConfigCommands::Reset { force } => {
-            let config_path = crate::config::config_path();
+            let config_path = crate::config::config_path()?;
 
             if config_path.exists() && !force {
                 return Err(anyhow::anyhow!(

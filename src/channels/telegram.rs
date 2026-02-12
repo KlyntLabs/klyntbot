@@ -8,6 +8,7 @@ use reqwest::Client;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
@@ -26,7 +27,7 @@ pub struct TelegramChannel {
     client: Client,
     api_base: String,
     transcriber: Option<TranscriptionProvider>,
-    running: Arc<RwLock<bool>>,
+    running: Arc<AtomicBool>,
     typing_tasks: Arc<RwLock<HashMap<String, tokio::task::JoinHandle<()>>>>,
 }
 
@@ -52,7 +53,7 @@ impl TelegramChannel {
             .build()
             .map_err(|e| ChannelError::ConnectionFailed(e.to_string()))?;
 
-        let api_base = format!("https://api.telegram.org/bot{}", config.token);
+        let api_base = format!("https://api.telegram.org/bot{}", config.token.expose());
 
         let transcriber = groq_api_key
             .filter(|k| !k.is_empty())
@@ -64,7 +65,7 @@ impl TelegramChannel {
             client,
             api_base,
             transcriber,
-            running: Arc::new(RwLock::new(false)),
+            running: Arc::new(AtomicBool::new(false)),
             typing_tasks: Arc::new(RwLock::new(HashMap::new())),
         })
     }
@@ -137,7 +138,7 @@ impl TelegramChannel {
             warn!("Failed to set bot commands: {}", e);
         }
 
-        while *self.running.read().await {
+        while self.running.load(Ordering::SeqCst) {
             let params = json!({
                 "offset": offset,
                 "timeout": 30,
@@ -321,7 +322,7 @@ impl TelegramChannel {
         // Download file
         let download_url = format!(
             "https://api.telegram.org/file/bot{}/{}",
-            self.config.token, file_path
+            self.config.token.expose(), file_path
         );
 
         let bytes = self
@@ -404,7 +405,7 @@ impl TelegramChannel {
                 let reset_msg = InboundMessage::new(
                     "system",
                     "telegram_reset",
-                    &session_key,
+                    session_key.as_str(),
                     "__RESET_SESSION__",
                 );
 
@@ -665,12 +666,12 @@ impl Channel for TelegramChannel {
     }
 
     async fn start(&self, bus: Arc<MessageBus>) -> Result<()> {
-        *self.running.write().await = true;
+        self.running.store(true, Ordering::SeqCst);
         self.poll_updates(bus).await
     }
 
     async fn stop(&self) -> Result<()> {
-        *self.running.write().await = false;
+        self.running.store(false, Ordering::SeqCst);
 
         // Stop all typing indicators
         let mut typing_tasks = self.typing_tasks.write().await;
@@ -684,10 +685,11 @@ impl Channel for TelegramChannel {
 
     async fn send(&self, msg: &OutboundMessage) -> Result<()> {
         // Stop typing indicator for this chat
-        self.stop_typing(&msg.chat_id).await;
+        self.stop_typing(msg.chat_id.as_str()).await;
 
         let chat_id: i64 = msg
             .chat_id
+            .as_str()
             .parse()
             .map_err(|_| ChannelError::SendFailed("Invalid chat_id".to_string()))?;
 

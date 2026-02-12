@@ -1,6 +1,6 @@
 //! Async message queue for decoupled channel-agent communication.
 
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::mpsc;
 use tracing::debug;
 
 use super::events::{InboundMessage, OutboundMessage};
@@ -9,9 +9,9 @@ use crate::error::{KlyntbotError, Result};
 /// Message bus for communication between channels and agent
 pub struct MessageBus {
     inbound_tx: mpsc::Sender<InboundMessage>,
-    inbound_rx: Mutex<mpsc::Receiver<InboundMessage>>,
+    inbound_rx: Option<mpsc::Receiver<InboundMessage>>,
     outbound_tx: mpsc::Sender<OutboundMessage>,
-    outbound_rx: Mutex<mpsc::Receiver<OutboundMessage>>,
+    outbound_rx: Option<mpsc::Receiver<OutboundMessage>>,
 }
 
 impl MessageBus {
@@ -22,10 +22,20 @@ impl MessageBus {
 
         Self {
             inbound_tx,
-            inbound_rx: Mutex::new(inbound_rx),
+            inbound_rx: Some(inbound_rx),
             outbound_tx,
-            outbound_rx: Mutex::new(outbound_rx),
+            outbound_rx: Some(outbound_rx),
         }
+    }
+
+    /// Take ownership of the inbound receiver (can only be called once)
+    pub fn take_inbound_rx(&mut self) -> Option<mpsc::Receiver<InboundMessage>> {
+        self.inbound_rx.take()
+    }
+
+    /// Take ownership of the outbound receiver (can only be called once)
+    pub fn take_outbound_rx(&mut self) -> Option<mpsc::Receiver<OutboundMessage>> {
+        self.outbound_rx.take()
     }
 
     /// Publish an inbound message to the bus
@@ -45,9 +55,13 @@ impl MessageBus {
     }
 
     /// Consume the next inbound message (blocks until available)
+    ///
+    /// Note: This method is deprecated. Use take_inbound_rx() to get ownership
+    /// of the receiver and call recv() directly on it.
+    #[deprecated(note = "Use take_inbound_rx() to own the receiver directly")]
     pub async fn consume_inbound(&self) -> Option<InboundMessage> {
-        let mut rx = self.inbound_rx.lock().await;
-        rx.recv().await
+        // This method is kept for backwards compatibility but will panic if receiver was taken
+        panic!("consume_inbound called after receiver was taken. Use the receiver directly.")
     }
 
     /// Publish an outbound message to the bus
@@ -67,9 +81,13 @@ impl MessageBus {
     }
 
     /// Consume the next outbound message (blocks until available)
+    ///
+    /// Note: This method is deprecated. Use take_outbound_rx() to get ownership
+    /// of the receiver and call recv() directly on it.
+    #[deprecated(note = "Use take_outbound_rx() to own the receiver directly")]
     pub async fn consume_outbound(&self) -> Option<OutboundMessage> {
-        let mut rx = self.outbound_rx.lock().await;
-        rx.recv().await
+        // This method is kept for backwards compatibility but will panic if receiver was taken
+        panic!("consume_outbound called after receiver was taken. Use the receiver directly.")
     }
 
     /// Get a sender for inbound messages
@@ -89,27 +107,29 @@ mod tests {
 
     #[tokio::test]
     async fn test_message_bus() {
-        let bus = MessageBus::new(10);
+        let mut bus = MessageBus::new(10);
 
         // Test inbound
         let msg = InboundMessage::new("telegram", "user123", "chat456", "Hello!");
         bus.publish_inbound(msg.clone()).await.unwrap();
 
-        let received = bus.consume_inbound().await.unwrap();
+        let mut inbound_rx = bus.take_inbound_rx().unwrap();
+        let received = inbound_rx.recv().await.unwrap();
         assert_eq!(received.content, "Hello!");
-        assert_eq!(received.session_key(), "telegram:chat456");
+        assert_eq!(received.session_key().to_string(), "telegram:chat456");
 
         // Test outbound
         let out_msg = OutboundMessage::new("telegram", "chat456", "Hi there!");
         bus.publish_outbound(out_msg.clone()).await.unwrap();
 
-        let received_out = bus.consume_outbound().await.unwrap();
+        let mut outbound_rx = bus.take_outbound_rx().unwrap();
+        let received_out = outbound_rx.recv().await.unwrap();
         assert_eq!(received_out.content, "Hi there!");
     }
 
     #[tokio::test]
     async fn test_message_bus_multiple_messages() {
-        let bus = MessageBus::new(10);
+        let mut bus = MessageBus::new(10);
 
         // Publish multiple inbound messages
         for i in 0..5 {
@@ -119,15 +139,16 @@ mod tests {
         }
 
         // Consume all messages
+        let mut inbound_rx = bus.take_inbound_rx().unwrap();
         for i in 0..5 {
-            let received = bus.consume_inbound().await.unwrap();
+            let received = inbound_rx.recv().await.unwrap();
             assert_eq!(received.content, format!("Message {}", i));
         }
     }
 
     #[tokio::test]
     async fn test_message_bus_senders() {
-        let bus = MessageBus::new(10);
+        let mut bus = MessageBus::new(10);
 
         // Get senders
         let inbound_sender = bus.inbound_sender();
@@ -137,14 +158,16 @@ mod tests {
         let msg = InboundMessage::new("telegram", "user123", "chat456", "Test");
         inbound_sender.send(msg).await.unwrap();
 
-        let received = bus.consume_inbound().await.unwrap();
+        let mut inbound_rx = bus.take_inbound_rx().unwrap();
+        let received = inbound_rx.recv().await.unwrap();
         assert_eq!(received.content, "Test");
 
         // Send outbound via cloned sender
         let out_msg = OutboundMessage::new("telegram", "chat456", "Response");
         outbound_sender.send(out_msg).await.unwrap();
 
-        let received_out = bus.consume_outbound().await.unwrap();
+        let mut outbound_rx = bus.take_outbound_rx().unwrap();
+        let received_out = outbound_rx.recv().await.unwrap();
         assert_eq!(received_out.content, "Response");
     }
 
@@ -171,15 +194,15 @@ mod tests {
     #[tokio::test]
     async fn test_session_key_format() {
         let msg = InboundMessage::new("telegram", "user123", "chat456", "Test");
-        assert_eq!(msg.session_key(), "telegram:chat456");
+        assert_eq!(msg.session_key().to_string(), "telegram:chat456");
 
         let msg2 = InboundMessage::new("discord", "user789", "guild123", "Test");
-        assert_eq!(msg2.session_key(), "discord:guild123");
+        assert_eq!(msg2.session_key().to_string(), "discord:guild123");
     }
 
     #[tokio::test]
     async fn test_bus_buffer_overflow() {
-        let bus = MessageBus::new(2); // Small buffer
+        let mut bus = MessageBus::new(2); // Small buffer
 
         // Fill buffer
         bus.publish_inbound(InboundMessage::new("telegram", "user1", "chat1", "Msg 1"))
@@ -189,9 +212,9 @@ mod tests {
             .await
             .unwrap();
 
-        // Try to publish when buffer is full (should block)
-        let bus_clone = std::sync::Arc::new(bus);
-        let bus_ref = bus_clone.clone();
+        let mut inbound_rx = bus.take_inbound_rx().unwrap();
+        let bus_arc = std::sync::Arc::new(bus);
+        let bus_ref = bus_arc.clone();
 
         let sender = tokio::spawn(async move {
             bus_ref
@@ -200,7 +223,7 @@ mod tests {
         });
 
         // Consume one message to make space
-        let _ = bus_clone.consume_inbound().await;
+        let _ = inbound_rx.recv().await;
 
         // Now the sender should succeed
         sender.await.unwrap().unwrap();
@@ -210,7 +233,9 @@ mod tests {
     async fn test_concurrent_publish_consume() {
         use std::sync::Arc;
 
-        let bus = Arc::new(MessageBus::new(100));
+        let mut bus = MessageBus::new(100);
+        let mut inbound_rx = bus.take_inbound_rx().unwrap();
+        let bus = Arc::new(bus);
 
         // Spawn multiple publishers
         let mut publishers = vec![];
@@ -237,7 +262,7 @@ mod tests {
 
         // Consume all messages
         let mut count = 0;
-        while bus.consume_inbound().await.is_some() {
+        while inbound_rx.recv().await.is_some() {
             count += 1;
             if count >= 50 {
                 break;
@@ -249,7 +274,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_message_ordering() {
-        let bus = MessageBus::new(100);
+        let mut bus = MessageBus::new(100);
 
         // Publish messages in order
         for i in 0..10 {
@@ -258,15 +283,16 @@ mod tests {
         }
 
         // Verify they come out in order
+        let mut inbound_rx = bus.take_inbound_rx().unwrap();
         for i in 0..10 {
-            let msg = bus.consume_inbound().await.unwrap();
+            let msg = inbound_rx.recv().await.unwrap();
             assert_eq!(msg.content, format!("Message {}", i));
         }
     }
 
     #[tokio::test]
     async fn test_inbound_and_outbound_independent() {
-        let bus = MessageBus::new(10);
+        let mut bus = MessageBus::new(10);
 
         // Publish to both queues
         bus.publish_inbound(InboundMessage::new("telegram", "user1", "chat1", "Inbound"))
@@ -276,20 +302,21 @@ mod tests {
             .await
             .unwrap();
 
+        let mut inbound_rx = bus.take_inbound_rx().unwrap();
+        let mut outbound_rx = bus.take_outbound_rx().unwrap();
+
         // Consume from outbound first
-        let out = bus.consume_outbound().await.unwrap();
+        let out = outbound_rx.recv().await.unwrap();
         assert_eq!(out.content, "Outbound");
 
         // Inbound should still be available
-        let in_msg = bus.consume_inbound().await.unwrap();
+        let in_msg = inbound_rx.recv().await.unwrap();
         assert_eq!(in_msg.content, "Inbound");
     }
 
     #[tokio::test]
     async fn test_multiple_consumers_share_messages() {
-        use std::sync::Arc;
-
-        let bus = Arc::new(MessageBus::new(10));
+        let mut bus = MessageBus::new(10);
 
         // Publish messages
         for i in 0..5 {
@@ -298,57 +325,61 @@ mod tests {
         }
 
         // Only one consumer can receive each message
-        let msg1 = bus.consume_inbound().await;
+        let mut inbound_rx = bus.take_inbound_rx().unwrap();
+        let msg1 = inbound_rx.recv().await;
         assert!(msg1.is_some());
         assert_eq!(msg1.unwrap().content, "Message 0");
 
-        let msg2 = bus.consume_inbound().await;
+        let msg2 = inbound_rx.recv().await;
         assert!(msg2.is_some());
         assert_eq!(msg2.unwrap().content, "Message 1");
     }
 
     #[tokio::test]
     async fn test_empty_bus_returns_none_eventually() {
-        let bus = MessageBus::new(10);
+        let mut bus = MessageBus::new(10);
 
         // Publish and consume
         bus.publish_inbound(InboundMessage::new("telegram", "user", "chat", "Test"))
             .await
             .unwrap();
 
-        let msg = bus.consume_inbound().await;
+        let mut inbound_rx = bus.take_inbound_rx().unwrap();
+        let msg = inbound_rx.recv().await;
         assert!(msg.is_some());
 
-        // Next consume should block (we can't test blocking easily, so we just verify the bus is empty)
-        // In a real scenario, consume_inbound() would block waiting for the next message
+        // Next recv would block waiting for the next message
+        // We can't easily test blocking behavior in unit tests
     }
 
     #[tokio::test]
     async fn test_message_with_empty_content() {
-        let bus = MessageBus::new(10);
+        let mut bus = MessageBus::new(10);
 
         let msg = InboundMessage::new("telegram", "user", "chat", "");
         bus.publish_inbound(msg).await.unwrap();
 
-        let received = bus.consume_inbound().await.unwrap();
+        let mut inbound_rx = bus.take_inbound_rx().unwrap();
+        let received = inbound_rx.recv().await.unwrap();
         assert_eq!(received.content, "");
     }
 
     #[tokio::test]
     async fn test_message_with_special_characters() {
-        let bus = MessageBus::new(10);
+        let mut bus = MessageBus::new(10);
 
         let content = "Hello 👋 测试 🚀 \n\t special chars!";
         let msg = InboundMessage::new("telegram", "user", "chat", content);
         bus.publish_inbound(msg).await.unwrap();
 
-        let received = bus.consume_inbound().await.unwrap();
+        let mut inbound_rx = bus.take_inbound_rx().unwrap();
+        let received = inbound_rx.recv().await.unwrap();
         assert_eq!(received.content, content);
     }
 
     #[tokio::test]
     async fn test_different_channels() {
-        let bus = MessageBus::new(10);
+        let mut bus = MessageBus::new(10);
 
         // Messages from different channels
         bus.publish_inbound(InboundMessage::new("telegram", "u1", "c1", "Telegram msg"))
@@ -361,36 +392,38 @@ mod tests {
             .await
             .unwrap();
 
-        let msg1 = bus.consume_inbound().await.unwrap();
-        assert_eq!(msg1.channel, "telegram");
+        let mut inbound_rx = bus.take_inbound_rx().unwrap();
+        let msg1 = inbound_rx.recv().await.unwrap();
+        assert_eq!(msg1.channel.as_str(), "telegram");
         assert_eq!(msg1.content, "Telegram msg");
 
-        let msg2 = bus.consume_inbound().await.unwrap();
-        assert_eq!(msg2.channel, "discord");
+        let msg2 = inbound_rx.recv().await.unwrap();
+        assert_eq!(msg2.channel.as_str(), "discord");
         assert_eq!(msg2.content, "Discord msg");
 
-        let msg3 = bus.consume_inbound().await.unwrap();
-        assert_eq!(msg3.channel, "slack");
+        let msg3 = inbound_rx.recv().await.unwrap();
+        assert_eq!(msg3.channel.as_str(), "slack");
         assert_eq!(msg3.content, "Slack msg");
     }
 
     #[tokio::test]
     async fn test_outbound_with_reply_to() {
-        let bus = MessageBus::new(10);
+        let mut bus = MessageBus::new(10);
 
         let msg = OutboundMessage::new("telegram", "chat123", "Reply content")
             .with_reply_to("original_msg_456");
 
         bus.publish_outbound(msg).await.unwrap();
 
-        let received = bus.consume_outbound().await.unwrap();
+        let mut outbound_rx = bus.take_outbound_rx().unwrap();
+        let received = outbound_rx.recv().await.unwrap();
         assert_eq!(received.reply_to, Some("original_msg_456".to_string()));
         assert_eq!(received.content, "Reply content");
     }
 
     #[tokio::test]
     async fn test_outbound_with_multiple_media() {
-        let bus = MessageBus::new(10);
+        let mut bus = MessageBus::new(10);
 
         let msg = OutboundMessage::new("telegram", "chat123", "Check these out")
             .with_media("https://example.com/image1.jpg")
@@ -399,7 +432,8 @@ mod tests {
 
         bus.publish_outbound(msg).await.unwrap();
 
-        let received = bus.consume_outbound().await.unwrap();
+        let mut outbound_rx = bus.take_outbound_rx().unwrap();
+        let received = outbound_rx.recv().await.unwrap();
         assert_eq!(received.media.len(), 3);
         assert!(received
             .media
@@ -419,6 +453,6 @@ mod tests {
 
         // Same chat_id should produce same session key
         assert_eq!(msg1.session_key(), msg2.session_key());
-        assert_eq!(msg1.session_key(), "telegram:chat456");
+        assert_eq!(msg1.session_key().as_str(), "telegram:chat456");
     }
 }

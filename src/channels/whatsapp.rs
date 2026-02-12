@@ -3,9 +3,10 @@
 use async_trait::async_trait;
 use futures_util::{stream::SplitSink, SinkExt, StreamExt};
 use serde_json::{json, Value};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::Mutex;
 use tokio_tungstenite::{
     connect_async, tungstenite::Message as WsMessage, MaybeTlsStream, WebSocketStream,
 };
@@ -21,7 +22,7 @@ type WsWriter = SplitSink<WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>
 /// WhatsApp channel implementation
 pub struct WhatsAppChannel {
     config: WhatsAppConfig,
-    running: Arc<RwLock<bool>>,
+    running: Arc<AtomicBool>,
     ws_writer: Arc<Mutex<Option<WsWriter>>>,
 }
 
@@ -30,7 +31,7 @@ impl WhatsAppChannel {
     pub fn new(config: WhatsAppConfig) -> Self {
         Self {
             config,
-            running: Arc::new(RwLock::new(false)),
+            running: Arc::new(AtomicBool::new(false)),
             ws_writer: Arc::new(Mutex::new(None)),
         }
     }
@@ -53,7 +54,7 @@ impl WhatsAppChannel {
 
         info!("Connected to WhatsApp bridge");
 
-        while *self.running.read().await {
+        while self.running.load(Ordering::SeqCst) {
             let msg = match tokio::time::timeout(Duration::from_secs(30), read.next()).await {
                 Ok(Some(Ok(msg))) => msg,
                 Ok(Some(Err(e))) => {
@@ -169,7 +170,7 @@ impl Channel for WhatsAppChannel {
     }
 
     async fn start(&self, bus: Arc<MessageBus>) -> Result<()> {
-        *self.running.write().await = true;
+        self.running.store(true, Ordering::SeqCst);
 
         super::reconnect_loop("WhatsApp", &self.running, || self.ws_loop(bus.clone())).await;
 
@@ -177,7 +178,7 @@ impl Channel for WhatsAppChannel {
     }
 
     async fn stop(&self) -> Result<()> {
-        *self.running.write().await = false;
+        self.running.store(false, Ordering::SeqCst);
         Ok(())
     }
 

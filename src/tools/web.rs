@@ -6,7 +6,7 @@ use serde_json::Value;
 use tracing::{debug, warn};
 use url::Url;
 
-use super::Tool;
+use super::{Tool, RoutingContext};
 use crate::error::{Result, ToolError};
 
 /// Tool for web search via Brave Search API
@@ -58,7 +58,7 @@ impl Tool for WebSearchTool {
         })
     }
 
-    async fn execute(&self, args: Value) -> Result<String> {
+    async fn execute(&self, args: Value, _ctx: &RoutingContext) -> Result<String> {
         let query = args
             .get("query")
             .and_then(|v| v.as_str())
@@ -199,7 +199,7 @@ impl Tool for WebFetchTool {
         })
     }
 
-    async fn execute(&self, args: Value) -> Result<String> {
+    async fn execute(&self, args: Value, _ctx: &RoutingContext) -> Result<String> {
         let url_str = args
             .get("url")
             .and_then(|v| v.as_str())

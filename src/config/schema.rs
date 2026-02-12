@@ -2,7 +2,52 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt;
 use std::path::PathBuf;
+
+/// Wrapper that redacts sensitive values in Debug/Display output.
+/// Use `.expose()` to access the inner value.
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct Secret<T>(T);
+
+impl<T> Secret<T> {
+    pub fn new(value: T) -> Self {
+        Self(value)
+    }
+
+    pub fn expose(&self) -> &T {
+        &self.0
+    }
+
+    pub fn into_inner(self) -> T {
+        self.0
+    }
+}
+
+impl<T> fmt::Debug for Secret<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[REDACTED]")
+    }
+}
+
+impl<T> fmt::Display for Secret<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "[REDACTED]")
+    }
+}
+
+impl Default for Secret<String> {
+    fn default() -> Self {
+        Self(String::new())
+    }
+}
+
+impl Secret<String> {
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
 
 /// Root configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -58,11 +103,11 @@ impl Config {
     /// Set the API key for a provider by name.
     pub fn set_provider_key(&mut self, provider_name: &str, key: String) {
         match provider_name {
-            "anthropic" => self.providers.anthropic.api_key = key,
-            "openai" => self.providers.openai.api_key = key,
-            "deepseek" => self.providers.deepseek.api_key = key,
-            "gemini" => self.providers.gemini.api_key = key,
-            "openrouter" => self.providers.openrouter.api_key = key,
+            "anthropic" => self.providers.anthropic.api_key = Secret::new(key),
+            "openai" => self.providers.openai.api_key = Secret::new(key),
+            "deepseek" => self.providers.deepseek.api_key = Secret::new(key),
+            "gemini" => self.providers.gemini.api_key = Secret::new(key),
+            "openrouter" => self.providers.openrouter.api_key = Secret::new(key),
             _ => {}
         }
     }
@@ -170,7 +215,7 @@ pub struct TelegramConfig {
     pub enabled: bool,
 
     #[serde(default)]
-    pub token: String,
+    pub token: Secret<String>,
 
     #[serde(default)]
     pub allow_from: Vec<String>,
@@ -187,7 +232,7 @@ pub struct DiscordConfig {
     pub enabled: bool,
 
     #[serde(default)]
-    pub token: String,
+    pub token: Secret<String>,
 
     #[serde(default)]
     pub allow_from: Vec<String>,
@@ -203,7 +248,7 @@ impl Default for DiscordConfig {
     fn default() -> Self {
         Self {
             enabled: false,
-            token: String::new(),
+            token: Secret::default(),
             allow_from: Vec::new(),
             gateway_url: default_discord_gateway_url(),
             intents: default_discord_intents(),
@@ -255,10 +300,10 @@ pub struct SlackConfig {
     pub enabled: bool,
 
     #[serde(default)]
-    pub bot_token: String,
+    pub bot_token: Secret<String>,
 
     #[serde(default)]
-    pub app_token: String,
+    pub app_token: Secret<String>,
 
     #[serde(default)]
     pub allow_from: Vec<String>,
@@ -280,8 +325,8 @@ impl Default for SlackConfig {
     fn default() -> Self {
         Self {
             enabled: false,
-            bot_token: String::new(),
-            app_token: String::new(),
+            bot_token: Secret::default(),
+            app_token: Secret::default(),
             allow_from: Vec::new(),
             mode: default_slack_mode(),
             group_policy: default_slack_group_policy(),
@@ -319,7 +364,7 @@ pub struct EmailConfig {
     pub imap_username: String,
 
     #[serde(default)]
-    pub imap_password: String,
+    pub imap_password: Secret<String>,
 
     #[serde(default = "default_imap_mailbox")]
     pub imap_mailbox: String,
@@ -337,7 +382,7 @@ pub struct EmailConfig {
     pub smtp_username: String,
 
     #[serde(default)]
-    pub smtp_password: String,
+    pub smtp_password: Secret<String>,
 
     #[serde(default = "default_smtp_use_tls")]
     pub smtp_use_tls: bool,
@@ -377,13 +422,13 @@ impl Default for EmailConfig {
             imap_host: String::new(),
             imap_port: default_imap_port(),
             imap_username: String::new(),
-            imap_password: String::new(),
+            imap_password: Secret::default(),
             imap_mailbox: default_imap_mailbox(),
             imap_use_ssl: default_imap_use_ssl(),
             smtp_host: String::new(),
             smtp_port: default_smtp_port(),
             smtp_username: String::new(),
-            smtp_password: String::new(),
+            smtp_password: Secret::default(),
             smtp_use_tls: default_smtp_use_tls(),
             smtp_use_ssl: false,
             from_address: String::new(),
@@ -458,7 +503,7 @@ pub struct QQConfig {
     pub app_id: String,
 
     #[serde(default)]
-    pub secret: String,
+    pub secret: Secret<String>,
 
     #[serde(default)]
     pub allow_from: Vec<String>,
@@ -475,10 +520,10 @@ pub struct FeishuConfig {
     pub app_id: String,
 
     #[serde(default)]
-    pub app_secret: String,
+    pub app_secret: Secret<String>,
 
     #[serde(default)]
-    pub encrypt_key: String,
+    pub encrypt_key: Secret<String>,
 
     #[serde(default)]
     pub verification_token: String,
@@ -498,7 +543,7 @@ pub struct DingTalkConfig {
     pub client_id: String,
 
     #[serde(default)]
-    pub client_secret: String,
+    pub client_secret: Secret<String>,
 
     #[serde(default)]
     pub allow_from: Vec<String>,
@@ -518,7 +563,7 @@ pub struct MochatConfig {
     pub socket_url: String,
 
     #[serde(default)]
-    pub claw_token: String,
+    pub claw_token: Secret<String>,
 
     #[serde(default)]
     pub agent_user_id: String,
@@ -539,7 +584,7 @@ impl Default for MochatConfig {
             enabled: false,
             base_url: default_mochat_base_url(),
             socket_url: String::new(),
-            claw_token: String::new(),
+            claw_token: Secret::default(),
             agent_user_id: String::new(),
             sessions: Vec::new(),
             panels: Vec::new(),
@@ -598,7 +643,7 @@ pub struct ProvidersConfig {
 #[serde(rename_all = "camelCase")]
 pub struct ProviderConfig {
     #[serde(default)]
-    pub api_key: String,
+    pub api_key: Secret<String>,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub api_base: Option<String>,
@@ -656,7 +701,7 @@ pub struct ToolsConfig {
 #[serde(rename_all = "camelCase")]
 pub struct WebToolsConfig {
     #[serde(default)]
-    pub brave_api_key: String,
+    pub brave_api_key: Secret<String>,
 
     #[serde(default = "default_web_max_results")]
     pub max_results: u8,
@@ -665,7 +710,7 @@ pub struct WebToolsConfig {
 impl Default for WebToolsConfig {
     fn default() -> Self {
         Self {
-            brave_api_key: String::new(),
+            brave_api_key: Secret::default(),
             max_results: default_web_max_results(),
         }
     }
@@ -753,7 +798,7 @@ mod tests {
     fn test_telegram_config_default() {
         let config = TelegramConfig::default();
         assert!(!config.enabled);
-        assert_eq!(config.token, "");
+        assert_eq!(config.token.expose(), "");
         assert_eq!(config.allow_from.len(), 0);
         assert!(config.proxy.is_none());
     }
@@ -762,7 +807,7 @@ mod tests {
     fn test_telegram_config_serialization() {
         let config = TelegramConfig {
             enabled: true,
-            token: "bot123".to_string(),
+            token: Secret::new("bot123".to_string()),
             allow_from: vec!["user1".to_string(), "user2".to_string()],
             proxy: Some("socks5://localhost:1080".to_string()),
         };
@@ -778,7 +823,7 @@ mod tests {
     fn test_discord_config_default() {
         let config = DiscordConfig::default();
         assert!(!config.enabled);
-        assert_eq!(config.token, "");
+        assert_eq!(config.token.expose(), "");
         assert_eq!(config.allow_from.len(), 0);
     }
 
@@ -794,8 +839,8 @@ mod tests {
     fn test_slack_config_default() {
         let config = SlackConfig::default();
         assert!(!config.enabled);
-        assert_eq!(config.bot_token, "");
-        assert_eq!(config.app_token, "");
+        assert_eq!(config.bot_token.expose(), "");
+        assert_eq!(config.app_token.expose(), "");
     }
 
     #[test]
@@ -813,23 +858,23 @@ mod tests {
         let config = QQConfig::default();
         assert!(!config.enabled);
         assert_eq!(config.app_id, "");
-        assert_eq!(config.secret, "");
+        assert_eq!(config.secret.expose(), "");
     }
 
     #[test]
     fn test_providers_config_default() {
         let config = ProvidersConfig::default();
-        assert_eq!(config.anthropic.api_key, "");
-        assert_eq!(config.openai.api_key, "");
-        assert_eq!(config.openrouter.api_key, "");
-        assert_eq!(config.deepseek.api_key, "");
+        assert_eq!(config.anthropic.api_key.expose(), "");
+        assert_eq!(config.openai.api_key.expose(), "");
+        assert_eq!(config.openrouter.api_key.expose(), "");
+        assert_eq!(config.deepseek.api_key.expose(), "");
         assert!(config.anthropic.api_base.is_none());
     }
 
     #[test]
     fn test_provider_config_with_api_base() {
         let config = ProviderConfig {
-            api_key: "test-key".to_string(),
+            api_key: Secret::new("test-key".to_string()),
             api_base: Some("https://custom.api.com/v1".to_string()),
             extra_headers: None,
         };
@@ -842,7 +887,7 @@ mod tests {
     #[test]
     fn test_provider_config_without_api_base() {
         let config = ProviderConfig {
-            api_key: "test-key".to_string(),
+            api_key: Secret::new("test-key".to_string()),
             api_base: None,
             extra_headers: None,
         };
@@ -857,7 +902,7 @@ mod tests {
         let config = ToolsConfig::default();
         assert!(!config.restrict_to_workspace);
         assert_eq!(config.exec.timeout, 60);
-        assert_eq!(config.web.brave_api_key, "");
+        assert_eq!(config.web.brave_api_key.expose(), "");
     }
 
     #[test]
@@ -910,9 +955,9 @@ mod tests {
         let mut config = Config::default();
         config.agents.defaults.model = "test-model".to_string();
         config.agents.defaults.max_tokens = 4096;
-        config.providers.anthropic.api_key = "sk-test-123".to_string();
+        config.providers.anthropic.api_key = Secret::new("sk-test-123".to_string());
         config.channels.telegram.enabled = true;
-        config.channels.telegram.token = "bot-token".to_string();
+        config.channels.telegram.token = Secret::new("bot-token".to_string());
 
         // Serialize
         let json = serde_json::to_string(&config).unwrap();
@@ -922,9 +967,9 @@ mod tests {
 
         assert_eq!(loaded.agents.defaults.model, "test-model");
         assert_eq!(loaded.agents.defaults.max_tokens, 4096);
-        assert_eq!(loaded.providers.anthropic.api_key, "sk-test-123");
+        assert_eq!(loaded.providers.anthropic.api_key.expose(), "sk-test-123");
         assert!(loaded.channels.telegram.enabled);
-        assert_eq!(loaded.channels.telegram.token, "bot-token");
+        assert_eq!(loaded.channels.telegram.token.expose(), "bot-token");
     }
 
     #[test]
@@ -934,13 +979,13 @@ mod tests {
             imap_host: "imap.gmail.com".to_string(),
             imap_port: 993,
             imap_username: "user@gmail.com".to_string(),
-            imap_password: "password".to_string(),
+            imap_password: Secret::new("password".to_string()),
             imap_mailbox: "INBOX".to_string(),
             imap_use_ssl: true,
             smtp_host: "smtp.gmail.com".to_string(),
             smtp_port: 587,
             smtp_username: "user@gmail.com".to_string(),
-            smtp_password: "password".to_string(),
+            smtp_password: Secret::new("password".to_string()),
             smtp_use_tls: true,
             smtp_use_ssl: false,
             from_address: "user@gmail.com".to_string(),
@@ -965,18 +1010,18 @@ mod tests {
     #[test]
     fn test_config_with_multiple_providers() {
         let mut config = Config::default();
-        config.providers.anthropic.api_key = "anthropic-key".to_string();
-        config.providers.openai.api_key = "openai-key".to_string();
-        config.providers.deepseek.api_key = "deepseek-key".to_string();
-        config.providers.openrouter.api_key = "sk-or-v1-test".to_string();
+        config.providers.anthropic.api_key = Secret::new("anthropic-key".to_string());
+        config.providers.openai.api_key = Secret::new("openai-key".to_string());
+        config.providers.deepseek.api_key = Secret::new("deepseek-key".to_string());
+        config.providers.openrouter.api_key = Secret::new("sk-or-v1-test".to_string());
 
         let json = serde_json::to_string(&config).unwrap();
         let loaded: Config = serde_json::from_str(&json).unwrap();
 
-        assert_eq!(loaded.providers.anthropic.api_key, "anthropic-key");
-        assert_eq!(loaded.providers.openai.api_key, "openai-key");
-        assert_eq!(loaded.providers.deepseek.api_key, "deepseek-key");
-        assert_eq!(loaded.providers.openrouter.api_key, "sk-or-v1-test");
+        assert_eq!(loaded.providers.anthropic.api_key.expose(), "anthropic-key");
+        assert_eq!(loaded.providers.openai.api_key.expose(), "openai-key");
+        assert_eq!(loaded.providers.deepseek.api_key.expose(), "deepseek-key");
+        assert_eq!(loaded.providers.openrouter.api_key.expose(), "sk-or-v1-test");
     }
 
     #[test]
@@ -1008,7 +1053,7 @@ mod tests {
     #[test]
     fn test_web_tools_config() {
         let config = WebToolsConfig {
-            brave_api_key: "brave-api-key-123".to_string(),
+            brave_api_key: Secret::new("brave-api-key-123".to_string()),
             max_results: 5,
         };
 

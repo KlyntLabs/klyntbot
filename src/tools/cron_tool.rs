@@ -5,36 +5,21 @@ use serde_json::Value;
 use std::sync::Arc;
 use tracing::debug;
 
-use super::{Tool, ToolContext};
+use super::{Tool, RoutingContext};
 use crate::cron::{CronSchedule, CronService};
 use crate::error::{Result, ToolError};
 
 /// Tool for cron job management via the LLM agent.
 pub struct CronTool {
     cron_service: Option<Arc<CronService>>,
-    context: ToolContext,
 }
 
 impl CronTool {
-    pub fn new(context: ToolContext) -> Self {
-        Self {
-            cron_service: None,
-            context,
-        }
-    }
-
     /// Create with a CronService reference
-    pub fn with_service(service: Arc<CronService>, context: ToolContext) -> Self {
+    pub fn with_service(service: Arc<CronService>) -> Self {
         Self {
             cron_service: Some(service),
-            context,
         }
-    }
-}
-
-impl Default for CronTool {
-    fn default() -> Self {
-        Self::new(ToolContext::new())
     }
 }
 
@@ -82,7 +67,7 @@ impl Tool for CronTool {
         })
     }
 
-    async fn execute(&self, args: Value) -> Result<String> {
+    async fn execute(&self, args: Value, ctx: &RoutingContext) -> Result<String> {
         let action = args
             .get("action")
             .and_then(|v| v.as_str())
@@ -127,20 +112,9 @@ impl Tool for CronTool {
                         .into());
                     };
 
-                // Get current context
-                let (ctx_channel, ctx_chat_id) = self.context.get();
-
-                let channel = if ctx_channel.is_empty() {
-                    None
-                } else {
-                    Some(ctx_channel)
-                };
-
-                let to = if ctx_chat_id.is_empty() {
-                    None
-                } else {
-                    Some(ctx_chat_id)
-                };
+                // Use routing context for scheduling
+                let channel = Some(ctx.channel.as_str().to_string());
+                let to = Some(ctx.chat_id.as_str().to_string());
 
                 let job = service
                     .add_job(name, schedule, message, true, channel, to, false)
@@ -194,10 +168,5 @@ impl Tool for CronTool {
             }
             _ => Err(ToolError::InvalidParams(format!("Unknown action: {}", action)).into()),
         }
-    }
-
-    /// Set the current context for scheduling jobs
-    fn set_context(&self, channel: &str, chat_id: &str) {
-        self.context.set(channel, chat_id);
     }
 }

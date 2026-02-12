@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use tokio::fs;
 use tracing::debug;
 
-use super::Tool;
+use super::{Tool, RoutingContext};
 use crate::error::{Result, ToolError};
 
 /// Resolve path and optionally enforce directory restriction
@@ -84,7 +84,7 @@ impl Tool for ReadFileTool {
         })
     }
 
-    async fn execute(&self, args: Value) -> Result<String> {
+    async fn execute(&self, args: Value, _ctx: &RoutingContext) -> Result<String> {
         let path = args
             .get("path")
             .and_then(|v| v.as_str())
@@ -148,7 +148,7 @@ impl Tool for WriteFileTool {
         })
     }
 
-    async fn execute(&self, args: Value) -> Result<String> {
+    async fn execute(&self, args: Value, _ctx: &RoutingContext) -> Result<String> {
         let path = args
             .get("path")
             .and_then(|v| v.as_str())
@@ -226,7 +226,7 @@ impl Tool for EditFileTool {
         })
     }
 
-    async fn execute(&self, args: Value) -> Result<String> {
+    async fn execute(&self, args: Value, _ctx: &RoutingContext) -> Result<String> {
         let path = args
             .get("path")
             .and_then(|v| v.as_str())
@@ -317,7 +317,7 @@ impl Tool for ListDirTool {
         })
     }
 
-    async fn execute(&self, args: Value) -> Result<String> {
+    async fn execute(&self, args: Value, _ctx: &RoutingContext) -> Result<String> {
         let path = args
             .get("path")
             .and_then(|v| v.as_str())
@@ -379,8 +379,13 @@ pub fn register_fs_tools(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tools::RoutingContext;
     use tempfile::TempDir;
     use tokio::fs;
+
+    fn test_ctx() -> RoutingContext {
+        RoutingContext::new("cli".into(), "test".into())
+    }
 
     #[tokio::test]
     async fn test_read_file_tool() {
@@ -393,7 +398,7 @@ mod tests {
             "path": file_path.to_str().unwrap()
         });
 
-        let result = tool.execute(args).await.unwrap();
+        let result = tool.execute(args, &test_ctx()).await.unwrap();
         assert_eq!(result, "Hello, World!");
     }
 
@@ -404,7 +409,7 @@ mod tests {
             "path": "/tmp/nonexistent_file_12345.txt"
         });
 
-        let result = tool.execute(args).await;
+        let result = tool.execute(args, &test_ctx()).await;
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(err.to_string().contains("File not found"));
@@ -425,7 +430,7 @@ mod tests {
         let args = serde_json::json!({
             "path": file_path.to_str().unwrap()
         });
-        let result = tool.execute(args).await.unwrap();
+        let result = tool.execute(args, &test_ctx()).await.unwrap();
         assert_eq!(result, "Allowed content");
     }
 
@@ -440,7 +445,7 @@ mod tests {
             "content": "Test content"
         });
 
-        let result = tool.execute(args).await.unwrap();
+        let result = tool.execute(args, &test_ctx()).await.unwrap();
         assert!(result.contains("Successfully wrote"));
 
         // Verify file was created with correct content
@@ -463,7 +468,7 @@ mod tests {
             "content": "Nested content"
         });
 
-        let result = tool.execute(args).await.unwrap();
+        let result = tool.execute(args, &test_ctx()).await.unwrap();
         assert!(result.contains("Successfully wrote"));
 
         // Verify parent directories were created
@@ -487,7 +492,7 @@ mod tests {
             "new_text": "Hi"
         });
 
-        let result = tool.execute(args).await.unwrap();
+        let result = tool.execute(args, &test_ctx()).await.unwrap();
         assert!(result.contains("Successfully edited"));
 
         // Verify file was edited correctly
@@ -508,7 +513,7 @@ mod tests {
             "new_text": "Replacement"
         });
 
-        let result = tool.execute(args).await;
+        let result = tool.execute(args, &test_ctx()).await;
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(err.to_string().contains("old_text not found"));
@@ -527,7 +532,7 @@ mod tests {
             "new_text": "replaced"
         });
 
-        let result = tool.execute(args).await;
+        let result = tool.execute(args, &test_ctx()).await;
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(err.to_string().contains("3 times"));
@@ -553,7 +558,7 @@ mod tests {
             "path": temp_dir.path().to_str().unwrap()
         });
 
-        let result = tool.execute(args).await.unwrap();
+        let result = tool.execute(args, &test_ctx()).await.unwrap();
         assert!(result.contains("file1.txt"));
         assert!(result.contains("file2.txt"));
         assert!(result.contains("subdir"));
@@ -568,7 +573,7 @@ mod tests {
             "path": "/tmp/nonexistent_dir_12345"
         });
 
-        let result = tool.execute(args).await;
+        let result = tool.execute(args, &test_ctx()).await;
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(err.to_string().contains("Directory not found"));
@@ -583,7 +588,7 @@ mod tests {
             "path": temp_dir.path().to_str().unwrap()
         });
 
-        let result = tool.execute(args).await.unwrap();
+        let result = tool.execute(args, &test_ctx()).await.unwrap();
         assert!(result.contains("empty"));
     }
 

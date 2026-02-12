@@ -7,12 +7,13 @@ use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 use crate::bus::InboundMessage;
-use crate::providers::{DynProvider, Message, tool_calls_to_messages};
+use crate::providers::{ChatParams, DynProvider, Message, tool_calls_to_messages};
 use crate::tools::{
     filesystem::register_fs_tools,
     registry::ToolRegistry,
     shell::ExecTool,
     web::{WebFetchTool, WebSearchTool},
+    RoutingContext,
 };
 
 /// Configuration for subagent execution
@@ -35,8 +36,85 @@ pub struct SubagentManager {
     restrict_to_workspace: bool,
 }
 
+/// Builder for SubagentManager
+pub struct SubagentManagerBuilder {
+    provider: DynProvider,
+    workspace: PathBuf,
+    inbound_tx: Option<mpsc::Sender<InboundMessage>>,
+    model: Option<String>,
+    brave_api_key: Option<String>,
+    web_max_results: u8,
+    exec_timeout: u64,
+    restrict_to_workspace: bool,
+}
+
+impl SubagentManagerBuilder {
+    /// Create a new builder with required parameters
+    pub fn new(provider: DynProvider, workspace: PathBuf) -> Self {
+        Self {
+            provider,
+            workspace,
+            inbound_tx: None,
+            model: None,
+            brave_api_key: None,
+            web_max_results: 5,
+            exec_timeout: 60,
+            restrict_to_workspace: true,
+        }
+    }
+
+    pub fn inbound_sender(mut self, tx: mpsc::Sender<InboundMessage>) -> Self {
+        self.inbound_tx = Some(tx);
+        self
+    }
+
+    pub fn model(mut self, model: impl Into<String>) -> Self {
+        self.model = Some(model.into());
+        self
+    }
+
+    pub fn brave_api_key(mut self, key: Option<String>) -> Self {
+        self.brave_api_key = key;
+        self
+    }
+
+    pub fn web_max_results(mut self, max: u8) -> Self {
+        self.web_max_results = max;
+        self
+    }
+
+    pub fn exec_timeout(mut self, timeout: u64) -> Self {
+        self.exec_timeout = timeout;
+        self
+    }
+
+    pub fn restrict_to_workspace(mut self, restrict: bool) -> Self {
+        self.restrict_to_workspace = restrict;
+        self
+    }
+
+    pub fn build(self) -> SubagentManager {
+        SubagentManager {
+            provider: self.provider,
+            workspace: self.workspace,
+            inbound_tx: self.inbound_tx.expect("inbound_sender is required"),
+            model: self.model.unwrap_or_else(|| "claude-sonnet-4".to_string()),
+            brave_api_key: self.brave_api_key,
+            web_max_results: self.web_max_results,
+            exec_timeout: self.exec_timeout,
+            restrict_to_workspace: self.restrict_to_workspace,
+        }
+    }
+}
+
 impl SubagentManager {
-    /// Create a new subagent manager
+    /// Create a new subagent manager builder
+    pub fn builder(provider: DynProvider, workspace: PathBuf) -> SubagentManagerBuilder {
+        SubagentManagerBuilder::new(provider, workspace)
+    }
+
+    /// Create a new subagent manager (deprecated - use builder)
+    #[deprecated(note = "Use SubagentManager::builder() instead")]
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         provider: DynProvider,
@@ -187,6 +265,9 @@ async fn run_subagent_task(
     let mut iteration = 0;
     let mut final_result: Option<String> = None;
 
+    // Subagents don't have meaningful routing context, use placeholder
+    let routing_ctx = RoutingContext::new("subagent".into(), "background".into());
+
     while iteration < max_iterations {
         iteration += 1;
 
@@ -194,8 +275,9 @@ async fn run_subagent_task(
 
         // Call LLM with tools
         let tool_defs = tools.get_definitions();
+        let params = ChatParams::new(model);
         let response = provider
-            .chat(&messages, Some(&tool_defs), Some(model))
+            .chat(&messages, Some(&tool_defs), &params)
             .await
             .map_err(|e| {
                 error!("Subagent LLM call failed: {}", e);
@@ -222,7 +304,7 @@ async fn run_subagent_task(
                 debug!("Subagent executing tool: {} with args: {}", tool_name, args);
 
                 let result = tools
-                    .execute(tool_name, args.clone())
+                    .execute(tool_name, args.clone(), &routing_ctx)
                     .await
                     .unwrap_or_else(|e| format!("Tool error: {}", e));
 

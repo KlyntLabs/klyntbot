@@ -13,8 +13,8 @@ use tracing::{debug, warn};
 
 use crate::error::{KlyntbotError, ProviderError, Result};
 use crate::providers::types::{
-    LlmProvider, LlmResponse, LlmStream, LlmStreamChunk, Message, ToolCall, ToolCallDelta,
-    ToolCallMessage, Usage,
+    ChatParams, LlmProvider, LlmResponse, LlmStream, LlmStreamChunk, Message, ToolCall,
+    ToolCallDelta, ToolCallMessage, Usage,
 };
 
 /// OpenAI-compatible provider using direct HTTP
@@ -164,16 +164,23 @@ impl LlmProvider for OpenAiCompatProvider {
         &self,
         messages: &[Message],
         tools: Option<&[Value]>,
-        model: Option<&str>,
+        params: &ChatParams,
     ) -> Result<LlmResponse> {
         let url = format!("{}/chat/completions", self.api_base);
-        let model = model.unwrap_or(&self.default_model);
 
         // Build request body
         let mut body = json!({
-            "model": model,
+            "model": params.model,
             "messages": messages,
         });
+
+        // Add optional parameters
+        if let Some(temp) = params.temperature {
+            body["temperature"] = json!(temp);
+        }
+        if let Some(max_tokens) = params.max_tokens {
+            body["max_tokens"] = json!(max_tokens);
+        }
 
         // Add tools if provided
         if let Some(tools) = tools {
@@ -183,7 +190,7 @@ impl LlmProvider for OpenAiCompatProvider {
             }
         }
 
-        debug!("Calling LLM: model={}, messages={}", model, messages.len());
+        debug!("Calling LLM: model={}, messages={}", params.model, messages.len());
 
         // Build request with authorization header
         let mut request = self
@@ -235,17 +242,24 @@ impl LlmProvider for OpenAiCompatProvider {
         &self,
         messages: &[Message],
         tools: Option<&[Value]>,
-        model: Option<&str>,
+        params: &ChatParams,
     ) -> Result<LlmStream> {
         let url = format!("{}/chat/completions", self.api_base);
-        let model = model.unwrap_or(&self.default_model);
 
         // Build request body with stream: true
         let mut body = json!({
-            "model": model,
+            "model": params.model,
             "messages": messages,
             "stream": true,
         });
+
+        // Add optional parameters
+        if let Some(temp) = params.temperature {
+            body["temperature"] = json!(temp);
+        }
+        if let Some(max_tokens) = params.max_tokens {
+            body["max_tokens"] = json!(max_tokens);
+        }
 
         if let Some(tools) = tools {
             if !tools.is_empty() {
@@ -256,7 +270,7 @@ impl LlmProvider for OpenAiCompatProvider {
 
         debug!(
             "Calling LLM (streaming): model={}, messages={}",
-            model,
+            params.model,
             messages.len()
         );
 

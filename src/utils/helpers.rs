@@ -74,10 +74,13 @@ pub fn safe_filename(s: impl AsRef<str>) -> String {
 }
 
 /// Get the klyntbot data directory (~/.klyntbot)
-pub fn get_data_dir() -> PathBuf {
+pub fn get_data_dir() -> std::io::Result<PathBuf> {
     dirs::home_dir()
-        .expect("Unable to determine home directory")
-        .join(".klyntbot")
+        .map(|home| home.join(".klyntbot"))
+        .ok_or_else(|| std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "Unable to determine home directory"
+        ))
 }
 
 /// Get the workspace path from config or default
@@ -262,7 +265,7 @@ mod tests {
 
     #[test]
     fn test_get_data_dir() {
-        let data_dir = get_data_dir();
+        let data_dir = get_data_dir().unwrap();
         assert!(data_dir.to_string_lossy().contains(".klyntbot"));
 
         let home = dirs::home_dir().unwrap();

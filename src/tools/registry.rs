@@ -5,12 +5,13 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{debug, warn};
 
-use super::{DynTool, Tool};
+use super::{DynTool, Tool, RoutingContext};
 use crate::error::{Result, ToolError};
 
 /// Registry for agent tools
 pub struct ToolRegistry {
     tools: HashMap<String, DynTool>,
+    cached_definitions: Option<Vec<Value>>,
 }
 
 impl ToolRegistry {
@@ -18,6 +19,7 @@ impl ToolRegistry {
     pub fn new() -> Self {
         Self {
             tools: HashMap::new(),
+            cached_definitions: None,
         }
     }
 
@@ -26,11 +28,15 @@ impl ToolRegistry {
         let name = tool.name().to_string();
         debug!("Registering tool: {}", name);
         self.tools.insert(name, Arc::new(tool));
+        // Invalidate cache when registry changes
+        self.cached_definitions = None;
     }
 
     /// Unregister a tool by name
     pub fn unregister(&mut self, name: &str) {
         self.tools.remove(name);
+        // Invalidate cache when registry changes
+        self.cached_definitions = None;
     }
 
     /// Get a tool by name
@@ -44,12 +50,21 @@ impl ToolRegistry {
     }
 
     /// Get all tool definitions in OpenAI function-calling format
-    pub fn get_definitions(&self) -> Vec<Value> {
-        self.tools.values().map(|tool| tool.to_schema()).collect()
+    pub fn get_definitions(&mut self) -> Vec<Value> {
+        if self.cached_definitions.is_none() {
+            // First time: build and cache all tool schemas
+            let definitions: Vec<Value> = self.tools.values().map(|tool| tool.to_schema()).collect();
+            self.cached_definitions = Some(definitions.clone());
+            debug!("Cached {} tool definitions", definitions.len());
+            definitions
+        } else {
+            // Return cached definitions
+            self.cached_definitions.as_ref().unwrap().clone()
+        }
     }
 
-    /// Execute a tool by name with given parameters
-    pub async fn execute(&self, name: &str, params: Value) -> Result<String> {
+    /// Execute a tool by name with given parameters and routing context
+    pub async fn execute(&self, name: &str, params: Value, ctx: &RoutingContext) -> Result<String> {
         let tool = self
             .tools
             .get(name)
@@ -62,7 +77,7 @@ impl ToolRegistry {
         }
 
         // Execute the tool
-        match tool.execute(params).await {
+        match tool.execute(params, ctx).await {
             Ok(result) => Ok(result),
             Err(e) => {
                 warn!("Tool {} execution failed: {}", name, e);
@@ -123,7 +138,7 @@ mod tests {
             })
         }
 
-        async fn execute(&self, _args: Value) -> Result<String> {
+        async fn execute(&self, _args: Value, _ctx: &RoutingContext) -> Result<String> {
             Ok("mock result".to_string())
         }
     }
@@ -141,7 +156,8 @@ mod tests {
         assert_eq!(defs.len(), 1);
 
         let params = serde_json::json!({"input": "test"});
-        let result = registry.execute("mock_tool", params).await.unwrap();
+        let ctx = RoutingContext::new("cli".into(), "test".into());
+        let result = registry.execute("mock_tool", params, &ctx).await.unwrap();
         assert_eq!(result, "mock result");
 
         registry.unregister("mock_tool");

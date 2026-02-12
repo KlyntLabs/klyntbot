@@ -4,6 +4,7 @@ use anyhow::Result;
 use crate::{AgentLoop, ChannelManager, CronService, HeartbeatService, MessageBus};
 use std::sync::Arc;
 use tokio::signal;
+use tokio::sync::Mutex;
 use tracing::{error, info};
 
 /// Handle serve command
@@ -28,7 +29,7 @@ pub async fn handle_serve(port: u16) -> Result<()> {
     info!("Cron service started");
 
     // Initialize agent loop WITH cron service
-    let agent_loop = Arc::new(
+    let agent_loop = Arc::new(Mutex::new(
         AgentLoop::new_with_cron(
             bus.clone(),
             provider,
@@ -36,11 +37,14 @@ pub async fn handle_serve(port: u16) -> Result<()> {
             Some(cron_service.clone()),
         )
         .await?,
-    );
+    ));
     info!("Agent loop initialized");
 
     // Initialize channel manager
-    let channel_manager = Arc::new(ChannelManager::new(Arc::new(config.clone()), bus.clone()));
+    let channel_manager = Arc::new(Mutex::new(ChannelManager::new(
+        Arc::new(config.clone()),
+        bus.clone(),
+    )));
 
     // Initialize heartbeat service with agent loop callback
     let workspace_path = config.workspace_path();
@@ -76,7 +80,7 @@ pub async fn handle_serve(port: u16) -> Result<()> {
     let agent_loop_handle = {
         let agent = agent_loop.clone();
         tokio::spawn(async move {
-            if let Err(e) = agent.run().await {
+            if let Err(e) = agent.lock().await.run().await {
                 error!("Agent loop error: {}", e);
             }
         })
@@ -86,7 +90,7 @@ pub async fn handle_serve(port: u16) -> Result<()> {
     let channel_manager_handle = {
         let cm = channel_manager.clone();
         tokio::spawn(async move {
-            if let Err(e) = cm.start_all().await {
+            if let Err(e) = cm.lock().await.start_all().await {
                 error!("Channel manager error: {}", e);
             }
         })
@@ -117,8 +121,8 @@ pub async fn handle_serve(port: u16) -> Result<()> {
     info!("Shutting down gracefully...");
 
     // Stop all services gracefully
-    agent_loop.stop().await;
-    channel_manager.stop_all().await?;
+    agent_loop.lock().await.stop().await;
+    channel_manager.lock().await.stop_all().await?;
     cron_service.stop().await;
     heartbeat_service.stop().await;
 

@@ -2,10 +2,10 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::RwLock;
+use tokio::sync::{mpsc, RwLock};
 use tracing::{debug, error, info, warn};
 
-use crate::bus::MessageBus;
+use crate::bus::{MessageBus, OutboundMessage};
 use crate::channels::{
     DiscordChannel, DynChannel, EmailChannel, QQChannel, SlackChannel, TelegramChannel,
     WhatsAppChannel,
@@ -34,15 +34,23 @@ macro_rules! init_channel {
 pub struct ChannelManager {
     channels: Arc<RwLock<HashMap<String, DynChannel>>>,
     bus: Arc<MessageBus>,
+    outbound_rx: Option<mpsc::Receiver<OutboundMessage>>,
     config: Arc<Config>,
 }
 
 impl ChannelManager {
     /// Create a new channel manager
-    pub fn new(config: Arc<Config>, bus: Arc<MessageBus>) -> Self {
+    pub fn new(config: Arc<Config>, mut bus: Arc<MessageBus>) -> Self {
+        // Take ownership of the outbound receiver
+        let outbound_rx = Arc::get_mut(&mut bus)
+            .expect("Bus should not be shared yet")
+            .take_outbound_rx()
+            .expect("Outbound receiver already taken");
+
         Self {
             channels: Arc::new(RwLock::new(HashMap::new())),
             bus,
+            outbound_rx: Some(outbound_rx),
             config,
         }
     }
@@ -53,7 +61,7 @@ impl ChannelManager {
 
         // Telegram (needs groq key for voice transcription)
         let groq_key = (!self.config.providers.groq.api_key.is_empty())
-            .then(|| self.config.providers.groq.api_key.clone());
+            .then(|| self.config.providers.groq.api_key.expose().clone());
         init_channel!(
             channels,
             self.config.channels.telegram,
@@ -100,7 +108,7 @@ impl ChannelManager {
     }
 
     /// Start all enabled channels
-    pub async fn start_all(&self) -> Result<()> {
+    pub async fn start_all(&mut self) -> Result<()> {
         // Initialize channels first
         self.initialize_channels().await?;
 
@@ -131,16 +139,16 @@ impl ChannelManager {
         }
 
         // Start outbound dispatcher
-        let bus_clone = self.bus.clone();
+        let mut outbound_rx = self.outbound_rx.take().expect("Outbound receiver already taken");
         let channels_clone = self.channels.clone();
         let dispatcher_task = tokio::spawn(async move {
             debug!("Starting outbound message dispatcher");
 
             loop {
-                match bus_clone.consume_outbound().await {
+                match outbound_rx.recv().await {
                     Some(msg) => {
                         let channels = channels_clone.read().await;
-                        if let Some(channel) = channels.get(&msg.channel) {
+                        if let Some(channel) = channels.get(msg.channel.as_str()) {
                             if let Err(e) = channel.send(&msg).await {
                                 error!("Failed to send message to {}: {}", msg.channel, e);
                             }

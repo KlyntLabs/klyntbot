@@ -7,6 +7,7 @@ use lettre::transport::smtp::authentication::Credentials;
 use lettre::{Message as LettreMessage, SmtpTransport, Transport};
 use mail_parser::MessageParser;
 use std::collections::{HashMap, HashSet};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
@@ -24,7 +25,7 @@ pub struct EmailChannel {
     last_subject_by_chat: Arc<RwLock<HashMap<String, String>>>,
     last_message_id_by_chat: Arc<RwLock<HashMap<String, String>>>,
     processed_uids: Arc<RwLock<HashSet<String>>>,
-    running: Arc<RwLock<bool>>,
+    running: Arc<AtomicBool>,
 }
 
 impl EmailChannel {
@@ -35,7 +36,7 @@ impl EmailChannel {
             last_subject_by_chat: Arc::new(RwLock::new(HashMap::new())),
             last_message_id_by_chat: Arc::new(RwLock::new(HashMap::new())),
             processed_uids: Arc::new(RwLock::new(HashSet::new())),
-            running: Arc::new(RwLock::new(false)),
+            running: Arc::new(AtomicBool::new(false)),
         })
     }
 
@@ -114,7 +115,7 @@ impl EmailChannel {
             let client = async_imap::Client::new(tls_stream);
 
             let mut session = client
-                .login(&self.config.imap_username, &self.config.imap_password)
+                .login(&self.config.imap_username, self.config.imap_password.expose())
                 .await
                 .map_err(|(e, _)| {
                     ChannelError::ConnectionFailed(format!("IMAP login failed: {}", e))
@@ -135,7 +136,7 @@ impl EmailChannel {
             let client = async_imap::Client::new(tcp_stream);
 
             let mut session = client
-                .login(&self.config.imap_username, &self.config.imap_password)
+                .login(&self.config.imap_username, self.config.imap_password.expose())
                 .await
                 .map_err(|(e, _)| {
                     ChannelError::ConnectionFailed(format!("IMAP login failed: {}", e))
@@ -309,7 +310,7 @@ impl EmailChannel {
         }
 
         // Publish to bus
-        let mut inbound = InboundMessage::new("email", &sender, &sender, &content);
+        let mut inbound = InboundMessage::new("email", sender.as_str(), sender.as_str(), &content);
         inbound.metadata.insert(
             "email".to_string(),
             serde_json::json!({
@@ -375,7 +376,7 @@ impl EmailChannel {
         // Send via SMTP
         let creds = Credentials::new(
             self.config.smtp_username.clone(),
-            self.config.smtp_password.clone(),
+            self.config.smtp_password.expose().clone(),
         );
 
         let mailer = SmtpTransport::relay(&self.config.smtp_host)
@@ -425,13 +426,13 @@ impl Channel for EmailChannel {
     async fn start(&self, bus: Arc<MessageBus>) -> Result<()> {
         self.validate_config()?;
 
-        *self.running.write().await = true;
+        self.running.store(true, Ordering::SeqCst);
 
         info!("Starting Email channel (IMAP polling mode)...");
 
         let poll_interval = Duration::from_secs(self.config.poll_interval_seconds.max(5) as u64);
 
-        while *self.running.read().await {
+        while self.running.load(Ordering::SeqCst) {
             if let Err(e) = self.poll_imap(&bus).await {
                 error!("Email polling error: {}", e);
             }
@@ -443,7 +444,7 @@ impl Channel for EmailChannel {
     }
 
     async fn stop(&self) -> Result<()> {
-        *self.running.write().await = false;
+        self.running.store(false, Ordering::SeqCst);
         Ok(())
     }
 
@@ -453,7 +454,7 @@ impl Channel for EmailChannel {
             return Ok(());
         }
 
-        let to = msg.chat_id.trim();
+        let to = msg.chat_id.as_str().trim();
         if to.is_empty() {
             return Err(ChannelError::SendFailed("Empty recipient address".to_string()).into());
         }

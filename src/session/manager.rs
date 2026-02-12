@@ -3,8 +3,8 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
-use std::fs;
 use std::path::PathBuf;
+use tokio::fs;
 use tracing::{debug, warn};
 
 use crate::error::{Result, SessionError};
@@ -53,9 +53,9 @@ impl Session {
     }
 
     /// Get recent message history for LLM context
-    pub fn get_history(&self, max_messages: usize) -> Vec<SessionMessage> {
+    pub fn get_history(&self, max_messages: usize) -> &[SessionMessage] {
         let start = self.messages.len().saturating_sub(max_messages);
-        self.messages[start..].to_vec()
+        &self.messages[start..]
     }
 
     /// Clear all messages
@@ -96,8 +96,8 @@ impl SessionManager {
     pub fn with_capacity(sessions_dir: impl Into<PathBuf>, max_cache_size: usize) -> Self {
         let sessions_dir = sessions_dir.into();
 
-        // Create sessions directory if it doesn't exist
-        if let Err(e) = fs::create_dir_all(&sessions_dir) {
+        // Create sessions directory if it doesn't exist (using std::fs for sync constructor)
+        if let Err(e) = std::fs::create_dir_all(&sessions_dir) {
             warn!("Failed to create sessions directory: {}", e);
         }
 
@@ -117,7 +117,7 @@ impl SessionManager {
     }
 
     /// Get an existing session or create a new one
-    pub fn get_or_create(&mut self, key: impl Into<String>) -> Result<&mut Session> {
+    pub async fn get_or_create(&mut self, key: impl Into<String>) -> Result<&mut Session> {
         let key = key.into();
 
         // Update LRU order
@@ -128,7 +128,7 @@ impl SessionManager {
         while self.lru_order.len() > self.max_cache_size {
             if let Some(old_key) = self.lru_order.pop_front() {
                 if let Some(session) = self.cache.remove(&old_key) {
-                    let _ = self.save(&session);
+                    let _ = self.save(&session).await;
                     debug!("Evicted session from cache: {}", old_key);
                 }
             }
@@ -137,7 +137,7 @@ impl SessionManager {
         // Check cache first
         if !self.cache.contains_key(&key) {
             // Try to load from disk
-            let session = match self.load(&key) {
+            let session = match self.load(&key).await {
                 Ok(s) => s,
                 Err(_) => {
                     debug!("Creating new session: {}", key);
@@ -151,14 +151,14 @@ impl SessionManager {
     }
 
     /// Load a session from disk
-    fn load(&self, key: &str) -> Result<Session> {
+    async fn load(&self, key: &str) -> Result<Session> {
         let path = self.session_path(key);
 
         if !path.exists() {
             return Err(SessionError::NotFound(key.to_string()).into());
         }
 
-        let content = fs::read_to_string(&path).map_err(|e| {
+        let content = fs::read_to_string(&path).await.map_err(|e| {
             SessionError::LoadFailed(format!("Failed to read {}: {}", path.display(), e))
         })?;
 
@@ -213,7 +213,7 @@ impl SessionManager {
     }
 
     /// Save a session to disk
-    pub fn save(&self, session: &Session) -> Result<()> {
+    pub async fn save(&self, session: &Session) -> Result<()> {
         let path = self.session_path(&session.key);
 
         debug!("Saving session to: {}", path.display());
@@ -236,7 +236,7 @@ impl SessionManager {
             content.push('\n');
         }
 
-        fs::write(&path, content).map_err(|e| {
+        fs::write(&path, content).await.map_err(|e| {
             SessionError::SaveFailed(format!("Failed to write {}: {}", path.display(), e))
         })?;
 
@@ -245,22 +245,22 @@ impl SessionManager {
 
     /// Save a session by key without requiring a clone.
     /// This method saves the session directly from the internal cache if it exists.
-    pub fn save_by_key(&mut self, key: &str) -> Result<()> {
+    pub async fn save_by_key(&mut self, key: &str) -> Result<()> {
         if let Some(session) = self.cache.get(key) {
-            self.save(session)?;
+            self.save(session).await?;
         }
         Ok(())
     }
 
     /// Delete a session
-    pub fn delete(&mut self, key: &str) -> Result<bool> {
+    pub async fn delete(&mut self, key: &str) -> Result<bool> {
         // Remove from cache
         self.cache.remove(key);
 
         // Remove file
         let path = self.session_path(key);
-        if path.exists() {
-            fs::remove_file(&path).map_err(SessionError::Io)?;
+        if tokio::fs::try_exists(&path).await.unwrap_or(false) {
+            fs::remove_file(&path).await.map_err(SessionError::Io)?;
             Ok(true)
         } else {
             Ok(false)
@@ -268,15 +268,15 @@ impl SessionManager {
     }
 
     /// List all sessions
-    pub fn list(&self) -> Result<Vec<SessionInfo>> {
+    pub async fn list(&self) -> Result<Vec<SessionInfo>> {
         let mut sessions = Vec::new();
 
-        if !self.sessions_dir.exists() {
+        if !tokio::fs::try_exists(&self.sessions_dir).await.unwrap_or(false) {
             return Ok(sessions);
         }
 
-        for entry in fs::read_dir(&self.sessions_dir).map_err(SessionError::Io)? {
-            let entry = entry.map_err(SessionError::Io)?;
+        let mut entries = fs::read_dir(&self.sessions_dir).await.map_err(SessionError::Io)?;
+        while let Some(entry) = entries.next_entry().await.map_err(SessionError::Io)? {
             let path = entry.path();
 
             if path.extension().and_then(|s| s.to_str()) == Some("jsonl") {
@@ -287,7 +287,7 @@ impl SessionManager {
                     .ok_or_else(|| SessionError::LoadFailed("Invalid filename".to_string()))
                 {
                     // Try to read metadata
-                    if let Ok(session) = self.load(&key) {
+                    if let Ok(session) = self.load(&key).await {
                         sessions.push(SessionInfo {
                             key: session.key,
                             created_at: session.created_at,
@@ -298,6 +298,7 @@ impl SessionManager {
                 }
             }
         }
+        drop(entries);
 
         // Sort by updated_at (most recent first)
         sessions.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
@@ -367,13 +368,13 @@ mod tests {
         assert_eq!(session.messages.len(), 0);
     }
 
-    #[test]
-    fn test_session_manager_get_or_create() {
+    #[tokio::test]
+    async fn test_session_manager_get_or_create() {
         let temp_dir = TempDir::new().unwrap();
         let mut manager = SessionManager::new(temp_dir.path());
 
         // Get non-existent session (should create new)
-        let session = manager.get_or_create("test:chat123").unwrap();
+        let session = manager.get_or_create("test:chat123").await.unwrap();
         assert_eq!(session.key, "test:chat123");
         assert_eq!(session.messages.len(), 0);
 
@@ -381,30 +382,30 @@ mod tests {
         session.add_message("user", "Test message");
 
         // Get same session again (should retrieve from cache)
-        let session2 = manager.get_or_create("test:chat123").unwrap();
+        let session2 = manager.get_or_create("test:chat123").await.unwrap();
         assert_eq!(session2.messages.len(), 1);
     }
 
-    #[test]
-    fn test_session_save_and_load() {
+    #[tokio::test]
+    async fn test_session_save_and_load() {
         let temp_dir = TempDir::new().unwrap();
         let mut manager = SessionManager::new(temp_dir.path());
 
         // Create and populate session
         {
-            let session = manager.get_or_create("test:chat123").unwrap();
+            let session = manager.get_or_create("test:chat123").await.unwrap();
             session.add_message("user", "Hello");
             session.add_message("assistant", "Hi there!");
         }
 
         // Save session (borrow ends above)
-        let session = manager.get_or_create("test:chat123").unwrap();
+        let session = manager.get_or_create("test:chat123").await.unwrap();
         let session_clone = session.clone();
-        manager.save(&session_clone).unwrap();
+        manager.save(&session_clone).await.unwrap();
 
         // Create new manager to force reload from disk
         let mut manager2 = SessionManager::new(temp_dir.path());
-        let loaded_session = manager2.get_or_create("test:chat123").unwrap();
+        let loaded_session = manager2.get_or_create("test:chat123").await.unwrap();
 
         assert_eq!(loaded_session.messages.len(), 2);
         assert_eq!(loaded_session.messages[0].content, "Hello");
@@ -422,51 +423,51 @@ mod tests {
         assert_eq!(filename, "telegram_chat_123_456.jsonl");
     }
 
-    #[test]
-    fn test_session_delete() {
+    #[tokio::test]
+    async fn test_session_delete() {
         let temp_dir = TempDir::new().unwrap();
         let mut manager = SessionManager::new(temp_dir.path());
 
         // Create and save session
         {
-            let session = manager.get_or_create("test:chat123").unwrap();
+            let session = manager.get_or_create("test:chat123").await.unwrap();
             session.add_message("user", "Test");
         }
-        let session = manager.get_or_create("test:chat123").unwrap();
+        let session = manager.get_or_create("test:chat123").await.unwrap();
         let session_clone = session.clone();
-        manager.save(&session_clone).unwrap();
+        manager.save(&session_clone).await.unwrap();
 
         // Delete session
-        let deleted = manager.delete("test:chat123").unwrap();
+        let deleted = manager.delete("test:chat123").await.unwrap();
         assert!(deleted);
 
         // Verify file is gone
         let path = manager.session_path("test:chat123");
-        assert!(!path.exists());
+        assert!(!tokio::fs::try_exists(&path).await.unwrap_or(false));
 
         // Delete non-existent session
-        let deleted2 = manager.delete("nonexistent").unwrap();
+        let deleted2 = manager.delete("nonexistent").await.unwrap();
         assert!(!deleted2);
     }
 
-    #[test]
-    fn test_session_list() {
+    #[tokio::test]
+    async fn test_session_list() {
         let temp_dir = TempDir::new().unwrap();
         let mut manager = SessionManager::new(temp_dir.path());
 
         // Create multiple sessions
         for i in 0..3 {
             {
-                let session = manager.get_or_create(format!("test:chat{}", i)).unwrap();
+                let session = manager.get_or_create(format!("test:chat{}", i)).await.unwrap();
                 session.add_message("user", "Test");
             }
-            let session = manager.get_or_create(format!("test:chat{}", i)).unwrap();
+            let session = manager.get_or_create(format!("test:chat{}", i)).await.unwrap();
             let session_clone = session.clone();
-            manager.save(&session_clone).unwrap();
+            manager.save(&session_clone).await.unwrap();
         }
 
         // List all sessions
-        let sessions = manager.list().unwrap();
+        let sessions = manager.list().await.unwrap();
         assert_eq!(sessions.len(), 3);
 
         // Verify they're sorted by updated_at (most recent first)

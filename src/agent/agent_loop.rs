@@ -1,6 +1,7 @@
 //! Agent loop: the core processing engine.
 
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
@@ -9,8 +10,9 @@ use tracing::{debug, error, info, warn};
 use crate::bus::{InboundMessage, MessageBus, OutboundMessage};
 use crate::config::Config;
 use crate::error::Result;
-use crate::providers::{DynProvider, Message, tool_calls_to_messages};
+use crate::providers::{ChatParams, DynProvider, Message, tool_calls_to_messages};
 use crate::session::SessionManager;
+use tokio::sync::mpsc;
 use crate::tools::{
     cron_tool::CronTool,
     filesystem::register_fs_tools,
@@ -19,9 +21,10 @@ use crate::tools::{
     shell::ExecTool,
     spawn::SpawnTool,
     web::{WebFetchTool, WebSearchTool},
-    ToolContext,
+    RoutingContext,
 };
 use futures_util::StreamExt;
+use futures_util::future::join_all;
 use std::collections::HashMap;
 
 use super::{ContextBuilder, SubagentManager};
@@ -35,6 +38,7 @@ const DEFAULT_HISTORY_LIMIT: usize = 50;
 /// Agent loop - the core processing engine
 pub struct AgentLoop {
     bus: Arc<MessageBus>,
+    inbound_rx: Option<mpsc::Receiver<InboundMessage>>,
     provider: DynProvider,
     config: Config,
     context_builder: Arc<RwLock<ContextBuilder>>,
@@ -42,13 +46,13 @@ pub struct AgentLoop {
     tool_registry: Arc<RwLock<ToolRegistry>>,
     #[allow(dead_code)] // Will be used when full agent loop implementation is completed
     subagent_manager: Arc<SubagentManager>,
-    running: Arc<RwLock<bool>>,
+    running: Arc<AtomicBool>,
 }
 
 impl AgentLoop {
     /// Create a new agent loop with optional cron service
     pub async fn new_with_cron(
-        bus: Arc<MessageBus>,
+        mut bus: Arc<MessageBus>,
         provider: DynProvider,
         config: Config,
         cron_service: Option<Arc<crate::cron::CronService>>,
@@ -73,18 +77,18 @@ impl AgentLoop {
 
         // Create subagent manager
         let brave_api_key = (!config.tools.web.brave_api_key.is_empty())
-            .then(|| config.tools.web.brave_api_key.clone());
+            .then(|| config.tools.web.brave_api_key.expose().clone());
 
-        let subagent_manager = Arc::new(SubagentManager::new(
-            Arc::clone(&provider),
-            workspace.clone(),
-            bus.inbound_sender(),
-            config.agents.defaults.model.clone(),
-            brave_api_key.clone(),
-            config.tools.web.max_results,
-            config.tools.exec.timeout,
-            config.tools.restrict_to_workspace,
-        ));
+        let subagent_manager = Arc::new(
+            SubagentManager::builder(Arc::clone(&provider), workspace.clone())
+                .inbound_sender(bus.inbound_sender())
+                .model(config.agents.defaults.model.clone())
+                .brave_api_key(brave_api_key.clone())
+                .web_max_results(config.tools.web.max_results)
+                .exec_timeout(config.tools.exec.timeout)
+                .restrict_to_workspace(config.tools.restrict_to_workspace)
+                .build(),
+        );
 
         // Create tool registry
         let mut tool_registry = ToolRegistry::new();
@@ -112,31 +116,33 @@ impl AgentLoop {
         ));
         tool_registry.register(WebFetchTool::new());
 
-        // Create shared tool context for routing info
-        let tool_context = ToolContext::new();
-
         // Register message tool
-        tool_registry.register(MessageTool::new(bus.outbound_sender(), tool_context.clone()));
+        tool_registry.register(MessageTool::new(bus.outbound_sender()));
 
         // Register spawn tool with subagent manager
-        tool_registry.register(SpawnTool::with_manager(subagent_manager.clone(), tool_context.clone()));
+        tool_registry.register(SpawnTool::with_manager(subagent_manager.clone()));
 
         // Register cron tool (with service if provided)
         if let Some(cron_svc) = cron_service {
-            tool_registry.register(CronTool::with_service(cron_svc, tool_context));
-        } else {
-            tool_registry.register(CronTool::new(tool_context));
+            tool_registry.register(CronTool::with_service(cron_svc));
         }
+
+        // Take ownership of the inbound receiver
+        let inbound_rx = Arc::get_mut(&mut bus)
+            .expect("Bus should not be shared yet")
+            .take_inbound_rx()
+            .expect("Inbound receiver already taken");
 
         Ok(Self {
             bus,
+            inbound_rx: Some(inbound_rx),
             provider,
             config,
             context_builder: Arc::new(RwLock::new(context_builder)),
             session_manager: Arc::new(RwLock::new(session_manager)),
             tool_registry: Arc::new(RwLock::new(tool_registry)),
             subagent_manager,
-            running: Arc::new(RwLock::new(false)),
+            running: Arc::new(AtomicBool::new(false)),
         })
     }
 
@@ -146,17 +152,17 @@ impl AgentLoop {
     }
 
     /// Run the agent loop, processing messages from the bus
-    pub async fn run(&self) -> Result<()> {
-        {
-            let mut running = self.running.write().await;
-            *running = true;
-        }
+    pub async fn run(&mut self) -> Result<()> {
+        self.running.store(true, Ordering::SeqCst);
 
         info!("Agent loop started");
 
-        while *self.running.read().await {
+        // Take ownership of the receiver
+        let mut inbound_rx = self.inbound_rx.take().expect("AgentLoop::run can only be called once");
+
+        while self.running.load(Ordering::SeqCst) {
             // Wait for next message with timeout
-            match tokio::time::timeout(Duration::from_secs(1), self.bus.consume_inbound()).await {
+            match tokio::time::timeout(Duration::from_secs(1), inbound_rx.recv()).await {
                 Ok(Some(msg)) => {
                     if let Err(e) = self.process_message(msg).await {
                         error!("Error processing message: {}", e);
@@ -179,12 +185,18 @@ impl AgentLoop {
 
     /// Stop the agent loop
     pub async fn stop(&self) {
-        let mut running = self.running.write().await;
-        *running = false;
+        self.running.store(false, Ordering::SeqCst);
     }
 
     /// Process a single inbound message
+    #[tracing::instrument(skip(self, msg), fields(channel = %msg.channel, sender = %msg.sender_id))]
     async fn process_message(&self, msg: InboundMessage) -> Result<()> {
+        // Validate message size
+        if let Err(e) = msg.validate() {
+            warn!("Message validation failed: {}", e);
+            return Ok(()); // silently drop oversized messages
+        }
+
         // Handle system messages (subagent results)
         if msg.channel.as_str() == "system" {
             return self.process_system_message(msg).await;
@@ -204,22 +216,22 @@ impl AgentLoop {
         // Get or create session
         let session_key = msg.session_key();
         let mut session_manager = self.session_manager.write().await;
-        let session = session_manager.get_or_create(session_key.as_str())?;
+        let session = session_manager.get_or_create(session_key.as_str()).await?;
 
         // Add user message to session
         session.add_message("user", &msg.content);
 
         // Get session history
-        let history = session.get_history(DEFAULT_HISTORY_LIMIT);
+        let history = session.get_history(DEFAULT_HISTORY_LIMIT).to_vec();
 
         // Drop the write lock
         drop(session_manager);
 
-        // Update tool contexts
-        self.update_tool_contexts(msg.channel.as_str(), msg.chat_id.as_str()).await;
+        // Create routing context for tools
+        let routing_ctx = RoutingContext::new(msg.channel.clone(), msg.chat_id.clone());
 
         // Build messages for LLM
-        let context_builder = self.context_builder.read().await;
+        let mut context_builder = self.context_builder.write().await;
         let media = if msg.media.is_empty() {
             None
         } else {
@@ -232,7 +244,7 @@ impl AgentLoop {
         drop(context_builder);
 
         // Run agent loop
-        let response_content = self.run_agent_loop(messages, false).await?;
+        let response_content = self.run_agent_loop(messages, false, &routing_ctx).await?;
 
         // Save assistant response to session
         self.save_to_session(session_key.as_str(), &response_content).await;
@@ -252,7 +264,7 @@ impl AgentLoop {
         if msg.sender_id == "telegram_reset" && msg.content == "__RESET_SESSION__" {
             let mut session_manager = self.session_manager.write().await;
             let session_to_save = {
-                if let Ok(session) = session_manager.get_or_create(msg.chat_id.as_str()) {
+                if let Ok(session) = session_manager.get_or_create(msg.chat_id.as_str()).await {
                     session.clear();
                     Some(session.clone())
                 } else {
@@ -261,7 +273,7 @@ impl AgentLoop {
             };
 
             if let Some(session) = session_to_save {
-                if let Err(e) = session_manager.save(&session) {
+                if let Err(e) = session_manager.save(&session).await {
                     warn!("Failed to save cleared session: {}", e);
                 }
             }
@@ -281,26 +293,25 @@ impl AgentLoop {
         // Session key for the original conversation
         let session_key = format!("{}:{}", origin_channel, origin_chat_id);
 
-        // Update tool contexts to the origin channel (not "system")
-        self.update_tool_contexts(origin_channel, origin_chat_id)
-            .await;
+        // Create routing context for the origin channel (not "system")
+        let routing_ctx = RoutingContext::new(origin_channel.into(), origin_chat_id.into());
 
         // Get or create session and add system message as "user" role
         let mut session_manager = self.session_manager.write().await;
-        let session = session_manager.get_or_create(&session_key)?;
+        let session = session_manager.get_or_create(&session_key).await?;
 
         // Format system message with sender_id prefix
         let system_msg_content = format!("[System: {}] {}", msg.sender_id, msg.content);
         session.add_message("user", &system_msg_content);
 
         // Get session history
-        let history = session.get_history(DEFAULT_HISTORY_LIMIT);
+        let history = session.get_history(DEFAULT_HISTORY_LIMIT).to_vec();
 
         // Drop the write lock before building messages
         drop(session_manager);
 
         // Build messages for LLM
-        let context_builder = self.context_builder.read().await;
+        let mut context_builder = self.context_builder.write().await;
         let messages = context_builder
             .build_messages(
                 history,
@@ -313,7 +324,7 @@ impl AgentLoop {
         drop(context_builder);
 
         // Run agent loop
-        let response_content = self.run_agent_loop(messages, false).await?;
+        let response_content = self.run_agent_loop(messages, false, &routing_ctx).await?;
 
         // Save assistant response to session
         self.save_to_session(session_key.as_str(), &response_content).await;
@@ -329,35 +340,13 @@ impl AgentLoop {
         Ok(())
     }
 
-    /// Update tool contexts with current channel/chat_id.
-    ///
-    /// Injects the current conversation context into tools that need routing info.
-    /// This is called before processing each message to ensure tools like message,
-    /// spawn, and cron know where to route their results.
-    async fn update_tool_contexts(&self, channel: &str, chat_id: &str) {
-        let registry = self.tool_registry.read().await;
-
-        // Context-aware tools need to be updated
-        if let Some(tool) = registry.get("message") {
-            tool.set_context(channel, chat_id);
-        }
-
-        if let Some(tool) = registry.get("spawn") {
-            tool.set_context(channel, chat_id);
-        }
-
-        if let Some(tool) = registry.get("cron") {
-            tool.set_context(channel, chat_id);
-        }
-    }
-
     /// Save an assistant response to the session.
     async fn save_to_session(&self, session_key: &str, content: &str) {
         let mut session_manager = self.session_manager.write().await;
-        if let Ok(session) = session_manager.get_or_create(session_key) {
+        if let Ok(session) = session_manager.get_or_create(session_key).await {
             session.add_message("assistant", content);
             let session_clone = session.clone();
-            if let Err(e) = session_manager.save(&session_clone) {
+            if let Err(e) = session_manager.save(&session_clone).await {
                 warn!("Failed to save session: {}", e);
             }
         }
@@ -365,10 +354,12 @@ impl AgentLoop {
 
     /// Run the agent iteration loop with the given messages.
     /// Returns the final response content.
+    #[tracing::instrument(skip(self, messages, routing_ctx), fields(message_count = messages.len()))]
     async fn run_agent_loop(
         &self,
         messages: Vec<Message>,
         use_streaming: bool,
+        routing_ctx: &RoutingContext,
     ) -> Result<String> {
         let mut current_messages = messages;
         let mut final_content = None;
@@ -376,15 +367,15 @@ impl AgentLoop {
         for iteration in 0..MAX_TOOL_ITERATIONS {
             debug!("Agent iteration {}/{}", iteration + 1, MAX_TOOL_ITERATIONS);
 
-            let tool_registry = self.tool_registry.read().await;
+            let mut tool_registry = self.tool_registry.write().await;
             let tools = tool_registry.get_definitions();
             drop(tool_registry);
 
             // Delegate to streaming or non-streaming path
             let response = if use_streaming && self.provider.supports_streaming() {
-                self.run_streaming_iteration(&mut current_messages, &tools).await?
+                self.run_streaming_iteration(&mut current_messages, &tools, routing_ctx).await?
             } else {
-                self.run_standard_iteration(&mut current_messages, &tools).await?
+                self.run_standard_iteration(&mut current_messages, &tools, routing_ctx).await?
             };
 
             match response {
@@ -410,10 +401,12 @@ impl AgentLoop {
         &self,
         messages: &mut Vec<Message>,
         tools: &[serde_json::Value],
+        routing_ctx: &RoutingContext,
     ) -> Result<IterationOutcome> {
+        let params = ChatParams::new(&self.config.agents.defaults.model);
         let response = self
             .provider
-            .chat(messages, Some(tools), Some(&self.config.agents.defaults.model))
+            .chat(messages, Some(tools), &params)
             .await?;
 
         // Check for tool calls
@@ -423,23 +416,28 @@ impl AgentLoop {
             let tool_call_messages = tool_calls_to_messages(&response.tool_calls);
             messages.push(Message::assistant_with_tools(tool_call_messages));
 
-            // Execute tools
-            for tool_call in response.tool_calls {
-                debug!("Executing tool: {}", tool_call.name);
+            // Execute tools in parallel
+            let tool_futures: Vec<_> = response.tool_calls.iter().map(|tc| {
+                let registry = self.tool_registry.clone();
+                let name = tc.name.clone();
+                let args = tc.arguments.clone();
+                let ctx = routing_ctx.clone();
+                let id = tc.id.clone();
+                async move {
+                    debug!("Executing tool: {}", name);
+                    let reg = registry.read().await;
+                    let result = reg.execute(&name, args, &ctx).await;
+                    (id, name, result)
+                }
+            }).collect();
 
-                let result = {
-                    let registry = self.tool_registry.read().await;
-                    registry
-                        .execute(&tool_call.name, tool_call.arguments.clone())
-                        .await
-                };
-
+            let results = join_all(tool_futures).await;
+            for (id, name, result) in results {
                 let result_str = match result {
                     Ok(r) => r,
                     Err(e) => format!("Error: {}", e),
                 };
-
-                messages.push(Message::tool(tool_call.id, tool_call.name, result_str));
+                messages.push(Message::tool(id, name, result_str));
             }
 
             return Ok(IterationOutcome::ToolCallsProcessed);
@@ -461,10 +459,12 @@ impl AgentLoop {
         &self,
         messages: &mut Vec<Message>,
         tools: &[serde_json::Value],
+        routing_ctx: &RoutingContext,
     ) -> Result<IterationOutcome> {
+        let params = ChatParams::new(&self.config.agents.defaults.model);
         let mut stream = self
             .provider
-            .chat_stream(messages, Some(tools), Some(&self.config.agents.defaults.model))
+            .chat_stream(messages, Some(tools), &params)
             .await?;
 
         let mut accumulated_content = String::new();
@@ -523,22 +523,28 @@ impl AgentLoop {
             let tool_call_messages = tool_calls_to_messages(&tool_calls);
             messages.push(Message::assistant_with_tools(tool_call_messages));
 
-            for tool_call in tool_calls {
-                debug!("Executing tool: {}", tool_call.name);
+            // Execute tools in parallel
+            let tool_futures: Vec<_> = tool_calls.iter().map(|tc| {
+                let registry = self.tool_registry.clone();
+                let name = tc.name.clone();
+                let args = tc.arguments.clone();
+                let ctx = routing_ctx.clone();
+                let id = tc.id.clone();
+                async move {
+                    debug!("Executing tool: {}", name);
+                    let reg = registry.read().await;
+                    let result = reg.execute(&name, args, &ctx).await;
+                    (id, name, result)
+                }
+            }).collect();
 
-                let result = {
-                    let registry = self.tool_registry.read().await;
-                    registry
-                        .execute(&tool_call.name, tool_call.arguments.clone())
-                        .await
-                };
-
+            let results = join_all(tool_futures).await;
+            for (id, name, result) in results {
                 let result_str = match result {
                     Ok(r) => r,
                     Err(e) => format!("Error: {}", e),
                 };
-
-                messages.push(Message::tool(tool_call.id, tool_call.name, result_str));
+                messages.push(Message::tool(id, name, result_str));
             }
 
             return Ok(IterationOutcome::ToolCallsProcessed);
@@ -564,20 +570,23 @@ impl AgentLoop {
 
         // Get or create session
         let mut session_manager = self.session_manager.write().await;
-        let session = session_manager.get_or_create(&session_key)?;
+        let session = session_manager.get_or_create(&session_key).await?;
         session.add_message("user", &content);
-        let history = session.get_history(DEFAULT_HISTORY_LIMIT);
+        let history = session.get_history(DEFAULT_HISTORY_LIMIT).to_vec();
         drop(session_manager);
 
+        // Create routing context for CLI
+        let routing_ctx = RoutingContext::new("cli".into(), session_key.clone().into());
+
         // Build messages for LLM
-        let context_builder = self.context_builder.read().await;
+        let mut context_builder = self.context_builder.write().await;
         let messages = context_builder
             .build_messages(history, &content, None, "cli", &session_key)
             .await;
         drop(context_builder);
 
         // Run agent loop (with streaming enabled for CLI)
-        let response_content = self.run_agent_loop(messages, true).await?;
+        let response_content = self.run_agent_loop(messages, true, &routing_ctx).await?;
 
         // Save to session
         self.save_to_session(&session_key, &response_content).await;

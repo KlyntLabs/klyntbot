@@ -4,6 +4,7 @@
 
 use klyntbot::bus::{InboundMessage, MessageBus, OutboundMessage};
 use klyntbot::config::Config;
+use klyntbot::config::schema::Secret;
 use klyntbot::session::SessionManager;
 use klyntbot::tools::{filesystem::ReadFileTool, registry::ToolRegistry};
 use tempfile::TempDir;
@@ -12,26 +13,30 @@ use tokio::fs;
 /// Test full message flow through the bus
 #[tokio::test]
 async fn test_full_message_flow() {
-    let bus = MessageBus::new(10);
+    let mut bus = MessageBus::new(10);
 
     // Simulate channel sending inbound message
     let inbound = InboundMessage::new("telegram", "user123", "chat456", "Hello, bot!");
     bus.publish_inbound(inbound).await.unwrap();
 
+    // Get receivers before publishing more messages
+    let mut inbound_rx = bus.take_inbound_rx().unwrap();
+    let mut outbound_rx = bus.take_outbound_rx().unwrap();
+
     // Agent consumes message
-    let received = bus.consume_inbound().await.unwrap();
+    let received = inbound_rx.recv().await.unwrap();
     assert_eq!(received.content, "Hello, bot!");
-    assert_eq!(received.channel, "telegram");
+    assert_eq!(received.channel.as_str(), "telegram");
 
     // Agent generates response
-    let response = OutboundMessage::new(&received.channel, &received.chat_id, "Hello, user!");
+    let response = OutboundMessage::new(received.channel.clone(), received.chat_id.clone(), "Hello, user!");
     bus.publish_outbound(response).await.unwrap();
 
     // Channel consumes outbound message
-    let outbound = bus.consume_outbound().await.unwrap();
+    let outbound = outbound_rx.recv().await.unwrap();
     assert_eq!(outbound.content, "Hello, user!");
-    assert_eq!(outbound.channel, "telegram");
-    assert_eq!(outbound.chat_id, "chat456");
+    assert_eq!(outbound.channel.as_str(), "telegram");
+    assert_eq!(outbound.chat_id.as_str(), "chat456");
 }
 
 /// Test session persistence across multiple messages
@@ -42,17 +47,17 @@ async fn test_session_persistence_flow() {
 
     // First conversation turn
     {
-        let session = manager.get_or_create("telegram:chat123").unwrap();
+        let session = manager.get_or_create("telegram:chat123").await.unwrap();
         session.add_message("user", "What is Rust?");
         session.add_message("assistant", "Rust is a systems programming language.");
     }
-    let session = manager.get_or_create("telegram:chat123").unwrap();
+    let session = manager.get_or_create("telegram:chat123").await.unwrap();
     let session_clone = session.clone();
-    manager.save(&session_clone).unwrap();
+    manager.save(&session_clone).await.unwrap();
 
     // Simulate restart - create new manager
     let mut manager2 = SessionManager::new(temp_dir.path());
-    let loaded_session = manager2.get_or_create("telegram:chat123").unwrap();
+    let loaded_session = manager2.get_or_create("telegram:chat123").await.unwrap();
 
     // Verify history was preserved
     assert_eq!(loaded_session.messages.len(), 2);
@@ -65,17 +70,19 @@ async fn test_session_persistence_flow() {
     // Add another turn
     loaded_session.add_message("user", "Tell me more");
     let loaded_clone = loaded_session.clone();
-    manager2.save(&loaded_clone).unwrap();
+    manager2.save(&loaded_clone).await.unwrap();
 
     // Verify it was saved
     let mut manager3 = SessionManager::new(temp_dir.path());
-    let final_session = manager3.get_or_create("telegram:chat123").unwrap();
+    let final_session = manager3.get_or_create("telegram:chat123").await.unwrap();
     assert_eq!(final_session.messages.len(), 3);
 }
 
 /// Test tool registry with multiple tools
 #[tokio::test]
 async fn test_tool_registry_integration() {
+    use klyntbot::tools::RoutingContext;
+
     let temp_dir = TempDir::new().unwrap();
     let test_file = temp_dir.path().join("test.txt");
     fs::write(&test_file, "Hello from file!").await.unwrap();
@@ -100,7 +107,8 @@ async fn test_tool_registry_integration() {
         "path": test_file.to_str().unwrap()
     });
 
-    let result = registry.execute("read_file", params).await.unwrap();
+    let ctx = RoutingContext::new("cli".into(), "test".into());
+    let result = registry.execute("read_file", params, &ctx).await.unwrap();
     assert_eq!(result, "Hello from file!");
 }
 
@@ -144,34 +152,34 @@ async fn test_multiple_sessions_parallel() {
 
     // Create multiple sessions
     {
-        let session1 = manager.get_or_create("telegram:chat1").unwrap();
+        let session1 = manager.get_or_create("telegram:chat1").await.unwrap();
         session1.add_message("user", "Session 1 message");
     }
     {
-        let session2 = manager.get_or_create("discord:guild1").unwrap();
+        let session2 = manager.get_or_create("discord:guild1").await.unwrap();
         session2.add_message("user", "Session 2 message");
     }
     {
-        let session3 = manager.get_or_create("slack:channel1").unwrap();
+        let session3 = manager.get_or_create("slack:channel1").await.unwrap();
         session3.add_message("user", "Session 3 message");
     }
 
     // Save all sessions
-    let s1 = manager.get_or_create("telegram:chat1").unwrap().clone();
-    let s2 = manager.get_or_create("discord:guild1").unwrap().clone();
-    let s3 = manager.get_or_create("slack:channel1").unwrap().clone();
+    let s1 = manager.get_or_create("telegram:chat1").await.unwrap().clone();
+    let s2 = manager.get_or_create("discord:guild1").await.unwrap().clone();
+    let s3 = manager.get_or_create("slack:channel1").await.unwrap().clone();
 
-    manager.save(&s1).unwrap();
-    manager.save(&s2).unwrap();
-    manager.save(&s3).unwrap();
+    manager.save(&s1).await.unwrap();
+    manager.save(&s2).await.unwrap();
+    manager.save(&s3).await.unwrap();
 
     // List all sessions
-    let sessions = manager.list().unwrap();
+    let sessions = manager.list().await.unwrap();
     assert_eq!(sessions.len(), 3);
 
     // Verify each session can be loaded
     for session_info in sessions {
-        let loaded = manager.get_or_create(&session_info.key).unwrap();
+        let loaded = manager.get_or_create(&session_info.key).await.unwrap();
         assert_eq!(loaded.messages.len(), 1);
     }
 }
@@ -179,7 +187,7 @@ async fn test_multiple_sessions_parallel() {
 /// Test bus message ordering
 #[tokio::test]
 async fn test_bus_message_ordering() {
-    let bus = MessageBus::new(100);
+    let mut bus = MessageBus::new(100);
 
     // Send multiple messages in order
     for i in 0..10 {
@@ -187,9 +195,12 @@ async fn test_bus_message_ordering() {
         bus.publish_inbound(msg).await.unwrap();
     }
 
+    // Get receiver
+    let mut inbound_rx = bus.take_inbound_rx().unwrap();
+
     // Verify they come out in order
     for i in 0..10 {
-        let received = bus.consume_inbound().await.unwrap();
+        let received = inbound_rx.recv().await.unwrap();
         assert_eq!(received.content, format!("Message {}", i));
     }
 }
@@ -221,7 +232,7 @@ async fn test_session_history_limit() {
     let temp_dir = TempDir::new().unwrap();
     let mut manager = SessionManager::new(temp_dir.path());
 
-    let session = manager.get_or_create("test:chat").unwrap();
+    let session = manager.get_or_create("test:chat").await.unwrap();
 
     // Add 100 messages
     for i in 0..100 {
@@ -238,20 +249,24 @@ async fn test_session_history_limit() {
 /// Test tool parameter validation
 #[tokio::test]
 async fn test_tool_parameter_validation() {
+    use klyntbot::tools::RoutingContext;
+
     let mut registry = ToolRegistry::new();
     let read_tool = ReadFileTool::new(None);
     registry.register(read_tool);
 
+    let ctx = RoutingContext::new("cli".into(), "test".into());
+
     // Test missing required parameter
     let invalid_params = serde_json::json!({});
-    let result = registry.execute("read_file", invalid_params).await;
+    let result = registry.execute("read_file", invalid_params, &ctx).await;
     assert!(result.is_err());
 
     // Test invalid parameter type
     let invalid_params = serde_json::json!({
         "path": 123 // Should be string
     });
-    let result = registry.execute("read_file", invalid_params).await;
+    let result = registry.execute("read_file", invalid_params, &ctx).await;
     assert!(result.is_err());
 }
 
@@ -264,26 +279,27 @@ async fn test_session_cleanup() {
     // Create and save sessions
     for i in 0..5 {
         {
-            let session = manager.get_or_create(format!("test:chat{}", i)).unwrap();
+            let session = manager.get_or_create(format!("test:chat{}", i)).await.unwrap();
             session.add_message("user", "Test");
         }
         let session = manager
             .get_or_create(format!("test:chat{}", i))
+            .await
             .unwrap()
             .clone();
-        manager.save(&session).unwrap();
+        manager.save(&session).await.unwrap();
     }
 
     // Verify all exist
-    let sessions = manager.list().unwrap();
+    let sessions = manager.list().await.unwrap();
     assert_eq!(sessions.len(), 5);
 
     // Delete some sessions
-    manager.delete("test:chat0").unwrap();
-    manager.delete("test:chat2").unwrap();
+    manager.delete("test:chat0").await.unwrap();
+    manager.delete("test:chat2").await.unwrap();
 
     // Verify deletion
-    let remaining = manager.list().unwrap();
+    let remaining = manager.list().await.unwrap();
     assert_eq!(remaining.len(), 3);
 }
 
@@ -295,22 +311,22 @@ async fn test_session_lru_eviction() {
 
     // Create 4 sessions (should evict the first one)
     for i in 0..4 {
-        let session = manager.get_or_create(format!("test:chat{}", i)).unwrap();
+        let session = manager.get_or_create(format!("test:chat{}", i)).await.unwrap();
         session.add_message("user", format!("Message {}", i));
     }
 
     // Verify only 3 sessions remain in cache (chat1, chat2, chat3)
     // The first session (chat0) should have been evicted
-    assert!(manager.get_or_create("test:chat1").is_ok());
-    assert!(manager.get_or_create("test:chat2").is_ok());
-    assert!(manager.get_or_create("test:chat3").is_ok());
+    assert!(manager.get_or_create("test:chat1").await.is_ok());
+    assert!(manager.get_or_create("test:chat2").await.is_ok());
+    assert!(manager.get_or_create("test:chat3").await.is_ok());
 
     // Verify evicted session was saved to disk
-    let sessions = manager.list().unwrap();
+    let sessions = manager.list().await.unwrap();
     assert!(sessions.iter().any(|s| s.key == "test:chat0"));
 
     // Load the evicted session - it should come from disk
-    let loaded = manager.get_or_create("test:chat0").unwrap();
+    let loaded = manager.get_or_create("test:chat0").await.unwrap();
     assert_eq!(loaded.messages.len(), 1);
     assert_eq!(loaded.messages[0].content, "Message 0");
 }
@@ -355,7 +371,7 @@ fn test_web_search_config() {
 
     // Test with custom value
     let custom_config = WebToolsConfig {
-        brave_api_key: "test-key".to_string(),
+        brave_api_key: Secret::new("test-key".to_string()),
         max_results: 10,
     };
     assert_eq!(custom_config.max_results, 10);
@@ -468,12 +484,12 @@ fn test_backward_compat_nanobot_config() {
     // Verify original fields preserved
     assert_eq!(config.agents.defaults.model, "anthropic/claude-opus-4-5");
     assert_eq!(config.agents.defaults.max_tokens, 4096);
-    assert_eq!(config.providers.anthropic.api_key, "sk-ant-test");
+    assert_eq!(config.providers.anthropic.api_key.expose(), "sk-ant-test");
 
     // Verify new fields got defaults
     assert!(config.providers.anthropic.extra_headers.is_none());
-    assert_eq!(config.providers.zhipu.api_key, "");
-    assert_eq!(config.providers.dashscope.api_key, "");
+    assert!(config.providers.zhipu.api_key.is_empty());
+    assert!(config.providers.dashscope.api_key.is_empty());
     assert!(!config.channels.feishu.enabled);
     assert!(!config.channels.dingtalk.enabled);
     assert!(!config.channels.mochat.enabled);
@@ -489,7 +505,7 @@ fn test_feishu_config_defaults() {
     let config = FeishuConfig::default();
     assert!(!config.enabled, "feishu should default to disabled");
     assert_eq!(config.app_id, "", "app_id should default to empty");
-    assert_eq!(config.app_secret, "", "app_secret should default to empty");
+    assert!(config.app_secret.is_empty(), "app_secret should default to empty");
     assert!(
         config.allow_from.is_empty(),
         "allow_from should default to empty"
@@ -504,8 +520,8 @@ fn test_dingtalk_config_defaults() {
     let config = DingTalkConfig::default();
     assert!(!config.enabled, "dingtalk should default to disabled");
     assert_eq!(config.client_id, "", "client_id should default to empty");
-    assert_eq!(
-        config.client_secret, "",
+    assert!(
+        config.client_secret.is_empty(),
         "client_secret should default to empty"
     );
     assert!(
@@ -523,7 +539,7 @@ fn test_mochat_config_defaults() {
     assert!(!config.enabled, "mochat should default to disabled");
     assert_eq!(config.base_url, "https://mochat.io");
     assert_eq!(config.socket_url, "", "socket_url should default to empty");
-    assert_eq!(config.claw_token, "", "claw_token should default to empty");
+    assert!(config.claw_token.is_empty(), "claw_token should default to empty");
     assert_eq!(
         config.agent_user_id, "",
         "agent_user_id should default to empty"
@@ -542,23 +558,23 @@ fn test_new_provider_configs() {
     let config = ProvidersConfig::default();
 
     // Verify all new providers have defaults
-    assert_eq!(config.zhipu.api_key, "");
+    assert!(config.zhipu.api_key.is_empty());
     assert!(config.zhipu.api_base.is_none());
     assert!(config.zhipu.extra_headers.is_none());
 
-    assert_eq!(config.dashscope.api_key, "");
+    assert!(config.dashscope.api_key.is_empty());
     assert!(config.dashscope.api_base.is_none());
     assert!(config.dashscope.extra_headers.is_none());
 
-    assert_eq!(config.minimax.api_key, "");
+    assert!(config.minimax.api_key.is_empty());
     assert!(config.minimax.api_base.is_none());
     assert!(config.minimax.extra_headers.is_none());
 
-    assert_eq!(config.moonshot.api_key, "");
+    assert!(config.moonshot.api_key.is_empty());
     assert!(config.moonshot.api_base.is_none());
     assert!(config.moonshot.extra_headers.is_none());
 
-    assert_eq!(config.aihubmix.api_key, "");
+    assert!(config.aihubmix.api_key.is_empty());
     assert!(config.aihubmix.api_base.is_none());
     assert!(config.aihubmix.extra_headers.is_none());
 }
@@ -585,7 +601,7 @@ fn test_provider_extra_headers() {
     headers.insert("Authorization".to_string(), "Bearer token".to_string());
 
     let config = ProviderConfig {
-        api_key: "test-key".to_string(),
+        api_key: Secret::new("test-key".to_string()),
         api_base: None,
         extra_headers: Some(headers.clone()),
     };
@@ -598,7 +614,7 @@ fn test_provider_extra_headers() {
 
     // Deserialize
     let loaded: ProviderConfig = serde_json::from_value(json).unwrap();
-    assert_eq!(loaded.api_key, "test-key");
+    assert_eq!(loaded.api_key.expose(), "test-key");
     assert!(loaded.extra_headers.is_some());
     let loaded_headers = loaded.extra_headers.unwrap();
     assert_eq!(
@@ -616,14 +632,14 @@ fn test_discord_config_usage() {
     // Create config with specific values
     let config = DiscordConfig {
         enabled: true,
-        token: "test-token-123".to_string(),
+        token: Secret::new("test-token-123".to_string()),
         gateway_url: "wss://custom-gateway.discord.gg".to_string(),
         intents: 12345,
         allow_from: vec!["user123".to_string()],
     };
 
     // Verify fields are accessible (not hardcoded constants)
-    assert_eq!(config.token, "test-token-123");
+    assert_eq!(config.token.expose(), "test-token-123");
     assert_eq!(config.gateway_url, "wss://custom-gateway.discord.gg");
     assert_eq!(config.intents, 12345);
     assert_eq!(config.allow_from.len(), 1);

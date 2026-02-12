@@ -5,36 +5,21 @@ use serde_json::Value;
 use std::sync::Arc;
 use tracing::debug;
 
-use super::{Tool, ToolContext};
+use super::{Tool, RoutingContext};
 use crate::agent::SubagentManager;
 use crate::error::{Result, ToolError};
 
 /// Tool to spawn subagents for background task execution.
 pub struct SpawnTool {
     subagent_manager: Option<Arc<SubagentManager>>,
-    context: ToolContext,
 }
 
 impl SpawnTool {
-    pub fn new(context: ToolContext) -> Self {
-        Self {
-            subagent_manager: None,
-            context,
-        }
-    }
-
     /// Create with a SubagentManager reference
-    pub fn with_manager(manager: Arc<SubagentManager>, context: ToolContext) -> Self {
+    pub fn with_manager(manager: Arc<SubagentManager>) -> Self {
         Self {
             subagent_manager: Some(manager),
-            context,
         }
-    }
-}
-
-impl Default for SpawnTool {
-    fn default() -> Self {
-        Self::new(ToolContext::new())
     }
 }
 
@@ -65,7 +50,7 @@ impl Tool for SpawnTool {
         })
     }
 
-    async fn execute(&self, args: Value) -> Result<String> {
+    async fn execute(&self, args: Value, ctx: &RoutingContext) -> Result<String> {
         let task = args
             .get("task")
             .and_then(|v| v.as_str())
@@ -82,30 +67,16 @@ impl Tool for SpawnTool {
             ToolError::ExecutionFailed("SubagentManager not available".to_string())
         })?;
 
-        // Get current context (this is where results will be routed back)
-        let (ctx_channel, ctx_chat_id) = self.context.get();
-
-        let channel = if ctx_channel.is_empty() {
-            "cli".to_string()
-        } else {
-            ctx_channel
-        };
-
-        let chat_id = if ctx_chat_id.is_empty() {
-            "default".to_string()
-        } else {
-            ctx_chat_id
-        };
-
+        // Use routing context for result routing
         let result = manager
-            .spawn(task.to_string(), label, channel, chat_id)
+            .spawn(
+                task.to_string(),
+                label,
+                ctx.channel.as_str().to_string(),
+                ctx.chat_id.as_str().to_string(),
+            )
             .await;
 
         Ok(result)
-    }
-
-    /// Set the origin context for routing subagent results
-    fn set_context(&self, channel: &str, chat_id: &str) {
-        self.context.set(channel, chat_id);
     }
 }

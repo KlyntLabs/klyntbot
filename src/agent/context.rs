@@ -16,6 +16,7 @@ pub struct ContextBuilder {
     workspace: PathBuf,
     memory: MemoryStore,
     skills: SkillManager,
+    cached_bootstrap: Option<String>,
 }
 
 impl ContextBuilder {
@@ -25,6 +26,7 @@ impl ContextBuilder {
             memory: MemoryStore::new(workspace.clone()),
             skills: SkillManager::new(),
             workspace,
+            cached_bootstrap: None,
         }
     }
 
@@ -36,7 +38,7 @@ impl ContextBuilder {
 
     /// Build messages array for LLM
     pub async fn build_messages(
-        &self,
+        &mut self,
         history: Vec<SessionMessage>,
         current_message: &str,
         media: Option<Vec<String>>,
@@ -95,40 +97,53 @@ impl ContextBuilder {
     }
 
     /// Build system prompt from all sources
-    async fn build_system_prompt(&self, channel: &str, chat_id: &str) -> String {
+    async fn build_system_prompt(&mut self, channel: &str, chat_id: &str) -> String {
         let mut sections = Vec::new();
 
-        // Identity section
+        // Identity section (always fresh - contains runtime info)
         sections.push(self.build_identity_section(channel, chat_id));
 
-        // Bootstrap files
-        if let Some(agents) = self.read_bootstrap_file("AGENTS.md").await {
-            sections.push(agents);
+        // Bootstrap files (cached)
+        if self.cached_bootstrap.is_none() {
+            // First time: read and cache all bootstrap files
+            let mut bootstrap_sections = Vec::new();
+
+            if let Some(agents) = self.read_bootstrap_file("AGENTS.md").await {
+                bootstrap_sections.push(agents);
+            }
+
+            if let Some(soul) = self.read_bootstrap_file("SOUL.md").await {
+                bootstrap_sections.push(soul);
+            }
+
+            if let Some(user) = self.read_bootstrap_file("USER.md").await {
+                bootstrap_sections.push(user);
+            }
+
+            if let Some(tools) = self.read_bootstrap_file("TOOLS.md").await {
+                bootstrap_sections.push(tools);
+            }
+
+            if let Some(identity) = self.read_bootstrap_file("IDENTITY.md").await {
+                bootstrap_sections.push(identity);
+            }
+
+            self.cached_bootstrap = Some(bootstrap_sections.join("\n\n---\n\n"));
+            debug!("Cached bootstrap files");
         }
 
-        if let Some(soul) = self.read_bootstrap_file("SOUL.md").await {
-            sections.push(soul);
+        // Add cached bootstrap content
+        if let Some(bootstrap) = &self.cached_bootstrap {
+            sections.push(bootstrap.clone());
         }
 
-        if let Some(user) = self.read_bootstrap_file("USER.md").await {
-            sections.push(user);
-        }
-
-        if let Some(tools) = self.read_bootstrap_file("TOOLS.md").await {
-            sections.push(tools);
-        }
-
-        if let Some(identity) = self.read_bootstrap_file("IDENTITY.md").await {
-            sections.push(identity);
-        }
-
-        // Memory
+        // Memory (always fresh)
         let memory_context = self.memory.get_memory_context().await;
         if !memory_context.trim().is_empty() {
             sections.push(format!("# Memory\n\n{}", memory_context));
         }
 
-        // Skills
+        // Skills (relatively stable)
         let skills_summary = self.skills.generate_summary();
         sections.push(format!("# Available Skills\n\n{}", skills_summary));
 
@@ -209,5 +224,11 @@ You are klyntbot, a personal AI assistant powered by advanced language models.
     /// Get memory store reference
     pub fn memory(&self) -> &MemoryStore {
         &self.memory
+    }
+
+    /// Invalidate the bootstrap cache (call when bootstrap files change)
+    pub fn invalidate_cache(&mut self) {
+        self.cached_bootstrap = None;
+        debug!("Invalidated bootstrap cache");
     }
 }

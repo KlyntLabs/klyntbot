@@ -10,39 +10,22 @@ pub mod web;
 
 use async_trait::async_trait;
 use serde_json::Value;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 
 use crate::error::Result;
+use crate::types::{ChannelName, ChatId};
 
-/// Shared context for tools that need routing information.
-/// This allows tools like message, spawn, and cron to share a single
-/// context instance instead of each maintaining their own.
-#[derive(Clone)]
-pub struct ToolContext {
-    inner: Arc<RwLock<(String, String)>>,
+/// Routing context for tools that need channel/chat information.
+/// This is passed explicitly to execute() instead of using shared mutable state.
+#[derive(Debug, Clone)]
+pub struct RoutingContext {
+    pub channel: ChannelName,
+    pub chat_id: ChatId,
 }
 
-impl Default for ToolContext {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl ToolContext {
-    pub fn new() -> Self {
-        Self {
-            inner: Arc::new(RwLock::new((String::new(), String::new()))),
-        }
-    }
-
-    pub fn set(&self, channel: &str, chat_id: &str) {
-        let mut ctx = self.inner.write().unwrap();
-        ctx.0 = channel.to_string();
-        ctx.1 = chat_id.to_string();
-    }
-
-    pub fn get(&self) -> (String, String) {
-        self.inner.read().unwrap().clone()
+impl RoutingContext {
+    pub fn new(channel: ChannelName, chat_id: ChatId) -> Self {
+        Self { channel, chat_id }
     }
 }
 
@@ -58,8 +41,8 @@ pub trait Tool: Send + Sync {
     /// JSON Schema for parameters
     fn parameters(&self) -> Value;
 
-    /// Execute the tool with given arguments
-    async fn execute(&self, args: Value) -> Result<String>;
+    /// Execute the tool with given arguments and routing context
+    async fn execute(&self, args: Value, ctx: &RoutingContext) -> Result<String>;
 
     /// Convert to OpenAI function schema format
     fn to_schema(&self) -> Value {
@@ -77,12 +60,6 @@ pub trait Tool: Send + Sync {
     fn validate_params(&self, params: &Value) -> Vec<String> {
         let schema = self.parameters();
         validate_value(params, &schema, "")
-    }
-
-    /// Set the current conversation context for tools that need routing info.
-    /// Default implementation is a no-op (most tools don't need context).
-    fn set_context(&self, _channel: &str, _chat_id: &str) {
-        // No-op by default
     }
 }
 

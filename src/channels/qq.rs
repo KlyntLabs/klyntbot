@@ -6,6 +6,7 @@ use reqwest::Client;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::VecDeque;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
@@ -26,7 +27,7 @@ pub struct QQChannel {
     client: Client,
     access_token: Arc<RwLock<Option<String>>>,
     processed_ids: Arc<RwLock<VecDeque<String>>>,
-    running: Arc<RwLock<bool>>,
+    running: Arc<AtomicBool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -74,7 +75,7 @@ impl QQChannel {
             client,
             access_token: Arc::new(RwLock::new(None)),
             processed_ids: Arc::new(RwLock::new(VecDeque::with_capacity(1000))),
-            running: Arc::new(RwLock::new(false)),
+            running: Arc::new(AtomicBool::new(false)),
         })
     }
 
@@ -83,7 +84,7 @@ impl QQChannel {
         let url = format!("{}/app/getAppAccessToken", QQ_API_BASE);
         let payload = json!({
             "appId": self.config.app_id,
-            "clientSecret": self.config.secret,
+            "clientSecret": self.config.secret.expose(),
         });
 
         let response = self
@@ -130,7 +131,7 @@ impl QQChannel {
 
         info!("Connected to QQ Gateway");
 
-        while *self.running.read().await {
+        while self.running.load(Ordering::SeqCst) {
             let msg = match tokio::time::timeout(Duration::from_secs(35), read.next()).await {
                 Ok(Some(Ok(msg))) => msg,
                 Ok(Some(Err(e))) => {
@@ -276,7 +277,7 @@ impl QQChannel {
         debug!("QQ message from {}: {}", user_id, content);
 
         // Publish to bus
-        let inbound = InboundMessage::new("qq", &user_id, &user_id, content);
+        let inbound = InboundMessage::new("qq", user_id.as_str(), user_id.as_str(), content);
         bus.publish_inbound(inbound)
             .await
             .map_err(|e| ChannelError::SendFailed(format!("Failed to publish to bus: {}", e)))?;
@@ -333,7 +334,7 @@ impl Channel for QQChannel {
             .into());
         }
 
-        *self.running.write().await = true;
+        self.running.store(true, Ordering::SeqCst);
 
         super::reconnect_loop("QQ", &self.running, || self.gateway_loop(bus.clone())).await;
 
@@ -341,12 +342,12 @@ impl Channel for QQChannel {
     }
 
     async fn stop(&self) -> Result<()> {
-        *self.running.write().await = false;
+        self.running.store(false, Ordering::SeqCst);
         Ok(())
     }
 
     async fn send(&self, msg: &OutboundMessage) -> Result<()> {
-        self.send_c2c_message(&msg.chat_id, &msg.content).await
+        self.send_c2c_message(msg.chat_id.as_str(), &msg.content).await
     }
 
     fn is_allowed(&self, sender_id: &str) -> bool {

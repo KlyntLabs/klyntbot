@@ -6,6 +6,7 @@ use regex::Regex;
 use reqwest::Client;
 use serde::Deserialize;
 use serde_json::{json, Value};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
@@ -24,7 +25,7 @@ pub struct SlackChannel {
     config: SlackConfig,
     client: Client,
     bot_user_id: Arc<RwLock<Option<String>>>,
-    running: Arc<RwLock<bool>>,
+    running: Arc<AtomicBool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -61,7 +62,7 @@ impl SlackChannel {
             config,
             client,
             bot_user_id: Arc::new(RwLock::new(None)),
-            running: Arc::new(RwLock::new(false)),
+            running: Arc::new(AtomicBool::new(false)),
         })
     }
 
@@ -72,7 +73,7 @@ impl SlackChannel {
         let response = self
             .client
             .post(&url)
-            .bearer_auth(&self.config.bot_token)
+            .bearer_auth(self.config.bot_token.expose())
             .send()
             .await
             .map_err(|e| ChannelError::ConnectionFailed(format!("Auth request failed: {}", e)))?;
@@ -104,7 +105,7 @@ impl SlackChannel {
         let response = self
             .client
             .post(&url)
-            .bearer_auth(&self.config.app_token)
+            .bearer_auth(self.config.app_token.expose())
             .send()
             .await
             .map_err(|e| {
@@ -142,7 +143,7 @@ impl SlackChannel {
 
         info!("Connected to Slack Socket Mode");
 
-        while *self.running.read().await {
+        while self.running.load(Ordering::SeqCst) {
             let msg = match tokio::time::timeout(Duration::from_secs(35), read.next()).await {
                 Ok(Some(Ok(msg))) => msg,
                 Ok(Some(Err(e))) => {
@@ -330,7 +331,7 @@ impl SlackChannel {
         let _ = self
             .client
             .post(&url)
-            .bearer_auth(&self.config.bot_token)
+            .bearer_auth(self.config.bot_token.expose())
             .json(&payload)
             .send()
             .await;
@@ -353,7 +354,7 @@ impl SlackChannel {
         let response = self
             .client
             .post(&url)
-            .bearer_auth(&self.config.bot_token)
+            .bearer_auth(self.config.bot_token.expose())
             .json(&payload)
             .send()
             .await
@@ -387,7 +388,7 @@ impl Channel for SlackChannel {
         let bot_user_id = self.authenticate().await?;
         *self.bot_user_id.write().await = Some(bot_user_id);
 
-        *self.running.write().await = true;
+        self.running.store(true, Ordering::SeqCst);
 
         super::reconnect_loop("Slack", &self.running, || self.socket_loop(bus.clone())).await;
 
@@ -395,7 +396,7 @@ impl Channel for SlackChannel {
     }
 
     async fn stop(&self) -> Result<()> {
-        *self.running.write().await = false;
+        self.running.store(false, Ordering::SeqCst);
         Ok(())
     }
 
@@ -416,7 +417,7 @@ impl Channel for SlackChannel {
         let use_thread = thread_ts.is_some() && channel_type != Some("im");
 
         self.send_message(
-            &msg.chat_id,
+            msg.chat_id.as_str(),
             &msg.content,
             if use_thread { thread_ts } else { None },
         )

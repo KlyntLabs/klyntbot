@@ -3,27 +3,26 @@
 use std::fs;
 use std::path::PathBuf;
 
-use super::schema::Config;
+use super::schema::{Config, Secret};
 use crate::error::{ConfigError, Result};
 
 /// Get the default configuration file path (~/.klyntbot/config.json)
-pub fn config_path() -> PathBuf {
+pub fn config_path() -> Result<PathBuf> {
     dirs::home_dir()
-        .expect("Unable to determine home directory")
-        .join(".klyntbot")
-        .join("config.json")
+        .map(|home| home.join(".klyntbot").join("config.json"))
+        .ok_or_else(|| ConfigError::Invalid("Unable to determine home directory".to_string()).into())
 }
 
 /// Get the klyntbot data directory (~/.klyntbot/)
-pub fn config_dir() -> PathBuf {
+pub fn config_dir() -> Result<PathBuf> {
     dirs::home_dir()
-        .expect("Unable to determine home directory")
-        .join(".klyntbot")
+        .map(|home| home.join(".klyntbot"))
+        .ok_or_else(|| ConfigError::Invalid("Unable to determine home directory".to_string()).into())
 }
 
 /// Load configuration from file or return default
 pub fn load() -> Result<Config> {
-    let klyntbot_path = config_path();
+    let klyntbot_path = config_path()?;
 
     if klyntbot_path.exists() {
         let content = fs::read_to_string(&klyntbot_path).map_err(ConfigError::Io)?;
@@ -36,7 +35,7 @@ pub fn load() -> Result<Config> {
 
     // Fallback: try nanobot config
     let nanobot_path = dirs::home_dir()
-        .expect("Unable to determine home directory")
+        .ok_or_else(|| ConfigError::Invalid("Unable to determine home directory".to_string()))?
         .join(".nanobot")
         .join("config.json");
 
@@ -82,7 +81,7 @@ fn migrate_config(data: &mut serde_json::Value) {
 
 /// Save configuration to file
 pub fn save(config: &Config) -> Result<()> {
-    let path = config_path();
+    let path = config_path()?;
 
     // Create parent directory if it doesn't exist
     if let Some(parent) = path.parent() {
@@ -125,73 +124,73 @@ pub fn load_with_env_overrides() -> Result<Config> {
 
     // Provider API keys
     if let Ok(key) = std::env::var("KLYNTBOT_PROVIDERS__ANTHROPIC__API_KEY") {
-        config.providers.anthropic.api_key = key;
+        config.providers.anthropic.api_key = Secret::new(key);
     }
 
     if let Ok(key) = std::env::var("KLYNTBOT_PROVIDERS__OPENAI__API_KEY") {
-        config.providers.openai.api_key = key;
+        config.providers.openai.api_key = Secret::new(key);
     }
 
     if let Ok(key) = std::env::var("KLYNTBOT_PROVIDERS__OPENROUTER__API_KEY") {
-        config.providers.openrouter.api_key = key;
+        config.providers.openrouter.api_key = Secret::new(key);
     }
 
     if let Ok(key) = std::env::var("KLYNTBOT_PROVIDERS__DEEPSEEK__API_KEY") {
-        config.providers.deepseek.api_key = key;
+        config.providers.deepseek.api_key = Secret::new(key);
     }
 
     if let Ok(key) = std::env::var("KLYNTBOT_PROVIDERS__GEMINI__API_KEY") {
-        config.providers.gemini.api_key = key;
+        config.providers.gemini.api_key = Secret::new(key);
     }
 
     if let Ok(key) = std::env::var("KLYNTBOT_PROVIDERS__GROQ__API_KEY") {
-        config.providers.groq.api_key = key;
+        config.providers.groq.api_key = Secret::new(key);
     }
 
     if let Ok(key) = std::env::var("KLYNTBOT_PROVIDERS__VLLM__API_KEY") {
-        config.providers.vllm.api_key = key;
+        config.providers.vllm.api_key = Secret::new(key);
     }
 
     if let Ok(key) = std::env::var("KLYNTBOT_PROVIDERS__ZHIPU__API_KEY") {
-        config.providers.zhipu.api_key = key;
+        config.providers.zhipu.api_key = Secret::new(key);
     }
 
     if let Ok(key) = std::env::var("KLYNTBOT_PROVIDERS__DASHSCOPE__API_KEY") {
-        config.providers.dashscope.api_key = key;
+        config.providers.dashscope.api_key = Secret::new(key);
     }
 
     if let Ok(key) = std::env::var("KLYNTBOT_PROVIDERS__MOONSHOT__API_KEY") {
-        config.providers.moonshot.api_key = key;
+        config.providers.moonshot.api_key = Secret::new(key);
     }
 
     if let Ok(key) = std::env::var("KLYNTBOT_PROVIDERS__MINIMAX__API_KEY") {
-        config.providers.minimax.api_key = key;
+        config.providers.minimax.api_key = Secret::new(key);
     }
 
     if let Ok(key) = std::env::var("KLYNTBOT_PROVIDERS__AIHUBMIX__API_KEY") {
-        config.providers.aihubmix.api_key = key;
+        config.providers.aihubmix.api_key = Secret::new(key);
     }
 
     // Channel tokens
     if let Ok(token) = std::env::var("KLYNTBOT_CHANNELS__TELEGRAM__TOKEN") {
-        config.channels.telegram.token = token;
+        config.channels.telegram.token = Secret::new(token);
     }
 
     if let Ok(token) = std::env::var("KLYNTBOT_CHANNELS__DISCORD__TOKEN") {
-        config.channels.discord.token = token;
+        config.channels.discord.token = Secret::new(token);
     }
 
     if let Ok(token) = std::env::var("KLYNTBOT_CHANNELS__SLACK__BOT_TOKEN") {
-        config.channels.slack.bot_token = token;
+        config.channels.slack.bot_token = Secret::new(token);
     }
 
     if let Ok(token) = std::env::var("KLYNTBOT_CHANNELS__SLACK__APP_TOKEN") {
-        config.channels.slack.app_token = token;
+        config.channels.slack.app_token = Secret::new(token);
     }
 
     // Tools
     if let Ok(key) = std::env::var("KLYNTBOT_TOOLS__WEB__BRAVE_API_KEY") {
-        config.tools.web.brave_api_key = key;
+        config.tools.web.brave_api_key = Secret::new(key);
     }
 
     Ok(config)
@@ -199,12 +198,12 @@ pub fn load_with_env_overrides() -> Result<Config> {
 
 /// Check if configuration exists
 pub fn exists() -> bool {
-    config_path().exists()
+    config_path().map(|p| p.exists()).unwrap_or(false)
 }
 
 /// Initialize configuration directory structure
 pub fn init() -> Result<()> {
-    let dir = config_dir();
+    let dir = config_dir()?;
     fs::create_dir_all(&dir).map_err(ConfigError::Io)?;
 
     // Create subdirectories
@@ -225,7 +224,7 @@ mod tests {
 
     #[test]
     fn test_config_paths() {
-        let path = config_path();
+        let path = config_path().unwrap();
         assert!(path.to_string_lossy().contains(".klyntbot"));
         assert!(path.to_string_lossy().ends_with("config.json"));
     }
@@ -239,7 +238,7 @@ mod tests {
 
     #[test]
     fn test_config_dir_path() {
-        let dir = config_dir();
+        let dir = config_dir().unwrap();
         assert!(dir.to_string_lossy().contains(".klyntbot"));
     }
 
@@ -275,8 +274,8 @@ mod tests {
     #[test]
     fn test_provider_config_defaults() {
         let config = super::super::schema::ProvidersConfig::default();
-        assert_eq!(config.anthropic.api_key, "");
-        assert_eq!(config.openai.api_key, "");
+        assert_eq!(config.anthropic.api_key.expose(), "");
+        assert_eq!(config.openai.api_key.expose(), "");
         assert!(config.anthropic.api_base.is_none());
     }
 
@@ -284,7 +283,7 @@ mod tests {
     fn test_telegram_config_defaults() {
         let config = super::super::schema::TelegramConfig::default();
         assert!(!config.enabled);
-        assert_eq!(config.token, "");
+        assert_eq!(config.token.expose(), "");
         assert_eq!(config.allow_from.len(), 0);
     }
 
@@ -305,7 +304,7 @@ mod tests {
 
         let mut config = Config::default();
         config.agents.defaults.model = "test-model".to_string();
-        config.providers.anthropic.api_key = "test-key".to_string();
+        config.providers.anthropic.api_key = Secret::new("test-key".to_string());
 
         // Serialize to JSON
         let json = serde_json::to_string_pretty(&config).unwrap();
@@ -316,7 +315,7 @@ mod tests {
         let loaded_config: Config = serde_json::from_str(&content).unwrap();
 
         assert_eq!(loaded_config.agents.defaults.model, "test-model");
-        assert_eq!(loaded_config.providers.anthropic.api_key, "test-key");
+        assert_eq!(loaded_config.providers.anthropic.api_key.expose(), "test-key");
     }
 
     #[test]
@@ -328,9 +327,9 @@ mod tests {
         let mut config = Config::default();
         config.agents.defaults.model = "custom-model".to_string();
         config.agents.defaults.max_tokens = 4096;
-        config.providers.anthropic.api_key = "sk-ant-test".to_string();
+        config.providers.anthropic.api_key = Secret::new("sk-ant-test".to_string());
         config.channels.telegram.enabled = true;
-        config.channels.telegram.token = "bot-token-123".to_string();
+        config.channels.telegram.token = Secret::new("bot-token-123".to_string());
 
         // Save config
         let json = serde_json::to_string_pretty(&config).unwrap();
@@ -343,9 +342,9 @@ mod tests {
         // Verify all fields
         assert_eq!(loaded.agents.defaults.model, "custom-model");
         assert_eq!(loaded.agents.defaults.max_tokens, 4096);
-        assert_eq!(loaded.providers.anthropic.api_key, "sk-ant-test");
+        assert_eq!(loaded.providers.anthropic.api_key.expose(), "sk-ant-test");
         assert!(loaded.channels.telegram.enabled);
-        assert_eq!(loaded.channels.telegram.token, "bot-token-123");
+        assert_eq!(loaded.channels.telegram.token.expose(), "bot-token-123");
     }
 
     #[test]
@@ -390,18 +389,18 @@ mod tests {
         let mut overridden = config.clone();
 
         if let Ok(key) = std::env::var("KLYNTBOT_PROVIDERS__ANTHROPIC__API_KEY") {
-            overridden.providers.anthropic.api_key = key;
+            overridden.providers.anthropic.api_key = Secret::new(key);
         }
         if let Ok(key) = std::env::var("KLYNTBOT_PROVIDERS__OPENAI__API_KEY") {
-            overridden.providers.openai.api_key = key;
+            overridden.providers.openai.api_key = Secret::new(key);
         }
         if let Ok(key) = std::env::var("KLYNTBOT_PROVIDERS__DEEPSEEK__API_KEY") {
-            overridden.providers.deepseek.api_key = key;
+            overridden.providers.deepseek.api_key = Secret::new(key);
         }
 
-        assert_eq!(overridden.providers.anthropic.api_key, "sk-ant-env");
-        assert_eq!(overridden.providers.openai.api_key, "sk-openai-env");
-        assert_eq!(overridden.providers.deepseek.api_key, "sk-deepseek-env");
+        assert_eq!(overridden.providers.anthropic.api_key.expose(), "sk-ant-env");
+        assert_eq!(overridden.providers.openai.api_key.expose(), "sk-openai-env");
+        assert_eq!(overridden.providers.deepseek.api_key.expose(), "sk-deepseek-env");
 
         std::env::remove_var("KLYNTBOT_PROVIDERS__ANTHROPIC__API_KEY");
         std::env::remove_var("KLYNTBOT_PROVIDERS__OPENAI__API_KEY");
@@ -511,7 +510,7 @@ mod tests {
 
     #[test]
     fn test_config_path_includes_home_directory() {
-        let path = config_path();
+        let path = config_path().unwrap();
         let home = dirs::home_dir().unwrap();
 
         assert!(path.starts_with(home));
@@ -520,7 +519,7 @@ mod tests {
 
     #[test]
     fn test_config_dir_includes_home_directory() {
-        let dir = config_dir();
+        let dir = config_dir().unwrap();
         let home = dirs::home_dir().unwrap();
 
         assert!(dir.starts_with(home));
