@@ -1,0 +1,18 @@
+[package]
+name = "providers"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+common.workspace = true
+config.workspace = true
+async-trait.workspace = true
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+futures-util.workspace = true
+tokio = { workspace = true }
+tracing.workspace = true
+base64.workspace = true

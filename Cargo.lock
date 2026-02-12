@@ -9,6 +9,32 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
+name = "agent"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "base64",
+ "bus",
+ "chrono",
+ "common",
+ "config",
+ "dirs",
+ "futures-util",
+ "mime_guess",
+ "providers",
+ "scheduling",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "session",
+ "tokio",
+ "tools",
+ "tracing",
+ "uuid",
+ "which",
+]
+
+[[package]]
 name = "ahash"
 version = "0.8.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -240,6 +266,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5dd9dc738b7a8311c7ade152424974d8115f2cdad61e8dab8dac9f2362298510"
 
 [[package]]
+name = "bus"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "common",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "byteorder"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -280,6 +319,34 @@ name = "cfg_aliases"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
+
+[[package]]
+name = "channels"
+version = "0.1.0"
+dependencies = [
+ "async-imap",
+ "async-trait",
+ "base64",
+ "bus",
+ "common",
+ "config",
+ "dirs",
+ "futures-util",
+ "html2text",
+ "lettre",
+ "mail-parser",
+ "mime_guess",
+ "native-tls",
+ "providers",
+ "regex",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-native-tls",
+ "tokio-tungstenite",
+ "tracing",
+]
 
 [[package]]
 name = "chrono"
@@ -346,6 +413,32 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3e64b0cc0439b12df2fa678eae89a1c56a529fd067a9115f7827f1fffd22b32"
 
 [[package]]
+name = "cli"
+version = "0.1.0"
+dependencies = [
+ "agent",
+ "anyhow",
+ "bus",
+ "channels",
+ "chrono",
+ "clap",
+ "common",
+ "config",
+ "dirs",
+ "heartbeat",
+ "providers",
+ "rustyline",
+ "scheduling",
+ "serde",
+ "serde_json",
+ "session",
+ "tokio",
+ "tools",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "clipboard-win"
 version = "5.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -380,6 +473,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "common"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "dirs",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "compression-codecs"
 version = "0.4.36"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -402,6 +507,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ca0197aee26d1ae37445ee532fefce43251d24cc7c166799f4d46817f1d3973"
 dependencies = [
  "crossbeam-utils",
+]
+
+[[package]]
+name = "config"
+version = "0.1.0"
+dependencies = [
+ "common",
+ "dirs",
+ "serde",
+ "serde_json",
+ "shellexpand",
+ "tempfile",
 ]
 
 [[package]]
@@ -946,6 +1063,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "heartbeat"
+version = "0.1.0"
+dependencies = [
+ "common",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "heck"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1324,217 +1450,26 @@ dependencies = [
 name = "klyntbot"
 version = "0.1.0"
 dependencies = [
+ "agent",
  "anyhow",
  "async-trait",
+ "bus",
+ "channels",
  "chrono",
  "clap",
- "klyntbot-agent",
- "klyntbot-bus",
- "klyntbot-channels",
- "klyntbot-cli",
- "klyntbot-config",
- "klyntbot-core",
- "klyntbot-cron",
- "klyntbot-heartbeat",
- "klyntbot-providers",
- "klyntbot-session",
- "klyntbot-tools",
+ "cli",
+ "common",
+ "config",
+ "heartbeat",
+ "providers",
+ "scheduling",
  "serde_json",
+ "session",
  "tempfile",
  "tokio",
+ "tools",
  "tracing",
  "tracing-subscriber",
-]
-
-[[package]]
-name = "klyntbot-agent"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "base64",
- "chrono",
- "dirs",
- "futures-util",
- "klyntbot-bus",
- "klyntbot-config",
- "klyntbot-core",
- "klyntbot-cron",
- "klyntbot-providers",
- "klyntbot-session",
- "klyntbot-tools",
- "mime_guess",
- "serde",
- "serde_json",
- "serde_yaml",
- "tokio",
- "tracing",
- "uuid",
- "which",
-]
-
-[[package]]
-name = "klyntbot-bus"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "klyntbot-core",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "klyntbot-channels"
-version = "0.1.0"
-dependencies = [
- "async-imap",
- "async-trait",
- "base64",
- "dirs",
- "futures-util",
- "html2text",
- "klyntbot-bus",
- "klyntbot-config",
- "klyntbot-core",
- "klyntbot-providers",
- "lettre",
- "mail-parser",
- "mime_guess",
- "native-tls",
- "regex",
- "reqwest",
- "serde",
- "serde_json",
- "tokio",
- "tokio-native-tls",
- "tokio-tungstenite",
- "tracing",
-]
-
-[[package]]
-name = "klyntbot-cli"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "clap",
- "dirs",
- "klyntbot-agent",
- "klyntbot-bus",
- "klyntbot-channels",
- "klyntbot-config",
- "klyntbot-core",
- "klyntbot-cron",
- "klyntbot-heartbeat",
- "klyntbot-providers",
- "klyntbot-session",
- "klyntbot-tools",
- "rustyline",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "klyntbot-config"
-version = "0.1.0"
-dependencies = [
- "dirs",
- "klyntbot-core",
- "serde",
- "serde_json",
- "shellexpand",
- "tempfile",
-]
-
-[[package]]
-name = "klyntbot-core"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "dirs",
- "serde",
- "serde_json",
- "tempfile",
- "thiserror 2.0.18",
-]
-
-[[package]]
-name = "klyntbot-cron"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "cron",
- "klyntbot-core",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "klyntbot-heartbeat"
-version = "0.1.0"
-dependencies = [
- "klyntbot-core",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "klyntbot-providers"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "base64",
- "futures-util",
- "klyntbot-config",
- "klyntbot-core",
- "reqwest",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "klyntbot-session"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "klyntbot-core",
- "serde",
- "serde_json",
- "tempfile",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "klyntbot-tools"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "html2text",
- "klyntbot-bus",
- "klyntbot-core",
- "klyntbot-cron",
- "regex",
- "reqwest",
- "scraper",
- "serde_json",
- "shellexpand",
- "tempfile",
- "tokio",
- "tracing",
- "url",
- "urlencoding",
 ]
 
 [[package]]
@@ -2036,6 +1971,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "providers"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "base64",
+ "common",
+ "config",
+ "futures-util",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "psm"
 version = "0.1.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2430,6 +2381,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "scheduling"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "common",
+ "cron",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "scopeguard"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2574,6 +2540,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "170fb83ab34de17dc69aa7c67482b22218ddb85da56546f9bd6b929e32a05930"
 dependencies = [
  "stable_deref_trait",
+]
+
+[[package]]
+name = "session"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "common",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -2947,6 +2926,27 @@ dependencies = [
  "futures-sink",
  "pin-project-lite",
  "tokio",
+]
+
+[[package]]
+name = "tools"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "bus",
+ "common",
+ "html2text",
+ "regex",
+ "reqwest",
+ "scheduling",
+ "scraper",
+ "serde_json",
+ "shellexpand",
+ "tempfile",
+ "tokio",
+ "tracing",
+ "url",
+ "urlencoding",
 ]
 
 [[package]]

@@ -1,17 +1,17 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/klyntbot-core",
-    "crates/klyntbot-config",
-    "crates/klyntbot-bus",
-    "crates/klyntbot-providers",
-    "crates/klyntbot-session",
-    "crates/klyntbot-cron",
-    "crates/klyntbot-tools",
-    "crates/klyntbot-channels",
-    "crates/klyntbot-heartbeat",
-    "crates/klyntbot-agent",
-    "crates/klyntbot-cli",
+    "crates/common",
+    "crates/config",
+    "crates/bus",
+    "crates/providers",
+    "crates/session",
+    "crates/scheduling",
+    "crates/tools",
+    "crates/channels",
+    "crates/heartbeat",
+    "crates/agent",
+    "crates/cli",
 ]
 
 [workspace.package]
@@ -22,17 +22,17 @@ license = "MIT"
 
 [workspace.dependencies]
 # Internal workspace crates
-klyntbot-core = { path = "crates/klyntbot-core" }
-klyntbot-config = { path = "crates/klyntbot-config" }
-klyntbot-bus = { path = "crates/klyntbot-bus" }
-klyntbot-providers = { path = "crates/klyntbot-providers" }
-klyntbot-session = { path = "crates/klyntbot-session" }
-klyntbot-cron = { path = "crates/klyntbot-cron" }
-klyntbot-tools = { path = "crates/klyntbot-tools" }
-klyntbot-channels = { path = "crates/klyntbot-channels" }
-klyntbot-heartbeat = { path = "crates/klyntbot-heartbeat" }
-klyntbot-agent = { path = "crates/klyntbot-agent" }
-klyntbot-cli = { path = "crates/klyntbot-cli" }
+common = { path = "crates/common" }
+config = { path = "crates/config" }
+bus = { path = "crates/bus" }
+providers = { path = "crates/providers" }
+session = { path = "crates/session" }
+scheduling = { path = "crates/scheduling" }
+tools = { path = "crates/tools" }
+channels = { path = "crates/channels" }
+heartbeat = { path = "crates/heartbeat" }
+agent = { path = "crates/agent" }
+cli = { path = "crates/cli" }
 
 # Shared external dependencies (version pinned at workspace level)
 tokio = { version = "1.49.0", features = ["rt-multi-thread", "macros", "time", "sync", "io-util", "net", "signal", "fs", "process"] }
@@ -81,21 +81,21 @@ license.workspace = true
 
 [features]
 default = ["email"]
-email = ["klyntbot-channels/email"]
+email = ["channels/email"]
 
 [dependencies]
 # Re-export all workspace crates
-klyntbot-core.workspace = true
-klyntbot-config.workspace = true
-klyntbot-bus.workspace = true
-klyntbot-providers.workspace = true
-klyntbot-session.workspace = true
-klyntbot-cron.workspace = true
-klyntbot-tools.workspace = true
-klyntbot-channels.workspace = true
-klyntbot-heartbeat.workspace = true
-klyntbot-agent.workspace = true
-klyntbot-cli.workspace = true
+common.workspace = true
+config.workspace = true
+bus.workspace = true
+providers.workspace = true
+session.workspace = true
+scheduling.workspace = true
+tools.workspace = true
+channels.workspace = true
+heartbeat.workspace = true
+agent.workspace = true
+cli.workspace = true
 
 # Binary-specific dependencies
 clap.workspace = true
