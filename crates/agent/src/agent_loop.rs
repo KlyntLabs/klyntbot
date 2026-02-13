@@ -10,7 +10,7 @@ use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, warn};
 
 use bus::{InboundMessage, MessageBus, OutboundMessage};
-use common::{PromptRequest, Result, UserResponse};
+use common::Result;
 use config::Config;
 use futures_util::future::join_all;
 use futures_util::StreamExt;
@@ -46,26 +46,28 @@ macro_rules! emit {
     };
 }
 
-/// Optional channels for interactive streaming (event output, user input, prompt flag).
-///
-/// Bundles the three parameters that are always `None` together (bus-driven modes)
-/// or `Some` together (CLI streaming mode). Keeps `run_agent_loop` under the
-/// argument-count lint threshold.
+/// Optional event channel for interactive streaming (CLI mode).
 struct StreamingChannels {
     event_tx: Option<mpsc::Sender<AgentEvent>>,
-    user_rx: Option<mpsc::Receiver<UserResponse>>,
-    prompt_pending: Option<Arc<AtomicBool>>,
 }
 
 impl StreamingChannels {
     /// No streaming — all channels disabled.
     fn none() -> Self {
-        Self {
-            event_tx: None,
-            user_rx: None,
-            prompt_pending: None,
-        }
+        Self { event_tx: None }
     }
+}
+
+/// Handle for consuming streaming agent output.
+pub struct StreamingHandle {
+    /// Agent events (content chunks, tool status).
+    pub event_rx: mpsc::Receiver<AgentEvent>,
+    /// Interaction requests from ask_user tool (with oneshot response channels).
+    pub interaction_rx: mpsc::Receiver<tools::InteractionBundle>,
+    /// Token to cancel processing.
+    pub cancel_token: CancellationToken,
+    /// Background task handle.
+    pub handle: JoinHandle<Result<String>>,
 }
 
 /// Type alias for last active channel tracking (channel + chat ID)
@@ -158,6 +160,9 @@ impl AgentLoop {
 
         // Register message tool
         tool_registry.register(MessageTool::new(bus.outbound_sender()));
+
+        // Register ask_user tool
+        tool_registry.register(tools::ask_user::AskUserTool);
 
         // Register spawn tool with subagent manager
         // TODO: Enable after refactoring spawn.rs to use SpawnHandler trait
@@ -458,7 +463,7 @@ impl AgentLoop {
         messages: Vec<Message>,
         use_streaming: bool,
         routing_ctx: &RoutingContext,
-        mut channels: StreamingChannels,
+        channels: StreamingChannels,
         cancel_token: CancellationToken,
     ) -> Result<String> {
         let mut current_messages = messages;
@@ -515,33 +520,6 @@ impl AgentLoop {
 
             match response {
                 IterationOutcome::ToolCallsProcessed => {
-                    // After tool execution, check if any tool emitted an interactive prompt.
-                    // If prompt_pending is set, we MUST wait for the user's response before
-                    // continuing — otherwise the LLM races ahead with stale context.
-                    let has_pending = channels
-                        .prompt_pending
-                        .as_ref()
-                        .is_some_and(|p| p.load(Ordering::SeqCst));
-
-                    if has_pending {
-                        if let Some(ref mut rx) = channels.user_rx {
-                            debug!("Waiting for user response to interactive prompt...");
-                            // Block until the user responds (or channel closes)
-                            if let Some(response) = rx.recv().await {
-                                // Clear the pending flag
-                                if let Some(ref p) = channels.prompt_pending {
-                                    p.store(false, Ordering::SeqCst);
-                                }
-                                if let UserResponse::Cancelled = response {
-                                    debug!("User cancelled interactive prompt");
-                                    return Ok("Cancelled by user.".to_string());
-                                }
-                                let msg = format_user_response(&response);
-                                debug!("Injecting user prompt response: {}", msg);
-                                current_messages.push(Message::user(msg));
-                            }
-                        }
-                    }
                     continue;
                 }
                 IterationOutcome::FinalContent(content) => {
@@ -846,12 +824,7 @@ impl AgentLoop {
         self: &Arc<Self>,
         content: String,
         session_key: String,
-    ) -> Result<(
-        mpsc::Receiver<AgentEvent>,
-        mpsc::Sender<UserResponse>,
-        CancellationToken,
-        JoinHandle<Result<String>>,
-    )> {
+    ) -> Result<StreamingHandle> {
         let preview = if content.len() > 80 {
             format!("{}...", &content[..80])
         } else {
@@ -866,27 +839,16 @@ impl AgentLoop {
         let history = session.get_history(DEFAULT_HISTORY_LIMIT).to_vec();
         drop(session_manager);
 
-        // Create event channel and user response channel (bidirectional)
+        // Create event channel and interaction channel
         let (event_tx, event_rx) = mpsc::channel(64);
-        let (user_tx, user_rx) = mpsc::channel(8);
+        let (interaction_tx, interaction_rx) = mpsc::channel(4);
 
-        // Create a prompt bridge: tools send PromptRequests via prompt_tx,
-        // the bridge forwards them as AgentEvent::PromptUser to the CLI.
-        // The prompt_pending flag tells the agent loop to wait for a user response.
-        let (prompt_tx, mut prompt_rx) = mpsc::channel::<PromptRequest>(8);
-        let prompt_pending = Arc::new(AtomicBool::new(false));
-        let bridge_event_tx = event_tx.clone();
-        let bridge_pending = Arc::clone(&prompt_pending);
-        tokio::spawn(async move {
-            while let Some(req) = prompt_rx.recv().await {
-                bridge_pending.store(true, Ordering::SeqCst);
-                let _ = bridge_event_tx.send(AgentEvent::PromptUser(req)).await;
-            }
-        });
-
-        // Routing context with prompt channel for interactive tools
-        let routing_ctx =
-            RoutingContext::with_prompt_tx("cli".into(), session_key.clone().into(), prompt_tx);
+        // Routing context with interaction channel for ask_user tool
+        let routing_ctx = RoutingContext::with_interaction(
+            "cli".into(),
+            session_key.clone().into(),
+            interaction_tx,
+        );
 
         let mut context_builder = self.context_builder.write().await;
         let messages = context_builder
@@ -909,8 +871,6 @@ impl AgentLoop {
                     &routing_ctx,
                     StreamingChannels {
                         event_tx: Some(event_tx),
-                        user_rx: Some(user_rx),
-                        prompt_pending: Some(prompt_pending),
                     },
                     cancel,
                 )
@@ -924,56 +884,17 @@ impl AgentLoop {
             result
         });
 
-        Ok((event_rx, user_tx, cancel_token, handle))
+        Ok(StreamingHandle {
+            event_rx,
+            interaction_rx,
+            cancel_token,
+            handle,
+        })
     }
 
     /// Get the model name from config (for display purposes).
     pub fn model_name(&self) -> &str {
         &self.config.agents.defaults.model
-    }
-}
-
-/// Format a user's interactive prompt response as a natural-language message
-/// for injection into the LLM conversation.
-fn format_user_response(response: &UserResponse) -> String {
-    match response {
-        UserResponse::Selected(idx) => {
-            format!("User selected option {} from the interactive prompt.", idx)
-        }
-        UserResponse::SelectedWithInput { index, text } => {
-            if let Some(t) = text {
-                if t.is_empty() {
-                    format!(
-                        "User selected option {} from the interactive prompt.",
-                        index
-                    )
-                } else {
-                    format!(
-                        "User selected option {} from the interactive prompt with input: \"{}\"",
-                        index, t
-                    )
-                }
-            } else {
-                format!(
-                    "User selected option {} from the interactive prompt.",
-                    index
-                )
-            }
-        }
-        UserResponse::MultiSelected(indices) => {
-            format!(
-                "User selected options {:?} from the interactive prompt.",
-                indices
-            )
-        }
-        UserResponse::YesNo(yes) => {
-            if *yes {
-                "User answered Yes to the interactive prompt.".to_string()
-            } else {
-                "User answered No to the interactive prompt.".to_string()
-            }
-        }
-        UserResponse::Cancelled => "User cancelled the interactive prompt.".to_string(),
     }
 }
 

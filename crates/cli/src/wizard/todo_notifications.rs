@@ -57,7 +57,6 @@ pub fn run_todo_notification_step(state: &mut WizardState) -> Result<StepResult>
         });
         target_names.push("slack");
     }
-    #[cfg(feature = "email")]
     if state.config.channels.email.enabled {
         options.push(SelectOption {
             label: "Email",

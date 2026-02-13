@@ -58,42 +58,29 @@ async fn test_low_confidence_triggers_enrichment_options() {
         "Should show 0% confidence for minimal task"
     );
 
-    // Verify enrichment options are presented
+    // Verify new ask_user integration guidance is provided
     assert!(
-        result.contains("🤖 AI INSTRUCTION"),
-        "Should include AI INSTRUCTION section for low confidence task"
+        result.contains("[Low confidence task]"),
+        "Should indicate low confidence task"
     );
     assert!(
-        result.contains("This task has low confidence"),
-        "Should explain low confidence"
+        result.contains("ask_user tool"),
+        "Should suggest using ask_user tool"
     );
-
-    // Verify all enrichment modes are offered
     assert!(
-        result.contains("Quick hint"),
-        "Should offer Quick hint mode"
+        result.contains("Suggest specific questions"),
+        "Should guide LLM to ask specific questions"
     );
-    assert!(result.contains("Manual fill"), "Should offer Manual mode");
-    assert!(result.contains("Auto-enrich"), "Should offer YOLO mode");
-    assert!(
-        result.contains("todo-yolo"),
-        "Should mention todo-yolo skill"
-    );
-    assert!(result.contains("Brainstorm"), "Should offer Party mode");
-    assert!(
-        result.contains("todo-party"),
-        "Should mention todo-party skill"
-    );
-    assert!(result.contains("Skip"), "Should offer Skip option");
 
     // Verify confidence breakdown is shown
     assert!(
         result.contains("Confidence breakdown:"),
         "Should show confidence breakdown"
     );
+    // Verify breakdown shows unchecked fields
     assert!(
-        result.contains("Missing fields:"),
-        "Should list missing fields"
+        result.contains("⬜"),
+        "Should show unchecked items for missing fields"
     );
 
     println!("\n=== Low Confidence Task Output ===\n{}\n", result);
@@ -391,10 +378,10 @@ async fn test_confidence_threshold_boundary() {
 
     let result_45 = tool.execute(args_45, &ctx()).await.unwrap();
 
-    // Below 50% should trigger full enrichment
+    // Below 50% should trigger ask_user guidance
     assert!(
-        result_45.contains("🤖 AI INSTRUCTION"),
-        "30% confidence should trigger full enrichment prompt"
+        result_45.contains("[Low confidence task]"),
+        "30% confidence should trigger ask_user guidance"
     );
 
     println!("\n=== 50% Threshold Result ===\n{}\n", result_50);
@@ -417,48 +404,45 @@ async fn test_missing_fields_list_accuracy() {
 
     let result = tool.execute(args, &ctx()).await.unwrap();
 
-    // Should list missing fields
+    // Should include confidence breakdown
     assert!(
-        result.contains("Missing fields:"),
-        "Should list missing fields"
+        result.contains("Confidence breakdown:"),
+        "Should include confidence breakdown"
     );
 
     // Should mention title quality (1 word, needs >3)
     assert!(
-        result.contains("title quality"),
-        "Should flag short title as missing"
+        result.contains("Title quality") && result.contains("needs >3 words"),
+        "Should flag short title: {}",
+        result
     );
 
-    // Should mention description
+    // Should mention description not set
     assert!(
-        result.contains("description"),
-        "Should list description as missing"
+        result.contains("Description") && result.contains("not set"),
+        "Should show description not set: {}",
+        result
     );
 
-    // Should mention priority
+    // Should mention priority not set
     assert!(
-        result.contains("priority"),
-        "Should list priority as missing"
+        result.contains("Priority") && result.contains("not set"),
+        "Should show priority not set: {}",
+        result
     );
 
-    // Should mention due date
+    // Should mention due date not set
     assert!(
-        result.contains("due date"),
-        "Should list due date as missing"
+        result.contains("Due date") && result.contains("not set"),
+        "Should show due date not set: {}",
+        result
     );
 
-    // Should NOT mention tags (already present)
-    let missing_section_start = result.find("Missing fields:").unwrap();
-    let missing_section = &result[missing_section_start..];
-    let missing_section_end = missing_section
-        .find("\n\n")
-        .unwrap_or(missing_section.len());
-    let missing_section = &missing_section[..missing_section_end];
-
+    // Tags should be marked as set (with checkmark)
     assert!(
-        !missing_section.contains("tags") || !missing_section.contains("tags (+15%)"),
-        "Should NOT list tags as missing (already present): {}",
-        missing_section
+        result.contains("Tags") && (result.contains("✅ Tags") || !result.contains("⬜ Tags")),
+        "Tags should be marked as present: {}",
+        result
     );
 
     println!("\n=== Missing Fields List ===\n{}\n", result);

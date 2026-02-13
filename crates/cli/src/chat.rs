@@ -1,17 +1,18 @@
 //! Chat command handler for interactive CLI mode
 
-use agent::{AgentEvent, AgentLoop, UserResponse};
+use agent::{AgentEvent, AgentLoop};
 use anyhow::Result;
 use bus::MessageBus;
-use common::prompts::PromptType;
 use common::utils::terminal::*;
 use common::utils::StreamRenderer;
+use common::FormResponse;
 use rustyline::error::ReadlineError;
 use std::io::{self, Write};
 use std::sync::Arc;
+use tools::InteractionBundle;
 
 use crate::interactive::SlashCommandHelper;
-use crate::wizard::prompts::{self, SelectOption, SelectWithInputOption, SelectWithInputResult};
+use crate::wizard::ask_user_prompt;
 
 /// Handle chat command
 pub async fn handle_chat(message: Option<String>, session: String) -> Result<()> {
@@ -240,9 +241,16 @@ async fn run_with_streaming(
     message: String,
     session_key: String,
 ) -> Result<()> {
-    let (mut event_rx, user_tx, cancel_token, handle) = agent_loop
+    let handle = agent_loop
         .process_direct_streaming(message, session_key)
         .await?;
+
+    let agent::StreamingHandle {
+        mut event_rx,
+        mut interaction_rx,
+        cancel_token,
+        handle: task_handle,
+    } = handle;
 
     let mut renderer = StreamRenderer::new();
 
@@ -255,45 +263,55 @@ async fn run_with_streaming(
 
     // Consume events from the agent, tracking whether we got a clean exit
     let mut clean_exit = false;
-    while let Some(event) = event_rx.recv().await {
-        match event {
-            AgentEvent::ContentChunk(chunk) => renderer.on_content_chunk(&chunk),
-            AgentEvent::ToolStart { name, args } => renderer.on_tool_start(&name, &args),
-            AgentEvent::ToolEnd {
-                name,
-                success,
-                duration_ms,
-            } => renderer.on_tool_end(&name, success, duration_ms),
-            AgentEvent::IterationStart { iteration, max } => {
-                renderer.on_iteration_start(iteration, max);
+    loop {
+        tokio::select! {
+            // Branch 1: Normal agent events
+            event = event_rx.recv() => {
+                let Some(event) = event else { break };
+                match event {
+                    AgentEvent::ContentChunk(chunk) => renderer.on_content_chunk(&chunk),
+                    AgentEvent::ToolStart { name, args } => renderer.on_tool_start(&name, &args),
+                    AgentEvent::ToolEnd {
+                        name,
+                        success,
+                        duration_ms,
+                    } => renderer.on_tool_end(&name, success, duration_ms),
+                    AgentEvent::IterationStart { iteration, max } => {
+                        renderer.on_iteration_start(iteration, max);
+                    }
+                    AgentEvent::Done(_) => {
+                        clean_exit = true;
+                        break;
+                    }
+                    AgentEvent::Error(e) => {
+                        eprintln!("\n{} {}", status_error(), e);
+                        clean_exit = true;
+                        break;
+                    }
+                }
             }
-            AgentEvent::PromptUser(request) => {
+
+            // Branch 2: Interactive user questions
+            bundle = interaction_rx.recv() => {
+                let Some(InteractionBundle { request, response_tx }) = bundle else { break };
+
                 // Pause streaming output to show interactive prompt
                 renderer.pause();
 
-                // Handle the prompt using wizard's interactive components.
-                // This blocks the event loop until the user responds — by design.
-                let response = handle_interactive_prompt(request.prompt_type);
+                // Call the tabbed multi-question UI
+                let response = match ask_user_prompt::prompt_multi_question(&request) {
+                    Ok(resp) => resp,
+                    Err(e) => {
+                        eprintln!("\n{} Error in ask_user prompt: {}", status_error(), e);
+                        FormResponse::Cancelled
+                    }
+                };
 
                 // Resume streaming (prompt was ~1 line of compact output)
                 renderer.resume(1);
 
-                // Send user's response back to the agent loop
-                if let Ok(resp) = response {
-                    let _ = user_tx.send(resp).await;
-                } else {
-                    // Prompt failed (e.g., Ctrl+C) — send Cancelled
-                    let _ = user_tx.send(UserResponse::Cancelled).await;
-                }
-            }
-            AgentEvent::Done(_) => {
-                clean_exit = true;
-                break;
-            }
-            AgentEvent::Error(e) => {
-                eprintln!("\n{} {}", status_error(), e);
-                clean_exit = true;
-                break;
+                // Send response back to the ask_user tool (unblocks it)
+                let _ = response_tx.send(response);
             }
         }
     }
@@ -307,7 +325,7 @@ async fn run_with_streaming(
     }
 
     // Wait for the agent task to complete
-    let result = handle.await?;
+    let result = task_handle.await?;
 
     // Finalize: always clean up terminal cursor state, then handle success/failure
     match result {
@@ -333,69 +351,6 @@ async fn run_with_streaming(
     );
 
     Ok(())
-}
-
-/// Handle an interactive prompt by delegating to wizard's prompt components.
-///
-/// Bridges between agent prompt types (from `common::prompts`) and the
-/// wizard's interactive terminal prompts (arrow keys, TAB, etc.).
-fn handle_interactive_prompt(prompt_type: PromptType) -> Result<UserResponse> {
-    match prompt_type {
-        PromptType::Select {
-            header,
-            options,
-            default_idx,
-        } => {
-            let opts: Vec<SelectOption<'_>> = options
-                .iter()
-                .map(|o| SelectOption {
-                    label: &o.label,
-                    description: &o.description,
-                })
-                .collect();
-
-            let idx = prompts::prompt_select(&header, &opts, default_idx)?;
-            Ok(UserResponse::Selected(idx))
-        }
-
-        PromptType::SelectWithInput {
-            header,
-            options,
-            default_idx,
-        } => {
-            let opts: Vec<SelectWithInputOption<'_>> = options
-                .iter()
-                .map(|o| SelectWithInputOption {
-                    label: &o.label,
-                    description: &o.description,
-                    expandable: o.expandable,
-                    input_hint: o.input_hint.as_deref(),
-                })
-                .collect();
-
-            let SelectWithInputResult { index, text } =
-                prompts::prompt_select_with_input(&header, &opts, default_idx)?;
-            Ok(UserResponse::SelectedWithInput { index, text })
-        }
-
-        PromptType::MultiSelect { header, options } => {
-            let opts: Vec<SelectOption<'_>> = options
-                .iter()
-                .map(|o| SelectOption {
-                    label: &o.label,
-                    description: &o.description,
-                })
-                .collect();
-
-            let indices = prompts::prompt_multi_select(&header, &opts)?;
-            Ok(UserResponse::MultiSelected(indices))
-        }
-
-        PromptType::YesNo { question, default } => {
-            let answer = prompts::prompt_yes_no(&question, default)?;
-            Ok(UserResponse::YesNo(answer))
-        }
-    }
 }
 
 /// Print help for REPL commands

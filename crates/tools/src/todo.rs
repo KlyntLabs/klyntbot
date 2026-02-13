@@ -11,7 +11,7 @@ use tokio::sync::RwLock;
 use super::{RoutingContext, Tool};
 use crate::todo_store::TodoStore;
 use crate::todo_types::{Todo, TodoFilter, TodoPatch, TodoStatus};
-use common::{PromptOptionWithInput, PromptRequest, PromptType, Result, ToolError};
+use common::{Result, ToolError};
 
 /// TodoTool with config-driven focus and confidence values (ADR-008)
 pub struct TodoTool {
@@ -106,7 +106,7 @@ impl Tool for TodoTool {
         })
     }
 
-    async fn execute(&self, args: Value, ctx: &RoutingContext) -> Result<String> {
+    async fn execute(&self, args: Value, _ctx: &RoutingContext) -> Result<String> {
         let action = args
             .get("action")
             .and_then(|v| v.as_str())
@@ -163,124 +163,16 @@ impl Tool for TodoTool {
                     created.confidence * 100.0
                 );
 
-                // Include enrichment guidance based on confidence
+                // Show confidence breakdown for low/medium confidence tasks
                 if created.confidence < self.confidence_threshold {
-                    // Emit interactive prompt if CLI prompt channel is available.
-                    // When the interactive prompt is shown, we tell the LLM to wait
-                    // for the user's choice instead of presenting text-based options.
-                    let interactive_prompt_sent = if let Some(prompt_tx) = &ctx.prompt_tx {
-                        let prompt = PromptRequest {
-                            prompt_type: PromptType::SelectWithInput {
-                                header: format!(
-                                    "Task created with {:.0}% confidence. How would you like to improve it?",
-                                    created.confidence * 100.0
-                                ),
-                                options: vec![
-                                    PromptOptionWithInput {
-                                        label: "Yes — looks good".to_string(),
-                                        description: "accept as-is".to_string(),
-                                        expandable: true,
-                                        input_hint: Some("add a hint for AI...".to_string()),
-                                    },
-                                    PromptOptionWithInput {
-                                        label: "Manual — I'll fill details".to_string(),
-                                        description: "field-by-field".to_string(),
-                                        expandable: true,
-                                        input_hint: Some("start with description...".to_string()),
-                                    },
-                                    PromptOptionWithInput {
-                                        label: "YOLO — auto-enrich".to_string(),
-                                        description: "from context".to_string(),
-                                        expandable: false,
-                                        input_hint: None,
-                                    },
-                                    PromptOptionWithInput {
-                                        label: "Party — brainstorm".to_string(),
-                                        description: "interactive".to_string(),
-                                        expandable: false,
-                                        input_hint: None,
-                                    },
-                                    PromptOptionWithInput {
-                                        label: "Skip — create as-is".to_string(),
-                                        description: "no enrichment".to_string(),
-                                        expandable: false,
-                                        input_hint: None,
-                                    },
-                                ],
-                                default_idx: 4, // Skip
-                            },
-                            context: serde_json::to_value(&created).unwrap_or_default(),
-                        };
-
-                        prompt_tx.send(prompt).await.is_ok()
-                    } else {
-                        false
-                    };
-
-                    if interactive_prompt_sent {
-                        // Interactive prompt is being shown to the user.
-                        // The user's choice will arrive as a message in the next iteration.
-                        // Tell the LLM to act on that choice rather than presenting text options.
-                        output.push_str("\n\nConfidence breakdown:");
-                        output.push_str(&format_confidence_breakdown(&created));
-                        output.push_str("\n\n🤖 AI INSTRUCTION: An interactive enrichment prompt is being shown to the user. Wait for their selection in the next message, then act on it:");
-                        output.push_str(
-                            "\n  Option 0 = accept as-is (with optional hint text to infer fields)",
-                        );
-                        output.push_str("\n  Option 1 = manual fill (ask for missing fields one at a time, use optional text as starting input)");
-                        output.push_str(
-                            "\n  Option 2 = YOLO auto-enrich (activate `todo-yolo` skill)",
-                        );
-                        output.push_str(
-                            "\n  Option 3 = Party brainstorm (activate `todo-party` skill)",
-                        );
-                        output.push_str("\n  Option 4 = skip (leave as-is)");
-                    } else {
-                        // No interactive prompt available (non-TTY or channel mode).
-                        // Fall back to text-based enrichment suggestions.
-                        output.push_str("\n\nConfidence breakdown:");
-                        output.push_str(&format_confidence_breakdown(&created));
-
-                        output.push_str("\n\nMissing fields:");
-                        let mut missing = Vec::new();
-                        if created.title.split_whitespace().count() <= 3 {
-                            missing.push("title quality (+25%)");
-                        }
-                        if created.description.as_ref().map_or(true, |d| d.len() <= 10) {
-                            missing.push("description (+25%)");
-                        }
-                        if created.priority.is_none() {
-                            missing.push("priority (+15%)");
-                        }
-                        if created.due_date.is_none() {
-                            missing.push("due date (+20%)");
-                        }
-                        if created.tags.is_empty() {
-                            missing.push("tags (+15%)");
-                        }
-                        for field in &missing {
-                            output.push_str(&format!("\n  - {}", field));
-                        }
-
-                        output.push_str("\n\n🤖 AI INSTRUCTION: This task has low confidence. Present enrichment options to the user:");
-                        output.push_str(
-                            "\n\n1. **Quick hint** — user provides context, AI infers fields",
-                        );
-                        output.push_str(
-                            "\n2. **Manual fill** — ask for missing fields one at a time",
-                        );
-                        output.push_str("\n3. **Auto-enrich (YOLO)** — activate `todo-yolo` skill to infer from conversation");
-                        output.push_str("\n4. **Brainstorm (Party)** — activate `todo-party` skill for targeted questions");
-                        output.push_str("\n5. **Skip** — leave as-is");
-                        output.push_str(
-                            "\n\nFormat the options conversationally per the `todo` skill instructions.",
-                        );
-                    }
-                } else if created.confidence < 0.8 {
-                    // Medium confidence - suggest potential improvements
                     output.push_str("\n\nConfidence breakdown:");
                     output.push_str(&format_confidence_breakdown(&created));
-                    output.push_str("\n\n💡 This task could be improved. Consider asking if the user wants to add missing fields.");
+                    output.push_str("\n\n[Low confidence task] Use the ask_user tool to gather missing details.");
+                    output.push_str("\nSuggest specific questions about the missing fields before proceeding.");
+                } else if created.confidence < 0.8 {
+                    output.push_str("\n\nConfidence breakdown:");
+                    output.push_str(&format_confidence_breakdown(&created));
+                    output.push_str("\n\n💡 This task could be improved by adding missing fields.");
                 }
 
                 Ok(output)

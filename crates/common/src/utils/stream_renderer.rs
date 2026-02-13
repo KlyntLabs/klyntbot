@@ -110,7 +110,7 @@ impl StreamRenderer {
         });
 
         // Format args inline: show up to 2 key-value pairs
-        let args_display = format_tool_args(args);
+        let args_display = format_tool_args(name, args);
         let line = if args_display.is_empty() {
             format!("  {} {}", colorize("\u{2192}", TOOL), colorize(name, TOOL))
         } else {
@@ -322,7 +322,29 @@ impl Default for StreamRenderer {
 /// Format tool arguments for compact inline display.
 ///
 /// Extracts up to 2 key-value pairs from a JSON object, truncating values to 40 chars.
-fn format_tool_args(args: &serde_json::Value) -> String {
+/// Special handling for `ask_user`: shows title and question count instead of raw JSON.
+fn format_tool_args(name: &str, args: &serde_json::Value) -> String {
+    // ask_user: show clean title + question count
+    if name == "ask_user" {
+        if let Some(obj) = args.as_object() {
+            let title = obj
+                .get("title")
+                .and_then(|v| v.as_str())
+                .unwrap_or("User Input");
+            let count = obj
+                .get("questions")
+                .and_then(|v| v.as_array())
+                .map(|a| a.len())
+                .unwrap_or(0);
+            return format!(
+                "\"{}\" ({} question{})",
+                title,
+                count,
+                if count == 1 { "" } else { "s" }
+            );
+        }
+    }
+
     let Some(obj) = args.as_object() else {
         return String::new();
     };
@@ -426,7 +448,7 @@ mod tests {
     #[test]
     fn test_tool_args_compact_display() {
         let args = json!({"path": "/src/main.rs", "query": "hello world"});
-        let display = format_tool_args(&args);
+        let display = format_tool_args("read_file", &args);
         assert!(display.contains("path="));
     }
 
@@ -434,22 +456,46 @@ mod tests {
     fn test_tool_args_truncation() {
         let long_value = "a".repeat(60);
         let args = json!({"key": long_value});
-        let display = format_tool_args(&args);
+        let display = format_tool_args("some_tool", &args);
         assert!(display.contains("...\""));
     }
 
     #[test]
     fn test_tool_args_empty() {
         let args = json!({});
-        let display = format_tool_args(&args);
+        let display = format_tool_args("some_tool", &args);
         assert!(display.is_empty());
     }
 
     #[test]
     fn test_tool_args_non_object() {
         let args = json!("just a string");
-        let display = format_tool_args(&args);
+        let display = format_tool_args("some_tool", &args);
         assert!(display.is_empty());
+    }
+
+    #[test]
+    fn test_tool_args_ask_user_clean_display() {
+        let args = json!({
+            "title": "Create a New To-Do Task",
+            "questions": [
+                {"id": "title", "text": "What is the title?", "type": "free_text"},
+                {"id": "priority", "text": "Priority?", "type": "single_select"},
+                {"id": "due", "text": "Due date?", "type": "free_text"}
+            ]
+        });
+        let display = format_tool_args("ask_user", &args);
+        assert_eq!(display, "\"Create a New To-Do Task\" (3 questions)");
+    }
+
+    #[test]
+    fn test_tool_args_ask_user_single_question() {
+        let args = json!({
+            "title": "Confirm",
+            "questions": [{"id": "q1", "text": "Proceed?", "type": "yes_no"}]
+        });
+        let display = format_tool_args("ask_user", &args);
+        assert_eq!(display, "\"Confirm\" (1 question)");
     }
 
     #[test]

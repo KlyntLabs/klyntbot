@@ -2,6 +2,7 @@
 //!
 //! This crate provides the Tool trait and various tool implementations.
 
+pub mod ask_user;
 pub mod cron_tool;
 pub mod filesystem;
 pub mod message;
@@ -27,44 +28,53 @@ pub trait CronHandler: Send + Sync {
 use async_trait::async_trait;
 use serde_json::Value;
 use std::sync::Arc;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 
-use common::{ChannelName, ChatId, PromptRequest, Result};
+use common::{ChannelName, ChatId, FormResponse, InteractionRequest, Result};
+
+/// Bundle sent from ask_user tool to the CLI.
+/// Each request carries its own response channel.
+pub struct InteractionBundle {
+    pub request: InteractionRequest,
+    pub response_tx: oneshot::Sender<FormResponse>,
+}
 
 /// Routing context for tools that need channel/chat information.
 /// This is passed explicitly to execute() instead of using shared mutable state.
 ///
-/// The optional `prompt_tx` allows tools to request interactive prompts from the
-/// CLI during execution (e.g., for todo enrichment flows). Tools fire prompt
-/// requests and return immediately — responses arrive in the next agent iteration.
-#[derive(Debug, Clone)]
+/// The optional `interaction_tx` allows the ask_user tool to send interaction
+/// requests to the CLI during execution. Each request includes a oneshot channel
+/// for the response, enabling blocking behavior within the tool.
+#[derive(Clone)]
 pub struct RoutingContext {
     pub channel: ChannelName,
     pub chat_id: ChatId,
-    /// Channel for tools to send interactive prompt requests to the CLI.
+    /// Channel for ask_user tool to send interaction bundles.
     /// Only available when running in CLI chat mode (TTY).
-    pub prompt_tx: Option<mpsc::Sender<PromptRequest>>,
+    /// Clone-safe: mpsc::Sender is Clone.
+    pub interaction_tx: Option<mpsc::Sender<InteractionBundle>>,
 }
 
 impl RoutingContext {
+    /// Non-interactive mode (bus-driven channels, non-TTY).
     pub fn new(channel: ChannelName, chat_id: ChatId) -> Self {
         Self {
             channel,
             chat_id,
-            prompt_tx: None,
+            interaction_tx: None,
         }
     }
 
-    /// Create a routing context with a prompt channel for interactive CLI mode.
-    pub fn with_prompt_tx(
+    /// Interactive CLI mode with user interaction support.
+    pub fn with_interaction(
         channel: ChannelName,
         chat_id: ChatId,
-        prompt_tx: mpsc::Sender<PromptRequest>,
+        interaction_tx: mpsc::Sender<InteractionBundle>,
     ) -> Self {
         Self {
             channel,
             chat_id,
-            prompt_tx: Some(prompt_tx),
+            interaction_tx: Some(interaction_tx),
         }
     }
 }

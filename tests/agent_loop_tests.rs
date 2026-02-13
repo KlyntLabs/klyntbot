@@ -271,10 +271,13 @@ async fn test_streaming_emits_done() {
 
     let agent_loop = Arc::new(AgentLoop::new(bus, provider, config).await.unwrap());
 
-    let (mut event_rx, _user_tx, _cancel_token, handle) = agent_loop
+    let streaming_handle = agent_loop
         .process_direct_streaming("Hello".to_string(), "test:stream1".to_string())
         .await
         .unwrap();
+
+    let mut event_rx = streaming_handle.event_rx;
+    let handle = streaming_handle.handle;
 
     // Collect all events
     let mut got_content = false;
@@ -319,10 +322,13 @@ async fn test_streaming_emits_error_on_failure() {
 
     let agent_loop = Arc::new(AgentLoop::new(bus, provider, config).await.unwrap());
 
-    let (mut event_rx, _user_tx, _cancel_token, handle) = agent_loop
+    let streaming_handle = agent_loop
         .process_direct_streaming("Hello".to_string(), "test:stream2".to_string())
         .await
         .unwrap();
+
+    let mut event_rx = streaming_handle.event_rx;
+    let handle = streaming_handle.handle;
 
     // Collect events — expect an Error event
     let mut got_error = false;

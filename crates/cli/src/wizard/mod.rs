@@ -16,7 +16,9 @@
 //! - `prompts`    – Reusable prompt utilities
 //! - `templates`  – Workspace template file contents
 //! - `oauth`      – OAuth callback server for Discord/Slack
+//! - `ask_user_prompt` – Tabbed multi-question UI for ask_user tool
 
+pub mod ask_user_prompt;
 pub mod channels;
 pub mod daemon;
 pub mod framework;

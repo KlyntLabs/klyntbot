@@ -4,6 +4,7 @@
 //! the entire klyntbot workspace.
 
 pub mod error;
+pub mod interaction;
 pub mod prompts;
 pub mod types;
 pub mod utils;
@@ -13,5 +14,8 @@ pub use error::{
     ChannelError, ConfigError, CronError, KlyntbotError, ProviderError, Result, SessionError,
     ToolError,
 };
-pub use prompts::{PromptOption, PromptOptionWithInput, PromptRequest, PromptType, UserResponse};
+pub use interaction::InteractionRenderer;
+pub use prompts::{
+    Answer, AnswerOption, AnswerType, AnswerValue, FormResponse, InteractionRequest, Question,
+};
 pub use types::{ChannelName, ChatId, MessageRole, SessionKey};

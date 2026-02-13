@@ -33,40 +33,63 @@ When a user asks to create a task in chat:
 
 1. **Assess completeness** — would this task have confidence >= 50%?
 2. **If high confidence** — create immediately with `todo.add`, show summary
-3. **If low confidence** — present enrichment options before creating:
-   - Quick hint, Manual fill, Auto-enrich (YOLO), Brainstorm (Party), or Skip
-   - Accept natural language responses, not just numbers
+3. **If low confidence** — create the task first, then use the `ask_user` tool to gather missing fields:
+   - Use ask_user to present enrichment options interactively
+   - Group related questions (description, priority, due date) into one call
+   - Ask user how they want to proceed: Quick hint, Manual fill, Auto-enrich (YOLO), Brainstorm (Party), or Skip
 4. **After creation** — always show task summary with confidence
 5. **If confidence < 80%** — offer improvement suggestions
 
+### Using ask_user for Enrichment
+
+When a task has low confidence, use the `ask_user` tool to present enrichment options:
+
+```json
+{
+  "tool": "ask_user",
+  "args": {
+    "title": "Improve Task Details",
+    "questions": [
+      {
+        "id": "enrichment_mode",
+        "title": "How to enrich",
+        "text": "This task has low confidence. How would you like to improve it?",
+        "answer_type": {
+          "type": "single_select",
+          "options": [
+            {"value": "quick_hint", "label": "Quick hint", "description": "Give me context and I'll infer the rest"},
+            {"value": "manual", "label": "I'll fill it", "description": "Ask me for each field"},
+            {"value": "yolo", "label": "Auto-enrich", "description": "Infer from our conversation"},
+            {"value": "brainstorm", "label": "Let's brainstorm", "description": "Ask me targeted questions"},
+            {"value": "skip", "label": "Skip", "description": "Create as-is (low confidence)"}
+          ]
+        }
+      }
+    ]
+  }
+}
+```
+
 ### Mode Activation
 
-- If user provides extra context inline → treat as Quick Hint
-- If user says "yolo" or "auto" → activate todo-yolo skill behavior
-- If user says "brainstorm" or "help me think about it" → activate todo-party skill behavior
-- If user provides structured fields → collect as Manual mode
-- If user says "skip" or "just create it" → create as-is
+- If user selects "quick_hint" → ask for one-liner context, then update task
+- If user selects "yolo" → activate todo-yolo skill behavior
+- If user selects "brainstorm" → activate todo-party skill behavior
+- If user selects "manual" → use ask_user to collect fields one-by-one
+- If user selects "skip" → leave task as-is
 
 ### Enrichment Response Format
 
-When presenting enrichment options for a low-confidence task:
+After creating a low-confidence task, the todo tool will suggest using ask_user.
+When you see this suggestion, call ask_user with enrichment options:
 
 ```
-I'll create that task, but it's pretty thin right now.
-
-📋 "[title]" — Confidence: [X]%
-   Missing: [list of missing fields]
-
-How would you like to flesh it out?
-
-1. **Quick hint** — give me a one-liner and I'll fill in the rest
-2. **I'll fill it** — tell me the details (description, priority, due date, tags)
-3. **Auto-enrich** — I'll infer everything from our conversation
-4. **Let's brainstorm** — I'll ask you a few quick questions
-5. **Skip** — create as-is (low confidence)
-
-Just reply with a number or describe what you'd like.
+Task created with low confidence. I'll now show you options to improve it.
 ```
+
+Then use ask_user (see example above) to present the interactive options.
+The user will select their preference via the tabbed UI, and you'll receive
+a structured response like: `enrichment_mode: quick_hint`
 
 ### Post-Creation Summary
 

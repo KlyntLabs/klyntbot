@@ -17,13 +17,16 @@ pub use tools;
 
 // Re-export commonly used types for convenience
 pub use agent::{
-    AgentEvent, AgentLoop, ContextBuilder, MemoryStore, PromptRequest, PromptType, SkillManager,
-    SubagentManager, UserResponse,
+    AgentEvent, AgentLoop, ContextBuilder, MemoryStore, SkillManager, StreamingHandle,
+    SubagentManager,
 };
 pub use bus::{InboundMessage, MessageBus, OutboundMessage};
 pub use channels::{Channel, ChannelManager, DynChannel};
 pub use common::error;
-pub use common::{ChannelName, ChatId, MessageRole, Result, SessionKey};
+pub use common::{
+    Answer, AnswerOption, AnswerType, AnswerValue, ChannelName, ChatId, FormResponse,
+    InteractionRequest, MessageRole, Question, Result, SessionKey,
+};
 pub use config::Config;
 pub use heartbeat::HeartbeatService;
 pub use providers::{

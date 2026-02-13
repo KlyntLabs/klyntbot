@@ -3,8 +3,6 @@
 //! These events are emitted by the agent loop during processing,
 //! allowing consumers (like the CLI) to display real-time progress.
 
-use common::PromptRequest;
-
 /// Events emitted by the agent loop during processing.
 #[derive(Debug, Clone)]
 pub enum AgentEvent {
@@ -32,8 +30,4 @@ pub enum AgentEvent {
 
     /// An error occurred during processing.
     Error(String),
-
-    /// A tool has requested an interactive prompt from the user.
-    /// The CLI should display the prompt and send the response on user_tx.
-    PromptUser(PromptRequest),
 }
