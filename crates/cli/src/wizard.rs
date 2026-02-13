@@ -222,12 +222,12 @@ fn configure_api(provider: &ProviderOption) -> Result<(String, String)> {
 
     // Model selection
     let default_model = match provider.key {
-        "anthropic" => "anthropic/claude-opus-4-5",
-        "openai" => "openai/gpt-4",
-        "deepseek" => "deepseek/deepseek-chat",
-        "gemini" => "google/gemini-pro",
+        "anthropic" => "claude-sonnet-4-5",
+        "openai" => "gpt-4o",
+        "deepseek" => "deepseek-chat",
+        "gemini" => "gemini-2.0-flash",
         "openrouter" => "openrouter/auto",
-        _ => "anthropic/claude-opus-4-5",
+        _ => "claude-sonnet-4-5",
     };
 
     print!("Model [{}]: ", default_model);
