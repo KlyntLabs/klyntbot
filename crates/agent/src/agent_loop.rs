@@ -198,6 +198,15 @@ impl AgentLoop {
         Ok(())
     }
 
+    /// Get a handle to the shutdown flag.
+    ///
+    /// This allows stopping the agent loop without holding its Mutex lock,
+    /// which is important because `run()` holds the lock for its entire
+    /// lifetime.
+    pub fn shutdown_flag(&self) -> Arc<AtomicBool> {
+        Arc::clone(&self.running)
+    }
+
     /// Stop the agent loop
     pub async fn stop(&self) {
         self.running.store(false, Ordering::SeqCst);

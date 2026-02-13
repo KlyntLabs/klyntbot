@@ -6,6 +6,7 @@ use bus::MessageBus;
 use channels::ChannelManager;
 use heartbeat::HeartbeatService;
 use scheduling::CronService;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use tokio::signal;
 use tokio::sync::Mutex;
@@ -79,6 +80,10 @@ pub async fn handle_serve(port: u16) -> Result<()> {
     heartbeat_service.start().await;
     info!("Heartbeat service started");
 
+    // Grab the agent's shutdown flag before spawning — this lets us signal
+    // stop without acquiring the Mutex (which run() holds for its lifetime).
+    let agent_shutdown = agent_loop.lock().await.shutdown_flag();
+
     // Start agent loop in background
     let agent_loop_handle = {
         let agent = agent_loop.clone();
@@ -100,8 +105,8 @@ pub async fn handle_serve(port: u16) -> Result<()> {
     };
 
     println!("\nklyntbot gateway running on port {}", port);
-    println!("\nActive services:");
-    println!("  Agent loop (processing messages)");
+    println!("\nServices:");
+    println!("  Agent loop");
     println!("  Cron scheduler");
     println!("  Heartbeat monitor");
     println!("\nChannels:");
@@ -121,22 +126,30 @@ pub async fn handle_serve(port: u16) -> Result<()> {
 
     // Wait for shutdown signal
     signal::ctrl_c().await?;
+    println!("\nShutting down gracefully...");
     info!("Shutting down gracefully...");
 
-    // Stop all services gracefully
-    agent_loop.lock().await.stop().await;
-    channel_manager.lock().await.stop_all().await?;
+    // Signal the agent loop to stop via the atomic flag (no Mutex needed).
+    agent_shutdown.store(false, Ordering::SeqCst);
+
+    // Stop services that don't hold long-lived Mutex locks.
     cron_service.stop().await;
     heartbeat_service.stop().await;
 
-    // Wait for tasks to finish (with timeout)
+    // Wait for spawned tasks to finish (they should exit soon now).
+    // The agent loop checks its flag every 1s; channel tasks may block
+    // on long-polling, so abort them after the timeout.
     let shutdown_timeout = tokio::time::Duration::from_secs(5);
-    let _ = tokio::time::timeout(shutdown_timeout, async {
+    if tokio::time::timeout(shutdown_timeout, async {
         let _ = tokio::join!(agent_loop_handle, channel_manager_handle);
     })
-    .await;
+    .await
+    .is_err()
+    {
+        info!("Shutdown timeout — aborting remaining tasks");
+    }
 
     info!("All services stopped");
-    println!("\nklyntbot stopped");
+    println!("klyntbot stopped");
     Ok(())
 }
