@@ -2,9 +2,9 @@
 
 use std::io::{self, Write};
 
-use config::{self as config, Config};
 use anyhow::Result;
 use common::utils::terminal::*;
+use config::{self as config, Config};
 
 /// Provider option for the onboarding wizard
 #[derive(Debug, Clone)]

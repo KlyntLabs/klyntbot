@@ -7,7 +7,7 @@ use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 use bus::InboundMessage;
-use providers::{ChatParams, DynProvider, Message, tool_calls_to_messages};
+use providers::{tool_calls_to_messages, ChatParams, DynProvider, Message};
 use tools::{
     filesystem::register_fs_tools,
     registry::ToolRegistry,

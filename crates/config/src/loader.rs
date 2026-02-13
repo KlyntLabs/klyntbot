@@ -12,14 +12,18 @@ use common::{ConfigError, Result};
 pub fn config_path() -> Result<PathBuf> {
     dirs::home_dir()
         .map(|home| home.join(".klyntbot").join("config.json"))
-        .ok_or_else(|| ConfigError::Invalid("Unable to determine home directory".to_string()).into())
+        .ok_or_else(|| {
+            ConfigError::Invalid("Unable to determine home directory".to_string()).into()
+        })
 }
 
 /// Get the klyntbot data directory (~/.klyntbot/)
 pub fn config_dir() -> Result<PathBuf> {
     dirs::home_dir()
         .map(|home| home.join(".klyntbot"))
-        .ok_or_else(|| ConfigError::Invalid("Unable to determine home directory".to_string()).into())
+        .ok_or_else(|| {
+            ConfigError::Invalid("Unable to determine home directory".to_string()).into()
+        })
 }
 
 /// Load configuration from file or return default
@@ -309,7 +313,10 @@ mod tests {
         let loaded_config: Config = serde_json::from_str(&content).unwrap();
 
         assert_eq!(loaded_config.agents.defaults.model, "test-model");
-        assert_eq!(loaded_config.providers.anthropic.api_key.expose(), "test-key");
+        assert_eq!(
+            loaded_config.providers.anthropic.api_key.expose(),
+            "test-key"
+        );
     }
 
     #[test]
@@ -392,9 +399,18 @@ mod tests {
             overridden.providers.deepseek.api_key = Secret::new(key);
         }
 
-        assert_eq!(overridden.providers.anthropic.api_key.expose(), "sk-ant-env");
-        assert_eq!(overridden.providers.openai.api_key.expose(), "sk-openai-env");
-        assert_eq!(overridden.providers.deepseek.api_key.expose(), "sk-deepseek-env");
+        assert_eq!(
+            overridden.providers.anthropic.api_key.expose(),
+            "sk-ant-env"
+        );
+        assert_eq!(
+            overridden.providers.openai.api_key.expose(),
+            "sk-openai-env"
+        );
+        assert_eq!(
+            overridden.providers.deepseek.api_key.expose(),
+            "sk-deepseek-env"
+        );
 
         std::env::remove_var("KLYNTBOT_PROVIDERS__ANTHROPIC__API_KEY");
         std::env::remove_var("KLYNTBOT_PROVIDERS__OPENAI__API_KEY");

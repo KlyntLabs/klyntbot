@@ -3,11 +3,11 @@
 //! This module provides the glue code to make CronService from klyntbot-cron
 //! compatible with the CronHandler trait from klyntbot-tools.
 
-use std::sync::Arc;
 use async_trait::async_trait;
-use tools::cron_tool::{AddCronJobParams, CronHandler, CronJobInfo};
 use common::Result;
-use scheduling::{CronService, CronSchedule};
+use scheduling::{CronSchedule, CronService};
+use std::sync::Arc;
+use tools::cron_tool::{AddCronJobParams, CronHandler, CronJobInfo};
 
 /// Wrapper around CronService that implements CronHandler
 pub struct CronHandlerAdapter {
@@ -23,12 +23,8 @@ impl CronHandlerAdapter {
 /// Convert tool CronSchedule to service CronSchedule
 fn convert_schedule(schedule: tools::cron_tool::CronSchedule) -> CronSchedule {
     match schedule {
-        tools::cron_tool::CronSchedule::Every { every_ms } => {
-            CronSchedule::Every { every_ms }
-        }
-        tools::cron_tool::CronSchedule::Cron { expr, tz } => {
-            CronSchedule::Cron { expr, tz }
-        }
+        tools::cron_tool::CronSchedule::Every { every_ms } => CronSchedule::Every { every_ms },
+        tools::cron_tool::CronSchedule::Cron { expr, tz } => CronSchedule::Cron { expr, tz },
     }
 }
 

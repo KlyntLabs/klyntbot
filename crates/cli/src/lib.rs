@@ -2,15 +2,16 @@
 //!
 //! This crate provides the command-line interface and interactive REPL.
 
-pub mod commands;
-pub mod wizard;
-pub mod chat;
-pub mod serve;
-pub mod status;
 pub mod channels;
-pub mod cron;
+pub mod chat;
+pub mod commands;
 pub mod config_cmd;
+pub mod cron;
+pub mod interactive;
+pub mod serve;
 pub mod skills;
+pub mod status;
+pub mod wizard;
 
 // Re-export commonly used items for convenience
 pub use commands::*;

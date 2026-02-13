@@ -4,13 +4,13 @@ use cli::{Cli, Commands};
 
 // Import CLI handlers
 mod cli_handlers {
-    pub use cli::chat::handle_chat;
-    pub use cli::serve::handle_serve;
-    pub use cli::status::{handle_brief_status, handle_status};
     pub use cli::channels::handle_channels;
-    pub use cli::cron::handle_cron;
+    pub use cli::chat::handle_chat;
     pub use cli::config_cmd::handle_config;
+    pub use cli::cron::handle_cron;
+    pub use cli::serve::handle_serve;
     pub use cli::skills::handle_skills;
+    pub use cli::status::{handle_brief_status, handle_status};
 }
 
 #[tokio::main]
@@ -27,11 +27,9 @@ async fn main() {
     init_tracing(log_level);
 
     let result = match cli.command {
-        Some(Commands::Chat {
-            message,
-            session,
-            no_markdown,
-        }) => cli_handlers::handle_chat(message, session, !no_markdown).await,
+        Some(Commands::Chat { message, session }) => {
+            cli_handlers::handle_chat(message, session).await
+        }
 
         Some(Commands::Serve { port, .. }) => cli_handlers::handle_serve(port).await,
 

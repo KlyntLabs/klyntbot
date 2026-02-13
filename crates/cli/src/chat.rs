@@ -1,20 +1,18 @@
 //! Chat command handler for interactive CLI mode
 
+use agent::{AgentEvent, AgentLoop};
 use anyhow::Result;
-use common::utils::terminal::*;
-use agent::AgentLoop;
 use bus::MessageBus;
+use common::utils::terminal::*;
+use common::utils::StreamRenderer;
 use rustyline::error::ReadlineError;
-use rustyline::DefaultEditor;
 use std::io::{self, Write};
 use std::sync::Arc;
 
+use crate::interactive::SlashCommandHelper;
+
 /// Handle chat command
-pub async fn handle_chat(
-    message: Option<String>,
-    session: String,
-    _render_markdown: bool, // Markdown always rendered for best UX
-) -> Result<()> {
+pub async fn handle_chat(message: Option<String>, session: String) -> Result<()> {
     // Load config
     let config = config::load()?;
     let model = config.agents.defaults.model.clone();
@@ -22,8 +20,8 @@ pub async fn handle_chat(
     // Clean startup header
     println!(
         "\n  {} {}",
-        colorize("klyntbot", BOLD),
-        colorize(&format!("· {}", model), DIM)
+        colorize("klyntbot", "\x1b[1;36m"), // bold cyan
+        colorize(&format!("\u{00b7} {}", model), DIM)
     );
 
     // Initialize LLM provider
@@ -32,7 +30,7 @@ pub async fn handle_chat(
     // Create a minimal message bus (not used in CLI mode, but required for AgentLoop)
     let bus = Arc::new(MessageBus::new(10));
 
-    // Initialize agent loop
+    // Initialize agent loop (Arc for streaming support)
     let agent_loop = Arc::new(AgentLoop::new(bus, provider, config).await?);
 
     // Session key for CLI
@@ -42,21 +40,9 @@ pub async fn handle_chat(
     if let Some(msg) = message {
         // Single message mode
         println!("\n{} {}", colorize("You:", PROMPT), msg);
+        println!();
 
-        let mut spinner = Spinner::new("thinking");
-        spinner.start();
-
-        match agent_loop.process_direct(msg, session_key).await {
-            Ok(response) => {
-                spinner.stop();
-                println!("\n{}\n", MarkdownRenderer::render(&response));
-            }
-            Err(e) => {
-                spinner.stop();
-                eprintln!("\n{} {}", status_error(), e);
-                return Err(e.into());
-            }
-        }
+        run_with_streaming(&agent_loop, msg, session_key).await?;
     } else {
         // Interactive REPL mode with rustyline
         let history_path = dirs::home_dir()
@@ -69,7 +55,10 @@ pub async fn handle_chat(
             std::fs::create_dir_all(parent)?;
         }
 
-        let mut editor = DefaultEditor::new()?;
+        let helper = SlashCommandHelper::new();
+        let config = rustyline::Config::builder().auto_add_history(false).build();
+        let mut editor = rustyline::Editor::with_config(config)?;
+        editor.set_helper(Some(helper));
         let _ = editor.load_history(&history_path);
 
         println!(
@@ -78,7 +67,7 @@ pub async fn handle_chat(
         );
 
         loop {
-            let prompt = format!("{} ", colorize("klyntbot>", PROMPT));
+            let prompt = format!("{} ", colorize("klyntbot>", "\x1b[1;36m")); // bold cyan
             let readline = editor.readline(&prompt);
 
             match readline {
@@ -173,27 +162,21 @@ pub async fn handle_chat(
                                 }
 
                                 // Concatenate all lines
-                                let message = lines.join("\n");
+                                let paste_message = lines.join("\n");
 
                                 // Add to history
-                                let _ = editor.add_history_entry(&message);
+                                let _ = editor.add_history_entry(&paste_message);
 
-                                // Process the multi-line message
-                                let mut spinner = Spinner::new("thinking");
-                                spinner.start();
-
-                                match agent_loop
-                                    .process_direct(message, session_key.clone())
-                                    .await
+                                // Process with streaming
+                                println!();
+                                if let Err(e) = run_with_streaming(
+                                    &agent_loop,
+                                    paste_message,
+                                    session_key.clone(),
+                                )
+                                .await
                                 {
-                                    Ok(response) => {
-                                        spinner.stop();
-                                        println!("\n{}\n", MarkdownRenderer::render(&response));
-                                    }
-                                    Err(e) => {
-                                        spinner.stop();
-                                        eprintln!("\n{} {}\n", status_error(), e);
-                                    }
+                                    eprintln!("\n{} {}\n", status_error(), e);
                                 }
 
                                 continue;
@@ -216,26 +199,17 @@ pub async fn handle_chat(
                         break;
                     }
 
-                    // Process the message with spinner + markdown rendering
-                    let mut spinner = Spinner::new("thinking");
-                    spinner.start();
-
-                    match agent_loop
-                        .process_direct(trimmed.to_string(), session_key.clone())
-                        .await
+                    // Process the message with streaming
+                    println!();
+                    if let Err(e) =
+                        run_with_streaming(&agent_loop, trimmed.to_string(), session_key.clone())
+                            .await
                     {
-                        Ok(response) => {
-                            spinner.stop();
-                            println!("\n{}\n", MarkdownRenderer::render(&response));
-                        }
-                        Err(e) => {
-                            spinner.stop();
-                            eprintln!("\n{} {}\n", status_error(), e);
-                        }
+                        eprintln!("\n{} {}\n", status_error(), e);
                     }
                 }
                 Err(ReadlineError::Interrupted) => {
-                    // Ctrl+C
+                    // Ctrl+C in prompt — exit
                     println!("{}", colorize("\nGoodbye!", DIM));
                     break;
                 }
@@ -258,6 +232,88 @@ pub async fn handle_chat(
     Ok(())
 }
 
+/// Process a message using the streaming event system with Ctrl+C cancellation.
+async fn run_with_streaming(
+    agent_loop: &Arc<AgentLoop>,
+    message: String,
+    session_key: String,
+) -> Result<()> {
+    let (mut event_rx, cancel_token, handle) = agent_loop
+        .process_direct_streaming(message, session_key)
+        .await?;
+
+    let mut renderer = StreamRenderer::new();
+
+    // Spawn a task that cancels on Ctrl+C
+    let cancel_for_signal = cancel_token.clone();
+    let signal_handle = tokio::spawn(async move {
+        let _ = tokio::signal::ctrl_c().await;
+        cancel_for_signal.cancel();
+    });
+
+    // Consume events from the agent, tracking whether we got a clean exit
+    let mut clean_exit = false;
+    while let Some(event) = event_rx.recv().await {
+        match event {
+            AgentEvent::ContentChunk(chunk) => renderer.on_content_chunk(&chunk),
+            AgentEvent::ToolStart { name, args } => renderer.on_tool_start(&name, &args),
+            AgentEvent::ToolEnd {
+                name,
+                success,
+                duration_ms,
+            } => renderer.on_tool_end(&name, success, duration_ms),
+            AgentEvent::IterationStart { iteration, max } => {
+                renderer.on_iteration_start(iteration, max);
+            }
+            AgentEvent::Done(_) => {
+                clean_exit = true;
+                break;
+            }
+            AgentEvent::Error(e) => {
+                eprintln!("\n{} {}", status_error(), e);
+                clean_exit = true;
+                break;
+            }
+        }
+    }
+
+    // Cancel the signal watcher (no longer needed)
+    signal_handle.abort();
+
+    // Mark cancelled if Ctrl+C was pressed or channel closed without Done/Error
+    if cancel_token.is_cancelled() || !clean_exit {
+        renderer.mark_cancelled();
+    }
+
+    // Wait for the agent task to complete
+    let result = handle.await?;
+
+    // Finalize: always clean up terminal cursor state, then handle success/failure
+    match result {
+        Ok(_) => {
+            let rendered = renderer.finalize();
+            println!("{}", rendered);
+        }
+        Err(e) => {
+            // Still finalize to clean up terminal cursor state
+            let rendered = renderer.finalize();
+            if !rendered.trim().is_empty() {
+                println!("{}", rendered);
+            }
+            eprintln!("\n{} {}", status_error(), e);
+        }
+    }
+
+    // Show elapsed time
+    let elapsed = renderer.elapsed_secs();
+    println!(
+        "{}\n",
+        StreamRenderer::draw_separator(Some(&format!("{:.1}s", elapsed)))
+    );
+
+    Ok(())
+}
+
 /// Print help for REPL commands
 pub fn print_help() {
     let help_text = r#"Commands:
@@ -272,10 +328,10 @@ pub fn print_help() {
 
 Keyboard Shortcuts:
 
-  Ctrl+C      Exit the chat (or cancel paste mode)
+  Ctrl+C      Cancel current response / Exit the chat
   Ctrl+D      Exit the chat (or submit in paste mode)
   Up/Down     Navigate command history
-  Ctrl+L      Clear screen (without resetting context)
+  Tab         Autocomplete slash commands
 
 Examples:
 
@@ -292,14 +348,17 @@ Tips:
 
   - History is saved to ~/.klyntbot/history.txt
   - Use markdown formatting in messages (bold, code, lists)
-  - Long responses are automatically formatted"#;
+  - Long responses are automatically formatted
+  - Press Ctrl+C during a response to cancel"#;
 
     println!("\n{}", draw_box(help_text, Some("Help")));
     println!();
 }
 
 /// Print command history
-pub fn print_history(editor: &rustyline::DefaultEditor) {
+pub fn print_history(
+    editor: &rustyline::Editor<SlashCommandHelper, rustyline::history::DefaultHistory>,
+) {
     use rustyline::history::History;
 
     let history = editor.history();
@@ -330,10 +389,11 @@ pub fn print_history(editor: &rustyline::DefaultEditor) {
 }
 
 /// Print status information
-pub async fn print_status(_agent_loop: &agent::AgentLoop) {
+pub async fn print_status(agent_loop: &agent::AgentLoop) {
     let status_text = format!(
-        "Status: {}\nMode: Interactive CLI\nHistory: ~/.klyntbot/history.txt",
-        colorize("Ready", SUCCESS)
+        "Status: {}\nModel: {}\nMode: Interactive CLI\nHistory: ~/.klyntbot/history.txt",
+        colorize("Ready", SUCCESS),
+        agent_loop.model_name(),
     );
 
     println!("\n{}", draw_box(&status_text, Some("Status")));

@@ -77,10 +77,12 @@ pub fn safe_filename(s: impl AsRef<str>) -> String {
 pub fn get_data_dir() -> std::io::Result<PathBuf> {
     dirs::home_dir()
         .map(|home| home.join(".klyntbot"))
-        .ok_or_else(|| std::io::Error::new(
-            std::io::ErrorKind::NotFound,
-            "Unable to determine home directory"
-        ))
+        .ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "Unable to determine home directory",
+            )
+        })
 }
 
 /// Get the workspace path from config or default

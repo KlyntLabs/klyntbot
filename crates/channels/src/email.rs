@@ -14,10 +14,10 @@ use tokio::sync::RwLock;
 use tokio::time::sleep;
 use tracing::{debug, error, info, warn};
 
-use bus::{InboundMessage, MessageBus, OutboundMessage};
 use crate::{check_allowlist, Channel};
-use config::EmailConfig;
+use bus::{InboundMessage, MessageBus, OutboundMessage};
 use common::{ChannelError, Result};
+use config::EmailConfig;
 
 /// Email channel implementation
 pub struct EmailChannel {
@@ -115,7 +115,10 @@ impl EmailChannel {
             let client = async_imap::Client::new(tls_stream);
 
             let mut session = client
-                .login(&self.config.imap_username, self.config.imap_password.expose())
+                .login(
+                    &self.config.imap_username,
+                    self.config.imap_password.expose(),
+                )
                 .await
                 .map_err(|(e, _)| {
                     ChannelError::ConnectionFailed(format!("IMAP login failed: {}", e))
@@ -136,7 +139,10 @@ impl EmailChannel {
             let client = async_imap::Client::new(tcp_stream);
 
             let mut session = client
-                .login(&self.config.imap_username, self.config.imap_password.expose())
+                .login(
+                    &self.config.imap_username,
+                    self.config.imap_password.expose(),
+                )
                 .await
                 .map_err(|(e, _)| {
                     ChannelError::ConnectionFailed(format!("IMAP login failed: {}", e))

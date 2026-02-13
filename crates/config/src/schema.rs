@@ -1021,7 +1021,10 @@ mod tests {
         assert_eq!(loaded.providers.anthropic.api_key.expose(), "anthropic-key");
         assert_eq!(loaded.providers.openai.api_key.expose(), "openai-key");
         assert_eq!(loaded.providers.deepseek.api_key.expose(), "deepseek-key");
-        assert_eq!(loaded.providers.openrouter.api_key.expose(), "sk-or-v1-test");
+        assert_eq!(
+            loaded.providers.openrouter.api_key.expose(),
+            "sk-or-v1-test"
+        );
     }
 
     #[test]

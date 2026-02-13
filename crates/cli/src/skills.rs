@@ -1,8 +1,8 @@
 //! Skills command handlers for managing agent skills
 
-use anyhow::Result;
-use agent::SkillManager;
 use crate::SkillsCommands;
+use agent::SkillManager;
+use anyhow::Result;
 
 /// Handle skills commands
 pub async fn handle_skills(cmd: SkillsCommands) -> Result<()> {

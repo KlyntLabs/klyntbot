@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{debug, warn};
 
-use super::{DynTool, Tool, RoutingContext};
+use super::{DynTool, RoutingContext, Tool};
 use common::{Result, ToolError};
 
 /// Registry for agent tools

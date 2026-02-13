@@ -9,7 +9,7 @@ use tokio::process::Command;
 use tokio::time::timeout;
 use tracing::{debug, warn};
 
-use super::{Tool, RoutingContext};
+use super::{RoutingContext, Tool};
 use common::{Result, ToolError};
 
 /// Tool to execute shell commands
@@ -39,11 +39,11 @@ impl ExecTool {
             r":\(\)\s*\{.*\};\s*:",            // fork bomb
             r"\bcurl\s+.*\|\s*(sh|bash)\b",    // curl pipe to shell
             r"\bwget\s+.*\|\s*(sh|bash)\b",    // wget pipe to shell
-            r"\bnc\s+-[el]",                    // netcat listeners
+            r"\bnc\s+-[el]",                   // netcat listeners
             r"\bchmod\s+[0-7]*777\b",          // world-writable permissions
             r"\bchown\s+root\b",               // chown to root
-            r"\bsudo\b",                        // sudo commands
-            r"\bsu\s+-\b",                      // switch user
+            r"\bsudo\b",                       // sudo commands
+            r"\bsu\s+-\b",                     // switch user
             r"\b(iptables|firewall-cmd)\b",    // firewall changes
             r"\bcrontab\s+-[re]\b",            // crontab edit/remove
             r"\bpasswd\b",                     // password changes
@@ -244,11 +244,14 @@ impl Tool for ExecTool {
                     Ok(result)
                 }
             }
-            Ok(Err(e)) => Err(ToolError::ExecutionFailed(format!("Error executing command: {}", e)).into()),
+            Ok(Err(e)) => {
+                Err(ToolError::ExecutionFailed(format!("Error executing command: {}", e)).into())
+            }
             Err(_) => Err(ToolError::ExecutionFailed(format!(
                 "Command timed out after {} seconds",
                 self.timeout.as_secs()
-            )).into()),
+            ))
+            .into()),
         }
     }
 }

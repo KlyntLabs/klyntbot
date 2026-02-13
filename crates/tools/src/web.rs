@@ -6,7 +6,7 @@ use serde_json::Value;
 use tracing::{debug, warn};
 use url::Url;
 
-use super::{Tool, RoutingContext};
+use super::{RoutingContext, Tool};
 use common::{Result, ToolError};
 
 /// Tool for web search via Brave Search API
@@ -95,7 +95,8 @@ impl Tool for WebSearchTool {
             return Err(ToolError::ExecutionFailed(format!(
                 "Search API returned status {}",
                 response.status()
-            )).into());
+            ))
+            .into());
         }
 
         let data: Value = response.json().await.map_err(|e| {
@@ -217,11 +218,16 @@ impl Tool for WebFetchTool {
             .map_err(|e| ToolError::ExecutionFailed(format!("Invalid URL: {}", e)))?;
 
         if url.scheme() != "http" && url.scheme() != "https" {
-            return Err(ToolError::ExecutionFailed("Only http and https URLs are supported".to_string()).into());
+            return Err(ToolError::ExecutionFailed(
+                "Only http and https URLs are supported".to_string(),
+            )
+            .into());
         }
 
         if url.host_str().is_none() {
-            return Err(ToolError::ExecutionFailed("URL must have a valid domain".to_string()).into());
+            return Err(
+                ToolError::ExecutionFailed("URL must have a valid domain".to_string()).into(),
+            );
         }
 
         // Fetch content

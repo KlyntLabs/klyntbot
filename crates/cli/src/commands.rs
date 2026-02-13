@@ -25,10 +25,6 @@ pub enum Commands {
         /// Session ID for conversation continuity
         #[arg(short, long, default_value = "cli:default")]
         session: String,
-
-        /// Disable markdown rendering in output
-        #[arg(long)]
-        no_markdown: bool,
     },
 
     /// Start the gateway daemon to enable channel integrations

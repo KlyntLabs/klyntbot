@@ -79,11 +79,8 @@ pub fn check_allowlist(allow_from: &[String], sender_id: &str) -> bool {
 /// Helper for reconnection loop pattern used by channels.
 /// Automatically retries on error with a 5-second delay.
 #[tracing::instrument(skip(running, connect))]
-pub async fn reconnect_loop<F, Fut>(
-    name: &str,
-    running: &Arc<AtomicBool>,
-    mut connect: F,
-) where
+pub async fn reconnect_loop<F, Fut>(name: &str, running: &Arc<AtomicBool>, mut connect: F)
+where
     F: FnMut() -> Fut,
     Fut: std::future::Future<Output = Result<()>>,
 {

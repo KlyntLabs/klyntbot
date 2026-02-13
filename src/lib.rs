@@ -7,24 +7,28 @@ pub use agent;
 pub use bus;
 pub use channels;
 pub use cli;
-pub use config;
 pub use common;
-pub use scheduling;
+pub use config;
 pub use heartbeat;
 pub use providers;
+pub use scheduling;
 pub use session;
 pub use tools;
 
 // Re-export commonly used types for convenience
-pub use common::error;
-pub use common::{ChannelName, ChatId, MessageRole, Result, SessionKey};
-pub use agent::{AgentLoop, ContextBuilder, MemoryStore, SkillManager, SubagentManager};
+pub use agent::{
+    AgentEvent, AgentLoop, ContextBuilder, MemoryStore, SkillManager, SubagentManager,
+};
 pub use bus::{InboundMessage, MessageBus, OutboundMessage};
 pub use channels::{Channel, ChannelManager, DynChannel};
+pub use common::error;
+pub use common::{ChannelName, ChatId, MessageRole, Result, SessionKey};
 pub use config::Config;
-pub use scheduling::{CronJob, CronService};
 pub use heartbeat::HeartbeatService;
-pub use providers::{create_provider, DynProvider, LlmProvider, LlmResponse, Message, ProviderRegistry};
+pub use providers::{
+    create_provider, DynProvider, LlmProvider, LlmResponse, Message, ProviderRegistry,
+};
+pub use scheduling::{CronJob, CronService};
 pub use session::{Session, SessionManager};
 pub use tools::{DynTool, Tool};
 

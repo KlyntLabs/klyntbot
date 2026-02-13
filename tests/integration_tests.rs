@@ -3,8 +3,8 @@
 //! These tests verify that components work together correctly.
 
 use klyntbot::bus::{InboundMessage, MessageBus, OutboundMessage};
-use klyntbot::config::Config;
 use klyntbot::config::schema::Secret;
+use klyntbot::config::Config;
 use klyntbot::session::SessionManager;
 use klyntbot::tools::{filesystem::ReadFileTool, registry::ToolRegistry};
 use tempfile::TempDir;
@@ -29,7 +29,11 @@ async fn test_full_message_flow() {
     assert_eq!(received.channel.as_str(), "telegram");
 
     // Agent generates response
-    let response = OutboundMessage::new(received.channel.clone(), received.chat_id.clone(), "Hello, user!");
+    let response = OutboundMessage::new(
+        received.channel.clone(),
+        received.chat_id.clone(),
+        "Hello, user!",
+    );
     bus.publish_outbound(response).await.unwrap();
 
     // Channel consumes outbound message
@@ -165,9 +169,21 @@ async fn test_multiple_sessions_parallel() {
     }
 
     // Save all sessions
-    let s1 = manager.get_or_create("telegram:chat1").await.unwrap().clone();
-    let s2 = manager.get_or_create("discord:guild1").await.unwrap().clone();
-    let s3 = manager.get_or_create("slack:channel1").await.unwrap().clone();
+    let s1 = manager
+        .get_or_create("telegram:chat1")
+        .await
+        .unwrap()
+        .clone();
+    let s2 = manager
+        .get_or_create("discord:guild1")
+        .await
+        .unwrap()
+        .clone();
+    let s3 = manager
+        .get_or_create("slack:channel1")
+        .await
+        .unwrap()
+        .clone();
 
     manager.save(&s1).await.unwrap();
     manager.save(&s2).await.unwrap();
@@ -279,7 +295,10 @@ async fn test_session_cleanup() {
     // Create and save sessions
     for i in 0..5 {
         {
-            let session = manager.get_or_create(format!("test:chat{}", i)).await.unwrap();
+            let session = manager
+                .get_or_create(format!("test:chat{}", i))
+                .await
+                .unwrap();
             session.add_message("user", "Test");
         }
         let session = manager
@@ -311,7 +330,10 @@ async fn test_session_lru_eviction() {
 
     // Create 4 sessions (should evict the first one)
     for i in 0..4 {
-        let session = manager.get_or_create(format!("test:chat{}", i)).await.unwrap();
+        let session = manager
+            .get_or_create(format!("test:chat{}", i))
+            .await
+            .unwrap();
         session.add_message("user", format!("Message {}", i));
     }
 
@@ -505,7 +527,10 @@ fn test_feishu_config_defaults() {
     let config = FeishuConfig::default();
     assert!(!config.enabled, "feishu should default to disabled");
     assert_eq!(config.app_id, "", "app_id should default to empty");
-    assert!(config.app_secret.is_empty(), "app_secret should default to empty");
+    assert!(
+        config.app_secret.is_empty(),
+        "app_secret should default to empty"
+    );
     assert!(
         config.allow_from.is_empty(),
         "allow_from should default to empty"
@@ -539,7 +564,10 @@ fn test_mochat_config_defaults() {
     assert!(!config.enabled, "mochat should default to disabled");
     assert_eq!(config.base_url, "https://mochat.io");
     assert_eq!(config.socket_url, "", "socket_url should default to empty");
-    assert!(config.claw_token.is_empty(), "claw_token should default to empty");
+    assert!(
+        config.claw_token.is_empty(),
+        "claw_token should default to empty"
+    );
     assert_eq!(
         config.agent_user_id, "",
         "agent_user_id should default to empty"

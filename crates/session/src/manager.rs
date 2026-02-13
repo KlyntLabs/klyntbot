@@ -271,11 +271,16 @@ impl SessionManager {
     pub async fn list(&self) -> Result<Vec<SessionInfo>> {
         let mut sessions = Vec::new();
 
-        if !tokio::fs::try_exists(&self.sessions_dir).await.unwrap_or(false) {
+        if !tokio::fs::try_exists(&self.sessions_dir)
+            .await
+            .unwrap_or(false)
+        {
             return Ok(sessions);
         }
 
-        let mut entries = fs::read_dir(&self.sessions_dir).await.map_err(SessionError::Io)?;
+        let mut entries = fs::read_dir(&self.sessions_dir)
+            .await
+            .map_err(SessionError::Io)?;
         while let Some(entry) = entries.next_entry().await.map_err(SessionError::Io)? {
             let path = entry.path();
 
@@ -458,10 +463,16 @@ mod tests {
         // Create multiple sessions
         for i in 0..3 {
             {
-                let session = manager.get_or_create(format!("test:chat{}", i)).await.unwrap();
+                let session = manager
+                    .get_or_create(format!("test:chat{}", i))
+                    .await
+                    .unwrap();
                 session.add_message("user", "Test");
             }
-            let session = manager.get_or_create(format!("test:chat{}", i)).await.unwrap();
+            let session = manager
+                .get_or_create(format!("test:chat{}", i))
+                .await
+                .unwrap();
             let session_clone = session.clone();
             manager.save(&session_clone).await.unwrap();
         }

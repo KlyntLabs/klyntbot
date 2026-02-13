@@ -1,7 +1,7 @@
 //! Channels command handlers for managing communication channels
 
-use anyhow::Result;
 use crate::ChannelCommands;
+use anyhow::Result;
 
 /// Handle channel commands
 pub async fn handle_channels(cmd: ChannelCommands) -> Result<()> {
@@ -155,8 +155,8 @@ pub async fn handle_channels(cmd: ChannelCommands) -> Result<()> {
         }
 
         ChannelCommands::Test { channel } => {
-            use channels::ChannelManager;
             use bus::MessageBus;
+            use channels::ChannelManager;
             use std::sync::Arc;
 
             let config = config::load()?;

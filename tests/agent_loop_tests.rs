@@ -1,13 +1,13 @@
 //! Integration tests for AgentLoop
 
 use klyntbot::config::Config;
-use klyntbot::{AgentLoop, MessageBus};
+use klyntbot::{AgentEvent, AgentLoop, MessageBus};
 use std::sync::Arc;
 use tempfile::TempDir;
 
 #[path = "mock_provider.rs"]
 mod mock_provider;
-use mock_provider::MockProvider;
+use mock_provider::{ErrorProvider, MockProvider};
 
 /// Test basic message processing through agent loop
 #[tokio::test]
@@ -239,7 +239,9 @@ async fn test_agent_loop_session_persistence() {
 
     // Create a new agent loop with a new bus (simulating restart)
     let bus2 = Arc::new(MessageBus::new(10));
-    let agent_loop2 = AgentLoop::new(bus2, provider.clone(), config).await.unwrap();
+    let agent_loop2 = AgentLoop::new(bus2, provider.clone(), config)
+        .await
+        .unwrap();
 
     // Second message - should have access to session history
     let response = agent_loop2
@@ -248,4 +250,99 @@ async fn test_agent_loop_session_persistence() {
         .unwrap();
 
     assert!(!response.is_empty());
+}
+
+/// Test that process_direct_streaming emits Done event with content
+#[tokio::test]
+async fn test_streaming_emits_done() {
+    let temp_dir = TempDir::new().unwrap();
+    std::env::set_var("HOME", temp_dir.path());
+
+    let bus = Arc::new(MessageBus::new(10));
+    let provider = Arc::new(MockProvider::new("streaming response"));
+
+    let mut config = Config::default();
+    config.agents.defaults.workspace = temp_dir
+        .path()
+        .join("workspace")
+        .to_str()
+        .unwrap()
+        .to_string();
+
+    let agent_loop = Arc::new(AgentLoop::new(bus, provider, config).await.unwrap());
+
+    let (mut event_rx, _cancel_token, handle) = agent_loop
+        .process_direct_streaming("Hello".to_string(), "test:stream1".to_string())
+        .await
+        .unwrap();
+
+    // Collect all events
+    let mut got_content = false;
+    let mut got_done = false;
+    let mut done_content = String::new();
+
+    while let Some(event) = event_rx.recv().await {
+        match event {
+            AgentEvent::ContentChunk(_) => got_content = true,
+            AgentEvent::Done(content) => {
+                got_done = true;
+                done_content = content;
+                break;
+            }
+            _ => {}
+        }
+    }
+
+    let result = handle.await.unwrap();
+    assert!(result.is_ok());
+    assert!(got_content, "should emit at least one ContentChunk");
+    assert!(got_done, "should emit Done event");
+    assert_eq!(done_content, "streaming response");
+}
+
+/// Test that process_direct_streaming emits Error event on provider failure
+#[tokio::test]
+async fn test_streaming_emits_error_on_failure() {
+    let temp_dir = TempDir::new().unwrap();
+    std::env::set_var("HOME", temp_dir.path());
+
+    let bus = Arc::new(MessageBus::new(10));
+    let provider = Arc::new(ErrorProvider::new("provider crashed"));
+
+    let mut config = Config::default();
+    config.agents.defaults.workspace = temp_dir
+        .path()
+        .join("workspace")
+        .to_str()
+        .unwrap()
+        .to_string();
+
+    let agent_loop = Arc::new(AgentLoop::new(bus, provider, config).await.unwrap());
+
+    let (mut event_rx, _cancel_token, handle) = agent_loop
+        .process_direct_streaming("Hello".to_string(), "test:stream2".to_string())
+        .await
+        .unwrap();
+
+    // Collect events — expect an Error event
+    let mut got_error = false;
+    while let Some(event) = event_rx.recv().await {
+        match event {
+            AgentEvent::Error(msg) => {
+                got_error = true;
+                assert!(
+                    msg.contains("provider crashed"),
+                    "error message should contain the provider error: {}",
+                    msg
+                );
+                break;
+            }
+            AgentEvent::Done(_) => break,
+            _ => {}
+        }
+    }
+
+    let result = handle.await.unwrap();
+    assert!(result.is_err(), "agent loop should return error");
+    assert!(got_error, "should emit Error event before returning");
 }

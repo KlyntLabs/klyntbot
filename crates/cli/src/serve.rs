@@ -1,11 +1,11 @@
 //! Serve command handler for gateway daemon mode
 
-use anyhow::Result;
 use agent::AgentLoop;
-use channels::ChannelManager;
-use scheduling::CronService;
-use heartbeat::HeartbeatService;
+use anyhow::Result;
 use bus::MessageBus;
+use channels::ChannelManager;
+use heartbeat::HeartbeatService;
+use scheduling::CronService;
 use std::sync::Arc;
 use tokio::signal;
 use tokio::sync::Mutex;
@@ -66,8 +66,7 @@ pub async fn handle_serve(port: u16) -> Result<()> {
             let bus = bus_for_heartbeat.clone();
             let prompt = prompt.to_string();
             rt.block_on(async {
-                let msg =
-                    bus::InboundMessage::new("system", "heartbeat", "heartbeat", prompt);
+                let msg = bus::InboundMessage::new("system", "heartbeat", "heartbeat", prompt);
                 bus.publish_inbound(msg)
                     .await
                     .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;

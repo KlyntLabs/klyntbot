@@ -191,7 +191,11 @@ impl LlmProvider for OpenAiCompatProvider {
             }
         }
 
-        debug!("Calling LLM: model={}, messages={}", params.model, messages.len());
+        debug!(
+            "Calling LLM: model={}, messages={}",
+            params.model,
+            messages.len()
+        );
 
         // Build request with authorization header
         let mut request = self
@@ -336,7 +340,9 @@ impl LlmProvider for OpenAiCompatProvider {
                     }
                     chunks
                 }
-                Err(e) => vec![Err(KlyntbotError::Provider(ProviderError::Http(e.to_string())))],
+                Err(e) => vec![Err(KlyntbotError::Provider(ProviderError::Http(
+                    e.to_string(),
+                )))],
             };
 
             // Return async block with processed chunks

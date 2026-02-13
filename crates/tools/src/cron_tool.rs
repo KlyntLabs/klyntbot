@@ -5,7 +5,7 @@ use serde_json::Value;
 use std::sync::Arc;
 use tracing::debug;
 
-use super::{Tool, RoutingContext};
+use super::{RoutingContext, Tool};
 use common::{Result, ToolError};
 
 /// Format timestamp milliseconds to human-readable string

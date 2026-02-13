@@ -19,8 +19,8 @@ pub use types::{
 use std::sync::Arc;
 use tracing::info;
 
-use config::Config;
 use common::{ConfigError, Result};
+use config::Config;
 
 /// Initialize the LLM provider from configuration.
 ///
@@ -55,9 +55,11 @@ pub fn create_provider(config: &Config) -> Result<DynProvider> {
         if pc.api_key.is_empty() {
             continue;
         }
-        if let Some(spec) =
-            ProviderRegistry::find_gateway(Some(name), Some(pc.api_key.expose()), pc.api_base.as_deref())
-        {
+        if let Some(spec) = ProviderRegistry::find_gateway(
+            Some(name),
+            Some(pc.api_key.expose()),
+            pc.api_base.as_deref(),
+        ) {
             let api_base = pc.api_base.as_deref().unwrap_or(spec.default_api_base);
             let provider = OpenAiCompatProvider::new(api_base, pc.api_key.expose(), model)?;
             info!("Using {} provider with {}", spec.name, model);

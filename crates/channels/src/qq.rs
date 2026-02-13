@@ -13,10 +13,10 @@ use tokio::sync::RwLock;
 use tokio_tungstenite::{connect_async, tungstenite::Message as WsMessage};
 use tracing::{debug, error, info, warn};
 
-use bus::{InboundMessage, MessageBus, OutboundMessage};
 use crate::{check_allowlist, Channel};
-use config::QQConfig;
+use bus::{InboundMessage, MessageBus, OutboundMessage};
 use common::{ChannelError, Result};
+use config::QQConfig;
 
 const QQ_API_BASE: &str = "https://api.sgroup.qq.com";
 const QQ_WS_URL: &str = "wss://api.sgroup.qq.com/websocket";
@@ -347,7 +347,8 @@ impl Channel for QQChannel {
     }
 
     async fn send(&self, msg: &OutboundMessage) -> Result<()> {
-        self.send_c2c_message(msg.chat_id.as_str(), &msg.content).await
+        self.send_c2c_message(msg.chat_id.as_str(), &msg.content)
+            .await
     }
 
     fn is_allowed(&self, sender_id: &str) -> bool {

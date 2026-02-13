@@ -1,7 +1,7 @@
 //! Config command handlers for configuration management
 
-use anyhow::Result;
 use crate::ConfigCommands;
+use anyhow::Result;
 
 /// Handle config commands
 pub async fn handle_config(cmd: ConfigCommands) -> Result<()> {
@@ -115,7 +115,10 @@ pub async fn handle_config(cmd: ConfigCommands) -> Result<()> {
 }
 
 /// Get a config value by dot-notation path
-pub fn get_config_value<'a>(json: &'a serde_json::Value, key: &str) -> Option<&'a serde_json::Value> {
+pub fn get_config_value<'a>(
+    json: &'a serde_json::Value,
+    key: &str,
+) -> Option<&'a serde_json::Value> {
     let parts: Vec<&str> = key.split('.').collect();
     let mut current = json;
 
@@ -146,7 +149,10 @@ pub fn set_config_value(
             current
                 .as_object_mut()
                 .ok_or_else(|| anyhow::anyhow!("Cannot navigate into non-object at '{}'", part))?
-                .insert(part.to_string(), serde_json::Value::Object(Default::default()));
+                .insert(
+                    part.to_string(),
+                    serde_json::Value::Object(Default::default()),
+                );
         }
         current = current.get_mut(part).unwrap();
     }
@@ -207,12 +213,7 @@ mod tests {
     fn test_set_config_value_deeply_nested_creation() {
         let mut json = serde_json::json!({});
 
-        let result = set_config_value(
-            &mut json,
-            "a.b.c.d",
-            serde_json::json!("deep"),
-        )
-        .unwrap();
+        let result = set_config_value(&mut json, "a.b.c.d", serde_json::json!("deep")).unwrap();
 
         assert!(result);
         assert_eq!(json["a"]["b"]["c"]["d"], "deep");

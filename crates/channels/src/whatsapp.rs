@@ -12,10 +12,10 @@ use tokio_tungstenite::{
 };
 use tracing::{debug, error, info, warn};
 
-use bus::{InboundMessage, MessageBus, OutboundMessage};
 use crate::{check_allowlist, Channel};
-use config::WhatsAppConfig;
+use bus::{InboundMessage, MessageBus, OutboundMessage};
 use common::{ChannelError, Result};
+use config::WhatsAppConfig;
 
 type WsWriter = SplitSink<WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>, WsMessage>;
 

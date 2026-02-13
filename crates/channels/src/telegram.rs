@@ -15,10 +15,10 @@ use tokio::sync::RwLock;
 use tokio::time::sleep;
 use tracing::{debug, error, info, warn};
 
-use bus::{InboundMessage, MessageBus, OutboundMessage};
 use crate::{check_allowlist, Channel};
-use config::schema::TelegramConfig;
+use bus::{InboundMessage, MessageBus, OutboundMessage};
 use common::{ChannelError, Result};
+use config::schema::TelegramConfig;
 use providers::TranscriptionProvider;
 
 /// Telegram channel implementation
@@ -322,7 +322,8 @@ impl TelegramChannel {
         // Download file
         let download_url = format!(
             "https://api.telegram.org/file/bot{}/{}",
-            self.config.token.expose(), file_path
+            self.config.token.expose(),
+            file_path
         );
 
         let bytes = self

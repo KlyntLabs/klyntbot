@@ -13,10 +13,10 @@ use tokio::sync::RwLock;
 use tokio_tungstenite::{connect_async, tungstenite::Message as WsMessage};
 use tracing::{debug, error, info, warn};
 
-use bus::{InboundMessage, MessageBus, OutboundMessage};
 use crate::{check_allowlist, Channel};
-use config::SlackConfig;
+use bus::{InboundMessage, MessageBus, OutboundMessage};
 use common::{ChannelError, Result};
+use config::SlackConfig;
 
 const SLACK_API_BASE: &str = "https://slack.com/api";
 

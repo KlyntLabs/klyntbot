@@ -15,10 +15,10 @@ use tokio::time::sleep;
 use tokio_tungstenite::{connect_async, tungstenite::Message as WsMessage};
 use tracing::{debug, error, info, warn};
 
-use bus::{InboundMessage, MessageBus, OutboundMessage};
 use crate::{check_allowlist, Channel};
-use config::DiscordConfig;
+use bus::{InboundMessage, MessageBus, OutboundMessage};
 use common::{ChannelError, Result};
+use config::DiscordConfig;
 
 const DISCORD_API_BASE: &str = "https://discord.com/api/v10";
 const MAX_ATTACHMENT_BYTES: usize = 20 * 1024 * 1024; // 20MB
@@ -435,7 +435,10 @@ impl DiscordChannel {
             let response = self
                 .client
                 .post(&url)
-                .header("Authorization", format!("Bot {}", self.config.token.expose()))
+                .header(
+                    "Authorization",
+                    format!("Bot {}", self.config.token.expose()),
+                )
                 .json(&payload)
                 .send()
                 .await;

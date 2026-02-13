@@ -5,13 +5,13 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
 use tracing::{debug, error, info, warn};
 
-use bus::{MessageBus, OutboundMessage};
 use crate::{
     DiscordChannel, DynChannel, EmailChannel, QQChannel, SlackChannel, TelegramChannel,
     WhatsAppChannel,
 };
-use config::Config;
+use bus::{MessageBus, OutboundMessage};
 use common::Result;
+use config::Config;
 
 /// Macro to reduce duplication in channel initialization.
 /// Handles the common pattern of checking enabled status, logging, creating the channel,
@@ -139,7 +139,10 @@ impl ChannelManager {
         }
 
         // Start outbound dispatcher
-        let mut outbound_rx = self.outbound_rx.take().expect("Outbound receiver already taken");
+        let mut outbound_rx = self
+            .outbound_rx
+            .take()
+            .expect("Outbound receiver already taken");
         let channels_clone = self.channels.clone();
         let dispatcher_task = tokio::spawn(async move {
             debug!("Starting outbound message dispatcher");

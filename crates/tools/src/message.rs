@@ -5,7 +5,7 @@ use serde_json::Value;
 use tokio::sync::mpsc;
 use tracing::debug;
 
-use super::{Tool, RoutingContext};
+use super::{RoutingContext, Tool};
 use bus::OutboundMessage;
 use common::{Result, ToolError};
 

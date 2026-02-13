@@ -3,15 +3,20 @@
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
+use tokio::task::JoinHandle;
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, warn};
 
 use bus::{InboundMessage, MessageBus, OutboundMessage};
-use config::Config;
 use common::Result;
-use providers::{ChatParams, DynProvider, Message, tool_calls_to_messages};
+use config::Config;
+use futures_util::future::join_all;
+use futures_util::StreamExt;
+use providers::{tool_calls_to_messages, ChatParams, DynProvider, Message};
 use session::SessionManager;
+use std::collections::HashMap;
 use tokio::sync::mpsc;
 use tools::{
     cron_tool::CronTool,
@@ -23,17 +28,23 @@ use tools::{
     web::{WebFetchTool, WebSearchTool},
     RoutingContext,
 };
-use futures_util::StreamExt;
-use futures_util::future::join_all;
-use std::collections::HashMap;
 
-use super::{ContextBuilder, CronHandlerAdapter, SubagentManager};
+use super::{AgentEvent, ContextBuilder, CronHandlerAdapter, SubagentManager};
 
 /// Maximum number of tool-calling iterations before returning final response
 const MAX_TOOL_ITERATIONS: usize = 20;
 
 /// Default session history limit (number of messages)
 const DEFAULT_HISTORY_LIMIT: usize = 50;
+
+/// Send an event if the channel is available. No-op if `None`.
+macro_rules! emit {
+    ($tx:expr, $event:expr) => {
+        if let Some(tx) = &$tx {
+            let _ = tx.send($event).await;
+        }
+    };
+}
 
 /// Agent loop - the core processing engine
 pub struct AgentLoop {
@@ -160,7 +171,10 @@ impl AgentLoop {
         info!("Agent loop started");
 
         // Take ownership of the receiver
-        let mut inbound_rx = self.inbound_rx.take().expect("AgentLoop::run can only be called once");
+        let mut inbound_rx = self
+            .inbound_rx
+            .take()
+            .expect("AgentLoop::run can only be called once");
 
         while self.running.load(Ordering::SeqCst) {
             // Wait for next message with timeout
@@ -240,16 +254,31 @@ impl AgentLoop {
             Some(msg.media.clone())
         };
         let messages = context_builder
-            .build_messages(history, &msg.content, media, msg.channel.as_str(), msg.chat_id.as_str())
+            .build_messages(
+                history,
+                &msg.content,
+                media,
+                msg.channel.as_str(),
+                msg.chat_id.as_str(),
+            )
             .await;
 
         drop(context_builder);
 
-        // Run agent loop
-        let response_content = self.run_agent_loop(messages, false, &routing_ctx).await?;
+        // Run agent loop (no event channel for bus mode)
+        let response_content = self
+            .run_agent_loop(
+                messages,
+                false,
+                &routing_ctx,
+                None,
+                CancellationToken::new(),
+            )
+            .await?;
 
         // Save assistant response to session
-        self.save_to_session(session_key.as_str(), &response_content).await;
+        self.save_to_session(session_key.as_str(), &response_content)
+            .await;
 
         // Send response
         let out_msg = OutboundMessage::new(msg.channel, msg.chat_id, response_content);
@@ -326,10 +355,19 @@ impl AgentLoop {
         drop(context_builder);
 
         // Run agent loop
-        let response_content = self.run_agent_loop(messages, false, &routing_ctx).await?;
+        let response_content = self
+            .run_agent_loop(
+                messages,
+                false,
+                &routing_ctx,
+                None,
+                CancellationToken::new(),
+            )
+            .await?;
 
         // Save assistant response to session
-        self.save_to_session(session_key.as_str(), &response_content).await;
+        self.save_to_session(session_key.as_str(), &response_content)
+            .await;
 
         // Publish response to origin channel
         let out_msg = OutboundMessage::new(
@@ -356,18 +394,36 @@ impl AgentLoop {
 
     /// Run the agent iteration loop with the given messages.
     /// Returns the final response content.
-    #[tracing::instrument(skip(self, messages, routing_ctx), fields(message_count = messages.len()))]
+    ///
+    /// When `event_tx` is provided, emits `AgentEvent` variants as processing happens.
+    /// When `cancel_token` is cancelled, stops processing and returns partial content.
+    #[tracing::instrument(skip(self, messages, routing_ctx, event_tx, cancel_token), fields(message_count = messages.len()))]
     async fn run_agent_loop(
         &self,
         messages: Vec<Message>,
         use_streaming: bool,
         routing_ctx: &RoutingContext,
+        event_tx: Option<mpsc::Sender<AgentEvent>>,
+        cancel_token: CancellationToken,
     ) -> Result<String> {
         let mut current_messages = messages;
         let mut final_content = None;
 
         for iteration in 0..MAX_TOOL_ITERATIONS {
+            // Check for cancellation before each iteration
+            if cancel_token.is_cancelled() {
+                debug!("Agent loop cancelled at iteration {}", iteration);
+                break;
+            }
+
             debug!("Agent iteration {}/{}", iteration + 1, MAX_TOOL_ITERATIONS);
+            emit!(
+                event_tx,
+                AgentEvent::IterationStart {
+                    iteration: iteration + 1,
+                    max: MAX_TOOL_ITERATIONS,
+                }
+            );
 
             let mut tool_registry = self.tool_registry.write().await;
             let tools = tool_registry.get_definitions();
@@ -375,9 +431,26 @@ impl AgentLoop {
 
             // Delegate to streaming or non-streaming path
             let response = if use_streaming && self.provider.supports_streaming() {
-                self.run_streaming_iteration(&mut current_messages, &tools, routing_ctx).await?
+                self.run_streaming_iteration(
+                    &mut current_messages,
+                    &tools,
+                    routing_ctx,
+                    &event_tx,
+                    &cancel_token,
+                )
+                .await
             } else {
-                self.run_standard_iteration(&mut current_messages, &tools, routing_ctx).await?
+                self.run_standard_iteration(&mut current_messages, &tools, routing_ctx, &event_tx)
+                    .await
+            };
+
+            // Emit Error event before propagating failures
+            let response = match response {
+                Ok(r) => r,
+                Err(e) => {
+                    emit!(event_tx, AgentEvent::Error(e.to_string()));
+                    return Err(e);
+                }
             };
 
             match response {
@@ -393,9 +466,13 @@ impl AgentLoop {
             }
         }
 
-        Ok(final_content.unwrap_or_else(|| {
+        let result = final_content.unwrap_or_else(|| {
             "I've finished processing. Is there anything else I can help with?".to_string()
-        }))
+        });
+
+        emit!(event_tx, AgentEvent::Done(result.clone()));
+
+        Ok(result)
     }
 
     /// Run a single standard (non-streaming) iteration.
@@ -404,12 +481,10 @@ impl AgentLoop {
         messages: &mut Vec<Message>,
         tools: &[serde_json::Value],
         routing_ctx: &RoutingContext,
+        event_tx: &Option<mpsc::Sender<AgentEvent>>,
     ) -> Result<IterationOutcome> {
         let params = ChatParams::new(&self.config.agents.defaults.model);
-        let response = self
-            .provider
-            .chat(messages, Some(tools), &params)
-            .await?;
+        let response = self.provider.chat(messages, Some(tools), &params).await?;
 
         // Check for tool calls
         if !response.tool_calls.is_empty() {
@@ -419,19 +494,44 @@ impl AgentLoop {
             messages.push(Message::assistant_with_tools(tool_call_messages));
 
             // Execute tools in parallel
-            let tool_futures: Vec<_> = response.tool_calls.iter().map(|tc| {
-                let registry = self.tool_registry.clone();
-                let name = tc.name.clone();
-                let args = tc.arguments.clone();
-                let ctx = routing_ctx.clone();
-                let id = tc.id.clone();
-                async move {
-                    debug!("Executing tool: {}", name);
-                    let reg = registry.read().await;
-                    let result = reg.execute(&name, args, &ctx).await;
-                    (id, name, result)
-                }
-            }).collect();
+            let tool_futures: Vec<_> = response
+                .tool_calls
+                .iter()
+                .map(|tc| {
+                    let registry = self.tool_registry.clone();
+                    let name = tc.name.clone();
+                    let args = tc.arguments.clone();
+                    let ctx = routing_ctx.clone();
+                    let id = tc.id.clone();
+                    let etx = event_tx.clone();
+                    async move {
+                        debug!("Executing tool: {}", name);
+                        if let Some(tx) = &etx {
+                            let _ = tx
+                                .send(AgentEvent::ToolStart {
+                                    name: name.clone(),
+                                    args: args.clone(),
+                                })
+                                .await;
+                        }
+                        let start = Instant::now();
+                        let reg = registry.read().await;
+                        let result = reg.execute(&name, args, &ctx).await;
+                        let duration_ms = start.elapsed().as_millis() as u64;
+                        let success = result.is_ok();
+                        if let Some(tx) = &etx {
+                            let _ = tx
+                                .send(AgentEvent::ToolEnd {
+                                    name: name.clone(),
+                                    success,
+                                    duration_ms,
+                                })
+                                .await;
+                        }
+                        (id, name, result)
+                    }
+                })
+                .collect();
 
             let results = join_all(tool_futures).await;
             for (id, name, result) in results {
@@ -447,6 +547,8 @@ impl AgentLoop {
 
         // No tool calls - check for final content
         if let Some(content) = response.content {
+            // Emit ContentChunk so the CLI can display text even for non-streaming providers
+            emit!(event_tx, AgentEvent::ContentChunk(content.clone()));
             Ok(IterationOutcome::FinalContent(content))
         } else {
             Ok(IterationOutcome::Empty)
@@ -455,13 +557,15 @@ impl AgentLoop {
 
     /// Run a single streaming iteration.
     ///
-    /// Content is accumulated silently (no stdout output) so the caller
-    /// can decide how to render it (e.g. markdown formatting).
+    /// Content chunks are emitted via `event_tx` for real-time display.
+    /// Respects cancellation via `cancel_token`.
     async fn run_streaming_iteration(
         &self,
         messages: &mut Vec<Message>,
         tools: &[serde_json::Value],
         routing_ctx: &RoutingContext,
+        event_tx: &Option<mpsc::Sender<AgentEvent>>,
+        cancel_token: &CancellationToken,
     ) -> Result<IterationOutcome> {
         let params = ChatParams::new(&self.config.agents.defaults.model);
         let mut stream = self
@@ -472,34 +576,48 @@ impl AgentLoop {
         let mut accumulated_content = String::new();
         let mut accumulated_tool_calls: HashMap<usize, ToolCallAccumulator> = HashMap::new();
 
-        // Process stream chunks
-        while let Some(chunk_result) = stream.next().await {
-            let chunk = chunk_result?;
+        // Process stream chunks with cancellation support
+        loop {
+            tokio::select! {
+                chunk_opt = stream.next() => {
+                    let Some(chunk_result) = chunk_opt else { break };
+                    let chunk = chunk_result?;
 
-            // Accumulate content (display is handled by the caller)
-            if let Some(content) = chunk.content {
-                accumulated_content.push_str(&content);
-            }
+                    // Accumulate and emit content chunks
+                    if let Some(content) = chunk.content {
+                        accumulated_content.push_str(&content);
+                        emit!(event_tx, AgentEvent::ContentChunk(content));
+                    }
 
-            // Accumulate tool calls
-            if let Some(delta) = chunk.tool_call_delta {
-                let accumulator = accumulated_tool_calls
-                    .entry(delta.index)
-                    .or_insert_with(ToolCallAccumulator::new);
+                    // Accumulate tool calls
+                    if let Some(delta) = chunk.tool_call_delta {
+                        let accumulator = accumulated_tool_calls
+                            .entry(delta.index)
+                            .or_insert_with(ToolCallAccumulator::new);
 
-                if let Some(id) = delta.id {
-                    accumulator.id = id;
+                        if let Some(id) = delta.id {
+                            accumulator.id = id;
+                        }
+                        if let Some(name) = delta.name {
+                            accumulator.name = name;
+                        }
+                        if let Some(args) = delta.arguments {
+                            accumulator.arguments.push_str(&args);
+                        }
+                    }
+
+                    if chunk.is_final {
+                        break;
+                    }
                 }
-                if let Some(name) = delta.name {
-                    accumulator.name = name;
+                _ = cancel_token.cancelled() => {
+                    debug!("Streaming cancelled by user");
+                    // Return whatever we have so far
+                    if !accumulated_content.is_empty() {
+                        return Ok(IterationOutcome::FinalContent(accumulated_content));
+                    }
+                    return Ok(IterationOutcome::Empty);
                 }
-                if let Some(args) = delta.arguments {
-                    accumulator.arguments.push_str(&args);
-                }
-            }
-
-            if chunk.is_final {
-                break;
             }
         }
 
@@ -526,19 +644,43 @@ impl AgentLoop {
             messages.push(Message::assistant_with_tools(tool_call_messages));
 
             // Execute tools in parallel
-            let tool_futures: Vec<_> = tool_calls.iter().map(|tc| {
-                let registry = self.tool_registry.clone();
-                let name = tc.name.clone();
-                let args = tc.arguments.clone();
-                let ctx = routing_ctx.clone();
-                let id = tc.id.clone();
-                async move {
-                    debug!("Executing tool: {}", name);
-                    let reg = registry.read().await;
-                    let result = reg.execute(&name, args, &ctx).await;
-                    (id, name, result)
-                }
-            }).collect();
+            let tool_futures: Vec<_> = tool_calls
+                .iter()
+                .map(|tc| {
+                    let registry = self.tool_registry.clone();
+                    let name = tc.name.clone();
+                    let args = tc.arguments.clone();
+                    let ctx = routing_ctx.clone();
+                    let id = tc.id.clone();
+                    let etx = event_tx.clone();
+                    async move {
+                        debug!("Executing tool: {}", name);
+                        if let Some(tx) = &etx {
+                            let _ = tx
+                                .send(AgentEvent::ToolStart {
+                                    name: name.clone(),
+                                    args: args.clone(),
+                                })
+                                .await;
+                        }
+                        let start = Instant::now();
+                        let reg = registry.read().await;
+                        let result = reg.execute(&name, args, &ctx).await;
+                        let duration_ms = start.elapsed().as_millis() as u64;
+                        let success = result.is_ok();
+                        if let Some(tx) = &etx {
+                            let _ = tx
+                                .send(AgentEvent::ToolEnd {
+                                    name: name.clone(),
+                                    success,
+                                    duration_ms,
+                                })
+                                .await;
+                        }
+                        (id, name, result)
+                    }
+                })
+                .collect();
 
             let results = join_all(tool_futures).await;
             for (id, name, result) in results {
@@ -588,12 +730,79 @@ impl AgentLoop {
         drop(context_builder);
 
         // Run agent loop (with streaming enabled for CLI)
-        let response_content = self.run_agent_loop(messages, true, &routing_ctx).await?;
+        let response_content = self
+            .run_agent_loop(messages, true, &routing_ctx, None, CancellationToken::new())
+            .await?;
 
         // Save to session
         self.save_to_session(&session_key, &response_content).await;
 
         Ok(response_content)
+    }
+
+    /// Process a message with real-time event streaming and cancellation support.
+    ///
+    /// Returns an event receiver for real-time updates, a cancellation token to
+    /// stop processing, and a join handle for the background task.
+    pub async fn process_direct_streaming(
+        self: &Arc<Self>,
+        content: String,
+        session_key: String,
+    ) -> Result<(
+        mpsc::Receiver<AgentEvent>,
+        CancellationToken,
+        JoinHandle<Result<String>>,
+    )> {
+        let preview = if content.len() > 80 {
+            format!("{}...", &content[..80])
+        } else {
+            content.clone()
+        };
+        debug!("Processing streaming direct message: {}", preview);
+
+        // Get or create session and build messages before spawning
+        let mut session_manager = self.session_manager.write().await;
+        let session = session_manager.get_or_create(&session_key).await?;
+        session.add_message("user", &content);
+        let history = session.get_history(DEFAULT_HISTORY_LIMIT).to_vec();
+        drop(session_manager);
+
+        let routing_ctx = RoutingContext::new("cli".into(), session_key.clone().into());
+
+        let mut context_builder = self.context_builder.write().await;
+        let messages = context_builder
+            .build_messages(history, &content, None, "cli", &session_key)
+            .await;
+        drop(context_builder);
+
+        // Create event channel and cancellation token
+        let (event_tx, event_rx) = mpsc::channel(64);
+        let cancel_token = CancellationToken::new();
+
+        // Clone Arcs for the spawned task
+        let agent = Arc::clone(self);
+        let cancel = cancel_token.clone();
+        let sk = session_key.clone();
+
+        let handle = tokio::spawn(async move {
+            let result = agent
+                .run_agent_loop(messages, true, &routing_ctx, Some(event_tx), cancel)
+                .await;
+
+            // Save to session regardless of success/failure
+            if let Ok(ref content) = result {
+                agent.save_to_session(&sk, content).await;
+            }
+
+            result
+        });
+
+        Ok((event_rx, cancel_token, handle))
+    }
+
+    /// Get the model name from config (for display purposes).
+    pub fn model_name(&self) -> &str {
+        &self.config.agents.defaults.model
     }
 }
 

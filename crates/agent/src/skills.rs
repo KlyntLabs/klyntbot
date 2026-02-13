@@ -16,7 +16,10 @@ const BUILTIN_SKILLS: &[(&str, &str)] = &[
         "skill-creator",
         include_str!("../../../skills/skill-creator/SKILL.md"),
     ),
-    ("summarize", include_str!("../../../skills/summarize/SKILL.md")),
+    (
+        "summarize",
+        include_str!("../../../skills/summarize/SKILL.md"),
+    ),
     ("tmux", include_str!("../../../skills/tmux/SKILL.md")),
     ("weather", include_str!("../../../skills/weather/SKILL.md")),
 ];

@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use tokio::fs;
 use tracing::debug;
 
-use super::{Tool, RoutingContext};
+use super::{RoutingContext, Tool};
 use common::{Result, ToolError};
 
 /// Resolve path and optionally enforce directory restriction
@@ -421,7 +421,9 @@ mod tests {
 
         // Create a file inside allowed directory
         let file_path = temp_dir.path().join("allowed.txt");
-        tokio::fs::write(&file_path, "Allowed content").await.unwrap();
+        tokio::fs::write(&file_path, "Allowed content")
+            .await
+            .unwrap();
 
         let tool = ReadFileTool::new(Some(allowed_dir.clone()));
 
@@ -522,7 +524,9 @@ mod tests {
     async fn test_edit_file_multiple_occurrences() {
         let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("edit.txt");
-        tokio::fs::write(&file_path, "test test test").await.unwrap();
+        tokio::fs::write(&file_path, "test test test")
+            .await
+            .unwrap();
 
         let tool = EditFileTool::new(None);
         let args = serde_json::json!({

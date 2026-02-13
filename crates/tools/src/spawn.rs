@@ -5,7 +5,7 @@ use serde_json::Value;
 use std::sync::Arc;
 use tracing::debug;
 
-use super::{Tool, RoutingContext};
+use super::{RoutingContext, Tool};
 use common::{Result, ToolError};
 
 /// Trait for spawning subagents (dependency inversion to avoid circular dependencies).
@@ -87,9 +87,10 @@ impl Tool for SpawnTool {
 
         debug!("Spawning subagent for task: {}", task);
 
-        let handler = self.handler.as_ref().ok_or_else(|| {
-            ToolError::ExecutionFailed("SpawnHandler not available".to_string())
-        })?;
+        let handler = self
+            .handler
+            .as_ref()
+            .ok_or_else(|| ToolError::ExecutionFailed("SpawnHandler not available".to_string()))?;
 
         // Use routing context for result routing
         let result = handler
