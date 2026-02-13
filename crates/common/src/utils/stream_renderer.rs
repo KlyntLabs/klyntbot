@@ -193,6 +193,27 @@ impl StreamRenderer {
         }
     }
 
+    /// Pause rendering to allow an interactive prompt to take over the terminal.
+    ///
+    /// Ensures any in-progress line is terminated so the prompt starts on a fresh line.
+    pub fn pause(&mut self) {
+        if self.is_tty {
+            // Ensure we're on a new line so the prompt renders cleanly
+            println!();
+            self.rendered_lines += 1;
+        }
+        let _ = io::stdout().flush();
+    }
+
+    /// Resume rendering after an interactive prompt has finished.
+    ///
+    /// The prompt's output was rendered between pause/resume; we account for it
+    /// in rendered_lines so finalize() erases the correct number of lines.
+    pub fn resume(&mut self, prompt_lines: u16) {
+        self.rendered_lines += prompt_lines;
+        let _ = io::stdout().flush();
+    }
+
     /// Mark the response as cancelled (for Ctrl+C or unexpected termination).
     pub fn mark_cancelled(&mut self) {
         self.cancelled = true;

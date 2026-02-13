@@ -10,7 +10,7 @@ use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, warn};
 
 use bus::{InboundMessage, MessageBus, OutboundMessage};
-use common::Result;
+use common::{PromptRequest, Result, UserResponse};
 use config::Config;
 use futures_util::future::join_all;
 use futures_util::StreamExt;
@@ -46,6 +46,31 @@ macro_rules! emit {
     };
 }
 
+/// Optional channels for interactive streaming (event output, user input, prompt flag).
+///
+/// Bundles the three parameters that are always `None` together (bus-driven modes)
+/// or `Some` together (CLI streaming mode). Keeps `run_agent_loop` under the
+/// argument-count lint threshold.
+struct StreamingChannels {
+    event_tx: Option<mpsc::Sender<AgentEvent>>,
+    user_rx: Option<mpsc::Receiver<UserResponse>>,
+    prompt_pending: Option<Arc<AtomicBool>>,
+}
+
+impl StreamingChannels {
+    /// No streaming — all channels disabled.
+    fn none() -> Self {
+        Self {
+            event_tx: None,
+            user_rx: None,
+            prompt_pending: None,
+        }
+    }
+}
+
+/// Type alias for last active channel tracking (channel + chat ID)
+type LastActiveChannel = Arc<RwLock<Option<(common::ChannelName, common::ChatId)>>>;
+
 /// Agent loop - the core processing engine
 pub struct AgentLoop {
     bus: Arc<MessageBus>,
@@ -58,20 +83,24 @@ pub struct AgentLoop {
     #[allow(dead_code)] // Will be used when full agent loop implementation is completed
     subagent_manager: Arc<SubagentManager>,
     running: Arc<AtomicBool>,
+    last_active_channel: Option<LastActiveChannel>,
 }
 
 impl AgentLoop {
-    /// Create a new agent loop with optional cron service
+    /// Create a new agent loop with optional cron service and shared instances
     pub async fn new_with_cron(
         bus: Arc<MessageBus>,
         provider: DynProvider,
         config: Config,
         cron_service: Option<Arc<scheduling::CronService>>,
+        todo_store: Arc<RwLock<tools::todo_store::TodoStore>>,
+        notification_handle: Option<LastActiveChannel>,
     ) -> Result<Self> {
         let workspace = config.workspace_path();
 
         // Create context builder
-        let mut context_builder = ContextBuilder::new(workspace.clone());
+        let mut context_builder =
+            ContextBuilder::new(workspace.clone(), Some(Arc::clone(&todo_store)));
         context_builder.init().await.map_err(|e| {
             common::KlyntbotError::Config(common::ConfigError::Invalid(format!(
                 "Failed to initialize context: {}",
@@ -140,6 +169,14 @@ impl AgentLoop {
             tool_registry.register(CronTool::with_handler(adapter));
         }
 
+        // Register todo tool
+        tool_registry.register(tools::todo::TodoTool::new(
+            Arc::clone(&todo_store),
+            config.todo.focus.max_slots,
+            config.todo.focus.deadline_hours,
+            config.todo.confidence_threshold,
+        ));
+
         // Take ownership of the inbound receiver
         let inbound_rx = bus
             .take_inbound_rx()
@@ -155,12 +192,15 @@ impl AgentLoop {
             tool_registry: Arc::new(RwLock::new(tool_registry)),
             subagent_manager,
             running: Arc::new(AtomicBool::new(false)),
+            last_active_channel: notification_handle,
         })
     }
 
     /// Create a new agent loop (without cron service)
     pub async fn new(bus: Arc<MessageBus>, provider: DynProvider, config: Config) -> Result<Self> {
-        Self::new_with_cron(bus, provider, config, None).await
+        let todo_path = config.todo_store_path();
+        let todo_store = Arc::new(RwLock::new(tools::todo_store::TodoStore::new(todo_path)));
+        Self::new_with_cron(bus, provider, config, None, todo_store, None).await
     }
 
     /// Run the agent loop, processing messages from the bus
@@ -226,6 +266,11 @@ impl AgentLoop {
             return self.process_system_message(msg).await;
         }
 
+        // Track last active channel for notifications
+        if let Some(last_active) = &self.last_active_channel {
+            *last_active.write().await = Some((msg.channel.clone(), msg.chat_id.clone()));
+        }
+
         let preview = if msg.content.len() > 80 {
             format!("{}...", &msg.content[..80])
         } else {
@@ -273,13 +318,13 @@ impl AgentLoop {
 
         drop(context_builder);
 
-        // Run agent loop (no event channel for bus mode)
+        // Run agent loop (no event/user/prompt channels for bus mode)
         let response_content = self
             .run_agent_loop(
                 messages,
                 false,
                 &routing_ctx,
-                None,
+                StreamingChannels::none(),
                 CancellationToken::new(),
             )
             .await?;
@@ -368,7 +413,7 @@ impl AgentLoop {
                 messages,
                 false,
                 &routing_ctx,
-                None,
+                StreamingChannels::none(),
                 CancellationToken::new(),
             )
             .await?;
@@ -403,15 +448,17 @@ impl AgentLoop {
     /// Run the agent iteration loop with the given messages.
     /// Returns the final response content.
     ///
-    /// When `event_tx` is provided, emits `AgentEvent` variants as processing happens.
+    /// `channels` carries optional event/user-response/prompt-pending channels
+    /// for interactive streaming mode. Pass `StreamingChannels::none()` when not
+    /// streaming interactively.
     /// When `cancel_token` is cancelled, stops processing and returns partial content.
-    #[tracing::instrument(skip(self, messages, routing_ctx, event_tx, cancel_token), fields(message_count = messages.len()))]
+    #[tracing::instrument(skip(self, messages, routing_ctx, channels, cancel_token), fields(message_count = messages.len()))]
     async fn run_agent_loop(
         &self,
         messages: Vec<Message>,
         use_streaming: bool,
         routing_ctx: &RoutingContext,
-        event_tx: Option<mpsc::Sender<AgentEvent>>,
+        mut channels: StreamingChannels,
         cancel_token: CancellationToken,
     ) -> Result<String> {
         let mut current_messages = messages;
@@ -426,7 +473,7 @@ impl AgentLoop {
 
             debug!("Agent iteration {}/{}", iteration + 1, MAX_TOOL_ITERATIONS);
             emit!(
-                event_tx,
+                channels.event_tx,
                 AgentEvent::IterationStart {
                     iteration: iteration + 1,
                     max: MAX_TOOL_ITERATIONS,
@@ -443,26 +490,60 @@ impl AgentLoop {
                     &mut current_messages,
                     &tools,
                     routing_ctx,
-                    &event_tx,
+                    &channels.event_tx,
                     &cancel_token,
                 )
                 .await
             } else {
-                self.run_standard_iteration(&mut current_messages, &tools, routing_ctx, &event_tx)
-                    .await
+                self.run_standard_iteration(
+                    &mut current_messages,
+                    &tools,
+                    routing_ctx,
+                    &channels.event_tx,
+                )
+                .await
             };
 
             // Emit Error event before propagating failures
             let response = match response {
                 Ok(r) => r,
                 Err(e) => {
-                    emit!(event_tx, AgentEvent::Error(e.to_string()));
+                    emit!(channels.event_tx, AgentEvent::Error(e.to_string()));
                     return Err(e);
                 }
             };
 
             match response {
-                IterationOutcome::ToolCallsProcessed => continue,
+                IterationOutcome::ToolCallsProcessed => {
+                    // After tool execution, check if any tool emitted an interactive prompt.
+                    // If prompt_pending is set, we MUST wait for the user's response before
+                    // continuing — otherwise the LLM races ahead with stale context.
+                    let has_pending = channels
+                        .prompt_pending
+                        .as_ref()
+                        .is_some_and(|p| p.load(Ordering::SeqCst));
+
+                    if has_pending {
+                        if let Some(ref mut rx) = channels.user_rx {
+                            debug!("Waiting for user response to interactive prompt...");
+                            // Block until the user responds (or channel closes)
+                            if let Some(response) = rx.recv().await {
+                                // Clear the pending flag
+                                if let Some(ref p) = channels.prompt_pending {
+                                    p.store(false, Ordering::SeqCst);
+                                }
+                                if let UserResponse::Cancelled = response {
+                                    debug!("User cancelled interactive prompt");
+                                    return Ok("Cancelled by user.".to_string());
+                                }
+                                let msg = format_user_response(&response);
+                                debug!("Injecting user prompt response: {}", msg);
+                                current_messages.push(Message::user(msg));
+                            }
+                        }
+                    }
+                    continue;
+                }
                 IterationOutcome::FinalContent(content) => {
                     final_content = Some(content);
                     break;
@@ -478,7 +559,7 @@ impl AgentLoop {
             "I've finished processing. Is there anything else I can help with?".to_string()
         });
 
-        emit!(event_tx, AgentEvent::Done(result.clone()));
+        emit!(channels.event_tx, AgentEvent::Done(result.clone()));
 
         Ok(result)
     }
@@ -737,9 +818,15 @@ impl AgentLoop {
             .await;
         drop(context_builder);
 
-        // Run agent loop (with streaming enabled for CLI)
+        // Run agent loop (with streaming enabled for CLI, no interactive prompts)
         let response_content = self
-            .run_agent_loop(messages, true, &routing_ctx, None, CancellationToken::new())
+            .run_agent_loop(
+                messages,
+                true,
+                &routing_ctx,
+                StreamingChannels::none(),
+                CancellationToken::new(),
+            )
             .await?;
 
         // Save to session
@@ -750,14 +837,18 @@ impl AgentLoop {
 
     /// Process a message with real-time event streaming and cancellation support.
     ///
-    /// Returns an event receiver for real-time updates, a cancellation token to
-    /// stop processing, and a join handle for the background task.
+    /// Returns:
+    /// - `event_rx`: Receiver for agent events (content, tool status, prompts)
+    /// - `user_tx`: Sender for user responses to interactive prompts
+    /// - `cancel_token`: Token to cancel processing
+    /// - `handle`: Join handle for the background task
     pub async fn process_direct_streaming(
         self: &Arc<Self>,
         content: String,
         session_key: String,
     ) -> Result<(
         mpsc::Receiver<AgentEvent>,
+        mpsc::Sender<UserResponse>,
         CancellationToken,
         JoinHandle<Result<String>>,
     )> {
@@ -775,7 +866,27 @@ impl AgentLoop {
         let history = session.get_history(DEFAULT_HISTORY_LIMIT).to_vec();
         drop(session_manager);
 
-        let routing_ctx = RoutingContext::new("cli".into(), session_key.clone().into());
+        // Create event channel and user response channel (bidirectional)
+        let (event_tx, event_rx) = mpsc::channel(64);
+        let (user_tx, user_rx) = mpsc::channel(8);
+
+        // Create a prompt bridge: tools send PromptRequests via prompt_tx,
+        // the bridge forwards them as AgentEvent::PromptUser to the CLI.
+        // The prompt_pending flag tells the agent loop to wait for a user response.
+        let (prompt_tx, mut prompt_rx) = mpsc::channel::<PromptRequest>(8);
+        let prompt_pending = Arc::new(AtomicBool::new(false));
+        let bridge_event_tx = event_tx.clone();
+        let bridge_pending = Arc::clone(&prompt_pending);
+        tokio::spawn(async move {
+            while let Some(req) = prompt_rx.recv().await {
+                bridge_pending.store(true, Ordering::SeqCst);
+                let _ = bridge_event_tx.send(AgentEvent::PromptUser(req)).await;
+            }
+        });
+
+        // Routing context with prompt channel for interactive tools
+        let routing_ctx =
+            RoutingContext::with_prompt_tx("cli".into(), session_key.clone().into(), prompt_tx);
 
         let mut context_builder = self.context_builder.write().await;
         let messages = context_builder
@@ -783,8 +894,6 @@ impl AgentLoop {
             .await;
         drop(context_builder);
 
-        // Create event channel and cancellation token
-        let (event_tx, event_rx) = mpsc::channel(64);
         let cancel_token = CancellationToken::new();
 
         // Clone Arcs for the spawned task
@@ -794,7 +903,17 @@ impl AgentLoop {
 
         let handle = tokio::spawn(async move {
             let result = agent
-                .run_agent_loop(messages, true, &routing_ctx, Some(event_tx), cancel)
+                .run_agent_loop(
+                    messages,
+                    true,
+                    &routing_ctx,
+                    StreamingChannels {
+                        event_tx: Some(event_tx),
+                        user_rx: Some(user_rx),
+                        prompt_pending: Some(prompt_pending),
+                    },
+                    cancel,
+                )
                 .await;
 
             // Save to session regardless of success/failure
@@ -805,12 +924,56 @@ impl AgentLoop {
             result
         });
 
-        Ok((event_rx, cancel_token, handle))
+        Ok((event_rx, user_tx, cancel_token, handle))
     }
 
     /// Get the model name from config (for display purposes).
     pub fn model_name(&self) -> &str {
         &self.config.agents.defaults.model
+    }
+}
+
+/// Format a user's interactive prompt response as a natural-language message
+/// for injection into the LLM conversation.
+fn format_user_response(response: &UserResponse) -> String {
+    match response {
+        UserResponse::Selected(idx) => {
+            format!("User selected option {} from the interactive prompt.", idx)
+        }
+        UserResponse::SelectedWithInput { index, text } => {
+            if let Some(t) = text {
+                if t.is_empty() {
+                    format!(
+                        "User selected option {} from the interactive prompt.",
+                        index
+                    )
+                } else {
+                    format!(
+                        "User selected option {} from the interactive prompt with input: \"{}\"",
+                        index, t
+                    )
+                }
+            } else {
+                format!(
+                    "User selected option {} from the interactive prompt.",
+                    index
+                )
+            }
+        }
+        UserResponse::MultiSelected(indices) => {
+            format!(
+                "User selected options {:?} from the interactive prompt.",
+                indices
+            )
+        }
+        UserResponse::YesNo(yes) => {
+            if *yes {
+                "User answered Yes to the interactive prompt.".to_string()
+            } else {
+                "User answered No to the interactive prompt.".to_string()
+            }
+        }
+        UserResponse::Cancelled => "User cancelled the interactive prompt.".to_string(),
     }
 }
 

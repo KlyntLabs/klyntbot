@@ -24,6 +24,7 @@ pub mod oauth;
 pub mod prompts;
 pub mod provider;
 pub mod templates;
+pub mod todo_notifications;
 pub mod tools;
 pub mod welcome;
 pub mod workspace;
@@ -80,6 +81,7 @@ pub async fn run_wizard() -> Result<()> {
             daemon::DaemonModule.is_applicable(&state),
         ),
         ("Workspace Setup", true, true),
+        ("Todo Notifications", false, true),
     ];
 
     // Filter to applicable steps
@@ -102,7 +104,7 @@ pub async fn run_wizard() -> Result<()> {
         print_step_header(&state, name, required);
 
         // Dispatch to the right module. Step indices correspond to `all_steps`:
-        // 0=welcome, 1=provider, 2=channels (async), 3=tools, 4=daemon, 5=workspace.
+        // 0=welcome, 1=provider, 2=channels (async), 3=tools, 4=daemon, 5=workspace, 6=todo_notifications.
         // Ctrl+C in raw-mode prompts surfaces as an Err containing "Ctrl+C".
         let result = match match step_idx {
             0 => welcome::WelcomeModule.run(&mut state),
@@ -111,14 +113,12 @@ pub async fn run_wizard() -> Result<()> {
             3 => ToolsModule.run(&mut state),
             4 => daemon::DaemonModule.run(&mut state),
             5 => workspace::WorkspaceModule.run(&mut state),
+            6 => todo_notifications::run_todo_notification_step(&mut state),
             _ => unreachable!(),
         } {
             Ok(r) => r,
             Err(e) if e.to_string().contains("Ctrl+C") => {
-                println!(
-                    "\n{} Setup cancelled. No changes saved.",
-                    status_warning()
-                );
+                println!("\n{} Setup cancelled. No changes saved.", status_warning());
                 return Ok(());
             }
             Err(e) => return Err(e),
@@ -129,10 +129,7 @@ pub async fn run_wizard() -> Result<()> {
             StepResult::Back if pos > 0 => pos -= 1,
             StepResult::Back => {} // already at first step
             StepResult::Cancel => {
-                println!(
-                    "\n{} Setup cancelled. No changes saved.",
-                    status_warning()
-                );
+                println!("\n{} Setup cancelled. No changes saved.", status_warning());
                 return Ok(());
             }
         }
@@ -173,10 +170,25 @@ async fn run_channels_step(state: &mut WizardState) -> Result<StepResult> {
 /// Print the global wizard header (shown once at the start).
 fn print_wizard_header() {
     println!();
-    println!("{}", colorize("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", BRAND));
+    println!(
+        "{}",
+        colorize(
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            BRAND
+        )
+    );
     println!("{}", draw_step_line(&colorize("klyntbot", BOLD)));
-    println!("{}", draw_step_line(&colorize("Your AI Assistant Platform", DIM)));
-    println!("{}", colorize("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", BRAND));
+    println!(
+        "{}",
+        draw_step_line(&colorize("Your AI Assistant Platform", DIM))
+    );
+    println!(
+        "{}",
+        colorize(
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            BRAND
+        )
+    );
     println!();
 }
 
@@ -187,35 +199,46 @@ fn print_completion() {
         .unwrap_or_else(|_| "~/.klyntbot/config.json".to_string());
 
     println!();
-    println!("{}", colorize("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", SUCCESS));
+    println!(
+        "{}",
+        colorize(
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            SUCCESS
+        )
+    );
     println!();
-    println!("  {} {}",
+    println!(
+        "  {} {}",
         colorize("✓", SUCCESS),
         colorize("Setup Complete!", BOLD)
     );
     println!();
-    println!("{}", colorize("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", SUCCESS));
+    println!(
+        "{}",
+        colorize(
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            SUCCESS
+        )
+    );
     println!();
 
-    println!("{} Your AI assistant is ready to use!\n", colorize("●", BRAND));
-
-    println!("{} {}",
-        colorize("→", BRAND),
-        colorize("Try it out:", BOLD)
+    println!(
+        "{} Your AI assistant is ready to use!\n",
+        colorize("●", BRAND)
     );
+
+    println!("{} {}", colorize("→", BRAND), colorize("Try it out:", BOLD));
     println!("  {} klyntbot chat", colorize("$", DIM));
     println!("  {} klyntbot chat \"Hello!\"", colorize("$", DIM));
     println!();
 
-    println!("{} {}",
-        colorize("→", BRAND),
-        colorize("Get help:", BOLD)
-    );
+    println!("{} {}", colorize("→", BRAND), colorize("Get help:", BOLD));
     println!("  {} klyntbot --help", colorize("$", DIM));
     println!("  {} klyntbot status", colorize("$", DIM));
     println!();
 
-    println!("{} {}",
+    println!(
+        "{} {}",
         colorize("→", BRAND),
         colorize("Configuration saved:", BOLD)
     );
@@ -270,10 +293,7 @@ mod tests {
             config.set_provider_key(key, format!("key-{}", key));
         }
 
-        assert_eq!(
-            config.providers.anthropic.api_key.expose(),
-            "key-anthropic"
-        );
+        assert_eq!(config.providers.anthropic.api_key.expose(), "key-anthropic");
         assert_eq!(config.providers.openai.api_key.expose(), "key-openai");
         assert_eq!(config.providers.deepseek.api_key.expose(), "key-deepseek");
         assert_eq!(config.providers.gemini.api_key.expose(), "key-gemini");

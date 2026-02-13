@@ -161,11 +161,7 @@ pub fn prompt_text(label: &str, default: Option<&str>, required: bool) -> Result
                 return Ok(def.to_string());
             }
             if required {
-                println!(
-                    "{}{}",
-                    prefix,
-                    colorize("This field is required", ERROR)
-                );
+                println!("{}{}", prefix, colorize("This field is required", ERROR));
                 continue;
             }
             return Ok(String::new());
@@ -241,11 +237,7 @@ pub fn prompt_secret(label: &str, min_length: usize) -> Result<String> {
             drop(_guard);
 
             if secret.is_empty() {
-                println!(
-                    "{}{}",
-                    prefix,
-                    colorize("This field is required", ERROR)
-                );
+                println!("{}{}", prefix, colorize("This field is required", ERROR));
                 continue;
             }
 
@@ -277,11 +269,7 @@ pub fn prompt_secret(label: &str, min_length: usize) -> Result<String> {
             let input = input.trim().to_string();
 
             if input.is_empty() {
-                println!(
-                    "{}{}",
-                    prefix,
-                    colorize("This field is required", ERROR)
-                );
+                println!("{}{}", prefix, colorize("This field is required", ERROR));
                 continue;
             }
 
@@ -518,10 +506,7 @@ fn prompt_select_fallback(
 /// number input for non-TTY.
 ///
 /// Returns 0-based indices of selected options.
-pub fn prompt_multi_select(
-    header: &str,
-    options: &[SelectOption<'_>],
-) -> Result<Vec<usize>> {
+pub fn prompt_multi_select(header: &str, options: &[SelectOption<'_>]) -> Result<Vec<usize>> {
     let prefix = step_prefix();
 
     if is_interactive() {
@@ -615,8 +600,7 @@ fn prompt_multi_select_interactive(
                         colorize("None selected", DIM)
                     );
                 } else {
-                    let names: Vec<&str> =
-                        selected.iter().map(|&i| options[i].label).collect();
+                    let names: Vec<&str> = selected.iter().map(|&i| options[i].label).collect();
                     println!(
                         "{}  {} {}",
                         prefix,
@@ -776,6 +760,333 @@ fn prompt_multi_select_fallback(
 }
 
 // ============================================================================
+// Select with expandable text input
+// ============================================================================
+
+/// Option for a select-with-input prompt.
+pub struct SelectWithInputOption<'a> {
+    pub label: &'a str,
+    pub description: &'a str,
+    pub expandable: bool,
+    pub input_hint: Option<&'a str>,
+}
+
+/// Result from a select-with-input prompt.
+pub struct SelectWithInputResult {
+    pub index: usize,
+    pub text: Option<String>,
+}
+
+/// Hybrid select/text-input prompt.
+///
+/// Each option can optionally be "expandable" — pressing TAB on an expandable
+/// option reveals an inline text field. User can type text, then press Enter
+/// to confirm the selection with the text.
+///
+/// Returns the selected index and optional text input.
+pub fn prompt_select_with_input(
+    header: &str,
+    options: &[SelectWithInputOption<'_>],
+    default_idx: usize,
+) -> Result<SelectWithInputResult> {
+    if is_interactive() {
+        prompt_select_with_input_interactive(header, options, default_idx)
+    } else {
+        prompt_select_with_input_fallback(header, options, default_idx)
+    }
+}
+
+/// State for the select-with-input component.
+enum InputState {
+    Selecting,
+    Expanded { buffer: String },
+}
+
+fn prompt_select_with_input_interactive(
+    header: &str,
+    options: &[SelectWithInputOption<'_>],
+    default_idx: usize,
+) -> Result<SelectWithInputResult> {
+    let prefix = step_prefix();
+    let mut selected = default_idx;
+    let mut state = InputState::Selecting;
+
+    if !header.is_empty() {
+        println!("{}{}:", prefix, header);
+    }
+
+    let _guard = RawModeGuard::enable()?;
+    let mut out = io::stdout();
+
+    // Initial render
+    render_select_with_input_list(&mut out, &prefix, options, selected, &state)?;
+    render_select_input_hint_bar(&mut out, &prefix, &options[selected], &state)?;
+
+    loop {
+        let key = read_key()?;
+        match key.code {
+            KeyCode::Up => {
+                if matches!(state, InputState::Selecting) && selected > 0 {
+                    selected -= 1;
+                    rerender_select_with_input(&mut out, &prefix, options, selected, &state)?;
+                }
+            }
+            KeyCode::Down => {
+                if matches!(state, InputState::Selecting) && selected < options.len() - 1 {
+                    selected += 1;
+                    rerender_select_with_input(&mut out, &prefix, options, selected, &state)?;
+                }
+            }
+            KeyCode::Char('k') => {
+                if matches!(state, InputState::Selecting) && selected > 0 {
+                    selected -= 1;
+                    rerender_select_with_input(&mut out, &prefix, options, selected, &state)?;
+                } else if let InputState::Expanded { ref mut buffer } = state {
+                    buffer.push('k');
+                    rerender_select_with_input(&mut out, &prefix, options, selected, &state)?;
+                }
+            }
+            KeyCode::Char('j') => {
+                if matches!(state, InputState::Selecting) && selected < options.len() - 1 {
+                    selected += 1;
+                    rerender_select_with_input(&mut out, &prefix, options, selected, &state)?;
+                } else if let InputState::Expanded { ref mut buffer } = state {
+                    buffer.push('j');
+                    rerender_select_with_input(&mut out, &prefix, options, selected, &state)?;
+                }
+            }
+            KeyCode::Tab => {
+                if matches!(state, InputState::Selecting) && options[selected].expandable {
+                    state = InputState::Expanded {
+                        buffer: String::new(),
+                    };
+                    rerender_select_with_input(&mut out, &prefix, options, selected, &state)?;
+                }
+            }
+            KeyCode::Esc => {
+                if matches!(state, InputState::Expanded { .. }) {
+                    state = InputState::Selecting;
+                    rerender_select_with_input(&mut out, &prefix, options, selected, &state)?;
+                }
+            }
+            KeyCode::Char(c) => {
+                if let InputState::Expanded { ref mut buffer } = state {
+                    buffer.push(c);
+                    rerender_select_with_input(&mut out, &prefix, options, selected, &state)?;
+                }
+            }
+            KeyCode::Backspace => {
+                if let InputState::Expanded { ref mut buffer } = state {
+                    buffer.pop();
+                    rerender_select_with_input(&mut out, &prefix, options, selected, &state)?;
+                }
+            }
+            KeyCode::Enter => {
+                drop(_guard);
+                erase_lines(count_select_input_lines(options, &state) + 1)?;
+
+                let text = match state {
+                    InputState::Expanded { buffer } => Some(buffer),
+                    InputState::Selecting => None,
+                };
+
+                // Compact final output
+                print!(
+                    "{}  {} {}",
+                    prefix,
+                    colorize("●", BRAND),
+                    options[selected].label
+                );
+                if let Some(ref t) = text {
+                    if !t.is_empty() {
+                        print!("\n{}  \"{}\"", prefix, colorize(t, DIM));
+                    }
+                }
+                println!();
+
+                return Ok(SelectWithInputResult {
+                    index: selected,
+                    text,
+                });
+            }
+            _ => {}
+        }
+    }
+}
+
+fn render_select_with_input_list(
+    out: &mut impl Write,
+    prefix: &str,
+    options: &[SelectWithInputOption<'_>],
+    selected: usize,
+    state: &InputState,
+) -> Result<()> {
+    for (i, opt) in options.iter().enumerate() {
+        let pointer = if i == selected {
+            colorize("❯", BRAND)
+        } else {
+            " ".to_string()
+        };
+        let label = if i == selected {
+            colorize(opt.label, BOLD)
+        } else {
+            opt.label.to_string()
+        };
+        let desc = colorize(opt.description, DIM);
+
+        // Show TAB hint on expandable options when selected
+        let hint = if i == selected && opt.expandable && matches!(state, InputState::Selecting) {
+            format!("  {}", colorize("[TAB to expand]", DIM))
+        } else {
+            String::new()
+        };
+
+        write!(
+            out,
+            "{}  {} {} — {}{}\r\n",
+            prefix, pointer, label, desc, hint
+        )?;
+
+        // If this option is selected and expanded, show input line
+        if i == selected {
+            if let InputState::Expanded { ref buffer } = state {
+                let hint_text = opt.input_hint.unwrap_or("Type here");
+                let display = if buffer.is_empty() {
+                    colorize(hint_text, DIM)
+                } else {
+                    buffer.clone()
+                };
+                write!(out, "{}    > {}█\r\n", prefix, display)?;
+            }
+        }
+    }
+
+    out.flush()?;
+    Ok(())
+}
+
+fn render_select_input_hint_bar(
+    out: &mut impl Write,
+    prefix: &str,
+    current_opt: &SelectWithInputOption<'_>,
+    state: &InputState,
+) -> Result<()> {
+    let hint = match state {
+        InputState::Selecting if current_opt.expandable => {
+            "[↑↓] Navigate  [TAB] Expand  [Enter] Confirm"
+        }
+        InputState::Selecting => "[↑↓] Navigate  [Enter] Confirm",
+        InputState::Expanded { .. } => "[Esc] Back  [Enter] Submit",
+    };
+
+    write!(out, "{}{}\r\n", prefix, colorize(hint, DIM))?;
+    out.flush()?;
+    Ok(())
+}
+
+fn count_select_input_lines(options: &[SelectWithInputOption<'_>], state: &InputState) -> usize {
+    let mut count = options.len();
+    if matches!(state, InputState::Expanded { .. }) {
+        count += 1; // Extra line for input field
+    }
+    count
+}
+
+fn rerender_select_with_input(
+    out: &mut impl Write,
+    prefix: &str,
+    options: &[SelectWithInputOption<'_>],
+    selected: usize,
+    state: &InputState,
+) -> Result<()> {
+    let total_lines = count_select_input_lines(options, state) + 1; // +1 for hint bar
+    for _ in 0..total_lines {
+        write!(out, "\x1b[A\x1b[2K")?;
+    }
+    render_select_with_input_list(out, prefix, options, selected, state)?;
+    render_select_input_hint_bar(out, prefix, &options[selected], state)?;
+    Ok(())
+}
+
+fn prompt_select_with_input_fallback(
+    header: &str,
+    options: &[SelectWithInputOption<'_>],
+    default_idx: usize,
+) -> Result<SelectWithInputResult> {
+    let prefix = step_prefix();
+
+    if !header.is_empty() {
+        println!("{}{}:", prefix, header);
+    }
+
+    for (i, opt) in options.iter().enumerate() {
+        let expandable = if opt.expandable {
+            " (type text after number to add input)"
+        } else {
+            ""
+        };
+        println!(
+            "{}  {}. {} — {}{}",
+            prefix,
+            colorize(&(i + 1).to_string(), BOLD),
+            opt.label,
+            colorize(opt.description, DIM),
+            expandable
+        );
+    }
+
+    loop {
+        print!("{}Choice [{}]: ", prefix, default_idx + 1);
+        io::stdout().flush()?;
+
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+        let input = input.trim();
+
+        // Parse "N text" format
+        let parts: Vec<&str> = input.splitn(2, ' ').collect();
+        let index = if let Some(first) = parts.first() {
+            first.parse::<usize>().ok().and_then(|n| {
+                if n > 0 && n <= options.len() {
+                    Some(n - 1)
+                } else {
+                    None
+                }
+            })
+        } else {
+            None
+        };
+
+        let selected = if input.is_empty() {
+            default_idx
+        } else if let Some(idx) = index {
+            idx
+        } else {
+            println!(
+                "{}{}",
+                prefix,
+                colorize(
+                    &format!("Please enter a number between 1 and {}", options.len()),
+                    ERROR
+                )
+            );
+            continue;
+        };
+
+        let text_input = if parts.len() > 1 {
+            Some(parts[1].to_string())
+        } else {
+            None
+        };
+
+        return Ok(SelectWithInputResult {
+            index: selected,
+            text: text_input,
+        });
+    }
+}
+
+// ============================================================================
 // List input
 // ============================================================================
 
@@ -845,5 +1156,52 @@ mod tests {
     fn test_is_interactive_runs() {
         // Just ensure it doesn't panic — actual value depends on test runner
         let _ = is_interactive();
+    }
+
+    #[test]
+    fn test_select_with_input_option_creation() {
+        let opt = SelectWithInputOption {
+            label: "Test",
+            description: "A test option",
+            expandable: true,
+            input_hint: Some("Type here"),
+        };
+        assert_eq!(opt.label, "Test");
+        assert_eq!(opt.description, "A test option");
+        assert!(opt.expandable);
+        assert_eq!(opt.input_hint, Some("Type here"));
+    }
+
+    #[test]
+    fn test_select_with_input_option_no_hint() {
+        let opt = SelectWithInputOption {
+            label: "Simple",
+            description: "No expansion",
+            expandable: false,
+            input_hint: None,
+        };
+        assert_eq!(opt.label, "Simple");
+        assert!(!opt.expandable);
+        assert_eq!(opt.input_hint, None);
+    }
+
+    #[test]
+    fn test_select_with_input_result() {
+        let result = SelectWithInputResult {
+            index: 2,
+            text: Some("user input".to_string()),
+        };
+        assert_eq!(result.index, 2);
+        assert_eq!(result.text, Some("user input".to_string()));
+    }
+
+    #[test]
+    fn test_select_with_input_result_no_text() {
+        let result = SelectWithInputResult {
+            index: 0,
+            text: None,
+        };
+        assert_eq!(result.index, 0);
+        assert_eq!(result.text, None);
     }
 }

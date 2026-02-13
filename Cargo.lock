@@ -494,6 +494,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "thiserror 2.0.18",
+ "tokio",
 ]
 
 [[package]]
@@ -3012,12 +3013,14 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "bus",
+ "chrono",
  "common",
  "html2text",
  "regex",
  "reqwest",
  "scheduling",
  "scraper",
+ "serde",
  "serde_json",
  "shellexpand",
  "tempfile",
@@ -3025,6 +3028,7 @@ dependencies = [
  "tracing",
  "url",
  "urlencoding",
+ "uuid",
 ]
 
 [[package]]

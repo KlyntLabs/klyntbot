@@ -222,7 +222,11 @@ fn configure_allowlist(config: &mut Config) -> Result<()> {
     }
 
     loop {
-        print!("{} {} ", colorize(chars.vertical, BRAND), colorize("+", SUCCESS));
+        print!(
+            "{} {} ",
+            colorize(chars.vertical, BRAND),
+            colorize("+", SUCCESS)
+        );
         io::stdout().flush()?;
 
         let mut input = String::new();
@@ -415,8 +419,16 @@ mod tests {
         assert!(config.tools.restrict_to_workspace);
         assert_eq!(config.tools.exec.timeout, 30);
         assert!(!config.tools.exec.allowed_commands.is_empty());
-        assert!(config.tools.exec.allowed_commands.contains(&"ls".to_string()));
-        assert!(config.tools.exec.allowed_commands.contains(&"cat".to_string()));
+        assert!(config
+            .tools
+            .exec
+            .allowed_commands
+            .contains(&"ls".to_string()));
+        assert!(config
+            .tools
+            .exec
+            .allowed_commands
+            .contains(&"cat".to_string()));
     }
 
     #[test]
@@ -459,11 +471,18 @@ mod tests {
         let safe_commands = vec![
             "ls", "cat", "head", "tail", "grep", "find", "wc", "echo", "pwd", "date",
         ];
-        assert_eq!(config.tools.exec.allowed_commands.len(), safe_commands.len());
+        assert_eq!(
+            config.tools.exec.allowed_commands.len(),
+            safe_commands.len()
+        );
 
         for cmd in safe_commands {
             assert!(
-                config.tools.exec.allowed_commands.contains(&cmd.to_string()),
+                config
+                    .tools
+                    .exec
+                    .allowed_commands
+                    .contains(&cmd.to_string()),
                 "Strict preset should include '{}'",
                 cmd
             );
@@ -478,7 +497,11 @@ mod tests {
         let dangerous = vec!["rm", "sudo", "chmod", "chown", "kill", "mkfs", "dd"];
         for cmd in dangerous {
             assert!(
-                !config.tools.exec.allowed_commands.contains(&cmd.to_string()),
+                !config
+                    .tools
+                    .exec
+                    .allowed_commands
+                    .contains(&cmd.to_string()),
                 "Strict preset should NOT include '{}'",
                 cmd
             );
@@ -531,7 +554,11 @@ mod tests {
 
         assert!(loaded.tools.restrict_to_workspace);
         assert_eq!(loaded.tools.exec.timeout, 30);
-        assert!(loaded.tools.exec.allowed_commands.contains(&"ls".to_string()));
+        assert!(loaded
+            .tools
+            .exec
+            .allowed_commands
+            .contains(&"ls".to_string()));
     }
 
     #[test]
@@ -547,7 +574,9 @@ mod tests {
         assert!(ToolsPreset::Strict.description().contains("Workspace"));
         assert!(ToolsPreset::Balanced.description().contains("Workspace"));
         // Permissive does NOT restrict to workspace
-        assert!(ToolsPreset::Permissive.description().contains("No workspace"));
+        assert!(ToolsPreset::Permissive
+            .description()
+            .contains("No workspace"));
     }
 
     // ========================================================================
@@ -615,6 +644,10 @@ mod tests {
 
         let loaded: Config = serde_json::from_str(&json).unwrap();
         assert_eq!(loaded.tools.exec.allowed_commands.len(), 3);
-        assert!(loaded.tools.exec.allowed_commands.contains(&"ls".to_string()));
+        assert!(loaded
+            .tools
+            .exec
+            .allowed_commands
+            .contains(&"ls".to_string()));
     }
 }

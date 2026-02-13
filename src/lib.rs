@@ -17,7 +17,8 @@ pub use tools;
 
 // Re-export commonly used types for convenience
 pub use agent::{
-    AgentEvent, AgentLoop, ContextBuilder, MemoryStore, SkillManager, SubagentManager,
+    AgentEvent, AgentLoop, ContextBuilder, MemoryStore, PromptRequest, PromptType, SkillManager,
+    SubagentManager, UserResponse,
 };
 pub use bus::{InboundMessage, MessageBus, OutboundMessage};
 pub use channels::{Channel, ChannelManager, DynChannel};

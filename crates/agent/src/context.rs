@@ -17,16 +17,21 @@ pub struct ContextBuilder {
     memory: MemoryStore,
     skills: SkillManager,
     cached_bootstrap: Option<String>,
+    todo_store: Option<std::sync::Arc<tokio::sync::RwLock<tools::todo_store::TodoStore>>>,
 }
 
 impl ContextBuilder {
     /// Create a new context builder
-    pub fn new(workspace: PathBuf) -> Self {
+    pub fn new(
+        workspace: PathBuf,
+        todo_store: Option<std::sync::Arc<tokio::sync::RwLock<tools::todo_store::TodoStore>>>,
+    ) -> Self {
         Self {
             memory: MemoryStore::new(workspace.clone()),
             skills: SkillManager::new(),
             workspace,
             cached_bootstrap: None,
+            todo_store,
         }
     }
 
@@ -96,6 +101,17 @@ impl ContextBuilder {
         messages
     }
 
+    /// Get todo context string from the store
+    async fn get_todo_context(&self) -> String {
+        if let Some(store) = &self.todo_store {
+            let mut guard = store.write().await;
+            if let Ok(ctx) = guard.to_context_string().await {
+                return ctx;
+            }
+        }
+        String::new()
+    }
+
     /// Build system prompt from all sources
     async fn build_system_prompt(&mut self, channel: &str, chat_id: &str) -> String {
         let mut sections = Vec::new();
@@ -141,6 +157,12 @@ impl ContextBuilder {
         let memory_context = self.memory.get_memory_context().await;
         if !memory_context.trim().is_empty() {
             sections.push(format!("# Memory\n\n{}", memory_context));
+        }
+
+        // Active tasks (between Memory and Skills)
+        let todo_context = self.get_todo_context().await;
+        if !todo_context.trim().is_empty() {
+            sections.push(todo_context);
         }
 
         // Skills (relatively stable)

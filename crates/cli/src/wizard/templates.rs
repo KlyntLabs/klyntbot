@@ -198,7 +198,11 @@ mod tests {
         ];
 
         for (name, template) in templates {
-            assert!(!template.is_empty(), "{} template should not be empty", name);
+            assert!(
+                !template.is_empty(),
+                "{} template should not be empty",
+                name
+            );
         }
     }
 

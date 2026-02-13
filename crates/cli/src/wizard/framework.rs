@@ -189,10 +189,7 @@ impl WizardRunner {
                     step_idx += 1;
                 }
                 StepResult::Cancel => {
-                    println!(
-                        "\n{} Setup cancelled. No changes saved.",
-                        status_warning()
-                    );
+                    println!("\n{} Setup cancelled. No changes saved.", status_warning());
                     return Ok(false);
                 }
             }
@@ -211,11 +208,10 @@ pub fn print_step_header(state: &WizardState, name: &str, _required: bool) {
     if state.current_step > 1 {
         println!();
     }
-    print!("{}", draw_wizard_step_header(
-        state.current_step,
-        state.total_steps,
-        name,
-    ));
+    print!(
+        "{}",
+        draw_wizard_step_header(state.current_step, state.total_steps, name,)
+    );
 }
 
 #[cfg(test)]

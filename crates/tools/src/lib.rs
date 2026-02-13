@@ -8,6 +8,9 @@ pub mod message;
 pub mod registry;
 pub mod shell;
 pub mod spawn;
+pub mod todo;
+pub mod todo_store;
+pub mod todo_types;
 pub mod web;
 
 // Dependency inversion traits (to avoid circular dependencies)
@@ -24,20 +27,45 @@ pub trait CronHandler: Send + Sync {
 use async_trait::async_trait;
 use serde_json::Value;
 use std::sync::Arc;
+use tokio::sync::mpsc;
 
-use common::{ChannelName, ChatId, Result};
+use common::{ChannelName, ChatId, PromptRequest, Result};
 
 /// Routing context for tools that need channel/chat information.
 /// This is passed explicitly to execute() instead of using shared mutable state.
+///
+/// The optional `prompt_tx` allows tools to request interactive prompts from the
+/// CLI during execution (e.g., for todo enrichment flows). Tools fire prompt
+/// requests and return immediately — responses arrive in the next agent iteration.
 #[derive(Debug, Clone)]
 pub struct RoutingContext {
     pub channel: ChannelName,
     pub chat_id: ChatId,
+    /// Channel for tools to send interactive prompt requests to the CLI.
+    /// Only available when running in CLI chat mode (TTY).
+    pub prompt_tx: Option<mpsc::Sender<PromptRequest>>,
 }
 
 impl RoutingContext {
     pub fn new(channel: ChannelName, chat_id: ChatId) -> Self {
-        Self { channel, chat_id }
+        Self {
+            channel,
+            chat_id,
+            prompt_tx: None,
+        }
+    }
+
+    /// Create a routing context with a prompt channel for interactive CLI mode.
+    pub fn with_prompt_tx(
+        channel: ChannelName,
+        chat_id: ChatId,
+        prompt_tx: mpsc::Sender<PromptRequest>,
+    ) -> Self {
+        Self {
+            channel,
+            chat_id,
+            prompt_tx: Some(prompt_tx),
+        }
     }
 }
 

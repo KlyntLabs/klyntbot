@@ -333,10 +333,7 @@ async fn configure_discord(config: &mut Config) -> Result<bool> {
                     colorize(chars.vertical, BRAND),
                     colorize("Invite URL:", BOLD)
                 );
-                println!(
-                    "{}",
-                    draw_step_line(&colorize(&invite_url, UNDERLINE))
-                );
+                println!("{}", draw_step_line(&colorize(&invite_url, UNDERLINE)));
             }
         }
         Err(e) => {
@@ -379,10 +376,7 @@ async fn get_discord_app_id(token: &str) -> Result<String> {
         .await?;
 
     let data: serde_json::Value = resp.json().await?;
-    let id = data
-        .get("id")
-        .and_then(|i| i.as_str())
-        .unwrap_or("");
+    let id = data.get("id").and_then(|i| i.as_str()).unwrap_or("");
     Ok(id.to_string())
 }
 
@@ -658,7 +652,14 @@ async fn configure_email(config: &mut Config) -> Result<bool> {
     let mut spinner = Spinner::new("Testing IMAP connection...");
     spinner.start();
 
-    let imap_test = test_imap_connection(&imap_host, imap_port, &imap_username, &imap_password, imap_use_ssl).await;
+    let imap_test = test_imap_connection(
+        &imap_host,
+        imap_port,
+        &imap_username,
+        &imap_password,
+        imap_use_ssl,
+    )
+    .await;
     spinner.stop();
 
     match imap_test {
@@ -684,7 +685,8 @@ async fn configure_email(config: &mut Config) -> Result<bool> {
     let mut spinner = Spinner::new("Testing SMTP connection...");
     spinner.start();
 
-    let smtp_test = test_smtp_connection(&smtp_host, smtp_port, &smtp_username, &smtp_password).await;
+    let smtp_test =
+        test_smtp_connection(&smtp_host, smtp_port, &smtp_username, &smtp_password).await;
     spinner.stop();
 
     match smtp_test {
@@ -778,12 +780,7 @@ async fn test_imap_connection(
 }
 
 /// Test SMTP connection by attempting relay setup.
-async fn test_smtp_connection(
-    host: &str,
-    port: u16,
-    username: &str,
-    password: &str,
-) -> Result<()> {
+async fn test_smtp_connection(host: &str, port: u16, username: &str, password: &str) -> Result<()> {
     let host = host.to_string();
     let username = username.to_string();
     let password = password.to_string();
@@ -931,7 +928,10 @@ fn prompt_allowlist(channel_name: &str) -> Result<Vec<String>> {
         draw_step_line(&colorize("Leave empty to allow everyone.", DIM))
     );
 
-    print!("{} Allowed IDs (comma-separated): ", colorize(chars.vertical, BRAND));
+    print!(
+        "{} Allowed IDs (comma-separated): ",
+        colorize(chars.vertical, BRAND)
+    );
     io::stdout().flush()?;
 
     let mut input = String::new();

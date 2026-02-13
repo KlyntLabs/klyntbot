@@ -59,10 +59,7 @@ impl WizardModule for DaemonModule {
 pub fn configure_daemon(config: &mut Config) -> Result<bool> {
     let chars = BoxChars::get();
 
-    let wants_daemon = prompts::prompt_yes_no(
-        "Set up klyntbot as a background service?",
-        false,
-    )?;
+    let wants_daemon = prompts::prompt_yes_no("Set up klyntbot as a background service?", false)?;
     if !wants_daemon {
         println!(
             "{} {} Skipping daemon setup {}",
@@ -149,10 +146,7 @@ fn configure_gateway(config: &mut Config) -> Result<()> {
                 );
             }
             Err(_) => {
-                println!(
-                    "  {}",
-                    colorize("Please enter a valid port number", ERROR)
-                );
+                println!("  {}", colorize("Please enter a valid port number", ERROR));
             }
         }
     }
@@ -202,10 +196,8 @@ fn generate_launchd(config: &Config) -> Result<()> {
     let binary_path =
         std::env::current_exe().unwrap_or_else(|_| PathBuf::from("/usr/local/bin/klyntbot"));
 
-    let plist_content = generate_launchd_plist(
-        &binary_path.display().to_string(),
-        config.gateway.port,
-    );
+    let plist_content =
+        generate_launchd_plist(&binary_path.display().to_string(), config.gateway.port);
 
     let plist_dir = dirs::home_dir()
         .map(|h| h.join("Library/LaunchAgents"))
@@ -239,10 +231,7 @@ fn generate_launchd(config: &Config) -> Result<()> {
 
             match status {
                 Ok(s) if s.success() => {
-                    println!(
-                        "  {} Service started",
-                        status_success()
-                    );
+                    println!("  {} Service started", status_success());
                 }
                 Ok(_) => {
                     println!(
@@ -251,26 +240,16 @@ fn generate_launchd(config: &Config) -> Result<()> {
                     );
                     println!(
                         "  {}",
-                        colorize(
-                            &format!("  launchctl load {}", plist_path.display()),
-                            DIM,
-                        )
+                        colorize(&format!("  launchctl load {}", plist_path.display()), DIM,)
                     );
                 }
                 Err(e) => {
-                    println!(
-                        "  {} Could not run launchctl: {}",
-                        status_warning(),
-                        e
-                    );
+                    println!("  {} Could not run launchctl: {}", status_warning(), e);
                 }
             }
         }
     } else {
-        println!(
-            "\n  {} Plist content (copy manually):\n",
-            status_success()
-        );
+        println!("\n  {} Plist content (copy manually):\n", status_success());
         println!("{}", colorize(&plist_content, DIM));
     }
 
@@ -298,10 +277,7 @@ fn print_launchd_management(plist_path: &std::path::Path) {
         "  {}",
         colorize("  Logs:    tail -f /tmp/klyntbot.stdout.log", DIM)
     );
-    println!(
-        "\n  {}",
-        colorize("To uninstall:", BOLD)
-    );
+    println!("\n  {}", colorize("To uninstall:", BOLD));
     println!(
         "  {}",
         colorize(
@@ -372,10 +348,8 @@ fn generate_systemd(config: &Config) -> Result<()> {
 
     let (unit_content, unit_path) = match mode {
         SystemdMode::User => {
-            let content = generate_systemd_user_unit(
-                &binary_path.display().to_string(),
-                config.gateway.port,
-            );
+            let content =
+                generate_systemd_user_unit(&binary_path.display().to_string(), config.gateway.port);
             let path = dirs::home_dir()
                 .map(|h| h.join(".config/systemd/user/klyntbot.service"))
                 .unwrap_or_else(|| PathBuf::from("~/.config/systemd/user/klyntbot.service"));
@@ -392,10 +366,7 @@ fn generate_systemd(config: &Config) -> Result<()> {
     };
 
     println!("\n  Generated systemd unit file:");
-    println!(
-        "  {}",
-        colorize(&format!("  {}", unit_path.display()), DIM)
-    );
+    println!("  {}", colorize(&format!("  {}", unit_path.display()), DIM));
 
     match mode {
         SystemdMode::User => {
@@ -426,7 +397,10 @@ fn generate_systemd(config: &Config) -> Result<()> {
                     .status();
                 if let Ok(s) = enable {
                     if s.success() {
-                        println!("  {} Service enabled (auto-start on login)", status_success());
+                        println!(
+                            "  {} Service enabled (auto-start on login)",
+                            status_success()
+                        );
                     }
                 }
 
@@ -475,11 +449,7 @@ fn generate_systemd(config: &Config) -> Result<()> {
             if save_local {
                 let local_path = config::config_dir()?.join("klyntbot.service");
                 std::fs::write(&local_path, &unit_content)?;
-                println!(
-                    "  {} Saved to {}",
-                    status_success(),
-                    local_path.display()
-                );
+                println!("  {} Saved to {}", status_success(), local_path.display());
                 println!(
                     "  {}",
                     colorize(
@@ -559,10 +529,7 @@ fn print_systemd_management(mode: SystemdMode) {
         )
     );
 
-    println!(
-        "\n  {}",
-        colorize("To uninstall:", BOLD)
-    );
+    println!("\n  {}", colorize("To uninstall:", BOLD));
     println!(
         "  {}",
         colorize(
@@ -654,35 +621,20 @@ fn show_windows_guidance() -> Result<()> {
         "  {}",
         colorize("  1. Download NSSM: https://nssm.cc/download", DIM)
     );
-    println!(
-        "  {}",
-        colorize("  2. Run: nssm install klyntbot", DIM)
-    );
+    println!("  {}", colorize("  2. Run: nssm install klyntbot", DIM));
     println!(
         "  {}",
         colorize("  3. Set path to klyntbot.exe, arguments: serve", DIM)
     );
-    println!(
-        "  {}",
-        colorize("  4. Start: nssm start klyntbot", DIM)
-    );
+    println!("  {}", colorize("  4. Start: nssm start klyntbot", DIM));
 
-    println!(
-        "\n  {}",
-        colorize("Option 2: Task Scheduler", BOLD)
-    );
+    println!("\n  {}", colorize("Option 2: Task Scheduler", BOLD));
     println!(
         "  {}",
         colorize("  1. Open Task Scheduler (taskschd.msc)", DIM)
     );
-    println!(
-        "  {}",
-        colorize("  2. Create Basic Task > 'klyntbot'", DIM)
-    );
-    println!(
-        "  {}",
-        colorize("  3. Trigger: At startup", DIM)
-    );
+    println!("  {}", colorize("  2. Create Basic Task > 'klyntbot'", DIM));
+    println!("  {}", colorize("  3. Trigger: At startup", DIM));
     println!(
         "  {}",
         colorize("  4. Action: Start klyntbot.exe serve", DIM)

@@ -68,6 +68,9 @@ pub struct Config {
 
     #[serde(default)]
     pub gateway: GatewayConfig,
+
+    #[serde(default)]
+    pub todo: TodoConfig,
 }
 
 impl Config {
@@ -98,6 +101,14 @@ impl Config {
         } else {
             "none"
         }
+    }
+
+    /// Get the standardized todo store path (P0 fix for path inconsistency)
+    pub fn todo_store_path(&self) -> PathBuf {
+        dirs::home_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join(".klyntbot")
+            .join("todos.jsonl")
     }
 
     /// Set the API key for a provider by name.
@@ -744,6 +755,96 @@ fn default_web_max_results() -> u8 {
     5
 }
 
+/// Todo system configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TodoConfig {
+    #[serde(default)]
+    pub notifications: TodoNotificationConfig,
+    #[serde(default)]
+    pub focus: TodoFocusConfig,
+    #[serde(default = "default_confidence_threshold")]
+    pub confidence_threshold: f32,
+}
+
+impl Default for TodoConfig {
+    fn default() -> Self {
+        Self {
+            notifications: TodoNotificationConfig::default(),
+            focus: TodoFocusConfig::default(),
+            confidence_threshold: default_confidence_threshold(),
+        }
+    }
+}
+
+/// Todo notification configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TodoNotificationConfig {
+    #[serde(default = "default_notification_targets")]
+    pub targets: Vec<String>,
+    #[serde(default = "default_true")]
+    pub focus_reminders: bool,
+    #[serde(default = "default_true")]
+    pub daily_digest: bool,
+    #[serde(default = "default_digest_time")]
+    pub daily_digest_time: String,
+}
+
+impl Default for TodoNotificationConfig {
+    fn default() -> Self {
+        Self {
+            targets: vec!["os_native".to_string()],
+            focus_reminders: true,
+            daily_digest: true,
+            daily_digest_time: default_digest_time(),
+        }
+    }
+}
+
+/// Todo focus mode configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TodoFocusConfig {
+    #[serde(default = "default_max_slots")]
+    pub max_slots: usize,
+    #[serde(default = "default_deadline_hours")]
+    pub deadline_hours: u64,
+}
+
+impl Default for TodoFocusConfig {
+    fn default() -> Self {
+        Self {
+            max_slots: default_max_slots(),
+            deadline_hours: default_deadline_hours(),
+        }
+    }
+}
+
+fn default_notification_targets() -> Vec<String> {
+    vec!["os_native".to_string()]
+}
+
+fn default_confidence_threshold() -> f32 {
+    0.5
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn default_digest_time() -> String {
+    "09:00".to_string()
+}
+
+fn default_max_slots() -> usize {
+    3
+}
+
+fn default_deadline_hours() -> u64 {
+    18
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1078,5 +1179,139 @@ mod tests {
         assert_eq!(loaded.channels.telegram.allow_from.len(), 2);
         assert_eq!(loaded.channels.discord.allow_from.len(), 1);
         assert_eq!(loaded.channels.slack.allow_from.len(), 2);
+    }
+
+    #[test]
+    fn test_todo_config_default() {
+        let config = TodoConfig::default();
+        assert_eq!(config.confidence_threshold, 0.5);
+        assert_eq!(config.focus.max_slots, 3);
+        assert_eq!(config.focus.deadline_hours, 18);
+        assert_eq!(config.notifications.targets, vec!["os_native"]);
+        assert!(config.notifications.focus_reminders);
+        assert!(config.notifications.daily_digest);
+        assert_eq!(config.notifications.daily_digest_time, "09:00");
+    }
+
+    #[test]
+    fn test_todo_notification_config_default() {
+        let config = TodoNotificationConfig::default();
+        assert_eq!(config.targets.len(), 1);
+        assert_eq!(config.targets[0], "os_native");
+        assert!(config.focus_reminders);
+        assert!(config.daily_digest);
+        assert_eq!(config.daily_digest_time, "09:00");
+    }
+
+    #[test]
+    fn test_todo_focus_config_default() {
+        let config = TodoFocusConfig::default();
+        assert_eq!(config.max_slots, 3);
+        assert_eq!(config.deadline_hours, 18);
+    }
+
+    #[test]
+    fn test_config_with_todo_field() {
+        let config = Config::default();
+        assert_eq!(config.todo.confidence_threshold, 0.5);
+        assert_eq!(config.todo.focus.max_slots, 3);
+    }
+
+    #[test]
+    fn test_todo_config_serialization() {
+        let config = TodoConfig::default();
+        let json = serde_json::to_value(&config).unwrap();
+
+        assert_eq!(json["confidenceThreshold"], 0.5);
+        assert_eq!(json["focus"]["maxSlots"], 3);
+        assert_eq!(json["focus"]["deadlineHours"], 18);
+        assert_eq!(json["notifications"]["targets"][0], "os_native");
+        assert_eq!(json["notifications"]["focusReminders"], true);
+        assert_eq!(json["notifications"]["dailyDigest"], true);
+        assert_eq!(json["notifications"]["dailyDigestTime"], "09:00");
+    }
+
+    #[test]
+    fn test_config_without_todo_deserializes() {
+        // AC-11.9: Existing config without todo field should deserialize with defaults
+        let json = r#"{
+            "agents": {
+                "defaults": {
+                    "workspace": "~/.klyntbot/workspace",
+                    "model": "anthropic/claude-opus-4-5",
+                    "maxTokens": 8192,
+                    "temperature": 0.7,
+                    "maxToolIterations": 20
+                }
+            }
+        }"#;
+
+        let config: Config = serde_json::from_str(json).unwrap();
+        assert_eq!(config.todo.confidence_threshold, 0.5);
+        assert_eq!(config.todo.focus.max_slots, 3);
+        assert_eq!(config.todo.notifications.targets, vec!["os_native"]);
+    }
+
+    #[test]
+    fn test_todo_config_round_trip() {
+        let config = TodoConfig {
+            confidence_threshold: 0.6,
+            focus: TodoFocusConfig {
+                max_slots: 5,
+                deadline_hours: 24,
+            },
+            notifications: TodoNotificationConfig {
+                targets: vec!["os_native".to_string(), "telegram".to_string()],
+                daily_digest_time: "08:00".to_string(),
+                ..Default::default()
+            },
+        };
+
+        let json = serde_json::to_string(&config).unwrap();
+        let loaded: TodoConfig = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(loaded.confidence_threshold, 0.6);
+        assert_eq!(loaded.focus.max_slots, 5);
+        assert_eq!(loaded.focus.deadline_hours, 24);
+        assert_eq!(loaded.notifications.targets.len(), 2);
+        assert_eq!(loaded.notifications.daily_digest_time, "08:00");
+    }
+
+    #[test]
+    fn test_todo_config_camel_case_json() {
+        let config = TodoConfig::default();
+        let json = serde_json::to_string(&config).unwrap();
+
+        // AC-11.11: Verify camelCase in JSON output
+        assert!(json.contains("confidenceThreshold"));
+        assert!(json.contains("maxSlots"));
+        assert!(json.contains("deadlineHours"));
+        assert!(json.contains("focusReminders"));
+        assert!(json.contains("dailyDigest"));
+        assert!(json.contains("dailyDigestTime"));
+    }
+
+    #[test]
+    fn test_partial_notification_config_deserializes() {
+        // Verify partial notification config (missing targets) deserializes OK
+        let json = r#"{
+            "todo": {
+                "notifications": {
+                    "focusReminders": false
+                }
+            },
+            "agents": {
+                "defaults": {
+                    "workspace": "~/.klyntbot/workspace",
+                    "model": "anthropic/claude-opus-4-5",
+                    "maxTokens": 8192,
+                    "temperature": 0.7,
+                    "maxToolIterations": 20
+                }
+            }
+        }"#;
+
+        let config: Config = serde_json::from_str(json).unwrap();
+        assert!(!config.todo.notifications.focus_reminders);
     }
 }

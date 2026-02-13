@@ -111,7 +111,10 @@ impl WizardModule for ProviderModule {
             })
             .collect();
 
-        println!("{}", draw_step_line(&colorize("Choose Your LLM Provider", BOLD)));
+        println!(
+            "{}",
+            draw_step_line(&colorize("Choose Your LLM Provider", BOLD))
+        );
         println!("{}", colorize(chars.vertical, BRAND));
         let idx = prompts::prompt_select("Select a provider", &options, 0)?;
         let provider = &PROVIDERS[idx];
@@ -161,11 +164,7 @@ impl WizardModule for ProviderModule {
 
         // Step 3: Model selection
         println!("{}", colorize(chars.vertical, BRAND));
-        let model = prompts::prompt_text(
-            "Model",
-            Some(provider.default_model),
-            true,
-        )?;
+        let model = prompts::prompt_text("Model", Some(provider.default_model), true)?;
         state.config.agents.defaults.model = model.clone();
 
         // Step 4: Custom API base (optional, for proxies/self-hosted)

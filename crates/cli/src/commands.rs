@@ -63,6 +63,10 @@ pub enum Commands {
     /// Manage and view available skills
     #[command(subcommand)]
     Skills(SkillsCommands),
+
+    /// Manage todo tasks (add, list, focus, complete)
+    #[command(subcommand)]
+    Todo(TodoCommands),
 }
 
 #[derive(Subcommand, Debug)]
@@ -203,4 +207,81 @@ pub enum SkillsCommands {
 
     /// Show the filesystem path to the skills directory
     Path,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum TodoCommands {
+    /// Add a new task
+    Add {
+        /// Task title
+        title: String,
+
+        /// Task description
+        #[arg(short, long)]
+        description: Option<String>,
+
+        /// Priority (1-5, where 5 is critical)
+        #[arg(short, long)]
+        priority: Option<u8>,
+
+        /// Due date (YYYY-MM-DD)
+        #[arg(short = 'D', long)]
+        due: Option<String>,
+
+        /// Tags (comma-separated)
+        #[arg(short, long)]
+        tags: Option<String>,
+    },
+
+    /// List tasks
+    List {
+        /// Filter by status (todo, doing, done, archived)
+        #[arg(short, long)]
+        status: Option<String>,
+
+        /// Filter by tag
+        #[arg(short, long)]
+        tag: Option<String>,
+
+        /// Minimum priority (1-5)
+        #[arg(short = 'P', long)]
+        priority_min: Option<u8>,
+
+        /// Limit number of results
+        #[arg(short, long)]
+        limit: Option<usize>,
+    },
+
+    /// Show task details
+    Show {
+        /// Task ID
+        id: String,
+    },
+
+    /// Mark task as complete
+    Complete {
+        /// Task ID
+        id: String,
+    },
+
+    /// Delete a task
+    Delete {
+        /// Task ID
+        id: String,
+    },
+
+    /// Focus on a task (adds to focus board)
+    Focus {
+        /// Task ID (omit to show focus board)
+        id: Option<String>,
+    },
+
+    /// Unfocus a task (removes from focus board)
+    Unfocus {
+        /// Task ID
+        id: String,
+    },
+
+    /// Show task summary and statistics
+    Summary,
 }

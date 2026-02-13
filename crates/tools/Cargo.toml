@@ -20,6 +20,9 @@ scraper.workspace = true
 html2text.workspace = true
 url.workspace = true
 urlencoding.workspace = true
+chrono = { workspace = true }
+uuid = { workspace = true }
+serde = { workspace = true }
 
 [dev-dependencies]
 tempfile.workspace = true

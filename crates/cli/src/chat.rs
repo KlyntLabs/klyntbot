@@ -1,8 +1,9 @@
 //! Chat command handler for interactive CLI mode
 
-use agent::{AgentEvent, AgentLoop};
+use agent::{AgentEvent, AgentLoop, UserResponse};
 use anyhow::Result;
 use bus::MessageBus;
+use common::prompts::PromptType;
 use common::utils::terminal::*;
 use common::utils::StreamRenderer;
 use rustyline::error::ReadlineError;
@@ -10,6 +11,7 @@ use std::io::{self, Write};
 use std::sync::Arc;
 
 use crate::interactive::SlashCommandHelper;
+use crate::wizard::prompts::{self, SelectOption, SelectWithInputOption, SelectWithInputResult};
 
 /// Handle chat command
 pub async fn handle_chat(message: Option<String>, session: String) -> Result<()> {
@@ -238,7 +240,7 @@ async fn run_with_streaming(
     message: String,
     session_key: String,
 ) -> Result<()> {
-    let (mut event_rx, cancel_token, handle) = agent_loop
+    let (mut event_rx, user_tx, cancel_token, handle) = agent_loop
         .process_direct_streaming(message, session_key)
         .await?;
 
@@ -264,6 +266,25 @@ async fn run_with_streaming(
             } => renderer.on_tool_end(&name, success, duration_ms),
             AgentEvent::IterationStart { iteration, max } => {
                 renderer.on_iteration_start(iteration, max);
+            }
+            AgentEvent::PromptUser(request) => {
+                // Pause streaming output to show interactive prompt
+                renderer.pause();
+
+                // Handle the prompt using wizard's interactive components.
+                // This blocks the event loop until the user responds — by design.
+                let response = handle_interactive_prompt(request.prompt_type);
+
+                // Resume streaming (prompt was ~1 line of compact output)
+                renderer.resume(1);
+
+                // Send user's response back to the agent loop
+                if let Ok(resp) = response {
+                    let _ = user_tx.send(resp).await;
+                } else {
+                    // Prompt failed (e.g., Ctrl+C) — send Cancelled
+                    let _ = user_tx.send(UserResponse::Cancelled).await;
+                }
             }
             AgentEvent::Done(_) => {
                 clean_exit = true;
@@ -312,6 +333,69 @@ async fn run_with_streaming(
     );
 
     Ok(())
+}
+
+/// Handle an interactive prompt by delegating to wizard's prompt components.
+///
+/// Bridges between agent prompt types (from `common::prompts`) and the
+/// wizard's interactive terminal prompts (arrow keys, TAB, etc.).
+fn handle_interactive_prompt(prompt_type: PromptType) -> Result<UserResponse> {
+    match prompt_type {
+        PromptType::Select {
+            header,
+            options,
+            default_idx,
+        } => {
+            let opts: Vec<SelectOption<'_>> = options
+                .iter()
+                .map(|o| SelectOption {
+                    label: &o.label,
+                    description: &o.description,
+                })
+                .collect();
+
+            let idx = prompts::prompt_select(&header, &opts, default_idx)?;
+            Ok(UserResponse::Selected(idx))
+        }
+
+        PromptType::SelectWithInput {
+            header,
+            options,
+            default_idx,
+        } => {
+            let opts: Vec<SelectWithInputOption<'_>> = options
+                .iter()
+                .map(|o| SelectWithInputOption {
+                    label: &o.label,
+                    description: &o.description,
+                    expandable: o.expandable,
+                    input_hint: o.input_hint.as_deref(),
+                })
+                .collect();
+
+            let SelectWithInputResult { index, text } =
+                prompts::prompt_select_with_input(&header, &opts, default_idx)?;
+            Ok(UserResponse::SelectedWithInput { index, text })
+        }
+
+        PromptType::MultiSelect { header, options } => {
+            let opts: Vec<SelectOption<'_>> = options
+                .iter()
+                .map(|o| SelectOption {
+                    label: &o.label,
+                    description: &o.description,
+                })
+                .collect();
+
+            let indices = prompts::prompt_multi_select(&header, &opts)?;
+            Ok(UserResponse::MultiSelected(indices))
+        }
+
+        PromptType::YesNo { question, default } => {
+            let answer = prompts::prompt_yes_no(&question, default)?;
+            Ok(UserResponse::YesNo(answer))
+        }
+    }
 }
 
 /// Print help for REPL commands

@@ -165,11 +165,11 @@ pub fn draw_step_progress(current: usize, total: usize) -> String {
         // Add connector line (except after last step)
         if i < total {
             let connector = if i < current {
-                colorize("─", SUCCESS)  // Completed section - green
+                colorize("─", SUCCESS) // Completed section - green
             } else if i == current {
-                colorize("─", BRAND)    // Current section - orange
+                colorize("─", BRAND) // Current section - orange
             } else {
-                colorize("─", DIM)      // Future section - dim
+                colorize("─", DIM) // Future section - dim
             };
             result.push_str(&connector);
         }
@@ -243,12 +243,7 @@ pub fn draw_sub_step(text: &str, completed: bool) -> String {
     } else {
         colorize("○", DIM)
     };
-    format!(
-        "{} {} {}",
-        colorize(chars.vertical, BRAND),
-        icon,
-        text
-    )
+    format!("{} {} {}", colorize(chars.vertical, BRAND), icon, text)
 }
 
 /// Draws the bottom connector for a step (vertical line continues to next step)
@@ -323,7 +318,10 @@ pub fn draw_warning_box(content: &str) -> String {
         "  {} {} {}\n",
         colorize(chars.top_left, WARNING),
         colorize("⚠", WARNING),
-        colorize(&format!("{}{}", chars.horizontal.repeat(max_width), chars.top_right), WARNING)
+        colorize(
+            &format!("{}{}", chars.horizontal.repeat(max_width), chars.top_right),
+            WARNING
+        )
     ));
 
     // Content lines
@@ -369,7 +367,10 @@ pub fn draw_error_box(content: &str) -> String {
         "  {} {} {}\n",
         colorize(chars.top_left, ERROR),
         colorize("✗", ERROR),
-        colorize(&format!("{}{}", chars.horizontal.repeat(max_width), chars.top_right), ERROR)
+        colorize(
+            &format!("{}{}", chars.horizontal.repeat(max_width), chars.top_right),
+            ERROR
+        )
     ));
 
     // Content lines
@@ -415,7 +416,10 @@ pub fn draw_success_box(content: &str) -> String {
         "  {} {} {}\n",
         colorize(chars.top_left, SUCCESS),
         colorize("✓", SUCCESS),
-        colorize(&format!("{}{}", chars.horizontal.repeat(max_width), chars.top_right), SUCCESS)
+        colorize(
+            &format!("{}{}", chars.horizontal.repeat(max_width), chars.top_right),
+            SUCCESS
+        )
     ));
 
     // Content lines

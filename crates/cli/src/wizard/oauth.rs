@@ -181,20 +181,20 @@ pub async fn run_oauth_flow(
         bail!("OAuth state mismatch — possible CSRF attack. Aborting.");
     }
 
-    println!(
-        "\n  {} Authorization code received!",
-        status_success()
-    );
+    println!("\n  {} Authorization code received!", status_success());
 
     // Step 5: Exchange code for tokens
-    println!(
-        "  {}",
-        colorize("Exchanging code for access token...", DIM)
-    );
+    println!("  {}", colorize("Exchanging code for access token...", DIM));
 
-    let tokens = exchange_code(provider, client_id, client_secret, &callback.code, &redirect_uri)
-        .await
-        .context("Failed to exchange authorization code for tokens")?;
+    let tokens = exchange_code(
+        provider,
+        client_id,
+        client_secret,
+        &callback.code,
+        &redirect_uri,
+    )
+    .await
+    .context("Failed to exchange authorization code for tokens")?;
 
     println!(
         "  {} {} tokens acquired successfully",
@@ -237,10 +237,7 @@ pub async fn validate_discord_token(token: &str) -> Result<String> {
     }
 
     let json: serde_json::Value = resp.json().await?;
-    let username = json["username"]
-        .as_str()
-        .unwrap_or("unknown")
-        .to_string();
+    let username = json["username"].as_str().unwrap_or("unknown").to_string();
 
     Ok(username)
 }
@@ -263,14 +260,8 @@ pub async fn validate_slack_token(bot_token: &str) -> Result<(String, String)> {
         bail!("Slack auth.test failed: {}", error);
     }
 
-    let bot_id = json["user_id"]
-        .as_str()
-        .unwrap_or("unknown")
-        .to_string();
-    let team = json["team"]
-        .as_str()
-        .unwrap_or("unknown")
-        .to_string();
+    let bot_id = json["user_id"].as_str().unwrap_or("unknown").to_string();
+    let team = json["team"].as_str().unwrap_or("unknown").to_string();
 
     Ok((bot_id, team))
 }
@@ -316,10 +307,7 @@ pub fn open_browser(url: &str) -> Result<()> {
 /// Prompt the user for a client ID.
 pub fn prompt_client_id(provider_name: &str) -> Result<String> {
     loop {
-        print!(
-            "  {} Client ID: ",
-            colorize(provider_name, BOLD)
-        );
+        print!("  {} Client ID: ", colorize(provider_name, BOLD));
         io::stdout().flush()?;
 
         let mut input = String::new();
@@ -327,10 +315,7 @@ pub fn prompt_client_id(provider_name: &str) -> Result<String> {
         let input = input.trim().to_string();
 
         if input.is_empty() {
-            println!(
-                "    {}",
-                colorize("Client ID is required", ERROR)
-            );
+            println!("    {}", colorize("Client ID is required", ERROR));
             continue;
         }
 
@@ -341,10 +326,7 @@ pub fn prompt_client_id(provider_name: &str) -> Result<String> {
 /// Prompt the user for a client secret.
 pub fn prompt_client_secret(provider_name: &str) -> Result<String> {
     loop {
-        print!(
-            "  {} Client Secret: ",
-            colorize(provider_name, BOLD)
-        );
+        print!("  {} Client Secret: ", colorize(provider_name, BOLD));
         io::stdout().flush()?;
 
         let mut input = String::new();
@@ -352,10 +334,7 @@ pub fn prompt_client_secret(provider_name: &str) -> Result<String> {
         let input = input.trim().to_string();
 
         if input.is_empty() {
-            println!(
-                "    {}",
-                colorize("Client Secret is required", ERROR)
-            );
+            println!("    {}", colorize("Client Secret is required", ERROR));
             continue;
         }
 
@@ -407,10 +386,7 @@ async fn handle_callback_connection(
 
     // Parse the request line: GET /callback?code=xxx&state=yyy HTTP/1.1
     let first_line = request.lines().next().unwrap_or("");
-    let path = first_line
-        .split_whitespace()
-        .nth(1)
-        .unwrap_or("/");
+    let path = first_line.split_whitespace().nth(1).unwrap_or("/");
 
     debug!("OAuth callback received: {}", path);
 
@@ -439,10 +415,7 @@ async fn handle_callback_connection(
             .get("error_description")
             .cloned()
             .unwrap_or_else(|| error.clone());
-        (
-            CALLBACK_ERROR_HTML.replace("{ERROR}", &desc),
-            None,
-        )
+        (CALLBACK_ERROR_HTML.replace("{ERROR}", &desc), None)
     } else {
         (
             CALLBACK_ERROR_HTML.replace("{ERROR}", "No authorization code received"),
@@ -533,11 +506,20 @@ async fn exchange_code(
     if !resp.status().is_success() {
         let status = resp.status();
         let body: String = resp.text().await.unwrap_or_default();
-        bail!("{} token exchange failed ({}): {}", provider.name, status, body);
+        bail!(
+            "{} token exchange failed ({}): {}",
+            provider.name,
+            status,
+            body
+        );
     }
 
     let json: serde_json::Value = resp.json().await?;
-    debug!("{} token response keys: {:?}", provider.name, json.as_object().map(|o| o.keys().collect::<Vec<_>>()));
+    debug!(
+        "{} token response keys: {:?}",
+        provider.name,
+        json.as_object().map(|o| o.keys().collect::<Vec<_>>())
+    );
 
     // Slack has a nested structure; Discord is flat
     let access_token = json["access_token"]
@@ -561,10 +543,7 @@ async fn exchange_code(
     Ok(OAuthTokens {
         access_token: Secret::new(access_token),
         refresh_token,
-        token_type: json["token_type"]
-            .as_str()
-            .unwrap_or("bearer")
-            .to_string(),
+        token_type: json["token_type"].as_str().unwrap_or("bearer").to_string(),
         expires_in: json["expires_in"].as_u64(),
         scope: json["scope"].as_str().map(String::from),
         bot_user_id: json["bot_user_id"].as_str().map(String::from),
@@ -585,10 +564,12 @@ fn generate_state() -> String {
     // where the attacker would need to intercept localhost traffic.
     let s = RandomState::new();
     let mut hasher = s.build_hasher();
-    hasher.write_u64(std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_nanos() as u64);
+    hasher.write_u64(
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos() as u64,
+    );
     format!("{:016x}", hasher.finish())
 }
 

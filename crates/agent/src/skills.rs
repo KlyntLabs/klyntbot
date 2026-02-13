@@ -21,6 +21,15 @@ const BUILTIN_SKILLS: &[(&str, &str)] = &[
         include_str!("../../../skills/summarize/SKILL.md"),
     ),
     ("tmux", include_str!("../../../skills/tmux/SKILL.md")),
+    ("todo", include_str!("../../../skills/todo/SKILL.md")),
+    (
+        "todo-party",
+        include_str!("../../../skills/todo-party/SKILL.md"),
+    ),
+    (
+        "todo-yolo",
+        include_str!("../../../skills/todo-yolo/SKILL.md"),
+    ),
     ("weather", include_str!("../../../skills/weather/SKILL.md")),
 ];
 

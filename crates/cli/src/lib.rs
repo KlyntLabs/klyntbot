@@ -11,6 +11,7 @@ pub mod interactive;
 pub mod serve;
 pub mod skills;
 pub mod status;
+pub mod todo;
 pub mod wizard;
 
 // Re-export commonly used items for convenience

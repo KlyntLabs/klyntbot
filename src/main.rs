@@ -11,6 +11,7 @@ mod cli_handlers {
     pub use cli::serve::handle_serve;
     pub use cli::skills::handle_skills;
     pub use cli::status::{handle_brief_status, handle_status};
+    pub use cli::todo::handle_todo;
 }
 
 #[tokio::main]
@@ -44,6 +45,8 @@ async fn main() {
         Some(Commands::Config(cmd)) => cli_handlers::handle_config(cmd).await,
 
         Some(Commands::Skills(cmd)) => cli_handlers::handle_skills(cmd).await,
+
+        Some(Commands::Todo(cmd)) => cli_handlers::handle_todo(cmd).await,
 
         None => {
             // No command specified, show brief status
