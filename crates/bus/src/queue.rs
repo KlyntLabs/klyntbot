@@ -1,5 +1,7 @@
 //! Async message queue for decoupled channel-agent communication.
 
+use std::sync::Mutex;
+
 use tokio::sync::mpsc;
 use tracing::debug;
 
@@ -9,9 +11,9 @@ use common::{KlyntbotError, Result};
 /// Message bus for communication between channels and agent
 pub struct MessageBus {
     inbound_tx: mpsc::Sender<InboundMessage>,
-    inbound_rx: Option<mpsc::Receiver<InboundMessage>>,
+    inbound_rx: Mutex<Option<mpsc::Receiver<InboundMessage>>>,
     outbound_tx: mpsc::Sender<OutboundMessage>,
-    outbound_rx: Option<mpsc::Receiver<OutboundMessage>>,
+    outbound_rx: Mutex<Option<mpsc::Receiver<OutboundMessage>>>,
 }
 
 impl MessageBus {
@@ -22,20 +24,20 @@ impl MessageBus {
 
         Self {
             inbound_tx,
-            inbound_rx: Some(inbound_rx),
+            inbound_rx: Mutex::new(Some(inbound_rx)),
             outbound_tx,
-            outbound_rx: Some(outbound_rx),
+            outbound_rx: Mutex::new(Some(outbound_rx)),
         }
     }
 
     /// Take ownership of the inbound receiver (can only be called once)
-    pub fn take_inbound_rx(&mut self) -> Option<mpsc::Receiver<InboundMessage>> {
-        self.inbound_rx.take()
+    pub fn take_inbound_rx(&self) -> Option<mpsc::Receiver<InboundMessage>> {
+        self.inbound_rx.lock().unwrap().take()
     }
 
     /// Take ownership of the outbound receiver (can only be called once)
-    pub fn take_outbound_rx(&mut self) -> Option<mpsc::Receiver<OutboundMessage>> {
-        self.outbound_rx.take()
+    pub fn take_outbound_rx(&self) -> Option<mpsc::Receiver<OutboundMessage>> {
+        self.outbound_rx.lock().unwrap().take()
     }
 
     /// Publish an inbound message to the bus
@@ -107,7 +109,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_message_bus() {
-        let mut bus = MessageBus::new(10);
+        let bus = MessageBus::new(10);
 
         // Test inbound
         let msg = InboundMessage::new("telegram", "user123", "chat456", "Hello!");
@@ -129,7 +131,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_message_bus_multiple_messages() {
-        let mut bus = MessageBus::new(10);
+        let bus = MessageBus::new(10);
 
         // Publish multiple inbound messages
         for i in 0..5 {
@@ -148,7 +150,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_message_bus_senders() {
-        let mut bus = MessageBus::new(10);
+        let bus = MessageBus::new(10);
 
         // Get senders
         let inbound_sender = bus.inbound_sender();
@@ -202,7 +204,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_bus_buffer_overflow() {
-        let mut bus = MessageBus::new(2); // Small buffer
+        let bus = MessageBus::new(2); // Small buffer
 
         // Fill buffer
         bus.publish_inbound(InboundMessage::new("telegram", "user1", "chat1", "Msg 1"))
@@ -233,7 +235,7 @@ mod tests {
     async fn test_concurrent_publish_consume() {
         use std::sync::Arc;
 
-        let mut bus = MessageBus::new(100);
+        let bus = MessageBus::new(100);
         let mut inbound_rx = bus.take_inbound_rx().unwrap();
         let bus = Arc::new(bus);
 
@@ -274,7 +276,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_message_ordering() {
-        let mut bus = MessageBus::new(100);
+        let bus = MessageBus::new(100);
 
         // Publish messages in order
         for i in 0..10 {
@@ -292,7 +294,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_inbound_and_outbound_independent() {
-        let mut bus = MessageBus::new(10);
+        let bus = MessageBus::new(10);
 
         // Publish to both queues
         bus.publish_inbound(InboundMessage::new("telegram", "user1", "chat1", "Inbound"))
@@ -316,7 +318,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_multiple_consumers_share_messages() {
-        let mut bus = MessageBus::new(10);
+        let bus = MessageBus::new(10);
 
         // Publish messages
         for i in 0..5 {
@@ -337,7 +339,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_empty_bus_returns_none_eventually() {
-        let mut bus = MessageBus::new(10);
+        let bus = MessageBus::new(10);
 
         // Publish and consume
         bus.publish_inbound(InboundMessage::new("telegram", "user", "chat", "Test"))
@@ -354,7 +356,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_message_with_empty_content() {
-        let mut bus = MessageBus::new(10);
+        let bus = MessageBus::new(10);
 
         let msg = InboundMessage::new("telegram", "user", "chat", "");
         bus.publish_inbound(msg).await.unwrap();
@@ -366,7 +368,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_message_with_special_characters() {
-        let mut bus = MessageBus::new(10);
+        let bus = MessageBus::new(10);
 
         let content = "Hello 👋 测试 🚀 \n\t special chars!";
         let msg = InboundMessage::new("telegram", "user", "chat", content);
@@ -379,7 +381,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_different_channels() {
-        let mut bus = MessageBus::new(10);
+        let bus = MessageBus::new(10);
 
         // Messages from different channels
         bus.publish_inbound(InboundMessage::new("telegram", "u1", "c1", "Telegram msg"))
@@ -408,7 +410,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_outbound_with_reply_to() {
-        let mut bus = MessageBus::new(10);
+        let bus = MessageBus::new(10);
 
         let msg = OutboundMessage::new("telegram", "chat123", "Reply content")
             .with_reply_to("original_msg_456");
@@ -423,7 +425,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_outbound_with_multiple_media() {
-        let mut bus = MessageBus::new(10);
+        let bus = MessageBus::new(10);
 
         let msg = OutboundMessage::new("telegram", "chat123", "Check these out")
             .with_media("https://example.com/image1.jpg")

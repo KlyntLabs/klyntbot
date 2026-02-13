@@ -13,6 +13,7 @@ use config::schema::{
 use config::Config;
 
 use super::oauth;
+use super::prompts::{self, SelectOption};
 
 /// Channel metadata for the selection UI
 struct ChannelInfo {
@@ -68,30 +69,34 @@ const CHANNELS: &[ChannelInfo] = &[
 /// Run the channel configuration wizard step.
 /// Returns the list of channel names that were successfully configured.
 pub async fn configure_channels(config: &mut Config) -> Result<Vec<String>> {
+    let chars = BoxChars::get();
+
     println!(
-        "\n  {} Connect klyntbot to your chat platforms.",
+        "{} {} Connect klyntbot to your chat platforms.",
+        colorize(chars.vertical, BRAND),
         colorize("Channels", BOLD)
     );
     println!(
-        "  {}",
-        colorize(
+        "{}",
+        draw_step_line(&colorize(
             "Each channel can be tested after configuration.",
             DIM
-        )
+        ))
     );
-    println!();
+    println!("{}", colorize(chars.vertical, BRAND));
 
-    // Channel selection (multi-select)
+    // Channel selection (interactive multi-select)
     let selected = select_channels()?;
 
     if selected.is_empty() {
         println!(
-            "\n  {} No channels selected. You can set them up later with:",
+            "{} {} No channels selected. You can set them up later with:",
+            colorize(chars.vertical, BRAND),
             colorize("Skipped.", DIM)
         );
         println!(
-            "  {}",
-            colorize("  klyntbot channels login <channel>", DIM)
+            "{}",
+            draw_step_line(&colorize("  klyntbot channels login <channel>", DIM))
         );
         return Ok(vec![]);
     }
@@ -100,17 +105,23 @@ pub async fn configure_channels(config: &mut Config) -> Result<Vec<String>> {
 
     for &idx in &selected {
         let channel = &CHANNELS[idx];
-        println!("\n{}", draw_separator());
+        println!("{}", colorize(chars.vertical, BRAND));
+        println!("{}", draw_separator());
+        println!("{}", colorize(chars.vertical, BRAND));
         println!(
-            "\n  {} {}",
+            "{} {} {}",
+            colorize(chars.vertical, BRAND),
             colorize("▸", SUCCESS),
             colorize(&format!("Configure {}", channel.name), BOLD)
         );
         println!(
-            "  {}",
-            colorize(&format!("Prerequisite: {}", channel.prerequisites), DIM)
+            "{}",
+            draw_step_line(&colorize(
+                &format!("Prerequisite: {}", channel.prerequisites),
+                DIM
+            ))
         );
-        println!();
+        println!("{}", colorize(chars.vertical, BRAND));
 
         let result = match channel.key {
             "telegram" => configure_telegram(config).await,
@@ -126,28 +137,31 @@ pub async fn configure_channels(config: &mut Config) -> Result<Vec<String>> {
             Ok(true) => {
                 configured.push(channel.key.to_string());
                 println!(
-                    "\n  {} {} configured successfully",
+                    "{} {} {} configured successfully",
+                    colorize(chars.vertical, BRAND),
                     status_success(),
                     channel.name
                 );
             }
             Ok(false) => {
                 println!(
-                    "\n  {} {} configuration skipped",
+                    "{} {} {} configuration skipped",
+                    colorize(chars.vertical, BRAND),
                     colorize("○", DIM),
                     channel.name
                 );
             }
             Err(e) => {
                 println!(
-                    "\n  {} {} configuration failed: {}",
+                    "{} {} {} configuration failed: {}",
+                    colorize(chars.vertical, BRAND),
                     status_error(),
                     channel.name,
                     e
                 );
                 println!(
-                    "  {}",
-                    colorize("You can configure this channel later.", DIM)
+                    "{}",
+                    draw_step_line(&colorize("You can configure this channel later.", DIM))
                 );
             }
         }
@@ -155,9 +169,11 @@ pub async fn configure_channels(config: &mut Config) -> Result<Vec<String>> {
 
     // Summary
     if !configured.is_empty() {
-        println!("\n{}", draw_separator());
+        println!("{}", colorize(chars.vertical, BRAND));
+        println!("{}", draw_separator());
         println!(
-            "\n  {} {} channel(s) configured: {}",
+            "{} {} {} channel(s) configured: {}",
+            colorize(chars.vertical, BRAND),
             status_success(),
             configured.len(),
             configured.join(", ")
@@ -171,68 +187,17 @@ pub async fn configure_channels(config: &mut Config) -> Result<Vec<String>> {
 // Channel selection UI
 // ============================================================================
 
-/// Multi-select prompt for choosing which channels to configure.
+/// Interactive multi-select prompt for choosing which channels to configure.
 fn select_channels() -> Result<Vec<usize>> {
-    println!("  Select channels to configure (comma-separated numbers, or Enter to skip):\n");
+    let options: Vec<SelectOption<'_>> = CHANNELS
+        .iter()
+        .map(|c| SelectOption {
+            label: c.name,
+            description: c.description,
+        })
+        .collect();
 
-    for (idx, channel) in CHANNELS.iter().enumerate() {
-        println!(
-            "    {}. {} - {}",
-            colorize(&(idx + 1).to_string(), BOLD),
-            channel.name,
-            colorize(channel.description, DIM)
-        );
-    }
-    println!();
-
-    loop {
-        print!("  Channels []: ");
-        io::stdout().flush()?;
-
-        let mut input = String::new();
-        io::stdin().read_line(&mut input)?;
-        let input = input.trim();
-
-        if input.is_empty() {
-            return Ok(vec![]);
-        }
-
-        let mut selected = Vec::new();
-        let mut valid = true;
-
-        for part in input.split(',') {
-            let part = part.trim();
-            if part.is_empty() {
-                continue;
-            }
-            match part.parse::<usize>() {
-                Ok(n) if n >= 1 && n <= CHANNELS.len() => {
-                    if !selected.contains(&(n - 1)) {
-                        selected.push(n - 1);
-                    }
-                }
-                _ => {
-                    println!(
-                        "  {}",
-                        colorize(
-                            &format!(
-                                "Invalid selection '{}'. Enter numbers 1-{}.",
-                                part,
-                                CHANNELS.len()
-                            ),
-                            ERROR
-                        )
-                    );
-                    valid = false;
-                    break;
-                }
-            }
-        }
-
-        if valid {
-            return Ok(selected);
-        }
-    }
+    prompts::prompt_multi_select("Select channels to configure", &options)
 }
 
 // ============================================================================
@@ -240,19 +205,20 @@ fn select_channels() -> Result<Vec<usize>> {
 // ============================================================================
 
 async fn configure_telegram(config: &mut Config) -> Result<bool> {
+    let chars = BoxChars::get();
+
     println!(
-        "  Get a bot token from {} in Telegram.\n",
+        "{} Get a bot token from {} in Telegram.",
+        colorize(chars.vertical, BRAND),
         colorize("@BotFather", UNDERLINE)
     );
+    println!("{}", colorize(chars.vertical, BRAND));
 
     // Bot token
-    let token = prompt_secret("  Bot Token: ")?;
-    if token.is_empty() {
-        return Ok(false);
-    }
+    let token = prompts::prompt_secret("Bot Token", 10)?;
 
     // Validate token via getMe API
-    print!("  ");
+    print!("{} ", colorize(chars.vertical, BRAND));
     let mut spinner = Spinner::new("Validating token...");
     spinner.start();
 
@@ -262,14 +228,20 @@ async fn configure_telegram(config: &mut Config) -> Result<bool> {
     match validation {
         Ok(bot_name) => {
             println!(
-                "  {} Token valid — bot: @{}",
+                "{} {} Token valid — bot: @{}",
+                colorize(chars.vertical, BRAND),
                 status_success(),
                 bot_name
             );
         }
         Err(e) => {
-            println!("  {} Token validation failed: {}", status_warning(), e);
-            if !prompt_yes_no_inline("  Continue anyway?", false)? {
+            println!(
+                "{} {} Token validation failed: {}",
+                colorize(chars.vertical, BRAND),
+                status_warning(),
+                e
+            );
+            if !prompts::prompt_yes_no("Continue anyway?", false)? {
                 return Ok(false);
             }
         }
@@ -279,7 +251,7 @@ async fn configure_telegram(config: &mut Config) -> Result<bool> {
     let allow_from = prompt_allowlist("Telegram")?;
 
     // Optional proxy
-    let proxy = prompt_optional("  Proxy URL (optional, e.g. socks5://...): ")?;
+    let proxy = prompts::prompt_optional("Proxy URL (optional, e.g. socks5://...)")?;
 
     // Apply config
     config.channels.telegram = TelegramConfig {
@@ -323,19 +295,20 @@ async fn validate_telegram_token(token: &str) -> Result<String> {
 // ============================================================================
 
 async fn configure_discord(config: &mut Config) -> Result<bool> {
+    let chars = BoxChars::get();
+
     println!(
-        "  Create a bot at {}\n",
+        "{} Create a bot at {}",
+        colorize(chars.vertical, BRAND),
         colorize("https://discord.com/developers/applications", UNDERLINE)
     );
+    println!("{}", colorize(chars.vertical, BRAND));
 
     // Bot token
-    let token = prompt_secret("  Bot Token: ")?;
-    if token.is_empty() {
-        return Ok(false);
-    }
+    let token = prompts::prompt_secret("Bot Token", 10)?;
 
     // Validate token
-    print!("  ");
+    print!("{} ", colorize(chars.vertical, BRAND));
     let mut spinner = Spinner::new("Validating token...");
     spinner.start();
 
@@ -344,22 +317,36 @@ async fn configure_discord(config: &mut Config) -> Result<bool> {
 
     match validation {
         Ok(bot_name) => {
-            println!("  {} Token valid — bot: {}", status_success(), bot_name);
+            println!(
+                "{} {} Token valid — bot: {}",
+                colorize(chars.vertical, BRAND),
+                status_success(),
+                bot_name
+            );
 
             // Generate invite URL using oauth module's properly URL-encoded helper
             let app_id = get_discord_app_id(&token).await.unwrap_or_default();
             if !app_id.is_empty() {
                 let invite_url = oauth::discord_bot_invite_url(&app_id, 274877991936);
                 println!(
-                    "\n  {} Invite your bot to a server:",
+                    "{} {} Invite your bot to a server:",
+                    colorize(chars.vertical, BRAND),
                     colorize("Invite URL:", BOLD)
                 );
-                println!("  {}", colorize(&invite_url, UNDERLINE));
+                println!(
+                    "{}",
+                    draw_step_line(&colorize(&invite_url, UNDERLINE))
+                );
             }
         }
         Err(e) => {
-            println!("  {} Token validation failed: {}", status_warning(), e);
-            if !prompt_yes_no_inline("  Continue anyway?", false)? {
+            println!(
+                "{} {} Token validation failed: {}",
+                colorize(chars.vertical, BRAND),
+                status_warning(),
+                e
+            );
+            if !prompts::prompt_yes_no("Continue anyway?", false)? {
                 return Ok(false);
             }
         }
@@ -404,33 +391,34 @@ async fn get_discord_app_id(token: &str) -> Result<String> {
 // ============================================================================
 
 async fn configure_slack(config: &mut Config) -> Result<bool> {
+    let chars = BoxChars::get();
+
     println!(
-        "  Create a Slack app at {}\n",
+        "{} Create a Slack app at {}",
+        colorize(chars.vertical, BRAND),
         colorize("https://api.slack.com/apps", UNDERLINE)
     );
     println!(
-        "  {}",
-        colorize("You need both a Bot Token (xoxb-) and an App Token (xapp-).", DIM)
+        "{}",
+        draw_step_line(&colorize(
+            "You need both a Bot Token (xoxb-) and an App Token (xapp-).",
+            DIM
+        ))
     );
     println!(
-        "  {}",
-        colorize("Enable Socket Mode in your app settings.\n", DIM)
+        "{}",
+        draw_step_line(&colorize("Enable Socket Mode in your app settings.", DIM))
     );
+    println!("{}", colorize(chars.vertical, BRAND));
 
     // Bot token
-    let bot_token = prompt_secret("  Bot Token (xoxb-...): ")?;
-    if bot_token.is_empty() {
-        return Ok(false);
-    }
+    let bot_token = prompts::prompt_secret("Bot Token (xoxb-...)", 10)?;
 
     // App token
-    let app_token = prompt_secret("  App Token (xapp-...): ")?;
-    if app_token.is_empty() {
-        return Ok(false);
-    }
+    let app_token = prompts::prompt_secret("App Token (xapp-...)", 10)?;
 
     // Validate bot token
-    print!("  ");
+    print!("{} ", colorize(chars.vertical, BRAND));
     let mut spinner = Spinner::new("Validating tokens...");
     spinner.start();
 
@@ -439,11 +427,21 @@ async fn configure_slack(config: &mut Config) -> Result<bool> {
 
     match validation {
         Ok((_bot_id, team)) => {
-            println!("  {} Tokens valid — workspace: {}", status_success(), team);
+            println!(
+                "{} {} Tokens valid — workspace: {}",
+                colorize(chars.vertical, BRAND),
+                status_success(),
+                team
+            );
         }
         Err(e) => {
-            println!("  {} Token validation failed: {}", status_warning(), e);
-            if !prompt_yes_no_inline("  Continue anyway?", false)? {
+            println!(
+                "{} {} Token validation failed: {}",
+                colorize(chars.vertical, BRAND),
+                status_warning(),
+                e
+            );
+            if !prompts::prompt_yes_no("Continue anyway?", false)? {
                 return Ok(false);
             }
         }
@@ -469,36 +467,30 @@ async fn configure_slack(config: &mut Config) -> Result<bool> {
 // ============================================================================
 
 async fn configure_whatsapp(config: &mut Config) -> Result<bool> {
+    let chars = BoxChars::get();
+
     println!(
-        "  {}",
+        "{} {}",
+        colorize(chars.vertical, BRAND),
         colorize(
             "WhatsApp requires a Node.js bridge (Baileys) running separately.",
             WARNING
         )
     );
     println!(
-        "  {}",
-        colorize(
-            "See: https://github.com/WhiskeySockets/Baileys for bridge setup.\n",
+        "{}",
+        draw_step_line(&colorize(
+            "See: https://github.com/WhiskeySockets/Baileys for bridge setup.",
             DIM
-        )
+        ))
     );
+    println!("{}", colorize(chars.vertical, BRAND));
 
     // Bridge URL
-    let default_url = "ws://localhost:3001";
-    print!("  Bridge URL [{}]: ", default_url);
-    io::stdout().flush()?;
-
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-    let bridge_url = if input.trim().is_empty() {
-        default_url.to_string()
-    } else {
-        input.trim().to_string()
-    };
+    let bridge_url = prompts::prompt_text("Bridge URL", Some("ws://localhost:3001"), false)?;
 
     // Test bridge connection
-    print!("  ");
+    print!("{} ", colorize(chars.vertical, BRAND));
     let mut spinner = Spinner::new("Testing bridge connection...");
     spinner.start();
 
@@ -507,27 +499,33 @@ async fn configure_whatsapp(config: &mut Config) -> Result<bool> {
 
     match bridge_ok {
         Ok(()) => {
-            println!("  {} Bridge reachable at {}", status_success(), bridge_url);
             println!(
-                "\n  {}",
-                colorize(
+                "{} {} Bridge reachable at {}",
+                colorize(chars.vertical, BRAND),
+                status_success(),
+                bridge_url
+            );
+            println!(
+                "{}",
+                draw_step_line(&colorize(
                     "Note: You'll need to scan a QR code when the bridge starts.",
                     DIM
-                )
+                ))
             );
         }
         Err(e) => {
             println!(
-                "  {} Bridge not reachable: {}",
+                "{} {} Bridge not reachable: {}",
+                colorize(chars.vertical, BRAND),
                 status_warning(),
                 e
             );
             println!(
-                "  {}",
-                colorize(
+                "{}",
+                draw_step_line(&colorize(
                     "The bridge may not be running yet. Configuration will be saved anyway.",
                     DIM
-                )
+                ))
             );
         }
     }
@@ -565,71 +563,98 @@ async fn test_websocket_connection(url: &str) -> Result<()> {
 // ============================================================================
 
 async fn configure_email(config: &mut Config) -> Result<bool> {
+    let chars = BoxChars::get();
+
     println!(
-        "  {}",
-        colorize(
+        "{}",
+        draw_step_line(&colorize(
             "Email channel reads your mailbox via IMAP and sends replies via SMTP.",
             DIM
-        )
+        ))
     );
     println!(
-        "  {}\n",
-        colorize(
+        "{}",
+        draw_step_line(&colorize(
             "This requires IMAP/SMTP credentials and explicit consent.",
             WARNING
-        )
+        ))
     );
+    println!("{}", colorize(chars.vertical, BRAND));
 
     // Consent
-    println!("  {} Email access grants klyntbot permission to:", colorize("Privacy notice:", BOLD));
-    println!("    - Read unread emails from your IMAP mailbox");
-    println!("    - Send replies via SMTP on your behalf");
-    println!("    - Mark messages as read\n");
+    println!(
+        "{} {} Email access grants klyntbot permission to:",
+        colorize(chars.vertical, BRAND),
+        colorize("Privacy notice:", BOLD)
+    );
+    println!(
+        "{} - Read unread emails from your IMAP mailbox",
+        colorize(chars.vertical, BRAND)
+    );
+    println!(
+        "{} - Send replies via SMTP on your behalf",
+        colorize(chars.vertical, BRAND)
+    );
+    println!(
+        "{} - Mark messages as read",
+        colorize(chars.vertical, BRAND)
+    );
+    println!("{}", colorize(chars.vertical, BRAND));
 
-    if !prompt_yes_no_inline("  Do you consent to email access?", false)? {
+    if !prompts::prompt_yes_no("Do you consent to email access?", false)? {
         return Ok(false);
     }
 
-    println!();
+    println!("{}", colorize(chars.vertical, BRAND));
 
     // IMAP configuration
-    println!("  {}", colorize("IMAP (Incoming Mail)", BOLD));
-    let imap_host = prompt_required("  IMAP Host (e.g. imap.gmail.com): ")?;
-    let imap_port = prompt_with_default("  IMAP Port", "993")?
+    println!(
+        "{} {}",
+        colorize(chars.vertical, BRAND),
+        colorize("IMAP (Incoming Mail)", BOLD)
+    );
+    let imap_host = prompts::prompt_text("IMAP Host (e.g. imap.gmail.com)", None, true)?;
+    let imap_port = prompts::prompt_text("IMAP Port", Some("993"), false)?
         .parse::<u16>()
         .unwrap_or(993);
-    let imap_username = prompt_required("  IMAP Username (email): ")?;
-    let imap_password = prompt_secret("  IMAP Password: ")?;
-    let imap_use_ssl = prompt_yes_no_inline("  Use SSL?", true)?;
+    let imap_username = prompts::prompt_text("IMAP Username (email)", None, true)?;
+    let imap_password = prompts::prompt_secret("IMAP Password", 1)?;
+    let imap_use_ssl = prompts::prompt_yes_no("Use SSL?", true)?;
 
-    println!();
+    println!("{}", colorize(chars.vertical, BRAND));
 
     // SMTP configuration
-    println!("  {}", colorize("SMTP (Outgoing Mail)", BOLD));
-    let smtp_host = prompt_required("  SMTP Host (e.g. smtp.gmail.com): ")?;
-    let smtp_port = prompt_with_default("  SMTP Port", "587")?
+    println!(
+        "{} {}",
+        colorize(chars.vertical, BRAND),
+        colorize("SMTP (Outgoing Mail)", BOLD)
+    );
+    let smtp_host = prompts::prompt_text("SMTP Host (e.g. smtp.gmail.com)", None, true)?;
+    let smtp_port = prompts::prompt_text("SMTP Port", Some("587"), false)?
         .parse::<u16>()
         .unwrap_or(587);
 
     // Default SMTP credentials to IMAP values
-    let smtp_user_default = &imap_username;
-    let smtp_username = prompt_with_default("  SMTP Username", smtp_user_default)?;
-    let smtp_password_input = prompt_optional_secret("  SMTP Password (Enter to use IMAP password): ")?;
+    let smtp_username = prompts::prompt_text("SMTP Username", Some(&imap_username), false)?;
+    let smtp_password_input = prompts::prompt_text(
+        "SMTP Password (Enter to use IMAP password)",
+        Some(""),
+        false,
+    )?;
     let smtp_password = if smtp_password_input.is_empty() {
         imap_password.clone()
     } else {
         smtp_password_input
     };
-    let smtp_use_tls = prompt_yes_no_inline("  Use TLS?", true)?;
+    let smtp_use_tls = prompts::prompt_yes_no("Use TLS?", true)?;
 
-    println!();
+    println!("{}", colorize(chars.vertical, BRAND));
 
     // From address
-    let from_default = &smtp_username;
-    let from_address = prompt_with_default("  From Address", from_default)?;
+    let from_address = prompts::prompt_text("From Address", Some(&smtp_username), false)?;
 
     // Test connections
-    print!("  ");
+    print!("{} ", colorize(chars.vertical, BRAND));
     let mut spinner = Spinner::new("Testing IMAP connection...");
     spinner.start();
 
@@ -637,16 +662,25 @@ async fn configure_email(config: &mut Config) -> Result<bool> {
     spinner.stop();
 
     match imap_test {
-        Ok(()) => println!("  {} IMAP connection successful", status_success()),
+        Ok(()) => println!(
+            "{} {} IMAP connection successful",
+            colorize(chars.vertical, BRAND),
+            status_success()
+        ),
         Err(e) => {
-            println!("  {} IMAP connection failed: {}", status_warning(), e);
-            if !prompt_yes_no_inline("  Continue anyway?", false)? {
+            println!(
+                "{} {} IMAP connection failed: {}",
+                colorize(chars.vertical, BRAND),
+                status_warning(),
+                e
+            );
+            if !prompts::prompt_yes_no("Continue anyway?", false)? {
                 return Ok(false);
             }
         }
     }
 
-    print!("  ");
+    print!("{} ", colorize(chars.vertical, BRAND));
     let mut spinner = Spinner::new("Testing SMTP connection...");
     spinner.start();
 
@@ -654,10 +688,19 @@ async fn configure_email(config: &mut Config) -> Result<bool> {
     spinner.stop();
 
     match smtp_test {
-        Ok(()) => println!("  {} SMTP connection successful", status_success()),
+        Ok(()) => println!(
+            "{} {} SMTP connection successful",
+            colorize(chars.vertical, BRAND),
+            status_success()
+        ),
         Err(e) => {
-            println!("  {} SMTP connection failed: {}", status_warning(), e);
-            if !prompt_yes_no_inline("  Continue anyway?", false)? {
+            println!(
+                "{} {} SMTP connection failed: {}",
+                colorize(chars.vertical, BRAND),
+                status_warning(),
+                e
+            );
+            if !prompts::prompt_yes_no("Continue anyway?", false)? {
                 return Ok(false);
             }
         }
@@ -768,22 +811,23 @@ async fn test_smtp_connection(
 // ============================================================================
 
 async fn configure_qq(config: &mut Config) -> Result<bool> {
+    let chars = BoxChars::get();
+
     println!(
-        "  Register a bot at {}\n",
+        "{} Register a bot at {}",
+        colorize(chars.vertical, BRAND),
         colorize("https://q.qq.com", UNDERLINE)
     );
+    println!("{}", colorize(chars.vertical, BRAND));
 
     // App ID
-    let app_id = prompt_required("  App ID: ")?;
+    let app_id = prompts::prompt_text("App ID", None, true)?;
 
     // Secret
-    let secret = prompt_secret("  App Secret: ")?;
-    if secret.is_empty() {
-        return Ok(false);
-    }
+    let secret = prompts::prompt_secret("App Secret", 1)?;
 
     // Validate credentials
-    print!("  ");
+    print!("{} ", colorize(chars.vertical, BRAND));
     let mut spinner = Spinner::new("Validating credentials...");
     spinner.start();
 
@@ -792,15 +836,20 @@ async fn configure_qq(config: &mut Config) -> Result<bool> {
 
     match validation {
         Ok(()) => {
-            println!("  {} Credentials valid", status_success());
+            println!(
+                "{} {} Credentials valid",
+                colorize(chars.vertical, BRAND),
+                status_success()
+            );
         }
         Err(e) => {
             println!(
-                "  {} Credential validation failed: {}",
+                "{} {} Credential validation failed: {}",
+                colorize(chars.vertical, BRAND),
                 status_warning(),
                 e
             );
-            if !prompt_yes_no_inline("  Continue anyway?", false)? {
+            if !prompts::prompt_yes_no("Continue anyway?", false)? {
                 return Ok(false);
             }
         }
@@ -866,107 +915,23 @@ fn draw_separator() -> String {
     )
 }
 
-/// Prompt for a required non-empty value.
-fn prompt_required(prompt: &str) -> Result<String> {
-    loop {
-        print!("{}", prompt);
-        io::stdout().flush()?;
-
-        let mut input = String::new();
-        io::stdin().read_line(&mut input)?;
-        let input = input.trim().to_string();
-
-        if !input.is_empty() {
-            return Ok(input);
-        }
-        println!(
-            "  {}",
-            colorize("This field is required.", ERROR)
-        );
-    }
-}
-
-/// Prompt for a secret value (displayed as-is since we can't hide stdin easily).
-fn prompt_secret(prompt: &str) -> Result<String> {
-    print!("{}", prompt);
-    io::stdout().flush()?;
-
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-    Ok(input.trim().to_string())
-}
-
-/// Prompt for an optional secret value.
-fn prompt_optional_secret(prompt: &str) -> Result<String> {
-    print!("{}", prompt);
-    io::stdout().flush()?;
-
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-    Ok(input.trim().to_string())
-}
-
-/// Prompt with a default value.
-fn prompt_with_default(prompt: &str, default: &str) -> Result<String> {
-    print!("{} [{}]: ", prompt, default);
-    io::stdout().flush()?;
-
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-    let input = input.trim();
-
-    if input.is_empty() {
-        Ok(default.to_string())
-    } else {
-        Ok(input.to_string())
-    }
-}
-
-/// Prompt for an optional value (returns None-wrapped in Option via String).
-fn prompt_optional(prompt: &str) -> Result<Option<String>> {
-    print!("{}", prompt);
-    io::stdout().flush()?;
-
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-    let input = input.trim().to_string();
-
-    if input.is_empty() {
-        Ok(None)
-    } else {
-        Ok(Some(input))
-    }
-}
-
-/// Inline yes/no prompt.
-fn prompt_yes_no_inline(prompt: &str, default: bool) -> Result<bool> {
-    let default_str = if default { "Y/n" } else { "y/N" };
-    print!("{} [{}]: ", prompt, default_str);
-    io::stdout().flush()?;
-
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-    let input = input.trim().to_lowercase();
-
-    if input.is_empty() {
-        return Ok(default);
-    }
-
-    Ok(input == "y" || input == "yes")
-}
-
 /// Prompt for allowlist entries (comma-separated user IDs).
 fn prompt_allowlist(channel_name: &str) -> Result<Vec<String>> {
+    let chars = BoxChars::get();
+
+    println!("{}", colorize(chars.vertical, BRAND));
     println!(
-        "\n  {} Restrict who can use klyntbot via {}.",
+        "{} {} Restrict who can use klyntbot via {}.",
+        colorize(chars.vertical, BRAND),
         colorize("Allowlist:", BOLD),
         channel_name
     );
     println!(
-        "  {}",
-        colorize("Leave empty to allow everyone.", DIM)
+        "{}",
+        draw_step_line(&colorize("Leave empty to allow everyone.", DIM))
     );
-    print!("  Allowed IDs (comma-separated): ");
+
+    print!("{} Allowed IDs (comma-separated): ", colorize(chars.vertical, BRAND));
     io::stdout().flush()?;
 
     let mut input = String::new();

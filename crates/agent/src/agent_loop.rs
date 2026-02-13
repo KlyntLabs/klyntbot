@@ -63,7 +63,7 @@ pub struct AgentLoop {
 impl AgentLoop {
     /// Create a new agent loop with optional cron service
     pub async fn new_with_cron(
-        mut bus: Arc<MessageBus>,
+        bus: Arc<MessageBus>,
         provider: DynProvider,
         config: Config,
         cron_service: Option<Arc<scheduling::CronService>>,
@@ -141,8 +141,7 @@ impl AgentLoop {
         }
 
         // Take ownership of the inbound receiver
-        let inbound_rx = Arc::get_mut(&mut bus)
-            .expect("Bus should not be shared yet")
+        let inbound_rx = bus
             .take_inbound_rx()
             .expect("Inbound receiver already taken");
 

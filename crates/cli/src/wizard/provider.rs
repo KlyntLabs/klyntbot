@@ -82,19 +82,24 @@ impl WizardModule for ProviderModule {
     }
 
     fn run(&self, state: &mut WizardState) -> Result<StepResult> {
+        let chars = BoxChars::get();
+
         // Check if already configured (reconfiguration scenario)
         let active = state.config.active_provider_name();
         if active != "none" {
             println!(
-                "{} Current provider: {}",
+                "{} {} Current provider: {}",
+                colorize(chars.vertical, BRAND),
                 colorize("✓", SUCCESS),
                 colorize(active, BOLD)
             );
+            println!("{}", colorize(chars.vertical, BRAND));
             let reconfigure = prompts::prompt_yes_no("Reconfigure provider?", false)?;
             if !reconfigure {
+                println!("{}", draw_step_footer());
                 return Ok(StepResult::Next);
             }
-            println!();
+            println!("{}", colorize(chars.vertical, BRAND));
         }
 
         // Step 1: Select provider
@@ -106,38 +111,47 @@ impl WizardModule for ProviderModule {
             })
             .collect();
 
-        println!("{}", draw_section_header("Choose Your LLM Provider"));
-        let idx = prompts::prompt_select("  Select a provider", &options, 0)?;
+        println!("{}", draw_step_line(&colorize("Choose Your LLM Provider", BOLD)));
+        println!("{}", colorize(chars.vertical, BRAND));
+        let idx = prompts::prompt_select("Select a provider", &options, 0)?;
         let provider = &PROVIDERS[idx];
 
+        println!("{}", colorize(chars.vertical, BRAND));
         println!(
-            "\n  {} {}",
+            "{} {} {}",
+            colorize(chars.vertical, BRAND),
             colorize("●", BRAND),
             colorize(&format!("Selected: {}", provider.name), BOLD)
         );
 
         // Step 2: API key
-        println!("{}", draw_section_header("API Configuration"));
+        println!("{}", colorize(chars.vertical, BRAND));
+        println!("{}", draw_step_line(&colorize("API Configuration", BOLD)));
         println!(
-            "  {} Get your API key at: {}",
+            "{} {} Get your API key at: {}",
+            colorize(chars.vertical, BRAND),
             colorize("→", BRAND),
             colorize(provider.api_url, UNDERLINE)
         );
-        println!();
+        println!("{}", colorize(chars.vertical, BRAND));
 
-        let api_key = prompts::prompt_secret("  API Key", 10)?;
+        let api_key = prompts::prompt_secret("API Key", 10)?;
+
+        println!("{}", colorize(chars.vertical, BRAND));
 
         // Validate key prefix if known
         if !provider.key_prefix.is_empty() && !api_key.starts_with(provider.key_prefix) {
-            let warning_msg = format!(
-                "{} keys usually start with '{}'.\nContinuing anyway, but please verify your key is correct.",
-                provider.name, provider.key_prefix
-            );
-            println!("\n{}", draw_warning_box(&warning_msg));
-        } else if !provider.key_prefix.is_empty() {
-            // Key format looks correct
             println!(
-                "  {} {}",
+                "{} {} {} keys usually start with '{}' - please verify",
+                colorize(chars.vertical, BRAND),
+                colorize("⚠", WARNING),
+                provider.name,
+                provider.key_prefix
+            );
+        } else if !provider.key_prefix.is_empty() {
+            println!(
+                "{} {} {}",
+                colorize(chars.vertical, BRAND),
                 colorize("✓", SUCCESS),
                 colorize("API key format validated", DIM)
             );
@@ -146,21 +160,24 @@ impl WizardModule for ProviderModule {
         state.config.set_provider_key(provider.key, api_key);
 
         // Step 3: Model selection
+        println!("{}", colorize(chars.vertical, BRAND));
         let model = prompts::prompt_text(
-            "  Model",
+            "Model",
             Some(provider.default_model),
             true,
         )?;
         state.config.agents.defaults.model = model.clone();
 
-        // Step 4: Custom API base (optional, for proxies or self-hosted)
+        // Step 4: Custom API base (optional, for proxies/self-hosted)
+        println!("{}", colorize(chars.vertical, BRAND));
         let custom_base = prompts::prompt_yes_no(
-            "\n  Use a custom API base URL? (for proxies/self-hosted)",
+            "Use a custom API base URL? (for proxies/self-hosted)",
             false,
         )?;
 
         if custom_base {
-            let base_url = prompts::prompt_text("  API Base URL", None, true)?;
+            println!("{}", colorize(chars.vertical, BRAND));
+            let base_url = prompts::prompt_text("API Base URL", None, true)?;
             match provider.key {
                 "anthropic" => {
                     state.config.providers.anthropic.api_base = Some(base_url);
@@ -182,17 +199,24 @@ impl WizardModule for ProviderModule {
                 }
                 _ => {}
             }
-            println!("  {} Custom API base configured", status_success());
+            println!("{}", colorize(chars.vertical, BRAND));
+            println!(
+                "{} {} Custom API base configured",
+                colorize(chars.vertical, BRAND),
+                status_success()
+            );
         }
 
-        // Success summary with orange branding
-        let summary = format!(
-            "Provider: {}\nModel: {}\n{}",
-            provider.name,
-            model,
-            if custom_base { "Custom API base configured" } else { "" }
+        // Success summary with vertical line
+        println!("{}", colorize(chars.vertical, BRAND));
+        println!(
+            "{} {} Provider: {} with model {}",
+            colorize(chars.vertical, BRAND),
+            colorize("✓", SUCCESS),
+            colorize(provider.name, BOLD),
+            colorize(&model, DIM)
         );
-        println!("\n{}", draw_success_box(&summary));
+        println!("{}", draw_step_footer());
 
         Ok(StepResult::Next)
     }

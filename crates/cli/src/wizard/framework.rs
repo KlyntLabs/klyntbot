@@ -206,19 +206,15 @@ impl WizardRunner {
 }
 
 /// Print a formatted step header with separator and progress indicator.
-pub fn print_step_header(state: &WizardState, name: &str, required: bool) {
-    let subtitle = if required {
-        ""
-    } else {
-        "Optional - press Enter to skip"
-    };
-
-    // Only one newline before progress bar, and no extra newline after subtitle
-    print!("\n{}", draw_wizard_step_header(
+pub fn print_step_header(state: &WizardState, name: &str, _required: bool) {
+    // Blank line before progress bar for steps after the first
+    if state.current_step > 1 {
+        println!();
+    }
+    print!("{}", draw_wizard_step_header(
         state.current_step,
         state.total_steps,
         name,
-        subtitle
     ));
 }
 

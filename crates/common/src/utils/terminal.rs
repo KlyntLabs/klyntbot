@@ -180,23 +180,23 @@ pub fn draw_step_progress(current: usize, total: usize) -> String {
 }
 
 /// Draws an enhanced step header with orange branding and progress
-pub fn draw_wizard_step_header(current: usize, total: usize, title: &str, subtitle: &str) -> String {
+pub fn draw_wizard_step_header(current: usize, total: usize, title: &str) -> String {
     let mut result = String::new();
+    let chars = BoxChars::get();
 
-    // Progress bar with connecting lines
+    // Progress bar at left margin (no │ prefix)
     result.push_str(&draw_step_progress(current, total));
 
-    // Step number and title with orange branding - compact spacing
+    // Step number and title with orange branding and vertical line
     result.push_str(&format!(
-        "{} {}\n",
+        "{} {} {}\n",
+        colorize(chars.vertical, BRAND),
         colorize(&format!("Step {} of {}", current, total), BRAND),
         colorize(title, BOLD)
     ));
 
-    // Subtitle in dim text (only if provided) - no extra newline
-    if !subtitle.is_empty() {
-        result.push_str(&format!("{}\n", colorize(subtitle, DIM)));
-    }
+    // Blank vertical line before content starts
+    result.push_str(&format!("{}\n", colorize(chars.vertical, BRAND)));
 
     result
 }
@@ -222,10 +222,39 @@ pub fn draw_validation_result(label: &str, success: bool, message: &str) -> Stri
 pub fn draw_section_header(title: &str) -> String {
     let chars = BoxChars::get();
     format!(
-        "\n  {} {}\n",
+        "{} {} {}\n",
+        colorize(chars.vertical, BRAND),
         colorize(chars.vertical_right, BRAND),
         colorize(title, BOLD)
     )
+}
+
+/// Draws text with vertical line prefix (for content within a step)
+pub fn draw_step_line(text: &str) -> String {
+    let chars = BoxChars::get();
+    format!("{} {}", colorize(chars.vertical, BRAND), text)
+}
+
+/// Draws a sub-step with vertical line and bullet
+pub fn draw_sub_step(text: &str, completed: bool) -> String {
+    let chars = BoxChars::get();
+    let icon = if completed {
+        colorize("✓", SUCCESS)
+    } else {
+        colorize("○", DIM)
+    };
+    format!(
+        "{} {} {}",
+        colorize(chars.vertical, BRAND),
+        icon,
+        text
+    )
+}
+
+/// Draws the bottom connector for a step (vertical line continues to next step)
+pub fn draw_step_footer() -> String {
+    let chars = BoxChars::get();
+    format!("{}\n", colorize(chars.vertical, BRAND))
 }
 
 /// Draws an info box with orange border

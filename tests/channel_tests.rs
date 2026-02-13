@@ -29,7 +29,7 @@ async fn test_channel_manager_initialization() {
 /// Test message routing through channels
 #[tokio::test]
 async fn test_message_routing_through_channels() {
-    let mut bus = MessageBus::new(10);
+    let bus = MessageBus::new(10);
 
     // Simulate a message arriving from a channel
     let inbound = InboundMessage::new("telegram", "user_123", "chat_456", "Hello from Telegram!");
@@ -103,7 +103,7 @@ fn test_channel_enable_disable() {
 /// Test outbound message dispatch to correct channel
 #[tokio::test]
 async fn test_outbound_dispatch_routing() {
-    let mut bus = MessageBus::new(10);
+    let bus = MessageBus::new(10);
 
     // Send messages to different channels
     let telegram_msg = OutboundMessage::new("telegram", "chat_1", "Telegram message");
@@ -155,7 +155,7 @@ async fn test_concurrent_message_handling() {
     }
 
     // Get a new bus instance with receiver for consumption
-    let mut bus_for_rx = MessageBus::new(100);
+    let bus_for_rx = MessageBus::new(100);
     let inbound_rx = bus_for_rx.take_inbound_rx().unwrap();
 
     // Move messages from original bus to new one
@@ -165,7 +165,7 @@ async fn test_concurrent_message_handling() {
     drop(inbound_rx); // Drop receiver
 
     // Restart with proper setup
-    let mut bus = MessageBus::new(100);
+    let bus = MessageBus::new(100);
 
     // Send messages
     for i in 0..10 {
@@ -190,7 +190,7 @@ async fn test_concurrent_message_handling() {
 /// Test message metadata preservation
 #[tokio::test]
 async fn test_message_metadata_preservation() {
-    let mut bus = MessageBus::new(10);
+    let bus = MessageBus::new(10);
 
     // Create message with full metadata
     let mut inbound = InboundMessage::new(
@@ -255,7 +255,7 @@ fn test_message_content_sanitization() {
 /// Test bus capacity limits
 #[tokio::test]
 async fn test_bus_capacity_limits() {
-    let mut bus = MessageBus::new(5); // Small capacity
+    let bus = MessageBus::new(5); // Small capacity
 
     // Fill the bus
     for i in 0..5 {
@@ -302,7 +302,7 @@ fn test_channel_message_formatting() {
 /// Test error message routing
 #[tokio::test]
 async fn test_error_message_routing() {
-    let mut bus = MessageBus::new(10);
+    let bus = MessageBus::new(10);
 
     // Simulate an error response
     let error_msg = OutboundMessage::new(
@@ -323,7 +323,7 @@ async fn test_error_message_routing() {
 /// Test multi-channel broadcast scenario
 #[tokio::test]
 async fn test_multi_channel_broadcast() {
-    let mut bus = MessageBus::new(10);
+    let bus = MessageBus::new(10);
 
     let channels = vec!["telegram", "discord", "slack"];
     let broadcast_content = "System announcement: Maintenance scheduled";

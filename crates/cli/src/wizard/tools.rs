@@ -13,6 +13,8 @@ use anyhow::Result;
 use common::utils::terminal::*;
 use config::Config;
 
+use super::prompts::{self, SelectOption};
+
 /// Security preset profile for tools configuration
 #[derive(Debug, Clone, Copy)]
 pub enum ToolsPreset {
@@ -34,22 +36,26 @@ impl ToolsPreset {
 /// Run the tools configuration wizard step.
 /// Returns true if tools were configured, false if skipped.
 pub fn configure_tools(config: &mut Config) -> Result<bool> {
-    let wants_config = prompt_yes_no("Would you like to configure tool permissions?", false)?;
+    let chars = BoxChars::get();
+
+    let wants_config = prompts::prompt_yes_no("Configure tool permissions?", false)?;
     if !wants_config {
         println!(
-            "\n  {} Using default tools configuration (balanced)",
+            "{} {} Using default tools configuration (balanced)",
+            colorize(chars.vertical, BRAND),
             status_success()
         );
         return Ok(false);
     }
 
-    println!();
+    println!("{}", colorize(chars.vertical, BRAND));
 
     // Step 1: Choose preset profile
     let preset = select_preset()?;
     apply_preset(config, preset);
     println!(
-        "\n  {} Applied {} preset",
+        "{} {} Applied {} preset",
+        colorize(chars.vertical, BRAND),
         status_success(),
         match preset {
             ToolsPreset::Strict => "strict",
@@ -59,20 +65,23 @@ pub fn configure_tools(config: &mut Config) -> Result<bool> {
     );
 
     // Step 2: Fine-tune workspace restriction
-    let restrict = prompt_yes_no(
-        "\nRestrict file/exec tools to workspace directory?",
+    println!("{}", colorize(chars.vertical, BRAND));
+    let restrict = prompts::prompt_yes_no(
+        "Restrict file/exec tools to workspace directory?",
         config.tools.restrict_to_workspace,
     )?;
     config.tools.restrict_to_workspace = restrict;
     if restrict {
         println!(
-            "  {} Workspace restriction {}",
+            "{} {} Workspace restriction {}",
+            colorize(chars.vertical, BRAND),
             status_success(),
             colorize("enabled", SUCCESS)
         );
     } else {
         println!(
-            "  {} Workspace restriction {}",
+            "{} {} Workspace restriction {}",
+            colorize(chars.vertical, BRAND),
             status_warning(),
             colorize("disabled", WARNING)
         );
@@ -87,63 +96,41 @@ pub fn configure_tools(config: &mut Config) -> Result<bool> {
     // Step 5: Execution timeout
     configure_timeout(config)?;
 
+    println!("{}", colorize(chars.vertical, BRAND));
     println!(
-        "\n  {} Tools configuration complete",
+        "{} {} Tools configuration complete",
+        colorize(chars.vertical, BRAND),
         status_success()
     );
 
     Ok(true)
 }
 
-/// Select a security preset profile
+/// Select a security preset profile using interactive select
 fn select_preset() -> Result<ToolsPreset> {
-    println!("Select a security preset:\n");
-
     let presets = [
         ToolsPreset::Strict,
         ToolsPreset::Balanced,
         ToolsPreset::Permissive,
     ];
 
-    for (idx, preset) in presets.iter().enumerate() {
-        let label = match preset {
-            ToolsPreset::Strict => "Strict",
-            ToolsPreset::Balanced => "Balanced",
-            ToolsPreset::Permissive => "Permissive",
-        };
-        println!(
-            "  {}. {} - {}",
-            colorize(&(idx + 1).to_string(), BOLD),
-            label,
-            colorize(preset.description(), DIM)
-        );
-    }
-    println!();
-
-    loop {
-        print!("Preset [2]: ");
-        io::stdout().flush()?;
-
-        let mut input = String::new();
-        io::stdin().read_line(&mut input)?;
-        let input = input.trim();
-
-        if input.is_empty() {
-            return Ok(ToolsPreset::Balanced);
-        }
-
-        match input {
-            "1" => return Ok(ToolsPreset::Strict),
-            "2" => return Ok(ToolsPreset::Balanced),
-            "3" => return Ok(ToolsPreset::Permissive),
-            _ => {
-                println!(
-                    "{}",
-                    colorize("Please enter 1, 2, or 3", ERROR)
-                );
+    let options: Vec<SelectOption<'_>> = presets
+        .iter()
+        .map(|p| {
+            let label = match p {
+                ToolsPreset::Strict => "Strict",
+                ToolsPreset::Balanced => "Balanced",
+                ToolsPreset::Permissive => "Permissive",
+            };
+            SelectOption {
+                label,
+                description: p.description(),
             }
-        }
-    }
+        })
+        .collect();
+
+    let idx = prompts::prompt_select("Select a security preset", &options, 1)?;
+    Ok(presets[idx])
 }
 
 /// Apply a preset profile to the config
@@ -180,51 +167,62 @@ fn apply_preset(config: &mut Config, preset: ToolsPreset) {
 
 /// Configure the shell command allowlist
 fn configure_allowlist(config: &mut Config) -> Result<()> {
+    let chars = BoxChars::get();
+
     if config.tools.exec.allowed_commands.is_empty() {
-        let wants_allowlist = prompt_yes_no(
-            "\nAdd a shell command allowlist? (empty = deny-list mode)",
+        println!("{}", colorize(chars.vertical, BRAND));
+        let wants_allowlist = prompts::prompt_yes_no(
+            "Add a shell command allowlist? (empty = deny-list mode)",
             false,
         )?;
         if !wants_allowlist {
             println!(
-                "  {} Using deny-list mode {}",
+                "{} {} Using deny-list mode {}",
+                colorize(chars.vertical, BRAND),
                 status_success(),
                 colorize("(blocks dangerous patterns only)", DIM)
             );
             return Ok(());
         }
     } else {
+        println!("{}", colorize(chars.vertical, BRAND));
         println!(
-            "\n  Current allowlist: {}",
+            "{} Current allowlist: {}",
+            colorize(chars.vertical, BRAND),
             colorize(&config.tools.exec.allowed_commands.join(", "), DIM)
         );
-        let modify = prompt_yes_no("Modify the command allowlist?", true)?;
+        let modify = prompts::prompt_yes_no("Modify the command allowlist?", true)?;
         if !modify {
             return Ok(());
         }
     }
 
+    println!("{}", colorize(chars.vertical, BRAND));
     println!(
-        "\n{}",
-        colorize(
-            "  Enter commands one per line (empty line to finish):",
+        "{}",
+        draw_step_line(&colorize(
+            "Enter commands one per line (empty line to finish):",
             DIM
-        )
+        ))
     );
 
     let mut commands: Vec<String> = config.tools.exec.allowed_commands.clone();
 
     // Show current commands for editing
     if !commands.is_empty() {
-        println!("  Current: {}", commands.join(", "));
-        let clear = prompt_yes_no("  Clear existing and start fresh?", false)?;
+        println!(
+            "{} Current: {}",
+            colorize(chars.vertical, BRAND),
+            commands.join(", ")
+        );
+        let clear = prompts::prompt_yes_no("Clear existing and start fresh?", false)?;
         if clear {
             commands.clear();
         }
     }
 
     loop {
-        print!("  {} ", colorize("+", SUCCESS));
+        print!("{} {} ", colorize(chars.vertical, BRAND), colorize("+", SUCCESS));
         io::stdout().flush()?;
 
         let mut input = String::new();
@@ -237,7 +235,8 @@ fn configure_allowlist(config: &mut Config) -> Result<()> {
 
         if commands.contains(&input) {
             println!(
-                "    {}",
+                "{}   {}",
+                colorize(chars.vertical, BRAND),
                 colorize("(already in list)", DIM)
             );
             continue;
@@ -248,12 +247,14 @@ fn configure_allowlist(config: &mut Config) -> Result<()> {
 
     if commands.is_empty() {
         println!(
-            "  {} Allowlist cleared, using deny-list mode",
+            "{} {} Allowlist cleared, using deny-list mode",
+            colorize(chars.vertical, BRAND),
             status_success()
         );
     } else {
         println!(
-            "  {} Allowlist set: {}",
+            "{} {} Allowlist set: {}",
+            colorize(chars.vertical, BRAND),
             status_success(),
             commands.join(", ")
         );
@@ -265,6 +266,8 @@ fn configure_allowlist(config: &mut Config) -> Result<()> {
 
 /// Configure Brave Search API key
 fn configure_brave_api(config: &mut Config) -> Result<()> {
+    let chars = BoxChars::get();
+
     let has_key = !config.tools.web.brave_api_key.is_empty();
     let prompt = if has_key {
         "Update Brave Search API key?"
@@ -272,13 +275,19 @@ fn configure_brave_api(config: &mut Config) -> Result<()> {
         "Configure Brave Search API key? (enables web_search tool)"
     };
 
-    let wants_api = prompt_yes_no(&format!("\n{}", prompt), false)?;
+    println!("{}", colorize(chars.vertical, BRAND));
+    let wants_api = prompts::prompt_yes_no(prompt, false)?;
     if !wants_api {
         if has_key {
-            println!("  {} Brave API key unchanged", status_success());
+            println!(
+                "{} {} Brave API key unchanged",
+                colorize(chars.vertical, BRAND),
+                status_success()
+            );
         } else {
             println!(
-                "  {} Web search disabled {}",
+                "{} {} Web search disabled {}",
+                colorize(chars.vertical, BRAND),
                 status_disabled(),
                 colorize("(no API key)", DIM)
             );
@@ -287,12 +296,13 @@ fn configure_brave_api(config: &mut Config) -> Result<()> {
     }
 
     println!(
-        "  Get yours at: {}",
+        "{} Get yours at: {}",
+        colorize(chars.vertical, BRAND),
         colorize("https://brave.com/search/api/", UNDERLINE)
     );
 
     loop {
-        print!("  API Key: ");
+        print!("{} API Key: ", colorize(chars.vertical, BRAND));
         io::stdout().flush()?;
 
         let mut input = String::new();
@@ -300,39 +310,53 @@ fn configure_brave_api(config: &mut Config) -> Result<()> {
         let input = input.trim().to_string();
 
         if input.is_empty() {
-            println!("  {} Skipped", status_disabled());
+            println!(
+                "{} {} Skipped",
+                colorize(chars.vertical, BRAND),
+                status_disabled()
+            );
             return Ok(());
         }
 
         if input.len() < 10 {
             println!(
-                "  {}",
+                "{} {}",
+                colorize(chars.vertical, BRAND),
                 colorize("API key seems too short, try again", WARNING)
             );
             continue;
         }
 
         config.tools.web.brave_api_key = config::schema::Secret::new(input);
-        println!("  {} Brave Search API key configured", status_success());
+        println!(
+            "{} {} Brave Search API key configured",
+            colorize(chars.vertical, BRAND),
+            status_success()
+        );
         return Ok(());
     }
 }
 
 /// Configure execution timeout
 fn configure_timeout(config: &mut Config) -> Result<()> {
+    let chars = BoxChars::get();
+
+    println!("{}", colorize(chars.vertical, BRAND));
     println!(
-        "\n  Current timeout: {}s",
+        "{} Current timeout: {}s",
+        colorize(chars.vertical, BRAND),
         colorize(&config.tools.exec.timeout.to_string(), BOLD)
     );
 
-    let modify = prompt_yes_no("Change execution timeout?", false)?;
+    let modify = prompts::prompt_yes_no("Change execution timeout?", false)?;
     if !modify {
         return Ok(());
     }
 
     loop {
         print!(
-            "  Timeout in seconds [{}]: ",
+            "{} Timeout in seconds [{}]: ",
+            colorize(chars.vertical, BRAND),
             config.tools.exec.timeout
         );
         io::stdout().flush()?;
@@ -349,7 +373,8 @@ fn configure_timeout(config: &mut Config) -> Result<()> {
             Ok(secs) if (5..=600).contains(&secs) => {
                 config.tools.exec.timeout = secs;
                 println!(
-                    "  {} Timeout set to {}s",
+                    "{} {} Timeout set to {}s",
+                    colorize(chars.vertical, BRAND),
                     status_success(),
                     secs
                 );
@@ -357,35 +382,20 @@ fn configure_timeout(config: &mut Config) -> Result<()> {
             }
             Ok(_) => {
                 println!(
-                    "  {}",
+                    "{} {}",
+                    colorize(chars.vertical, BRAND),
                     colorize("Timeout must be between 5 and 600 seconds", ERROR)
                 );
             }
             Err(_) => {
                 println!(
-                    "  {}",
+                    "{} {}",
+                    colorize(chars.vertical, BRAND),
                     colorize("Please enter a number", ERROR)
                 );
             }
         }
     }
-}
-
-/// Prompt for yes/no input (local copy matching wizard pattern)
-fn prompt_yes_no(prompt: &str, default: bool) -> Result<bool> {
-    let default_str = if default { "Y/n" } else { "y/N" };
-    print!("{} [{}]: ", prompt, default_str);
-    io::stdout().flush()?;
-
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-    let input = input.trim().to_lowercase();
-
-    if input.is_empty() {
-        return Ok(default);
-    }
-
-    Ok(input == "y" || input == "yes")
 }
 
 #[cfg(test)]

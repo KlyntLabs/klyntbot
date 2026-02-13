@@ -40,10 +40,9 @@ pub struct ChannelManager {
 
 impl ChannelManager {
     /// Create a new channel manager
-    pub fn new(config: Arc<Config>, mut bus: Arc<MessageBus>) -> Self {
+    pub fn new(config: Arc<Config>, bus: Arc<MessageBus>) -> Self {
         // Take ownership of the outbound receiver
-        let outbound_rx = Arc::get_mut(&mut bus)
-            .expect("Bus should not be shared yet")
+        let outbound_rx = bus
             .take_outbound_rx()
             .expect("Outbound receiver already taken");
 

@@ -22,20 +22,26 @@ impl WizardModule for WorkspaceModule {
     }
 
     fn run(&self, state: &mut WizardState) -> Result<StepResult> {
+        let chars = BoxChars::get();
         let workspace = state.config.workspace_path();
 
         // Check if workspace already exists
         if workspace.exists() {
             println!(
-                "  Workspace already exists at {}",
+                "{} Workspace already exists at {}",
+                colorize(chars.vertical, BRAND),
                 colorize(&workspace.display().to_string(), DIM)
             );
             let recreate = prompts::prompt_yes_no(
-                "  Re-create workspace files? (existing files will be preserved)",
+                "Re-create workspace files? (existing files will be preserved)",
                 false,
             )?;
             if !recreate {
-                println!("  {} Workspace unchanged", status_success());
+                println!(
+                    "{} {} Workspace unchanged",
+                    colorize(chars.vertical, BRAND),
+                    status_success()
+                );
                 return Ok(StepResult::Next);
             }
         }
@@ -43,7 +49,7 @@ impl WizardModule for WorkspaceModule {
         // Allow custom workspace path
         let custom = prompts::prompt_yes_no(
             &format!(
-                "Use default workspace path ({})? ",
+                "Use default workspace path ({})?",
                 colorize(&workspace.display().to_string(), DIM)
             ),
             true,
@@ -51,7 +57,7 @@ impl WizardModule for WorkspaceModule {
 
         if !custom {
             let new_path = prompts::prompt_text(
-                "  Workspace path",
+                "Workspace path",
                 Some(&workspace.display().to_string()),
                 true,
             )?;
@@ -59,16 +65,23 @@ impl WizardModule for WorkspaceModule {
         }
 
         let workspace = state.config.workspace_path();
+        println!("{}", colorize(chars.vertical, BRAND));
         println!(
-            "\n  Creating workspace at {}...\n",
+            "{} Creating workspace at {}...",
+            colorize(chars.vertical, BRAND),
             colorize(&workspace.display().to_string(), DIM)
         );
+        println!("{}", colorize(chars.vertical, BRAND));
 
         // Create directories
         std::fs::create_dir_all(&workspace)?;
         std::fs::create_dir_all(workspace.join("memory"))?;
         std::fs::create_dir_all(workspace.join("skills"))?;
-        println!("  {} Created workspace directories", status_success());
+        println!(
+            "{} {} Created workspace directories",
+            colorize(chars.vertical, BRAND),
+            status_success()
+        );
 
         // Create template files (only if they don't already exist)
         create_template_file(&workspace.join("AGENTS.md"), templates::AGENTS)?;
@@ -76,14 +89,22 @@ impl WizardModule for WorkspaceModule {
         create_template_file(&workspace.join("USER.md"), templates::USER)?;
         create_template_file(&workspace.join("TOOLS.md"), templates::TOOLS)?;
         create_template_file(&workspace.join("IDENTITY.md"), templates::IDENTITY)?;
-        println!("  {} Created workspace templates", status_success());
+        println!(
+            "{} {} Created workspace templates",
+            colorize(chars.vertical, BRAND),
+            status_success()
+        );
 
         // Create memory file
         let memory_file = workspace.join("memory").join("MEMORY.md");
         if !memory_file.exists() {
             std::fs::write(&memory_file, templates::MEMORY)?;
         }
-        println!("  {} Initialized memory directory", status_success());
+        println!(
+            "{} {} Initialized memory directory",
+            colorize(chars.vertical, BRAND),
+            status_success()
+        );
 
         // Create config directories
         let config_dir = config::config_dir()?;
@@ -91,7 +112,11 @@ impl WizardModule for WorkspaceModule {
         std::fs::create_dir_all(config_dir.join("cron"))?;
         std::fs::create_dir_all(config_dir.join("media"))?;
         std::fs::create_dir_all(config_dir.join("history"))?;
-        println!("  {} Set up configuration directories", status_success());
+        println!(
+            "{} {} Set up configuration directories",
+            colorize(chars.vertical, BRAND),
+            status_success()
+        );
 
         Ok(StepResult::Next)
     }

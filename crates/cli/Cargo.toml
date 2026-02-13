@@ -34,6 +34,7 @@ async-imap = { workspace = true }
 native-tls = { workspace = true }
 tokio-native-tls = { workspace = true }
 lettre = { workspace = true }
+crossterm = { workspace = true }
 
 [dev-dependencies]
 tempfile.workspace = true

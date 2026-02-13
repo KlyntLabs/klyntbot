@@ -426,6 +426,7 @@ dependencies = [
  "clap",
  "common",
  "config",
+ "crossterm",
  "dirs",
  "heartbeat",
  "lettre",

@@ -13,7 +13,7 @@ use tokio::fs;
 /// Test full message flow through the bus
 #[tokio::test]
 async fn test_full_message_flow() {
-    let mut bus = MessageBus::new(10);
+    let bus = MessageBus::new(10);
 
     // Simulate channel sending inbound message
     let inbound = InboundMessage::new("telegram", "user123", "chat456", "Hello, bot!");
@@ -203,7 +203,7 @@ async fn test_multiple_sessions_parallel() {
 /// Test bus message ordering
 #[tokio::test]
 async fn test_bus_message_ordering() {
-    let mut bus = MessageBus::new(100);
+    let bus = MessageBus::new(100);
 
     // Send multiple messages in order
     for i in 0..10 {

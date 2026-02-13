@@ -6,7 +6,6 @@ use anyhow::Result;
 use common::utils::terminal::*;
 
 use super::framework::{StepResult, WizardModule, WizardState};
-use super::prompts;
 
 pub struct WelcomeModule;
 
@@ -26,47 +25,28 @@ impl WizardModule for WelcomeModule {
             "reconfiguration"
         };
 
-        // Simple clean header with orange branding - no box, just clean lines
-        println!();
-        println!("{}", colorize("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", BRAND));
-        println!();
-        println!("  {}  {}",
-            colorize("●", BRAND),
-            colorize("klyntbot", BOLD)
-        );
-        println!("  {}  {}",
-            colorize("│", BRAND),
-            colorize("Your AI Assistant Platform", DIM)
-        );
-        println!();
-        println!("{}", colorize("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", BRAND));
+        // Setup overview with vertical line throughout
+        println!("{}", draw_step_line(&format!("Let's set up your AI assistant ({}).", colorize(mode, HIGHLIGHT))));
+        println!("{}", draw_step_line("This wizard will guide you through:"));
+        println!("{}", draw_step_line(""));
 
-        // Setup overview with orange highlights
-        println!("\nLet's set up your AI assistant ({}).", colorize(mode, HIGHLIGHT));
-        println!("This wizard will guide you through:");
-        println!();
-
-        println!("  {}  LLM provider & API key", colorize("1", BRAND));
-        println!("  {}  Chat channels (Telegram, Discord, Slack, ...)", colorize("2", BRAND));
-        println!("  {}  Tool permissions & security", colorize("3", BRAND));
-        println!("  {}  Workspace & file templates", colorize("4", BRAND));
+        println!("{}", draw_step_line(&format!(" {}  LLM provider & API key", colorize("1", BRAND))));
+        println!("{}", draw_step_line(&format!(" {}  Chat channels (Telegram, Discord, Slack, ...)", colorize("2", BRAND))));
+        println!("{}", draw_step_line(&format!(" {}  Tool permissions & security", colorize("3", BRAND))));
+        println!("{}", draw_step_line(&format!(" {}  Workspace & file templates", colorize("4", BRAND))));
 
         if state.total_steps > 4 {
-            println!("  {}  Additional configuration", colorize("+", BRAND));
+            println!("{}", draw_step_line(&format!(" {}  Additional configuration", colorize("+", BRAND))));
         }
 
-        println!();
-        println!("{} You can press {} at any time to cancel.",
+        println!("{}", draw_step_line(""));
+        println!("{}", draw_step_line(&format!("{} You can press {} at any time to cancel.",
             colorize("→", BRAND),
             colorize("Ctrl+C", BOLD)
-        );
+        )));
 
-        let proceed = prompts::prompt_yes_no("\nReady to begin?", true)?;
-        if proceed {
-            Ok(StepResult::Next)
-        } else {
-            Ok(StepResult::Cancel)
-        }
+        // Running `init` signals intent — no confirmation needed
+        Ok(StepResult::Next)
     }
 }
 

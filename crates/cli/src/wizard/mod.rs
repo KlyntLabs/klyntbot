@@ -62,6 +62,9 @@ impl WizardModule for ToolsModule {
 /// Orchestrates all wizard modules in sequence with forward/back navigation.
 /// The channels step is handled inline because it requires async I/O (OAuth).
 pub async fn run_wizard() -> Result<()> {
+    // Print global branding header at the very top
+    print_wizard_header();
+
     let mut state = WizardState::new();
 
     // Step table: (name, required, applicable)
@@ -100,14 +103,25 @@ pub async fn run_wizard() -> Result<()> {
 
         // Dispatch to the right module. Step indices correspond to `all_steps`:
         // 0=welcome, 1=provider, 2=channels (async), 3=tools, 4=daemon, 5=workspace.
-        let result = match step_idx {
-            0 => welcome::WelcomeModule.run(&mut state)?,
-            1 => provider::ProviderModule.run(&mut state)?,
-            2 => run_channels_step(&mut state).await?,
-            3 => ToolsModule.run(&mut state)?,
-            4 => daemon::DaemonModule.run(&mut state)?,
-            5 => workspace::WorkspaceModule.run(&mut state)?,
+        // Ctrl+C in raw-mode prompts surfaces as an Err containing "Ctrl+C".
+        let result = match match step_idx {
+            0 => welcome::WelcomeModule.run(&mut state),
+            1 => provider::ProviderModule.run(&mut state),
+            2 => run_channels_step(&mut state).await,
+            3 => ToolsModule.run(&mut state),
+            4 => daemon::DaemonModule.run(&mut state),
+            5 => workspace::WorkspaceModule.run(&mut state),
             _ => unreachable!(),
+        } {
+            Ok(r) => r,
+            Err(e) if e.to_string().contains("Ctrl+C") => {
+                println!(
+                    "\n{} Setup cancelled. No changes saved.",
+                    status_warning()
+                );
+                return Ok(());
+            }
+            Err(e) => return Err(e),
         };
 
         match result {
@@ -135,22 +149,35 @@ pub async fn run_wizard() -> Result<()> {
 
 /// Channels wizard step (async due to OAuth flows).
 async fn run_channels_step(state: &mut WizardState) -> Result<StepResult> {
-    let wants = prompts::prompt_yes_no("Would you like to enable chat channels?", false)?;
+    let chars = BoxChars::get();
+
+    let wants = prompts::prompt_yes_no("Enable chat channels?", false)?;
 
     if !wants {
         println!(
-            "\n  {}",
-            colorize("Channel setup can be done later with:", DIM)
+            "{}",
+            draw_step_line(&colorize("Channel setup can be done later with:", DIM))
         );
         println!(
-            "  {}",
-            colorize("  klyntbot channels login <channel>", DIM)
+            "{}",
+            draw_step_line(&colorize("  klyntbot channels login <channel>", DIM))
         );
+        println!("{}", colorize(chars.vertical, BRAND));
         return Ok(StepResult::Skip);
     }
 
     channels::configure_channels(&mut state.config).await?;
     Ok(StepResult::Next)
+}
+
+/// Print the global wizard header (shown once at the start).
+fn print_wizard_header() {
+    println!();
+    println!("{}", colorize("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", BRAND));
+    println!("{}", draw_step_line(&colorize("klyntbot", BOLD)));
+    println!("{}", draw_step_line(&colorize("Your AI Assistant Platform", DIM)));
+    println!("{}", colorize("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━", BRAND));
+    println!();
 }
 
 /// Print the completion screen after all steps finish.

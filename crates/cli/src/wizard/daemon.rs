@@ -57,28 +57,33 @@ impl WizardModule for DaemonModule {
 /// Run the daemon setup wizard step.
 /// Returns true if daemon was configured, false if skipped.
 pub fn configure_daemon(config: &mut Config) -> Result<bool> {
+    let chars = BoxChars::get();
+
     let wants_daemon = prompts::prompt_yes_no(
-        "Would you like to set up klyntbot as a background service?",
+        "Set up klyntbot as a background service?",
         false,
     )?;
     if !wants_daemon {
         println!(
-            "\n  {} Skipping daemon setup {}",
+            "{} {} Skipping daemon setup {}",
+            colorize(chars.vertical, BRAND),
             status_disabled(),
             colorize("(run manually with: klyntbot serve)", DIM)
         );
         return Ok(false);
     }
 
-    println!();
+    println!("{}", colorize(chars.vertical, BRAND));
 
     // Step 1: Configure gateway port
     configure_gateway(config)?;
 
     // Step 2: Generate service file
     let platform = detect_platform();
+    println!("{}", colorize(chars.vertical, BRAND));
     println!(
-        "\n  Detected platform: {}",
+        "{} Detected platform: {}",
+        colorize(chars.vertical, BRAND),
         colorize(platform.name(), BOLD)
     );
 
@@ -88,19 +93,22 @@ pub fn configure_daemon(config: &mut Config) -> Result<bool> {
         Platform::Windows => show_windows_guidance()?,
         Platform::Unknown => {
             println!(
-                "  {} Unsupported platform for automatic service setup",
+                "{} {} Unsupported platform for automatic service setup",
+                colorize(chars.vertical, BRAND),
                 status_warning()
             );
             println!(
-                "  {}",
-                colorize("Run manually: klyntbot serve", DIM)
+                "{}",
+                draw_step_line(&colorize("Run manually: klyntbot serve", DIM))
             );
             return Ok(false);
         }
     }
 
+    println!("{}", colorize(chars.vertical, BRAND));
     println!(
-        "\n  {} Daemon configuration complete",
+        "{} {} Daemon configuration complete",
+        colorize(chars.vertical, BRAND),
         status_success()
     );
 
