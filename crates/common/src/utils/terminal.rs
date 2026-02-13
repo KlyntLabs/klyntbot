@@ -47,6 +47,18 @@ pub const DIM: &str = "\x1b[90m";
 /// Dim gray for separators
 pub const SEPARATOR: &str = "\x1b[2;90m";
 
+/// Orange for brand/primary actions (Klyntbot theme color)
+pub const BRAND: &str = "\x1b[38;5;208m";
+
+/// Bright orange for highlights
+pub const HIGHLIGHT: &str = "\x1b[38;5;214m";
+
+/// Blue for informational elements
+pub const INFO: &str = "\x1b[34m";
+
+/// Magenta for special elements
+pub const ACCENT: &str = "\x1b[35m";
+
 /// Bold text
 pub const BOLD: &str = "\x1b[1m";
 
@@ -114,6 +126,292 @@ pub fn status_error() -> String {
 /// Returns a yellow exclamation mark for warnings
 pub fn status_warning() -> String {
     colorize("!", WARNING)
+}
+
+/// Returns an orange arrow indicator for in-progress items
+pub fn status_progress() -> String {
+    colorize("→", BRAND)
+}
+
+/// Returns an orange filled circle for active items
+pub fn status_active() -> String {
+    colorize("●", BRAND)
+}
+
+// ============================================================================
+// Enhanced Wizard UI Components
+// ============================================================================
+
+/// Draws a progress bar for wizard steps with connecting lines
+pub fn draw_step_progress(current: usize, total: usize) -> String {
+    if total == 0 {
+        return String::new();
+    }
+
+    let mut result = String::new();
+
+    for i in 1..=total {
+        if i == current {
+            // Current step - orange filled circle
+            result.push_str(&colorize("●", BRAND));
+        } else if i < current {
+            // Completed step - green checkmark
+            result.push_str(&colorize("✓", SUCCESS));
+        } else {
+            // Future step - dim circle
+            result.push_str(&colorize("○", DIM));
+        }
+
+        // Add connector line (except after last step)
+        if i < total {
+            let connector = if i < current {
+                colorize("─", SUCCESS)  // Completed section - green
+            } else if i == current {
+                colorize("─", BRAND)    // Current section - orange
+            } else {
+                colorize("─", DIM)      // Future section - dim
+            };
+            result.push_str(&connector);
+        }
+    }
+
+    result.push('\n');
+    result
+}
+
+/// Draws an enhanced step header with orange branding and progress
+pub fn draw_wizard_step_header(current: usize, total: usize, title: &str, subtitle: &str) -> String {
+    let mut result = String::new();
+
+    // Progress bar with connecting lines
+    result.push_str(&draw_step_progress(current, total));
+
+    // Step number and title with orange branding - compact spacing
+    result.push_str(&format!(
+        "{} {}\n",
+        colorize(&format!("Step {} of {}", current, total), BRAND),
+        colorize(title, BOLD)
+    ));
+
+    // Subtitle in dim text (only if provided) - no extra newline
+    if !subtitle.is_empty() {
+        result.push_str(&format!("{}\n", colorize(subtitle, DIM)));
+    }
+
+    result
+}
+
+/// Draws a validation result with color-coded status
+pub fn draw_validation_result(label: &str, success: bool, message: &str) -> String {
+    let icon = if success {
+        colorize("✓", SUCCESS)
+    } else {
+        colorize("✗", ERROR)
+    };
+
+    let label_colored = if success {
+        colorize(label, SUCCESS)
+    } else {
+        colorize(label, ERROR)
+    };
+
+    format!("  {} {} {}", icon, label_colored, colorize(message, DIM))
+}
+
+/// Draws a section header with orange accent
+pub fn draw_section_header(title: &str) -> String {
+    let chars = BoxChars::get();
+    format!(
+        "\n  {} {}\n",
+        colorize(chars.vertical_right, BRAND),
+        colorize(title, BOLD)
+    )
+}
+
+/// Draws an info box with orange border
+pub fn draw_info_box(content: &str) -> String {
+    let chars = BoxChars::get();
+    let lines: Vec<&str> = content.lines().collect();
+
+    let max_width = lines
+        .iter()
+        .map(|line| line.chars().count())
+        .max()
+        .unwrap_or(0);
+
+    let mut result = String::new();
+
+    // Top border with orange
+    result.push_str(&format!(
+        "  {}{}{}{}\n",
+        colorize(chars.top_left, BRAND),
+        colorize(&chars.horizontal.repeat(max_width + 2), BRAND),
+        colorize(chars.top_right, BRAND),
+        color(RESET)
+    ));
+
+    // Content lines
+    for line in lines {
+        let padding = max_width.saturating_sub(line.chars().count());
+        result.push_str(&format!(
+            "  {}{} {}{}{}",
+            colorize(chars.vertical, BRAND),
+            color(RESET),
+            line,
+            " ".repeat(padding),
+            colorize(chars.vertical, BRAND)
+        ));
+        result.push('\n');
+    }
+
+    // Bottom border
+    result.push_str(&format!(
+        "  {}{}{}{}\n",
+        colorize(chars.bottom_left, BRAND),
+        colorize(&chars.horizontal.repeat(max_width + 2), BRAND),
+        colorize(chars.bottom_right, BRAND),
+        color(RESET)
+    ));
+
+    result
+}
+
+/// Draws a warning box with yellow border
+pub fn draw_warning_box(content: &str) -> String {
+    let chars = BoxChars::get();
+    let lines: Vec<&str> = content.lines().collect();
+
+    let max_width = lines
+        .iter()
+        .map(|line| line.chars().count())
+        .max()
+        .unwrap_or(0);
+
+    let mut result = String::new();
+
+    // Top border with warning icon
+    result.push_str(&format!(
+        "  {} {} {}\n",
+        colorize(chars.top_left, WARNING),
+        colorize("⚠", WARNING),
+        colorize(&format!("{}{}", chars.horizontal.repeat(max_width), chars.top_right), WARNING)
+    ));
+
+    // Content lines
+    for line in lines {
+        let padding = max_width.saturating_sub(line.chars().count());
+        result.push_str(&format!(
+            "  {}{} {}{}{}",
+            colorize(chars.vertical, WARNING),
+            color(RESET),
+            line,
+            " ".repeat(padding),
+            colorize(chars.vertical, WARNING)
+        ));
+        result.push('\n');
+    }
+
+    // Bottom border
+    result.push_str(&format!(
+        "  {}{}{}\n",
+        colorize(chars.bottom_left, WARNING),
+        colorize(&chars.horizontal.repeat(max_width + 2), WARNING),
+        colorize(chars.bottom_right, WARNING)
+    ));
+
+    result
+}
+
+/// Draws an error box with red border and error icon
+pub fn draw_error_box(content: &str) -> String {
+    let chars = BoxChars::get();
+    let lines: Vec<&str> = content.lines().collect();
+
+    let max_width = lines
+        .iter()
+        .map(|line| line.chars().count())
+        .max()
+        .unwrap_or(0);
+
+    let mut result = String::new();
+
+    // Top border with error icon
+    result.push_str(&format!(
+        "  {} {} {}\n",
+        colorize(chars.top_left, ERROR),
+        colorize("✗", ERROR),
+        colorize(&format!("{}{}", chars.horizontal.repeat(max_width), chars.top_right), ERROR)
+    ));
+
+    // Content lines
+    for line in lines {
+        let padding = max_width.saturating_sub(line.chars().count());
+        result.push_str(&format!(
+            "  {}{} {}{}{}",
+            colorize(chars.vertical, ERROR),
+            color(RESET),
+            line,
+            " ".repeat(padding),
+            colorize(chars.vertical, ERROR)
+        ));
+        result.push('\n');
+    }
+
+    // Bottom border
+    result.push_str(&format!(
+        "  {}{}{}\n",
+        colorize(chars.bottom_left, ERROR),
+        colorize(&chars.horizontal.repeat(max_width + 2), ERROR),
+        colorize(chars.bottom_right, ERROR)
+    ));
+
+    result
+}
+
+/// Draws a success box with green border and checkmark
+pub fn draw_success_box(content: &str) -> String {
+    let chars = BoxChars::get();
+    let lines: Vec<&str> = content.lines().collect();
+
+    let max_width = lines
+        .iter()
+        .map(|line| line.chars().count())
+        .max()
+        .unwrap_or(0);
+
+    let mut result = String::new();
+
+    // Top border with success icon
+    result.push_str(&format!(
+        "  {} {} {}\n",
+        colorize(chars.top_left, SUCCESS),
+        colorize("✓", SUCCESS),
+        colorize(&format!("{}{}", chars.horizontal.repeat(max_width), chars.top_right), SUCCESS)
+    ));
+
+    // Content lines
+    for line in lines {
+        let padding = max_width.saturating_sub(line.chars().count());
+        result.push_str(&format!(
+            "  {}{} {}{}{}",
+            colorize(chars.vertical, SUCCESS),
+            color(RESET),
+            line,
+            " ".repeat(padding),
+            colorize(chars.vertical, SUCCESS)
+        ));
+        result.push('\n');
+    }
+
+    // Bottom border
+    result.push_str(&format!(
+        "  {}{}{}\n",
+        colorize(chars.bottom_left, SUCCESS),
+        colorize(&chars.horizontal.repeat(max_width + 2), SUCCESS),
+        colorize(chars.bottom_right, SUCCESS)
+    ));
+
+    result
 }
 
 // ============================================================================

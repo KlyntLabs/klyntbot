@@ -27,3 +27,13 @@ serde.workspace = true
 serde_json.workspace = true
 chrono.workspace = true
 dirs.workspace = true
+reqwest.workspace = true
+url.workspace = true
+tokio-tungstenite = { workspace = true }
+async-imap = { workspace = true }
+native-tls = { workspace = true }
+tokio-native-tls = { workspace = true }
+lettre = { workspace = true }
+
+[dev-dependencies]
+tempfile.workspace = true

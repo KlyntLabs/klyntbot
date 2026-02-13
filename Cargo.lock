@@ -419,6 +419,7 @@ version = "0.1.0"
 dependencies = [
  "agent",
  "anyhow",
+ "async-imap",
  "bus",
  "channels",
  "chrono",
@@ -427,17 +428,24 @@ dependencies = [
  "config",
  "dirs",
  "heartbeat",
+ "lettre",
+ "native-tls",
  "providers",
+ "reqwest",
  "rustyline",
  "scheduling",
  "serde",
  "serde_json",
  "session",
+ "tempfile",
  "tokio",
+ "tokio-native-tls",
+ "tokio-tungstenite",
  "tokio-util",
  "tools",
  "tracing",
  "tracing-subscriber",
+ "url",
 ]
 
 [[package]]
