@@ -107,8 +107,12 @@ impl AgentLoop {
         let workspace = config.workspace_path();
 
         // Create context builder
-        let mut context_builder =
-            ContextBuilder::new(workspace.clone(), Some(Arc::clone(&todo_store))).await;
+        let mut context_builder = ContextBuilder::new(
+            workspace.clone(),
+            config.timezone.clone(),
+            Some(Arc::clone(&todo_store)),
+        )
+        .await;
         context_builder.init().await.map_err(|e| {
             common::KlyntbotError::Config(common::ConfigError::Invalid(format!(
                 "Failed to initialize context: {}",
@@ -192,10 +196,12 @@ impl AgentLoop {
             let calendar_adapter = Arc::new(CalendarSyncAdapter::new(
                 Arc::clone(&todo_store),
                 config.calendar.clone(),
+                config.timezone.clone(),
             )?);
 
             // Inject calendar handler into TodoTool for immediate sync
-            todo_tool = todo_tool.with_calendar_handler(Arc::clone(&calendar_adapter) as Arc<dyn CalendarHandler>);
+            todo_tool = todo_tool
+                .with_calendar_handler(Arc::clone(&calendar_adapter) as Arc<dyn CalendarHandler>);
 
             tool_registry.register(CalendarTool::new(calendar_adapter));
         }

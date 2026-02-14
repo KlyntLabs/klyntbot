@@ -56,23 +56,42 @@ fn render_priority(priority: u8) -> String {
     colorize(&badge, color)
 }
 
-/// Parse a due date string (YYYY-MM-DD) to DateTime<Utc>
-fn parse_due_date(date_str: &str) -> Result<chrono::DateTime<chrono::Utc>> {
-    use chrono::{NaiveDate, Utc};
+/// Parse a due date string (YYYY-MM-DD) to DateTime<Utc>.
+/// Interprets the date as midnight in the configured timezone, then converts to UTC.
+fn parse_due_date(date_str: &str, timezone: &str) -> Result<chrono::DateTime<chrono::Utc>> {
+    use chrono::{NaiveDate, TimeZone, Utc};
+    use chrono_tz::Tz;
 
     let naive = NaiveDate::parse_from_str(date_str, "%Y-%m-%d")?;
     let naive_datetime = naive
         .and_hms_opt(0, 0, 0)
         .ok_or_else(|| anyhow::anyhow!("Invalid date"))?;
 
-    Ok(chrono::DateTime::<Utc>::from_naive_utc_and_offset(
-        naive_datetime,
-        Utc,
-    ))
+    let tz: Tz = timezone
+        .parse()
+        .map_err(|_| anyhow::anyhow!("Invalid timezone: {}", timezone))?;
+
+    tz.from_local_datetime(&naive_datetime)
+        .earliest()
+        .map(|dt| dt.with_timezone(&Utc))
+        .ok_or_else(|| anyhow::anyhow!("Ambiguous datetime for timezone {}", timezone))
+}
+
+/// Format a UTC datetime for display in the user's timezone
+pub(super) fn format_date_local(
+    dt: &chrono::DateTime<chrono::Utc>,
+    timezone: &str,
+    fmt: &str,
+) -> String {
+    if let Ok(tz) = timezone.parse::<chrono_tz::Tz>() {
+        dt.with_timezone(&tz).format(fmt).to_string()
+    } else {
+        dt.format(fmt).to_string()
+    }
 }
 
 /// Show detailed task view (used by show and list)
-fn show_task_details(todo: &Todo) {
+fn show_task_details(todo: &Todo, timezone: &str) {
     println!(
         "{}",
         colorize(
@@ -98,7 +117,7 @@ fn show_task_details(todo: &Todo) {
         colorize("│", BRAND),
         colorize(&todo.id, TOOL),
         todo.status,
-        todo.created_at.format("%b %d"),
+        format_date_local(&todo.created_at, timezone, "%b %d"),
         colorize("  │", BRAND)
     );
     println!(
@@ -144,10 +163,11 @@ fn show_task_details(todo: &Todo) {
     // Due date
     if let Some(due) = &todo.due_date {
         let now = chrono::Utc::now();
+        let formatted = format_date_local(due, timezone, "%Y-%m-%d");
         let due_str = if *due < now {
-            colorize(&format!("{} (OVERDUE)", due.format("%Y-%m-%d")), ERROR)
+            colorize(&format!("{} (OVERDUE)", formatted), ERROR)
         } else {
-            colorize(&due.format("%Y-%m-%d").to_string(), DIM)
+            colorize(&formatted, DIM)
         };
         println!(
             "{}  Due:         {}{}",

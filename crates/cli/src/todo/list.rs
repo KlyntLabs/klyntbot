@@ -91,7 +91,13 @@ pub async fn handle_list(
             if *due < now {
                 print!("  {}", colorize("OVERDUE", ERROR));
             } else {
-                print!("  {}", colorize(&due.format("%b %d").to_string(), DIM));
+                // Display in user's local timezone
+                let display_date = if let Ok(tz) = config.timezone.parse::<chrono_tz::Tz>() {
+                    due.with_timezone(&tz).format("%b %d").to_string()
+                } else {
+                    due.format("%b %d").to_string()
+                };
+                print!("  {}", colorize(&display_date, DIM));
             }
         }
 
@@ -110,7 +116,7 @@ pub async fn handle_show(id: &str) -> Result<()> {
 
     match todo {
         Some(t) => {
-            show_task_details(&t);
+            show_task_details(&t, &config.timezone);
             Ok(())
         }
         None => {

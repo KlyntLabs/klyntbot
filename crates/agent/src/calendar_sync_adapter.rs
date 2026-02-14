@@ -32,11 +32,13 @@ impl CalendarSyncAdapter {
     pub fn new(
         todo_store: Arc<RwLock<TodoStore>>,
         config: CalendarConfig,
+        timezone: String,
     ) -> Result<Self> {
         let caldav_client = CalDavClient::new(
             config.caldav_url.clone(),
             config.username.clone(),
             config.password.expose().to_string(),
+            timezone,
         );
 
         let conflicts_path = dirs::home_dir()
@@ -101,7 +103,14 @@ impl CalendarSyncAdapter {
             let base = if current_url.contains("://") {
                 current_url.split('/').take(3).collect::<Vec<_>>().join("/")
             } else {
-                format!("https://{}", current_url.trim_start_matches("https://").split('/').next().unwrap_or("caldav.icloud.com"))
+                format!(
+                    "https://{}",
+                    current_url
+                        .trim_start_matches("https://")
+                        .split('/')
+                        .next()
+                        .unwrap_or("caldav.icloud.com")
+                )
             };
             format!("{}{}", base, discovered_calendar_url)
         };
@@ -158,7 +167,8 @@ impl CalendarSyncAdapter {
                         self.log_conflict(remote_event, &local_event).await?;
 
                         // Resolve using server-wins strategy
-                        let resolved_event = SyncEngine::resolve_conflict(remote_event, &local_event);
+                        let resolved_event =
+                            SyncEngine::resolve_conflict(remote_event, &local_event);
                         self.update_todo_from_event(&mut store, &local_todo.id, &resolved_event)
                             .await?;
                     } else {
@@ -174,7 +184,8 @@ impl CalendarSyncAdapter {
                 events_pulled += 1;
             } else {
                 // New event from server - create local todo
-                self.create_todo_from_event(&mut store, remote_event).await?;
+                self.create_todo_from_event(&mut store, remote_event)
+                    .await?;
                 events_pulled += 1;
             }
         }
@@ -202,8 +213,7 @@ impl CalendarSyncAdapter {
                                     Ok(_) => {
                                         events_pushed += 1;
                                     }
-                                    Err(_e) => {
-                                    }
+                                    Err(_e) => {}
                                 }
                             }
                             Err(e) => {
@@ -416,10 +426,7 @@ impl CalendarHandler for CalendarSyncAdapter {
 
         // Filter to upcoming events only
         let now = Utc::now();
-        let mut upcoming: Vec<_> = events
-            .into_iter()
-            .filter(|e| e.start >= now)
-            .collect();
+        let mut upcoming: Vec<_> = events.into_iter().filter(|e| e.start >= now).collect();
 
         // Sort by start time
         upcoming.sort_by_key(|e| e.start);
@@ -553,7 +560,7 @@ mod tests {
             auto_sync_due_dates: true,
         };
 
-        let adapter = CalendarSyncAdapter::new(todo_store, config);
+        let adapter = CalendarSyncAdapter::new(todo_store, config, "UTC".to_string());
         assert!(adapter.is_ok());
     }
 
@@ -574,7 +581,7 @@ mod tests {
             auto_sync_due_dates: true,
         };
 
-        let adapter = CalendarSyncAdapter::new(todo_store, config).unwrap();
+        let adapter = CalendarSyncAdapter::new(todo_store, config, "UTC".to_string()).unwrap();
 
         let now = Utc::now();
         let due_date = now + Duration::hours(2);
@@ -631,7 +638,7 @@ mod tests {
             auto_sync_due_dates: true,
         };
 
-        let adapter = CalendarSyncAdapter::new(todo_store, config).unwrap();
+        let adapter = CalendarSyncAdapter::new(todo_store, config, "UTC".to_string()).unwrap();
 
         let now = Utc::now();
 

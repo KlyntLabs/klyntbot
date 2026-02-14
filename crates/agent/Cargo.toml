@@ -28,6 +28,7 @@ futures-util.workspace = true
 tokio-util.workspace = true
 dirs.workspace = true
 async-trait.workspace = true
+chrono-tz = { workspace = true }
 
 [dev-dependencies]
 tempfile.workspace = true

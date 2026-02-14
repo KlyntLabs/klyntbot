@@ -24,5 +24,8 @@ async fn test_icloud_discovery() {
         }
     }
 
-    assert!(result.is_ok(), "Discovery should succeed with valid credentials");
+    assert!(
+        result.is_ok(),
+        "Discovery should succeed with valid credentials"
+    );
 }

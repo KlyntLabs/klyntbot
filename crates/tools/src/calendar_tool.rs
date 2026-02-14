@@ -121,11 +121,9 @@ impl Tool for CalendarTool {
                 Ok(serde_json::to_string_pretty(&result)
                     .unwrap_or_else(|_| "Calendar status retrieved".to_string()))
             }
-            _ => Err(ToolError::InvalidParams(format!(
-                "Unknown calendar action: {}",
-                action
-            ))
-            .into()),
+            _ => {
+                Err(ToolError::InvalidParams(format!("Unknown calendar action: {}", action)).into())
+            }
         }
     }
 }

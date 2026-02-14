@@ -11,16 +11,19 @@ pub struct CalDavClient {
     username: String,
     password: String,
     http_client: Client,
+    /// IANA timezone name for generating iCalendar events (e.g., "Asia/Bangkok")
+    timezone: String,
 }
 
 impl CalDavClient {
     /// Create a new CalDAV client
-    pub fn new(calendar_url: String, username: String, password: String) -> Self {
+    pub fn new(calendar_url: String, username: String, password: String, timezone: String) -> Self {
         Self {
             calendar_url,
             username,
             password,
             http_client: Client::new(),
+            timezone,
         }
     }
 
@@ -47,21 +50,15 @@ impl CalDavClient {
         let well_known_url = format!("{}/.well-known/caldav", base_url.trim_end_matches('/'));
         tracing::debug!("CalDAV discovery: checking {}", well_known_url);
 
-        let principal_url = match Self::discover_principal_url(
-            &http_client,
-            &well_known_url,
-            username,
-            password,
-        )
-        .await
-        {
-            Ok(url) => {
-                url
-            }
-            Err(e) => {
-                return Err(e);
-            }
-        };
+        let principal_url =
+            match Self::discover_principal_url(&http_client, &well_known_url, username, password)
+                .await
+            {
+                Ok(url) => url,
+                Err(e) => {
+                    return Err(e);
+                }
+            };
 
         tracing::debug!("CalDAV discovery: found principal URL: {}", principal_url);
 
@@ -75,15 +72,16 @@ impl CalDavClient {
         )
         .await
         {
-            Ok(url) => {
-                url
-            }
+            Ok(url) => url,
             Err(e) => {
                 return Err(e);
             }
         };
 
-        tracing::debug!("CalDAV discovery: found calendar-home-set: {}", calendar_home_url);
+        tracing::debug!(
+            "CalDAV discovery: found calendar-home-set: {}",
+            calendar_home_url
+        );
 
         // Step 3: List calendars and find the one we want
         let calendar_url = Self::find_calendar(
@@ -120,7 +118,10 @@ impl CalDavClient {
             }
         };
 
-        tracing::info!("CalDAV discovery: selected calendar URL: {}", full_calendar_url);
+        tracing::info!(
+            "CalDAV discovery: selected calendar URL: {}",
+            full_calendar_url
+        );
 
         Ok(full_calendar_url)
     }
@@ -140,7 +141,10 @@ impl CalDavClient {
 </D:propfind>"#;
 
         let response = http_client
-            .request(reqwest::Method::from_bytes(b"PROPFIND").unwrap(), well_known_url)
+            .request(
+                reqwest::Method::from_bytes(b"PROPFIND").unwrap(),
+                well_known_url,
+            )
             .basic_auth(username, Some(password))
             .header(header::CONTENT_TYPE, "application/xml; charset=utf-8")
             .header("Depth", "0")
@@ -155,7 +159,10 @@ impl CalDavClient {
             })?;
 
         match response.status() {
-            StatusCode::MULTI_STATUS | StatusCode::OK | StatusCode::MOVED_PERMANENTLY | StatusCode::FOUND => {
+            StatusCode::MULTI_STATUS
+            | StatusCode::OK
+            | StatusCode::MOVED_PERMANENTLY
+            | StatusCode::FOUND => {
                 let body = response.text().await.map_err(|e| {
                     KlyntbotError::Calendar(CalendarError::ProtocolError(e.to_string()))
                 })?;
@@ -196,7 +203,6 @@ impl CalDavClient {
             format!("{}{}", base_host, principal_url)
         };
 
-
         let response = http_client
             .request(reqwest::Method::from_bytes(b"PROPFIND").unwrap(), &full_url)
             .basic_auth(username, Some(password))
@@ -205,9 +211,7 @@ impl CalDavClient {
             .body(propfind_body)
             .send()
             .await
-            .map_err(|e| {
-                KlyntbotError::Calendar(CalendarError::ConnectionFailed(e.to_string()))
-            })?;
+            .map_err(|e| KlyntbotError::Calendar(CalendarError::ConnectionFailed(e.to_string())))?;
 
         match response.status() {
             StatusCode::MULTI_STATUS | StatusCode::OK => {
@@ -253,7 +257,6 @@ impl CalDavClient {
             format!("{}{}", base_host, calendar_home_url)
         };
 
-
         let response = http_client
             .request(reqwest::Method::from_bytes(b"PROPFIND").unwrap(), &full_url)
             .basic_auth(username, Some(password))
@@ -262,9 +265,7 @@ impl CalDavClient {
             .body(propfind_body)
             .send()
             .await
-            .map_err(|e| {
-                KlyntbotError::Calendar(CalendarError::ConnectionFailed(e.to_string()))
-            })?;
+            .map_err(|e| KlyntbotError::Calendar(CalendarError::ConnectionFailed(e.to_string())))?;
 
         match response.status() {
             StatusCode::MULTI_STATUS | StatusCode::OK => {
@@ -501,7 +502,7 @@ impl CalDavClient {
     pub async fn put_event(&self, event: &CalendarEvent) -> Result<String> {
         let base_url = self.calendar_url.trim_end_matches('/');
         let event_url = format!("{}/{}.ics", base_url, event.uid);
-        let ical_data = generate_vevent(event)?;
+        let ical_data = generate_vevent(event, &self.timezone)?;
 
         let response = self
             .http_client
@@ -511,9 +512,7 @@ impl CalDavClient {
             .body(ical_data)
             .send()
             .await
-            .map_err(|e| {
-                KlyntbotError::Calendar(CalendarError::ConnectionFailed(e.to_string()))
-            })?;
+            .map_err(|e| KlyntbotError::Calendar(CalendarError::ConnectionFailed(e.to_string())))?;
 
         match response.status() {
             StatusCode::CREATED | StatusCode::NO_CONTENT | StatusCode::OK => {
@@ -546,9 +545,7 @@ impl CalDavClient {
             .basic_auth(&self.username, Some(&self.password))
             .send()
             .await
-            .map_err(|e| {
-                KlyntbotError::Calendar(CalendarError::ConnectionFailed(e.to_string()))
-            })?;
+            .map_err(|e| KlyntbotError::Calendar(CalendarError::ConnectionFailed(e.to_string())))?;
 
         match response.status() {
             StatusCode::NO_CONTENT | StatusCode::OK | StatusCode::NOT_FOUND => Ok(()),
@@ -572,16 +569,17 @@ impl CalDavClient {
 
         let response = self
             .http_client
-            .request(reqwest::Method::from_bytes(b"REPORT").unwrap(), calendar_url)
+            .request(
+                reqwest::Method::from_bytes(b"REPORT").unwrap(),
+                calendar_url,
+            )
             .basic_auth(&self.username, Some(&self.password))
             .header(header::CONTENT_TYPE, "application/xml; charset=utf-8")
             .header("Depth", "1")
             .body(report_body)
             .send()
             .await
-            .map_err(|e| {
-                KlyntbotError::Calendar(CalendarError::ConnectionFailed(e.to_string()))
-            })?;
+            .map_err(|e| KlyntbotError::Calendar(CalendarError::ConnectionFailed(e.to_string())))?;
 
         match response.status() {
             StatusCode::MULTI_STATUS | StatusCode::OK => {
@@ -752,6 +750,7 @@ mod tests {
             "https://caldav.example.com/calendar".to_string(),
             "user@example.com".to_string(),
             "password123".to_string(),
+            "UTC".to_string(),
         );
 
         assert_eq!(client.calendar_url, "https://caldav.example.com/calendar");
@@ -765,6 +764,7 @@ mod tests {
             "https://caldav.example.com/calendar".to_string(),
             "user".to_string(),
             "pass".to_string(),
+            "UTC".to_string(),
         );
 
         let body = client.build_report_body(None);
@@ -779,6 +779,7 @@ mod tests {
             "https://caldav.example.com/calendar".to_string(),
             "user".to_string(),
             "pass".to_string(),
+            "UTC".to_string(),
         );
 
         let body = client.build_report_body(Some("token-abc-123"));
@@ -792,6 +793,7 @@ mod tests {
             "https://caldav.example.com/calendar".to_string(),
             "user".to_string(),
             "pass".to_string(),
+            "UTC".to_string(),
         );
 
         let body = client.build_propfind_body();
@@ -806,6 +808,7 @@ mod tests {
             "https://caldav.example.com/calendar".to_string(),
             "user".to_string(),
             "pass".to_string(),
+            "UTC".to_string(),
         );
 
         let xml = r#"<?xml version="1.0" encoding="utf-8"?>
@@ -847,6 +850,7 @@ END:VCALENDAR</C:calendar-data>
             "https://caldav.example.com/calendar".to_string(),
             "user".to_string(),
             "pass".to_string(),
+            "UTC".to_string(),
         );
 
         let xml = r#"<?xml version="1.0" encoding="utf-8"?>
@@ -866,6 +870,7 @@ END:VCALENDAR</C:calendar-data>
             "https://caldav.example.com/calendar".to_string(),
             "user".to_string(),
             "pass".to_string(),
+            "UTC".to_string(),
         );
 
         let xml = r#"<?xml version="1.0" encoding="utf-8"?>

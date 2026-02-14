@@ -82,6 +82,9 @@ pub struct Config {
 
     #[serde(default)]
     pub project: ProjectConfig,
+
+    #[serde(default = "default_timezone")]
+    pub timezone: String,
 }
 
 impl Config {
@@ -456,6 +459,11 @@ fn default_sync_interval_secs() -> u64 {
 
 fn default_conflict_resolution() -> String {
     "server_wins".to_string()
+}
+
+/// Auto-detect system timezone, fallback to UTC
+fn default_timezone() -> String {
+    iana_time_zone::get_timezone().unwrap_or_else(|_| "UTC".to_string())
 }
 
 /// Project management configuration

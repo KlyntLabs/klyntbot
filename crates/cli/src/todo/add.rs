@@ -26,7 +26,9 @@ pub async fn handle_add(
         title: title.clone(),
         description: description.clone(),
         priority,
-        due_date: due.as_ref().and_then(|d| parse_due_date(d).ok()),
+        due_date: due
+            .as_ref()
+            .and_then(|d| parse_due_date(d, &config.timezone).ok()),
         tags: tags
             .as_ref()
             .map(|t| t.split(',').map(|s| s.trim().to_string()).collect())
@@ -53,13 +55,13 @@ pub async fn handle_add(
     let saved_todo = store.add(todo.clone()).await?;
 
     // Show created task
-    show_task_created_box(&saved_todo);
+    show_task_created_box(&saved_todo, &config.timezone);
 
     Ok(())
 }
 
 /// Show task created box with details
-fn show_task_created_box(todo: &Todo) {
+fn show_task_created_box(todo: &Todo, timezone: &str) {
     println!(
         "{}",
         colorize("┌─ ✓ Task Created ──────────────────────────────┐", SUCCESS)
@@ -103,10 +105,11 @@ fn show_task_created_box(todo: &Todo) {
 
     // Due date
     if let Some(due) = &todo.due_date {
+        let formatted = super::format_date_local(due, timezone, "%Y-%m-%d");
         println!(
             "{}  Due:         {}{}",
             colorize("│", SUCCESS),
-            due.format("%Y-%m-%d"),
+            formatted,
             colorize("                              │", SUCCESS)
         );
     }

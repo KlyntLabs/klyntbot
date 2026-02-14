@@ -36,6 +36,7 @@ impl CachedContext {
 /// Context builder for agent prompts
 pub struct ContextBuilder {
     workspace: PathBuf,
+    timezone: String,
     memory: MemoryStore,
     skills: SkillManager,
     cached_bootstrap: Option<String>,
@@ -48,12 +49,14 @@ impl ContextBuilder {
     /// Create a new context builder
     pub async fn new(
         workspace: PathBuf,
+        timezone: String,
         todo_store: Option<std::sync::Arc<tokio::sync::RwLock<tools::todo_store::TodoStore>>>,
     ) -> Self {
         Self {
             memory: MemoryStore::new(workspace.clone()).await,
             skills: SkillManager::new(),
             workspace,
+            timezone,
             cached_bootstrap: None,
             cached_memory: None,
             cached_todo: None,
@@ -241,7 +244,18 @@ impl ContextBuilder {
     /// Build identity section with runtime info
     fn build_identity_section(&self, channel: &str, chat_id: &str) -> String {
         let now = Utc::now();
-        let date_str = now.format("%Y-%m-%d %H:%M (%A)").to_string();
+
+        // Format time in user's local timezone
+        let date_str = if let Ok(tz) = self.timezone.parse::<chrono_tz::Tz>() {
+            let local = now.with_timezone(&tz);
+            format!(
+                "{} ({})",
+                local.format("%Y-%m-%d %H:%M (%A)"),
+                self.timezone
+            )
+        } else {
+            now.format("%Y-%m-%d %H:%M (%A) (UTC)").to_string()
+        };
 
         let os = std::env::consts::OS;
         let arch = std::env::consts::ARCH;

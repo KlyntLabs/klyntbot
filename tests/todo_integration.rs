@@ -147,8 +147,12 @@ async fn test_todo_context_injection() {
 
     // Create ContextBuilder with the todo store
     let todo_store_arc = Arc::new(RwLock::new(store));
-    let mut context_builder =
-        ContextBuilder::new(workspace.clone(), Some(Arc::clone(&todo_store_arc))).await;
+    let mut context_builder = ContextBuilder::new(
+        workspace.clone(),
+        "UTC".to_string(),
+        Some(Arc::clone(&todo_store_arc)),
+    )
+    .await;
 
     // Initialize (this loads skills from workspace - will be empty for test)
     context_builder.init().await.unwrap();
@@ -235,8 +239,12 @@ async fn test_todo_context_injection() {
     // Test empty store scenario - verify no "(no focused tasks)" leaks through
     let empty_store = TodoStore::new(temp_dir.path().join("empty.jsonl"));
     let empty_store_arc = Arc::new(RwLock::new(empty_store));
-    let mut empty_context_builder =
-        ContextBuilder::new(workspace, Some(Arc::clone(&empty_store_arc))).await;
+    let mut empty_context_builder = ContextBuilder::new(
+        workspace,
+        "UTC".to_string(),
+        Some(Arc::clone(&empty_store_arc)),
+    )
+    .await;
     empty_context_builder.init().await.unwrap();
 
     let empty_messages = empty_context_builder

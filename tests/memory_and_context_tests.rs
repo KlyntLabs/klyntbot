@@ -11,7 +11,7 @@ async fn test_context_builder_init() {
     let workspace = temp_dir.path().join("workspace");
     std::fs::create_dir_all(&workspace).unwrap();
 
-    let mut context_builder = ContextBuilder::new(workspace, None).await;
+    let mut context_builder = ContextBuilder::new(workspace, "UTC".to_string(), None).await;
     let result = context_builder.init().await;
     assert!(result.is_ok());
 }
@@ -39,7 +39,7 @@ async fn test_context_builder_with_bootstrap_files() {
     let tools_md = workspace.join("TOOLS.md");
     std::fs::write(&tools_md, "# Tools\n\nUse tools when needed.").unwrap();
 
-    let mut context_builder = ContextBuilder::new(workspace, None).await;
+    let mut context_builder = ContextBuilder::new(workspace, "UTC".to_string(), None).await;
     context_builder.init().await.unwrap();
 
     // Build messages
@@ -110,7 +110,7 @@ async fn test_daily_notes_structure() {
     // Verify file exists
     assert!(daily_note.exists());
 
-    let mut context_builder = ContextBuilder::new(workspace, None).await;
+    let mut context_builder = ContextBuilder::new(workspace, "UTC".to_string(), None).await;
     context_builder.init().await.unwrap();
 
     // Build messages
@@ -128,7 +128,7 @@ async fn test_context_builder_with_history() {
     let workspace = temp_dir.path().join("workspace");
     std::fs::create_dir_all(&workspace).unwrap();
 
-    let mut context_builder = ContextBuilder::new(workspace, None).await;
+    let mut context_builder = ContextBuilder::new(workspace, "UTC".to_string(), None).await;
     context_builder.init().await.unwrap();
 
     // Create conversation history
@@ -175,7 +175,7 @@ async fn test_bootstrap_files_optional() {
 
     // Don't create any bootstrap files - should still work
 
-    let mut context_builder = ContextBuilder::new(workspace, None).await;
+    let mut context_builder = ContextBuilder::new(workspace, "UTC".to_string(), None).await;
     let result = context_builder.init().await;
 
     // Should initialize successfully even without bootstrap files
@@ -231,7 +231,7 @@ async fn test_context_builder_with_media() {
     let workspace = temp_dir.path().join("workspace");
     std::fs::create_dir_all(&workspace).unwrap();
 
-    let mut context_builder = ContextBuilder::new(workspace, None).await;
+    let mut context_builder = ContextBuilder::new(workspace, "UTC".to_string(), None).await;
     context_builder.init().await.unwrap();
 
     // Create test media paths
@@ -260,8 +260,8 @@ async fn test_multiple_context_builders() {
     std::fs::create_dir_all(&workspace).unwrap();
 
     // Create two context builders
-    let mut builder1 = ContextBuilder::new(workspace.clone(), None).await;
-    let mut builder2 = ContextBuilder::new(workspace.clone(), None).await;
+    let mut builder1 = ContextBuilder::new(workspace.clone(), "UTC".to_string(), None).await;
+    let mut builder2 = ContextBuilder::new(workspace.clone(), "UTC".to_string(), None).await;
 
     // Both should initialize successfully
     assert!(builder1.init().await.is_ok());
@@ -286,7 +286,7 @@ async fn test_context_with_channel_info() {
     let workspace = temp_dir.path().join("workspace");
     std::fs::create_dir_all(&workspace).unwrap();
 
-    let mut context_builder = ContextBuilder::new(workspace, None).await;
+    let mut context_builder = ContextBuilder::new(workspace, "UTC".to_string(), None).await;
     context_builder.init().await.unwrap();
 
     // Build messages with different channel/chat combinations
@@ -310,7 +310,7 @@ async fn test_empty_conversation_history() {
     let workspace = temp_dir.path().join("workspace");
     std::fs::create_dir_all(&workspace).unwrap();
 
-    let mut context_builder = ContextBuilder::new(workspace, None).await;
+    let mut context_builder = ContextBuilder::new(workspace, "UTC".to_string(), None).await;
     context_builder.init().await.unwrap();
 
     // Build messages with empty history
@@ -329,7 +329,7 @@ async fn test_long_conversation_history() {
     let workspace = temp_dir.path().join("workspace");
     std::fs::create_dir_all(&workspace).unwrap();
 
-    let mut context_builder = ContextBuilder::new(workspace, None).await;
+    let mut context_builder = ContextBuilder::new(workspace, "UTC".to_string(), None).await;
     context_builder.init().await.unwrap();
 
     // Create long history
