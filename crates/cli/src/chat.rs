@@ -7,7 +7,7 @@ use common::utils::terminal::*;
 use common::utils::StreamRenderer;
 use common::FormResponse;
 use rustyline::error::ReadlineError;
-use std::io::{self, Write};
+use std::io::{self, IsTerminal, Write};
 use std::sync::Arc;
 use tools::InteractionBundle;
 
@@ -20,12 +20,8 @@ pub async fn handle_chat(message: Option<String>, session: String) -> Result<()>
     let config = config::load()?;
     let model = config.agents.defaults.model.clone();
 
-    // Clean startup header
-    println!(
-        "\n  {} {}",
-        colorize("klyntbot", "\x1b[1;36m"), // bold cyan
-        colorize(&format!("\u{00b7} {}", model), DIM)
-    );
+    // Startup banner
+    print!("{}", draw_banner(&model));
 
     // Initialize LLM provider
     let provider = providers::create_provider(&config)?;
@@ -42,10 +38,15 @@ pub async fn handle_chat(message: Option<String>, session: String) -> Result<()>
     // Handle single message or interactive mode
     if let Some(msg) = message {
         // Single message mode
-        println!("\n{} {}", colorize("You:", PROMPT), msg);
+        let badge = if colors_enabled() {
+            "\x1b[48;5;236m\x1b[38;5;208m > \x1b[0m".to_string()
+        } else {
+            ">".to_string()
+        };
+        println!("\n{} {}", badge, msg);
         println!();
 
-        run_with_streaming(&agent_loop, msg, session_key).await?;
+        run_with_streaming(&agent_loop, msg, session_key, &model).await?;
     } else {
         // Interactive REPL mode with rustyline
         let history_path = dirs::home_dir()
@@ -64,13 +65,14 @@ pub async fn handle_chat(message: Option<String>, session: String) -> Result<()>
         editor.set_helper(Some(helper));
         let _ = editor.load_history(&history_path);
 
-        println!(
-            "\n{}",
-            colorize("Interactive chat mode. Type /help for commands.\n", DIM)
-        );
+        println!();
 
         loop {
-            let prompt = format!("{} ", colorize("klyntbot>", "\x1b[1;36m")); // bold cyan
+            let prompt = if colors_enabled() {
+                "\x1b[48;5;236m\x1b[38;5;208m > \x1b[0m ".to_string()
+            } else {
+                "> ".to_string()
+            };
             let readline = editor.readline(&prompt);
 
             match readline {
@@ -176,6 +178,7 @@ pub async fn handle_chat(message: Option<String>, session: String) -> Result<()>
                                     &agent_loop,
                                     paste_message,
                                     session_key.clone(),
+                                    &model,
                                 )
                                 .await
                                 {
@@ -204,9 +207,13 @@ pub async fn handle_chat(message: Option<String>, session: String) -> Result<()>
 
                     // Process the message with streaming
                     println!();
-                    if let Err(e) =
-                        run_with_streaming(&agent_loop, trimmed.to_string(), session_key.clone())
-                            .await
+                    if let Err(e) = run_with_streaming(
+                        &agent_loop,
+                        trimmed.to_string(),
+                        session_key.clone(),
+                        &model,
+                    )
+                    .await
                     {
                         eprintln!("\n{} {}\n", status_error(), e);
                     }
@@ -240,6 +247,7 @@ async fn run_with_streaming(
     agent_loop: &Arc<AgentLoop>,
     message: String,
     session_key: String,
+    model: &str,
 ) -> Result<()> {
     let handle = agent_loop
         .process_direct_streaming(message, session_key)
@@ -253,6 +261,15 @@ async fn run_with_streaming(
     } = handle;
 
     let mut renderer = StreamRenderer::new();
+
+    // Start thinking spinner (TTY only)
+    let mut spinner = if io::stdout().is_terminal() {
+        let mut s = Spinner::new(colorize("Thinking...", DIM));
+        s.start();
+        Some(s)
+    } else {
+        None
+    };
 
     // Spawn a task that cancels on Ctrl+C
     let cancel_for_signal = cancel_token.clone();
@@ -269,8 +286,21 @@ async fn run_with_streaming(
             event = event_rx.recv() => {
                 let Some(event) = event else { break };
                 match event {
-                    AgentEvent::ContentChunk(chunk) => renderer.on_content_chunk(&chunk),
-                    AgentEvent::ToolStart { name, args } => renderer.on_tool_start(&name, &args),
+                    AgentEvent::ContentChunk(chunk) => {
+                        if let Some(ref mut s) = spinner {
+                            s.stop();
+                            spinner = None;
+                            print!("{} ", colorize("◆", BRAND));
+                        }
+                        renderer.on_content_chunk(&chunk);
+                    }
+                    AgentEvent::ToolStart { name, args } => {
+                        if let Some(ref mut s) = spinner {
+                            s.stop();
+                            spinner = None;
+                        }
+                        renderer.on_tool_start(&name, &args);
+                    }
                     AgentEvent::ToolEnd {
                         name,
                         success,
@@ -295,6 +325,12 @@ async fn run_with_streaming(
             bundle = interaction_rx.recv() => {
                 let Some(InteractionBundle { request, response_tx }) = bundle else { break };
 
+                // Stop spinner if still running
+                if let Some(ref mut s) = spinner {
+                    s.stop();
+                    spinner = None;
+                }
+
                 // Pause streaming output to show interactive prompt
                 renderer.pause();
 
@@ -307,14 +343,23 @@ async fn run_with_streaming(
                     }
                 };
 
-                // Resume streaming (prompt was ~1 line of compact output)
-                renderer.resume(1);
+                // Resume streaming — account for the lines the prompt wrote:
+                //   Completed: 3-line boxed summary (top + content + bottom)
+                //   Cancelled: 1-line message
+                let prompt_lines = match &response {
+                    FormResponse::Completed(_) => 3,
+                    FormResponse::Cancelled => 1,
+                };
+                renderer.resume(prompt_lines);
 
                 // Send response back to the ask_user tool (unblocks it)
                 let _ = response_tx.send(response);
             }
         }
     }
+
+    // Ensure spinner is stopped before printing results
+    drop(spinner);
 
     // Cancel the signal watcher (no longer needed)
     signal_handle.abort();
@@ -331,23 +376,25 @@ async fn run_with_streaming(
     match result {
         Ok(_) => {
             let rendered = renderer.finalize();
-            println!("{}", rendered);
+            if !rendered.trim().is_empty() {
+                println!("{} {}", colorize("◆", BRAND), rendered);
+            }
         }
         Err(e) => {
             // Still finalize to clean up terminal cursor state
             let rendered = renderer.finalize();
             if !rendered.trim().is_empty() {
-                println!("{}", rendered);
+                println!("{} {}", colorize("◆", BRAND), rendered);
             }
             eprintln!("\n{} {}", status_error(), e);
         }
     }
 
-    // Show elapsed time
+    // Show elapsed time with model info
     let elapsed = renderer.elapsed_secs();
     println!(
         "{}\n",
-        StreamRenderer::draw_separator(Some(&format!("{:.1}s", elapsed)))
+        StreamRenderer::draw_separator(Some(&format!("{} · {:.1}s", model, elapsed)))
     );
 
     Ok(())

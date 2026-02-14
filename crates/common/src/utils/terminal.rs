@@ -139,6 +139,53 @@ pub fn status_active() -> String {
 }
 
 // ============================================================================
+// Chat Banner
+// ============================================================================
+
+/// Draws the startup banner with ASCII logo, model info, and tips.
+///
+/// In non-TTY or NO_COLOR environments, falls back to a plain one-liner.
+pub fn draw_banner(model: &str) -> String {
+    if colors_enabled() {
+        let logo = [
+            "  ╭─╮    ╭─╮",
+            "  │ │╭─╮ │ │╭─╮ ╭─╮╭─╮╭───╮",
+            "  │ ╰╯ ╰─╯ ╰╯ ╰─╯ ╰╯ ╰╯   │",
+            "  ╰──────────────────────────╯",
+        ];
+        let mut result = String::from("\n");
+        for (i, line) in logo.iter().enumerate() {
+            result.push_str(&colorize(line, BRAND));
+            if i == logo.len() - 1 {
+                result.push_str(&format!("  {}", colorize("klyntbot", BOLD)));
+            }
+            result.push('\n');
+        }
+        result.push_str(&format!(
+            "  {} {}\n",
+            colorize("Ready", SUCCESS),
+            colorize(&format!("· {}", model), DIM),
+        ));
+        result.push_str(&format!(
+            "\n  {}  {}\n",
+            colorize("Tips:", DIM),
+            colorize("1. Ask questions or give tasks", DIM),
+        ));
+        result.push_str(&format!(
+            "         {}\n",
+            colorize("2. Use /help for commands", DIM),
+        ));
+        result.push_str(&format!(
+            "         {}\n",
+            colorize("3. Press Ctrl+C to cancel", DIM),
+        ));
+        result
+    } else {
+        format!("\n  klyntbot · {}\n", model)
+    }
+}
+
+// ============================================================================
 // Enhanced Wizard UI Components
 // ============================================================================
 

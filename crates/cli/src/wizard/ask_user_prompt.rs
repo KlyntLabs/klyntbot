@@ -116,15 +116,123 @@ fn visible_len(s: &str) -> usize {
     count
 }
 
-/// Calculate how many terminal rows a string occupies, accounting for line wrapping.
-fn visual_rows(text: &str, terminal_width: u16) -> usize {
-    let width = terminal_width.max(1) as usize;
-    let len = visible_len(text);
-    if len <= width {
-        1
+// ============================================================================
+// Rounded Box Drawing
+// ============================================================================
+
+/// Characters for rounded-corner box drawing.
+struct RoundedChars {
+    top_left: &'static str,
+    top_right: &'static str,
+    bottom_left: &'static str,
+    bottom_right: &'static str,
+    horizontal: &'static str,
+    vertical: &'static str,
+    sep_left: &'static str,
+    sep_right: &'static str,
+}
+
+const ROUNDED_UNICODE: RoundedChars = RoundedChars {
+    top_left: "╭",
+    top_right: "╮",
+    bottom_left: "╰",
+    bottom_right: "╯",
+    horizontal: "─",
+    vertical: "│",
+    sep_left: "├",
+    sep_right: "┤",
+};
+
+const ROUNDED_ASCII: RoundedChars = RoundedChars {
+    top_left: "+",
+    top_right: "+",
+    bottom_left: "+",
+    bottom_right: "+",
+    horizontal: "-",
+    vertical: "|",
+    sep_left: "+",
+    sep_right: "+",
+};
+
+fn rounded_chars() -> &'static RoundedChars {
+    if colors_enabled() {
+        &ROUNDED_UNICODE
     } else {
-        (len + width - 1) / width
+        &ROUNDED_ASCII
     }
+}
+
+/// Write the top border: `  ╭─ Title ───...───╮`
+fn write_box_top(out: &mut impl Write, title: &str, inner_w: usize) -> Result<usize> {
+    let rc = rounded_chars();
+    let title_vis = visible_len(title);
+    let fill = inner_w.saturating_sub(3 + title_vis);
+    write!(
+        out,
+        "\r  {}{} {} {}{}\r\n",
+        colorize(rc.top_left, BRAND),
+        colorize(rc.horizontal, BRAND),
+        title,
+        colorize(&rc.horizontal.repeat(fill), BRAND),
+        colorize(rc.top_right, BRAND)
+    )?;
+    Ok(1)
+}
+
+/// Write a content line: `  │  content  pad  │`
+fn write_box_line(out: &mut impl Write, content: &str, inner_w: usize) -> Result<usize> {
+    let rc = rounded_chars();
+    let content_area = inner_w.saturating_sub(4);
+    let content_vis = visible_len(content);
+    let pad = content_area.saturating_sub(content_vis);
+    write!(
+        out,
+        "\r  {}  {}{}  {}\r\n",
+        colorize(rc.vertical, BRAND),
+        content,
+        " ".repeat(pad),
+        colorize(rc.vertical, BRAND)
+    )?;
+    Ok(1)
+}
+
+/// Write an empty line: `  │                │`
+fn write_box_empty(out: &mut impl Write, inner_w: usize) -> Result<usize> {
+    let rc = rounded_chars();
+    write!(
+        out,
+        "\r  {}{}{}\r\n",
+        colorize(rc.vertical, BRAND),
+        " ".repeat(inner_w),
+        colorize(rc.vertical, BRAND)
+    )?;
+    Ok(1)
+}
+
+/// Write a separator: `  ├──────────────┤`
+fn write_box_sep(out: &mut impl Write, inner_w: usize) -> Result<usize> {
+    let rc = rounded_chars();
+    write!(
+        out,
+        "\r  {}{}{}\r\n",
+        colorize(rc.sep_left, BRAND),
+        colorize(&rc.horizontal.repeat(inner_w), BRAND),
+        colorize(rc.sep_right, BRAND)
+    )?;
+    Ok(1)
+}
+
+/// Write the bottom border: `  ╰──────────────╯`
+fn write_box_bottom(out: &mut impl Write, inner_w: usize) -> Result<usize> {
+    let rc = rounded_chars();
+    write!(
+        out,
+        "\r  {}{}{}\r\n",
+        colorize(rc.bottom_left, BRAND),
+        colorize(&rc.horizontal.repeat(inner_w), BRAND),
+        colorize(rc.bottom_right, BRAND)
+    )?;
+    Ok(1)
 }
 
 // ============================================================================
@@ -307,53 +415,56 @@ impl TabbedFormState {
 // ============================================================================
 
 impl TabbedFormState {
-    /// Render the entire UI and return the number of visual rows drawn.
+    /// Render the entire UI inside a rounded-corner box.
     ///
     /// Uses `\r\n` line endings for raw-mode compatibility (plain `\n`
     /// doesn't return cursor to column 0 in raw mode).
     fn render(&self) -> Result<usize> {
         let mut out = io::stdout();
         let mut lines = 0;
-        let tw = self.terminal_width;
+        let inner_w = (self.terminal_width as usize).saturating_sub(6).max(20);
 
-        // Title
-        if !self.request.title.is_empty() {
-            write!(out, "\r\n")?;
-            lines += 1;
-            let title_str = format!("  {}", colorize(&self.request.title, BRAND));
-            write!(out, "\r{}\r\n", title_str)?;
-            lines += visual_rows(&title_str, tw);
+        // Leading blank line for spacing
+        write!(out, "\r\n")?;
+        lines += 1;
 
-            // Separator line
-            let sep_width = 48.min(tw as usize - 4);
-            let sep = "─".repeat(sep_width);
-            write!(out, "\r  {}\r\n", colorize(&sep, DIM))?;
-            lines += 1;
-        }
+        // Box title
+        let title = if self.request.title.is_empty() {
+            colorize("Question", BOLD)
+        } else {
+            colorize(&self.request.title, BOLD)
+        };
+        lines += write_box_top(&mut out, &title, inner_w)?;
+        lines += write_box_empty(&mut out, inner_w)?;
 
         // Tab bar (multi-question only)
         if self.num_questions() > 1 {
             let tab_line = self.render_tab_bar();
-            let tab_str = format!("    {}", tab_line);
-            write!(out, "\r{}\r\n", tab_str)?;
-            lines += visual_rows(&tab_str, tw);
+            lines += write_box_line(&mut out, &tab_line, inner_w)?;
+            lines += write_box_empty(&mut out, inner_w)?;
         }
 
-        write!(out, "\r\n")?;
-        lines += 1;
-
-        // Question pane
-        if self.is_on_submit_tab() {
-            lines += self.render_submit_pane(&mut out)?;
+        // Content lines
+        let content_lines = if self.is_on_submit_tab() {
+            self.submit_content_lines()
         } else {
-            lines += self.render_question_pane(&mut out)?;
+            self.question_content_lines()
+        };
+        for line in &content_lines {
+            if line.is_empty() {
+                lines += write_box_empty(&mut out, inner_w)?;
+            } else {
+                lines += write_box_line(&mut out, line, inner_w)?;
+            }
         }
 
-        // Hint bar
+        lines += write_box_empty(&mut out, inner_w)?;
+
+        // Separator and hint bar
+        lines += write_box_sep(&mut out, inner_w)?;
         let hint_line = self.render_hint_bar();
-        let hint_str = format!("    {}", colorize(&hint_line, DIM));
-        write!(out, "\r\n\r{}\r\n", hint_str)?;
-        lines += 1 + visual_rows(&hint_str, tw);
+        lines += write_box_line(&mut out, &colorize(&hint_line, DIM), inner_w)?;
+        lines += write_box_bottom(&mut out, inner_w)?;
 
         out.flush()?;
         Ok(lines)
@@ -427,16 +538,15 @@ impl TabbedFormState {
         tabs.join(&format!("  {}  ", colorize("·", DIM)))
     }
 
-    /// Render the question pane for the current question.
-    fn render_question_pane(&self, out: &mut impl Write) -> Result<usize> {
+    /// Build content lines for the current question (rendered inside the box).
+    fn question_content_lines(&self) -> Vec<String> {
         let question = &self.request.questions[self.current_tab];
         let state = &self.question_states[self.current_tab];
-        let mut lines = 0;
+        let mut lines = Vec::new();
 
         // Question text
-        write!(out, "\r    {}\r\n", question.text)?;
-        write!(out, "\r\n")?;
-        lines += 2;
+        lines.push(question.text.clone());
+        lines.push(String::new());
 
         match (&question.answer_type, state) {
             (
@@ -465,12 +575,10 @@ impl TabbedFormState {
                         option.label.clone()
                     };
 
-                    write!(out, "\r      {} {} {}\r\n", pointer, radio, label)?;
-                    lines += 1;
+                    lines.push(format!("  {} {} {}", pointer, radio, label));
 
                     if let Some(desc) = &option.description {
-                        write!(out, "\r          {}\r\n", colorize(desc, DIM))?;
-                        lines += 1;
+                        lines.push(format!("      {}", colorize(desc, DIM)));
                     }
                 }
             }
@@ -501,12 +609,10 @@ impl TabbedFormState {
                         option.label.clone()
                     };
 
-                    write!(out, "\r      {} {} {}\r\n", pointer, checkbox, label)?;
-                    lines += 1;
+                    lines.push(format!("  {} {} {}", pointer, checkbox, label));
 
                     if let Some(desc) = &option.description {
-                        write!(out, "\r          {}\r\n", colorize(desc, DIM))?;
-                        lines += 1;
+                        lines.push(format!("      {}", colorize(desc, DIM)));
                     }
                 }
             }
@@ -523,54 +629,45 @@ impl TabbedFormState {
                     colorize("○", DIM)
                 };
 
-                write!(out, "\r      {} Yes\r\n", yes_indicator)?;
-                write!(out, "\r      {} No\r\n", no_indicator)?;
-                lines += 2;
+                lines.push(format!("  {} Yes", yes_indicator));
+                lines.push(format!("  {} No", no_indicator));
             }
 
             (AnswerType::FreeText { placeholder }, QuestionState::FreeText { input }) => {
                 let prompt = colorize("▸", BRAND);
-                let cursor = colorize("▏", BRAND);
+                let caret = colorize("▏", BRAND);
                 if input.is_empty() {
                     let hint = placeholder.as_deref().unwrap_or("Type your answer...");
-                    write!(
-                        out,
-                        "\r      {} {}{}\r\n",
-                        prompt,
-                        colorize(hint, DIM),
-                        cursor
-                    )?;
+                    lines.push(format!("  {} {}{}", prompt, colorize(hint, DIM), caret));
                 } else {
-                    write!(out, "\r      {} {}{}\r\n", prompt, input, cursor)?;
+                    lines.push(format!("  {} {}{}", prompt, input, caret));
                 }
-                lines += 1;
             }
 
             _ => unreachable!("Mismatched question type and state"),
         }
 
-        Ok(lines)
+        lines
     }
 
-    /// Render the Submit/Review pane.
-    fn render_submit_pane(&self, out: &mut impl Write) -> Result<usize> {
-        let mut lines = 0;
+    /// Build content lines for the Submit/Review pane (rendered inside the box).
+    fn submit_content_lines(&self) -> Vec<String> {
+        let mut lines = Vec::new();
 
-        write!(out, "\r    Review your answers:\r\n")?;
-        write!(out, "\r\n")?;
-        lines += 2;
+        lines.push("Review your answers:".to_string());
+        lines.push(String::new());
 
-        for (question, state) in self.request.questions.iter().zip(&self.question_states) {
-            let answer_text = match state {
+        for (question, qstate) in self.request.questions.iter().zip(&self.question_states) {
+            let answer_text = match qstate {
                 QuestionState::SingleSelect { selected, .. } => {
                     if let Some(idx) = selected {
                         if let AnswerType::SingleSelect { options } = &question.answer_type {
                             options[*idx].label.clone()
                         } else {
-                            colorize("(not answered)", WARNING).to_string()
+                            colorize("(not answered)", WARNING)
                         }
                     } else {
-                        colorize("(not answered)", WARNING).to_string()
+                        colorize("(not answered)", WARNING)
                     }
                 }
                 QuestionState::MultiSelect { selected, .. } => {
@@ -587,12 +684,12 @@ impl TabbedFormState {
                             })
                             .collect();
                         if labels.is_empty() {
-                            colorize("(none selected)", WARNING).to_string()
+                            colorize("(none selected)", WARNING)
                         } else {
                             labels.join(", ")
                         }
                     } else {
-                        colorize("(not answered)", WARNING).to_string()
+                        colorize("(not answered)", WARNING)
                     }
                 }
                 QuestionState::YesNo { answer } => {
@@ -604,48 +701,36 @@ impl TabbedFormState {
                 }
                 QuestionState::FreeText { input } => {
                     if input.trim().is_empty() {
-                        colorize("(not answered)", WARNING).to_string()
+                        colorize("(not answered)", WARNING)
                     } else {
                         format!("\"{}\"", input)
                     }
                 }
             };
 
-            write!(
-                out,
-                "\r      {}  {}  {}\r\n",
+            lines.push(format!(
+                "  {}  {}  {}",
                 colorize(&question.title, DIM),
                 colorize("→", BRAND),
                 colorize(&answer_text, BOLD)
-            )?;
-            lines += 1;
+            ));
         }
 
-        write!(out, "\r\n")?;
-        lines += 1;
+        lines.push(String::new());
 
         if self.all_answered() {
-            write!(
-                out,
-                "\r    {}\r\n",
-                colorize(
-                    "Press Enter to submit, or navigate to a tab to change an answer.",
-                    DIM
-                )
-            )?;
+            lines.push(colorize(
+                "Press Enter to submit, or navigate to a tab to change an answer.",
+                DIM,
+            ));
         } else {
-            write!(
-                out,
-                "\r    {}\r\n",
-                colorize(
-                    "Answer all questions before submitting. Navigate to unanswered tabs.",
-                    WARNING
-                )
-            )?;
+            lines.push(colorize(
+                "Answer all questions before submitting. Navigate to unanswered tabs.",
+                WARNING,
+            ));
         }
-        lines += 1;
 
-        Ok(lines)
+        lines
     }
 
     /// Render the hint bar.
@@ -975,12 +1060,15 @@ pub fn prompt_multi_question(request: &InteractionRequest) -> Result<FormRespons
     }
 }
 
-/// Print a compact summary after submission.
+/// Print a compact boxed summary after submission.
 fn print_submission_summary(state: &TabbedFormState) -> Result<()> {
+    let mut out = io::stdout();
+    let inner_w = (state.terminal_width as usize).saturating_sub(6).max(20);
+
     let mut summary_parts = Vec::new();
 
-    for (question, state) in state.request.questions.iter().zip(&state.question_states) {
-        let answer_text = match state {
+    for (question, qstate) in state.request.questions.iter().zip(&state.question_states) {
+        let answer_text = match qstate {
             QuestionState::SingleSelect { selected, .. } => {
                 if let Some(idx) = selected {
                     if let AnswerType::SingleSelect { options } = &question.answer_type {
@@ -1026,14 +1114,13 @@ fn print_submission_summary(state: &TabbedFormState) -> Result<()> {
     }
 
     if !summary_parts.is_empty() {
-        write!(
-            io::stdout(),
-            "\r  {}  {}\r\n",
-            colorize("☑", SUCCESS),
-            summary_parts.join("  ·  ")
-        )?;
+        let title = format!("{} {}", colorize("☑", SUCCESS), colorize("Submitted", BOLD));
+        write_box_top(&mut out, &title, inner_w)?;
+        write_box_line(&mut out, &summary_parts.join("  ·  "), inner_w)?;
+        write_box_bottom(&mut out, inner_w)?;
     }
 
+    out.flush()?;
     Ok(())
 }
 
