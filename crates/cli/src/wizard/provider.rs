@@ -589,6 +589,308 @@ fn set_provider_api_base(config: &mut config::Config, provider_key: &str, base: 
     }
 }
 
+/// RAII guard for raw mode (same pattern as prompts.rs).
+struct RawModeGuard;
+
+impl RawModeGuard {
+    fn enable() -> Result<Self> {
+        terminal::enable_raw_mode()?;
+        Ok(Self)
+    }
+}
+
+impl Drop for RawModeGuard {
+    fn drop(&mut self) {
+        let _ = terminal::disable_raw_mode();
+    }
+}
+
+fn read_key() -> Result<KeyEvent> {
+    loop {
+        if let Event::Key(key) = event::read()? {
+            if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
+                return Err(anyhow::anyhow!("Ctrl+C"));
+            }
+            return Ok(key);
+        }
+    }
+}
+
+/// Erase `n` lines above cursor.
+fn erase_lines(n: usize) -> Result<()> {
+    let mut out = io::stdout();
+    for _ in 0..n {
+        crossterm::execute!(out, cursor::MoveUp(1), terminal::Clear(ClearType::CurrentLine))?;
+    }
+    Ok(())
+}
+
+fn execute_edit_api_key(state: &mut WizardState, provider_idx: usize) -> Result<()> {
+    let chars = BoxChars::get();
+    let provider = &PROVIDERS[provider_idx];
+    let prefix = format!("{} ", colorize(chars.vertical, BRAND));
+
+    println!(
+        "{}{} Configuring {}",
+        prefix,
+        colorize("●", BRAND),
+        colorize(provider.name, BOLD)
+    );
+    println!(
+        "{}{} Get your API key at: {}",
+        prefix,
+        colorize("→", BRAND),
+        colorize(provider.api_url, UNDERLINE)
+    );
+
+    let existing_key = get_provider_key(&state.config, provider.key);
+    let api_key = if existing_key.is_empty() {
+        prompts::prompt_secret("API Key", 10)?
+    } else {
+        match prompts::prompt_secret_with_existing("API Key", &existing_key, 10)? {
+            Some(new_key) => new_key,
+            None => existing_key.clone(),
+        }
+    };
+
+    // Validate key prefix
+    if !provider.key_prefix.is_empty() && !api_key.starts_with(provider.key_prefix) {
+        println!(
+            "{}{} {} keys usually start with '{}' — please verify",
+            prefix,
+            colorize("⚠", WARNING),
+            provider.name,
+            provider.key_prefix
+        );
+    } else if !provider.key_prefix.is_empty() {
+        println!(
+            "{}{} {}",
+            prefix,
+            colorize("✓", SUCCESS),
+            colorize("API key format validated", DIM)
+        );
+    }
+
+    state.config.set_provider_key(provider.key, api_key);
+
+    println!(
+        "{}{} {} configured",
+        prefix,
+        colorize("✓", SUCCESS),
+        colorize(provider.name, BOLD)
+    );
+
+    Ok(())
+}
+
+fn execute_change_model(state: &mut WizardState, provider_idx: usize) -> Result<()> {
+    let chars = BoxChars::get();
+    let provider = &PROVIDERS[provider_idx];
+    let prefix = format!("{} ", colorize(chars.vertical, BRAND));
+
+    println!(
+        "{}{} Select model for {}",
+        prefix,
+        colorize("●", BRAND),
+        colorize(provider.name, BOLD)
+    );
+
+    let current_model = &state.config.agents.defaults.model;
+
+    let options: Vec<prompts::SelectOption<'_>> = provider
+        .models
+        .iter()
+        .map(|m| {
+            let desc = if *m == provider.default_model {
+                "default"
+            } else {
+                ""
+            };
+            prompts::SelectOption {
+                label: m,
+                description: desc,
+            }
+        })
+        .collect();
+
+    // Find current model in list, default to first (which is the default_model)
+    let default_idx = provider
+        .models
+        .iter()
+        .position(|m| *m == current_model.as_str())
+        .unwrap_or(0);
+
+    let idx = prompts::prompt_select("Model", &options, default_idx)?;
+    state.config.agents.defaults.model = provider.models[idx].to_string();
+
+    Ok(())
+}
+
+fn execute_custom_base_url(state: &mut WizardState, provider_idx: usize) -> Result<()> {
+    let chars = BoxChars::get();
+    let provider = &PROVIDERS[provider_idx];
+    let prefix = format!("{} ", colorize(chars.vertical, BRAND));
+
+    let existing_base = get_provider_api_base(&state.config, provider.key);
+
+    if let Some(ref base) = existing_base {
+        println!("{}Current: {}", prefix, colorize(base, DIM));
+    }
+
+    let wants_custom = prompts::prompt_yes_no(
+        "Use a custom API base URL? (for proxies/self-hosted)",
+        existing_base.is_some(),
+    )?;
+
+    if wants_custom {
+        let base_url = prompts::prompt_text("API Base URL", existing_base.as_deref(), true)?;
+        set_provider_api_base(&mut state.config, provider.key, Some(base_url));
+        println!(
+            "{}{} Custom API base configured",
+            prefix,
+            colorize("✓", SUCCESS)
+        );
+    } else if existing_base.is_some() {
+        set_provider_api_base(&mut state.config, provider.key, None);
+        println!(
+            "{}{} Custom API base removed",
+            prefix,
+            colorize("✓", SUCCESS)
+        );
+    }
+
+    Ok(())
+}
+
+/// Run the interactive provider menu. Returns when user selects "Done".
+fn run_provider_menu(state: &mut WizardState) -> Result<()> {
+    let chars = BoxChars::get();
+    let mut menu = MenuState::new();
+    let mut out = io::stdout();
+
+    // Initial render
+    terminal::enable_raw_mode()?;
+    let mut list_lines = render_provider_menu(&mut out, &state.config, &menu, chars)?;
+    render_menu_hint(&mut out, &menu, chars)?;
+
+    loop {
+        let key = read_key()?;
+        match key.code {
+            KeyCode::Up | KeyCode::Char('k') if !menu.in_sub_menu => {
+                if menu.cursor > 0 {
+                    menu.cursor -= 1;
+                    // If we moved away from expanded provider, collapse it
+                    if menu.expanded.is_some() && menu.expanded != Some(menu.cursor) {
+                        menu.expanded = None;
+                    }
+                    list_lines = rerender_menu(&mut out, &state.config, &menu, chars, list_lines)?;
+                }
+            }
+            KeyCode::Down | KeyCode::Char('j') if !menu.in_sub_menu => {
+                if menu.cursor < menu.total_main_items() - 1 {
+                    menu.cursor += 1;
+                    if menu.expanded.is_some() && menu.expanded != Some(menu.cursor) {
+                        menu.expanded = None;
+                    }
+                    list_lines = rerender_menu(&mut out, &state.config, &menu, chars, list_lines)?;
+                }
+            }
+            KeyCode::Up | KeyCode::Char('k') if menu.in_sub_menu => {
+                if menu.sub_cursor > 0 {
+                    menu.sub_cursor -= 1;
+                    list_lines = rerender_menu(&mut out, &state.config, &menu, chars, list_lines)?;
+                }
+            }
+            KeyCode::Down | KeyCode::Char('j') if menu.in_sub_menu => {
+                if menu.sub_cursor < SUB_ACTIONS.len() - 1 {
+                    menu.sub_cursor += 1;
+                    list_lines = rerender_menu(&mut out, &state.config, &menu, chars, list_lines)?;
+                }
+            }
+            KeyCode::Enter if !menu.in_sub_menu => {
+                if menu.is_on_done() {
+                    // Done — exit if any provider configured
+                    if has_any_provider_configured(&state.config) {
+                        // Erase menu
+                        terminal::disable_raw_mode()?;
+                        erase_lines(list_lines + 1)?;
+                        return Ok(());
+                    }
+                    // Otherwise do nothing (can't exit without a provider)
+                } else {
+                    // Expand provider
+                    menu.expanded = Some(menu.cursor);
+                    menu.in_sub_menu = true;
+                    menu.sub_cursor = 0;
+                    list_lines = rerender_menu(&mut out, &state.config, &menu, chars, list_lines)?;
+                }
+            }
+            KeyCode::Enter if menu.in_sub_menu => {
+                let provider_idx = menu.expanded.unwrap();
+                let action = SUB_ACTIONS[menu.sub_cursor];
+
+                match action {
+                    SubAction::SetActive => {
+                        // Immediate — set active and collapse
+                        let provider = &PROVIDERS[provider_idx];
+                        state.config.agents.defaults.provider = Some(provider.key.to_string());
+
+                        // Also set default model if not already set or switching providers
+                        state.config.agents.defaults.model = provider.default_model.to_string();
+
+                        menu.expanded = None;
+                        menu.in_sub_menu = false;
+                        list_lines = rerender_menu(&mut out, &state.config, &menu, chars, list_lines)?;
+                    }
+                    SubAction::Close => {
+                        menu.expanded = None;
+                        menu.in_sub_menu = false;
+                        list_lines = rerender_menu(&mut out, &state.config, &menu, chars, list_lines)?;
+                    }
+                    SubAction::EditApiKey => {
+                        // Exit raw mode, erase menu, run prompt, re-enter
+                        terminal::disable_raw_mode()?;
+                        erase_lines(list_lines + 1)?;
+
+                        execute_edit_api_key(state, provider_idx)?;
+
+                        // Re-enter raw mode and redraw
+                        terminal::enable_raw_mode()?;
+                        list_lines = render_provider_menu(&mut out, &state.config, &menu, chars)?;
+                        render_menu_hint(&mut out, &menu, chars)?;
+                    }
+                    SubAction::ChangeModel => {
+                        terminal::disable_raw_mode()?;
+                        erase_lines(list_lines + 1)?;
+
+                        execute_change_model(state, provider_idx)?;
+
+                        terminal::enable_raw_mode()?;
+                        list_lines = render_provider_menu(&mut out, &state.config, &menu, chars)?;
+                        render_menu_hint(&mut out, &menu, chars)?;
+                    }
+                    SubAction::CustomBaseUrl => {
+                        terminal::disable_raw_mode()?;
+                        erase_lines(list_lines + 1)?;
+
+                        execute_custom_base_url(state, provider_idx)?;
+
+                        terminal::enable_raw_mode()?;
+                        list_lines = render_provider_menu(&mut out, &state.config, &menu, chars)?;
+                        render_menu_hint(&mut out, &menu, chars)?;
+                    }
+                }
+            }
+            KeyCode::Esc if menu.in_sub_menu => {
+                menu.expanded = None;
+                menu.in_sub_menu = false;
+                list_lines = rerender_menu(&mut out, &state.config, &menu, chars, list_lines)?;
+            }
+            _ => {}
+        }
+    }
+}
+
 /// Render the full provider menu list. Returns total lines rendered.
 fn render_provider_menu(
     out: &mut impl Write,
