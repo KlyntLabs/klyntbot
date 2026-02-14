@@ -168,7 +168,9 @@ impl Tool for TodoTool {
                     output.push_str("\n\nConfidence breakdown:");
                     output.push_str(&format_confidence_breakdown(&created));
                     output.push_str("\n\n[Low confidence task] Use the ask_user tool to gather missing details.");
-                    output.push_str("\nSuggest specific questions about the missing fields before proceeding.");
+                    output.push_str(
+                        "\nSuggest specific questions about the missing fields before proceeding.",
+                    );
                 } else if created.confidence < 0.8 {
                     output.push_str("\n\nConfidence breakdown:");
                     output.push_str(&format_confidence_breakdown(&created));

@@ -16,7 +16,7 @@
 //! ## UI Layout
 //! ```text
 //! ┌─ Tab Bar ──────────────────────────────────┐
-//! │  ☐ Auth method  │  ● Database  │  ☐ Submit  │
+//! │  ○ Auth method  │  ◉ Database  │  ○ Submit  │
 //! ├─ Question Pane ────────────────────────────┤
 //! │  Which database should we use?             │
 //! │    ❯ ● PostgreSQL                          │
@@ -485,11 +485,11 @@ impl TabbedFormState {
             };
 
             let indicator = if is_answered {
-                colorize("☑", SUCCESS)
+                colorize("✔", SUCCESS)
             } else if is_active {
-                colorize("●", BRAND)
+                colorize("◉", BRAND)
             } else {
-                colorize("☐", DIM)
+                colorize("○", DIM)
             };
 
             let title_text = if is_active {
@@ -535,7 +535,29 @@ impl TabbedFormState {
             tabs.push(format!("{} {}", indicator, title_text));
         }
 
-        tabs.join(&format!("  {}  ", colorize("·", DIM)))
+        let tab_line = tabs.join(&format!("  {}  ", colorize("·", DIM)));
+
+        // Add progress counter for multi-question forms
+        if self.num_questions() > 1 {
+            let answered = self
+                .question_states
+                .iter()
+                .filter(|s| match s {
+                    QuestionState::SingleSelect { selected, .. } => selected.is_some(),
+                    QuestionState::MultiSelect { selected, .. } => selected.iter().any(|&s| s),
+                    QuestionState::YesNo { .. } => true,
+                    QuestionState::FreeText { input } => !input.trim().is_empty(),
+                })
+                .count();
+
+            format!(
+                "{}  {}",
+                tab_line,
+                colorize(&format!("({}/{})", answered, self.num_questions()), DIM)
+            )
+        } else {
+            tab_line
+        }
     }
 
     /// Build content lines for the current question (rendered inside the box).
@@ -677,7 +699,7 @@ impl TabbedFormState {
                             .enumerate()
                             .filter_map(|(i, &sel)| {
                                 if sel {
-                                    Some(options[i].label.as_str())
+                                    options.get(i).map(|o| o.label.as_str())
                                 } else {
                                     None
                                 }
@@ -1016,14 +1038,28 @@ impl TabbedFormState {
 /// Main entry point: prompt the user with a tabbed multi-question UI.
 ///
 /// Returns FormResponse::Completed with collected answers, or FormResponse::Cancelled.
-pub fn prompt_multi_question(request: &InteractionRequest) -> Result<FormResponse> {
+/// Result of a multi-question prompt, including how many lines the summary occupied.
+pub struct PromptResult {
+    pub response: FormResponse,
+    /// Number of terminal lines the summary/cancellation output occupied.
+    pub summary_lines: u16,
+}
+
+pub fn prompt_multi_question(request: &InteractionRequest) -> Result<PromptResult> {
     if !is_interactive() {
-        return prompt_non_interactive(request);
+        let response = prompt_non_interactive(request)?;
+        return Ok(PromptResult {
+            response,
+            summary_lines: 0,
+        });
     }
 
     // Validate request
     if request.questions.is_empty() {
-        return Ok(FormResponse::Completed(Vec::new()));
+        return Ok(PromptResult {
+            response: FormResponse::Completed(Vec::new()),
+            summary_lines: 0,
+        });
     }
 
     let mut state = TabbedFormState::new(request.clone());
@@ -1045,83 +1081,250 @@ pub fn prompt_multi_question(request: &InteractionRequest) -> Result<FormRespons
         match state.handle_key(key) {
             Action::Continue => continue,
             Action::Submit => {
-                // Erase UI and show summary
+                // Erase UI and show rich summary
                 erase_render(rendered_lines)?;
-                print_submission_summary(&state)?;
-                return Ok(FormResponse::Completed(state.collect_answers()));
+                let summary_lines = print_submission_summary(&state)? as u16;
+                return Ok(PromptResult {
+                    response: FormResponse::Completed(state.collect_answers()),
+                    summary_lines,
+                });
             }
             Action::Cancel => {
-                // Erase UI and show cancellation
+                // Erase UI and show cancellation (with progress if any)
                 erase_render(rendered_lines)?;
-                write!(io::stdout(), "\r  {}\r\n", colorize("✗ Cancelled", ERROR))?;
-                return Ok(FormResponse::Cancelled);
+                let summary_lines = print_cancellation_summary(&state)? as u16;
+                return Ok(PromptResult {
+                    response: FormResponse::Cancelled,
+                    summary_lines,
+                });
             }
         }
     }
 }
 
-/// Print a compact boxed summary after submission.
-fn print_submission_summary(state: &TabbedFormState) -> Result<()> {
+/// Print a rich multi-line boxed summary after submission.
+///
+/// Shows each answer on its own line with the question title, question text,
+/// and answer value with descriptions. Provides a clear visual record of
+/// what the user submitted.
+fn print_submission_summary(state: &TabbedFormState) -> Result<usize> {
     let mut out = io::stdout();
     let inner_w = (state.terminal_width as usize).saturating_sub(6).max(20);
+    let mut lines = 0;
 
-    let mut summary_parts = Vec::new();
+    let title = format!("{} {}", colorize("✔", SUCCESS), colorize("Submitted", BOLD));
+    lines += write_box_top(&mut out, &title, inner_w)?;
+    lines += write_box_empty(&mut out, inner_w)?;
 
     for (question, qstate) in state.request.questions.iter().zip(&state.question_states) {
-        let answer_text = match qstate {
+        // Question title (bold)
+        lines += write_box_line(&mut out, &colorize(&question.title, BOLD), inner_w)?;
+
+        // Question text (dim)
+        lines += write_box_line(&mut out, &colorize(&question.text, DIM), inner_w)?;
+
+        // Answer line with arrow and value
+        let answer_line = format_answer_display(question, qstate);
+        lines += write_box_line(&mut out, &answer_line, inner_w)?;
+
+        // Spacing between questions
+        lines += write_box_empty(&mut out, inner_w)?;
+    }
+
+    lines += write_box_bottom(&mut out, inner_w)?;
+
+    out.flush()?;
+    Ok(lines)
+}
+
+/// Format a single answer for display in the submission summary.
+fn format_answer_display(question: &common::Question, qstate: &QuestionState) -> String {
+    match qstate {
+        QuestionState::SingleSelect { selected, .. } => {
+            if let Some(idx) = selected {
+                if let AnswerType::SingleSelect { options } = &question.answer_type {
+                    let opt = &options[*idx];
+                    let mut line =
+                        format!("{} {}", colorize("→", BRAND), colorize(&opt.label, SUCCESS));
+                    if let Some(desc) = &opt.description {
+                        line.push_str(&format!(
+                            "  {}  {}",
+                            colorize("·", DIM),
+                            colorize(desc, DIM)
+                        ));
+                    }
+                    line
+                } else {
+                    format!("{} {}", colorize("→", BRAND), colorize("(error)", ERROR))
+                }
+            } else {
+                format!(
+                    "{} {}",
+                    colorize("→", BRAND),
+                    colorize("(not answered)", WARNING)
+                )
+            }
+        }
+        QuestionState::MultiSelect { selected, .. } => {
+            if let AnswerType::MultiSelect { options } = &question.answer_type {
+                let labels: Vec<&str> = selected
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, &sel)| {
+                        if sel {
+                            options.get(i).map(|o| o.label.as_str())
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                if labels.is_empty() {
+                    format!(
+                        "{} {}",
+                        colorize("→", BRAND),
+                        colorize("(none selected)", WARNING)
+                    )
+                } else {
+                    format!(
+                        "{} {}",
+                        colorize("→", BRAND),
+                        colorize(&labels.join(", "), SUCCESS)
+                    )
+                }
+            } else {
+                format!("{} {}", colorize("→", BRAND), colorize("(error)", ERROR))
+            }
+        }
+        QuestionState::YesNo { answer } => {
+            format!(
+                "{} {}",
+                colorize("→", BRAND),
+                colorize(if *answer { "Yes" } else { "No" }, SUCCESS)
+            )
+        }
+        QuestionState::FreeText { input } => {
+            if input.trim().is_empty() {
+                format!(
+                    "{} {}",
+                    colorize("→", BRAND),
+                    colorize("(not answered)", WARNING)
+                )
+            } else {
+                format!(
+                    "{} {}",
+                    colorize("→", BRAND),
+                    colorize(&format!("\"{}\"", input), SUCCESS)
+                )
+            }
+        }
+    }
+}
+
+/// Print a boxed cancellation summary showing progress before cancellation.
+fn print_cancellation_summary(state: &TabbedFormState) -> Result<usize> {
+    let mut out = io::stdout();
+    let inner_w = (state.terminal_width as usize).saturating_sub(6).max(20);
+    let mut lines = 0;
+
+    // Check if any questions were answered
+    let any_answered = state.question_states.iter().any(|s| match s {
+        QuestionState::SingleSelect { selected, .. } => selected.is_some(),
+        QuestionState::MultiSelect { selected, .. } => selected.iter().any(|&s| s),
+        QuestionState::FreeText { input } => !input.trim().is_empty(),
+        QuestionState::YesNo { .. } => false, // Has a default, don't count
+    });
+
+    if !any_answered {
+        // Simple cancellation — no progress to show
+        write!(out, "\r  {}\r\n", colorize("✗ Cancelled", ERROR))?;
+        out.flush()?;
+        return Ok(1);
+    }
+
+    // Rich cancellation with progress
+    let title = format!("{} {}", colorize("✗", ERROR), colorize("Cancelled", BOLD));
+    lines += write_box_top(&mut out, &title, inner_w)?;
+    lines += write_box_empty(&mut out, inner_w)?;
+
+    for (question, qstate) in state.request.questions.iter().zip(&state.question_states) {
+        let status_line = match qstate {
             QuestionState::SingleSelect { selected, .. } => {
                 if let Some(idx) = selected {
                     if let AnswerType::SingleSelect { options } = &question.answer_type {
-                        Some(options[*idx].label.clone())
+                        format!(
+                            "{}  {}  {}  {}",
+                            colorize("✔", SUCCESS),
+                            colorize(&question.title, SUCCESS),
+                            colorize("→", BRAND),
+                            options[*idx].label
+                        )
                     } else {
-                        None
+                        format!("{}  {}", colorize("○", DIM), colorize(&question.title, DIM))
                     }
                 } else {
-                    None
+                    format!("{}  {}", colorize("○", DIM), colorize(&question.title, DIM))
                 }
             }
             QuestionState::MultiSelect { selected, .. } => {
-                if let AnswerType::MultiSelect { options } = &question.answer_type {
-                    let labels: Vec<&str> = selected
-                        .iter()
-                        .enumerate()
-                        .filter_map(|(i, &sel)| {
-                            if sel {
-                                Some(options[i].label.as_str())
-                            } else {
-                                None
-                            }
-                        })
-                        .collect();
-                    Some(labels.join(", "))
+                if selected.iter().any(|&s| s) {
+                    if let AnswerType::MultiSelect { options } = &question.answer_type {
+                        let labels: Vec<&str> = selected
+                            .iter()
+                            .enumerate()
+                            .filter_map(|(i, &sel)| {
+                                if sel {
+                                    options.get(i).map(|o| o.label.as_str())
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect();
+                        format!(
+                            "{}  {}  {}  {}",
+                            colorize("✔", SUCCESS),
+                            colorize(&question.title, SUCCESS),
+                            colorize("→", BRAND),
+                            labels.join(", ")
+                        )
+                    } else {
+                        format!("{}  {}", colorize("○", DIM), colorize(&question.title, DIM))
+                    }
                 } else {
-                    None
+                    format!("{}  {}", colorize("○", DIM), colorize(&question.title, DIM))
                 }
             }
-            QuestionState::YesNo { answer } => Some(if *answer { "Yes" } else { "No" }.to_string()),
             QuestionState::FreeText { input } => {
                 if !input.trim().is_empty() {
-                    Some(format!("\"{}\"", input))
+                    format!(
+                        "{}  {}  {}  \"{}\"",
+                        colorize("✔", SUCCESS),
+                        colorize(&question.title, SUCCESS),
+                        colorize("→", BRAND),
+                        input
+                    )
                 } else {
-                    None
+                    format!("{}  {}", colorize("○", DIM), colorize(&question.title, DIM))
                 }
+            }
+            QuestionState::YesNo { answer } => {
+                format!(
+                    "{}  {}  {}  {}",
+                    colorize("✔", DIM),
+                    colorize(&question.title, DIM),
+                    colorize("→", BRAND),
+                    if *answer { "Yes" } else { "No" }
+                )
             }
         };
 
-        if let Some(text) = answer_text {
-            summary_parts.push(format!("{}: {}", question.title, text));
-        }
+        lines += write_box_line(&mut out, &status_line, inner_w)?;
     }
 
-    if !summary_parts.is_empty() {
-        let title = format!("{} {}", colorize("☑", SUCCESS), colorize("Submitted", BOLD));
-        write_box_top(&mut out, &title, inner_w)?;
-        write_box_line(&mut out, &summary_parts.join("  ·  "), inner_w)?;
-        write_box_bottom(&mut out, inner_w)?;
-    }
+    lines += write_box_empty(&mut out, inner_w)?;
+    lines += write_box_bottom(&mut out, inner_w)?;
 
     out.flush()?;
-    Ok(())
+    Ok(lines)
 }
 
 /// Non-interactive fallback: sequential numbered prompts.

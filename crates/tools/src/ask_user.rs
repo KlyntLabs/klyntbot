@@ -10,8 +10,8 @@ use tracing::warn;
 
 use super::{InteractionBundle, RoutingContext, Tool};
 use common::{
-    AnswerOption, AnswerType, AnswerValue, FormResponse, InteractionRequest, Question, Result,
-    ToolError,
+    Answer, AnswerOption, AnswerType, AnswerValue, FormResponse, InteractionRequest, Question,
+    Result, ToolError,
 };
 
 /// Tool for asking structured questions to the user.
@@ -120,7 +120,10 @@ impl Tool for AskUserTool {
         // 3. Create oneshot channel for this request's response
         let (response_tx, response_rx) = tokio::sync::oneshot::channel();
 
-        // 4. Send interaction bundle (request + response channel)
+        // 4. Clone request before moving into bundle (needed for rich response formatting)
+        let request_for_response = request.clone();
+
+        // 5. Send interaction bundle (request + response channel)
         if let Err(e) = interaction_tx
             .send(InteractionBundle {
                 request,
@@ -134,19 +137,22 @@ impl Tool for AskUserTool {
             return Err(ToolError::ExecutionFailed(msg).into());
         }
 
-        // 5. Block until user responds (or channel drops)
+        // 6. Block until user responds (or channel drops)
         let response = match response_rx.await {
             Ok(r) => r,
             Err(e) => {
-                let msg = format!("User interaction cancelled (response channel dropped): {}", e);
+                let msg = format!(
+                    "User interaction cancelled (response channel dropped): {}",
+                    e
+                );
                 warn!("{}", msg);
                 eprintln!("[ask_user] {}", msg);
                 return Err(ToolError::ExecutionFailed(msg).into());
             }
         };
 
-        // 6. Format semantic response
-        Ok(format_semantic_response(&response))
+        // 7. Format rich semantic response with full question context
+        Ok(format_semantic_response(&response, &request_for_response))
     }
 }
 
@@ -208,10 +214,7 @@ fn parse_interaction_request(args: &Value) -> Result<InteractionRequest> {
         };
 
         // Get title, truncate if too long for tab display (no error, just truncate)
-        let raw_title = q_obj
-            .get("title")
-            .and_then(|v| v.as_str())
-            .unwrap_or(&id);
+        let raw_title = q_obj.get("title").and_then(|v| v.as_str()).unwrap_or(&id);
         let question_title = if raw_title.len() > 20 {
             format!("{}…", &raw_title[..19])
         } else {
@@ -266,11 +269,9 @@ fn parse_flat_answer_type(
         })?;
 
     // Get options from flat format or nested answer_type format
-    let options_val = q_obj.get("options").or_else(|| {
-        q_obj
-            .get("answer_type")
-            .and_then(|at| at.get("options"))
-    });
+    let options_val = q_obj
+        .get("options")
+        .or_else(|| q_obj.get("answer_type").and_then(|at| at.get("options")));
 
     match type_str {
         "single_select" => {
@@ -378,40 +379,149 @@ fn parse_options(value: Option<&Value>, question_idx: usize) -> Result<Vec<Answe
     Ok(options)
 }
 
-/// Format the FormResponse into a semantic string for the LLM.
-fn format_semantic_response(response: &FormResponse) -> String {
+/// Format the FormResponse into a rich semantic string for the LLM.
+///
+/// Includes full question context (text, descriptions, other options) so the
+/// LLM has maximum information to continue the conversation meaningfully.
+fn format_semantic_response(response: &FormResponse, request: &InteractionRequest) -> String {
     match response {
-        FormResponse::Cancelled => "User cancelled the interaction.".to_string(),
+        FormResponse::Cancelled => format_cancelled_response(request),
         FormResponse::Completed(answers) => {
             if answers.is_empty() {
                 return "User submitted the form with no answers.".to_string();
             }
-
-            let mut output = String::from("User answered your questions:\n");
-            for answer in answers {
-                let value_str = format_answer_value(&answer.value);
-                output.push_str(&format!("- {}: {}\n", answer.question_id, value_str));
-            }
-            output
+            format_completed_response(answers, request)
         }
     }
 }
 
-/// Format a single AnswerValue into a readable string.
-fn format_answer_value(value: &AnswerValue) -> String {
-    match value {
-        AnswerValue::Selected { value } => value.clone(),
-        AnswerValue::MultiSelected { values } => {
-            if values.is_empty() {
-                "(none selected)".to_string()
+/// Format a completed form response with full question context.
+fn format_completed_response(answers: &[Answer], request: &InteractionRequest) -> String {
+    use std::collections::HashMap;
+
+    let mut output = format!("User completed \"{}\":\n", request.title);
+
+    // Build answer lookup by question_id
+    let answer_map: HashMap<&str, &Answer> = answers
+        .iter()
+        .map(|a| (a.question_id.as_str(), a))
+        .collect();
+
+    for (idx, question) in request.questions.iter().enumerate() {
+        output.push_str(&format!(
+            "\n{}. {} — \"{}\"\n",
+            idx + 1,
+            question.id,
+            question.text
+        ));
+
+        if let Some(answer) = answer_map.get(question.id.as_str()) {
+            format_rich_answer(&mut output, &answer.value, &question.answer_type);
+        } else {
+            output.push_str("   Answer: (not answered)\n");
+        }
+    }
+
+    output
+}
+
+/// Format a single answer with context from the question's answer type.
+fn format_rich_answer(output: &mut String, value: &AnswerValue, answer_type: &AnswerType) {
+    match (value, answer_type) {
+        (AnswerValue::Selected { value }, AnswerType::SingleSelect { options }) => {
+            // Look up the label and description for the selected option
+            if let Some(opt) = options.iter().find(|o| o.value == *value) {
+                output.push_str(&format!("   Answer: {}\n", opt.label));
+                if let Some(desc) = &opt.description {
+                    output.push_str(&format!("   Description: {}\n", desc));
+                }
             } else {
-                values.join(", ")
+                output.push_str(&format!("   Answer: {}\n", value));
+            }
+
+            // Show other available options for context
+            let others: Vec<&AnswerOption> = options.iter().filter(|o| o.value != *value).collect();
+            if !others.is_empty() {
+                output.push_str("   Other options were:\n");
+                for opt in others {
+                    output.push_str(&format!("   - {}", opt.label));
+                    if let Some(desc) = &opt.description {
+                        output.push_str(&format!(" — {}", desc));
+                    }
+                    output.push('\n');
+                }
             }
         }
-        AnswerValue::YesNo { answer } => if *answer { "Yes" } else { "No" }.to_string(),
-        AnswerValue::Text { content } => format!("\"{}\"", content),
-        AnswerValue::Skipped => "(skipped)".to_string(),
+        (AnswerValue::MultiSelected { values }, AnswerType::MultiSelect { options }) => {
+            let labels: Vec<&str> = values
+                .iter()
+                .filter_map(|v| {
+                    options
+                        .iter()
+                        .find(|o| &o.value == v)
+                        .map(|o| o.label.as_str())
+                })
+                .collect();
+            output.push_str(&format!("   Answer: {}\n", labels.join(", ")));
+
+            // Show unselected options
+            let unselected: Vec<&AnswerOption> = options
+                .iter()
+                .filter(|o| !values.contains(&o.value))
+                .collect();
+            if !unselected.is_empty() {
+                output.push_str("   Not selected:\n");
+                for opt in unselected {
+                    output.push_str(&format!("   - {}", opt.label));
+                    if let Some(desc) = &opt.description {
+                        output.push_str(&format!(" — {}", desc));
+                    }
+                    output.push('\n');
+                }
+            }
+        }
+        (AnswerValue::YesNo { answer }, _) => {
+            output.push_str(&format!(
+                "   Answer: {}\n",
+                if *answer { "Yes" } else { "No" }
+            ));
+        }
+        (AnswerValue::Text { content }, _) => {
+            output.push_str(&format!("   Answer: \"{}\"\n", content));
+        }
+        (AnswerValue::Skipped, _) => {
+            output.push_str("   Answer: (skipped)\n");
+        }
+        // Fallback for mismatched value/type
+        (AnswerValue::Selected { value }, _) => {
+            output.push_str(&format!("   Answer: {}\n", value));
+        }
+        (AnswerValue::MultiSelected { values }, _) => {
+            output.push_str(&format!("   Answer: {}\n", values.join(", ")));
+        }
     }
+}
+
+/// Format a cancelled interaction response with question context.
+fn format_cancelled_response(request: &InteractionRequest) -> String {
+    let mut output = format!("User cancelled the interaction \"{}\".\n", request.title);
+
+    if !request.questions.is_empty() {
+        output.push_str("\nQuestions that were presented:\n");
+        for (idx, question) in request.questions.iter().enumerate() {
+            output.push_str(&format!(
+                "  {}. {} — \"{}\"\n",
+                idx + 1,
+                question.id,
+                question.text
+            ));
+        }
+        output.push_str(
+            "\nThe user chose not to answer. Ask if they'd like to try again or take a different approach.\n",
+        );
+    }
+
+    output
 }
 
 /// Format a text-based fallback when interactive UI is not available.
@@ -663,8 +773,61 @@ mod tests {
         assert_eq!(request.title, "User Input");
     }
 
+    fn make_test_request() -> InteractionRequest {
+        InteractionRequest {
+            title: "Test Form".into(),
+            questions: vec![
+                Question {
+                    id: "auth_method".into(),
+                    title: "Auth".into(),
+                    text: "Which authentication method?".into(),
+                    answer_type: AnswerType::SingleSelect {
+                        options: vec![
+                            AnswerOption {
+                                value: "oauth2".into(),
+                                label: "OAuth 2.0".into(),
+                                description: Some("Industry standard".into()),
+                            },
+                            AnswerOption {
+                                value: "jwt".into(),
+                                label: "JWT".into(),
+                                description: None,
+                            },
+                        ],
+                    },
+                },
+                Question {
+                    id: "features".into(),
+                    title: "Features".into(),
+                    text: "Which features do you want?".into(),
+                    answer_type: AnswerType::MultiSelect {
+                        options: vec![
+                            AnswerOption {
+                                value: "auth".into(),
+                                label: "Authentication".into(),
+                                description: None,
+                            },
+                            AnswerOption {
+                                value: "logging".into(),
+                                label: "Logging".into(),
+                                description: None,
+                            },
+                        ],
+                    },
+                },
+                Question {
+                    id: "confirm".into(),
+                    title: "Confirm".into(),
+                    text: "Do you want to proceed?".into(),
+                    answer_type: AnswerType::YesNo { default: None },
+                },
+            ],
+        }
+    }
+
     #[test]
     fn test_format_semantic_response_selected() {
+        let request = make_test_request();
         let response = FormResponse::Completed(vec![Answer {
             question_id: "auth_method".into(),
             value: AnswerValue::Selected {
@@ -672,13 +835,19 @@ mod tests {
             },
         }]);
 
-        let formatted = format_semantic_response(&response);
-        assert!(formatted.contains("User answered your questions"));
-        assert!(formatted.contains("auth_method: oauth2"));
+        let formatted = format_semantic_response(&response, &request);
+        assert!(formatted.contains("User completed"));
+        assert!(formatted.contains("Test Form"));
+        assert!(formatted.contains("auth_method"));
+        assert!(formatted.contains("OAuth 2.0"));
+        assert!(formatted.contains("Industry standard"));
+        // Should show other options
+        assert!(formatted.contains("JWT"));
     }
 
     #[test]
     fn test_format_semantic_response_multi_selected() {
+        let request = make_test_request();
         let response = FormResponse::Completed(vec![Answer {
             question_id: "features".into(),
             value: AnswerValue::MultiSelected {
@@ -686,26 +855,33 @@ mod tests {
             },
         }]);
 
-        let formatted = format_semantic_response(&response);
-        assert!(formatted.contains("features: auth, logging"));
+        let formatted = format_semantic_response(&response, &request);
+        assert!(formatted.contains("Authentication, Logging"));
     }
 
     #[test]
     fn test_format_semantic_response_yes_no() {
+        let request = make_test_request();
         let response = FormResponse::Completed(vec![Answer {
             question_id: "confirm".into(),
             value: AnswerValue::YesNo { answer: true },
         }]);
 
-        let formatted = format_semantic_response(&response);
-        assert!(formatted.contains("confirm: Yes"));
+        let formatted = format_semantic_response(&response, &request);
+        assert!(formatted.contains("Answer: Yes"));
     }
 
     #[test]
     fn test_format_semantic_response_cancelled() {
+        let request = make_test_request();
         let response = FormResponse::Cancelled;
-        let formatted = format_semantic_response(&response);
-        assert_eq!(formatted, "User cancelled the interaction.");
+        let formatted = format_semantic_response(&response, &request);
+        assert!(formatted.contains("cancelled"));
+        assert!(formatted.contains("Test Form"));
+        // Should list the questions that were presented
+        assert!(formatted.contains("auth_method"));
+        assert!(formatted.contains("features"));
+        assert!(formatted.contains("confirm"));
     }
 
     #[test]

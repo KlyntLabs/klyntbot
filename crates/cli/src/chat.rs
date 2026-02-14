@@ -334,25 +334,22 @@ async fn run_with_streaming(
                 renderer.pause();
 
                 // Call the tabbed multi-question UI
-                let response = match ask_user_prompt::prompt_multi_question(&request) {
-                    Ok(resp) => resp,
+                let result = match ask_user_prompt::prompt_multi_question(&request) {
+                    Ok(r) => r,
                     Err(e) => {
                         eprintln!("\n{} Error in ask_user prompt: {}", status_error(), e);
-                        FormResponse::Cancelled
+                        ask_user_prompt::PromptResult {
+                            response: FormResponse::Cancelled,
+                            summary_lines: 1,
+                        }
                     }
                 };
 
-                // Resume streaming — account for the lines the prompt wrote:
-                //   Completed: 3-line boxed summary (top + content + bottom)
-                //   Cancelled: 1-line message
-                let prompt_lines = match &response {
-                    FormResponse::Completed(_) => 3,
-                    FormResponse::Cancelled => 1,
-                };
-                renderer.resume(prompt_lines);
+                // Resume streaming — account for the lines the summary wrote
+                renderer.resume(result.summary_lines);
 
                 // Send response back to the ask_user tool (unblocks it)
-                let _ = response_tx.send(response);
+                let _ = response_tx.send(result.response);
             }
         }
     }

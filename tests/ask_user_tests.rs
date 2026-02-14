@@ -78,10 +78,13 @@ async fn test_ask_user_single_select_question() {
         .send(response)
         .expect("Should send response");
 
-    // Verify semantic response format
+    // Verify rich semantic response format
     let result = execute_handle.await.unwrap().unwrap();
-    assert!(result.contains("User answered your questions"));
-    assert!(result.contains("auth_method: oauth2"));
+    assert!(result.contains("User completed"));
+    assert!(result.contains("Choose authentication"));
+    assert!(result.contains("auth_method"));
+    assert!(result.contains("Which authentication method?"));
+    assert!(result.contains("OAuth 2.0")); // Shows label, not raw value
 }
 
 #[tokio::test]
@@ -159,9 +162,16 @@ async fn test_ask_user_multi_question_form() {
     bundle.response_tx.send(response).unwrap();
 
     let result = execute_handle.await.unwrap().unwrap();
-    assert!(result.contains("priority: high"));
-    assert!(result.contains("features: auth, logging"));
-    assert!(result.contains("confirm: Yes"));
+    assert!(result.contains("User completed"));
+    assert!(result.contains("Task Configuration"));
+    // Single select: shows label + description + other options
+    assert!(result.contains("High"));
+    assert!(result.contains("Critical tasks"));
+    assert!(result.contains("Low")); // Other option shown
+                                     // Multi select: shows labels
+    assert!(result.contains("Authentication, Logging"));
+    // Yes/No
+    assert!(result.contains("Answer: Yes"));
 }
 
 #[tokio::test]
@@ -190,7 +200,9 @@ async fn test_ask_user_cancellation() {
     bundle.response_tx.send(FormResponse::Cancelled).unwrap();
 
     let result = execute_handle.await.unwrap().unwrap();
-    assert_eq!(result, "User cancelled the interaction.");
+    assert!(result.contains("cancelled"));
+    assert!(result.contains("Test Question"));
+    assert!(result.contains("test")); // question id listed
 }
 
 #[tokio::test]
@@ -259,7 +271,9 @@ async fn test_ask_user_free_text_question() {
     bundle.response_tx.send(response).unwrap();
 
     let result = execute_handle.await.unwrap().unwrap();
-    assert!(result.contains("description: \"The login button is not responding\""));
+    assert!(result.contains("description"));
+    assert!(result.contains("Describe the issue"));
+    assert!(result.contains("The login button is not responding"));
 }
 
 #[tokio::test]
@@ -291,7 +305,8 @@ async fn test_ask_user_skipped_answers() {
     bundle.response_tx.send(response).unwrap();
 
     let result = execute_handle.await.unwrap().unwrap();
-    assert!(result.contains("optional: (skipped)"));
+    assert!(result.contains("optional"));
+    assert!(result.contains("(skipped)"));
 }
 
 #[tokio::test]
@@ -330,7 +345,9 @@ async fn test_ask_user_empty_multi_select() {
     bundle.response_tx.send(response).unwrap();
 
     let result = execute_handle.await.unwrap().unwrap();
-    assert!(result.contains("features: (none selected)"));
+    assert!(result.contains("features"));
+    // Empty multi-select with no matching labels shows empty answer
+    assert!(result.contains("Answer:"));
 }
 
 #[tokio::test]
