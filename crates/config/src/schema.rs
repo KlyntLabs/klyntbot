@@ -71,6 +71,9 @@ pub struct Config {
 
     #[serde(default)]
     pub todo: TodoConfig,
+
+    #[serde(default)]
+    pub confidence: ConfidenceConfig,
 }
 
 impl Config {
@@ -756,23 +759,36 @@ fn default_web_max_results() -> u8 {
 }
 
 /// Todo system configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TodoConfig {
     #[serde(default)]
     pub notifications: TodoNotificationConfig,
     #[serde(default)]
     pub focus: TodoFocusConfig,
-    #[serde(default = "default_confidence_threshold")]
-    pub confidence_threshold: f32,
 }
 
-impl Default for TodoConfig {
+/// Confidence evaluation configuration (LLM-driven decision engine)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConfidenceConfig {
+    /// Threshold below which ask_user is triggered (default: 0.7)
+    #[serde(default = "default_confidence_threshold")]
+    pub threshold: f32,
+    /// Enable/disable confidence evaluation (default: true)
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    /// Path to decision log file (default: ~/.klyntbot/decision_log.jsonl)
+    #[serde(default)]
+    pub log_path: Option<PathBuf>,
+}
+
+impl Default for ConfidenceConfig {
     fn default() -> Self {
         Self {
-            notifications: TodoNotificationConfig::default(),
-            focus: TodoFocusConfig::default(),
-            confidence_threshold: default_confidence_threshold(),
+            threshold: default_confidence_threshold(),
+            enabled: true,
+            log_path: None,
         }
     }
 }
@@ -826,7 +842,7 @@ fn default_notification_targets() -> Vec<String> {
 }
 
 fn default_confidence_threshold() -> f32 {
-    0.5
+    0.7
 }
 
 fn default_true() -> bool {
@@ -1184,7 +1200,6 @@ mod tests {
     #[test]
     fn test_todo_config_default() {
         let config = TodoConfig::default();
-        assert_eq!(config.confidence_threshold, 0.5);
         assert_eq!(config.focus.max_slots, 3);
         assert_eq!(config.focus.deadline_hours, 18);
         assert_eq!(config.notifications.targets, vec!["os_native"]);
@@ -1213,7 +1228,6 @@ mod tests {
     #[test]
     fn test_config_with_todo_field() {
         let config = Config::default();
-        assert_eq!(config.todo.confidence_threshold, 0.5);
         assert_eq!(config.todo.focus.max_slots, 3);
     }
 
@@ -1222,7 +1236,6 @@ mod tests {
         let config = TodoConfig::default();
         let json = serde_json::to_value(&config).unwrap();
 
-        assert_eq!(json["confidenceThreshold"], 0.5);
         assert_eq!(json["focus"]["maxSlots"], 3);
         assert_eq!(json["focus"]["deadlineHours"], 18);
         assert_eq!(json["notifications"]["targets"][0], "os_native");
@@ -1247,7 +1260,6 @@ mod tests {
         }"#;
 
         let config: Config = serde_json::from_str(json).unwrap();
-        assert_eq!(config.todo.confidence_threshold, 0.5);
         assert_eq!(config.todo.focus.max_slots, 3);
         assert_eq!(config.todo.notifications.targets, vec!["os_native"]);
     }
@@ -1255,7 +1267,6 @@ mod tests {
     #[test]
     fn test_todo_config_round_trip() {
         let config = TodoConfig {
-            confidence_threshold: 0.6,
             focus: TodoFocusConfig {
                 max_slots: 5,
                 deadline_hours: 24,
@@ -1270,7 +1281,6 @@ mod tests {
         let json = serde_json::to_string(&config).unwrap();
         let loaded: TodoConfig = serde_json::from_str(&json).unwrap();
 
-        assert_eq!(loaded.confidence_threshold, 0.6);
         assert_eq!(loaded.focus.max_slots, 5);
         assert_eq!(loaded.focus.deadline_hours, 24);
         assert_eq!(loaded.notifications.targets.len(), 2);
@@ -1283,7 +1293,6 @@ mod tests {
         let json = serde_json::to_string(&config).unwrap();
 
         // AC-11.11: Verify camelCase in JSON output
-        assert!(json.contains("confidenceThreshold"));
         assert!(json.contains("maxSlots"));
         assert!(json.contains("deadlineHours"));
         assert!(json.contains("focusReminders"));

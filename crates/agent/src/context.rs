@@ -165,6 +165,9 @@ impl ContextBuilder {
             sections.push(todo_context);
         }
 
+        // Confidence evaluation instructions (internal)
+        sections.push(super::confidence::prompt::CONFIDENCE_PROMPT.to_string());
+
         // Skills (relatively stable)
         let skills_summary = self.skills.generate_summary();
         sections.push(format!("# Available Skills\n\n{}", skills_summary));

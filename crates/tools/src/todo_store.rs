@@ -77,7 +77,6 @@ impl TodoStore {
     pub async fn add(&mut self, mut todo: Todo) -> Result<Todo> {
         self.ensure_loaded().await?;
 
-        todo.confidence = todo.calculate_confidence();
         todo.updated_at = Utc::now();
 
         self.todos.push(todo.clone());
@@ -127,7 +126,6 @@ impl TodoStore {
                 }
             }
 
-            todo.confidence = todo.calculate_confidence();
             todo.updated_at = Utc::now();
 
             Some(todo.clone())
@@ -312,15 +310,10 @@ impl TodoStore {
 
         let mut by_status = HashMap::new();
         let mut overdue = Vec::new();
-        let mut low_confidence = Vec::new();
         let mut upcoming_week = Vec::new();
 
         for todo in &self.todos {
             *by_status.entry(todo.status).or_insert(0) += 1;
-
-            if todo.confidence < 0.5 {
-                low_confidence.push(todo.id.clone());
-            }
 
             if let Some(due) = todo.due_date {
                 if due < now {
@@ -335,7 +328,6 @@ impl TodoStore {
             total: self.todos.len(),
             by_status,
             overdue,
-            low_confidence,
             upcoming_week,
         })
     }
@@ -408,10 +400,6 @@ impl TodoStore {
         }
 
         ctx.push_str("\n## Stats\n");
-        ctx.push_str(&format!(
-            "- Low confidence: {} tasks\n",
-            summary.low_confidence.len()
-        ));
         ctx.push_str(&format!("- Overdue: {}\n", summary.overdue.len()));
 
         Ok(ctx)
@@ -439,7 +427,7 @@ mod tests {
             due_date: None,
             tags: vec![],
             status: TodoStatus::Todo,
-            confidence: 0.0,
+
             focused_at: None,
             focus_deadline: None,
             focus_expired_count: 0,
@@ -463,7 +451,6 @@ mod tests {
 
         let added = store.add(todo.clone()).await.unwrap();
         assert_eq!(added.title, "Test task");
-        assert!(added.confidence >= 0.0);
     }
 
     #[tokio::test]
@@ -502,27 +489,6 @@ mod tests {
         let updated = store.update(&id, patch).await.unwrap();
         assert!(updated.is_some());
         assert_eq!(updated.unwrap().title, "Updated");
-    }
-
-    #[tokio::test]
-    async fn test_update_recalculates_confidence() {
-        let (mut store, _dir) = create_test_store().await;
-        let todo = create_test_todo("Task");
-        let id = todo.id.clone();
-
-        store.add(todo).await.unwrap();
-
-        let patch = TodoPatch {
-            description: Some(Some(
-                "A long description that is more than ten characters".to_string(),
-            )),
-            priority: Some(4),
-            tags: Some(vec!["test".to_string()]),
-            ..Default::default()
-        };
-
-        let updated = store.update(&id, patch).await.unwrap().unwrap();
-        assert!(updated.confidence > 0.0);
     }
 
     #[tokio::test]

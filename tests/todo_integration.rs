@@ -96,7 +96,6 @@ async fn test_todo_context_injection() {
         due_date: None,
         tags: vec!["backend".to_string(), "urgent".to_string()],
         status: TodoStatus::Doing,
-        confidence: 0.0,
         focused_at: None,
         focus_deadline: None,
         focus_expired_count: 0,
@@ -115,7 +114,6 @@ async fn test_todo_context_injection() {
         due_date: None,
         tags: vec!["frontend".to_string(), "ui".to_string()],
         status: TodoStatus::Todo,
-        confidence: 0.0,
         focused_at: None,
         focus_deadline: None,
         focus_expired_count: 0,
@@ -577,7 +575,7 @@ async fn test_todo_store_persistence() {
             due_date: None,
             tags: vec![],
             status: TodoStatus::Todo,
-            confidence: 0.0,
+
             focused_at: None,
             focus_deadline: None,
             focus_expired_count: 0,
@@ -596,7 +594,7 @@ async fn test_todo_store_persistence() {
             due_date: None,
             tags: vec!["backend".to_string()],
             status: TodoStatus::Doing,
-            confidence: 0.0,
+
             focused_at: None,
             focus_deadline: None,
             focus_expired_count: 0,
@@ -615,7 +613,7 @@ async fn test_todo_store_persistence() {
             due_date: Some(Utc::now() + chrono::Duration::days(7)),
             tags: vec!["backend".to_string(), "storage".to_string()],
             status: TodoStatus::Done,
-            confidence: 0.0,
+
             focused_at: None,
             focus_deadline: None,
             focus_expired_count: 0,
@@ -643,7 +641,6 @@ async fn test_todo_store_persistence() {
         .expect("Task 1 should exist");
     assert_eq!(task1.title, "Fix bug");
     assert_eq!(task1.status, TodoStatus::Todo);
-    assert_eq!(task1.confidence, 0.0, "Low confidence task");
 
     // Verify task 2 (partial)
     let task2 = store
@@ -653,7 +650,6 @@ async fn test_todo_store_persistence() {
         .expect("Task 2 should exist");
     assert_eq!(task2.title, "Fix the authentication bug");
     assert_eq!(task2.status, TodoStatus::Doing);
-    assert!(task2.confidence > 0.5, "Should have medium-high confidence");
 
     // Verify task 3 (complete)
     let task3 = store
@@ -667,215 +663,15 @@ async fn test_todo_store_persistence() {
         task3.completed_at.is_some(),
         "Completed task should have timestamp"
     );
-    assert!(task3.confidence > 0.9, "Should have very high confidence");
 }
 
+// test_confidence_scoring_accuracy removed — old field-completeness heuristic replaced by LLM-driven confidence
+
 #[tokio::test]
-async fn test_confidence_scoring_accuracy() {
-    // SCENARIO: Validate exact confidence scores against AC document edge cases
-    // SOURCE: docs/plans/2026-02-13-acceptance-criteria.md Part 2, AC-9.4 to AC-9.10
-    //
-    // Confidence scoring weights (EXACT):
-    // - Title: 0.25 (triggered when split_whitespace().count() > 3)
-    // - Description: 0.25 (triggered when desc.len() > 10)
-    // - Priority: 0.15 (triggered when priority.is_some())
-    // - Due date: 0.20 (triggered when due_date.is_some())
-    // - Tags: 0.15 (triggered when !tags.is_empty())
-    //
-    // CRITICAL EDGE CASES from AC document confidence scoring table:
-
-    use chrono::Utc;
-    use klyntbot::tools::todo_types::Todo;
-
-    // Edge Case 1: "fix bug" (2 words) → 0.0
-    // Title ≤ 3 words, no other fields
-    let task1 = Todo {
-        id: Todo::generate_id(),
-        title: "fix bug".to_string(),
-        description: None,
-        priority: None,
-        due_date: None,
-        tags: vec![],
-        status: klyntbot::tools::todo_types::TodoStatus::Todo,
-        confidence: 0.0,
-        focused_at: None,
-        focus_deadline: None,
-        focus_expired_count: 0,
-        created_at: Utc::now(),
-        updated_at: Utc::now(),
-        completed_at: None,
-    };
-    assert_eq!(
-        task1.calculate_confidence(),
-        0.0,
-        "2-word title should score 0.0"
-    );
-
-    // Edge Case 2: "fix the auth bug" (4 words) → 0.25
-    // Title > 3 words only
-    let task2 = Todo {
-        id: Todo::generate_id(),
-        title: "fix the auth bug".to_string(),
-        description: None,
-        priority: None,
-        due_date: None,
-        tags: vec![],
-        status: klyntbot::tools::todo_types::TodoStatus::Todo,
-        confidence: 0.0,
-        focused_at: None,
-        focus_deadline: None,
-        focus_expired_count: 0,
-        created_at: Utc::now(),
-        updated_at: Utc::now(),
-        completed_at: None,
-    };
-    assert_eq!(
-        task2.calculate_confidence(),
-        0.25,
-        "4-word title should score 0.25"
-    );
-
-    // Edge Case 3: "fix" + "short" (5 chars) → 0.0
-    // Title ≤ 3 words, desc ≤ 10 chars
-    let task3 = Todo {
-        id: Todo::generate_id(),
-        title: "fix".to_string(),
-        description: Some("short".to_string()),
-        priority: None,
-        due_date: None,
-        tags: vec![],
-        status: klyntbot::tools::todo_types::TodoStatus::Todo,
-        confidence: 0.0,
-        focused_at: None,
-        focus_deadline: None,
-        focus_expired_count: 0,
-        created_at: Utc::now(),
-        updated_at: Utc::now(),
-        completed_at: None,
-    };
-    assert_eq!(
-        task3.calculate_confidence(),
-        0.0,
-        "1-word title + 5-char desc should score 0.0"
-    );
-
-    // Edge Case 4: "fix" + "longer than 10" (14 chars) → 0.25
-    // Desc > 10 chars only
-    let task4 = Todo {
-        id: Todo::generate_id(),
-        title: "fix".to_string(),
-        description: Some("longer than 10".to_string()),
-        priority: None,
-        due_date: None,
-        tags: vec![],
-        status: klyntbot::tools::todo_types::TodoStatus::Todo,
-        confidence: 0.0,
-        focused_at: None,
-        focus_deadline: None,
-        focus_expired_count: 0,
-        created_at: Utc::now(),
-        updated_at: Utc::now(),
-        completed_at: None,
-    };
-    assert_eq!(
-        task4.calculate_confidence(),
-        0.25,
-        "1-word title + 14-char desc should score 0.25"
-    );
-
-    // Edge Case 5: All fields present → 1.0
-    let task5 = Todo {
-        id: Todo::generate_id(),
-        title: "fix the authentication bug".to_string(),
-        description: Some("Auth tokens expire during sessions".to_string()),
-        priority: Some(4),
-        due_date: Some(Utc::now() + chrono::Duration::days(7)),
-        tags: vec!["backend".to_string()],
-        status: klyntbot::tools::todo_types::TodoStatus::Todo,
-        confidence: 0.0,
-        focused_at: None,
-        focus_deadline: None,
-        focus_expired_count: 0,
-        created_at: Utc::now(),
-        updated_at: Utc::now(),
-        completed_at: None,
-    };
-    assert_eq!(
-        task5.calculate_confidence(),
-        1.0,
-        "All fields should score 1.0"
-    );
-
-    // Edge Case 6: Exactly 3 words in title → 0.0 (boundary test)
-    // "fix the bug" = 3 words, does NOT trigger (needs > 3, not >= 3)
-    let task6 = Todo {
-        id: Todo::generate_id(),
-        title: "fix the bug".to_string(),
-        description: None,
-        priority: None,
-        due_date: None,
-        tags: vec![],
-        status: klyntbot::tools::todo_types::TodoStatus::Todo,
-        confidence: 0.0,
-        focused_at: None,
-        focus_deadline: None,
-        focus_expired_count: 0,
-        created_at: Utc::now(),
-        updated_at: Utc::now(),
-        completed_at: None,
-    };
-    assert_eq!(
-        task6.calculate_confidence(),
-        0.0,
-        "Exactly 3 words should NOT trigger (needs > 3)"
-    );
-
-    // Edge Case 7: Exactly 10 chars in description → 0.0 (boundary test)
-    // "1234567890" = 10 chars, does NOT trigger (needs > 10, not >= 10)
-    let task7 = Todo {
-        id: Todo::generate_id(),
-        title: "title".to_string(),
-        description: Some("1234567890".to_string()),
-        priority: None,
-        due_date: None,
-        tags: vec![],
-        status: klyntbot::tools::todo_types::TodoStatus::Todo,
-        confidence: 0.0,
-        focused_at: None,
-        focus_deadline: None,
-        focus_expired_count: 0,
-        created_at: Utc::now(),
-        updated_at: Utc::now(),
-        completed_at: None,
-    };
-    assert_eq!(
-        task7.calculate_confidence(),
-        0.0,
-        "Exactly 10 chars should NOT trigger (needs > 10)"
-    );
-
-    // Edge Case 8: 11 chars in description → 0.25 (just over boundary)
-    let task8 = Todo {
-        id: Todo::generate_id(),
-        title: "title".to_string(),
-        description: Some("12345678901".to_string()),
-        priority: None,
-        due_date: None,
-        tags: vec![],
-        status: klyntbot::tools::todo_types::TodoStatus::Todo,
-        confidence: 0.0,
-        focused_at: None,
-        focus_deadline: None,
-        focus_expired_count: 0,
-        created_at: Utc::now(),
-        updated_at: Utc::now(),
-        completed_at: None,
-    };
-    assert_eq!(
-        task8.calculate_confidence(),
-        0.25,
-        "11 chars should trigger (> 10)"
-    );
+#[ignore] // Legacy confidence test — replaced by LLM-driven confidence
+async fn test_confidence_scoring_accuracy_legacy() {
+    // This test validated the old calculate_confidence() heuristic which has been removed.
+    // The new confidence system is LLM-driven (see crates/agent/src/confidence/).
 }
 
 #[tokio::test]
@@ -909,7 +705,7 @@ async fn test_focus_slot_limit() {
             due_date: None,
             tags: vec!["test".to_string()],
             status: TodoStatus::Todo,
-            confidence: 0.0,
+
             focused_at: None,
             focus_deadline: None,
             focus_expired_count: 0,
@@ -1005,7 +801,6 @@ async fn test_auto_unfocus_expired_tasks() {
         due_date: None,
         tags: vec!["urgent".to_string()],
         status: TodoStatus::Doing,
-        confidence: 0.0,
         focused_at: Some(now - Duration::hours(20)), // Focused 20 hours ago
         focus_deadline: Some(now - Duration::hours(2)), // Expired 2 hours ago
         focus_expired_count: 0,
@@ -1077,7 +872,6 @@ async fn test_auto_unfocus_expired_tasks() {
         due_date: None,
         tags: vec![],
         status: TodoStatus::Todo,
-        confidence: 0.0,
         focused_at: Some(now - Duration::hours(25)),
         focus_deadline: Some(now - Duration::hours(7)),
         focus_expired_count: 3, // Already expired 3 times before
@@ -1149,7 +943,7 @@ async fn test_complete_focused_task_frees_slot() {
             due_date: None,
             tags: vec![],
             status: TodoStatus::Todo,
-            confidence: 0.0,
+
             focused_at: None,
             focus_deadline: None,
             focus_expired_count: 0,
@@ -1244,7 +1038,7 @@ async fn test_focus_and_delete_interaction() {
             due_date: None,
             tags: vec!["test".to_string()],
             status: TodoStatus::Todo,
-            confidence: 0.0,
+
             focused_at: None,
             focus_deadline: None,
             focus_expired_count: 0,
@@ -1364,11 +1158,6 @@ async fn test_empty_store_operations() {
         summary.overdue.len(),
         0,
         "Empty store should have no overdue tasks"
-    );
-    assert_eq!(
-        summary.low_confidence.len(),
-        0,
-        "Empty store should have no low confidence tasks"
     );
     assert_eq!(
         summary.upcoming_week.len(),

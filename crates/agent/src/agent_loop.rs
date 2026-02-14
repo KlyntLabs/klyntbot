@@ -29,6 +29,7 @@ use tools::{
     RoutingContext,
 };
 
+use super::confidence::{self, ConfidenceEvaluator, DecisionAction, DecisionLogger};
 use super::{AgentEvent, ContextBuilder, CronHandlerAdapter, SubagentManager};
 
 /// Maximum number of tool-calling iterations before returning final response
@@ -84,6 +85,8 @@ pub struct AgentLoop {
     tool_registry: Arc<RwLock<ToolRegistry>>,
     #[allow(dead_code)] // Will be used when full agent loop implementation is completed
     subagent_manager: Arc<SubagentManager>,
+    confidence_evaluator: Option<ConfidenceEvaluator>,
+    decision_logger: DecisionLogger,
     running: Arc<AtomicBool>,
     last_active_channel: Option<LastActiveChannel>,
 }
@@ -179,8 +182,19 @@ impl AgentLoop {
             Arc::clone(&todo_store),
             config.todo.focus.max_slots,
             config.todo.focus.deadline_hours,
-            config.todo.confidence_threshold,
         ));
+
+        // Confidence evaluator
+        let confidence_evaluator = if config.confidence.enabled {
+            Some(ConfidenceEvaluator::new(config.confidence.threshold))
+        } else {
+            None
+        };
+
+        let decision_logger = match &config.confidence.log_path {
+            Some(path) => DecisionLogger::new(path.clone()),
+            None => DecisionLogger::default_path(),
+        };
 
         // Take ownership of the inbound receiver
         let inbound_rx = bus
@@ -196,6 +210,8 @@ impl AgentLoop {
             session_manager: Arc::new(RwLock::new(session_manager)),
             tool_registry: Arc::new(RwLock::new(tool_registry)),
             subagent_manager,
+            confidence_evaluator,
+            decision_logger,
             running: Arc::new(AtomicBool::new(false)),
             last_active_channel: notification_handle,
         })
@@ -557,6 +573,67 @@ impl AgentLoop {
         if !response.tool_calls.is_empty() {
             debug!("LLM requested {} tool calls", response.tool_calls.len());
 
+            // Evaluate confidence if enabled
+            if let Some(evaluator) = &self.confidence_evaluator {
+                let content = response.content.as_deref().unwrap_or("");
+                if let Some(assessment) = evaluator.parse_assessment(content) {
+                    let action_str = match &assessment.action {
+                        DecisionAction::Proceed => "proceed",
+                        DecisionAction::Clarify { .. } => "clarify",
+                        DecisionAction::Skip { .. } => "skip",
+                    };
+                    emit!(
+                        event_tx,
+                        AgentEvent::ConfidenceAssessed {
+                            score: assessment.score,
+                            action: action_str.to_string(),
+                        }
+                    );
+
+                    // Log the assessment
+                    let tool_names: Vec<String> = response
+                        .tool_calls
+                        .iter()
+                        .map(|tc| tc.name.clone())
+                        .collect();
+                    let entry = confidence::types::DecisionLogEntry {
+                        id: uuid::Uuid::new_v4().to_string(),
+                        session_key: routing_ctx.chat_id.to_string(),
+                        iteration: 0,
+                        tool_names,
+                        user_message_preview: String::new(),
+                        assessment: assessment.clone(),
+                        outcome: None,
+                        created_at: chrono::Utc::now(),
+                    };
+                    self.decision_logger.log(&entry).await;
+
+                    // Act on confidence
+                    match &assessment.action {
+                        DecisionAction::Clarify { questions } => {
+                            debug!(
+                                score = assessment.score,
+                                "Low confidence — requesting clarification"
+                            );
+                            let clarification = questions.join("\n");
+                            messages.push(Message::assistant(format!(
+                                "I need to clarify before proceeding:\n{}",
+                                clarification
+                            )));
+                            return Ok(IterationOutcome::FinalContent(format!(
+                                "I need to clarify before proceeding:\n{}",
+                                clarification
+                            )));
+                        }
+                        DecisionAction::Skip { reason } => {
+                            debug!(reason = %reason, "Skipping tool calls");
+                            return Ok(IterationOutcome::FinalContent(reason.clone()));
+                        }
+                        DecisionAction::Proceed => {}
+                    }
+                }
+            }
+
             let tool_call_messages = tool_calls_to_messages(&response.tool_calls);
             messages.push(Message::assistant_with_tools(tool_call_messages));
 
@@ -614,9 +691,10 @@ impl AgentLoop {
 
         // No tool calls - check for final content
         if let Some(content) = response.content {
+            let clean = confidence::evaluator::strip_confidence_blocks(&content);
             // Emit ContentChunk so the CLI can display text even for non-streaming providers
-            emit!(event_tx, AgentEvent::ContentChunk(content.clone()));
-            Ok(IterationOutcome::FinalContent(content))
+            emit!(event_tx, AgentEvent::ContentChunk(clean.clone()));
+            Ok(IterationOutcome::FinalContent(clean))
         } else {
             Ok(IterationOutcome::Empty)
         }
@@ -707,6 +785,56 @@ impl AgentLoop {
         if !tool_calls.is_empty() {
             debug!("LLM requested {} tool calls", tool_calls.len());
 
+            // Evaluate confidence if enabled
+            if let Some(evaluator) = &self.confidence_evaluator {
+                if let Some(assessment) = evaluator.parse_assessment(&accumulated_content) {
+                    let action_str = match &assessment.action {
+                        DecisionAction::Proceed => "proceed",
+                        DecisionAction::Clarify { .. } => "clarify",
+                        DecisionAction::Skip { .. } => "skip",
+                    };
+                    emit!(
+                        event_tx,
+                        AgentEvent::ConfidenceAssessed {
+                            score: assessment.score,
+                            action: action_str.to_string(),
+                        }
+                    );
+
+                    let tool_names: Vec<String> =
+                        tool_calls.iter().map(|tc| tc.name.clone()).collect();
+                    let entry = confidence::types::DecisionLogEntry {
+                        id: uuid::Uuid::new_v4().to_string(),
+                        session_key: routing_ctx.chat_id.to_string(),
+                        iteration: 0,
+                        tool_names,
+                        user_message_preview: String::new(),
+                        assessment: assessment.clone(),
+                        outcome: None,
+                        created_at: chrono::Utc::now(),
+                    };
+                    self.decision_logger.log(&entry).await;
+
+                    match &assessment.action {
+                        DecisionAction::Clarify { questions } => {
+                            debug!(
+                                score = assessment.score,
+                                "Low confidence — requesting clarification"
+                            );
+                            let clarification = questions.join("\n");
+                            return Ok(IterationOutcome::FinalContent(format!(
+                                "I need to clarify before proceeding:\n{}",
+                                clarification
+                            )));
+                        }
+                        DecisionAction::Skip { reason } => {
+                            return Ok(IterationOutcome::FinalContent(reason.clone()));
+                        }
+                        DecisionAction::Proceed => {}
+                    }
+                }
+            }
+
             let tool_call_messages = tool_calls_to_messages(&tool_calls);
             messages.push(Message::assistant_with_tools(tool_call_messages));
 
@@ -762,7 +890,8 @@ impl AgentLoop {
         }
 
         if !accumulated_content.is_empty() {
-            Ok(IterationOutcome::FinalContent(accumulated_content))
+            let clean = confidence::evaluator::strip_confidence_blocks(&accumulated_content);
+            Ok(IterationOutcome::FinalContent(clean))
         } else {
             Ok(IterationOutcome::Empty)
         }

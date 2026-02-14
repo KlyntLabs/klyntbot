@@ -312,6 +312,9 @@ async fn run_with_streaming(
                         clean_exit = true;
                         break;
                     }
+                    AgentEvent::ConfidenceAssessed { .. } => {
+                        // Internal-only event; not displayed to user
+                    }
                     AgentEvent::Error(e) => {
                         eprintln!("\n{} {}", status_error(), e);
                         clean_exit = true;

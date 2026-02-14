@@ -28,6 +28,9 @@ pub enum AgentEvent {
     /// Processing is complete with the final accumulated content.
     Done(String),
 
+    /// Internal confidence assessment completed (not shown to user in CLI).
+    ConfidenceAssessed { score: f32, action: String },
+
     /// An error occurred during processing.
     Error(String),
 }

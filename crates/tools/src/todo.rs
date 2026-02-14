@@ -13,12 +13,11 @@ use crate::todo_store::TodoStore;
 use crate::todo_types::{Todo, TodoFilter, TodoPatch, TodoStatus};
 use common::{Result, ToolError};
 
-/// TodoTool with config-driven focus and confidence values (ADR-008)
+/// TodoTool with config-driven focus values (ADR-008)
 pub struct TodoTool {
     store: Arc<RwLock<TodoStore>>,
     max_focus_slots: usize,
     focus_deadline_hours: u64,
-    confidence_threshold: f32,
 }
 
 impl TodoTool {
@@ -27,13 +26,11 @@ impl TodoTool {
         store: Arc<RwLock<TodoStore>>,
         max_focus_slots: usize,
         focus_deadline_hours: u64,
-        confidence_threshold: f32,
     ) -> Self {
         Self {
             store,
             max_focus_slots,
             focus_deadline_hours,
-            confidence_threshold,
         }
     }
 }
@@ -146,7 +143,6 @@ impl Tool for TodoTool {
                         })
                         .unwrap_or_default(),
                     status: TodoStatus::Todo,
-                    confidence: 0.0, // Will be calculated in add()
                     focused_at: None,
                     focus_deadline: None,
                     focus_expired_count: 0,
@@ -156,28 +152,10 @@ impl Tool for TodoTool {
                 };
 
                 let created = store.add(todo).await?;
-                let mut output = format!(
-                    "Task created: {} (ID: {}, confidence: {:.0}%)",
-                    created.title,
-                    created.id,
-                    created.confidence * 100.0
-                );
-
-                // Show confidence breakdown for low/medium confidence tasks
-                if created.confidence < self.confidence_threshold {
-                    output.push_str("\n\nConfidence breakdown:");
-                    output.push_str(&format_confidence_breakdown(&created));
-                    output.push_str("\n\n[Low confidence task] Use the ask_user tool to gather missing details.");
-                    output.push_str(
-                        "\nSuggest specific questions about the missing fields before proceeding.",
-                    );
-                } else if created.confidence < 0.8 {
-                    output.push_str("\n\nConfidence breakdown:");
-                    output.push_str(&format_confidence_breakdown(&created));
-                    output.push_str("\n\n💡 This task could be improved by adding missing fields.");
-                }
-
-                Ok(output)
+                Ok(format!(
+                    "Task created: {} (ID: {})",
+                    created.title, created.id
+                ))
             }
 
             "list" => {
@@ -260,41 +238,7 @@ impl Tool for TodoTool {
                 };
 
                 match store.update(id, patch).await? {
-                    Some(todo) => {
-                        let mut output = format!(
-                            "Updated task: {} (confidence: {:.0}%)",
-                            todo.title,
-                            todo.confidence * 100.0
-                        );
-
-                        // During enrichment flows, show confidence progress
-                        if todo.confidence < 0.8 {
-                            output.push_str("\n\n💡 Still missing:");
-                            let mut missing = Vec::new();
-                            if todo.title.split_whitespace().count() <= 3 {
-                                missing.push("title quality (+25%)");
-                            }
-                            if todo.description.as_ref().map_or(true, |d| d.len() <= 10) {
-                                missing.push("description (+25%)");
-                            }
-                            if todo.priority.is_none() {
-                                missing.push("priority (+15%)");
-                            }
-                            if todo.due_date.is_none() {
-                                missing.push("due date (+20%)");
-                            }
-                            if todo.tags.is_empty() {
-                                missing.push("tags (+15%)");
-                            }
-                            for field in &missing {
-                                output.push_str(&format!("\n  - {}", field));
-                            }
-                        } else {
-                            output.push_str(" ✅ High confidence!");
-                        }
-
-                        Ok(output)
-                    }
+                    Some(todo) => Ok(format!("Updated task: {}", todo.title)),
                     None => {
                         Err(ToolError::ExecutionFailed(format!("Task not found: {}", id)).into())
                     }
@@ -342,7 +286,6 @@ impl Tool for TodoTool {
                         output.push_str(&format!("ID: {}\n", todo.id));
                         output.push_str(&format!("Status: {:?}\n", todo.status));
                         output.push_str(&format!("Priority: {}\n", todo.priority.unwrap_or(3)));
-                        output.push_str(&format!("Confidence: {:.0}%\n", todo.confidence * 100.0));
                         if let Some(desc) = &todo.description {
                             output.push_str(&format!("Description: {}\n", desc));
                         }
@@ -351,38 +294,6 @@ impl Tool for TodoTool {
                         }
                         if let Some(due) = &todo.due_date {
                             output.push_str(&format!("Due: {}\n", due.format("%Y-%m-%d")));
-                        }
-
-                        // Always include confidence breakdown for show
-                        output.push_str(&format!(
-                            "\nConfidence breakdown:{}",
-                            format_confidence_breakdown(&todo)
-                        ));
-
-                        // Suggest improvements for low-confidence tasks
-                        if todo.confidence < 0.8 {
-                            output.push_str("\n\n💡 Improvement suggestions:");
-                            let mut suggestions = Vec::new();
-                            if todo.title.split_whitespace().count() <= 3 {
-                                suggestions.push("Expand title to >3 words (+25%)");
-                            }
-                            if todo.description.as_ref().map_or(true, |d| d.len() <= 10) {
-                                suggestions.push("Add detailed description (+25%)");
-                            }
-                            if todo.priority.is_none() {
-                                suggestions.push("Set priority 1-5 (+15%)");
-                            }
-                            if todo.due_date.is_none() {
-                                suggestions.push("Add due date (+20%)");
-                            }
-                            if todo.tags.is_empty() {
-                                suggestions.push("Add relevant tags (+15%)");
-                            }
-                            for suggestion in &suggestions {
-                                output.push_str(&format!("\n  - {}", suggestion));
-                            }
-
-                            output.push_str("\n\n🤖 AI INSTRUCTION: Consider asking the user if they want to improve this task using YOLO or Party mode.");
                         }
 
                         Ok(output)
@@ -402,12 +313,6 @@ impl Tool for TodoTool {
                 }
                 if !summary.overdue.is_empty() {
                     output.push_str(&format!("\nOverdue: {} tasks\n", summary.overdue.len()));
-                }
-                if !summary.low_confidence.is_empty() {
-                    output.push_str(&format!(
-                        "Low confidence: {} tasks\n",
-                        summary.low_confidence.len()
-                    ));
                 }
                 Ok(output)
             }
@@ -445,60 +350,6 @@ impl Tool for TodoTool {
     }
 }
 
-/// Format a confidence breakdown showing which fields contribute to the score
-fn format_confidence_breakdown(todo: &Todo) -> String {
-    let mut parts = Vec::new();
-
-    let title_ok = todo.title.split_whitespace().count() > 3;
-    parts.push(format!(
-        "\n  {} Title quality (25%) — {}",
-        if title_ok { "✅" } else { "⬜" },
-        if title_ok { "good" } else { "needs >3 words" }
-    ));
-
-    let desc_ok = todo.description.as_ref().is_some_and(|d| d.len() > 10);
-    parts.push(format!(
-        "\n  {} Description (25%) — {}",
-        if desc_ok { "✅" } else { "⬜" },
-        if desc_ok { "set" } else { "not set" }
-    ));
-
-    let pri_ok = todo.priority.is_some();
-    parts.push(format!(
-        "\n  {} Priority (15%) — {}",
-        if pri_ok { "✅" } else { "⬜" },
-        if let Some(p) = todo.priority {
-            format!("P{}", p)
-        } else {
-            "not set".to_string()
-        }
-    ));
-
-    let due_ok = todo.due_date.is_some();
-    parts.push(format!(
-        "\n  {} Due date (20%) — {}",
-        if due_ok { "✅" } else { "⬜" },
-        if let Some(d) = &todo.due_date {
-            d.format("%Y-%m-%d").to_string()
-        } else {
-            "not set".to_string()
-        }
-    ));
-
-    let tags_ok = !todo.tags.is_empty();
-    parts.push(format!(
-        "\n  {} Tags (15%) — {}",
-        if tags_ok { "✅" } else { "⬜" },
-        if tags_ok {
-            todo.tags.join(", ")
-        } else {
-            "none".to_string()
-        }
-    ));
-
-    parts.join("")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -509,7 +360,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("todos.jsonl");
         let store = Arc::new(RwLock::new(TodoStore::new(file_path)));
-        let tool = TodoTool::new(store, 3, 18, 0.5);
+        let tool = TodoTool::new(store, 3, 18);
         (tool, temp_dir)
     }
 
@@ -538,7 +389,6 @@ mod tests {
         let result = tool.execute(args, &ctx()).await.unwrap();
         assert!(result.contains("Task created"));
         assert!(result.contains("Test task"));
-        assert!(result.contains("confidence"));
     }
 
     #[tokio::test]
@@ -608,7 +458,7 @@ mod tests {
 
         // Extract ID from result
         let id_start = add_result.find("ID: ").unwrap() + 4;
-        let id_end = add_result[id_start..].find(',').unwrap() + id_start;
+        let id_end = add_result[id_start..].find(')').unwrap() + id_start;
         let id = &add_result[id_start..id_end];
 
         // Update the task
@@ -640,7 +490,7 @@ mod tests {
             .unwrap();
 
         let id_start = add_result.find("ID: ").unwrap() + 4;
-        let id_end = add_result[id_start..].find(',').unwrap() + id_start;
+        let id_end = add_result[id_start..].find(')').unwrap() + id_start;
         let id = &add_result[id_start..id_end];
 
         // Complete it
@@ -671,7 +521,7 @@ mod tests {
             .unwrap();
 
         let id_start = add_result.find("ID: ").unwrap() + 4;
-        let id_end = add_result[id_start..].find(',').unwrap() + id_start;
+        let id_end = add_result[id_start..].find(')').unwrap() + id_start;
         let id = &add_result[id_start..id_end];
 
         // Delete it
@@ -704,7 +554,7 @@ mod tests {
             .unwrap();
 
         let id_start = add_result.find("ID: ").unwrap() + 4;
-        let id_end = add_result[id_start..].find(',').unwrap() + id_start;
+        let id_end = add_result[id_start..].find(')').unwrap() + id_start;
         let id = &add_result[id_start..id_end];
 
         // Show it
@@ -763,7 +613,7 @@ mod tests {
             .unwrap();
 
         let id_start = add_result.find("ID: ").unwrap() + 4;
-        let id_end = add_result[id_start..].find(',').unwrap() + id_start;
+        let id_end = add_result[id_start..].find(')').unwrap() + id_start;
         let id = &add_result[id_start..id_end];
 
         // Focus it
@@ -793,7 +643,7 @@ mod tests {
             .unwrap();
 
         let id_start = add_result.find("ID: ").unwrap() + 4;
-        let id_end = add_result[id_start..].find(',').unwrap() + id_start;
+        let id_end = add_result[id_start..].find(')').unwrap() + id_start;
         let id = &add_result[id_start..id_end];
 
         tool.execute(serde_json::json!({"action": "focus", "id": id}), &ctx())
@@ -849,16 +699,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_adr008_config_driven_focus() {
-        // ADR-008: Focus and confidence values come from config, not hardcoded
+        // ADR-008: Focus values come from config, not hardcoded
         let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("todos.jsonl");
         let store = Arc::new(RwLock::new(TodoStore::new(file_path)));
 
         // Create tool with custom config values
-        let tool = TodoTool::new(store, 5, 24, 0.6);
+        let tool = TodoTool::new(store, 5, 24);
 
         assert_eq!(tool.max_focus_slots, 5);
         assert_eq!(tool.focus_deadline_hours, 24);
-        assert_eq!(tool.confidence_threshold, 0.6);
     }
 }

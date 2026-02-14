@@ -1,7 +1,7 @@
 //! Todo task management CLI commands.
 //!
-//! Implements all todo subcommands including task creation with confidence
-//! scoring, Phase 1/2 enrichment flow, focus mode, and dashboard rendering.
+//! Implements all todo subcommands including task creation,
+//! enrichment flow, focus mode, and dashboard rendering.
 
 use anyhow::Result;
 use chrono::Utc;
@@ -10,7 +10,6 @@ use tools::todo_store::TodoStore;
 use tools::todo_types::{Todo, TodoFilter, TodoPatch, TodoStatus};
 
 use crate::commands::TodoCommands;
-use crate::wizard::prompts::{prompt_optional, prompt_select_with_input, SelectWithInputOption};
 
 /// Handle todo subcommands.
 ///
@@ -52,7 +51,7 @@ async fn handle_add(
     let mut store = TodoStore::new(store_path);
 
     // Create initial todo from args
-    let mut todo = Todo {
+    let todo = Todo {
         id: Todo::generate_id(),
         title: title.clone(),
         description: description.clone(),
@@ -63,7 +62,6 @@ async fn handle_add(
             .map(|t| t.split(',').map(|s| s.trim().to_string()).collect())
             .unwrap_or_default(),
         status: TodoStatus::Todo,
-        confidence: 0.0, // Will be calculated
         focused_at: None,
         focus_deadline: None,
         focus_expired_count: 0,
@@ -72,130 +70,11 @@ async fn handle_add(
         completed_at: None,
     };
 
-    // Calculate initial confidence
-    let initial_confidence = todo.calculate_confidence();
-    todo.confidence = initial_confidence;
-
-    // Phase 1: Pre-creation enrichment (if confidence < threshold)
-    if initial_confidence < config.todo.confidence_threshold {
-        println!("Creating task: \"{}\"", colorize(&title, BOLD));
-        println!();
-
-        // Show confidence bar
-        println!(
-            "Confidence: {}% {}",
-            (initial_confidence * 100.0) as u8,
-            render_confidence_bar(initial_confidence)
-        );
-        println!(
-            "             {} title only, no description/priority/date/tags",
-            colorize("↑", DIM)
-        );
-        println!();
-        println!("How would you like to improve it?");
-        println!();
-
-        let options = vec![
-            SelectWithInputOption {
-                label: "Yes — looks good",
-                description: "",
-                expandable: true,
-                input_hint: Some("Add more detail to help the task"),
-            },
-            SelectWithInputOption {
-                label: "Manual — I'll fill the details",
-                description: "",
-                expandable: true,
-                input_hint: Some("Description"),
-            },
-            SelectWithInputOption {
-                label: "YOLO — auto-enrich from context & memory",
-                description: "",
-                expandable: false,
-                input_hint: None,
-            },
-            SelectWithInputOption {
-                label: "Party — let's brainstorm together",
-                description: "",
-                expandable: false,
-                input_hint: None,
-            },
-            SelectWithInputOption {
-                label: "Skip — create as-is (low confidence)",
-                description: "",
-                expandable: false,
-                input_hint: None,
-            },
-        ];
-
-        let result = prompt_select_with_input("", &options, 0)?;
-
-        match result.index {
-            0 => {
-                // "Yes — looks good" (with optional hint)
-                if let Some(hint) = result.text {
-                    if !hint.is_empty() {
-                        todo = enrich_with_ai_hint(&todo, &hint).await?;
-                    }
-                }
-            }
-            1 => {
-                // "Manual" — either with description from expanded input or full form
-                if let Some(desc) = result.text {
-                    if !desc.is_empty() {
-                        todo.description = Some(desc);
-                    }
-                }
-
-                // Always prompt for remaining fields in manual mode
-                let priority_str = prompt_optional("Priority (1-5)")?;
-                if let Some(p) = priority_str {
-                    if let Ok(pri) = p.parse::<u8>() {
-                        if (1..=5).contains(&pri) {
-                            todo.priority = Some(pri);
-                        }
-                    }
-                }
-
-                let due_str = prompt_optional("Due date (YYYY-MM-DD)")?;
-                if let Some(d) = due_str {
-                    if let Ok(due_date) = parse_due_date(&d) {
-                        todo.due_date = Some(due_date);
-                    }
-                }
-
-                let tags_str = prompt_optional("Tags (comma-separated)")?;
-                if let Some(t) = tags_str {
-                    todo.tags = t.split(',').map(|s| s.trim().to_string()).collect();
-                }
-            }
-            2 => {
-                // "YOLO" — AI auto-enrichment
-                println!("{} Auto-enriching task...", colorize("⣾", BRAND));
-                todo = enrich_with_ai_auto(&todo).await?;
-            }
-            3 => {
-                // "Party" — conversational brainstorm
-                todo = enrich_with_ai_party(&todo).await?;
-            }
-            4 => {
-                // "Skip" — create as-is
-                // No enrichment
-            }
-            _ => unreachable!(),
-        }
-
-        // Recalculate confidence after enrichment
-        todo.confidence = todo.calculate_confidence();
-    }
-
     // Save to store
     let saved_todo = store.add(todo.clone()).await?;
 
-    // Phase 2: Post-creation review
+    // Show created task
     show_task_created_box(&saved_todo);
-
-    // TODO: Implement Phase 2 review loop (improve/confirm)
 
     Ok(())
 }
@@ -286,17 +165,6 @@ async fn handle_list(
                 print!("  {}", colorize(&due.format("%b %d").to_string(), DIM));
             }
         }
-
-        // P1: Confidence column
-        let conf_pct = (todo.confidence * 100.0) as u8;
-        let conf_color = if todo.confidence >= 0.8 {
-            SUCCESS
-        } else if todo.confidence >= 0.5 {
-            BRAND
-        } else {
-            WARNING
-        };
-        print!("  {}", colorize(&format!("{}%", conf_pct), conf_color));
 
         println!();
     }
@@ -483,19 +351,6 @@ async fn handle_summary() -> Result<()> {
         println!();
     }
 
-    // Low confidence
-    if !summary.low_confidence.is_empty() {
-        println!(
-            "{} {} low confidence tasks:",
-            status_warning(),
-            summary.low_confidence.len()
-        );
-        for id in &summary.low_confidence {
-            println!("  {}", colorize(id, TOOL));
-        }
-        println!();
-    }
-
     // Upcoming
     if !summary.upcoming_week.is_empty() {
         println!("Due this week: {}", summary.upcoming_week.len());
@@ -522,23 +377,6 @@ fn parse_due_date(date_str: &str) -> Result<chrono::DateTime<Utc>> {
         naive_datetime,
         Utc,
     ))
-}
-
-/// Render a confidence bar (10 chars)
-fn render_confidence_bar(confidence: f32) -> String {
-    let filled = (confidence * 10.0) as usize;
-    let empty = 10 - filled;
-
-    let color = if confidence >= 0.8 {
-        SUCCESS
-    } else if confidence >= 0.5 {
-        BRAND
-    } else {
-        WARNING
-    };
-
-    let bar = format!("{}{}", "■".repeat(filled), "░".repeat(empty));
-    colorize(&bar, color)
 }
 
 /// Show task created box with details
@@ -622,20 +460,6 @@ fn show_task_created_box(todo: &Todo) {
         )
     );
     println!(
-        "{}  Confidence:  {}% {}{}",
-        colorize("│", SUCCESS),
-        (todo.confidence * 100.0) as u8,
-        render_confidence_bar(todo.confidence),
-        colorize("                    │", SUCCESS)
-    );
-    println!(
-        "{}",
-        colorize(
-            "│                                                │",
-            SUCCESS
-        )
-    );
-    println!(
         "{}",
         colorize(
             "└─────────────────────────────────────────────────┘",
@@ -657,27 +481,6 @@ fn render_priority(priority: u8) -> String {
 
     let badge = format!("{} P{}", blocks, priority);
     colorize(&badge, color)
-}
-
-// AI enrichment stubs (to be implemented with actual AI integration)
-
-async fn enrich_with_ai_hint(todo: &Todo, hint: &str) -> Result<Todo> {
-    // TODO: Call AI with hint to enrich the task
-    // For now, just return the todo unchanged
-    println!("TODO: Implement AI enrichment with hint: {}", hint);
-    Ok(todo.clone())
-}
-
-async fn enrich_with_ai_auto(todo: &Todo) -> Result<Todo> {
-    // TODO: Call AI to auto-generate all fields from context
-    println!("TODO: Implement AI auto-enrichment");
-    Ok(todo.clone())
-}
-
-async fn enrich_with_ai_party(todo: &Todo) -> Result<Todo> {
-    // TODO: Call AI with persona to ask questions
-    println!("TODO: Implement AI party mode");
-    Ok(todo.clone())
 }
 
 /// Show focused task in focus board
@@ -807,171 +610,6 @@ fn show_focused_task(todo: &Todo, deadline_hours: u64) {
     );
 }
 
-/// Render confidence breakdown with field-by-field analysis
-fn render_confidence_breakdown(todo: &Todo) {
-    println!(
-        "{}",
-        colorize(
-            "│                                                         │",
-            BRAND
-        )
-    );
-
-    // Title quality (0.25)
-    let title_words = todo.title.split_whitespace().count();
-    let has_title = title_words > 3;
-    let title_icon = if has_title {
-        colorize("✓", SUCCESS)
-    } else {
-        colorize("○", DIM)
-    };
-    println!(
-        "{}    {} Title quality    (25%)  — {} words{}",
-        colorize("│", BRAND),
-        title_icon,
-        title_words,
-        colorize("  │", BRAND)
-    );
-
-    // Description (0.25)
-    let has_desc = todo.description.as_ref().is_some_and(|d| d.len() > 10);
-    let desc_icon = if has_desc {
-        colorize("✓", SUCCESS)
-    } else {
-        colorize("○", DIM)
-    };
-    let desc_text = if let Some(desc) = &todo.description {
-        format!("{} chars", desc.len())
-    } else {
-        "not set".to_string()
-    };
-    println!(
-        "{}    {} Description      (25%)  — {}{}",
-        colorize("│", BRAND),
-        desc_icon,
-        desc_text,
-        colorize("  │", BRAND)
-    );
-
-    // Priority (0.15)
-    let has_priority = todo.priority.is_some();
-    let priority_icon = if has_priority {
-        colorize("✓", SUCCESS)
-    } else {
-        colorize("○", DIM)
-    };
-    let priority_text = if let Some(p) = todo.priority {
-        format!("P{}", p)
-    } else {
-        "not set".to_string()
-    };
-    println!(
-        "{}    {} Priority set     (15%)  — {}{}",
-        colorize("│", BRAND),
-        priority_icon,
-        priority_text,
-        colorize("  │", BRAND)
-    );
-
-    // Due date (0.20)
-    let has_due = todo.due_date.is_some();
-    let due_icon = if has_due {
-        colorize("✓", SUCCESS)
-    } else {
-        colorize("○", DIM)
-    };
-    let due_text = if let Some(due) = &todo.due_date {
-        due.format("%Y-%m-%d").to_string()
-    } else {
-        "not set".to_string()
-    };
-    println!(
-        "{}    {} Due date         (20%)  — {}{}",
-        colorize("│", BRAND),
-        due_icon,
-        due_text,
-        colorize("  │", BRAND)
-    );
-
-    // Tags (0.15)
-    let has_tags = !todo.tags.is_empty();
-    let tags_icon = if has_tags {
-        colorize("✓", SUCCESS)
-    } else {
-        colorize("○", DIM)
-    };
-    let tags_text = if has_tags {
-        todo.tags.join(", ")
-    } else {
-        "none".to_string()
-    };
-    println!(
-        "{}    {} Tags             (15%)  — {}{}",
-        colorize("│", BRAND),
-        tags_icon,
-        tags_text,
-        colorize("  │", BRAND)
-    );
-
-    // Suggestions (only if confidence < 80%)
-    if todo.confidence < 0.8 {
-        println!(
-            "{}",
-            colorize(
-                "│                                                         │",
-                BRAND
-            )
-        );
-        println!(
-            "{}    {}{}",
-            colorize("│", BRAND),
-            colorize("Suggestions:", DIM),
-            colorize("  │", BRAND)
-        );
-
-        if !has_title {
-            println!(
-                "{}      {} Add more detail to title (+25%){}",
-                colorize("│", BRAND),
-                colorize("→", BRAND),
-                colorize("  │", BRAND)
-            );
-        }
-        if !has_desc {
-            println!(
-                "{}      {} Add a description (+25%){}",
-                colorize("│", BRAND),
-                colorize("→", BRAND),
-                colorize("  │", BRAND)
-            );
-        }
-        if !has_priority {
-            println!(
-                "{}      {} Set a priority level (+15%){}",
-                colorize("│", BRAND),
-                colorize("→", BRAND),
-                colorize("  │", BRAND)
-            );
-        }
-        if !has_due {
-            println!(
-                "{}      {} Add a due date (+20%){}",
-                colorize("│", BRAND),
-                colorize("→", BRAND),
-                colorize("  │", BRAND)
-            );
-        }
-        if !has_tags {
-            println!(
-                "{}      {} Add tags (+15%){}",
-                colorize("│", BRAND),
-                colorize("→", BRAND),
-                colorize("  │", BRAND)
-            );
-        }
-    }
-}
-
 /// Show detailed task view
 fn show_task_details(todo: &Todo) {
     println!(
@@ -1067,18 +705,6 @@ fn show_task_details(todo: &Todo) {
             colorize("  │", BRAND)
         );
     }
-
-    // Confidence
-    println!(
-        "{}  Confidence:  {}% {}{}",
-        colorize("│", BRAND),
-        (todo.confidence * 100.0) as u8,
-        render_confidence_bar(todo.confidence),
-        colorize("  │", BRAND)
-    );
-
-    // P3: Confidence breakdown
-    render_confidence_breakdown(todo);
 
     println!(
         "{}",
