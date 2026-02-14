@@ -659,6 +659,7 @@ impl CalDavClient {
         let mut current_etag = None;
         let mut sync_token = None;
         let mut in_calendar_data = false;
+        let mut in_sync_token = false;
 
         let mut buf = Vec::new();
 
@@ -671,13 +672,17 @@ impl CalDavClient {
                     if local_name.ends_with("calendar-data") {
                         in_calendar_data = true;
                         current_ical_data.clear();
+                    } else if local_name.ends_with("sync-token") {
+                        in_sync_token = true;
                     }
                 }
                 Ok(Event::End(e)) => {
                     let name = e.name();
                     let local_name = std::str::from_utf8(name.as_ref()).unwrap_or("");
 
-                    if local_name.ends_with("calendar-data") {
+                    if local_name.ends_with("sync-token") {
+                        in_sync_token = false;
+                    } else if local_name.ends_with("calendar-data") {
                         in_calendar_data = false;
                         // Parse the accumulated iCalendar data
                         if !current_ical_data.trim().is_empty() {
@@ -703,17 +708,21 @@ impl CalDavClient {
                         if let Ok(text) = e.unescape() {
                             current_ical_data.push_str(&text);
                         }
+                    } else if in_sync_token {
+                        // Inside sync-token element
+                        if let Ok(text) = e.unescape() {
+                            let text_str = text.trim();
+                            if !text_str.is_empty() {
+                                sync_token = Some(text_str.to_string());
+                            }
+                        }
                     } else {
-                        // Check for etag or sync-token
+                        // Check for etag
                         if let Ok(text) = e.unescape() {
                             let text_str = text.trim();
                             // Simple heuristic: if it looks like an etag (quoted string)
                             if text_str.starts_with('"') && text_str.ends_with('"') {
                                 current_etag = Some(text_str.to_string());
-                            }
-                            // Check for sync-token (usually a URL or opaque token)
-                            if text_str.contains("http") || text_str.len() > 20 {
-                                sync_token = Some(text_str.to_string());
                             }
                         }
                     }

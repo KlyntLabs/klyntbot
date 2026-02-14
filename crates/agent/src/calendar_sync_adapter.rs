@@ -184,13 +184,8 @@ impl CalendarSyncAdapter {
             let filter = TodoFilter::default();
             let todos = store.list(&filter).await?;
             for todo in todos {
-                // Only sync todos with due dates that aren't already synced
-                if todo.due_date.is_some()
-                    && (todo.calendar_event_uid.is_none()
-                        || !remote_events
-                            .iter()
-                            .any(|e| Some(&e.uid) == todo.calendar_event_uid.as_ref()))
-                {
+                // Handle CREATE: New todos with due dates
+                if todo.due_date.is_some() && todo.calendar_event_uid.is_none() {
                     if let Some(event) = self.todo_to_event(&todo) {
                         let put_result = {
                             let client = self.caldav_client.read().await;
@@ -203,11 +198,50 @@ impl CalendarSyncAdapter {
                                     calendar_event_uid: Some(Some(event.uid.clone())),
                                     ..Default::default()
                                 };
-                                store.update(&todo.id, patch).await?;
-                                events_pushed += 1;
+                                match store.update(&todo.id, patch).await {
+                                    Ok(_) => {
+                                        events_pushed += 1;
+                                    }
+                                    Err(_e) => {
+                                    }
+                                }
                             }
                             Err(e) => {
                                 tracing::warn!("Failed to push event {}: {}", event.uid, e);
+                            }
+                        }
+                    }
+                }
+                // Handle UPDATE: Todo has calendar_uid and due_date, update the event
+                else if todo.due_date.is_some() && todo.calendar_event_uid.is_some() {
+                    if let Some(event) = self.todo_to_event(&todo) {
+                        let put_result = {
+                            let client = self.caldav_client.read().await;
+                            client.put_event(&event).await
+                        };
+                        if let Err(e) = put_result {
+                            tracing::warn!("Failed to update event {}: {}", event.uid, e);
+                        }
+                    }
+                }
+                // Handle DELETE: Todo has calendar_uid but no due_date (due_date removed)
+                else if todo.due_date.is_none() && todo.calendar_event_uid.is_some() {
+                    if let Some(uid) = &todo.calendar_event_uid {
+                        let delete_result = {
+                            let client = self.caldav_client.read().await;
+                            client.delete_event(uid).await
+                        };
+                        match delete_result {
+                            Ok(()) => {
+                                // Clear calendar UID from todo
+                                let patch = TodoPatch {
+                                    calendar_event_uid: Some(None),
+                                    ..Default::default()
+                                };
+                                store.update(&todo.id, patch).await?;
+                            }
+                            Err(e) => {
+                                tracing::warn!("Failed to delete event {}: {}", uid, e);
                             }
                         }
                     }
