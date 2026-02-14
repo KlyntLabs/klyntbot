@@ -6,6 +6,12 @@
 
 use anyhow::Result;
 use common::utils::terminal::*;
+use crossterm::{
+    cursor,
+    event::{self, Event, KeyCode, KeyEvent, KeyModifiers},
+    terminal::{self, ClearType},
+};
+use std::io::{self, Write};
 
 use super::framework::{StepResult, WizardModule, WizardState};
 use super::prompts::{self, mask_secret, SelectOption};
@@ -77,6 +83,76 @@ const PROVIDERS: &[ProviderInfo] = &[
         models: &["llama-4-scout", "llama-4-maverick", "llama-3.3-70b-versatile", "llama-3.1-8b-instant", "gemma2-9b-it"],
     },
 ];
+
+/// Actions available in the expanded provider sub-menu.
+#[derive(Clone, Copy, PartialEq)]
+enum SubAction {
+    EditApiKey,
+    SetActive,
+    ChangeModel,
+    CustomBaseUrl,
+    Close,
+}
+
+const SUB_ACTIONS: &[SubAction] = &[
+    SubAction::EditApiKey,
+    SubAction::SetActive,
+    SubAction::ChangeModel,
+    SubAction::CustomBaseUrl,
+    SubAction::Close,
+];
+
+impl SubAction {
+    fn label(&self, config: &config::Config, provider: &ProviderInfo) -> String {
+        match self {
+            SubAction::EditApiKey => {
+                let key = get_provider_key(config, provider.key);
+                if key.is_empty() {
+                    "Set API key".to_string()
+                } else {
+                    format!("Edit API key ({})", mask_secret(&key))
+                }
+            }
+            SubAction::SetActive => "Set as active provider".to_string(),
+            SubAction::ChangeModel => "Change model".to_string(),
+            SubAction::CustomBaseUrl => {
+                let base = get_provider_api_base(config, provider.key);
+                match base {
+                    Some(url) => format!("Custom base URL ({})", url),
+                    None => "Custom base URL".to_string(),
+                }
+            }
+            SubAction::Close => "Close".to_string(),
+        }
+    }
+}
+
+/// State for the interactive provider menu.
+struct MenuState {
+    cursor: usize,            // 0..PROVIDERS.len() for providers, PROVIDERS.len() for "Done"
+    expanded: Option<usize>,  // Which provider index is expanded
+    sub_cursor: usize,        // Position in SUB_ACTIONS (0..4)
+    in_sub_menu: bool,        // Whether navigating inside the sub-menu
+}
+
+impl MenuState {
+    fn new() -> Self {
+        Self {
+            cursor: 0,
+            expanded: None,
+            sub_cursor: 0,
+            in_sub_menu: false,
+        }
+    }
+
+    fn total_main_items(&self) -> usize {
+        PROVIDERS.len() + 1 // providers + "Done"
+    }
+
+    fn is_on_done(&self) -> bool {
+        self.cursor == PROVIDERS.len()
+    }
+}
 
 pub struct ProviderModule;
 
@@ -511,6 +587,175 @@ fn set_provider_api_base(config: &mut config::Config, provider_key: &str, base: 
         "groq" => config.providers.groq.api_base = base,
         _ => {}
     }
+}
+
+/// Render the full provider menu list. Returns total lines rendered.
+fn render_provider_menu(
+    out: &mut impl Write,
+    config: &config::Config,
+    menu: &MenuState,
+    chars: &BoxChars,
+) -> Result<usize> {
+    let prefix = format!("{} ", colorize(chars.vertical, BRAND));
+    let active_provider = config
+        .agents
+        .defaults
+        .provider
+        .as_deref()
+        .unwrap_or_else(|| config.active_provider_name());
+    let mut lines = 0;
+
+    for (i, provider) in PROVIDERS.iter().enumerate() {
+        let key = get_provider_key(config, provider.key);
+        let configured = !key.is_empty();
+        let is_active = provider.key == active_provider;
+        let is_cursor = !menu.in_sub_menu && menu.cursor == i;
+        let is_expanded = menu.expanded == Some(i);
+
+        // Provider icon
+        let icon = if is_active {
+            colorize("★", HIGHLIGHT)
+        } else if configured {
+            colorize("✓", SUCCESS)
+        } else {
+            colorize("○", DIM)
+        };
+
+        // Expand indicator
+        let expand = if is_expanded { "▼" } else { " " };
+        let expand_colored = if is_expanded {
+            colorize(expand, BRAND)
+        } else {
+            " ".to_string()
+        };
+
+        // Cursor indicator
+        let pointer = if is_cursor {
+            colorize("❯", BRAND)
+        } else {
+            " ".to_string()
+        };
+
+        // Provider name + status
+        let name = if is_cursor || is_expanded {
+            colorize(provider.name, BOLD)
+        } else if !configured {
+            colorize(provider.name, DIM)
+        } else {
+            provider.name.to_string()
+        };
+
+        let status = if configured {
+            format!(" {}", colorize(&format!("({})", mask_secret(&key)), DIM))
+        } else {
+            format!(" {}", colorize("— not configured", DIM))
+        };
+
+        write!(
+            out,
+            "{}{}{} {} {}{}\r\n",
+            prefix, pointer, expand_colored, icon, name, status
+        )?;
+        lines += 1;
+
+        // Render sub-menu if expanded
+        if is_expanded {
+            for (si, action) in SUB_ACTIONS.iter().enumerate() {
+                let sub_pointer = if menu.in_sub_menu && menu.sub_cursor == si {
+                    colorize("❯", BRAND)
+                } else {
+                    " ".to_string()
+                };
+
+                let label = action.label(config, provider);
+                let label_display = if menu.in_sub_menu && menu.sub_cursor == si {
+                    colorize(&label, BOLD)
+                } else if *action == SubAction::Close {
+                    colorize(&format!("── {} ──", label), DIM)
+                } else {
+                    label
+                };
+
+                write!(out, "{}      {} {}\r\n", prefix, sub_pointer, label_display)?;
+                lines += 1;
+            }
+        }
+    }
+
+    // Separator before Done
+    write!(
+        out,
+        "{}  {}\r\n",
+        prefix,
+        colorize("──────────────────────────", DIM)
+    )?;
+    lines += 1;
+
+    // Done row
+    let done_available = has_any_provider_configured(config);
+    let done_pointer = if !menu.in_sub_menu && menu.is_on_done() {
+        colorize("❯", BRAND)
+    } else {
+        " ".to_string()
+    };
+    let done_icon = if done_available {
+        colorize("●", BRAND)
+    } else {
+        colorize("○", DIM)
+    };
+    let done_label = if done_available {
+        if !menu.in_sub_menu && menu.is_on_done() {
+            colorize("Done", BOLD)
+        } else {
+            "Done".to_string()
+        }
+    } else {
+        colorize("Done", DIM).to_string()
+    };
+    let done_desc = if done_available {
+        colorize("— finish provider setup", DIM)
+    } else {
+        colorize("— configure at least one provider first", DIM)
+    };
+
+    write!(
+        out,
+        "{}{} {} {} {}\r\n",
+        prefix, done_pointer, done_icon, done_label, done_desc
+    )?;
+    lines += 1;
+
+    out.flush()?;
+    Ok(lines)
+}
+
+fn render_menu_hint(out: &mut impl Write, menu: &MenuState, chars: &BoxChars) -> Result<()> {
+    let prefix = format!("{} ", colorize(chars.vertical, BRAND));
+    let hint = if menu.in_sub_menu {
+        "↑/↓ navigate · Enter select · Esc back"
+    } else {
+        "↑/↓ navigate · Enter expand/select"
+    };
+    write!(out, "{}{}\r\n", prefix, colorize(hint, DIM))?;
+    out.flush()?;
+    Ok(())
+}
+
+fn rerender_menu(
+    out: &mut impl Write,
+    config: &config::Config,
+    menu: &MenuState,
+    chars: &BoxChars,
+    prev_lines: usize,
+) -> Result<usize> {
+    // Erase previous render (list + hint)
+    let total = prev_lines + 1; // +1 for hint bar
+    for _ in 0..total {
+        write!(out, "\x1b[A\x1b[2K")?;
+    }
+    let new_lines = render_provider_menu(out, config, menu, chars)?;
+    render_menu_hint(out, menu, chars)?;
+    Ok(new_lines)
 }
 
 #[cfg(test)]
