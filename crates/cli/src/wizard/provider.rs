@@ -18,6 +18,7 @@ struct ProviderInfo {
     api_url: &'static str,
     default_model: &'static str,
     key_prefix: &'static str,
+    models: &'static [&'static str],
 }
 
 const PROVIDERS: &[ProviderInfo] = &[
@@ -26,16 +27,18 @@ const PROVIDERS: &[ProviderInfo] = &[
         key: "anthropic",
         description: "Recommended for best quality",
         api_url: "https://console.anthropic.com",
-        default_model: "claude-sonnet-4-5",
+        default_model: "claude-haiku-4-5",
         key_prefix: "sk-ant-",
+        models: &["claude-opus-4-6", "claude-sonnet-4-5", "claude-haiku-4-5", "claude-opus-4-5"],
     },
     ProviderInfo {
         name: "OpenAI (GPT)",
         key: "openai",
         description: "Industry standard models",
         api_url: "https://platform.openai.com/api-keys",
-        default_model: "gpt-4o",
+        default_model: "o4-mini",
         key_prefix: "sk-",
+        models: &["o3", "o4-mini", "gpt-4o", "o3-pro"],
     },
     ProviderInfo {
         name: "DeepSeek",
@@ -44,30 +47,34 @@ const PROVIDERS: &[ProviderInfo] = &[
         api_url: "https://platform.deepseek.com",
         default_model: "deepseek-chat",
         key_prefix: "sk-",
+        models: &["deepseek-chat", "deepseek-reasoner"],
     },
     ProviderInfo {
         name: "Google (Gemini)",
         key: "gemini",
         description: "Multimodal capabilities",
         api_url: "https://makersuite.google.com/app/apikey",
-        default_model: "gemini-2.0-flash",
+        default_model: "gemini-2.5-flash-lite",
         key_prefix: "",
+        models: &["gemini-3-pro-preview", "gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite"],
     },
     ProviderInfo {
         name: "OpenRouter",
         key: "openrouter",
         description: "Access to many models via unified API",
         api_url: "https://openrouter.ai/keys",
-        default_model: "openrouter/auto",
+        default_model: "openrouter/free",
         key_prefix: "sk-or-",
+        models: &["openrouter/auto", "openrouter/free", "anthropic/claude-opus-4-6", "openai/o3"],
     },
     ProviderInfo {
         name: "Groq",
         key: "groq",
         description: "Ultra-fast inference",
         api_url: "https://console.groq.com/keys",
-        default_model: "llama-3.3-70b-versatile",
+        default_model: "llama-3.1-8b-instant",
         key_prefix: "gsk_",
+        models: &["llama-4-scout", "llama-4-maverick", "llama-3.3-70b-versatile", "llama-3.1-8b-instant", "gemma2-9b-it"],
     },
 ];
 
@@ -518,6 +525,12 @@ mod tests {
             assert!(!provider.description.is_empty());
             assert!(!provider.api_url.is_empty());
             assert!(!provider.default_model.is_empty());
+            assert!(!provider.models.is_empty(), "Provider {} has no models", provider.name);
+            assert!(
+                provider.models.contains(&provider.default_model),
+                "Provider {} default_model not in models list",
+                provider.name
+            );
         }
     }
 
@@ -584,20 +597,20 @@ mod tests {
     #[test]
     fn test_anthropic_default_model() {
         let anthropic = &PROVIDERS[0];
-        assert_eq!(anthropic.default_model, "claude-sonnet-4-5");
+        assert_eq!(anthropic.default_model, "claude-haiku-4-5");
         assert_eq!(anthropic.key_prefix, "sk-ant-");
     }
 
     #[test]
     fn test_openai_default_model() {
         let openai = PROVIDERS.iter().find(|p| p.key == "openai").unwrap();
-        assert_eq!(openai.default_model, "gpt-4o");
+        assert_eq!(openai.default_model, "o4-mini");
     }
 
     #[test]
     fn test_groq_default_model() {
         let groq = PROVIDERS.iter().find(|p| p.key == "groq").unwrap();
-        assert_eq!(groq.default_model, "llama-3.3-70b-versatile");
+        assert_eq!(groq.default_model, "llama-3.1-8b-instant");
         assert_eq!(groq.key_prefix, "gsk_");
     }
 
