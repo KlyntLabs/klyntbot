@@ -290,7 +290,6 @@ async fn run_with_streaming(
                         if let Some(ref mut s) = spinner {
                             s.stop();
                             spinner = None;
-                            print!("{} ", colorize("◆", BRAND));
                         }
                         renderer.on_content_chunk(&chunk);
                     }
