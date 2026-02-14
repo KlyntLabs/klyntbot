@@ -415,20 +415,13 @@ impl DiscordChannel {
 
 #[async_trait]
 impl WsHandler for DiscordChannel {
-    async fn on_connected(
-        &self,
-        _write: &Arc<Mutex<WsSink>>,
-    ) -> Result<Option<HeartbeatStrategy>> {
+    async fn on_connected(&self, _write: &Arc<Mutex<WsSink>>) -> Result<Option<HeartbeatStrategy>> {
         // Discord doesn't handshake here — it waits for HELLO (op 10)
         // which arrives as a text message. Heartbeat is managed internally.
         Ok(Some(HeartbeatStrategy::None))
     }
 
-    async fn on_text_message(
-        &self,
-        text: &str,
-        write: &Arc<Mutex<WsSink>>,
-    ) -> Result<bool> {
+    async fn on_text_message(&self, text: &str, write: &Arc<Mutex<WsSink>>) -> Result<bool> {
         let data: Value = match serde_json::from_str(text) {
             Ok(d) => d,
             Err(e) => {

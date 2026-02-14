@@ -25,7 +25,7 @@ const COMPACTION_THRESHOLD: usize = 100;
 #[serde(tag = "_op")]
 enum JournalEntry {
     #[serde(rename = "upsert")]
-    Upsert { todo: Todo },
+    Upsert { todo: Box<Todo> },
     #[serde(rename = "delete")]
     Delete { id: String },
 }
@@ -93,7 +93,7 @@ impl TodoStore {
                         if !index.contains_key(&todo.id) {
                             order.push(todo.id.clone());
                         }
-                        index.insert(todo.id.clone(), todo);
+                        index.insert(todo.id.clone(), *todo);
                     }
                     JournalEntry::Delete { id } => {
                         if index.remove(&id).is_some() {
@@ -176,7 +176,9 @@ impl TodoStore {
         let mut content = String::with_capacity(self.index.len() * 256);
         for id in &self.order {
             if let Some(todo) = self.index.get(id) {
-                let entry = JournalEntry::Upsert { todo: todo.clone() };
+                let entry = JournalEntry::Upsert {
+                    todo: Box::new(todo.clone()),
+                };
                 content.push_str(&serde_json::to_string(&entry)?);
                 content.push('\n');
             }
@@ -215,7 +217,9 @@ impl TodoStore {
 
         todo.updated_at = Utc::now();
 
-        let entry = JournalEntry::Upsert { todo: todo.clone() };
+        let entry = JournalEntry::Upsert {
+            todo: Box::new(todo.clone()),
+        };
         self.append_entry(&entry).await?;
 
         self.order.push(todo.id.clone());
@@ -264,6 +268,12 @@ impl TodoStore {
                     todo.completed_at = Some(Utc::now());
                 }
             }
+            if let Some(last_reminded) = patch.last_reminded_at {
+                todo.last_reminded_at = last_reminded;
+            }
+            if let Some(calendar_uid) = patch.calendar_event_uid {
+                todo.calendar_event_uid = calendar_uid;
+            }
 
             todo.updated_at = Utc::now();
 
@@ -273,7 +283,9 @@ impl TodoStore {
         };
 
         if let Some(ref todo) = updated {
-            let entry = JournalEntry::Upsert { todo: todo.clone() };
+            let entry = JournalEntry::Upsert {
+                todo: Box::new(todo.clone()),
+            };
             self.append_entry(&entry).await?;
             self.maybe_compact().await?;
         }
@@ -320,6 +332,18 @@ impl TodoStore {
                         return false;
                     }
                 }
+                // Phase 2: project_id filter
+                if let Some(ref project_id) = filter.project_id {
+                    if t.project_id.as_ref() != Some(project_id) {
+                        return false;
+                    }
+                }
+                // Phase 2: parent_id filter
+                if let Some(ref parent_id) = filter.parent_id {
+                    if t.parent_id.as_ref() != Some(parent_id) {
+                        return false;
+                    }
+                }
                 true
             })
             .cloned()
@@ -357,7 +381,9 @@ impl TodoStore {
             todo.focus_deadline = Some(now + chrono::Duration::hours(deadline_hours as i64));
             todo.updated_at = now;
 
-            let entry = JournalEntry::Upsert { todo: todo.clone() };
+            let entry = JournalEntry::Upsert {
+                todo: Box::new(todo.clone()),
+            };
             self.append_entry(&entry).await?;
             self.maybe_compact().await?;
             Ok(true)
@@ -375,7 +401,9 @@ impl TodoStore {
             todo.focus_deadline = None;
             todo.updated_at = Utc::now();
 
-            let entry = JournalEntry::Upsert { todo: todo.clone() };
+            let entry = JournalEntry::Upsert {
+                todo: Box::new(todo.clone()),
+            };
             self.append_entry(&entry).await?;
             self.maybe_compact().await?;
             Ok(true)
@@ -447,7 +475,9 @@ impl TodoStore {
                 todo.updated_at = now;
 
                 affected.push(todo.clone());
-                entries.push(JournalEntry::Upsert { todo: todo.clone() });
+                entries.push(JournalEntry::Upsert {
+                    todo: Box::new(todo.clone()),
+                });
             }
         }
 
@@ -487,6 +517,204 @@ impl TodoStore {
             overdue,
             upcoming_week,
         })
+    }
+
+    /// Add a time entry to a todo (Phase 2)
+    pub async fn add_time_entry(
+        &mut self,
+        id: &str,
+        entry: crate::todo_types::TimeEntry,
+    ) -> Result<bool> {
+        self.ensure_loaded().await?;
+
+        if let Some(todo) = self.index.get_mut(id) {
+            todo.time_entries.push(entry);
+            todo.updated_at = Utc::now();
+
+            let journal_entry = JournalEntry::Upsert {
+                todo: Box::new(todo.clone()),
+            };
+            self.append_entry(&journal_entry).await?;
+            self.maybe_compact().await?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    /// Close a running time entry (Phase 2)
+    pub async fn close_time_entry(&mut self, id: &str, entry_id: &str) -> Result<bool> {
+        self.ensure_loaded().await?;
+
+        if let Some(todo) = self.index.get_mut(id) {
+            if let Some(entry) = todo.time_entries.iter_mut().find(|e| e.id == entry_id) {
+                if entry.ended_at.is_none() {
+                    let now = Utc::now();
+                    entry.ended_at = Some(now);
+                    let duration = now.signed_duration_since(entry.started_at);
+                    entry.duration_secs = Some(duration.num_seconds().max(0) as u64);
+
+                    // Update denormalized total
+                    todo.total_tracked_secs = todo
+                        .time_entries
+                        .iter()
+                        .filter_map(|e| e.duration_secs)
+                        .sum();
+
+                    todo.updated_at = now;
+
+                    let journal_entry = JournalEntry::Upsert {
+                        todo: Box::new(todo.clone()),
+                    };
+                    self.append_entry(&journal_entry).await?;
+                    self.maybe_compact().await?;
+                    return Ok(true);
+                }
+            }
+        }
+        Ok(false)
+    }
+
+    /// Add an attachment to a todo (Phase 2)
+    pub async fn add_attachment(
+        &mut self,
+        id: &str,
+        attachment: crate::todo_types::Attachment,
+    ) -> Result<bool> {
+        self.ensure_loaded().await?;
+
+        if let Some(todo) = self.index.get_mut(id) {
+            todo.attachments.push(attachment);
+            todo.updated_at = Utc::now();
+
+            let journal_entry = JournalEntry::Upsert {
+                todo: Box::new(todo.clone()),
+            };
+            self.append_entry(&journal_entry).await?;
+            self.maybe_compact().await?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    /// Remove an attachment from a todo (Phase 2)
+    pub async fn remove_attachment(&mut self, id: &str, attachment_id: &str) -> Result<bool> {
+        self.ensure_loaded().await?;
+
+        if let Some(todo) = self.index.get_mut(id) {
+            let before_len = todo.attachments.len();
+            todo.attachments.retain(|a| a.id != attachment_id);
+
+            if todo.attachments.len() < before_len {
+                todo.updated_at = Utc::now();
+
+                let journal_entry = JournalEntry::Upsert {
+                    todo: Box::new(todo.clone()),
+                };
+                self.append_entry(&journal_entry).await?;
+                self.maybe_compact().await?;
+                Ok(true)
+            } else {
+                Ok(false)
+            }
+        } else {
+            Ok(false)
+        }
+    }
+
+    /// Move a todo (reparent or change project) (Phase 2)
+    pub async fn move_todo(
+        &mut self,
+        id: &str,
+        new_parent_id: Option<String>,
+        new_project_id: Option<String>,
+    ) -> Result<Option<crate::todo_types::Todo>> {
+        self.ensure_loaded().await?;
+
+        if let Some(todo) = self.index.get_mut(id) {
+            // Validate parent_id doesn't create a cycle
+            if let Some(ref parent) = new_parent_id {
+                if parent == id {
+                    return Err(common::ToolError::InvalidParams(
+                        "Cannot set task as its own parent".to_string(),
+                    )
+                    .into());
+                }
+                // TODO: Check for circular references by traversing parent chain
+            }
+
+            todo.parent_id = new_parent_id;
+            todo.project_id = new_project_id;
+            todo.updated_at = Utc::now();
+
+            let updated = todo.clone();
+
+            let journal_entry = JournalEntry::Upsert {
+                todo: Box::new(updated.clone()),
+            };
+            self.append_entry(&journal_entry).await?;
+            self.maybe_compact().await?;
+
+            Ok(Some(updated))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Cascade completion to subtasks (Phase 2)
+    pub async fn cascade_complete(&mut self, parent_id: &str) -> Result<Vec<String>> {
+        self.ensure_loaded().await?;
+
+        let mut completed_ids = Vec::new();
+        let mut entries = Vec::new();
+
+        // Find all direct children
+        let child_ids: Vec<String> = self
+            .index
+            .values()
+            .filter(|t| t.parent_id.as_ref() == Some(&parent_id.to_string()))
+            .map(|t| t.id.clone())
+            .collect();
+
+        for child_id in child_ids {
+            if let Some(todo) = self.index.get_mut(&child_id) {
+                if todo.status != TodoStatus::Done {
+                    todo.status = TodoStatus::Done;
+                    todo.completed_at = Some(Utc::now());
+                    todo.updated_at = Utc::now();
+
+                    // Close any running time entries
+                    for entry in &mut todo.time_entries {
+                        if entry.ended_at.is_none() {
+                            let now = Utc::now();
+                            entry.ended_at = Some(now);
+                            let duration = now.signed_duration_since(entry.started_at);
+                            entry.duration_secs = Some(duration.num_seconds().max(0) as u64);
+                        }
+                    }
+
+                    // Update denormalized total
+                    todo.total_tracked_secs = todo
+                        .time_entries
+                        .iter()
+                        .filter_map(|e| e.duration_secs)
+                        .sum();
+
+                    completed_ids.push(todo.id.clone());
+                    entries.push(JournalEntry::Upsert {
+                        todo: Box::new(todo.clone()),
+                    });
+                }
+            }
+        }
+
+        if !entries.is_empty() {
+            self.append_entries(&entries).await?;
+            self.maybe_compact().await?;
+        }
+
+        Ok(completed_ids)
     }
 
     /// Generate markdown context for AI system prompt
@@ -591,6 +819,16 @@ mod tests {
             created_at: Utc::now(),
             updated_at: Utc::now(),
             completed_at: None,
+
+            // Phase 1 new fields (test defaults)
+            parent_id: None,
+            project_id: None,
+            attachments: Vec::new(),
+            time_entries: Vec::new(),
+            total_tracked_secs: 0,
+            estimated_minutes: None,
+            calendar_event_uid: None,
+            last_reminded_at: None,
         }
     }
 
@@ -1266,7 +1504,9 @@ mod tests {
 
         let journal_todo = create_test_todo("Journal");
         let journal_id = journal_todo.id.clone();
-        let journal_entry = JournalEntry::Upsert { todo: journal_todo };
+        let journal_entry = JournalEntry::Upsert {
+            todo: Box::new(journal_todo),
+        };
 
         let content = format!(
             "{}\n{}\n",

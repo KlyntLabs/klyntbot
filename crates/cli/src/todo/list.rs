@@ -19,24 +19,24 @@ pub async fn handle_list(
     let mut store = TodoStore::new(store_path);
 
     // Parse status filter
-    let status_filter = status
-        .as_ref()
-        .and_then(|s| {
-            use tools::todo_types::TodoStatus;
-            match s.to_lowercase().as_str() {
-                "todo" => Some(TodoStatus::Todo),
-                "doing" => Some(TodoStatus::Doing),
-                "done" => Some(TodoStatus::Done),
-                "archived" => Some(TodoStatus::Archived),
-                _ => None,
-            }
-        });
+    let status_filter = status.as_ref().and_then(|s| {
+        use tools::todo_types::TodoStatus;
+        match s.to_lowercase().as_str() {
+            "todo" => Some(TodoStatus::Todo),
+            "doing" => Some(TodoStatus::Doing),
+            "done" => Some(TodoStatus::Done),
+            "archived" => Some(TodoStatus::Archived),
+            _ => None,
+        }
+    });
 
     let filter = TodoFilter {
         status: status_filter,
         tag: tag.clone(),
         priority_min,
         limit,
+        project_id: None, // Phase 2
+        parent_id: None,  // Phase 2
     };
 
     let todos = store.list(&filter).await?;

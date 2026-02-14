@@ -38,6 +38,15 @@ pub async fn handle_add(
         created_at: Utc::now(),
         updated_at: Utc::now(),
         completed_at: None,
+        // Phase 1 new fields (all default values)
+        parent_id: None,
+        project_id: None,
+        attachments: Vec::new(),
+        time_entries: Vec::new(),
+        total_tracked_secs: 0,
+        estimated_minutes: None,
+        calendar_event_uid: None,
+        last_reminded_at: None,
     };
 
     // Save to store

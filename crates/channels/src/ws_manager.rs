@@ -13,7 +13,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
-use tokio_tungstenite::{connect_async, tungstenite::Message as WsMessage, MaybeTlsStream, WebSocketStream};
+use tokio_tungstenite::{
+    connect_async, tungstenite::Message as WsMessage, MaybeTlsStream, WebSocketStream,
+};
 use tracing::{debug, error, warn};
 
 /// Alias for the write half of a WebSocket connection.
@@ -73,19 +75,12 @@ pub trait WsHandler: Send + Sync {
     /// Use for handshakes (Discord IDENTIFY, storing the write half, etc.).
     /// Return an updated [`HeartbeatStrategy`] to override the config default,
     /// or `None` to keep it.
-    async fn on_connected(
-        &self,
-        write: &Arc<Mutex<WsSink>>,
-    ) -> Result<Option<HeartbeatStrategy>>;
+    async fn on_connected(&self, write: &Arc<Mutex<WsSink>>) -> Result<Option<HeartbeatStrategy>>;
 
     /// Called for each text message received from the WebSocket.
     ///
     /// Return `Ok(true)` to continue the read loop, `Ok(false)` to disconnect.
-    async fn on_text_message(
-        &self,
-        text: &str,
-        write: &Arc<Mutex<WsSink>>,
-    ) -> Result<bool>;
+    async fn on_text_message(&self, text: &str, write: &Arc<Mutex<WsSink>>) -> Result<bool>;
 
     /// Called when the read loop exits (error, server close, or shutdown).
     async fn on_disconnected(&self) {}
@@ -104,11 +99,7 @@ impl WebSocketManager {
     }
 
     /// Run a single WebSocket session. Returns when the connection drops or `running` is false.
-    pub async fn run(
-        &self,
-        config: &WsConfig,
-        handler: &(dyn WsHandler + '_),
-    ) -> Result<()> {
+    pub async fn run(&self, config: &WsConfig, handler: &(dyn WsHandler + '_)) -> Result<()> {
         // 1. Connect with timeout
         let ws_stream = tokio::time::timeout(config.connect_timeout, connect_async(&config.url))
             .await
@@ -234,11 +225,7 @@ mod tests {
             Ok(None)
         }
 
-        async fn on_text_message(
-            &self,
-            _text: &str,
-            _write: &Arc<Mutex<WsSink>>,
-        ) -> Result<bool> {
+        async fn on_text_message(&self, _text: &str, _write: &Arc<Mutex<WsSink>>) -> Result<bool> {
             let count = self.message_count.fetch_add(1, Ordering::SeqCst) + 1;
             if let Some(limit) = self.disconnect_after {
                 Ok(count < limit)

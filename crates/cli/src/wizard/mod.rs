@@ -19,6 +19,7 @@
 //! - `ask_user_prompt` – Tabbed multi-question UI for ask_user tool
 
 pub mod ask_user_prompt;
+pub mod calendar;
 pub mod channels;
 pub mod daemon;
 pub mod framework;
@@ -84,6 +85,7 @@ pub async fn run_wizard() -> Result<()> {
         ),
         ("Workspace Setup", true, true),
         ("Todo Notifications", false, true),
+        ("Calendar Sync", false, true),
     ];
 
     // Filter to applicable steps
@@ -106,7 +108,7 @@ pub async fn run_wizard() -> Result<()> {
         print_step_header(&state, name, required);
 
         // Dispatch to the right module. Step indices correspond to `all_steps`:
-        // 0=welcome, 1=provider, 2=channels (async), 3=tools, 4=daemon, 5=workspace, 6=todo_notifications.
+        // 0=welcome, 1=provider, 2=channels (async), 3=tools, 4=daemon, 5=workspace, 6=todo_notifications, 7=calendar.
         // Ctrl+C in raw-mode prompts surfaces as an Err containing "Ctrl+C".
         let result = match match step_idx {
             0 => welcome::WelcomeModule.run(&mut state),
@@ -116,6 +118,7 @@ pub async fn run_wizard() -> Result<()> {
             4 => daemon::DaemonModule.run(&mut state),
             5 => workspace::WorkspaceModule.run(&mut state),
             6 => todo_notifications::run_todo_notification_step(&mut state),
+            7 => calendar::run_calendar_step(&mut state),
             _ => unreachable!(),
         } {
             Ok(r) => r,

@@ -13,6 +13,7 @@ providers.workspace = true
 session.workspace = true
 tools.workspace = true
 scheduling.workspace = true
+calendar.workspace = true
 tokio = { workspace = true }
 tracing.workspace = true
 uuid = { workspace = true }

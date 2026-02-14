@@ -11,8 +11,8 @@ pub mod utils;
 
 // Re-export commonly used types
 pub use error::{
-    ChannelError, ConfigError, CronError, KlyntbotError, ProviderError, Result, SessionError,
-    ToolError,
+    CalendarError, ChannelError, ConfigError, CronError, KlyntbotError, ProviderError, Result,
+    SessionError, ToolError,
 };
 pub use interaction::InteractionRenderer;
 pub use prompts::{

@@ -212,8 +212,7 @@ mod tests {
     #[test]
     fn test_config_with_custom_api_bases() {
         let mut config = Config::default();
-        config.providers.anthropic.api_base =
-            Some("https://custom-anthropic.com/v1".to_string());
+        config.providers.anthropic.api_base = Some("https://custom-anthropic.com/v1".to_string());
         config.providers.openai.api_base = Some("https://custom-openai.com/v1".to_string());
 
         let json = serde_json::to_string(&config).unwrap();
@@ -234,8 +233,7 @@ mod tests {
         let mut config = Config::default();
         config.channels.telegram.allow_from = vec!["123".to_string(), "456".to_string()];
         config.channels.discord.allow_from = vec!["guild1".to_string()];
-        config.channels.slack.allow_from =
-            vec!["channel1".to_string(), "channel2".to_string()];
+        config.channels.slack.allow_from = vec!["channel1".to_string(), "channel2".to_string()];
 
         let json = serde_json::to_string(&config).unwrap();
         let loaded: Config = serde_json::from_str(&json).unwrap();

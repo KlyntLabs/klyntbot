@@ -118,11 +118,7 @@ impl QQChannel {
     }
 
     /// Handle a gateway event
-    async fn handle_gateway_event(
-        &self,
-        text: &str,
-        bus: &MessageBus,
-    ) -> Result<bool> {
+    async fn handle_gateway_event(&self, text: &str, bus: &MessageBus) -> Result<bool> {
         let payload: WsPayload = serde_json::from_str(text).map_err(|e| {
             ChannelError::SendFailed(format!("Failed to parse gateway message: {}", e))
         })?;
@@ -267,19 +263,12 @@ impl QQChannel {
 
 #[async_trait]
 impl WsHandler for QQChannel {
-    async fn on_connected(
-        &self,
-        _write: &Arc<Mutex<WsSink>>,
-    ) -> Result<Option<HeartbeatStrategy>> {
+    async fn on_connected(&self, _write: &Arc<Mutex<WsSink>>) -> Result<Option<HeartbeatStrategy>> {
         info!("Connected to QQ Gateway");
         Ok(None) // Use default heartbeat from config
     }
 
-    async fn on_text_message(
-        &self,
-        text: &str,
-        _write: &Arc<Mutex<WsSink>>,
-    ) -> Result<bool> {
+    async fn on_text_message(&self, text: &str, _write: &Arc<Mutex<WsSink>>) -> Result<bool> {
         let bus_guard = self.bus.lock().await;
         if let Some(bus) = bus_guard.as_ref() {
             return self.handle_gateway_event(text, bus).await;

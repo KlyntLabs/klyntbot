@@ -142,7 +142,10 @@ mod tests {
 
         #[test]
         fn escapes_backslash() {
-            assert_eq!(sanitize_for_applescript("path\\to\\file"), "path\\\\to\\\\file");
+            assert_eq!(
+                sanitize_for_applescript("path\\to\\file"),
+                "path\\\\to\\\\file"
+            );
         }
 
         #[test]
@@ -152,7 +155,10 @@ mod tests {
 
         #[test]
         fn strips_newlines_and_carriage_returns() {
-            assert_eq!(sanitize_for_applescript("line1\nline2\rline3"), "line1line2line3");
+            assert_eq!(
+                sanitize_for_applescript("line1\nline2\rline3"),
+                "line1line2line3"
+            );
         }
 
         #[test]
@@ -171,7 +177,9 @@ mod tests {
             let input = r#"" & do shell script "whoami" & ""#;
             let sanitized = sanitize_for_applescript(input);
             // All double quotes must be escaped — no unescaped " to break context
-            assert!(!sanitized.contains(r#"""#) || sanitized.replace("\\\"", "").find('"').is_none());
+            assert!(
+                !sanitized.contains(r#"""#) || sanitized.replace("\\\"", "").find('"').is_none()
+            );
             assert!(sanitized.contains("\\\""));
         }
 
@@ -205,7 +213,10 @@ mod tests {
             assert!(!sanitized.contains('\n'));
             // Every " in output must be preceded by \
             let clean = sanitized.replace("\\\"", "");
-            assert!(!clean.contains('"'), "unescaped double-quote found: {sanitized}");
+            assert!(
+                !clean.contains('"'),
+                "unescaped double-quote found: {sanitized}"
+            );
         }
     }
 
@@ -268,10 +279,6 @@ mod tests {
         let _ = send_os_notification("Test", "Body").await;
         let _ = send_os_notification("", "").await;
         let _ = send_os_notification("a\nb\rc", "x\0y").await;
-        let _ = send_os_notification(
-            r#""; do shell script "whoami""#,
-            "$PATH `id` $(uname)",
-        )
-        .await;
+        let _ = send_os_notification(r#""; do shell script "whoami""#, "$PATH `id` $(uname)").await;
     }
 }

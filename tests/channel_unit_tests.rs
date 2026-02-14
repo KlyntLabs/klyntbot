@@ -8,9 +8,7 @@ mod common;
 
 use klyntbot::bus::{InboundMessage, MessageBus, OutboundMessage};
 use klyntbot::channels::check_allowlist;
-use klyntbot::config::{
-    Config, DiscordConfig, EmailConfig, QQConfig, SlackConfig, WhatsAppConfig,
-};
+use klyntbot::config::{DiscordConfig, EmailConfig, QQConfig, SlackConfig, WhatsAppConfig};
 use klyntbot::ChannelManager;
 use std::sync::Arc;
 
@@ -95,8 +93,10 @@ fn test_discord_is_allowed_empty_allowlist() {
 #[test]
 fn test_discord_is_allowed_with_allowlist() {
     use klyntbot::channels::{Channel, DiscordChannel};
-    let mut config = DiscordConfig::default();
-    config.allow_from = vec!["user_abc".to_string()];
+    let config = DiscordConfig {
+        allow_from: vec!["user_abc".to_string()],
+        ..Default::default()
+    };
     let channel = DiscordChannel::new(config).unwrap();
     assert!(channel.is_allowed("user_abc"));
     assert!(!channel.is_allowed("user_xyz"));
@@ -144,8 +144,10 @@ fn test_slack_is_allowed_empty_allowlist() {
 #[test]
 fn test_slack_is_allowed_with_allowlist() {
     use klyntbot::channels::{Channel, SlackChannel};
-    let mut config = SlackConfig::default();
-    config.allow_from = vec!["U12345".to_string()];
+    let config = SlackConfig {
+        allow_from: vec!["U12345".to_string()],
+        ..Default::default()
+    };
     let channel = SlackChannel::new(config).unwrap();
     assert!(channel.is_allowed("U12345"));
     assert!(!channel.is_allowed("U99999"));
@@ -203,8 +205,10 @@ fn test_qq_is_allowed_empty_allowlist() {
 #[test]
 fn test_qq_is_allowed_with_allowlist() {
     use klyntbot::channels::{Channel, QQChannel};
-    let mut config = QQConfig::default();
-    config.allow_from = vec!["openid_abc".to_string()];
+    let config = QQConfig {
+        allow_from: vec!["openid_abc".to_string()],
+        ..Default::default()
+    };
     let channel = QQChannel::new(config).unwrap();
     assert!(channel.is_allowed("openid_abc"));
     assert!(!channel.is_allowed("openid_xyz"));
@@ -261,8 +265,10 @@ fn test_whatsapp_is_allowed_empty_allowlist() {
 #[test]
 fn test_whatsapp_is_allowed_with_allowlist() {
     use klyntbot::channels::{Channel, WhatsAppChannel};
-    let mut config = WhatsAppConfig::default();
-    config.allow_from = vec!["628123456789@s.whatsapp.net".to_string()];
+    let config = WhatsAppConfig {
+        allow_from: vec!["628123456789@s.whatsapp.net".to_string()],
+        ..Default::default()
+    };
     let channel = WhatsAppChannel::new(config);
     assert!(channel.is_allowed("628123456789@s.whatsapp.net"));
     assert!(!channel.is_allowed("other@s.whatsapp.net"));
@@ -328,8 +334,10 @@ fn test_email_is_allowed_empty_allowlist() {
 #[test]
 fn test_email_is_allowed_with_allowlist() {
     use klyntbot::channels::{Channel, EmailChannel};
-    let mut config = EmailConfig::default();
-    config.allow_from = vec!["trusted@example.com".to_string()];
+    let config = EmailConfig {
+        allow_from: vec!["trusted@example.com".to_string()],
+        ..Default::default()
+    };
     let channel = EmailChannel::new(config).unwrap();
     assert!(channel.is_allowed("trusted@example.com"));
     assert!(!channel.is_allowed("untrusted@example.com"));
@@ -338,9 +346,11 @@ fn test_email_is_allowed_with_allowlist() {
 #[tokio::test]
 async fn test_email_start_rejects_missing_consent() {
     use klyntbot::channels::{Channel, EmailChannel};
-    let mut config = EmailConfig::default();
-    config.enabled = true;
     // consent_granted is false by default
+    let config = EmailConfig {
+        enabled: true,
+        ..Default::default()
+    };
     let channel = EmailChannel::new(config).unwrap();
     let bus = common::test_message_bus();
     let result = channel.start(bus).await;
@@ -352,10 +362,12 @@ async fn test_email_start_rejects_missing_consent() {
 #[tokio::test]
 async fn test_email_start_rejects_missing_config_fields() {
     use klyntbot::channels::{Channel, EmailChannel};
-    let mut config = EmailConfig::default();
-    config.enabled = true;
-    config.consent_granted = true;
     // All host/user/pass fields are empty
+    let config = EmailConfig {
+        enabled: true,
+        consent_granted: true,
+        ..Default::default()
+    };
     let channel = EmailChannel::new(config).unwrap();
     let bus = common::test_message_bus();
     let result = channel.start(bus).await;
@@ -367,8 +379,10 @@ async fn test_email_start_rejects_missing_config_fields() {
 #[tokio::test]
 async fn test_email_send_skips_when_auto_reply_disabled() {
     use klyntbot::channels::{Channel, EmailChannel};
-    let mut config = EmailConfig::default();
-    config.auto_reply_enabled = false;
+    let config = EmailConfig {
+        auto_reply_enabled: false,
+        ..Default::default()
+    };
     let channel = EmailChannel::new(config).unwrap();
     let msg = OutboundMessage::new("email", "user@example.com", "Hello");
     // Should succeed (skip) not error
@@ -418,10 +432,7 @@ async fn test_inbound_message_preserves_channel_identity() {
     for channel in channels {
         let msg = InboundMessage::new(channel, "user", "chat", "Hello");
         assert_eq!(msg.channel.as_str(), channel);
-        assert_eq!(
-            msg.session_key().to_string(),
-            format!("{}:chat", channel)
-        );
+        assert_eq!(msg.session_key().to_string(), format!("{}:chat", channel));
     }
 }
 

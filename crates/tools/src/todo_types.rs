@@ -10,6 +10,7 @@ use std::collections::HashMap;
 /// A task/todo item with focus tracking
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Todo {
+    // ── Existing fields (unchanged) ──
     pub id: String,
     pub title: String,
     pub description: Option<String>,
@@ -23,6 +24,31 @@ pub struct Todo {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub completed_at: Option<DateTime<Utc>>,
+
+    // ── New fields (Phase 1 additions) ──
+    #[serde(default)]
+    pub parent_id: Option<String>, // Hierarchical: links to parent todo
+
+    #[serde(default)]
+    pub project_id: Option<String>, // Project grouping
+
+    #[serde(default)]
+    pub attachments: Vec<Attachment>, // Inline attachments
+
+    #[serde(default)]
+    pub time_entries: Vec<TimeEntry>, // Time tracking log
+
+    #[serde(default)]
+    pub total_tracked_secs: u64, // Denormalized total (avoids summing entries)
+
+    #[serde(default)]
+    pub estimated_minutes: Option<u32>, // For calendar event duration
+
+    #[serde(default)]
+    pub calendar_event_uid: Option<String>, // CalDAV UID link
+
+    #[serde(default)]
+    pub last_reminded_at: Option<DateTime<Utc>>, // Notification dedup
 }
 
 /// Task status lifecycle
@@ -51,6 +77,8 @@ pub struct TodoPatch {
     pub due_date: Option<Option<DateTime<Utc>>>,
     pub tags: Option<Vec<String>>,
     pub status: Option<TodoStatus>,
+    pub last_reminded_at: Option<Option<DateTime<Utc>>>,
+    pub calendar_event_uid: Option<Option<String>>,
 }
 
 /// Filter criteria for listing todos
@@ -60,6 +88,9 @@ pub struct TodoFilter {
     pub priority_min: Option<u8>,
     pub tag: Option<String>,
     pub limit: Option<usize>,
+    // Phase 2 additions
+    pub project_id: Option<String>,
+    pub parent_id: Option<String>,
 }
 
 /// Summary statistics for todo collection
@@ -69,6 +100,49 @@ pub struct TodoSummary {
     pub by_status: HashMap<TodoStatus, usize>,
     pub overdue: Vec<String>,
     pub upcoming_week: Vec<String>,
+}
+
+/// Attachment to a todo (file, URL, or note)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Attachment {
+    pub id: String, // 8-char UUID
+    #[serde(rename = "type")]
+    pub attachment_type: AttachmentType,
+    pub title: Option<String>,
+    pub value: String, // Path, URL, or note content
+    #[serde(default)]
+    pub tags: Vec<String>,
+    pub created_at: DateTime<Utc>,
+}
+
+/// Type of attachment
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum AttachmentType {
+    File,
+    Url,
+    Note,
+}
+
+/// Time tracking entry for a todo
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TimeEntry {
+    pub id: String, // 8-char UUID
+    pub started_at: DateTime<Utc>,
+    pub ended_at: Option<DateTime<Utc>>, // None = still running
+    pub duration_secs: Option<u64>,      // Computed on close
+    pub note: Option<String>,
+    #[serde(default)]
+    pub source: TimeEntrySource,
+}
+
+/// Source of a time entry
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum TimeEntrySource {
+    #[default]
+    Focus, // Auto-created by focus/unfocus
+    Manual, // Created by log_time action
 }
 
 #[cfg(test)]

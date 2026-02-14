@@ -29,6 +29,9 @@ pub enum KlyntbotError {
     #[error("Cron error: {0}")]
     Cron(#[from] CronError),
 
+    #[error("Calendar error: {0}")]
+    Calendar(#[from] CalendarError),
+
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
@@ -130,6 +133,31 @@ pub enum CronError {
 
     #[error("Job execution failed: {0}")]
     ExecutionFailed(String),
+
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+
+    #[error("JSON error: {0}")]
+    Json(#[from] serde_json::Error),
+}
+
+/// Calendar-specific errors (Phase 1 prep for Phase 3)
+#[derive(Error, Debug)]
+pub enum CalendarError {
+    #[error("Authentication failed: {0}")]
+    AuthFailed(String),
+
+    #[error("Connection failed: {0}")]
+    ConnectionFailed(String),
+
+    #[error("Sync failed: {0}")]
+    SyncFailed(String),
+
+    #[error("Calendar not found: {0}")]
+    NotFound(String),
+
+    #[error("CalDAV protocol error: {0}")]
+    ProtocolError(String),
 
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),

@@ -14,7 +14,7 @@ use tempfile::TempDir;
 #[path = "../mock_provider.rs"]
 pub mod mock_provider;
 
-pub use mock_provider::{ErrorProvider, MockProvider};
+pub use mock_provider::MockProvider;
 
 /// Create a Config with sensible test defaults.
 ///

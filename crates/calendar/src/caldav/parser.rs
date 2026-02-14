@@ -96,14 +96,9 @@ pub fn generate_vevent(event: &CalendarEvent) -> Result<String> {
     Ok(lines.join("\r\n"))
 }
 
-/// Parse iCalendar datetime format (YYYYMMDDTHHMMSSZ)
+/// Parse iCalendar datetime format (YYYYMMDDTHHMMSSZ or YYYYMMDDTHHMMSS floating)
 fn parse_datetime(dt_str: &str) -> Result<DateTime<Utc>> {
-    if !dt_str.ends_with('Z') {
-        return Err(common::KlyntbotError::Calendar(
-            common::CalendarError::ProtocolError("Only UTC times supported".to_string()),
-        ));
-    }
-
+    // Handle both UTC (with Z) and floating time (without Z)
     let dt_str = dt_str.trim_end_matches('Z');
 
     if dt_str.len() != 15 || dt_str.chars().nth(8) != Some('T') {
@@ -152,9 +147,12 @@ fn parse_datetime(dt_str: &str) -> Result<DateTime<Utc>> {
         })
 }
 
-/// Format datetime as iCalendar format (YYYYMMDDTHHMMSSZ)
+/// Format datetime as iCalendar floating time (no timezone)
+/// Floating time is interpreted by calendar apps in the user's local timezone
+/// This prevents timezone conversion issues where "5pm" becomes "midnight next day"
 fn format_datetime(dt: &DateTime<Utc>) -> String {
-    dt.format("%Y%m%dT%H%M%SZ").to_string()
+    // Remove Z suffix to use floating time (local timezone interpretation)
+    dt.format("%Y%m%dT%H%M%S").to_string()
 }
 
 #[cfg(test)]
@@ -238,8 +236,8 @@ END:VCALENDAR";
         assert!(ical_data.contains("UID:test-event-789"));
         assert!(ical_data.contains("SUMMARY:Standup Meeting"));
         assert!(ical_data.contains("DESCRIPTION:Daily team sync"));
-        assert!(ical_data.contains("DTSTART:20260301T090000Z"));
-        assert!(ical_data.contains("DTEND:20260301T091500Z"));
+        assert!(ical_data.contains("DTSTART:20260301T090000"));
+        assert!(ical_data.contains("DTEND:20260301T091500"));
         assert!(ical_data.contains("END:VEVENT"));
         assert!(ical_data.contains("END:VCALENDAR"));
     }

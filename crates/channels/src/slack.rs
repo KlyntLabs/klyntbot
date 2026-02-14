@@ -333,19 +333,12 @@ impl SlackChannel {
 
 #[async_trait]
 impl WsHandler for SlackChannel {
-    async fn on_connected(
-        &self,
-        _write: &Arc<Mutex<WsSink>>,
-    ) -> Result<Option<HeartbeatStrategy>> {
+    async fn on_connected(&self, _write: &Arc<Mutex<WsSink>>) -> Result<Option<HeartbeatStrategy>> {
         info!("Connected to Slack Socket Mode");
         Ok(None) // Use default heartbeat from config
     }
 
-    async fn on_text_message(
-        &self,
-        text: &str,
-        write: &Arc<Mutex<WsSink>>,
-    ) -> Result<bool> {
+    async fn on_text_message(&self, text: &str, write: &Arc<Mutex<WsSink>>) -> Result<bool> {
         let bus_guard = self.bus.lock().await;
         if let Some(bus) = bus_guard.as_ref() {
             self.handle_envelope(text, bus, write).await?;

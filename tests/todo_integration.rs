@@ -102,6 +102,15 @@ async fn test_todo_context_injection() {
         created_at: Utc::now(),
         updated_at: Utc::now(),
         completed_at: None,
+        // Phase 1 new fields
+        parent_id: None,
+        project_id: None,
+        attachments: Vec::new(),
+        time_entries: Vec::new(),
+        total_tracked_secs: 0,
+        estimated_minutes: None,
+        calendar_event_uid: None,
+        last_reminded_at: None,
     };
     let task1 = store.add(task1).await.unwrap();
 
@@ -120,6 +129,15 @@ async fn test_todo_context_injection() {
         created_at: Utc::now(),
         updated_at: Utc::now(),
         completed_at: None,
+        // Phase 1 new fields
+        parent_id: None,
+        project_id: None,
+        attachments: Vec::new(),
+        time_entries: Vec::new(),
+        total_tracked_secs: 0,
+        estimated_minutes: None,
+        calendar_event_uid: None,
+        last_reminded_at: None,
     };
     let task2 = store.add(task2).await.unwrap();
 
@@ -582,6 +600,15 @@ async fn test_todo_store_persistence() {
             created_at: Utc::now(),
             updated_at: Utc::now(),
             completed_at: None,
+            // Phase 1 new fields
+            parent_id: None,
+            project_id: None,
+            attachments: Vec::new(),
+            time_entries: Vec::new(),
+            total_tracked_secs: 0,
+            estimated_minutes: None,
+            calendar_event_uid: None,
+            last_reminded_at: None,
         };
         let task1 = store.add(task1).await.unwrap();
 
@@ -601,6 +628,15 @@ async fn test_todo_store_persistence() {
             created_at: Utc::now(),
             updated_at: Utc::now(),
             completed_at: None,
+            // Phase 1 new fields
+            parent_id: None,
+            project_id: None,
+            attachments: Vec::new(),
+            time_entries: Vec::new(),
+            total_tracked_secs: 0,
+            estimated_minutes: None,
+            calendar_event_uid: None,
+            last_reminded_at: None,
         };
         let task2 = store.add(task2).await.unwrap();
 
@@ -620,6 +656,15 @@ async fn test_todo_store_persistence() {
             created_at: Utc::now(),
             updated_at: Utc::now(),
             completed_at: Some(Utc::now()),
+            // Phase 1 new fields
+            parent_id: None,
+            project_id: None,
+            attachments: Vec::new(),
+            time_entries: Vec::new(),
+            total_tracked_secs: 0,
+            estimated_minutes: None,
+            calendar_event_uid: None,
+            last_reminded_at: None,
         };
         let task3 = store.add(task3).await.unwrap();
 
@@ -712,6 +757,15 @@ async fn test_focus_slot_limit() {
             created_at: Utc::now(),
             updated_at: Utc::now(),
             completed_at: None,
+            // Phase 1 new fields
+            parent_id: None,
+            project_id: None,
+            attachments: Vec::new(),
+            time_entries: Vec::new(),
+            total_tracked_secs: 0,
+            estimated_minutes: None,
+            calendar_event_uid: None,
+            last_reminded_at: None,
         };
         let task = store.add(task).await.unwrap();
         task_ids.push(task.id.clone());
@@ -807,6 +861,15 @@ async fn test_auto_unfocus_expired_tasks() {
         created_at: now - Duration::hours(20),
         updated_at: now - Duration::hours(20),
         completed_at: None,
+        // Phase 1 new fields
+        parent_id: None,
+        project_id: None,
+        attachments: Vec::new(),
+        time_entries: Vec::new(),
+        total_tracked_secs: 0,
+        estimated_minutes: None,
+        calendar_event_uid: None,
+        last_reminded_at: None,
     };
 
     let task = store.add(expired_task).await.unwrap();
@@ -878,6 +941,15 @@ async fn test_auto_unfocus_expired_tasks() {
         created_at: now - Duration::hours(25),
         updated_at: now - Duration::hours(25),
         completed_at: None,
+        // Phase 1 new fields
+        parent_id: None,
+        project_id: None,
+        attachments: Vec::new(),
+        time_entries: Vec::new(),
+        total_tracked_secs: 0,
+        estimated_minutes: None,
+        calendar_event_uid: None,
+        last_reminded_at: None,
     };
 
     let task2 = store.add(expired_task2).await.unwrap();
@@ -950,6 +1022,15 @@ async fn test_complete_focused_task_frees_slot() {
             created_at: Utc::now(),
             updated_at: Utc::now(),
             completed_at: None,
+            // Phase 1 new fields
+            parent_id: None,
+            project_id: None,
+            attachments: Vec::new(),
+            time_entries: Vec::new(),
+            total_tracked_secs: 0,
+            estimated_minutes: None,
+            calendar_event_uid: None,
+            last_reminded_at: None,
         };
         let task = store.add(task).await.unwrap();
         task_ids.push(task.id.clone());
@@ -1045,6 +1126,15 @@ async fn test_focus_and_delete_interaction() {
             created_at: Utc::now(),
             updated_at: Utc::now(),
             completed_at: None,
+            // Phase 1 new fields
+            parent_id: None,
+            project_id: None,
+            attachments: Vec::new(),
+            time_entries: Vec::new(),
+            total_tracked_secs: 0,
+            estimated_minutes: None,
+            calendar_event_uid: None,
+            last_reminded_at: None,
         };
         let task = store.add(task).await.unwrap();
         task_ids.push(task.id.clone());

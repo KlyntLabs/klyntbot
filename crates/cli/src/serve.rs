@@ -48,12 +48,14 @@ pub async fn handle_serve(port: u16) -> Result<()> {
         let todo_store = Arc::clone(&todo_store);
         let dispatcher = Arc::clone(&notification_dispatcher);
         let config_focus = config.todo.focus.clone();
+        let bus_for_cron = bus.clone();
         let rt = tokio::runtime::Handle::current();
 
         cron_service.set_callback(Arc::new(move |job: &scheduling::CronJob| {
             let todo_store = Arc::clone(&todo_store);
             let dispatcher = Arc::clone(&dispatcher);
             let config_focus = config_focus.clone();
+            let bus = Arc::clone(&bus_for_cron);
             let job_name = job.name.clone();
 
             rt.block_on(async move {
@@ -138,6 +140,39 @@ pub async fn handle_serve(port: u16) -> Result<()> {
                         }
                         Ok(Some("Overdue check complete".to_string()))
                     }
+                    "__klyntbot_weekly_report" => {
+                        // Trigger agent turn with weekly-report skill via bus
+                        let msg = bus::InboundMessage::new(
+                            "system",
+                            "cron",
+                            "weekly_report",
+                            "Generate weekly progress report using the weekly-report skill"
+                                .to_string(),
+                        );
+                        bus.publish_inbound(msg).await.map_err(|e| {
+                            common::KlyntbotError::Bus(format!(
+                                "Failed to publish weekly report message: {}",
+                                e
+                            ))
+                        })?;
+                        Ok(Some("Weekly report triggered".to_string()))
+                    }
+                    "__klyntbot_calendar_sync" => {
+                        // Trigger calendar sync via bus message
+                        let msg = bus::InboundMessage::new(
+                            "system",
+                            "cron",
+                            "calendar_sync",
+                            "Sync calendar events with Apple Calendar via CalDAV".to_string(),
+                        );
+                        bus.publish_inbound(msg).await.map_err(|e| {
+                            common::KlyntbotError::Bus(format!(
+                                "Failed to publish calendar sync message: {}",
+                                e
+                            ))
+                        })?;
+                        Ok(Some("Calendar sync triggered".to_string()))
+                    }
                     _ => Ok(None),
                 }
             })
@@ -190,6 +225,43 @@ pub async fn handle_serve(port: u16) -> Result<()> {
             false,
         )
         .await?;
+
+    cron_service
+        .add_job(
+            "__klyntbot_weekly_report",
+            scheduling::CronSchedule::Cron {
+                expr: "0 18 * * 0".to_string(), // Sunday at 18:00
+                tz: None,
+            },
+            "Generate weekly progress report",
+            false,
+            None,
+            None,
+            false,
+        )
+        .await?;
+
+    // Register calendar sync cron job if enabled
+    if config.calendar.enabled {
+        let sync_interval_secs = config.calendar.sync_interval_secs;
+        cron_service
+            .add_job(
+                "__klyntbot_calendar_sync",
+                scheduling::CronSchedule::Every {
+                    every_ms: sync_interval_secs * 1000,
+                },
+                "Sync calendar events with Apple Calendar",
+                false,
+                None,
+                None,
+                false,
+            )
+            .await?;
+        info!(
+            "Calendar sync cron registered (interval: {}s)",
+            sync_interval_secs
+        );
+    }
 
     info!("Todo cron jobs registered");
 

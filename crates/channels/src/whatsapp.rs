@@ -105,21 +105,14 @@ impl WhatsAppChannel {
 
 #[async_trait]
 impl WsHandler for WhatsAppChannel {
-    async fn on_connected(
-        &self,
-        write: &Arc<Mutex<WsSink>>,
-    ) -> Result<Option<HeartbeatStrategy>> {
+    async fn on_connected(&self, write: &Arc<Mutex<WsSink>>) -> Result<Option<HeartbeatStrategy>> {
         // Store the write half for send()
         *self.ws_writer.lock().await = Some(Arc::clone(write));
         info!("Connected to WhatsApp bridge");
         Ok(None) // Use default heartbeat from config
     }
 
-    async fn on_text_message(
-        &self,
-        text: &str,
-        _write: &Arc<Mutex<WsSink>>,
-    ) -> Result<bool> {
+    async fn on_text_message(&self, text: &str, _write: &Arc<Mutex<WsSink>>) -> Result<bool> {
         let bus_guard = self.bus.lock().await;
         if let Some(bus) = bus_guard.as_ref() {
             self.handle_message(text, bus).await?;

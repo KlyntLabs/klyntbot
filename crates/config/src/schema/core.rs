@@ -76,6 +76,12 @@ pub struct Config {
 
     #[serde(default)]
     pub confidence: ConfidenceConfig,
+
+    #[serde(default)]
+    pub calendar: CalendarConfig,
+
+    #[serde(default)]
+    pub project: ProjectConfig,
 }
 
 impl Config {
@@ -114,6 +120,14 @@ impl Config {
             .unwrap_or_else(|| PathBuf::from("."))
             .join(".klyntbot")
             .join("todos.jsonl")
+    }
+
+    /// Get the standardized project store path
+    pub fn project_store_path(&self) -> PathBuf {
+        dirs::home_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join(".klyntbot")
+            .join("projects.jsonl")
     }
 
     /// Set the API key for a provider by name.
@@ -382,4 +396,237 @@ fn default_max_slots() -> usize {
 
 fn default_deadline_hours() -> u64 {
     18
+}
+
+/// Calendar sync configuration (Phase 1 prep for Phase 3)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CalendarConfig {
+    #[serde(default)]
+    pub enabled: bool,
+
+    #[serde(default)]
+    pub username: String,
+
+    #[serde(default)]
+    pub password: Secret<String>,
+
+    #[serde(default = "default_caldav_url")]
+    pub caldav_url: String,
+
+    #[serde(default = "default_calendar_name")]
+    pub calendar_name: String,
+
+    #[serde(default = "default_sync_interval_secs")]
+    pub sync_interval_secs: u64,
+
+    #[serde(default = "default_conflict_resolution")]
+    pub conflict_resolution: String,
+
+    #[serde(default = "default_true")]
+    pub auto_sync_due_dates: bool,
+}
+
+impl Default for CalendarConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            username: String::new(),
+            password: Secret::default(),
+            caldav_url: default_caldav_url(),
+            calendar_name: default_calendar_name(),
+            sync_interval_secs: default_sync_interval_secs(),
+            conflict_resolution: default_conflict_resolution(),
+            auto_sync_due_dates: true,
+        }
+    }
+}
+
+fn default_caldav_url() -> String {
+    "https://caldav.icloud.com".to_string()
+}
+
+fn default_calendar_name() -> String {
+    "Klyntbot Tasks".to_string()
+}
+
+fn default_sync_interval_secs() -> u64 {
+    300 // 5 minutes
+}
+
+fn default_conflict_resolution() -> String {
+    "server_wins".to_string()
+}
+
+/// Project management configuration
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectConfig {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json;
+
+    // ========================================================================
+    // CalendarConfig tests
+    // ========================================================================
+
+    #[test]
+    fn test_calendar_config_default() {
+        let config = CalendarConfig::default();
+        assert!(!config.enabled);
+        assert!(config.username.is_empty());
+        assert!(config.password.is_empty());
+        assert_eq!(config.caldav_url, "https://caldav.icloud.com");
+        assert_eq!(config.calendar_name, "Klyntbot Tasks");
+        assert_eq!(config.sync_interval_secs, 300);
+        assert_eq!(config.conflict_resolution, "server_wins");
+        assert!(config.auto_sync_due_dates);
+    }
+
+    #[test]
+    fn test_calendar_config_secret_redaction() {
+        let config = CalendarConfig {
+            enabled: true,
+            username: "user@example.com".to_string(),
+            password: Secret::new("secret123".to_string()),
+            caldav_url: "https://caldav.icloud.com".to_string(),
+            calendar_name: "Klyntbot".to_string(),
+            sync_interval_secs: 300,
+            conflict_resolution: "server_wins".to_string(),
+            auto_sync_due_dates: true,
+        };
+
+        let debug_str = format!("{:?}", config);
+        assert!(!debug_str.contains("secret123"));
+        assert!(debug_str.contains("[REDACTED]"));
+    }
+
+    #[test]
+    fn test_calendar_config_serialization_camel_case() {
+        let config = CalendarConfig {
+            enabled: true,
+            username: "user@example.com".to_string(),
+            password: Secret::new("pass123".to_string()),
+            caldav_url: "https://caldav.icloud.com".to_string(),
+            calendar_name: "My Calendar".to_string(),
+            sync_interval_secs: 600,
+            conflict_resolution: "client_wins".to_string(),
+            auto_sync_due_dates: false,
+        };
+
+        let json = serde_json::to_string(&config).unwrap();
+
+        // Check camelCase field names
+        assert!(json.contains("\"enabled\""));
+        assert!(json.contains("\"username\""));
+        assert!(json.contains("\"password\""));
+        assert!(json.contains("\"caldavUrl\""));
+        assert!(json.contains("\"calendarName\""));
+        assert!(json.contains("\"syncIntervalSecs\""));
+        assert!(json.contains("\"conflictResolution\""));
+        assert!(json.contains("\"autoSyncDueDates\""));
+
+        // Check values
+        assert!(json.contains("\"user@example.com\""));
+        assert!(json.contains("\"pass123\""));
+        assert!(json.contains("\"My Calendar\""));
+        assert!(json.contains("600"));
+        assert!(json.contains("\"client_wins\""));
+        assert!(json.contains("false"));
+    }
+
+    #[test]
+    fn test_calendar_config_deserialization() {
+        let json = r#"{
+            "enabled": true,
+            "username": "test@apple.com",
+            "password": "app-password-123",
+            "caldavUrl": "https://caldav.icloud.com",
+            "calendarName": "Work Tasks",
+            "syncIntervalSecs": 900,
+            "conflictResolution": "server_wins",
+            "autoSyncDueDates": true
+        }"#;
+
+        let config: CalendarConfig = serde_json::from_str(json).unwrap();
+        assert!(config.enabled);
+        assert_eq!(config.username, "test@apple.com");
+        assert_eq!(config.password.expose(), "app-password-123");
+        assert_eq!(config.caldav_url, "https://caldav.icloud.com");
+        assert_eq!(config.calendar_name, "Work Tasks");
+        assert_eq!(config.sync_interval_secs, 900);
+        assert_eq!(config.conflict_resolution, "server_wins");
+        assert!(config.auto_sync_due_dates);
+    }
+
+    #[test]
+    fn test_calendar_config_round_trip() {
+        let original = CalendarConfig {
+            enabled: true,
+            username: "roundtrip@test.com".to_string(),
+            password: Secret::new("secure-pass".to_string()),
+            caldav_url: "https://caldav.example.com".to_string(),
+            calendar_name: "Test Calendar".to_string(),
+            sync_interval_secs: 1800,
+            conflict_resolution: "merge".to_string(),
+            auto_sync_due_dates: false,
+        };
+
+        let json = serde_json::to_string(&original).unwrap();
+        let deserialized: CalendarConfig = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(original.enabled, deserialized.enabled);
+        assert_eq!(original.username, deserialized.username);
+        assert_eq!(original.password.expose(), deserialized.password.expose());
+        assert_eq!(original.caldav_url, deserialized.caldav_url);
+        assert_eq!(original.calendar_name, deserialized.calendar_name);
+        assert_eq!(original.sync_interval_secs, deserialized.sync_interval_secs);
+        assert_eq!(
+            original.conflict_resolution,
+            deserialized.conflict_resolution
+        );
+        assert_eq!(
+            original.auto_sync_due_dates,
+            deserialized.auto_sync_due_dates
+        );
+    }
+
+    #[test]
+    fn test_secret_is_empty() {
+        let empty_secret: Secret<String> = Secret::default();
+        assert!(empty_secret.is_empty());
+
+        let non_empty_secret = Secret::new("value".to_string());
+        assert!(!non_empty_secret.is_empty());
+    }
+
+    // ========================================================================
+    // Config integration tests
+    // ========================================================================
+
+    #[test]
+    fn test_config_includes_calendar() {
+        let config = Config::default();
+        assert!(!config.calendar.enabled);
+        assert_eq!(config.calendar.caldav_url, "https://caldav.icloud.com");
+    }
+
+    #[test]
+    fn test_config_calendar_serialization() {
+        let mut config = Config::default();
+        config.calendar.enabled = true;
+        config.calendar.username = "test@example.com".to_string();
+        config.calendar.password = Secret::new("password123".to_string());
+
+        let json = serde_json::to_string_pretty(&config).unwrap();
+        assert!(json.contains("\"calendar\""));
+        assert!(json.contains("\"enabled\": true"));
+        assert!(json.contains("\"username\": \"test@example.com\""));
+        assert!(json.contains("\"password\": \"password123\""));
+    }
 }

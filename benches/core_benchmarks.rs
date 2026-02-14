@@ -156,8 +156,7 @@ fn bench_message_bus(c: &mut Criterion) {
                 let mut rx = bus.take_inbound_rx().unwrap();
 
                 for i in 0..1_000 {
-                    let msg =
-                        InboundMessage::new("telegram", "user", "chat", format!("msg {}", i));
+                    let msg = InboundMessage::new("telegram", "user", "chat", format!("msg {}", i));
                     bus.publish_inbound(msg).await.unwrap();
                 }
 
@@ -237,7 +236,7 @@ fn bench_inbound_message(c: &mut Criterion) {
     group.bench_function("validate", |b| {
         let msg = InboundMessage::new("telegram", "user", "chat", "Normal message");
         b.iter(|| {
-            black_box(msg.validate());
+            let _ = black_box(msg.validate());
         });
     });
 

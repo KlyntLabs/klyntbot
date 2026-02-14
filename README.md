@@ -26,10 +26,11 @@
 
 ## Why klyntbot
 
-A full-featured AI agent framework that connects to 6+ chat platforms, executes tools, manages persistent memory, and schedules tasks — all from a single binary.
+A full-featured AI agent framework that connects to 6+ chat platforms, executes tools, manages persistent memory, schedules tasks, and syncs with Apple Calendar — all from a single binary.
 
 - **Multi-channel** — Telegram, Discord, WhatsApp, Slack, Email, QQ — all running simultaneously with independent conversation history.
-- **Tool-equipped** — 9 built-in tools: file I/O, shell execution, web search/fetch, message routing, background subagents, and cron scheduling.
+- **Work management** — Hierarchical tasks, project grouping, time tracking, calendar sync, and smart reminders for managing complex work and study projects.
+- **Tool-equipped** — 12 built-in tools: file I/O, shell execution, web search/fetch, message routing, background subagents, cron scheduling, todo/project management, and calendar sync.
 - **Memory-aware** — Long-term memory (`MEMORY.md`), daily notes, and extensible skills that persist across sessions and restarts.
 - **Fast and lightweight** — Starts in **5.8ms**, idles at **8.7 MB** RAM, ships as a **single 10 MB binary** with zero runtime dependencies.
 - **Async-native** — Built on Tokio for true multi-threaded async I/O. Channels, agent loop, cron, and heartbeat run as independent tasks.
@@ -48,7 +49,7 @@ Measured on Apple M-series (klyntbot v0.1.0):
 | **Memory (idle)** | 8.7 MB |
 | **Binary size** | 10 MB |
 | **Runtime dependencies** | 0 |
-| **Test cases** | 330 |
+| **Test cases** | 870+ |
 | **Clippy warnings** | 0 |
 
 > klyntbot uses a ~400-line OpenAI-compatible HTTP client that handles all 12+ providers directly via `reqwest` — no external LLM routing library needed.
@@ -101,6 +102,63 @@ cargo build --release
 
 ---
 
+## Work & Study Management
+
+klyntbot includes a comprehensive task and project management system designed for students and knowledge workers:
+
+### Hierarchical Tasks
+
+- **Sub-tasks** — Break down complex work into manageable pieces (up to 16 levels deep)
+- **Tree view** — Visualize task hierarchies with `klyntbot todo tree`
+- **Auto-completion** — Parent tasks complete automatically when all sub-tasks are done
+- **Flexible structure** — Move tasks between parents and projects with full subtree preservation
+
+### Project Management
+
+- **Project grouping** — Organize related tasks into named projects with colors and tags
+- **Project lifecycle** — Track projects through Active → Paused → Completed → Archived states
+- **Per-project reporting** — Time tracking and progress metrics for each project
+- **6 project actions** — create, list, show, archive, tasks, report
+
+### Time Tracking
+
+- **Automatic tracking** — Focus sessions auto-start time entries
+- **Manual logging** — Add time entries for offline work with `log-time`
+- **Progress reports** — Weekly summaries with time breakdown by project
+- **Denormalized totals** — Fast access to cumulative tracked time
+
+### Apple Calendar Sync
+
+- **Two-way CalDAV sync** — Tasks with due dates appear in Apple Calendar on iPhone, Mac, and iPad
+- **Conflict resolution** — Server-wins policy with audit logging
+- **Incremental sync** — RFC 6578 sync-token support for efficient updates
+- **Event management** — View upcoming events, check sync status, resolve conflicts
+
+See [CALENDAR_SETUP.md](docs/CALENDAR_SETUP.md) for setup instructions.
+
+### Smart Reminders
+
+- **Deadline awareness** — Proactive reminders 2h, 1h, 30m, 15m before due dates
+- **Focus tracking** — Alerts when focus sessions are about to expire
+- **Overdue nags** — Daily reminders for overdue tasks
+- **Calendar integration** — Alerts 30 minutes before calendar events
+
+### Document Attachments
+
+- **Three attachment types** — Files (paths), URLs, and notes
+- **Full-text search** — Search across task titles, descriptions, and attachments
+- **Tagging** — Organize attachments with custom tags
+
+### Extended CLI
+
+**16 todo actions** — add, list, show, complete, delete, focus, unfocus, summary, update, add-subtask, tree, move, attach, detach, log-time, search
+
+**6 project actions** — create, list, show, archive, tasks, report
+
+**4 calendar actions** — sync, status, list, conflicts
+
+---
+
 ## Features
 
 ### Core Agent
@@ -125,6 +183,9 @@ cargo build --release
 | `message` | Send messages to users through any connected channel |
 | `spawn` | Create background subagents for complex tasks |
 | `cron` | Schedule recurring tasks with natural language or cron expressions |
+| `todo` | Manage hierarchical tasks with 16 actions (add, list, show, complete, delete, focus, unfocus, summary, update, add-subtask, tree, move, attach, detach, log-time, search) |
+| `project` | Manage projects with 6 actions (create, list, show, archive, tasks, report) |
+| `calendar` | Sync with Apple Calendar via CalDAV (sync, status, list, conflicts) |
 
 ### Safety
 
@@ -381,6 +442,29 @@ klyntbot serve                   # Start gateway (all enabled channels)
 klyntbot serve --port 8080       # Custom gateway port
 klyntbot init                    # Initialize config and workspace
 klyntbot status                  # Show config, provider, workspace info
+
+# Task Management
+klyntbot todo add "Task title" [--project ID] [--parent ID]
+klyntbot todo list [--project ID] [--status doing]
+klyntbot todo tree [--project ID] [--depth 3]
+klyntbot todo focus [ID]         # Start focus session (auto-tracks time)
+klyntbot todo log-time ID 45 --note "Work description"
+klyntbot todo add-subtask PARENT_ID "Subtask title"
+klyntbot todo search "query" [--include-attachments]
+
+# Project Management
+klyntbot project create "Project name" [--color blue]
+klyntbot project list [--status active]
+klyntbot project show ID
+klyntbot project report ID --period week
+
+# Calendar Sync
+klyntbot calendar sync           # Manual sync with Apple Calendar
+klyntbot calendar status         # Show sync status
+klyntbot calendar list --from 2026-02-14 --to 2026-02-21
+klyntbot calendar conflicts      # Show sync conflicts
+
+# Other Commands
 klyntbot channels                # Channel management
 klyntbot cron list               # List scheduled jobs
 klyntbot cron add --name "daily" --cron "0 9 * * *" --message "Good morning!"
@@ -450,6 +534,17 @@ Config file: `~/.klyntbot/config.json`
     "web": { "search": { "apiKey": "", "maxResults": 5 } },
     "exec": { "timeout": 60 },
     "restrictToWorkspace": false
+  },
+  "calendar": {
+    "enabled": false,
+    "appleId": "",
+    "appSpecificPassword": "",
+    "caldavUrl": "https://caldav.icloud.com",
+    "calendarName": "Klyntbot Tasks",
+    "syncIntervalSecs": 300
+  },
+  "project": {
+    "enabled": true
   }
 }
 ```
@@ -461,6 +556,10 @@ Config file: `~/.klyntbot/config.json`
 ```
 ~/.klyntbot/
   config.json                   # Main configuration
+  todos.jsonl                   # Task store (NEW)
+  projects.jsonl                # Project store (NEW)
+  calendar_sync.json            # CalDAV sync state (NEW)
+  calendar_conflicts.jsonl      # Conflict audit log (NEW)
   sessions/                     # Conversation history (JSONL per session)
   cron/jobs.json                # Scheduled job store
   media/                        # Downloaded media files
@@ -474,9 +573,10 @@ Config file: `~/.klyntbot/config.json`
     HEARTBEAT.md                # Periodic task definitions
     memory/
       MEMORY.md                 # Long-term persistent memory
-      2026-02-12.md             # Daily notes (auto-dated)
+      2026-02-14.md             # Daily notes (auto-dated)
     skills/
       custom-skill/SKILL.md     # User-defined skills
+      weekly-report.md          # Weekly progress reports (NEW)
 ```
 
 ---
@@ -591,14 +691,15 @@ cargo fmt --check
 ```
 klyntbot/
   Cargo.toml                    # Workspace root
-  crates/                       # 11 focused workspace crates
+  crates/                       # 12 focused workspace crates
     common/              # Foundation types and errors
     config/            # Configuration schema and loader
     bus/               # Async message bus
     providers/         # LLM provider abstraction
     session/           # Session persistence (JSONL + cache)
     scheduling/              # Cron scheduling service
-    tools/             # Tool trait and implementations
+    calendar/          # CalDAV client and sync engine (NEW)
+    tools/             # Tool trait and implementations (12 tools)
     channels/          # Chat platform integrations
     heartbeat/         # Periodic wake-up service
     agent/             # Agent loop and orchestration
@@ -610,6 +711,7 @@ klyntbot/
   skills/                       # Built-in skill definitions
   tests/                        # Integration tests
   docs/                         # Architecture documentation
+    CALENDAR_SETUP.md           # Calendar setup guide (NEW)
 ```
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the complete dependency graph and design patterns.
@@ -618,11 +720,11 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the complete dependency gra
 
 | Metric | Value |
 |--------|-------|
-| Workspace crates | 11 |
-| Source lines | ~16,700 |
-| Test cases | 330 |
+| Workspace crates | 12 |
+| Source lines | ~19,200 |
+| Test cases | 870+ |
 | Clippy warnings | 0 |
-| Tools | 9 |
+| Tools | 12 |
 | Providers | 12+ |
 | Channels | 6 ready, 3 planned |
 
@@ -630,7 +732,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the complete dependency gra
 
 ## Workspace Structure
 
-Klyntbot is organized as a Cargo workspace with 11 focused crates:
+Klyntbot is organized as a Cargo workspace with 12 focused crates:
 
 ```
 crates/
@@ -640,7 +742,8 @@ crates/
 ├── providers/      → LLM provider abstraction (12+ providers)
 ├── session/        → Session persistence (JSONL + cache)
 ├── scheduling/     → Cron job scheduling
-├── tools/          → Tool implementations (9 tools)
+├── calendar/       → CalDAV client and two-way sync (NEW)
+├── tools/          → Tool implementations (12 tools: file I/O, shell, web, todo, project, calendar)
 ├── channels/       → Chat platform integrations (6 platforms)
 ├── heartbeat/      → Periodic wake-up service
 ├── agent/          → Agent orchestration

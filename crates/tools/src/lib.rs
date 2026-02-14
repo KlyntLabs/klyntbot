@@ -3,11 +3,15 @@
 //! This crate provides the Tool trait and various tool implementations.
 
 pub mod ask_user;
+pub mod calendar_tool;
 pub mod cron_tool;
 pub mod filesystem;
 pub mod message;
 pub mod params;
 pub use params::ParamExtractor;
+pub mod project_store;
+pub mod project_tool;
+pub mod project_types;
 pub mod registry;
 pub mod shell;
 pub mod spawn;
@@ -15,6 +19,9 @@ pub mod todo;
 pub mod todo_store;
 pub mod todo_types;
 pub mod web;
+
+// Re-export calendar types for use by agent crate
+pub use calendar_tool::{CalendarHandler, CalendarTool};
 
 // Dependency inversion traits (to avoid circular dependencies)
 /// Trait for spawning subagents (implemented by klyntbot-agent)

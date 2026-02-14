@@ -19,6 +19,7 @@ use session::SessionManager;
 use std::collections::HashMap;
 use tokio::sync::mpsc;
 use tools::{
+    calendar_tool::{CalendarHandler, CalendarTool},
     cron_tool::CronTool,
     filesystem::register_fs_tools,
     message::MessageTool,
@@ -30,7 +31,7 @@ use tools::{
 };
 
 use super::confidence::{self, ConfidenceEvaluator, DecisionAction, DecisionLogger};
-use super::{AgentEvent, ContextBuilder, CronHandlerAdapter, SubagentManager};
+use super::{AgentEvent, CalendarSyncAdapter, ContextBuilder, CronHandlerAdapter, SubagentManager};
 
 /// Maximum number of tool-calling iterations before returning final response
 const MAX_TOOL_ITERATIONS: usize = 20;
@@ -89,6 +90,8 @@ pub struct AgentLoop {
     decision_logger: DecisionLogger,
     running: Arc<AtomicBool>,
     last_active_channel: Option<LastActiveChannel>,
+    #[allow(dead_code)] // TODO: Use for cleanup when agent loop stops
+    reminder_engine: Option<Arc<RwLock<super::ReminderEngine>>>,
 }
 
 impl AgentLoop {
@@ -178,11 +181,26 @@ impl AgentLoop {
         }
 
         // Register todo tool
-        tool_registry.register(tools::todo::TodoTool::new(
+        let mut todo_tool = tools::todo::TodoTool::new(
             Arc::clone(&todo_store),
             config.todo.focus.max_slots,
             config.todo.focus.deadline_hours,
-        ));
+        );
+
+        // Register calendar tool (if enabled)
+        if config.calendar.enabled {
+            let calendar_adapter = Arc::new(CalendarSyncAdapter::new(
+                Arc::clone(&todo_store),
+                config.calendar.clone(),
+            )?);
+
+            // Inject calendar handler into TodoTool for immediate sync
+            todo_tool = todo_tool.with_calendar_handler(Arc::clone(&calendar_adapter) as Arc<dyn CalendarHandler>);
+
+            tool_registry.register(CalendarTool::new(calendar_adapter));
+        }
+
+        tool_registry.register(todo_tool);
 
         // Confidence evaluator
         let confidence_evaluator = if config.confidence.enabled {
@@ -194,6 +212,27 @@ impl AgentLoop {
         let decision_logger = match &config.confidence.log_path {
             Some(path) => DecisionLogger::new(path.clone()),
             None => DecisionLogger::default_path(),
+        };
+
+        // Create NotificationDispatcher and ReminderEngine if notifications configured
+        let reminder_engine = if !config.todo.notifications.targets.is_empty() {
+            let notification_dispatcher = Arc::new(super::NotificationDispatcher::new(
+                bus.outbound_sender(),
+                config.todo.notifications.clone(),
+            ));
+
+            // TODO: Link notification dispatcher to last_active_channel tracker if needed
+
+            let mut engine = super::ReminderEngine::new(
+                Arc::clone(&todo_store),
+                None, // TODO: Add CalendarHandler when calendar sync is integrated
+                Arc::clone(&notification_dispatcher),
+                std::time::Duration::from_secs(300), // Check every 5 minutes
+            );
+            engine.start();
+            Some(Arc::new(RwLock::new(engine)))
+        } else {
+            None
         };
 
         // Take ownership of the inbound receiver
@@ -214,6 +253,7 @@ impl AgentLoop {
             decision_logger,
             running: Arc::new(AtomicBool::new(false)),
             last_active_channel: notification_handle,
+            reminder_engine,
         })
     }
 
@@ -719,7 +759,8 @@ impl AgentLoop {
             .await?;
 
         let mut accumulated_content = String::new();
-        let mut accumulated_tool_calls: HashMap<usize, ToolCallAccumulator> = HashMap::with_capacity(4);
+        let mut accumulated_tool_calls: HashMap<usize, ToolCallAccumulator> =
+            HashMap::with_capacity(4);
 
         // Process stream chunks with cancellation support
         loop {
