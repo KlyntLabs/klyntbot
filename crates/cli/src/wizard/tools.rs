@@ -1,6 +1,6 @@
 //! Tools configuration wizard step.
 //!
-//! Provides interactive setup for:
+//! Provides an expand-in-place interactive menu for:
 //! - Security preset profiles (strict, balanced, permissive)
 //! - Workspace restriction toggle
 //! - Shell command allowlist editing
@@ -9,16 +9,25 @@
 //!
 //! On reconfiguration, all fields show current values as defaults.
 
-use std::io::{self, Write};
+use std::io::{self, IsTerminal, Write};
 
 use anyhow::Result;
 use common::utils::terminal::*;
 use config::Config;
+use crossterm::{
+    cursor,
+    event::{self, Event, KeyCode, KeyEvent, KeyModifiers},
+    terminal::{self, ClearType},
+};
 
-use super::prompts::{self, SelectOption};
+use super::prompts;
+
+// ============================================================================
+// Preset Types
+// ============================================================================
 
 /// Security preset profile for tools configuration
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ToolsPreset {
     Strict,
     Balanced,
@@ -33,125 +42,432 @@ impl ToolsPreset {
             Self::Permissive => "No workspace restriction, deny dangerous commands, 120s timeout",
         }
     }
+
+    fn name(&self) -> &str {
+        match self {
+            Self::Strict => "Strict",
+            Self::Balanced => "Balanced",
+            Self::Permissive => "Permissive",
+        }
+    }
 }
 
+// ============================================================================
+// Setting Metadata
+// ============================================================================
+
+struct ToolSettingInfo {
+    key: &'static str,
+    name: &'static str,
+}
+
+const TOOL_SETTINGS: &[ToolSettingInfo] = &[
+    ToolSettingInfo {
+        key: "preset",
+        name: "Security Preset",
+    },
+    ToolSettingInfo {
+        key: "workspace",
+        name: "Workspace Restriction",
+    },
+    ToolSettingInfo {
+        key: "allowlist",
+        name: "Shell Allowlist",
+    },
+    ToolSettingInfo {
+        key: "brave_api",
+        name: "Brave Search API",
+    },
+    ToolSettingInfo {
+        key: "timeout",
+        name: "Execution Timeout",
+    },
+];
+
+// ============================================================================
+// Configuration Detection Helpers
+// ============================================================================
+
 /// Detect the current preset from config values.
-fn detect_preset(config: &Config) -> usize {
+fn detect_preset(config: &Config) -> ToolsPreset {
     if config.tools.restrict_to_workspace
         && !config.tools.exec.allowed_commands.is_empty()
         && config.tools.exec.timeout <= 30
     {
-        0 // Strict
+        ToolsPreset::Strict
     } else if !config.tools.restrict_to_workspace && config.tools.exec.timeout >= 120 {
-        2 // Permissive
+        ToolsPreset::Permissive
     } else {
-        1 // Balanced
+        ToolsPreset::Balanced
     }
 }
 
-/// Run the tools configuration wizard step.
-/// Returns true if tools were configured, false if skipped.
-pub fn configure_tools(config: &mut Config) -> Result<bool> {
-    let chars = BoxChars::get();
-
-    // Show current status
-    let presets = [
-        ToolsPreset::Strict,
-        ToolsPreset::Balanced,
-        ToolsPreset::Permissive,
-    ];
-    let current_preset_idx = detect_preset(config);
-    let preset_name = match current_preset_idx {
-        0 => "Strict",
-        2 => "Permissive",
-        _ => "Balanced",
-    };
-    println!(
-        "{} Current: {} preset, timeout {}s, workspace restriction {}",
-        colorize(chars.vertical, BRAND),
-        colorize(preset_name, BOLD),
-        colorize(&config.tools.exec.timeout.to_string(), DIM),
-        if config.tools.restrict_to_workspace {
-            colorize("on", SUCCESS)
-        } else {
-            colorize("off", WARNING)
-        }
-    );
-    println!("{}", colorize(chars.vertical, BRAND));
-
-    // Step 1: Choose preset profile (pre-select current)
-    let options: Vec<SelectOption<'_>> = presets
-        .iter()
-        .map(|p| {
-            let label = match p {
-                ToolsPreset::Strict => "Strict",
-                ToolsPreset::Balanced => "Balanced",
-                ToolsPreset::Permissive => "Permissive",
-            };
-            SelectOption {
-                label,
-                description: p.description(),
+/// Get the icon and color for a setting based on current config state.
+fn get_setting_icon(config: &Config, key: &str) -> (&'static str, &'static str) {
+    match key {
+        "preset" => ("★", HIGHLIGHT),
+        "workspace" => {
+            if config.tools.restrict_to_workspace {
+                ("✓", SUCCESS)
+            } else {
+                ("○", DIM)
             }
-        })
-        .collect();
-
-    let idx = prompts::prompt_select("Select a security preset", &options, current_preset_idx)?;
-    let preset = presets[idx];
-    apply_preset(config, preset);
-    println!(
-        "{} {} Applied {} preset",
-        colorize(chars.vertical, BRAND),
-        status_success(),
-        match preset {
-            ToolsPreset::Strict => "strict",
-            ToolsPreset::Balanced => "balanced",
-            ToolsPreset::Permissive => "permissive",
         }
-    );
-
-    // Step 2: Fine-tune workspace restriction (default from preset)
-    println!("{}", colorize(chars.vertical, BRAND));
-    let restrict = prompts::prompt_yes_no(
-        "Restrict file/exec tools to workspace directory?",
-        config.tools.restrict_to_workspace,
-    )?;
-    config.tools.restrict_to_workspace = restrict;
-    if restrict {
-        println!(
-            "{} {} Workspace restriction {}",
-            colorize(chars.vertical, BRAND),
-            status_success(),
-            colorize("enabled", SUCCESS)
-        );
-    } else {
-        println!(
-            "{} {} Workspace restriction {}",
-            colorize(chars.vertical, BRAND),
-            status_warning(),
-            colorize("disabled", WARNING)
-        );
+        "allowlist" => {
+            if config.tools.exec.allowed_commands.is_empty() {
+                ("○", DIM)
+            } else {
+                ("★", HIGHLIGHT)
+            }
+        }
+        "brave_api" => {
+            if config.tools.web.brave_api_key.is_empty() {
+                ("○", DIM)
+            } else {
+                ("✓", SUCCESS)
+            }
+        }
+        "timeout" => ("○", DIM),
+        _ => ("○", DIM),
     }
-
-    // Step 3: Shell command allowlist
-    configure_allowlist(config)?;
-
-    // Step 4: Brave Search API key (edit-in-place)
-    configure_brave_api(config)?;
-
-    // Step 5: Execution timeout (edit-in-place)
-    configure_timeout(config)?;
-
-    println!("{}", colorize(chars.vertical, BRAND));
-    println!(
-        "{} {} Tools configuration complete",
-        colorize(chars.vertical, BRAND),
-        status_success()
-    );
-
-    Ok(true)
 }
 
-/// Apply a preset profile to the config
+/// Get the status text for a setting.
+fn get_setting_status(config: &Config, key: &str) -> String {
+    match key {
+        "preset" => detect_preset(config).name().to_string(),
+        "workspace" => {
+            if config.tools.restrict_to_workspace {
+                "enabled".to_string()
+            } else {
+                "disabled".to_string()
+            }
+        }
+        "allowlist" => {
+            if config.tools.exec.allowed_commands.is_empty() {
+                "deny-list mode".to_string()
+            } else {
+                format!("{} commands", config.tools.exec.allowed_commands.len())
+            }
+        }
+        "brave_api" => {
+            let key_val = config.tools.web.brave_api_key.expose();
+            if key_val.is_empty() {
+                "not configured".to_string()
+            } else {
+                format!("configured ({})", prompts::mask_secret(key_val))
+            }
+        }
+        "timeout" => format!("{}s", config.tools.exec.timeout),
+        _ => String::new(),
+    }
+}
+
+// ============================================================================
+// State Model and Sub-Actions
+// ============================================================================
+
+/// Actions available in expanded setting sub-menus.
+#[derive(Clone, PartialEq)]
+enum ToolSubAction {
+    SwitchPreset(ToolsPreset),
+    ToggleWorkspace,
+    EditAllowlist,
+    SwitchAllowlistMode,
+    ConfigureBraveKey,
+    EditBraveKey,
+    RemoveBraveKey,
+    ChangeTimeout,
+    Close,
+}
+
+impl ToolSubAction {
+    fn label(&self, config: &Config) -> String {
+        match self {
+            Self::SwitchPreset(preset) => {
+                format!("{} ({})", preset.name(), preset.description())
+            }
+            Self::ToggleWorkspace => {
+                if config.tools.restrict_to_workspace {
+                    "Disable restriction".to_string()
+                } else {
+                    "Enable restriction".to_string()
+                }
+            }
+            Self::EditAllowlist => {
+                let cmds = &config.tools.exec.allowed_commands;
+                if cmds.len() <= 5 {
+                    format!("Edit commands [{}]", cmds.join(", "))
+                } else {
+                    let preview: Vec<&str> = cmds.iter().take(4).map(|s| s.as_str()).collect();
+                    format!("Edit commands [{}, ...]", preview.join(", "))
+                }
+            }
+            Self::SwitchAllowlistMode => {
+                if config.tools.exec.allowed_commands.is_empty() {
+                    "Switch to allowlist mode".to_string()
+                } else {
+                    "Switch to deny-list mode".to_string()
+                }
+            }
+            Self::ConfigureBraveKey => "Configure API key".to_string(),
+            Self::EditBraveKey => {
+                let key = config.tools.web.brave_api_key.expose();
+                format!("Edit API key ({})", prompts::mask_secret(key))
+            }
+            Self::RemoveBraveKey => "Remove API key".to_string(),
+            Self::ChangeTimeout => "Change timeout".to_string(),
+            Self::Close => "Close".to_string(),
+        }
+    }
+}
+
+/// Get the dynamic sub-actions for a setting based on current config state.
+fn get_sub_actions(config: &Config, setting_idx: usize) -> Vec<ToolSubAction> {
+    let key = TOOL_SETTINGS[setting_idx].key;
+    match key {
+        "preset" => {
+            let current = detect_preset(config);
+            let mut actions = Vec::new();
+            for preset in &[ToolsPreset::Strict, ToolsPreset::Balanced, ToolsPreset::Permissive] {
+                if *preset != current {
+                    actions.push(ToolSubAction::SwitchPreset(*preset));
+                }
+            }
+            actions.push(ToolSubAction::Close);
+            actions
+        }
+        "workspace" => {
+            vec![ToolSubAction::ToggleWorkspace, ToolSubAction::Close]
+        }
+        "allowlist" => {
+            if config.tools.exec.allowed_commands.is_empty() {
+                vec![ToolSubAction::SwitchAllowlistMode, ToolSubAction::Close]
+            } else {
+                vec![
+                    ToolSubAction::EditAllowlist,
+                    ToolSubAction::SwitchAllowlistMode,
+                    ToolSubAction::Close,
+                ]
+            }
+        }
+        "brave_api" => {
+            if config.tools.web.brave_api_key.is_empty() {
+                vec![ToolSubAction::ConfigureBraveKey, ToolSubAction::Close]
+            } else {
+                vec![
+                    ToolSubAction::EditBraveKey,
+                    ToolSubAction::RemoveBraveKey,
+                    ToolSubAction::Close,
+                ]
+            }
+        }
+        "timeout" => {
+            vec![ToolSubAction::ChangeTimeout, ToolSubAction::Close]
+        }
+        _ => vec![ToolSubAction::Close],
+    }
+}
+
+/// State for the interactive tool permissions menu.
+struct ToolMenuState {
+    cursor: usize,
+    expanded: Option<usize>,
+    sub_cursor: usize,
+    in_sub_menu: bool,
+}
+
+impl ToolMenuState {
+    fn new() -> Self {
+        Self {
+            cursor: 0,
+            expanded: None,
+            sub_cursor: 0,
+            in_sub_menu: false,
+        }
+    }
+
+    fn total_main_items(&self) -> usize {
+        TOOL_SETTINGS.len() + 1 // settings + "Done"
+    }
+
+    fn is_on_done(&self) -> bool {
+        self.cursor == TOOL_SETTINGS.len()
+    }
+}
+
+// ============================================================================
+// Rendering Functions
+// ============================================================================
+
+/// Render the full tool settings menu. Returns total lines rendered.
+fn render_tool_menu(
+    out: &mut impl Write,
+    config: &Config,
+    menu: &ToolMenuState,
+    chars: &BoxChars,
+) -> Result<usize> {
+    let prefix = format!("{} ", colorize(chars.vertical, BRAND));
+    let mut lines = 0;
+
+    for (i, setting) in TOOL_SETTINGS.iter().enumerate() {
+        let is_cursor = !menu.in_sub_menu && menu.cursor == i;
+        let is_expanded = menu.expanded == Some(i);
+
+        // Setting icon
+        let (icon_str, icon_color) = get_setting_icon(config, setting.key);
+        let icon = colorize(icon_str, icon_color);
+
+        // Expand indicator
+        let expand = if is_expanded {
+            colorize("▼", BRAND)
+        } else {
+            " ".to_string()
+        };
+
+        // Cursor indicator
+        let pointer = if is_cursor {
+            colorize("❯", BRAND)
+        } else {
+            " ".to_string()
+        };
+
+        // Setting name
+        let name = if is_cursor || is_expanded {
+            colorize(setting.name, BOLD)
+        } else {
+            setting.name.to_string()
+        };
+
+        // Status
+        let status_text = get_setting_status(config, setting.key);
+        let status = format!(" — {}", colorize(&status_text, DIM));
+
+        write!(
+            out,
+            "{}{}{} {} {}{}\r\n",
+            prefix, pointer, expand, icon, name, status
+        )?;
+        lines += 1;
+
+        // Render sub-menu if expanded
+        if is_expanded {
+            let sub_actions = get_sub_actions(config, i);
+            for (si, action) in sub_actions.iter().enumerate() {
+                let sub_pointer = if menu.in_sub_menu && menu.sub_cursor == si {
+                    colorize("❯", BRAND)
+                } else {
+                    " ".to_string()
+                };
+
+                let label = action.label(config);
+                let label_display = if menu.in_sub_menu && menu.sub_cursor == si {
+                    colorize(&label, BOLD)
+                } else if *action == ToolSubAction::Close {
+                    colorize(&format!("── {} ──", label), DIM)
+                } else {
+                    label
+                };
+
+                write!(out, "{}      {} {}\r\n", prefix, sub_pointer, label_display)?;
+                lines += 1;
+            }
+        }
+    }
+
+    // Separator before Done
+    write!(
+        out,
+        "{}  {}\r\n",
+        prefix,
+        colorize("──────────────────────────", DIM)
+    )?;
+    lines += 1;
+
+    // Done row
+    let done_pointer = if !menu.in_sub_menu && menu.is_on_done() {
+        colorize("❯", BRAND)
+    } else {
+        " ".to_string()
+    };
+    let done_icon = colorize("●", BRAND);
+    let done_label = if !menu.in_sub_menu && menu.is_on_done() {
+        colorize("Done", BOLD)
+    } else {
+        "Done".to_string()
+    };
+
+    write!(
+        out,
+        "{}{} {} {}\r\n",
+        prefix, done_pointer, done_icon, done_label
+    )?;
+    lines += 1;
+
+    out.flush()?;
+    Ok(lines)
+}
+
+/// Render the keyboard hint bar.
+fn render_menu_hint(out: &mut impl Write, menu: &ToolMenuState, chars: &BoxChars) -> Result<()> {
+    let prefix = format!("{} ", colorize(chars.vertical, BRAND));
+    let hint = if menu.in_sub_menu {
+        "↑/↓ navigate · Enter select · Esc back"
+    } else {
+        "↑/↓ navigate · Enter expand/select"
+    };
+    write!(out, "{}{}\r\n", prefix, colorize(hint, DIM))?;
+    out.flush()?;
+    Ok(())
+}
+
+/// Erase and re-render the menu. Returns new line count.
+fn rerender_menu(
+    out: &mut impl Write,
+    config: &Config,
+    menu: &ToolMenuState,
+    chars: &BoxChars,
+    prev_lines: usize,
+) -> Result<usize> {
+    let total = prev_lines + 1; // +1 for hint bar
+    for _ in 0..total {
+        write!(out, "\x1b[A\x1b[2K")?;
+    }
+    let new_lines = render_tool_menu(out, config, menu, chars)?;
+    render_menu_hint(out, menu, chars)?;
+    Ok(new_lines)
+}
+
+// ============================================================================
+// Terminal Helpers
+// ============================================================================
+
+/// Read a keypress event, handling Ctrl+C gracefully.
+fn read_key() -> Result<KeyEvent> {
+    loop {
+        if let Event::Key(key) = event::read()? {
+            if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
+                return Err(anyhow::anyhow!("Ctrl+C"));
+            }
+            return Ok(key);
+        }
+    }
+}
+
+/// Erase `n` lines above cursor.
+fn erase_lines(n: usize) -> Result<()> {
+    let mut out = io::stdout();
+    for _ in 0..n {
+        crossterm::execute!(out, cursor::MoveUp(1), terminal::Clear(ClearType::CurrentLine))?;
+    }
+    Ok(())
+}
+
+// ============================================================================
+// Sub-Action Executors
+// ============================================================================
+
+/// Apply a preset profile to the config.
 fn apply_preset(config: &mut Config, preset: ToolsPreset) {
     match preset {
         ToolsPreset::Strict => {
@@ -173,66 +489,34 @@ fn apply_preset(config: &mut Config, preset: ToolsPreset) {
         ToolsPreset::Balanced => {
             config.tools.restrict_to_workspace = true;
             config.tools.exec.timeout = 60;
-            config.tools.exec.allowed_commands = Vec::new(); // deny-list mode
+            config.tools.exec.allowed_commands = Vec::new();
         }
         ToolsPreset::Permissive => {
             config.tools.restrict_to_workspace = false;
             config.tools.exec.timeout = 120;
-            config.tools.exec.allowed_commands = Vec::new(); // deny-list mode
+            config.tools.exec.allowed_commands = Vec::new();
         }
     }
 }
 
-/// Configure the shell command allowlist
-fn configure_allowlist(config: &mut Config) -> Result<()> {
+/// Execute the edit allowlist action (exits raw mode for input).
+fn execute_edit_allowlist(config: &mut Config) -> Result<()> {
     let chars = BoxChars::get();
+    let prefix = format!("{} ", colorize(chars.vertical, BRAND));
 
-    if config.tools.exec.allowed_commands.is_empty() {
-        println!("{}", colorize(chars.vertical, BRAND));
-        let wants_allowlist = prompts::prompt_yes_no(
-            "Add a shell command allowlist? (empty = deny-list mode)",
-            false,
-        )?;
-        if !wants_allowlist {
-            println!(
-                "{} {} Using deny-list mode {}",
-                colorize(chars.vertical, BRAND),
-                status_success(),
-                colorize("(blocks dangerous patterns only)", DIM)
-            );
-            return Ok(());
-        }
-    } else {
-        println!("{}", colorize(chars.vertical, BRAND));
-        println!(
-            "{} Current allowlist: {}",
-            colorize(chars.vertical, BRAND),
-            colorize(&config.tools.exec.allowed_commands.join(", "), DIM)
-        );
-        let modify = prompts::prompt_yes_no("Modify the command allowlist?", false)?;
-        if !modify {
-            return Ok(());
-        }
-    }
-
-    println!("{}", colorize(chars.vertical, BRAND));
     println!(
-        "{}",
-        draw_step_line(&colorize(
+        "{}{}",
+        prefix,
+        colorize(
             "Enter commands one per line (empty line to finish):",
             DIM
-        ))
+        )
     );
 
     let mut commands: Vec<String> = config.tools.exec.allowed_commands.clone();
 
-    // Show current commands for editing
     if !commands.is_empty() {
-        println!(
-            "{} Current: {}",
-            colorize(chars.vertical, BRAND),
-            commands.join(", ")
-        );
+        println!("{}Current: {}", prefix, commands.join(", "));
         let clear = prompts::prompt_yes_no("Clear existing and start fresh?", false)?;
         if clear {
             commands.clear();
@@ -241,8 +525,8 @@ fn configure_allowlist(config: &mut Config) -> Result<()> {
 
     loop {
         print!(
-            "{} {} ",
-            colorize(chars.vertical, BRAND),
+            "{}{} ",
+            prefix,
             colorize("+", SUCCESS)
         );
         io::stdout().flush()?;
@@ -257,8 +541,8 @@ fn configure_allowlist(config: &mut Config) -> Result<()> {
 
         if commands.contains(&input) {
             println!(
-                "{}   {}",
-                colorize(chars.vertical, BRAND),
+                "{}  {}",
+                prefix,
                 colorize("(already in list)", DIM)
             );
             continue;
@@ -267,76 +551,60 @@ fn configure_allowlist(config: &mut Config) -> Result<()> {
         commands.push(input);
     }
 
-    if commands.is_empty() {
+    config.tools.exec.allowed_commands = commands;
+
+    if config.tools.exec.allowed_commands.is_empty() {
         println!(
-            "{} {} Allowlist cleared, using deny-list mode",
-            colorize(chars.vertical, BRAND),
+            "{}{} Allowlist cleared, using deny-list mode",
+            prefix,
             status_success()
         );
     } else {
         println!(
-            "{} {} Allowlist set: {}",
-            colorize(chars.vertical, BRAND),
+            "{}{} Allowlist set: {}",
+            prefix,
             status_success(),
-            commands.join(", ")
+            config.tools.exec.allowed_commands.join(", ")
         );
     }
 
-    config.tools.exec.allowed_commands = commands;
     Ok(())
 }
 
-/// Configure Brave Search API key (edit-in-place with masked preview)
-fn configure_brave_api(config: &mut Config) -> Result<()> {
+/// Execute the configure/edit brave API key action (exits raw mode for input).
+fn execute_configure_brave_key(config: &mut Config) -> Result<()> {
     let chars = BoxChars::get();
-    println!("{}", colorize(chars.vertical, BRAND));
+    let prefix = format!("{} ", colorize(chars.vertical, BRAND));
 
     let existing_key = config.tools.web.brave_api_key.expose().clone();
 
     if existing_key.is_empty() {
-        // No existing key - ask if they want to add one
-        let wants_api = prompts::prompt_yes_no(
-            "Configure Brave Search API key? (enables web_search tool)",
-            false,
-        )?;
-        if !wants_api {
-            println!(
-                "{} {} Web search disabled {}",
-                colorize(chars.vertical, BRAND),
-                status_disabled(),
-                colorize("(no API key)", DIM)
-            );
-            return Ok(());
-        }
-
         println!(
-            "{} Get yours at: {}",
-            colorize(chars.vertical, BRAND),
+            "{}Get yours at: {}",
+            prefix,
             colorize("https://brave.com/search/api/", UNDERLINE)
         );
-
         let key = prompts::prompt_secret("Brave API Key", 10)?;
         config.tools.web.brave_api_key = config::schema::Secret::new(key);
         println!(
-            "{} {} Brave Search API key configured",
-            colorize(chars.vertical, BRAND),
+            "{}{} Brave Search API key configured",
+            prefix,
             status_success()
         );
     } else {
-        // Has existing key - edit-in-place
         match prompts::prompt_secret_with_existing("Brave API Key", &existing_key, 10)? {
             Some(new_key) => {
                 config.tools.web.brave_api_key = config::schema::Secret::new(new_key);
                 println!(
-                    "{} {} Brave Search API key updated",
-                    colorize(chars.vertical, BRAND),
+                    "{}{} Brave Search API key updated",
+                    prefix,
                     status_success()
                 );
             }
             None => {
                 println!(
-                    "{} {} Brave API key unchanged",
-                    colorize(chars.vertical, BRAND),
+                    "{}{} Brave API key unchanged",
+                    prefix,
                     status_success()
                 );
             }
@@ -346,11 +614,10 @@ fn configure_brave_api(config: &mut Config) -> Result<()> {
     Ok(())
 }
 
-/// Configure execution timeout (edit-in-place with current as default)
-fn configure_timeout(config: &mut Config) -> Result<()> {
+/// Execute the change timeout action (exits raw mode for input).
+fn execute_change_timeout(config: &mut Config) -> Result<()> {
     let chars = BoxChars::get();
-
-    println!("{}", colorize(chars.vertical, BRAND));
+    let prefix = format!("{} ", colorize(chars.vertical, BRAND));
 
     let current = config.tools.exec.timeout.to_string();
     let input = prompts::prompt_text("Execution timeout (seconds)", Some(&current), true)?;
@@ -359,16 +626,16 @@ fn configure_timeout(config: &mut Config) -> Result<()> {
         Ok(secs) if (5..=600).contains(&secs) => {
             config.tools.exec.timeout = secs;
             println!(
-                "{} {} Timeout set to {}s",
-                colorize(chars.vertical, BRAND),
+                "{}{} Timeout set to {}s",
+                prefix,
                 status_success(),
                 secs
             );
         }
         Ok(_) => {
             println!(
-                "{} {}",
-                colorize(chars.vertical, BRAND),
+                "{}{}",
+                prefix,
                 colorize(
                     "Timeout must be between 5 and 600 seconds, keeping current",
                     WARNING
@@ -377,8 +644,8 @@ fn configure_timeout(config: &mut Config) -> Result<()> {
         }
         Err(_) => {
             println!(
-                "{} {}",
-                colorize(chars.vertical, BRAND),
+                "{}{}",
+                prefix,
                 colorize("Invalid number, keeping current timeout", WARNING)
             );
         }
@@ -386,6 +653,305 @@ fn configure_timeout(config: &mut Config) -> Result<()> {
 
     Ok(())
 }
+
+// ============================================================================
+// Interactive Event Loop
+// ============================================================================
+
+/// Run the interactive tool permissions menu.
+fn run_tool_menu(config: &mut Config) -> Result<()> {
+    let chars = BoxChars::get();
+    let mut menu = ToolMenuState::new();
+    let mut out = io::stdout();
+
+    // Initial render
+    terminal::enable_raw_mode()?;
+    let mut list_lines = render_tool_menu(&mut out, config, &menu, chars)?;
+    render_menu_hint(&mut out, &menu, chars)?;
+
+    loop {
+        let key = read_key()?;
+        match key.code {
+            // Main menu navigation
+            KeyCode::Up | KeyCode::Char('k') if !menu.in_sub_menu => {
+                if menu.cursor > 0 {
+                    menu.cursor -= 1;
+                    if menu.expanded.is_some() && menu.expanded != Some(menu.cursor) {
+                        menu.expanded = None;
+                    }
+                    list_lines = rerender_menu(&mut out, config, &menu, chars, list_lines)?;
+                }
+            }
+            KeyCode::Down | KeyCode::Char('j') if !menu.in_sub_menu => {
+                if menu.cursor < menu.total_main_items() - 1 {
+                    menu.cursor += 1;
+                    if menu.expanded.is_some() && menu.expanded != Some(menu.cursor) {
+                        menu.expanded = None;
+                    }
+                    list_lines = rerender_menu(&mut out, config, &menu, chars, list_lines)?;
+                }
+            }
+            // Sub-menu navigation
+            KeyCode::Up | KeyCode::Char('k') if menu.in_sub_menu => {
+                if menu.sub_cursor > 0 {
+                    menu.sub_cursor -= 1;
+                    list_lines = rerender_menu(&mut out, config, &menu, chars, list_lines)?;
+                }
+            }
+            KeyCode::Down | KeyCode::Char('j') if menu.in_sub_menu => {
+                let sub_actions = get_sub_actions(config, menu.expanded.unwrap());
+                if menu.sub_cursor < sub_actions.len() - 1 {
+                    menu.sub_cursor += 1;
+                    list_lines = rerender_menu(&mut out, config, &menu, chars, list_lines)?;
+                }
+            }
+            // Main menu Enter
+            KeyCode::Enter if !menu.in_sub_menu => {
+                if menu.is_on_done() {
+                    terminal::disable_raw_mode()?;
+                    erase_lines(list_lines + 1)?;
+                    return Ok(());
+                } else {
+                    menu.expanded = Some(menu.cursor);
+                    menu.in_sub_menu = true;
+                    menu.sub_cursor = 0;
+                    list_lines = rerender_menu(&mut out, config, &menu, chars, list_lines)?;
+                }
+            }
+            // Sub-menu Enter
+            KeyCode::Enter if menu.in_sub_menu => {
+                let setting_idx = menu.expanded.unwrap();
+                let sub_actions = get_sub_actions(config, setting_idx);
+                let action = &sub_actions[menu.sub_cursor];
+
+                match action {
+                    ToolSubAction::Close => {
+                        menu.expanded = None;
+                        menu.in_sub_menu = false;
+                        list_lines = rerender_menu(&mut out, config, &menu, chars, list_lines)?;
+                    }
+                    // Immediate actions (no raw mode exit needed)
+                    ToolSubAction::SwitchPreset(preset) => {
+                        apply_preset(config, *preset);
+                        menu.expanded = None;
+                        menu.in_sub_menu = false;
+                        list_lines = rerender_menu(&mut out, config, &menu, chars, list_lines)?;
+                    }
+                    ToolSubAction::ToggleWorkspace => {
+                        config.tools.restrict_to_workspace =
+                            !config.tools.restrict_to_workspace;
+                        list_lines = rerender_menu(&mut out, config, &menu, chars, list_lines)?;
+                    }
+                    ToolSubAction::SwitchAllowlistMode => {
+                        if config.tools.exec.allowed_commands.is_empty() {
+                            // Switch to allowlist mode with default safe commands
+                            config.tools.exec.allowed_commands = vec![
+                                "ls".to_string(),
+                                "cat".to_string(),
+                                "head".to_string(),
+                                "tail".to_string(),
+                                "grep".to_string(),
+                                "find".to_string(),
+                                "wc".to_string(),
+                                "echo".to_string(),
+                                "pwd".to_string(),
+                                "date".to_string(),
+                            ];
+                        } else {
+                            // Switch to deny-list mode
+                            config.tools.exec.allowed_commands = Vec::new();
+                        }
+                        list_lines = rerender_menu(&mut out, config, &menu, chars, list_lines)?;
+                    }
+                    ToolSubAction::RemoveBraveKey => {
+                        config.tools.web.brave_api_key =
+                            config::schema::Secret::new(String::new());
+                        list_lines = rerender_menu(&mut out, config, &menu, chars, list_lines)?;
+                    }
+                    // Input actions (exit raw mode, prompt, re-enter)
+                    ToolSubAction::EditAllowlist => {
+                        terminal::disable_raw_mode()?;
+                        erase_lines(list_lines + 1)?;
+
+                        execute_edit_allowlist(config)?;
+
+                        terminal::enable_raw_mode()?;
+                        list_lines = render_tool_menu(&mut out, config, &menu, chars)?;
+                        render_menu_hint(&mut out, &menu, chars)?;
+                    }
+                    ToolSubAction::ConfigureBraveKey | ToolSubAction::EditBraveKey => {
+                        terminal::disable_raw_mode()?;
+                        erase_lines(list_lines + 1)?;
+
+                        execute_configure_brave_key(config)?;
+
+                        terminal::enable_raw_mode()?;
+                        list_lines = render_tool_menu(&mut out, config, &menu, chars)?;
+                        render_menu_hint(&mut out, &menu, chars)?;
+                    }
+                    ToolSubAction::ChangeTimeout => {
+                        terminal::disable_raw_mode()?;
+                        erase_lines(list_lines + 1)?;
+
+                        execute_change_timeout(config)?;
+
+                        terminal::enable_raw_mode()?;
+                        list_lines = render_tool_menu(&mut out, config, &menu, chars)?;
+                        render_menu_hint(&mut out, &menu, chars)?;
+                    }
+                }
+            }
+            // Esc to collapse
+            KeyCode::Esc if menu.in_sub_menu => {
+                menu.expanded = None;
+                menu.in_sub_menu = false;
+                list_lines = rerender_menu(&mut out, config, &menu, chars, list_lines)?;
+            }
+            _ => {}
+        }
+    }
+}
+
+// ============================================================================
+// Non-TTY Fallback
+// ============================================================================
+
+/// Run a simplified menu for non-TTY environments.
+fn run_tool_menu_fallback(config: &mut Config) -> Result<()> {
+    let chars = BoxChars::get();
+
+    loop {
+        println!("{}", colorize(chars.vertical, BRAND));
+        println!(
+            "{} Select a setting to configure:",
+            colorize(chars.vertical, BRAND)
+        );
+        println!("{}", colorize(chars.vertical, BRAND));
+
+        for (i, setting) in TOOL_SETTINGS.iter().enumerate() {
+            let status = get_setting_status(config, setting.key);
+            println!(
+                "{}  {}. {} — {}",
+                colorize(chars.vertical, BRAND),
+                i + 1,
+                setting.name,
+                colorize(&status, DIM)
+            );
+        }
+
+        println!(
+            "{}  {}. Done",
+            colorize(chars.vertical, BRAND),
+            TOOL_SETTINGS.len() + 1,
+        );
+        println!("{}", colorize(chars.vertical, BRAND));
+
+        let choice = prompts::prompt_text("Enter number", None, true)?;
+        let idx = match choice.parse::<usize>() {
+            Ok(n) if n > 0 && n <= TOOL_SETTINGS.len() + 1 => n - 1,
+            _ => {
+                println!(
+                    "{} Invalid choice. Please enter a number between 1 and {}.",
+                    colorize(chars.vertical, BRAND),
+                    TOOL_SETTINGS.len() + 1
+                );
+                continue;
+            }
+        };
+
+        if idx == TOOL_SETTINGS.len() {
+            return Ok(());
+        }
+
+        match TOOL_SETTINGS[idx].key {
+            "preset" => {
+                let options: Vec<prompts::SelectOption<'_>> = [
+                    ToolsPreset::Strict,
+                    ToolsPreset::Balanced,
+                    ToolsPreset::Permissive,
+                ]
+                .iter()
+                .map(|p| prompts::SelectOption {
+                    label: p.name(),
+                    description: p.description(),
+                })
+                .collect();
+
+                let current = match detect_preset(config) {
+                    ToolsPreset::Strict => 0,
+                    ToolsPreset::Balanced => 1,
+                    ToolsPreset::Permissive => 2,
+                };
+
+                let sel = prompts::prompt_select("Select preset", &options, current)?;
+                let preset = [ToolsPreset::Strict, ToolsPreset::Balanced, ToolsPreset::Permissive][sel];
+                apply_preset(config, preset);
+            }
+            "workspace" => {
+                let restrict = prompts::prompt_yes_no(
+                    "Restrict to workspace?",
+                    config.tools.restrict_to_workspace,
+                )?;
+                config.tools.restrict_to_workspace = restrict;
+            }
+            "allowlist" => {
+                execute_edit_allowlist(config)?;
+            }
+            "brave_api" => {
+                execute_configure_brave_key(config)?;
+            }
+            "timeout" => {
+                execute_change_timeout(config)?;
+            }
+            _ => {}
+        }
+    }
+}
+
+// ============================================================================
+// Public Entry Point
+// ============================================================================
+
+/// Run the tools configuration wizard step.
+/// Returns true if tools were configured, false if skipped.
+pub fn configure_tools(config: &mut Config) -> Result<bool> {
+    let chars = BoxChars::get();
+
+    // Show current status summary
+    let preset = detect_preset(config);
+    println!(
+        "{} Current: {} preset, timeout {}s, workspace restriction {}",
+        colorize(chars.vertical, BRAND),
+        colorize(preset.name(), BOLD),
+        colorize(&config.tools.exec.timeout.to_string(), DIM),
+        if config.tools.restrict_to_workspace {
+            colorize("on", SUCCESS)
+        } else {
+            colorize("off", WARNING)
+        }
+    );
+    println!("{}", colorize(chars.vertical, BRAND));
+
+    // Run interactive menu (TTY) or fallback (non-TTY)
+    if io::stdin().is_terminal() && io::stdout().is_terminal() {
+        run_tool_menu(config)?;
+    } else {
+        run_tool_menu_fallback(config)?;
+    }
+
+    println!("{}", colorize(chars.vertical, BRAND));
+    println!(
+        "{} {} Tools configuration complete",
+        colorize(chars.vertical, BRAND),
+        status_success()
+    );
+
+    Ok(true)
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
 
 #[cfg(test)]
 mod tests {
@@ -450,21 +1016,21 @@ mod tests {
     #[test]
     fn test_detect_preset_default_is_balanced() {
         let config = Config::default();
-        assert_eq!(detect_preset(&config), 1); // Balanced
+        assert_eq!(detect_preset(&config), ToolsPreset::Balanced);
     }
 
     #[test]
     fn test_detect_preset_strict() {
         let mut config = Config::default();
         apply_preset(&mut config, ToolsPreset::Strict);
-        assert_eq!(detect_preset(&config), 0); // Strict
+        assert_eq!(detect_preset(&config), ToolsPreset::Strict);
     }
 
     #[test]
     fn test_detect_preset_permissive() {
         let mut config = Config::default();
         apply_preset(&mut config, ToolsPreset::Permissive);
-        assert_eq!(detect_preset(&config), 2); // Permissive
+        assert_eq!(detect_preset(&config), ToolsPreset::Permissive);
     }
 
     // ========================================================================
@@ -652,5 +1218,217 @@ mod tests {
             .exec
             .allowed_commands
             .contains(&"ls".to_string()));
+    }
+
+    // ========================================================================
+    // Setting info tests
+    // ========================================================================
+
+    #[test]
+    fn test_tool_settings_count() {
+        assert_eq!(TOOL_SETTINGS.len(), 5);
+    }
+
+    #[test]
+    fn test_tool_settings_keys_unique() {
+        let keys: Vec<&str> = TOOL_SETTINGS.iter().map(|s| s.key).collect();
+        let mut unique = keys.clone();
+        unique.sort();
+        unique.dedup();
+        assert_eq!(keys.len(), unique.len());
+    }
+
+    #[test]
+    fn test_get_setting_status_preset() {
+        let config = Config::default();
+        assert_eq!(get_setting_status(&config, "preset"), "Balanced");
+    }
+
+    #[test]
+    fn test_get_setting_status_workspace() {
+        let mut config = Config::default();
+        config.tools.restrict_to_workspace = true;
+        assert_eq!(get_setting_status(&config, "workspace"), "enabled");
+
+        config.tools.restrict_to_workspace = false;
+        assert_eq!(get_setting_status(&config, "workspace"), "disabled");
+    }
+
+    #[test]
+    fn test_get_setting_status_allowlist_empty() {
+        let config = Config::default();
+        assert_eq!(get_setting_status(&config, "allowlist"), "deny-list mode");
+    }
+
+    #[test]
+    fn test_get_setting_status_allowlist_with_commands() {
+        let mut config = Config::default();
+        apply_preset(&mut config, ToolsPreset::Strict);
+        assert_eq!(get_setting_status(&config, "allowlist"), "10 commands");
+    }
+
+    #[test]
+    fn test_get_setting_status_timeout() {
+        let config = Config::default();
+        assert_eq!(get_setting_status(&config, "timeout"), "60s");
+    }
+
+    #[test]
+    fn test_get_setting_status_brave_not_configured() {
+        let config = Config::default();
+        assert_eq!(get_setting_status(&config, "brave_api"), "not configured");
+    }
+
+    #[test]
+    fn test_get_setting_status_brave_configured() {
+        let mut config = Config::default();
+        config.tools.web.brave_api_key =
+            config::schema::Secret::new("BSA-test-key-12345".to_string());
+        let status = get_setting_status(&config, "brave_api");
+        assert!(status.starts_with("configured"));
+    }
+
+    // ========================================================================
+    // Sub-action generation tests
+    // ========================================================================
+
+    #[test]
+    fn test_preset_sub_actions_exclude_current() {
+        let config = Config::default(); // Balanced
+        let actions = get_sub_actions(&config, 0); // preset
+        // Should have Strict, Permissive, Close (not Balanced)
+        assert_eq!(actions.len(), 3);
+        assert!(actions.contains(&ToolSubAction::SwitchPreset(ToolsPreset::Strict)));
+        assert!(actions.contains(&ToolSubAction::SwitchPreset(ToolsPreset::Permissive)));
+        assert!(actions.contains(&ToolSubAction::Close));
+    }
+
+    #[test]
+    fn test_workspace_sub_actions() {
+        let config = Config::default();
+        let actions = get_sub_actions(&config, 1); // workspace
+        assert_eq!(actions.len(), 2);
+        assert!(actions.contains(&ToolSubAction::ToggleWorkspace));
+        assert!(actions.contains(&ToolSubAction::Close));
+    }
+
+    #[test]
+    fn test_allowlist_sub_actions_deny_list_mode() {
+        let config = Config::default(); // empty allowlist = deny-list
+        let actions = get_sub_actions(&config, 2); // allowlist
+        assert_eq!(actions.len(), 2);
+        assert!(actions.contains(&ToolSubAction::SwitchAllowlistMode));
+        assert!(actions.contains(&ToolSubAction::Close));
+    }
+
+    #[test]
+    fn test_allowlist_sub_actions_allowlist_mode() {
+        let mut config = Config::default();
+        apply_preset(&mut config, ToolsPreset::Strict); // has commands
+        let actions = get_sub_actions(&config, 2); // allowlist
+        assert_eq!(actions.len(), 3);
+        assert!(actions.contains(&ToolSubAction::EditAllowlist));
+        assert!(actions.contains(&ToolSubAction::SwitchAllowlistMode));
+        assert!(actions.contains(&ToolSubAction::Close));
+    }
+
+    #[test]
+    fn test_brave_sub_actions_not_configured() {
+        let config = Config::default();
+        let actions = get_sub_actions(&config, 3); // brave_api
+        assert_eq!(actions.len(), 2);
+        assert!(actions.contains(&ToolSubAction::ConfigureBraveKey));
+        assert!(actions.contains(&ToolSubAction::Close));
+    }
+
+    #[test]
+    fn test_brave_sub_actions_configured() {
+        let mut config = Config::default();
+        config.tools.web.brave_api_key =
+            config::schema::Secret::new("BSA-test-key".to_string());
+        let actions = get_sub_actions(&config, 3); // brave_api
+        assert_eq!(actions.len(), 3);
+        assert!(actions.contains(&ToolSubAction::EditBraveKey));
+        assert!(actions.contains(&ToolSubAction::RemoveBraveKey));
+        assert!(actions.contains(&ToolSubAction::Close));
+    }
+
+    #[test]
+    fn test_timeout_sub_actions() {
+        let config = Config::default();
+        let actions = get_sub_actions(&config, 4); // timeout
+        assert_eq!(actions.len(), 2);
+        assert!(actions.contains(&ToolSubAction::ChangeTimeout));
+        assert!(actions.contains(&ToolSubAction::Close));
+    }
+
+    // ========================================================================
+    // Menu state tests
+    // ========================================================================
+
+    #[test]
+    fn test_menu_state_initial() {
+        let menu = ToolMenuState::new();
+        assert_eq!(menu.cursor, 0);
+        assert!(menu.expanded.is_none());
+        assert_eq!(menu.sub_cursor, 0);
+        assert!(!menu.in_sub_menu);
+    }
+
+    #[test]
+    fn test_menu_state_total_items() {
+        let menu = ToolMenuState::new();
+        assert_eq!(menu.total_main_items(), 6); // 5 settings + Done
+    }
+
+    #[test]
+    fn test_menu_state_is_on_done() {
+        let mut menu = ToolMenuState::new();
+        assert!(!menu.is_on_done());
+        menu.cursor = TOOL_SETTINGS.len();
+        assert!(menu.is_on_done());
+    }
+
+    // ========================================================================
+    // Icon tests
+    // ========================================================================
+
+    #[test]
+    fn test_setting_icon_preset_always_star() {
+        let config = Config::default();
+        let (icon, _) = get_setting_icon(&config, "preset");
+        assert_eq!(icon, "★");
+    }
+
+    #[test]
+    fn test_setting_icon_workspace_enabled() {
+        let mut config = Config::default();
+        config.tools.restrict_to_workspace = true;
+        let (icon, _) = get_setting_icon(&config, "workspace");
+        assert_eq!(icon, "✓");
+    }
+
+    #[test]
+    fn test_setting_icon_workspace_disabled() {
+        let mut config = Config::default();
+        config.tools.restrict_to_workspace = false;
+        let (icon, _) = get_setting_icon(&config, "workspace");
+        assert_eq!(icon, "○");
+    }
+
+    #[test]
+    fn test_setting_icon_brave_not_configured() {
+        let config = Config::default();
+        let (icon, _) = get_setting_icon(&config, "brave_api");
+        assert_eq!(icon, "○");
+    }
+
+    #[test]
+    fn test_setting_icon_brave_configured() {
+        let mut config = Config::default();
+        config.tools.web.brave_api_key =
+            config::schema::Secret::new("BSA-test".to_string());
+        let (icon, _) = get_setting_icon(&config, "brave_api");
+        assert_eq!(icon, "✓");
     }
 }

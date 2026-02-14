@@ -59,10 +59,28 @@ impl WizardModule for ToolsModule {
     }
 }
 
+/// Adapter wrapping [`workspace::configure_workspace`] as a [`WizardModule`].
+struct WorkspaceModule;
+
+impl WizardModule for WorkspaceModule {
+    fn name(&self) -> &str {
+        "Workspace & Notifications"
+    }
+
+    fn description(&self) -> &str {
+        "Create workspace and configure notification preferences"
+    }
+
+    fn run(&self, state: &mut WizardState) -> Result<StepResult> {
+        workspace::configure_workspace(&mut state.config)?;
+        Ok(StepResult::Next)
+    }
+}
+
 /// Run the interactive onboarding wizard.
 ///
 /// Orchestrates all wizard modules in sequence with forward/back navigation.
-/// The channels step is handled inline because it requires async I/O (OAuth).
+/// The channels and calendar steps are handled inline because they require async I/O.
 pub async fn run_wizard() -> Result<()> {
     // Print global branding header at the very top
     print_wizard_header();
@@ -81,8 +99,7 @@ pub async fn run_wizard() -> Result<()> {
             false,
             daemon::DaemonModule.is_applicable(&state),
         ),
-        ("Workspace Setup", true, true),
-        ("Todo Notifications", false, true),
+        ("Workspace & Notifications", true, true),
         ("Calendar Sync", false, true),
     ];
 
@@ -106,7 +123,7 @@ pub async fn run_wizard() -> Result<()> {
         print_step_header(&state, name, required);
 
         // Dispatch to the right module. Step indices correspond to `all_steps`:
-        // 0=welcome, 1=provider, 2=channels (async), 3=tools, 4=daemon, 5=workspace, 6=todo_notifications, 7=calendar.
+        // 0=welcome, 1=provider, 2=channels (async), 3=tools, 4=daemon, 5=workspace+notifications, 6=calendar (async).
         // Ctrl+C in raw-mode prompts surfaces as an Err containing "Ctrl+C".
         let result = match match step_idx {
             0 => welcome::WelcomeModule.run(&mut state),
@@ -114,9 +131,8 @@ pub async fn run_wizard() -> Result<()> {
             2 => run_channels_step(&mut state).await,
             3 => ToolsModule.run(&mut state),
             4 => daemon::DaemonModule.run(&mut state),
-            5 => workspace::WorkspaceModule.run(&mut state),
-            6 => todo_notifications::run_todo_notification_step(&mut state),
-            7 => calendar::run_calendar_step(&mut state),
+            5 => WorkspaceModule.run(&mut state),
+            6 => run_calendar_step(&mut state).await,
             _ => unreachable!(),
         } {
             Ok(r) => r,
@@ -152,6 +168,14 @@ pub async fn run_wizard() -> Result<()> {
 /// No y/n gate — always shows channel configuration with current state.
 async fn run_channels_step(state: &mut WizardState) -> Result<StepResult> {
     channels::configure_channels(&mut state.config).await?;
+    Ok(StepResult::Next)
+}
+
+/// Calendar wizard step (async due to connection testing).
+///
+/// No y/n gate — always shows calendar configuration with current state.
+async fn run_calendar_step(state: &mut WizardState) -> Result<StepResult> {
+    calendar::configure_calendars(&mut state.config).await?;
     Ok(StepResult::Next)
 }
 
@@ -431,7 +455,7 @@ mod tests {
         let provider_mod = provider::ProviderModule;
         let tools_mod = ToolsModule;
         let daemon_mod = daemon::DaemonModule;
-        let workspace_mod = workspace::WorkspaceModule;
+        let workspace_mod = WorkspaceModule;
 
         let applicables: Vec<bool> = vec![
             welcome.is_applicable(&state),
@@ -440,12 +464,13 @@ mod tests {
             tools_mod.is_applicable(&state),
             daemon_mod.is_applicable(&state),
             workspace_mod.is_applicable(&state),
+            true, // calendar
         ];
 
         let count = applicables.iter().filter(|a| **a).count();
-        // On macOS/Linux daemon is applicable, so all 6 steps.
-        // On unknown platforms it would be 5.
-        assert!(count >= 5, "Should have at least 5 applicable steps");
-        assert!(count <= 6, "Should have at most 6 steps");
+        // On macOS/Linux daemon is applicable, so all 7 steps.
+        // On unknown platforms it would be 6.
+        assert!(count >= 6, "Should have at least 6 applicable steps");
+        assert!(count <= 7, "Should have at most 7 steps");
     }
 }
