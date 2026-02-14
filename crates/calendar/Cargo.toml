@@ -1,0 +1,36 @@
+[package]
+name = "calendar"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Workspace crates
+common = { path = "../common" }
+config = { path = "../config" }
+
+# Time handling
+chrono = { version = "0.4", features = ["serde"] }
+
+# HTTP client for CalDAV
+reqwest = { workspace = true }
+
+# XML parsing for CalDAV responses
+quick-xml = "0.36"
+
+# Data structures
+uuid = { version = "1.0", features = ["v4", "serde"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Async runtime
+tokio = { version = "1", features = ["fs", "io-util"] }
+
+# Logging
+tracing = "0.1"
+
+# Directories
+dirs = "6.0"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full", "test-util"] }
+tempfile = "3.0"
