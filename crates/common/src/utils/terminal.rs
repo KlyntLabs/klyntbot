@@ -15,6 +15,7 @@ use std::io::{self, IsTerminal, Write};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
+use unicode_width::UnicodeWidthChar;
 
 // ============================================================================
 // Color Scheme (ANSI Codes)
@@ -101,6 +102,41 @@ pub fn colorize(text: &str, code: &str) -> String {
         format!("{}{}{}", code, text, RESET)
     } else {
         text.to_string()
+    }
+}
+
+/// Calculates the visible display width of a string, ignoring ANSI escape codes
+/// and using Unicode character widths for proper terminal column counting.
+pub fn display_width(s: &str) -> usize {
+    let mut width = 0;
+    let mut in_escape = false;
+
+    for ch in s.chars() {
+        if in_escape {
+            // End of ANSI escape sequence
+            if ch.is_ascii_alphabetic() {
+                in_escape = false;
+            }
+            continue;
+        }
+        if ch == '\x1b' {
+            in_escape = true;
+            continue;
+        }
+        width += UnicodeWidthChar::width(ch).unwrap_or(0);
+    }
+
+    width
+}
+
+/// Pads a string with spaces to reach the target display width.
+/// Accounts for ANSI codes and Unicode character widths.
+pub fn pad_to_width(s: &str, target: usize) -> String {
+    let current = display_width(s);
+    if current >= target {
+        s.to_string()
+    } else {
+        format!("{}{}", s, " ".repeat(target - current))
     }
 }
 
@@ -704,12 +740,12 @@ pub fn draw_table(headers: &[&str], rows: &[Vec<String>]) -> String {
 
     let chars = BoxChars::get();
 
-    // Calculate column widths
-    let mut widths: Vec<usize> = headers.iter().map(|h| h.len()).collect();
+    // Calculate column widths using display width (Unicode-aware)
+    let mut widths: Vec<usize> = headers.iter().map(|h| display_width(h)).collect();
     for row in rows {
         for (i, cell) in row.iter().enumerate() {
             if i < widths.len() {
-                widths[i] = widths[i].max(cell.len());
+                widths[i] = widths[i].max(display_width(cell));
             }
         }
     }
@@ -732,11 +768,11 @@ pub fn draw_table(headers: &[&str], rows: &[Vec<String>]) -> String {
     // Header row
     result.push_str(&colorize(chars.vertical, SEPARATOR));
     for (i, header) in headers.iter().enumerate() {
+        let colored = colorize(header, BOLD);
         result.push_str(&format!(
-            " {:<width$} {}",
-            colorize(header, BOLD),
+            " {} {}",
+            pad_to_width(&colored, widths[i]),
             &colorize(chars.vertical, SEPARATOR),
-            width = widths[i]
         ));
     }
     result.push('\n');
@@ -760,10 +796,9 @@ pub fn draw_table(headers: &[&str], rows: &[Vec<String>]) -> String {
         for (i, cell) in row.iter().enumerate() {
             let width = widths.get(i).copied().unwrap_or(0);
             result.push_str(&format!(
-                " {:<width$} {}",
-                cell,
+                " {} {}",
+                pad_to_width(cell, width),
                 &colorize(chars.vertical, SEPARATOR),
-                width = width
             ));
         }
         result.push('\n');
@@ -828,6 +863,8 @@ impl MarkdownRenderer {
         let mut in_code_block = false;
         let mut code_block_lang = String::new();
         let mut code_block_content = String::new();
+        let mut in_table = false;
+        let mut table_lines: Vec<String> = Vec::new();
 
         for line in markdown.lines() {
             // Handle code blocks
@@ -858,6 +895,21 @@ impl MarkdownRenderer {
                 code_block_content.push_str(line);
                 code_block_content.push('\n');
                 continue;
+            }
+
+            // Handle table lines
+            if line.trim_start().starts_with('|') {
+                in_table = true;
+                table_lines.push(line.to_string());
+                continue;
+            }
+
+            // Flush table if we were in one and hit a non-table line
+            if in_table {
+                result.push_str(&Self::flush_table(&table_lines));
+                result.push('\n');
+                table_lines.clear();
+                in_table = false;
             }
 
             // Handle blockquotes
@@ -913,7 +965,51 @@ impl MarkdownRenderer {
             }
         }
 
+        // Flush any remaining table at the end
+        if in_table {
+            result.push_str(&Self::flush_table(&table_lines));
+            result.push('\n');
+        }
+
         result
+    }
+
+    /// Parses accumulated markdown table lines and renders them via `draw_table()`
+    fn flush_table(table_lines: &[String]) -> String {
+        if table_lines.is_empty() {
+            return String::new();
+        }
+
+        // Parse cells from a table row: split by |, trim, drop empty leading/trailing
+        let parse_row = |line: &str| -> Vec<String> {
+            line.split('|')
+                .map(|cell| cell.trim().to_string())
+                .filter(|cell| !cell.is_empty())
+                .collect()
+        };
+
+        // First row is headers
+        let headers = parse_row(&table_lines[0]);
+        if headers.is_empty() {
+            return table_lines.join("\n");
+        }
+
+        // Collect data rows, skipping the separator line (contains only dashes/colons)
+        let mut rows: Vec<Vec<String>> = Vec::new();
+        for line in &table_lines[1..] {
+            let cells = parse_row(line);
+            // Skip separator lines like |---|---|
+            let is_separator = cells
+                .iter()
+                .all(|c| c.chars().all(|ch| ch == '-' || ch == ':' || ch == ' '));
+            if is_separator {
+                continue;
+            }
+            rows.push(cells);
+        }
+
+        let header_refs: Vec<&str> = headers.iter().map(|s| s.as_str()).collect();
+        draw_table(&header_refs, &rows)
     }
 
     /// Renders inline markdown formatting (bold, italic, code, links)
@@ -1351,6 +1447,21 @@ mod tests {
         let output = MarkdownRenderer::render(md);
         // Should render empty box
         assert!(output.contains("+"));
+        env::remove_var("NO_COLOR");
+    }
+
+    #[test]
+    fn test_markdown_table() {
+        env::set_var("NO_COLOR", "1");
+        let md = "| Name | Age |\n|------|-----|\n| Alice | 30 |\n| Bob | 25 |";
+        let output = MarkdownRenderer::render(md);
+        // Should contain data from draw_table, not raw pipes
+        assert!(output.contains("Alice"));
+        assert!(output.contains("Bob"));
+        assert!(output.contains("Name"));
+        // Should use box drawing chars (ASCII in NO_COLOR mode)
+        assert!(output.contains("+"));
+        assert!(!output.contains("|---"));
         env::remove_var("NO_COLOR");
     }
 }

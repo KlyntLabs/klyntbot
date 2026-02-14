@@ -63,6 +63,7 @@ mime_guess = "2.0.5"
 urlencoding = "2.1"
 futures-util = "0.3.31"
 crossterm = "0.28"
+unicode-width = "0.2"
 tokio-util = "0.7"
 tempfile = "3.14"
 
