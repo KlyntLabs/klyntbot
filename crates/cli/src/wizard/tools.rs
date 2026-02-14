@@ -6,6 +6,8 @@
 //! - Shell command allowlist editing
 //! - Brave Search API key
 //! - Execution timeout
+//!
+//! On reconfiguration, all fields show current values as defaults.
 
 use std::io::{self, Write};
 
@@ -33,25 +35,68 @@ impl ToolsPreset {
     }
 }
 
+/// Detect the current preset from config values.
+fn detect_preset(config: &Config) -> usize {
+    if config.tools.restrict_to_workspace
+        && !config.tools.exec.allowed_commands.is_empty()
+        && config.tools.exec.timeout <= 30
+    {
+        0 // Strict
+    } else if !config.tools.restrict_to_workspace && config.tools.exec.timeout >= 120 {
+        2 // Permissive
+    } else {
+        1 // Balanced
+    }
+}
+
 /// Run the tools configuration wizard step.
 /// Returns true if tools were configured, false if skipped.
 pub fn configure_tools(config: &mut Config) -> Result<bool> {
     let chars = BoxChars::get();
 
-    let wants_config = prompts::prompt_yes_no("Configure tool permissions?", false)?;
-    if !wants_config {
-        println!(
-            "{} {} Using default tools configuration (balanced)",
-            colorize(chars.vertical, BRAND),
-            status_success()
-        );
-        return Ok(false);
-    }
-
+    // Show current status
+    let presets = [
+        ToolsPreset::Strict,
+        ToolsPreset::Balanced,
+        ToolsPreset::Permissive,
+    ];
+    let current_preset_idx = detect_preset(config);
+    let preset_name = match current_preset_idx {
+        0 => "Strict",
+        2 => "Permissive",
+        _ => "Balanced",
+    };
+    println!(
+        "{} Current: {} preset, timeout {}s, workspace restriction {}",
+        colorize(chars.vertical, BRAND),
+        colorize(preset_name, BOLD),
+        colorize(&config.tools.exec.timeout.to_string(), DIM),
+        if config.tools.restrict_to_workspace {
+            colorize("on", SUCCESS)
+        } else {
+            colorize("off", WARNING)
+        }
+    );
     println!("{}", colorize(chars.vertical, BRAND));
 
-    // Step 1: Choose preset profile
-    let preset = select_preset()?;
+    // Step 1: Choose preset profile (pre-select current)
+    let options: Vec<SelectOption<'_>> = presets
+        .iter()
+        .map(|p| {
+            let label = match p {
+                ToolsPreset::Strict => "Strict",
+                ToolsPreset::Balanced => "Balanced",
+                ToolsPreset::Permissive => "Permissive",
+            };
+            SelectOption {
+                label,
+                description: p.description(),
+            }
+        })
+        .collect();
+
+    let idx = prompts::prompt_select("Select a security preset", &options, current_preset_idx)?;
+    let preset = presets[idx];
     apply_preset(config, preset);
     println!(
         "{} {} Applied {} preset",
@@ -64,7 +109,7 @@ pub fn configure_tools(config: &mut Config) -> Result<bool> {
         }
     );
 
-    // Step 2: Fine-tune workspace restriction
+    // Step 2: Fine-tune workspace restriction (default from preset)
     println!("{}", colorize(chars.vertical, BRAND));
     let restrict = prompts::prompt_yes_no(
         "Restrict file/exec tools to workspace directory?",
@@ -90,10 +135,10 @@ pub fn configure_tools(config: &mut Config) -> Result<bool> {
     // Step 3: Shell command allowlist
     configure_allowlist(config)?;
 
-    // Step 4: Brave Search API key (optional)
+    // Step 4: Brave Search API key (edit-in-place)
     configure_brave_api(config)?;
 
-    // Step 5: Execution timeout
+    // Step 5: Execution timeout (edit-in-place)
     configure_timeout(config)?;
 
     println!("{}", colorize(chars.vertical, BRAND));
@@ -104,33 +149,6 @@ pub fn configure_tools(config: &mut Config) -> Result<bool> {
     );
 
     Ok(true)
-}
-
-/// Select a security preset profile using interactive select
-fn select_preset() -> Result<ToolsPreset> {
-    let presets = [
-        ToolsPreset::Strict,
-        ToolsPreset::Balanced,
-        ToolsPreset::Permissive,
-    ];
-
-    let options: Vec<SelectOption<'_>> = presets
-        .iter()
-        .map(|p| {
-            let label = match p {
-                ToolsPreset::Strict => "Strict",
-                ToolsPreset::Balanced => "Balanced",
-                ToolsPreset::Permissive => "Permissive",
-            };
-            SelectOption {
-                label,
-                description: p.description(),
-            }
-        })
-        .collect();
-
-    let idx = prompts::prompt_select("Select a security preset", &options, 1)?;
-    Ok(presets[idx])
 }
 
 /// Apply a preset profile to the config
@@ -191,7 +209,7 @@ fn configure_allowlist(config: &mut Config) -> Result<()> {
             colorize(chars.vertical, BRAND),
             colorize(&config.tools.exec.allowed_commands.join(", "), DIM)
         );
-        let modify = prompts::prompt_yes_no("Modify the command allowlist?", true)?;
+        let modify = prompts::prompt_yes_no("Modify the command allowlist?", false)?;
         if !modify {
             return Ok(());
         }
@@ -268,138 +286,105 @@ fn configure_allowlist(config: &mut Config) -> Result<()> {
     Ok(())
 }
 
-/// Configure Brave Search API key
+/// Configure Brave Search API key (edit-in-place with masked preview)
 fn configure_brave_api(config: &mut Config) -> Result<()> {
     let chars = BoxChars::get();
-
-    let has_key = !config.tools.web.brave_api_key.is_empty();
-    let prompt = if has_key {
-        "Update Brave Search API key?"
-    } else {
-        "Configure Brave Search API key? (enables web_search tool)"
-    };
-
     println!("{}", colorize(chars.vertical, BRAND));
-    let wants_api = prompts::prompt_yes_no(prompt, false)?;
-    if !wants_api {
-        if has_key {
-            println!(
-                "{} {} Brave API key unchanged",
-                colorize(chars.vertical, BRAND),
-                status_success()
-            );
-        } else {
+
+    let existing_key = config.tools.web.brave_api_key.expose().clone();
+
+    if existing_key.is_empty() {
+        // No existing key - ask if they want to add one
+        let wants_api = prompts::prompt_yes_no(
+            "Configure Brave Search API key? (enables web_search tool)",
+            false,
+        )?;
+        if !wants_api {
             println!(
                 "{} {} Web search disabled {}",
                 colorize(chars.vertical, BRAND),
                 status_disabled(),
                 colorize("(no API key)", DIM)
             );
-        }
-        return Ok(());
-    }
-
-    println!(
-        "{} Get yours at: {}",
-        colorize(chars.vertical, BRAND),
-        colorize("https://brave.com/search/api/", UNDERLINE)
-    );
-
-    loop {
-        print!("{} API Key: ", colorize(chars.vertical, BRAND));
-        io::stdout().flush()?;
-
-        let mut input = String::new();
-        io::stdin().read_line(&mut input)?;
-        let input = input.trim().to_string();
-
-        if input.is_empty() {
-            println!(
-                "{} {} Skipped",
-                colorize(chars.vertical, BRAND),
-                status_disabled()
-            );
             return Ok(());
         }
 
-        if input.len() < 10 {
-            println!(
-                "{} {}",
-                colorize(chars.vertical, BRAND),
-                colorize("API key seems too short, try again", WARNING)
-            );
-            continue;
-        }
+        println!(
+            "{} Get yours at: {}",
+            colorize(chars.vertical, BRAND),
+            colorize("https://brave.com/search/api/", UNDERLINE)
+        );
 
-        config.tools.web.brave_api_key = config::schema::Secret::new(input);
+        let key = prompts::prompt_secret("Brave API Key", 10)?;
+        config.tools.web.brave_api_key = config::schema::Secret::new(key);
         println!(
             "{} {} Brave Search API key configured",
             colorize(chars.vertical, BRAND),
             status_success()
         );
-        return Ok(());
+    } else {
+        // Has existing key - edit-in-place
+        match prompts::prompt_secret_with_existing("Brave API Key", &existing_key, 10)? {
+            Some(new_key) => {
+                config.tools.web.brave_api_key = config::schema::Secret::new(new_key);
+                println!(
+                    "{} {} Brave Search API key updated",
+                    colorize(chars.vertical, BRAND),
+                    status_success()
+                );
+            }
+            None => {
+                println!(
+                    "{} {} Brave API key unchanged",
+                    colorize(chars.vertical, BRAND),
+                    status_success()
+                );
+            }
+        }
     }
+
+    Ok(())
 }
 
-/// Configure execution timeout
+/// Configure execution timeout (edit-in-place with current as default)
 fn configure_timeout(config: &mut Config) -> Result<()> {
     let chars = BoxChars::get();
 
     println!("{}", colorize(chars.vertical, BRAND));
-    println!(
-        "{} Current timeout: {}s",
-        colorize(chars.vertical, BRAND),
-        colorize(&config.tools.exec.timeout.to_string(), BOLD)
-    );
 
-    let modify = prompts::prompt_yes_no("Change execution timeout?", false)?;
-    if !modify {
-        return Ok(());
-    }
+    let current = config.tools.exec.timeout.to_string();
+    let input = prompts::prompt_text("Execution timeout (seconds)", Some(&current), true)?;
 
-    loop {
-        print!(
-            "{} Timeout in seconds [{}]: ",
-            colorize(chars.vertical, BRAND),
-            config.tools.exec.timeout
-        );
-        io::stdout().flush()?;
-
-        let mut input = String::new();
-        io::stdin().read_line(&mut input)?;
-        let input = input.trim();
-
-        if input.is_empty() {
-            return Ok(());
+    match input.parse::<u64>() {
+        Ok(secs) if (5..=600).contains(&secs) => {
+            config.tools.exec.timeout = secs;
+            println!(
+                "{} {} Timeout set to {}s",
+                colorize(chars.vertical, BRAND),
+                status_success(),
+                secs
+            );
         }
-
-        match input.parse::<u64>() {
-            Ok(secs) if (5..=600).contains(&secs) => {
-                config.tools.exec.timeout = secs;
-                println!(
-                    "{} {} Timeout set to {}s",
-                    colorize(chars.vertical, BRAND),
-                    status_success(),
-                    secs
-                );
-                return Ok(());
-            }
-            Ok(_) => {
-                println!(
-                    "{} {}",
-                    colorize(chars.vertical, BRAND),
-                    colorize("Timeout must be between 5 and 600 seconds", ERROR)
-                );
-            }
-            Err(_) => {
-                println!(
-                    "{} {}",
-                    colorize(chars.vertical, BRAND),
-                    colorize("Please enter a number", ERROR)
-                );
-            }
+        Ok(_) => {
+            println!(
+                "{} {}",
+                colorize(chars.vertical, BRAND),
+                colorize(
+                    "Timeout must be between 5 and 600 seconds, keeping current",
+                    WARNING
+                )
+            );
+        }
+        Err(_) => {
+            println!(
+                "{} {}",
+                colorize(chars.vertical, BRAND),
+                colorize("Invalid number, keeping current timeout", WARNING)
+            );
         }
     }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -453,10 +438,33 @@ mod tests {
 
     #[test]
     fn test_preset_descriptions() {
-        // Ensure all presets have non-empty descriptions
         assert!(!ToolsPreset::Strict.description().is_empty());
         assert!(!ToolsPreset::Balanced.description().is_empty());
         assert!(!ToolsPreset::Permissive.description().is_empty());
+    }
+
+    // ========================================================================
+    // Detect preset tests
+    // ========================================================================
+
+    #[test]
+    fn test_detect_preset_default_is_balanced() {
+        let config = Config::default();
+        assert_eq!(detect_preset(&config), 1); // Balanced
+    }
+
+    #[test]
+    fn test_detect_preset_strict() {
+        let mut config = Config::default();
+        apply_preset(&mut config, ToolsPreset::Strict);
+        assert_eq!(detect_preset(&config), 0); // Strict
+    }
+
+    #[test]
+    fn test_detect_preset_permissive() {
+        let mut config = Config::default();
+        apply_preset(&mut config, ToolsPreset::Permissive);
+        assert_eq!(detect_preset(&config), 2); // Permissive
     }
 
     // ========================================================================
@@ -516,12 +524,10 @@ mod tests {
     fn test_preset_transition_strict_to_permissive() {
         let mut config = Config::default();
 
-        // Start strict
         apply_preset(&mut config, ToolsPreset::Strict);
         assert!(config.tools.restrict_to_workspace);
         assert!(!config.tools.exec.allowed_commands.is_empty());
 
-        // Switch to permissive
         apply_preset(&mut config, ToolsPreset::Permissive);
         assert!(!config.tools.restrict_to_workspace);
         assert!(config.tools.exec.allowed_commands.is_empty());
@@ -563,7 +569,6 @@ mod tests {
 
     #[test]
     fn test_preset_descriptions_contain_timeout() {
-        // Each preset description should mention its timeout
         assert!(ToolsPreset::Strict.description().contains("30s"));
         assert!(ToolsPreset::Balanced.description().contains("60s"));
         assert!(ToolsPreset::Permissive.description().contains("120s"));
@@ -573,7 +578,6 @@ mod tests {
     fn test_preset_descriptions_mention_workspace() {
         assert!(ToolsPreset::Strict.description().contains("Workspace"));
         assert!(ToolsPreset::Balanced.description().contains("Workspace"));
-        // Permissive does NOT restrict to workspace
         assert!(ToolsPreset::Permissive
             .description()
             .contains("No workspace"));
@@ -617,7 +621,6 @@ mod tests {
         config.tools.exec.timeout = 120;
         assert_eq!(config.tools.exec.timeout, 120);
 
-        // Verify serialization preserves it
         let json = serde_json::to_string(&config).unwrap();
         let loaded: Config = serde_json::from_str(&json).unwrap();
         assert_eq!(loaded.tools.exec.timeout, 120);

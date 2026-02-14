@@ -54,10 +54,8 @@ impl WizardModule for ToolsModule {
     }
 
     fn run(&self, state: &mut WizardState) -> Result<StepResult> {
-        match tools::configure_tools(&mut state.config)? {
-            true => Ok(StepResult::Next),
-            false => Ok(StepResult::Skip),
-        }
+        tools::configure_tools(&mut state.config)?;
+        Ok(StepResult::Next)
     }
 }
 
@@ -150,24 +148,9 @@ pub async fn run_wizard() -> Result<()> {
 }
 
 /// Channels wizard step (async due to OAuth flows).
+///
+/// No y/n gate — always shows channel configuration with current state.
 async fn run_channels_step(state: &mut WizardState) -> Result<StepResult> {
-    let chars = BoxChars::get();
-
-    let wants = prompts::prompt_yes_no("Enable chat channels?", false)?;
-
-    if !wants {
-        println!(
-            "{}",
-            draw_step_line(&colorize("Channel setup can be done later with:", DIM))
-        );
-        println!(
-            "{}",
-            draw_step_line(&colorize("  klyntbot channels login <channel>", DIM))
-        );
-        println!("{}", colorize(chars.vertical, BRAND));
-        return Ok(StepResult::Skip);
-    }
-
     channels::configure_channels(&mut state.config).await?;
     Ok(StepResult::Next)
 }
@@ -403,6 +386,36 @@ mod tests {
         config.set_provider_key("openai", "sk-openai-key".to_string());
         config.set_provider_key("anthropic", "sk-ant-key".to_string());
         assert_eq!(config.active_provider_name(), "anthropic");
+    }
+
+    #[test]
+    fn test_active_provider_explicit_field() {
+        let mut config = config::Config::default();
+        config.set_provider_key("anthropic", "sk-ant-key".to_string());
+        config.set_provider_key("deepseek", "sk-deepseek-key".to_string());
+        // Without explicit field, anthropic wins by priority
+        assert_eq!(config.active_provider_name(), "anthropic");
+        // With explicit field, deepseek wins
+        config.agents.defaults.provider = Some("deepseek".to_string());
+        assert_eq!(config.active_provider_name(), "deepseek");
+    }
+
+    #[test]
+    fn test_active_provider_explicit_fallback() {
+        let mut config = config::Config::default();
+        config.set_provider_key("openai", "sk-openai-key".to_string());
+        // Explicit provider set but no key for it → falls back to auto-detection
+        config.agents.defaults.provider = Some("anthropic".to_string());
+        assert_eq!(config.active_provider_name(), "openai");
+    }
+
+    #[test]
+    fn test_is_provider_configured() {
+        let mut config = config::Config::default();
+        assert!(!config.is_provider_configured("anthropic"));
+        config.set_provider_key("anthropic", "sk-ant-test".to_string());
+        assert!(config.is_provider_configured("anthropic"));
+        assert!(!config.is_provider_configured("openai"));
     }
 
     // ========================================================================

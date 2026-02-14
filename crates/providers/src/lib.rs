@@ -25,13 +25,30 @@ use config::Config;
 /// Initialize the LLM provider from configuration.
 ///
 /// Resolution order:
-/// 1. Check if model name matches a known provider (e.g., "claude-*" → Anthropic)
-/// 2. Check for gateway providers (OpenRouter, AiHubMix) by api_key prefix or api_base
-/// 3. Fall back to first provider with a non-empty API key
+/// 1. Check explicit provider field (`config.agents.defaults.provider`) if set
+/// 2. Check if model name matches a known provider (e.g., "claude-*" → Anthropic)
+/// 3. Check for gateway providers (OpenRouter, AiHubMix) by api_key prefix or api_base
+/// 4. Fall back to first provider with a non-empty API key
 pub fn create_provider(config: &Config) -> Result<DynProvider> {
     let model = &config.agents.defaults.model;
 
-    // Try to find provider by model name
+    // Priority 1: Explicit provider field
+    if let Some(ref provider_name) = config.agents.defaults.provider {
+        if !provider_name.is_empty() {
+            if let Some(spec) = ProviderRegistry::find_by_name(provider_name) {
+                if let Some(provider) = try_create_from_spec(spec, config, model) {
+                    info!("Using explicitly configured provider: {}", provider_name);
+                    return Ok(provider);
+                }
+                tracing::warn!(
+                    "Provider '{}' configured but API key missing, trying auto-detection",
+                    provider_name
+                );
+            }
+        }
+    }
+
+    // Priority 2: Try to find provider by model name
     if let Some(spec) = ProviderRegistry::find_by_model(model) {
         if let Some(provider) = try_create_from_spec(spec, config, model) {
             return Ok(provider);

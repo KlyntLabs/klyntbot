@@ -1,39 +1,68 @@
 //! Calendar sync configuration wizard step.
 //!
 //! Configures Apple Calendar sync via CalDAV including credentials,
-//! calendar name, and sync interval.
+//! calendar name, and sync interval. On reconfiguration, shows current
+//! values as defaults — Enter to keep.
 
 use anyhow::Result;
 use config::schema::Secret;
 
 use crate::wizard::framework::{StepResult, WizardState};
 use crate::wizard::prompts::{
-    prompt_secret, prompt_select, prompt_text, prompt_yes_no, SelectOption,
+    prompt_secret, prompt_secret_with_existing, prompt_select, prompt_text, SelectOption,
 };
 use common::utils::terminal::*;
 
 /// Run the calendar sync configuration step.
 ///
-/// Prompts the user to:
-/// - Enable/disable Apple Calendar sync
-/// - Enter Apple ID (email)
-/// - Enter app-specific password with instructions
-/// - Choose calendar name
-/// - Select sync interval
-///
-/// All settings are saved to `state.config.calendar`.
+/// Shows enabled/disabled as a select (no y/n gate). When enabled,
+/// all fields show current values as defaults — Enter to keep.
 pub fn run_calendar_step(state: &mut WizardState) -> Result<StepResult> {
     let chars = BoxChars::get();
 
-    // Step 1: Ask if user wants calendar sync
-    if !prompt_yes_no("Enable Apple Calendar sync?", false)? {
-        // User declined - skip configuration
+    // Show current status
+    if state.config.calendar.enabled {
+        println!(
+            "{} {} Calendar sync: {} ({})",
+            colorize(chars.vertical, BRAND),
+            colorize("✓", SUCCESS),
+            colorize("enabled", SUCCESS),
+            colorize(&state.config.calendar.username, DIM)
+        );
+        println!("{}", colorize(chars.vertical, BRAND));
+    }
+
+    println!(
+        "{}",
+        draw_step_line(&colorize(
+            "Apple Calendar (CalDAV) sync with your todos.",
+            DIM
+        ))
+    );
+    println!("{}", colorize(chars.vertical, BRAND));
+
+    // Step 1: Enabled/disabled select
+    let enable_options = vec![
+        SelectOption {
+            label: "Enabled",
+            description: "Sync todos to Apple Calendar",
+        },
+        SelectOption {
+            label: "Disabled",
+            description: "Skip calendar sync",
+        },
+    ];
+
+    let enable_default = if state.config.calendar.enabled { 0 } else { 1 };
+    let enable_idx = prompt_select("Calendar sync", &enable_options, enable_default)?;
+
+    if enable_idx == 1 {
+        // Disabled
+        state.config.calendar.enabled = false;
+        println!("{}", colorize(chars.vertical, BRAND));
         println!(
             "{}",
-            draw_step_line(&colorize(
-                "Calendar sync can be configured later with:",
-                DIM
-            ))
+            draw_step_line(&colorize("Calendar sync can be enabled later with:", DIM))
         );
         println!(
             "{}",
@@ -43,23 +72,44 @@ pub fn run_calendar_step(state: &mut WizardState) -> Result<StepResult> {
             ))
         );
         println!("{}", colorize(chars.vertical, BRAND));
-        return Ok(StepResult::Skip);
+        return Ok(StepResult::Next);
     }
 
-    // Step 2: Prompt for Apple ID (email)
-    let username = prompt_text_with_validation("Apple ID email", None, true, validate_email)?;
+    // Step 2: Apple ID email - edit-in-place
+    let existing_username = &state.config.calendar.username;
+    let username_default = if existing_username.is_empty() {
+        None
+    } else {
+        Some(existing_username.as_str())
+    };
+    let username =
+        prompt_text_with_validation("Apple ID email", username_default, true, validate_email)?;
     state.config.calendar.username = username;
 
-    // Step 3: Prompt for app-specific password with instructions
-    display_password_instructions(chars);
-    let password = prompt_secret("App-specific password", 16)?;
+    // Step 3: App-specific password - edit-in-place
+    let existing_password = state.config.calendar.password.expose().clone();
+    let password = if existing_password.is_empty() {
+        display_password_instructions(chars);
+        prompt_secret("App-specific password", 16)?
+    } else {
+        // Has existing password - allow Enter to keep
+        match prompt_secret_with_existing("App-specific password", &existing_password, 16)? {
+            Some(new_password) => new_password,
+            None => existing_password,
+        }
+    };
     state.config.calendar.password = Secret::new(password);
 
-    // Step 4: Prompt for calendar name
-    let calendar_name = prompt_text("Calendar name", Some("Klyntbot"), false)?;
+    // Step 4: Calendar name - edit-in-place
+    let cal_default = if state.config.calendar.calendar_name.is_empty() {
+        "Klyntbot"
+    } else {
+        &state.config.calendar.calendar_name
+    };
+    let calendar_name = prompt_text("Calendar name", Some(cal_default), false)?;
     state.config.calendar.calendar_name = calendar_name;
 
-    // Step 5: Select sync interval
+    // Step 5: Sync interval - pre-select current
     let interval_options = vec![
         SelectOption {
             label: "1 minute",
@@ -79,20 +129,24 @@ pub fn run_calendar_step(state: &mut WizardState) -> Result<StepResult> {
         },
     ];
 
-    let selected = prompt_select("Sync interval", &interval_options, 1)?; // Default to 5 minutes
+    let interval_default = match state.config.calendar.sync_interval_secs {
+        0..=60 => 0,
+        61..=300 => 1,
+        301..=900 => 2,
+        _ => 3,
+    };
+    let selected = prompt_select("Sync interval", &interval_options, interval_default)?;
 
     let interval_secs = match selected {
-        0 => 60,   // 1 minute
-        1 => 300,  // 5 minutes
-        2 => 900,  // 15 minutes
-        3 => 1800, // 30 minutes
-        _ => 300,  // Fallback to 5 minutes
+        0 => 60,
+        1 => 300,
+        2 => 900,
+        3 => 1800,
+        _ => 300,
     };
 
     state.config.calendar.sync_interval_secs = interval_secs;
     state.config.calendar.enabled = true;
-
-    // Set iCloud CalDAV base URL for auto-discovery
     state.config.calendar.caldav_url = "https://caldav.icloud.com".to_string();
 
     println!("{}", colorize(chars.vertical, BRAND));

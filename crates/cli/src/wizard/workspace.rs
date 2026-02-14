@@ -2,6 +2,8 @@
 //!
 //! Creates the workspace directory structure and template files
 //! (AGENTS.md, SOUL.md, USER.md, TOOLS.md, IDENTITY.md, MEMORY.md).
+//! On reconfiguration, shows workspace path with current as default,
+//! silently creates dirs/templates if missing.
 
 use anyhow::Result;
 use common::utils::terminal::*;
@@ -23,88 +25,43 @@ impl WizardModule for WorkspaceModule {
 
     fn run(&self, state: &mut WizardState) -> Result<StepResult> {
         let chars = BoxChars::get();
-        let workspace = state.config.workspace_path();
+        let current_path = state.config.workspace_path();
 
-        // Check if workspace already exists
-        if workspace.exists() {
-            println!(
-                "{} Workspace already exists at {}",
-                colorize(chars.vertical, BRAND),
-                colorize(&workspace.display().to_string(), DIM)
-            );
-            let recreate = prompts::prompt_yes_no(
-                "Re-create workspace files? (existing files will be preserved)",
-                false,
-            )?;
-            if !recreate {
-                println!(
-                    "{} {} Workspace unchanged",
-                    colorize(chars.vertical, BRAND),
-                    status_success()
-                );
-                return Ok(StepResult::Next);
-            }
-        }
-
-        // Allow custom workspace path
-        let custom = prompts::prompt_yes_no(
-            &format!(
-                "Use default workspace path ({})?",
-                colorize(&workspace.display().to_string(), DIM)
-            ),
+        // Show workspace path with current as default - Enter to keep
+        let new_path = prompts::prompt_text(
+            "Workspace path",
+            Some(&current_path.display().to_string()),
             true,
         )?;
 
-        if !custom {
-            let new_path = prompts::prompt_text(
-                "Workspace path",
-                Some(&workspace.display().to_string()),
-                true,
-            )?;
+        // Update config if path changed
+        if new_path != current_path.display().to_string() {
             state.config.agents.defaults.workspace = new_path;
         }
 
         let workspace = state.config.workspace_path();
         println!("{}", colorize(chars.vertical, BRAND));
-        println!(
-            "{} Creating workspace at {}...",
-            colorize(chars.vertical, BRAND),
-            colorize(&workspace.display().to_string(), DIM)
-        );
-        println!("{}", colorize(chars.vertical, BRAND));
 
-        // Create directories
+        // Create directories (silently, no y/n)
         std::fs::create_dir_all(&workspace)?;
         std::fs::create_dir_all(workspace.join("memory"))?;
         std::fs::create_dir_all(workspace.join("skills"))?;
-        println!(
-            "{} {} Created workspace directories",
-            colorize(chars.vertical, BRAND),
-            status_success()
-        );
 
         // Create template files (only if they don't already exist)
-        create_template_file(&workspace.join("AGENTS.md"), templates::AGENTS)?;
-        create_template_file(&workspace.join("SOUL.md"), templates::SOUL)?;
-        create_template_file(&workspace.join("USER.md"), templates::USER)?;
-        create_template_file(&workspace.join("TOOLS.md"), templates::TOOLS)?;
-        create_template_file(&workspace.join("IDENTITY.md"), templates::IDENTITY)?;
-        println!(
-            "{} {} Created workspace templates",
-            colorize(chars.vertical, BRAND),
-            status_success()
-        );
+        let mut template_count = 0;
+        template_count += create_template_file(&workspace.join("AGENTS.md"), templates::AGENTS)?;
+        template_count += create_template_file(&workspace.join("SOUL.md"), templates::SOUL)?;
+        template_count += create_template_file(&workspace.join("USER.md"), templates::USER)?;
+        template_count += create_template_file(&workspace.join("TOOLS.md"), templates::TOOLS)?;
+        template_count +=
+            create_template_file(&workspace.join("IDENTITY.md"), templates::IDENTITY)?;
 
         // Create memory file
         let memory_file = workspace.join("memory").join("MEMORY.md");
         if !memory_file.exists() {
             std::fs::write(&memory_file, templates::MEMORY)?;
+            template_count += 1;
         }
-        println!(
-            "{} {} Initialized memory directory",
-            colorize(chars.vertical, BRAND),
-            status_success()
-        );
 
         // Create config directories
         let config_dir = config::config_dir()?;
@@ -112,22 +69,42 @@ impl WizardModule for WorkspaceModule {
         std::fs::create_dir_all(config_dir.join("cron"))?;
         std::fs::create_dir_all(config_dir.join("media"))?;
         std::fs::create_dir_all(config_dir.join("history"))?;
+
+        // Report what was done
         println!(
-            "{} {} Set up configuration directories",
+            "{} {} Workspace directories verified",
             colorize(chars.vertical, BRAND),
             status_success()
         );
+
+        if template_count > 0 {
+            println!(
+                "{} {} Created {} new template file(s)",
+                colorize(chars.vertical, BRAND),
+                status_success(),
+                template_count
+            );
+        } else {
+            println!(
+                "{} {} Template files intact (5 files)",
+                colorize(chars.vertical, BRAND),
+                status_success()
+            );
+        }
 
         Ok(StepResult::Next)
     }
 }
 
 /// Create a template file if it doesn't already exist.
-fn create_template_file(path: &std::path::Path, content: &str) -> Result<()> {
+/// Returns 1 if created, 0 if already existed.
+fn create_template_file(path: &std::path::Path, content: &str) -> Result<usize> {
     if !path.exists() {
         std::fs::write(path, content)?;
+        Ok(1)
+    } else {
+        Ok(0)
     }
-    Ok(())
 }
 
 #[cfg(test)]
@@ -163,9 +140,10 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let path = temp_dir.path().join("test.md");
 
-        create_template_file(&path, "test content").unwrap();
+        let count = create_template_file(&path, "test content").unwrap();
 
         assert!(path.exists());
+        assert_eq!(count, 1);
         assert_eq!(std::fs::read_to_string(&path).unwrap(), "test content");
     }
 
@@ -175,8 +153,9 @@ mod tests {
         let path = temp_dir.path().join("test.md");
 
         std::fs::write(&path, "original").unwrap();
-        create_template_file(&path, "replacement").unwrap();
+        let count = create_template_file(&path, "replacement").unwrap();
 
+        assert_eq!(count, 0);
         assert_eq!(
             std::fs::read_to_string(&path).unwrap(),
             "original",
@@ -189,9 +168,10 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let path = temp_dir.path().join("empty.md");
 
-        create_template_file(&path, "").unwrap();
+        let count = create_template_file(&path, "").unwrap();
 
         assert!(path.exists());
+        assert_eq!(count, 1);
         assert_eq!(std::fs::read_to_string(&path).unwrap(), "");
     }
 
@@ -201,8 +181,9 @@ mod tests {
         let path = temp_dir.path().join("unicode.md");
 
         let content = "# 你好世界\n\nEmoji: 🤖✅❌\nCyrillc: Привет";
-        create_template_file(&path, content).unwrap();
+        let count = create_template_file(&path, content).unwrap();
 
+        assert_eq!(count, 1);
         assert_eq!(std::fs::read_to_string(&path).unwrap(), content);
     }
 }

@@ -2,29 +2,21 @@
 //!
 //! Configures where task reminders are sent (OS native, Telegram, Discord, etc.)
 //! and notification preferences (daily digest, focus reminders).
+//! On reconfiguration, shows current targets pre-checked and current values as defaults.
 
 use anyhow::Result;
 
 use crate::wizard::framework::{StepResult, WizardState};
-use crate::wizard::prompts::{prompt_multi_select, prompt_text, prompt_yes_no, SelectOption};
+use crate::wizard::prompts::{
+    prompt_multi_select_with_defaults, prompt_text, prompt_yes_no, SelectOption,
+};
 
 /// Run the todo notifications configuration step.
 ///
-/// Prompts the user to:
-/// - Enable/disable todo notifications
-/// - Select notification targets (OS native + configured channels)
-/// - Configure daily digest settings
-/// - Configure focus reminder settings
-///
-/// All settings are saved to `state.config.todo.notifications`.
+/// No y/n gate - shows notification targets with currently configured ones
+/// pre-checked, and all settings with current values as defaults.
 pub fn run_todo_notification_step(state: &mut WizardState) -> Result<StepResult> {
-    // Ask if user wants todo notifications
-    if !prompt_yes_no("Enable todo notifications?", true)? {
-        // User declined - skip configuration
-        return Ok(StepResult::Next);
-    }
-
-    // Build notification target options and mapping in parallel
+    // Build notification target options and mapping
     let mut options = Vec::new();
     let mut target_names = Vec::new();
 
@@ -65,8 +57,16 @@ pub fn run_todo_notification_step(state: &mut WizardState) -> Result<StepResult>
         target_names.push("email");
     }
 
-    // Prompt for notification targets
-    let selected_indices = prompt_multi_select("Select notification targets", &options)?;
+    // Build defaults from current config - pre-check currently configured targets
+    let current_targets = &state.config.todo.notifications.targets;
+    let defaults: Vec<bool> = target_names
+        .iter()
+        .map(|name| current_targets.iter().any(|t| t == name))
+        .collect();
+
+    // Prompt for notification targets with pre-checked defaults
+    let selected_indices =
+        prompt_multi_select_with_defaults("Notification targets", &options, &defaults)?;
 
     // Map selected indices to target names
     let targets: Vec<String> = selected_indices
@@ -76,16 +76,28 @@ pub fn run_todo_notification_step(state: &mut WizardState) -> Result<StepResult>
 
     state.config.todo.notifications.targets = targets;
 
-    // Configure focus reminders
-    let enable_reminders = prompt_yes_no("Enable focus deadline reminders?", true)?;
+    // Configure focus reminders (default from current config)
+    let enable_reminders = prompt_yes_no(
+        "Enable focus deadline reminders?",
+        state.config.todo.notifications.focus_reminders,
+    )?;
     state.config.todo.notifications.focus_reminders = enable_reminders;
 
-    // Configure daily digest
-    let enable_digest = prompt_yes_no("Enable daily task digest?", true)?;
+    // Configure daily digest (default from current config)
+    let enable_digest = prompt_yes_no(
+        "Enable daily task digest?",
+        state.config.todo.notifications.daily_digest,
+    )?;
     state.config.todo.notifications.daily_digest = enable_digest;
 
     if enable_digest {
-        let time = prompt_text("Daily digest time (HH:MM)", Some("09:00"), false)?;
+        let current_time = &state.config.todo.notifications.daily_digest_time;
+        let default_time = if current_time.is_empty() {
+            "09:00"
+        } else {
+            current_time
+        };
+        let time = prompt_text("Daily digest time (HH:MM)", Some(default_time), false)?;
         state.config.todo.notifications.daily_digest_time = time;
     }
 

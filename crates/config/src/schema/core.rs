@@ -102,8 +102,19 @@ impl Config {
         }
     }
 
-    /// Detect the active provider based on which API keys are configured.
+    /// Detect the active provider.
+    ///
+    /// Resolution: explicit `agents.defaults.provider` field first,
+    /// then auto-detect from which API keys are configured.
     pub fn active_provider_name(&self) -> &str {
+        // Check explicit provider field first
+        if let Some(ref name) = self.agents.defaults.provider {
+            if !name.is_empty() && self.is_provider_configured(name) {
+                return name;
+            }
+        }
+
+        // Fall back to auto-detection
         if !self.providers.anthropic.api_key.is_empty() {
             "anthropic"
         } else if !self.providers.openai.api_key.is_empty() {
@@ -112,8 +123,25 @@ impl Config {
             "openrouter"
         } else if !self.providers.deepseek.api_key.is_empty() {
             "deepseek"
+        } else if !self.providers.gemini.api_key.is_empty() {
+            "gemini"
+        } else if !self.providers.groq.api_key.is_empty() {
+            "groq"
         } else {
             "none"
+        }
+    }
+
+    /// Check if a provider has an API key configured.
+    pub fn is_provider_configured(&self, name: &str) -> bool {
+        match name {
+            "anthropic" => !self.providers.anthropic.api_key.is_empty(),
+            "openai" => !self.providers.openai.api_key.is_empty(),
+            "deepseek" => !self.providers.deepseek.api_key.is_empty(),
+            "gemini" => !self.providers.gemini.api_key.is_empty(),
+            "openrouter" => !self.providers.openrouter.api_key.is_empty(),
+            "groq" => !self.providers.groq.api_key.is_empty(),
+            _ => false,
         }
     }
 
@@ -141,6 +169,7 @@ impl Config {
             "deepseek" => self.providers.deepseek.api_key = Secret::new(key),
             "gemini" => self.providers.gemini.api_key = Secret::new(key),
             "openrouter" => self.providers.openrouter.api_key = Secret::new(key),
+            "groq" => self.providers.groq.api_key = Secret::new(key),
             _ => {}
         }
     }
@@ -165,6 +194,11 @@ pub struct AgentDefaults {
     #[serde(default = "default_model")]
     pub model: String,
 
+    /// Explicit active provider name (e.g., "anthropic", "deepseek").
+    /// When set, takes priority over model-name auto-detection.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
+
     #[serde(default = "default_max_tokens")]
     pub max_tokens: u32,
 
@@ -180,6 +214,7 @@ impl Default for AgentDefaults {
         Self {
             workspace: default_workspace(),
             model: default_model(),
+            provider: None,
             max_tokens: default_max_tokens(),
             temperature: default_temperature(),
             max_tool_iterations: default_max_iterations(),

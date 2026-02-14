@@ -1087,6 +1087,274 @@ fn prompt_select_with_input_fallback(
 }
 
 // ============================================================================
+// Secret masking & edit-in-place helpers
+// ============================================================================
+
+/// Mask a secret for display, showing a prefix and last 4 chars.
+///
+/// Examples: `"sk-ant-api03-abc...xyz1234"` → `"sk-ant-****1234"`
+///           `"short"` → `"●●●●●"`
+pub fn mask_secret(s: &str) -> String {
+    if s.is_empty() {
+        return String::new();
+    }
+
+    let len = s.len();
+    if len <= 8 {
+        return "●".repeat(len);
+    }
+
+    // Find a recognizable prefix (e.g. "sk-ant-", "sk-or-", "gsk_", "sk-", "BSA-")
+    let prefix_len = if s.starts_with("sk-ant-") {
+        7
+    } else if s.starts_with("sk-or-") {
+        6
+    } else if s.starts_with("gsk_") || s.starts_with("BSA-") {
+        4
+    } else if s.starts_with("sk-") {
+        3
+    } else {
+        0
+    };
+
+    let suffix_len = 4;
+    if prefix_len + suffix_len >= len {
+        return "●".repeat(len);
+    }
+
+    let prefix = &s[..prefix_len];
+    let suffix = &s[len - suffix_len..];
+    format!("{}****{}", prefix, suffix)
+}
+
+/// Prompt for a secret with an existing value. Shows masked preview, Enter to keep.
+///
+/// Returns `None` if the user pressed Enter (keep existing), `Some(new)` if they
+/// entered a new value.
+pub fn prompt_secret_with_existing(
+    label: &str,
+    existing: &str,
+    min_length: usize,
+) -> Result<Option<String>> {
+    let prefix = step_prefix();
+    let masked = mask_secret(existing);
+
+    if is_interactive() {
+        loop {
+            let _guard = RawModeGuard::enable()?;
+            let mut out = io::stdout();
+            let mut secret = String::new();
+
+            write!(out, "{}{} [{}]: ", prefix, label, masked)?;
+            out.flush()?;
+
+            loop {
+                let key = read_key()?;
+                match key.code {
+                    KeyCode::Enter => {
+                        write!(out, "\r\n")?;
+                        out.flush()?;
+                        break;
+                    }
+                    KeyCode::Backspace => {
+                        if !secret.is_empty() {
+                            secret.pop();
+                            write!(out, "\x08 \x08")?;
+                            out.flush()?;
+                        }
+                    }
+                    KeyCode::Char(c) => {
+                        secret.push(c);
+                        write!(out, "●")?;
+                        out.flush()?;
+                    }
+                    _ => {}
+                }
+            }
+
+            drop(_guard);
+
+            if secret.is_empty() {
+                // Keep existing
+                return Ok(None);
+            }
+
+            if secret.len() < min_length {
+                println!(
+                    "{}{}",
+                    prefix,
+                    colorize(
+                        &format!(
+                            "Value seems too short (expected at least {} chars)",
+                            min_length
+                        ),
+                        WARNING
+                    )
+                );
+                continue;
+            }
+
+            return Ok(Some(secret));
+        }
+    } else {
+        // Non-TTY fallback
+        loop {
+            print!("{}{} [{}]: ", prefix, label, masked);
+            io::stdout().flush()?;
+
+            let mut input = String::new();
+            io::stdin().read_line(&mut input)?;
+            let input = input.trim().to_string();
+
+            if input.is_empty() {
+                return Ok(None);
+            }
+
+            if input.len() < min_length {
+                println!(
+                    "{}{}",
+                    prefix,
+                    colorize(
+                        &format!(
+                            "Value seems too short (expected at least {} chars)",
+                            min_length
+                        ),
+                        WARNING
+                    )
+                );
+                continue;
+            }
+
+            return Ok(Some(input));
+        }
+    }
+}
+
+/// Prompt the user to select multiple options from a list with pre-checked defaults.
+///
+/// Like `prompt_multi_select`, but accepts a `defaults` slice indicating which
+/// options should be pre-checked.
+///
+/// Returns 0-based indices of selected options.
+pub fn prompt_multi_select_with_defaults(
+    header: &str,
+    options: &[SelectOption<'_>],
+    defaults: &[bool],
+) -> Result<Vec<usize>> {
+    let prefix = step_prefix();
+
+    if is_interactive() {
+        prompt_multi_select_with_defaults_interactive(header, options, defaults)
+    } else {
+        // Fallback to standard multi-select (defaults shown in header)
+        prompt_multi_select_fallback(&prefix, header, options)
+    }
+}
+
+fn prompt_multi_select_with_defaults_interactive(
+    header: &str,
+    options: &[SelectOption<'_>],
+    defaults: &[bool],
+) -> Result<Vec<usize>> {
+    let prefix = step_prefix();
+    let mut cursor_pos = 0usize;
+    let mut checked: Vec<bool> = if defaults.len() == options.len() {
+        defaults.to_vec()
+    } else {
+        vec![false; options.len()]
+    };
+
+    if !header.is_empty() {
+        println!("{}{}:", prefix, header);
+    }
+
+    let _guard = RawModeGuard::enable()?;
+    let mut out = io::stdout();
+
+    let list_lines = render_multi_select_list(&mut out, &prefix, options, &checked, cursor_pos)?;
+
+    let hint = format!(
+        "{}{}",
+        prefix,
+        colorize(
+            "  \u{2191}/\u{2193} navigate  \u{00b7}  Space toggle  \u{00b7}  a all  \u{00b7}  Enter confirm",
+            DIM
+        )
+    );
+    write!(out, "{}\r\n", hint)?;
+    out.flush()?;
+
+    loop {
+        let key = read_key()?;
+        match key.code {
+            KeyCode::Up | KeyCode::Char('k') => {
+                if cursor_pos > 0 {
+                    cursor_pos -= 1;
+                    rerender_multi_select_list(
+                        &mut out, &prefix, options, &checked, cursor_pos, list_lines,
+                    )?;
+                }
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                if cursor_pos < options.len() - 1 {
+                    cursor_pos += 1;
+                    rerender_multi_select_list(
+                        &mut out, &prefix, options, &checked, cursor_pos, list_lines,
+                    )?;
+                }
+            }
+            KeyCode::Char(' ') => {
+                checked[cursor_pos] = !checked[cursor_pos];
+                rerender_multi_select_list(
+                    &mut out, &prefix, options, &checked, cursor_pos, list_lines,
+                )?;
+            }
+            KeyCode::Char('a') | KeyCode::Char('A') => {
+                let all_checked = checked.iter().all(|&c| c);
+                for c in checked.iter_mut() {
+                    *c = !all_checked;
+                }
+                rerender_multi_select_list(
+                    &mut out, &prefix, options, &checked, cursor_pos, list_lines,
+                )?;
+            }
+            KeyCode::Enter => {
+                let total_lines = list_lines + 1;
+                drop(_guard);
+                erase_lines(total_lines)?;
+
+                let selected: Vec<usize> = checked
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, &c)| c)
+                    .map(|(i, _)| i)
+                    .collect();
+
+                if selected.is_empty() {
+                    println!(
+                        "{}  {} {}",
+                        prefix,
+                        colorize("○", DIM),
+                        colorize("None selected", DIM)
+                    );
+                } else {
+                    let names: Vec<&str> = selected.iter().map(|&i| options[i].label).collect();
+                    println!(
+                        "{}  {} {}",
+                        prefix,
+                        colorize("●", BRAND),
+                        colorize(&names.join(", "), BOLD)
+                    );
+                }
+
+                return Ok(selected);
+            }
+            _ => {}
+        }
+    }
+}
+
+// ============================================================================
 // List input
 // ============================================================================
 
@@ -1203,5 +1471,53 @@ mod tests {
         };
         assert_eq!(result.index, 0);
         assert_eq!(result.text, None);
+    }
+
+    // ========================================================================
+    // mask_secret tests
+    // ========================================================================
+
+    #[test]
+    fn test_mask_secret_empty() {
+        assert_eq!(mask_secret(""), "");
+    }
+
+    #[test]
+    fn test_mask_secret_short() {
+        assert_eq!(mask_secret("abc"), "●●●");
+        assert_eq!(mask_secret("12345678"), "●●●●●●●●");
+    }
+
+    #[test]
+    fn test_mask_secret_anthropic_key() {
+        assert_eq!(
+            mask_secret("sk-ant-api03-abcdefghijklmnop"),
+            "sk-ant-****mnop"
+        );
+    }
+
+    #[test]
+    fn test_mask_secret_openai_key() {
+        assert_eq!(mask_secret("sk-proj-abcdefghij"), "sk-****ghij");
+    }
+
+    #[test]
+    fn test_mask_secret_openrouter_key() {
+        assert_eq!(mask_secret("sk-or-v1-abcdefghij"), "sk-or-****ghij");
+    }
+
+    #[test]
+    fn test_mask_secret_groq_key() {
+        assert_eq!(mask_secret("gsk_abcdefghijklm"), "gsk_****jklm");
+    }
+
+    #[test]
+    fn test_mask_secret_brave_key() {
+        assert_eq!(mask_secret("BSA-abcdefghijklm"), "BSA-****jklm");
+    }
+
+    #[test]
+    fn test_mask_secret_no_prefix() {
+        assert_eq!(mask_secret("abcdefghijklmnop"), "****mnop");
     }
 }
