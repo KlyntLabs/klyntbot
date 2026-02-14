@@ -3,7 +3,7 @@
 //! Provides guided configuration for all supported chat channels:
 //! Telegram, Discord, Slack, WhatsApp, Email, and QQ.
 
-use std::io::{self, Write};
+use std::io::{self, IsTerminal, Write};
 
 use anyhow::Result;
 use common::utils::terminal::*;
@@ -13,7 +13,7 @@ use config::schema::{
 use config::Config;
 
 use super::oauth;
-use super::prompts::{self, SelectOption};
+use super::prompts;
 
 /// Channel metadata for the selection UI
 struct ChannelInfo {
@@ -63,6 +63,896 @@ const CHANNELS: &[ChannelInfo] = &[
 ];
 
 // ============================================================================
+// Configuration Detection Helpers
+// ============================================================================
+
+/// Check if a channel is configured (has credentials).
+fn is_channel_configured(config: &Config, channel_key: &str) -> bool {
+    match channel_key {
+        "telegram" => !config.channels.telegram.token.expose().is_empty(),
+        "discord" => !config.channels.discord.token.expose().is_empty(),
+        "slack" => {
+            !config.channels.slack.bot_token.expose().is_empty()
+                && !config.channels.slack.app_token.expose().is_empty()
+        }
+        "whatsapp" => !config.channels.whatsapp.bridge_url.is_empty(),
+        "email" => {
+            !config.channels.email.imap_host.is_empty()
+                && !config.channels.email.smtp_host.is_empty()
+        }
+        "qq" => {
+            !config.channels.qq.app_id.is_empty() && !config.channels.qq.secret.expose().is_empty()
+        }
+        _ => false,
+    }
+}
+
+/// Check if a channel is enabled.
+fn is_channel_enabled(config: &Config, channel_key: &str) -> bool {
+    match channel_key {
+        "telegram" => config.channels.telegram.enabled,
+        "discord" => config.channels.discord.enabled,
+        "slack" => config.channels.slack.enabled,
+        "whatsapp" => config.channels.whatsapp.enabled,
+        "email" => config.channels.email.enabled,
+        "qq" => config.channels.qq.enabled,
+        _ => false,
+    }
+}
+
+/// Get the count of allowlist entries for a channel.
+fn get_allowlist_count(config: &Config, channel_key: &str) -> usize {
+    match channel_key {
+        "telegram" => config.channels.telegram.allow_from.len(),
+        "discord" => config.channels.discord.allow_from.len(),
+        "slack" => config.channels.slack.allow_from.len(),
+        "whatsapp" => config.channels.whatsapp.allow_from.len(),
+        "email" => config.channels.email.allow_from.len(),
+        "qq" => config.channels.qq.allow_from.len(),
+        _ => 0,
+    }
+}
+
+/// Get a masked version of channel credentials for display.
+fn mask_channel_credentials(config: &Config, channel_key: &str) -> String {
+    use super::prompts::mask_secret;
+
+    match channel_key {
+        "telegram" => mask_secret(config.channels.telegram.token.expose()),
+        "discord" => mask_secret(config.channels.discord.token.expose()),
+        "slack" => mask_secret(config.channels.slack.bot_token.expose()),
+        "whatsapp" => {
+            let url = &config.channels.whatsapp.bridge_url;
+            if url.len() > 20 {
+                format!("{}...", &url[..17])
+            } else {
+                url.clone()
+            }
+        }
+        "email" => format!("{}@{}", config.channels.email.imap_username, config.channels.email.imap_host),
+        "qq" => config.channels.qq.app_id.clone(),
+        _ => String::new(),
+    }
+}
+
+/// Get a human-readable status description for a configured channel.
+fn get_channel_status_description(config: &Config, channel_key: &str) -> String {
+    match channel_key {
+        "telegram" => {
+            // For Telegram, we could potentially show bot username if we stored it
+            // For now, just show it's configured
+            "configured".to_string()
+        }
+        "discord" => "configured".to_string(),
+        "slack" => "configured".to_string(),
+        "whatsapp" => config.channels.whatsapp.bridge_url.clone(),
+        "email" => config.channels.email.from_address.clone(),
+        "qq" => format!("App ID: {}", config.channels.qq.app_id),
+        _ => String::new(),
+    }
+}
+
+// ============================================================================
+// State Model and Sub-Actions
+// ============================================================================
+
+/// Actions available in the expanded channel sub-menu.
+#[derive(Clone, Copy, PartialEq)]
+enum ChannelSubAction {
+    ConfigureCredentials,
+    TestConnection,
+    ToggleEnabled,
+    ManageAllowlist,
+    Reconnect,
+    Close,
+}
+
+const SUB_ACTIONS: &[ChannelSubAction] = &[
+    ChannelSubAction::ConfigureCredentials,
+    ChannelSubAction::TestConnection,
+    ChannelSubAction::ToggleEnabled,
+    ChannelSubAction::ManageAllowlist,
+    ChannelSubAction::Reconnect,
+    ChannelSubAction::Close,
+];
+
+impl ChannelSubAction {
+    /// Check if this action is available given the channel's configuration state.
+    fn is_available(&self, configured: bool, enabled: bool) -> bool {
+        match self {
+            Self::ConfigureCredentials | Self::Close => true,
+            Self::TestConnection | Self::ToggleEnabled | Self::ManageAllowlist => configured,
+            Self::Reconnect => configured && enabled,
+        }
+    }
+
+    /// Get the display label for this action, adapting to the channel's state.
+    fn label(&self, config: &Config, channel: &ChannelInfo) -> String {
+        let configured = is_channel_configured(config, channel.key);
+        let enabled = is_channel_enabled(config, channel.key);
+
+        match self {
+            Self::ConfigureCredentials => {
+                if configured {
+                    let masked = mask_channel_credentials(config, channel.key);
+                    format!("Edit credentials ({})", masked)
+                } else {
+                    "Configure credentials".to_string()
+                }
+            }
+            Self::TestConnection => {
+                if configured {
+                    "Test connection".to_string()
+                } else {
+                    "Test connection (requires credentials)".to_string()
+                }
+            }
+            Self::ToggleEnabled => {
+                let status = if enabled { "✓ enabled" } else { "disabled" };
+                format!("Toggle enable/disable [{}]", status)
+            }
+            Self::ManageAllowlist => {
+                let count = get_allowlist_count(config, channel.key);
+                if count == 0 {
+                    "Manage allowlist [empty - allows all]".to_string()
+                } else {
+                    format!("Manage allowlist [{} users]", count)
+                }
+            }
+            Self::Reconnect => "Reconnect channel".to_string(),
+            Self::Close => "Close".to_string(),
+        }
+    }
+}
+
+/// State for the interactive channel menu.
+struct ChannelMenuState {
+    cursor: usize,            // 0..CHANNELS.len() for channels, CHANNELS.len() for "Done"
+    expanded: Option<usize>,  // Which channel index is expanded
+    sub_cursor: usize,        // Position in SUB_ACTIONS
+    in_sub_menu: bool,        // Whether navigating inside the sub-menu
+}
+
+impl ChannelMenuState {
+    fn new() -> Self {
+        Self {
+            cursor: 0,
+            expanded: None,
+            sub_cursor: 0,
+            in_sub_menu: false,
+        }
+    }
+
+    fn total_main_items(&self) -> usize {
+        CHANNELS.len() + 1 // channels + "Done"
+    }
+
+    fn is_on_done(&self) -> bool {
+        self.cursor == CHANNELS.len()
+    }
+}
+
+// ============================================================================
+// Rendering Functions
+// ============================================================================
+
+/// Render the full channel menu list. Returns total lines rendered.
+fn render_channel_menu(
+    out: &mut impl Write,
+    config: &Config,
+    menu: &ChannelMenuState,
+    chars: &BoxChars,
+) -> Result<usize> {
+    let prefix = format!("{} ", colorize(chars.vertical, BRAND));
+    let mut lines = 0;
+
+    for (i, channel) in CHANNELS.iter().enumerate() {
+        let configured = is_channel_configured(config, channel.key);
+        let enabled = is_channel_enabled(config, channel.key);
+        let is_cursor = !menu.in_sub_menu && menu.cursor == i;
+        let is_expanded = menu.expanded == Some(i);
+
+        // Channel icon
+        let icon = if configured && enabled {
+            colorize("✓", SUCCESS)
+        } else {
+            colorize("○", DIM)
+        };
+
+        // Expand indicator
+        let expand = if is_expanded { "▼" } else { " " };
+        let expand_colored = if is_expanded {
+            colorize(expand, BRAND)
+        } else {
+            " ".to_string()
+        };
+
+        // Cursor indicator
+        let pointer = if is_cursor {
+            colorize("❯", BRAND)
+        } else {
+            " ".to_string()
+        };
+
+        // Channel name + status
+        let name = if is_cursor || is_expanded {
+            colorize(channel.name, BOLD)
+        } else if !configured {
+            colorize(channel.name, DIM)
+        } else {
+            channel.name.to_string()
+        };
+
+        let status = if configured {
+            let desc = get_channel_status_description(config, channel.key);
+            let enabled_text = if enabled { "enabled" } else { "disabled" };
+            format!(
+                " {} — {}",
+                colorize(&format!("({})", enabled_text), if enabled { SUCCESS } else { DIM }),
+                colorize(&desc, DIM)
+            )
+        } else {
+            format!(" {}", colorize("— not configured", DIM))
+        };
+
+        write!(
+            out,
+            "{}{}{} {} {}{}\r\n",
+            prefix, pointer, expand_colored, icon, name, status
+        )?;
+        lines += 1;
+
+        // Render sub-menu if expanded
+        if is_expanded {
+            for (si, action) in SUB_ACTIONS.iter().enumerate() {
+                let available = action.is_available(configured, enabled);
+
+                let sub_pointer = if menu.in_sub_menu && menu.sub_cursor == si {
+                    colorize("❯", BRAND)
+                } else {
+                    " ".to_string()
+                };
+
+                let label = action.label(config, channel);
+                let label_display = if menu.in_sub_menu && menu.sub_cursor == si {
+                    if available {
+                        colorize(&label, BOLD)
+                    } else {
+                        colorize(&label, DIM)
+                    }
+                } else if *action == ChannelSubAction::Close {
+                    colorize(&format!("── {} ──", label), DIM)
+                } else if !available {
+                    colorize(&label, DIM)
+                } else {
+                    label
+                };
+
+                write!(out, "{}      {} {}\r\n", prefix, sub_pointer, label_display)?;
+                lines += 1;
+            }
+        }
+    }
+
+    // Separator before Done
+    write!(
+        out,
+        "{}  {}\r\n",
+        prefix,
+        colorize("──────────────────────────", DIM)
+    )?;
+    lines += 1;
+
+    // Done row
+    let done_pointer = if !menu.in_sub_menu && menu.is_on_done() {
+        colorize("❯", BRAND)
+    } else {
+        " ".to_string()
+    };
+    let done_icon = colorize("●", BRAND);
+    let done_label = if !menu.in_sub_menu && menu.is_on_done() {
+        colorize("Done", BOLD)
+    } else {
+        "Done".to_string()
+    };
+    let done_desc = colorize("(skip channels)", DIM);
+
+    write!(
+        out,
+        "{}{} {} {} {}\r\n",
+        prefix, done_pointer, done_icon, done_label, done_desc
+    )?;
+    lines += 1;
+
+    out.flush()?;
+    Ok(lines)
+}
+
+/// Render the keyboard hint bar at the bottom of the menu.
+fn render_menu_hint(out: &mut impl Write, menu: &ChannelMenuState, chars: &BoxChars) -> Result<()> {
+    let prefix = format!("{} ", colorize(chars.vertical, BRAND));
+    let hint = if menu.in_sub_menu {
+        "↑/↓ navigate · Enter select · Esc back"
+    } else {
+        "↑/↓ navigate · Enter expand/select"
+    };
+    write!(out, "{}{}\r\n", prefix, colorize(hint, DIM))?;
+    out.flush()?;
+    Ok(())
+}
+
+/// Erase and re-render the menu. Returns new line count.
+fn rerender_menu(
+    out: &mut impl Write,
+    config: &Config,
+    menu: &ChannelMenuState,
+    chars: &BoxChars,
+    prev_lines: usize,
+) -> Result<usize> {
+    // Erase previous render (list + hint)
+    let total = prev_lines + 1; // +1 for hint bar
+    for _ in 0..total {
+        write!(out, "\x1b[A\x1b[2K")?;
+    }
+    let new_lines = render_channel_menu(out, config, menu, chars)?;
+    render_menu_hint(out, menu, chars)?;
+    Ok(new_lines)
+}
+
+// ============================================================================
+// Interactive Event Loop
+// ============================================================================
+
+/// Read a keypress event, handling Ctrl+C gracefully.
+fn read_key() -> Result<crossterm::event::KeyEvent> {
+    use crossterm::event::{self, Event, KeyCode, KeyModifiers};
+
+    loop {
+        if let Event::Key(key) = event::read()? {
+            if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
+                return Err(anyhow::anyhow!("Ctrl+C"));
+            }
+            return Ok(key);
+        }
+    }
+}
+
+/// Erase `n` lines above cursor using ANSI codes.
+fn erase_lines(n: usize) -> Result<()> {
+    use crossterm::{cursor, terminal::{self, ClearType}};
+
+    let mut out = io::stdout();
+    for _ in 0..n {
+        crossterm::execute!(out, cursor::MoveUp(1), terminal::Clear(ClearType::CurrentLine))?;
+    }
+    Ok(())
+}
+
+/// Run the interactive channel menu. Modifies config in place and returns when user selects "Done".
+async fn run_channel_menu(config: &mut Config) -> Result<()> {
+    use crossterm::{event::KeyCode, terminal};
+
+    let chars = BoxChars::get();
+    let mut menu = ChannelMenuState::new();
+    let mut out = io::stdout();
+
+    // Initial render
+    terminal::enable_raw_mode()?;
+    let mut list_lines = render_channel_menu(&mut out, config, &menu, &chars)?;
+    render_menu_hint(&mut out, &menu, &chars)?;
+
+    loop {
+        let key = read_key()?;
+        match key.code {
+            KeyCode::Up | KeyCode::Char('k') if !menu.in_sub_menu => {
+                if menu.cursor > 0 {
+                    menu.cursor -= 1;
+                    // If we moved away from expanded channel, collapse it
+                    if menu.expanded.is_some() && menu.expanded != Some(menu.cursor) {
+                        menu.expanded = None;
+                    }
+                    list_lines = rerender_menu(&mut out, config, &menu, &chars, list_lines)?;
+                }
+            }
+            KeyCode::Down | KeyCode::Char('j') if !menu.in_sub_menu => {
+                if menu.cursor < menu.total_main_items() - 1 {
+                    menu.cursor += 1;
+                    if menu.expanded.is_some() && menu.expanded != Some(menu.cursor) {
+                        menu.expanded = None;
+                    }
+                    list_lines = rerender_menu(&mut out, config, &menu, &chars, list_lines)?;
+                }
+            }
+            KeyCode::Up | KeyCode::Char('k') if menu.in_sub_menu => {
+                // Skip disabled actions when navigating up
+                let channel_idx = menu.expanded.unwrap();
+                let channel = &CHANNELS[channel_idx];
+                let configured = is_channel_configured(config, channel.key);
+                let enabled = is_channel_enabled(config, channel.key);
+
+                loop {
+                    if menu.sub_cursor == 0 {
+                        break;
+                    }
+                    menu.sub_cursor -= 1;
+                    let action = SUB_ACTIONS[menu.sub_cursor];
+                    if action.is_available(configured, enabled) {
+                        break;
+                    }
+                }
+                list_lines = rerender_menu(&mut out, config, &menu, &chars, list_lines)?;
+            }
+            KeyCode::Down | KeyCode::Char('j') if menu.in_sub_menu => {
+                // Skip disabled actions when navigating down
+                let channel_idx = menu.expanded.unwrap();
+                let channel = &CHANNELS[channel_idx];
+                let configured = is_channel_configured(config, channel.key);
+                let enabled = is_channel_enabled(config, channel.key);
+
+                loop {
+                    if menu.sub_cursor >= SUB_ACTIONS.len() - 1 {
+                        break;
+                    }
+                    menu.sub_cursor += 1;
+                    let action = SUB_ACTIONS[menu.sub_cursor];
+                    if action.is_available(configured, enabled) {
+                        break;
+                    }
+                }
+                list_lines = rerender_menu(&mut out, config, &menu, &chars, list_lines)?;
+            }
+            KeyCode::Enter if !menu.in_sub_menu => {
+                if menu.is_on_done() {
+                    // Done — exit
+                    terminal::disable_raw_mode()?;
+                    erase_lines(list_lines + 1)?;
+                    return Ok(());
+                } else {
+                    // Expand channel sub-menu
+                    menu.expanded = Some(menu.cursor);
+                    menu.in_sub_menu = true;
+                    menu.sub_cursor = 0;
+
+                    // Start on first available action
+                    let channel = &CHANNELS[menu.cursor];
+                    let configured = is_channel_configured(config, channel.key);
+                    let enabled = is_channel_enabled(config, channel.key);
+
+                    for (i, action) in SUB_ACTIONS.iter().enumerate() {
+                        if action.is_available(configured, enabled) {
+                            menu.sub_cursor = i;
+                            break;
+                        }
+                    }
+
+                    list_lines = rerender_menu(&mut out, config, &menu, &chars, list_lines)?;
+                }
+            }
+            KeyCode::Enter if menu.in_sub_menu => {
+                let channel_idx = menu.expanded.unwrap();
+                let action = SUB_ACTIONS[menu.sub_cursor];
+                let channel = &CHANNELS[channel_idx];
+
+                // Check if action is available
+                let configured = is_channel_configured(config, channel.key);
+                let enabled = is_channel_enabled(config, channel.key);
+                if !action.is_available(configured, enabled) {
+                    // Do nothing on disabled actions
+                    continue;
+                }
+
+                match action {
+                    ChannelSubAction::Close => {
+                        menu.expanded = None;
+                        menu.in_sub_menu = false;
+                        list_lines = rerender_menu(&mut out, config, &menu, &chars, list_lines)?;
+                    }
+                    ChannelSubAction::ConfigureCredentials => {
+                        // Exit raw mode, erase menu, run configuration, re-enter
+                        terminal::disable_raw_mode()?;
+                        erase_lines(list_lines + 1)?;
+
+                        execute_configure_credentials(config, channel_idx).await?;
+
+                        // Re-enter raw mode and redraw
+                        terminal::enable_raw_mode()?;
+                        list_lines = render_channel_menu(&mut out, config, &menu, &chars)?;
+                        render_menu_hint(&mut out, &menu, &chars)?;
+                    }
+                    ChannelSubAction::TestConnection => {
+                        terminal::disable_raw_mode()?;
+                        erase_lines(list_lines + 1)?;
+
+                        execute_test_connection(config, channel_idx).await?;
+
+                        terminal::enable_raw_mode()?;
+                        list_lines = render_channel_menu(&mut out, config, &menu, &chars)?;
+                        render_menu_hint(&mut out, &menu, &chars)?;
+                    }
+                    ChannelSubAction::ToggleEnabled => {
+                        // Immediate toggle — no need to exit raw mode
+                        execute_toggle_enabled(config, channel_idx)?;
+                        list_lines = rerender_menu(&mut out, config, &menu, &chars, list_lines)?;
+                    }
+                    ChannelSubAction::ManageAllowlist => {
+                        terminal::disable_raw_mode()?;
+                        erase_lines(list_lines + 1)?;
+
+                        execute_manage_allowlist(config, channel_idx)?;
+
+                        terminal::enable_raw_mode()?;
+                        list_lines = render_channel_menu(&mut out, config, &menu, &chars)?;
+                        render_menu_hint(&mut out, &menu, &chars)?;
+                    }
+                    ChannelSubAction::Reconnect => {
+                        terminal::disable_raw_mode()?;
+                        erase_lines(list_lines + 1)?;
+
+                        execute_reconnect(channel.key).await?;
+
+                        terminal::enable_raw_mode()?;
+                        list_lines = render_channel_menu(&mut out, config, &menu, &chars)?;
+                        render_menu_hint(&mut out, &menu, &chars)?;
+                    }
+                }
+            }
+            KeyCode::Esc if menu.in_sub_menu => {
+                menu.expanded = None;
+                menu.in_sub_menu = false;
+                list_lines = rerender_menu(&mut out, config, &menu, &chars, list_lines)?;
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Run a simplified channel menu for non-TTY environments.
+async fn run_channel_menu_fallback(config: &mut Config) -> Result<()> {
+    let chars = BoxChars::get();
+
+    loop {
+        println!("{}", colorize(chars.vertical, BRAND));
+        println!(
+            "{} Select a channel to configure:",
+            colorize(chars.vertical, BRAND)
+        );
+        println!("{}", colorize(chars.vertical, BRAND));
+
+        for (i, channel) in CHANNELS.iter().enumerate() {
+            let configured = is_channel_configured(config, channel.key);
+            let status = if configured {
+                colorize("(configured)", SUCCESS)
+            } else {
+                colorize("(not configured)", DIM)
+            };
+            println!(
+                "{}  {}. {} {}",
+                colorize(chars.vertical, BRAND),
+                i + 1,
+                channel.name,
+                status
+            );
+        }
+
+        println!(
+            "{}  {}. {}",
+            colorize(chars.vertical, BRAND),
+            CHANNELS.len() + 1,
+            "Done"
+        );
+        println!("{}", colorize(chars.vertical, BRAND));
+
+        let choice = prompts::prompt_text("Enter number", None, true)?;
+        let idx = match choice.parse::<usize>() {
+            Ok(n) if n > 0 && n <= CHANNELS.len() + 1 => n - 1,
+            _ => {
+                println!(
+                    "{} Invalid choice. Please enter a number between 1 and {}.",
+                    colorize(chars.vertical, BRAND),
+                    CHANNELS.len() + 1
+                );
+                continue;
+            }
+        };
+
+        if idx == CHANNELS.len() {
+            // Done
+            return Ok(());
+        }
+
+        // Configure selected channel
+        println!("{}", colorize(chars.vertical, BRAND));
+        execute_configure_credentials(config, idx).await?;
+    }
+}
+
+// ============================================================================
+// Sub-Action Executors
+// ============================================================================
+
+/// Execute the configure credentials action for a channel.
+async fn execute_configure_credentials(config: &mut Config, channel_idx: usize) -> Result<()> {
+    let channel = &CHANNELS[channel_idx];
+
+    match channel.key {
+        "telegram" => {
+            configure_telegram(config).await?;
+        }
+        "discord" => {
+            configure_discord(config).await?;
+        }
+        "slack" => {
+            configure_slack(config).await?;
+        }
+        "whatsapp" => {
+            configure_whatsapp(config).await?;
+        }
+        "email" => {
+            configure_email(config).await?;
+        }
+        "qq" => {
+            configure_qq(config).await?;
+        }
+        _ => {}
+    }
+
+    Ok(())
+}
+
+/// Execute the test connection action for a channel.
+async fn execute_test_connection(config: &Config, channel_idx: usize) -> Result<()> {
+    let chars = BoxChars::get();
+    let channel = &CHANNELS[channel_idx];
+    let prefix = format!("{} ", colorize(chars.vertical, BRAND));
+
+    println!("{}{} Testing {} connection...", prefix, colorize("●", BRAND), channel.name);
+
+    match channel.key {
+        "telegram" => {
+            let token = config.channels.telegram.token.expose();
+            let validation = validate_telegram_token(token).await;
+            match validation {
+                Ok(bot_name) => {
+                    println!(
+                        "{}{} Connection successful — bot: @{}",
+                        prefix,
+                        status_success(),
+                        bot_name
+                    );
+                }
+                Err(e) => {
+                    println!(
+                        "{}{} Connection failed: {}",
+                        prefix,
+                        status_error(),
+                        e
+                    );
+                }
+            }
+        }
+        "discord" => {
+            let token = config.channels.discord.token.expose();
+            let validation = oauth::validate_discord_token(token).await;
+            match validation {
+                Ok(bot_name) => {
+                    println!(
+                        "{}{} Connection successful — bot: {}",
+                        prefix,
+                        status_success(),
+                        bot_name
+                    );
+                }
+                Err(e) => {
+                    println!(
+                        "{}{} Connection failed: {}",
+                        prefix,
+                        status_error(),
+                        e
+                    );
+                }
+            }
+        }
+        "slack" => {
+            let bot_token = config.channels.slack.bot_token.expose();
+            let validation = oauth::validate_slack_token(bot_token).await;
+            match validation {
+                Ok((_bot_id, team)) => {
+                    println!(
+                        "{}{} Connection successful — workspace: {}",
+                        prefix,
+                        status_success(),
+                        team
+                    );
+                }
+                Err(e) => {
+                    println!(
+                        "{}{} Connection failed: {}",
+                        prefix,
+                        status_error(),
+                        e
+                    );
+                }
+            }
+        }
+        "whatsapp" => {
+            let bridge_url = &config.channels.whatsapp.bridge_url;
+            let test = test_websocket_connection(bridge_url).await;
+            match test {
+                Ok(()) => {
+                    println!(
+                        "{}{} Bridge reachable at {}",
+                        prefix,
+                        status_success(),
+                        bridge_url
+                    );
+                }
+                Err(e) => {
+                    println!(
+                        "{}{} Bridge not reachable: {}",
+                        prefix,
+                        status_error(),
+                        e
+                    );
+                }
+            }
+        }
+        "email" => {
+            let test = test_imap_connection(
+                &config.channels.email.imap_host,
+                config.channels.email.imap_port,
+                &config.channels.email.imap_username,
+                config.channels.email.imap_password.expose(),
+                config.channels.email.imap_use_ssl,
+            )
+            .await;
+            match test {
+                Ok(()) => {
+                    println!(
+                        "{}{} IMAP connection successful",
+                        prefix,
+                        status_success()
+                    );
+                }
+                Err(e) => {
+                    println!(
+                        "{}{} IMAP connection failed: {}",
+                        prefix,
+                        status_error(),
+                        e
+                    );
+                }
+            }
+        }
+        "qq" => {
+            let validation = validate_qq_credentials(
+                &config.channels.qq.app_id,
+                config.channels.qq.secret.expose(),
+            )
+            .await;
+            match validation {
+                Ok(()) => {
+                    println!(
+                        "{}{} Credentials valid",
+                        prefix,
+                        status_success()
+                    );
+                }
+                Err(e) => {
+                    println!(
+                        "{}{} Validation failed: {}",
+                        prefix,
+                        status_error(),
+                        e
+                    );
+                }
+            }
+        }
+        _ => {}
+    }
+
+    println!("{}", colorize(chars.vertical, BRAND));
+    prompts::prompt_text("Press Enter to continue", Some(""), false)?;
+
+    Ok(())
+}
+
+/// Execute the toggle enabled action for a channel.
+fn execute_toggle_enabled(config: &mut Config, channel_idx: usize) -> Result<()> {
+    let channel = &CHANNELS[channel_idx];
+
+    match channel.key {
+        "telegram" => config.channels.telegram.enabled = !config.channels.telegram.enabled,
+        "discord" => config.channels.discord.enabled = !config.channels.discord.enabled,
+        "slack" => config.channels.slack.enabled = !config.channels.slack.enabled,
+        "whatsapp" => config.channels.whatsapp.enabled = !config.channels.whatsapp.enabled,
+        "email" => config.channels.email.enabled = !config.channels.email.enabled,
+        "qq" => config.channels.qq.enabled = !config.channels.qq.enabled,
+        _ => {}
+    }
+
+    Ok(())
+}
+
+/// Execute the manage allowlist action for a channel.
+fn execute_manage_allowlist(config: &mut Config, channel_idx: usize) -> Result<()> {
+    let chars = BoxChars::get();
+    let channel = &CHANNELS[channel_idx];
+    let prefix = format!("{} ", colorize(chars.vertical, BRAND));
+
+    println!(
+        "{}{} Manage allowlist for {}",
+        prefix,
+        colorize("●", BRAND),
+        channel.name
+    );
+
+    let new_allowlist = prompt_allowlist(channel.name)?;
+
+    match channel.key {
+        "telegram" => config.channels.telegram.allow_from = new_allowlist,
+        "discord" => config.channels.discord.allow_from = new_allowlist,
+        "slack" => config.channels.slack.allow_from = new_allowlist,
+        "whatsapp" => config.channels.whatsapp.allow_from = new_allowlist,
+        "email" => config.channels.email.allow_from = new_allowlist,
+        "qq" => config.channels.qq.allow_from = new_allowlist,
+        _ => {}
+    }
+
+    println!(
+        "{}{} Allowlist updated",
+        prefix,
+        status_success()
+    );
+
+    Ok(())
+}
+
+/// Execute the reconnect action for a channel.
+async fn execute_reconnect(channel_key: &str) -> Result<()> {
+    let chars = BoxChars::get();
+    let prefix = format!("{} ", colorize(chars.vertical, BRAND));
+
+    println!(
+        "{}{} Reconnect feature coming soon for {}",
+        prefix,
+        colorize("●", BRAND),
+        channel_key
+    );
+    println!(
+        "{}{}",
+        prefix,
+        colorize(
+            "Restart klyntbot to reconnect this channel.",
+            DIM
+        )
+    );
+    println!("{}", colorize(chars.vertical, BRAND));
+    prompts::prompt_text("Press Enter to continue", Some(""), false)?;
+
+    Ok(())
+}
+
+// ============================================================================
 // Public entry point
 // ============================================================================
 
@@ -79,98 +969,44 @@ pub async fn configure_channels(config: &mut Config) -> Result<Vec<String>> {
     println!(
         "{}",
         draw_step_line(&colorize(
-            "Each channel can be tested after configuration.",
+            "Configure and manage channel connections.",
             DIM
         ))
     );
     println!("{}", colorize(chars.vertical, BRAND));
 
-    // Channel selection (interactive multi-select)
-    let selected = select_channels()?;
+    // Show currently configured channels summary
+    let configured_count = CHANNELS
+        .iter()
+        .filter(|c| is_channel_configured(config, c.key))
+        .count();
 
-    if selected.is_empty() {
+    if configured_count > 0 {
         println!(
-            "{} {} No channels selected. You can set them up later with:",
+            "{} {} channels currently configured",
             colorize(chars.vertical, BRAND),
-            colorize("Skipped.", DIM)
+            colorize(&configured_count.to_string(), BOLD)
         );
-        println!(
-            "{}",
-            draw_step_line(&colorize("  klyntbot channels login <channel>", DIM))
-        );
-        return Ok(vec![]);
+        println!("{}", colorize(chars.vertical, BRAND));
     }
 
-    let mut configured = Vec::new();
-
-    for &idx in &selected {
-        let channel = &CHANNELS[idx];
-        println!("{}", colorize(chars.vertical, BRAND));
-        println!("{}", draw_separator());
-        println!("{}", colorize(chars.vertical, BRAND));
-        println!(
-            "{} {} {}",
-            colorize(chars.vertical, BRAND),
-            colorize("▸", SUCCESS),
-            colorize(&format!("Configure {}", channel.name), BOLD)
-        );
-        println!(
-            "{}",
-            draw_step_line(&colorize(
-                &format!("Prerequisite: {}", channel.prerequisites),
-                DIM
-            ))
-        );
-        println!("{}", colorize(chars.vertical, BRAND));
-
-        let result = match channel.key {
-            "telegram" => configure_telegram(config).await,
-            "discord" => configure_discord(config).await,
-            "slack" => configure_slack(config).await,
-            "whatsapp" => configure_whatsapp(config).await,
-            "email" => configure_email(config).await,
-            "qq" => configure_qq(config).await,
-            _ => Ok(false),
-        };
-
-        match result {
-            Ok(true) => {
-                configured.push(channel.key.to_string());
-                println!(
-                    "{} {} {} configured successfully",
-                    colorize(chars.vertical, BRAND),
-                    status_success(),
-                    channel.name
-                );
-            }
-            Ok(false) => {
-                println!(
-                    "{} {} {} configuration skipped",
-                    colorize(chars.vertical, BRAND),
-                    colorize("○", DIM),
-                    channel.name
-                );
-            }
-            Err(e) => {
-                println!(
-                    "{} {} {} configuration failed: {}",
-                    colorize(chars.vertical, BRAND),
-                    status_error(),
-                    channel.name,
-                    e
-                );
-                println!(
-                    "{}",
-                    draw_step_line(&colorize("You can configure this channel later.", DIM))
-                );
-            }
-        }
+    // Run interactive menu (TTY) or fallback (non-TTY)
+    if io::stdin().is_terminal() && io::stdout().is_terminal() {
+        run_channel_menu(config).await?;
+    } else {
+        run_channel_menu_fallback(config).await?;
     }
+
+    // Collect list of configured channels
+    let configured: Vec<String> = CHANNELS
+        .iter()
+        .filter(|c| is_channel_configured(config, c.key))
+        .map(|c| c.key.to_string())
+        .collect();
 
     // Summary
     if !configured.is_empty() {
         println!("{}", colorize(chars.vertical, BRAND));
-        println!("{}", draw_separator());
         println!(
             "{} {} {} channel(s) configured: {}",
             colorize(chars.vertical, BRAND),
@@ -178,26 +1014,19 @@ pub async fn configure_channels(config: &mut Config) -> Result<Vec<String>> {
             configured.len(),
             configured.join(", ")
         );
+    } else {
+        println!(
+            "{} {} No channels configured. You can set them up later with:",
+            colorize(chars.vertical, BRAND),
+            colorize("Skipped.", DIM)
+        );
+        println!(
+            "{}",
+            draw_step_line(&colorize("  klyntbot init", DIM))
+        );
     }
 
     Ok(configured)
-}
-
-// ============================================================================
-// Channel selection UI
-// ============================================================================
-
-/// Interactive multi-select prompt for choosing which channels to configure.
-fn select_channels() -> Result<Vec<usize>> {
-    let options: Vec<SelectOption<'_>> = CHANNELS
-        .iter()
-        .map(|c| SelectOption {
-            label: c.name,
-            description: c.description,
-        })
-        .collect();
-
-    prompts::prompt_multi_select("Select channels to configure", &options)
 }
 
 // ============================================================================
