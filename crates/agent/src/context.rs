@@ -144,6 +144,10 @@ impl ContextBuilder {
                 bootstrap_sections.push(identity);
             }
 
+            if let Some(response) = self.read_bootstrap_file("RESPONSE.md").await {
+                bootstrap_sections.push(response);
+            }
+
             self.cached_bootstrap = Some(bootstrap_sections.join("\n\n---\n\n"));
             debug!("Cached bootstrap files");
         }

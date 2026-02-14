@@ -93,54 +93,8 @@ a structured response like: `enrichment_mode: quick_hint`
 
 ### Post-Creation Summary
 
-Always show after creating a task:
-
-```
-✅ Task Created
-
-**[title]**
-ID: [id]
-Priority: P[n] ([label]) · Due: [date] · Tags: [tags]
-Description: [description if present]
-
-Confidence: [X]% [█████░░░░░]
-
-Want to improve it, or focus on it now?
-```
-
-**If confidence < 80%**, proactively suggest improvements:
-
-```
-✅ Task Created
-
-**[title]**
-ID: [id]
-Confidence: [X]% [██░░░░░░░░]
-
-This task is pretty sparse. Missing: [list of missing fields].
-Want me to help flesh it out? (I can auto-enrich or ask you questions)
-```
-
-### Confidence Visualization
-
-Use Unicode bars for confidence display (no ANSI colors in chat):
-
-- `Confidence: 90% ████████░░` (high — all good!)
-- `Confidence: 65% ██████░░░░` (medium — could be better)
-- `Confidence: 25% ██░░░░░░░░` (low — needs more detail)
-
-For `todo show` responses with field breakdown:
-
-```
-Confidence: 65%
-  ✅ Title quality (25%)
-  ✅ Description (25%)
-  ✅ Priority (15%)
-  ⬜ Due date (0%) — not set
-  ⬜ Tags (0%) — none
-
-💡 Add a due date (+20%) and tags (+15%) to improve confidence.
-```
+After creating a task, show the confidence score and offer improvement if < 80%.
+For formatting (tables, single-item display, status indicators), follow the rules in **RESPONSE.md**.
 
 ### Important Rules
 
