@@ -11,10 +11,10 @@ use crossterm::{
     event::{self, Event, KeyCode, KeyEvent, KeyModifiers},
     terminal::{self, ClearType},
 };
-use std::io::{self, Write};
+use std::io::{self, IsTerminal, Write};
 
 use super::framework::{StepResult, WizardModule, WizardState};
-use super::prompts::{self, mask_secret, SelectOption};
+use super::prompts::{self, mask_secret};
 
 /// Provider metadata used to drive the selection UI and configuration.
 struct ProviderInfo {
@@ -168,379 +168,104 @@ impl WizardModule for ProviderModule {
     fn run(&self, state: &mut WizardState) -> Result<StepResult> {
         let chars = BoxChars::get();
 
-        // On fresh install with no providers, go straight to configure
-        if !has_any_provider_configured(&state.config) {
+        // Header
+        let header = if has_any_provider_configured(&state.config) {
+            "Provider Management"
+        } else {
+            "Configure Your First LLM Provider"
+        };
+        println!("{}", draw_step_line(&colorize(header, BOLD)));
+        println!("{}", colorize(chars.vertical, BRAND));
+
+        // Show active provider info
+        let active = state
+            .config
+            .agents
+            .defaults
+            .provider
+            .clone()
+            .unwrap_or_else(|| state.config.active_provider_name().to_string());
+        if active != "none" && has_any_provider_configured(&state.config) {
+            let model = &state.config.agents.defaults.model;
             println!(
-                "{}",
-                draw_step_line(&colorize("Configure Your First LLM Provider", BOLD))
-            );
-            println!("{}", colorize(chars.vertical, BRAND));
-            configure_provider_flow(state)?;
-
-            // Auto-set as active
-            let active = state.config.active_provider_name().to_string();
-            if active != "none" {
-                state.config.agents.defaults.provider = Some(active.clone());
-            }
-
-            // Ask for model
-            println!("{}", colorize(chars.vertical, BRAND));
-            prompt_model_selection(state)?;
-
-            println!("{}", colorize(chars.vertical, BRAND));
-            println!(
-                "{} {} Provider configured. You can add more providers later with {}.",
+                "{} {} Active: {} ({})",
                 colorize(chars.vertical, BRAND),
-                colorize("✓", SUCCESS),
-                colorize("klyntbot init", BOLD)
+                colorize("★", HIGHLIGHT),
+                colorize(&active, BOLD),
+                colorize(model, DIM)
             );
-            println!("{}", draw_step_footer());
-            return Ok(StepResult::Next);
-        }
-
-        // Management loop for existing configuration
-        loop {
-            let active = state
-                .config
-                .agents
-                .defaults
-                .provider
-                .clone()
-                .unwrap_or_else(|| state.config.active_provider_name().to_string());
-
-            // Show provider status list
-            println!("{}", draw_step_line(&colorize("Provider Management", BOLD)));
             println!("{}", colorize(chars.vertical, BRAND));
+        }
 
-            if active != "none" {
-                let model = &state.config.agents.defaults.model;
-                println!(
-                    "{} {} Active: {} ({})",
-                    colorize(chars.vertical, BRAND),
-                    colorize("★", HIGHLIGHT),
-                    colorize(&active, BOLD),
-                    colorize(model, DIM)
-                );
-                println!("{}", colorize(chars.vertical, BRAND));
-            }
+        // Run interactive menu
+        if io::stdin().is_terminal() && io::stdout().is_terminal() {
+            run_provider_menu(state)?;
+        } else {
+            // Non-TTY fallback: keep the old linear flow
+            run_provider_menu_fallback(state)?;
+        }
 
-            print_provider_status_list(&state.config, chars);
-            println!("{}", colorize(chars.vertical, BRAND));
-
-            // Menu
-            let menu_options = vec![
-                SelectOption {
-                    label: "Add / edit a provider",
-                    description: "Configure API key and settings",
-                },
-                SelectOption {
-                    label: "Switch active provider",
-                    description: "Choose which provider to use",
-                },
-                SelectOption {
-                    label: "Set model",
-                    description: "Change the default model",
-                },
-                SelectOption {
-                    label: "Done",
-                    description: "Finish provider setup",
-                },
-            ];
-
-            let choice = prompts::prompt_select("Action", &menu_options, 3)?; // Default to "Done"
-
-            match choice {
-                0 => {
-                    // Configure a provider
-                    println!("{}", colorize(chars.vertical, BRAND));
-                    configure_provider_flow(state)?;
-                }
-                1 => {
-                    // Switch active provider
-                    println!("{}", colorize(chars.vertical, BRAND));
-                    set_active_provider(state)?;
-                }
-                2 => {
-                    // Set model
-                    println!("{}", colorize(chars.vertical, BRAND));
-                    prompt_model_selection(state)?;
-                }
-                3 => {
-                    // Done
-                    if has_any_provider_configured(&state.config) {
-                        // Ensure active provider is set
-                        if state.config.agents.defaults.provider.is_none() {
-                            let detected = state.config.active_provider_name().to_string();
-                            if detected != "none" {
-                                state.config.agents.defaults.provider = Some(detected);
-                            }
-                        }
-
-                        println!("{}", colorize(chars.vertical, BRAND));
-                        let active_name = state.config.active_provider_name();
-                        let model = &state.config.agents.defaults.model;
-                        println!(
-                            "{} {} Provider: {} with model {}",
-                            colorize(chars.vertical, BRAND),
-                            colorize("✓", SUCCESS),
-                            colorize(active_name, BOLD),
-                            colorize(model, DIM)
-                        );
-                        println!("{}", draw_step_footer());
-                        return Ok(StepResult::Next);
-                    }
-
-                    println!(
-                        "{} {} At least one provider must be configured.",
-                        colorize(chars.vertical, BRAND),
-                        colorize("⚠", WARNING)
-                    );
-                }
-                _ => unreachable!(),
+        // Ensure active provider is set
+        if state.config.agents.defaults.provider.is_none() {
+            let detected = state.config.active_provider_name().to_string();
+            if detected != "none" {
+                state.config.agents.defaults.provider = Some(detected);
             }
         }
-    }
-}
 
-/// Display the status of all providers (configured or not).
-fn print_provider_status_list(config: &config::Config, chars: &BoxChars) {
-    let active = config
-        .agents
-        .defaults
-        .provider
-        .as_deref()
-        .unwrap_or_else(|| config.active_provider_name());
-
-    for provider in PROVIDERS {
-        let key = get_provider_key(config, provider.key);
-        let configured = !key.is_empty();
-        let is_active = provider.key == active;
-
-        let icon = if is_active {
-            colorize("★", HIGHLIGHT)
-        } else if configured {
-            colorize("✓", SUCCESS)
-        } else {
-            colorize("○", DIM)
-        };
-
-        let status = if configured {
-            let masked = mask_secret(&key);
-            format!(
-                "{} {}",
-                provider.name,
-                colorize(&format!("({})", masked), DIM)
-            )
-        } else {
-            format!("{} {}", provider.name, colorize("— not configured", DIM))
-        };
-
-        println!("{}  {}  {}", colorize(chars.vertical, BRAND), icon, status);
-    }
-}
-
-/// Configure a specific provider: select which one, enter API key, optional base URL.
-fn configure_provider_flow(state: &mut WizardState) -> Result<()> {
-    let chars = BoxChars::get();
-
-    // Select which provider to configure
-    let options: Vec<SelectOption<'_>> = PROVIDERS
-        .iter()
-        .map(|p| {
-            let key = get_provider_key(&state.config, p.key);
-            let desc = if key.is_empty() {
-                p.description
-            } else {
-                "configured — edit to update"
-            };
-            SelectOption {
-                label: p.name,
-                description: desc,
-            }
-        })
-        .collect();
-
-    println!(
-        "{}",
-        draw_step_line(&colorize("Select Provider to Configure", BOLD))
-    );
-    println!("{}", colorize(chars.vertical, BRAND));
-
-    let idx = prompts::prompt_select("Provider", &options, 0)?;
-    let provider = &PROVIDERS[idx];
-
-    println!("{}", colorize(chars.vertical, BRAND));
-    println!(
-        "{} {} Configuring {}",
-        colorize(chars.vertical, BRAND),
-        colorize("●", BRAND),
-        colorize(provider.name, BOLD)
-    );
-
-    // API key
-    println!("{}", colorize(chars.vertical, BRAND));
-    println!(
-        "{} {} Get your API key at: {}",
-        colorize(chars.vertical, BRAND),
-        colorize("→", BRAND),
-        colorize(provider.api_url, UNDERLINE)
-    );
-    println!("{}", colorize(chars.vertical, BRAND));
-
-    let existing_key = get_provider_key(&state.config, provider.key);
-    let api_key = if existing_key.is_empty() {
-        prompts::prompt_secret("API Key", 10)?
-    } else {
-        match prompts::prompt_secret_with_existing("API Key", &existing_key, 10)? {
-            Some(new_key) => new_key,
-            None => existing_key.clone(),
-        }
-    };
-
-    println!("{}", colorize(chars.vertical, BRAND));
-
-    // Validate key prefix
-    if !provider.key_prefix.is_empty() && !api_key.starts_with(provider.key_prefix) {
+        // Final confirmation
+        println!("{}", colorize(chars.vertical, BRAND));
+        let active_name = state.config.active_provider_name();
+        let model = &state.config.agents.defaults.model;
         println!(
-            "{} {} {} keys usually start with '{}' — please verify",
-            colorize(chars.vertical, BRAND),
-            colorize("⚠", WARNING),
-            provider.name,
-            provider.key_prefix
-        );
-    } else if !provider.key_prefix.is_empty() {
-        println!(
-            "{} {} {}",
+            "{} {} Provider: {} with model {}",
             colorize(chars.vertical, BRAND),
             colorize("✓", SUCCESS),
-            colorize("API key format validated", DIM)
+            colorize(active_name, BOLD),
+            colorize(model, DIM)
         );
+        println!("{}", draw_step_footer());
+        Ok(StepResult::Next)
     }
-
-    state.config.set_provider_key(provider.key, api_key);
-
-    // Custom API base (optional)
-    let existing_base = get_provider_api_base(&state.config, provider.key);
-    println!("{}", colorize(chars.vertical, BRAND));
-
-    if let Some(ref base) = existing_base {
-        println!(
-            "{} Current API base: {}",
-            colorize(chars.vertical, BRAND),
-            colorize(base, DIM)
-        );
-    }
-
-    let custom_base = prompts::prompt_yes_no(
-        "Use a custom API base URL? (for proxies/self-hosted)",
-        existing_base.is_some(),
-    )?;
-
-    if custom_base {
-        println!("{}", colorize(chars.vertical, BRAND));
-        let base_url = prompts::prompt_text("API Base URL", existing_base.as_deref(), true)?;
-        set_provider_api_base(&mut state.config, provider.key, Some(base_url));
-        println!("{}", colorize(chars.vertical, BRAND));
-        println!(
-            "{} {} Custom API base configured",
-            colorize(chars.vertical, BRAND),
-            status_success()
-        );
-    } else if existing_base.is_some() {
-        set_provider_api_base(&mut state.config, provider.key, None);
-    }
-
-    println!("{}", colorize(chars.vertical, BRAND));
-    println!(
-        "{} {} {} configured successfully",
-        colorize(chars.vertical, BRAND),
-        colorize("✓", SUCCESS),
-        colorize(provider.name, BOLD)
-    );
-
-    Ok(())
 }
 
-/// Set the active provider from configured providers.
-fn set_active_provider(state: &mut WizardState) -> Result<()> {
-    let chars = BoxChars::get();
+fn run_provider_menu_fallback(state: &mut WizardState) -> Result<()> {
+    // Simple numbered menu for CI/piped environments
+    loop {
+        let options: Vec<prompts::SelectOption<'_>> = PROVIDERS
+            .iter()
+            .map(|p| prompts::SelectOption {
+                label: p.name,
+                description: p.description,
+            })
+            .chain(std::iter::once(prompts::SelectOption {
+                label: "Done",
+                description: "finish provider setup",
+            }))
+            .collect();
 
-    let configured: Vec<&ProviderInfo> = PROVIDERS
-        .iter()
-        .filter(|p| !get_provider_key(&state.config, p.key).is_empty())
-        .collect();
+        let idx = prompts::prompt_select(
+            "Select provider to configure (or Done)",
+            &options,
+            options.len() - 1,
+        )?;
 
-    if configured.is_empty() {
-        println!(
-            "{} {} No providers configured yet. Add one first.",
-            colorize(chars.vertical, BRAND),
-            colorize("⚠", WARNING)
-        );
-        return Ok(());
+        if idx == PROVIDERS.len() {
+            if has_any_provider_configured(&state.config) {
+                return Ok(());
+            }
+            println!("At least one provider must be configured.");
+            continue;
+        }
+
+        execute_edit_api_key(state, idx)?;
+
+        // Ask to set active
+        if prompts::prompt_yes_no("Set as active provider?", true)? {
+            state.config.agents.defaults.provider = Some(PROVIDERS[idx].key.to_string());
+            execute_change_model(state, idx)?;
+        }
     }
-
-    let options: Vec<SelectOption<'_>> = configured
-        .iter()
-        .map(|p| SelectOption {
-            label: p.name,
-            description: p.description,
-        })
-        .collect();
-
-    let current_active = state
-        .config
-        .agents
-        .defaults
-        .provider
-        .as_deref()
-        .unwrap_or_else(|| state.config.active_provider_name());
-    let default_idx = configured
-        .iter()
-        .position(|p| p.key == current_active)
-        .unwrap_or(0);
-
-    let idx = prompts::prompt_select("Active provider", &options, default_idx)?;
-    let selected = configured[idx];
-
-    state.config.agents.defaults.provider = Some(selected.key.to_string());
-
-    println!("{}", colorize(chars.vertical, BRAND));
-    println!(
-        "{} {} {} set as active provider",
-        colorize(chars.vertical, BRAND),
-        colorize("★", HIGHLIGHT),
-        colorize(selected.name, BOLD)
-    );
-
-    Ok(())
-}
-
-/// Prompt for model selection with current value as default.
-fn prompt_model_selection(state: &mut WizardState) -> Result<()> {
-    let active_key = state
-        .config
-        .agents
-        .defaults
-        .provider
-        .as_deref()
-        .unwrap_or_else(|| state.config.active_provider_name());
-
-    let provider_default = PROVIDERS
-        .iter()
-        .find(|p| p.key == active_key)
-        .map(|p| p.default_model)
-        .unwrap_or("claude-sonnet-4-5");
-
-    let current_model = &state.config.agents.defaults.model;
-    let model_default = if current_model.is_empty() {
-        provider_default
-    } else {
-        current_model
-    };
-
-    let model = prompts::prompt_text("Model", Some(model_default), true)?;
-    state.config.agents.defaults.model = model;
-    Ok(())
 }
 
 /// Check if any provider has an API key configured.
@@ -586,22 +311,6 @@ fn set_provider_api_base(config: &mut config::Config, provider_key: &str, base: 
         "openrouter" => config.providers.openrouter.api_base = base,
         "groq" => config.providers.groq.api_base = base,
         _ => {}
-    }
-}
-
-/// RAII guard for raw mode (same pattern as prompts.rs).
-struct RawModeGuard;
-
-impl RawModeGuard {
-    fn enable() -> Result<Self> {
-        terminal::enable_raw_mode()?;
-        Ok(Self)
-    }
-}
-
-impl Drop for RawModeGuard {
-    fn drop(&mut self) {
-        let _ = terminal::disable_raw_mode();
     }
 }
 
