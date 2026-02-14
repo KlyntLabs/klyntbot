@@ -1,7 +1,7 @@
 //! Discord channel using raw WebSocket Gateway (no serenity).
 
 use async_trait::async_trait;
-use futures_util::{SinkExt, StreamExt};
+use futures_util::SinkExt;
 use reqwest::Client;
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -12,9 +12,10 @@ use std::time::Duration;
 use tokio::sync::{Mutex, RwLock};
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
-use tokio_tungstenite::{connect_async, tungstenite::Message as WsMessage};
+use tokio_tungstenite::tungstenite::Message as WsMessage;
 use tracing::{debug, error, info, warn};
 
+use crate::ws_manager::{HeartbeatStrategy, WebSocketManager, WsConfig, WsHandler, WsSink};
 use crate::{check_allowlist, Channel};
 use bus::{InboundMessage, MessageBus, OutboundMessage};
 use common::{ChannelError, Result};
@@ -30,6 +31,8 @@ pub struct DiscordChannel {
     seq: Arc<RwLock<Option<i64>>>,
     running: Arc<AtomicBool>,
     typing_tasks: Arc<RwLock<HashMap<String, JoinHandle<()>>>>,
+    bus: Mutex<Option<Arc<MessageBus>>>,
+    heartbeat_task: Mutex<Option<JoinHandle<()>>>,
 }
 
 impl DiscordChannel {
@@ -46,167 +49,78 @@ impl DiscordChannel {
             seq: Arc::new(RwLock::new(None)),
             running: Arc::new(AtomicBool::new(false)),
             typing_tasks: Arc::new(RwLock::new(HashMap::new())),
+            bus: Mutex::new(None),
+            heartbeat_task: Mutex::new(None),
         })
     }
 
-    /// Main gateway loop
-    async fn gateway_loop(&self, bus: Arc<MessageBus>) -> Result<()> {
-        info!("Connecting to Discord Gateway: {}", self.config.gateway_url);
+    /// Handle HELLO (op 10) — start heartbeat + send IDENTIFY
+    async fn handle_hello(
+        &self,
+        payload: Option<&Value>,
+        write: &Arc<Mutex<WsSink>>,
+    ) -> Result<()> {
+        if let Some(p) = payload {
+            let interval_ms = p
+                .get("heartbeat_interval")
+                .and_then(|v| v.as_i64())
+                .unwrap_or(45000);
 
-        let (ws_stream, _) = connect_async(&self.config.gateway_url)
-            .await
-            .map_err(|e| ChannelError::ConnectionFailed(e.to_string()))?;
+            info!(
+                "Discord HELLO received, heartbeat interval: {}ms",
+                interval_ms
+            );
 
-        let (write, mut read) = ws_stream.split();
-        let write = Arc::new(Mutex::new(write));
-
-        let mut heartbeat_task: Option<JoinHandle<()>> = None;
-
-        // Read messages
-        while let Some(msg) = read.next().await {
-            if !self.running.load(Ordering::SeqCst) {
-                break;
+            // Abort existing heartbeat task
+            if let Some(task) = self.heartbeat_task.lock().await.take() {
+                task.abort();
             }
 
-            let msg = match msg {
-                Ok(m) => m,
-                Err(e) => {
-                    error!("WebSocket error: {}", e);
-                    break;
+            // Spawn new heartbeat task
+            let seq = self.seq.clone();
+            let running = self.running.clone();
+            let write_shared = Arc::clone(write);
+            let interval_secs = interval_ms as f64 / 1000.0;
+
+            *self.heartbeat_task.lock().await = Some(tokio::spawn(async move {
+                loop {
+                    sleep(Duration::from_secs_f64(interval_secs)).await;
+                    if !running.load(Ordering::SeqCst) {
+                        break;
+                    }
+                    let current_seq = *seq.read().await;
+                    let payload = json!({"op": 1, "d": current_seq});
+                    let mut w = write_shared.lock().await;
+                    if let Err(e) = w.send(WsMessage::text(payload.to_string())).await {
+                        warn!("Heartbeat failed: {}", e);
+                        break;
+                    }
+                    debug!("Sent heartbeat");
                 }
-            };
+            }));
 
-            if let WsMessage::Text(text) = msg {
-                match serde_json::from_str::<Value>(&text) {
-                    Ok(data) => {
-                        let op = data.get("op").and_then(|v| v.as_i64()).unwrap_or(0);
-                        let seq = data.get("s").and_then(|v| v.as_i64());
-                        let event_type = data.get("t").and_then(|v| v.as_str());
-                        let payload = data.get("d");
-
-                        // Update sequence
-                        if let Some(s) = seq {
-                            *self.seq.write().await = Some(s);
-                        }
-
-                        match op {
-                            10 => {
-                                // HELLO - start heartbeat and identify
-                                if let Some(p) = payload {
-                                    let interval_ms = p
-                                        .get("heartbeat_interval")
-                                        .and_then(|v| v.as_i64())
-                                        .unwrap_or(45000);
-
-                                    info!(
-                                        "Discord HELLO received, heartbeat interval: {}ms",
-                                        interval_ms
-                                    );
-
-                                    // Start heartbeat task
-                                    if let Some(task) = heartbeat_task.take() {
-                                        task.abort();
-                                    }
-
-                                    let seq = self.seq.clone();
-                                    let running = self.running.clone();
-                                    let write_shared = Arc::clone(&write);
-                                    let interval_secs = interval_ms as f64 / 1000.0;
-
-                                    heartbeat_task = Some(tokio::spawn(async move {
-                                        loop {
-                                            sleep(Duration::from_secs_f64(interval_secs)).await;
-                                            if !running.load(Ordering::SeqCst) {
-                                                break;
-                                            }
-                                            let current_seq = *seq.read().await;
-                                            let payload = json!({"op": 1, "d": current_seq});
-                                            let mut w = write_shared.lock().await;
-                                            if let Err(e) =
-                                                w.send(WsMessage::text(payload.to_string())).await
-                                            {
-                                                warn!("Heartbeat failed: {}", e);
-                                                break;
-                                            }
-                                            debug!("Sent heartbeat");
-                                        }
-                                    }));
-
-                                    // Send IDENTIFY
-                                    let identify = json!({
-                                        "op": 2,
-                                        "d": {
-                                            "token": self.config.token.expose(),
-                                            "intents": self.config.intents as i64,
-                                            "properties": {
-                                                "os": "klyntbot",
-                                                "browser": "klyntbot",
-                                                "device": "klyntbot"
-                                            }
-                                        }
-                                    });
-
-                                    {
-                                        let mut w = write.lock().await;
-                                        if let Err(e) =
-                                            w.send(WsMessage::text(identify.to_string())).await
-                                        {
-                                            error!("Failed to send IDENTIFY: {}", e);
-                                            break;
-                                        }
-                                    }
-                                    debug!("Sent IDENTIFY");
-                                }
-                            }
-                            0 => {
-                                // Dispatch event
-                                match event_type {
-                                    Some("READY") => {
-                                        info!("Discord gateway READY");
-                                    }
-                                    Some("MESSAGE_CREATE") => {
-                                        if let Some(p) = payload {
-                                            if let Err(e) =
-                                                self.handle_message_create(p, &bus).await
-                                            {
-                                                error!("Error handling MESSAGE_CREATE: {}", e);
-                                            }
-                                        }
-                                    }
-                                    _ => {
-                                        debug!("Unhandled event: {:?}", event_type);
-                                    }
-                                }
-                            }
-                            7 => {
-                                // RECONNECT
-                                info!("Discord requested reconnect");
-                                break;
-                            }
-                            9 => {
-                                // INVALID_SESSION
-                                warn!("Discord invalid session");
-                                break;
-                            }
-                            11 => {
-                                // HEARTBEAT_ACK
-                                debug!("Received heartbeat ACK");
-                            }
-                            _ => {
-                                debug!("Unknown opcode: {}", op);
-                            }
-                        }
+            // Send IDENTIFY
+            let identify = json!({
+                "op": 2,
+                "d": {
+                    "token": self.config.token.expose(),
+                    "intents": self.config.intents as i64,
+                    "properties": {
+                        "os": "klyntbot",
+                        "browser": "klyntbot",
+                        "device": "klyntbot"
                     }
-                    Err(e) => {
-                        warn!("Failed to parse gateway message: {}", e);
-                    }
+                }
+            });
+
+            {
+                let mut w = write.lock().await;
+                if let Err(e) = w.send(WsMessage::text(identify.to_string())).await {
+                    error!("Failed to send IDENTIFY: {}", e);
+                    return Err(ChannelError::ConnectionFailed("IDENTIFY failed".into()).into());
                 }
             }
-        }
-
-        // Cleanup
-        if let Some(task) = heartbeat_task {
-            task.abort();
+            debug!("Sent IDENTIFY");
         }
 
         Ok(())
@@ -291,7 +205,11 @@ impl DiscordChannel {
             content_parts.push(content.to_string());
         }
 
-        let mut media_paths = Vec::new();
+        let attachment_count = payload
+            .get("attachments")
+            .and_then(|v| v.as_array())
+            .map_or(0, |a| a.len());
+        let mut media_paths = Vec::with_capacity(attachment_count);
 
         // Handle attachments - download them
         if let Some(attachments) = payload.get("attachments").and_then(|v| v.as_array()) {
@@ -385,7 +303,7 @@ impl DiscordChannel {
         self.start_typing(channel_id.to_string()).await;
 
         // Build metadata
-        let mut metadata = HashMap::new();
+        let mut metadata = HashMap::with_capacity(3);
         if let Some(msg_id) = payload.get("id").and_then(|v| v.as_str()) {
             metadata.insert("message_id".to_string(), json!(msg_id));
         }
@@ -496,6 +414,96 @@ impl DiscordChannel {
 }
 
 #[async_trait]
+impl WsHandler for DiscordChannel {
+    async fn on_connected(
+        &self,
+        _write: &Arc<Mutex<WsSink>>,
+    ) -> Result<Option<HeartbeatStrategy>> {
+        // Discord doesn't handshake here — it waits for HELLO (op 10)
+        // which arrives as a text message. Heartbeat is managed internally.
+        Ok(Some(HeartbeatStrategy::None))
+    }
+
+    async fn on_text_message(
+        &self,
+        text: &str,
+        write: &Arc<Mutex<WsSink>>,
+    ) -> Result<bool> {
+        let data: Value = match serde_json::from_str(text) {
+            Ok(d) => d,
+            Err(e) => {
+                warn!("Failed to parse gateway message: {}", e);
+                return Ok(true);
+            }
+        };
+
+        let op = data.get("op").and_then(|v| v.as_i64()).unwrap_or(0);
+        let seq = data.get("s").and_then(|v| v.as_i64());
+        let event_type = data.get("t").and_then(|v| v.as_str());
+        let payload = data.get("d");
+
+        // Update sequence
+        if let Some(s) = seq {
+            *self.seq.write().await = Some(s);
+        }
+
+        match op {
+            10 => {
+                // HELLO — start heartbeat + send IDENTIFY
+                self.handle_hello(payload, write).await?;
+            }
+            0 => {
+                // Dispatch event
+                match event_type {
+                    Some("READY") => {
+                        info!("Discord gateway READY");
+                    }
+                    Some("MESSAGE_CREATE") => {
+                        if let Some(p) = payload {
+                            let bus_guard = self.bus.lock().await;
+                            if let Some(bus) = bus_guard.as_ref() {
+                                if let Err(e) = self.handle_message_create(p, bus).await {
+                                    error!("Error handling MESSAGE_CREATE: {}", e);
+                                }
+                            }
+                        }
+                    }
+                    _ => {
+                        debug!("Unhandled event: {:?}", event_type);
+                    }
+                }
+            }
+            7 => {
+                // RECONNECT
+                info!("Discord requested reconnect");
+                return Ok(false);
+            }
+            9 => {
+                // INVALID_SESSION
+                warn!("Discord invalid session");
+                return Ok(false);
+            }
+            11 => {
+                // HEARTBEAT_ACK
+                debug!("Received heartbeat ACK");
+            }
+            _ => {
+                debug!("Unknown opcode: {}", op);
+            }
+        }
+
+        Ok(true)
+    }
+
+    async fn on_disconnected(&self) {
+        // Abort heartbeat task
+        if let Some(task) = self.heartbeat_task.lock().await.take() {
+            task.abort();
+        }
+    }
+}
+
+#[async_trait]
 impl Channel for DiscordChannel {
     fn name(&self) -> &str {
         "discord"
@@ -503,8 +511,17 @@ impl Channel for DiscordChannel {
 
     async fn start(&self, bus: Arc<MessageBus>) -> Result<()> {
         self.running.store(true, Ordering::SeqCst);
+        *self.bus.lock().await = Some(bus);
 
-        super::reconnect_loop("Discord", &self.running, || self.gateway_loop(bus.clone())).await;
+        let config = WsConfig {
+            url: self.config.gateway_url.clone(),
+            heartbeat: HeartbeatStrategy::None, // Discord manages its own heartbeat
+            ..Default::default()
+        };
+
+        let manager = WebSocketManager::new(self.running.clone());
+
+        super::reconnect_loop("Discord", &self.running, || manager.run(&config, self)).await;
 
         // Cleanup typing tasks
         let tasks: Vec<_> = self.typing_tasks.write().await.drain().collect();

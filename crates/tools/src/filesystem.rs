@@ -7,6 +7,7 @@ use tokio::fs;
 use tracing::debug;
 
 use super::{RoutingContext, Tool};
+use crate::params::ParamExtractor;
 use common::{Result, ToolError};
 
 /// Resolve path and optionally enforce directory restriction
@@ -85,10 +86,8 @@ impl Tool for ReadFileTool {
     }
 
     async fn execute(&self, args: Value, _ctx: &RoutingContext) -> Result<String> {
-        let path = args
-            .get("path")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| ToolError::InvalidParams("missing 'path' parameter".to_string()))?;
+        let p = ParamExtractor::new(&args);
+        let path = p.required_str("path")?;
 
         debug!("Reading file: {}", path);
 
@@ -149,15 +148,9 @@ impl Tool for WriteFileTool {
     }
 
     async fn execute(&self, args: Value, _ctx: &RoutingContext) -> Result<String> {
-        let path = args
-            .get("path")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| ToolError::InvalidParams("missing 'path' parameter".to_string()))?;
-
-        let content = args
-            .get("content")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| ToolError::InvalidParams("missing 'content' parameter".to_string()))?;
+        let p = ParamExtractor::new(&args);
+        let path = p.required_str("path")?;
+        let content = p.required_str("content")?;
 
         debug!("Writing file: {}", path);
 
@@ -227,20 +220,10 @@ impl Tool for EditFileTool {
     }
 
     async fn execute(&self, args: Value, _ctx: &RoutingContext) -> Result<String> {
-        let path = args
-            .get("path")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| ToolError::InvalidParams("missing 'path' parameter".to_string()))?;
-
-        let old_text = args
-            .get("old_text")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| ToolError::InvalidParams("missing 'old_text' parameter".to_string()))?;
-
-        let new_text = args
-            .get("new_text")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| ToolError::InvalidParams("missing 'new_text' parameter".to_string()))?;
+        let p = ParamExtractor::new(&args);
+        let path = p.required_str("path")?;
+        let old_text = p.required_str("old_text")?;
+        let new_text = p.required_str("new_text")?;
 
         debug!("Editing file: {}", path);
 
@@ -318,10 +301,8 @@ impl Tool for ListDirTool {
     }
 
     async fn execute(&self, args: Value, _ctx: &RoutingContext) -> Result<String> {
-        let path = args
-            .get("path")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| ToolError::InvalidParams("missing 'path' parameter".to_string()))?;
+        let p = ParamExtractor::new(&args);
+        let path = p.required_str("path")?;
 
         debug!("Listing directory: {}", path);
 

@@ -6,6 +6,7 @@ use std::sync::Arc;
 use tracing::debug;
 
 use super::{RoutingContext, Tool};
+use crate::params::ParamExtractor;
 use common::{Result, ToolError};
 
 /// Trait for spawning subagents (dependency inversion to avoid circular dependencies).
@@ -75,15 +76,9 @@ impl Tool for SpawnTool {
     }
 
     async fn execute(&self, args: Value, ctx: &RoutingContext) -> Result<String> {
-        let task = args
-            .get("task")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| ToolError::InvalidParams("missing 'task' parameter".to_string()))?;
-
-        let label = args
-            .get("label")
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string());
+        let p = ParamExtractor::new(&args);
+        let task = p.required_str("task")?;
+        let label = p.optional_str("label")?.map(|s| s.to_string());
 
         debug!("Spawning subagent for task: {}", task);
 

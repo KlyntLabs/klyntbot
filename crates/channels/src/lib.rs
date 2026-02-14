@@ -20,6 +20,7 @@ pub mod qq;
 pub mod slack;
 pub mod telegram;
 pub mod whatsapp;
+pub mod ws_manager;
 
 pub use discord::DiscordChannel;
 #[cfg(feature = "email")]

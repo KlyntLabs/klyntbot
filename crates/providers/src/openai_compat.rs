@@ -62,7 +62,8 @@ impl OpenAiCompatProvider {
             .ok_or_else(|| ProviderError::InvalidResponse("No choices in response".to_string()))?;
 
         let message = &choice.message;
-        let mut tool_calls = Vec::new();
+        let call_count = message.tool_calls.as_ref().map_or(0, |c| c.len());
+        let mut tool_calls = Vec::with_capacity(call_count);
 
         // Parse tool calls if present
         if let Some(calls) = &message.tool_calls {

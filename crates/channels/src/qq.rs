@@ -1,7 +1,6 @@
 //! QQ channel using direct WebSocket connection to QQ Bot API.
 
 use async_trait::async_trait;
-use futures_util::{SinkExt, StreamExt};
 use reqwest::Client;
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -9,10 +8,11 @@ use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::RwLock;
-use tokio_tungstenite::{connect_async, tungstenite::Message as WsMessage};
-use tracing::{debug, error, info, warn};
+use tokio::sync::{Mutex, RwLock};
+use tokio_tungstenite::tungstenite::Message as WsMessage;
+use tracing::{debug, info, warn};
 
+use crate::ws_manager::{HeartbeatStrategy, WebSocketManager, WsConfig, WsHandler, WsSink};
 use crate::{check_allowlist, Channel};
 use bus::{InboundMessage, MessageBus, OutboundMessage};
 use common::{ChannelError, Result};
@@ -28,6 +28,8 @@ pub struct QQChannel {
     access_token: Arc<RwLock<Option<String>>>,
     processed_ids: Arc<RwLock<VecDeque<String>>>,
     running: Arc<AtomicBool>,
+    bus: Mutex<Option<Arc<MessageBus>>>,
+    seq: RwLock<Option<i64>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -76,6 +78,8 @@ impl QQChannel {
             access_token: Arc::new(RwLock::new(None)),
             processed_ids: Arc::new(RwLock::new(VecDeque::with_capacity(1000))),
             running: Arc::new(AtomicBool::new(false)),
+            bus: Mutex::new(None),
+            seq: RwLock::new(None),
         })
     }
 
@@ -113,71 +117,19 @@ impl QQChannel {
         Ok(auth.access_token)
     }
 
-    /// WebSocket gateway loop
-    async fn gateway_loop(&self, bus: Arc<MessageBus>) -> Result<()> {
-        // Authenticate first
-        let token = self.authenticate().await?;
-        *self.access_token.write().await = Some(token.clone());
-
-        info!("Connecting to QQ Gateway: {}", QQ_WS_URL);
-
-        let (ws_stream, _) = connect_async(QQ_WS_URL)
-            .await
-            .map_err(|e| ChannelError::ConnectionFailed(e.to_string()))?;
-
-        let (mut write, mut read) = ws_stream.split();
-        let mut seq: Option<i64> = None;
-        let _heartbeat_interval = Duration::from_secs(30);
-
-        info!("Connected to QQ Gateway");
-
-        while self.running.load(Ordering::SeqCst) {
-            let msg = match tokio::time::timeout(Duration::from_secs(35), read.next()).await {
-                Ok(Some(Ok(msg))) => msg,
-                Ok(Some(Err(e))) => {
-                    error!("WebSocket error: {}", e);
-                    break;
-                }
-                Ok(None) => {
-                    warn!("WebSocket closed");
-                    break;
-                }
-                Err(_) => {
-                    // Timeout - send heartbeat
-                    let payload = json!({"op": 1, "d": seq});
-                    if let Err(e) = write.send(WsMessage::text(payload.to_string())).await {
-                        error!("Failed to send heartbeat: {}", e);
-                        break;
-                    }
-                    debug!("Sent heartbeat");
-                    continue;
-                }
-            };
-
-            if let WsMessage::Text(text) = msg {
-                if let Err(e) = self.handle_gateway_event(&text, &bus, &mut seq).await {
-                    error!("Error handling gateway event: {}", e);
-                }
-            }
-        }
-
-        Ok(())
-    }
-
     /// Handle a gateway event
     async fn handle_gateway_event(
         &self,
         text: &str,
         bus: &MessageBus,
-        seq: &mut Option<i64>,
-    ) -> Result<()> {
+    ) -> Result<bool> {
         let payload: WsPayload = serde_json::from_str(text).map_err(|e| {
             ChannelError::SendFailed(format!("Failed to parse gateway message: {}", e))
         })?;
 
         // Update sequence
         if let Some(s) = payload.s {
-            *seq = Some(s);
+            *self.seq.write().await = Some(s);
         }
 
         match payload.op {
@@ -200,12 +152,7 @@ impl QQChannel {
                                 debug!("Ready payload: {:?}", d);
                             }
                         }
-                        "C2C_MESSAGE_CREATE" => {
-                            if let Some(d) = payload.d {
-                                self.handle_c2c_message(&d, bus).await?;
-                            }
-                        }
-                        "DIRECT_MESSAGE_CREATE" => {
+                        "C2C_MESSAGE_CREATE" | "DIRECT_MESSAGE_CREATE" => {
                             if let Some(d) = payload.d {
                                 self.handle_c2c_message(&d, bus).await?;
                             }
@@ -219,14 +166,12 @@ impl QQChannel {
             7 => {
                 // RECONNECT
                 info!("QQ Gateway requested reconnect");
-                return Err(
-                    ChannelError::ConnectionFailed("Reconnect requested".to_string()).into(),
-                );
+                return Ok(false);
             }
             9 => {
                 // INVALID_SESSION
                 warn!("QQ Gateway invalid session");
-                return Err(ChannelError::ConnectionFailed("Invalid session".to_string()).into());
+                return Ok(false);
             }
             11 => {
                 // HEARTBEAT_ACK
@@ -237,7 +182,7 @@ impl QQChannel {
             }
         }
 
-        Ok(())
+        Ok(true)
     }
 
     /// Handle C2C (direct/private) message
@@ -321,6 +266,33 @@ impl QQChannel {
 }
 
 #[async_trait]
+impl WsHandler for QQChannel {
+    async fn on_connected(
+        &self,
+        _write: &Arc<Mutex<WsSink>>,
+    ) -> Result<Option<HeartbeatStrategy>> {
+        info!("Connected to QQ Gateway");
+        Ok(None) // Use default heartbeat from config
+    }
+
+    async fn on_text_message(
+        &self,
+        text: &str,
+        _write: &Arc<Mutex<WsSink>>,
+    ) -> Result<bool> {
+        let bus_guard = self.bus.lock().await;
+        if let Some(bus) = bus_guard.as_ref() {
+            return self.handle_gateway_event(text, bus).await;
+        }
+        Ok(true)
+    }
+
+    async fn on_disconnected(&self) {
+        debug!("Disconnected from QQ Gateway");
+    }
+}
+
+#[async_trait]
 impl Channel for QQChannel {
     fn name(&self) -> &str {
         "qq"
@@ -336,7 +308,27 @@ impl Channel for QQChannel {
 
         self.running.store(true, Ordering::SeqCst);
 
-        super::reconnect_loop("QQ", &self.running, || self.gateway_loop(bus.clone())).await;
+        // Authenticate before connecting
+        let token = self.authenticate().await?;
+        *self.access_token.write().await = Some(token);
+        *self.bus.lock().await = Some(bus);
+
+        let config = WsConfig {
+            url: QQ_WS_URL.to_string(),
+            heartbeat: HeartbeatStrategy::Timeout {
+                timeout: Duration::from_secs(35),
+                build_payload: Box::new(move || {
+                    // Build heartbeat with current sequence (best-effort read)
+                    let payload = json!({"op": 1, "d": null});
+                    WsMessage::text(payload.to_string())
+                }),
+            },
+            ..Default::default()
+        };
+
+        let manager = WebSocketManager::new(self.running.clone());
+
+        super::reconnect_loop("QQ", &self.running, || manager.run(&config, self)).await;
 
         Ok(())
     }

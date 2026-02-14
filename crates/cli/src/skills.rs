@@ -8,7 +8,7 @@ use anyhow::Result;
 pub async fn handle_skills(cmd: SkillsCommands) -> Result<()> {
     match cmd {
         SkillsCommands::List => {
-            let config = config::load()?;
+            let config = config::load().await?;
             let workspace = config.workspace_path();
 
             let mut skill_manager = SkillManager::new();
@@ -49,7 +49,7 @@ pub async fn handle_skills(cmd: SkillsCommands) -> Result<()> {
             println!("Total: {} skill(s)", skills.len());
         }
         SkillsCommands::Info { name } => {
-            let config = config::load()?;
+            let config = config::load().await?;
             let workspace = config.workspace_path();
 
             let mut skill_manager = SkillManager::new();
@@ -91,7 +91,7 @@ pub async fn handle_skills(cmd: SkillsCommands) -> Result<()> {
             }
         }
         SkillsCommands::Path => {
-            let config = config::load()?;
+            let config = config::load().await?;
             let skills_path = config.workspace_path().join("skills");
             println!("{}", skills_path.display());
         }

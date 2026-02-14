@@ -1,6 +1,7 @@
 //! Shell execution tool with safety guards.
 
 use async_trait::async_trait;
+use once_cell::sync::Lazy;
 use regex::Regex;
 use serde_json::Value;
 use std::path::{Path, PathBuf};
@@ -10,13 +11,45 @@ use tokio::time::timeout;
 use tracing::{debug, warn};
 
 use super::{RoutingContext, Tool};
+use crate::params::ParamExtractor;
 use common::{Result, ToolError};
+
+/// Compiled deny patterns — built once on first access, shared across all ExecTool instances.
+static DENY_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
+    [
+        r"\brm\s+-[rf]{1,2}\b",            // rm -r, rm -rf, rm -fr
+        r"\bdel\s+/[fq]\b",                // del /f, del /q
+        r"\brmdir\s+/s\b",                 // rmdir /s
+        r"\b(format|mkfs|diskpart)\b",     // disk operations
+        r"\bdd\s+if=",                     // dd
+        r">\s*/dev/sd",                    // write to disk
+        r"\b(shutdown|reboot|poweroff)\b", // system power
+        r":\(\)\s*\{.*\};\s*:",            // fork bomb
+        r"\bcurl\s+.*\|\s*(sh|bash)\b",    // curl pipe to shell
+        r"\bwget\s+.*\|\s*(sh|bash)\b",    // wget pipe to shell
+        r"\bnc\s+-[el]",                   // netcat listeners
+        r"\bchmod\s+[0-7]*777\b",          // world-writable permissions
+        r"\bchown\s+root\b",               // chown to root
+        r"\bsudo\b",                       // sudo commands
+        r"\bsu\s+-\b",                     // switch user
+        r"\b(iptables|firewall-cmd)\b",    // firewall changes
+        r"\bcrontab\s+-[re]\b",            // crontab edit/remove
+        r"\bpasswd\b",                     // password changes
+    ]
+    .iter()
+    .filter_map(|p| Regex::new(p).ok())
+    .collect()
+});
+
+/// Workspace path guard patterns — compiled once, used in guard_command.
+static WIN_PATH_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r#"[A-Za-z]:\\[^\\"']+"#).unwrap());
+static POSIX_PATH_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r#"(?:^|[\s|>])(/[^\s"'>]+)"#).unwrap());
 
 /// Tool to execute shell commands
 pub struct ExecTool {
     timeout: Duration,
     working_dir: Option<PathBuf>,
-    deny_patterns: Vec<Regex>,
     allow_patterns: Vec<Regex>,
     restrict_to_workspace: bool,
 }
@@ -27,37 +60,9 @@ impl ExecTool {
         working_dir: Option<PathBuf>,
         restrict_to_workspace: bool,
     ) -> Self {
-        // Default deny patterns for safety
-        let deny_patterns = [
-            r"\brm\s+-[rf]{1,2}\b",            // rm -r, rm -rf, rm -fr
-            r"\bdel\s+/[fq]\b",                // del /f, del /q
-            r"\brmdir\s+/s\b",                 // rmdir /s
-            r"\b(format|mkfs|diskpart)\b",     // disk operations
-            r"\bdd\s+if=",                     // dd
-            r">\s*/dev/sd",                    // write to disk
-            r"\b(shutdown|reboot|poweroff)\b", // system power
-            r":\(\)\s*\{.*\};\s*:",            // fork bomb
-            r"\bcurl\s+.*\|\s*(sh|bash)\b",    // curl pipe to shell
-            r"\bwget\s+.*\|\s*(sh|bash)\b",    // wget pipe to shell
-            r"\bnc\s+-[el]",                   // netcat listeners
-            r"\bchmod\s+[0-7]*777\b",          // world-writable permissions
-            r"\bchown\s+root\b",               // chown to root
-            r"\bsudo\b",                       // sudo commands
-            r"\bsu\s+-\b",                     // switch user
-            r"\b(iptables|firewall-cmd)\b",    // firewall changes
-            r"\bcrontab\s+-[re]\b",            // crontab edit/remove
-            r"\bpasswd\b",                     // password changes
-        ];
-
-        let compiled_deny = deny_patterns
-            .iter()
-            .filter_map(|p| Regex::new(p).ok())
-            .collect();
-
         Self {
             timeout: Duration::from_secs(timeout_secs),
             working_dir,
-            deny_patterns: compiled_deny,
             allow_patterns: Vec::new(),
             restrict_to_workspace,
         }
@@ -74,7 +79,7 @@ impl ExecTool {
         let lower = cmd.to_lowercase();
 
         // Check deny patterns
-        for pattern in &self.deny_patterns {
+        for pattern in DENY_PATTERNS.iter() {
             if pattern.is_match(&lower) {
                 return Err(
                     "Command blocked by safety guard (dangerous pattern detected)".to_string(),
@@ -99,10 +104,7 @@ impl ExecTool {
             let cwd_resolved = cwd.canonicalize().unwrap_or_else(|_| cwd.to_path_buf());
 
             // Check for absolute paths in command
-            let win_path_re = Regex::new(r#"[A-Za-z]:\\[^\\"']+"#).unwrap();
-            let posix_path_re = Regex::new(r#"(?:^|[\s|>])(/[^\s"'>]+)"#).unwrap();
-
-            for cap in win_path_re.captures_iter(cmd) {
+            for cap in WIN_PATH_RE.captures_iter(cmd) {
                 if let Some(path_match) = cap.get(0) {
                     if let Ok(p) = PathBuf::from(path_match.as_str().trim()).canonicalize() {
                         if p.is_absolute() && !p.starts_with(&cwd_resolved) && p != cwd_resolved {
@@ -115,7 +117,7 @@ impl ExecTool {
                 }
             }
 
-            for cap in posix_path_re.captures_iter(cmd) {
+            for cap in POSIX_PATH_RE.captures_iter(cmd) {
                 if let Some(path_match) = cap.get(1) {
                     if let Ok(p) = PathBuf::from(path_match.as_str().trim()).canonicalize() {
                         if p.is_absolute() && !p.starts_with(&cwd_resolved) && p != cwd_resolved {
@@ -161,14 +163,11 @@ impl Tool for ExecTool {
     }
 
     async fn execute(&self, args: Value, _ctx: &RoutingContext) -> Result<String> {
-        let command = args
-            .get("command")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| ToolError::InvalidParams("missing 'command' parameter".to_string()))?;
+        let p = ParamExtractor::new(&args);
+        let command = p.required_str("command")?;
 
-        let working_dir = args
-            .get("working_dir")
-            .and_then(|v| v.as_str())
+        let working_dir = p
+            .optional_str("working_dir")?
             .map(PathBuf::from)
             .or_else(|| self.working_dir.clone())
             .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
@@ -204,7 +203,7 @@ impl Tool for ExecTool {
 
         match timeout(self.timeout, child).await {
             Ok(Ok(output)) => {
-                let mut result_parts = Vec::new();
+                let mut result_parts = Vec::with_capacity(3);
 
                 if !output.stdout.is_empty() {
                     let stdout = String::from_utf8_lossy(&output.stdout);

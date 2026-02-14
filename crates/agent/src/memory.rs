@@ -14,11 +14,11 @@ pub struct MemoryStore {
 
 impl MemoryStore {
     /// Create a new memory store
-    pub fn new(workspace_path: PathBuf) -> Self {
+    pub async fn new(workspace_path: PathBuf) -> Self {
         let memory_dir = workspace_path.join("memory");
 
         // Create memory directory if it doesn't exist
-        if let Err(e) = std::fs::create_dir_all(&memory_dir) {
+        if let Err(e) = tokio::fs::create_dir_all(&memory_dir).await {
             warn!("Failed to create memory directory: {}", e);
         }
 

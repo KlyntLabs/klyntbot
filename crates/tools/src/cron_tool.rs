@@ -6,6 +6,7 @@ use std::sync::Arc;
 use tracing::debug;
 
 use super::{RoutingContext, Tool};
+use crate::params::ParamExtractor;
 use common::{Result, ToolError};
 
 /// Format timestamp milliseconds to human-readable string
@@ -132,10 +133,8 @@ impl Tool for CronTool {
     }
 
     async fn execute(&self, args: Value, ctx: &RoutingContext) -> Result<String> {
-        let action = args
-            .get("action")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| ToolError::InvalidParams("missing 'action' parameter".to_string()))?;
+        let p = ParamExtractor::new(&args);
+        let action = p.required_str("action")?;
 
         debug!("Cron action: {}", action);
 
@@ -146,35 +145,25 @@ impl Tool for CronTool {
 
         match action {
             "add" => {
-                let name = args
-                    .get("name")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("scheduled task");
-
-                let message = args
-                    .get("message")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| {
-                        ToolError::InvalidParams("missing 'message' parameter for add".to_string())
-                    })?;
+                let name = p.str_or("name", "scheduled task")?;
+                let message = p.required_str("message")?;
 
                 // Determine schedule type
-                let schedule =
-                    if let Some(every_s) = args.get("every_seconds").and_then(|v| v.as_u64()) {
-                        CronSchedule::Every {
-                            every_ms: every_s * 1000,
-                        }
-                    } else if let Some(cron_expr) = args.get("cron_expr").and_then(|v| v.as_str()) {
-                        CronSchedule::Cron {
-                            expr: cron_expr.to_string(),
-                            tz: None,
-                        }
-                    } else {
-                        return Err(ToolError::InvalidParams(
-                            "must specify 'every_seconds' or 'cron_expr'".to_string(),
-                        )
-                        .into());
-                    };
+                let schedule = if let Some(every_s) = p.optional_u64("every_seconds")? {
+                    CronSchedule::Every {
+                        every_ms: every_s * 1000,
+                    }
+                } else if let Some(cron_expr) = p.optional_str("cron_expr")? {
+                    CronSchedule::Cron {
+                        expr: cron_expr.to_string(),
+                        tz: None,
+                    }
+                } else {
+                    return Err(ToolError::InvalidParams(
+                        "must specify 'every_seconds' or 'cron_expr'".to_string(),
+                    )
+                    .into());
+                };
 
                 // Use routing context for scheduling
                 let params = AddCronJobParams {
@@ -222,9 +211,7 @@ impl Tool for CronTool {
                 Ok(output)
             }
             "remove" => {
-                let job_id = args.get("job_id").and_then(|v| v.as_str()).ok_or_else(|| {
-                    ToolError::InvalidParams("missing 'job_id' parameter for remove".to_string())
-                })?;
+                let job_id = p.required_str("job_id")?;
 
                 let removed = handler.remove_job(job_id).await?;
                 if removed {

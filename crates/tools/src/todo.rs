@@ -9,6 +9,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use super::{RoutingContext, Tool};
+use crate::params::ParamExtractor;
 use crate::todo_store::TodoStore;
 use crate::todo_types::{Todo, TodoFilter, TodoPatch, TodoStatus};
 use common::{Result, ToolError};
@@ -104,44 +105,25 @@ impl Tool for TodoTool {
     }
 
     async fn execute(&self, args: Value, _ctx: &RoutingContext) -> Result<String> {
-        let action = args
-            .get("action")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| ToolError::InvalidParams("missing 'action' parameter".to_string()))?;
+        let p = ParamExtractor::new(&args);
+        let action = p.required_str("action")?;
 
         let mut store = self.store.write().await;
 
         match action {
             "add" => {
-                let title = args.get("title").and_then(|v| v.as_str()).ok_or_else(|| {
-                    ToolError::InvalidParams("missing 'title' parameter".to_string())
-                })?;
+                let title = p.required_str("title")?;
 
                 let todo = Todo {
                     id: Todo::generate_id(),
                     title: title.to_string(),
-                    description: args
-                        .get("description")
-                        .and_then(|v| v.as_str())
-                        .map(String::from),
-                    priority: args
-                        .get("priority")
-                        .and_then(|v| v.as_u64())
-                        .map(|p| p as u8),
-                    due_date: args
-                        .get("due_date")
-                        .and_then(|v| v.as_str())
+                    description: p.optional_str("description")?.map(String::from),
+                    priority: p.optional_u64("priority")?.map(|v| v as u8),
+                    due_date: p
+                        .optional_str("due_date")?
                         .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
                         .map(|dt| dt.with_timezone(&Utc)),
-                    tags: args
-                        .get("tags")
-                        .and_then(|v| v.as_array())
-                        .map(|arr| {
-                            arr.iter()
-                                .filter_map(|v| v.as_str().map(String::from))
-                                .collect()
-                        })
-                        .unwrap_or_default(),
+                    tags: p.string_array_or_empty("tags")?,
                     status: TodoStatus::Todo,
                     focused_at: None,
                     focus_deadline: None,
@@ -160,25 +142,16 @@ impl Tool for TodoTool {
 
             "list" => {
                 let filter = TodoFilter {
-                    status: args
-                        .get("status")
-                        .and_then(|v| v.as_str())
-                        .and_then(|s| match s {
-                            "todo" => Some(TodoStatus::Todo),
-                            "doing" => Some(TodoStatus::Doing),
-                            "done" => Some(TodoStatus::Done),
-                            "archived" => Some(TodoStatus::Archived),
-                            _ => None,
-                        }),
-                    priority_min: args
-                        .get("priority_min")
-                        .and_then(|v| v.as_u64())
-                        .map(|p| p as u8),
-                    tag: args.get("tag").and_then(|v| v.as_str()).map(String::from),
-                    limit: args
-                        .get("limit")
-                        .and_then(|v| v.as_u64())
-                        .map(|l| l as usize),
+                    status: p.optional_str("status")?.and_then(|s| match s {
+                        "todo" => Some(TodoStatus::Todo),
+                        "doing" => Some(TodoStatus::Doing),
+                        "done" => Some(TodoStatus::Done),
+                        "archived" => Some(TodoStatus::Archived),
+                        _ => None,
+                    }),
+                    priority_min: p.optional_u64("priority_min")?.map(|v| v as u8),
+                    tag: p.optional_str("tag")?.map(String::from),
+                    limit: p.optional_u64("limit")?.map(|l| l as usize),
                 };
 
                 let todos = store.list(&filter).await?;
@@ -201,40 +174,28 @@ impl Tool for TodoTool {
             }
 
             "update" => {
-                let id = args.get("id").and_then(|v| v.as_str()).ok_or_else(|| {
-                    ToolError::InvalidParams("missing 'id' parameter".to_string())
-                })?;
+                let id = p.required_str("id")?;
 
                 let patch = TodoPatch {
-                    title: args.get("title").and_then(|v| v.as_str()).map(String::from),
-                    description: args
-                        .get("description")
-                        .and_then(|v| v.as_str())
-                        .map(|s| Some(s.to_string())),
-                    priority: args
-                        .get("priority")
-                        .and_then(|v| v.as_u64())
-                        .map(|p| p as u8),
-                    due_date: args
-                        .get("due_date")
-                        .and_then(|v| v.as_str())
+                    title: p.optional_str("title")?.map(String::from),
+                    description: p.optional_str("description")?.map(|s| Some(s.to_string())),
+                    priority: p.optional_u64("priority")?.map(|v| v as u8),
+                    due_date: p
+                        .optional_str("due_date")?
                         .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
                         .map(|dt| Some(dt.with_timezone(&Utc))),
-                    tags: args.get("tags").and_then(|v| v.as_array()).map(|arr| {
+                    tags: p.optional_array("tags")?.map(|arr| {
                         arr.iter()
                             .filter_map(|v| v.as_str().map(String::from))
                             .collect()
                     }),
-                    status: args
-                        .get("status")
-                        .and_then(|v| v.as_str())
-                        .and_then(|s| match s {
-                            "todo" => Some(TodoStatus::Todo),
-                            "doing" => Some(TodoStatus::Doing),
-                            "done" => Some(TodoStatus::Done),
-                            "archived" => Some(TodoStatus::Archived),
-                            _ => None,
-                        }),
+                    status: p.optional_str("status")?.and_then(|s| match s {
+                        "todo" => Some(TodoStatus::Todo),
+                        "doing" => Some(TodoStatus::Doing),
+                        "done" => Some(TodoStatus::Done),
+                        "archived" => Some(TodoStatus::Archived),
+                        _ => None,
+                    }),
                 };
 
                 match store.update(id, patch).await? {
@@ -246,9 +207,7 @@ impl Tool for TodoTool {
             }
 
             "complete" => {
-                let id = args.get("id").and_then(|v| v.as_str()).ok_or_else(|| {
-                    ToolError::InvalidParams("missing 'id' parameter".to_string())
-                })?;
+                let id = p.required_str("id")?;
 
                 let patch = TodoPatch {
                     status: Some(TodoStatus::Done),
@@ -264,9 +223,7 @@ impl Tool for TodoTool {
             }
 
             "delete" => {
-                let id = args.get("id").and_then(|v| v.as_str()).ok_or_else(|| {
-                    ToolError::InvalidParams("missing 'id' parameter".to_string())
-                })?;
+                let id = p.required_str("id")?;
 
                 if store.delete(id).await? {
                     Ok(format!("Deleted task: {}", id))
@@ -276,9 +233,7 @@ impl Tool for TodoTool {
             }
 
             "show" => {
-                let id = args.get("id").and_then(|v| v.as_str()).ok_or_else(|| {
-                    ToolError::InvalidParams("missing 'id' parameter".to_string())
-                })?;
+                let id = p.required_str("id")?;
 
                 match store.get(id).await? {
                     Some(todo) => {
@@ -318,9 +273,7 @@ impl Tool for TodoTool {
             }
 
             "focus" => {
-                let id = args.get("id").and_then(|v| v.as_str()).ok_or_else(|| {
-                    ToolError::InvalidParams("missing 'id' parameter".to_string())
-                })?;
+                let id = p.required_str("id")?;
 
                 // ADR-008: Use config values, not hardcoded
                 if store
@@ -334,9 +287,7 @@ impl Tool for TodoTool {
             }
 
             "unfocus" => {
-                let id = args.get("id").and_then(|v| v.as_str()).ok_or_else(|| {
-                    ToolError::InvalidParams("missing 'id' parameter".to_string())
-                })?;
+                let id = p.required_str("id")?;
 
                 if store.unfocus(id).await? {
                     Ok(format!("Unfocused task: {}", id))

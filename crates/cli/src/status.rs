@@ -12,7 +12,7 @@ pub async fn handle_brief_status() -> Result<()> {
     println!();
 
     if exists {
-        let config = config::load()?;
+        let config = config::load().await?;
 
         // Status indicator
         let has_api_key = !config.providers.anthropic.api_key.is_empty()
@@ -64,7 +64,7 @@ pub async fn handle_status(verbose: bool) -> Result<()> {
     println!();
 
     if exists {
-        let config = config::load()?;
+        let config = config::load().await?;
         let workspace = config.workspace_path();
 
         // Determine active provider

@@ -1,21 +1,45 @@
-//! TodoStore - JSONL persistence for todo system
+//! TodoStore - Append-only JSONL persistence for todo system
 //!
-//! Provides lazy-loading JSONL storage with full CRUD operations,
-//! focus management, and summary generation.
+//! Uses an append-only journal pattern for O(1) writes instead of O(n) full rewrites.
+//! Journal entries are either upserts (full Todo) or deletes (tombstones).
+//! Periodic compaction rewrites the file when stale entries exceed a threshold.
 
 use chrono::Utc;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use tokio::fs;
+use tokio::io::AsyncWriteExt;
 
 use crate::todo_types::{Todo, TodoFilter, TodoPatch, TodoStatus, TodoSummary};
 use common::Result;
 
-/// JSONL-backed todo storage with lazy loading
+/// Compaction threshold: compact when journal has this many more entries than live todos
+const COMPACTION_THRESHOLD: usize = 100;
+
+/// A single entry in the append-only journal.
+///
+/// Tagged enum serialized as `{"_op":"upsert","todo":{...}}` or `{"_op":"delete","id":"..."}`.
+/// Plain Todo JSON lines (legacy format) are handled during load for backwards compatibility.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "_op")]
+enum JournalEntry {
+    #[serde(rename = "upsert")]
+    Upsert { todo: Todo },
+    #[serde(rename = "delete")]
+    Delete { id: String },
+}
+
+/// Append-only JSONL-backed todo storage with lazy loading and automatic compaction
 pub struct TodoStore {
     file_path: PathBuf,
-    todos: Vec<Todo>,
+    /// In-memory index: id -> Todo (authoritative state after load)
+    index: HashMap<String, Todo>,
+    /// Ordered list of live todo IDs (preserves insertion order)
+    order: Vec<String>,
     loaded: bool,
-    dirty: bool,
+    /// Number of journal entries on disk (including stale/overwritten ones)
+    journal_len: usize,
 }
 
 impl TodoStore {
@@ -23,9 +47,10 @@ impl TodoStore {
     pub fn new(file_path: PathBuf) -> Self {
         Self {
             file_path,
-            todos: Vec::new(),
+            index: HashMap::new(),
+            order: Vec::new(),
             loaded: false,
-            dirty: false,
+            journal_len: 0,
         }
     }
 
@@ -37,31 +62,124 @@ impl TodoStore {
         Ok(())
     }
 
-    /// Load todos from JSONL file
+    /// Load todos from JSONL file, replaying the journal to build the index.
+    ///
+    /// Supports both legacy format (plain Todo JSON) and new journal format (JournalEntry).
     async fn load(&mut self) -> Result<()> {
         if !self.file_path.exists() {
-            self.todos = Vec::new();
+            self.index = HashMap::new();
+            self.order = Vec::new();
             self.loaded = true;
+            self.journal_len = 0;
             return Ok(());
         }
 
         let content = fs::read_to_string(&self.file_path).await?;
-        self.todos = content
-            .lines()
-            .filter(|line| !line.trim().is_empty())
-            .filter_map(|line| serde_json::from_str::<Todo>(line).ok())
-            .collect();
+        let mut index = HashMap::new();
+        let mut order = Vec::new();
+        let mut journal_len = 0;
 
+        for line in content.lines() {
+            let line = line.trim();
+            if line.is_empty() {
+                continue;
+            }
+            journal_len += 1;
+
+            // Try new journal format first, then fall back to legacy plain Todo
+            if let Ok(entry) = serde_json::from_str::<JournalEntry>(line) {
+                match entry {
+                    JournalEntry::Upsert { todo } => {
+                        if !index.contains_key(&todo.id) {
+                            order.push(todo.id.clone());
+                        }
+                        index.insert(todo.id.clone(), todo);
+                    }
+                    JournalEntry::Delete { id } => {
+                        if index.remove(&id).is_some() {
+                            order.retain(|oid| oid != &id);
+                        }
+                    }
+                }
+            } else if let Ok(todo) = serde_json::from_str::<Todo>(line) {
+                // Legacy format: plain Todo JSON line treated as upsert
+                if !index.contains_key(&todo.id) {
+                    order.push(todo.id.clone());
+                }
+                index.insert(todo.id.clone(), todo);
+            }
+            // Malformed lines are silently skipped (backwards compatible)
+        }
+
+        self.index = index;
+        self.order = order;
+        self.journal_len = journal_len;
         self.loaded = true;
         Ok(())
     }
 
-    /// Save todos to JSONL file (full rewrite)
-    async fn save(&self) -> Result<()> {
-        let mut content = String::new();
-        for todo in &self.todos {
-            content.push_str(&serde_json::to_string(todo)?);
-            content.push('\n');
+    /// Append a single journal entry to the file (O(1) write)
+    async fn append_entry(&mut self, entry: &JournalEntry) -> Result<()> {
+        // Ensure parent dir exists
+        if let Some(parent) = self.file_path.parent() {
+            fs::create_dir_all(parent).await?;
+        }
+
+        let mut file = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&self.file_path)
+            .await?;
+
+        let mut line = serde_json::to_string(entry)?;
+        line.push('\n');
+        file.write_all(line.as_bytes()).await?;
+        file.flush().await?;
+
+        self.journal_len += 1;
+        Ok(())
+    }
+
+    /// Append multiple journal entries in a single buffered write
+    async fn append_entries(&mut self, entries: &[JournalEntry]) -> Result<()> {
+        if entries.is_empty() {
+            return Ok(());
+        }
+
+        // Ensure parent dir exists
+        if let Some(parent) = self.file_path.parent() {
+            fs::create_dir_all(parent).await?;
+        }
+
+        let mut file = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&self.file_path)
+            .await?;
+
+        let mut buf = String::new();
+        for entry in entries {
+            buf.push_str(&serde_json::to_string(entry)?);
+            buf.push('\n');
+        }
+        file.write_all(buf.as_bytes()).await?;
+        file.flush().await?;
+
+        self.journal_len += entries.len();
+        Ok(())
+    }
+
+    /// Compact the journal file: rewrite with only live entries.
+    ///
+    /// Called automatically when stale entries exceed the threshold.
+    async fn compact(&mut self) -> Result<()> {
+        let mut content = String::with_capacity(self.index.len() * 256);
+        for id in &self.order {
+            if let Some(todo) = self.index.get(id) {
+                let entry = JournalEntry::Upsert { todo: todo.clone() };
+                content.push_str(&serde_json::to_string(&entry)?);
+                content.push('\n');
+            }
         }
 
         // Ensure parent dir exists
@@ -70,7 +188,25 @@ impl TodoStore {
         }
 
         fs::write(&self.file_path, content).await?;
+        self.journal_len = self.index.len();
         Ok(())
+    }
+
+    /// Check if compaction is needed and run it
+    async fn maybe_compact(&mut self) -> Result<()> {
+        let stale = self.journal_len.saturating_sub(self.index.len());
+        if stale >= COMPACTION_THRESHOLD {
+            self.compact().await?;
+        }
+        Ok(())
+    }
+
+    /// Helper: get ordered Vec of live todos (from index, in insertion order)
+    fn todos_ordered(&self) -> Vec<&Todo> {
+        self.order
+            .iter()
+            .filter_map(|id| self.index.get(id))
+            .collect()
     }
 
     /// Add a new todo
@@ -79,24 +215,27 @@ impl TodoStore {
 
         todo.updated_at = Utc::now();
 
-        self.todos.push(todo.clone());
-        self.dirty = true;
-        self.save().await?;
+        let entry = JournalEntry::Upsert { todo: todo.clone() };
+        self.append_entry(&entry).await?;
 
+        self.order.push(todo.id.clone());
+        self.index.insert(todo.id.clone(), todo.clone());
+
+        self.maybe_compact().await?;
         Ok(todo)
     }
 
-    /// Get a todo by ID
+    /// Get a todo by ID (O(1) lookup)
     pub async fn get(&mut self, id: &str) -> Result<Option<Todo>> {
         self.ensure_loaded().await?;
-        Ok(self.todos.iter().find(|t| t.id == id).cloned())
+        Ok(self.index.get(id).cloned())
     }
 
     /// Update a todo with a patch
     pub async fn update(&mut self, id: &str, patch: TodoPatch) -> Result<Option<Todo>> {
         self.ensure_loaded().await?;
 
-        let updated = if let Some(todo) = self.todos.iter_mut().find(|t| t.id == id) {
+        let updated = if let Some(todo) = self.index.get_mut(id) {
             if let Some(title) = patch.title {
                 todo.title = title;
             }
@@ -133,9 +272,10 @@ impl TodoStore {
             None
         };
 
-        if updated.is_some() {
-            self.dirty = true;
-            self.save().await?;
+        if let Some(ref todo) = updated {
+            let entry = JournalEntry::Upsert { todo: todo.clone() };
+            self.append_entry(&entry).await?;
+            self.maybe_compact().await?;
         }
 
         Ok(updated)
@@ -145,12 +285,12 @@ impl TodoStore {
     pub async fn delete(&mut self, id: &str) -> Result<bool> {
         self.ensure_loaded().await?;
 
-        let before_len = self.todos.len();
-        self.todos.retain(|t| t.id != id);
+        if self.index.remove(id).is_some() {
+            self.order.retain(|oid| oid != id);
 
-        if self.todos.len() < before_len {
-            self.dirty = true;
-            self.save().await?;
+            let entry = JournalEntry::Delete { id: id.to_string() };
+            self.append_entry(&entry).await?;
+            self.maybe_compact().await?;
             Ok(true)
         } else {
             Ok(false)
@@ -162,8 +302,8 @@ impl TodoStore {
         self.ensure_loaded().await?;
 
         let mut filtered: Vec<Todo> = self
-            .todos
-            .iter()
+            .todos_ordered()
+            .into_iter()
             .filter(|t| {
                 if let Some(status) = filter.status {
                     if t.status != status {
@@ -197,7 +337,11 @@ impl TodoStore {
         self.ensure_loaded().await?;
 
         // Check slot limit
-        let focused_count = self.todos.iter().filter(|t| t.focused_at.is_some()).count();
+        let focused_count = self
+            .index
+            .values()
+            .filter(|t| t.focused_at.is_some())
+            .count();
         if focused_count >= max_slots {
             return Err(common::KlyntbotError::Tool(
                 common::ToolError::ExecutionFailed(format!(
@@ -207,14 +351,15 @@ impl TodoStore {
             ));
         }
 
-        if let Some(todo) = self.todos.iter_mut().find(|t| t.id == id) {
+        if let Some(todo) = self.index.get_mut(id) {
             let now = Utc::now();
             todo.focused_at = Some(now);
             todo.focus_deadline = Some(now + chrono::Duration::hours(deadline_hours as i64));
             todo.updated_at = now;
 
-            self.dirty = true;
-            self.save().await?;
+            let entry = JournalEntry::Upsert { todo: todo.clone() };
+            self.append_entry(&entry).await?;
+            self.maybe_compact().await?;
             Ok(true)
         } else {
             Ok(false)
@@ -225,13 +370,14 @@ impl TodoStore {
     pub async fn unfocus(&mut self, id: &str) -> Result<bool> {
         self.ensure_loaded().await?;
 
-        if let Some(todo) = self.todos.iter_mut().find(|t| t.id == id) {
+        if let Some(todo) = self.index.get_mut(id) {
             todo.focused_at = None;
             todo.focus_deadline = None;
             todo.updated_at = Utc::now();
 
-            self.dirty = true;
-            self.save().await?;
+            let entry = JournalEntry::Upsert { todo: todo.clone() };
+            self.append_entry(&entry).await?;
+            self.maybe_compact().await?;
             Ok(true)
         } else {
             Ok(false)
@@ -242,8 +388,8 @@ impl TodoStore {
     pub async fn focused(&mut self) -> Result<Vec<Todo>> {
         self.ensure_loaded().await?;
         Ok(self
-            .todos
-            .iter()
+            .todos_ordered()
+            .into_iter()
             .filter(|t| t.focused_at.is_some())
             .cloned()
             .collect())
@@ -254,8 +400,8 @@ impl TodoStore {
         self.ensure_loaded().await?;
         let now = Utc::now();
         Ok(self
-            .todos
-            .iter()
+            .todos_ordered()
+            .into_iter()
             .filter(|t| {
                 if let Some(deadline) = t.focus_deadline {
                     deadline < now
@@ -276,26 +422,38 @@ impl TodoStore {
 
         let now = Utc::now();
         let mut affected = Vec::new();
+        let mut entries = Vec::new();
 
-        for todo in self.todos.iter_mut() {
-            if let Some(deadline) = todo.focus_deadline {
-                if deadline < now {
-                    // Increment expired count
-                    todo.focus_expired_count += 1;
+        // Collect IDs to modify (can't mutate index while iterating)
+        let expired_ids: Vec<String> = self
+            .index
+            .values()
+            .filter(|t| {
+                t.focus_deadline
+                    .map(|deadline| deadline < now)
+                    .unwrap_or(false)
+            })
+            .map(|t| t.id.clone())
+            .collect();
 
-                    // Clear focus fields
-                    todo.focused_at = None;
-                    todo.focus_deadline = None;
-                    todo.updated_at = now;
+        for id in expired_ids {
+            if let Some(todo) = self.index.get_mut(&id) {
+                // Increment expired count
+                todo.focus_expired_count += 1;
 
-                    affected.push(todo.clone());
-                }
+                // Clear focus fields
+                todo.focused_at = None;
+                todo.focus_deadline = None;
+                todo.updated_at = now;
+
+                affected.push(todo.clone());
+                entries.push(JournalEntry::Upsert { todo: todo.clone() });
             }
         }
 
-        if !affected.is_empty() {
-            self.dirty = true;
-            self.save().await?;
+        if !entries.is_empty() {
+            self.append_entries(&entries).await?;
+            self.maybe_compact().await?;
         }
 
         Ok(affected)
@@ -305,14 +463,13 @@ impl TodoStore {
     pub async fn summary(&mut self) -> Result<TodoSummary> {
         self.ensure_loaded().await?;
 
-        use std::collections::HashMap;
         let now = Utc::now();
 
         let mut by_status = HashMap::new();
         let mut overdue = Vec::new();
         let mut upcoming_week = Vec::new();
 
-        for todo in &self.todos {
+        for todo in self.index.values() {
             *by_status.entry(todo.status).or_insert(0) += 1;
 
             if let Some(due) = todo.due_date {
@@ -325,7 +482,7 @@ impl TodoStore {
         }
 
         Ok(TodoSummary {
-            total: self.todos.len(),
+            total: self.index.len(),
             by_status,
             overdue,
             upcoming_week,
@@ -368,8 +525,8 @@ impl TodoStore {
 
         // Backlog
         let active: Vec<_> = self
-            .todos
-            .iter()
+            .todos_ordered()
+            .into_iter()
             .filter(|t| {
                 t.status != TodoStatus::Done
                     && t.status != TodoStatus::Archived
@@ -441,7 +598,7 @@ mod tests {
     async fn test_new_store_not_loaded() {
         let (store, _dir) = create_test_store().await;
         assert!(!store.loaded);
-        assert_eq!(store.todos.len(), 0);
+        assert_eq!(store.index.len(), 0);
     }
 
     #[tokio::test]
@@ -896,5 +1053,255 @@ mod tests {
         assert!(context.contains("Test task for context"));
         assert!(context.contains("## 📋 Backlog"));
         assert!(context.contains("## Stats"));
+    }
+
+    // ── Append-only specific tests ──────────────────────────────────────
+
+    #[tokio::test]
+    async fn test_append_only_journal_format() {
+        // Verify the file uses journal entries, not plain Todo lines
+        let (mut store, _dir) = create_test_store().await;
+        let todo = create_test_todo("Journal test");
+        store.add(todo).await.unwrap();
+
+        let content = fs::read_to_string(&store.file_path).await.unwrap();
+        let line = content.lines().next().unwrap();
+
+        // Should contain the _op tag
+        assert!(
+            line.contains("\"_op\":\"upsert\""),
+            "Should use journal format"
+        );
+        assert!(line.contains("\"todo\":"), "Should wrap todo in entry");
+    }
+
+    #[tokio::test]
+    async fn test_delete_writes_tombstone() {
+        let (mut store, _dir) = create_test_store().await;
+        let todo = create_test_todo("To tombstone");
+        let id = todo.id.clone();
+
+        store.add(todo).await.unwrap();
+        store.delete(&id).await.unwrap();
+
+        let content = fs::read_to_string(&store.file_path).await.unwrap();
+        let lines: Vec<&str> = content.lines().collect();
+
+        assert_eq!(lines.len(), 2, "Should have upsert + delete entries");
+        assert!(
+            lines[1].contains("\"_op\":\"delete\""),
+            "Second line should be tombstone"
+        );
+        assert!(
+            lines[1].contains(&id),
+            "Tombstone should reference the deleted ID"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_update_appends_not_rewrites() {
+        let (mut store, _dir) = create_test_store().await;
+        let todo = create_test_todo("Original");
+        let id = todo.id.clone();
+
+        store.add(todo).await.unwrap();
+
+        let patch = TodoPatch {
+            title: Some("Updated".to_string()),
+            ..Default::default()
+        };
+        store.update(&id, patch).await.unwrap();
+
+        let content = fs::read_to_string(&store.file_path).await.unwrap();
+        let lines: Vec<&str> = content.lines().filter(|l| !l.is_empty()).collect();
+
+        // Should have 2 entries: original add + update (both upserts)
+        assert_eq!(lines.len(), 2, "Should append, not rewrite");
+    }
+
+    #[tokio::test]
+    async fn test_journal_replay_deduplicates() {
+        // Write a journal with duplicate entries for the same ID
+        let (mut store, dir) = create_test_store().await;
+
+        let todo = create_test_todo("V1");
+        let id = todo.id.clone();
+        store.add(todo).await.unwrap();
+
+        let patch = TodoPatch {
+            title: Some("V2".to_string()),
+            ..Default::default()
+        };
+        store.update(&id, patch).await.unwrap();
+
+        // Reload from disk
+        let file_path = dir.path().join("todos.jsonl");
+        let mut store2 = TodoStore::new(file_path);
+
+        let todos = store2.list(&TodoFilter::default()).await.unwrap();
+        assert_eq!(todos.len(), 1, "Should deduplicate to 1 todo");
+        assert_eq!(todos[0].title, "V2", "Should use the latest version");
+    }
+
+    #[tokio::test]
+    async fn test_journal_replay_respects_deletes() {
+        let (mut store, dir) = create_test_store().await;
+
+        let todo = create_test_todo("Will be deleted");
+        let id = todo.id.clone();
+        store.add(todo).await.unwrap();
+        store.delete(&id).await.unwrap();
+
+        // Reload from disk
+        let file_path = dir.path().join("todos.jsonl");
+        let mut store2 = TodoStore::new(file_path);
+
+        let todos = store2.list(&TodoFilter::default()).await.unwrap();
+        assert_eq!(
+            todos.len(),
+            0,
+            "Deleted todo should not appear after replay"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_backwards_compat_legacy_format() {
+        // Write legacy format (plain Todo JSON lines) and verify we can read them
+        let (mut store, _dir) = create_test_store().await;
+
+        let todo1 = create_test_todo("Legacy 1");
+        let todo2 = create_test_todo("Legacy 2");
+        let id1 = todo1.id.clone();
+
+        let content = format!(
+            "{}\n{}\n",
+            serde_json::to_string(&todo1).unwrap(),
+            serde_json::to_string(&todo2).unwrap()
+        );
+
+        // Ensure parent dir exists
+        if let Some(parent) = store.file_path.parent() {
+            fs::create_dir_all(parent).await.unwrap();
+        }
+        fs::write(&store.file_path, content).await.unwrap();
+
+        store.load().await.unwrap();
+
+        let todos = store.list(&TodoFilter::default()).await.unwrap();
+        assert_eq!(todos.len(), 2, "Should load legacy format");
+        assert!(store.get(&id1).await.unwrap().is_some());
+    }
+
+    #[tokio::test]
+    async fn test_compaction_reduces_file_size() {
+        let (mut store, _dir) = create_test_store().await;
+
+        // Add a todo and update it many times to grow the journal
+        let todo = create_test_todo("Compaction test");
+        let id = todo.id.clone();
+        store.add(todo).await.unwrap();
+
+        for i in 0..50 {
+            let patch = TodoPatch {
+                title: Some(format!("Version {}", i)),
+                ..Default::default()
+            };
+            store.update(&id, patch).await.unwrap();
+        }
+
+        // Journal should have 51 entries (1 add + 50 updates), 1 live todo
+        let content_before = fs::read_to_string(&store.file_path).await.unwrap();
+        let lines_before = content_before.lines().filter(|l| !l.is_empty()).count();
+        assert_eq!(lines_before, 51);
+
+        // Force compaction
+        store.compact().await.unwrap();
+
+        let content_after = fs::read_to_string(&store.file_path).await.unwrap();
+        let lines_after = content_after.lines().filter(|l| !l.is_empty()).count();
+        assert_eq!(lines_after, 1, "Compaction should reduce to 1 live entry");
+
+        // Verify data integrity after compaction
+        let retrieved = store.get(&id).await.unwrap().unwrap();
+        assert_eq!(retrieved.title, "Version 49");
+    }
+
+    #[tokio::test]
+    async fn test_auto_compaction_triggers() {
+        let (mut store, _dir) = create_test_store().await;
+
+        // Add a todo and update it COMPACTION_THRESHOLD times
+        let todo = create_test_todo("Auto compact");
+        let id = todo.id.clone();
+        store.add(todo).await.unwrap();
+
+        for i in 0..COMPACTION_THRESHOLD {
+            let patch = TodoPatch {
+                title: Some(format!("V{}", i)),
+                ..Default::default()
+            };
+            store.update(&id, patch).await.unwrap();
+        }
+
+        // After COMPACTION_THRESHOLD stale entries, compaction should have run
+        let content = fs::read_to_string(&store.file_path).await.unwrap();
+        let lines = content.lines().filter(|l| !l.is_empty()).count();
+
+        // After compaction, should be just the live entries (1 todo)
+        assert_eq!(lines, 1, "Auto-compaction should have cleaned up");
+        assert_eq!(store.journal_len, 1);
+
+        // Data should still be correct
+        let retrieved = store.get(&id).await.unwrap().unwrap();
+        assert_eq!(retrieved.title, format!("V{}", COMPACTION_THRESHOLD - 1));
+    }
+
+    #[tokio::test]
+    async fn test_mixed_legacy_and_journal_format() {
+        // Simulate a migration scenario: file starts with legacy lines, then journal entries
+        let (mut store, _dir) = create_test_store().await;
+
+        let legacy_todo = create_test_todo("Legacy");
+        let legacy_id = legacy_todo.id.clone();
+
+        let journal_todo = create_test_todo("Journal");
+        let journal_id = journal_todo.id.clone();
+        let journal_entry = JournalEntry::Upsert { todo: journal_todo };
+
+        let content = format!(
+            "{}\n{}\n",
+            serde_json::to_string(&legacy_todo).unwrap(),
+            serde_json::to_string(&journal_entry).unwrap()
+        );
+
+        if let Some(parent) = store.file_path.parent() {
+            fs::create_dir_all(parent).await.unwrap();
+        }
+        fs::write(&store.file_path, content).await.unwrap();
+
+        store.load().await.unwrap();
+
+        assert!(store.get(&legacy_id).await.unwrap().is_some());
+        assert!(store.get(&journal_id).await.unwrap().is_some());
+        let todos = store.list(&TodoFilter::default()).await.unwrap();
+        assert_eq!(todos.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_insertion_order_preserved() {
+        let (mut store, _dir) = create_test_store().await;
+
+        let todo_a = create_test_todo("Alpha");
+        let todo_b = create_test_todo("Beta");
+        let todo_c = create_test_todo("Charlie");
+
+        store.add(todo_a.clone()).await.unwrap();
+        store.add(todo_b.clone()).await.unwrap();
+        store.add(todo_c.clone()).await.unwrap();
+
+        let todos = store.list(&TodoFilter::default()).await.unwrap();
+        assert_eq!(todos[0].title, "Alpha");
+        assert_eq!(todos[1].title, "Beta");
+        assert_eq!(todos[2].title, "Charlie");
     }
 }

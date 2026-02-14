@@ -7,12 +7,12 @@ use anyhow::Result;
 pub async fn handle_config(cmd: ConfigCommands) -> Result<()> {
     match cmd {
         ConfigCommands::Show => {
-            let config = config::load()?;
+            let config = config::load().await?;
             let json = serde_json::to_string_pretty(&config)?;
             println!("{}", json);
         }
         ConfigCommands::Get { key } => {
-            let config = config::load()?;
+            let config = config::load().await?;
             let json = serde_json::to_value(&config)?;
 
             // Navigate the dot-notation path
@@ -30,7 +30,7 @@ pub async fn handle_config(cmd: ConfigCommands) -> Result<()> {
         }
         ConfigCommands::Set { key, value } => {
             let config_path = config::config_path()?;
-            let content = std::fs::read_to_string(&config_path)?;
+            let content = tokio::fs::read_to_string(&config_path).await?;
             let mut json: serde_json::Value = serde_json::from_str(&content)?;
 
             // Parse the value as JSON first, fall back to string if it fails
@@ -46,7 +46,7 @@ pub async fn handle_config(cmd: ConfigCommands) -> Result<()> {
 
                 // Save back to file
                 let content = serde_json::to_string_pretty(&json)?;
-                std::fs::write(&config_path, content)?;
+                tokio::fs::write(&config_path, content).await?;
 
                 println!("✓ Set {} = {}", key, value);
             } else {
@@ -77,7 +77,7 @@ pub async fn handle_config(cmd: ConfigCommands) -> Result<()> {
             }
 
             // Validate the edited config
-            match config::load() {
+            match config::load().await {
                 Ok(_) => {
                     println!("✓ Configuration is valid");
                 }
@@ -99,13 +99,13 @@ pub async fn handle_config(cmd: ConfigCommands) -> Result<()> {
 
             // Create default config
             let default_config = config::Config::default();
-            config::save(&default_config)?;
+            config::save(&default_config).await?;
 
             println!("✓ Reset configuration to defaults");
             println!("Config: {}", config_path.display());
         }
         ConfigCommands::Validate => {
-            let config = config::load()?;
+            let config = config::load().await?;
             println!("✓ Configuration is valid");
             println!("  Model: {}", config.agents.defaults.model);
             println!("  Workspace: {}", config.agents.defaults.workspace);

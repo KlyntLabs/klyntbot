@@ -7,6 +7,7 @@ use tracing::{debug, warn};
 use url::Url;
 
 use super::{RoutingContext, Tool};
+use crate::params::ParamExtractor;
 use common::{Result, ToolError};
 
 /// Tool for web search via Brave Search API
@@ -59,16 +60,9 @@ impl Tool for WebSearchTool {
     }
 
     async fn execute(&self, args: Value, _ctx: &RoutingContext) -> Result<String> {
-        let query = args
-            .get("query")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| ToolError::InvalidParams("missing 'query' parameter".to_string()))?;
-
-        let count = args
-            .get("count")
-            .and_then(|v| v.as_i64())
-            .unwrap_or(self.max_results as i64)
-            .clamp(1, 10);
+        let p = ParamExtractor::new(&args);
+        let query = p.required_str("query")?;
+        let count = p.i64_or("count", self.max_results as i64)?.clamp(1, 10);
 
         let api_key = self.api_key.as_ref().ok_or_else(|| {
             ToolError::ExecutionFailed("Brave Search API key not configured".to_string())
@@ -201,15 +195,9 @@ impl Tool for WebFetchTool {
     }
 
     async fn execute(&self, args: Value, _ctx: &RoutingContext) -> Result<String> {
-        let url_str = args
-            .get("url")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| ToolError::InvalidParams("missing 'url' parameter".to_string()))?;
-
-        let max_chars = args
-            .get("max_chars")
-            .and_then(|v| v.as_i64())
-            .unwrap_or(50000) as usize;
+        let p = ParamExtractor::new(&args);
+        let url_str = p.required_str("url")?;
+        let max_chars = p.i64_or("max_chars", 50000)? as usize;
 
         debug!("Fetching URL: {}", url_str);
 

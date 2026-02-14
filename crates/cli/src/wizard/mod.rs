@@ -138,7 +138,7 @@ pub async fn run_wizard() -> Result<()> {
     }
 
     // Save configuration
-    config::save(&state.config)?;
+    config::save(&state.config).await?;
 
     // Completion screen
     print_completion();

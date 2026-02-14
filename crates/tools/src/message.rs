@@ -6,6 +6,7 @@ use tokio::sync::mpsc;
 use tracing::debug;
 
 use super::{RoutingContext, Tool};
+use crate::params::ParamExtractor;
 use bus::OutboundMessage;
 use common::{Result, ToolError};
 
@@ -52,21 +53,17 @@ impl Tool for MessageTool {
     }
 
     async fn execute(&self, args: Value, ctx: &RoutingContext) -> Result<String> {
-        let content = args
-            .get("content")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| ToolError::InvalidParams("missing 'content' parameter".to_string()))?;
+        let p = ParamExtractor::new(&args);
+        let content = p.required_str("content")?;
 
         // Use provided context or optional overrides from args
-        let channel = args
-            .get("channel")
-            .and_then(|v| v.as_str())
+        let channel = p
+            .optional_str("channel")?
             .map(|s| s.to_string())
             .unwrap_or_else(|| ctx.channel.as_str().to_string());
 
-        let chat_id = args
-            .get("chat_id")
-            .and_then(|v| v.as_str())
+        let chat_id = p
+            .optional_str("chat_id")?
             .map(|s| s.to_string())
             .unwrap_or_else(|| ctx.chat_id.as_str().to_string());
 

@@ -97,13 +97,9 @@ impl HeartbeatService {
     }
 
     /// Read HEARTBEAT.md content
-    fn read_heartbeat_file(&self) -> Option<String> {
+    async fn read_heartbeat_file(&self) -> Option<String> {
         let path = self.heartbeat_file();
-        if path.exists() {
-            std::fs::read_to_string(&path).ok()
-        } else {
-            None
-        }
+        tokio::fs::read_to_string(&path).await.ok()
     }
 
     /// Start the heartbeat service
@@ -160,7 +156,7 @@ impl HeartbeatService {
 
     /// Execute a single heartbeat tick
     async fn tick(&self) {
-        let content = self.read_heartbeat_file();
+        let content = self.read_heartbeat_file().await;
 
         // Skip if HEARTBEAT.md is empty or doesn't exist
         if is_heartbeat_empty(content.as_deref()) {

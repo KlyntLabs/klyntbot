@@ -1,29 +1,27 @@
 //! WhatsApp channel via WebSocket bridge to Node.js Baileys.
 
 use async_trait::async_trait;
-use futures_util::{stream::SplitSink, SinkExt, StreamExt};
+use futures_util::SinkExt;
 use serde_json::{json, Value};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
-use tokio_tungstenite::{
-    connect_async, tungstenite::Message as WsMessage, MaybeTlsStream, WebSocketStream,
-};
+use tokio_tungstenite::tungstenite::Message as WsMessage;
 use tracing::{debug, error, info, warn};
 
+use crate::ws_manager::{HeartbeatStrategy, WebSocketManager, WsConfig, WsHandler, WsSink};
 use crate::{check_allowlist, Channel};
 use bus::{InboundMessage, MessageBus, OutboundMessage};
 use common::{ChannelError, Result};
 use config::WhatsAppConfig;
 
-type WsWriter = SplitSink<WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>, WsMessage>;
-
 /// WhatsApp channel implementation
 pub struct WhatsAppChannel {
     config: WhatsAppConfig,
     running: Arc<AtomicBool>,
-    ws_writer: Arc<Mutex<Option<WsWriter>>>,
+    bus: Mutex<Option<Arc<MessageBus>>>,
+    ws_writer: Arc<Mutex<Option<Arc<Mutex<WsSink>>>>>,
 }
 
 impl WhatsAppChannel {
@@ -32,66 +30,9 @@ impl WhatsAppChannel {
         Self {
             config,
             running: Arc::new(AtomicBool::new(false)),
+            bus: Mutex::new(None),
             ws_writer: Arc::new(Mutex::new(None)),
         }
-    }
-
-    /// WebSocket connection loop
-    async fn ws_loop(&self, bus: Arc<MessageBus>) -> Result<()> {
-        info!("Connecting to WhatsApp bridge: {}", self.config.bridge_url);
-
-        let (ws_stream, _) = connect_async(&self.config.bridge_url)
-            .await
-            .map_err(|e| ChannelError::ConnectionFailed(e.to_string()))?;
-
-        let (write, mut read) = ws_stream.split();
-
-        // Store the write half for sending messages
-        {
-            let mut writer = self.ws_writer.lock().await;
-            *writer = Some(write);
-        }
-
-        info!("Connected to WhatsApp bridge");
-
-        while self.running.load(Ordering::SeqCst) {
-            let msg = match tokio::time::timeout(Duration::from_secs(30), read.next()).await {
-                Ok(Some(Ok(msg))) => msg,
-                Ok(Some(Err(e))) => {
-                    error!("WebSocket error: {}", e);
-                    break;
-                }
-                Ok(None) => {
-                    warn!("WebSocket closed");
-                    break;
-                }
-                Err(_) => {
-                    // Timeout - send ping
-                    let mut writer = self.ws_writer.lock().await;
-                    if let Some(ws) = writer.as_mut() {
-                        if let Err(e) = ws.send(WsMessage::Ping(vec![].into())).await {
-                            error!("Failed to send ping: {}", e);
-                            break;
-                        }
-                    }
-                    continue;
-                }
-            };
-
-            if let WsMessage::Text(text) = msg {
-                if let Err(e) = self.handle_message(&text, &bus).await {
-                    error!("Error handling message: {}", e);
-                }
-            }
-        }
-
-        // Clear the writer when connection ends
-        {
-            let mut writer = self.ws_writer.lock().await;
-            *writer = None;
-        }
-
-        Ok(())
     }
 
     /// Handle a message from the bridge
@@ -103,7 +44,6 @@ impl WhatsAppChannel {
 
         match msg_type {
             "qr" => {
-                // QR code for authentication
                 if let Some(qr) = data.get("qr").and_then(|v| v.as_str()) {
                     info!("WhatsApp QR code: {}", qr);
                     info!("Scan this QR code with WhatsApp to authenticate");
@@ -164,6 +104,35 @@ impl WhatsAppChannel {
 }
 
 #[async_trait]
+impl WsHandler for WhatsAppChannel {
+    async fn on_connected(
+        &self,
+        write: &Arc<Mutex<WsSink>>,
+    ) -> Result<Option<HeartbeatStrategy>> {
+        // Store the write half for send()
+        *self.ws_writer.lock().await = Some(Arc::clone(write));
+        info!("Connected to WhatsApp bridge");
+        Ok(None) // Use default heartbeat from config
+    }
+
+    async fn on_text_message(
+        &self,
+        text: &str,
+        _write: &Arc<Mutex<WsSink>>,
+    ) -> Result<bool> {
+        let bus_guard = self.bus.lock().await;
+        if let Some(bus) = bus_guard.as_ref() {
+            self.handle_message(text, bus).await?;
+        }
+        Ok(true)
+    }
+
+    async fn on_disconnected(&self) {
+        *self.ws_writer.lock().await = None;
+    }
+}
+
+#[async_trait]
 impl Channel for WhatsAppChannel {
     fn name(&self) -> &str {
         "whatsapp"
@@ -171,8 +140,20 @@ impl Channel for WhatsAppChannel {
 
     async fn start(&self, bus: Arc<MessageBus>) -> Result<()> {
         self.running.store(true, Ordering::SeqCst);
+        *self.bus.lock().await = Some(bus);
 
-        super::reconnect_loop("WhatsApp", &self.running, || self.ws_loop(bus.clone())).await;
+        let config = WsConfig {
+            url: self.config.bridge_url.clone(),
+            heartbeat: HeartbeatStrategy::Timeout {
+                timeout: Duration::from_secs(30),
+                build_payload: Box::new(|| WsMessage::Ping(vec![].into())),
+            },
+            ..Default::default()
+        };
+
+        let manager = WebSocketManager::new(self.running.clone());
+
+        super::reconnect_loop("WhatsApp", &self.running, || manager.run(&config, self)).await;
 
         Ok(())
     }
@@ -183,13 +164,12 @@ impl Channel for WhatsAppChannel {
     }
 
     async fn send(&self, msg: &OutboundMessage) -> Result<()> {
-        let mut writer = self.ws_writer.lock().await;
+        let writer_guard = self.ws_writer.lock().await;
 
-        let ws = writer
-            .as_mut()
+        let ws = writer_guard
+            .as_ref()
             .ok_or_else(|| ChannelError::SendFailed("WhatsApp bridge not connected".to_string()))?;
 
-        // Create JSON payload matching Python implementation
         let payload = json!({
             "type": "send",
             "to": msg.chat_id,
@@ -199,7 +179,8 @@ impl Channel for WhatsAppChannel {
         let payload_str = serde_json::to_string(&payload)
             .map_err(|e| ChannelError::SendFailed(format!("Failed to serialize message: {}", e)))?;
 
-        ws.send(WsMessage::Text(payload_str.into()))
+        let mut w = ws.lock().await;
+        w.send(WsMessage::Text(payload_str.into()))
             .await
             .map_err(|e| ChannelError::SendFailed(format!("Failed to send message: {}", e)))?;
 

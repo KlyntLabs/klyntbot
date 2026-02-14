@@ -1,7 +1,7 @@
 //! Slack channel using Socket Mode WebSocket.
 
 use async_trait::async_trait;
-use futures_util::{SinkExt, StreamExt};
+use futures_util::SinkExt;
 use regex::Regex;
 use reqwest::Client;
 use serde::Deserialize;
@@ -9,10 +9,11 @@ use serde_json::{json, Value};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::RwLock;
-use tokio_tungstenite::{connect_async, tungstenite::Message as WsMessage};
-use tracing::{debug, error, info, warn};
+use tokio::sync::{Mutex, RwLock};
+use tokio_tungstenite::tungstenite::Message as WsMessage;
+use tracing::{debug, info, warn};
 
+use crate::ws_manager::{HeartbeatStrategy, WebSocketManager, WsConfig, WsHandler, WsSink};
 use crate::{check_allowlist, Channel};
 use bus::{InboundMessage, MessageBus, OutboundMessage};
 use common::{ChannelError, Result};
@@ -26,6 +27,7 @@ pub struct SlackChannel {
     client: Client,
     bot_user_id: Arc<RwLock<Option<String>>>,
     running: Arc<AtomicBool>,
+    bus: Mutex<Option<Arc<MessageBus>>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -63,6 +65,7 @@ impl SlackChannel {
             client,
             bot_user_id: Arc::new(RwLock::new(None)),
             running: Arc::new(AtomicBool::new(false)),
+            bus: Mutex::new(None),
         })
     }
 
@@ -129,58 +132,13 @@ impl SlackChannel {
         })?)
     }
 
-    /// Socket Mode WebSocket loop
-    async fn socket_loop(&self, bus: Arc<MessageBus>) -> Result<()> {
-        // Get Socket Mode URL
-        let socket_url = self.get_socket_url().await?;
-        info!("Connecting to Slack Socket Mode: {}", socket_url);
-
-        let (ws_stream, _) = connect_async(&socket_url)
-            .await
-            .map_err(|e| ChannelError::ConnectionFailed(e.to_string()))?;
-
-        let (mut write, mut read) = ws_stream.split();
-
-        info!("Connected to Slack Socket Mode");
-
-        while self.running.load(Ordering::SeqCst) {
-            let msg = match tokio::time::timeout(Duration::from_secs(35), read.next()).await {
-                Ok(Some(Ok(msg))) => msg,
-                Ok(Some(Err(e))) => {
-                    error!("WebSocket error: {}", e);
-                    break;
-                }
-                Ok(None) => {
-                    warn!("WebSocket closed");
-                    break;
-                }
-                Err(_) => {
-                    // Timeout - send ping
-                    if let Err(e) = write.send(WsMessage::Ping(vec![].into())).await {
-                        error!("Failed to send ping: {}", e);
-                        break;
-                    }
-                    debug!("Sent ping");
-                    continue;
-                }
-            };
-
-            if let WsMessage::Text(text) = msg {
-                if let Err(e) = self.handle_envelope(&text, &bus, &mut write).await {
-                    error!("Error handling envelope: {}", e);
-                }
-            }
-        }
-
-        Ok(())
-    }
-
     /// Handle a Socket Mode envelope
-    async fn handle_envelope<S>(&self, text: &str, bus: &MessageBus, write: &mut S) -> Result<()>
-    where
-        S: SinkExt<WsMessage> + Unpin,
-        <S as futures_util::Sink<WsMessage>>::Error: std::fmt::Display,
-    {
+    async fn handle_envelope(
+        &self,
+        text: &str,
+        bus: &MessageBus,
+        write: &Arc<Mutex<WsSink>>,
+    ) -> Result<()> {
         let envelope: SocketEnvelope = serde_json::from_str(text)
             .map_err(|e| ChannelError::SendFailed(format!("Failed to parse envelope: {}", e)))?;
 
@@ -190,8 +148,11 @@ impl SlackChannel {
         let ack = json!({
             "envelope_id": envelope.envelope_id
         });
-        if let Err(e) = write.send(WsMessage::text(ack.to_string())).await {
-            warn!("Failed to send ACK: {}", e);
+        {
+            let mut w = write.lock().await;
+            if let Err(e) = w.send(WsMessage::text(ack.to_string())).await {
+                warn!("Failed to send ACK: {}", e);
+            }
         }
 
         // Handle events_api
@@ -371,6 +332,33 @@ impl SlackChannel {
 }
 
 #[async_trait]
+impl WsHandler for SlackChannel {
+    async fn on_connected(
+        &self,
+        _write: &Arc<Mutex<WsSink>>,
+    ) -> Result<Option<HeartbeatStrategy>> {
+        info!("Connected to Slack Socket Mode");
+        Ok(None) // Use default heartbeat from config
+    }
+
+    async fn on_text_message(
+        &self,
+        text: &str,
+        write: &Arc<Mutex<WsSink>>,
+    ) -> Result<bool> {
+        let bus_guard = self.bus.lock().await;
+        if let Some(bus) = bus_guard.as_ref() {
+            self.handle_envelope(text, bus, write).await?;
+        }
+        Ok(true)
+    }
+
+    async fn on_disconnected(&self) {
+        debug!("Disconnected from Slack Socket Mode");
+    }
+}
+
+#[async_trait]
 impl Channel for SlackChannel {
     fn name(&self) -> &str {
         "slack"
@@ -389,8 +377,27 @@ impl Channel for SlackChannel {
         *self.bot_user_id.write().await = Some(bot_user_id);
 
         self.running.store(true, Ordering::SeqCst);
+        *self.bus.lock().await = Some(bus);
 
-        super::reconnect_loop("Slack", &self.running, || self.socket_loop(bus.clone())).await;
+        // Get a fresh socket URL for each connection attempt
+        let get_socket_url = || self.get_socket_url();
+
+        super::reconnect_loop("Slack", &self.running, || async {
+            let socket_url = get_socket_url().await?;
+
+            let config = WsConfig {
+                url: socket_url,
+                heartbeat: HeartbeatStrategy::Timeout {
+                    timeout: Duration::from_secs(35),
+                    build_payload: Box::new(|| WsMessage::Ping(vec![].into())),
+                },
+                ..Default::default()
+            };
+
+            let manager = WebSocketManager::new(self.running.clone());
+            manager.run(&config, self).await
+        })
+        .await;
 
         Ok(())
     }

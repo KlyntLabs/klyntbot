@@ -56,7 +56,7 @@ impl WizardState {
         let config = if is_fresh {
             Config::default()
         } else {
-            config::load().unwrap_or_default()
+            config::load_sync().unwrap_or_default()
         };
 
         Self {
@@ -196,7 +196,7 @@ impl WizardRunner {
         }
 
         // Save configuration
-        config::save(&state.config)?;
+        config::save_sync(&state.config)?;
 
         Ok(true)
     }

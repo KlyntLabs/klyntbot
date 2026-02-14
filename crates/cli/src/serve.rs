@@ -16,7 +16,7 @@ use tracing::{error, info};
 pub async fn handle_serve(port: u16) -> Result<()> {
     info!("Starting klyntbot gateway on port {}", port);
 
-    let config = config::load()?;
+    let config = config::load().await?;
     info!("Configuration loaded from: {:?}", config::config_path());
 
     // Initialize LLM provider

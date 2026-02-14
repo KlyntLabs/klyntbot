@@ -1,7 +1,7 @@
 //! Context builder for assembling system prompts.
 
 use base64::{engine::general_purpose, Engine as _};
-use chrono::Utc;
+use chrono::{DateTime, Duration, Utc};
 use std::path::PathBuf;
 use tokio::fs;
 use tracing::{debug, warn};
@@ -11,26 +11,52 @@ use session::SessionMessage;
 
 use super::{MemoryStore, SkillManager};
 
+/// Default TTL for cached contexts (seconds)
+const CONTEXT_CACHE_TTL_SECS: i64 = 60;
+
+/// Cached context string with TTL expiration
+struct CachedContext {
+    content: String,
+    expires_at: DateTime<Utc>,
+}
+
+impl CachedContext {
+    fn new(content: String, ttl_secs: i64) -> Self {
+        Self {
+            content,
+            expires_at: Utc::now() + Duration::seconds(ttl_secs),
+        }
+    }
+
+    fn is_valid(&self) -> bool {
+        Utc::now() < self.expires_at
+    }
+}
+
 /// Context builder for agent prompts
 pub struct ContextBuilder {
     workspace: PathBuf,
     memory: MemoryStore,
     skills: SkillManager,
     cached_bootstrap: Option<String>,
+    cached_memory: Option<CachedContext>,
+    cached_todo: Option<CachedContext>,
     todo_store: Option<std::sync::Arc<tokio::sync::RwLock<tools::todo_store::TodoStore>>>,
 }
 
 impl ContextBuilder {
     /// Create a new context builder
-    pub fn new(
+    pub async fn new(
         workspace: PathBuf,
         todo_store: Option<std::sync::Arc<tokio::sync::RwLock<tools::todo_store::TodoStore>>>,
     ) -> Self {
         Self {
-            memory: MemoryStore::new(workspace.clone()),
+            memory: MemoryStore::new(workspace.clone()).await,
             skills: SkillManager::new(),
             workspace,
             cached_bootstrap: None,
+            cached_memory: None,
+            cached_todo: None,
             todo_store,
         }
     }
@@ -50,7 +76,9 @@ impl ContextBuilder {
         channel: &str,
         chat_id: &str,
     ) -> Vec<Message> {
-        let mut messages = Vec::new();
+        // 1 system + up to 50 history + 1 current message
+        let history_count = history.len().min(50);
+        let mut messages = Vec::with_capacity(2 + history_count);
 
         // System prompt
         let system_prompt = self.build_system_prompt(channel, chat_id).await;
@@ -71,7 +99,7 @@ impl ContextBuilder {
         if let Some(media_paths) = media {
             if !media_paths.is_empty() {
                 // Multipart message with images
-                let mut parts = Vec::new();
+                let mut parts = Vec::with_capacity(1 + media_paths.len());
                 parts.push(ContentPart::Text {
                     text: current_message.to_string(),
                 });
@@ -101,20 +129,44 @@ impl ContextBuilder {
         messages
     }
 
-    /// Get todo context string from the store
-    async fn get_todo_context(&self) -> String {
-        if let Some(store) = &self.todo_store {
-            let mut guard = store.write().await;
-            if let Ok(ctx) = guard.to_context_string().await {
-                return ctx;
+    /// Get todo context string from the store (with TTL cache)
+    async fn get_todo_context(&mut self) -> String {
+        // Return cached if still valid
+        if let Some(ref cached) = self.cached_todo {
+            if cached.is_valid() {
+                return cached.content.clone();
             }
         }
-        String::new()
+
+        let content = if let Some(store) = &self.todo_store {
+            let mut guard = store.write().await;
+            guard.to_context_string().await.unwrap_or_default()
+        } else {
+            String::new()
+        };
+
+        self.cached_todo = Some(CachedContext::new(content.clone(), CONTEXT_CACHE_TTL_SECS));
+        content
+    }
+
+    /// Get memory context (with TTL cache)
+    async fn get_memory_context_cached(&mut self) -> String {
+        // Return cached if still valid
+        if let Some(ref cached) = self.cached_memory {
+            if cached.is_valid() {
+                return cached.content.clone();
+            }
+        }
+
+        let content = self.memory.get_memory_context().await;
+        self.cached_memory = Some(CachedContext::new(content.clone(), CONTEXT_CACHE_TTL_SECS));
+        content
     }
 
     /// Build system prompt from all sources
     async fn build_system_prompt(&mut self, channel: &str, chat_id: &str) -> String {
-        let mut sections = Vec::new();
+        // identity + bootstrap + memory + todo + confidence + skills + always-loaded skills
+        let mut sections = Vec::with_capacity(8);
 
         // Identity section (always fresh - contains runtime info)
         sections.push(self.build_identity_section(channel, chat_id));
@@ -122,7 +174,7 @@ impl ContextBuilder {
         // Bootstrap files (cached)
         if self.cached_bootstrap.is_none() {
             // First time: read and cache all bootstrap files
-            let mut bootstrap_sections = Vec::new();
+            let mut bootstrap_sections = Vec::with_capacity(6);
 
             if let Some(agents) = self.read_bootstrap_file("AGENTS.md").await {
                 bootstrap_sections.push(agents);
@@ -157,13 +209,13 @@ impl ContextBuilder {
             sections.push(bootstrap.clone());
         }
 
-        // Memory (always fresh)
-        let memory_context = self.memory.get_memory_context().await;
+        // Memory (cached with TTL)
+        let memory_context = self.get_memory_context_cached().await;
         if !memory_context.trim().is_empty() {
             sections.push(format!("# Memory\n\n{}", memory_context));
         }
 
-        // Active tasks (between Memory and Skills)
+        // Active tasks (cached with TTL)
         let todo_context = self.get_todo_context().await;
         if !todo_context.trim().is_empty() {
             sections.push(todo_context);
@@ -268,9 +320,23 @@ You are klyntbot, a personal AI assistant powered by advanced language models.
         &self.memory
     }
 
-    /// Invalidate the bootstrap cache (call when bootstrap files change)
+    /// Invalidate all caches (bootstrap, memory, todo)
     pub fn invalidate_cache(&mut self) {
         self.cached_bootstrap = None;
-        debug!("Invalidated bootstrap cache");
+        self.cached_memory = None;
+        self.cached_todo = None;
+        debug!("Invalidated all context caches");
+    }
+
+    /// Invalidate only the memory context cache (call after memory writes)
+    pub fn invalidate_memory_cache(&mut self) {
+        self.cached_memory = None;
+        debug!("Invalidated memory context cache");
+    }
+
+    /// Invalidate only the todo context cache (call after todo mutations)
+    pub fn invalidate_todo_cache(&mut self) {
+        self.cached_todo = None;
+        debug!("Invalidated todo context cache");
     }
 }

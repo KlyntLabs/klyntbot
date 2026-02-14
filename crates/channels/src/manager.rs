@@ -121,7 +121,7 @@ impl ChannelManager {
         info!("Starting {} channel(s)", channels.len());
 
         // Start each channel in its own task
-        let mut tasks = Vec::new();
+        let mut tasks = Vec::with_capacity(channels.len());
         for (name, channel) in channels.iter() {
             let channel = channel.clone();
             let bus = self.bus.clone();

@@ -47,7 +47,7 @@ async fn test_full_message_flow() {
 #[tokio::test]
 async fn test_session_persistence_flow() {
     let temp_dir = TempDir::new().unwrap();
-    let mut manager = SessionManager::new(temp_dir.path());
+    let mut manager = SessionManager::new(temp_dir.path()).await;
 
     // First conversation turn
     {
@@ -60,7 +60,7 @@ async fn test_session_persistence_flow() {
     manager.save(&session_clone).await.unwrap();
 
     // Simulate restart - create new manager
-    let mut manager2 = SessionManager::new(temp_dir.path());
+    let mut manager2 = SessionManager::new(temp_dir.path()).await;
     let loaded_session = manager2.get_or_create("telegram:chat123").await.unwrap();
 
     // Verify history was preserved
@@ -77,7 +77,7 @@ async fn test_session_persistence_flow() {
     manager2.save(&loaded_clone).await.unwrap();
 
     // Verify it was saved
-    let mut manager3 = SessionManager::new(temp_dir.path());
+    let mut manager3 = SessionManager::new(temp_dir.path()).await;
     let final_session = manager3.get_or_create("telegram:chat123").await.unwrap();
     assert_eq!(final_session.messages.len(), 3);
 }
@@ -152,7 +152,7 @@ fn test_config_init() {
 #[tokio::test]
 async fn test_multiple_sessions_parallel() {
     let temp_dir = TempDir::new().unwrap();
-    let mut manager = SessionManager::new(temp_dir.path());
+    let mut manager = SessionManager::new(temp_dir.path()).await;
 
     // Create multiple sessions
     {
@@ -246,7 +246,7 @@ fn test_config_env_override() {
 #[tokio::test]
 async fn test_session_history_limit() {
     let temp_dir = TempDir::new().unwrap();
-    let mut manager = SessionManager::new(temp_dir.path());
+    let mut manager = SessionManager::new(temp_dir.path()).await;
 
     let session = manager.get_or_create("test:chat").await.unwrap();
 
@@ -290,7 +290,7 @@ async fn test_tool_parameter_validation() {
 #[tokio::test]
 async fn test_session_cleanup() {
     let temp_dir = TempDir::new().unwrap();
-    let mut manager = SessionManager::new(temp_dir.path());
+    let mut manager = SessionManager::new(temp_dir.path()).await;
 
     // Create and save sessions
     for i in 0..5 {
@@ -326,7 +326,7 @@ async fn test_session_cleanup() {
 #[tokio::test]
 async fn test_session_lru_eviction() {
     let temp_dir = TempDir::new().unwrap();
-    let mut manager = SessionManager::with_capacity(temp_dir.path(), 3);
+    let mut manager = SessionManager::with_capacity(temp_dir.path(), 3).await;
 
     // Create 4 sessions (should evict the first one)
     for i in 0..4 {

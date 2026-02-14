@@ -17,7 +17,7 @@ use crate::wizard::ask_user_prompt;
 /// Handle chat command
 pub async fn handle_chat(message: Option<String>, session: String) -> Result<()> {
     // Load config
-    let config = config::load()?;
+    let config = config::load().await?;
     let model = config.agents.defaults.model.clone();
 
     // Startup banner
@@ -56,7 +56,7 @@ pub async fn handle_chat(message: Option<String>, session: String) -> Result<()>
 
         // Ensure the .klyntbot directory exists
         if let Some(parent) = history_path.parent() {
-            std::fs::create_dir_all(parent)?;
+            tokio::fs::create_dir_all(parent).await?;
         }
 
         let helper = SlashCommandHelper::new();

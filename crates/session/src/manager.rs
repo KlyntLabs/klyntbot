@@ -88,16 +88,16 @@ pub struct SessionManager {
 
 impl SessionManager {
     /// Create a new session manager
-    pub fn new(sessions_dir: impl Into<PathBuf>) -> Self {
-        Self::with_capacity(sessions_dir, 1000) // Default 1000 sessions
+    pub async fn new(sessions_dir: impl Into<PathBuf>) -> Self {
+        Self::with_capacity(sessions_dir, 1000).await // Default 1000 sessions
     }
 
     /// Create a new session manager with a specific cache capacity
-    pub fn with_capacity(sessions_dir: impl Into<PathBuf>, max_cache_size: usize) -> Self {
+    pub async fn with_capacity(sessions_dir: impl Into<PathBuf>, max_cache_size: usize) -> Self {
         let sessions_dir = sessions_dir.into();
 
-        // Create sessions directory if it doesn't exist (using std::fs for sync constructor)
-        if let Err(e) = std::fs::create_dir_all(&sessions_dir) {
+        // Create sessions directory if it doesn't exist
+        if let Err(e) = tokio::fs::create_dir_all(&sessions_dir).await {
             warn!("Failed to create sessions directory: {}", e);
         }
 
@@ -134,9 +134,8 @@ impl SessionManager {
             }
         }
 
-        // Check cache first
+        // On cache miss: load or create, then move key into cache (no extra clone)
         if !self.cache.contains_key(&key) {
-            // Try to load from disk
             let session = match self.load(&key).await {
                 Ok(s) => s,
                 Err(_) => {
@@ -144,7 +143,10 @@ impl SessionManager {
                     Session::new(key.clone())
                 }
             };
-            self.cache.insert(key.clone(), session);
+            self.cache.insert(key, session);
+            // Retrieve via LRU back-reference (key was moved into cache)
+            let lru_key = self.lru_order.back().unwrap();
+            return Ok(self.cache.get_mut(lru_key.as_str()).unwrap());
         }
 
         Ok(self.cache.get_mut(&key).unwrap())
@@ -162,8 +164,9 @@ impl SessionManager {
             SessionError::LoadFailed(format!("Failed to read {}: {}", path.display(), e))
         })?;
 
-        let mut messages = Vec::new();
-        let mut metadata = HashMap::new();
+        let line_count = content.lines().count();
+        let mut messages = Vec::with_capacity(line_count);
+        let mut metadata = HashMap::with_capacity(4);
         let mut created_at = None;
         let mut updated_at = None;
 
@@ -376,7 +379,7 @@ mod tests {
     #[tokio::test]
     async fn test_session_manager_get_or_create() {
         let temp_dir = TempDir::new().unwrap();
-        let mut manager = SessionManager::new(temp_dir.path());
+        let mut manager = SessionManager::new(temp_dir.path()).await;
 
         // Get non-existent session (should create new)
         let session = manager.get_or_create("test:chat123").await.unwrap();
@@ -394,7 +397,7 @@ mod tests {
     #[tokio::test]
     async fn test_session_save_and_load() {
         let temp_dir = TempDir::new().unwrap();
-        let mut manager = SessionManager::new(temp_dir.path());
+        let mut manager = SessionManager::new(temp_dir.path()).await;
 
         // Create and populate session
         {
@@ -409,7 +412,7 @@ mod tests {
         manager.save(&session_clone).await.unwrap();
 
         // Create new manager to force reload from disk
-        let mut manager2 = SessionManager::new(temp_dir.path());
+        let mut manager2 = SessionManager::new(temp_dir.path()).await;
         let loaded_session = manager2.get_or_create("test:chat123").await.unwrap();
 
         assert_eq!(loaded_session.messages.len(), 2);
@@ -417,10 +420,10 @@ mod tests {
         assert_eq!(loaded_session.messages[1].content, "Hi there!");
     }
 
-    #[test]
-    fn test_session_path_sanitization() {
+    #[tokio::test]
+    async fn test_session_path_sanitization() {
         let temp_dir = TempDir::new().unwrap();
-        let manager = SessionManager::new(temp_dir.path());
+        let manager = SessionManager::new(temp_dir.path()).await;
 
         // Test that colons and slashes are replaced
         let path = manager.session_path("telegram:chat/123\\456");
@@ -431,7 +434,7 @@ mod tests {
     #[tokio::test]
     async fn test_session_delete() {
         let temp_dir = TempDir::new().unwrap();
-        let mut manager = SessionManager::new(temp_dir.path());
+        let mut manager = SessionManager::new(temp_dir.path()).await;
 
         // Create and save session
         {
@@ -458,7 +461,7 @@ mod tests {
     #[tokio::test]
     async fn test_session_list() {
         let temp_dir = TempDir::new().unwrap();
-        let mut manager = SessionManager::new(temp_dir.path());
+        let mut manager = SessionManager::new(temp_dir.path()).await;
 
         // Create multiple sessions
         for i in 0..3 {

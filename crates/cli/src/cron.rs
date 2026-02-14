@@ -6,7 +6,7 @@ use scheduling::{CronSchedule, CronService};
 
 /// Handle cron commands
 pub async fn handle_cron(cmd: CronCommands) -> Result<()> {
-    let config = config::load()?;
+    let config = config::load().await?;
     let cron_store_path = config.workspace_path().join(".klyntbot").join("cron.json");
     let cron_service = CronService::new(cron_store_path);
 

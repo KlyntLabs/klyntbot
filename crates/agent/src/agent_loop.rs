@@ -105,7 +105,7 @@ impl AgentLoop {
 
         // Create context builder
         let mut context_builder =
-            ContextBuilder::new(workspace.clone(), Some(Arc::clone(&todo_store)));
+            ContextBuilder::new(workspace.clone(), Some(Arc::clone(&todo_store))).await;
         context_builder.init().await.map_err(|e| {
             common::KlyntbotError::Config(common::ConfigError::Invalid(format!(
                 "Failed to initialize context: {}",
@@ -118,7 +118,7 @@ impl AgentLoop {
             .unwrap_or_else(|| PathBuf::from("."))
             .join(".klyntbot")
             .join("sessions");
-        let session_manager = SessionManager::new(sessions_dir);
+        let session_manager = SessionManager::new(sessions_dir).await;
 
         // Create subagent manager
         let brave_api_key = (!config.tools.web.brave_api_key.is_empty())
@@ -719,7 +719,7 @@ impl AgentLoop {
             .await?;
 
         let mut accumulated_content = String::new();
-        let mut accumulated_tool_calls: HashMap<usize, ToolCallAccumulator> = HashMap::new();
+        let mut accumulated_tool_calls: HashMap<usize, ToolCallAccumulator> = HashMap::with_capacity(4);
 
         // Process stream chunks with cancellation support
         loop {

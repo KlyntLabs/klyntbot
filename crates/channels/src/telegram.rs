@@ -221,8 +221,8 @@ impl TelegramChannel {
         self.start_typing(&chat_id_str).await;
 
         // Build content from message
-        let mut content_parts = Vec::new();
-        let mut media_paths = Vec::new();
+        let mut content_parts = Vec::with_capacity(2);
+        let mut media_paths = Vec::with_capacity(2);
 
         // Text content
         if let Some(text) = message.get("text").and_then(|v| v.as_str()) {
@@ -507,7 +507,7 @@ impl TelegramChannel {
             return vec![text.to_string()];
         }
 
-        let mut chunks = Vec::new();
+        let mut chunks = Vec::with_capacity(text.len() / MAX_LENGTH + 1);
         let mut current_chunk = String::new();
 
         // Split by lines to avoid breaking in the middle of formatting

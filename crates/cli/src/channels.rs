@@ -7,7 +7,7 @@ use anyhow::Result;
 pub async fn handle_channels(cmd: ChannelCommands) -> Result<()> {
     match cmd {
         ChannelCommands::List => {
-            let config = config::load()?;
+            let config = config::load().await?;
 
             println!("Available channels:\n");
 
@@ -57,7 +57,7 @@ pub async fn handle_channels(cmd: ChannelCommands) -> Result<()> {
         }
 
         ChannelCommands::Login { channel } => {
-            let config = config::load()?;
+            let config = config::load().await?;
 
             match channel.to_lowercase().as_str() {
                 "telegram" => {
@@ -159,7 +159,7 @@ pub async fn handle_channels(cmd: ChannelCommands) -> Result<()> {
             use channels::ChannelManager;
             use std::sync::Arc;
 
-            let config = config::load()?;
+            let config = config::load().await?;
 
             // Check if the requested channel is configured
             let channel_name = channel.to_lowercase();

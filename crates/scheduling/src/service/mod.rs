@@ -1,6 +1,12 @@
 //! Cron service for scheduling agent tasks.
+//!
+//! Split into submodules:
+//! - `executor`: Job execution and state updates
+//! - `store`: Persistence (load/save to JSON on disk)
 
-use std::fs;
+mod executor;
+mod store;
+
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -8,11 +14,11 @@ use std::time::Duration;
 use chrono::Utc;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
-use tracing::{error, info, warn};
+use tracing::info;
 use uuid::Uuid;
 
-use super::types::{CronJob, CronSchedule, CronStore};
-use common::{CronError, Result};
+use crate::types::{CronJob, CronSchedule, CronStore};
+use common::Result;
 
 /// Get current time in milliseconds
 fn now_ms() -> i64 {
@@ -54,11 +60,11 @@ pub type JobCallback = Arc<dyn Fn(&CronJob) -> Result<Option<String>> + Send + S
 
 /// Service for managing and executing scheduled jobs
 pub struct CronService {
-    store_path: PathBuf,
-    store: Arc<RwLock<CronStore>>,
-    on_job: Option<JobCallback>,
-    running: Arc<RwLock<bool>>,
-    timer_task: Arc<RwLock<Option<JoinHandle<()>>>>,
+    pub(crate) store_path: PathBuf,
+    pub(crate) store: Arc<RwLock<CronStore>>,
+    pub(crate) on_job: Option<JobCallback>,
+    pub(crate) running: Arc<RwLock<bool>>,
+    pub(crate) timer_task: Arc<RwLock<Option<JoinHandle<()>>>>,
 }
 
 impl CronService {
@@ -76,27 +82,6 @@ impl CronService {
     /// Set the job execution callback
     pub fn set_callback(&mut self, callback: JobCallback) {
         self.on_job = Some(callback);
-    }
-
-    /// Load jobs from disk
-    async fn load_store(&self) -> Result<()> {
-        if !self.store_path.exists() {
-            return Ok(());
-        }
-
-        let content = fs::read_to_string(&self.store_path).map_err(CronError::Io)?;
-
-        let loaded_store: CronStore = serde_json::from_str(&content).map_err(CronError::Json)?;
-
-        let mut store = self.store.write().await;
-        *store = loaded_store;
-
-        Ok(())
-    }
-
-    /// Save jobs to disk
-    async fn save_store(&self) -> Result<()> {
-        Self::save_store_static(&self.store, &self.store_path).await
     }
 
     /// Recompute next run times for all enabled jobs
@@ -174,124 +159,6 @@ impl CronService {
             let mut timer_task = timer_task_ref.write().await;
             *timer_task = Some(task);
         });
-    }
-
-    /// Process all due jobs (static method to avoid self-references)
-    async fn process_due_jobs(
-        store: &Arc<RwLock<CronStore>>,
-        store_path: &PathBuf,
-        on_job: &Option<JobCallback>,
-    ) {
-        let now = now_ms();
-
-        // Get due jobs
-        let due_jobs = {
-            let store = store.read().await;
-            store
-                .jobs
-                .iter()
-                .filter(|j| {
-                    j.enabled
-                        && j.state.next_run_at_ms.is_some()
-                        && now >= j.state.next_run_at_ms.unwrap()
-                })
-                .cloned()
-                .collect::<Vec<_>>()
-        };
-
-        // Execute due jobs
-        for job in due_jobs {
-            Self::execute_job_static(store, on_job, &job).await;
-        }
-
-        // Save store
-        if let Err(e) = Self::save_store_static(store, store_path).await {
-            error!("Failed to save cron store: {}", e);
-        }
-    }
-
-    /// Execute a single job (static version)
-    async fn execute_job_static(
-        store: &Arc<RwLock<CronStore>>,
-        on_job: &Option<JobCallback>,
-        job: &CronJob,
-    ) {
-        let start_ms = now_ms();
-        info!("Cron: executing job '{}' ({})", job.name, job.id);
-
-        let status;
-        let error_msg;
-
-        if let Some(callback) = on_job {
-            match callback(job) {
-                Ok(_response) => {
-                    status = "ok".to_string();
-                    error_msg = None;
-                    info!("Cron: job '{}' completed", job.name);
-                }
-                Err(e) => {
-                    status = "error".to_string();
-                    error_msg = Some(e.to_string());
-                    error!("Cron: job '{}' failed: {}", job.name, e);
-                }
-            }
-        } else {
-            status = "skipped".to_string();
-            error_msg = Some("No callback configured".to_string());
-            warn!("Cron: job '{}' skipped (no callback)", job.name);
-        }
-
-        // Update job state
-        let mut store = store.write().await;
-        let should_delete = if let Some(job) = store.jobs.iter_mut().find(|j| j.id == job.id) {
-            job.state.last_status = Some(status);
-            job.state.last_error = error_msg;
-            job.state.last_run_at_ms = Some(start_ms);
-            job.updated_at_ms = now_ms();
-
-            // Handle one-shot jobs
-            match &job.schedule {
-                CronSchedule::At { .. } => {
-                    if job.delete_after_run {
-                        true
-                    } else {
-                        job.enabled = false;
-                        job.state.next_run_at_ms = None;
-                        false
-                    }
-                }
-                _ => {
-                    // Compute next run
-                    job.state.next_run_at_ms = compute_next_run(&job.schedule, now_ms());
-                    false
-                }
-            }
-        } else {
-            false
-        };
-
-        // Delete job if needed
-        if should_delete {
-            store.jobs.retain(|j| j.id != job.id);
-        }
-    }
-
-    /// Save store (static version)
-    async fn save_store_static(store: &Arc<RwLock<CronStore>>, store_path: &PathBuf) -> Result<()> {
-        if let Some(parent) = store_path.parent() {
-            fs::create_dir_all(parent).map_err(CronError::Io)?;
-        }
-
-        let store = store.read().await;
-        let content = serde_json::to_string_pretty(&*store).map_err(CronError::Json)?;
-        fs::write(store_path, content).map_err(CronError::Io)?;
-
-        Ok(())
-    }
-
-    /// Execute a single job
-    async fn execute_job(&self, job: &CronJob) {
-        Self::execute_job_static(&self.store, &self.on_job, job).await;
     }
 
     // ========== Public API ==========
@@ -462,6 +329,7 @@ impl CronService {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use common::CronError;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use tempfile::TempDir;
 

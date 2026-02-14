@@ -1,9 +1,9 @@
 //! Configuration loading and saving utilities.
 
-use std::fs;
 use std::path::PathBuf;
 
 use serde_json::Value;
+use tokio::fs;
 
 use super::schema::{Config, Secret};
 use common::{ConfigError, Result};
@@ -27,11 +27,13 @@ pub fn config_dir() -> Result<PathBuf> {
 }
 
 /// Load configuration from file or return default
-pub fn load() -> Result<Config> {
+pub async fn load() -> Result<Config> {
     let klyntbot_path = config_path()?;
 
     if klyntbot_path.exists() {
-        let content = fs::read_to_string(&klyntbot_path).map_err(ConfigError::Io)?;
+        let content = fs::read_to_string(&klyntbot_path)
+            .await
+            .map_err(ConfigError::Io)?;
 
         let config: Config = serde_json::from_str(&content)
             .map_err(|e| ConfigError::Invalid(format!("Failed to parse config: {}", e)))?;
@@ -44,12 +46,12 @@ pub fn load() -> Result<Config> {
 }
 
 /// Save configuration to file, writing only fields that differ from defaults.
-pub fn save(config: &Config) -> Result<()> {
+pub async fn save(config: &Config) -> Result<()> {
     let path = config_path()?;
 
     // Create parent directory if it doesn't exist
     if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).map_err(ConfigError::Io)?;
+        fs::create_dir_all(parent).await.map_err(ConfigError::Io)?;
     }
 
     let full = serde_json::to_value(config).map_err(ConfigError::Json)?;
@@ -58,7 +60,46 @@ pub fn save(config: &Config) -> Result<()> {
 
     let content = serde_json::to_string_pretty(&minimal).map_err(ConfigError::Json)?;
 
-    fs::write(&path, content).map_err(ConfigError::Io)?;
+    fs::write(&path, content).await.map_err(ConfigError::Io)?;
+
+    Ok(())
+}
+
+/// Synchronous config load for non-hot-path contexts (constructors, wizard, tests).
+///
+/// Prefer the async [`load()`] in request-handling and agent loop code.
+pub fn load_sync() -> Result<Config> {
+    let klyntbot_path = config_path()?;
+
+    if klyntbot_path.exists() {
+        let content = std::fs::read_to_string(&klyntbot_path).map_err(ConfigError::Io)?;
+
+        let config: Config = serde_json::from_str(&content)
+            .map_err(|e| ConfigError::Invalid(format!("Failed to parse config: {}", e)))?;
+
+        return Ok(config);
+    }
+
+    Ok(Config::default())
+}
+
+/// Synchronous config save for non-hot-path contexts (constructors, wizard, tests).
+///
+/// Prefer the async [`save()`] in request-handling and agent loop code.
+pub fn save_sync(config: &Config) -> Result<()> {
+    let path = config_path()?;
+
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(ConfigError::Io)?;
+    }
+
+    let full = serde_json::to_value(config).map_err(ConfigError::Json)?;
+    let default = serde_json::to_value(Config::default()).map_err(ConfigError::Json)?;
+    let minimal = diff_json(&full, &default);
+
+    let content = serde_json::to_string_pretty(&minimal).map_err(ConfigError::Json)?;
+
+    std::fs::write(&path, content).map_err(ConfigError::Io)?;
 
     Ok(())
 }
@@ -96,8 +137,8 @@ fn is_empty_object(v: &Value) -> bool {
 /// Load configuration from environment variables
 /// Environment variables are prefixed with KLYNTBOT_ and use double underscores for nesting
 /// Example: KLYNTBOT_AGENTS__DEFAULTS__MODEL=claude-sonnet-4-5
-pub fn load_with_env_overrides() -> Result<Config> {
-    let mut config = load()?;
+pub async fn load_with_env_overrides() -> Result<Config> {
+    let mut config = load().await?;
 
     // Agent defaults
     if let Ok(model) = std::env::var("KLYNTBOT_AGENTS__DEFAULTS__MODEL") {
@@ -200,17 +241,21 @@ pub fn exists() -> bool {
 }
 
 /// Initialize configuration directory structure
-pub fn init() -> Result<()> {
+pub async fn init() -> Result<()> {
     let dir = config_dir()?;
-    fs::create_dir_all(&dir).map_err(ConfigError::Io)?;
+    fs::create_dir_all(&dir).await.map_err(ConfigError::Io)?;
 
     // Create subdirectories
-    fs::create_dir_all(dir.join("sessions")).map_err(ConfigError::Io)?;
-    fs::create_dir_all(dir.join("workspace")).map_err(ConfigError::Io)?;
+    fs::create_dir_all(dir.join("sessions"))
+        .await
+        .map_err(ConfigError::Io)?;
+    fs::create_dir_all(dir.join("workspace"))
+        .await
+        .map_err(ConfigError::Io)?;
 
     // Save default config if it doesn't exist
     if !exists() {
-        save(&Config::default())?;
+        save(&Config::default()).await?;
     }
 
     Ok(())
