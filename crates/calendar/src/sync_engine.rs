@@ -18,6 +18,7 @@ impl SyncEngine {
             || server_event.start != local_event.start
             || server_event.end != local_event.end
             || server_event.etag != local_event.etag
+            || server_event.status != local_event.status
     }
 
     /// Resolve conflict using server-wins strategy
@@ -75,6 +76,7 @@ mod tests {
             end: Utc.with_ymd_and_hms(2026, 3, 1, 11, 0, 0).unwrap(),
             source: EventSource::CalDAV,
             etag: Some("etag-1".to_string()),
+            status: None,
         };
 
         let local_event = CalendarEvent {
@@ -85,6 +87,7 @@ mod tests {
             end: Utc.with_ymd_and_hms(2026, 3, 2, 15, 0, 0).unwrap(),
             source: EventSource::TodoItem,
             etag: None,
+            status: None,
         };
 
         let conflict = SyncEngine::detect_conflict(&server_event, &local_event);
@@ -101,6 +104,7 @@ mod tests {
             end: Utc.with_ymd_and_hms(2026, 3, 1, 11, 0, 0).unwrap(),
             source: EventSource::CalDAV,
             etag: Some("etag-new".to_string()),
+            status: None,
         };
 
         let local_event = CalendarEvent {
@@ -111,6 +115,7 @@ mod tests {
             end: Utc.with_ymd_and_hms(2026, 3, 1, 11, 0, 0).unwrap(),
             source: EventSource::TodoItem,
             etag: Some("etag-old".to_string()),
+            status: None,
         };
 
         let conflict = SyncEngine::detect_conflict(&server_event, &local_event);
@@ -127,6 +132,7 @@ mod tests {
             end: Utc.with_ymd_and_hms(2026, 3, 1, 11, 0, 0).unwrap(),
             source: EventSource::CalDAV,
             etag: Some("etag-new".to_string()),
+            status: None,
         };
 
         let local_event = CalendarEvent {
@@ -137,6 +143,7 @@ mod tests {
             end: Utc.with_ymd_and_hms(2026, 3, 1, 11, 0, 0).unwrap(),
             source: EventSource::TodoItem,
             etag: Some("etag-old".to_string()),
+            status: None,
         };
 
         let resolved = SyncEngine::resolve_conflict(&server_event, &local_event);

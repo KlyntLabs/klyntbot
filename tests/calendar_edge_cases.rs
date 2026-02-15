@@ -31,6 +31,7 @@ fn test_conflict_detection_identical_events() {
         end: Utc.with_ymd_and_hms(2026, 3, 1, 11, 0, 0).unwrap(),
         source: EventSource::CalDAV,
         etag: Some("etag-1".to_string()),
+        status: None,
     };
 
     let event2 = CalendarEvent {
@@ -41,6 +42,7 @@ fn test_conflict_detection_identical_events() {
         end: Utc.with_ymd_and_hms(2026, 3, 1, 11, 0, 0).unwrap(),
         source: EventSource::TodoItem,
         etag: Some("etag-1".to_string()),
+        status: None,
     };
 
     let conflict = SyncEngine::detect_conflict(&event1, &event2);
@@ -58,6 +60,7 @@ fn test_conflict_detection_different_summary() {
         end: Utc.with_ymd_and_hms(2026, 3, 1, 11, 0, 0).unwrap(),
         source: EventSource::CalDAV,
         etag: Some("etag-1".to_string()),
+        status: None,
     };
 
     let event2 = CalendarEvent {
@@ -68,6 +71,7 @@ fn test_conflict_detection_different_summary() {
         end: Utc.with_ymd_and_hms(2026, 3, 1, 11, 0, 0).unwrap(),
         source: EventSource::TodoItem,
         etag: Some("etag-1".to_string()),
+        status: None,
     };
 
     let conflict = SyncEngine::detect_conflict(&event1, &event2);
@@ -85,6 +89,7 @@ fn test_conflict_detection_different_description() {
         end: Utc.with_ymd_and_hms(2026, 3, 1, 11, 0, 0).unwrap(),
         source: EventSource::CalDAV,
         etag: Some("etag-1".to_string()),
+        status: None,
     };
 
     let event2 = CalendarEvent {
@@ -95,6 +100,7 @@ fn test_conflict_detection_different_description() {
         end: Utc.with_ymd_and_hms(2026, 3, 1, 11, 0, 0).unwrap(),
         source: EventSource::TodoItem,
         etag: Some("etag-1".to_string()),
+        status: None,
     };
 
     let conflict = SyncEngine::detect_conflict(&event1, &event2);
@@ -112,6 +118,7 @@ fn test_conflict_detection_none_vs_some_description() {
         end: Utc.with_ymd_and_hms(2026, 3, 1, 11, 0, 0).unwrap(),
         source: EventSource::CalDAV,
         etag: Some("etag-1".to_string()),
+        status: None,
     };
 
     let event2 = CalendarEvent {
@@ -122,6 +129,7 @@ fn test_conflict_detection_none_vs_some_description() {
         end: Utc.with_ymd_and_hms(2026, 3, 1, 11, 0, 0).unwrap(),
         source: EventSource::TodoItem,
         etag: Some("etag-1".to_string()),
+        status: None,
     };
 
     let conflict = SyncEngine::detect_conflict(&event1, &event2);
@@ -139,6 +147,7 @@ fn test_conflict_detection_different_start_time() {
         end: Utc.with_ymd_and_hms(2026, 3, 1, 11, 0, 0).unwrap(),
         source: EventSource::CalDAV,
         etag: Some("etag-1".to_string()),
+        status: None,
     };
 
     let event2 = CalendarEvent {
@@ -149,6 +158,7 @@ fn test_conflict_detection_different_start_time() {
         end: Utc.with_ymd_and_hms(2026, 3, 1, 11, 0, 0).unwrap(),
         source: EventSource::TodoItem,
         etag: Some("etag-1".to_string()),
+        status: None,
     };
 
     let conflict = SyncEngine::detect_conflict(&event1, &event2);
@@ -166,6 +176,7 @@ fn test_conflict_detection_different_end_time() {
         end: Utc.with_ymd_and_hms(2026, 3, 1, 11, 0, 0).unwrap(),
         source: EventSource::CalDAV,
         etag: Some("etag-1".to_string()),
+        status: None,
     };
 
     let event2 = CalendarEvent {
@@ -176,6 +187,7 @@ fn test_conflict_detection_different_end_time() {
         end: Utc.with_ymd_and_hms(2026, 3, 1, 11, 30, 0).unwrap(), // Different
         source: EventSource::TodoItem,
         etag: Some("etag-1".to_string()),
+        status: None,
     };
 
     let conflict = SyncEngine::detect_conflict(&event1, &event2);
@@ -193,6 +205,7 @@ fn test_conflict_detection_different_etag() {
         end: Utc.with_ymd_and_hms(2026, 3, 1, 11, 0, 0).unwrap(),
         source: EventSource::CalDAV,
         etag: Some("etag-old".to_string()),
+        status: None,
     };
 
     let event2 = CalendarEvent {
@@ -203,6 +216,7 @@ fn test_conflict_detection_different_etag() {
         end: Utc.with_ymd_and_hms(2026, 3, 1, 11, 0, 0).unwrap(),
         source: EventSource::TodoItem,
         etag: Some("etag-new".to_string()),
+        status: None,
     };
 
     let conflict = SyncEngine::detect_conflict(&event1, &event2);
@@ -220,6 +234,7 @@ fn test_conflict_detection_none_vs_some_etag() {
         end: Utc.with_ymd_and_hms(2026, 3, 1, 11, 0, 0).unwrap(),
         source: EventSource::CalDAV,
         etag: None,
+        status: None,
     };
 
     let event2 = CalendarEvent {
@@ -230,6 +245,7 @@ fn test_conflict_detection_none_vs_some_etag() {
         end: Utc.with_ymd_and_hms(2026, 3, 1, 11, 0, 0).unwrap(),
         source: EventSource::TodoItem,
         etag: Some("etag-1".to_string()),
+        status: None,
     };
 
     let conflict = SyncEngine::detect_conflict(&event1, &event2);
@@ -247,6 +263,7 @@ fn test_resolve_conflict_preserves_server_data() {
         end: Utc.with_ymd_and_hms(2026, 3, 1, 11, 0, 0).unwrap(),
         source: EventSource::CalDAV,
         etag: Some("server-etag".to_string()),
+        status: None,
     };
 
     let local_event = CalendarEvent {
@@ -257,6 +274,7 @@ fn test_resolve_conflict_preserves_server_data() {
         end: Utc.with_ymd_and_hms(2026, 3, 1, 10, 0, 0).unwrap(),
         source: EventSource::TodoItem,
         etag: Some("local-etag".to_string()),
+        status: None,
     };
 
     let resolved = SyncEngine::resolve_conflict(&server_event, &local_event);
@@ -289,6 +307,7 @@ fn test_event_source_variants() {
         end: Utc::now() + chrono::Duration::hours(1),
         source: EventSource::CalDAV,
         etag: None,
+        status: None,
     };
 
     let todo_event = CalendarEvent {
@@ -299,6 +318,7 @@ fn test_event_source_variants() {
         end: Utc::now() + chrono::Duration::hours(1),
         source: EventSource::TodoItem,
         etag: None,
+        status: None,
     };
 
     assert!(matches!(caldav_event.source, EventSource::CalDAV));
@@ -317,6 +337,7 @@ fn test_calendar_event_with_very_long_summary() {
         end: Utc::now() + chrono::Duration::hours(1),
         source: EventSource::CalDAV,
         etag: None,
+        status: None,
     };
 
     assert_eq!(event.summary.len(), 1000);
@@ -335,6 +356,7 @@ fn test_calendar_event_with_zero_duration() {
         end: time,
         source: EventSource::CalDAV,
         etag: None,
+        status: None,
     };
 
     assert_eq!(event.start, event.end);
@@ -354,6 +376,7 @@ fn test_calendar_event_with_negative_duration() {
         end,
         source: EventSource::CalDAV,
         etag: None,
+        status: None,
     };
 
     assert!(event.end < event.start);

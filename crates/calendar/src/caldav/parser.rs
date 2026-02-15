@@ -13,6 +13,7 @@ pub fn parse_vevent(ical_data: &str) -> Result<CalendarEvent> {
     let mut description = None;
     let mut dtstart = None;
     let mut dtend = None;
+    let mut status = None;
 
     let mut in_vevent = false;
 
@@ -45,6 +46,7 @@ pub fn parse_vevent(ical_data: &str) -> Result<CalendarEvent> {
                 "DESCRIPTION" => description = Some(value.to_string()),
                 "DTSTART" => dtstart = Some(parse_datetime_with_params(value, params)?),
                 "DTEND" => dtend = Some(parse_datetime_with_params(value, params)?),
+                "STATUS" => status = Some(value.to_string()),
                 _ => {}
             }
         }
@@ -79,6 +81,7 @@ pub fn parse_vevent(ical_data: &str) -> Result<CalendarEvent> {
         end,
         source: EventSource::CalDAV,
         etag: None,
+        status,
     })
 }
 
@@ -110,6 +113,10 @@ pub fn generate_vevent(event: &CalendarEvent, timezone: &str) -> Result<String> 
 
     if let Some(desc) = &event.description {
         lines.push(format!("DESCRIPTION:{}", desc));
+    }
+
+    if let Some(stat) = &event.status {
+        lines.push(format!("STATUS:{}", stat));
     }
 
     // Format with TZID for non-UTC, or Z suffix for UTC
@@ -405,6 +412,7 @@ END:VCALENDAR";
             end: Utc.with_ymd_and_hms(2026, 3, 1, 2, 15, 0).unwrap(),
             source: EventSource::TodoItem,
             etag: None,
+            status: None,
         };
 
         let ical_data = generate_vevent(&event, "Asia/Bangkok").unwrap();
@@ -432,6 +440,7 @@ END:VCALENDAR";
             end: Utc.with_ymd_and_hms(2026, 3, 1, 10, 0, 0).unwrap(),
             source: EventSource::TodoItem,
             etag: None,
+            status: None,
         };
 
         let ical_data = generate_vevent(&event, "UTC").unwrap();
@@ -451,6 +460,7 @@ END:VCALENDAR";
             end: Utc.with_ymd_and_hms(2026, 4, 15, 6, 0, 0).unwrap(),
             source: EventSource::CalDAV,
             etag: None,
+            status: None,
         };
 
         let ical_data = generate_vevent(&original, "Asia/Bangkok").unwrap();
@@ -472,6 +482,7 @@ END:VCALENDAR";
             end: Utc.with_ymd_and_hms(2026, 4, 15, 13, 0, 0).unwrap(),
             source: EventSource::CalDAV,
             etag: None,
+            status: None,
         };
 
         let ical_data = generate_vevent(&original, "UTC").unwrap();
@@ -544,5 +555,67 @@ END:VCALENDAR";
 
         let result = parse_vevent(ical_data);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_vevent_with_status_confirmed() {
+        let ical_data = "\
+BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:confirmed-event
+SUMMARY:Confirmed Meeting
+STATUS:CONFIRMED
+DTSTART:20260215T140000Z
+DTEND:20260215T150000Z
+END:VEVENT
+END:VCALENDAR";
+
+        let event = parse_vevent(ical_data).unwrap();
+
+        assert_eq!(event.uid, "confirmed-event");
+        assert_eq!(event.summary, "Confirmed Meeting");
+        assert_eq!(event.status, Some("CONFIRMED".to_string()));
+    }
+
+    #[test]
+    fn test_parse_vevent_with_status_cancelled() {
+        let ical_data = "\
+BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:cancelled-event
+SUMMARY:Cancelled Meeting
+STATUS:CANCELLED
+DTSTART:20260215T140000Z
+DTEND:20260215T150000Z
+END:VEVENT
+END:VCALENDAR";
+
+        let event = parse_vevent(ical_data).unwrap();
+
+        assert_eq!(event.uid, "cancelled-event");
+        assert_eq!(event.summary, "Cancelled Meeting");
+        assert_eq!(event.status, Some("CANCELLED".to_string()));
+    }
+
+    #[test]
+    fn test_parse_vevent_without_status() {
+        let ical_data = "\
+BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:no-status-event
+SUMMARY:Event Without Status
+DTSTART:20260215T140000Z
+DTEND:20260215T150000Z
+END:VEVENT
+END:VCALENDAR";
+
+        let event = parse_vevent(ical_data).unwrap();
+
+        assert_eq!(event.uid, "no-status-event");
+        assert_eq!(event.summary, "Event Without Status");
+        assert_eq!(event.status, None);
     }
 }

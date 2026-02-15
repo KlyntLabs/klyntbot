@@ -2,6 +2,7 @@
 //!
 //! This crate provides the command-line interface and interactive REPL.
 
+pub mod calendar;
 pub mod channels;
 pub mod chat;
 pub mod commands;

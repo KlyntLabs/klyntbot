@@ -18,6 +18,9 @@ pub struct CalendarEvent {
     pub source: EventSource,
     /// ETag for CalDAV sync (if from server)
     pub etag: Option<String>,
+    /// Event status (CONFIRMED, CANCELLED, TENTATIVE, COMPLETED)
+    #[serde(default)]
+    pub status: Option<String>,
 }
 
 /// Source of a calendar event
@@ -56,6 +59,7 @@ mod tests {
             end: end_time,
             source: EventSource::CalDAV,
             etag: Some("etag-456".to_string()),
+            status: None,
         };
 
         assert_eq!(event.uid, "event-123");

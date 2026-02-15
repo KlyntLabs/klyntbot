@@ -26,14 +26,18 @@
 //! - Sync 100 todos < 2s
 //! - Sync 1000 events < 5s
 
+#[allow(dead_code)] // Used by ignored tests that will be implemented later
+mod mock_calendar_handler;
+
+use agent::calendar_reconcile::reconcile_calendar_events;
+use calendar::{CalendarEvent, EventSource};
 use chrono::{TimeZone, Utc};
-use serde_json::json;
 use std::sync::Arc;
 use tempfile::TempDir;
 use tokio::sync::RwLock;
 use tools::{
     todo_store::TodoStore,
-    todo_types::{Todo, TodoFilter, TodoStatus},
+    todo_types::{Todo, TodoStatus},
 };
 
 // ─── Test helpers ──────────────────────────────────────────────
@@ -77,14 +81,22 @@ async fn create_store() -> (TodoStore, TempDir) {
     (store, temp_dir)
 }
 
-// TODO: Implement MockCalendarProvider in tests/mock_calendar_provider.rs
-// async fn create_adapter_with_mock() -> (
-//     CalendarSyncAdapter,
-//     Arc<RwLock<TodoStore>>,
-//     Arc<MockCalendarProvider>,
-// ) {
-//     // Implementation deferred until calendar_reconcile.rs exists
-// }
+fn create_test_event(
+    uid: &str,
+    start: chrono::DateTime<Utc>,
+    status: Option<String>,
+) -> CalendarEvent {
+    CalendarEvent {
+        uid: uid.to_string(),
+        summary: "Test Event".to_string(),
+        description: None,
+        start,
+        end: start + chrono::Duration::hours(1),
+        source: EventSource::CalDAV,
+        etag: None,
+        status,
+    }
+}
 
 // ═══════════════════════════════════════════════════════════════
 // CORE RECONCILIATION LOGIC
@@ -93,7 +105,6 @@ async fn create_store() -> (TodoStore, TempDir) {
 // ─── AC1: Event time changed → todo.due_date updates ───────────
 
 #[tokio::test]
-#[ignore] // Remove #[ignore] when calendar_reconcile.rs is implemented
 async fn test_reconcile_event_time_changed_updates_todo() {
     // Setup
     let (mut store, _dir) = create_store().await;
@@ -105,17 +116,30 @@ async fn test_reconcile_event_time_changed_updates_todo() {
     todo.calendar_event_uid = Some("event-123".to_string());
     let todo = store.add(todo).await.unwrap();
 
-    // TODO: Mock calendar provider returns event with new time
-    // let new_time = Utc.with_ymd_and_hms(2026, 2, 20, 16, 0, 0).unwrap();
-    // mock_provider.set_event_start("event-123", new_time);
+    // Calendar returns event with new time
+    let new_time = Utc.with_ymd_and_hms(2026, 2, 20, 16, 0, 0).unwrap();
+    let events = vec![create_test_event("event-123", new_time, None)];
 
-    // TODO: Action: Run reconciliation
-    // let report = adapter.reconcile_calendar_events().await.unwrap();
+    // Action: Run reconciliation
+    let store_arc = Arc::new(RwLock::new(store));
+    let report = reconcile_calendar_events(store_arc.clone(), events)
+        .await
+        .unwrap();
 
-    // TODO: Assert
-    // assert_eq!(report["updated"].as_array().unwrap().len(), 1);
-    // let updated_todo = store.get(&todo.id).await.unwrap().unwrap();
-    // assert_eq!(updated_todo.due_date, Some(new_time));
+    // Assert
+    assert_eq!(report.checked, 1);
+    assert_eq!(report.due_dates_updated, 1);
+    assert_eq!(report.todos_completed, 0);
+    assert_eq!(report.links_cleared, 0);
+
+    let updated_todo = store_arc
+        .write()
+        .await
+        .get(&todo.id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(updated_todo.due_date, Some(new_time));
 }
 
 #[tokio::test]
@@ -147,26 +171,42 @@ async fn test_reconcile_event_description_changed_updates_todo() {
 // ─── AC2: Event marked complete → todo.status = Done ───────────
 
 #[tokio::test]
-#[ignore]
 async fn test_reconcile_event_completed_marks_todo_done() {
     let (mut store, _dir) = create_store().await;
 
     let mut todo = create_test_todo("Task");
     todo.status = TodoStatus::Todo;
     todo.calendar_event_uid = Some("event-456".to_string());
+    todo.due_date = Some(Utc::now());
     let todo = store.add(todo).await.unwrap();
 
-    // TODO: Mock calendar returns completed event
-    // mock_provider.set_event_status("event-456", "COMPLETED");
+    // Calendar returns completed event
+    let events = vec![create_test_event(
+        "event-456",
+        Utc::now(),
+        Some("COMPLETED".to_string()),
+    )];
 
-    // TODO: Action
-    // let report = adapter.reconcile_calendar_events().await.unwrap();
+    // Action
+    let store_arc = Arc::new(RwLock::new(store));
+    let report = reconcile_calendar_events(store_arc.clone(), events)
+        .await
+        .unwrap();
 
-    // TODO: Assert
-    // assert_eq!(report["completed"].as_array().unwrap().len(), 1);
-    // let updated = store.get(&todo.id).await.unwrap().unwrap();
-    // assert_eq!(updated.status, TodoStatus::Done);
-    // assert!(updated.completed_at.is_some());
+    // Assert
+    assert_eq!(report.checked, 1);
+    assert_eq!(report.todos_completed, 1);
+    assert_eq!(report.due_dates_updated, 0);
+    assert_eq!(report.links_cleared, 0);
+
+    let updated = store_arc
+        .write()
+        .await
+        .get(&todo.id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(updated.status, TodoStatus::Done);
 }
 
 #[tokio::test]
@@ -185,7 +225,6 @@ async fn test_reconcile_event_completed_with_blockers() {
 // ─── AC3: Event cancelled/deleted → calendar_event_uid cleared ─
 
 #[tokio::test]
-#[ignore]
 async fn test_reconcile_event_cancelled_clears_uid() {
     let (mut store, _dir) = create_store().await;
 
@@ -193,22 +232,65 @@ async fn test_reconcile_event_cancelled_clears_uid() {
     todo.calendar_event_uid = Some("event-789".to_string());
     let todo = store.add(todo).await.unwrap();
 
-    // TODO: Mock calendar returns cancelled event
-    // mock_provider.set_event_status("event-789", "CANCELLED");
+    // Calendar returns cancelled event
+    let events = vec![create_test_event(
+        "event-789",
+        Utc::now(),
+        Some("CANCELLED".to_string()),
+    )];
 
-    // TODO: Action
-    // let report = adapter.reconcile_calendar_events().await.unwrap();
+    // Action
+    let store_arc = Arc::new(RwLock::new(store));
+    let report = reconcile_calendar_events(store_arc.clone(), events)
+        .await
+        .unwrap();
 
-    // TODO: Assert
-    // assert_eq!(report["unlinked"].as_array().unwrap().len(), 1);
-    // let updated = store.get(&todo.id).await.unwrap().unwrap();
-    // assert!(updated.calendar_event_uid.is_none());
+    // Assert
+    assert_eq!(report.checked, 1);
+    assert_eq!(report.links_cleared, 1);
+    assert_eq!(report.todos_completed, 0);
+    assert_eq!(report.due_dates_updated, 0);
+
+    let updated = store_arc
+        .write()
+        .await
+        .get(&todo.id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(updated.calendar_event_uid.is_none());
 }
 
 #[tokio::test]
-#[ignore]
 async fn test_reconcile_event_deleted_from_provider_clears_uid() {
     // Event no longer exists in provider response → clear UID
+    let (mut store, _dir) = create_store().await;
+
+    let mut todo = create_test_todo("Deleted event");
+    todo.calendar_event_uid = Some("event-999".to_string());
+    let todo = store.add(todo).await.unwrap();
+
+    // Calendar returns empty list (event deleted)
+    let events: Vec<CalendarEvent> = vec![];
+
+    // Action
+    let store_arc = Arc::new(RwLock::new(store));
+    let report = reconcile_calendar_events(store_arc.clone(), events)
+        .await
+        .unwrap();
+
+    // Assert
+    assert_eq!(report.checked, 1);
+    assert_eq!(report.links_cleared, 1);
+
+    let updated = store_arc
+        .write()
+        .await
+        .get(&todo.id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(updated.calendar_event_uid.is_none());
 }
 
 #[tokio::test]
@@ -220,10 +302,63 @@ async fn test_reconcile_event_deleted_does_not_delete_todo() {
 // ─── Multiple changes ──────────────────────────────────────────
 
 #[tokio::test]
-#[ignore]
 async fn test_reconcile_multiple_changes_in_single_sync() {
-    // 5 todos: 2 time changed, 1 completed, 1 cancelled, 1 unchanged
-    // Verify all changes applied correctly in one reconciliation pass
+    // 5 todos: 1 time changed, 1 completed, 1 cancelled, 1 unchanged, 1 deleted
+    let (mut store, _dir) = create_store().await;
+
+    let original_time = Utc.with_ymd_and_hms(2026, 2, 20, 14, 0, 0).unwrap();
+    let new_time = Utc.with_ymd_and_hms(2026, 2, 20, 16, 0, 0).unwrap();
+    let unchanged_time = Utc.with_ymd_and_hms(2026, 2, 20, 10, 0, 0).unwrap();
+
+    // Todo 1: Time changed
+    let mut todo1 = create_test_todo("Todo 1");
+    todo1.calendar_event_uid = Some("event-1".to_string());
+    todo1.due_date = Some(original_time);
+    store.add(todo1).await.unwrap();
+
+    // Todo 2: Completed
+    let mut todo2 = create_test_todo("Todo 2");
+    todo2.calendar_event_uid = Some("event-2".to_string());
+    todo2.status = TodoStatus::Todo;
+    todo2.due_date = Some(unchanged_time);
+    store.add(todo2).await.unwrap();
+
+    // Todo 3: Cancelled
+    let mut todo3 = create_test_todo("Todo 3");
+    todo3.calendar_event_uid = Some("event-3".to_string());
+    store.add(todo3).await.unwrap();
+
+    // Todo 4: Unchanged
+    let mut todo4 = create_test_todo("Todo 4");
+    todo4.calendar_event_uid = Some("event-4".to_string());
+    todo4.due_date = Some(unchanged_time);
+    store.add(todo4).await.unwrap();
+
+    // Todo 5: Event deleted
+    let mut todo5 = create_test_todo("Todo 5");
+    todo5.calendar_event_uid = Some("event-5".to_string());
+    store.add(todo5).await.unwrap();
+
+    // Calendar returns events
+    let events = vec![
+        create_test_event("event-1", new_time, None), // Time changed
+        create_test_event("event-2", unchanged_time, Some("COMPLETED".to_string())), // Completed
+        create_test_event("event-3", unchanged_time, Some("CANCELLED".to_string())), // Cancelled
+        create_test_event("event-4", unchanged_time, None), // Unchanged (same time as todo4)
+                                                      // event-5 not in list (deleted)
+    ];
+
+    // Action
+    let store_arc = Arc::new(RwLock::new(store));
+    let report = reconcile_calendar_events(store_arc.clone(), events)
+        .await
+        .unwrap();
+
+    // Assert
+    assert_eq!(report.checked, 5);
+    assert_eq!(report.due_dates_updated, 1); // todo1
+    assert_eq!(report.todos_completed, 1); // todo2
+    assert_eq!(report.links_cleared, 2); // todo3 + todo5
 }
 
 #[tokio::test]

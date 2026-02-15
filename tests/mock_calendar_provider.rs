@@ -47,6 +47,7 @@ impl MockCalendarProvider {
             end: start + Duration::hours(1),
             source: EventSource::TodoItem,
             etag: Some(format!("etag-{}", uid)),
+            status: None,
         };
         self.events.lock().unwrap().insert(uid.to_string(), event);
     }
@@ -68,6 +69,7 @@ impl MockCalendarProvider {
             end,
             source: EventSource::TodoItem,
             etag: Some(format!("etag-{}", uid)),
+            status: None,
         };
         self.events.lock().unwrap().insert(uid.to_string(), event);
     }
@@ -114,11 +116,9 @@ impl MockCalendarProvider {
         self.events.lock().unwrap().get(uid).and_then(|event| {
             event.description.as_ref().and_then(|desc| {
                 if desc.starts_with("STATUS:") {
-                    desc.lines().next().map(|line| {
-                        line.strip_prefix("STATUS:")
-                            .unwrap_or("")
-                            .to_string()
-                    })
+                    desc.lines()
+                        .next()
+                        .map(|line| line.strip_prefix("STATUS:").unwrap_or("").to_string())
                 } else {
                     None
                 }
@@ -183,6 +183,10 @@ impl CalendarProvider for MockCalendarProvider {
         &self.name
     }
 
+    fn provider_id(&self) -> &str {
+        &self.name
+    }
+
     async fn get_events(
         &self,
         _sync_token: Option<&str>,
@@ -205,13 +209,7 @@ impl CalendarProvider for MockCalendarProvider {
         }
 
         // Return all events
-        let events: Vec<CalendarEvent> = self
-            .events
-            .lock()
-            .unwrap()
-            .values()
-            .cloned()
-            .collect();
+        let events: Vec<CalendarEvent> = self.events.lock().unwrap().values().cloned().collect();
 
         // Generate new sync token
         let new_token = Some(format!("mock-token-{}", Utc::now().timestamp()));
@@ -220,7 +218,7 @@ impl CalendarProvider for MockCalendarProvider {
         Ok((events, new_token))
     }
 
-    async fn put_event(&self, event: &CalendarEvent) -> Result<Option<String>> {
+    async fn put_event(&self, event: &CalendarEvent) -> Result<String> {
         // Increment request counter
         *self.request_count.lock().unwrap() += 1;
 
@@ -245,7 +243,7 @@ impl CalendarProvider for MockCalendarProvider {
             .insert(event.uid.clone(), event.clone());
 
         // Return new etag
-        Ok(Some(format!("etag-{}-put", event.uid)))
+        Ok(format!("etag-{}-put", event.uid))
     }
 
     async fn delete_event(&self, uid: &str) -> Result<()> {
@@ -269,6 +267,22 @@ impl CalendarProvider for MockCalendarProvider {
         // Remove event
         self.events.lock().unwrap().remove(uid);
 
+        Ok(())
+    }
+
+    async fn test_connection(&self) -> Result<()> {
+        // Increment request counter
+        *self.request_count.lock().unwrap() += 1;
+
+        // Simulate network failure if configured
+        if *self.fail_next_request.lock().unwrap() {
+            *self.fail_next_request.lock().unwrap() = false;
+            return Err(KlyntbotError::Calendar(CalendarError::ConnectionFailed(
+                "Mock network failure".to_string(),
+            )));
+        }
+
+        // Test connection always succeeds for mock provider
         Ok(())
     }
 }

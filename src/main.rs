@@ -4,6 +4,7 @@ use cli::{Cli, Commands};
 
 // Import CLI handlers
 mod cli_handlers {
+    pub use cli::calendar::handle_calendar;
     pub use cli::channels::handle_channels;
     pub use cli::chat::handle_chat;
     pub use cli::config_cmd::handle_config;
@@ -50,6 +51,8 @@ async fn main() {
         Some(Commands::Todo(cmd)) => cli_handlers::handle_todo(cmd).await,
 
         Some(Commands::Project(cmd)) => cli_handlers::handle_project(cmd).await,
+
+        Some(Commands::Calendar(cmd)) => cli_handlers::handle_calendar(cmd).await,
 
         None => {
             // No command specified, show brief status

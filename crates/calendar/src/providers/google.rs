@@ -173,6 +173,7 @@ impl GoogleCalendarProvider {
             end: end_dt,
             source: EventSource::CalDAV, // Reuse existing variant for remote events
             etag,
+            status: None, // TODO: Parse Google Calendar status field
         })
     }
 
@@ -497,6 +498,7 @@ mod tests {
             end: Utc::now() + chrono::Duration::hours(1),
             source: EventSource::TodoItem,
             etag: None,
+            status: None,
         };
 
         let json = GoogleCalendarProvider::event_to_json(&event);
@@ -546,6 +548,7 @@ mod tests {
             end: Utc::now() + chrono::Duration::hours(1),
             source: EventSource::TodoItem,
             etag: None,
+            status: None,
         };
 
         let json = GoogleCalendarProvider::event_to_json(&event);

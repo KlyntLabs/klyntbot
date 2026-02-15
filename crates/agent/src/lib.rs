@@ -3,6 +3,7 @@
 //! This crate provides the AgentLoop and related agent functionality.
 
 pub mod agent_loop;
+pub mod calendar_reconcile;
 pub mod calendar_sync_adapter;
 pub mod confidence;
 pub mod context;
@@ -16,6 +17,7 @@ pub mod skills;
 pub mod subagent;
 
 pub use agent_loop::{AgentLoop, StreamingHandle};
+pub use calendar_reconcile::{reconcile_calendar_events, ReconcileAction, ReconcileReport};
 pub use calendar_sync_adapter::CalendarSyncAdapter;
 pub use confidence::{ConfidenceAssessment, ConfidenceEvaluator, DecisionAction, DecisionLogger};
 pub use context::ContextBuilder;

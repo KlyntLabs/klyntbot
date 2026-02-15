@@ -1,6 +1,7 @@
 // CalendarTool - Calendar operations tool with dependency injection
 
 use async_trait::async_trait;
+use calendar::CalendarEvent;
 use common::{Result, ToolError};
 use serde_json::{json, Value};
 use std::sync::Arc;
@@ -30,6 +31,14 @@ pub trait CalendarHandler: Send + Sync {
 
     /// Get sync status
     async fn get_status(&self) -> Result<Value>;
+
+    /// Get a single calendar event by UID
+    /// Returns None if the event is not found in any enabled provider
+    async fn get_event(&self, uid: &str) -> Result<Option<CalendarEvent>>;
+
+    /// Get all calendar events from all enabled providers for reconciliation
+    /// Returns combined list of events (deduplicated by UID)
+    async fn get_events_for_reconciliation(&self) -> Result<Vec<CalendarEvent>>;
 }
 
 /// CalendarTool - Tool interface for calendar operations
@@ -173,6 +182,14 @@ mod tests {
                 "last_sync": "2026-02-14T10:00:00Z",
                 "events_count": 42
             }))
+        }
+
+        async fn get_event(&self, _uid: &str) -> Result<Option<CalendarEvent>> {
+            Ok(None)
+        }
+
+        async fn get_events_for_reconciliation(&self) -> Result<Vec<CalendarEvent>> {
+            Ok(vec![])
         }
     }
 

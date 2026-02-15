@@ -447,6 +447,12 @@ pub struct CalendarConfig {
     #[serde(default = "default_conflict_resolution")]
     pub conflict_resolution: String,
 
+    /// Enable bidirectional sync reconciliation (default: true).
+    /// When true, the reconciliation engine periodically checks calendar events
+    /// and updates linked todos based on event status/completion.
+    #[serde(default = "default_true")]
+    pub bidirectional_sync: bool,
+
     // --- Legacy fields for backward compatibility during deserialization ---
     // These fields are populated by the custom deserializer when reading old-format configs.
     // They are NOT serialized. Code should use `providers` instead.
@@ -460,6 +466,7 @@ impl Default for CalendarConfig {
         Self {
             providers: Vec::new(),
             conflict_resolution: default_conflict_resolution(),
+            bidirectional_sync: true,
             legacy_migrated: false,
         }
     }
@@ -557,6 +564,11 @@ impl CalendarConfig {
             .map(|p| p.sync_interval_secs())
             .min()
             .unwrap_or(300)
+    }
+
+    /// Check if bidirectional sync reconciliation is enabled.
+    pub fn bidirectional_sync(&self) -> bool {
+        self.bidirectional_sync
     }
 }
 
@@ -809,6 +821,7 @@ impl CalendarConfig {
                 return CalendarConfig {
                     providers: vec![CalendarProviderConfig::Apple(apple)],
                     conflict_resolution,
+                    bidirectional_sync: true, // Default to true for migrated configs
                     legacy_migrated: true,
                 };
             }
@@ -863,6 +876,8 @@ mod tests {
         assert!(config.providers.is_empty());
         assert!(!config.is_any_enabled());
         assert_eq!(config.conflict_resolution, "server_wins");
+        assert!(config.bidirectional_sync); // Defaults to true
+        assert!(config.bidirectional_sync()); // Accessor works
     }
 
     #[test]

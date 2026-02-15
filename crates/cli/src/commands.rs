@@ -71,6 +71,10 @@ pub enum Commands {
     /// Manage projects (create, list, show, update, archive)
     #[command(subcommand)]
     Project(ProjectCommands),
+
+    /// Calendar operations (sync, reconcile, status)
+    #[command(subcommand)]
+    Calendar(CalendarCommands),
 }
 
 #[derive(Subcommand, Debug)]
@@ -581,4 +585,10 @@ pub enum ProjectCommands {
         #[arg(short, long)]
         tree: bool,
     },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum CalendarCommands {
+    /// Manually trigger calendar reconciliation (check event status and update linked todos)
+    Reconcile,
 }

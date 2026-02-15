@@ -29,6 +29,8 @@ pub struct CalendarSyncAdapter {
     todo_store: Arc<RwLock<TodoStore>>,
     conflicts_path: PathBuf,
     auto_sync_due_dates: bool,
+    dispatcher: Option<Arc<crate::NotificationDispatcher>>,
+    bidirectional_sync: bool,
 }
 
 impl CalendarSyncAdapter {
@@ -37,6 +39,8 @@ impl CalendarSyncAdapter {
         todo_store: Arc<RwLock<TodoStore>>,
         config: &CalendarConfig,
         timezone: String,
+        dispatcher: Option<Arc<crate::NotificationDispatcher>>,
+        bidirectional_sync: bool,
     ) -> Result<Self> {
         // Migrate legacy sync state if needed
         if let Err(e) = migrate_legacy_sync_state().await {
@@ -98,6 +102,8 @@ impl CalendarSyncAdapter {
             todo_store,
             conflicts_path,
             auto_sync_due_dates: any_auto_sync,
+            dispatcher,
+            bidirectional_sync,
         })
     }
 
@@ -158,6 +164,61 @@ impl CalendarSyncAdapter {
             }
         }
 
+        // Run reconciliation if bidirectional sync is enabled
+        let mut reconcile_report = None;
+        if self.bidirectional_sync {
+            match self.get_events_for_reconciliation().await {
+                Ok(events) => {
+                    match crate::reconcile_calendar_events(self.todo_store.clone(), events).await {
+                        Ok(report) => {
+                            let changes_count = report.due_dates_updated
+                                + report.todos_completed
+                                + report.links_cleared;
+
+                            if changes_count > 0 {
+                                tracing::info!(
+                                    "Reconciliation: {} due dates updated, {} todos completed, {} links cleared",
+                                    report.due_dates_updated,
+                                    report.todos_completed,
+                                    report.links_cleared
+                                );
+
+                                // Send notification if dispatcher is available
+                                if let Some(ref dispatcher) = self.dispatcher {
+                                    let summary = format!(
+                                        "Updated: {} | Completed: {} | Unlinked: {}",
+                                        report.due_dates_updated,
+                                        report.todos_completed,
+                                        report.links_cleared
+                                    );
+                                    dispatcher
+                                        .notify("📅 Calendar Sync: Changes Detected", &summary)
+                                        .await
+                                        .ok();
+                                }
+                            }
+
+                            if !report.errors.is_empty() {
+                                tracing::warn!(
+                                    "Reconciliation encountered {} errors: {:?}",
+                                    report.errors.len(),
+                                    report.errors
+                                );
+                            }
+
+                            reconcile_report = Some(report);
+                        }
+                        Err(e) => {
+                            tracing::error!("Reconciliation failed: {}", e);
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("Failed to fetch events for reconciliation: {}", e);
+                }
+            }
+        }
+
         let status = if errors.is_empty() {
             "success"
         } else if errors.len() < self.providers.len() {
@@ -166,14 +227,27 @@ impl CalendarSyncAdapter {
             "failed"
         };
 
-        Ok(json!({
+        let mut result = json!({
             "status": status,
             "events_pulled": total_pulled,
             "events_pushed": total_pushed,
             "conflicts_detected": total_conflicts,
             "providers": provider_results,
             "last_sync": Local::now().to_rfc3339(),
-        }))
+        });
+
+        // Add reconciliation report if available
+        if let Some(report) = reconcile_report {
+            result["reconciliation"] = json!({
+                "checked": report.checked,
+                "due_dates_updated": report.due_dates_updated,
+                "todos_completed": report.todos_completed,
+                "links_cleared": report.links_cleared,
+                "errors": report.errors,
+            });
+        }
+
+        Ok(result)
     }
 
     /// Sync a single provider.
@@ -379,6 +453,7 @@ impl CalendarSyncAdapter {
             end,
             source: EventSource::TodoItem,
             etag: None,
+            status: None, // TODO: Map todo status to iCal STATUS
         })
     }
 
@@ -414,7 +489,13 @@ impl CalendarSyncAdapter {
 
         let mut line = serde_json::to_string(&conflict_entry)?;
         line.push('\n');
-        fs::write(&self.conflicts_path, line.as_bytes()).await?;
+        use tokio::io::AsyncWriteExt;
+        let mut file = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&self.conflicts_path)
+            .await?;
+        file.write_all(line.as_bytes()).await?;
 
         Ok(())
     }
@@ -510,6 +591,7 @@ impl CalendarHandler for CalendarSyncAdapter {
             end: end_dt,
             source: EventSource::TodoItem,
             etag: None,
+            status: None, // New events default to no status
         };
 
         // Push to all providers
@@ -587,6 +669,58 @@ impl CalendarHandler for CalendarSyncAdapter {
             "auto_sync_enabled": self.auto_sync_due_dates
         }))
     }
+
+    /// Get a single calendar event by UID from any enabled provider.
+    /// Returns the first match found across all providers, or None if not found.
+    async fn get_event(&self, uid: &str) -> Result<Option<CalendarEvent>> {
+        for (_provider_id, provider) in &self.providers {
+            match provider.get_events(None).await {
+                Ok((events, _sync_token)) => {
+                    if let Some(event) = events.into_iter().find(|e| e.uid == uid) {
+                        return Ok(Some(event));
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to get events from {} while searching for UID {}: {}",
+                        provider.name(),
+                        uid,
+                        e
+                    );
+                }
+            }
+        }
+
+        Ok(None)
+    }
+
+    /// Get all calendar events from all enabled providers for reconciliation.
+    /// Returns a combined, deduplicated list of events (by UID).
+    async fn get_events_for_reconciliation(&self) -> Result<Vec<CalendarEvent>> {
+        let mut all_events = Vec::new();
+
+        for (_provider_id, provider) in &self.providers {
+            match provider.get_events(None).await {
+                Ok((events, _sync_token)) => all_events.extend(events),
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to get events from {} for reconciliation: {}",
+                        provider.name(),
+                        e
+                    );
+                }
+            }
+        }
+
+        // Deduplicate by UID (keep first occurrence)
+        let mut seen_uids = std::collections::HashSet::new();
+        let deduplicated: Vec<CalendarEvent> = all_events
+            .into_iter()
+            .filter(|event| seen_uids.insert(event.uid.clone()))
+            .collect();
+
+        Ok(deduplicated)
+    }
 }
 
 #[cfg(test)]
@@ -618,7 +752,8 @@ mod tests {
         let todo_store = Arc::new(RwLock::new(TodoStore::new(store_path)));
         let config = test_calendar_config();
 
-        let adapter = CalendarSyncAdapter::new(todo_store, &config, "UTC".to_string()).await;
+        let adapter =
+            CalendarSyncAdapter::new(todo_store, &config, "UTC".to_string(), None, false).await;
         assert!(adapter.is_ok());
 
         let adapter = adapter.unwrap();
@@ -633,7 +768,7 @@ mod tests {
         let todo_store = Arc::new(RwLock::new(TodoStore::new(store_path)));
         let config = test_calendar_config();
 
-        let adapter = CalendarSyncAdapter::new(todo_store, &config, "UTC".to_string())
+        let adapter = CalendarSyncAdapter::new(todo_store, &config, "UTC".to_string(), None, false)
             .await
             .unwrap();
 
@@ -688,7 +823,7 @@ mod tests {
         let todo_store = Arc::new(RwLock::new(TodoStore::new(store_path)));
         let config = test_calendar_config();
 
-        let adapter = CalendarSyncAdapter::new(todo_store, &config, "UTC".to_string())
+        let adapter = CalendarSyncAdapter::new(todo_store, &config, "UTC".to_string(), None, false)
             .await
             .unwrap();
 
@@ -755,7 +890,7 @@ mod tests {
             ..CalendarConfig::default()
         };
 
-        let adapter = CalendarSyncAdapter::new(todo_store, &config, "UTC".to_string())
+        let adapter = CalendarSyncAdapter::new(todo_store, &config, "UTC".to_string(), None, false)
             .await
             .unwrap();
         assert_eq!(adapter.providers.len(), 2);
@@ -779,7 +914,7 @@ mod tests {
             ..CalendarConfig::default()
         };
 
-        let adapter = CalendarSyncAdapter::new(todo_store, &config, "UTC".to_string())
+        let adapter = CalendarSyncAdapter::new(todo_store, &config, "UTC".to_string(), None, false)
             .await
             .unwrap();
         assert_eq!(adapter.providers.len(), 0);

@@ -94,6 +94,8 @@ pub struct AgentLoop {
     reminder_engine: Option<Arc<RwLock<super::ReminderEngine>>>,
     #[allow(dead_code)] // Held for lifetime; stopped on agent shutdown
     recurring_task_spawner: Option<Arc<RwLock<super::RecurringTaskSpawner>>>,
+    #[allow(dead_code)] // Held for lifetime; shared with CalendarSyncAdapter
+    notification_dispatcher: Option<Arc<super::NotificationDispatcher>>,
 }
 
 impl AgentLoop {
@@ -194,6 +196,16 @@ impl AgentLoop {
             config.timezone.clone(),
         );
 
+        // Create NotificationDispatcher early so it can be shared with calendar adapter
+        let notification_dispatcher = if !config.todo.notifications.targets.is_empty() {
+            Some(Arc::new(super::NotificationDispatcher::new(
+                bus.outbound_sender(),
+                config.todo.notifications.clone(),
+            )))
+        } else {
+            None
+        };
+
         // Register calendar tool (if any provider is enabled)
         if config.calendar.is_any_enabled() {
             let calendar_adapter = Arc::new(
@@ -201,6 +213,8 @@ impl AgentLoop {
                     Arc::clone(&todo_store),
                     &config.calendar,
                     config.timezone.clone(),
+                    notification_dispatcher.clone(),
+                    config.calendar.bidirectional_sync(),
                 )
                 .await?,
             );
@@ -226,19 +240,12 @@ impl AgentLoop {
             None => DecisionLogger::default_path(),
         };
 
-        // Create NotificationDispatcher and ReminderEngine if notifications configured
-        let reminder_engine = if !config.todo.notifications.targets.is_empty() {
-            let notification_dispatcher = Arc::new(super::NotificationDispatcher::new(
-                bus.outbound_sender(),
-                config.todo.notifications.clone(),
-            ));
-
-            // TODO: Link notification dispatcher to last_active_channel tracker if needed
-
+        // Create ReminderEngine using the shared notification dispatcher
+        let reminder_engine = if let Some(ref dispatcher) = notification_dispatcher {
             let mut engine = super::ReminderEngine::new(
                 Arc::clone(&todo_store),
                 None, // TODO: Add CalendarHandler when calendar sync is integrated
-                Arc::clone(&notification_dispatcher),
+                Arc::clone(dispatcher),
                 std::time::Duration::from_secs(300), // Check every 5 minutes
             );
             engine.start();
@@ -276,6 +283,7 @@ impl AgentLoop {
             last_active_channel: notification_handle,
             reminder_engine,
             recurring_task_spawner,
+            notification_dispatcher,
         })
     }
 
