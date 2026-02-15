@@ -9,31 +9,30 @@
 //! On entry, auto-creates workspace dirs and templates at the default path.
 //! On reconfiguration, all fields show current values as defaults.
 
-use std::io::{self, IsTerminal, Write};
+mod directories;
+mod menus;
+
+use std::io::{self, IsTerminal};
 use std::path::Path;
 
 use anyhow::Result;
 use common::utils::terminal::*;
 use config::Config;
-use crossterm::{
-    cursor,
-    event::{self, Event, KeyCode, KeyEvent, KeyModifiers},
-    terminal::{self, ClearType},
-};
 
+use self::directories::{create_config_dirs, create_workspace_dirs, create_workspace_templates};
+use self::menus::{run_workspace_menu, run_workspace_menu_fallback};
 use super::prompts;
-use super::templates;
 
 // ============================================================================
 // Setting Metadata
 // ============================================================================
 
-struct WorkspaceSettingInfo {
-    key: &'static str,
-    name: &'static str,
+pub(super) struct WorkspaceSettingInfo {
+    pub key: &'static str,
+    pub name: &'static str,
 }
 
-const WORKSPACE_SETTINGS: &[WorkspaceSettingInfo] = &[
+pub(super) const WORKSPACE_SETTINGS: &[WorkspaceSettingInfo] = &[
     WorkspaceSettingInfo {
         key: "templates",
         name: "Template Files",
@@ -49,7 +48,7 @@ const WORKSPACE_SETTINGS: &[WorkspaceSettingInfo] = &[
 ];
 
 /// Known workspace template files (name, path relative to workspace root).
-const TEMPLATE_FILES: &[(&str, &str)] = &[
+pub(super) const TEMPLATE_FILES: &[(&str, &str)] = &[
     ("AGENTS.md", "AGENTS.md"),
     ("SOUL.md", "SOUL.md"),
     ("USER.md", "USER.md"),
@@ -63,7 +62,11 @@ const TEMPLATE_FILES: &[(&str, &str)] = &[
 // ============================================================================
 
 /// Get the icon and color for a setting based on current config state.
-fn get_setting_icon(config: &Config, workspace: &Path, key: &str) -> (&'static str, &'static str) {
+pub(super) fn get_setting_icon(
+    config: &Config,
+    workspace: &Path,
+    key: &str,
+) -> (&'static str, &'static str) {
     match key {
         "templates" => {
             let existing = count_existing_templates(workspace);
@@ -92,7 +95,7 @@ fn get_setting_icon(config: &Config, workspace: &Path, key: &str) -> (&'static s
 }
 
 /// Get the status text for a setting.
-fn get_setting_status(config: &Config, workspace: &Path, key: &str) -> String {
+pub(super) fn get_setting_status(config: &Config, workspace: &Path, key: &str) -> String {
     match key {
         "templates" => {
             let existing = count_existing_templates(workspace);
@@ -157,9 +160,7 @@ fn validate_time(input: &str) -> Result<(), String> {
     if parts.len() != 2 {
         return Err("Expected HH:MM format".to_string());
     }
-    let hours: u32 = parts[0]
-        .parse()
-        .map_err(|_| "Invalid hours".to_string())?;
+    let hours: u32 = parts[0].parse().map_err(|_| "Invalid hours".to_string())?;
     let minutes: u32 = parts[1]
         .parse()
         .map_err(|_| "Invalid minutes".to_string())?;
@@ -178,7 +179,7 @@ fn validate_time(input: &str) -> Result<(), String> {
 
 /// Actions available in expanded setting sub-menus.
 #[derive(Clone, PartialEq)]
-enum WorkspaceSubAction {
+pub(super) enum WorkspaceSubAction {
     RegenerateTemplates,
     ToggleTarget(String),
     ToggleDailyDigest,
@@ -187,7 +188,7 @@ enum WorkspaceSubAction {
 }
 
 /// Known notification target metadata: (key, display_name).
-const NOTIFICATION_TARGETS: &[(&str, &str)] = &[
+pub(super) const NOTIFICATION_TARGETS: &[(&str, &str)] = &[
     ("os_native", "OS Native"),
     ("telegram", "Telegram"),
     ("discord", "Discord"),
@@ -196,7 +197,7 @@ const NOTIFICATION_TARGETS: &[(&str, &str)] = &[
 ];
 
 /// Check if a notification target is available (always for os_native, requires enabled channel otherwise).
-fn is_target_available(config: &Config, key: &str) -> bool {
+pub(super) fn is_target_available(config: &Config, key: &str) -> bool {
     match key {
         "os_native" => true,
         "telegram" => config.channels.telegram.enabled,
@@ -217,7 +218,7 @@ fn target_display_name(key: &str) -> &str {
 }
 
 impl WorkspaceSubAction {
-    fn label(&self, config: &Config, workspace: &Path) -> String {
+    pub(super) fn label(&self, config: &Config, workspace: &Path) -> String {
         match self {
             Self::RegenerateTemplates => {
                 let existing = count_existing_templates(workspace);
@@ -248,11 +249,14 @@ impl WorkspaceSubAction {
 }
 
 /// Get the dynamic sub-actions for a setting based on current config state.
-fn get_sub_actions(config: &Config, setting_idx: usize) -> Vec<WorkspaceSubAction> {
+pub(super) fn get_sub_actions(config: &Config, setting_idx: usize) -> Vec<WorkspaceSubAction> {
     let key = WORKSPACE_SETTINGS[setting_idx].key;
     match key {
         "templates" => {
-            vec![WorkspaceSubAction::RegenerateTemplates, WorkspaceSubAction::Close]
+            vec![
+                WorkspaceSubAction::RegenerateTemplates,
+                WorkspaceSubAction::Close,
+            ]
         }
         "targets" => {
             let mut actions: Vec<WorkspaceSubAction> = NOTIFICATION_TARGETS
@@ -271,7 +275,10 @@ fn get_sub_actions(config: &Config, setting_idx: usize) -> Vec<WorkspaceSubActio
                     WorkspaceSubAction::Close,
                 ]
             } else {
-                vec![WorkspaceSubAction::ToggleDailyDigest, WorkspaceSubAction::Close]
+                vec![
+                    WorkspaceSubAction::ToggleDailyDigest,
+                    WorkspaceSubAction::Close,
+                ]
             }
         }
         _ => vec![WorkspaceSubAction::Close],
@@ -279,15 +286,15 @@ fn get_sub_actions(config: &Config, setting_idx: usize) -> Vec<WorkspaceSubActio
 }
 
 /// State for the interactive workspace menu.
-struct WorkspaceMenuState {
-    cursor: usize,
-    expanded: Option<usize>,
-    sub_cursor: usize,
-    in_sub_menu: bool,
+pub(super) struct WorkspaceMenuState {
+    pub cursor: usize,
+    pub expanded: Option<usize>,
+    pub sub_cursor: usize,
+    pub in_sub_menu: bool,
 }
 
 impl WorkspaceMenuState {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             cursor: 0,
             expanded: None,
@@ -296,237 +303,12 @@ impl WorkspaceMenuState {
         }
     }
 
-    fn total_main_items(&self) -> usize {
+    pub fn total_main_items(&self) -> usize {
         WORKSPACE_SETTINGS.len() + 1 // settings + "Done"
     }
 
-    fn is_on_done(&self) -> bool {
+    pub fn is_on_done(&self) -> bool {
         self.cursor == WORKSPACE_SETTINGS.len()
-    }
-}
-
-// ============================================================================
-// Rendering Functions
-// ============================================================================
-
-/// Render the full workspace settings menu. Returns total lines rendered.
-fn render_workspace_menu(
-    out: &mut impl Write,
-    config: &Config,
-    workspace: &Path,
-    menu: &WorkspaceMenuState,
-    chars: &BoxChars,
-) -> Result<usize> {
-    let prefix = format!("{} ", colorize(chars.vertical, BRAND));
-    let mut lines = 0;
-
-    for (i, setting) in WORKSPACE_SETTINGS.iter().enumerate() {
-        let is_cursor = !menu.in_sub_menu && menu.cursor == i;
-        let is_expanded = menu.expanded == Some(i);
-
-        // Setting icon
-        let (icon_str, icon_color) = get_setting_icon(config, workspace, setting.key);
-        let icon = colorize(icon_str, icon_color);
-
-        // Expand indicator
-        let expand = if is_expanded {
-            colorize("▼", BRAND)
-        } else {
-            " ".to_string()
-        };
-
-        // Cursor indicator
-        let pointer = if is_cursor {
-            colorize("❯", BRAND)
-        } else {
-            " ".to_string()
-        };
-
-        // Setting name
-        let name = if is_cursor || is_expanded {
-            colorize(setting.name, BOLD)
-        } else {
-            setting.name.to_string()
-        };
-
-        // Status
-        let status_text = get_setting_status(config, workspace, setting.key);
-        let status = format!(" — {}", colorize(&status_text, DIM));
-
-        write!(
-            out,
-            "{}{}{} {} {}{}\r\n",
-            prefix, pointer, expand, icon, name, status
-        )?;
-        lines += 1;
-
-        // Render sub-menu if expanded
-        if is_expanded {
-            let sub_actions = get_sub_actions(config, i);
-            for (si, action) in sub_actions.iter().enumerate() {
-                let sub_pointer = if menu.in_sub_menu && menu.sub_cursor == si {
-                    colorize("❯", BRAND)
-                } else {
-                    " ".to_string()
-                };
-
-                let label = action.label(config, workspace);
-                let label_display = if menu.in_sub_menu && menu.sub_cursor == si {
-                    colorize(&label, BOLD)
-                } else if *action == WorkspaceSubAction::Close {
-                    colorize(&format!("── {} ──", label), DIM)
-                } else {
-                    label
-                };
-
-                write!(out, "{}      {} {}\r\n", prefix, sub_pointer, label_display)?;
-                lines += 1;
-            }
-        }
-    }
-
-    // Separator before Done
-    write!(
-        out,
-        "{}  {}\r\n",
-        prefix,
-        colorize("──────────────────────────", DIM)
-    )?;
-    lines += 1;
-
-    // Done row
-    let done_pointer = if !menu.in_sub_menu && menu.is_on_done() {
-        colorize("❯", BRAND)
-    } else {
-        " ".to_string()
-    };
-    let done_icon = colorize("●", BRAND);
-    let done_label = if !menu.in_sub_menu && menu.is_on_done() {
-        colorize("Done", BOLD)
-    } else {
-        "Done".to_string()
-    };
-
-    write!(
-        out,
-        "{}{} {} {}\r\n",
-        prefix, done_pointer, done_icon, done_label
-    )?;
-    lines += 1;
-
-    out.flush()?;
-    Ok(lines)
-}
-
-/// Render the keyboard hint bar.
-fn render_menu_hint(
-    out: &mut impl Write,
-    menu: &WorkspaceMenuState,
-    chars: &BoxChars,
-) -> Result<()> {
-    let prefix = format!("{} ", colorize(chars.vertical, BRAND));
-    let hint = if menu.in_sub_menu {
-        "↑/↓ navigate · Enter select · Esc back"
-    } else {
-        "↑/↓ navigate · Enter expand/select"
-    };
-    write!(out, "{}{}\r\n", prefix, colorize(hint, DIM))?;
-    out.flush()?;
-    Ok(())
-}
-
-/// Erase and re-render the menu. Returns new line count.
-fn rerender_menu(
-    out: &mut impl Write,
-    config: &Config,
-    workspace: &Path,
-    menu: &WorkspaceMenuState,
-    chars: &BoxChars,
-    prev_lines: usize,
-) -> Result<usize> {
-    let total = prev_lines + 1; // +1 for hint bar
-    for _ in 0..total {
-        write!(out, "\x1b[A\x1b[2K")?;
-    }
-    let new_lines = render_workspace_menu(out, config, workspace, menu, chars)?;
-    render_menu_hint(out, menu, chars)?;
-    Ok(new_lines)
-}
-
-// ============================================================================
-// Terminal Helpers
-// ============================================================================
-
-/// Read a keypress event, handling Ctrl+C gracefully.
-fn read_key() -> Result<KeyEvent> {
-    loop {
-        if let Event::Key(key) = event::read()? {
-            if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
-                return Err(anyhow::anyhow!("Ctrl+C"));
-            }
-            return Ok(key);
-        }
-    }
-}
-
-/// Erase `n` lines above cursor.
-fn erase_lines(n: usize) -> Result<()> {
-    let mut out = io::stdout();
-    for _ in 0..n {
-        crossterm::execute!(out, cursor::MoveUp(1), terminal::Clear(ClearType::CurrentLine))?;
-    }
-    Ok(())
-}
-
-// ============================================================================
-// Workspace Creation Helpers
-// ============================================================================
-
-/// Create workspace directories (workspace root, memory, skills).
-fn create_workspace_dirs(workspace: &Path) -> Result<()> {
-    std::fs::create_dir_all(workspace)?;
-    std::fs::create_dir_all(workspace.join("memory"))?;
-    std::fs::create_dir_all(workspace.join("skills"))?;
-    Ok(())
-}
-
-/// Create workspace template files (only if they don't already exist).
-/// Returns the number of files newly created.
-fn create_workspace_templates(workspace: &Path) -> Result<usize> {
-    let mut count = 0;
-    count += create_template_file(&workspace.join("AGENTS.md"), templates::AGENTS)?;
-    count += create_template_file(&workspace.join("SOUL.md"), templates::SOUL)?;
-    count += create_template_file(&workspace.join("USER.md"), templates::USER)?;
-    count += create_template_file(&workspace.join("TOOLS.md"), templates::TOOLS)?;
-    count += create_template_file(&workspace.join("IDENTITY.md"), templates::IDENTITY)?;
-
-    let memory_file = workspace.join("memory").join("MEMORY.md");
-    if !memory_file.exists() {
-        std::fs::write(&memory_file, templates::MEMORY)?;
-        count += 1;
-    }
-
-    Ok(count)
-}
-
-/// Create config directories (sessions, cron, media, history).
-fn create_config_dirs() -> Result<()> {
-    let config_dir = config::config_dir()?;
-    std::fs::create_dir_all(config_dir.join("sessions"))?;
-    std::fs::create_dir_all(config_dir.join("cron"))?;
-    std::fs::create_dir_all(config_dir.join("media"))?;
-    std::fs::create_dir_all(config_dir.join("history"))?;
-    Ok(())
-}
-
-/// Create a template file if it doesn't already exist.
-/// Returns 1 if created, 0 if already existed.
-fn create_template_file(path: &std::path::Path, content: &str) -> Result<usize> {
-    if !path.exists() {
-        std::fs::write(path, content)?;
-        Ok(1)
-    } else {
-        Ok(0)
     }
 }
 
@@ -535,7 +317,7 @@ fn create_template_file(path: &std::path::Path, content: &str) -> Result<usize> 
 // ============================================================================
 
 /// Execute the change digest time action (exits raw mode for input).
-fn execute_change_digest_time(config: &mut Config) -> Result<()> {
+pub(super) fn execute_change_digest_time(config: &mut Config) -> Result<()> {
     let chars = BoxChars::get();
     let prefix = format!("{} ", colorize(chars.vertical, BRAND));
 
@@ -546,11 +328,7 @@ fn execute_change_digest_time(config: &mut Config) -> Result<()> {
     match validate_time(&input) {
         Ok(()) => {
             config.todo.notifications.daily_digest_time = input;
-            println!(
-                "{}{} Digest time updated",
-                prefix,
-                status_success()
-            );
+            println!("{}{} Digest time updated", prefix, status_success());
         }
         Err(msg) => {
             println!(
@@ -565,7 +343,7 @@ fn execute_change_digest_time(config: &mut Config) -> Result<()> {
 }
 
 /// Execute the regenerate templates action (exits raw mode for feedback).
-fn execute_regenerate_templates(workspace: &Path) -> Result<()> {
+pub(super) fn execute_regenerate_templates(workspace: &Path) -> Result<()> {
     let chars = BoxChars::get();
     let prefix = format!("{} ", colorize(chars.vertical, BRAND));
 
@@ -586,247 +364,6 @@ fn execute_regenerate_templates(workspace: &Path) -> Result<()> {
     }
 
     Ok(())
-}
-
-// ============================================================================
-// Interactive Event Loop
-// ============================================================================
-
-/// Run the interactive workspace & notifications menu.
-fn run_workspace_menu(config: &mut Config, workspace: &Path) -> Result<()> {
-    let chars = BoxChars::get();
-    let mut menu = WorkspaceMenuState::new();
-    let mut out = io::stdout();
-
-    // Initial render
-    terminal::enable_raw_mode()?;
-    let mut list_lines = render_workspace_menu(&mut out, config, workspace, &menu, chars)?;
-    render_menu_hint(&mut out, &menu, chars)?;
-
-    loop {
-        let key = read_key()?;
-        match key.code {
-            // Main menu navigation
-            KeyCode::Up | KeyCode::Char('k') if !menu.in_sub_menu => {
-                if menu.cursor > 0 {
-                    menu.cursor -= 1;
-                    if menu.expanded.is_some() && menu.expanded != Some(menu.cursor) {
-                        menu.expanded = None;
-                    }
-                    list_lines =
-                        rerender_menu(&mut out, config, workspace, &menu, chars, list_lines)?;
-                }
-            }
-            KeyCode::Down | KeyCode::Char('j') if !menu.in_sub_menu => {
-                if menu.cursor < menu.total_main_items() - 1 {
-                    menu.cursor += 1;
-                    if menu.expanded.is_some() && menu.expanded != Some(menu.cursor) {
-                        menu.expanded = None;
-                    }
-                    list_lines =
-                        rerender_menu(&mut out, config, workspace, &menu, chars, list_lines)?;
-                }
-            }
-            // Sub-menu navigation
-            KeyCode::Up | KeyCode::Char('k') if menu.in_sub_menu => {
-                if menu.sub_cursor > 0 {
-                    menu.sub_cursor -= 1;
-                    list_lines =
-                        rerender_menu(&mut out, config, workspace, &menu, chars, list_lines)?;
-                }
-            }
-            KeyCode::Down | KeyCode::Char('j') if menu.in_sub_menu => {
-                let sub_actions = get_sub_actions(config, menu.expanded.unwrap());
-                if menu.sub_cursor < sub_actions.len() - 1 {
-                    menu.sub_cursor += 1;
-                    list_lines =
-                        rerender_menu(&mut out, config, workspace, &menu, chars, list_lines)?;
-                }
-            }
-            // Main menu Enter
-            KeyCode::Enter if !menu.in_sub_menu => {
-                if menu.is_on_done() {
-                    terminal::disable_raw_mode()?;
-                    erase_lines(list_lines + 1)?;
-                    return Ok(());
-                } else {
-                    menu.expanded = Some(menu.cursor);
-                    menu.in_sub_menu = true;
-                    menu.sub_cursor = 0;
-                    list_lines =
-                        rerender_menu(&mut out, config, workspace, &menu, chars, list_lines)?;
-                }
-            }
-            // Sub-menu Enter
-            KeyCode::Enter if menu.in_sub_menu => {
-                let setting_idx = menu.expanded.unwrap();
-                let sub_actions = get_sub_actions(config, setting_idx);
-                let action = &sub_actions[menu.sub_cursor];
-
-                match action {
-                    WorkspaceSubAction::Close => {
-                        menu.expanded = None;
-                        menu.in_sub_menu = false;
-                        list_lines = rerender_menu(
-                            &mut out, config, workspace, &menu, chars, list_lines,
-                        )?;
-                    }
-                    // Immediate actions (no raw mode exit needed)
-                    WorkspaceSubAction::ToggleDailyDigest => {
-                        config.todo.notifications.daily_digest =
-                            !config.todo.notifications.daily_digest;
-                        list_lines = rerender_menu(
-                            &mut out, config, workspace, &menu, chars, list_lines,
-                        )?;
-                    }
-                    // Immediate toggle for notification targets
-                    WorkspaceSubAction::ToggleTarget(key) => {
-                        let targets = &mut config.todo.notifications.targets;
-                        if let Some(pos) = targets.iter().position(|t| t == key) {
-                            targets.remove(pos);
-                        } else {
-                            targets.push(key.clone());
-                        }
-                        list_lines = rerender_menu(
-                            &mut out, config, workspace, &menu, chars, list_lines,
-                        )?;
-                    }
-                    // Input actions (exit raw mode, prompt, re-enter)
-                    WorkspaceSubAction::RegenerateTemplates => {
-                        terminal::disable_raw_mode()?;
-                        erase_lines(list_lines + 1)?;
-
-                        execute_regenerate_templates(workspace)?;
-
-                        terminal::enable_raw_mode()?;
-                        list_lines =
-                            render_workspace_menu(&mut out, config, workspace, &menu, chars)?;
-                        render_menu_hint(&mut out, &menu, chars)?;
-                    }
-                    WorkspaceSubAction::ChangeDigestTime => {
-                        terminal::disable_raw_mode()?;
-                        erase_lines(list_lines + 1)?;
-
-                        execute_change_digest_time(config)?;
-
-                        terminal::enable_raw_mode()?;
-                        list_lines =
-                            render_workspace_menu(&mut out, config, workspace, &menu, chars)?;
-                        render_menu_hint(&mut out, &menu, chars)?;
-                    }
-                }
-            }
-            // Esc to collapse
-            KeyCode::Esc if menu.in_sub_menu => {
-                menu.expanded = None;
-                menu.in_sub_menu = false;
-                list_lines =
-                    rerender_menu(&mut out, config, workspace, &menu, chars, list_lines)?;
-            }
-            _ => {}
-        }
-    }
-}
-
-// ============================================================================
-// Non-TTY Fallback
-// ============================================================================
-
-/// Run a simplified menu for non-TTY environments.
-fn run_workspace_menu_fallback(config: &mut Config, workspace: &Path) -> Result<()> {
-    let chars = BoxChars::get();
-
-    loop {
-        println!("{}", colorize(chars.vertical, BRAND));
-        println!(
-            "{} Select a setting to configure:",
-            colorize(chars.vertical, BRAND)
-        );
-        println!("{}", colorize(chars.vertical, BRAND));
-
-        for (i, setting) in WORKSPACE_SETTINGS.iter().enumerate() {
-            let status = get_setting_status(config, workspace, setting.key);
-            println!(
-                "{}  {}. {} — {}",
-                colorize(chars.vertical, BRAND),
-                i + 1,
-                setting.name,
-                colorize(&status, DIM)
-            );
-        }
-
-        println!(
-            "{}  {}. Done",
-            colorize(chars.vertical, BRAND),
-            WORKSPACE_SETTINGS.len() + 1,
-        );
-        println!("{}", colorize(chars.vertical, BRAND));
-
-        let choice = prompts::prompt_text("Enter number", None, true)?;
-        let idx = match choice.parse::<usize>() {
-            Ok(n) if n > 0 && n <= WORKSPACE_SETTINGS.len() + 1 => n - 1,
-            _ => {
-                println!(
-                    "{} Invalid choice. Please enter a number between 1 and {}.",
-                    colorize(chars.vertical, BRAND),
-                    WORKSPACE_SETTINGS.len() + 1
-                );
-                continue;
-            }
-        };
-
-        if idx == WORKSPACE_SETTINGS.len() {
-            return Ok(());
-        }
-
-        match WORKSPACE_SETTINGS[idx].key {
-            "templates" => {
-                execute_regenerate_templates(workspace)?;
-            }
-            "targets" => {
-                // List available targets with current state
-                let available: Vec<(&str, &str)> = NOTIFICATION_TARGETS
-                    .iter()
-                    .filter(|(key, _)| is_target_available(config, key))
-                    .copied()
-                    .collect();
-                for (i, (key, name)) in available.iter().enumerate() {
-                    let enabled = config.todo.notifications.targets.contains(&key.to_string());
-                    let icon = if enabled { "✓" } else { "○" };
-                    println!(
-                        "{}    {}. {} {}",
-                        colorize(chars.vertical, BRAND),
-                        i + 1,
-                        icon,
-                        name
-                    );
-                }
-                let toggle = prompts::prompt_text("Toggle target (number, or empty to skip)", None, false)?;
-                if let Ok(n) = toggle.parse::<usize>() {
-                    if n > 0 && n <= available.len() {
-                        let key = available[n - 1].0.to_string();
-                        let targets = &mut config.todo.notifications.targets;
-                        if let Some(pos) = targets.iter().position(|t| t == &key) {
-                            targets.remove(pos);
-                        } else {
-                            targets.push(key);
-                        }
-                    }
-                }
-            }
-            "digest" => {
-                let enabled = prompts::prompt_yes_no(
-                    "Enable daily digest?",
-                    config.todo.notifications.daily_digest,
-                )?;
-                config.todo.notifications.daily_digest = enabled;
-                if enabled {
-                    execute_change_digest_time(config)?;
-                }
-            }
-            _ => {}
-        }
-    }
 }
 
 // ============================================================================
@@ -892,6 +429,7 @@ pub fn configure_workspace(config: &mut Config) -> Result<bool> {
 
 #[cfg(test)]
 mod tests {
+    use self::directories::create_template_file;
     use super::*;
     use tempfile::TempDir;
 
@@ -1053,7 +591,10 @@ mod tests {
         }
 
         let config = Config::default();
-        assert_eq!(get_setting_status(&config, ws, "templates"), "6 files intact");
+        assert_eq!(
+            get_setting_status(&config, ws, "templates"),
+            "6 files intact"
+        );
     }
 
     #[test]
@@ -1091,8 +632,7 @@ mod tests {
     fn test_status_targets_multiple() {
         let temp_dir = TempDir::new().unwrap();
         let mut config = Config::default();
-        config.todo.notifications.targets =
-            vec!["os_native".to_string(), "telegram".to_string()];
+        config.todo.notifications.targets = vec!["os_native".to_string(), "telegram".to_string()];
         assert_eq!(
             get_setting_status(&config, temp_dir.path(), "targets"),
             "OS Native, Telegram"
@@ -1136,7 +676,7 @@ mod tests {
     fn test_targets_sub_actions_default() {
         let config = Config::default();
         let actions = get_sub_actions(&config, 1); // targets
-        // Only os_native is available by default (no channels enabled) + Close
+                                                   // Only os_native is available by default (no channels enabled) + Close
         assert_eq!(actions.len(), 2);
         assert!(actions.contains(&WorkspaceSubAction::ToggleTarget("os_native".to_string())));
         assert!(actions.contains(&WorkspaceSubAction::Close));
@@ -1148,7 +688,7 @@ mod tests {
         config.channels.telegram.enabled = true;
         config.channels.discord.enabled = true;
         let actions = get_sub_actions(&config, 1); // targets
-        // os_native + telegram + discord + Close
+                                                   // os_native + telegram + discord + Close
         assert_eq!(actions.len(), 4);
         assert!(actions.contains(&WorkspaceSubAction::ToggleTarget("os_native".to_string())));
         assert!(actions.contains(&WorkspaceSubAction::ToggleTarget("telegram".to_string())));

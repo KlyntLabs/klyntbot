@@ -9,16 +9,13 @@
 //!
 //! On reconfiguration, all fields show current values as defaults.
 
+pub(crate) mod menus;
+
 use std::io::{self, IsTerminal, Write};
 
 use anyhow::Result;
 use common::utils::terminal::*;
 use config::Config;
-use crossterm::{
-    cursor,
-    event::{self, Event, KeyCode, KeyEvent, KeyModifiers},
-    terminal::{self, ClearType},
-};
 
 use super::prompts;
 
@@ -56,12 +53,12 @@ impl ToolsPreset {
 // Setting Metadata
 // ============================================================================
 
-struct ToolSettingInfo {
-    key: &'static str,
-    name: &'static str,
+pub(super) struct ToolSettingInfo {
+    pub(super) key: &'static str,
+    pub(super) name: &'static str,
 }
 
-const TOOL_SETTINGS: &[ToolSettingInfo] = &[
+pub(super) const TOOL_SETTINGS: &[ToolSettingInfo] = &[
     ToolSettingInfo {
         key: "preset",
         name: "Security Preset",
@@ -89,7 +86,7 @@ const TOOL_SETTINGS: &[ToolSettingInfo] = &[
 // ============================================================================
 
 /// Detect the current preset from config values.
-fn detect_preset(config: &Config) -> ToolsPreset {
+pub(super) fn detect_preset(config: &Config) -> ToolsPreset {
     if config.tools.restrict_to_workspace
         && !config.tools.exec.allowed_commands.is_empty()
         && config.tools.exec.timeout <= 30
@@ -103,7 +100,7 @@ fn detect_preset(config: &Config) -> ToolsPreset {
 }
 
 /// Get the icon and color for a setting based on current config state.
-fn get_setting_icon(config: &Config, key: &str) -> (&'static str, &'static str) {
+pub(super) fn get_setting_icon(config: &Config, key: &str) -> (&'static str, &'static str) {
     match key {
         "preset" => ("★", HIGHLIGHT),
         "workspace" => {
@@ -133,7 +130,7 @@ fn get_setting_icon(config: &Config, key: &str) -> (&'static str, &'static str) 
 }
 
 /// Get the status text for a setting.
-fn get_setting_status(config: &Config, key: &str) -> String {
+pub(super) fn get_setting_status(config: &Config, key: &str) -> String {
     match key {
         "preset" => detect_preset(config).name().to_string(),
         "workspace" => {
@@ -169,7 +166,7 @@ fn get_setting_status(config: &Config, key: &str) -> String {
 
 /// Actions available in expanded setting sub-menus.
 #[derive(Clone, PartialEq)]
-enum ToolSubAction {
+pub(super) enum ToolSubAction {
     SwitchPreset(ToolsPreset),
     ToggleWorkspace,
     EditAllowlist,
@@ -182,7 +179,7 @@ enum ToolSubAction {
 }
 
 impl ToolSubAction {
-    fn label(&self, config: &Config) -> String {
+    pub(super) fn label(&self, config: &Config) -> String {
         match self {
             Self::SwitchPreset(preset) => {
                 format!("{} ({})", preset.name(), preset.description())
@@ -223,13 +220,17 @@ impl ToolSubAction {
 }
 
 /// Get the dynamic sub-actions for a setting based on current config state.
-fn get_sub_actions(config: &Config, setting_idx: usize) -> Vec<ToolSubAction> {
+pub(super) fn get_sub_actions(config: &Config, setting_idx: usize) -> Vec<ToolSubAction> {
     let key = TOOL_SETTINGS[setting_idx].key;
     match key {
         "preset" => {
             let current = detect_preset(config);
             let mut actions = Vec::new();
-            for preset in &[ToolsPreset::Strict, ToolsPreset::Balanced, ToolsPreset::Permissive] {
+            for preset in &[
+                ToolsPreset::Strict,
+                ToolsPreset::Balanced,
+                ToolsPreset::Permissive,
+            ] {
                 if *preset != current {
                     actions.push(ToolSubAction::SwitchPreset(*preset));
                 }
@@ -270,15 +271,15 @@ fn get_sub_actions(config: &Config, setting_idx: usize) -> Vec<ToolSubAction> {
 }
 
 /// State for the interactive tool permissions menu.
-struct ToolMenuState {
-    cursor: usize,
-    expanded: Option<usize>,
-    sub_cursor: usize,
-    in_sub_menu: bool,
+pub(super) struct ToolMenuState {
+    pub(super) cursor: usize,
+    pub(super) expanded: Option<usize>,
+    pub(super) sub_cursor: usize,
+    pub(super) in_sub_menu: bool,
 }
 
 impl ToolMenuState {
-    fn new() -> Self {
+    pub(super) fn new() -> Self {
         Self {
             cursor: 0,
             expanded: None,
@@ -287,180 +288,13 @@ impl ToolMenuState {
         }
     }
 
-    fn total_main_items(&self) -> usize {
+    pub(super) fn total_main_items(&self) -> usize {
         TOOL_SETTINGS.len() + 1 // settings + "Done"
     }
 
-    fn is_on_done(&self) -> bool {
+    pub(super) fn is_on_done(&self) -> bool {
         self.cursor == TOOL_SETTINGS.len()
     }
-}
-
-// ============================================================================
-// Rendering Functions
-// ============================================================================
-
-/// Render the full tool settings menu. Returns total lines rendered.
-fn render_tool_menu(
-    out: &mut impl Write,
-    config: &Config,
-    menu: &ToolMenuState,
-    chars: &BoxChars,
-) -> Result<usize> {
-    let prefix = format!("{} ", colorize(chars.vertical, BRAND));
-    let mut lines = 0;
-
-    for (i, setting) in TOOL_SETTINGS.iter().enumerate() {
-        let is_cursor = !menu.in_sub_menu && menu.cursor == i;
-        let is_expanded = menu.expanded == Some(i);
-
-        // Setting icon
-        let (icon_str, icon_color) = get_setting_icon(config, setting.key);
-        let icon = colorize(icon_str, icon_color);
-
-        // Expand indicator
-        let expand = if is_expanded {
-            colorize("▼", BRAND)
-        } else {
-            " ".to_string()
-        };
-
-        // Cursor indicator
-        let pointer = if is_cursor {
-            colorize("❯", BRAND)
-        } else {
-            " ".to_string()
-        };
-
-        // Setting name
-        let name = if is_cursor || is_expanded {
-            colorize(setting.name, BOLD)
-        } else {
-            setting.name.to_string()
-        };
-
-        // Status
-        let status_text = get_setting_status(config, setting.key);
-        let status = format!(" — {}", colorize(&status_text, DIM));
-
-        write!(
-            out,
-            "{}{}{} {} {}{}\r\n",
-            prefix, pointer, expand, icon, name, status
-        )?;
-        lines += 1;
-
-        // Render sub-menu if expanded
-        if is_expanded {
-            let sub_actions = get_sub_actions(config, i);
-            for (si, action) in sub_actions.iter().enumerate() {
-                let sub_pointer = if menu.in_sub_menu && menu.sub_cursor == si {
-                    colorize("❯", BRAND)
-                } else {
-                    " ".to_string()
-                };
-
-                let label = action.label(config);
-                let label_display = if menu.in_sub_menu && menu.sub_cursor == si {
-                    colorize(&label, BOLD)
-                } else if *action == ToolSubAction::Close {
-                    colorize(&format!("── {} ──", label), DIM)
-                } else {
-                    label
-                };
-
-                write!(out, "{}      {} {}\r\n", prefix, sub_pointer, label_display)?;
-                lines += 1;
-            }
-        }
-    }
-
-    // Separator before Done
-    write!(
-        out,
-        "{}  {}\r\n",
-        prefix,
-        colorize("──────────────────────────", DIM)
-    )?;
-    lines += 1;
-
-    // Done row
-    let done_pointer = if !menu.in_sub_menu && menu.is_on_done() {
-        colorize("❯", BRAND)
-    } else {
-        " ".to_string()
-    };
-    let done_icon = colorize("●", BRAND);
-    let done_label = if !menu.in_sub_menu && menu.is_on_done() {
-        colorize("Done", BOLD)
-    } else {
-        "Done".to_string()
-    };
-
-    write!(
-        out,
-        "{}{} {} {}\r\n",
-        prefix, done_pointer, done_icon, done_label
-    )?;
-    lines += 1;
-
-    out.flush()?;
-    Ok(lines)
-}
-
-/// Render the keyboard hint bar.
-fn render_menu_hint(out: &mut impl Write, menu: &ToolMenuState, chars: &BoxChars) -> Result<()> {
-    let prefix = format!("{} ", colorize(chars.vertical, BRAND));
-    let hint = if menu.in_sub_menu {
-        "↑/↓ navigate · Enter select · Esc back"
-    } else {
-        "↑/↓ navigate · Enter expand/select"
-    };
-    write!(out, "{}{}\r\n", prefix, colorize(hint, DIM))?;
-    out.flush()?;
-    Ok(())
-}
-
-/// Erase and re-render the menu. Returns new line count.
-fn rerender_menu(
-    out: &mut impl Write,
-    config: &Config,
-    menu: &ToolMenuState,
-    chars: &BoxChars,
-    prev_lines: usize,
-) -> Result<usize> {
-    let total = prev_lines + 1; // +1 for hint bar
-    for _ in 0..total {
-        write!(out, "\x1b[A\x1b[2K")?;
-    }
-    let new_lines = render_tool_menu(out, config, menu, chars)?;
-    render_menu_hint(out, menu, chars)?;
-    Ok(new_lines)
-}
-
-// ============================================================================
-// Terminal Helpers
-// ============================================================================
-
-/// Read a keypress event, handling Ctrl+C gracefully.
-fn read_key() -> Result<KeyEvent> {
-    loop {
-        if let Event::Key(key) = event::read()? {
-            if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
-                return Err(anyhow::anyhow!("Ctrl+C"));
-            }
-            return Ok(key);
-        }
-    }
-}
-
-/// Erase `n` lines above cursor.
-fn erase_lines(n: usize) -> Result<()> {
-    let mut out = io::stdout();
-    for _ in 0..n {
-        crossterm::execute!(out, cursor::MoveUp(1), terminal::Clear(ClearType::CurrentLine))?;
-    }
-    Ok(())
 }
 
 // ============================================================================
@@ -468,7 +302,7 @@ fn erase_lines(n: usize) -> Result<()> {
 // ============================================================================
 
 /// Apply a preset profile to the config.
-fn apply_preset(config: &mut Config, preset: ToolsPreset) {
+pub(super) fn apply_preset(config: &mut Config, preset: ToolsPreset) {
     match preset {
         ToolsPreset::Strict => {
             config.tools.restrict_to_workspace = true;
@@ -500,17 +334,14 @@ fn apply_preset(config: &mut Config, preset: ToolsPreset) {
 }
 
 /// Execute the edit allowlist action (exits raw mode for input).
-fn execute_edit_allowlist(config: &mut Config) -> Result<()> {
+pub(super) fn execute_edit_allowlist(config: &mut Config) -> Result<()> {
     let chars = BoxChars::get();
     let prefix = format!("{} ", colorize(chars.vertical, BRAND));
 
     println!(
         "{}{}",
         prefix,
-        colorize(
-            "Enter commands one per line (empty line to finish):",
-            DIM
-        )
+        colorize("Enter commands one per line (empty line to finish):", DIM)
     );
 
     let mut commands: Vec<String> = config.tools.exec.allowed_commands.clone();
@@ -524,11 +355,7 @@ fn execute_edit_allowlist(config: &mut Config) -> Result<()> {
     }
 
     loop {
-        print!(
-            "{}{} ",
-            prefix,
-            colorize("+", SUCCESS)
-        );
+        print!("{}{} ", prefix, colorize("+", SUCCESS));
         io::stdout().flush()?;
 
         let mut input = String::new();
@@ -540,11 +367,7 @@ fn execute_edit_allowlist(config: &mut Config) -> Result<()> {
         }
 
         if commands.contains(&input) {
-            println!(
-                "{}  {}",
-                prefix,
-                colorize("(already in list)", DIM)
-            );
+            println!("{}  {}", prefix, colorize("(already in list)", DIM));
             continue;
         }
 
@@ -572,7 +395,7 @@ fn execute_edit_allowlist(config: &mut Config) -> Result<()> {
 }
 
 /// Execute the configure/edit brave API key action (exits raw mode for input).
-fn execute_configure_brave_key(config: &mut Config) -> Result<()> {
+pub(super) fn execute_configure_brave_key(config: &mut Config) -> Result<()> {
     let chars = BoxChars::get();
     let prefix = format!("{} ", colorize(chars.vertical, BRAND));
 
@@ -602,11 +425,7 @@ fn execute_configure_brave_key(config: &mut Config) -> Result<()> {
                 );
             }
             None => {
-                println!(
-                    "{}{} Brave API key unchanged",
-                    prefix,
-                    status_success()
-                );
+                println!("{}{} Brave API key unchanged", prefix, status_success());
             }
         }
     }
@@ -615,7 +434,7 @@ fn execute_configure_brave_key(config: &mut Config) -> Result<()> {
 }
 
 /// Execute the change timeout action (exits raw mode for input).
-fn execute_change_timeout(config: &mut Config) -> Result<()> {
+pub(super) fn execute_change_timeout(config: &mut Config) -> Result<()> {
     let chars = BoxChars::get();
     let prefix = format!("{} ", colorize(chars.vertical, BRAND));
 
@@ -625,12 +444,7 @@ fn execute_change_timeout(config: &mut Config) -> Result<()> {
     match input.parse::<u64>() {
         Ok(secs) if (5..=600).contains(&secs) => {
             config.tools.exec.timeout = secs;
-            println!(
-                "{}{} Timeout set to {}s",
-                prefix,
-                status_success(),
-                secs
-            );
+            println!("{}{} Timeout set to {}s", prefix, status_success(), secs);
         }
         Ok(_) => {
             println!(
@@ -652,260 +466,6 @@ fn execute_change_timeout(config: &mut Config) -> Result<()> {
     }
 
     Ok(())
-}
-
-// ============================================================================
-// Interactive Event Loop
-// ============================================================================
-
-/// Run the interactive tool permissions menu.
-fn run_tool_menu(config: &mut Config) -> Result<()> {
-    let chars = BoxChars::get();
-    let mut menu = ToolMenuState::new();
-    let mut out = io::stdout();
-
-    // Initial render
-    terminal::enable_raw_mode()?;
-    let mut list_lines = render_tool_menu(&mut out, config, &menu, chars)?;
-    render_menu_hint(&mut out, &menu, chars)?;
-
-    loop {
-        let key = read_key()?;
-        match key.code {
-            // Main menu navigation
-            KeyCode::Up | KeyCode::Char('k') if !menu.in_sub_menu => {
-                if menu.cursor > 0 {
-                    menu.cursor -= 1;
-                    if menu.expanded.is_some() && menu.expanded != Some(menu.cursor) {
-                        menu.expanded = None;
-                    }
-                    list_lines = rerender_menu(&mut out, config, &menu, chars, list_lines)?;
-                }
-            }
-            KeyCode::Down | KeyCode::Char('j') if !menu.in_sub_menu => {
-                if menu.cursor < menu.total_main_items() - 1 {
-                    menu.cursor += 1;
-                    if menu.expanded.is_some() && menu.expanded != Some(menu.cursor) {
-                        menu.expanded = None;
-                    }
-                    list_lines = rerender_menu(&mut out, config, &menu, chars, list_lines)?;
-                }
-            }
-            // Sub-menu navigation
-            KeyCode::Up | KeyCode::Char('k') if menu.in_sub_menu => {
-                if menu.sub_cursor > 0 {
-                    menu.sub_cursor -= 1;
-                    list_lines = rerender_menu(&mut out, config, &menu, chars, list_lines)?;
-                }
-            }
-            KeyCode::Down | KeyCode::Char('j') if menu.in_sub_menu => {
-                let sub_actions = get_sub_actions(config, menu.expanded.unwrap());
-                if menu.sub_cursor < sub_actions.len() - 1 {
-                    menu.sub_cursor += 1;
-                    list_lines = rerender_menu(&mut out, config, &menu, chars, list_lines)?;
-                }
-            }
-            // Main menu Enter
-            KeyCode::Enter if !menu.in_sub_menu => {
-                if menu.is_on_done() {
-                    terminal::disable_raw_mode()?;
-                    erase_lines(list_lines + 1)?;
-                    return Ok(());
-                } else {
-                    menu.expanded = Some(menu.cursor);
-                    menu.in_sub_menu = true;
-                    menu.sub_cursor = 0;
-                    list_lines = rerender_menu(&mut out, config, &menu, chars, list_lines)?;
-                }
-            }
-            // Sub-menu Enter
-            KeyCode::Enter if menu.in_sub_menu => {
-                let setting_idx = menu.expanded.unwrap();
-                let sub_actions = get_sub_actions(config, setting_idx);
-                let action = &sub_actions[menu.sub_cursor];
-
-                match action {
-                    ToolSubAction::Close => {
-                        menu.expanded = None;
-                        menu.in_sub_menu = false;
-                        list_lines = rerender_menu(&mut out, config, &menu, chars, list_lines)?;
-                    }
-                    // Immediate actions (no raw mode exit needed)
-                    ToolSubAction::SwitchPreset(preset) => {
-                        apply_preset(config, *preset);
-                        menu.expanded = None;
-                        menu.in_sub_menu = false;
-                        list_lines = rerender_menu(&mut out, config, &menu, chars, list_lines)?;
-                    }
-                    ToolSubAction::ToggleWorkspace => {
-                        config.tools.restrict_to_workspace =
-                            !config.tools.restrict_to_workspace;
-                        list_lines = rerender_menu(&mut out, config, &menu, chars, list_lines)?;
-                    }
-                    ToolSubAction::SwitchAllowlistMode => {
-                        if config.tools.exec.allowed_commands.is_empty() {
-                            // Switch to allowlist mode with default safe commands
-                            config.tools.exec.allowed_commands = vec![
-                                "ls".to_string(),
-                                "cat".to_string(),
-                                "head".to_string(),
-                                "tail".to_string(),
-                                "grep".to_string(),
-                                "find".to_string(),
-                                "wc".to_string(),
-                                "echo".to_string(),
-                                "pwd".to_string(),
-                                "date".to_string(),
-                            ];
-                        } else {
-                            // Switch to deny-list mode
-                            config.tools.exec.allowed_commands = Vec::new();
-                        }
-                        list_lines = rerender_menu(&mut out, config, &menu, chars, list_lines)?;
-                    }
-                    ToolSubAction::RemoveBraveKey => {
-                        config.tools.web.brave_api_key =
-                            config::schema::Secret::new(String::new());
-                        list_lines = rerender_menu(&mut out, config, &menu, chars, list_lines)?;
-                    }
-                    // Input actions (exit raw mode, prompt, re-enter)
-                    ToolSubAction::EditAllowlist => {
-                        terminal::disable_raw_mode()?;
-                        erase_lines(list_lines + 1)?;
-
-                        execute_edit_allowlist(config)?;
-
-                        terminal::enable_raw_mode()?;
-                        list_lines = render_tool_menu(&mut out, config, &menu, chars)?;
-                        render_menu_hint(&mut out, &menu, chars)?;
-                    }
-                    ToolSubAction::ConfigureBraveKey | ToolSubAction::EditBraveKey => {
-                        terminal::disable_raw_mode()?;
-                        erase_lines(list_lines + 1)?;
-
-                        execute_configure_brave_key(config)?;
-
-                        terminal::enable_raw_mode()?;
-                        list_lines = render_tool_menu(&mut out, config, &menu, chars)?;
-                        render_menu_hint(&mut out, &menu, chars)?;
-                    }
-                    ToolSubAction::ChangeTimeout => {
-                        terminal::disable_raw_mode()?;
-                        erase_lines(list_lines + 1)?;
-
-                        execute_change_timeout(config)?;
-
-                        terminal::enable_raw_mode()?;
-                        list_lines = render_tool_menu(&mut out, config, &menu, chars)?;
-                        render_menu_hint(&mut out, &menu, chars)?;
-                    }
-                }
-            }
-            // Esc to collapse
-            KeyCode::Esc if menu.in_sub_menu => {
-                menu.expanded = None;
-                menu.in_sub_menu = false;
-                list_lines = rerender_menu(&mut out, config, &menu, chars, list_lines)?;
-            }
-            _ => {}
-        }
-    }
-}
-
-// ============================================================================
-// Non-TTY Fallback
-// ============================================================================
-
-/// Run a simplified menu for non-TTY environments.
-fn run_tool_menu_fallback(config: &mut Config) -> Result<()> {
-    let chars = BoxChars::get();
-
-    loop {
-        println!("{}", colorize(chars.vertical, BRAND));
-        println!(
-            "{} Select a setting to configure:",
-            colorize(chars.vertical, BRAND)
-        );
-        println!("{}", colorize(chars.vertical, BRAND));
-
-        for (i, setting) in TOOL_SETTINGS.iter().enumerate() {
-            let status = get_setting_status(config, setting.key);
-            println!(
-                "{}  {}. {} — {}",
-                colorize(chars.vertical, BRAND),
-                i + 1,
-                setting.name,
-                colorize(&status, DIM)
-            );
-        }
-
-        println!(
-            "{}  {}. Done",
-            colorize(chars.vertical, BRAND),
-            TOOL_SETTINGS.len() + 1,
-        );
-        println!("{}", colorize(chars.vertical, BRAND));
-
-        let choice = prompts::prompt_text("Enter number", None, true)?;
-        let idx = match choice.parse::<usize>() {
-            Ok(n) if n > 0 && n <= TOOL_SETTINGS.len() + 1 => n - 1,
-            _ => {
-                println!(
-                    "{} Invalid choice. Please enter a number between 1 and {}.",
-                    colorize(chars.vertical, BRAND),
-                    TOOL_SETTINGS.len() + 1
-                );
-                continue;
-            }
-        };
-
-        if idx == TOOL_SETTINGS.len() {
-            return Ok(());
-        }
-
-        match TOOL_SETTINGS[idx].key {
-            "preset" => {
-                let options: Vec<prompts::SelectOption<'_>> = [
-                    ToolsPreset::Strict,
-                    ToolsPreset::Balanced,
-                    ToolsPreset::Permissive,
-                ]
-                .iter()
-                .map(|p| prompts::SelectOption {
-                    label: p.name(),
-                    description: p.description(),
-                })
-                .collect();
-
-                let current = match detect_preset(config) {
-                    ToolsPreset::Strict => 0,
-                    ToolsPreset::Balanced => 1,
-                    ToolsPreset::Permissive => 2,
-                };
-
-                let sel = prompts::prompt_select("Select preset", &options, current)?;
-                let preset = [ToolsPreset::Strict, ToolsPreset::Balanced, ToolsPreset::Permissive][sel];
-                apply_preset(config, preset);
-            }
-            "workspace" => {
-                let restrict = prompts::prompt_yes_no(
-                    "Restrict to workspace?",
-                    config.tools.restrict_to_workspace,
-                )?;
-                config.tools.restrict_to_workspace = restrict;
-            }
-            "allowlist" => {
-                execute_edit_allowlist(config)?;
-            }
-            "brave_api" => {
-                execute_configure_brave_key(config)?;
-            }
-            "timeout" => {
-                execute_change_timeout(config)?;
-            }
-            _ => {}
-        }
-    }
 }
 
 // ============================================================================
@@ -934,9 +494,9 @@ pub fn configure_tools(config: &mut Config) -> Result<bool> {
 
     // Run interactive menu (TTY) or fallback (non-TTY)
     if io::stdin().is_terminal() && io::stdout().is_terminal() {
-        run_tool_menu(config)?;
+        menus::run_tool_menu(config)?;
     } else {
-        run_tool_menu_fallback(config)?;
+        menus::run_tool_menu_fallback(config)?;
     }
 
     println!("{}", colorize(chars.vertical, BRAND));
@@ -1296,7 +856,7 @@ mod tests {
     fn test_preset_sub_actions_exclude_current() {
         let config = Config::default(); // Balanced
         let actions = get_sub_actions(&config, 0); // preset
-        // Should have Strict, Permissive, Close (not Balanced)
+                                                   // Should have Strict, Permissive, Close (not Balanced)
         assert_eq!(actions.len(), 3);
         assert!(actions.contains(&ToolSubAction::SwitchPreset(ToolsPreset::Strict)));
         assert!(actions.contains(&ToolSubAction::SwitchPreset(ToolsPreset::Permissive)));
@@ -1344,8 +904,7 @@ mod tests {
     #[test]
     fn test_brave_sub_actions_configured() {
         let mut config = Config::default();
-        config.tools.web.brave_api_key =
-            config::schema::Secret::new("BSA-test-key".to_string());
+        config.tools.web.brave_api_key = config::schema::Secret::new("BSA-test-key".to_string());
         let actions = get_sub_actions(&config, 3); // brave_api
         assert_eq!(actions.len(), 3);
         assert!(actions.contains(&ToolSubAction::EditBraveKey));
@@ -1426,8 +985,7 @@ mod tests {
     #[test]
     fn test_setting_icon_brave_configured() {
         let mut config = Config::default();
-        config.tools.web.brave_api_key =
-            config::schema::Secret::new("BSA-test".to_string());
+        config.tools.web.brave_api_key = config::schema::Secret::new("BSA-test".to_string());
         let (icon, _) = get_setting_icon(&config, "brave_api");
         assert_eq!(icon, "✓");
     }

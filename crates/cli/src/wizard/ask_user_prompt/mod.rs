@@ -28,6 +28,9 @@
 //! └────────────────────────────────────────────┘
 //! ```
 
+mod box_drawing;
+mod fallback;
+
 use std::io::{self, IsTerminal, Write};
 
 use anyhow::{anyhow, Result};
@@ -38,6 +41,11 @@ use crossterm::{
     event::{self, Event, KeyCode, KeyEvent, KeyModifiers},
     terminal::{self, ClearType},
 };
+
+use box_drawing::{
+    write_box_bottom, write_box_empty, write_box_line, write_box_sep, write_box_top,
+};
+use fallback::prompt_non_interactive;
 
 // ============================================================================
 // Terminal Utilities
@@ -92,147 +100,6 @@ fn read_key() -> Result<KeyEvent> {
             return Ok(key);
         }
     }
-}
-
-// ============================================================================
-// Raw-Mode Rendering Helpers
-// ============================================================================
-
-/// Count visible characters in a string, stripping ANSI escape sequences.
-fn visible_len(s: &str) -> usize {
-    let mut count = 0;
-    let mut in_escape = false;
-    for c in s.chars() {
-        if c == '\x1b' {
-            in_escape = true;
-        } else if in_escape {
-            if c == 'm' {
-                in_escape = false;
-            }
-        } else {
-            count += 1;
-        }
-    }
-    count
-}
-
-// ============================================================================
-// Rounded Box Drawing
-// ============================================================================
-
-/// Characters for rounded-corner box drawing.
-struct RoundedChars {
-    top_left: &'static str,
-    top_right: &'static str,
-    bottom_left: &'static str,
-    bottom_right: &'static str,
-    horizontal: &'static str,
-    vertical: &'static str,
-    sep_left: &'static str,
-    sep_right: &'static str,
-}
-
-const ROUNDED_UNICODE: RoundedChars = RoundedChars {
-    top_left: "╭",
-    top_right: "╮",
-    bottom_left: "╰",
-    bottom_right: "╯",
-    horizontal: "─",
-    vertical: "│",
-    sep_left: "├",
-    sep_right: "┤",
-};
-
-const ROUNDED_ASCII: RoundedChars = RoundedChars {
-    top_left: "+",
-    top_right: "+",
-    bottom_left: "+",
-    bottom_right: "+",
-    horizontal: "-",
-    vertical: "|",
-    sep_left: "+",
-    sep_right: "+",
-};
-
-fn rounded_chars() -> &'static RoundedChars {
-    if colors_enabled() {
-        &ROUNDED_UNICODE
-    } else {
-        &ROUNDED_ASCII
-    }
-}
-
-/// Write the top border: `  ╭─ Title ───...───╮`
-fn write_box_top(out: &mut impl Write, title: &str, inner_w: usize) -> Result<usize> {
-    let rc = rounded_chars();
-    let title_vis = visible_len(title);
-    let fill = inner_w.saturating_sub(3 + title_vis);
-    write!(
-        out,
-        "\r  {}{} {} {}{}\r\n",
-        colorize(rc.top_left, BRAND),
-        colorize(rc.horizontal, BRAND),
-        title,
-        colorize(&rc.horizontal.repeat(fill), BRAND),
-        colorize(rc.top_right, BRAND)
-    )?;
-    Ok(1)
-}
-
-/// Write a content line: `  │  content  pad  │`
-fn write_box_line(out: &mut impl Write, content: &str, inner_w: usize) -> Result<usize> {
-    let rc = rounded_chars();
-    let content_area = inner_w.saturating_sub(4);
-    let content_vis = visible_len(content);
-    let pad = content_area.saturating_sub(content_vis);
-    write!(
-        out,
-        "\r  {}  {}{}  {}\r\n",
-        colorize(rc.vertical, BRAND),
-        content,
-        " ".repeat(pad),
-        colorize(rc.vertical, BRAND)
-    )?;
-    Ok(1)
-}
-
-/// Write an empty line: `  │                │`
-fn write_box_empty(out: &mut impl Write, inner_w: usize) -> Result<usize> {
-    let rc = rounded_chars();
-    write!(
-        out,
-        "\r  {}{}{}\r\n",
-        colorize(rc.vertical, BRAND),
-        " ".repeat(inner_w),
-        colorize(rc.vertical, BRAND)
-    )?;
-    Ok(1)
-}
-
-/// Write a separator: `  ├──────────────┤`
-fn write_box_sep(out: &mut impl Write, inner_w: usize) -> Result<usize> {
-    let rc = rounded_chars();
-    write!(
-        out,
-        "\r  {}{}{}\r\n",
-        colorize(rc.sep_left, BRAND),
-        colorize(&rc.horizontal.repeat(inner_w), BRAND),
-        colorize(rc.sep_right, BRAND)
-    )?;
-    Ok(1)
-}
-
-/// Write the bottom border: `  ╰──────────────╯`
-fn write_box_bottom(out: &mut impl Write, inner_w: usize) -> Result<usize> {
-    let rc = rounded_chars();
-    write!(
-        out,
-        "\r  {}{}{}\r\n",
-        colorize(rc.bottom_left, BRAND),
-        colorize(&rc.horizontal.repeat(inner_w), BRAND),
-        colorize(rc.bottom_right, BRAND)
-    )?;
-    Ok(1)
 }
 
 // ============================================================================
@@ -1325,139 +1192,4 @@ fn print_cancellation_summary(state: &TabbedFormState) -> Result<usize> {
 
     out.flush()?;
     Ok(lines)
-}
-
-/// Non-interactive fallback: sequential numbered prompts.
-fn prompt_non_interactive(request: &InteractionRequest) -> Result<FormResponse> {
-    let mut answers = Vec::new();
-    let num_questions = request.questions.len();
-
-    for (idx, question) in request.questions.iter().enumerate() {
-        println!(
-            "\nQuestion {} of {}: {}",
-            idx + 1,
-            num_questions,
-            question.text
-        );
-
-        let value = match &question.answer_type {
-            AnswerType::SingleSelect { options } => {
-                for (i, option) in options.iter().enumerate() {
-                    println!("  {}) {}", i + 1, option.label);
-                    if let Some(desc) = &option.description {
-                        println!("     {}", desc);
-                    }
-                }
-
-                print!("Choice [1]: ");
-                io::stdout().flush()?;
-
-                let mut input = String::new();
-                io::stdin().read_line(&mut input)?;
-                let choice = input.trim();
-                let selected_idx = if choice.is_empty() {
-                    0
-                } else {
-                    choice.parse::<usize>().unwrap_or(1).saturating_sub(1)
-                };
-
-                if selected_idx < options.len() {
-                    AnswerValue::Selected {
-                        value: options[selected_idx].value.clone(),
-                    }
-                } else {
-                    AnswerValue::Skipped
-                }
-            }
-
-            AnswerType::MultiSelect { options } => {
-                for (i, option) in options.iter().enumerate() {
-                    println!("  {}) {}", i + 1, option.label);
-                    if let Some(desc) = &option.description {
-                        println!("     {}", desc);
-                    }
-                }
-
-                print!("Select (comma-separated) []: ");
-                io::stdout().flush()?;
-
-                let mut input = String::new();
-                io::stdin().read_line(&mut input)?;
-                let choices: Vec<usize> = input
-                    .trim()
-                    .split(',')
-                    .filter_map(|s| s.trim().parse::<usize>().ok())
-                    .map(|n| n.saturating_sub(1))
-                    .filter(|&i| i < options.len())
-                    .collect();
-
-                if choices.is_empty() {
-                    AnswerValue::Skipped
-                } else {
-                    AnswerValue::MultiSelected {
-                        values: choices.iter().map(|&i| options[i].value.clone()).collect(),
-                    }
-                }
-            }
-
-            AnswerType::YesNo { default } => {
-                let default_str = if default.unwrap_or(false) {
-                    "Y/n"
-                } else {
-                    "y/N"
-                };
-                print!("[{}]: ", default_str);
-                io::stdout().flush()?;
-
-                let mut input = String::new();
-                io::stdin().read_line(&mut input)?;
-                let answer = match input.trim().to_lowercase().as_str() {
-                    "y" | "yes" => true,
-                    "n" | "no" => false,
-                    "" => default.unwrap_or(false),
-                    _ => default.unwrap_or(false),
-                };
-
-                AnswerValue::YesNo { answer }
-            }
-
-            AnswerType::FreeText { placeholder } => {
-                if let Some(hint) = placeholder {
-                    println!("  ({})", hint);
-                }
-                print!("> ");
-                io::stdout().flush()?;
-
-                let mut input = String::new();
-                io::stdin().read_line(&mut input)?;
-                let text = input.trim().to_string();
-
-                if text.is_empty() {
-                    AnswerValue::Skipped
-                } else {
-                    AnswerValue::Text { content: text }
-                }
-            }
-        };
-
-        answers.push(Answer {
-            question_id: question.id.clone(),
-            value,
-        });
-    }
-
-    // Print summary
-    println!("\nAnswers:");
-    for answer in &answers {
-        let value_str = match &answer.value {
-            AnswerValue::Selected { value } => value.clone(),
-            AnswerValue::MultiSelected { values } => values.join(", "),
-            AnswerValue::YesNo { answer } => if *answer { "Yes" } else { "No" }.to_string(),
-            AnswerValue::Text { content } => format!("\"{}\"", content),
-            AnswerValue::Skipped => "(skipped)".to_string(),
-        };
-        println!("  {}: {}", answer.question_id, value_str);
-    }
-
-    Ok(FormResponse::Completed(answers))
 }

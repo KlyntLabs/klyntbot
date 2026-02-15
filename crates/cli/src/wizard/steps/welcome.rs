@@ -6,8 +6,8 @@
 use anyhow::Result;
 use common::utils::terminal::*;
 
-use super::framework::{StepResult, WizardModule, WizardState};
-use super::prompts::mask_secret;
+use crate::wizard::framework::{StepResult, WizardModule, WizardState};
+use crate::wizard::prompts::mask_secret;
 
 pub struct WelcomeModule;
 
