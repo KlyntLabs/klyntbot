@@ -189,20 +189,19 @@ fn test_wizard_step_count() {
     // Verify the declared step count matches the number of step entries
     // (this catches off-by-one errors if someone adds a step)
     let state = WizardState::new();
-    let welcome = steps::welcome::WelcomeModule;
     let provider_mod = provider::ProviderModule;
     let tools_mod = ToolsModule;
     let daemon_mod = daemon::DaemonModule;
     let workspace_mod = WorkspaceModule;
 
     let applicables: Vec<bool> = vec![
-        welcome.is_applicable(&state),
         provider_mod.is_applicable(&state),
         true, // channels
         tools_mod.is_applicable(&state),
-        daemon_mod.is_applicable(&state),
         workspace_mod.is_applicable(&state),
         true, // calendar
+        daemon_mod.is_applicable(&state),
+        true, // review
     ];
 
     let count = applicables.iter().filter(|a| **a).count();

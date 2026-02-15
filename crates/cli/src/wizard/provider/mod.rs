@@ -116,6 +116,11 @@ impl WizardModule for ProviderModule {
         let chars = BoxChars::get();
         let can_go_back = state.current_step > 1;
 
+        // Config status dashboard (moved from former Welcome step)
+        use crate::wizard::steps::welcome::print_config_status;
+        print_config_status(state);
+        println!("{}", draw_step_line(""));
+
         // Header
         let header = if has_any_provider_configured(&state.config) {
             "Provider Management"

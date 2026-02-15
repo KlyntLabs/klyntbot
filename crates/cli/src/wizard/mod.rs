@@ -1,7 +1,7 @@
 //! Interactive onboarding wizard for klyntbot initialization.
 //!
 //! Step modules (expand-in-place menus):
-//! - `provider`  – LLM provider selection, API key, model
+//! - `provider`  – LLM provider selection, API key, model (includes config dashboard)
 //! - `channels`  – Chat platform configuration (async)
 //! - `tools`     – Security presets and tool permissions
 //! - `daemon`    – Background service installation
@@ -9,7 +9,7 @@
 //! - `calendar`  – Calendar sync configuration
 //!
 //! Steps under `steps/`:
-//! - `welcome`   – Welcome screen and overview
+//! - `welcome`   – Config status dashboard utilities
 //! - `todo_notifications` – Notification preferences
 //!
 //! Supporting modules:
@@ -102,17 +102,16 @@ pub async fn run_wizard() -> Result<()> {
     // Step table: (name, required, applicable)
     // Index order must match the dispatch arms below.
     let all_steps: &[(&str, bool, bool)] = &[
-        ("Welcome", true, true),
         ("LLM Provider", true, true),
         ("Chat Channels", false, true),
         ("Tool Permissions", false, true),
+        ("Workspace & Notifications", true, true),
+        ("Calendar Sync", false, true),
         (
             "Background Service",
             false,
             daemon::DaemonModule.is_applicable(&state),
         ),
-        ("Workspace & Notifications", true, true),
-        ("Calendar Sync", false, true),
         ("Review & Confirm", true, true),
     ];
 
@@ -136,18 +135,17 @@ pub async fn run_wizard() -> Result<()> {
         print_step_header(&state, name, required);
 
         // Dispatch to the right module. Step indices correspond to `all_steps`:
-        // 0=welcome, 1=provider, 2=channels (async), 3=tools, 4=daemon,
-        // 5=workspace+notifications, 6=calendar (async), 7=review.
+        // 0=provider, 1=channels (async), 2=tools, 3=workspace+notifications,
+        // 4=calendar (async), 5=daemon, 6=review.
         // Ctrl+C in raw-mode prompts surfaces as an Err containing "Ctrl+C".
         let result = match match step_idx {
-            0 => steps::welcome::WelcomeModule.run(&mut state),
-            1 => provider::ProviderModule.run(&mut state),
-            2 => run_channels_step(&mut state).await,
-            3 => ToolsModule.run(&mut state),
-            4 => daemon::DaemonModule.run(&mut state),
-            5 => WorkspaceModule.run(&mut state),
-            6 => run_calendar_step(&mut state).await,
-            7 => steps::review::ReviewModule.run(&mut state),
+            0 => provider::ProviderModule.run(&mut state),
+            1 => run_channels_step(&mut state).await,
+            2 => ToolsModule.run(&mut state),
+            3 => WorkspaceModule.run(&mut state),
+            4 => run_calendar_step(&mut state).await,
+            5 => daemon::DaemonModule.run(&mut state),
+            6 => steps::review::ReviewModule.run(&mut state),
             _ => unreachable!(),
         } {
             Ok(r) => r,
@@ -159,7 +157,11 @@ pub async fn run_wizard() -> Result<()> {
         };
 
         match result {
-            StepResult::Next | StepResult::Skip => pos += 1,
+            StepResult::Next | StepResult::Skip => {
+                // Auto-save after each completed step so progress isn't lost
+                config::save(&state.config).await?;
+                pos += 1;
+            }
             StepResult::Back if pos > 0 => pos -= 1,
             StepResult::Back => {} // already at first step
             StepResult::Cancel => {
@@ -169,7 +171,7 @@ pub async fn run_wizard() -> Result<()> {
         }
     }
 
-    // Save configuration
+    // Final safety save (redundant but ensures config is written)
     config::save(&state.config).await?;
 
     // Completion screen

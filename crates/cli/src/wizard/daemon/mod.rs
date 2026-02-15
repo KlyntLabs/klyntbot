@@ -6,15 +6,22 @@
 //! - Windows service wrapper guidance
 //!
 //! Also handles gateway (HTTP server) port configuration.
+//!
+//! Uses a raw-mode interactive menu (not prompt_yes_no) so that
+//! Esc / Back navigation works consistently with other wizard steps.
 
 mod platform;
+
+use std::io::{self, IsTerminal, Write};
 
 use anyhow::Result;
 use common::utils::terminal::*;
 use config::Config;
+use crossterm::{event::KeyCode, terminal};
 
 use super::framework::{StepResult, WizardModule, WizardState};
 use super::prompts;
+use super::ui::{erase_lines, read_key, MenuOutcome};
 
 // Re-export public APIs
 pub use platform::{
@@ -53,32 +60,248 @@ impl WizardModule for DaemonModule {
     }
 
     fn run(&self, state: &mut WizardState) -> Result<StepResult> {
-        match configure_daemon(&mut state.config)? {
-            true => Ok(StepResult::Next),
-            false => Ok(StepResult::Skip),
+        let can_go_back = state.current_step > 1;
+        let outcome = if io::stdin().is_terminal() && io::stdout().is_terminal() {
+            run_daemon_menu(&mut state.config, can_go_back)?
+        } else {
+            run_daemon_menu_fallback(&mut state.config, can_go_back)?
+        };
+
+        match outcome {
+            MenuOutcome::Back => Ok(StepResult::Back),
+            MenuOutcome::Done => Ok(StepResult::Next),
         }
     }
 }
 
 // ============================================================================
-// Core logic
+// Menu items
 // ============================================================================
 
-/// Run the daemon setup wizard step.
-/// Returns true if daemon was configured, false if skipped.
-pub fn configure_daemon(config: &mut Config) -> Result<bool> {
-    let chars = BoxChars::get();
+/// Items shown in the daemon menu.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum DaemonItem {
+    SetUp,
+    Back,
+    Skip,
+}
 
-    let wants_daemon = prompts::prompt_yes_no("Set up klyntbot as a background service?", false)?;
-    if !wants_daemon {
-        println!(
-            "{} {} Skipping daemon setup {}",
-            colorize(chars.vertical, BRAND),
-            status_disabled(),
-            colorize("(run manually with: klyntbot serve)", DIM)
-        );
-        return Ok(false);
+fn menu_items(can_go_back: bool) -> Vec<DaemonItem> {
+    let mut items = vec![DaemonItem::SetUp];
+    if can_go_back {
+        items.push(DaemonItem::Back);
     }
+    items.push(DaemonItem::Skip);
+    items
+}
+
+fn item_label(item: DaemonItem, selected: bool) -> String {
+    match item {
+        DaemonItem::SetUp => {
+            let label = "Set up background service";
+            if selected {
+                colorize(label, BOLD)
+            } else {
+                label.to_string()
+            }
+        }
+        DaemonItem::Back => {
+            let label = "← Back";
+            if selected {
+                colorize(label, BOLD)
+            } else {
+                label.to_string()
+            }
+        }
+        DaemonItem::Skip => {
+            let label = "Skip";
+            if selected {
+                colorize(label, BOLD)
+            } else {
+                label.to_string()
+            }
+        }
+    }
+}
+
+fn item_icon(item: DaemonItem) -> String {
+    match item {
+        DaemonItem::SetUp => colorize("●", BRAND),
+        DaemonItem::Back => colorize("◁", DIM),
+        DaemonItem::Skip => colorize("○", DIM),
+    }
+}
+
+// ============================================================================
+// Interactive menu (raw mode)
+// ============================================================================
+
+/// Render the daemon menu. Returns total lines rendered.
+fn render_daemon_menu(
+    out: &mut impl Write,
+    items: &[DaemonItem],
+    cursor: usize,
+    chars: &BoxChars,
+) -> Result<usize> {
+    let prefix = format!("{} ", colorize(chars.vertical, BRAND));
+    let mut lines = 0;
+
+    for (i, &item) in items.iter().enumerate() {
+        let is_cursor = cursor == i;
+        let pointer = if is_cursor {
+            colorize("❯", BRAND)
+        } else {
+            " ".to_string()
+        };
+
+        write!(
+            out,
+            "{}{} {} {}\r\n",
+            prefix,
+            pointer,
+            item_icon(item),
+            item_label(item, is_cursor)
+        )?;
+        lines += 1;
+    }
+
+    out.flush()?;
+    Ok(lines)
+}
+
+fn render_daemon_hint(out: &mut impl Write, can_go_back: bool, chars: &BoxChars) -> Result<()> {
+    let prefix = format!("{} ", colorize(chars.vertical, BRAND));
+    let hint = if can_go_back {
+        "↑/↓ navigate · Enter select · Esc back"
+    } else {
+        "↑/↓ navigate · Enter select"
+    };
+    write!(out, "{}{}\r\n", prefix, colorize(hint, DIM))?;
+    out.flush()?;
+    Ok(())
+}
+
+/// Run the interactive daemon menu in raw mode.
+fn run_daemon_menu(config: &mut Config, can_go_back: bool) -> Result<MenuOutcome> {
+    let chars = BoxChars::get();
+    let items = menu_items(can_go_back);
+    let mut cursor: usize = 0;
+    let mut out = io::stdout();
+
+    terminal::enable_raw_mode()?;
+    let mut list_lines = render_daemon_menu(&mut out, &items, cursor, chars)?;
+    render_daemon_hint(&mut out, can_go_back, chars)?;
+
+    loop {
+        let key = read_key()?;
+        match key.code {
+            KeyCode::Up | KeyCode::Char('k') => {
+                if cursor > 0 {
+                    cursor -= 1;
+                    // Erase and re-render
+                    let total = list_lines + 1;
+                    for _ in 0..total {
+                        write!(out, "\x1b[A\x1b[2K")?;
+                    }
+                    list_lines = render_daemon_menu(&mut out, &items, cursor, chars)?;
+                    render_daemon_hint(&mut out, can_go_back, chars)?;
+                }
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                if cursor < items.len() - 1 {
+                    cursor += 1;
+                    let total = list_lines + 1;
+                    for _ in 0..total {
+                        write!(out, "\x1b[A\x1b[2K")?;
+                    }
+                    list_lines = render_daemon_menu(&mut out, &items, cursor, chars)?;
+                    render_daemon_hint(&mut out, can_go_back, chars)?;
+                }
+            }
+            KeyCode::Enter => {
+                let selected = items[cursor];
+                terminal::disable_raw_mode()?;
+                erase_lines(list_lines + 1)?;
+
+                match selected {
+                    DaemonItem::Back => return Ok(MenuOutcome::Back),
+                    DaemonItem::Skip => {
+                        println!(
+                            "{} {} Skipping daemon setup {}",
+                            colorize(chars.vertical, BRAND),
+                            status_disabled(),
+                            colorize("(run manually with: klyntbot serve)", DIM)
+                        );
+                        return Ok(MenuOutcome::Done);
+                    }
+                    DaemonItem::SetUp => {
+                        // Run the setup flow in cooked mode
+                        run_daemon_setup(config)?;
+                        return Ok(MenuOutcome::Done);
+                    }
+                }
+            }
+            KeyCode::Esc if can_go_back => {
+                terminal::disable_raw_mode()?;
+                erase_lines(list_lines + 1)?;
+                return Ok(MenuOutcome::Back);
+            }
+            _ => {}
+        }
+    }
+}
+
+// ============================================================================
+// Non-TTY fallback
+// ============================================================================
+
+/// Simplified menu for non-TTY environments.
+fn run_daemon_menu_fallback(config: &mut Config, can_go_back: bool) -> Result<MenuOutcome> {
+    let chars = BoxChars::get();
+    let items = menu_items(can_go_back);
+
+    println!("{}", colorize(chars.vertical, BRAND));
+    for (i, &item) in items.iter().enumerate() {
+        println!(
+            "{}  {}. {}",
+            colorize(chars.vertical, BRAND),
+            i + 1,
+            item_label(item, false)
+        );
+    }
+    println!("{}", colorize(chars.vertical, BRAND));
+
+    let choice = prompts::prompt_text("Enter number", None, true)?;
+    let idx = match choice.parse::<usize>() {
+        Ok(n) if n > 0 && n <= items.len() => n - 1,
+        _ => return Ok(MenuOutcome::Done), // default to skip
+    };
+
+    match items[idx] {
+        DaemonItem::Back => Ok(MenuOutcome::Back),
+        DaemonItem::Skip => {
+            println!(
+                "{} {} Skipping daemon setup {}",
+                colorize(chars.vertical, BRAND),
+                status_disabled(),
+                colorize("(run manually with: klyntbot serve)", DIM)
+            );
+            Ok(MenuOutcome::Done)
+        }
+        DaemonItem::SetUp => {
+            run_daemon_setup(config)?;
+            Ok(MenuOutcome::Done)
+        }
+    }
+}
+
+// ============================================================================
+// Core setup logic (cooked mode)
+// ============================================================================
+
+/// Run the daemon setup flow (gateway port + platform service generation).
+fn run_daemon_setup(config: &mut Config) -> Result<()> {
+    let chars = BoxChars::get();
 
     println!("{}", colorize(chars.vertical, BRAND));
 
@@ -108,7 +331,7 @@ pub fn configure_daemon(config: &mut Config) -> Result<bool> {
                 "{}",
                 draw_step_line(&colorize("Run manually: klyntbot serve", DIM))
             );
-            return Ok(false);
+            return Ok(());
         }
     }
 
@@ -119,7 +342,7 @@ pub fn configure_daemon(config: &mut Config) -> Result<bool> {
         status_success()
     );
 
-    Ok(true)
+    Ok(())
 }
 
 /// Configure gateway host and port
@@ -306,5 +529,22 @@ mod tests {
         assert_eq!(ServiceStatus::NotInstalled, ServiceStatus::NotInstalled);
         assert_eq!(ServiceStatus::Unknown, ServiceStatus::Unknown);
         assert_ne!(ServiceStatus::Running, ServiceStatus::Stopped);
+    }
+
+    #[test]
+    fn test_menu_items_with_back() {
+        let items = menu_items(true);
+        assert_eq!(items.len(), 3);
+        assert_eq!(items[0], DaemonItem::SetUp);
+        assert_eq!(items[1], DaemonItem::Back);
+        assert_eq!(items[2], DaemonItem::Skip);
+    }
+
+    #[test]
+    fn test_menu_items_without_back() {
+        let items = menu_items(false);
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0], DaemonItem::SetUp);
+        assert_eq!(items[1], DaemonItem::Skip);
     }
 }

@@ -1,75 +1,15 @@
-//! Welcome screen wizard module.
+//! Configuration status dashboard utilities.
 //!
-//! Displays a branded welcome message, configuration status dashboard,
-//! and overview of the setup process.
+//! Originally the "Welcome" wizard step. Now provides reusable functions
+//! for displaying the config status dashboard (used by the provider step).
 
-use anyhow::Result;
 use common::utils::terminal::*;
 
-use crate::wizard::framework::{StepResult, WizardModule, WizardState};
+use crate::wizard::framework::WizardState;
 use crate::wizard::prompts::mask_secret;
 
-pub struct WelcomeModule;
-
-impl WizardModule for WelcomeModule {
-    fn name(&self) -> &str {
-        "Welcome"
-    }
-
-    fn description(&self) -> &str {
-        "Introduction and setup overview"
-    }
-
-    fn run(&self, state: &mut WizardState) -> Result<StepResult> {
-        let mode = if state.is_fresh_install {
-            "first-time setup"
-        } else {
-            "reconfiguration"
-        };
-
-        println!(
-            "{}",
-            draw_step_line(&format!(
-                "Let's configure your AI assistant ({}).",
-                colorize(mode, HIGHLIGHT)
-            ))
-        );
-        println!("{}", draw_step_line(""));
-
-        // Show configuration status dashboard
-        print_config_status(state);
-
-        println!("{}", draw_step_line(""));
-
-        if state.is_fresh_install {
-            println!(
-                "{}",
-                draw_step_line(&format!(
-                    "{} You can press {} at any time to cancel.",
-                    colorize("→", BRAND),
-                    colorize("Ctrl+C", BOLD)
-                ))
-            );
-        } else {
-            println!(
-                "{}",
-                draw_step_line(&colorize(
-                    "Press Enter through each step to keep current values,",
-                    DIM
-                ))
-            );
-            println!(
-                "{}",
-                draw_step_line(&colorize("or type new values to change them.", DIM))
-            );
-        }
-
-        Ok(StepResult::Next)
-    }
-}
-
 /// Print a configuration status dashboard showing what's configured.
-fn print_config_status(state: &WizardState) {
+pub(crate) fn print_config_status(state: &WizardState) {
     let config = &state.config;
 
     // Provider status
@@ -185,7 +125,7 @@ fn count_configured_providers(config: &config::Config) -> usize {
 }
 
 /// Detect which tools preset most closely matches current config.
-fn detect_preset(config: &config::Config) -> &'static str {
+pub(crate) fn detect_preset(config: &config::Config) -> &'static str {
     if config.tools.restrict_to_workspace
         && !config.tools.exec.allowed_commands.is_empty()
         && config.tools.exec.timeout <= 30
@@ -199,7 +139,7 @@ fn detect_preset(config: &config::Config) -> &'static str {
 }
 
 /// Capitalize the first letter of a string.
-fn capitalize(s: &str) -> String {
+pub(crate) fn capitalize(s: &str) -> String {
     let mut chars = s.chars();
     match chars.next() {
         None => String::new(),
@@ -210,26 +150,6 @@ fn capitalize(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_welcome_module_metadata() {
-        let module = WelcomeModule;
-        assert_eq!(module.name(), "Welcome");
-        assert_eq!(module.description(), "Introduction and setup overview");
-    }
-
-    #[test]
-    fn test_welcome_module_is_required() {
-        let module = WelcomeModule;
-        assert!(module.is_required());
-    }
-
-    #[test]
-    fn test_welcome_module_is_applicable() {
-        let module = WelcomeModule;
-        let state = WizardState::new();
-        assert!(module.is_applicable(&state));
-    }
 
     #[test]
     fn test_detect_preset_balanced_default() {
