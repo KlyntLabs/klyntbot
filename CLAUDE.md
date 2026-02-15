@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 cargo build --workspace              # Build all crates
 cargo build --release                # Optimized release build (LTO, stripped)
-cargo test --workspace               # Run all 870+ tests
+cargo test --workspace               # Run all 910+ tests
 cargo test -p agent                  # Test a single crate
 cargo test -p calendar               # Test calendar crate specifically
 cargo test --test integration_tests  # Run a specific test file
@@ -63,6 +63,7 @@ Dependencies flow strictly upward. No circular dependencies — enforced by Carg
 | `SpawnHandler` | `tools` | Dependency inversion for subagent spawning |
 | `CronHandler` | `tools` | Dependency inversion for cron job management |
 | `CalendarHandler` | `tools` | Dependency inversion for calendar sync (NEW: `async fn sync_now()`, `async fn get_status()`, `async fn list_events()`, etc.) |
+| `EnrichmentHandler` | `tools` | Dependency inversion for AI-powered task enrichment (NEW: `async fn enrich_task()`) |
 
 ### Conventions
 
@@ -82,7 +83,7 @@ klyntbot serve --port 8080       # Start HTTP server (default port from config)
 klyntbot init                    # Interactive setup wizard (includes calendar setup in Step 7)
 klyntbot status [--verbose]      # Show agent/config status
 
-# Task Management (22 commands)
+# Task Management (23 commands)
 klyntbot todo add <title> [--description TEXT] [--priority N] [--due DATE] [--tags CSV]
 klyntbot todo list [--status doing|todo|done] [--tag TAG] [--priority-min N] [--limit N]
 klyntbot todo show ID
@@ -104,6 +105,7 @@ klyntbot todo depend ID [--on BLOCKER_ID] [--remove BLOCKER_ID]
 klyntbot todo recur add <title> --rule RRULE [--priority N] [--tags CSV] [--project ID]
 klyntbot todo recur list [--project ID]
 klyntbot todo recur delete TEMPLATE_ID
+klyntbot todo enrich ID          # AI-powered task enrichment (priority, duration, scheduling)
 
 # Project Management (6 commands)
 klyntbot project create <name> [--description TEXT] [--color COLOR] [--tags CSV]
@@ -129,6 +131,59 @@ KLYNTBOT_AGENTS__DEFAULTS__MODEL=gpt-4o
 KLYNTBOT_PROVIDERS__ANTHROPIC__API_KEY=sk-...
 KLYNTBOT_TOOLS__RESTRICT_TO_WORKSPACE=true
 ```
+
+## Enrichment Configuration
+
+The enrichment engine auto-infers missing task fields using keyword analysis:
+
+**Config schema** (`~/.klyntbot/config.json`):
+```json
+{
+  "todo": {
+    "enrichment": {
+      "enabled": true,
+      "autoApplyThreshold": 0.70
+    }
+  }
+}
+```
+
+**Fields:**
+- `enabled`: Enable/disable enrichment engine (default: `true`)
+- `autoApplyThreshold`: Confidence threshold for auto-applying suggestions (0.0-1.0, default: `0.70`)
+
+**How it works:**
+1. **Priority inference**: Detects keywords like "urgent", "critical", "fix", "feature", "cleanup"
+   - High priority (1): urgent, critical, blocker, hotfix, emergency, asap
+   - Medium-high (2): important, bug, fix, broken, regression
+   - Medium (3): feature, enhance, improvement, update, refactor
+   - Low (4): nice to have, cleanup, chore, documentation, typo
+
+2. **Duration prediction**: Estimates task duration based on keywords
+   - Quick (15 min): typo, rename, tweak, bump, toggle
+   - Small (30 min): fix, patch, update, adjust, lint
+   - Medium (60 min): feature, implement, add, create, build
+   - Large (120 min): refactor, overhaul, rewrite, redesign, architecture
+
+3. **Due date suggestion**: Suggests deadline based on priority and keywords
+   - Urgent tasks → today
+   - Important tasks → this week
+   - Normal tasks → no suggestion (manual assignment)
+
+**CLI usage:**
+```bash
+# Manual enrichment (shows suggestions without applying)
+klyntbot todo enrich <task-id>
+
+# Enrichment runs automatically on task creation if enabled
+klyntbot todo add "URGENT: Fix production auth bug"
+# → Priority auto-set to 1, duration estimated at 30 mins
+```
+
+**Troubleshooting:**
+- **Enrichment not working?** Check `config.todo.enrichment.enabled` is `true`
+- **Suggestions not applied?** Lower `autoApplyThreshold` or manually approve via `todo enrich <id>`
+- **Wrong suggestions?** Adjust task title keywords or set fields manually
 
 ## Skills
 

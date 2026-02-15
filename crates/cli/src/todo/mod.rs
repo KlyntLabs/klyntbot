@@ -7,6 +7,7 @@ mod add;
 mod attach;
 mod complete;
 mod depend;
+mod enrich;
 mod focus;
 mod list;
 mod move_task;
@@ -89,6 +90,7 @@ pub async fn handle_todo(cmd: TodoCommands) -> Result<()> {
         }
         TodoCommands::Report { period, project } => report::handle_report(period, project).await,
         TodoCommands::Depend { id, on, remove } => depend::handle_depend(id, on, remove).await,
+        TodoCommands::Enrich { id } => enrich::handle_enrich(id).await,
         TodoCommands::Recur(cmd) => recur::handle_recur(cmd).await,
     }
 }

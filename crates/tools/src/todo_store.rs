@@ -274,6 +274,9 @@ impl TodoStore {
             if let Some(calendar_uid) = patch.calendar_event_uid {
                 todo.calendar_event_uid = calendar_uid;
             }
+            if let Some(estimated) = patch.estimated_minutes {
+                todo.estimated_minutes = estimated;
+            }
 
             todo.updated_at = Utc::now();
 

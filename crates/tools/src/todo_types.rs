@@ -136,6 +136,7 @@ pub struct TodoPatch {
     pub status: Option<TodoStatus>,
     pub last_reminded_at: Option<Option<DateTime<Utc>>>,
     pub calendar_event_uid: Option<Option<String>>,
+    pub estimated_minutes: Option<Option<u32>>,
 }
 
 /// Filter criteria for listing todos

@@ -21,6 +21,7 @@ use tokio::sync::mpsc;
 use tools::{
     calendar_tool::{CalendarHandler, CalendarTool},
     cron_tool::CronTool,
+    enrichment::EnrichmentHandler,
     filesystem::register_fs_tools,
     message::MessageTool,
     registry::ToolRegistry,
@@ -224,6 +225,17 @@ impl AgentLoop {
                 .with_calendar_handler(Arc::clone(&calendar_adapter) as Arc<dyn CalendarHandler>);
 
             tool_registry.register(CalendarTool::new(calendar_adapter));
+        }
+
+        // Register enrichment engine (if enabled)
+        if config.todo.enrichment.enabled {
+            let enrichment_engine = Arc::new(super::enrichment::EnrichmentEngine::new(
+                config.todo.enrichment.clone(),
+            ));
+
+            todo_tool = todo_tool.with_enrichment_handler(
+                Arc::clone(&enrichment_engine) as Arc<dyn EnrichmentHandler>
+            );
         }
 
         tool_registry.register(todo_tool);

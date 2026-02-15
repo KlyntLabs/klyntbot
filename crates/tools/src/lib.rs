@@ -5,6 +5,7 @@
 pub mod ask_user;
 pub mod calendar_tool;
 pub mod cron_tool;
+pub mod enrichment;
 pub mod filesystem;
 pub mod message;
 pub mod params;
@@ -23,6 +24,9 @@ pub mod web;
 
 // Re-export calendar types for use by agent crate
 pub use calendar_tool::{CalendarHandler, CalendarTool};
+
+// Re-export enrichment types for use by agent crate
+pub use enrichment::{EnrichmentHandler, EnrichmentResult, EnrichmentSuggestion};
 
 // Dependency inversion traits (to avoid circular dependencies)
 /// Trait for spawning subagents (implemented by klyntbot-agent)

@@ -341,6 +341,33 @@ pub struct TodoConfig {
     pub notifications: TodoNotificationConfig,
     #[serde(default)]
     pub focus: TodoFocusConfig,
+    #[serde(default)]
+    pub enrichment: TodoEnrichmentConfig,
+}
+
+/// Smart enrichment configuration for auto-inferring task metadata
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TodoEnrichmentConfig {
+    /// Enable/disable automatic enrichment on task creation (default: true)
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    /// Confidence threshold for auto-applying suggestions without confirmation (default: 0.85)
+    #[serde(default = "default_enrichment_confidence_threshold")]
+    pub auto_apply_threshold: f64,
+}
+
+impl Default for TodoEnrichmentConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            auto_apply_threshold: default_enrichment_confidence_threshold(),
+        }
+    }
+}
+
+fn default_enrichment_confidence_threshold() -> f64 {
+    0.85
 }
 
 /// Confidence evaluation configuration (LLM-driven decision engine)

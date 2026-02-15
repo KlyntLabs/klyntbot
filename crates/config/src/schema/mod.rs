@@ -274,6 +274,7 @@ mod tests {
                 daily_digest_time: "08:00".to_string(),
                 ..Default::default()
             },
+            enrichment: TodoEnrichmentConfig::default(),
         };
 
         let json = serde_json::to_string(&config).unwrap();

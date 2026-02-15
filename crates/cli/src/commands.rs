@@ -278,6 +278,12 @@ pub enum TodoCommands {
         id: String,
     },
 
+    /// AI-enrich a task with priority, duration, and due date suggestions
+    Enrich {
+        /// Task ID to enrich
+        id: String,
+    },
+
     /// Focus on a task (adds to focus board)
     Focus {
         /// Task ID (omit to show focus board)

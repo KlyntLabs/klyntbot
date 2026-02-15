@@ -10,6 +10,7 @@ use tokio::sync::RwLock;
 
 use super::{RoutingContext, Tool};
 use crate::calendar_tool::CalendarHandler;
+use crate::enrichment::EnrichmentHandler;
 use crate::params::ParamExtractor;
 use crate::rrule_utils;
 use crate::todo_store::TodoStore;
@@ -24,6 +25,7 @@ pub struct TodoTool {
     max_focus_slots: usize,
     focus_deadline_hours: u64,
     calendar_handler: Option<Arc<dyn CalendarHandler>>,
+    enrichment_handler: Option<Arc<dyn EnrichmentHandler>>,
     timezone: String,
 }
 
@@ -40,6 +42,7 @@ impl TodoTool {
             max_focus_slots,
             focus_deadline_hours,
             calendar_handler: None,
+            enrichment_handler: None,
             timezone,
         }
     }
@@ -47,6 +50,12 @@ impl TodoTool {
     /// Add calendar handler for immediate sync on todo changes
     pub fn with_calendar_handler(mut self, handler: Arc<dyn CalendarHandler>) -> Self {
         self.calendar_handler = Some(handler);
+        self
+    }
+
+    /// Add enrichment handler for AI-powered task suggestions
+    pub fn with_enrichment_handler(mut self, handler: Arc<dyn EnrichmentHandler>) -> Self {
+        self.enrichment_handler = Some(handler);
         self
     }
 
@@ -67,7 +76,7 @@ impl Tool for TodoTool {
     }
 
     fn description(&self) -> &str {
-        "Manage tasks and todos. Actions: add, list, update, complete, delete, show, summary, focus, unfocus, add_subtask, move, attach, detach, log_time, tree, search, report, add_dependency, remove_dependency, recur, list_recurring, delete_recurring."
+        "Manage tasks and todos. Actions: add, list, update, complete, delete, show, summary, focus, unfocus, add_subtask, move, attach, detach, log_time, tree, search, report, add_dependency, remove_dependency, recur, list_recurring, delete_recurring, enrich."
     }
 
     fn parameters(&self) -> Value {
@@ -76,12 +85,12 @@ impl Tool for TodoTool {
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": ["add", "list", "update", "complete", "delete", "show", "summary", "focus", "unfocus", "add_subtask", "move", "attach", "detach", "log_time", "tree", "search", "report", "add_dependency", "remove_dependency", "recur", "list_recurring", "delete_recurring"],
+                    "enum": ["add", "list", "update", "complete", "delete", "show", "summary", "focus", "unfocus", "add_subtask", "move", "attach", "detach", "log_time", "tree", "search", "report", "add_dependency", "remove_dependency", "recur", "list_recurring", "delete_recurring", "enrich"],
                     "description": "Action to perform"
                 },
                 "id": {
                     "type": "string",
-                    "description": "Task ID (for update/complete/delete/show/focus/unfocus/move/attach/detach/log_time)"
+                    "description": "Task ID (for update/complete/delete/show/focus/unfocus/move/attach/detach/log_time/enrich)"
                 },
                 "title": {
                     "type": "string",
@@ -230,15 +239,66 @@ impl Tool for TodoTool {
                 };
 
                 let created = store.add(todo).await?;
-                let result = format!("Task created: {} (ID: {})", created.title, created.id);
 
-                // Drop lock before triggering sync
-                drop(store);
+                // Auto-enrich if handler is available
+                let mut enriched_info = String::new();
+                if let Some(handler) = &self.enrichment_handler {
+                    // Drop lock before calling LLM
+                    drop(store);
+
+                    match handler.enrich_task(&created).await {
+                        Ok(Some(suggestions)) => {
+                            // Check each suggestion against its own confidence and apply if high enough
+                            let mut patch = TodoPatch::default();
+                            let mut applied = Vec::new();
+
+                            if let Some(ref priority_sug) = suggestions.priority {
+                                if priority_sug.confidence >= 0.7 {
+                                    patch.priority = Some(priority_sug.value);
+                                    applied.push(format!("P{}", priority_sug.value));
+                                }
+                            }
+
+                            if let Some(ref duration_sug) = suggestions.estimated_minutes {
+                                if duration_sug.confidence >= 0.7 {
+                                    patch.estimated_minutes = Some(Some(duration_sug.value));
+                                    applied.push(format!("~{}min", duration_sug.value));
+                                }
+                            }
+
+                            if let Some(ref due_sug) = suggestions.due_date {
+                                if due_sug.confidence >= 0.7 {
+                                    patch.due_date = Some(Some(due_sug.value));
+                                    applied.push("due date".to_string());
+                                }
+                            }
+
+                            if !applied.is_empty() {
+                                let mut store = self.store.write().await;
+                                if store.update(&created.id, patch).await.is_ok() {
+                                    enriched_info = format!(" (enriched: {})", applied.join(", "));
+                                }
+                                drop(store);
+                            }
+                        }
+                        Ok(None) => {
+                            // Enrichment disabled or nothing to suggest
+                        }
+                        Err(e) => {
+                            warn!("Task enrichment failed: {}", e);
+                        }
+                    }
+                } else {
+                    drop(store);
+                }
 
                 // Trigger immediate calendar sync
                 self.trigger_sync_async().await;
 
-                Ok(result)
+                Ok(format!(
+                    "Task created: {} (ID: {}){}",
+                    created.title, created.id, enriched_info
+                ))
             }
 
             "list" => {
@@ -307,6 +367,7 @@ impl Tool for TodoTool {
                     }),
                     last_reminded_at: None,
                     calendar_event_uid: None,
+                    estimated_minutes: p.optional_u64("estimated_minutes")?.map(|v| Some(v as u32)),
                 };
 
                 let result = match store.update(id, patch).await? {
@@ -431,6 +492,104 @@ impl Tool for TodoTool {
                 }
 
                 result
+            }
+
+            "enrich" => {
+                let id = p.required_str("id")?;
+
+                // Get the task
+                let task = store.get(id).await?;
+                let task = match task {
+                    Some(t) => t,
+                    None => {
+                        return Err(
+                            ToolError::ExecutionFailed(format!("Task not found: {}", id)).into(),
+                        );
+                    }
+                };
+
+                // Check if enrichment handler is available
+                let handler = match &self.enrichment_handler {
+                    Some(h) => h,
+                    None => {
+                        return Err(ToolError::ExecutionFailed(
+                            "Enrichment is not enabled".to_string(),
+                        )
+                        .into());
+                    }
+                };
+
+                // Drop lock before calling LLM
+                drop(store);
+
+                // Call enrichment
+                let suggestions = handler.enrich_task(&task).await?;
+
+                match suggestions {
+                    None => Ok(format!(
+                        "No enrichment suggestions for task {}: all fields already set or enrichment disabled",
+                        id
+                    )),
+                    Some(result) => {
+                        let mut patch = TodoPatch::default();
+                        let mut applied = Vec::new();
+                        let mut suggested = Vec::new();
+
+                        // Build suggestion summary
+                        if let Some(ref priority_sug) = result.priority {
+                            suggested.push(format!(
+                                "Priority: {} (confidence: {:.0}%) - {}",
+                                priority_sug.value,
+                                priority_sug.confidence * 100.0,
+                                priority_sug.reasoning
+                            ));
+                            patch.priority = Some(priority_sug.value);
+                            applied.push(format!("P{}", priority_sug.value));
+                        }
+
+                        if let Some(ref duration_sug) = result.estimated_minutes {
+                            suggested.push(format!(
+                                "Duration: {} minutes (confidence: {:.0}%) - {}",
+                                duration_sug.value,
+                                duration_sug.confidence * 100.0,
+                                duration_sug.reasoning
+                            ));
+                            patch.estimated_minutes = Some(Some(duration_sug.value));
+                            applied.push(format!("~{}min", duration_sug.value));
+                        }
+
+                        if let Some(ref due_sug) = result.due_date {
+                            let formatted_date = due_sug.value.format("%Y-%m-%d").to_string();
+                            suggested.push(format!(
+                                "Due date: {} (confidence: {:.0}%) - {}",
+                                formatted_date,
+                                due_sug.confidence * 100.0,
+                                due_sug.reasoning
+                            ));
+                            patch.due_date = Some(Some(due_sug.value));
+                            applied.push(format!("due {}", formatted_date));
+                        }
+
+                        if suggested.is_empty() {
+                            return Ok(format!("No enrichment suggestions for task {}", id));
+                        }
+
+                        // Apply the suggestions
+                        let mut store = self.store.write().await;
+                        store.update(id, patch).await?;
+                        drop(store);
+
+                        // Trigger calendar sync
+                        self.trigger_sync_async().await;
+
+                        Ok(format!(
+                            "Enriched task {} with: {}\n\nSuggestions:\n{}",
+                            id,
+                            applied.join(", "),
+                            suggested.join("\n")
+                        ))
+                    }
+                }
             }
 
             "show" => {
