@@ -21,7 +21,7 @@ async fn create_test_tool() -> (TodoTool, TempDir) {
     let temp_dir = TempDir::new().unwrap();
     let file_path = temp_dir.path().join("todos.jsonl");
     let store = Arc::new(RwLock::new(TodoStore::new(file_path)));
-    let tool = TodoTool::new(store, 3, 18);
+    let tool = TodoTool::new(store, 3, 18, "UTC".to_string());
     (tool, temp_dir)
 }
 

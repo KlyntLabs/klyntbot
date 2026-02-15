@@ -76,11 +76,11 @@ impl Tool for CalendarTool {
                 },
                 "start": {
                     "type": "string",
-                    "description": "Start time ISO 8601 format (for create_event)"
+                    "description": "Start time in RFC3339 format with timezone offset (e.g. '2026-02-17T21:00:00+07:00'). Always include the timezone offset. (for create_event)"
                 },
                 "end": {
                     "type": "string",
-                    "description": "End time ISO 8601 format (for create_event)"
+                    "description": "End time in RFC3339 format with timezone offset (e.g. '2026-02-17T22:00:00+07:00'). Always include the timezone offset. (for create_event)"
                 }
             },
             "required": ["action"]

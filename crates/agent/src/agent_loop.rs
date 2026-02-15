@@ -189,6 +189,7 @@ impl AgentLoop {
             Arc::clone(&todo_store),
             config.todo.focus.max_slots,
             config.todo.focus.deadline_hours,
+            config.timezone.clone(),
         );
 
         // Register calendar tool (if any provider is enabled)

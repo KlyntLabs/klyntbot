@@ -13,6 +13,7 @@ use crate::calendar_tool::CalendarHandler;
 use crate::params::ParamExtractor;
 use crate::todo_store::TodoStore;
 use crate::todo_types::{Todo, TodoFilter, TodoPatch, TodoStatus};
+use common::utils::date::parse_datetime;
 use common::{Result, ToolError};
 use tracing::warn;
 
@@ -22,6 +23,7 @@ pub struct TodoTool {
     max_focus_slots: usize,
     focus_deadline_hours: u64,
     calendar_handler: Option<Arc<dyn CalendarHandler>>,
+    timezone: String,
 }
 
 impl TodoTool {
@@ -30,12 +32,14 @@ impl TodoTool {
         store: Arc<RwLock<TodoStore>>,
         max_focus_slots: usize,
         focus_deadline_hours: u64,
+        timezone: String,
     ) -> Self {
         Self {
             store,
             max_focus_slots,
             focus_deadline_hours,
             calendar_handler: None,
+            timezone,
         }
     }
 
@@ -94,7 +98,7 @@ impl Tool for TodoTool {
                 },
                 "due_date": {
                     "type": "string",
-                    "description": "Due date in RFC3339 format with timezone (YYYY-MM-DDTHH:MM:SSZ). IMPORTANT: You MUST convert natural language like 'tomorrow at 2pm' to proper RFC3339 format based on current date/time before calling this tool. Current date is available in system context. (for add/add_subtask/update)"
+                    "description": "Due date. Accepts: RFC3339 with timezone (e.g. '2026-02-17T21:00:00+07:00'), date with time ('2026-02-17 21:00'), or date only ('2026-02-17', interpreted as midnight in user's timezone). Always include time when the user specifies one. IMPORTANT: Convert natural language dates to these formats using the current date/time from system context. (for add/add_subtask/update)"
                 },
                 "tags": {
                     "type": "array",
@@ -188,10 +192,7 @@ impl Tool for TodoTool {
                     title: title.to_string(),
                     description: p.optional_str("description")?.map(String::from),
                     priority: p.optional_u64("priority")?.map(|v| v as u8),
-                    due_date: p
-                        .optional_str("due_date")?
-                        .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
-                        .map(|dt| dt.with_timezone(&Utc)),
+                    due_date: p.optional_str("due_date")?.and_then(|s| parse_datetime(s, &self.timezone)),
                     tags: p.string_array_or_empty("tags")?,
                     status: TodoStatus::Todo,
                     focused_at: None,
@@ -271,10 +272,7 @@ impl Tool for TodoTool {
                             // Empty string or "null" means clear the due_date
                             None
                         } else {
-                            // Parse RFC3339 format
-                            chrono::DateTime::parse_from_rfc3339(s)
-                                .ok()
-                                .map(|dt| dt.with_timezone(&Utc))
+                            parse_datetime(s, &self.timezone)
                         }
                     }),
                     tags: p.optional_array("tags")?.map(|arr| {
@@ -486,10 +484,7 @@ impl Tool for TodoTool {
                     title: title.to_string(),
                     description: p.optional_str("description")?.map(String::from),
                     priority: p.optional_u64("priority")?.map(|v| v as u8),
-                    due_date: p
-                        .optional_str("due_date")?
-                        .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
-                        .map(|dt| dt.with_timezone(&Utc)),
+                    due_date: p.optional_str("due_date")?.and_then(|s| parse_datetime(s, &self.timezone)),
                     tags: p.string_array_or_empty("tags")?,
                     status: TodoStatus::Todo,
                     focused_at: None,
@@ -913,7 +908,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("todos.jsonl");
         let store = Arc::new(RwLock::new(TodoStore::new(file_path)));
-        let tool = TodoTool::new(store, 3, 18);
+        let tool = TodoTool::new(store, 3, 18, "UTC".to_string());
         (tool, temp_dir)
     }
 
@@ -1258,10 +1253,11 @@ mod tests {
         let store = Arc::new(RwLock::new(TodoStore::new(file_path)));
 
         // Create tool with custom config values
-        let tool = TodoTool::new(store, 5, 24);
+        let tool = TodoTool::new(store, 5, 24, "Asia/Bangkok".to_string());
 
         assert_eq!(tool.max_focus_slots, 5);
         assert_eq!(tool.focus_deadline_hours, 24);
+        assert_eq!(tool.timezone, "Asia/Bangkok");
     }
 
     // ── Phase 2: New actions tests ──────────────────────────────────────

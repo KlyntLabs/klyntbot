@@ -56,25 +56,11 @@ fn render_priority(priority: u8) -> String {
     colorize(&badge, color)
 }
 
-/// Parse a due date string (YYYY-MM-DD) to DateTime<Utc>.
-/// Interprets the date as midnight in the configured timezone, then converts to UTC.
+/// Parse a due date string to DateTime<Utc> using the shared date utility.
+/// Interprets non-timezone strings in the configured timezone.
 fn parse_due_date(date_str: &str, timezone: &str) -> Result<chrono::DateTime<chrono::Utc>> {
-    use chrono::{NaiveDate, TimeZone, Utc};
-    use chrono_tz::Tz;
-
-    let naive = NaiveDate::parse_from_str(date_str, "%Y-%m-%d")?;
-    let naive_datetime = naive
-        .and_hms_opt(0, 0, 0)
-        .ok_or_else(|| anyhow::anyhow!("Invalid date"))?;
-
-    let tz: Tz = timezone
-        .parse()
-        .map_err(|_| anyhow::anyhow!("Invalid timezone: {}", timezone))?;
-
-    tz.from_local_datetime(&naive_datetime)
-        .earliest()
-        .map(|dt| dt.with_timezone(&Utc))
-        .ok_or_else(|| anyhow::anyhow!("Ambiguous datetime for timezone {}", timezone))
+    common::utils::date::parse_datetime(date_str, timezone)
+        .ok_or_else(|| anyhow::anyhow!("Failed to parse date: {}", date_str))
 }
 
 /// Format a UTC datetime for display in the user's timezone
@@ -83,11 +69,7 @@ pub(super) fn format_date_local(
     timezone: &str,
     fmt: &str,
 ) -> String {
-    if let Ok(tz) = timezone.parse::<chrono_tz::Tz>() {
-        dt.with_timezone(&tz).format(fmt).to_string()
-    } else {
-        dt.format(fmt).to_string()
-    }
+    common::utils::date::format_datetime_local(dt, timezone, fmt)
 }
 
 /// Show detailed task view (used by show and list)

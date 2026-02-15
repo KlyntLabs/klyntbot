@@ -1,5 +1,6 @@
 //! Utility functions and terminal rendering.
 
+pub mod date;
 pub mod helpers;
 pub mod notify;
 pub mod stream_renderer;

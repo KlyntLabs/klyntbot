@@ -245,13 +245,15 @@ impl ContextBuilder {
     fn build_identity_section(&self, channel: &str, chat_id: &str) -> String {
         let now = Utc::now();
 
-        // Format time in user's local timezone
+        // Format time in user's local timezone (with UTC offset for LLM clarity)
         let date_str = if let Ok(tz) = self.timezone.parse::<chrono_tz::Tz>() {
             let local = now.with_timezone(&tz);
+            let utc_offset = common::utils::date::timezone_utc_offset(&self.timezone);
             format!(
-                "{} ({})",
+                "{} ({}, UTC{})",
                 local.format("%Y-%m-%d %H:%M (%A)"),
-                self.timezone
+                self.timezone,
+                utc_offset
             )
         } else {
             now.format("%Y-%m-%d %H:%M (%A) (UTC)").to_string()
