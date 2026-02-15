@@ -35,8 +35,9 @@ pub async fn handle_list(
         tag: tag.clone(),
         priority_min,
         limit,
-        project_id: None, // Phase 2
-        parent_id: None,  // Phase 2
+        project_id: None,
+        parent_id: None,
+        include_templates: false,
     };
 
     let todos = store.list(&filter).await?;

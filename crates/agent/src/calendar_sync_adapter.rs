@@ -349,6 +349,12 @@ impl CalendarSyncAdapter {
             estimated_minutes: None,
             calendar_event_uid: Some(event.uid.clone()),
             last_reminded_at: None,
+            recurrence_rule: None,
+            recurrence_parent_id: None,
+            is_template: false,
+            next_instance_date: None,
+            blocked_by: Vec::new(),
+            blocks: Vec::new(),
         };
 
         store.add(todo).await?;
@@ -656,6 +662,12 @@ mod tests {
             estimated_minutes: Some(90),
             calendar_event_uid: Some("event-uid-123".to_string()),
             last_reminded_at: None,
+            recurrence_rule: None,
+            recurrence_parent_id: None,
+            is_template: false,
+            next_instance_date: None,
+            blocked_by: Vec::new(),
+            blocks: Vec::new(),
         };
 
         let event = adapter.todo_to_event(&todo);
@@ -704,6 +716,12 @@ mod tests {
             estimated_minutes: None,
             calendar_event_uid: None,
             last_reminded_at: None,
+            recurrence_rule: None,
+            recurrence_parent_id: None,
+            is_template: false,
+            next_instance_date: None,
+            blocked_by: Vec::new(),
+            blocks: Vec::new(),
         };
 
         let event = adapter.todo_to_event(&todo);

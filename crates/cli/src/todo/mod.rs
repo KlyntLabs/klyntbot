@@ -4,9 +4,18 @@
 //! enrichment flow, focus mode, and dashboard rendering.
 
 mod add;
+mod attach;
 mod complete;
+mod depend;
 mod focus;
 mod list;
+mod move_task;
+mod recur;
+mod report;
+mod search;
+mod time;
+mod tree;
+mod update;
 
 use anyhow::Result;
 use common::utils::terminal::*;
@@ -38,6 +47,49 @@ pub async fn handle_todo(cmd: TodoCommands) -> Result<()> {
         TodoCommands::Focus { id } => focus::handle_focus(id).await,
         TodoCommands::Unfocus { id } => focus::handle_unfocus(&id).await,
         TodoCommands::Summary => list::handle_summary().await,
+        TodoCommands::Tree { project, depth } => tree::handle_tree(project, depth).await,
+        TodoCommands::Search {
+            query,
+            include_attachments,
+        } => search::handle_search(query, include_attachments).await,
+        TodoCommands::Update {
+            id,
+            title,
+            description,
+            priority,
+            due,
+            tags,
+            status,
+        } => update::handle_update(id, title, description, priority, due, tags, status).await,
+        TodoCommands::Attach {
+            id,
+            file,
+            url,
+            note,
+            title,
+        } => attach::handle_attach(id, file, url, note, title).await,
+        TodoCommands::Detach { id, attachment_id } => {
+            attach::handle_detach(&id, &attachment_id).await
+        }
+        TodoCommands::AddSubtask {
+            parent_id,
+            title,
+            description,
+            priority,
+            due,
+            tags,
+        } => add::handle_add_subtask(parent_id, title, description, priority, due, tags).await,
+        TodoCommands::Move {
+            id,
+            parent,
+            project,
+        } => move_task::handle_move(id, parent, project).await,
+        TodoCommands::LogTime { id, minutes, note } => {
+            time::handle_log_time(id, minutes, note).await
+        }
+        TodoCommands::Report { period, project } => report::handle_report(period, project).await,
+        TodoCommands::Depend { id, on, remove } => depend::handle_depend(id, on, remove).await,
+        TodoCommands::Recur(cmd) => recur::handle_recur(cmd).await,
     }
 }
 

@@ -1,6 +1,6 @@
 //! TodoTool - Tool interface for todo system
 //!
-//! Provides 9 actions for complete todo management through the Tool trait.
+//! Provides 22 actions for complete todo management through the Tool trait.
 
 use async_trait::async_trait;
 use chrono::Utc;
@@ -11,6 +11,7 @@ use tokio::sync::RwLock;
 use super::{RoutingContext, Tool};
 use crate::calendar_tool::CalendarHandler;
 use crate::params::ParamExtractor;
+use crate::rrule_utils;
 use crate::todo_store::TodoStore;
 use crate::todo_types::{Todo, TodoFilter, TodoPatch, TodoStatus};
 use common::utils::date::parse_datetime;
@@ -66,7 +67,7 @@ impl Tool for TodoTool {
     }
 
     fn description(&self) -> &str {
-        "Manage tasks and todos. Actions: add, list, update, complete, delete, show, summary, focus, unfocus, add_subtask, move, attach, detach, log_time, tree, search, report."
+        "Manage tasks and todos. Actions: add, list, update, complete, delete, show, summary, focus, unfocus, add_subtask, move, attach, detach, log_time, tree, search, report, add_dependency, remove_dependency, recur, list_recurring, delete_recurring."
     }
 
     fn parameters(&self) -> Value {
@@ -75,7 +76,7 @@ impl Tool for TodoTool {
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": ["add", "list", "update", "complete", "delete", "show", "summary", "focus", "unfocus", "add_subtask", "move", "attach", "detach", "log_time", "tree", "search", "report"],
+                    "enum": ["add", "list", "update", "complete", "delete", "show", "summary", "focus", "unfocus", "add_subtask", "move", "attach", "detach", "log_time", "tree", "search", "report", "add_dependency", "remove_dependency", "recur", "list_recurring", "delete_recurring"],
                     "description": "Action to perform"
                 },
                 "id": {
@@ -171,6 +172,14 @@ impl Tool for TodoTool {
                     "type": "string",
                     "enum": ["week", "month"],
                     "description": "Time period for report (for report)"
+                },
+                "rule": {
+                    "type": "string",
+                    "description": "RRULE recurrence string, e.g. 'FREQ=DAILY;BYHOUR=9' (for recur). V1 supports: FREQ, INTERVAL, BYDAY, BYHOUR, BYMINUTE, BYMONTHDAY."
+                },
+                "template_id": {
+                    "type": "string",
+                    "description": "Recurring task template ID (for delete_recurring)"
                 }
             },
             "required": ["action"]
@@ -212,6 +221,12 @@ impl Tool for TodoTool {
                     estimated_minutes: None,
                     calendar_event_uid: None,
                     last_reminded_at: None,
+                    recurrence_rule: None,
+                    recurrence_parent_id: None,
+                    is_template: false,
+                    next_instance_date: None,
+                    blocked_by: Vec::new(),
+                    blocks: Vec::new(),
                 };
 
                 let created = store.add(todo).await?;
@@ -241,6 +256,7 @@ impl Tool for TodoTool {
                     // Phase 2: new filters
                     project_id: p.optional_str("project_id")?.map(String::from),
                     parent_id: p.optional_str("parent_id")?.map(String::from),
+                    include_templates: false,
                 };
 
                 let todos = store.list(&filter).await?;
@@ -312,6 +328,21 @@ impl Tool for TodoTool {
             "complete" => {
                 let id = p.required_str("id")?;
 
+                // Check for incomplete blockers before allowing completion
+                let blockers = store.incomplete_blockers(id).await?;
+                if !blockers.is_empty() {
+                    let blocker_list: Vec<String> = blockers
+                        .iter()
+                        .map(|b| format!("[{}] {}", b.id, b.title))
+                        .collect();
+                    return Err(ToolError::ExecutionFailed(format!(
+                        "Cannot complete: blocked by {} incomplete task(s):\n  {}",
+                        blockers.len(),
+                        blocker_list.join("\n  ")
+                    ))
+                    .into());
+                }
+
                 // Phase 2: Close any running time entries before completing
                 if let Some(todo) = store.get(id).await? {
                     for entry in &todo.time_entries {
@@ -320,6 +351,13 @@ impl Tool for TodoTool {
                         }
                     }
                 }
+
+                // Collect tasks this will unblock (before marking done)
+                let blocks_ids: Vec<String> = store
+                    .get(id)
+                    .await?
+                    .map(|t| t.blocks.clone())
+                    .unwrap_or_default();
 
                 let patch = TodoPatch {
                     status: Some(TodoStatus::Done),
@@ -331,15 +369,37 @@ impl Tool for TodoTool {
                         // Phase 2: Cascade completion to subtasks
                         let completed_children = store.cascade_complete(id).await?;
 
-                        if completed_children.is_empty() {
-                            Ok(format!("Completed: {}", todo.title))
+                        let mut msg = if completed_children.is_empty() {
+                            format!("Completed: {}", todo.title)
                         } else {
-                            Ok(format!(
+                            format!(
                                 "Completed: {} ({} subtasks also completed)",
                                 todo.title,
                                 completed_children.len()
-                            ))
+                            )
+                        };
+
+                        // Report newly unblocked tasks
+                        if !blocks_ids.is_empty() {
+                            let mut unblocked = Vec::new();
+                            for bid in &blocks_ids {
+                                let remaining = store.incomplete_blockers(bid).await?;
+                                if remaining.is_empty() {
+                                    if let Some(t) = store.get(bid).await? {
+                                        unblocked.push(format!("[{}] {}", t.id, t.title));
+                                    }
+                                }
+                            }
+                            if !unblocked.is_empty() {
+                                msg.push_str(&format!(
+                                    "\n\nUnblocked {} task(s):\n  {}",
+                                    unblocked.len(),
+                                    unblocked.join("\n  ")
+                                ));
+                            }
                         }
+
+                        Ok(msg)
                     }
                     None => {
                         Err(ToolError::ExecutionFailed(format!("Task not found: {}", id)).into())
@@ -505,6 +565,12 @@ impl Tool for TodoTool {
                     estimated_minutes: None,
                     calendar_event_uid: None,
                     last_reminded_at: None,
+                    recurrence_rule: None,
+                    recurrence_parent_id: None,
+                    is_template: false,
+                    next_instance_date: None,
+                    blocked_by: Vec::new(),
+                    blocks: Vec::new(),
                 };
 
                 let created = store.add(todo).await?;
@@ -680,6 +746,35 @@ impl Tool for TodoTool {
                         todo.status
                     ));
 
+                    // Show dependency info
+                    let detail_prefix = format!("{}{}  ", prefix, if is_last { " " } else { "│" });
+                    if !todo.blocked_by.is_empty() {
+                        for dep_id in &todo.blocked_by {
+                            let dep_title = all_todos
+                                .iter()
+                                .find(|t| t.id == *dep_id)
+                                .map(|t| t.title.as_str())
+                                .unwrap_or("(unknown)");
+                            output.push_str(&format!(
+                                "{}⛔ Blocked by: [{}] {}\n",
+                                detail_prefix, dep_id, dep_title
+                            ));
+                        }
+                    }
+                    if !todo.blocks.is_empty() {
+                        for dep_id in &todo.blocks {
+                            let dep_title = all_todos
+                                .iter()
+                                .find(|t| t.id == *dep_id)
+                                .map(|t| t.title.as_str())
+                                .unwrap_or("(unknown)");
+                            output.push_str(&format!(
+                                "{}→ Blocks: [{}] {}\n",
+                                detail_prefix, dep_id, dep_title
+                            ));
+                        }
+                    }
+
                     // Find children
                     let children: Vec<_> = all_todos
                         .iter()
@@ -687,13 +782,12 @@ impl Tool for TodoTool {
                         .collect();
 
                     // Render children
-                    let child_prefix = format!("{}{}  ", prefix, if is_last { " " } else { "│" });
                     for (i, child) in children.iter().enumerate() {
                         let is_last_child = i == children.len() - 1;
                         output.push_str(&render_tree(
                             child,
                             all_todos,
-                            &child_prefix,
+                            &detail_prefix,
                             is_last_child,
                         ));
                     }
@@ -895,6 +989,145 @@ impl Tool for TodoTool {
                 output.push_str(&format!("  - Overdue tasks: {}\n", overdue_count));
 
                 Ok(output)
+            }
+
+            "add_dependency" => {
+                let task_id = p.required_str("task_id")?;
+                let blocked_by = p.required_str("blocked_by")?;
+
+                store.add_dependency(task_id, blocked_by).await?;
+
+                let task = store.get(task_id).await?.unwrap();
+                let blocker = store.get(blocked_by).await?.unwrap();
+                Ok(format!(
+                    "Dependency added: [{}] {} is now blocked by [{}] {}",
+                    task.id, task.title, blocker.id, blocker.title
+                ))
+            }
+
+            "remove_dependency" => {
+                let task_id = p.required_str("task_id")?;
+                let blocked_by = p.required_str("blocked_by")?;
+
+                store.remove_dependency(task_id, blocked_by).await?;
+
+                Ok(format!(
+                    "Dependency removed: {} is no longer blocked by {}",
+                    task_id, blocked_by
+                ))
+            }
+
+            "recur" => {
+                let title = p.required_str("title")?;
+                let rule = p.required_str("rule")?;
+
+                // Validate the RRULE against V1 subset
+                rrule_utils::validate_rrule(rule)?;
+
+                let now = Utc::now();
+                let next_date = rrule_utils::next_occurrence(rule, now)?;
+
+                let template = Todo {
+                    id: Todo::generate_id(),
+                    title: title.to_string(),
+                    description: p.optional_str("description")?.map(String::from),
+                    priority: p.optional_u64("priority")?.map(|v| v as u8),
+                    due_date: None,
+                    tags: p.string_array_or_empty("tags")?,
+                    status: TodoStatus::Todo,
+                    focused_at: None,
+                    focus_deadline: None,
+                    focus_expired_count: 0,
+                    created_at: now,
+                    updated_at: now,
+                    completed_at: None,
+                    parent_id: None,
+                    project_id: p.optional_str("project_id")?.map(String::from),
+                    attachments: Vec::new(),
+                    time_entries: Vec::new(),
+                    total_tracked_secs: 0,
+                    estimated_minutes: None,
+                    calendar_event_uid: None,
+                    last_reminded_at: None,
+                    recurrence_rule: Some(rule.to_string()),
+                    recurrence_parent_id: None,
+                    is_template: true,
+                    next_instance_date: next_date,
+                    blocked_by: Vec::new(),
+                    blocks: Vec::new(),
+                };
+
+                let created = store.add(template).await?;
+                let human_rule = rrule_utils::humanize_rrule(rule);
+                let next_str = next_date
+                    .map(|d| d.format("%Y-%m-%d %H:%M UTC").to_string())
+                    .unwrap_or_else(|| "unknown".to_string());
+
+                Ok(format!(
+                    "Recurring task created: {} (ID: {}, rule: {}, next: {})",
+                    created.title, created.id, human_rule, next_str
+                ))
+            }
+
+            "list_recurring" => {
+                let templates = store.list_templates().await?;
+
+                if templates.is_empty() {
+                    return Ok("No recurring task templates found.".to_string());
+                }
+
+                let mut output = format!("{} recurring template(s):\n\n", templates.len());
+                for t in &templates {
+                    let rule_str = t.recurrence_rule.as_deref().unwrap_or("(no rule)");
+                    let human = rrule_utils::humanize_rrule(rule_str);
+                    let next_str = t
+                        .next_instance_date
+                        .map(|d| d.format("%Y-%m-%d %H:%M UTC").to_string())
+                        .unwrap_or_else(|| "none".to_string());
+
+                    output.push_str(&format!(
+                        "- [{}] {} | {} | Next: {}\n",
+                        t.id, t.title, human, next_str
+                    ));
+
+                    if let Some(ref desc) = t.description {
+                        output.push_str(&format!("  Description: {}\n", desc));
+                    }
+                    if let Some(pri) = t.priority {
+                        output.push_str(&format!("  Priority: {}\n", pri));
+                    }
+                    if !t.tags.is_empty() {
+                        output.push_str(&format!("  Tags: {}\n", t.tags.join(", ")));
+                    }
+                }
+
+                Ok(output)
+            }
+
+            "delete_recurring" => {
+                let template_id = p.required_str("template_id")?;
+
+                // Verify the task exists and is a template
+                let template = store.get(template_id).await?;
+                match template {
+                    Some(t) if t.is_template => {
+                        store.delete(template_id).await?;
+                        Ok(format!(
+                            "Recurring template deleted: [{}] {}. Existing instances are now standalone tasks.",
+                            t.id, t.title
+                        ))
+                    }
+                    Some(_) => Err(ToolError::InvalidParams(format!(
+                        "Task {} is not a recurring template. Use 'delete' for regular tasks.",
+                        template_id
+                    ))
+                    .into()),
+                    None => Err(ToolError::ExecutionFailed(format!(
+                        "Template not found: {}",
+                        template_id
+                    ))
+                    .into()),
+                }
             }
 
             _ => Err(ToolError::InvalidParams(format!("Unknown action: {}", action)).into()),

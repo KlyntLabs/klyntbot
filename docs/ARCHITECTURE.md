@@ -17,7 +17,7 @@ This document describes the architecture of klyntbot's multi-crate workspace, ex
 
 ## Overview
 
-Klyntbot is structured as a Cargo workspace with 11 crates organized into 8 dependency layers. This architecture enables:
+Klyntbot is structured as a Cargo workspace with 12 crates organized into 8 dependency layers. This architecture enables:
 
 - **Parallel compilation** — Independent crates in the same layer compile simultaneously
 - **Incremental builds** — Changes to one crate only recompile dependents
@@ -47,6 +47,7 @@ klyntbot/
 │   ├── providers/ ← Layer 2: LLM providers
 │   ├── session/   ← Layer 2: Session persistence
 │   ├── scheduling/      ← Layer 2: Scheduling
+│   ├── calendar/  ← Layer 2: CalDAV client & sync engine
 │   ├── tools/     ← Layer 3: Tool system
 │   ├── channels/  ← Layer 4: Chat platforms
 │   ├── heartbeat/ ← Layer 4: Periodic wake-up
@@ -69,12 +70,13 @@ klyntbot/
 | `providers` | ~1,355 | 4 | LLM provider abstraction |
 | `session` | ~479 | 1 | Session persistence |
 | `scheduling` | ~1,284 | 2 | Cron scheduling service |
+| `calendar` | ~2,921 | 12 | CalDAV client, sync engine, provider adapters (Apple, Google, Generic) |
 | `tools` | ~1,892 | 7 | Tool trait + implementations |
 | `channels` | ~3,306 | 8 | Channel trait + platform impls |
 | `heartbeat` | ~229 | 1 | Heartbeat service |
 | `agent` | ~2,286 | 5 | Agent loop and orchestration |
 | `cli` | ~1,849 | 9 | CLI commands and REPL |
-| **Total** | **~15,299** | **45** | |
+| **Total** | **~18,220** | **57** | |
 
 ---
 
@@ -96,7 +98,7 @@ Layer 1 (Data):
         ├─────────────────┬───────────────┬───────────────┐
         │                 │               │               │
 Layer 2 (Services):
-    providers  session  scheduling  │
+    providers  session  scheduling  calendar
         │                 │               │               │
         └─────────────────┴───────────────┴───────────────┘
         │
@@ -187,7 +189,7 @@ pub struct SessionKey { channel: ChannelName, chat_id: ChatId }
 
 ### Trait-Based Extension
 
-Four primary extension traits:
+Six primary extension traits:
 
 | Trait | Crate | Purpose |
 |-------|-------|---------|
@@ -196,6 +198,7 @@ Four primary extension traits:
 | `Channel` | `channels` | Add chat platform integrations |
 | `SpawnHandler` | `tools` | Abstraction for subagent spawning |
 | `CronHandler` | `tools` | Abstraction for cron job management |
+| `CalendarHandler` | `tools` | Abstraction for calendar sync (sync, list events, create events, status) |
 
 ---
 
@@ -402,11 +405,11 @@ email = ["channels/email"]
 
 ### Compilation Parallelism
 
-With 11 crates in 8 layers, the compiler can parallelize:
+With 12 crates in 8 layers, the compiler can parallelize:
 
 - **Layer 0**: `common` (first, serial)
 - **Layer 1**: `config` + `bus` (parallel)
-- **Layer 2**: `providers` + `session` + `scheduling` (parallel)
+- **Layer 2**: `providers` + `session` + `scheduling` + `calendar` (parallel)
 - **Layer 3**: `tools` (serial)
 - **Layer 4**: `channels` + `heartbeat` (parallel)
 - **Layer 5**: `agent` (serial)
@@ -420,9 +423,10 @@ With 11 crates in 8 layers, the compiler can parallelize:
 | Changed Crate | Recompiles |
 |---------------|------------|
 | `common` | All (foundation) |
-| `config` | 6 crates |
-| `bus` | 6 crates |
+| `config` | 7 crates |
+| `bus` | 7 crates |
 | `providers` | 5 crates |
+| `calendar` | 3 crates (agent, cli, klyntbot) |
 | `tools` | 4 crates |
 | `channels` | 2 crates (channels, cli) |
 | `session` | 3 crates |
@@ -524,7 +528,9 @@ Inject at construction:
 let spawn_tool = SpawnTool::new(Some(Arc::clone(&subagent_mgr) as Arc<dyn SpawnHandler>));
 ```
 
-**Same pattern for `CronTool` and `CronHandler`.**
+**Same pattern for `CronTool`/`CronHandler` and `CalendarTool`/`CalendarHandler`.**
+
+The `CalendarHandler` trait is defined in `tools/src/calendar_tool.rs` and implemented by `CalendarSyncAdapter` in `agent/src/calendar_sync_adapter.rs`. It provides `sync_calendar()`, `list_events()`, `create_event()`, and `get_status()` methods, with the adapter wrapping the `calendar` crate's `SyncEngine` and provider-specific clients.
 
 ### Re-export Facade
 
@@ -559,15 +565,19 @@ This keeps dependencies flowing upward while allowing runtime polymorphism.
 
 ## Rationale for Key Decisions
 
-### Why 11 crates?
+### Why 12 crates?
 
 Each crate represents a **logical boundary** with a single responsibility:
-- `core` = foundation types
+- `common` = foundation types
 - `config` = configuration I/O
 - `bus` = message passing
 - `providers` = LLM abstraction
+- `session` = conversation persistence
+- `scheduling` = cron jobs
+- `calendar` = CalDAV client & sync engine
 - `tools` = agent capabilities
 - `channels` = platform integrations
+- `heartbeat` = periodic wake-up
 - `agent` = orchestration logic
 - `cli` = user interface
 
@@ -579,8 +589,9 @@ They are **independent services** with no dependencies on each other:
 - Providers talk to LLM APIs
 - Session manages conversation history
 - Cron handles scheduled jobs
+- Calendar handles CalDAV sync
 
-They all depend on `config` and `core`, making them Layer 2.
+They all depend on `config` and `common`, making them Layer 2.
 
 ### Why put tools at Layer 3?
 
@@ -628,7 +639,7 @@ cargo build --features email
 ## Summary
 
 Klyntbot's workspace architecture achieves:
-- **Clear separation of concerns** via 11 focused crates
+- **Clear separation of concerns** via 12 focused crates
 - **No circular dependencies** via dependency inversion patterns
 - **Parallel compilation** via layered dependency graph
 - **Incremental builds** via crate-level isolation

@@ -8,6 +8,7 @@ pub mod commands;
 pub mod config_cmd;
 pub mod cron;
 pub mod interactive;
+pub mod project;
 pub mod serve;
 pub mod skills;
 pub mod status;

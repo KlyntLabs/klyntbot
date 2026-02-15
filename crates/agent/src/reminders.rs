@@ -320,6 +320,12 @@ mod tests {
             estimated_minutes: None,
             calendar_event_uid: None,
             last_reminded_at: None,
+            recurrence_rule: None,
+            recurrence_parent_id: None,
+            is_template: false,
+            next_instance_date: None,
+            blocked_by: Vec::new(),
+            blocks: Vec::new(),
         }
     }
 

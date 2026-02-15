@@ -92,6 +92,8 @@ pub struct AgentLoop {
     last_active_channel: Option<LastActiveChannel>,
     #[allow(dead_code)] // TODO: Use for cleanup when agent loop stops
     reminder_engine: Option<Arc<RwLock<super::ReminderEngine>>>,
+    #[allow(dead_code)] // Held for lifetime; stopped on agent shutdown
+    recurring_task_spawner: Option<Arc<RwLock<super::RecurringTaskSpawner>>>,
 }
 
 impl AgentLoop {
@@ -245,6 +247,15 @@ impl AgentLoop {
             None
         };
 
+        // Start RecurringTaskSpawner (checks every 60s for due recurring templates)
+        let mut recurring_spawner = super::RecurringTaskSpawner::new(
+            Arc::clone(&todo_store),
+            config.timezone.clone(),
+            std::time::Duration::from_secs(60),
+        );
+        recurring_spawner.start();
+        let recurring_task_spawner = Some(Arc::new(RwLock::new(recurring_spawner)));
+
         // Take ownership of the inbound receiver
         let inbound_rx = bus
             .take_inbound_rx()
@@ -264,6 +275,7 @@ impl AgentLoop {
             running: Arc::new(AtomicBool::new(false)),
             last_active_channel: notification_handle,
             reminder_engine,
+            recurring_task_spawner,
         })
     }
 

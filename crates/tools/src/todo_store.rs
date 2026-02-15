@@ -4,7 +4,7 @@
 //! Journal entries are either upserts (full Todo) or deletes (tombstones).
 //! Periodic compaction rewrites the file when stale entries exceed a threshold.
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -293,15 +293,33 @@ impl TodoStore {
         Ok(updated)
     }
 
-    /// Delete a todo by ID
+    /// Delete a todo by ID.
+    /// Also removes this ID from blocked_by/blocks in all other tasks.
     pub async fn delete(&mut self, id: &str) -> Result<bool> {
         self.ensure_loaded().await?;
 
         if self.index.remove(id).is_some() {
             self.order.retain(|oid| oid != id);
 
-            let entry = JournalEntry::Delete { id: id.to_string() };
-            self.append_entry(&entry).await?;
+            // Defensive full scan: remove deleted ID from ALL tasks' blocked_by/blocks.
+            // Guards against inconsistency from crashes, manual edits, or bugs.
+            let mut affected_entries = Vec::new();
+            for todo in self.index.values_mut() {
+                let had_ref = todo.blocked_by.contains(&id.to_string())
+                    || todo.blocks.contains(&id.to_string());
+                if had_ref {
+                    todo.blocked_by.retain(|bid| bid != id);
+                    todo.blocks.retain(|bid| bid != id);
+                    todo.updated_at = Utc::now();
+                    affected_entries.push(JournalEntry::Upsert {
+                        todo: Box::new(todo.clone()),
+                    });
+                }
+            }
+
+            // Append delete entry + any affected dependency cleanups
+            affected_entries.push(JournalEntry::Delete { id: id.to_string() });
+            self.append_entries(&affected_entries).await?;
             self.maybe_compact().await?;
             Ok(true)
         } else {
@@ -317,6 +335,10 @@ impl TodoStore {
             .todos_ordered()
             .into_iter()
             .filter(|t| {
+                // Sprint 2: exclude templates from normal lists unless explicitly included
+                if !filter.include_templates && t.is_template {
+                    return false;
+                }
                 if let Some(status) = filter.status {
                     if t.status != status {
                         return false;
@@ -354,6 +376,40 @@ impl TodoStore {
         }
 
         Ok(filtered)
+    }
+
+    /// List only template todos (is_template == true).
+    pub async fn list_templates(&mut self) -> Result<Vec<Todo>> {
+        self.ensure_loaded().await?;
+        Ok(self
+            .todos_ordered()
+            .into_iter()
+            .filter(|t| t.is_template)
+            .cloned()
+            .collect())
+    }
+
+    /// Update the next_instance_date for a recurring template.
+    /// Used by RecurringTaskSpawner after spawning an instance.
+    pub async fn update_next_instance_date(
+        &mut self,
+        id: &str,
+        next: Option<DateTime<Utc>>,
+    ) -> Result<()> {
+        self.ensure_loaded().await?;
+
+        if let Some(todo) = self.index.get_mut(id) {
+            todo.next_instance_date = next;
+            todo.updated_at = Utc::now();
+            let entry = JournalEntry::Upsert {
+                todo: Box::new(todo.clone()),
+            };
+            self.append_entry(&entry).await?;
+            self.maybe_compact().await?;
+            Ok(())
+        } else {
+            Err(common::ToolError::ExecutionFailed(format!("Task not found: {}", id)).into())
+        }
     }
 
     /// Focus a task (with slot limit enforcement)
@@ -789,6 +845,151 @@ impl TodoStore {
 
         Ok(ctx)
     }
+
+    // ── Dependency management ──────────────────────────────────────────
+
+    /// Check if adding edge (from_id → to_id) would create a cycle.
+    /// Uses iterative DFS from to_id following blocked_by edges.
+    /// Returns true if cycle detected (i.e., to_id can reach from_id).
+    pub async fn would_create_cycle(&mut self, from_id: &str, to_id: &str) -> Result<bool> {
+        self.ensure_loaded().await?;
+
+        let mut visited = std::collections::HashSet::new();
+        let mut stack = vec![to_id.to_string()];
+
+        while let Some(current) = stack.pop() {
+            if current == from_id {
+                return Ok(true);
+            }
+            if !visited.insert(current.clone()) {
+                continue;
+            }
+            if let Some(todo) = self.index.get(&current) {
+                for dep in &todo.blocked_by {
+                    if !visited.contains(dep) {
+                        stack.push(dep.clone());
+                    }
+                }
+            }
+        }
+        Ok(false)
+    }
+
+    /// Add a dependency: task_id is blocked by blocker_id.
+    /// Maintains bidirectional consistency and checks for cycles.
+    pub async fn add_dependency(&mut self, task_id: &str, blocker_id: &str) -> Result<()> {
+        self.ensure_loaded().await?;
+
+        // Validate both tasks exist
+        if !self.index.contains_key(task_id) {
+            return Err(
+                common::ToolError::ExecutionFailed(format!("Task not found: {}", task_id)).into(),
+            );
+        }
+        if !self.index.contains_key(blocker_id) {
+            return Err(common::ToolError::ExecutionFailed(format!(
+                "Task not found: {}",
+                blocker_id
+            ))
+            .into());
+        }
+
+        // Self-dependency check
+        if task_id == blocker_id {
+            return Err(common::ToolError::InvalidParams("Cannot depend on self".into()).into());
+        }
+
+        // Cycle detection
+        if self.would_create_cycle(task_id, blocker_id).await? {
+            return Err(common::ToolError::InvalidParams(format!(
+                "Adding dependency would create a cycle: {} → {} → ... → {}",
+                task_id, blocker_id, task_id
+            ))
+            .into());
+        }
+
+        // Add blocked_by to task_id
+        if let Some(task) = self.index.get_mut(task_id) {
+            if !task.blocked_by.contains(&blocker_id.to_string()) {
+                task.blocked_by.push(blocker_id.to_string());
+                task.updated_at = Utc::now();
+            }
+        }
+
+        // Add blocks to blocker_id
+        if let Some(blocker) = self.index.get_mut(blocker_id) {
+            if !blocker.blocks.contains(&task_id.to_string()) {
+                blocker.blocks.push(task_id.to_string());
+                blocker.updated_at = Utc::now();
+            }
+        }
+
+        // Persist both changes atomically
+        let entries = vec![
+            JournalEntry::Upsert {
+                todo: Box::new(self.index[task_id].clone()),
+            },
+            JournalEntry::Upsert {
+                todo: Box::new(self.index[blocker_id].clone()),
+            },
+        ];
+        self.append_entries(&entries).await?;
+        self.maybe_compact().await?;
+
+        Ok(())
+    }
+
+    /// Remove a dependency: task_id is no longer blocked by blocker_id.
+    pub async fn remove_dependency(&mut self, task_id: &str, blocker_id: &str) -> Result<()> {
+        self.ensure_loaded().await?;
+
+        if let Some(task) = self.index.get_mut(task_id) {
+            task.blocked_by.retain(|id| id != blocker_id);
+            task.updated_at = Utc::now();
+        }
+
+        if let Some(blocker) = self.index.get_mut(blocker_id) {
+            blocker.blocks.retain(|id| id != task_id);
+            blocker.updated_at = Utc::now();
+        }
+
+        // Persist both changes atomically
+        let mut entries = Vec::new();
+        if let Some(task) = self.index.get(task_id) {
+            entries.push(JournalEntry::Upsert {
+                todo: Box::new(task.clone()),
+            });
+        }
+        if let Some(blocker) = self.index.get(blocker_id) {
+            entries.push(JournalEntry::Upsert {
+                todo: Box::new(blocker.clone()),
+            });
+        }
+        if !entries.is_empty() {
+            self.append_entries(&entries).await?;
+            self.maybe_compact().await?;
+        }
+
+        Ok(())
+    }
+
+    /// Get all incomplete blockers for a task.
+    /// Returns tasks in blocked_by that are not Done or Archived.
+    pub async fn incomplete_blockers(&mut self, task_id: &str) -> Result<Vec<Todo>> {
+        self.ensure_loaded().await?;
+
+        let blocked_by = match self.index.get(task_id) {
+            Some(task) => task.blocked_by.clone(),
+            None => return Ok(Vec::new()),
+        };
+
+        Ok(blocked_by
+            .iter()
+            .filter_map(|id| self.index.get(id))
+            .filter(|t| t.status != TodoStatus::Done && t.status != TodoStatus::Archived)
+            .cloned()
+            .collect())
+    }
 }
 
 #[cfg(test)]
@@ -829,6 +1030,12 @@ mod tests {
             estimated_minutes: None,
             calendar_event_uid: None,
             last_reminded_at: None,
+            recurrence_rule: None,
+            recurrence_parent_id: None,
+            is_template: false,
+            next_instance_date: None,
+            blocked_by: Vec::new(),
+            blocks: Vec::new(),
         }
     }
 
@@ -1543,5 +1750,436 @@ mod tests {
         assert_eq!(todos[0].title, "Alpha");
         assert_eq!(todos[1].title, "Beta");
         assert_eq!(todos[2].title, "Charlie");
+    }
+
+    // ── Dependency tests ──────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn test_add_dependency() {
+        let (mut store, _dir) = create_test_store().await;
+        let task = create_test_todo("Blocked task");
+        let blocker = create_test_todo("Blocker");
+        let task_id = task.id.clone();
+        let blocker_id = blocker.id.clone();
+
+        store.add(task).await.unwrap();
+        store.add(blocker).await.unwrap();
+
+        store.add_dependency(&task_id, &blocker_id).await.unwrap();
+
+        let t = store.get(&task_id).await.unwrap().unwrap();
+        assert!(t.blocked_by.contains(&blocker_id));
+
+        let b = store.get(&blocker_id).await.unwrap().unwrap();
+        assert!(b.blocks.contains(&task_id));
+    }
+
+    #[tokio::test]
+    async fn test_add_dependency_self_ref() {
+        let (mut store, _dir) = create_test_store().await;
+        let task = create_test_todo("Self ref");
+        let id = task.id.clone();
+        store.add(task).await.unwrap();
+
+        let result = store.add_dependency(&id, &id).await;
+        assert!(result.is_err(), "Self-dependency should fail");
+    }
+
+    #[tokio::test]
+    async fn test_add_dependency_nonexistent_task() {
+        let (mut store, _dir) = create_test_store().await;
+        let task = create_test_todo("Exists");
+        let id = task.id.clone();
+        store.add(task).await.unwrap();
+
+        let result = store.add_dependency(&id, "nonexistent").await;
+        assert!(result.is_err(), "Nonexistent blocker should fail");
+
+        let result = store.add_dependency("nonexistent", &id).await;
+        assert!(result.is_err(), "Nonexistent task should fail");
+    }
+
+    #[tokio::test]
+    async fn test_add_dependency_idempotent() {
+        let (mut store, _dir) = create_test_store().await;
+        let task = create_test_todo("Task");
+        let blocker = create_test_todo("Blocker");
+        let task_id = task.id.clone();
+        let blocker_id = blocker.id.clone();
+
+        store.add(task).await.unwrap();
+        store.add(blocker).await.unwrap();
+
+        store.add_dependency(&task_id, &blocker_id).await.unwrap();
+        store.add_dependency(&task_id, &blocker_id).await.unwrap();
+
+        let t = store.get(&task_id).await.unwrap().unwrap();
+        assert_eq!(
+            t.blocked_by.iter().filter(|x| **x == blocker_id).count(),
+            1,
+            "Should not duplicate"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_would_create_cycle_simple() {
+        let (mut store, _dir) = create_test_store().await;
+        let a = create_test_todo("A");
+        let b = create_test_todo("B");
+        let a_id = a.id.clone();
+        let b_id = b.id.clone();
+
+        store.add(a).await.unwrap();
+        store.add(b).await.unwrap();
+
+        // A blocked by B
+        store.add_dependency(&a_id, &b_id).await.unwrap();
+
+        // B blocked by A would create a cycle
+        assert!(store.would_create_cycle(&b_id, &a_id).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_would_create_cycle_transitive() {
+        let (mut store, _dir) = create_test_store().await;
+        let a = create_test_todo("A");
+        let b = create_test_todo("B");
+        let c = create_test_todo("C");
+        let a_id = a.id.clone();
+        let b_id = b.id.clone();
+        let c_id = c.id.clone();
+
+        store.add(a).await.unwrap();
+        store.add(b).await.unwrap();
+        store.add(c).await.unwrap();
+
+        // A blocked by B, B blocked by C
+        store.add_dependency(&a_id, &b_id).await.unwrap();
+        store.add_dependency(&b_id, &c_id).await.unwrap();
+
+        // C blocked by A would create A→B→C→A cycle
+        assert!(store.would_create_cycle(&c_id, &a_id).await.unwrap());
+
+        // A blocked by C would NOT create a cycle (C→B is not in the graph)
+        assert!(!store.would_create_cycle(&a_id, &c_id).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_add_dependency_cycle_rejected() {
+        let (mut store, _dir) = create_test_store().await;
+        let a = create_test_todo("A");
+        let b = create_test_todo("B");
+        let a_id = a.id.clone();
+        let b_id = b.id.clone();
+
+        store.add(a).await.unwrap();
+        store.add(b).await.unwrap();
+
+        store.add_dependency(&a_id, &b_id).await.unwrap();
+
+        let result = store.add_dependency(&b_id, &a_id).await;
+        assert!(result.is_err(), "Cycle should be rejected");
+    }
+
+    #[tokio::test]
+    async fn test_remove_dependency() {
+        let (mut store, _dir) = create_test_store().await;
+        let task = create_test_todo("Task");
+        let blocker = create_test_todo("Blocker");
+        let task_id = task.id.clone();
+        let blocker_id = blocker.id.clone();
+
+        store.add(task).await.unwrap();
+        store.add(blocker).await.unwrap();
+
+        store.add_dependency(&task_id, &blocker_id).await.unwrap();
+        store
+            .remove_dependency(&task_id, &blocker_id)
+            .await
+            .unwrap();
+
+        let t = store.get(&task_id).await.unwrap().unwrap();
+        assert!(t.blocked_by.is_empty());
+
+        let b = store.get(&blocker_id).await.unwrap().unwrap();
+        assert!(b.blocks.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_remove_dependency_nonexistent_noop() {
+        let (mut store, _dir) = create_test_store().await;
+        let task = create_test_todo("Task");
+        let task_id = task.id.clone();
+        store.add(task).await.unwrap();
+
+        // Should not error when removing a dependency that doesn't exist
+        store
+            .remove_dependency(&task_id, "nonexistent")
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_incomplete_blockers() {
+        let (mut store, _dir) = create_test_store().await;
+        let task = create_test_todo("Task");
+        let blocker1 = create_test_todo("Incomplete blocker");
+        let mut blocker2 = create_test_todo("Done blocker");
+        blocker2.status = TodoStatus::Done;
+        let mut blocker3 = create_test_todo("Archived blocker");
+        blocker3.status = TodoStatus::Archived;
+
+        let task_id = task.id.clone();
+        let b1_id = blocker1.id.clone();
+        let b2_id = blocker2.id.clone();
+        let b3_id = blocker3.id.clone();
+
+        store.add(task).await.unwrap();
+        store.add(blocker1).await.unwrap();
+        store.add(blocker2).await.unwrap();
+        store.add(blocker3).await.unwrap();
+
+        store.add_dependency(&task_id, &b1_id).await.unwrap();
+        store.add_dependency(&task_id, &b2_id).await.unwrap();
+        store.add_dependency(&task_id, &b3_id).await.unwrap();
+
+        let blockers = store.incomplete_blockers(&task_id).await.unwrap();
+        assert_eq!(blockers.len(), 1, "Only incomplete blocker should appear");
+        assert_eq!(blockers[0].id, b1_id);
+    }
+
+    #[tokio::test]
+    async fn test_incomplete_blockers_nonexistent() {
+        let (mut store, _dir) = create_test_store().await;
+        let blockers = store.incomplete_blockers("nonexistent").await.unwrap();
+        assert!(blockers.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_delete_cascades_dependencies() {
+        let (mut store, _dir) = create_test_store().await;
+        let a = create_test_todo("A");
+        let b = create_test_todo("B");
+        let c = create_test_todo("C");
+        let a_id = a.id.clone();
+        let b_id = b.id.clone();
+        let c_id = c.id.clone();
+
+        store.add(a).await.unwrap();
+        store.add(b).await.unwrap();
+        store.add(c).await.unwrap();
+
+        // A blocked by B, C blocked by B
+        store.add_dependency(&a_id, &b_id).await.unwrap();
+        store.add_dependency(&c_id, &b_id).await.unwrap();
+
+        // Delete B — should clean up A.blocked_by and C.blocked_by
+        store.delete(&b_id).await.unwrap();
+
+        let a = store.get(&a_id).await.unwrap().unwrap();
+        assert!(
+            a.blocked_by.is_empty(),
+            "A should no longer be blocked by deleted B"
+        );
+
+        let c = store.get(&c_id).await.unwrap().unwrap();
+        assert!(
+            c.blocked_by.is_empty(),
+            "C should no longer be blocked by deleted B"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_delete_cascades_blocks() {
+        let (mut store, _dir) = create_test_store().await;
+        let a = create_test_todo("A");
+        let b = create_test_todo("B");
+        let a_id = a.id.clone();
+        let b_id = b.id.clone();
+
+        store.add(a).await.unwrap();
+        store.add(b).await.unwrap();
+
+        // A blocked by B (so B.blocks contains A)
+        store.add_dependency(&a_id, &b_id).await.unwrap();
+
+        // Delete A — should clean up B.blocks
+        store.delete(&a_id).await.unwrap();
+
+        let b = store.get(&b_id).await.unwrap().unwrap();
+        assert!(
+            b.blocks.is_empty(),
+            "B should no longer list deleted A in blocks"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_dependency_persists_across_reload() {
+        let (mut store, dir) = create_test_store().await;
+        let task = create_test_todo("Task");
+        let blocker = create_test_todo("Blocker");
+        let task_id = task.id.clone();
+        let blocker_id = blocker.id.clone();
+
+        store.add(task).await.unwrap();
+        store.add(blocker).await.unwrap();
+        store.add_dependency(&task_id, &blocker_id).await.unwrap();
+
+        // Reload from disk
+        let file_path = dir.path().join("todos.jsonl");
+        let mut store2 = TodoStore::new(file_path);
+
+        let t = store2.get(&task_id).await.unwrap().unwrap();
+        assert!(
+            t.blocked_by.contains(&blocker_id),
+            "Dependency should survive reload"
+        );
+
+        let b = store2.get(&blocker_id).await.unwrap().unwrap();
+        assert!(
+            b.blocks.contains(&task_id),
+            "Reverse dependency should survive reload"
+        );
+    }
+
+    // ── Template and recurring task tests ──────────────────────────────
+
+    #[tokio::test]
+    async fn test_list_excludes_templates_by_default() {
+        let (mut store, _dir) = create_test_store().await;
+
+        // Add a normal task
+        let normal = create_test_todo("Normal task");
+        store.add(normal.clone()).await.unwrap();
+
+        // Add a template task
+        let mut template = create_test_todo("Daily standup");
+        template.is_template = true;
+        template.recurrence_rule = Some("FREQ=DAILY;BYHOUR=9".to_string());
+        store.add(template.clone()).await.unwrap();
+
+        // Default filter (include_templates = false) should exclude templates
+        let filter = TodoFilter::default();
+        let results = store.list(&filter).await.unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, normal.id);
+    }
+
+    #[tokio::test]
+    async fn test_list_includes_templates_when_requested() {
+        let (mut store, _dir) = create_test_store().await;
+
+        let normal = create_test_todo("Normal task");
+        store.add(normal.clone()).await.unwrap();
+
+        let mut template = create_test_todo("Weekly review");
+        template.is_template = true;
+        store.add(template.clone()).await.unwrap();
+
+        let filter = TodoFilter {
+            include_templates: true,
+            ..Default::default()
+        };
+        let results = store.list(&filter).await.unwrap();
+        assert_eq!(results.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_list_templates_only() {
+        let (mut store, _dir) = create_test_store().await;
+
+        // Add 2 normal tasks and 1 template
+        store.add(create_test_todo("Task A")).await.unwrap();
+        store.add(create_test_todo("Task B")).await.unwrap();
+
+        let mut template = create_test_todo("Monthly report");
+        template.is_template = true;
+        template.recurrence_rule = Some("FREQ=MONTHLY;BYMONTHDAY=1".to_string());
+        store.add(template.clone()).await.unwrap();
+
+        let templates = store.list_templates().await.unwrap();
+        assert_eq!(templates.len(), 1);
+        assert_eq!(templates[0].id, template.id);
+        assert!(templates[0].is_template);
+    }
+
+    #[tokio::test]
+    async fn test_list_templates_empty() {
+        let (mut store, _dir) = create_test_store().await;
+
+        store.add(create_test_todo("Normal task")).await.unwrap();
+
+        let templates = store.list_templates().await.unwrap();
+        assert!(templates.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_update_next_instance_date() {
+        let (mut store, _dir) = create_test_store().await;
+
+        let mut template = create_test_todo("Daily standup");
+        template.is_template = true;
+        template.recurrence_rule = Some("FREQ=DAILY".to_string());
+        let id = template.id.clone();
+        store.add(template).await.unwrap();
+
+        // Initially None
+        let t = store.get(&id).await.unwrap().unwrap();
+        assert!(t.next_instance_date.is_none());
+
+        // Set a next instance date
+        let next = Utc::now() + chrono::Duration::days(1);
+        store
+            .update_next_instance_date(&id, Some(next))
+            .await
+            .unwrap();
+
+        let t = store.get(&id).await.unwrap().unwrap();
+        assert_eq!(t.next_instance_date.unwrap(), next);
+
+        // Clear it
+        store.update_next_instance_date(&id, None).await.unwrap();
+        let t = store.get(&id).await.unwrap().unwrap();
+        assert!(t.next_instance_date.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_update_next_instance_date_not_found() {
+        let (mut store, _dir) = create_test_store().await;
+
+        let result = store
+            .update_next_instance_date("nonexistent", Some(Utc::now()))
+            .await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_update_next_instance_date_persists() {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("todos.jsonl");
+
+        let next = Utc::now() + chrono::Duration::hours(12);
+        let id;
+
+        {
+            let mut store = TodoStore::new(file_path.clone());
+            let mut template = create_test_todo("Recurring task");
+            template.is_template = true;
+            id = template.id.clone();
+            store.add(template).await.unwrap();
+            store
+                .update_next_instance_date(&id, Some(next))
+                .await
+                .unwrap();
+        }
+
+        // Reload from disk
+        let mut store2 = TodoStore::new(file_path);
+        let t = store2.get(&id).await.unwrap().unwrap();
+        assert_eq!(
+            t.next_instance_date.unwrap(),
+            next,
+            "next_instance_date should survive reload"
+        );
     }
 }

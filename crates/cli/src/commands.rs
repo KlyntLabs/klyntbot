@@ -67,6 +67,10 @@ pub enum Commands {
     /// Manage todo tasks (add, list, focus, complete)
     #[command(subcommand)]
     Todo(TodoCommands),
+
+    /// Manage projects (create, list, show, update, archive)
+    #[command(subcommand)]
+    Project(ProjectCommands),
 }
 
 #[derive(Subcommand, Debug)]
@@ -284,4 +288,297 @@ pub enum TodoCommands {
 
     /// Show task summary and statistics
     Summary,
+
+    /// View tasks as a hierarchical tree
+    Tree {
+        /// Filter by project ID
+        #[arg(short, long)]
+        project: Option<String>,
+
+        /// Maximum nesting depth
+        #[arg(short, long)]
+        depth: Option<usize>,
+    },
+
+    /// Search tasks by keyword
+    Search {
+        /// Search query
+        query: String,
+
+        /// Also search attachment content
+        #[arg(short, long)]
+        include_attachments: bool,
+    },
+
+    /// Update task fields
+    Update {
+        /// Task ID
+        id: String,
+
+        /// New title
+        #[arg(short, long)]
+        title: Option<String>,
+
+        /// New description
+        #[arg(long)]
+        description: Option<String>,
+
+        /// New priority (1-5)
+        #[arg(short, long)]
+        priority: Option<u8>,
+
+        /// New due date (supports natural language: "tomorrow", "next Friday")
+        #[arg(short = 'D', long)]
+        due: Option<String>,
+
+        /// New tags (comma-separated)
+        #[arg(long)]
+        tags: Option<String>,
+
+        /// New status (todo, doing, done, archived)
+        #[arg(short, long)]
+        status: Option<String>,
+    },
+
+    /// Attach a file, URL, or note to a task
+    Attach {
+        /// Task ID
+        id: String,
+
+        /// Attach a file by path
+        #[arg(short, long)]
+        file: Option<String>,
+
+        /// Attach a URL
+        #[arg(short, long)]
+        url: Option<String>,
+
+        /// Attach a text note
+        #[arg(short, long)]
+        note: Option<String>,
+
+        /// Attachment title
+        #[arg(short, long)]
+        title: Option<String>,
+    },
+
+    /// Remove an attachment from a task
+    Detach {
+        /// Task ID
+        id: String,
+
+        /// Attachment ID to remove
+        attachment_id: String,
+    },
+
+    /// Add a subtask to an existing task
+    AddSubtask {
+        /// Parent task ID
+        parent_id: String,
+
+        /// Subtask title
+        title: String,
+
+        /// Subtask description
+        #[arg(short, long)]
+        description: Option<String>,
+
+        /// Priority (1-5)
+        #[arg(short, long)]
+        priority: Option<u8>,
+
+        /// Due date
+        #[arg(short = 'D', long)]
+        due: Option<String>,
+
+        /// Tags (comma-separated)
+        #[arg(short, long)]
+        tags: Option<String>,
+    },
+
+    /// Move a task to a different parent or project
+    Move {
+        /// Task ID
+        id: String,
+
+        /// New parent task ID (use "none" to make top-level)
+        #[arg(short = 'P', long)]
+        parent: Option<String>,
+
+        /// New project ID (use "none" to remove from project)
+        #[arg(long)]
+        project: Option<String>,
+    },
+
+    /// Log time spent on a task
+    LogTime {
+        /// Task ID
+        id: String,
+
+        /// Minutes spent
+        minutes: u32,
+
+        /// Optional note about the work done
+        #[arg(short, long)]
+        note: Option<String>,
+    },
+
+    /// Generate a time tracking and completion report
+    Report {
+        /// Report period
+        #[arg(short = 'P', long, default_value = "week")]
+        period: String,
+
+        /// Filter by project ID
+        #[arg(long)]
+        project: Option<String>,
+    },
+
+    /// Manage task dependencies
+    Depend {
+        /// Task ID
+        id: String,
+
+        /// Add dependency: this task is blocked by the given task ID
+        #[arg(long)]
+        on: Option<String>,
+
+        /// Remove dependency: this task is no longer blocked by the given task ID
+        #[arg(long)]
+        remove: Option<String>,
+    },
+
+    /// Manage recurring task templates
+    #[command(subcommand)]
+    Recur(RecurCommands),
+}
+
+#[derive(Subcommand, Debug)]
+pub enum RecurCommands {
+    /// Create a new recurring task template
+    Add {
+        /// Task title
+        title: String,
+
+        /// RRULE recurrence string, e.g. "FREQ=DAILY;BYHOUR=9"
+        #[arg(short, long)]
+        rule: String,
+
+        /// Task description
+        #[arg(short, long)]
+        description: Option<String>,
+
+        /// Priority (1-5)
+        #[arg(short, long)]
+        priority: Option<u8>,
+
+        /// Tags (comma-separated)
+        #[arg(short, long, value_delimiter = ',')]
+        tags: Option<Vec<String>>,
+
+        /// Project ID to associate with
+        #[arg(long)]
+        project: Option<String>,
+    },
+
+    /// List all recurring task templates
+    List {
+        /// Filter by project ID
+        #[arg(long)]
+        project: Option<String>,
+    },
+
+    /// Delete a recurring task template
+    Delete {
+        /// Template ID to delete
+        id: String,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum ProjectCommands {
+    /// Create a new project
+    Create {
+        /// Project name
+        name: String,
+
+        /// Project description
+        #[arg(short, long)]
+        description: Option<String>,
+
+        /// Project color (red, orange, yellow, green, blue, purple, gray)
+        #[arg(short, long)]
+        color: Option<String>,
+
+        /// Tags (comma-separated)
+        #[arg(short, long)]
+        tags: Option<String>,
+    },
+
+    /// List projects
+    List {
+        /// Filter by status (active, paused, completed, archived)
+        #[arg(short, long)]
+        status: Option<String>,
+
+        /// Filter by tag
+        #[arg(short, long)]
+        tag: Option<String>,
+
+        /// Limit number of results
+        #[arg(short, long)]
+        limit: Option<usize>,
+    },
+
+    /// Show project details
+    Show {
+        /// Project ID
+        id: String,
+    },
+
+    /// Update project fields
+    Update {
+        /// Project ID
+        id: String,
+
+        /// New name
+        #[arg(short, long)]
+        name: Option<String>,
+
+        /// New description
+        #[arg(short, long)]
+        description: Option<String>,
+
+        /// New color
+        #[arg(short, long)]
+        color: Option<String>,
+
+        /// New status (active, paused, completed, archived)
+        #[arg(short, long)]
+        status: Option<String>,
+
+        /// New tags (comma-separated)
+        #[arg(short, long)]
+        tags: Option<String>,
+    },
+
+    /// Archive a project
+    Archive {
+        /// Project ID
+        id: String,
+    },
+
+    /// List tasks belonging to a project
+    Tasks {
+        /// Project ID
+        id: String,
+
+        /// Limit number of results
+        #[arg(short, long)]
+        limit: Option<usize>,
+
+        /// Show as tree instead of flat list
+        #[arg(short, long)]
+        tree: bool,
+    },
 }

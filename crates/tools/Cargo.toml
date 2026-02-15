@@ -24,6 +24,7 @@ once_cell.workspace = true
 chrono = { workspace = true }
 uuid = { workspace = true }
 serde = { workspace = true }
+rrule.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

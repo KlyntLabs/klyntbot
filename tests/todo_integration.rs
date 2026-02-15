@@ -111,6 +111,12 @@ async fn test_todo_context_injection() {
         estimated_minutes: None,
         calendar_event_uid: None,
         last_reminded_at: None,
+        recurrence_rule: None,
+        recurrence_parent_id: None,
+        is_template: false,
+        next_instance_date: None,
+        blocked_by: Vec::new(),
+        blocks: Vec::new(),
     };
     let task1 = store.add(task1).await.unwrap();
 
@@ -138,6 +144,12 @@ async fn test_todo_context_injection() {
         estimated_minutes: None,
         calendar_event_uid: None,
         last_reminded_at: None,
+        recurrence_rule: None,
+        recurrence_parent_id: None,
+        is_template: false,
+        next_instance_date: None,
+        blocked_by: Vec::new(),
+        blocks: Vec::new(),
     };
     let task2 = store.add(task2).await.unwrap();
 
@@ -617,6 +629,12 @@ async fn test_todo_store_persistence() {
             estimated_minutes: None,
             calendar_event_uid: None,
             last_reminded_at: None,
+            recurrence_rule: None,
+            recurrence_parent_id: None,
+            is_template: false,
+            next_instance_date: None,
+            blocked_by: Vec::new(),
+            blocks: Vec::new(),
         };
         let task1 = store.add(task1).await.unwrap();
 
@@ -645,6 +663,12 @@ async fn test_todo_store_persistence() {
             estimated_minutes: None,
             calendar_event_uid: None,
             last_reminded_at: None,
+            recurrence_rule: None,
+            recurrence_parent_id: None,
+            is_template: false,
+            next_instance_date: None,
+            blocked_by: Vec::new(),
+            blocks: Vec::new(),
         };
         let task2 = store.add(task2).await.unwrap();
 
@@ -673,6 +697,12 @@ async fn test_todo_store_persistence() {
             estimated_minutes: None,
             calendar_event_uid: None,
             last_reminded_at: None,
+            recurrence_rule: None,
+            recurrence_parent_id: None,
+            is_template: false,
+            next_instance_date: None,
+            blocked_by: Vec::new(),
+            blocks: Vec::new(),
         };
         let task3 = store.add(task3).await.unwrap();
 
@@ -774,6 +804,12 @@ async fn test_focus_slot_limit() {
             estimated_minutes: None,
             calendar_event_uid: None,
             last_reminded_at: None,
+            recurrence_rule: None,
+            recurrence_parent_id: None,
+            is_template: false,
+            next_instance_date: None,
+            blocked_by: Vec::new(),
+            blocks: Vec::new(),
         };
         let task = store.add(task).await.unwrap();
         task_ids.push(task.id.clone());
@@ -878,6 +914,12 @@ async fn test_auto_unfocus_expired_tasks() {
         estimated_minutes: None,
         calendar_event_uid: None,
         last_reminded_at: None,
+        recurrence_rule: None,
+        recurrence_parent_id: None,
+        is_template: false,
+        next_instance_date: None,
+        blocked_by: Vec::new(),
+        blocks: Vec::new(),
     };
 
     let task = store.add(expired_task).await.unwrap();
@@ -958,6 +1000,12 @@ async fn test_auto_unfocus_expired_tasks() {
         estimated_minutes: None,
         calendar_event_uid: None,
         last_reminded_at: None,
+        recurrence_rule: None,
+        recurrence_parent_id: None,
+        is_template: false,
+        next_instance_date: None,
+        blocked_by: Vec::new(),
+        blocks: Vec::new(),
     };
 
     let task2 = store.add(expired_task2).await.unwrap();
@@ -1039,6 +1087,12 @@ async fn test_complete_focused_task_frees_slot() {
             estimated_minutes: None,
             calendar_event_uid: None,
             last_reminded_at: None,
+            recurrence_rule: None,
+            recurrence_parent_id: None,
+            is_template: false,
+            next_instance_date: None,
+            blocked_by: Vec::new(),
+            blocks: Vec::new(),
         };
         let task = store.add(task).await.unwrap();
         task_ids.push(task.id.clone());
@@ -1143,6 +1197,12 @@ async fn test_focus_and_delete_interaction() {
             estimated_minutes: None,
             calendar_event_uid: None,
             last_reminded_at: None,
+            recurrence_rule: None,
+            recurrence_parent_id: None,
+            is_template: false,
+            next_instance_date: None,
+            blocked_by: Vec::new(),
+            blocks: Vec::new(),
         };
         let task = store.add(task).await.unwrap();
         task_ids.push(task.id.clone());

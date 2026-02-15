@@ -82,43 +82,42 @@ klyntbot serve --port 8080       # Start HTTP server (default port from config)
 klyntbot init                    # Interactive setup wizard (includes calendar setup in Step 7)
 klyntbot status [--verbose]      # Show agent/config status
 
-# Task Management (16 actions)
-klyntbot todo add <title> [--project ID] [--parent ID] [--due DATE]
-klyntbot todo list [--project ID] [--status doing|todo|done]
-klyntbot todo tree [--project ID] [--depth N]
-klyntbot todo focus [ID]         # Start focus session (auto-tracks time)
-klyntbot todo unfocus ID
-klyntbot todo add-subtask PARENT_ID <title>
-klyntbot todo move ID [--parent ID|none] [--project ID|none]
-klyntbot todo attach ID --file PATH | --url URL | --note TEXT
-klyntbot todo detach ID ATTACHMENT_ID
-klyntbot todo log-time ID MINUTES [--note TEXT]
-klyntbot todo search QUERY [--include-attachments]
+# Task Management (22 commands)
+klyntbot todo add <title> [--description TEXT] [--priority N] [--due DATE] [--tags CSV]
+klyntbot todo list [--status doing|todo|done] [--tag TAG] [--priority-min N] [--limit N]
 klyntbot todo show ID
+klyntbot todo update ID [--title TEXT] [--description TEXT] [--due DATE] [--priority N] [--status STATUS] [--tags CSV]
 klyntbot todo complete ID
 klyntbot todo delete ID
-klyntbot todo update ID [--title TEXT] [--due DATE] [--priority N]
-klyntbot todo summary [--project ID]
+klyntbot todo focus [ID]         # Start focus session (auto-tracks time)
+klyntbot todo unfocus ID
+klyntbot todo summary
+klyntbot todo tree [--project ID] [--depth N]
+klyntbot todo search QUERY [--include-attachments]
+klyntbot todo add-subtask PARENT_ID <title> [--description TEXT] [--priority N] [--due DATE] [--tags CSV]
+klyntbot todo move ID [--parent ID|none] [--project ID|none]
+klyntbot todo attach ID --file PATH | --url URL | --note TEXT [--title TEXT]
+klyntbot todo detach ID ATTACHMENT_ID
+klyntbot todo log-time ID MINUTES [--note TEXT]
+klyntbot todo report [--period week|month] [--project ID]
+klyntbot todo depend ID [--on BLOCKER_ID] [--remove BLOCKER_ID]
+klyntbot todo recur add <title> --rule RRULE [--priority N] [--tags CSV] [--project ID]
+klyntbot todo recur list [--project ID]
+klyntbot todo recur delete TEMPLATE_ID
 
-# Project Management (6 actions)
-klyntbot project create <name> [--description TEXT] [--color COLOR]
-klyntbot project list [--status active|paused|completed|archived]
+# Project Management (6 commands)
+klyntbot project create <name> [--description TEXT] [--color COLOR] [--tags CSV]
+klyntbot project list [--status active|paused|completed|archived] [--tag TAG] [--limit N]
 klyntbot project show ID
+klyntbot project update ID [--name TEXT] [--description TEXT] [--color COLOR] [--status STATUS] [--tags CSV]
 klyntbot project archive ID
-klyntbot project tasks ID [--tree]
-klyntbot project report ID --period week|month
-
-# Calendar Sync (4 actions)
-klyntbot calendar sync [--force]
-klyntbot calendar status
-klyntbot calendar list [--from DATE] [--to DATE]
-klyntbot calendar conflicts [--limit N]
+klyntbot project tasks ID [--tree] [--limit N]
 
 # Other Commands
-klyntbot channels list|start|stop
-klyntbot cron list|add|remove
-klyntbot config validate|show|set
-klyntbot skills list|info
+klyntbot channels list|login|test
+klyntbot cron list|add|remove|run|enable|disable
+klyntbot config show|get|set|edit|validate|reset
+klyntbot skills list|info|path
 ```
 
 ## Environment Variables
@@ -134,3 +133,11 @@ KLYNTBOT_TOOLS__RESTRICT_TO_WORKSPACE=true
 ## Skills
 
 Built-in skills live in `skills/` as `SKILL.md` files (summarize, skill-creator, github, tmux, weather, cron). The `SkillManager` in the agent crate discovers and loads them at runtime.
+
+## Gotchas & Common Pitfalls
+
+- **CalDAV sync is async**: Calendar sync runs in background. Use `CalendarTool::sync_now()` for immediate sync, or wait for next scheduled interval.
+- **JSONL corruption recovery**: If `todos.jsonl` or `projects.jsonl` gets corrupted, backup files are in `~/.klyntbot/data/*.jsonl.bak`. Restore manually if needed.
+- **Config changes require restart**: Modifying `~/.klyntbot/config.json` requires restarting `klyntbot serve` for changes to take effect.
+- **Dependency inversion gotcha**: When adding new tools that need agent context (spawn/cron handlers), inject via `Arc<dyn Trait>` at construction to avoid circular deps.
+- **Calendar conflicts are informational**: Detected conflicts are logged to `calendar_conflicts.jsonl` but don't block sync. Review and resolve manually.

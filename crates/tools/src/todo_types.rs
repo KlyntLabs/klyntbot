@@ -49,6 +49,26 @@ pub struct Todo {
 
     #[serde(default)]
     pub last_reminded_at: Option<DateTime<Utc>>, // Notification dedup
+
+    // ── Sprint 2: Recurring tasks ──
+    #[serde(default)]
+    pub recurrence_rule: Option<String>, // RRULE string, e.g. "FREQ=DAILY;BYHOUR=9"
+
+    #[serde(default)]
+    pub recurrence_parent_id: Option<String>, // Links spawned instance → template
+
+    #[serde(default)]
+    pub is_template: bool, // true = recurring template, filtered from normal lists
+
+    #[serde(default)]
+    pub next_instance_date: Option<DateTime<Utc>>, // Cached next occurrence
+
+    // ── Sprint 2: Task dependencies ──
+    #[serde(default)]
+    pub blocked_by: Vec<String>, // IDs of tasks this task depends on
+
+    #[serde(default)]
+    pub blocks: Vec<String>, // IDs of tasks that depend on this task
 }
 
 /// Task status lifecycle
@@ -65,6 +85,43 @@ impl Todo {
     /// Generate short ID (8 chars) from UUID
     pub fn generate_id() -> String {
         uuid::Uuid::new_v4().to_string()[..8].to_string()
+    }
+
+    /// Create a default instance suitable for spawning from a template.
+    /// All fields are set to their zero/empty/None values. Callers should
+    /// override id, title, description, priority, tags, due_date, project_id,
+    /// and recurrence_parent_id as needed.
+    pub fn default_instance() -> Self {
+        let now = Utc::now();
+        Self {
+            id: Self::generate_id(),
+            title: String::new(),
+            description: None,
+            priority: None,
+            due_date: None,
+            tags: Vec::new(),
+            status: TodoStatus::Todo,
+            focused_at: None,
+            focus_deadline: None,
+            focus_expired_count: 0,
+            created_at: now,
+            updated_at: now,
+            completed_at: None,
+            parent_id: None,
+            project_id: None,
+            attachments: Vec::new(),
+            time_entries: Vec::new(),
+            total_tracked_secs: 0,
+            estimated_minutes: None,
+            calendar_event_uid: None,
+            last_reminded_at: None,
+            recurrence_rule: None,
+            recurrence_parent_id: None,
+            is_template: false,
+            next_instance_date: None,
+            blocked_by: Vec::new(),
+            blocks: Vec::new(),
+        }
     }
 }
 
@@ -91,6 +148,8 @@ pub struct TodoFilter {
     // Phase 2 additions
     pub project_id: Option<String>,
     pub parent_id: Option<String>,
+    // Sprint 2: template filtering (default false — templates hidden from normal lists)
+    pub include_templates: bool,
 }
 
 /// Summary statistics for todo collection
@@ -199,6 +258,7 @@ mod tests {
         assert!(filter.priority_min.is_none());
         assert!(filter.tag.is_none());
         assert!(filter.limit.is_none());
+        assert!(!filter.include_templates);
     }
 
     #[test]
@@ -210,5 +270,69 @@ mod tests {
         assert!(patch.due_date.is_none());
         assert!(patch.tags.is_none());
         assert!(patch.status.is_none());
+    }
+
+    #[test]
+    fn test_default_instance() {
+        let todo = Todo::default_instance();
+        assert_eq!(todo.id.len(), 8);
+        assert!(todo.title.is_empty());
+        assert_eq!(todo.status, TodoStatus::Todo);
+        assert!(!todo.is_template);
+        assert!(todo.recurrence_rule.is_none());
+        assert!(todo.recurrence_parent_id.is_none());
+        assert!(todo.next_instance_date.is_none());
+        assert!(todo.blocked_by.is_empty());
+        assert!(todo.blocks.is_empty());
+    }
+
+    #[test]
+    fn test_backward_compat_serde_without_new_fields() {
+        // Verify existing JSONL entries (without new fields) deserialize correctly
+        let json = r#"{
+            "id": "abc12345",
+            "title": "Old task",
+            "description": null,
+            "priority": null,
+            "due_date": null,
+            "tags": [],
+            "status": "todo",
+            "focused_at": null,
+            "focus_deadline": null,
+            "focus_expired_count": 0,
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z",
+            "completed_at": null
+        }"#;
+        let todo: Todo = serde_json::from_str(json).unwrap();
+        assert_eq!(todo.id, "abc12345");
+        assert!(!todo.is_template);
+        assert!(todo.recurrence_rule.is_none());
+        assert!(todo.recurrence_parent_id.is_none());
+        assert!(todo.next_instance_date.is_none());
+        assert!(todo.blocked_by.is_empty());
+        assert!(todo.blocks.is_empty());
+        assert!(todo.parent_id.is_none());
+        assert!(todo.project_id.is_none());
+    }
+
+    #[test]
+    fn test_new_fields_serde_round_trip() {
+        let mut todo = Todo::default_instance();
+        todo.is_template = true;
+        todo.recurrence_rule = Some("FREQ=DAILY;BYHOUR=9".to_string());
+        todo.blocked_by = vec!["task1".to_string(), "task2".to_string()];
+        todo.blocks = vec!["task3".to_string()];
+
+        let json = serde_json::to_string(&todo).unwrap();
+        let parsed: Todo = serde_json::from_str(&json).unwrap();
+
+        assert!(parsed.is_template);
+        assert_eq!(
+            parsed.recurrence_rule,
+            Some("FREQ=DAILY;BYHOUR=9".to_string())
+        );
+        assert_eq!(parsed.blocked_by, vec!["task1", "task2"]);
+        assert_eq!(parsed.blocks, vec!["task3"]);
     }
 }

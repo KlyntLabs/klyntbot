@@ -49,6 +49,12 @@ pub async fn handle_add(
         estimated_minutes: None,
         calendar_event_uid: None,
         last_reminded_at: None,
+        recurrence_rule: None,
+        recurrence_parent_id: None,
+        is_template: false,
+        next_instance_date: None,
+        blocked_by: Vec::new(),
+        blocks: Vec::new(),
     };
 
     // Save to store
@@ -56,6 +62,76 @@ pub async fn handle_add(
 
     // Show created task
     show_task_created_box(&saved_todo, &config.timezone);
+
+    Ok(())
+}
+
+pub async fn handle_add_subtask(
+    parent_id: String,
+    title: String,
+    description: Option<String>,
+    priority: Option<u8>,
+    due: Option<String>,
+    tags: Option<String>,
+) -> Result<()> {
+    let config = config::load().await?;
+    let store_path = config.todo_store_path();
+    let mut store = TodoStore::new(store_path);
+
+    // Verify parent exists and get its project_id
+    let parent = store.get(&parent_id).await?;
+    let parent = match parent {
+        Some(p) => p,
+        None => {
+            println!("{} Parent task not found: {}", status_error(), parent_id);
+            return Ok(());
+        }
+    };
+
+    let todo = Todo {
+        id: Todo::generate_id(),
+        title: title.clone(),
+        description,
+        priority,
+        due_date: due
+            .as_ref()
+            .and_then(|d| parse_due_date(d, &config.timezone).ok()),
+        tags: tags
+            .as_ref()
+            .map(|t| t.split(',').map(|s| s.trim().to_string()).collect())
+            .unwrap_or_default(),
+        status: TodoStatus::Todo,
+        focused_at: None,
+        focus_deadline: None,
+        focus_expired_count: 0,
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+        completed_at: None,
+        parent_id: Some(parent_id.clone()),
+        project_id: parent.project_id.clone(),
+        attachments: Vec::new(),
+        time_entries: Vec::new(),
+        total_tracked_secs: 0,
+        estimated_minutes: None,
+        calendar_event_uid: None,
+        last_reminded_at: None,
+        recurrence_rule: None,
+        recurrence_parent_id: None,
+        is_template: false,
+        next_instance_date: None,
+        blocked_by: Vec::new(),
+        blocks: Vec::new(),
+    };
+
+    let saved = store.add(todo).await?;
+
+    println!(
+        "{} Created subtask {} under {}",
+        status_success(),
+        colorize(&saved.id, TOOL),
+        colorize(&parent_id, TOOL),
+    );
+    println!("  {}", colorize(&saved.title, BOLD));
 
     Ok(())
 }

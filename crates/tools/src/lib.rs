@@ -13,6 +13,7 @@ pub mod project_store;
 pub mod project_tool;
 pub mod project_types;
 pub mod registry;
+pub mod rrule_utils;
 pub mod shell;
 pub mod spawn;
 pub mod todo;
