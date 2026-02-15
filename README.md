@@ -16,6 +16,7 @@
   <p>
     <a href="#quick-start">Quick Start</a> &middot;
     <a href="#features">Features</a> &middot;
+    <a href="#work--study-management">Task Management</a> &middot;
     <a href="#benchmarks">Benchmarks</a> &middot;
     <a href="#channels">Channels</a> &middot;
     <a href="#architecture">Architecture</a>
@@ -104,58 +105,46 @@ cargo build --release
 
 ## Work & Study Management
 
-klyntbot includes a comprehensive task and project management system designed for students and knowledge workers:
+klyntbot includes a comprehensive task and project management system with **22 CLI commands**, AI chat integration, and proactive intelligence. Manage tasks through the terminal or by chatting with the AI — both use the same system.
 
-### Hierarchical Tasks
+> **[Read the full Task Management Guide →](docs/TASK_MANAGEMENT.md)** for detailed usage, examples, and tips.
 
-- **Sub-tasks** — Break down complex work into manageable pieces (up to 16 levels deep)
-- **Tree view** — Visualize task hierarchies with `klyntbot todo tree`
-- **Auto-completion** — Parent tasks complete automatically when all sub-tasks are done
-- **Flexible structure** — Move tasks between parents and projects with full subtree preservation
+### Highlights
 
-### Project Management
+| Feature | What it does |
+|---------|-------------|
+| **22 todo commands** | Add, list, update, complete, focus, search, subtasks, attachments, time tracking, dependencies, recurring tasks, reports |
+| **6 project commands** | Create, list, show, update, archive, and view project tasks |
+| **Focus mode** | Time-boxed work sessions with automatic time tracking and visual progress bars |
+| **Subtask hierarchies** | Break down complex work up to 16 levels deep, view with `todo tree` |
+| **Recurring tasks** | RRULE-based schedules — daily, weekly, monthly — auto-spawned in the background |
+| **Task dependencies** | Mark blocking relationships, prevents completing blocked tasks |
+| **Smart reminders** | Proactive alerts at 2h, 1h, 30m, 15m before deadlines + overdue nags |
+| **Apple Calendar sync** | Two-way CalDAV sync — tasks appear on iPhone, Mac, and iPad |
+| **Attachments** | Attach files, URLs, or notes to any task with full-text search |
+| **AI chat interface** | Natural language task management through any connected channel |
+| **Reports** | Weekly/monthly analytics with time tracking, completion rates, and priority breakdown |
 
-- **Project grouping** — Organize related tasks into named projects with colors and tags
-- **Project lifecycle** — Track projects through Active → Paused → Completed → Archived states
-- **Per-project reporting** — Time tracking and progress metrics for each project
-- **6 project actions** — create, list, show, archive, tasks, report
+### Quick example
 
-### Time Tracking
+```bash
+# Create a task with natural language dates
+klyntbot todo add "Review PR" --priority 4 --due tomorrow --tags work
 
-- **Automatic tracking** — Focus sessions auto-start time entries
-- **Manual logging** — Add time entries for offline work with `log-time`
-- **Progress reports** — Weekly summaries with time breakdown by project
-- **Denormalized totals** — Fast access to cumulative tracked time
+# Start a focus session (auto-tracks time)
+klyntbot todo focus abc123
 
-### Apple Calendar Sync
+# Break down work into subtasks
+klyntbot todo add-subtask abc123 "Check test coverage"
 
-- **Two-way CalDAV sync** — Tasks with due dates appear in Apple Calendar on iPhone, Mac, and iPad
-- **Conflict resolution** — Server-wins policy with audit logging
-- **Incremental sync** — RFC 6578 sync-token support for efficient updates
-- **Event management** — View upcoming events, check sync status, resolve conflicts
+# Set up a recurring task
+klyntbot todo recur add "Daily standup" --rule "FREQ=DAILY;BYHOUR=9"
 
-See [CALENDAR_SETUP.md](docs/CALENDAR_SETUP.md) for setup instructions.
+# Generate a productivity report
+klyntbot todo report --period week
+```
 
-### Smart Reminders
-
-- **Deadline awareness** — Proactive reminders 2h, 1h, 30m, 15m before due dates
-- **Focus tracking** — Alerts when focus sessions are about to expire
-- **Overdue nags** — Daily reminders for overdue tasks
-- **Calendar integration** — Alerts 30 minutes before calendar events
-
-### Document Attachments
-
-- **Three attachment types** — Files (paths), URLs, and notes
-- **Full-text search** — Search across task titles, descriptions, and attachments
-- **Tagging** — Organize attachments with custom tags
-
-### Extended CLI
-
-**16 todo actions** — add, list, show, complete, delete, focus, unfocus, summary, update, add-subtask, tree, move, attach, detach, log-time, search
-
-**6 project actions** — create, list, show, archive, tasks, report
-
-**4 calendar actions** — sync, status, list, conflicts
+See also: [Calendar Setup Guide](docs/CALENDAR_SETUP.md)
 
 ---
 
@@ -757,7 +746,9 @@ crates/
 - **Zero circular dependencies** — Enforced by Cargo
 
 **Documentation**:
+- [Task Management Guide](docs/TASK_MANAGEMENT.md) — Complete guide to tasks, projects, focus mode, and more
 - [Architecture Guide](docs/ARCHITECTURE.md) — Detailed workspace architecture and dependency graph
+- [Calendar Setup Guide](docs/CALENDAR_SETUP.md) — Apple Calendar sync configuration
 - [Contributing Guide](CONTRIBUTING.md) — Development workflow and guidelines
 
 ---
