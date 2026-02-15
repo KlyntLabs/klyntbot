@@ -30,6 +30,22 @@ pub(crate) fn erase_lines(n: usize) -> Result<()> {
 }
 
 // ============================================================================
+// Menu Outcome
+// ============================================================================
+
+/// Result of an interactive menu session.
+///
+/// Menus return this to indicate whether the user chose "Done" (advance)
+/// or "← Back" (return to previous step).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) enum MenuOutcome {
+    /// User selected "Done" — advance to next step.
+    Done,
+    /// User selected "← Back" or pressed Esc — return to previous step.
+    Back,
+}
+
+// ============================================================================
 // Key Input
 // ============================================================================
 

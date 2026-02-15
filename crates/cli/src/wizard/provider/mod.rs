@@ -71,24 +71,33 @@ pub(crate) struct MenuState {
     pub expanded: Option<usize>,
     pub sub_cursor: usize,
     pub in_sub_menu: bool,
+    /// Whether the user can go back to the previous wizard step.
+    pub can_go_back: bool,
 }
 
 impl MenuState {
-    pub fn new() -> Self {
+    pub fn new(can_go_back: bool) -> Self {
         Self {
             cursor: 0,
             expanded: None,
             sub_cursor: 0,
             in_sub_menu: false,
+            can_go_back,
         }
     }
 
     pub fn total_main_items(&self) -> usize {
-        PROVIDERS.len() + 1 // providers + "Done"
+        PROVIDERS.len() + 1 + if self.can_go_back { 1 } else { 0 } // providers + Back? + Done
+    }
+
+    /// Whether the cursor is on the "← Back" row.
+    pub fn is_on_back(&self) -> bool {
+        self.can_go_back && self.cursor == PROVIDERS.len()
     }
 
     pub fn is_on_done(&self) -> bool {
-        self.cursor == PROVIDERS.len()
+        let done_idx = PROVIDERS.len() + if self.can_go_back { 1 } else { 0 };
+        self.cursor == done_idx
     }
 }
 
@@ -105,6 +114,7 @@ impl WizardModule for ProviderModule {
 
     fn run(&self, state: &mut WizardState) -> Result<StepResult> {
         let chars = BoxChars::get();
+        let can_go_back = state.current_step > 1;
 
         // Header
         let header = if has_any_provider_configured(&state.config) {
@@ -136,10 +146,15 @@ impl WizardModule for ProviderModule {
         }
 
         // Run interactive menu
-        if io::stdin().is_terminal() && io::stdout().is_terminal() {
-            menus::run_provider_menu(state)?;
+        use crate::wizard::ui::MenuOutcome;
+        let outcome = if io::stdin().is_terminal() && io::stdout().is_terminal() {
+            menus::run_provider_menu(state, can_go_back)?
         } else {
-            menus::run_provider_menu_fallback(state)?;
+            menus::run_provider_menu_fallback(state, can_go_back)?
+        };
+
+        if outcome == MenuOutcome::Back {
+            return Ok(StepResult::Back);
         }
 
         // Ensure active provider is set

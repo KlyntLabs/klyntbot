@@ -13,7 +13,7 @@ use super::{
     ToolSubAction, ToolsPreset, TOOL_SETTINGS,
 };
 use crate::wizard::prompts;
-use crate::wizard::ui::{erase_lines, read_key};
+use crate::wizard::ui::{erase_lines, read_key, MenuOutcome};
 
 // ============================================================================
 // Rendering Functions
@@ -103,6 +103,29 @@ fn render_tool_menu(
     )?;
     lines += 1;
 
+    // Back row (only if not first step)
+    if menu.can_go_back {
+        let back_pointer = if !menu.in_sub_menu && menu.is_on_back() {
+            colorize("❯", BRAND)
+        } else {
+            " ".to_string()
+        };
+        let back_label = if !menu.in_sub_menu && menu.is_on_back() {
+            colorize("← Back", BOLD)
+        } else {
+            "← Back".to_string()
+        };
+        write!(
+            out,
+            "{}{} {} {}\r\n",
+            prefix,
+            back_pointer,
+            colorize("◁", DIM),
+            back_label
+        )?;
+        lines += 1;
+    }
+
     // Done row
     let done_pointer = if !menu.in_sub_menu && menu.is_on_done() {
         colorize("❯", BRAND)
@@ -131,9 +154,11 @@ fn render_tool_menu(
 fn render_menu_hint(out: &mut impl Write, menu: &ToolMenuState, chars: &BoxChars) -> Result<()> {
     let prefix = format!("{} ", colorize(chars.vertical, BRAND));
     let hint = if menu.in_sub_menu {
+        "↑/↓ navigate · Enter select · Esc close"
+    } else if menu.can_go_back {
         "↑/↓ navigate · Enter select · Esc back"
     } else {
-        "↑/↓ navigate · Enter expand/select"
+        "↑/↓ navigate · Enter select"
     };
     write!(out, "{}{}\r\n", prefix, colorize(hint, DIM))?;
     out.flush()?;
@@ -162,9 +187,9 @@ fn rerender_menu(
 // ============================================================================
 
 /// Run the interactive tool permissions menu.
-pub(super) fn run_tool_menu(config: &mut Config) -> Result<()> {
+pub(super) fn run_tool_menu(config: &mut Config, can_go_back: bool) -> Result<MenuOutcome> {
     let chars = BoxChars::get();
-    let mut menu = ToolMenuState::new();
+    let mut menu = ToolMenuState::new(can_go_back);
     let mut out = io::stdout();
 
     // Initial render
@@ -210,10 +235,14 @@ pub(super) fn run_tool_menu(config: &mut Config) -> Result<()> {
             }
             // Main menu Enter
             KeyCode::Enter if !menu.in_sub_menu => {
-                if menu.is_on_done() {
+                if menu.is_on_back() {
                     terminal::disable_raw_mode()?;
                     erase_lines(list_lines + 1)?;
-                    return Ok(());
+                    return Ok(MenuOutcome::Back);
+                } else if menu.is_on_done() {
+                    terminal::disable_raw_mode()?;
+                    erase_lines(list_lines + 1)?;
+                    return Ok(MenuOutcome::Done);
                 } else {
                     menu.expanded = Some(menu.cursor);
                     menu.in_sub_menu = true;
@@ -302,11 +331,17 @@ pub(super) fn run_tool_menu(config: &mut Config) -> Result<()> {
                     }
                 }
             }
-            // Esc to collapse
+            // Esc to collapse sub-menu
             KeyCode::Esc if menu.in_sub_menu => {
                 menu.expanded = None;
                 menu.in_sub_menu = false;
                 list_lines = rerender_menu(&mut out, config, &menu, chars, list_lines)?;
+            }
+            // Esc to go back (main menu level)
+            KeyCode::Esc if !menu.in_sub_menu && menu.can_go_back => {
+                terminal::disable_raw_mode()?;
+                erase_lines(list_lines + 1)?;
+                return Ok(MenuOutcome::Back);
             }
             _ => {}
         }
@@ -318,8 +353,13 @@ pub(super) fn run_tool_menu(config: &mut Config) -> Result<()> {
 // ============================================================================
 
 /// Run a simplified menu for non-TTY environments.
-pub(super) fn run_tool_menu_fallback(config: &mut Config) -> Result<()> {
+pub(super) fn run_tool_menu_fallback(
+    config: &mut Config,
+    can_go_back: bool,
+) -> Result<MenuOutcome> {
     let chars = BoxChars::get();
+    let back_offset: usize = if can_go_back { 1 } else { 0 };
+    let total_options = TOOL_SETTINGS.len() + back_offset + 1; // settings + optional back + done
 
     loop {
         println!("{}", colorize(chars.vertical, BRAND));
@@ -340,28 +380,42 @@ pub(super) fn run_tool_menu_fallback(config: &mut Config) -> Result<()> {
             );
         }
 
+        if can_go_back {
+            println!(
+                "{}  {}. ← Back",
+                colorize(chars.vertical, BRAND),
+                TOOL_SETTINGS.len() + 1,
+            );
+        }
+
         println!(
             "{}  {}. Done",
             colorize(chars.vertical, BRAND),
-            TOOL_SETTINGS.len() + 1,
+            total_options,
         );
         println!("{}", colorize(chars.vertical, BRAND));
 
         let choice = prompts::prompt_text("Enter number", None, true)?;
         let idx = match choice.parse::<usize>() {
-            Ok(n) if n > 0 && n <= TOOL_SETTINGS.len() + 1 => n - 1,
+            Ok(n) if n > 0 && n <= total_options => n - 1,
             _ => {
                 println!(
                     "{} Invalid choice. Please enter a number between 1 and {}.",
                     colorize(chars.vertical, BRAND),
-                    TOOL_SETTINGS.len() + 1
+                    total_options
                 );
                 continue;
             }
         };
 
-        if idx == TOOL_SETTINGS.len() {
-            return Ok(());
+        // Back option
+        if can_go_back && idx == TOOL_SETTINGS.len() {
+            return Ok(MenuOutcome::Back);
+        }
+
+        // Done option
+        if idx == total_options - 1 {
+            return Ok(MenuOutcome::Done);
         }
 
         match TOOL_SETTINGS[idx].key {

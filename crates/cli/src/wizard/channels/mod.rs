@@ -13,6 +13,7 @@ use common::utils::terminal::*;
 use config::Config;
 
 use super::prompts;
+use crate::wizard::ui::MenuOutcome;
 
 /// Channel metadata for the selection UI
 #[allow(dead_code)]
@@ -230,24 +231,31 @@ pub(super) struct ChannelMenuState {
     pub expanded: Option<usize>,
     pub sub_cursor: usize,
     pub in_sub_menu: bool,
+    pub can_go_back: bool,
 }
 
 impl ChannelMenuState {
-    pub fn new() -> Self {
+    pub fn new(can_go_back: bool) -> Self {
         Self {
             cursor: 0,
             expanded: None,
             sub_cursor: 0,
             in_sub_menu: false,
+            can_go_back,
         }
     }
 
     pub fn total_main_items(&self) -> usize {
-        CHANNELS.len() + 1 // channels + "Done"
+        CHANNELS.len() + 1 + if self.can_go_back { 1 } else { 0 }
+    }
+
+    pub fn is_on_back(&self) -> bool {
+        self.can_go_back && self.cursor == CHANNELS.len()
     }
 
     pub fn is_on_done(&self) -> bool {
-        self.cursor == CHANNELS.len()
+        let done_idx = CHANNELS.len() + if self.can_go_back { 1 } else { 0 };
+        self.cursor == done_idx
     }
 }
 
@@ -485,8 +493,11 @@ pub(super) async fn execute_reconnect(channel_key: &str) -> Result<()> {
 // ============================================================================
 
 /// Run the channel configuration wizard step.
-/// Returns the list of channel names that were successfully configured.
-pub async fn configure_channels(config: &mut Config) -> Result<Vec<String>> {
+/// Returns a `MenuOutcome` indicating whether the user chose Done or Back.
+pub(crate) async fn configure_channels(
+    config: &mut Config,
+    can_go_back: bool,
+) -> Result<MenuOutcome> {
     let chars = BoxChars::get();
 
     println!(
@@ -516,10 +527,14 @@ pub async fn configure_channels(config: &mut Config) -> Result<Vec<String>> {
     }
 
     // Run interactive menu (TTY) or fallback (non-TTY)
-    if io::stdin().is_terminal() && io::stdout().is_terminal() {
-        menus::run_channel_menu(config).await?;
+    let outcome = if io::stdin().is_terminal() && io::stdout().is_terminal() {
+        menus::run_channel_menu(config, can_go_back).await?
     } else {
-        menus::run_channel_menu_fallback(config).await?;
+        menus::run_channel_menu_fallback(config, can_go_back).await?
+    };
+
+    if outcome == MenuOutcome::Back {
+        return Ok(MenuOutcome::Back);
     }
 
     // Collect list of configured channels
@@ -548,7 +563,7 @@ pub async fn configure_channels(config: &mut Config) -> Result<Vec<String>> {
         println!("{}", draw_step_line(&colorize("  klyntbot init", DIM)));
     }
 
-    Ok(configured)
+    Ok(MenuOutcome::Done)
 }
 
 // ============================================================================

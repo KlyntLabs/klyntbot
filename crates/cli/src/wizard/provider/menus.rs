@@ -15,12 +15,12 @@ use super::{
 };
 use crate::wizard::framework::WizardState;
 use crate::wizard::prompts::{self, mask_secret};
-use crate::wizard::ui::{erase_lines, read_key};
+use crate::wizard::ui::{erase_lines, read_key, MenuOutcome};
 
-/// Run the interactive provider menu. Returns when user selects "Done".
-pub(crate) fn run_provider_menu(state: &mut WizardState) -> Result<()> {
+/// Run the interactive provider menu. Returns `Done` or `Back`.
+pub(crate) fn run_provider_menu(state: &mut WizardState, can_go_back: bool) -> Result<MenuOutcome> {
     let chars = BoxChars::get();
-    let mut menu = MenuState::new();
+    let mut menu = MenuState::new(can_go_back);
     let mut out = io::stdout();
 
     // Initial render
@@ -62,11 +62,15 @@ pub(crate) fn run_provider_menu(state: &mut WizardState) -> Result<()> {
                 }
             }
             KeyCode::Enter if !menu.in_sub_menu => {
-                if menu.is_on_done() {
+                if menu.is_on_back() {
+                    terminal::disable_raw_mode()?;
+                    erase_lines(list_lines + 1)?;
+                    return Ok(MenuOutcome::Back);
+                } else if menu.is_on_done() {
                     if has_any_provider_configured(&state.config) {
                         terminal::disable_raw_mode()?;
                         erase_lines(list_lines + 1)?;
-                        return Ok(());
+                        return Ok(MenuOutcome::Done);
                     }
                 } else {
                     menu.expanded = Some(menu.cursor);
@@ -133,15 +137,29 @@ pub(crate) fn run_provider_menu(state: &mut WizardState) -> Result<()> {
                 menu.in_sub_menu = false;
                 list_lines = rerender_menu(&mut out, &state.config, &menu, chars, list_lines)?;
             }
+            KeyCode::Esc if !menu.in_sub_menu && menu.can_go_back => {
+                terminal::disable_raw_mode()?;
+                erase_lines(list_lines + 1)?;
+                return Ok(MenuOutcome::Back);
+            }
             _ => {}
         }
     }
 }
 
 /// Non-TTY fallback: simple numbered menu for CI/piped environments.
-pub(crate) fn run_provider_menu_fallback(state: &mut WizardState) -> Result<()> {
+pub(crate) fn run_provider_menu_fallback(
+    state: &mut WizardState,
+    can_go_back: bool,
+) -> Result<MenuOutcome> {
     loop {
-        let options = provider_select_options();
+        let mut options = provider_select_options();
+        if can_go_back {
+            options.push(prompts::SelectOption {
+                label: "← Back",
+                description: "Return to previous step",
+            });
+        }
 
         let idx = prompts::prompt_select(
             "Select provider to configure (or Done)",
@@ -149,9 +167,14 @@ pub(crate) fn run_provider_menu_fallback(state: &mut WizardState) -> Result<()> 
             options.len() - 1,
         )?;
 
+        // Check for Back option
+        if can_go_back && idx == options.len() - 1 {
+            return Ok(MenuOutcome::Back);
+        }
+
         if idx == PROVIDERS.len() {
             if has_any_provider_configured(&state.config) {
-                return Ok(());
+                return Ok(MenuOutcome::Done);
             }
             println!("At least one provider must be configured.");
             continue;
@@ -262,6 +285,30 @@ pub(crate) fn render_provider_menu(
     )?;
     lines += 1;
 
+    // Back row (only if not first step)
+    if menu.can_go_back {
+        let back_pointer = if !menu.in_sub_menu && menu.is_on_back() {
+            colorize("❯", BRAND)
+        } else {
+            " ".to_string()
+        };
+        let back_label = if !menu.in_sub_menu && menu.is_on_back() {
+            colorize("← Back", BOLD)
+        } else {
+            "← Back".to_string()
+        };
+        write!(
+            out,
+            "{}{} {} {}\r\n",
+            prefix,
+            back_pointer,
+            colorize("◁", DIM),
+            back_label
+        )?;
+        lines += 1;
+    }
+
+    // Done row
     let done_available = has_any_provider_configured(config);
     let done_pointer = if !menu.in_sub_menu && menu.is_on_done() {
         colorize("❯", BRAND)
@@ -306,9 +353,11 @@ pub(crate) fn render_menu_hint(
 ) -> Result<()> {
     let prefix = format!("{} ", colorize(chars.vertical, BRAND));
     let hint = if menu.in_sub_menu {
+        "↑/↓ navigate · Enter select · Esc close"
+    } else if menu.can_go_back {
         "↑/↓ navigate · Enter select · Esc back"
     } else {
-        "↑/↓ navigate · Enter expand/select"
+        "↑/↓ navigate · Enter select"
     };
     write!(out, "{}{}\r\n", prefix, colorize(hint, DIM))?;
     out.flush()?;

@@ -16,6 +16,8 @@ use anyhow::Result;
 use common::utils::terminal::*;
 use config::Config;
 
+use crate::wizard::ui::MenuOutcome;
+
 use super::prompts;
 
 use configure_generic::configure_generic_caldav;
@@ -312,24 +314,31 @@ pub(super) struct CalendarMenuState {
     pub(super) expanded: Option<usize>,
     pub(super) sub_cursor: usize,
     pub(super) in_sub_menu: bool,
+    pub(super) can_go_back: bool,
 }
 
 impl CalendarMenuState {
-    pub(super) fn new() -> Self {
+    pub(super) fn new(can_go_back: bool) -> Self {
         Self {
             cursor: 0,
             expanded: None,
             sub_cursor: 0,
             in_sub_menu: false,
+            can_go_back,
         }
     }
 
     pub(super) fn total_main_items(&self) -> usize {
-        CALENDAR_PROVIDERS.len() + 1 // providers + "Done"
+        CALENDAR_PROVIDERS.len() + 1 + if self.can_go_back { 1 } else { 0 }
+    }
+
+    pub(super) fn is_on_back(&self) -> bool {
+        self.can_go_back && self.cursor == CALENDAR_PROVIDERS.len()
     }
 
     pub(super) fn is_on_done(&self) -> bool {
-        self.cursor == CALENDAR_PROVIDERS.len()
+        let done_idx = CALENDAR_PROVIDERS.len() + if self.can_go_back { 1 } else { 0 };
+        self.cursor == done_idx
     }
 }
 
@@ -642,7 +651,10 @@ pub(super) fn validate_email(email: &str) -> Result<(), String> {
 ///
 /// Presents an interactive expand-in-place menu for calendar provider
 /// management, similar to the channels step.
-pub async fn configure_calendars(config: &mut Config) -> Result<()> {
+pub(crate) async fn configure_calendars(
+    config: &mut Config,
+    can_go_back: bool,
+) -> Result<MenuOutcome> {
     let chars = BoxChars::get();
 
     println!(
@@ -675,10 +687,14 @@ pub async fn configure_calendars(config: &mut Config) -> Result<()> {
     }
 
     // Run interactive menu (TTY) or fallback (non-TTY)
-    if io::stdin().is_terminal() && io::stdout().is_terminal() {
-        run_calendar_menu(config).await?;
+    let outcome = if io::stdin().is_terminal() && io::stdout().is_terminal() {
+        run_calendar_menu(config, can_go_back).await?
     } else {
-        run_calendar_menu_fallback(config).await?;
+        run_calendar_menu_fallback(config, can_go_back).await?
+    };
+
+    if outcome == MenuOutcome::Back {
+        return Ok(MenuOutcome::Back);
     }
 
     // Summary
@@ -706,7 +722,7 @@ pub async fn configure_calendars(config: &mut Config) -> Result<()> {
         println!("{}", draw_step_line(&colorize("  klyntbot init", DIM)));
     }
 
-    Ok(())
+    Ok(MenuOutcome::Done)
 }
 
 // ============================================================================
@@ -863,24 +879,47 @@ mod tests {
 
     #[test]
     fn test_menu_state_new() {
-        let menu = CalendarMenuState::new();
+        let menu = CalendarMenuState::new(false);
         assert_eq!(menu.cursor, 0);
         assert_eq!(menu.expanded, None);
         assert_eq!(menu.sub_cursor, 0);
         assert!(!menu.in_sub_menu);
+        assert!(!menu.can_go_back);
     }
 
     #[test]
     fn test_menu_state_total_items() {
-        let menu = CalendarMenuState::new();
+        let menu = CalendarMenuState::new(false);
         assert_eq!(menu.total_main_items(), CALENDAR_PROVIDERS.len() + 1);
+        let menu_back = CalendarMenuState::new(true);
+        assert_eq!(menu_back.total_main_items(), CALENDAR_PROVIDERS.len() + 2);
     }
 
     #[test]
     fn test_menu_state_is_on_done() {
-        let mut menu = CalendarMenuState::new();
+        let mut menu = CalendarMenuState::new(false);
         assert!(!menu.is_on_done());
         menu.cursor = CALENDAR_PROVIDERS.len();
+        assert!(menu.is_on_done());
+    }
+
+    #[test]
+    fn test_menu_state_is_on_back() {
+        let mut menu = CalendarMenuState::new(true);
+        assert!(!menu.is_on_back());
+        menu.cursor = CALENDAR_PROVIDERS.len();
+        assert!(menu.is_on_back());
+        assert!(!menu.is_on_done());
+        menu.cursor = CALENDAR_PROVIDERS.len() + 1;
+        assert!(!menu.is_on_back());
+        assert!(menu.is_on_done());
+    }
+
+    #[test]
+    fn test_menu_state_no_back_when_disabled() {
+        let mut menu = CalendarMenuState::new(false);
+        menu.cursor = CALENDAR_PROVIDERS.len();
+        assert!(!menu.is_on_back());
         assert!(menu.is_on_done());
     }
 

@@ -56,8 +56,13 @@ impl WizardModule for ToolsModule {
     }
 
     fn run(&self, state: &mut WizardState) -> Result<StepResult> {
-        tools::configure_tools(&mut state.config)?;
-        Ok(StepResult::Next)
+        let can_go_back = state.current_step > 1;
+        let outcome = tools::configure_tools(&mut state.config, can_go_back)?;
+        Ok(if outcome == ui::MenuOutcome::Back {
+            StepResult::Back
+        } else {
+            StepResult::Next
+        })
     }
 }
 
@@ -74,8 +79,13 @@ impl WizardModule for WorkspaceModule {
     }
 
     fn run(&self, state: &mut WizardState) -> Result<StepResult> {
-        workspace::configure_workspace(&mut state.config)?;
-        Ok(StepResult::Next)
+        let can_go_back = state.current_step > 1;
+        let outcome = workspace::configure_workspace(&mut state.config, can_go_back)?;
+        Ok(if outcome == ui::MenuOutcome::Back {
+            StepResult::Back
+        } else {
+            StepResult::Next
+        })
     }
 }
 
@@ -103,6 +113,7 @@ pub async fn run_wizard() -> Result<()> {
         ),
         ("Workspace & Notifications", true, true),
         ("Calendar Sync", false, true),
+        ("Review & Confirm", true, true),
     ];
 
     // Filter to applicable steps
@@ -125,7 +136,8 @@ pub async fn run_wizard() -> Result<()> {
         print_step_header(&state, name, required);
 
         // Dispatch to the right module. Step indices correspond to `all_steps`:
-        // 0=welcome, 1=provider, 2=channels (async), 3=tools, 4=daemon, 5=workspace+notifications, 6=calendar (async).
+        // 0=welcome, 1=provider, 2=channels (async), 3=tools, 4=daemon,
+        // 5=workspace+notifications, 6=calendar (async), 7=review.
         // Ctrl+C in raw-mode prompts surfaces as an Err containing "Ctrl+C".
         let result = match match step_idx {
             0 => steps::welcome::WelcomeModule.run(&mut state),
@@ -135,6 +147,7 @@ pub async fn run_wizard() -> Result<()> {
             4 => daemon::DaemonModule.run(&mut state),
             5 => WorkspaceModule.run(&mut state),
             6 => run_calendar_step(&mut state).await,
+            7 => steps::review::ReviewModule.run(&mut state),
             _ => unreachable!(),
         } {
             Ok(r) => r,
@@ -169,16 +182,26 @@ pub async fn run_wizard() -> Result<()> {
 ///
 /// No y/n gate — always shows channel configuration with current state.
 async fn run_channels_step(state: &mut WizardState) -> Result<StepResult> {
-    channels::configure_channels(&mut state.config).await?;
-    Ok(StepResult::Next)
+    let can_go_back = state.current_step > 1;
+    let outcome = channels::configure_channels(&mut state.config, can_go_back).await?;
+    Ok(if outcome == ui::MenuOutcome::Back {
+        StepResult::Back
+    } else {
+        StepResult::Next
+    })
 }
 
 /// Calendar wizard step (async due to connection testing).
 ///
 /// No y/n gate — always shows calendar configuration with current state.
 async fn run_calendar_step(state: &mut WizardState) -> Result<StepResult> {
-    calendar::configure_calendars(&mut state.config).await?;
-    Ok(StepResult::Next)
+    let can_go_back = state.current_step > 1;
+    let outcome = calendar::configure_calendars(&mut state.config, can_go_back).await?;
+    Ok(if outcome == ui::MenuOutcome::Back {
+        StepResult::Back
+    } else {
+        StepResult::Next
+    })
 }
 
 /// Print the global wizard header (shown once at the start).

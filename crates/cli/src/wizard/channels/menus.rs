@@ -13,7 +13,7 @@ use super::{
     SUB_ACTIONS,
 };
 use crate::wizard::prompts;
-use crate::wizard::ui::erase_lines;
+use crate::wizard::ui::{erase_lines, MenuOutcome};
 
 // ============================================================================
 // Rendering Functions
@@ -120,7 +120,7 @@ pub(super) fn render_channel_menu(
         }
     }
 
-    // Separator before Done
+    // Separator before Back/Done
     write!(
         out,
         "{}  {}\r\n",
@@ -128,6 +128,29 @@ pub(super) fn render_channel_menu(
         colorize("──────────────────────────", DIM)
     )?;
     lines += 1;
+
+    // Back row (only if not first step)
+    if menu.can_go_back {
+        let back_pointer = if !menu.in_sub_menu && menu.is_on_back() {
+            colorize("❯", BRAND)
+        } else {
+            " ".to_string()
+        };
+        let back_label = if !menu.in_sub_menu && menu.is_on_back() {
+            colorize("← Back", BOLD)
+        } else {
+            "← Back".to_string()
+        };
+        write!(
+            out,
+            "{}{} {} {}\r\n",
+            prefix,
+            back_pointer,
+            colorize("◁", DIM),
+            back_label
+        )?;
+        lines += 1;
+    }
 
     // Done row
     let done_pointer = if !menu.in_sub_menu && menu.is_on_done() {
@@ -158,9 +181,11 @@ pub(super) fn render_channel_menu(
 fn render_menu_hint(out: &mut impl Write, menu: &ChannelMenuState, chars: &BoxChars) -> Result<()> {
     let prefix = format!("{} ", colorize(chars.vertical, BRAND));
     let hint = if menu.in_sub_menu {
+        "↑/↓ navigate · Enter select · Esc close"
+    } else if menu.can_go_back {
         "↑/↓ navigate · Enter select · Esc back"
     } else {
-        "↑/↓ navigate · Enter expand/select"
+        "↑/↓ navigate · Enter select"
     };
     write!(out, "{}{}\r\n", prefix, colorize(hint, DIM))?;
     out.flush()?;
@@ -189,13 +214,16 @@ fn rerender_menu(
 // Interactive Event Loop
 // ============================================================================
 
-/// Run the interactive channel menu. Modifies config in place and returns when user selects "Done".
-pub(super) async fn run_channel_menu(config: &mut Config) -> Result<()> {
+/// Run the interactive channel menu. Modifies config in place and returns when user selects "Done" or "Back".
+pub(super) async fn run_channel_menu(
+    config: &mut Config,
+    can_go_back: bool,
+) -> Result<MenuOutcome> {
     use crate::wizard::ui::read_key;
     use crossterm::{event::KeyCode, terminal};
 
     let chars = BoxChars::get();
-    let mut menu = ChannelMenuState::new();
+    let mut menu = ChannelMenuState::new(can_go_back);
     let mut out = io::stdout();
 
     // Initial render
@@ -264,11 +292,16 @@ pub(super) async fn run_channel_menu(config: &mut Config) -> Result<()> {
                 list_lines = rerender_menu(&mut out, config, &menu, chars, list_lines)?;
             }
             KeyCode::Enter if !menu.in_sub_menu => {
-                if menu.is_on_done() {
+                if menu.is_on_back() {
+                    // Back — return to previous step
+                    terminal::disable_raw_mode()?;
+                    erase_lines(list_lines + 1)?;
+                    return Ok(MenuOutcome::Back);
+                } else if menu.is_on_done() {
                     // Done — exit
                     terminal::disable_raw_mode()?;
                     erase_lines(list_lines + 1)?;
-                    return Ok(());
+                    return Ok(MenuOutcome::Done);
                 } else {
                     // Expand channel sub-menu
                     menu.expanded = Some(menu.cursor);
@@ -363,14 +396,24 @@ pub(super) async fn run_channel_menu(config: &mut Config) -> Result<()> {
                 menu.in_sub_menu = false;
                 list_lines = rerender_menu(&mut out, config, &menu, chars, list_lines)?;
             }
+            KeyCode::Esc if !menu.in_sub_menu && can_go_back => {
+                terminal::disable_raw_mode()?;
+                erase_lines(list_lines + 1)?;
+                return Ok(MenuOutcome::Back);
+            }
             _ => {}
         }
     }
 }
 
 /// Run a simplified channel menu for non-TTY environments.
-pub(super) async fn run_channel_menu_fallback(config: &mut Config) -> Result<()> {
+pub(super) async fn run_channel_menu_fallback(
+    config: &mut Config,
+    can_go_back: bool,
+) -> Result<MenuOutcome> {
     let chars = BoxChars::get();
+    let back_offset: usize = if can_go_back { 1 } else { 0 };
+    let total_options = CHANNELS.len() + back_offset + 1; // channels + optional back + done
 
     loop {
         println!("{}", colorize(chars.vertical, BRAND));
@@ -396,29 +439,42 @@ pub(super) async fn run_channel_menu_fallback(config: &mut Config) -> Result<()>
             );
         }
 
+        if can_go_back {
+            println!(
+                "{}  {}. ← Back",
+                colorize(chars.vertical, BRAND),
+                CHANNELS.len() + 1
+            );
+        }
+
         println!(
             "{}  {}. Done",
             colorize(chars.vertical, BRAND),
-            CHANNELS.len() + 1
+            CHANNELS.len() + back_offset + 1
         );
         println!("{}", colorize(chars.vertical, BRAND));
 
         let choice = prompts::prompt_text("Enter number", None, true)?;
         let idx = match choice.parse::<usize>() {
-            Ok(n) if n > 0 && n <= CHANNELS.len() + 1 => n - 1,
+            Ok(n) if n > 0 && n <= total_options => n - 1,
             _ => {
                 println!(
                     "{} Invalid choice. Please enter a number between 1 and {}.",
                     colorize(chars.vertical, BRAND),
-                    CHANNELS.len() + 1
+                    total_options
                 );
                 continue;
             }
         };
 
-        if idx == CHANNELS.len() {
+        if can_go_back && idx == CHANNELS.len() {
+            // Back
+            return Ok(MenuOutcome::Back);
+        }
+
+        if idx == CHANNELS.len() + back_offset {
             // Done
-            return Ok(());
+            return Ok(MenuOutcome::Done);
         }
 
         // Configure selected channel

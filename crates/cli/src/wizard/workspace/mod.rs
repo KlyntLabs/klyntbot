@@ -22,6 +22,7 @@ use config::Config;
 use self::directories::{create_config_dirs, create_workspace_dirs, create_workspace_templates};
 use self::menus::{run_workspace_menu, run_workspace_menu_fallback};
 use super::prompts;
+use crate::wizard::ui::MenuOutcome;
 
 // ============================================================================
 // Setting Metadata
@@ -291,24 +292,31 @@ pub(super) struct WorkspaceMenuState {
     pub expanded: Option<usize>,
     pub sub_cursor: usize,
     pub in_sub_menu: bool,
+    pub(super) can_go_back: bool,
 }
 
 impl WorkspaceMenuState {
-    pub fn new() -> Self {
+    pub fn new(can_go_back: bool) -> Self {
         Self {
             cursor: 0,
             expanded: None,
             sub_cursor: 0,
             in_sub_menu: false,
+            can_go_back,
         }
     }
 
     pub fn total_main_items(&self) -> usize {
-        WORKSPACE_SETTINGS.len() + 1 // settings + "Done"
+        WORKSPACE_SETTINGS.len() + 1 + if self.can_go_back { 1 } else { 0 }
+    }
+
+    pub fn is_on_back(&self) -> bool {
+        self.can_go_back && self.cursor == WORKSPACE_SETTINGS.len()
     }
 
     pub fn is_on_done(&self) -> bool {
-        self.cursor == WORKSPACE_SETTINGS.len()
+        let done_idx = WORKSPACE_SETTINGS.len() + if self.can_go_back { 1 } else { 0 };
+        self.cursor == done_idx
     }
 }
 
@@ -373,8 +381,8 @@ pub(super) fn execute_regenerate_templates(workspace: &Path) -> Result<()> {
 /// Run the workspace & notifications configuration wizard step.
 /// Auto-creates workspace at the default path, then presents an interactive
 /// menu for templates and notification preferences.
-/// Returns true if configuration was completed.
-pub fn configure_workspace(config: &mut Config) -> Result<bool> {
+/// Returns `MenuOutcome::Done` if completed, `MenuOutcome::Back` if the user navigated back.
+pub(crate) fn configure_workspace(config: &mut Config, can_go_back: bool) -> Result<MenuOutcome> {
     let chars = BoxChars::get();
     let workspace = config.workspace_path();
 
@@ -407,10 +415,14 @@ pub fn configure_workspace(config: &mut Config) -> Result<bool> {
     println!("{}", colorize(chars.vertical, BRAND));
 
     // 3. Run menu
-    if io::stdin().is_terminal() && io::stdout().is_terminal() {
-        run_workspace_menu(config, &workspace)?;
+    let outcome = if io::stdin().is_terminal() && io::stdout().is_terminal() {
+        run_workspace_menu(config, &workspace, can_go_back)?
     } else {
-        run_workspace_menu_fallback(config, &workspace)?;
+        run_workspace_menu_fallback(config, &workspace, can_go_back)?
+    };
+
+    if outcome == MenuOutcome::Back {
+        return Ok(MenuOutcome::Back);
     }
 
     println!("{}", colorize(chars.vertical, BRAND));
@@ -420,7 +432,7 @@ pub fn configure_workspace(config: &mut Config) -> Result<bool> {
         status_success()
     );
 
-    Ok(true)
+    Ok(MenuOutcome::Done)
 }
 
 // ============================================================================
@@ -722,7 +734,7 @@ mod tests {
 
     #[test]
     fn test_menu_state_initial() {
-        let menu = WorkspaceMenuState::new();
+        let menu = WorkspaceMenuState::new(false);
         assert_eq!(menu.cursor, 0);
         assert!(menu.expanded.is_none());
         assert_eq!(menu.sub_cursor, 0);
@@ -731,13 +743,13 @@ mod tests {
 
     #[test]
     fn test_menu_state_total_items() {
-        let menu = WorkspaceMenuState::new();
+        let menu = WorkspaceMenuState::new(false);
         assert_eq!(menu.total_main_items(), 4); // 3 settings + Done
     }
 
     #[test]
     fn test_menu_state_is_on_done() {
-        let mut menu = WorkspaceMenuState::new();
+        let mut menu = WorkspaceMenuState::new(false);
         assert!(!menu.is_on_done());
         menu.cursor = WORKSPACE_SETTINGS.len();
         assert!(menu.is_on_done());

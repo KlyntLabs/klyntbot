@@ -18,6 +18,7 @@ use common::utils::terminal::*;
 use config::Config;
 
 use super::prompts;
+use super::ui::MenuOutcome;
 
 // ============================================================================
 // Preset Types
@@ -40,7 +41,7 @@ impl ToolsPreset {
         }
     }
 
-    fn name(&self) -> &str {
+    pub(crate) fn name(&self) -> &str {
         match self {
             Self::Strict => "Strict",
             Self::Balanced => "Balanced",
@@ -86,7 +87,7 @@ pub(super) const TOOL_SETTINGS: &[ToolSettingInfo] = &[
 // ============================================================================
 
 /// Detect the current preset from config values.
-pub(super) fn detect_preset(config: &Config) -> ToolsPreset {
+pub(crate) fn detect_preset(config: &Config) -> ToolsPreset {
     if config.tools.restrict_to_workspace
         && !config.tools.exec.allowed_commands.is_empty()
         && config.tools.exec.timeout <= 30
@@ -276,24 +277,31 @@ pub(super) struct ToolMenuState {
     pub(super) expanded: Option<usize>,
     pub(super) sub_cursor: usize,
     pub(super) in_sub_menu: bool,
+    pub(super) can_go_back: bool,
 }
 
 impl ToolMenuState {
-    pub(super) fn new() -> Self {
+    pub(super) fn new(can_go_back: bool) -> Self {
         Self {
             cursor: 0,
             expanded: None,
             sub_cursor: 0,
             in_sub_menu: false,
+            can_go_back,
         }
     }
 
     pub(super) fn total_main_items(&self) -> usize {
-        TOOL_SETTINGS.len() + 1 // settings + "Done"
+        TOOL_SETTINGS.len() + 1 + if self.can_go_back { 1 } else { 0 }
+    }
+
+    pub(super) fn is_on_back(&self) -> bool {
+        self.can_go_back && self.cursor == TOOL_SETTINGS.len()
     }
 
     pub(super) fn is_on_done(&self) -> bool {
-        self.cursor == TOOL_SETTINGS.len()
+        let done_idx = TOOL_SETTINGS.len() + if self.can_go_back { 1 } else { 0 };
+        self.cursor == done_idx
     }
 }
 
@@ -473,8 +481,8 @@ pub(super) fn execute_change_timeout(config: &mut Config) -> Result<()> {
 // ============================================================================
 
 /// Run the tools configuration wizard step.
-/// Returns true if tools were configured, false if skipped.
-pub fn configure_tools(config: &mut Config) -> Result<bool> {
+/// Returns `MenuOutcome::Done` if tools were configured, `MenuOutcome::Back` to go back.
+pub(crate) fn configure_tools(config: &mut Config, can_go_back: bool) -> Result<MenuOutcome> {
     let chars = BoxChars::get();
 
     // Show current status summary
@@ -493,10 +501,14 @@ pub fn configure_tools(config: &mut Config) -> Result<bool> {
     println!("{}", colorize(chars.vertical, BRAND));
 
     // Run interactive menu (TTY) or fallback (non-TTY)
-    if io::stdin().is_terminal() && io::stdout().is_terminal() {
-        menus::run_tool_menu(config)?;
+    let outcome = if io::stdin().is_terminal() && io::stdout().is_terminal() {
+        menus::run_tool_menu(config, can_go_back)?
     } else {
-        menus::run_tool_menu_fallback(config)?;
+        menus::run_tool_menu_fallback(config, can_go_back)?
+    };
+
+    if outcome == MenuOutcome::Back {
+        return Ok(MenuOutcome::Back);
     }
 
     println!("{}", colorize(chars.vertical, BRAND));
@@ -506,7 +518,7 @@ pub fn configure_tools(config: &mut Config) -> Result<bool> {
         status_success()
     );
 
-    Ok(true)
+    Ok(MenuOutcome::Done)
 }
 
 // ============================================================================
@@ -927,7 +939,7 @@ mod tests {
 
     #[test]
     fn test_menu_state_initial() {
-        let menu = ToolMenuState::new();
+        let menu = ToolMenuState::new(false);
         assert_eq!(menu.cursor, 0);
         assert!(menu.expanded.is_none());
         assert_eq!(menu.sub_cursor, 0);
@@ -936,13 +948,13 @@ mod tests {
 
     #[test]
     fn test_menu_state_total_items() {
-        let menu = ToolMenuState::new();
+        let menu = ToolMenuState::new(false);
         assert_eq!(menu.total_main_items(), 6); // 5 settings + Done
     }
 
     #[test]
     fn test_menu_state_is_on_done() {
-        let mut menu = ToolMenuState::new();
+        let mut menu = ToolMenuState::new(false);
         assert!(!menu.is_on_done());
         menu.cursor = TOOL_SETTINGS.len();
         assert!(menu.is_on_done());
