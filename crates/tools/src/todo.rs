@@ -192,7 +192,9 @@ impl Tool for TodoTool {
                     title: title.to_string(),
                     description: p.optional_str("description")?.map(String::from),
                     priority: p.optional_u64("priority")?.map(|v| v as u8),
-                    due_date: p.optional_str("due_date")?.and_then(|s| parse_datetime(s, &self.timezone)),
+                    due_date: p
+                        .optional_str("due_date")?
+                        .and_then(|s| parse_datetime(s, &self.timezone)),
                     tags: p.string_array_or_empty("tags")?,
                     status: TodoStatus::Todo,
                     focused_at: None,
@@ -484,7 +486,9 @@ impl Tool for TodoTool {
                     title: title.to_string(),
                     description: p.optional_str("description")?.map(String::from),
                     priority: p.optional_u64("priority")?.map(|v| v as u8),
-                    due_date: p.optional_str("due_date")?.and_then(|s| parse_datetime(s, &self.timezone)),
+                    due_date: p
+                        .optional_str("due_date")?
+                        .and_then(|s| parse_datetime(s, &self.timezone)),
                     tags: p.string_array_or_empty("tags")?,
                     status: TodoStatus::Todo,
                     focused_at: None,

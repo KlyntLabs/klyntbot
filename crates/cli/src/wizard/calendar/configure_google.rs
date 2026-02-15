@@ -43,10 +43,7 @@ pub(super) async fn configure_google_calendar(config: &mut Config) -> Result<()>
     );
     println!(
         "{}",
-        draw_step_line(&colorize(
-            "  3. Go to APIs & Services > Library",
-            DIM
-        ))
+        draw_step_line(&colorize("  3. Go to APIs & Services > Library", DIM))
     );
     println!(
         "{}",
@@ -57,10 +54,7 @@ pub(super) async fn configure_google_calendar(config: &mut Config) -> Result<()>
     );
     println!(
         "{}",
-        draw_step_line(&colorize(
-            "  5. Go to APIs & Services > Credentials",
-            DIM
-        ))
+        draw_step_line(&colorize("  5. Go to APIs & Services > Credentials", DIM))
     );
     println!(
         "{}",
@@ -85,10 +79,7 @@ pub(super) async fn configure_google_calendar(config: &mut Config) -> Result<()>
     println!("{}", colorize(chars.vertical, BRAND));
     println!(
         "{}",
-        draw_step_line(&colorize(
-            "Starting OAuth2 authorization flow...",
-            DIM
-        ))
+        draw_step_line(&colorize("Starting OAuth2 authorization flow...", DIM))
     );
 
     match oauth::run_google_oauth_flow(&client_id, &client_secret, 300).await? {
@@ -143,10 +134,7 @@ pub(super) async fn configure_google_calendar(config: &mut Config) -> Result<()>
                             BOLD
                         ))
                     );
-                    println!(
-                        "{}",
-                        draw_step_line(&colorize("To fix this:", DIM))
-                    );
+                    println!("{}", draw_step_line(&colorize("To fix this:", DIM)));
                     println!(
                         "{}",
                         draw_step_line(&colorize(
@@ -156,18 +144,9 @@ pub(super) async fn configure_google_calendar(config: &mut Config) -> Result<()>
                     );
                     println!(
                         "{}",
-                        draw_step_line(&colorize(
-                            "  2. Search for 'Google Calendar API'",
-                            DIM
-                        ))
+                        draw_step_line(&colorize("  2. Search for 'Google Calendar API'", DIM))
                     );
-                    println!(
-                        "{}",
-                        draw_step_line(&colorize(
-                            "  3. Click 'Enable'",
-                            DIM
-                        ))
-                    );
+                    println!("{}", draw_step_line(&colorize("  3. Click 'Enable'", DIM)));
                     println!(
                         "{}",
                         draw_step_line(&colorize(
@@ -263,15 +242,10 @@ async fn verify_google_calendar_api(access_token: &str) -> Result<()> {
     }
 
     let status = resp.status();
-    let body: serde_json::Value = resp
-        .json()
-        .await
-        .unwrap_or_else(|_| serde_json::json!({}));
+    let body: serde_json::Value = resp.json().await.unwrap_or_else(|_| serde_json::json!({}));
 
     // Extract the human-readable error message from Google's API response
-    let message = body["error"]["message"]
-        .as_str()
-        .unwrap_or("Unknown error");
+    let message = body["error"]["message"].as_str().unwrap_or("Unknown error");
 
     anyhow::bail!("HTTP {} — {}", status, message)
 }

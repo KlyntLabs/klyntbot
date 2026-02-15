@@ -33,7 +33,9 @@ impl GenericCalDavProvider {
     ) -> Self {
         let provider_id = format!(
             "generic-{}",
-            label.to_lowercase().replace(|c: char| !c.is_alphanumeric(), "-")
+            label
+                .to_lowercase()
+                .replace(|c: char| !c.is_alphanumeric(), "-")
         );
 
         let client = CalDavClient::new(
@@ -210,6 +212,9 @@ mod tests {
             "UTC".to_string(),
         );
 
-        assert_eq!(provider.base_url, "https://radicale.example.com/user/calendars/tasks/");
+        assert_eq!(
+            provider.base_url,
+            "https://radicale.example.com/user/calendars/tasks/"
+        );
     }
 }

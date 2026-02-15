@@ -68,10 +68,7 @@ pub(super) async fn configure_generic_caldav(config: &mut Config) -> Result<()> 
     };
 
     println!("{}", colorize(chars.vertical, BRAND));
-    println!(
-        "{}",
-        draw_step_line(&colorize("Common CalDAV URLs:", DIM))
-    );
+    println!("{}", draw_step_line(&colorize("Common CalDAV URLs:", DIM)));
     println!(
         "{}",
         draw_step_line(&colorize(

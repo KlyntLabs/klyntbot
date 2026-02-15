@@ -56,25 +56,21 @@ impl CalendarSyncAdapter {
             any_auto_sync = any_auto_sync || provider_config.auto_sync_due_dates();
 
             let provider: Box<dyn CalendarProvider> = match provider_config {
-                CalendarProviderConfig::Apple(apple) => {
-                    Box::new(AppleCalendarProvider::new(
-                        apple.caldav_url.clone(),
-                        apple.username.clone(),
-                        apple.password.expose().to_string(),
-                        apple.calendar_name.clone(),
-                        timezone.clone(),
-                    ))
-                }
-                CalendarProviderConfig::Google(google) => {
-                    Box::new(GoogleCalendarProvider::new(
-                        google.client_id.clone(),
-                        google.client_secret.expose().to_string(),
-                        google.access_token.expose().to_string(),
-                        google.refresh_token.expose().to_string(),
-                        google.calendar_id.clone(),
-                        timezone.clone(),
-                    ))
-                }
+                CalendarProviderConfig::Apple(apple) => Box::new(AppleCalendarProvider::new(
+                    apple.caldav_url.clone(),
+                    apple.username.clone(),
+                    apple.password.expose().to_string(),
+                    apple.calendar_name.clone(),
+                    timezone.clone(),
+                )),
+                CalendarProviderConfig::Google(google) => Box::new(GoogleCalendarProvider::new(
+                    google.client_id.clone(),
+                    google.client_secret.expose().to_string(),
+                    google.access_token.expose().to_string(),
+                    google.refresh_token.expose().to_string(),
+                    google.calendar_id.clone(),
+                    timezone.clone(),
+                )),
                 CalendarProviderConfig::GenericCalDav(generic) => {
                     Box::new(GenericCalDavProvider::new(
                         generic.name.clone(),
@@ -190,8 +186,9 @@ impl CalendarSyncAdapter {
         let mut sync_state = load_provider_sync_state(provider_id).await?;
 
         // Fetch remote events
-        let (remote_events, new_sync_token) =
-            provider.get_events(sync_state.sync_token.as_deref()).await?;
+        let (remote_events, new_sync_token) = provider
+            .get_events(sync_state.sync_token.as_deref())
+            .await?;
 
         let mut store = self.todo_store.write().await;
         let mut conflicts_detected = 0;
@@ -250,7 +247,9 @@ impl CalendarSyncAdapter {
                             Err(e) => {
                                 tracing::warn!(
                                     "Failed to sync event {} to {}: {}",
-                                    event.uid, provider_id, e
+                                    event.uid,
+                                    provider_id,
+                                    e
                                 );
                             }
                         }
@@ -263,7 +262,9 @@ impl CalendarSyncAdapter {
                             Err(e) => {
                                 tracing::warn!(
                                     "Failed to delete event {} from {}: {}",
-                                    uid, provider_id, e
+                                    uid,
+                                    provider_id,
+                                    e
                                 );
                             }
                         }

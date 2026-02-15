@@ -478,12 +478,16 @@ impl CalendarConfig {
 
     /// Find a provider by its ID (e.g., "apple", "google", "generic-nextcloud").
     pub fn find_provider(&self, provider_id: &str) -> Option<&CalendarProviderConfig> {
-        self.providers.iter().find(|p| p.provider_id() == provider_id)
+        self.providers
+            .iter()
+            .find(|p| p.provider_id() == provider_id)
     }
 
     /// Find a provider by its ID (mutable).
     pub fn find_provider_mut(&mut self, provider_id: &str) -> Option<&mut CalendarProviderConfig> {
-        self.providers.iter_mut().find(|p| p.provider_id() == provider_id)
+        self.providers
+            .iter_mut()
+            .find(|p| p.provider_id() == provider_id)
     }
 
     /// Get the Apple provider config, if present.
@@ -520,16 +524,27 @@ impl CalendarConfig {
 
     /// Get or create the Apple provider config (mutable).
     pub fn ensure_apple_mut(&mut self) -> &mut AppleCalendarConfig {
-        if !self.providers.iter().any(|p| matches!(p, CalendarProviderConfig::Apple(_))) {
-            self.providers.push(CalendarProviderConfig::Apple(AppleCalendarConfig::default()));
+        if !self
+            .providers
+            .iter()
+            .any(|p| matches!(p, CalendarProviderConfig::Apple(_)))
+        {
+            self.providers
+                .push(CalendarProviderConfig::Apple(AppleCalendarConfig::default()));
         }
         self.apple_mut().unwrap()
     }
 
     /// Get or create the Google provider config (mutable).
     pub fn ensure_google_mut(&mut self) -> &mut GoogleCalendarConfig {
-        if !self.providers.iter().any(|p| matches!(p, CalendarProviderConfig::Google(_))) {
-            self.providers.push(CalendarProviderConfig::Google(GoogleCalendarConfig::default()));
+        if !self
+            .providers
+            .iter()
+            .any(|p| matches!(p, CalendarProviderConfig::Google(_)))
+        {
+            self.providers.push(CalendarProviderConfig::Google(
+                GoogleCalendarConfig::default(),
+            ));
         }
         self.google_mut().unwrap()
     }
@@ -575,7 +590,9 @@ impl CalendarProviderConfig {
             Self::GenericCalDav(c) => {
                 format!(
                     "generic-{}",
-                    c.name.to_lowercase().replace(|ch: char| !ch.is_alphanumeric(), "-")
+                    c.name
+                        .to_lowercase()
+                        .replace(|ch: char| !ch.is_alphanumeric(), "-")
                 )
             }
         }
@@ -727,7 +744,9 @@ pub struct GenericCalDavConfig {
 }
 
 /// Custom deserializer that handles both old (flat) and new (providers array) formats.
-fn deserialize_providers<'de, D>(deserializer: D) -> std::result::Result<Vec<CalendarProviderConfig>, D::Error>
+fn deserialize_providers<'de, D>(
+    deserializer: D,
+) -> std::result::Result<Vec<CalendarProviderConfig>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
@@ -746,7 +765,10 @@ impl CalendarConfig {
         // Check if this is old format (has "username" at top level)
         if let Some(username) = json.get("username").and_then(|v| v.as_str()) {
             if !username.is_empty() {
-                let password = json.get("password").and_then(|v| v.as_str()).unwrap_or_default();
+                let password = json
+                    .get("password")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default();
                 let caldav_url = json
                     .get("caldavUrl")
                     .and_then(|v| v.as_str())
@@ -975,7 +997,10 @@ mod tests {
         let deserialized: CalendarConfig = serde_json::from_str(&json).unwrap();
 
         assert_eq!(original.providers.len(), deserialized.providers.len());
-        assert_eq!(original.conflict_resolution, deserialized.conflict_resolution);
+        assert_eq!(
+            original.conflict_resolution,
+            deserialized.conflict_resolution
+        );
     }
 
     #[test]
@@ -1026,12 +1051,15 @@ mod tests {
     #[test]
     fn test_config_calendar_serialization() {
         let mut config = Config::default();
-        config.calendar.providers.push(CalendarProviderConfig::Apple(AppleCalendarConfig {
-            enabled: true,
-            username: "test@example.com".to_string(),
-            password: Secret::new("password123".to_string()),
-            ..AppleCalendarConfig::default()
-        }));
+        config
+            .calendar
+            .providers
+            .push(CalendarProviderConfig::Apple(AppleCalendarConfig {
+                enabled: true,
+                username: "test@example.com".to_string(),
+                password: Secret::new("password123".to_string()),
+                ..AppleCalendarConfig::default()
+            }));
 
         let json = serde_json::to_string_pretty(&config).unwrap();
         assert!(json.contains("\"calendar\""));

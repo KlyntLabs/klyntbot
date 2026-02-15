@@ -79,11 +79,7 @@ impl AppleCalendarProvider {
         let full_url = if discovered_url.starts_with("http") {
             discovered_url
         } else {
-            let base_host = current_url
-                .split('/')
-                .take(3)
-                .collect::<Vec<_>>()
-                .join("/");
+            let base_host = current_url.split('/').take(3).collect::<Vec<_>>().join("/");
             format!("{}{}", base_host, discovered_url)
         };
 
@@ -170,6 +166,9 @@ mod tests {
             "Asia/Bangkok".to_string(),
         );
 
-        assert_eq!(provider.base_url, "https://p123-caldav.icloud.com:443/12345/calendars/klyntbot/");
+        assert_eq!(
+            provider.base_url,
+            "https://p123-caldav.icloud.com:443/12345/calendars/klyntbot/"
+        );
     }
 }

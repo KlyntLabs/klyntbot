@@ -541,11 +541,10 @@ impl CalDavClient {
             .put(&event_url)
             .header(header::CONTENT_TYPE, "text/calendar; charset=utf-8")
             .body(ical_data);
-        let response = self
-            .apply_auth(request)
-            .send()
-            .await
-            .map_err(|e| KlyntbotError::Calendar(CalendarError::ConnectionFailed(e.to_string())))?;
+        let response =
+            self.apply_auth(request).send().await.map_err(|e| {
+                KlyntbotError::Calendar(CalendarError::ConnectionFailed(e.to_string()))
+            })?;
 
         match response.status() {
             StatusCode::CREATED | StatusCode::NO_CONTENT | StatusCode::OK => {
@@ -573,11 +572,10 @@ impl CalDavClient {
         let event_url = format!("{}/{}.ics", base_url, event_uid);
 
         let request = self.http_client.delete(&event_url);
-        let response = self
-            .apply_auth(request)
-            .send()
-            .await
-            .map_err(|e| KlyntbotError::Calendar(CalendarError::ConnectionFailed(e.to_string())))?;
+        let response =
+            self.apply_auth(request).send().await.map_err(|e| {
+                KlyntbotError::Calendar(CalendarError::ConnectionFailed(e.to_string()))
+            })?;
 
         match response.status() {
             StatusCode::NO_CONTENT | StatusCode::OK | StatusCode::NOT_FOUND => Ok(()),
@@ -608,11 +606,10 @@ impl CalDavClient {
             .header(header::CONTENT_TYPE, "application/xml; charset=utf-8")
             .header("Depth", "1")
             .body(report_body);
-        let response = self
-            .apply_auth(request)
-            .send()
-            .await
-            .map_err(|e| KlyntbotError::Calendar(CalendarError::ConnectionFailed(e.to_string())))?;
+        let response =
+            self.apply_auth(request).send().await.map_err(|e| {
+                KlyntbotError::Calendar(CalendarError::ConnectionFailed(e.to_string()))
+            })?;
 
         match response.status() {
             StatusCode::MULTI_STATUS | StatusCode::OK => {

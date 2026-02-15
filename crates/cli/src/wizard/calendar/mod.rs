@@ -82,9 +82,11 @@ pub(super) fn is_provider_enabled(config: &Config, provider_key: &str) -> bool {
     match provider_key {
         "apple" => config.calendar.apple().is_some_and(|a| a.enabled),
         "google" => config.calendar.google().is_some_and(|g| g.enabled),
-        "generic_caldav" => config.calendar.providers.iter().any(|p| {
-            matches!(p, config::CalendarProviderConfig::GenericCalDav(c) if c.enabled)
-        }),
+        "generic_caldav" => config
+            .calendar
+            .providers
+            .iter()
+            .any(|p| matches!(p, config::CalendarProviderConfig::GenericCalDav(c) if c.enabled)),
         _ => false,
     }
 }
@@ -108,17 +110,15 @@ fn mask_provider_credentials(config: &Config, provider_key: &str) -> String {
                 }
             })
             .unwrap_or_default(),
-        "generic_caldav" => {
-            config
-                .calendar
-                .providers
-                .iter()
-                .find_map(|p| match p {
-                    config::CalendarProviderConfig::GenericCalDav(c) => Some(c.name.clone()),
-                    _ => None,
-                })
-                .unwrap_or_default()
-        }
+        "generic_caldav" => config
+            .calendar
+            .providers
+            .iter()
+            .find_map(|p| match p {
+                config::CalendarProviderConfig::GenericCalDav(c) => Some(c.name.clone()),
+                _ => None,
+            })
+            .unwrap_or_default(),
         _ => String::new(),
     }
 }
@@ -151,20 +151,18 @@ pub(super) fn get_provider_status_description(config: &Config, provider_key: &st
                 String::new()
             }
         }
-        "generic_caldav" => {
-            config
-                .calendar
-                .providers
-                .iter()
-                .find_map(|p| match p {
-                    config::CalendarProviderConfig::GenericCalDav(c) => {
-                        let interval = format_interval(c.sync_interval_secs);
-                        Some(format!("{} / {}", c.name, interval))
-                    }
-                    _ => None,
-                })
-                .unwrap_or_default()
-        }
+        "generic_caldav" => config
+            .calendar
+            .providers
+            .iter()
+            .find_map(|p| match p {
+                config::CalendarProviderConfig::GenericCalDav(c) => {
+                    let interval = format_interval(c.sync_interval_secs);
+                    Some(format!("{} / {}", c.name, interval))
+                }
+                _ => None,
+            })
+            .unwrap_or_default(),
         _ => String::new(),
     }
 }
@@ -395,11 +393,7 @@ pub(super) async fn execute_test_connection(config: &Config, provider_idx: usize
                     }
                 }
             } else {
-                println!(
-                    "{}{} Apple Calendar not configured",
-                    prefix,
-                    status_error()
-                );
+                println!("{}{} Apple Calendar not configured", prefix, status_error());
             }
         }
         "google" => {
@@ -453,11 +447,7 @@ pub(super) async fn execute_test_connection(config: &Config, provider_idx: usize
                     }
                 }
             } else {
-                println!(
-                    "{}{} Generic CalDAV not configured",
-                    prefix,
-                    status_error()
-                );
+                println!("{}{} Generic CalDAV not configured", prefix, status_error());
             }
         }
         _ => {}
@@ -489,10 +479,7 @@ pub(super) fn execute_toggle_enabled(config: &mut Config, provider_idx: usize) {
 
 /// Execute the change calendar name action.
 #[allow(clippy::single_match)]
-pub(super) fn execute_change_calendar_name(
-    config: &mut Config,
-    provider_idx: usize,
-) -> Result<()> {
+pub(super) fn execute_change_calendar_name(config: &mut Config, provider_idx: usize) -> Result<()> {
     let provider = &CALENDAR_PROVIDERS[provider_idx];
 
     match provider.key {
@@ -534,10 +521,7 @@ pub(super) fn execute_change_calendar_name(
 
 /// Execute the change sync interval action.
 #[allow(clippy::single_match)]
-pub(super) fn execute_change_sync_interval(
-    config: &mut Config,
-    provider_idx: usize,
-) -> Result<()> {
+pub(super) fn execute_change_sync_interval(config: &mut Config, provider_idx: usize) -> Result<()> {
     let provider = &CALENDAR_PROVIDERS[provider_idx];
 
     let interval_options = vec![
