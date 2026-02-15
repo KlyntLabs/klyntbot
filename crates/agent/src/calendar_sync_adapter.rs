@@ -6,7 +6,7 @@ use calendar::{
     AppleCalendarProvider, CalendarEvent, CalendarProvider, EventSource, GenericCalDavProvider,
     GoogleCalendarProvider, SyncEngine,
 };
-use chrono::{Duration, Utc};
+use chrono::{Duration, Local, Utc};
 use common::Result;
 use config::{CalendarConfig, CalendarProviderConfig};
 use serde_json::{json, Value};
@@ -147,6 +147,21 @@ impl CalendarSyncAdapter {
             }
         }
 
+        // Clear calendar_event_uid for todos that had events deleted from all providers
+        if self.auto_sync_due_dates {
+            let mut store = self.todo_store.write().await;
+            let todos = store.list(&TodoFilter::default()).await?;
+            for todo in todos {
+                if todo.due_date.is_none() && todo.calendar_event_uid.is_some() {
+                    let patch = TodoPatch {
+                        calendar_event_uid: Some(None),
+                        ..Default::default()
+                    };
+                    store.update(&todo.id, patch).await.ok();
+                }
+            }
+        }
+
         let status = if errors.is_empty() {
             "success"
         } else if errors.len() < self.providers.len() {
@@ -161,7 +176,7 @@ impl CalendarSyncAdapter {
             "events_pushed": total_pushed,
             "conflicts_detected": total_conflicts,
             "providers": provider_results,
-            "last_sync": Utc::now().to_rfc3339(),
+            "last_sync": Local::now().to_rfc3339(),
         }))
     }
 
@@ -213,46 +228,43 @@ impl CalendarSyncAdapter {
             }
         }
 
-        // Push local changes
+        // Push local changes to this provider
         if self.auto_sync_due_dates {
             let filter = TodoFilter::default();
             let todos = store.list(&filter).await?;
             for todo in todos {
-                if todo.due_date.is_some() && todo.calendar_event_uid.is_none() {
+                if todo.due_date.is_some() {
+                    // Always PUT — CalDAV creates if new, updates if exists
                     if let Some(event) = self.todo_to_event(&todo) {
                         match provider.put_event(&event).await {
                             Ok(_etag) => {
-                                let patch = TodoPatch {
-                                    calendar_event_uid: Some(Some(event.uid.clone())),
-                                    ..Default::default()
-                                };
-                                if store.update(&todo.id, patch).await.is_ok() {
-                                    events_pushed += 1;
+                                if todo.calendar_event_uid.is_none() {
+                                    let patch = TodoPatch {
+                                        calendar_event_uid: Some(Some(event.uid.clone())),
+                                        ..Default::default()
+                                    };
+                                    store.update(&todo.id, patch).await.ok();
                                 }
+                                events_pushed += 1;
                             }
                             Err(e) => {
-                                tracing::warn!("Failed to push event {}: {}", event.uid, e);
+                                tracing::warn!(
+                                    "Failed to sync event {} to {}: {}",
+                                    event.uid, provider_id, e
+                                );
                             }
                         }
                     }
-                } else if todo.due_date.is_some() && todo.calendar_event_uid.is_some() {
-                    if let Some(event) = self.todo_to_event(&todo) {
-                        if let Err(e) = provider.put_event(&event).await {
-                            tracing::warn!("Failed to update event {}: {}", event.uid, e);
-                        }
-                    }
-                } else if todo.due_date.is_none() && todo.calendar_event_uid.is_some() {
+                } else if todo.calendar_event_uid.is_some() {
+                    // Delete from this provider (don't clear UID yet — deferred)
                     if let Some(uid) = &todo.calendar_event_uid {
                         match provider.delete_event(uid).await {
-                            Ok(()) => {
-                                let patch = TodoPatch {
-                                    calendar_event_uid: Some(None),
-                                    ..Default::default()
-                                };
-                                store.update(&todo.id, patch).await?;
-                            }
+                            Ok(()) => events_pushed += 1,
                             Err(e) => {
-                                tracing::warn!("Failed to delete event {}: {}", uid, e);
+                                tracing::warn!(
+                                    "Failed to delete event {} from {}: {}",
+                                    uid, provider_id, e
+                                );
                             }
                         }
                     }
@@ -493,27 +505,47 @@ impl CalendarHandler for CalendarSyncAdapter {
             etag: None,
         };
 
-        // Use first provider
-        if let Some((_id, provider)) = self.providers.first() {
-            let etag = provider.put_event(&event).await?;
-
-            Ok(json!({
-                "status": "created",
-                "uid": uid,
-                "summary": summary,
-                "description": description,
-                "start": start,
-                "end": end,
-                "etag": etag,
-                "provider": provider.name()
-            }))
-        } else {
-            Err(common::KlyntbotError::Calendar(
+        // Push to all providers
+        if self.providers.is_empty() {
+            return Err(common::KlyntbotError::Calendar(
                 common::CalendarError::ConnectionFailed(
                     "No calendar providers configured".to_string(),
                 ),
-            ))
+            ));
         }
+
+        let mut push_results = Vec::new();
+        for (provider_id, provider) in &self.providers {
+            match provider.put_event(&event).await {
+                Ok(etag) => {
+                    push_results.push(json!({
+                        "provider": provider.name(),
+                        "provider_id": provider_id,
+                        "status": "created",
+                        "etag": etag,
+                    }));
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to create event on {}: {}", provider.name(), e);
+                    push_results.push(json!({
+                        "provider": provider.name(),
+                        "provider_id": provider_id,
+                        "status": "error",
+                        "error": e.to_string(),
+                    }));
+                }
+            }
+        }
+
+        Ok(json!({
+            "status": "created",
+            "uid": uid,
+            "summary": summary,
+            "description": description,
+            "start": start,
+            "end": end,
+            "providers": push_results,
+        }))
     }
 
     /// Get sync status for all providers.
@@ -534,7 +566,7 @@ impl CalendarHandler for CalendarSyncAdapter {
             provider_statuses.push(json!({
                 "provider": provider.name(),
                 "provider_id": provider_id,
-                "last_sync": sync_state.as_ref().and_then(|s| s.last_sync.map(|t| t.to_rfc3339())),
+                "last_sync": sync_state.as_ref().and_then(|s| s.last_sync.map(|t| t.with_timezone(&Local).to_rfc3339())),
                 "has_sync_token": sync_state.as_ref().is_some_and(|s| s.sync_token.is_some()),
             }));
         }
