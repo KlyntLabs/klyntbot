@@ -194,11 +194,14 @@ impl AgentLoop {
 
         // Register calendar tool (if any provider is enabled)
         if config.calendar.is_any_enabled() {
-            let calendar_adapter = Arc::new(CalendarSyncAdapter::new(
-                Arc::clone(&todo_store),
-                &config.calendar,
-                config.timezone.clone(),
-            ).await?);
+            let calendar_adapter = Arc::new(
+                CalendarSyncAdapter::new(
+                    Arc::clone(&todo_store),
+                    &config.calendar,
+                    config.timezone.clone(),
+                )
+                .await?,
+            );
 
             // Inject calendar handler into TodoTool for immediate sync
             todo_tool = todo_tool
@@ -657,20 +660,30 @@ impl AgentLoop {
 
                     // Act on confidence
                     match &assessment.action {
-                        DecisionAction::Clarify { questions } => {
+                        DecisionAction::Clarify { .. } => {
                             debug!(
                                 score = assessment.score,
-                                "Low confidence — requesting clarification"
+                                "Low confidence — nudging LLM to call ask_user"
                             );
-                            let clarification = questions.join("\n");
-                            messages.push(Message::assistant(format!(
-                                "I need to clarify before proceeding:\n{}",
-                                clarification
-                            )));
-                            return Ok(IterationOutcome::FinalContent(format!(
-                                "I need to clarify before proceeding:\n{}",
-                                clarification
-                            )));
+                            let nudge = format!(
+                                "Your confidence assessment was low (score: {:.2}). \
+                                 Low dimensions: {}. Reasoning: \"{}\"\n\n\
+                                 You MUST call the ask_user tool to clarify with the user \
+                                 before proceeding. Ask contextually relevant questions \
+                                 using appropriate types (single_select, yes_no, free_text). \
+                                 Do NOT proceed with other tools until you have clarified.",
+                                assessment.score,
+                                low_dimensions_summary(
+                                    &assessment,
+                                    self.confidence_evaluator
+                                        .as_ref()
+                                        .map(|e| e.threshold())
+                                        .unwrap_or(0.7),
+                                ),
+                                assessment.reasoning,
+                            );
+                            messages.push(Message::system(nudge));
+                            return Ok(IterationOutcome::ToolCallsProcessed);
                         }
                         DecisionAction::Skip { reason } => {
                             debug!(reason = %reason, "Skipping tool calls");
@@ -864,16 +877,30 @@ impl AgentLoop {
                     self.decision_logger.log(&entry).await;
 
                     match &assessment.action {
-                        DecisionAction::Clarify { questions } => {
+                        DecisionAction::Clarify { .. } => {
                             debug!(
                                 score = assessment.score,
-                                "Low confidence — requesting clarification"
+                                "Low confidence — nudging LLM to call ask_user"
                             );
-                            let clarification = questions.join("\n");
-                            return Ok(IterationOutcome::FinalContent(format!(
-                                "I need to clarify before proceeding:\n{}",
-                                clarification
-                            )));
+                            let nudge = format!(
+                                "Your confidence assessment was low (score: {:.2}). \
+                                 Low dimensions: {}. Reasoning: \"{}\"\n\n\
+                                 You MUST call the ask_user tool to clarify with the user \
+                                 before proceeding. Ask contextually relevant questions \
+                                 using appropriate types (single_select, yes_no, free_text). \
+                                 Do NOT proceed with other tools until you have clarified.",
+                                assessment.score,
+                                low_dimensions_summary(
+                                    &assessment,
+                                    self.confidence_evaluator
+                                        .as_ref()
+                                        .map(|e| e.threshold())
+                                        .unwrap_or(0.7),
+                                ),
+                                assessment.reasoning,
+                            );
+                            messages.push(Message::system(nudge));
+                            return Ok(IterationOutcome::ToolCallsProcessed);
                         }
                         DecisionAction::Skip { reason } => {
                             return Ok(IterationOutcome::FinalContent(reason.clone()));
@@ -1075,6 +1102,37 @@ impl AgentLoop {
     }
 }
 
+/// Summarize which confidence dimensions scored below threshold.
+///
+/// Used in the system nudge message when confidence is low, so the LLM
+/// knows which aspects to clarify with the user.
+fn low_dimensions_summary(
+    assessment: &confidence::types::ConfidenceAssessment,
+    threshold: f32,
+) -> String {
+    let mut low = Vec::new();
+    if assessment.dimensions.intent_clarity < threshold {
+        low.push(format!(
+            "intent_clarity ({:.2})",
+            assessment.dimensions.intent_clarity
+        ));
+    }
+    if assessment.dimensions.tool_fit < threshold {
+        low.push(format!("tool_fit ({:.2})", assessment.dimensions.tool_fit));
+    }
+    if assessment.dimensions.info_sufficiency < threshold {
+        low.push(format!(
+            "info_sufficiency ({:.2})",
+            assessment.dimensions.info_sufficiency
+        ));
+    }
+    if low.is_empty() {
+        "overall score".to_string()
+    } else {
+        low.join(", ")
+    }
+}
+
 /// Helper to accumulate tool call data across chunks
 struct ToolCallAccumulator {
     id: String,
@@ -1100,4 +1158,65 @@ enum IterationOutcome {
     FinalContent(String),
     /// No content and no tool calls; end iteration
     Empty,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+    use confidence::types::{
+        AssessmentPhase, ConfidenceAssessment, ConfidenceDimensions, DecisionAction,
+    };
+
+    fn make_assessment(
+        intent_clarity: f32,
+        tool_fit: f32,
+        info_sufficiency: f32,
+    ) -> ConfidenceAssessment {
+        ConfidenceAssessment {
+            score: (intent_clarity + tool_fit + info_sufficiency) / 3.0,
+            phase: AssessmentPhase::PreTool,
+            reasoning: "test reasoning".to_string(),
+            dimensions: ConfidenceDimensions {
+                intent_clarity,
+                tool_fit,
+                info_sufficiency,
+            },
+            action: DecisionAction::default(),
+            assessed_at: Utc::now(),
+        }
+    }
+
+    #[test]
+    fn test_low_dimensions_summary_all_low() {
+        let assessment = make_assessment(0.3, 0.4, 0.2);
+        let summary = low_dimensions_summary(&assessment, 0.7);
+        assert!(summary.contains("intent_clarity"));
+        assert!(summary.contains("tool_fit"));
+        assert!(summary.contains("info_sufficiency"));
+    }
+
+    #[test]
+    fn test_low_dimensions_summary_one_low() {
+        let assessment = make_assessment(0.9, 0.8, 0.3);
+        let summary = low_dimensions_summary(&assessment, 0.7);
+        assert!(!summary.contains("intent_clarity"));
+        assert!(!summary.contains("tool_fit"));
+        assert!(summary.contains("info_sufficiency (0.30)"));
+    }
+
+    #[test]
+    fn test_low_dimensions_summary_none_low() {
+        let assessment = make_assessment(0.9, 0.8, 0.75);
+        let summary = low_dimensions_summary(&assessment, 0.7);
+        assert_eq!(summary, "overall score");
+    }
+
+    #[test]
+    fn test_low_dimensions_summary_at_threshold() {
+        // Exactly at threshold should NOT be listed as low
+        let assessment = make_assessment(0.7, 0.7, 0.7);
+        let summary = low_dimensions_summary(&assessment, 0.7);
+        assert_eq!(summary, "overall score");
+    }
 }

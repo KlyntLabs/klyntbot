@@ -20,6 +20,11 @@ impl ConfidenceEvaluator {
         }
     }
 
+    /// Get the configured threshold.
+    pub fn threshold(&self) -> f32 {
+        self.threshold
+    }
+
     /// Parse a `<confidence>` JSON block from LLM response content.
     ///
     /// Returns `None` if no block is found or parsing fails.
@@ -187,6 +192,18 @@ mod tests {
         assert!((assessment.score - 1.0).abs() < f32::EPSILON);
         assert!((assessment.dimensions.intent_clarity - 0.0).abs() < f32::EPSILON);
         assert!((assessment.dimensions.tool_fit - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_threshold_getter() {
+        let evaluator = ConfidenceEvaluator::new(0.7);
+        assert!((evaluator.threshold() - 0.7).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_threshold_getter_clamped() {
+        let evaluator = ConfidenceEvaluator::new(1.5);
+        assert!((evaluator.threshold() - 1.0).abs() < f32::EPSILON);
     }
 
     #[test]
