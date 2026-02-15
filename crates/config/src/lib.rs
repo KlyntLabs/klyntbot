@@ -9,6 +9,7 @@ pub use loader::{
     config_dir, config_path, init, load, load_sync, load_with_env_overrides, save, save_sync,
 };
 pub use schema::{
-    CalendarConfig, Config, DiscordConfig, EmailConfig, QQConfig, Secret, SlackConfig,
+    AppleCalendarConfig, CalendarConfig, CalendarProviderConfig, Config, DiscordConfig,
+    EmailConfig, GenericCalDavConfig, GoogleCalendarConfig, QQConfig, Secret, SlackConfig,
     TelegramConfig, WhatsAppConfig,
 };

@@ -3,28 +3,60 @@
 use crate::caldav::parser::{generate_vevent, parse_vevent};
 use crate::types::CalendarEvent;
 use common::{CalendarError, KlyntbotError, Result};
-use reqwest::{header, Client, StatusCode};
+use reqwest::{header, Client, RequestBuilder, StatusCode};
+
+/// Authentication method for CalDAV connections.
+#[derive(Debug, Clone)]
+pub enum CalDavAuth {
+    /// HTTP Basic authentication (Apple Calendar, Nextcloud, Fastmail, etc.)
+    Basic { username: String, password: String },
+    /// HTTP Bearer token authentication (Google Calendar via OAuth2)
+    Bearer { token: String },
+}
 
 /// CalDAV client for HTTP-based calendar operations
 pub struct CalDavClient {
     pub(crate) calendar_url: String,
-    username: String,
-    password: String,
+    auth: CalDavAuth,
     http_client: Client,
     /// IANA timezone name for generating iCalendar events (e.g., "Asia/Bangkok")
     timezone: String,
 }
 
 impl CalDavClient {
-    /// Create a new CalDAV client
+    /// Create a new CalDAV client with Basic auth (backward-compatible constructor).
     pub fn new(calendar_url: String, username: String, password: String, timezone: String) -> Self {
         Self {
             calendar_url,
-            username,
-            password,
+            auth: CalDavAuth::Basic { username, password },
             http_client: Client::new(),
             timezone,
         }
+    }
+
+    /// Create a new CalDAV client with a specified auth method.
+    pub fn new_with_auth(calendar_url: String, auth: CalDavAuth, timezone: String) -> Self {
+        Self {
+            calendar_url,
+            auth,
+            http_client: Client::new(),
+            timezone,
+        }
+    }
+
+    /// Apply the configured auth method to an outgoing request.
+    fn apply_auth(&self, builder: RequestBuilder) -> RequestBuilder {
+        match &self.auth {
+            CalDavAuth::Basic { username, password } => {
+                builder.basic_auth(username, Some(password))
+            }
+            CalDavAuth::Bearer { token } => builder.bearer_auth(token),
+        }
+    }
+
+    /// Update the Bearer token (used after OAuth2 refresh).
+    pub fn set_bearer_token(&mut self, token: String) {
+        self.auth = CalDavAuth::Bearer { token };
     }
 
     /// Update the calendar URL (used after discovery)
@@ -504,12 +536,13 @@ impl CalDavClient {
         let event_url = format!("{}/{}.ics", base_url, event.uid);
         let ical_data = generate_vevent(event, &self.timezone)?;
 
-        let response = self
+        let request = self
             .http_client
             .put(&event_url)
-            .basic_auth(&self.username, Some(&self.password))
             .header(header::CONTENT_TYPE, "text/calendar; charset=utf-8")
-            .body(ical_data)
+            .body(ical_data);
+        let response = self
+            .apply_auth(request)
             .send()
             .await
             .map_err(|e| KlyntbotError::Calendar(CalendarError::ConnectionFailed(e.to_string())))?;
@@ -539,10 +572,9 @@ impl CalDavClient {
         let base_url = self.calendar_url.trim_end_matches('/');
         let event_url = format!("{}/{}.ics", base_url, event_uid);
 
+        let request = self.http_client.delete(&event_url);
         let response = self
-            .http_client
-            .delete(&event_url)
-            .basic_auth(&self.username, Some(&self.password))
+            .apply_auth(request)
             .send()
             .await
             .map_err(|e| KlyntbotError::Calendar(CalendarError::ConnectionFailed(e.to_string())))?;
@@ -567,16 +599,17 @@ impl CalDavClient {
         let report_body = self.build_report_body(sync_token);
         let calendar_url = self.calendar_url.trim_end_matches('/');
 
-        let response = self
+        let request = self
             .http_client
             .request(
                 reqwest::Method::from_bytes(b"REPORT").unwrap(),
                 calendar_url,
             )
-            .basic_auth(&self.username, Some(&self.password))
             .header(header::CONTENT_TYPE, "application/xml; charset=utf-8")
             .header("Depth", "1")
-            .body(report_body)
+            .body(report_body);
+        let response = self
+            .apply_auth(request)
             .send()
             .await
             .map_err(|e| KlyntbotError::Calendar(CalendarError::ConnectionFailed(e.to_string())))?;
@@ -754,8 +787,13 @@ mod tests {
         );
 
         assert_eq!(client.calendar_url, "https://caldav.example.com/calendar");
-        assert_eq!(client.username, "user@example.com");
-        assert_eq!(client.password, "password123");
+        match &client.auth {
+            CalDavAuth::Basic { username, password } => {
+                assert_eq!(username, "user@example.com");
+                assert_eq!(password, "password123");
+            }
+            _ => panic!("Expected Basic auth"),
+        }
     }
 
     #[test]

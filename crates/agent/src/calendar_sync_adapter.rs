@@ -1,12 +1,14 @@
-// CalendarSyncAdapter - Two-way sync implementation between CalDAV and TodoStore
+// CalendarSyncAdapter - Multi-provider two-way sync between CalDAV and TodoStore
 
 use async_trait::async_trait;
 use calendar::{
-    load_sync_state, save_sync_state, CalDavClient, CalendarEvent, EventSource, SyncEngine,
+    load_provider_sync_state, migrate_legacy_sync_state, save_provider_sync_state,
+    AppleCalendarProvider, CalendarEvent, CalendarProvider, EventSource, GenericCalDavProvider,
+    GoogleCalendarProvider, SyncEngine,
 };
 use chrono::{Duration, Utc};
 use common::Result;
-use config::CalendarConfig;
+use config::{CalendarConfig, CalendarProviderConfig};
 use serde_json::{json, Value};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -19,27 +21,75 @@ use tools::{
 };
 
 /// CalendarSyncAdapter - implements two-way calendar synchronization
+/// with multiple CalDAV providers.
 pub struct CalendarSyncAdapter {
-    caldav_client: Arc<RwLock<CalDavClient>>,
+    providers: Vec<(String, Box<dyn CalendarProvider>)>,
+    #[allow(dead_code)]
+    provider_configs: Vec<CalendarProviderConfig>,
     todo_store: Arc<RwLock<TodoStore>>,
-    config: CalendarConfig,
     conflicts_path: PathBuf,
-    discovered_url: Arc<RwLock<Option<String>>>,
+    auto_sync_due_dates: bool,
 }
 
 impl CalendarSyncAdapter {
-    /// Create a new CalendarSyncAdapter
-    pub fn new(
+    /// Create a new CalendarSyncAdapter from the calendar config.
+    pub async fn new(
         todo_store: Arc<RwLock<TodoStore>>,
-        config: CalendarConfig,
+        config: &CalendarConfig,
         timezone: String,
     ) -> Result<Self> {
-        let caldav_client = CalDavClient::new(
-            config.caldav_url.clone(),
-            config.username.clone(),
-            config.password.expose().to_string(),
-            timezone,
-        );
+        // Migrate legacy sync state if needed
+        if let Err(e) = migrate_legacy_sync_state().await {
+            tracing::warn!("Failed to migrate legacy sync state: {}", e);
+        }
+
+        let mut providers: Vec<(String, Box<dyn CalendarProvider>)> = Vec::new();
+        let mut provider_configs = Vec::new();
+        let mut any_auto_sync = false;
+
+        for provider_config in &config.providers {
+            if !provider_config.is_enabled() {
+                continue;
+            }
+
+            let provider_id = provider_config.provider_id();
+            any_auto_sync = any_auto_sync || provider_config.auto_sync_due_dates();
+
+            let provider: Box<dyn CalendarProvider> = match provider_config {
+                CalendarProviderConfig::Apple(apple) => {
+                    Box::new(AppleCalendarProvider::new(
+                        apple.caldav_url.clone(),
+                        apple.username.clone(),
+                        apple.password.expose().to_string(),
+                        apple.calendar_name.clone(),
+                        timezone.clone(),
+                    ))
+                }
+                CalendarProviderConfig::Google(google) => {
+                    Box::new(GoogleCalendarProvider::new(
+                        google.client_id.clone(),
+                        google.client_secret.expose().to_string(),
+                        google.access_token.expose().to_string(),
+                        google.refresh_token.expose().to_string(),
+                        google.calendar_id.clone(),
+                        timezone.clone(),
+                    ))
+                }
+                CalendarProviderConfig::GenericCalDav(generic) => {
+                    Box::new(GenericCalDavProvider::new(
+                        generic.name.clone(),
+                        generic.caldav_url.clone(),
+                        generic.username.clone(),
+                        generic.password.expose().to_string(),
+                        generic.calendar_name.clone(),
+                        timezone.clone(),
+                    ))
+                }
+            };
+
+            providers.push((provider_id, provider));
+            provider_configs.push(provider_config.clone());
+        }
 
         let conflicts_path = dirs::home_dir()
             .unwrap_or_else(|| PathBuf::from("."))
@@ -47,173 +97,137 @@ impl CalendarSyncAdapter {
             .join("calendar_conflicts.jsonl");
 
         Ok(Self {
-            caldav_client: Arc::new(RwLock::new(caldav_client)),
+            providers,
+            provider_configs,
             todo_store,
-            config,
             conflicts_path,
-            discovered_url: Arc::new(RwLock::new(None)),
+            auto_sync_due_dates: any_auto_sync,
         })
     }
 
-    /// Ensure the calendar URL has been discovered (if using a base URL like caldav.icloud.com)
-    async fn ensure_calendar_url_discovered(&self) -> Result<()> {
-        // Check if we've already discovered the URL
-        {
-            let discovered = self.discovered_url.read().await;
-            if discovered.is_some() {
-                return Ok(());
+    /// Two-way sync: Pull from all CalDAV providers, resolve conflicts, push local changes.
+    async fn sync_calendar_internal(&self) -> Result<Value> {
+        let mut total_pulled = 0;
+        let mut total_pushed = 0;
+        let mut total_conflicts = 0;
+        let mut provider_results = Vec::new();
+        let mut errors = Vec::new();
+
+        for (provider_id, provider) in &self.providers {
+            match self
+                .sync_single_provider(provider_id, provider.as_ref())
+                .await
+            {
+                Ok(result) => {
+                    let pulled = result["events_pulled"].as_u64().unwrap_or(0);
+                    let pushed = result["events_pushed"].as_u64().unwrap_or(0);
+                    let conflicts = result["conflicts_detected"].as_u64().unwrap_or(0);
+                    total_pulled += pulled;
+                    total_pushed += pushed;
+                    total_conflicts += conflicts;
+                    provider_results.push(json!({
+                        "provider": provider.name(),
+                        "provider_id": provider_id,
+                        "status": "success",
+                        "events_pulled": pulled,
+                        "events_pushed": pushed,
+                        "conflicts_detected": conflicts,
+                    }));
+                }
+                Err(e) => {
+                    tracing::error!("Calendar sync failed for {}: {:?}", provider.name(), e);
+                    errors.push(format!("{}: {}", provider.name(), e));
+                    provider_results.push(json!({
+                        "provider": provider.name(),
+                        "provider_id": provider_id,
+                        "status": "error",
+                        "error": e.to_string(),
+                    }));
+                }
             }
         }
 
-        // Check if the current URL looks like a base URL that needs discovery
-        let current_url = &self.config.caldav_url;
-        let needs_discovery = current_url == "https://caldav.icloud.com/"
-            || current_url == "https://caldav.icloud.com"
-            || current_url.ends_with("/.well-known/caldav")
-            || (!current_url.ends_with(".ics") && !current_url.contains("/calendars/"));
-
-        if !needs_discovery {
-            tracing::debug!("Calendar URL appears to be specific, skipping discovery");
-            return Ok(());
-        }
-
-        tracing::info!("Discovering calendar URL for base URL: {}", current_url);
-
-        // Perform discovery
-        let discovered_calendar_url = match CalDavClient::discover_calendar_url(
-            current_url,
-            &self.config.username,
-            self.config.password.expose(),
-            &self.config.calendar_name,
-        )
-        .await
-        {
-            Ok(url) => url,
-            Err(e) => {
-                tracing::error!("CalDAV discovery failed: {:?}", e);
-                return Err(e);
-            }
-        };
-
-        // Convert relative path to full URL
-        let full_url = if discovered_calendar_url.starts_with("http") {
-            discovered_calendar_url.clone()
+        let status = if errors.is_empty() {
+            "success"
+        } else if errors.len() < self.providers.len() {
+            "partial_success"
         } else {
-            // Extract base from current URL and append discovered path
-            let base = if current_url.contains("://") {
-                current_url.split('/').take(3).collect::<Vec<_>>().join("/")
-            } else {
-                format!(
-                    "https://{}",
-                    current_url
-                        .trim_start_matches("https://")
-                        .split('/')
-                        .next()
-                        .unwrap_or("caldav.icloud.com")
-                )
-            };
-            format!("{}{}", base, discovered_calendar_url)
+            "failed"
         };
 
-        tracing::info!("Discovered full calendar URL: {}", full_url);
-
-        // Update the client's calendar_url
-        {
-            let mut client = self.caldav_client.write().await;
-            client.set_calendar_url(full_url.clone());
-        }
-
-        // Store the discovered URL
-        {
-            let mut discovered = self.discovered_url.write().await;
-            *discovered = Some(full_url);
-        }
-
-        Ok(())
+        Ok(json!({
+            "status": status,
+            "events_pulled": total_pulled,
+            "events_pushed": total_pushed,
+            "conflicts_detected": total_conflicts,
+            "providers": provider_results,
+            "last_sync": Utc::now().to_rfc3339(),
+        }))
     }
 
-    /// Two-way sync: Pull from CalDAV server, resolve conflicts, push local changes
-    async fn sync_calendar_internal(&self) -> Result<Value> {
-        // Auto-discover calendar URL on first sync if using base URL
-        self.ensure_calendar_url_discovered().await?;
+    /// Sync a single provider.
+    async fn sync_single_provider(
+        &self,
+        provider_id: &str,
+        provider: &dyn CalendarProvider,
+    ) -> Result<Value> {
+        // Load per-provider sync state
+        let mut sync_state = load_provider_sync_state(provider_id).await?;
 
-        // Step 1: Load sync state
-        let mut sync_state = load_sync_state().await?;
-
-        // Step 2: Fetch remote events (incremental if we have a sync token)
-        let (remote_events, new_sync_token) = {
-            let client = self.caldav_client.read().await;
-            client.get_events(sync_state.sync_token.as_deref()).await?
-        };
+        // Fetch remote events
+        let (remote_events, new_sync_token) =
+            provider.get_events(sync_state.sync_token.as_deref()).await?;
 
         let mut store = self.todo_store.write().await;
-
-        // Step 3: Process remote changes
         let mut conflicts_detected = 0;
         let mut events_pulled = 0;
         let mut events_pushed = 0;
 
+        // Process remote changes
         for remote_event in &remote_events {
-            // Find corresponding local todo by calendar UID
             if let Some(local_todo) = self
                 .find_todo_by_calendar_uid_async(&mut store, &remote_event.uid)
                 .await
             {
-                // Convert local todo to event for comparison
                 if let Some(local_event) = self.todo_to_event(&local_todo) {
-                    // Detect conflict
                     if SyncEngine::detect_conflict(remote_event, &local_event) {
                         conflicts_detected += 1;
                         self.log_conflict(remote_event, &local_event).await?;
-
-                        // Resolve using server-wins strategy
                         let resolved_event =
                             SyncEngine::resolve_conflict(remote_event, &local_event);
                         self.update_todo_from_event(&mut store, &local_todo.id, &resolved_event)
                             .await?;
                     } else {
-                        // No conflict, but update from server if needed
                         self.update_todo_from_event(&mut store, &local_todo.id, remote_event)
                             .await?;
                     }
                 } else {
-                    // Local todo exists but can't be converted to event - update it
                     self.update_todo_from_event(&mut store, &local_todo.id, remote_event)
                         .await?;
                 }
                 events_pulled += 1;
             } else {
-                // New event from server - create local todo
                 self.create_todo_from_event(&mut store, remote_event)
                     .await?;
                 events_pulled += 1;
             }
         }
 
-        // Step 4: Push local changes to server
-        if self.config.auto_sync_due_dates {
+        // Push local changes
+        if self.auto_sync_due_dates {
             let filter = TodoFilter::default();
             let todos = store.list(&filter).await?;
             for todo in todos {
-                // Handle CREATE: New todos with due dates
                 if todo.due_date.is_some() && todo.calendar_event_uid.is_none() {
                     if let Some(event) = self.todo_to_event(&todo) {
-                        let put_result = {
-                            let client = self.caldav_client.read().await;
-                            client.put_event(&event).await
-                        };
-                        match put_result {
+                        match provider.put_event(&event).await {
                             Ok(_etag) => {
-                                // Update todo with calendar UID
                                 let patch = TodoPatch {
                                     calendar_event_uid: Some(Some(event.uid.clone())),
                                     ..Default::default()
                                 };
-                                match store.update(&todo.id, patch).await {
-                                    Ok(_) => {
-                                        events_pushed += 1;
-                                    }
-                                    Err(_e) => {}
+                                if store.update(&todo.id, patch).await.is_ok() {
+                                    events_pushed += 1;
                                 }
                             }
                             Err(e) => {
@@ -221,29 +235,16 @@ impl CalendarSyncAdapter {
                             }
                         }
                     }
-                }
-                // Handle UPDATE: Todo has calendar_uid and due_date, update the event
-                else if todo.due_date.is_some() && todo.calendar_event_uid.is_some() {
+                } else if todo.due_date.is_some() && todo.calendar_event_uid.is_some() {
                     if let Some(event) = self.todo_to_event(&todo) {
-                        let put_result = {
-                            let client = self.caldav_client.read().await;
-                            client.put_event(&event).await
-                        };
-                        if let Err(e) = put_result {
+                        if let Err(e) = provider.put_event(&event).await {
                             tracing::warn!("Failed to update event {}: {}", event.uid, e);
                         }
                     }
-                }
-                // Handle DELETE: Todo has calendar_uid but no due_date (due_date removed)
-                else if todo.due_date.is_none() && todo.calendar_event_uid.is_some() {
+                } else if todo.due_date.is_none() && todo.calendar_event_uid.is_some() {
                     if let Some(uid) = &todo.calendar_event_uid {
-                        let delete_result = {
-                            let client = self.caldav_client.read().await;
-                            client.delete_event(uid).await
-                        };
-                        match delete_result {
+                        match provider.delete_event(uid).await {
                             Ok(()) => {
-                                // Clear calendar UID from todo
                                 let patch = TodoPatch {
                                     calendar_event_uid: Some(None),
                                     ..Default::default()
@@ -259,22 +260,19 @@ impl CalendarSyncAdapter {
             }
         }
 
-        // Step 5: Update sync state
+        // Save sync state
         sync_state.sync_token = new_sync_token;
         sync_state.last_sync = Some(Utc::now());
-        save_sync_state(&sync_state).await?;
+        save_provider_sync_state(provider_id, &sync_state).await?;
 
         Ok(json!({
-            "status": "success",
             "events_pulled": events_pulled,
             "events_pushed": events_pushed,
             "conflicts_detected": conflicts_detected,
-            "last_sync": sync_state.last_sync,
-            "sync_token": sync_state.sync_token
         }))
     }
 
-    /// Find a todo by its calendar event UID (async helper)
+    /// Find a todo by its calendar event UID.
     async fn find_todo_by_calendar_uid_async(
         &self,
         store: &mut TodoStore,
@@ -290,7 +288,7 @@ impl CalendarSyncAdapter {
         }
     }
 
-    /// Update a todo from a calendar event
+    /// Update a todo from a calendar event.
     async fn update_todo_from_event(
         &self,
         store: &mut TodoStore,
@@ -309,7 +307,7 @@ impl CalendarSyncAdapter {
         Ok(())
     }
 
-    /// Create a new todo from a calendar event
+    /// Create a new todo from a calendar event.
     async fn create_todo_from_event(
         &self,
         store: &mut TodoStore,
@@ -344,17 +342,13 @@ impl CalendarSyncAdapter {
         Ok(())
     }
 
-    /// Convert a todo to a calendar event
+    /// Convert a todo to a calendar event.
     fn todo_to_event(&self, todo: &Todo) -> Option<CalendarEvent> {
         let due_date = todo.due_date?;
-
-        // Generate UID if not present
         let uid = todo
             .calendar_event_uid
             .clone()
             .unwrap_or_else(|| format!("klyntbot-{}", todo.id));
-
-        // Calculate event duration from estimated_minutes or default to 1 hour
         let duration_mins = todo.estimated_minutes.unwrap_or(60);
         let end = due_date + Duration::minutes(duration_mins as i64);
 
@@ -369,13 +363,12 @@ impl CalendarSyncAdapter {
         })
     }
 
-    /// Log a conflict to the conflicts file
+    /// Log a conflict to the conflicts file.
     async fn log_conflict(
         &self,
         server_event: &CalendarEvent,
         local_event: &CalendarEvent,
     ) -> Result<()> {
-        // Ensure parent dir exists
         if let Some(parent) = self.conflicts_path.parent() {
             fs::create_dir_all(parent).await?;
         }
@@ -402,7 +395,6 @@ impl CalendarSyncAdapter {
 
         let mut line = serde_json::to_string(&conflict_entry)?;
         line.push('\n');
-
         fs::write(&self.conflicts_path, line.as_bytes()).await?;
 
         Ok(())
@@ -411,27 +403,33 @@ impl CalendarSyncAdapter {
 
 #[async_trait]
 impl CalendarHandler for CalendarSyncAdapter {
-    /// Synchronize calendar with CalDAV server
+    /// Synchronize calendar with all enabled providers.
     async fn sync_calendar(&self) -> Result<Value> {
         self.sync_calendar_internal().await
     }
 
-    /// List upcoming calendar events
+    /// List upcoming calendar events from all enabled providers.
     async fn list_events(&self, limit: usize) -> Result<Value> {
-        // Fetch all events from CalDAV server
-        let (events, _sync_token) = {
-            let client = self.caldav_client.read().await;
-            client.get_events(None).await?
-        };
+        let mut all_events = Vec::new();
 
-        // Filter to upcoming events only
+        for (_provider_id, provider) in &self.providers {
+            match provider.get_events(None).await {
+                Ok((events, _)) => all_events.extend(events),
+                Err(e) => {
+                    tracing::warn!("Failed to list events from {}: {}", provider.name(), e);
+                }
+            }
+        }
+
+        // Deduplicate by UID, filter to upcoming, sort by start time
         let now = Utc::now();
-        let mut upcoming: Vec<_> = events.into_iter().filter(|e| e.start >= now).collect();
+        let mut seen_uids = std::collections::HashSet::new();
+        let mut upcoming: Vec<_> = all_events
+            .into_iter()
+            .filter(|e| e.start >= now && seen_uids.insert(e.uid.clone()))
+            .collect();
 
-        // Sort by start time
         upcoming.sort_by_key(|e| e.start);
-
-        // Limit results
         upcoming.truncate(limit);
 
         let event_list: Vec<Value> = upcoming
@@ -455,7 +453,7 @@ impl CalendarHandler for CalendarSyncAdapter {
         }))
     }
 
-    /// Create a new calendar event
+    /// Create a new calendar event (uses first enabled provider).
     async fn create_event(
         &self,
         summary: String,
@@ -465,7 +463,6 @@ impl CalendarHandler for CalendarSyncAdapter {
     ) -> Result<Value> {
         use chrono::DateTime;
 
-        // Parse ISO 8601 timestamps
         let start_dt = DateTime::parse_from_rfc3339(&start)
             .map_err(|e| {
                 common::KlyntbotError::Calendar(common::CalendarError::ProtocolError(format!(
@@ -484,7 +481,6 @@ impl CalendarHandler for CalendarSyncAdapter {
             })?
             .with_timezone(&Utc);
 
-        // Generate unique UID
         let uid = format!("klyntbot-event-{}", uuid::Uuid::new_v4());
 
         let event = CalendarEvent {
@@ -497,27 +493,31 @@ impl CalendarHandler for CalendarSyncAdapter {
             etag: None,
         };
 
-        // Push to CalDAV server
-        let etag = {
-            let client = self.caldav_client.read().await;
-            client.put_event(&event).await?
-        };
+        // Use first provider
+        if let Some((_id, provider)) = self.providers.first() {
+            let etag = provider.put_event(&event).await?;
 
-        Ok(json!({
-            "status": "created",
-            "uid": uid,
-            "summary": summary,
-            "description": description,
-            "start": start,
-            "end": end,
-            "etag": etag
-        }))
+            Ok(json!({
+                "status": "created",
+                "uid": uid,
+                "summary": summary,
+                "description": description,
+                "start": start,
+                "end": end,
+                "etag": etag,
+                "provider": provider.name()
+            }))
+        } else {
+            Err(common::KlyntbotError::Calendar(
+                common::CalendarError::ConnectionFailed(
+                    "No calendar providers configured".to_string(),
+                ),
+            ))
+        }
     }
 
-    /// Get sync status
+    /// Get sync status for all providers.
     async fn get_status(&self) -> Result<Value> {
-        let sync_state = load_sync_state().await?;
-
         let mut store = self.todo_store.write().await;
         let filter = TodoFilter::default();
         let todos = store.list(&filter).await?;
@@ -526,14 +526,26 @@ impl CalendarHandler for CalendarSyncAdapter {
             .filter(|t| t.calendar_event_uid.is_some())
             .count();
 
+        let mut provider_statuses = Vec::new();
+
+        for (provider_id, provider) in &self.providers {
+            let sync_state = load_provider_sync_state(provider_id).await.ok();
+
+            provider_statuses.push(json!({
+                "provider": provider.name(),
+                "provider_id": provider_id,
+                "last_sync": sync_state.as_ref().and_then(|s| s.last_sync.map(|t| t.to_rfc3339())),
+                "has_sync_token": sync_state.as_ref().is_some_and(|s| s.sync_token.is_some()),
+            }));
+        }
+
         Ok(json!({
             "status": "ok",
-            "last_sync": sync_state.last_sync.map(|t| t.to_rfc3339()),
-            "has_sync_token": sync_state.sync_token.is_some(),
+            "providers": provider_statuses,
+            "provider_count": self.providers.len(),
             "todos_with_calendar_events": synced_count,
             "total_todos": todos.len(),
-            "calendar_url": self.config.caldav_url,
-            "auto_sync_enabled": self.config.auto_sync_due_dates
+            "auto_sync_enabled": self.auto_sync_due_dates
         }))
     }
 }
@@ -541,27 +553,38 @@ impl CalendarHandler for CalendarSyncAdapter {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use config::{AppleCalendarConfig, Secret};
     use tools::todo_store::TodoStore;
+
+    fn test_calendar_config() -> CalendarConfig {
+        CalendarConfig {
+            providers: vec![CalendarProviderConfig::Apple(AppleCalendarConfig {
+                enabled: true,
+                username: "user@example.com".to_string(),
+                password: Secret::new("password123".to_string()),
+                caldav_url: "https://caldav.example.com/calendar".to_string(),
+                calendar_name: "Test Calendar".to_string(),
+                sync_interval_secs: 300,
+                auto_sync_due_dates: true,
+            })],
+            conflict_resolution: "server_wins".to_string(),
+            ..CalendarConfig::default()
+        }
+    }
 
     #[tokio::test]
     async fn test_calendar_sync_adapter_creation() {
         let temp_dir = tempfile::tempdir().unwrap();
         let store_path = temp_dir.path().join("todos.jsonl");
         let todo_store = Arc::new(RwLock::new(TodoStore::new(store_path)));
+        let config = test_calendar_config();
 
-        let config = CalendarConfig {
-            enabled: true,
-            username: "user@example.com".to_string(),
-            password: config::Secret::new("password123".to_string()),
-            caldav_url: "https://caldav.example.com/calendar".to_string(),
-            calendar_name: "Test Calendar".to_string(),
-            sync_interval_secs: 300,
-            conflict_resolution: "server_wins".to_string(),
-            auto_sync_due_dates: true,
-        };
-
-        let adapter = CalendarSyncAdapter::new(todo_store, config, "UTC".to_string());
+        let adapter = CalendarSyncAdapter::new(todo_store, &config, "UTC".to_string()).await;
         assert!(adapter.is_ok());
+
+        let adapter = adapter.unwrap();
+        assert_eq!(adapter.providers.len(), 1);
+        assert_eq!(adapter.providers[0].0, "apple");
     }
 
     #[tokio::test]
@@ -569,19 +592,11 @@ mod tests {
         let temp_dir = tempfile::tempdir().unwrap();
         let store_path = temp_dir.path().join("todos.jsonl");
         let todo_store = Arc::new(RwLock::new(TodoStore::new(store_path)));
+        let config = test_calendar_config();
 
-        let config = CalendarConfig {
-            enabled: true,
-            username: "user@example.com".to_string(),
-            password: config::Secret::new("password123".to_string()),
-            caldav_url: "https://caldav.example.com/calendar".to_string(),
-            calendar_name: "Test Calendar".to_string(),
-            sync_interval_secs: 300,
-            conflict_resolution: "server_wins".to_string(),
-            auto_sync_due_dates: true,
-        };
-
-        let adapter = CalendarSyncAdapter::new(todo_store, config, "UTC".to_string()).unwrap();
+        let adapter = CalendarSyncAdapter::new(todo_store, &config, "UTC".to_string())
+            .await
+            .unwrap();
 
         let now = Utc::now();
         let due_date = now + Duration::hours(2);
@@ -626,19 +641,11 @@ mod tests {
         let temp_dir = tempfile::tempdir().unwrap();
         let store_path = temp_dir.path().join("todos.jsonl");
         let todo_store = Arc::new(RwLock::new(TodoStore::new(store_path)));
+        let config = test_calendar_config();
 
-        let config = CalendarConfig {
-            enabled: true,
-            username: "user@example.com".to_string(),
-            password: config::Secret::new("password123".to_string()),
-            caldav_url: "https://caldav.example.com/calendar".to_string(),
-            calendar_name: "Test Calendar".to_string(),
-            sync_interval_secs: 300,
-            conflict_resolution: "server_wins".to_string(),
-            auto_sync_due_dates: true,
-        };
-
-        let adapter = CalendarSyncAdapter::new(todo_store, config, "UTC".to_string()).unwrap();
+        let adapter = CalendarSyncAdapter::new(todo_store, &config, "UTC".to_string())
+            .await
+            .unwrap();
 
         let now = Utc::now();
 
@@ -647,7 +654,7 @@ mod tests {
             title: "No Due Date Task".to_string(),
             description: None,
             priority: None,
-            due_date: None, // No due date
+            due_date: None,
             tags: vec![],
             status: TodoStatus::Todo,
             focused_at: None,
@@ -667,6 +674,63 @@ mod tests {
         };
 
         let event = adapter.todo_to_event(&todo);
-        assert!(event.is_none()); // Should return None without due date
+        assert!(event.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_multi_provider_adapter() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let store_path = temp_dir.path().join("todos.jsonl");
+        let todo_store = Arc::new(RwLock::new(TodoStore::new(store_path)));
+
+        let config = CalendarConfig {
+            providers: vec![
+                CalendarProviderConfig::Apple(AppleCalendarConfig {
+                    enabled: true,
+                    username: "user@apple.com".to_string(),
+                    password: Secret::new("pass".to_string()),
+                    caldav_url: "https://caldav.icloud.com".to_string(),
+                    ..AppleCalendarConfig::default()
+                }),
+                CalendarProviderConfig::Google(config::GoogleCalendarConfig {
+                    enabled: true,
+                    client_id: "id".to_string(),
+                    client_secret: Secret::new("secret".to_string()),
+                    access_token: Secret::new("tok".to_string()),
+                    refresh_token: Secret::new("ref".to_string()),
+                    ..config::GoogleCalendarConfig::default()
+                }),
+            ],
+            ..CalendarConfig::default()
+        };
+
+        let adapter = CalendarSyncAdapter::new(todo_store, &config, "UTC".to_string())
+            .await
+            .unwrap();
+        assert_eq!(adapter.providers.len(), 2);
+        assert_eq!(adapter.providers[0].0, "apple");
+        assert_eq!(adapter.providers[1].0, "google");
+    }
+
+    #[tokio::test]
+    async fn test_disabled_provider_skipped() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let store_path = temp_dir.path().join("todos.jsonl");
+        let todo_store = Arc::new(RwLock::new(TodoStore::new(store_path)));
+
+        let config = CalendarConfig {
+            providers: vec![CalendarProviderConfig::Apple(AppleCalendarConfig {
+                enabled: false, // disabled
+                username: "user@apple.com".to_string(),
+                password: Secret::new("pass".to_string()),
+                ..AppleCalendarConfig::default()
+            })],
+            ..CalendarConfig::default()
+        };
+
+        let adapter = CalendarSyncAdapter::new(todo_store, &config, "UTC".to_string())
+            .await
+            .unwrap();
+        assert_eq!(adapter.providers.len(), 0);
     }
 }

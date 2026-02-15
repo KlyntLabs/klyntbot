@@ -132,13 +132,10 @@ fn print_config_status(state: &WizardState) {
     }
 
     // Calendar status
-    if config.calendar.enabled {
-        let user = if config.calendar.username.is_empty() {
-            "configured".to_string()
-        } else {
-            config.calendar.username.clone()
-        };
-        print_status_line(true, "Calendar", &user);
+    if config.calendar.is_any_enabled() {
+        let enabled = config.calendar.enabled_providers();
+        let names: Vec<&str> = enabled.iter().map(|p| p.display_name()).collect();
+        print_status_line(true, "Calendar", &names.join(", "));
     } else {
         print_status_line(false, "Calendar", "Not configured");
     }

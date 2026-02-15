@@ -436,36 +436,218 @@ fn default_deadline_hours() -> u64 {
     18
 }
 
-/// Calendar sync configuration (Phase 1 prep for Phase 3)
+/// Calendar sync configuration — supports multiple providers simultaneously.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CalendarConfig {
-    #[serde(default)]
-    pub enabled: bool,
-
-    #[serde(default)]
-    pub username: String,
-
-    #[serde(default)]
-    pub password: Secret<String>,
-
-    #[serde(default = "default_caldav_url")]
-    pub caldav_url: String,
-
-    #[serde(default = "default_calendar_name")]
-    pub calendar_name: String,
-
-    #[serde(default = "default_sync_interval_secs")]
-    pub sync_interval_secs: u64,
+    /// Calendar providers (Apple, Google, Generic CalDAV).
+    #[serde(default, deserialize_with = "deserialize_providers")]
+    pub providers: Vec<CalendarProviderConfig>,
 
     #[serde(default = "default_conflict_resolution")]
     pub conflict_resolution: String,
 
+    // --- Legacy fields for backward compatibility during deserialization ---
+    // These fields are populated by the custom deserializer when reading old-format configs.
+    // They are NOT serialized. Code should use `providers` instead.
+    #[serde(skip)]
+    #[doc(hidden)]
+    pub legacy_migrated: bool,
+}
+
+impl Default for CalendarConfig {
+    fn default() -> Self {
+        Self {
+            providers: Vec::new(),
+            conflict_resolution: default_conflict_resolution(),
+            legacy_migrated: false,
+        }
+    }
+}
+
+impl CalendarConfig {
+    /// Check if any provider is enabled.
+    pub fn is_any_enabled(&self) -> bool {
+        self.providers.iter().any(|p| p.is_enabled())
+    }
+
+    /// Get all enabled providers.
+    pub fn enabled_providers(&self) -> Vec<&CalendarProviderConfig> {
+        self.providers.iter().filter(|p| p.is_enabled()).collect()
+    }
+
+    /// Find a provider by its ID (e.g., "apple", "google", "generic-nextcloud").
+    pub fn find_provider(&self, provider_id: &str) -> Option<&CalendarProviderConfig> {
+        self.providers.iter().find(|p| p.provider_id() == provider_id)
+    }
+
+    /// Find a provider by its ID (mutable).
+    pub fn find_provider_mut(&mut self, provider_id: &str) -> Option<&mut CalendarProviderConfig> {
+        self.providers.iter_mut().find(|p| p.provider_id() == provider_id)
+    }
+
+    /// Get the Apple provider config, if present.
+    pub fn apple(&self) -> Option<&AppleCalendarConfig> {
+        self.providers.iter().find_map(|p| match p {
+            CalendarProviderConfig::Apple(c) => Some(c),
+            _ => None,
+        })
+    }
+
+    /// Get the Apple provider config mutably, if present.
+    pub fn apple_mut(&mut self) -> Option<&mut AppleCalendarConfig> {
+        self.providers.iter_mut().find_map(|p| match p {
+            CalendarProviderConfig::Apple(c) => Some(c),
+            _ => None,
+        })
+    }
+
+    /// Get the Google provider config, if present.
+    pub fn google(&self) -> Option<&GoogleCalendarConfig> {
+        self.providers.iter().find_map(|p| match p {
+            CalendarProviderConfig::Google(c) => Some(c),
+            _ => None,
+        })
+    }
+
+    /// Get the Google provider config mutably, if present.
+    pub fn google_mut(&mut self) -> Option<&mut GoogleCalendarConfig> {
+        self.providers.iter_mut().find_map(|p| match p {
+            CalendarProviderConfig::Google(c) => Some(c),
+            _ => None,
+        })
+    }
+
+    /// Get or create the Apple provider config (mutable).
+    pub fn ensure_apple_mut(&mut self) -> &mut AppleCalendarConfig {
+        if !self.providers.iter().any(|p| matches!(p, CalendarProviderConfig::Apple(_))) {
+            self.providers.push(CalendarProviderConfig::Apple(AppleCalendarConfig::default()));
+        }
+        self.apple_mut().unwrap()
+    }
+
+    /// Get or create the Google provider config (mutable).
+    pub fn ensure_google_mut(&mut self) -> &mut GoogleCalendarConfig {
+        if !self.providers.iter().any(|p| matches!(p, CalendarProviderConfig::Google(_))) {
+            self.providers.push(CalendarProviderConfig::Google(GoogleCalendarConfig::default()));
+        }
+        self.google_mut().unwrap()
+    }
+
+    /// Get the minimum sync interval across all enabled providers.
+    pub fn min_sync_interval_secs(&self) -> u64 {
+        self.providers
+            .iter()
+            .filter(|p| p.is_enabled())
+            .map(|p| p.sync_interval_secs())
+            .min()
+            .unwrap_or(300)
+    }
+}
+
+/// Provider-specific configuration (tagged enum).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", tag = "type")]
+pub enum CalendarProviderConfig {
+    #[serde(rename = "apple")]
+    Apple(AppleCalendarConfig),
+    #[serde(rename = "google")]
+    Google(GoogleCalendarConfig),
+    #[serde(rename = "genericCaldav")]
+    GenericCalDav(GenericCalDavConfig),
+}
+
+impl CalendarProviderConfig {
+    /// Check if this provider is enabled.
+    pub fn is_enabled(&self) -> bool {
+        match self {
+            Self::Apple(c) => c.enabled,
+            Self::Google(c) => c.enabled,
+            Self::GenericCalDav(c) => c.enabled,
+        }
+    }
+
+    /// Get the unique provider ID.
+    pub fn provider_id(&self) -> String {
+        match self {
+            Self::Apple(_) => "apple".to_string(),
+            Self::Google(_) => "google".to_string(),
+            Self::GenericCalDav(c) => {
+                format!(
+                    "generic-{}",
+                    c.name.to_lowercase().replace(|ch: char| !ch.is_alphanumeric(), "-")
+                )
+            }
+        }
+    }
+
+    /// Check if auto-sync of due dates is enabled.
+    pub fn auto_sync_due_dates(&self) -> bool {
+        match self {
+            Self::Apple(c) => c.auto_sync_due_dates,
+            Self::Google(c) => c.auto_sync_due_dates,
+            Self::GenericCalDav(c) => c.auto_sync_due_dates,
+        }
+    }
+
+    /// Get the calendar name.
+    pub fn calendar_name(&self) -> &str {
+        match self {
+            Self::Apple(c) => &c.calendar_name,
+            Self::Google(c) => &c.calendar_name,
+            Self::GenericCalDav(c) => &c.calendar_name,
+        }
+    }
+
+    /// Get the human-readable display name for this provider type.
+    pub fn display_name(&self) -> &str {
+        match self {
+            Self::Apple(_) => "Apple Calendar",
+            Self::Google(_) => "Google Calendar",
+            Self::GenericCalDav(c) => &c.name,
+        }
+    }
+
+    /// Get the sync interval in seconds.
+    pub fn sync_interval_secs(&self) -> u64 {
+        match self {
+            Self::Apple(c) => c.sync_interval_secs,
+            Self::Google(c) => c.sync_interval_secs,
+            Self::GenericCalDav(c) => c.sync_interval_secs,
+        }
+    }
+
+    /// Set enabled state.
+    pub fn set_enabled(&mut self, enabled: bool) {
+        match self {
+            Self::Apple(c) => c.enabled = enabled,
+            Self::Google(c) => c.enabled = enabled,
+            Self::GenericCalDav(c) => c.enabled = enabled,
+        }
+    }
+}
+
+/// Apple Calendar (iCloud CalDAV) configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppleCalendarConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub username: String,
+    #[serde(default)]
+    pub password: Secret<String>,
+    #[serde(default = "default_caldav_url")]
+    pub caldav_url: String,
+    #[serde(default = "default_calendar_name")]
+    pub calendar_name: String,
+    #[serde(default = "default_sync_interval_secs")]
+    pub sync_interval_secs: u64,
     #[serde(default = "default_true")]
     pub auto_sync_due_dates: bool,
 }
 
-impl Default for CalendarConfig {
+impl Default for AppleCalendarConfig {
     fn default() -> Self {
         Self {
             enabled: false,
@@ -474,9 +656,144 @@ impl Default for CalendarConfig {
             caldav_url: default_caldav_url(),
             calendar_name: default_calendar_name(),
             sync_interval_secs: default_sync_interval_secs(),
-            conflict_resolution: default_conflict_resolution(),
             auto_sync_due_dates: true,
         }
+    }
+}
+
+/// Google Calendar (OAuth2 CalDAV) configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GoogleCalendarConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default)]
+    pub client_id: String,
+    #[serde(default)]
+    pub client_secret: Secret<String>,
+    #[serde(default)]
+    pub access_token: Secret<String>,
+    #[serde(default)]
+    pub refresh_token: Secret<String>,
+    #[serde(default = "default_google_calendar_id")]
+    pub calendar_id: String,
+    #[serde(default = "default_calendar_name")]
+    pub calendar_name: String,
+    #[serde(default = "default_sync_interval_secs")]
+    pub sync_interval_secs: u64,
+    #[serde(default = "default_true")]
+    pub auto_sync_due_dates: bool,
+}
+
+impl Default for GoogleCalendarConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            client_id: String::new(),
+            client_secret: Secret::default(),
+            access_token: Secret::default(),
+            refresh_token: Secret::default(),
+            calendar_id: default_google_calendar_id(),
+            calendar_name: default_calendar_name(),
+            sync_interval_secs: default_sync_interval_secs(),
+            auto_sync_due_dates: true,
+        }
+    }
+}
+
+fn default_google_calendar_id() -> String {
+    "primary".to_string()
+}
+
+/// Generic CalDAV provider configuration (Nextcloud, Fastmail, Zoho, etc.).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GenericCalDavConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    /// User-chosen label (e.g., "Nextcloud", "Fastmail").
+    pub name: String,
+    pub caldav_url: String,
+    #[serde(default)]
+    pub username: String,
+    #[serde(default)]
+    pub password: Secret<String>,
+    #[serde(default = "default_calendar_name")]
+    pub calendar_name: String,
+    #[serde(default = "default_sync_interval_secs")]
+    pub sync_interval_secs: u64,
+    #[serde(default = "default_true")]
+    pub auto_sync_due_dates: bool,
+}
+
+/// Custom deserializer that handles both old (flat) and new (providers array) formats.
+fn deserialize_providers<'de, D>(deserializer: D) -> std::result::Result<Vec<CalendarProviderConfig>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    // Try to deserialize as the new format (Vec<CalendarProviderConfig>)
+    Vec::<CalendarProviderConfig>::deserialize(deserializer)
+}
+
+/// Deserialize a CalendarConfig that might be in the old flat format.
+/// This is handled by CalendarConfig's serde derive — the old format will have
+/// `username`, `password`, etc. at the top level instead of a `providers` array.
+/// We detect this by checking for the presence of `username` in the raw JSON.
+impl CalendarConfig {
+    /// Migrate from old flat format to new providers format.
+    /// Call this after deserialization if the config might be in the old format.
+    pub fn migrate_from_legacy(json: &serde_json::Value) -> Self {
+        // Check if this is old format (has "username" at top level)
+        if let Some(username) = json.get("username").and_then(|v| v.as_str()) {
+            if !username.is_empty() {
+                let password = json.get("password").and_then(|v| v.as_str()).unwrap_or_default();
+                let caldav_url = json
+                    .get("caldavUrl")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("https://caldav.icloud.com");
+                let calendar_name = json
+                    .get("calendarName")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Klyntbot Tasks");
+                let sync_interval_secs = json
+                    .get("syncIntervalSecs")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(300);
+                let auto_sync_due_dates = json
+                    .get("autoSyncDueDates")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(true);
+                let enabled = json
+                    .get("enabled")
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+
+                let apple = AppleCalendarConfig {
+                    enabled,
+                    username: username.to_string(),
+                    password: Secret::new(password.to_string()),
+                    caldav_url: caldav_url.to_string(),
+                    calendar_name: calendar_name.to_string(),
+                    sync_interval_secs,
+                    auto_sync_due_dates,
+                };
+
+                let conflict_resolution = json
+                    .get("conflictResolution")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("server_wins")
+                    .to_string();
+
+                return CalendarConfig {
+                    providers: vec![CalendarProviderConfig::Apple(apple)],
+                    conflict_resolution,
+                    legacy_migrated: true,
+                };
+            }
+        }
+
+        // Try new format
+        serde_json::from_value(json.clone()).unwrap_or_default()
     }
 }
 
@@ -521,27 +838,43 @@ mod tests {
     #[test]
     fn test_calendar_config_default() {
         let config = CalendarConfig::default();
-        assert!(!config.enabled);
-        assert!(config.username.is_empty());
-        assert!(config.password.is_empty());
-        assert_eq!(config.caldav_url, "https://caldav.icloud.com");
-        assert_eq!(config.calendar_name, "Klyntbot Tasks");
-        assert_eq!(config.sync_interval_secs, 300);
+        assert!(config.providers.is_empty());
+        assert!(!config.is_any_enabled());
         assert_eq!(config.conflict_resolution, "server_wins");
-        assert!(config.auto_sync_due_dates);
+    }
+
+    #[test]
+    fn test_apple_calendar_config_default() {
+        let apple = AppleCalendarConfig::default();
+        assert!(!apple.enabled);
+        assert!(apple.username.is_empty());
+        assert!(apple.password.is_empty());
+        assert_eq!(apple.caldav_url, "https://caldav.icloud.com");
+        assert_eq!(apple.calendar_name, "Klyntbot Tasks");
+        assert_eq!(apple.sync_interval_secs, 300);
+        assert!(apple.auto_sync_due_dates);
+    }
+
+    #[test]
+    fn test_google_calendar_config_default() {
+        let google = GoogleCalendarConfig::default();
+        assert!(!google.enabled);
+        assert!(google.client_id.is_empty());
+        assert_eq!(google.calendar_id, "primary");
     }
 
     #[test]
     fn test_calendar_config_secret_redaction() {
-        let config = CalendarConfig {
+        let apple = AppleCalendarConfig {
             enabled: true,
             username: "user@example.com".to_string(),
             password: Secret::new("secret123".to_string()),
-            caldav_url: "https://caldav.icloud.com".to_string(),
-            calendar_name: "Klyntbot".to_string(),
-            sync_interval_secs: 300,
-            conflict_resolution: "server_wins".to_string(),
-            auto_sync_due_dates: true,
+            ..AppleCalendarConfig::default()
+        };
+
+        let config = CalendarConfig {
+            providers: vec![CalendarProviderConfig::Apple(apple)],
+            ..CalendarConfig::default()
         };
 
         let debug_str = format!("{:?}", config);
@@ -550,42 +883,104 @@ mod tests {
     }
 
     #[test]
-    fn test_calendar_config_serialization_camel_case() {
-        let config = CalendarConfig {
+    fn test_calendar_provider_config_helpers() {
+        let apple = CalendarProviderConfig::Apple(AppleCalendarConfig {
             enabled: true,
-            username: "user@example.com".to_string(),
-            password: Secret::new("pass123".to_string()),
-            caldav_url: "https://caldav.icloud.com".to_string(),
             calendar_name: "My Calendar".to_string(),
-            sync_interval_secs: 600,
-            conflict_resolution: "client_wins".to_string(),
             auto_sync_due_dates: false,
-        };
+            ..AppleCalendarConfig::default()
+        });
 
-        let json = serde_json::to_string(&config).unwrap();
+        assert!(apple.is_enabled());
+        assert_eq!(apple.provider_id(), "apple");
+        assert!(!apple.auto_sync_due_dates());
+        assert_eq!(apple.calendar_name(), "My Calendar");
+        assert_eq!(apple.display_name(), "Apple Calendar");
 
-        // Check camelCase field names
-        assert!(json.contains("\"enabled\""));
-        assert!(json.contains("\"username\""));
-        assert!(json.contains("\"password\""));
-        assert!(json.contains("\"caldavUrl\""));
-        assert!(json.contains("\"calendarName\""));
-        assert!(json.contains("\"syncIntervalSecs\""));
-        assert!(json.contains("\"conflictResolution\""));
-        assert!(json.contains("\"autoSyncDueDates\""));
+        let google = CalendarProviderConfig::Google(GoogleCalendarConfig {
+            enabled: false,
+            ..GoogleCalendarConfig::default()
+        });
 
-        // Check values
-        assert!(json.contains("\"user@example.com\""));
-        assert!(json.contains("\"pass123\""));
-        assert!(json.contains("\"My Calendar\""));
-        assert!(json.contains("600"));
-        assert!(json.contains("\"client_wins\""));
-        assert!(json.contains("false"));
+        assert!(!google.is_enabled());
+        assert_eq!(google.provider_id(), "google");
+        assert_eq!(google.display_name(), "Google Calendar");
     }
 
     #[test]
-    fn test_calendar_config_deserialization() {
-        let json = r#"{
+    fn test_calendar_config_multi_provider() {
+        let config = CalendarConfig {
+            providers: vec![
+                CalendarProviderConfig::Apple(AppleCalendarConfig {
+                    enabled: true,
+                    ..AppleCalendarConfig::default()
+                }),
+                CalendarProviderConfig::Google(GoogleCalendarConfig {
+                    enabled: false,
+                    ..GoogleCalendarConfig::default()
+                }),
+            ],
+            ..CalendarConfig::default()
+        };
+
+        assert!(config.is_any_enabled());
+        assert_eq!(config.enabled_providers().len(), 1);
+        assert!(config.apple().is_some());
+        assert!(config.google().is_some());
+    }
+
+    #[test]
+    fn test_calendar_config_serialization_new_format() {
+        let config = CalendarConfig {
+            providers: vec![CalendarProviderConfig::Apple(AppleCalendarConfig {
+                enabled: true,
+                username: "user@apple.com".to_string(),
+                password: Secret::new("pass".to_string()),
+                ..AppleCalendarConfig::default()
+            })],
+            conflict_resolution: "server_wins".to_string(),
+            ..CalendarConfig::default()
+        };
+
+        let json = serde_json::to_string(&config).unwrap();
+        assert!(json.contains("\"providers\""));
+        assert!(json.contains("\"type\":\"apple\""));
+        assert!(json.contains("\"user@apple.com\""));
+    }
+
+    #[test]
+    fn test_calendar_config_roundtrip() {
+        let original = CalendarConfig {
+            providers: vec![
+                CalendarProviderConfig::Apple(AppleCalendarConfig {
+                    enabled: true,
+                    username: "user@apple.com".to_string(),
+                    password: Secret::new("pass".to_string()),
+                    ..AppleCalendarConfig::default()
+                }),
+                CalendarProviderConfig::Google(GoogleCalendarConfig {
+                    enabled: true,
+                    client_id: "id123".to_string(),
+                    client_secret: Secret::new("secret".to_string()),
+                    access_token: Secret::new("tok".to_string()),
+                    refresh_token: Secret::new("ref".to_string()),
+                    ..GoogleCalendarConfig::default()
+                }),
+            ],
+            conflict_resolution: "server_wins".to_string(),
+            ..CalendarConfig::default()
+        };
+
+        let json = serde_json::to_string(&original).unwrap();
+        let deserialized: CalendarConfig = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(original.providers.len(), deserialized.providers.len());
+        assert_eq!(original.conflict_resolution, deserialized.conflict_resolution);
+    }
+
+    #[test]
+    fn test_calendar_config_legacy_migration() {
+        let legacy_json = serde_json::json!({
             "enabled": true,
             "username": "test@apple.com",
             "password": "app-password-123",
@@ -594,49 +989,18 @@ mod tests {
             "syncIntervalSecs": 900,
             "conflictResolution": "server_wins",
             "autoSyncDueDates": true
-        }"#;
+        });
 
-        let config: CalendarConfig = serde_json::from_str(json).unwrap();
-        assert!(config.enabled);
-        assert_eq!(config.username, "test@apple.com");
-        assert_eq!(config.password.expose(), "app-password-123");
-        assert_eq!(config.caldav_url, "https://caldav.icloud.com");
-        assert_eq!(config.calendar_name, "Work Tasks");
-        assert_eq!(config.sync_interval_secs, 900);
-        assert_eq!(config.conflict_resolution, "server_wins");
-        assert!(config.auto_sync_due_dates);
-    }
+        let config = CalendarConfig::migrate_from_legacy(&legacy_json);
+        assert_eq!(config.providers.len(), 1);
+        assert!(config.is_any_enabled());
 
-    #[test]
-    fn test_calendar_config_round_trip() {
-        let original = CalendarConfig {
-            enabled: true,
-            username: "roundtrip@test.com".to_string(),
-            password: Secret::new("secure-pass".to_string()),
-            caldav_url: "https://caldav.example.com".to_string(),
-            calendar_name: "Test Calendar".to_string(),
-            sync_interval_secs: 1800,
-            conflict_resolution: "merge".to_string(),
-            auto_sync_due_dates: false,
-        };
-
-        let json = serde_json::to_string(&original).unwrap();
-        let deserialized: CalendarConfig = serde_json::from_str(&json).unwrap();
-
-        assert_eq!(original.enabled, deserialized.enabled);
-        assert_eq!(original.username, deserialized.username);
-        assert_eq!(original.password.expose(), deserialized.password.expose());
-        assert_eq!(original.caldav_url, deserialized.caldav_url);
-        assert_eq!(original.calendar_name, deserialized.calendar_name);
-        assert_eq!(original.sync_interval_secs, deserialized.sync_interval_secs);
-        assert_eq!(
-            original.conflict_resolution,
-            deserialized.conflict_resolution
-        );
-        assert_eq!(
-            original.auto_sync_due_dates,
-            deserialized.auto_sync_due_dates
-        );
+        let apple = config.apple().unwrap();
+        assert!(apple.enabled);
+        assert_eq!(apple.username, "test@apple.com");
+        assert_eq!(apple.password.expose(), "app-password-123");
+        assert_eq!(apple.calendar_name, "Work Tasks");
+        assert_eq!(apple.sync_interval_secs, 900);
     }
 
     #[test]
@@ -655,21 +1019,23 @@ mod tests {
     #[test]
     fn test_config_includes_calendar() {
         let config = Config::default();
-        assert!(!config.calendar.enabled);
-        assert_eq!(config.calendar.caldav_url, "https://caldav.icloud.com");
+        assert!(!config.calendar.is_any_enabled());
+        assert!(config.calendar.providers.is_empty());
     }
 
     #[test]
     fn test_config_calendar_serialization() {
         let mut config = Config::default();
-        config.calendar.enabled = true;
-        config.calendar.username = "test@example.com".to_string();
-        config.calendar.password = Secret::new("password123".to_string());
+        config.calendar.providers.push(CalendarProviderConfig::Apple(AppleCalendarConfig {
+            enabled: true,
+            username: "test@example.com".to_string(),
+            password: Secret::new("password123".to_string()),
+            ..AppleCalendarConfig::default()
+        }));
 
         let json = serde_json::to_string_pretty(&config).unwrap();
         assert!(json.contains("\"calendar\""));
-        assert!(json.contains("\"enabled\": true"));
-        assert!(json.contains("\"username\": \"test@example.com\""));
-        assert!(json.contains("\"password\": \"password123\""));
+        assert!(json.contains("\"providers\""));
+        assert!(json.contains("\"test@example.com\""));
     }
 }

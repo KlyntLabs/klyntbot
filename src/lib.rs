@@ -5,6 +5,7 @@
 // Re-export all workspace crates
 pub use agent;
 pub use bus;
+pub use calendar;
 pub use channels;
 pub use cli;
 pub use common;

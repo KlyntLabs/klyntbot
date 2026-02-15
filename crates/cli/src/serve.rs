@@ -163,7 +163,7 @@ pub async fn handle_serve(port: u16) -> Result<()> {
                             "system",
                             "cron",
                             "calendar_sync",
-                            "Sync calendar events with Apple Calendar via CalDAV".to_string(),
+                            "Sync calendar events with configured providers".to_string(),
                         );
                         bus.publish_inbound(msg).await.map_err(|e| {
                             common::KlyntbotError::Bus(format!(
@@ -241,16 +241,16 @@ pub async fn handle_serve(port: u16) -> Result<()> {
         )
         .await?;
 
-    // Register calendar sync cron job if enabled
-    if config.calendar.enabled {
-        let sync_interval_secs = config.calendar.sync_interval_secs;
+    // Register calendar sync cron job if any provider is enabled
+    if config.calendar.is_any_enabled() {
+        let sync_interval_secs = config.calendar.min_sync_interval_secs();
         cron_service
             .add_job(
                 "__klyntbot_calendar_sync",
                 scheduling::CronSchedule::Every {
                     every_ms: sync_interval_secs * 1000,
                 },
-                "Sync calendar events with Apple Calendar",
+                "Sync calendar events with configured providers",
                 false,
                 None,
                 None,

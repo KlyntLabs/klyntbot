@@ -95,6 +95,17 @@ pub const SLACK_OAUTH: OAuthProviderConfig = OAuthProviderConfig {
     ],
 };
 
+/// Google Calendar OAuth 2.0 configuration.
+///
+/// Google requires `access_type=offline` and `prompt=consent` to get a
+/// refresh_token. These extra params are appended in `build_google_auth_url()`.
+pub const GOOGLE_CALENDAR_OAUTH: OAuthProviderConfig = OAuthProviderConfig {
+    name: "Google Calendar",
+    auth_url: "https://accounts.google.com/o/oauth2/v2/auth",
+    token_url: "https://oauth2.googleapis.com/token",
+    scopes: &["https://www.googleapis.com/auth/calendar"],
+};
+
 // ============================================================================
 // Public API
 // ============================================================================
@@ -184,6 +195,105 @@ pub async fn run_oauth_flow(
     println!("\n  {} Authorization code received!", status_success());
 
     // Step 5: Exchange code for tokens
+    println!("  {}", colorize("Exchanging code for access token...", DIM));
+
+    let tokens = exchange_code(
+        provider,
+        client_id,
+        client_secret,
+        &callback.code,
+        &redirect_uri,
+    )
+    .await
+    .context("Failed to exchange authorization code for tokens")?;
+
+    println!(
+        "  {} {} tokens acquired successfully",
+        status_success(),
+        provider.name,
+    );
+
+    Ok(Some(tokens))
+}
+
+/// Run Google Calendar OAuth flow with extra params for refresh token.
+///
+/// Google requires `access_type=offline` and `prompt=consent` to return a
+/// refresh_token that allows long-lived access without re-authorization.
+pub async fn run_google_oauth_flow(
+    client_id: &str,
+    client_secret: &str,
+    timeout_secs: u64,
+) -> Result<Option<OAuthTokens>> {
+    let provider = &GOOGLE_CALENDAR_OAUTH;
+    let state = generate_state();
+
+    let (port, code_rx) = start_callback_server(state.clone()).await?;
+    let redirect_uri = format!("http://127.0.0.1:{}/callback", port);
+
+    let auth_url = build_auth_url_with_extras(
+        provider,
+        client_id,
+        &redirect_uri,
+        &state,
+        &[("access_type", "offline"), ("prompt", "consent")],
+    );
+
+    println!();
+    println!(
+        "  {} Opening browser for {} authorization...",
+        status_info(),
+        provider.name
+    );
+    println!();
+
+    if let Err(e) = open_browser(&auth_url) {
+        warn!("Failed to open browser: {}", e);
+        println!(
+            "  {} Could not open browser automatically.",
+            status_warning()
+        );
+        println!("  Please open this URL manually:\n");
+        println!("  {}", colorize(&auth_url, UNDERLINE));
+        println!();
+    }
+
+    println!(
+        "  {}",
+        colorize("Waiting for authorization in browser...", DIM)
+    );
+    println!(
+        "  {}",
+        colorize(
+            &format!("(timeout: {}s — press Ctrl+C to cancel)", timeout_secs),
+            DIM
+        )
+    );
+
+    let callback = match tokio::time::timeout(Duration::from_secs(timeout_secs), code_rx).await {
+        Ok(Ok(result)) => result,
+        Ok(Err(_)) => {
+            println!(
+                "\n  {} Authorization callback server closed unexpectedly",
+                status_error()
+            );
+            return Ok(None);
+        }
+        Err(_) => {
+            println!(
+                "\n  {} Authorization timed out after {}s",
+                status_error(),
+                timeout_secs
+            );
+            return Ok(None);
+        }
+    };
+
+    if callback.state != state {
+        bail!("OAuth state mismatch — possible CSRF attack");
+    }
+
+    println!("\n  {} Authorization code received!", status_success());
     println!("  {}", colorize("Exchanging code for access token...", DIM));
 
     let tokens = exchange_code(
@@ -464,14 +574,28 @@ fn build_auth_url(
     redirect_uri: &str,
     state: &str,
 ) -> String {
+    build_auth_url_with_extras(provider, client_id, redirect_uri, state, &[])
+}
+
+fn build_auth_url_with_extras(
+    provider: &OAuthProviderConfig,
+    client_id: &str,
+    redirect_uri: &str,
+    state: &str,
+    extra_params: &[(&str, &str)],
+) -> String {
     let scopes = provider.scopes.join(" ");
-    let query = url::form_urlencoded::Serializer::new(String::new())
+    let mut serializer = url::form_urlencoded::Serializer::new(String::new());
+    serializer
         .append_pair("client_id", client_id)
         .append_pair("redirect_uri", redirect_uri)
         .append_pair("response_type", "code")
         .append_pair("scope", &scopes)
-        .append_pair("state", state)
-        .finish();
+        .append_pair("state", state);
+    for (key, value) in extra_params {
+        serializer.append_pair(key, value);
+    }
+    let query = serializer.finish();
     format!("{}?{}", provider.auth_url, query)
 }
 

@@ -191,13 +191,13 @@ impl AgentLoop {
             config.todo.focus.deadline_hours,
         );
 
-        // Register calendar tool (if enabled)
-        if config.calendar.enabled {
+        // Register calendar tool (if any provider is enabled)
+        if config.calendar.is_any_enabled() {
             let calendar_adapter = Arc::new(CalendarSyncAdapter::new(
                 Arc::clone(&todo_store),
-                config.calendar.clone(),
+                &config.calendar,
                 config.timezone.clone(),
-            )?);
+            ).await?);
 
             // Inject calendar handler into TodoTool for immediate sync
             todo_tool = todo_tool

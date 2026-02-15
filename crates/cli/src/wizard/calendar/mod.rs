@@ -2,11 +2,11 @@
 //!
 //! Provides an expand-in-place interactive menu for calendar provider
 //! management, modeled after the channels step. Each calendar provider
-//! (currently Apple Calendar via CalDAV) is an expandable row with
+//! (Apple Calendar, Google Calendar, Generic CalDAV) is an expandable row with
 //! sub-actions for credentials, settings, and connection testing.
-//!
-//! Designed for future expansion (Google Calendar, Outlook, etc.).
 
+mod configure_generic;
+mod configure_google;
 mod connection;
 mod menus;
 
@@ -18,6 +18,8 @@ use config::Config;
 
 use super::prompts;
 
+use configure_generic::configure_generic_caldav;
+use configure_google::configure_google_calendar;
 use connection::{configure_apple_calendar, test_caldav_connection};
 use menus::{run_calendar_menu, run_calendar_menu_fallback};
 
@@ -32,11 +34,23 @@ pub(super) struct CalendarProviderInfo {
     pub(super) description: &'static str,
 }
 
-pub(super) const CALENDAR_PROVIDERS: &[CalendarProviderInfo] = &[CalendarProviderInfo {
-    name: "Apple Calendar",
-    key: "apple",
-    description: "CalDAV sync with iCloud",
-}];
+pub(super) const CALENDAR_PROVIDERS: &[CalendarProviderInfo] = &[
+    CalendarProviderInfo {
+        name: "Apple Calendar",
+        key: "apple",
+        description: "CalDAV sync with iCloud",
+    },
+    CalendarProviderInfo {
+        name: "Google Calendar",
+        key: "google",
+        description: "OAuth2 sync with Google",
+    },
+    CalendarProviderInfo {
+        name: "Generic CalDAV",
+        key: "generic_caldav",
+        description: "Nextcloud, Fastmail, Zoho, etc.",
+    },
+];
 
 // ============================================================================
 // Configuration Detection Helpers
@@ -45,8 +59,19 @@ pub(super) const CALENDAR_PROVIDERS: &[CalendarProviderInfo] = &[CalendarProvide
 /// Check if a calendar provider is configured (has credentials).
 pub(super) fn is_provider_configured(config: &Config, provider_key: &str) -> bool {
     match provider_key {
-        "apple" => {
-            !config.calendar.username.is_empty() && !config.calendar.password.expose().is_empty()
+        "apple" => config
+            .calendar
+            .apple()
+            .is_some_and(|a| !a.username.is_empty() && !a.password.expose().is_empty()),
+        "google" => config
+            .calendar
+            .google()
+            .is_some_and(|g| !g.client_id.is_empty() && !g.refresh_token.expose().is_empty()),
+        "generic_caldav" => {
+            // Check if any generic CalDAV provider exists
+            config.calendar.providers.iter().any(|p| {
+                matches!(p, config::CalendarProviderConfig::GenericCalDav(c) if !c.caldav_url.is_empty() && !c.username.is_empty())
+            })
         }
         _ => false,
     }
@@ -55,7 +80,11 @@ pub(super) fn is_provider_configured(config: &Config, provider_key: &str) -> boo
 /// Check if a calendar provider is enabled.
 pub(super) fn is_provider_enabled(config: &Config, provider_key: &str) -> bool {
     match provider_key {
-        "apple" => config.calendar.enabled,
+        "apple" => config.calendar.apple().is_some_and(|a| a.enabled),
+        "google" => config.calendar.google().is_some_and(|g| g.enabled),
+        "generic_caldav" => config.calendar.providers.iter().any(|p| {
+            matches!(p, config::CalendarProviderConfig::GenericCalDav(c) if c.enabled)
+        }),
         _ => false,
     }
 }
@@ -63,7 +92,33 @@ pub(super) fn is_provider_enabled(config: &Config, provider_key: &str) -> bool {
 /// Get a masked version of provider credentials for display.
 fn mask_provider_credentials(config: &Config, provider_key: &str) -> String {
     match provider_key {
-        "apple" => config.calendar.username.clone(),
+        "apple" => config
+            .calendar
+            .apple()
+            .map(|a| a.username.clone())
+            .unwrap_or_default(),
+        "google" => config
+            .calendar
+            .google()
+            .map(|g| {
+                if g.calendar_id.is_empty() {
+                    "configured".to_string()
+                } else {
+                    g.calendar_id.clone()
+                }
+            })
+            .unwrap_or_default(),
+        "generic_caldav" => {
+            config
+                .calendar
+                .providers
+                .iter()
+                .find_map(|p| match p {
+                    config::CalendarProviderConfig::GenericCalDav(c) => Some(c.name.clone()),
+                    _ => None,
+                })
+                .unwrap_or_default()
+        }
         _ => String::new(),
     }
 }
@@ -72,12 +127,43 @@ fn mask_provider_credentials(config: &Config, provider_key: &str) -> String {
 pub(super) fn get_provider_status_description(config: &Config, provider_key: &str) -> String {
     match provider_key {
         "apple" => {
-            if !config.calendar.calendar_name.is_empty() {
-                let interval = format_interval(config.calendar.sync_interval_secs);
-                format!("{} / {}", config.calendar.calendar_name, interval)
+            if let Some(apple) = config.calendar.apple() {
+                if !apple.calendar_name.is_empty() {
+                    let interval = format_interval(apple.sync_interval_secs);
+                    format!("{} / {}", apple.calendar_name, interval)
+                } else {
+                    "configured".to_string()
+                }
             } else {
-                "configured".to_string()
+                String::new()
             }
+        }
+        "google" => {
+            if let Some(google) = config.calendar.google() {
+                let cal = if google.calendar_id.is_empty() {
+                    "primary"
+                } else {
+                    &google.calendar_id
+                };
+                let interval = format_interval(google.sync_interval_secs);
+                format!("{} / {}", cal, interval)
+            } else {
+                String::new()
+            }
+        }
+        "generic_caldav" => {
+            config
+                .calendar
+                .providers
+                .iter()
+                .find_map(|p| match p {
+                    config::CalendarProviderConfig::GenericCalDav(c) => {
+                        let interval = format_interval(c.sync_interval_secs);
+                        Some(format!("{} / {}", c.name, interval))
+                    }
+                    _ => None,
+                })
+                .unwrap_or_default()
         }
         _ => String::new(),
     }
@@ -153,7 +239,7 @@ impl CalendarSubAction {
                 format!("Toggle enable/disable [{}]", status)
             }
             Self::ChangeCalendarName => {
-                let name = &config.calendar.calendar_name;
+                let name = get_calendar_name_for_provider(config, provider.key);
                 if name.is_empty() {
                     "Calendar name".to_string()
                 } else {
@@ -161,11 +247,64 @@ impl CalendarSubAction {
                 }
             }
             Self::ChangeSyncInterval => {
-                let interval = format_interval(config.calendar.sync_interval_secs);
+                let secs = get_sync_interval_for_provider(config, provider.key);
+                let interval = format_interval(secs);
                 format!("Sync interval [{}]", interval)
             }
             Self::Close => "Close".to_string(),
         }
+    }
+}
+
+/// Get the calendar name for a provider.
+fn get_calendar_name_for_provider(config: &Config, provider_key: &str) -> String {
+    match provider_key {
+        "apple" => config
+            .calendar
+            .apple()
+            .map(|a| a.calendar_name.clone())
+            .unwrap_or_default(),
+        "google" => config
+            .calendar
+            .google()
+            .map(|g| g.calendar_name.clone())
+            .unwrap_or_default(),
+        "generic_caldav" => config
+            .calendar
+            .providers
+            .iter()
+            .find_map(|p| match p {
+                config::CalendarProviderConfig::GenericCalDav(c) => Some(c.calendar_name.clone()),
+                _ => None,
+            })
+            .unwrap_or_default(),
+        _ => String::new(),
+    }
+}
+
+/// Get the sync interval for a provider.
+fn get_sync_interval_for_provider(config: &Config, provider_key: &str) -> u64 {
+    match provider_key {
+        "apple" => config
+            .calendar
+            .apple()
+            .map(|a| a.sync_interval_secs)
+            .unwrap_or(300),
+        "google" => config
+            .calendar
+            .google()
+            .map(|g| g.sync_interval_secs)
+            .unwrap_or(300),
+        "generic_caldav" => config
+            .calendar
+            .providers
+            .iter()
+            .find_map(|p| match p {
+                config::CalendarProviderConfig::GenericCalDav(c) => Some(c.sync_interval_secs),
+                _ => None,
+            })
+            .unwrap_or(300),
+        _ => 300,
     }
 }
 
@@ -210,6 +349,8 @@ pub(super) async fn execute_configure_credentials(
 
     match provider.key {
         "apple" => configure_apple_calendar(config).await?,
+        "google" => configure_google_calendar(config).await?,
+        "generic_caldav" => configure_generic_caldav(config).await?,
         _ => {}
     }
 
@@ -232,25 +373,91 @@ pub(super) async fn execute_test_connection(config: &Config, provider_idx: usize
 
     match provider.key {
         "apple" => {
-            let result = test_caldav_connection(
-                &config.calendar.caldav_url,
-                &config.calendar.username,
-                config.calendar.password.expose(),
-            )
-            .await;
+            if let Some(apple) = config.calendar.apple() {
+                let result = test_caldav_connection(
+                    &apple.caldav_url,
+                    &apple.username,
+                    apple.password.expose(),
+                )
+                .await;
 
-            match result {
-                Ok(()) => {
+                match result {
+                    Ok(()) => {
+                        println!(
+                            "{}{} Connection successful — {}",
+                            prefix,
+                            status_success(),
+                            apple.username
+                        );
+                    }
+                    Err(e) => {
+                        println!("{}{} Connection failed: {}", prefix, status_error(), e);
+                    }
+                }
+            } else {
+                println!(
+                    "{}{} Apple Calendar not configured",
+                    prefix,
+                    status_error()
+                );
+            }
+        }
+        "google" => {
+            if let Some(google) = config.calendar.google() {
+                if google.access_token.expose().is_empty() {
                     println!(
-                        "{}{} Connection successful — {}",
+                        "{}{} Google Calendar not authorized — run Configure credentials first",
+                        prefix,
+                        status_error()
+                    );
+                } else {
+                    println!(
+                        "{}{} Google Calendar authorized (calendar: {})",
                         prefix,
                         status_success(),
-                        config.calendar.username
+                        google.calendar_id
                     );
                 }
-                Err(e) => {
-                    println!("{}{} Connection failed: {}", prefix, status_error(), e);
+            } else {
+                println!(
+                    "{}{} Google Calendar not configured",
+                    prefix,
+                    status_error()
+                );
+            }
+        }
+        "generic_caldav" => {
+            if let Some(generic) = config.calendar.providers.iter().find_map(|p| match p {
+                config::CalendarProviderConfig::GenericCalDav(c) => Some(c),
+                _ => None,
+            }) {
+                let result = test_caldav_connection(
+                    &generic.caldav_url,
+                    &generic.username,
+                    generic.password.expose(),
+                )
+                .await;
+
+                match result {
+                    Ok(()) => {
+                        println!(
+                            "{}{} Connection successful — {} ({})",
+                            prefix,
+                            status_success(),
+                            generic.name,
+                            generic.username
+                        );
+                    }
+                    Err(e) => {
+                        println!("{}{} Connection failed: {}", prefix, status_error(), e);
+                    }
                 }
+            } else {
+                println!(
+                    "{}{} Generic CalDAV not configured",
+                    prefix,
+                    status_error()
+                );
             }
         }
         _ => {}
@@ -268,25 +475,56 @@ pub(super) fn execute_toggle_enabled(config: &mut Config, provider_idx: usize) {
     let provider = &CALENDAR_PROVIDERS[provider_idx];
 
     match provider.key {
-        "apple" => config.calendar.enabled = !config.calendar.enabled,
+        "apple" => {
+            let apple = config.calendar.ensure_apple_mut();
+            apple.enabled = !apple.enabled;
+        }
+        "google" => {
+            let google = config.calendar.ensure_google_mut();
+            google.enabled = !google.enabled;
+        }
         _ => {}
     }
 }
 
 /// Execute the change calendar name action.
 #[allow(clippy::single_match)]
-pub(super) fn execute_change_calendar_name(config: &mut Config, provider_idx: usize) -> Result<()> {
+pub(super) fn execute_change_calendar_name(
+    config: &mut Config,
+    provider_idx: usize,
+) -> Result<()> {
     let provider = &CALENDAR_PROVIDERS[provider_idx];
 
     match provider.key {
         "apple" => {
-            let current = if config.calendar.calendar_name.is_empty() {
+            let current_name = config
+                .calendar
+                .apple()
+                .map(|a| a.calendar_name.clone())
+                .unwrap_or_default();
+            let current = if current_name.is_empty() {
                 "Klyntbot"
             } else {
-                &config.calendar.calendar_name
+                &current_name
             };
             let name = prompts::prompt_text("Calendar name", Some(current), false)?;
-            config.calendar.calendar_name = name;
+            let apple = config.calendar.ensure_apple_mut();
+            apple.calendar_name = name;
+        }
+        "google" => {
+            let current_name = config
+                .calendar
+                .google()
+                .map(|g| g.calendar_name.clone())
+                .unwrap_or_default();
+            let current = if current_name.is_empty() {
+                "Klyntbot"
+            } else {
+                &current_name
+            };
+            let name = prompts::prompt_text("Calendar name", Some(current), false)?;
+            let google = config.calendar.ensure_google_mut();
+            google.calendar_name = name;
         }
         _ => {}
     }
@@ -296,47 +534,57 @@ pub(super) fn execute_change_calendar_name(config: &mut Config, provider_idx: us
 
 /// Execute the change sync interval action.
 #[allow(clippy::single_match)]
-pub(super) fn execute_change_sync_interval(config: &mut Config, provider_idx: usize) -> Result<()> {
+pub(super) fn execute_change_sync_interval(
+    config: &mut Config,
+    provider_idx: usize,
+) -> Result<()> {
     let provider = &CALENDAR_PROVIDERS[provider_idx];
+
+    let interval_options = vec![
+        prompts::SelectOption {
+            label: "1 minute",
+            description: "Most frequent (higher battery usage)",
+        },
+        prompts::SelectOption {
+            label: "5 minutes",
+            description: "Recommended balance",
+        },
+        prompts::SelectOption {
+            label: "15 minutes",
+            description: "Less frequent updates",
+        },
+        prompts::SelectOption {
+            label: "30 minutes",
+            description: "Least frequent",
+        },
+    ];
+
+    let current_secs = get_sync_interval_for_provider(config, provider.key);
+    let interval_default = match current_secs {
+        0..=60 => 0,
+        61..=300 => 1,
+        301..=900 => 2,
+        _ => 3,
+    };
+
+    let selected = prompts::prompt_select("Sync interval", &interval_options, interval_default)?;
+
+    let new_interval = match selected {
+        0 => 60,
+        1 => 300,
+        2 => 900,
+        3 => 1800,
+        _ => 300,
+    };
 
     match provider.key {
         "apple" => {
-            let interval_options = vec![
-                prompts::SelectOption {
-                    label: "1 minute",
-                    description: "Most frequent (higher battery usage)",
-                },
-                prompts::SelectOption {
-                    label: "5 minutes",
-                    description: "Recommended balance",
-                },
-                prompts::SelectOption {
-                    label: "15 minutes",
-                    description: "Less frequent updates",
-                },
-                prompts::SelectOption {
-                    label: "30 minutes",
-                    description: "Least frequent",
-                },
-            ];
-
-            let interval_default = match config.calendar.sync_interval_secs {
-                0..=60 => 0,
-                61..=300 => 1,
-                301..=900 => 2,
-                _ => 3,
-            };
-
-            let selected =
-                prompts::prompt_select("Sync interval", &interval_options, interval_default)?;
-
-            config.calendar.sync_interval_secs = match selected {
-                0 => 60,
-                1 => 300,
-                2 => 900,
-                3 => 1800,
-                _ => 300,
-            };
+            let apple = config.calendar.ensure_apple_mut();
+            apple.sync_interval_secs = new_interval;
+        }
+        "google" => {
+            let google = config.calendar.ensure_google_mut();
+            google.sync_interval_secs = new_interval;
         }
         _ => {}
     }
@@ -485,10 +733,11 @@ pub async fn configure_calendars(config: &mut Config) -> Result<()> {
 mod tests {
     use super::*;
     use config::schema::Secret;
+    use config::{AppleCalendarConfig, CalendarProviderConfig};
 
     #[test]
     fn test_provider_count() {
-        assert_eq!(CALENDAR_PROVIDERS.len(), 1);
+        assert_eq!(CALENDAR_PROVIDERS.len(), 3);
     }
 
     #[test]
@@ -512,7 +761,6 @@ mod tests {
 
     #[test]
     fn test_sub_action_availability_unconfigured() {
-        // When not configured, only ConfigureCredentials and Close are available
         for action in SUB_ACTIONS {
             let available = action.is_available(false, false);
             match action {
@@ -528,7 +776,6 @@ mod tests {
 
     #[test]
     fn test_sub_action_availability_configured() {
-        // When configured, all actions are available
         for action in SUB_ACTIONS {
             assert!(action.is_available(true, true));
         }
@@ -543,16 +790,28 @@ mod tests {
     #[test]
     fn test_is_provider_configured_with_credentials() {
         let mut config = Config::default();
-        config.calendar.username = "test@example.com".to_string();
-        config.calendar.password = Secret::new("test-password".to_string());
+        config
+            .calendar
+            .providers
+            .push(CalendarProviderConfig::Apple(AppleCalendarConfig {
+                username: "test@example.com".to_string(),
+                password: Secret::new("test-password".to_string()),
+                ..Default::default()
+            }));
         assert!(is_provider_configured(&config, "apple"));
     }
 
     #[test]
     fn test_is_provider_configured_partial() {
         let mut config = Config::default();
-        config.calendar.username = "test@example.com".to_string();
-        // No password
+        config
+            .calendar
+            .providers
+            .push(CalendarProviderConfig::Apple(AppleCalendarConfig {
+                username: "test@example.com".to_string(),
+                // No password
+                ..Default::default()
+            }));
         assert!(!is_provider_configured(&config, "apple"));
     }
 
@@ -560,21 +819,33 @@ mod tests {
     fn test_is_provider_enabled() {
         let mut config = Config::default();
         assert!(!is_provider_enabled(&config, "apple"));
-        config.calendar.enabled = true;
+        config
+            .calendar
+            .providers
+            .push(CalendarProviderConfig::Apple(AppleCalendarConfig {
+                enabled: true,
+                ..Default::default()
+            }));
         assert!(is_provider_enabled(&config, "apple"));
     }
 
     #[test]
     fn test_is_provider_configured_unknown() {
         let config = Config::default();
-        assert!(!is_provider_configured(&config, "google"));
-        assert!(!is_provider_enabled(&config, "google"));
+        assert!(!is_provider_configured(&config, "outlook"));
+        assert!(!is_provider_enabled(&config, "outlook"));
     }
 
     #[test]
     fn test_mask_provider_credentials() {
         let mut config = Config::default();
-        config.calendar.username = "user@example.com".to_string();
+        config
+            .calendar
+            .providers
+            .push(CalendarProviderConfig::Apple(AppleCalendarConfig {
+                username: "user@example.com".to_string(),
+                ..Default::default()
+            }));
         assert_eq!(
             mask_provider_credentials(&config, "apple"),
             "user@example.com"
@@ -593,8 +864,14 @@ mod tests {
     #[test]
     fn test_get_provider_status_description() {
         let mut config = Config::default();
-        config.calendar.calendar_name = "My Calendar".to_string();
-        config.calendar.sync_interval_secs = 300;
+        config
+            .calendar
+            .providers
+            .push(CalendarProviderConfig::Apple(AppleCalendarConfig {
+                calendar_name: "My Calendar".to_string(),
+                sync_interval_secs: 300,
+                ..Default::default()
+            }));
         let desc = get_provider_status_description(&config, "apple");
         assert!(desc.contains("My Calendar"));
         assert!(desc.contains("5 min"));
@@ -638,11 +915,17 @@ mod tests {
     #[test]
     fn test_sub_action_labels_configured() {
         let mut config = Config::default();
-        config.calendar.username = "user@example.com".to_string();
-        config.calendar.password = Secret::new("pass".to_string());
-        config.calendar.enabled = true;
-        config.calendar.calendar_name = "Klyntbot".to_string();
-        config.calendar.sync_interval_secs = 300;
+        config
+            .calendar
+            .providers
+            .push(CalendarProviderConfig::Apple(AppleCalendarConfig {
+                username: "user@example.com".to_string(),
+                password: Secret::new("pass".to_string()),
+                enabled: true,
+                calendar_name: "Klyntbot".to_string(),
+                sync_interval_secs: 300,
+                ..Default::default()
+            }));
         let provider = &CALENDAR_PROVIDERS[0];
 
         let label = CalendarSubAction::ConfigureCredentials.label(&config, provider);
@@ -661,11 +944,11 @@ mod tests {
     #[test]
     fn test_toggle_enabled() {
         let mut config = Config::default();
-        assert!(!config.calendar.enabled);
+        assert!(!is_provider_enabled(&config, "apple"));
         execute_toggle_enabled(&mut config, 0);
-        assert!(config.calendar.enabled);
+        assert!(is_provider_enabled(&config, "apple"));
         execute_toggle_enabled(&mut config, 0);
-        assert!(!config.calendar.enabled);
+        assert!(!is_provider_enabled(&config, "apple"));
     }
 
     #[test]

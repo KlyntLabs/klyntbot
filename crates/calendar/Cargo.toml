@@ -28,8 +28,14 @@ tokio = { version = "1", features = ["fs", "io-util"] }
 # Timezone support
 chrono-tz = { workspace = true }
 
+# Async traits
+async-trait.workspace = true
+
 # Logging
 tracing = "0.1"
+
+# URL handling
+url = { workspace = true }
 
 # Directories
 dirs = "6.0"

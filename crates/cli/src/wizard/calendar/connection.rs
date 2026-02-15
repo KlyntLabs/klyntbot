@@ -1,4 +1,4 @@
-//! Apple Calendar configuration and CalDAV connection testing.
+//! Calendar provider configuration and CalDAV connection testing.
 
 use anyhow::Result;
 use common::utils::terminal::*;
@@ -15,12 +15,13 @@ use crate::wizard::prompts;
 pub(super) async fn configure_apple_calendar(config: &mut Config) -> Result<()> {
     let chars = BoxChars::get();
 
+    let apple = config.calendar.ensure_apple_mut();
+
     // Apple ID email
-    let existing_username = &config.calendar.username;
-    let username_default = if existing_username.is_empty() {
+    let username_default = if apple.username.is_empty() {
         None
     } else {
-        Some(existing_username.as_str())
+        Some(apple.username.as_str())
     };
     let username = super::prompt_text_with_validation(
         "Apple ID email",
@@ -28,10 +29,15 @@ pub(super) async fn configure_apple_calendar(config: &mut Config) -> Result<()> 
         true,
         super::validate_email,
     )?;
-    config.calendar.username = username;
+    let apple = config.calendar.ensure_apple_mut();
+    apple.username = username;
 
     // App-specific password
-    let existing_password = config.calendar.password.expose().clone();
+    let existing_password = config
+        .calendar
+        .apple()
+        .map(|a| a.password.expose().clone())
+        .unwrap_or_default();
     let password = if existing_password.is_empty() {
         display_password_instructions(chars);
         prompts::prompt_secret("App-specific password", 16)?
@@ -42,16 +48,23 @@ pub(super) async fn configure_apple_calendar(config: &mut Config) -> Result<()> 
             None => existing_password,
         }
     };
-    config.calendar.password = Secret::new(password);
+    let apple = config.calendar.ensure_apple_mut();
+    apple.password = Secret::new(password);
 
     // Calendar name
-    let cal_default = if config.calendar.calendar_name.is_empty() {
+    let cal_name = config
+        .calendar
+        .apple()
+        .map(|a| a.calendar_name.clone())
+        .unwrap_or_default();
+    let cal_default = if cal_name.is_empty() {
         "Klyntbot"
     } else {
-        &config.calendar.calendar_name
+        &cal_name
     };
     let calendar_name = prompts::prompt_text("Calendar name", Some(cal_default), false)?;
-    config.calendar.calendar_name = calendar_name;
+    let apple = config.calendar.ensure_apple_mut();
+    apple.calendar_name = calendar_name;
 
     // Sync interval
     let interval_options = vec![
@@ -73,7 +86,12 @@ pub(super) async fn configure_apple_calendar(config: &mut Config) -> Result<()> 
         },
     ];
 
-    let interval_default = match config.calendar.sync_interval_secs {
+    let current_interval = config
+        .calendar
+        .apple()
+        .map(|a| a.sync_interval_secs)
+        .unwrap_or(300);
+    let interval_default = match current_interval {
         0..=60 => 0,
         61..=300 => 1,
         301..=900 => 2,
@@ -81,7 +99,8 @@ pub(super) async fn configure_apple_calendar(config: &mut Config) -> Result<()> 
     };
     let selected = prompts::prompt_select("Sync interval", &interval_options, interval_default)?;
 
-    config.calendar.sync_interval_secs = match selected {
+    let apple = config.calendar.ensure_apple_mut();
+    apple.sync_interval_secs = match selected {
         0 => 60,
         1 => 300,
         2 => 900,
@@ -90,8 +109,8 @@ pub(super) async fn configure_apple_calendar(config: &mut Config) -> Result<()> 
     };
 
     // Set defaults
-    config.calendar.enabled = true;
-    config.calendar.caldav_url = "https://caldav.icloud.com".to_string();
+    apple.enabled = true;
+    apple.caldav_url = "https://caldav.icloud.com".to_string();
 
     Ok(())
 }
