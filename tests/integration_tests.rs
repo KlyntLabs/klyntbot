@@ -738,3 +738,208 @@ fn test_email_consent_granted_enforcement() {
         "consent_granted must default to false when missing from config"
     );
 }
+
+// ============================================================================
+// Plan Integration Tests (Phase 2 Planning Engine)
+// ============================================================================
+
+/// Test 21: End-to-end plan lifecycle
+/// Verifies: plan creation → state transitions → persistence
+#[tokio::test]
+async fn test_plan_end_to_end() {
+    use chrono::Utc;
+    use plan::{Plan, PlanStatus, PlanStore};
+    use tempfile::TempDir;
+    use uuid::Uuid;
+
+    let temp_dir = TempDir::new().unwrap();
+    let store_path = temp_dir.path().join("plans.jsonl");
+    let mut store = PlanStore::new(store_path.clone());
+
+    // Create a new plan (Draft status)
+    let now = Utc::now();
+    let plan_id = Uuid::new_v4();
+    let plan = Plan {
+        id: plan_id,
+        session_key: "test-session".to_string(),
+        goal_id: None,
+        title: "Integration Test Plan".to_string(),
+        description: "Testing plan lifecycle".to_string(),
+        status: PlanStatus::Draft,
+        steps: vec![],
+        current_step_index: 0,
+        iteration_limit: 50,
+        backtrack_history: vec![],
+        created_at: now,
+        updated_at: now,
+        completed_at: None,
+    };
+
+    // Upsert plan
+    let saved = store.upsert(plan).await.unwrap();
+    assert_eq!(saved.status, PlanStatus::Draft);
+
+    // Approve the plan
+    let mut approved_plan = store.get(&plan_id).await.unwrap().unwrap();
+    approved_plan.status = PlanStatus::Approved;
+    store.upsert(approved_plan.clone()).await.unwrap();
+
+    // Verify approval persisted
+    let loaded = store.get(&plan_id).await.unwrap().unwrap();
+    assert_eq!(loaded.status, PlanStatus::Approved);
+
+    // Transition to Executing
+    let mut executing_plan = loaded;
+    executing_plan.status = PlanStatus::Executing;
+    store.upsert(executing_plan).await.unwrap();
+
+    // Transition to Completed
+    let mut completed_plan = store.get(&plan_id).await.unwrap().unwrap();
+    completed_plan.status = PlanStatus::Completed;
+    completed_plan.completed_at = Some(Utc::now());
+    store.upsert(completed_plan).await.unwrap();
+
+    // Verify final state
+    let final_plan = store.get(&plan_id).await.unwrap().unwrap();
+    assert_eq!(final_plan.status, PlanStatus::Completed);
+    assert!(final_plan.completed_at.is_some());
+
+    // Verify persistence across store instances
+    drop(store);
+    let mut new_store = PlanStore::new(store_path);
+    let persisted = new_store.get(&plan_id).await.unwrap().unwrap();
+    assert_eq!(persisted.status, PlanStatus::Completed);
+    assert_eq!(persisted.title, "Integration Test Plan");
+}
+
+/// Test 22: Plan failure recovery scenario
+/// Verifies: plan abandonment and error handling
+#[tokio::test]
+async fn test_plan_failure_recovery() {
+    use chrono::Utc;
+    use plan::{BacktrackEntry, Plan, PlanStatus, PlanStore};
+    use tempfile::TempDir;
+    use uuid::Uuid;
+
+    let temp_dir = TempDir::new().unwrap();
+    let store_path = temp_dir.path().join("plans.jsonl");
+    let mut store = PlanStore::new(store_path);
+
+    // Create a plan that will "fail"
+    let now = Utc::now();
+    let plan_id = Uuid::new_v4();
+    let mut plan = Plan {
+        id: plan_id,
+        session_key: "test-session".to_string(),
+        goal_id: None,
+        title: "Failing Plan".to_string(),
+        description: "Testing failure recovery".to_string(),
+        status: PlanStatus::Approved,
+        steps: vec![],
+        current_step_index: 0,
+        iteration_limit: 50,
+        backtrack_history: vec![],
+        created_at: now,
+        updated_at: now,
+        completed_at: None,
+    };
+
+    store.upsert(plan.clone()).await.unwrap();
+
+    // Simulate failure by adding backtrack entry
+    plan.backtrack_history.push(BacktrackEntry {
+        step_index: 0,
+        attempt: 1,
+        failure_reason: "Simulated failure".to_string(),
+        timestamp: Utc::now(),
+    });
+    plan.status = PlanStatus::Executing;
+    store.upsert(plan.clone()).await.unwrap();
+
+    // Verify backtrack history is recorded
+    let loaded = store.get(&plan_id).await.unwrap().unwrap();
+    assert_eq!(loaded.backtrack_history.len(), 1);
+    assert_eq!(loaded.backtrack_history[0].failure_reason, "Simulated failure");
+
+    // Abandon the failed plan
+    let mut abandoned_plan = loaded;
+    abandoned_plan.status = PlanStatus::Abandoned;
+    store.upsert(abandoned_plan).await.unwrap();
+
+    // Verify final state
+    let final_plan = store.get(&plan_id).await.unwrap().unwrap();
+    assert_eq!(final_plan.status, PlanStatus::Abandoned);
+    assert!(!final_plan.backtrack_history.is_empty());
+}
+
+/// Test 23: Session isolation
+/// Verifies: plans are session-isolated and don't leak across sessions
+#[tokio::test]
+async fn test_session_isolation() {
+    use chrono::Utc;
+    use plan::{Plan, PlanStatus, PlanStore};
+    use tempfile::TempDir;
+    use uuid::Uuid;
+
+    let temp_dir = TempDir::new().unwrap();
+    let store_path = temp_dir.path().join("plans.jsonl");
+    let mut store = PlanStore::new(store_path);
+
+    let now = Utc::now();
+
+    // Create plan for session A
+    let plan_a = Plan {
+        id: Uuid::new_v4(),
+        session_key: "session-A".to_string(),
+        goal_id: None,
+        title: "Plan A".to_string(),
+        description: "Session A plan".to_string(),
+        status: PlanStatus::Draft,
+        steps: vec![],
+        current_step_index: 0,
+        iteration_limit: 50,
+        backtrack_history: vec![],
+        created_at: now,
+        updated_at: now,
+        completed_at: None,
+    };
+
+    // Create plan for session B
+    let plan_b = Plan {
+        id: Uuid::new_v4(),
+        session_key: "session-B".to_string(),
+        goal_id: None,
+        title: "Plan B".to_string(),
+        description: "Session B plan".to_string(),
+        status: PlanStatus::Draft,
+        steps: vec![],
+        current_step_index: 0,
+        iteration_limit: 50,
+        backtrack_history: vec![],
+        created_at: now,
+        updated_at: now,
+        completed_at: None,
+    };
+
+    store.upsert(plan_a.clone()).await.unwrap();
+    store.upsert(plan_b.clone()).await.unwrap();
+
+    // Verify session A gets its plan
+    let active_a = store.get_active_plan("session-A").await.unwrap();
+    assert!(active_a.is_some());
+    assert_eq!(active_a.unwrap().title, "Plan A");
+
+    // Verify session B gets its plan
+    let active_b = store.get_active_plan("session-B").await.unwrap();
+    assert!(active_b.is_some());
+    assert_eq!(active_b.unwrap().title, "Plan B");
+
+    // Verify session C has no plan
+    let active_c = store.get_active_plan("session-C").await.unwrap();
+    assert!(active_c.is_none());
+
+    // Verify plans are correctly isolated by session
+    let loaded_a = store.get(&plan_a.id).await.unwrap().unwrap();
+    let loaded_b = store.get(&plan_b.id).await.unwrap().unwrap();
+    assert_ne!(loaded_a.session_key, loaded_b.session_key);
+}
