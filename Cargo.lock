@@ -24,6 +24,7 @@ dependencies = [
  "futures-util",
  "goal",
  "mime_guess",
+ "plan",
  "providers",
  "scheduling",
  "serde",
