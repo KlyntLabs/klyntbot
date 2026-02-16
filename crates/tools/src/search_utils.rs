@@ -4,14 +4,16 @@
 //! multiple sources (keyword, semantic, etc.) using the RRF algorithm.
 
 use std::collections::HashMap;
+use crate::conversation_embedding::ConversationEmbeddingRecord;
 use crate::todo_types::Todo;
 
 /// Search result types that can be merged via RRF
 #[derive(Debug, Clone)]
 pub enum SearchResult {
-    /// Todo task search result
-    Todo(Todo),
-    // Future: Conversation(ConversationMessage) for Phase 4.1
+    /// Todo task search result (boxed to reduce enum size variance)
+    Todo(Box<Todo>),
+    /// Conversation message search result
+    Conversation(ConversationEmbeddingRecord),
 }
 
 impl SearchResult {
@@ -19,6 +21,7 @@ impl SearchResult {
     pub fn id(&self) -> &str {
         match self {
             SearchResult::Todo(todo) => &todo.id,
+            SearchResult::Conversation(record) => &record.id,
         }
     }
 }
@@ -135,12 +138,12 @@ mod tests {
         // Test RRF formula: 1/(k + rank)
         let k = 60;
         let keyword = vec![
-            SearchResult::Todo(mock_todo("1", "First")),
-            SearchResult::Todo(mock_todo("2", "Second")),
+            SearchResult::Todo(Box::new(mock_todo("1", "First"))),
+            SearchResult::Todo(Box::new(mock_todo("2", "Second"))),
         ];
         let semantic = vec![("1".to_string(), 0.9), ("3".to_string(), 0.8)];
         let mut map = HashMap::new();
-        map.insert("3".to_string(), SearchResult::Todo(mock_todo("3", "Third")));
+        map.insert("3".to_string(), SearchResult::Todo(Box::new(mock_todo("3", "Third"))));
 
         let results = rrf_merge(&keyword, &semantic, k, &map);
 
@@ -168,7 +171,7 @@ mod tests {
     #[test]
     fn test_rrf_merge_single_source() {
         // Test keyword-only
-        let keyword = vec![SearchResult::Todo(mock_todo("1", "Only keyword"))];
+        let keyword = vec![SearchResult::Todo(Box::new(mock_todo("1", "Only keyword")))];
         let semantic = vec![];
         let map = HashMap::new();
 
@@ -182,7 +185,7 @@ mod tests {
         let keyword = vec![];
         let semantic = vec![("2".to_string(), 0.9)];
         let mut map = HashMap::new();
-        map.insert("2".to_string(), SearchResult::Todo(mock_todo("2", "Only semantic")));
+        map.insert("2".to_string(), SearchResult::Todo(Box::new(mock_todo("2", "Only semantic"))));
 
         let results = rrf_merge(&keyword, &semantic, 60, &map);
 
@@ -195,15 +198,15 @@ mod tests {
     fn test_rrf_merge_with_overlap() {
         let k = 60;
         let keyword = vec![
-            SearchResult::Todo(mock_todo("A", "Alpha")),
-            SearchResult::Todo(mock_todo("B", "Beta")),
+            SearchResult::Todo(Box::new(mock_todo("A", "Alpha"))),
+            SearchResult::Todo(Box::new(mock_todo("B", "Beta"))),
         ];
         let semantic = vec![
             ("B".to_string(), 0.95), // B appears in both
             ("C".to_string(), 0.85),
         ];
         let mut map = HashMap::new();
-        map.insert("C".to_string(), SearchResult::Todo(mock_todo("C", "Gamma")));
+        map.insert("C".to_string(), SearchResult::Todo(Box::new(mock_todo("C", "Gamma"))));
 
         let results = rrf_merge(&keyword, &semantic, k, &map);
 

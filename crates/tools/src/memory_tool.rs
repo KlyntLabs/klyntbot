@@ -5,9 +5,15 @@
 
 use async_trait::async_trait;
 use serde_json::{json, Value};
+use std::collections::HashMap;
 use std::sync::Arc;
+use tokio::sync::RwLock;
 
 use crate::conversation_embedding::{ConversationEmbeddingHandler, ConversationEmbeddingRecord, PurgeFilter};
+use crate::embedding_engine::{self, EmbeddingHandler};
+use crate::embedding_store::EmbeddingStore;
+use crate::todo_store::TodoStore;
+use crate::todo_types::{Todo, TodoFilter};
 use crate::{RoutingContext, Tool};
 use common::Result;
 
@@ -15,6 +21,14 @@ use common::Result;
 pub struct MemoryTool {
     conversation_handler: Option<Arc<dyn ConversationEmbeddingHandler>>,
     semantic_threshold: f64,
+    /// RRF k parameter for hybrid search (from config)
+    rrf_k: u32,
+    /// Todo store for unified search
+    todo_store: Option<Arc<RwLock<TodoStore>>>,
+    /// Embedding handler for todo semantic search
+    todo_embedding_handler: Option<Arc<dyn EmbeddingHandler>>,
+    /// Embedding store for todo semantic search
+    todo_embedding_store: Option<Arc<RwLock<EmbeddingStore>>>,
 }
 
 impl MemoryTool {
@@ -23,6 +37,10 @@ impl MemoryTool {
         Self {
             conversation_handler: None,
             semantic_threshold: 0.5,
+            rrf_k: 60,
+            todo_store: None,
+            todo_embedding_handler: None,
+            todo_embedding_store: None,
         }
     }
 
@@ -38,6 +56,30 @@ impl MemoryTool {
     /// Set semantic search threshold.
     pub fn with_threshold(mut self, threshold: f64) -> Self {
         self.semantic_threshold = threshold;
+        self
+    }
+
+    /// Set RRF k parameter for unified search.
+    pub fn with_rrf_k(mut self, k: u32) -> Self {
+        self.rrf_k = k;
+        self
+    }
+
+    /// Inject todo store for unified search.
+    pub fn with_todo_store(mut self, store: Arc<RwLock<TodoStore>>) -> Self {
+        self.todo_store = Some(store);
+        self
+    }
+
+    /// Inject todo embedding handler for unified search.
+    pub fn with_todo_embedding_handler(mut self, handler: Arc<dyn EmbeddingHandler>) -> Self {
+        self.todo_embedding_handler = Some(handler);
+        self
+    }
+
+    /// Inject todo embedding store for unified search.
+    pub fn with_todo_embedding_store(mut self, store: Arc<RwLock<EmbeddingStore>>) -> Self {
+        self.todo_embedding_store = Some(store);
         self
     }
 }
@@ -178,7 +220,6 @@ impl MemoryTool {
     }
 
     /// Unified search across todos and conversations using RRF.
-    /// Phase 4.1: Conversation-only implementation (TodoTool integration in Phase 4).
     async fn search_all(&self, args: &Value) -> Result<String> {
         let handler = self.conversation_handler.as_ref().ok_or_else(|| {
             common::ToolError::InvalidParams(
@@ -201,22 +242,136 @@ impl MemoryTool {
             .and_then(|v| v.as_f64())
             .unwrap_or(self.semantic_threshold);
 
-        // Phase 4.1: Conversation-only search (TodoTool integration in Phase 4)
-        // For now, unified search = conversation search only
-
         if !handler.is_available() {
             return Ok("Semantic search is not available (embedding model not loaded).".to_string());
         }
 
-        // Search conversations
-        let conversation_results: Vec<(ConversationEmbeddingRecord, f64)> = handler.search(query, limit, threshold).await?;
+        // 1. Search conversations
+        let conversation_results: Vec<(ConversationEmbeddingRecord, f64)> = handler.search(query, limit * 2, threshold).await?;
 
-        // TODO: In Phase 4, add TodoTool integration here:
-        // let todo_results = self.todo_handler.search(query, limit)?;
-        // let merged = rrf_merge(todo_results, conversation_results, 60);
+        // 2. Search todos (keyword + semantic if available)
+        let todo_results: Vec<(Todo, f64)> = if let Some(todo_store) = &self.todo_store {
+            let mut store = todo_store.write().await;
 
-        // For now, return conversation results only
-        if conversation_results.is_empty() {
+            // Keyword search
+            let query_lower = query.to_lowercase();
+            let all_todos = store.list(&TodoFilter::default()).await?;
+            let keyword_todos: Vec<Todo> = all_todos
+                .iter()
+                .filter(|t| {
+                    t.title.to_lowercase().contains(&query_lower)
+                        || t.description.as_ref().is_some_and(|d| d.to_lowercase().contains(&query_lower))
+                })
+                .cloned()
+                .collect();
+
+            drop(store); // Release lock before embedding operations
+
+            // Semantic search (if available)
+            let semantic_todos: Vec<(String, f64)> = if let (Some(emb), Some(emb_store)) =
+                (&self.todo_embedding_handler, &self.todo_embedding_store)
+            {
+                let query_vec = emb.embed_query(query).await?;
+                let mut emb_store_guard = emb_store.write().await;
+                let all_embeddings = emb_store_guard.get_all().await?;
+
+                let mut scored: Vec<(String, f64)> = all_embeddings
+                    .iter()
+                    .map(|(id, rec)| {
+                        let sim = embedding_engine::EmbeddingEngine::cosine_similarity(
+                            &query_vec,
+                            &rec.embedding,
+                        );
+                        (id.clone(), sim)
+                    })
+                    .filter(|(_, sim)| *sim >= threshold)
+                    .collect();
+
+                scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+                scored
+            } else {
+                Vec::new()
+            };
+
+            // Merge keyword and semantic results using RRF
+            if !semantic_todos.is_empty() {
+                let todos_by_id: HashMap<String, crate::search_utils::SearchResult> =
+                    all_todos.into_iter().map(|t| (t.id.clone(), crate::search_utils::SearchResult::Todo(Box::new(t)))).collect();
+
+                let keyword_search_results: Vec<crate::search_utils::SearchResult> = keyword_todos
+                    .into_iter()
+                    .map(|t| crate::search_utils::SearchResult::Todo(Box::new(t)))
+                    .collect();
+
+                let merged = crate::search_utils::rrf_merge(
+                    &keyword_search_results,
+                    &semantic_todos,
+                    self.rrf_k,
+                    &todos_by_id,
+                );
+
+                merged.into_iter().map(|(result, score, _source)| {
+                    match result {
+                        crate::search_utils::SearchResult::Todo(todo) => (*todo, score),
+                        _ => unreachable!("Expected Todo result"),
+                    }
+                }).collect()
+            } else {
+                // Keyword-only results with simple scoring
+                keyword_todos.into_iter()
+                    .enumerate()
+                    .map(|(rank, todo)| {
+                        let score = 1.0 / (self.rrf_k as f64 + rank as f64 + 1.0);
+                        (todo, score)
+                    })
+                    .collect()
+            }
+        } else {
+            Vec::new()
+        };
+
+        // 3. Convert to SearchResult and merge using RRF
+        let conversation_search_results: Vec<crate::search_utils::SearchResult> = conversation_results
+            .iter()
+            .map(|(rec, _)| crate::search_utils::SearchResult::Conversation(rec.clone()))
+            .collect();
+
+        let todo_search_results: Vec<crate::search_utils::SearchResult> = todo_results
+            .iter()
+            .map(|(todo, _)| crate::search_utils::SearchResult::Todo(Box::new(todo.clone())))
+            .collect();
+
+        // Build ID lookup map for conversations
+        let mut results_by_id: HashMap<String, crate::search_utils::SearchResult> = HashMap::new();
+        for (rec, _) in &conversation_results {
+            results_by_id.insert(rec.id.clone(), crate::search_utils::SearchResult::Conversation(rec.clone()));
+        }
+        for (todo, _) in &todo_results {
+            results_by_id.insert(todo.id.clone(), crate::search_utils::SearchResult::Todo(Box::new(todo.clone())));
+        }
+
+        // Prepare semantic results for RRF (both conversations and todos)
+        let mut semantic_results: Vec<(String, f64)> = conversation_results
+            .iter()
+            .map(|(rec, sim)| (rec.id.clone(), *sim))
+            .collect();
+        semantic_results.extend(todo_results.iter().map(|(todo, score)| (todo.id.clone(), *score)));
+
+        // Merge all results using RRF
+        let all_keyword_results: Vec<crate::search_utils::SearchResult> = conversation_search_results
+            .into_iter()
+            .chain(todo_search_results.into_iter())
+            .collect();
+
+        let merged = crate::search_utils::rrf_merge(
+            &all_keyword_results,
+            &semantic_results,
+            self.rrf_k,
+            &results_by_id,
+        );
+
+        // 4. Format output
+        if merged.is_empty() {
             return Ok(format!(
                 "No results found matching '{}' (threshold: {:.2}).",
                 query, threshold
@@ -224,19 +379,38 @@ impl MemoryTool {
         }
 
         let mut output = format!(
-            "{} result(s) matching '{}':\n",
-            conversation_results.len(),
+            "{} result(s) matching '{}' (unified search: todos + conversations):\n",
+            merged.len().min(limit),
             query
         );
 
-        for (record, similarity) in &conversation_results {
-            output.push_str(&format!(
-                "\n- [Conversation] {} said: \"{}\" (similarity: {:.3}, session: {})",
-                record.role,
-                record.content_preview,
-                similarity,
-                record.session_key
-            ));
+        for (result, rrf_score, source) in merged.iter().take(limit) {
+            match result {
+                crate::search_utils::SearchResult::Conversation(record) => {
+                    output.push_str(&format!(
+                        "\n- [Conversation|{}] {} said: \"{}\" (score: {:.4}, session: {})",
+                        source,
+                        record.role,
+                        record.content_preview,
+                        rrf_score,
+                        record.session_key
+                    ));
+                }
+                crate::search_utils::SearchResult::Todo(todo) => {
+                    let preview = if let Some(desc) = &todo.description {
+                        format!("{} - {}", todo.title, &desc.chars().take(50).collect::<String>())
+                    } else {
+                        todo.title.clone()
+                    };
+                    output.push_str(&format!(
+                        "\n- [Todo|{}] {} (score: {:.4}, status: {:?})",
+                        source,
+                        preview,
+                        rrf_score,
+                        todo.status
+                    ));
+                }
+            }
         }
 
         Ok(output)

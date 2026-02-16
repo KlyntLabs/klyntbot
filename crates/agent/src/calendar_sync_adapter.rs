@@ -153,7 +153,9 @@ impl CalendarSyncAdapter {
                         calendar_event_uid: Some(None),
                         ..Default::default()
                     };
-                    store.update(&todo.id, patch).await.ok();
+                    if let Err(e) = store.update(&todo.id, patch).await {
+                        tracing::warn!("Failed to sync calendar update to todo {}: {}. Calendar and todo may be out of sync.", todo.id, e);
+                    }
                 }
             }
         }
@@ -308,7 +310,9 @@ impl CalendarSyncAdapter {
                                         calendar_event_uid: Some(Some(event.uid.clone())),
                                         ..Default::default()
                                     };
-                                    store.update(&todo.id, patch).await.ok();
+                                    if let Err(e) = store.update(&todo.id, patch).await {
+                                        tracing::warn!("Failed to sync calendar update to todo {}: {}. Calendar and todo may be out of sync.", todo.id, e);
+                                    }
                                 }
                                 events_pushed += 1;
                             }
