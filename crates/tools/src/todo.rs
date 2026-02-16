@@ -1365,7 +1365,7 @@ impl Tool for TodoTool {
 
                 // Build ID-to-Todo map for RRF lookups
                 let todos_by_id: HashMap<String, crate::search_utils::SearchResult> =
-                    all_todos.into_iter().map(|t| (t.id.clone(), crate::search_utils::SearchResult::Todo(t))).collect();
+                    all_todos.into_iter().map(|t| (t.id.clone(), crate::search_utils::SearchResult::Todo(Box::new(t)))).collect();
 
                 drop(store); // Release lock before embedding operations
 
@@ -1402,7 +1402,7 @@ impl Tool for TodoTool {
                 let keyword_count = keyword_results.len(); // Save for logging
                 let keyword_search_results: Vec<crate::search_utils::SearchResult> = keyword_results
                     .into_iter()
-                    .map(crate::search_utils::SearchResult::Todo)
+                    .map(|t| crate::search_utils::SearchResult::Todo(Box::new(t)))
                     .collect();
 
                 let merged = crate::search_utils::rrf_merge(
@@ -1427,16 +1427,17 @@ impl Tool for TodoTool {
                 );
 
                 for (search_result, _rrf_score, source) in &results {
-                    // Extract Todo from SearchResult (currently only variant)
-                    let crate::search_utils::SearchResult::Todo(todo) = search_result;
-                    output.push_str(&format!(
-                        "\n- [{}] {} (P{}, {:?}, match: {})",
-                        todo.id,
-                        todo.title,
-                        todo.priority.unwrap_or(3),
-                        todo.status,
-                        source,
-                    ));
+                    // Extract Todo from SearchResult (skip any non-Todo results)
+                    if let crate::search_utils::SearchResult::Todo(todo) = search_result {
+                        output.push_str(&format!(
+                            "\n- [{}] {} (P{}, {:?}, match: {})",
+                            todo.id,
+                            todo.title,
+                            todo.priority.unwrap_or(3),
+                            todo.status,
+                            source,
+                        ));
+                    }
                 }
 
                 let has_semantic = self.embedding_handler.is_some();
