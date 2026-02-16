@@ -10,7 +10,7 @@ use crate::{
     WhatsAppChannel,
 };
 use bus::{MessageBus, OutboundMessage};
-use common::Result;
+use common::{ChannelError, Result};
 use config::Config;
 
 /// Macro to reduce duplication in channel initialization.
@@ -40,18 +40,21 @@ pub struct ChannelManager {
 
 impl ChannelManager {
     /// Create a new channel manager
-    pub fn new(config: Arc<Config>, bus: Arc<MessageBus>) -> Self {
+    pub fn new(config: Arc<Config>, bus: Arc<MessageBus>) -> Result<Self> {
         // Take ownership of the outbound receiver
-        let outbound_rx = bus
-            .take_outbound_rx()
-            .expect("Outbound receiver already taken");
+        let outbound_rx = bus.take_outbound_rx().ok_or_else(|| {
+            ChannelError::InvalidConfig(
+                "Outbound receiver already taken - ChannelManager may have been instantiated twice"
+                    .to_string(),
+            )
+        })?;
 
-        Self {
+        Ok(Self {
             channels: Arc::new(RwLock::new(HashMap::new())),
             bus,
             outbound_rx: Some(outbound_rx),
             config,
-        }
+        })
     }
 
     /// Initialize all enabled channels
@@ -138,10 +141,12 @@ impl ChannelManager {
         }
 
         // Start outbound dispatcher
-        let mut outbound_rx = self
-            .outbound_rx
-            .take()
-            .expect("Outbound receiver already taken");
+        let mut outbound_rx = self.outbound_rx.take().ok_or_else(|| {
+            ChannelError::InvalidConfig(
+                "Outbound receiver already taken - start_all() may have been called twice"
+                    .to_string(),
+            )
+        })?;
         let channels_clone = self.channels.clone();
         let dispatcher_task = tokio::spawn(async move {
             debug!("Starting outbound message dispatcher");

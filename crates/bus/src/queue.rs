@@ -56,16 +56,6 @@ impl MessageBus {
         Ok(())
     }
 
-    /// Consume the next inbound message (blocks until available)
-    ///
-    /// Note: This method is deprecated. Use take_inbound_rx() to get ownership
-    /// of the receiver and call recv() directly on it.
-    #[deprecated(note = "Use take_inbound_rx() to own the receiver directly")]
-    pub async fn consume_inbound(&self) -> Option<InboundMessage> {
-        // This method is kept for backwards compatibility but will panic if receiver was taken
-        panic!("consume_inbound called after receiver was taken. Use the receiver directly.")
-    }
-
     /// Publish an outbound message to the bus
     pub async fn publish_outbound(&self, msg: OutboundMessage) -> Result<()> {
         debug!(
@@ -80,16 +70,6 @@ impl MessageBus {
             .map_err(|_| KlyntbotError::BusDisconnected)?;
 
         Ok(())
-    }
-
-    /// Consume the next outbound message (blocks until available)
-    ///
-    /// Note: This method is deprecated. Use take_outbound_rx() to get ownership
-    /// of the receiver and call recv() directly on it.
-    #[deprecated(note = "Use take_outbound_rx() to own the receiver directly")]
-    pub async fn consume_outbound(&self) -> Option<OutboundMessage> {
-        // This method is kept for backwards compatibility but will panic if receiver was taken
-        panic!("consume_outbound called after receiver was taken. Use the receiver directly.")
     }
 
     /// Get a sender for inbound messages

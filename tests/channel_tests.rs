@@ -20,9 +20,9 @@ async fn test_channel_manager_initialization() {
 
     let bus = MessageBus::new(10);
     let bus = Arc::new(bus);
-    let _manager = ChannelManager::new(Arc::new(config), bus);
+    let _manager = ChannelManager::new(Arc::new(config), bus)
+        .expect("Failed to create channel manager");
 
-    // ChannelManager::new returns Self directly, not a Result
     // Just verify it was created successfully (no panic)
 }
 

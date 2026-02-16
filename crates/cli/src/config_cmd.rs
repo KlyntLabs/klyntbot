@@ -154,7 +154,9 @@ pub fn set_config_value(
                     serde_json::Value::Object(Default::default()),
                 );
         }
-        current = current.get_mut(part).unwrap();
+        current = current
+            .get_mut(part)
+            .ok_or_else(|| anyhow::anyhow!("Failed to navigate to '{}'", part))?;
     }
 
     // Set the final value

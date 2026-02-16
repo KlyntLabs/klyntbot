@@ -2,9 +2,8 @@
 
 use async_trait::async_trait;
 use calendar::{
-    load_provider_sync_state, migrate_legacy_sync_state, save_provider_sync_state,
-    AppleCalendarProvider, CalendarEvent, CalendarProvider, EventSource, GenericCalDavProvider,
-    GoogleCalendarProvider, SyncEngine,
+    load_provider_sync_state, save_provider_sync_state, AppleCalendarProvider, CalendarEvent,
+    CalendarProvider, EventSource, GenericCalDavProvider, GoogleCalendarProvider, SyncEngine,
 };
 use chrono::{Duration, Local, Utc};
 use common::Result;
@@ -42,11 +41,6 @@ impl CalendarSyncAdapter {
         dispatcher: Option<Arc<crate::NotificationDispatcher>>,
         bidirectional_sync: bool,
     ) -> Result<Self> {
-        // Migrate legacy sync state if needed
-        if let Err(e) = migrate_legacy_sync_state().await {
-            tracing::warn!("Failed to migrate legacy sync state: {}", e);
-        }
-
         let mut providers: Vec<(String, Box<dyn CalendarProvider>)> = Vec::new();
         let mut provider_configs = Vec::new();
         let mut any_auto_sync = false;
@@ -453,7 +447,12 @@ impl CalendarSyncAdapter {
             end,
             source: EventSource::TodoItem,
             etag: None,
-            status: None, // TODO: Map todo status to iCal STATUS
+            status: Some(match todo.status {
+                TodoStatus::Todo => "TENTATIVE".to_string(),
+                TodoStatus::Doing => "CONFIRMED".to_string(),
+                TodoStatus::Done => "CONFIRMED".to_string(),
+                TodoStatus::Archived => "CANCELLED".to_string(),
+            }),
         })
     }
 
@@ -814,6 +813,70 @@ mod tests {
         assert_eq!(event.description, Some("Task description".to_string()));
         assert_eq!(event.start, due_date);
         assert_eq!(event.end, due_date + Duration::minutes(90));
+    }
+
+    #[tokio::test]
+    async fn test_todo_status_mapping() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let store_path = temp_dir.path().join("todos.jsonl");
+        let todo_store = Arc::new(RwLock::new(TodoStore::new(store_path)));
+        let config = test_calendar_config();
+
+        let adapter = CalendarSyncAdapter::new(todo_store, &config, "UTC".to_string(), None, false)
+            .await
+            .unwrap();
+
+        let now = Utc::now();
+        let due_date = now + Duration::hours(2);
+
+        // Test Todo status -> TENTATIVE
+        let mut todo = Todo {
+            id: "test-todo".to_string(),
+            title: "Test Task".to_string(),
+            description: None,
+            priority: Some(1),
+            due_date: Some(due_date),
+            tags: vec![],
+            status: TodoStatus::Todo,
+            focused_at: None,
+            focus_deadline: None,
+            focus_expired_count: 0,
+            created_at: now,
+            updated_at: now,
+            completed_at: None,
+            parent_id: None,
+            project_id: None,
+            attachments: vec![],
+            time_entries: vec![],
+            total_tracked_secs: 0,
+            estimated_minutes: Some(60),
+            calendar_event_uid: Some("event-uid".to_string()),
+            last_reminded_at: None,
+            recurrence_rule: None,
+            recurrence_parent_id: None,
+            is_template: false,
+            next_instance_date: None,
+            blocked_by: Vec::new(),
+            blocks: Vec::new(),
+        };
+
+        let event = adapter.todo_to_event(&todo).unwrap();
+        assert_eq!(event.status, Some("TENTATIVE".to_string()));
+
+        // Test Doing status -> CONFIRMED
+        todo.status = TodoStatus::Doing;
+        let event = adapter.todo_to_event(&todo).unwrap();
+        assert_eq!(event.status, Some("CONFIRMED".to_string()));
+
+        // Test Done status -> CONFIRMED
+        todo.status = TodoStatus::Done;
+        let event = adapter.todo_to_event(&todo).unwrap();
+        assert_eq!(event.status, Some("CONFIRMED".to_string()));
+
+        // Test Archived status -> CANCELLED
+        todo.status = TodoStatus::Archived;
+        let event = adapter.todo_to_event(&todo).unwrap();
+        assert_eq!(event.status, Some("CANCELLED".to_string()));
     }
 
     #[tokio::test]

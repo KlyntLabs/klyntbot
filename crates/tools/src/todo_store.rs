@@ -20,7 +20,6 @@ const COMPACTION_THRESHOLD: usize = 100;
 /// A single entry in the append-only journal.
 ///
 /// Tagged enum serialized as `{"_op":"upsert","todo":{...}}` or `{"_op":"delete","id":"..."}`.
-/// Plain Todo JSON lines (legacy format) are handled during load for backwards compatibility.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "_op")]
 enum JournalEntry {
@@ -63,8 +62,6 @@ impl TodoStore {
     }
 
     /// Load todos from JSONL file, replaying the journal to build the index.
-    ///
-    /// Supports both legacy format (plain Todo JSON) and new journal format (JournalEntry).
     async fn load(&mut self) -> Result<()> {
         if !self.file_path.exists() {
             self.index = HashMap::new();
@@ -86,7 +83,7 @@ impl TodoStore {
             }
             journal_len += 1;
 
-            // Try new journal format first, then fall back to legacy plain Todo
+            // Parse journal entry
             if let Ok(entry) = serde_json::from_str::<JournalEntry>(line) {
                 match entry {
                     JournalEntry::Upsert { todo } => {
@@ -101,14 +98,8 @@ impl TodoStore {
                         }
                     }
                 }
-            } else if let Ok(todo) = serde_json::from_str::<Todo>(line) {
-                // Legacy format: plain Todo JSON line treated as upsert
-                if !index.contains_key(&todo.id) {
-                    order.push(todo.id.clone());
-                }
-                index.insert(todo.id.clone(), todo);
             }
-            // Malformed lines are silently skipped (backwards compatible)
+            // Malformed lines are silently skipped
         }
 
         self.index = index;
@@ -682,6 +673,34 @@ impl TodoStore {
         }
     }
 
+    /// Check if reparenting would create a circular reference in the parent hierarchy
+    ///
+    /// Traverses the parent chain upward from new_parent_id. If we encounter
+    /// todo_id, then setting todo_id's parent to new_parent_id would create a cycle.
+    fn would_create_parent_cycle(&self, todo_id: &str, new_parent_id: &str) -> bool {
+        use std::collections::HashSet;
+
+        let mut current = Some(new_parent_id);
+        let mut visited = HashSet::new();
+
+        while let Some(parent_id) = current {
+            // If we encounter the todo being moved, that's a cycle
+            if parent_id == todo_id {
+                return true;
+            }
+
+            // Detect infinite loops in existing parent chain
+            if !visited.insert(parent_id) {
+                return true;
+            }
+
+            // Traverse upward to the next parent
+            current = self.index.get(parent_id).and_then(|t| t.parent_id.as_deref());
+        }
+
+        false
+    }
+
     /// Move a todo (reparent or change project) (Phase 2)
     pub async fn move_todo(
         &mut self,
@@ -691,18 +710,25 @@ impl TodoStore {
     ) -> Result<Option<crate::todo_types::Todo>> {
         self.ensure_loaded().await?;
 
-        if let Some(todo) = self.index.get_mut(id) {
-            // Validate parent_id doesn't create a cycle
-            if let Some(ref parent) = new_parent_id {
-                if parent == id {
-                    return Err(common::ToolError::InvalidParams(
-                        "Cannot set task as its own parent".to_string(),
-                    )
-                    .into());
-                }
-                // TODO: Check for circular references by traversing parent chain
+        // Validate parent_id doesn't create a cycle BEFORE getting mutable reference
+        if let Some(ref parent) = new_parent_id {
+            if parent == id {
+                return Err(common::ToolError::InvalidParams(
+                    "Cannot set task as its own parent".to_string(),
+                )
+                .into());
             }
 
+            // Check for circular references by traversing parent chain
+            if self.would_create_parent_cycle(id, parent) {
+                return Err(common::ToolError::InvalidParams(
+                    "Cannot reparent: would create circular reference".to_string(),
+                )
+                .into());
+            }
+        }
+
+        if let Some(todo) = self.index.get_mut(id) {
             todo.parent_id = new_parent_id;
             todo.project_id = new_project_id;
             todo.updated_at = Utc::now();
@@ -1466,12 +1492,19 @@ mod tests {
     async fn test_malformed_jsonl_skipped() {
         let (mut store, _dir) = create_test_store().await;
 
-        // Write malformed JSONL manually with proper serialization
+        // Write malformed JSONL manually with proper JournalEntry format
         let todo1 = create_test_todo("Valid");
         let todo2 = create_test_todo("Also valid");
 
-        let line1 = serde_json::to_string(&todo1).unwrap();
-        let line2 = serde_json::to_string(&todo2).unwrap();
+        let entry1 = JournalEntry::Upsert {
+            todo: Box::new(todo1),
+        };
+        let entry2 = JournalEntry::Upsert {
+            todo: Box::new(todo2),
+        };
+
+        let line1 = serde_json::to_string(&entry1).unwrap();
+        let line2 = serde_json::to_string(&entry2).unwrap();
 
         let content = format!("{}\ninvalid json line here\n{}\n", line1, line2);
 
@@ -1613,34 +1646,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_backwards_compat_legacy_format() {
-        // Write legacy format (plain Todo JSON lines) and verify we can read them
-        let (mut store, _dir) = create_test_store().await;
-
-        let todo1 = create_test_todo("Legacy 1");
-        let todo2 = create_test_todo("Legacy 2");
-        let id1 = todo1.id.clone();
-
-        let content = format!(
-            "{}\n{}\n",
-            serde_json::to_string(&todo1).unwrap(),
-            serde_json::to_string(&todo2).unwrap()
-        );
-
-        // Ensure parent dir exists
-        if let Some(parent) = store.file_path.parent() {
-            fs::create_dir_all(parent).await.unwrap();
-        }
-        fs::write(&store.file_path, content).await.unwrap();
-
-        store.load().await.unwrap();
-
-        let todos = store.list(&TodoFilter::default()).await.unwrap();
-        assert_eq!(todos.len(), 2, "Should load legacy format");
-        assert!(store.get(&id1).await.unwrap().is_some());
-    }
-
-    #[tokio::test]
     async fn test_compaction_reduces_file_size() {
         let (mut store, _dir) = create_test_store().await;
 
@@ -1702,39 +1707,6 @@ mod tests {
         // Data should still be correct
         let retrieved = store.get(&id).await.unwrap().unwrap();
         assert_eq!(retrieved.title, format!("V{}", COMPACTION_THRESHOLD - 1));
-    }
-
-    #[tokio::test]
-    async fn test_mixed_legacy_and_journal_format() {
-        // Simulate a migration scenario: file starts with legacy lines, then journal entries
-        let (mut store, _dir) = create_test_store().await;
-
-        let legacy_todo = create_test_todo("Legacy");
-        let legacy_id = legacy_todo.id.clone();
-
-        let journal_todo = create_test_todo("Journal");
-        let journal_id = journal_todo.id.clone();
-        let journal_entry = JournalEntry::Upsert {
-            todo: Box::new(journal_todo),
-        };
-
-        let content = format!(
-            "{}\n{}\n",
-            serde_json::to_string(&legacy_todo).unwrap(),
-            serde_json::to_string(&journal_entry).unwrap()
-        );
-
-        if let Some(parent) = store.file_path.parent() {
-            fs::create_dir_all(parent).await.unwrap();
-        }
-        fs::write(&store.file_path, content).await.unwrap();
-
-        store.load().await.unwrap();
-
-        assert!(store.get(&legacy_id).await.unwrap().is_some());
-        assert!(store.get(&journal_id).await.unwrap().is_some());
-        let todos = store.list(&TodoFilter::default()).await.unwrap();
-        assert_eq!(todos.len(), 2);
     }
 
     #[tokio::test]
@@ -2183,6 +2155,147 @@ mod tests {
             t.next_instance_date.unwrap(),
             next,
             "next_instance_date should survive reload"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_cycle_detection_simple() {
+        // Test case: A→B, then attempt B→A (should fail)
+        let (mut store, _dir) = create_test_store().await;
+
+        let task_a = create_test_todo("Task A");
+        let id_a = task_a.id.clone();
+        store.add(task_a.clone()).await.unwrap();
+
+        let task_b = create_test_todo("Task B");
+        let id_b = task_b.id.clone();
+        store.add(task_b.clone()).await.unwrap();
+
+        // Set A→B (A is parent of B)
+        store
+            .move_todo(&id_b, Some(id_a.clone()), None)
+            .await
+            .unwrap();
+
+        // Now try B→A (B is parent of A) - should fail with cycle error
+        let result = store.move_todo(&id_a, Some(id_b.clone()), None).await;
+
+        assert!(result.is_err(), "Should reject simple cycle A→B→A");
+        let err_msg = format!("{:?}", result.unwrap_err());
+        assert!(
+            err_msg.contains("circular reference"),
+            "Error should mention circular reference, got: {}",
+            err_msg
+        );
+    }
+
+    #[tokio::test]
+    async fn test_cycle_detection_complex() {
+        // Test case: A→B→C, then attempt C→A (should fail)
+        let (mut store, _dir) = create_test_store().await;
+
+        let task_a = create_test_todo("Task A");
+        let id_a = task_a.id.clone();
+        store.add(task_a).await.unwrap();
+
+        let task_b = create_test_todo("Task B");
+        let id_b = task_b.id.clone();
+        store.add(task_b).await.unwrap();
+
+        let task_c = create_test_todo("Task C");
+        let id_c = task_c.id.clone();
+        store.add(task_c).await.unwrap();
+
+        // Build chain: A→B→C
+        store
+            .move_todo(&id_b, Some(id_a.clone()), None)
+            .await
+            .unwrap();
+        store
+            .move_todo(&id_c, Some(id_b.clone()), None)
+            .await
+            .unwrap();
+
+        // Verify the chain is set up correctly
+        let b = store.get(&id_b).await.unwrap().unwrap();
+        assert_eq!(b.parent_id, Some(id_a.clone()));
+        let c = store.get(&id_c).await.unwrap().unwrap();
+        assert_eq!(c.parent_id, Some(id_b.clone()));
+
+        // Now try C→A (making A a child of C) - should fail
+        let result = store.move_todo(&id_a, Some(id_c.clone()), None).await;
+
+        assert!(result.is_err(), "Should reject complex cycle A→B→C→A");
+        let err_msg = format!("{:?}", result.unwrap_err());
+        assert!(
+            err_msg.contains("circular reference"),
+            "Error should mention circular reference, got: {}",
+            err_msg
+        );
+    }
+
+    #[tokio::test]
+    async fn test_valid_reparenting() {
+        // Test case: Valid reparenting operations that don't create cycles
+        let (mut store, _dir) = create_test_store().await;
+
+        let task_a = create_test_todo("Task A");
+        let id_a = task_a.id.clone();
+        store.add(task_a).await.unwrap();
+
+        let task_b = create_test_todo("Task B");
+        let id_b = task_b.id.clone();
+        store.add(task_b).await.unwrap();
+
+        let task_c = create_test_todo("Task C");
+        let id_c = task_c.id.clone();
+        store.add(task_c).await.unwrap();
+
+        let task_d = create_test_todo("Task D");
+        let id_d = task_d.id.clone();
+        store.add(task_d).await.unwrap();
+
+        // Build chain: A→B→C
+        let result = store.move_todo(&id_b, Some(id_a.clone()), None).await;
+        assert!(result.is_ok(), "Setting B's parent to A should succeed");
+
+        let result = store.move_todo(&id_c, Some(id_b.clone()), None).await;
+        assert!(result.is_ok(), "Setting C's parent to B should succeed");
+
+        // D is independent, so setting B's parent to D is valid
+        // Changes from: A→B→C, D (independent) to: A (independent), D→B→C
+        let result = store.move_todo(&id_b, Some(id_d.clone()), None).await;
+        assert!(result.is_ok(), "Moving B from A to D should succeed");
+
+        // Verify final structure: D→B→C, A is independent
+        let b = store.get(&id_b).await.unwrap().unwrap();
+        assert_eq!(b.parent_id, Some(id_d.clone()), "B's parent should be D");
+
+        let c = store.get(&id_c).await.unwrap().unwrap();
+        assert_eq!(c.parent_id, Some(id_b.clone()), "C's parent should still be B");
+
+        let d = store.get(&id_d).await.unwrap().unwrap();
+        assert_eq!(d.parent_id, None, "D should have no parent");
+    }
+
+    #[tokio::test]
+    async fn test_cycle_detection_self_parent_still_blocked() {
+        // Ensure existing self-parent check still works
+        let (mut store, _dir) = create_test_store().await;
+
+        let task_a = create_test_todo("Task A");
+        let id_a = task_a.id.clone();
+        store.add(task_a).await.unwrap();
+
+        // Try to set A as its own parent
+        let result = store.move_todo(&id_a, Some(id_a.clone()), None).await;
+
+        assert!(result.is_err(), "Should reject self-parenting");
+        let err_msg = format!("{:?}", result.unwrap_err());
+        assert!(
+            err_msg.contains("own parent"),
+            "Error should mention self-parenting, got: {}",
+            err_msg
         );
     }
 }

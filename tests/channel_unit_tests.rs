@@ -409,7 +409,8 @@ async fn test_channel_manager_creates_with_no_channels() {
     let (temp_dir, _workspace) = common::test_workspace();
     let config = common::test_config(&temp_dir);
     let bus = common::test_message_bus();
-    let _manager = ChannelManager::new(Arc::new(config), bus);
+    let _manager = ChannelManager::new(Arc::new(config), bus)
+        .expect("Failed to create channel manager");
 }
 
 #[tokio::test]
@@ -417,7 +418,8 @@ async fn test_channel_manager_initialize_with_no_enabled() {
     let (temp_dir, _workspace) = common::test_workspace();
     let config = common::test_config(&temp_dir);
     let bus = common::test_message_bus();
-    let manager = ChannelManager::new(Arc::new(config), bus);
+    let manager = ChannelManager::new(Arc::new(config), bus)
+        .expect("Failed to create channel manager");
     let result = manager.initialize_channels().await;
     assert!(result.is_ok());
 }

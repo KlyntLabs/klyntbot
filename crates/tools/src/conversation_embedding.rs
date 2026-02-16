@@ -441,7 +441,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_upsert_new_record() {
-        let (mut store, _dir) = create_test_store().await;
+        let (store, _dir) = create_test_store().await;
         let record = create_test_record("msg-1", "telegram:12345", "user");
 
         store.upsert(record.clone()).await.unwrap();
@@ -455,7 +455,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_load_from_empty_file() {
-        let (mut store, _dir) = create_test_store().await;
+        let (store, _dir) = create_test_store().await;
 
         store.load().await.unwrap();
 
@@ -500,7 +500,7 @@ mod tests {
         );
         std::fs::write(&file_path, content).unwrap();
 
-        let mut store2 = ConversationEmbeddingStore::new(file_path);
+        let store2 = ConversationEmbeddingStore::new(file_path);
         store2.load().await.unwrap(); // Should not panic
 
         assert!(store2.get("valid1").await.unwrap().is_some(), "Should load valid1");
@@ -509,7 +509,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_search_by_session_key() {
-        let (mut store, _dir) = create_test_store().await;
+        let (store, _dir) = create_test_store().await;
 
         store.upsert(create_test_record("msg-1", "telegram:12345", "user")).await.unwrap();
         store.upsert(create_test_record("msg-2", "telegram:12345", "assistant")).await.unwrap();
@@ -524,7 +524,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_purge_by_session_key() {
-        let (mut store, _dir) = create_test_store().await;
+        let (store, _dir) = create_test_store().await;
 
         store.upsert(create_test_record("msg-1", "telegram:12345", "user")).await.unwrap();
         store.upsert(create_test_record("msg-2", "telegram:12345", "assistant")).await.unwrap();
@@ -540,7 +540,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_purge_by_date() {
-        let (mut store, _dir) = create_test_store().await;
+        let (store, _dir) = create_test_store().await;
 
         let old_date = Utc::now() - chrono::Duration::days(10);
         let cutoff_date = Utc::now() - chrono::Duration::days(5);
@@ -564,7 +564,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_compaction_removes_stale() {
-        let (mut store, _dir) = create_test_store().await;
+        let (store, _dir) = create_test_store().await;
 
         // Write 100 upserts for the same ID (creates 100 journal entries)
         for i in 0..100 {

@@ -344,10 +344,9 @@ pub async fn handle_serve(port: u16) -> Result<()> {
     info!("Agent loop initialized");
 
     // Initialize channel manager
-    let channel_manager = Arc::new(Mutex::new(ChannelManager::new(
-        Arc::new(config.clone()),
-        bus.clone(),
-    )));
+    let channel_manager = Arc::new(Mutex::new(
+        ChannelManager::new(Arc::new(config.clone()), bus.clone())?,
+    ));
 
     // Initialize heartbeat service with agent loop callback
     let workspace_path = config.workspace_path();

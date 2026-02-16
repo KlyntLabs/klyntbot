@@ -85,30 +85,6 @@ pub async fn save_sync_state(state: &SyncState) -> Result<()> {
     Ok(())
 }
 
-/// Migrate legacy sync state to per-provider format.
-/// If ~/.klyntbot/calendar_sync.json exists and no apple state exists,
-/// move it to ~/.klyntbot/calendar_sync_states/apple.json.
-pub async fn migrate_legacy_sync_state() -> Result<()> {
-    let legacy_path = get_sync_state_path();
-    let apple_path = get_provider_sync_state_path("apple");
-
-    if legacy_path.exists() && !apple_path.exists() {
-        tracing::info!("Migrating legacy calendar_sync.json to calendar_sync_states/apple.json");
-
-        if let Some(parent) = apple_path.parent() {
-            fs::create_dir_all(parent).await?;
-        }
-
-        let contents = fs::read_to_string(&legacy_path).await?;
-        fs::write(&apple_path, contents).await?;
-
-        // Keep old file around for safety — don't delete
-        tracing::info!("Legacy sync state migrated successfully");
-    }
-
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

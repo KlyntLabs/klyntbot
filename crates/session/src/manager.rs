@@ -139,7 +139,9 @@ impl SessionManager {
         while self.lru_order.len() > self.max_cache_size {
             if let Some(old_key) = self.lru_order.pop_front() {
                 if let Some(session) = self.cache.remove(&old_key) {
-                    let _ = self.save(&session).await;
+                    if let Err(e) = self.save(&session).await {
+                        warn!("Failed to save evicted session {}: {}. Data may be lost.", old_key, e);
+                    }
                     debug!("Evicted session from cache: {}", old_key);
                 }
             }
@@ -557,5 +559,75 @@ mod tests {
         // Verify IDs persisted
         assert_eq!(loaded_session.messages[0].id, original_id);
         assert!(!loaded_session.messages[1].id.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_eviction_succeeds_despite_save_failure() {
+        // Test that eviction completes successfully even when save fails
+        // This verifies the error is logged (not propagated) per the fix
+        let temp_dir = TempDir::new().unwrap();
+        let mut manager = SessionManager::with_capacity(temp_dir.path(), 2).await;
+
+        // Fill cache with 2 sessions
+        {
+            let session1 = manager.get_or_create("test:chat1").await.unwrap();
+            session1.add_message("user", "Message 1");
+        }
+        {
+            let session2 = manager.get_or_create("test:chat2").await.unwrap();
+            session2.add_message("user", "Message 2");
+        }
+
+        // Make directory read-only to cause save to fail during eviction
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let mut perms = tokio::fs::metadata(temp_dir.path())
+                .await
+                .unwrap()
+                .permissions();
+            perms.set_mode(0o444); // Read-only
+            tokio::fs::set_permissions(temp_dir.path(), perms)
+                .await
+                .unwrap();
+        }
+
+        // On Windows, we can't easily make a directory read-only while still being able
+        // to use it, so we'll just verify the eviction logic works normally
+        #[cfg(not(unix))]
+        {
+            // No permission change needed - test will pass on behavior alone
+        }
+
+        // Add third session to trigger eviction (should evict test:chat1)
+        // This should NOT panic or fail even though save will fail on Unix
+        let result = manager.get_or_create("test:chat3").await;
+        assert!(
+            result.is_ok(),
+            "Eviction should succeed even if save fails"
+        );
+
+        {
+            let session3 = result.unwrap();
+            session3.add_message("user", "Message 3");
+        }
+
+        // Verify eviction still succeeded (cache should have chat2 and chat3, not chat1)
+        // The key behavior: eviction completed despite save failure (error was logged, not propagated)
+        assert!(
+            !manager.cache.contains_key("test:chat1"),
+            "chat1 should be evicted"
+        );
+        assert!(
+            manager.cache.contains_key("test:chat2"),
+            "chat2 should remain"
+        );
+        assert!(
+            manager.cache.contains_key("test:chat3"),
+            "chat3 should be added"
+        );
+
+        // Note: The warning log "Failed to save evicted session test:chat1: ... Data may be lost."
+        // will be emitted to stderr during test run on Unix systems
     }
 }

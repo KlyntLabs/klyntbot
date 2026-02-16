@@ -42,7 +42,11 @@ pub async fn handle_attach(
     } else if let Some(u) = url {
         (AttachmentType::Url, u)
     } else {
-        (AttachmentType::Note, note.unwrap())
+        // note must be Some() because we validated exactly one of file/url/note is provided
+        (
+            AttachmentType::Note,
+            note.ok_or_else(|| anyhow::anyhow!("Note value is required"))?,
+        )
     };
 
     let config = config::load().await?;

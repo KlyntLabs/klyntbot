@@ -34,7 +34,10 @@ pub async fn handle_log_time(id: String, minutes: u32, note: Option<String>) -> 
     let added = store.add_time_entry(&id, entry).await?;
 
     if added {
-        let todo = store.get(&id).await?.unwrap();
+        let todo = store
+            .get(&id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Task {} was deleted", id))?;
         // Compute total from entries since add_time_entry doesn't update the denormalized field
         let total_secs: u64 = todo
             .time_entries

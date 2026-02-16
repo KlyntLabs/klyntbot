@@ -217,7 +217,13 @@ pub async fn handle_channels(cmd: ChannelCommands) -> Result<()> {
 
             // Create a temporary channel manager to test initialization
             let bus = Arc::new(MessageBus::new(10));
-            let channel_manager = ChannelManager::new(Arc::new(config), bus);
+            let channel_manager = match ChannelManager::new(Arc::new(config), bus) {
+                Ok(manager) => manager,
+                Err(e) => {
+                    println!("✗ Failed to create channel manager: {}", e);
+                    return Err(anyhow::Error::from(e));
+                }
+            };
 
             // Try to initialize channels (this will create the channel)
             match channel_manager.initialize_channels().await {

@@ -165,6 +165,9 @@ impl GoogleCalendarProvider {
 
         let etag = item["etag"].as_str().map(String::from);
 
+        // Parse status field from Google Calendar API (lowercase) and convert to iCal format (uppercase)
+        let status = item["status"].as_str().map(|s| s.to_uppercase());
+
         Some(CalendarEvent {
             uid: uid.to_string(),
             summary: summary.to_string(),
@@ -173,7 +176,7 @@ impl GoogleCalendarProvider {
             end: end_dt,
             source: EventSource::CalDAV, // Reuse existing variant for remote events
             etag,
-            status: None, // TODO: Parse Google Calendar status field
+            status,
         })
     }
 
@@ -192,6 +195,11 @@ impl GoogleCalendarProvider {
 
         if let Some(ref desc) = event.description {
             body["description"] = Value::String(desc.clone());
+        }
+
+        // Convert iCal status (uppercase) to Google Calendar format (lowercase)
+        if let Some(ref status) = event.status {
+            body["status"] = Value::String(status.to_lowercase());
         }
 
         body
@@ -553,5 +561,126 @@ mod tests {
 
         let json = GoogleCalendarProvider::event_to_json(&event);
         assert!(json.get("description").is_none());
+    }
+
+    #[test]
+    fn test_json_to_event_with_status() {
+        // Test parsing lowercase Google Calendar status → uppercase iCal format
+        let json = serde_json::json!({
+            "id": "google-id",
+            "iCalUID": "ical-uid",
+            "summary": "Event with status",
+            "start": { "dateTime": "2026-03-01T10:00:00Z" },
+            "end": { "dateTime": "2026-03-01T11:00:00Z" },
+            "status": "confirmed"
+        });
+
+        let event = GoogleCalendarProvider::json_to_event(&json).unwrap();
+        assert_eq!(event.status, Some("CONFIRMED".to_string()));
+
+        // Test tentative status
+        let json = serde_json::json!({
+            "id": "google-id",
+            "iCalUID": "ical-uid",
+            "summary": "Tentative event",
+            "start": { "dateTime": "2026-03-01T10:00:00Z" },
+            "end": { "dateTime": "2026-03-01T11:00:00Z" },
+            "status": "tentative"
+        });
+
+        let event = GoogleCalendarProvider::json_to_event(&json).unwrap();
+        assert_eq!(event.status, Some("TENTATIVE".to_string()));
+
+        // Test cancelled status
+        let json = serde_json::json!({
+            "id": "google-id",
+            "iCalUID": "ical-uid",
+            "summary": "Cancelled event",
+            "start": { "dateTime": "2026-03-01T10:00:00Z" },
+            "end": { "dateTime": "2026-03-01T11:00:00Z" },
+            "status": "cancelled"
+        });
+
+        let event = GoogleCalendarProvider::json_to_event(&json).unwrap();
+        assert_eq!(event.status, Some("CANCELLED".to_string()));
+    }
+
+    #[test]
+    fn test_json_to_event_without_status() {
+        let json = serde_json::json!({
+            "id": "google-id",
+            "iCalUID": "ical-uid",
+            "summary": "No status",
+            "start": { "dateTime": "2026-03-01T10:00:00Z" },
+            "end": { "dateTime": "2026-03-01T11:00:00Z" }
+        });
+
+        let event = GoogleCalendarProvider::json_to_event(&json).unwrap();
+        assert_eq!(event.status, None);
+    }
+
+    #[test]
+    fn test_event_to_json_with_status() {
+        // Test uppercase iCal format → lowercase Google Calendar format
+        let event = CalendarEvent {
+            uid: "test-uid".to_string(),
+            summary: "Event with status".to_string(),
+            description: None,
+            start: Utc::now(),
+            end: Utc::now() + chrono::Duration::hours(1),
+            source: EventSource::TodoItem,
+            etag: None,
+            status: Some("CONFIRMED".to_string()),
+        };
+
+        let json = GoogleCalendarProvider::event_to_json(&event);
+        assert_eq!(json["status"], "confirmed");
+
+        // Test TENTATIVE
+        let event = CalendarEvent {
+            uid: "test-uid".to_string(),
+            summary: "Tentative".to_string(),
+            description: None,
+            start: Utc::now(),
+            end: Utc::now() + chrono::Duration::hours(1),
+            source: EventSource::TodoItem,
+            etag: None,
+            status: Some("TENTATIVE".to_string()),
+        };
+
+        let json = GoogleCalendarProvider::event_to_json(&event);
+        assert_eq!(json["status"], "tentative");
+
+        // Test CANCELLED
+        let event = CalendarEvent {
+            uid: "test-uid".to_string(),
+            summary: "Cancelled".to_string(),
+            description: None,
+            start: Utc::now(),
+            end: Utc::now() + chrono::Duration::hours(1),
+            source: EventSource::TodoItem,
+            etag: None,
+            status: Some("CANCELLED".to_string()),
+        };
+
+        let json = GoogleCalendarProvider::event_to_json(&event);
+        assert_eq!(json["status"], "cancelled");
+    }
+
+    #[test]
+    fn test_event_to_json_without_status() {
+        let event = CalendarEvent {
+            uid: "test-uid".to_string(),
+            summary: "No status".to_string(),
+            description: None,
+            start: Utc::now(),
+            end: Utc::now() + chrono::Duration::hours(1),
+            source: EventSource::TodoItem,
+            etag: None,
+            status: None,
+        };
+
+        let json = GoogleCalendarProvider::event_to_json(&event);
+        assert!(json.get("status").is_none());
     }
 }

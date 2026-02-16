@@ -74,8 +74,14 @@ pub async fn handle_depend(id: String, on: Option<String>, remove: Option<String
     if let Some(blocker_id) = on {
         match store.add_dependency(&id, &blocker_id).await {
             Ok(()) => {
-                let task = store.get(&id).await?.unwrap();
-                let blocker = store.get(&blocker_id).await?.unwrap();
+                let task = store
+                    .get(&id)
+                    .await?
+                    .ok_or_else(|| anyhow::anyhow!("Task {} was deleted", id))?;
+                let blocker = store
+                    .get(&blocker_id)
+                    .await?
+                    .ok_or_else(|| anyhow::anyhow!("Blocker task {} was deleted", blocker_id))?;
                 println!(
                     "{} {} is now blocked by {}",
                     status_success(),
