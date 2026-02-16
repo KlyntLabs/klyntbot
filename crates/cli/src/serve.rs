@@ -37,6 +37,10 @@ pub async fn handle_serve(port: u16) -> Result<()> {
     let todo_path = config.todo_store_path();
     let todo_store = Arc::new(RwLock::new(tools::todo_store::TodoStore::new(todo_path)));
 
+    // Create SHARED GoalStore
+    let goal_path = config.goal_store_path();
+    let goal_store = Arc::new(RwLock::new(goal::GoalStore::new(goal_path)));
+
     // Create SHARED NotificationDispatcher
     let notification_dispatcher = Arc::new(agent::NotificationDispatcher::new(
         bus.outbound_sender(),
@@ -337,6 +341,7 @@ pub async fn handle_serve(port: u16) -> Result<()> {
             config.clone(),
             Some(cron_service.clone()),
             todo_store.clone(),
+            Some(goal_store.clone()),
             Some(notification_dispatcher.last_active_handle()),
         )
         .await?,

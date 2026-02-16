@@ -22,6 +22,7 @@ use tools::{
     calendar_tool::{CalendarHandler, CalendarTool},
     cron_tool::CronTool,
     enrichment::EnrichmentHandler,
+    goal_tool::{GoalHandler, GoalTool},
     EmbeddingHandler,
     filesystem::register_fs_tools,
     message::MessageTool,
@@ -111,6 +112,7 @@ impl AgentLoop {
         config: Config,
         cron_service: Option<Arc<scheduling::CronService>>,
         todo_store: Arc<RwLock<tools::todo_store::TodoStore>>,
+        goal_store: Option<Arc<RwLock<goal::GoalStore>>>,
         notification_handle: Option<LastActiveChannel>,
     ) -> Result<Self> {
         let workspace = config.workspace_path();
@@ -281,6 +283,14 @@ impl AgentLoop {
 
         tool_registry.register(todo_tool);
 
+        // Register goal tool (if goal_store is provided)
+        if let Some(gs) = goal_store {
+            let goal_handler = Arc::new(super::GoalHandlerImpl::new(gs));
+            tool_registry.register(GoalTool::new(Some(
+                goal_handler as Arc<dyn GoalHandler>,
+            )));
+        }
+
         // Register conversation embedding handler (Phase 4.1)
         let conversation_embedding_handler = if config.conversation.embedding.enabled {
             let conv_store_path = dirs::home_dir()
@@ -388,7 +398,9 @@ impl AgentLoop {
     pub async fn new(bus: Arc<MessageBus>, provider: DynProvider, config: Config) -> Result<Self> {
         let todo_path = config.todo_store_path();
         let todo_store = Arc::new(RwLock::new(tools::todo_store::TodoStore::new(todo_path)));
-        Self::new_with_cron(bus, provider, config, None, todo_store, None).await
+        let goal_path = config.goal_store_path();
+        let goal_store = Some(Arc::new(RwLock::new(goal::GoalStore::new(goal_path))));
+        Self::new_with_cron(bus, provider, config, None, todo_store, goal_store, None).await
     }
 
     /// Run the agent loop, processing messages from the bus
