@@ -173,6 +173,22 @@ pub async fn handle_serve(port: u16) -> Result<()> {
                         })?;
                         Ok(Some("Calendar sync triggered".to_string()))
                     }
+                    "__klyntbot_daily_planning" => {
+                        // Trigger daily planning skill via bus message
+                        let msg = bus::InboundMessage::new(
+                            "system",
+                            "cron",
+                            "daily_planning",
+                            "/daily-planning".to_string(),
+                        );
+                        bus.publish_inbound(msg).await.map_err(|e| {
+                            common::KlyntbotError::Bus(format!(
+                                "Failed to publish daily planning message: {}",
+                                e
+                            ))
+                        })?;
+                        Ok(Some("Daily planning triggered".to_string()))
+                    }
                     _ => Ok(None),
                 }
             })
@@ -261,6 +277,54 @@ pub async fn handle_serve(port: u16) -> Result<()> {
             "Calendar sync cron registered (interval: {}s)",
             sync_interval_secs
         );
+    }
+
+    // Register daily planning cron job if enabled
+    if config.todo.daily_planning.enabled {
+        let planning_time = &config.todo.daily_planning.planning_time;
+
+        // Parse HH:MM format to cron expression (minute hour * * *)
+        let parts: Vec<&str> = planning_time.split(':').collect();
+        if parts.len() == 2 {
+            if let (Ok(hour), Ok(minute)) = (parts[0].parse::<u8>(), parts[1].parse::<u8>()) {
+                if hour < 24 && minute < 60 {
+                    let cron_expr = format!("{} {} * * *", minute, hour);
+                    cron_service
+                        .add_job(
+                            "__klyntbot_daily_planning",
+                            scheduling::CronSchedule::Cron {
+                                expr: cron_expr.clone(),
+                                tz: None,
+                            },
+                            "Generate daily planning notification",
+                            false,
+                            None,
+                            None,
+                            false,
+                        )
+                        .await?;
+                    info!(
+                        "Daily planning cron registered (time: {}, cron: {})",
+                        planning_time, cron_expr
+                    );
+                } else {
+                    anyhow::bail!(
+                        "Invalid planning_time '{}': hour must be 0-23, minute 0-59",
+                        planning_time
+                    );
+                }
+            } else {
+                anyhow::bail!(
+                    "Invalid planning_time '{}': must be numeric HH:MM (e.g., '08:00', not '8:00am')",
+                    planning_time
+                );
+            }
+        } else {
+            anyhow::bail!(
+                "Invalid planning_time '{}': must be in HH:MM format (e.g., '08:00')",
+                planning_time
+            );
+        }
     }
 
     info!("Todo cron jobs registered");

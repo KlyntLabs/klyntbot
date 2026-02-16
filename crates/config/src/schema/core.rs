@@ -936,6 +936,10 @@ fn default_rrf_k() -> u32 {
     60
 }
 
+fn default_planning_time() -> String {
+    "08:00".to_string()
+}
+
 /// Daily planning configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -943,11 +947,17 @@ pub struct DailyPlanningConfig {
     /// Enable/disable daily planning feature (default: true)
     #[serde(default = "default_true")]
     pub enabled: bool,
+    /// Time to trigger daily planning in HH:MM format (default: "08:00")
+    #[serde(default = "default_planning_time")]
+    pub planning_time: String,
 }
 
 impl Default for DailyPlanningConfig {
     fn default() -> Self {
-        Self { enabled: true }
+        Self {
+            enabled: true,
+            planning_time: "08:00".to_string(),
+        }
     }
 }
 
@@ -1193,14 +1203,27 @@ mod tests {
     #[test]
     fn test_daily_planning_config_serde_roundtrip() {
         // Test with enabled: false to verify it doesn't just rely on defaults
-        let config = DailyPlanningConfig { enabled: false };
+        let config = DailyPlanningConfig {
+            enabled: false,
+            planning_time: "09:30".to_string(),
+        };
         let json = serde_json::to_string(&config).unwrap();
 
         // Verify camelCase serialization
         assert!(json.contains("\"enabled\""));
+        assert!(json.contains("\"planningTime\""));
+        assert!(json.contains("\"09:30\""));
 
         // Verify roundtrip
         let loaded: DailyPlanningConfig = serde_json::from_str(&json).unwrap();
         assert!(!loaded.enabled);
+        assert_eq!(loaded.planning_time, "09:30");
+    }
+
+    #[test]
+    fn test_daily_planning_config_default() {
+        let config = DailyPlanningConfig::default();
+        assert!(config.enabled);
+        assert_eq!(config.planning_time, "08:00");
     }
 }

@@ -1,7 +1,7 @@
 ---
 name: todo-party
 description: Interactive persona-driven brainstorming to flesh out todo tasks. Used during task creation when user selects Party mode for low-confidence tasks.
-metadata: {"klyntbot":{"triggers":["todo","party","brainstorm"]}}
+metadata: '{"klyntbot":{"triggers":["todo","party","brainstorm"]}}'
 ---
 
 # Party Mode — Brainstorm Buddy

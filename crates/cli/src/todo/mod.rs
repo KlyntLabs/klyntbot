@@ -12,6 +12,7 @@ mod enrich;
 mod focus;
 mod list;
 mod move_task;
+mod plan;
 mod recur;
 mod report;
 mod search;
@@ -106,6 +107,7 @@ pub async fn handle_todo(cmd: TodoCommands) -> Result<()> {
         TodoCommands::Enrich { id } => enrich::handle_enrich(id).await,
         TodoCommands::Recur(cmd) => recur::handle_recur(cmd).await,
         TodoCommands::BackfillEmbeddings => backfill::handle_backfill().await,
+        TodoCommands::Plan => plan::handle_plan().await,
     }
 }
 

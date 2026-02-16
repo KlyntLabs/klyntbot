@@ -11,6 +11,10 @@ use common::Result;
 /// Built-in skill definitions (bundled at compile time)
 const BUILTIN_SKILLS: &[(&str, &str)] = &[
     ("cron", include_str!("../../../skills/cron/SKILL.md")),
+    (
+        "daily-planning",
+        include_str!("../../../skills/daily-planning/SKILL.md"),
+    ),
     ("github", include_str!("../../../skills/github/SKILL.md")),
     (
         "skill-creator",

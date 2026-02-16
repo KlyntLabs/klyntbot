@@ -8,6 +8,7 @@ pub mod cron_tool;
 pub mod embedding_engine;
 pub mod embedding_store;
 pub mod enrichment;
+pub mod plan_response;
 pub mod filesystem;
 pub mod message;
 pub mod params;

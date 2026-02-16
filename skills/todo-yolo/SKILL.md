@@ -1,7 +1,7 @@
 ---
 name: todo-yolo
 description: Auto-enrich todo tasks from conversation context and memory. Used during task creation when user selects YOLO mode for low-confidence tasks.
-metadata: {"klyntbot":{"triggers":["todo","yolo","auto-enrich"]}}
+metadata: '{"klyntbot":{"triggers":["todo","yolo","auto-enrich"]}}'
 ---
 
 # YOLO Mode — Auto-Enrichment

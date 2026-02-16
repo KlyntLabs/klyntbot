@@ -480,6 +480,9 @@ pub enum TodoCommands {
 
     /// Generate embeddings for tasks that don't have them (enables semantic search)
     BackfillEmbeddings,
+
+    /// Generate and view daily planning (top 3 most impactful tasks)
+    Plan,
 }
 
 #[derive(Subcommand, Debug)]

@@ -101,6 +101,109 @@ impl TodoTool {
         }
     }
 
+    // ─── Daily Planning — Scoring Algorithm (Sprint 6, Task #9/#11) ───
+    //
+    // The planning algorithm ranks tasks by a composite score that balances:
+    // 1. Urgency (due dates) — ensures deadline-driven work isn't missed
+    // 2. Priority (importance) — respects user-defined task importance
+    // 3. Age (staleness) — prevents old tasks from being perpetually deferred
+    //
+    // Score formula: (urgency × priority_weight) + (age_days × 0.1)
+    //
+    // This weighted approach ensures that an overdue P1 task (score ~50) always ranks
+    // above a future P5 task (score ~1), while still rewarding long-pending work.
+
+    /// Calculate urgency tier based on due date relative to now.
+    ///
+    /// **Urgency tiers** (exponential weighting):
+    /// - `overdue`: 10 — tasks past their deadline (highest urgency)
+    /// - `today`: 5 — tasks due within 24 hours
+    /// - `tomorrow`: 3 — tasks due in 24-48 hours
+    /// - `future` or `None`: 1 — tasks due beyond 48 hours or without deadlines
+    ///
+    /// **Rationale**: Exponential tiers (10/5/3/1 instead of linear 4/3/2/1) ensure
+    /// that urgency dominates the score for time-sensitive work, preventing low-priority
+    /// but overdue tasks from being ignored.
+    fn calculate_urgency(due_date: Option<chrono::DateTime<chrono::Utc>>, now: chrono::DateTime<chrono::Utc>) -> u32 {
+        match due_date {
+            None => 1, // No due date → future tier
+            Some(due) => {
+                let now_date = now.date_naive();
+                let due_date = due.date_naive();
+
+                if due_date < now_date {
+                    10 // Overdue
+                } else if due_date == now_date {
+                    5 // Due today
+                } else if due_date == now_date + chrono::Duration::days(1) {
+                    3 // Due tomorrow
+                } else {
+                    1 // Future
+                }
+            }
+        }
+    }
+
+    /// Convert priority to weight for scoring.
+    ///
+    /// **Priority weights** (inverse mapping):
+    /// - P1 (highest priority): 5
+    /// - P2: 4
+    /// - P3: 3 (default for tasks without priority)
+    /// - P4: 2
+    /// - P5 (lowest priority): 1
+    /// - None: 3 (default, treated as medium priority)
+    ///
+    /// **Rationale**: Inverse weighting (P1=5, P5=1) ensures that high-priority tasks
+    /// receive higher scores. The default of 3 (P3-equivalent) prevents unprioritized
+    /// tasks from being treated as either critical or negligible.
+    fn priority_weight(priority: Option<u8>) -> u32 {
+        match priority {
+            Some(1) => 5,
+            Some(2) => 4,
+            Some(3) => 3,
+            Some(4) => 2,
+            Some(5) => 1,
+            None => 3, // Default: treat as P3
+            _ => 3,    // Invalid priorities default to P3
+        }
+    }
+
+    /// Calculate age in days from created_at to now.
+    ///
+    /// **Rationale**: Age factor prevents old tasks from being perpetually deferred
+    /// in favor of newer high-urgency work. Each day adds 0.1 to the score, so a
+    /// 10-day-old task gets +1.0 boost, and a 50-day-old task gets +5.0.
+    ///
+    /// **Edge case**: If `created_at` is in the future (clock skew, bad data), age
+    /// is clamped to 0 to prevent negative scores.
+    fn calculate_age_days(created_at: chrono::DateTime<chrono::Utc>, now: chrono::DateTime<chrono::Utc>) -> f64 {
+        let duration = now.signed_duration_since(created_at);
+        (duration.num_seconds().max(0) as f64) / 86400.0 // Clamp negative to 0
+    }
+
+    /// Calculate composite planning score for a task.
+    ///
+    /// **Formula**: `score = (urgency × priority_weight) + (age_days × 0.1)`
+    ///
+    /// **Example scores**:
+    /// - Overdue P1 task (5 days old): `(10 × 5) + (5 × 0.1) = 50.5`
+    /// - Due today P2 task (3 days old): `(5 × 4) + (3 × 0.1) = 20.3`
+    /// - Due tomorrow P3 task (1 day old): `(3 × 3) + (1 × 0.1) = 9.1`
+    /// - Future P4 task (0 days old): `(1 × 2) + (0 × 0.1) = 2.0`
+    ///
+    /// **Range**: Typically 1.0-60.0, with higher scores ranking first.
+    ///
+    /// **Tiebreaking**: When scores are equal, tasks are ranked by `created_at`
+    /// (older tasks first) to ensure deterministic ordering.
+    fn calculate_score(task: &Todo, now: chrono::DateTime<chrono::Utc>) -> f64 {
+        let urgency = Self::calculate_urgency(task.due_date, now) as f64;
+        let priority_wt = Self::priority_weight(task.priority) as f64;
+        let age_days = Self::calculate_age_days(task.created_at, now);
+
+        (urgency * priority_wt) + (age_days * 0.1)
+    }
+
     /// Reciprocal Rank Fusion: merge keyword and semantic ranked lists.
     ///
     /// RRF formula: score(d) = sum(1 / (k + rank_i)) for each list where d appears.
@@ -156,7 +259,7 @@ impl Tool for TodoTool {
     }
 
     fn description(&self) -> &str {
-        "Manage tasks and todos. Actions: add, list, update, complete, delete, show, summary, focus, unfocus, add_subtask, move, attach, detach, log_time, tree, search, search_semantic, search_hybrid, report, add_dependency, remove_dependency, recur, list_recurring, delete_recurring, enrich."
+        "Manage tasks and todos. Actions: add, list, update, complete, delete, show, summary, focus, unfocus, add_subtask, move, attach, detach, log_time, tree, search, search_semantic, search_hybrid, report, add_dependency, remove_dependency, recur, list_recurring, delete_recurring, enrich, plan."
     }
 
     fn parameters(&self) -> Value {
@@ -165,7 +268,7 @@ impl Tool for TodoTool {
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": ["add", "list", "update", "complete", "delete", "show", "summary", "focus", "unfocus", "add_subtask", "move", "attach", "detach", "log_time", "tree", "search", "search_semantic", "search_hybrid", "report", "add_dependency", "remove_dependency", "recur", "list_recurring", "delete_recurring", "enrich"],
+                    "enum": ["add", "list", "update", "complete", "delete", "show", "summary", "focus", "unfocus", "add_subtask", "move", "attach", "detach", "log_time", "tree", "search", "search_semantic", "search_hybrid", "report", "add_dependency", "remove_dependency", "recur", "list_recurring", "delete_recurring", "enrich", "plan"],
                     "description": "Action to perform"
                 },
                 "id": {
@@ -273,6 +376,10 @@ impl Tool for TodoTool {
                 "template_id": {
                     "type": "string",
                     "description": "Recurring task template ID (for delete_recurring)"
+                },
+                "count": {
+                    "type": "integer",
+                    "description": "Number of tasks to include in plan (for plan, default: 3)"
                 }
             },
             "required": ["action"]
@@ -1658,6 +1765,134 @@ impl Tool for TodoTool {
                     ))
                     .into()),
                 }
+            }
+
+            "plan" => {
+                // Generate a daily plan: score eligible tasks and return top N
+                // Cap count at 10 to prevent unbounded output and confusing validation messages
+                let count = p.optional_u64("count")?.unwrap_or(3).min(10) as usize;
+                info!("Generating daily plan (top {} tasks)", count);
+
+                // Get all tasks
+                let all_tasks = store.list(&TodoFilter::default()).await?;
+                debug!("Total tasks in store: {}", all_tasks.len());
+
+                // Filter eligible tasks:
+                // - status = Todo (not Doing, Done, or Archived)
+                // - not a template (is_template = false)
+                // - not currently focused (focused_at = None)
+                // - not blocked (no incomplete blockers)
+                let now = Utc::now();
+                let mut eligible = Vec::new();
+                let mut filtered_counts = std::collections::HashMap::new();
+
+                for task in all_tasks {
+                    if task.status != TodoStatus::Todo {
+                        *filtered_counts.entry("non_todo").or_insert(0) += 1;
+                        continue; // Skip non-Todo tasks
+                    }
+                    if task.is_template {
+                        *filtered_counts.entry("template").or_insert(0) += 1;
+                        continue; // Skip templates
+                    }
+                    if task.focused_at.is_some() {
+                        *filtered_counts.entry("focused").or_insert(0) += 1;
+                        continue; // Skip already focused tasks
+                    }
+
+                    // Check if blocked
+                    let blockers = store.incomplete_blockers(&task.id).await?;
+                    if !blockers.is_empty() {
+                        *filtered_counts.entry("blocked").or_insert(0) += 1;
+                        continue; // Skip blocked tasks
+                    }
+
+                    eligible.push(task);
+                }
+
+                debug!(
+                    "Eligible tasks: {} (filtered: {} non-todo, {} templates, {} focused, {} blocked)",
+                    eligible.len(),
+                    filtered_counts.get("non_todo").unwrap_or(&0),
+                    filtered_counts.get("template").unwrap_or(&0),
+                    filtered_counts.get("focused").unwrap_or(&0),
+                    filtered_counts.get("blocked").unwrap_or(&0)
+                );
+
+                // Score and sort eligible tasks
+                let mut scored: Vec<(Todo, f64)> = eligible
+                    .into_iter()
+                    .map(|task| {
+                        let score = Self::calculate_score(&task, now);
+                        debug!("Scored task [{}] '{}': {:.2}", task.id, task.title, score);
+                        (task, score)
+                    })
+                    .collect();
+
+                // Sort by score descending, then by created_at ascending (tiebreak: older tasks first)
+                scored.sort_by(|a, b| {
+                    b.1.partial_cmp(&a.1)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                        .then_with(|| a.0.created_at.cmp(&b.0.created_at))
+                });
+
+                // Take top N
+                let plan: Vec<&(Todo, f64)> = scored.iter().take(count).collect();
+
+                if plan.is_empty() {
+                    info!("Daily plan generated: No eligible tasks (all clear)");
+                    return Ok("No eligible tasks for planning. All clear!".to_string());
+                }
+
+                info!(
+                    "Daily plan generated: {} tasks (top scores: {:.1}, {:.1}, {:.1})",
+                    plan.len(),
+                    plan.first().map(|(_, s)| s).unwrap_or(&0.0),
+                    plan.get(1).map(|(_, s)| s).unwrap_or(&0.0),
+                    plan.get(2).map(|(_, s)| s).unwrap_or(&0.0)
+                );
+
+                // Format the plan output
+                let mut output = format!("Daily plan ({} tasks):\n\n", plan.len());
+                for (i, (task, score)) in plan.iter().enumerate() {
+                    let priority_label = task.priority.map(|p| format!("P{}", p)).unwrap_or_else(|| "P3".to_string());
+
+                    let due_context = if let Some(due) = task.due_date {
+                        let due_date = due.date_naive();
+                        let now_date = now.date_naive();
+
+                        if due_date < now_date {
+                            let days_overdue = (now_date - due_date).num_days();
+                            format!("Overdue by {} day(s)", days_overdue)
+                        } else if due_date == now_date {
+                            "Due today".to_string()
+                        } else if due_date == now_date + chrono::Duration::days(1) {
+                            "Due tomorrow".to_string()
+                        } else {
+                            format!("Due {}", due_date.format("%Y-%m-%d"))
+                        }
+                    } else {
+                        "No deadline".to_string()
+                    };
+
+                    let duration_info = task
+                        .estimated_minutes
+                        .map(|m| format!(" · {} min", m))
+                        .unwrap_or_default();
+
+                    output.push_str(&format!(
+                        "{}. {} (ID: {})\n   {} · {} · Score: {:.1}{}\n\n",
+                        i + 1,
+                        task.title,
+                        task.id,
+                        priority_label,
+                        due_context,
+                        score,
+                        duration_info
+                    ));
+                }
+
+                Ok(output)
             }
 
             _ => Err(ToolError::InvalidParams(format!("Unknown action: {}", action)).into()),
@@ -3127,5 +3362,289 @@ mod tests {
         let result = tool.execute(args, &ctx()).await.unwrap();
         assert!(result.contains("Fix authentication bug"));
         assert!(result.contains("keyword"));
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // DAILY PLANNING — SCORING ALGORITHM TESTS (Sprint 6, Task #9)
+    // ═══════════════════════════════════════════════════════════════
+
+    /// Test urgency tier: overdue tasks get urgency=10
+    #[test]
+    fn test_urgency_overdue_returns_10() {
+        use chrono::{Duration, Utc};
+
+        let now = Utc::now();
+        let overdue = now - Duration::days(2);
+
+        let urgency = TodoTool::calculate_urgency(Some(overdue), now);
+        assert_eq!(urgency, 10, "Overdue tasks should have urgency=10");
+    }
+
+    /// Test urgency tier: tasks due today get urgency=5
+    #[test]
+    fn test_urgency_today_returns_5() {
+        use chrono::Utc;
+
+        let now = Utc::now();
+        let today = now; // Same day
+
+        let urgency = TodoTool::calculate_urgency(Some(today), now);
+        assert_eq!(urgency, 5, "Tasks due today should have urgency=5");
+    }
+
+    /// Test urgency tier: tasks due tomorrow get urgency=3
+    #[test]
+    fn test_urgency_tomorrow_returns_3() {
+        use chrono::{Duration, Utc};
+
+        let now = Utc::now();
+        let tomorrow = now + Duration::days(1);
+
+        let urgency = TodoTool::calculate_urgency(Some(tomorrow), now);
+        assert_eq!(urgency, 3, "Tasks due tomorrow should have urgency=3");
+    }
+
+    /// Test urgency tier: tasks due in the future get urgency=1
+    #[test]
+    fn test_urgency_future_returns_1() {
+        use chrono::{Duration, Utc};
+
+        let now = Utc::now();
+        let future = now + Duration::days(7);
+
+        let urgency = TodoTool::calculate_urgency(Some(future), now);
+        assert_eq!(urgency, 1, "Tasks due in future should have urgency=1");
+    }
+
+    /// Test urgency tier: tasks with no due date get urgency=1
+    #[test]
+    fn test_urgency_no_due_date_returns_1() {
+        use chrono::Utc;
+
+        let now = Utc::now();
+
+        let urgency = TodoTool::calculate_urgency(None, now);
+        assert_eq!(urgency, 1, "Tasks with no due date should have urgency=1");
+    }
+
+    /// Test priority weight: P1 gets weight=5
+    #[test]
+    fn test_priority_weight_p1_returns_5() {
+        let weight = TodoTool::priority_weight(Some(1));
+        assert_eq!(weight, 5, "P1 should have weight=5");
+    }
+
+    /// Test priority weight: P2 gets weight=4
+    #[test]
+    fn test_priority_weight_p2_returns_4() {
+        let weight = TodoTool::priority_weight(Some(2));
+        assert_eq!(weight, 4, "P2 should have weight=4");
+    }
+
+    /// Test priority weight: P3 gets weight=3
+    #[test]
+    fn test_priority_weight_p3_returns_3() {
+        let weight = TodoTool::priority_weight(Some(3));
+        assert_eq!(weight, 3, "P3 should have weight=3");
+    }
+
+    /// Test priority weight: None gets default weight=3
+    #[test]
+    fn test_priority_weight_none_returns_3() {
+        let weight = TodoTool::priority_weight(None);
+        assert_eq!(weight, 3, "Tasks with no priority should get default weight=3");
+    }
+
+    /// Test full scoring formula: (urgency × priority_weight) + (age_days × 0.1)
+    #[test]
+    fn test_score_formula_correct() {
+        use chrono::{Duration, Utc};
+
+        let now = Utc::now();
+        let mut task = Todo::default_instance();
+        task.id = "test-1".to_string();
+        task.title = "Overdue P1 task".to_string();
+        task.priority = Some(1);                      // P1 → weight=5
+        task.due_date = Some(now - Duration::days(2)); // Overdue → urgency=10
+        task.created_at = now - Duration::days(5);    // Age=5 days
+        task.status = TodoStatus::Todo;
+
+        let score = TodoTool::calculate_score(&task, now);
+
+        // Expected: (10 × 5) + (5 × 0.1) = 50.5
+        assert!((score - 50.5).abs() < 0.01, "Score should be ~50.5, got {}", score);
+    }
+
+    /// Test age calculation
+    #[test]
+    fn test_age_calculation() {
+        use chrono::{Duration, Utc};
+
+        let now = Utc::now();
+        let created_10_days_ago = now - Duration::days(10);
+
+        let age = TodoTool::calculate_age_days(created_10_days_ago, now);
+        assert!((age - 10.0).abs() < 0.01, "Age should be ~10 days, got {}", age);
+    }
+
+    /// Test age calculation with future timestamp (clock skew edge case)
+    #[test]
+    fn test_age_calculation_future_timestamp() {
+        use chrono::{Duration, Utc};
+
+        let now = Utc::now();
+        let created_in_future = now + Duration::days(5); // Clock skew or bad data
+
+        let age = TodoTool::calculate_age_days(created_in_future, now);
+        assert_eq!(age, 0.0, "Age should be clamped to 0 for future timestamps, got {}", age);
+    }
+
+    /// Test plan action: generates top 3 tasks from eligible pool
+    #[tokio::test]
+    async fn test_plan_action() {
+        use chrono::{Duration, Utc};
+
+        let (tool, _dir) = create_test_tool().await;
+        let now = Utc::now();
+
+        // Create test tasks with different scores
+        // Task 1: Overdue P1 (should rank #1)
+        tool.execute(
+            serde_json::json!({
+                "action": "add",
+                "title": "Fix critical bug",
+                "priority": 1,
+                "due_date": (now - Duration::days(2)).to_rfc3339()
+            }),
+            &ctx(),
+        )
+        .await
+        .unwrap();
+
+        // Task 2: Due today P2 (should rank #2)
+        tool.execute(
+            serde_json::json!({
+                "action": "add",
+                "title": "Implement feature",
+                "priority": 2,
+                "due_date": now.to_rfc3339()
+            }),
+            &ctx(),
+        )
+        .await
+        .unwrap();
+
+        // Task 3: Due tomorrow P3 (should rank #3)
+        tool.execute(
+            serde_json::json!({
+                "action": "add",
+                "title": "Update docs",
+                "priority": 3,
+                "due_date": (now + Duration::days(1)).to_rfc3339()
+            }),
+            &ctx(),
+        )
+        .await
+        .unwrap();
+
+        // Task 4: Future P4 (should NOT be in top 3)
+        tool.execute(
+            serde_json::json!({
+                "action": "add",
+                "title": "Refactor module",
+                "priority": 4,
+                "due_date": (now + Duration::days(7)).to_rfc3339()
+            }),
+            &ctx(),
+        )
+        .await
+        .unwrap();
+
+        // Generate plan
+        let result = tool.execute(serde_json::json!({"action": "plan"}), &ctx()).await.unwrap();
+
+        // Verify plan includes top 3 tasks
+        assert!(result.contains("Daily plan (3 tasks)"), "Plan should have 3 tasks");
+        assert!(result.contains("Fix critical bug"), "Should include overdue P1 task");
+        assert!(result.contains("Implement feature"), "Should include today P2 task");
+        assert!(result.contains("Update docs"), "Should include tomorrow P3 task");
+        assert!(!result.contains("Refactor module"), "Should NOT include future P4 task");
+
+        // Verify ordering: overdue P1 should be first
+        let fix_pos = result.find("Fix critical bug").unwrap();
+        let implement_pos = result.find("Implement feature").unwrap();
+        let update_pos = result.find("Update docs").unwrap();
+        assert!(fix_pos < implement_pos, "Overdue P1 should rank before today P2");
+        assert!(implement_pos < update_pos, "Today P2 should rank before tomorrow P3");
+    }
+
+    /// Test plan action: excludes completed tasks
+    #[tokio::test]
+    async fn test_plan_excludes_completed() {
+        let (tool, _dir) = create_test_tool().await;
+
+        // Create and complete a task
+        let result = tool.execute(
+            serde_json::json!({
+                "action": "add",
+                "title": "Completed task",
+                "priority": 1
+            }),
+            &ctx(),
+        )
+        .await
+        .unwrap();
+
+        let id = result.split("ID: ").nth(1).unwrap().split(')').next().unwrap();
+
+        tool.execute(
+            serde_json::json!({
+                "action": "complete",
+                "id": id
+            }),
+            &ctx(),
+        )
+        .await
+        .unwrap();
+
+        // Generate plan
+        let plan = tool.execute(serde_json::json!({"action": "plan"}), &ctx()).await.unwrap();
+
+        assert!(plan.contains("No eligible tasks"), "Completed tasks should be excluded");
+    }
+
+    /// Test plan action: excludes focused tasks
+    #[tokio::test]
+    async fn test_plan_excludes_focused() {
+        let (tool, _dir) = create_test_tool().await;
+
+        // Create and focus a task
+        let result = tool.execute(
+            serde_json::json!({
+                "action": "add",
+                "title": "Already focused",
+                "priority": 1
+            }),
+            &ctx(),
+        )
+        .await
+        .unwrap();
+
+        let id = result.split("ID: ").nth(1).unwrap().split(')').next().unwrap();
+
+        tool.execute(
+            serde_json::json!({
+                "action": "focus",
+                "id": id
+            }),
+            &ctx(),
+        )
+        .await
+        .unwrap();
+
+        // Generate plan
+        let plan = tool.execute(serde_json::json!({"action": "plan"}), &ctx()).await.unwrap();
+
+        assert!(plan.contains("No eligible tasks"), "Focused tasks should be excluded");
     }
 }

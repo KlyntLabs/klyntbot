@@ -1,7 +1,7 @@
 ---
 name: todo
 description: Task management best practices and confidence scoring guidelines.
-metadata: {"klyntbot":{"triggers":["todo","task","focus"]}}
+metadata: '{"klyntbot":{"triggers":["todo","task","focus"]}}'
 ---
 
 # Todo Management
