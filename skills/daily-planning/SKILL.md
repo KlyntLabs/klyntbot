@@ -1,10 +1,43 @@
 ---
 name: daily-planning
 description: Get a curated morning plan with your top 3 most impactful tasks.
-metadata: '{"klyntbot":{"triggers":["daily plan","plan","morning plan","focus","what should I focus on"]}}'
+metadata: '{"klyntbot":{"triggers":["daily plan","plan","morning plan","focus","what should I focus on"],"always":true}}'
 ---
 
 # Daily Planning
+
+## Agent Instructions
+
+**When the user asks for their daily plan** (phrases like "daily plan", "what should I focus on", "morning plan", "plan"), YOU MUST:
+
+1. **Generate the plan** using the TodoTool:
+   ```json
+   {"action": "plan", "count": 3}
+   ```
+
+2. **IMMEDIATELY display the full plan** to the user in your response text (NOT via message tool). Show:
+   ```
+   ☀ Good morning! Here's your daily plan:
+
+   1. [Task Title] (P1, overdue by 3 days, est. 30min) — Score: 50.3
+      Why focus: This is critical and overdue
+
+   2. [Task Title] (P2, due today, est. 45min) — Score: 20.0
+      Why focus: Due today with high impact
+
+   3. [Task Title] (P3, due tomorrow, est. 15min) — Score: 15.1
+      Why focus: Quick win to build momentum
+   ```
+
+3. **Include calendar context** (if available) showing today's events
+
+4. **Then ask** what they want to do: accept, swap, skip, or defer
+
+**CRITICAL:** Show the task titles and details FIRST in your text response. Don't hide them in tool calls or message actions. Users need to SEE what they're focusing on before deciding.
+
+---
+
+## Feature Overview
 
 Start each day with clarity. The daily planning feature analyzes your tasks and suggests the top 3 most impactful items to focus on, considering urgency, priority, and age.
 

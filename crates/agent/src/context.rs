@@ -98,13 +98,23 @@ impl ContextBuilder {
             }
         }
 
+        // Check for skill trigger matches and modify user message
+        let final_message = if let Some(skill_name) = self.match_skill_triggers(current_message) {
+            format!(
+                "[SKILL TRIGGER: {}]\n\nIMPORTANT: Execute the '{}' skill instructions immediately. The user is asking for their daily plan.\n\nUser message: {}",
+                skill_name, skill_name, current_message
+            )
+        } else {
+            current_message.to_string()
+        };
+
         // Add current message
         if let Some(media_paths) = media {
             if !media_paths.is_empty() {
                 // Multipart message with images
                 let mut parts = Vec::with_capacity(1 + media_paths.len());
                 parts.push(ContentPart::Text {
-                    text: current_message.to_string(),
+                    text: final_message.clone(),
                 });
 
                 for path in media_paths {
@@ -123,10 +133,10 @@ impl ContextBuilder {
 
                 messages.push(Message::user_multipart(parts));
             } else {
-                messages.push(Message::user(current_message));
+                messages.push(Message::user(&final_message));
             }
         } else {
-            messages.push(Message::user(current_message));
+            messages.push(Message::user(&final_message));
         }
 
         messages
@@ -354,5 +364,23 @@ You are klyntbot, a personal AI assistant powered by advanced language models.
     pub fn invalidate_todo_cache(&mut self) {
         self.cached_todo = None;
         debug!("Invalidated todo context cache");
+    }
+
+    /// Match user message against skill triggers
+    fn match_skill_triggers(&self, message: &str) -> Option<String> {
+        let msg_lower = message.to_lowercase();
+
+        // Check each skill's triggers
+        for skill in self.skills.all() {
+            for trigger in &skill.triggers {
+                // Case-insensitive exact match or substring match
+                if msg_lower == trigger.to_lowercase() || msg_lower.contains(&trigger.to_lowercase()) {
+                    debug!("Matched skill '{}' via trigger '{}'", skill.name, trigger);
+                    return Some(skill.name.clone());
+                }
+            }
+        }
+
+        None
     }
 }
