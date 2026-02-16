@@ -3,6 +3,8 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt;
+use std::str::FromStr;
 use uuid::Uuid;
 
 /// A strategic goal that spans multiple projects.
@@ -37,6 +39,49 @@ pub enum GoalStatus {
     Achieved,
     /// No longer pursuing
     Abandoned,
+}
+
+impl fmt::Display for GoalStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            GoalStatus::Active => write!(f, "active"),
+            GoalStatus::Paused => write!(f, "paused"),
+            GoalStatus::Achieved => write!(f, "achieved"),
+            GoalStatus::Abandoned => write!(f, "abandoned"),
+        }
+    }
+}
+
+impl FromStr for GoalStatus {
+    type Err = common::KlyntbotError;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "active" => Ok(GoalStatus::Active),
+            "paused" => Ok(GoalStatus::Paused),
+            "achieved" => Ok(GoalStatus::Achieved),
+            "abandoned" => Ok(GoalStatus::Abandoned),
+            _ => Err(common::GoalError::ValidationFailed(format!(
+                "unknown status '{}'. Valid: active, paused, achieved, abandoned",
+                s
+            ))
+            .into()),
+        }
+    }
+}
+
+impl Goal {
+    /// Validate that priority is within the allowed range (1-5).
+    pub fn validate_priority(&self) -> common::Result<()> {
+        if self.priority < 1 || self.priority > 5 {
+            return Err(common::GoalError::ValidationFailed(format!(
+                "priority must be 1-5, got {}",
+                self.priority
+            ))
+            .into());
+        }
+        Ok(())
+    }
 }
 
 /// A quantifiable progress indicator for a goal.

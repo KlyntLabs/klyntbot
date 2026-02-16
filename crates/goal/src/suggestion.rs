@@ -77,16 +77,24 @@ impl GoalSuggestionEngine {
     }
 
     /// Build a suggested title from the message context around the keyword.
-    fn extract_title(&self, lower: &str, keyword: &str, original: &str) -> String {
-        // Find the keyword position in the lowercased string
-        if let Some(pos) = lower.find(keyword) {
-            // Take from the keyword onward in the original message
-            let from_keyword = &original[pos..];
-            // Capitalize first letter
-            let mut chars = from_keyword.chars();
-            match chars.next() {
-                Some(c) => format!("{}{}", c.to_uppercase(), chars.as_str()),
-                None => original.to_string(),
+    ///
+    /// Uses char-boundary-safe indexing to avoid panics with multibyte characters.
+    fn extract_title(&self, _lower: &str, keyword: &str, original: &str) -> String {
+        // Search case-insensitively in the original string to avoid byte-offset
+        // mismatches between `original` and its lowercased form.
+        let original_lower = original.to_lowercase();
+        if let Some(pos) = original_lower.find(keyword) {
+            // Verify `pos` is a valid char boundary in `original` (it should be,
+            // since both strings have the same char structure for ASCII keywords).
+            if original.is_char_boundary(pos) {
+                let from_keyword = &original[pos..];
+                let mut chars = from_keyword.chars();
+                match chars.next() {
+                    Some(c) => format!("{}{}", c.to_uppercase(), chars.as_str()),
+                    None => original.to_string(),
+                }
+            } else {
+                original.to_string()
             }
         } else {
             original.to_string()

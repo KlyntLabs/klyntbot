@@ -502,6 +502,16 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_delete_nonexistent_goal() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("goals.jsonl");
+        let mut store = GoalStore::new(path);
+
+        let deleted = store.delete(&Uuid::new_v4()).await.unwrap();
+        assert!(!deleted);
+    }
+
+    #[tokio::test]
     async fn test_goal_with_metrics_persistence() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("goals.jsonl");

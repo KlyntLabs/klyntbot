@@ -10,6 +10,7 @@ pub use channels;
 pub use cli;
 pub use common;
 pub use config;
+pub use goal;
 pub use heartbeat;
 pub use providers;
 pub use scheduling;
