@@ -14,7 +14,7 @@ use crossterm::{
 };
 
 use super::terminal::{
-    colorize, colors_enabled, status_error, status_success, MarkdownRenderer, BRAND, DIM,
+    colorize, colors_enabled, status_error, status_success, MarkdownRenderer, DIM,
     SEPARATOR, TOOL,
 };
 
@@ -112,11 +112,10 @@ impl StreamRenderer {
 
         // Format args inline: show up to 2 key-value pairs
         let args_display = format_tool_args(name, args);
-        let prefix = if name.starts_with("skill:") {
-            colorize("◆", BRAND)
-        } else {
-            colorize("→", TOOL)
-        };
+
+        // Use spinner (⟳) for running state
+        let prefix = colorize("⟳", TOOL);
+
         let line = if args_display.is_empty() {
             format!("  {} {}", prefix, colorize(name, TOOL))
         } else {
@@ -185,16 +184,9 @@ impl StreamRenderer {
 
     /// Handle a new agent iteration starting.
     pub fn on_iteration_start(&mut self, iteration: usize, _max: usize) {
-        // First iteration is silent
-        if iteration > 1 {
-            let line = format!(
-                "  {} {}",
-                colorize("◆", BRAND),
-                colorize(&format!("Iteration {} · processing...", iteration), DIM),
-            );
-            println!("{}", line);
-            self.rendered_lines += 1;
-        }
+        // Suppress iteration messages entirely for cleaner output
+        // Tool calls already show progress, no need for extra "processing..." lines
+        let _ = iteration; // Silence unused warning
     }
 
     /// Pause rendering to allow an interactive prompt to take over the terminal.
