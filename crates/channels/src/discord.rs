@@ -151,7 +151,9 @@ impl DiscordChannel {
             )]);
 
             while running.load(Ordering::SeqCst) {
-                let _ = client.post(&url).headers(headers.clone()).send().await;
+                if let Err(e) = client.post(&url).headers(headers.clone()).send().await {
+                    warn!("Failed to send typing indicator to Discord channel {}: {}", channel_id_clone, e);
+                }
                 sleep(Duration::from_secs(8)).await;
             }
         });

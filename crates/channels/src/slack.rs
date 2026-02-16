@@ -251,7 +251,9 @@ impl SlackChannel {
 
         // Add :eyes: reaction (best-effort)
         if let Some(ts) = event.get("ts").and_then(|v| v.as_str()) {
-            let _ = self.add_reaction(chat_id, ts, "eyes").await;
+            if let Err(e) = self.add_reaction(chat_id, ts, "eyes").await {
+                warn!("Failed to add reaction to Slack message {}: {}", ts, e);
+            }
         }
 
         // Get thread_ts for threading
@@ -289,13 +291,16 @@ impl SlackChannel {
             "name": name,
         });
 
-        let _ = self
+        if let Err(e) = self
             .client
             .post(&url)
             .bearer_auth(self.config.bot_token.expose())
             .json(&payload)
             .send()
-            .await;
+            .await
+        {
+            warn!("Failed to add reaction to Slack message {}: {}", timestamp, e);
+        }
 
         Ok(())
     }

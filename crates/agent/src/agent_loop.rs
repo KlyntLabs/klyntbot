@@ -92,9 +92,7 @@ pub struct AgentLoop {
     decision_logger: DecisionLogger,
     running: Arc<AtomicBool>,
     last_active_channel: Option<LastActiveChannel>,
-    #[allow(dead_code)] // TODO: Use for cleanup when agent loop stops
     reminder_engine: Option<Arc<RwLock<super::ReminderEngine>>>,
-    #[allow(dead_code)] // Held for lifetime; stopped on agent shutdown
     recurring_task_spawner: Option<Arc<RwLock<super::RecurringTaskSpawner>>>,
     #[allow(dead_code)] // Held for lifetime; shared with CalendarSyncAdapter
     notification_dispatcher: Option<Arc<super::NotificationDispatcher>>,
@@ -253,7 +251,10 @@ impl AgentLoop {
         // Create shared embedding engine (used by both todo and conversation embedding)
         let embedding_engine = Arc::new(tools::EmbeddingEngine::new());
 
-        // Register todo embedding (if enabled)
+        // Register todo embedding (if enabled) and capture for MemoryTool
+        let todo_embedding_handler: Option<Arc<dyn EmbeddingHandler>>;
+        let todo_embedding_store: Option<Arc<RwLock<tools::EmbeddingStore>>>;
+
         if config.todo.search.enabled {
             let emb_store_path = config.embedding_store_path();
             let emb_store = Arc::new(RwLock::new(tools::EmbeddingStore::new(emb_store_path)));
@@ -264,11 +265,18 @@ impl AgentLoop {
 
             todo_tool = todo_tool
                 .with_embedding_handler(Arc::clone(&embedding_handler) as Arc<dyn EmbeddingHandler>)
-                .with_embedding_store(emb_store)
+                .with_embedding_store(Arc::clone(&emb_store))
                 .with_search_config(
                     config.todo.search.semantic_threshold,
                     config.todo.search.rrf_k,
                 );
+
+            // Capture for MemoryTool unified search
+            todo_embedding_handler = Some(Arc::clone(&embedding_handler) as Arc<dyn EmbeddingHandler>);
+            todo_embedding_store = Some(emb_store);
+        } else {
+            todo_embedding_handler = None;
+            todo_embedding_store = None;
         }
 
         tool_registry.register(todo_tool);
@@ -294,9 +302,20 @@ impl AgentLoop {
         // Register MemoryTool (Phase 4.1) - if conversation search is enabled
         if config.conversation.search.enabled {
             if let Some(ref handler) = conversation_embedding_handler {
-                let memory_tool = tools::MemoryTool::new()
+                let mut memory_tool = tools::MemoryTool::new()
                     .with_conversation_handler(Arc::clone(handler))
-                    .with_threshold(config.conversation.search.semantic_threshold);
+                    .with_todo_store(Arc::clone(&todo_store))
+                    .with_threshold(config.conversation.search.semantic_threshold)
+                    .with_rrf_k(config.todo.search.rrf_k);
+
+                // Inject todo embedding dependencies if available
+                if let Some(ref h) = todo_embedding_handler {
+                    memory_tool = memory_tool.with_todo_embedding_handler(Arc::clone(h));
+                }
+                if let Some(ref s) = todo_embedding_store {
+                    memory_tool = memory_tool.with_todo_embedding_store(Arc::clone(s));
+                }
+
                 tool_registry.register(memory_tool);
             }
         }
@@ -419,6 +438,26 @@ impl AgentLoop {
     /// Stop the agent loop
     pub async fn stop(&self) {
         self.running.store(false, Ordering::SeqCst);
+    }
+
+    /// Gracefully shutdown all background tasks
+    pub async fn shutdown(&self) -> Result<()> {
+        // First stop the agent loop
+        self.stop().await;
+
+        // Stop the reminder engine
+        if let Some(engine) = &self.reminder_engine {
+            let mut engine_guard = engine.write().await;
+            engine_guard.stop().await;
+        }
+
+        // Stop the recurring task spawner
+        if let Some(spawner) = &self.recurring_task_spawner {
+            let mut spawner_guard = spawner.write().await;
+            spawner_guard.stop().await;
+        }
+
+        Ok(())
     }
 
     /// Process a single inbound message

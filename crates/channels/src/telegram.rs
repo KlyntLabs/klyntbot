@@ -464,7 +464,9 @@ impl TelegramChannel {
                 });
 
                 let url = format!("{}/sendChatAction", api_base);
-                let _ = client.post(&url).json(&params).send().await;
+                if let Err(e) = client.post(&url).json(&params).send().await {
+                    tracing::warn!("Failed to send typing indicator to Telegram chat {}: {}", chat_id_i64, e);
+                }
 
                 // Send typing action every 4 seconds (Telegram typing lasts ~5s)
                 sleep(Duration::from_secs(4)).await;
