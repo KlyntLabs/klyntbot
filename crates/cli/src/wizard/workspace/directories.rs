@@ -32,6 +32,43 @@ pub(super) fn create_workspace_templates(workspace: &Path) -> Result<usize> {
         count += 1;
     }
 
+    // Copy built-in skills to workspace/skills/
+    count += create_builtin_skills(workspace)?;
+
+    Ok(count)
+}
+
+/// Copy built-in skills to workspace/skills/ (only if they don't already exist).
+/// Returns the number of skills newly created.
+fn create_builtin_skills(workspace: &Path) -> Result<usize> {
+    let skills_dir = workspace.join("skills");
+    let mut count = 0;
+
+    // Built-in skills to copy (paths relative to workspace root)
+    let builtin_skills = [
+        ("cron", include_str!("../../../../../skills/cron/SKILL.md")),
+        ("daily-planning", include_str!("../../../../../skills/daily-planning/SKILL.md")),
+        ("github", include_str!("../../../../../skills/github/SKILL.md")),
+        ("skill-creator", include_str!("../../../../../skills/skill-creator/SKILL.md")),
+        ("summarize", include_str!("../../../../../skills/summarize/SKILL.md")),
+        ("tmux", include_str!("../../../../../skills/tmux/SKILL.md")),
+        ("todo", include_str!("../../../../../skills/todo/SKILL.md")),
+        ("todo-party", include_str!("../../../../../skills/todo-party/SKILL.md")),
+        ("todo-yolo", include_str!("../../../../../skills/todo-yolo/SKILL.md")),
+        ("weather", include_str!("../../../../../skills/weather/SKILL.md")),
+    ];
+
+    for (name, content) in builtin_skills {
+        let skill_dir = skills_dir.join(name);
+        let skill_file = skill_dir.join("SKILL.md");
+
+        if !skill_file.exists() {
+            std::fs::create_dir_all(&skill_dir)?;
+            std::fs::write(&skill_file, content)?;
+            count += 1;
+        }
+    }
+
     Ok(count)
 }
 
