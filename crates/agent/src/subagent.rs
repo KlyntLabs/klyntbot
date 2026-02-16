@@ -6,12 +6,14 @@ use tokio::sync::mpsc;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
+use async_trait::async_trait;
 use bus::InboundMessage;
 use providers::{tool_calls_to_messages, ChatParams, DynProvider, Message};
 use tools::{
     filesystem::register_fs_tools,
     registry::ToolRegistry,
     shell::ExecTool,
+    spawn::SpawnHandler,
     web::{WebFetchTool, WebSearchTool},
     RoutingContext,
 };
@@ -211,6 +213,21 @@ impl SubagentManager {
             &subagent_id[..8],
             label_text
         )
+    }
+}
+
+/// Implement SpawnHandler trait for dependency inversion (tools layer can use agent layer)
+#[async_trait]
+impl SpawnHandler for SubagentManager {
+    async fn spawn(
+        &self,
+        task: String,
+        label: Option<String>,
+        origin_channel: String,
+        origin_chat_id: String,
+    ) -> String {
+        self.spawn(task, label, origin_channel, origin_chat_id)
+            .await
     }
 }
 

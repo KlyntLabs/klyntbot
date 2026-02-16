@@ -27,7 +27,7 @@ use tools::{
     message::MessageTool,
     registry::ToolRegistry,
     shell::ExecTool,
-    // spawn::SpawnTool, // TODO: Enable after refactoring to use SpawnHandler trait
+    spawn::SpawnTool,
     web::{WebFetchTool, WebSearchTool},
     RoutingContext,
 };
@@ -98,6 +98,9 @@ pub struct AgentLoop {
     recurring_task_spawner: Option<Arc<RwLock<super::RecurringTaskSpawner>>>,
     #[allow(dead_code)] // Held for lifetime; shared with CalendarSyncAdapter
     notification_dispatcher: Option<Arc<super::NotificationDispatcher>>,
+    /// Calendar sync adapter (shared with ReminderEngine)
+    #[allow(dead_code)] // Held for lifetime; shared with ReminderEngine
+    calendar_adapter: Option<Arc<CalendarSyncAdapter>>,
     /// Conversation embedding handler for semantic memory (Phase 4.1)
     conversation_embedding_handler: Option<Arc<dyn tools::ConversationEmbeddingHandler>>,
 }
@@ -182,9 +185,10 @@ impl AgentLoop {
         // Register ask_user tool
         tool_registry.register(tools::ask_user::AskUserTool);
 
-        // Register spawn tool with subagent manager
-        // TODO: Enable after refactoring spawn.rs to use SpawnHandler trait
-        // tool_registry.register(SpawnTool::with_manager(subagent_manager.clone()));
+        // Register spawn tool with subagent manager as handler
+        tool_registry.register(SpawnTool::with_handler(
+            Arc::clone(&subagent_manager) as Arc<dyn tools::spawn::SpawnHandler>
+        ));
 
         // Register cron tool (with service if provided)
         if let Some(cron_svc) = cron_service {
@@ -211,8 +215,8 @@ impl AgentLoop {
         };
 
         // Register calendar tool (if any provider is enabled)
-        if config.calendar.is_any_enabled() {
-            let calendar_adapter = Arc::new(
+        let calendar_adapter = if config.calendar.is_any_enabled() {
+            let adapter = Arc::new(
                 CalendarSyncAdapter::new(
                     Arc::clone(&todo_store),
                     &config.calendar,
@@ -225,10 +229,15 @@ impl AgentLoop {
 
             // Inject calendar handler into TodoTool for immediate sync
             todo_tool = todo_tool
-                .with_calendar_handler(Arc::clone(&calendar_adapter) as Arc<dyn CalendarHandler>);
+                .with_calendar_handler(Arc::clone(&adapter) as Arc<dyn CalendarHandler>);
 
-            tool_registry.register(CalendarTool::new(calendar_adapter));
-        }
+            tool_registry.register(CalendarTool::new(
+                Arc::clone(&adapter) as Arc<dyn CalendarHandler>
+            ));
+            Some(adapter)
+        } else {
+            None
+        };
 
         // Register enrichment engine (if enabled)
         if config.todo.enrichment.enabled {
@@ -304,11 +313,14 @@ impl AgentLoop {
             None => DecisionLogger::default_path(),
         };
 
-        // Create ReminderEngine using the shared notification dispatcher
+        // Create ReminderEngine using the shared notification dispatcher and calendar handler
         let reminder_engine = if let Some(ref dispatcher) = notification_dispatcher {
+            let calendar_handler_opt = calendar_adapter
+                .as_ref()
+                .map(|adapter| Arc::clone(adapter) as Arc<dyn CalendarHandler>);
             let mut engine = super::ReminderEngine::new(
                 Arc::clone(&todo_store),
-                None, // TODO: Add CalendarHandler when calendar sync is integrated
+                calendar_handler_opt,
                 Arc::clone(dispatcher),
                 std::time::Duration::from_secs(300), // Check every 5 minutes
             );
@@ -348,6 +360,7 @@ impl AgentLoop {
             reminder_engine,
             recurring_task_spawner,
             notification_dispatcher,
+            calendar_adapter,
             conversation_embedding_handler,
         })
     }

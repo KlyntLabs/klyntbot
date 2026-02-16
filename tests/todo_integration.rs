@@ -15,22 +15,38 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tempfile::TempDir;
 
+#[path = "mock_provider.rs"]
+mod mock_provider;
+
 /// Helper: Create a test AgentLoop with todo system enabled
 async fn create_test_agent_with_todo() -> (AgentLoop, TempDir) {
-    // TODO: Implement once AgentLoop constructor is updated with TodoStore
-    // This should:
-    // 1. Create temp directory for test isolation
-    // 2. Create minimal config with todo enabled
-    // 3. Initialize AgentLoop with test config
-    // 4. Return both agent and temp dir (for cleanup)
-    todo!("Implement after Phase 4 completion")
+    let temp_dir = TempDir::new().unwrap();
+    // Set HOME to temp dir so .klyntbot directories are created in test isolation
+    std::env::set_var("HOME", temp_dir.path());
+
+    // Create workspace directory
+    let workspace = temp_dir.path().join("workspace");
+    std::fs::create_dir_all(&workspace).unwrap();
+
+    // Create minimal config with workspace path
+    let mut config = Config::default();
+    config.agents.defaults.workspace = workspace.to_str().unwrap().to_string();
+
+    // Create message bus and mock provider
+    let bus = Arc::new(MessageBus::new(10));
+    let provider = Arc::new(crate::mock_provider::MockProvider::new("Test response"));
+
+    // Create AgentLoop (automatically includes TodoStore)
+    let agent = AgentLoop::new(bus, provider, config).await.unwrap();
+
+    (agent, temp_dir)
 }
 
 /// Helper: Create a mock NotificationDispatcher for testing
 fn create_mock_notification_dispatcher() -> Arc<tokio::sync::RwLock<Vec<(String, String)>>> {
-    // TODO: Implement mock that captures notification calls
-    // Should return Arc<RwLock<Vec<(title, body)>>> for verification
-    todo!("Implement after Phase 4.3 completion")
+    // Returns a shared vector to capture notification calls
+    // Tests can push (title, body) tuples to verify notifications
+    Arc::new(tokio::sync::RwLock::new(Vec::new()))
 }
 
 #[tokio::test]
@@ -1386,10 +1402,12 @@ struct NotificationCapture {
 
 impl NotificationCapture {
     fn new() -> Self {
-        todo!("Implement after Phase 4.3");
+        Self {
+            calls: Arc::new(tokio::sync::RwLock::new(Vec::new())),
+        }
     }
 
     async fn get_calls(&self) -> Vec<(String, String)> {
-        todo!("Implement after Phase 4.3");
+        self.calls.read().await.clone()
     }
 }
