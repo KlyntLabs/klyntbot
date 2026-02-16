@@ -861,7 +861,8 @@ mod tests {
         std::fs::create_dir_all(ws.join("memory")).unwrap();
 
         let count = create_workspace_templates(ws).unwrap();
-        assert_eq!(count, TEMPLATE_FILES.len());
+        // 6 template files + 10 built-in skills
+        assert_eq!(count, TEMPLATE_FILES.len() + 10);
 
         // Second call should create 0
         let count2 = create_workspace_templates(ws).unwrap();
