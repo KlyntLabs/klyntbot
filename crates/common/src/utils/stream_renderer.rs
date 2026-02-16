@@ -435,10 +435,12 @@ mod tests {
     }
 
     #[test]
-    fn test_iteration_start_visible_for_subsequent() {
+    fn test_iteration_start_silent_for_subsequent() {
+        // Iteration messages are suppressed for cleaner output —
+        // tool calls already show progress.
         let mut r = test_renderer();
         r.on_iteration_start(2, 20);
-        assert!(r.rendered_lines > 0);
+        assert_eq!(r.rendered_lines, 0);
     }
 
     #[test]
