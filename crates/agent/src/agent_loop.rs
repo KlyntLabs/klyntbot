@@ -240,21 +240,23 @@ impl AgentLoop {
         }
 
         // Register embedding engine for semantic search (Sprint 5)
-        let emb_store_path = config.embedding_store_path();
-        let emb_store = Arc::new(RwLock::new(tools::EmbeddingStore::new(emb_store_path)));
-        let embedding_engine = Arc::new(tools::EmbeddingEngine::new());
-        let embedding_handler = Arc::new(tools::EmbeddingEngineImpl::new(
-            embedding_engine,
-            Arc::clone(&emb_store),
-        ));
+        if config.todo.search.enabled {
+            let emb_store_path = config.embedding_store_path();
+            let emb_store = Arc::new(RwLock::new(tools::EmbeddingStore::new(emb_store_path)));
+            let embedding_engine = Arc::new(tools::EmbeddingEngine::new());
+            let embedding_handler = Arc::new(tools::EmbeddingEngineImpl::new(
+                embedding_engine,
+                Arc::clone(&emb_store),
+            ));
 
-        todo_tool = todo_tool
-            .with_embedding_handler(Arc::clone(&embedding_handler) as Arc<dyn EmbeddingHandler>)
-            .with_embedding_store(emb_store)
-            .with_search_config(
-                config.todo.search.semantic_threshold,
-                config.todo.search.rrf_k,
-            );
+            todo_tool = todo_tool
+                .with_embedding_handler(Arc::clone(&embedding_handler) as Arc<dyn EmbeddingHandler>)
+                .with_embedding_store(emb_store)
+                .with_search_config(
+                    config.todo.search.semantic_threshold,
+                    config.todo.search.rrf_k,
+                );
+        }
 
         tool_registry.register(todo_tool);
 

@@ -80,7 +80,7 @@ Dependencies flow strictly upward. No circular dependencies — enforced by Carg
 klyntbot chat "message"          # One-shot chat (or omit message for REPL)
 klyntbot chat --session my-sess  # Resume a named session
 klyntbot serve --port 8080       # Start HTTP server (default port from config)
-klyntbot init                    # Interactive setup wizard (includes calendar setup in Step 7)
+klyntbot init                    # Interactive setup wizard (8 steps: provider, channels, tools, workspace, calendar, semantic search, daemon, review)
 klyntbot status [--verbose]      # Show agent/config status
 
 # Task Management (25 commands)
@@ -189,13 +189,18 @@ klyntbot todo add "URGENT: Fix production auth bug"
 
 ## Semantic Search
 
-Semantic search uses local embeddings (fastembed, paraphrase-multilingual-MiniLM-L12-v2, 384 dimensions) for meaning-based task retrieval. The model (~420MB) downloads on first use.
+Semantic search uses local embeddings (fastembed, paraphrase-multilingual-MiniLM-L12-v2, 384 dimensions) for meaning-based task retrieval. Finds related concepts, not just keywords (e.g., "login bug" finds "authentication issue").
+
+**Setup** (`klyntbot init` Step 6):
+- Option 1: Enable & download model now (~420MB, ~60 sec with progress bar)
+- Option 2: Disable semantic search (saves disk space)
 
 **Config schema** (`~/.klyntbot/config.json`):
 ```json
 {
   "todo": {
     "search": {
+      "enabled": true,
       "semanticThreshold": 0.5,
       "embeddingModel": "paraphrase-multilingual-MiniLM-L12-v2",
       "rrfK": 60
@@ -205,6 +210,7 @@ Semantic search uses local embeddings (fastembed, paraphrase-multilingual-MiniLM
 ```
 
 **Fields:**
+- `enabled`: Enable/disable semantic search (default: `true`)
 - `semanticThreshold`: Minimum cosine similarity for results (0.0-1.0, default: `0.5`)
 - `embeddingModel`: Model name stored in embedding records (default: `paraphrase-multilingual-MiniLM-L12-v2`)
 - `rrfK`: Reciprocal Rank Fusion k parameter for hybrid search (default: `60`)

@@ -353,6 +353,8 @@ pub struct TodoConfig {
     pub enrichment: TodoEnrichmentConfig,
     #[serde(default)]
     pub search: TodoSearchConfig,
+    #[serde(default)]
+    pub daily_planning: DailyPlanningConfig,
 }
 
 /// Smart enrichment configuration for auto-inferring task metadata
@@ -894,6 +896,10 @@ fn default_timezone() -> String {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TodoSearchConfig {
+    /// Enable semantic search (default: true)
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+
     /// Cosine similarity threshold for semantic search results (0.0-1.0, default: 0.5)
     #[serde(default = "default_semantic_threshold")]
     pub semantic_threshold: f64,
@@ -910,6 +916,7 @@ pub struct TodoSearchConfig {
 impl Default for TodoSearchConfig {
     fn default() -> Self {
         Self {
+            enabled: true,
             semantic_threshold: default_semantic_threshold(),
             embedding_model: default_embedding_model(),
             rrf_k: default_rrf_k(),
@@ -927,6 +934,21 @@ fn default_embedding_model() -> String {
 
 fn default_rrf_k() -> u32 {
     60
+}
+
+/// Daily planning configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DailyPlanningConfig {
+    /// Enable/disable daily planning feature (default: true)
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+}
+
+impl Default for DailyPlanningConfig {
+    fn default() -> Self {
+        Self { enabled: true }
+    }
 }
 
 /// Project management configuration
@@ -1156,5 +1178,29 @@ mod tests {
         assert!(json.contains("\"calendar\""));
         assert!(json.contains("\"providers\""));
         assert!(json.contains("\"test@example.com\""));
+    }
+
+    // ========================================================================
+    // DailyPlanningConfig tests
+    // ========================================================================
+
+    #[test]
+    fn test_daily_planning_config_defaults_to_true() {
+        let config = DailyPlanningConfig::default();
+        assert!(config.enabled);
+    }
+
+    #[test]
+    fn test_daily_planning_config_serde_roundtrip() {
+        // Test with enabled: false to verify it doesn't just rely on defaults
+        let config = DailyPlanningConfig { enabled: false };
+        let json = serde_json::to_string(&config).unwrap();
+
+        // Verify camelCase serialization
+        assert!(json.contains("\"enabled\""));
+
+        // Verify roundtrip
+        let loaded: DailyPlanningConfig = serde_json::from_str(&json).unwrap();
+        assert!(!loaded.enabled);
     }
 }

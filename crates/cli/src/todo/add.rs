@@ -62,16 +62,17 @@ pub async fn handle_add(
     // Save to store
     let saved_todo = store.add(todo.clone()).await?;
 
-    // Auto-generate embedding (Sprint 5)
-    // Initialize embedding handler and generate embedding for the new todo
-    let emb_store_path = config.embedding_store_path();
-    let emb_store = Arc::new(tokio::sync::RwLock::new(EmbeddingStore::new(emb_store_path)));
-    let engine = Arc::new(EmbeddingEngine::new());
-    let handler = EmbeddingEngineImpl::new(engine, emb_store);
+    // Auto-generate embedding (Sprint 5) - only if enabled
+    if config.todo.search.enabled {
+        let emb_store_path = config.embedding_store_path();
+        let emb_store = Arc::new(tokio::sync::RwLock::new(EmbeddingStore::new(emb_store_path)));
+        let engine = Arc::new(EmbeddingEngine::new());
+        let handler = EmbeddingEngineImpl::new(engine, emb_store);
 
-    // Best-effort embedding generation (don't fail if it errors)
-    if let Err(e) = handler.embed_todo(&saved_todo).await {
-        tracing::warn!("Failed to generate embedding for todo {}: {}", saved_todo.id, e);
+        // Best-effort embedding generation (don't fail if it errors)
+        if let Err(e) = handler.embed_todo(&saved_todo).await {
+            tracing::warn!("Failed to generate embedding for todo {}: {}", saved_todo.id, e);
+        }
     }
 
     // Show created task

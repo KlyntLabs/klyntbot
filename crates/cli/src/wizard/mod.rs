@@ -28,6 +28,7 @@ pub mod framework;
 pub mod oauth;
 pub mod prompts;
 pub mod provider;
+pub mod search;
 pub mod steps;
 pub mod templates;
 pub mod tools;
@@ -107,6 +108,7 @@ pub async fn run_wizard() -> Result<()> {
         ("Tool Permissions", false, true),
         ("Workspace & Notifications", true, true),
         ("Calendar Sync", false, true),
+        ("Semantic Search", false, true),
         (
             "Background Service",
             false,
@@ -136,7 +138,7 @@ pub async fn run_wizard() -> Result<()> {
 
         // Dispatch to the right module. Step indices correspond to `all_steps`:
         // 0=provider, 1=channels (async), 2=tools, 3=workspace+notifications,
-        // 4=calendar (async), 5=daemon, 6=review.
+        // 4=calendar (async), 5=semantic_search, 6=daemon, 7=review.
         // Ctrl+C in raw-mode prompts surfaces as an Err containing "Ctrl+C".
         let result = match match step_idx {
             0 => provider::ProviderModule.run(&mut state),
@@ -144,8 +146,9 @@ pub async fn run_wizard() -> Result<()> {
             2 => ToolsModule.run(&mut state),
             3 => WorkspaceModule.run(&mut state),
             4 => run_calendar_step(&mut state).await,
-            5 => daemon::DaemonModule.run(&mut state),
-            6 => steps::review::ReviewModule.run(&mut state),
+            5 => run_search_step(&mut state),
+            6 => daemon::DaemonModule.run(&mut state),
+            7 => steps::review::ReviewModule.run(&mut state),
             _ => unreachable!(),
         } {
             Ok(r) => r,
@@ -205,6 +208,20 @@ async fn run_calendar_step(state: &mut WizardState) -> Result<StepResult> {
         StepResult::Next
     })
 }
+
+/// Semantic search wizard step (sync, but model download can take time).
+///
+/// Shows enable/disable menu with optional model download.
+fn run_search_step(state: &mut WizardState) -> Result<StepResult> {
+    let can_go_back = state.current_step > 1;
+    let outcome = search::configure_semantic_search(&mut state.config, can_go_back)?;
+    Ok(if outcome == ui::MenuOutcome::Back {
+        StepResult::Back
+    } else {
+        StepResult::Next
+    })
+}
+
 
 /// Print the global wizard header (shown once at the start).
 fn print_wizard_header() {
