@@ -11,7 +11,7 @@ use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use uuid::Uuid;
 
-use crate::types::{Goal, GoalStatus};
+use crate::types::{Goal, GoalProgress, GoalStatus};
 use common::Result;
 
 /// Compaction threshold: compact when journal has this many more entries than live goals
@@ -242,6 +242,44 @@ impl GoalStore {
         Ok(filtered)
     }
 
+    /// Calculate progress for a goal based on its metrics.
+    ///
+    /// Returns `None` if the goal doesn't exist.
+    /// Completion percentage is the average of all metric progress percentages,
+    /// or 0.0 if no metrics are defined.
+    pub async fn calculate_progress(&mut self, id: &Uuid) -> Result<Option<GoalProgress>> {
+        self.ensure_loaded().await?;
+
+        let goal = match self.index.get(id) {
+            Some(g) => g,
+            None => return Ok(None),
+        };
+
+        let completion = if goal.metrics.is_empty() {
+            0.0
+        } else {
+            let sum: f64 = goal.metrics.iter().map(|m| m.progress_percentage()).sum();
+            sum / goal.metrics.len() as f64
+        };
+
+        let summary = if goal.metrics.is_empty() {
+            "No metrics defined".to_string()
+        } else {
+            format!(
+                "{:.0}% complete across {} metric(s)",
+                completion,
+                goal.metrics.len()
+            )
+        };
+
+        Ok(Some(GoalProgress {
+            goal_id: *id,
+            completion_percentage: completion,
+            metrics: goal.metrics.clone(),
+            summary,
+        }))
+    }
+
     /// Get all goals.
     pub async fn all(&mut self) -> Result<Vec<Goal>> {
         self.ensure_loaded().await?;
@@ -400,6 +438,67 @@ mod tests {
 
         // Journal should have been compacted (stale entries removed)
         assert!(store.journal_len < 150);
+    }
+
+    #[tokio::test]
+    async fn test_calculate_progress_no_metrics() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("goals.jsonl");
+        let mut store = GoalStore::new(path);
+
+        let goal = test_goal("No Metrics");
+        let id = goal.id;
+        store.add(goal).await.unwrap();
+
+        let progress = store.calculate_progress(&id).await.unwrap();
+        assert!(progress.is_some());
+        let progress = progress.unwrap();
+        assert_eq!(progress.goal_id, id);
+        assert_eq!(progress.completion_percentage, 0.0);
+        assert!(progress.metrics.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_calculate_progress_with_metrics() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("goals.jsonl");
+        let mut store = GoalStore::new(path);
+
+        let mut goal = test_goal("With Metrics");
+        goal.metrics = vec![
+            Metric {
+                name: "Tasks".to_string(),
+                current: 5.0,
+                target: 10.0,
+                unit: "tasks".to_string(),
+            },
+            Metric {
+                name: "Docs".to_string(),
+                current: 8.0,
+                target: 8.0,
+                unit: "pages".to_string(),
+            },
+        ];
+        let id = goal.id;
+        store.add(goal).await.unwrap();
+
+        let progress = store.calculate_progress(&id).await.unwrap();
+        assert!(progress.is_some());
+        let progress = progress.unwrap();
+        assert_eq!(progress.goal_id, id);
+        // (50 + 100) / 2 = 75
+        assert!((progress.completion_percentage - 75.0).abs() < f64::EPSILON);
+        assert_eq!(progress.metrics.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_calculate_progress_nonexistent_goal() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("goals.jsonl");
+        let mut store = GoalStore::new(path);
+
+        let progress = store.calculate_progress(&Uuid::new_v4()).await.unwrap();
+        assert!(progress.is_none());
     }
 
     #[tokio::test]
