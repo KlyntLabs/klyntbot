@@ -32,6 +32,9 @@ pub enum KlyntbotError {
     #[error("Calendar error: {0}")]
     Calendar(#[from] CalendarError),
 
+    #[error("Goal error: {0}")]
+    Goal(#[from] GoalError),
+
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
@@ -166,6 +169,22 @@ pub enum CalendarError {
     Json(#[from] serde_json::Error),
 }
 
+/// Goal-specific errors
+#[derive(Error, Debug)]
+pub enum GoalError {
+    #[error("Goal not found: {0}")]
+    NotFound(String),
+
+    #[error("Invalid goal state: {0}")]
+    InvalidState(String),
+
+    #[error("Goal store error: {0}")]
+    StoreFailed(String),
+
+    #[error("Goal validation failed: {0}")]
+    ValidationFailed(String),
+}
+
 /// Type alias for Result with KlyntbotError
 pub type Result<T> = std::result::Result<T, KlyntbotError>;
 
@@ -294,5 +313,33 @@ mod tests {
     fn test_bus_disconnected_error() {
         let err = KlyntbotError::BusDisconnected;
         assert_eq!(err.to_string(), "Bus disconnected");
+    }
+
+    #[test]
+    fn test_goal_error_display() {
+        let err = GoalError::NotFound("goal-123".to_string());
+        assert_eq!(err.to_string(), "Goal not found: goal-123");
+
+        let err = GoalError::InvalidState("cannot transition from active to draft".to_string());
+        assert_eq!(
+            err.to_string(),
+            "Invalid goal state: cannot transition from active to draft"
+        );
+
+        let err = GoalError::StoreFailed("disk full".to_string());
+        assert_eq!(err.to_string(), "Goal store error: disk full");
+
+        let err = GoalError::ValidationFailed("title is required".to_string());
+        assert_eq!(
+            err.to_string(),
+            "Goal validation failed: title is required"
+        );
+    }
+
+    #[test]
+    fn test_klyntbot_error_from_goal_error() {
+        let goal_err = GoalError::NotFound("test".to_string());
+        let klyntbot_err: KlyntbotError = goal_err.into();
+        assert!(klyntbot_err.to_string().contains("Goal error"));
     }
 }
