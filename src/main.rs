@@ -9,6 +9,7 @@ mod cli_handlers {
     pub use cli::chat::handle_chat;
     pub use cli::config_cmd::handle_config;
     pub use cli::cron::handle_cron;
+    pub use cli::goal::handle_goal;
     pub use cli::project::handle_project;
     pub use cli::serve::handle_serve;
     pub use cli::skills::handle_skills;
@@ -53,6 +54,8 @@ async fn main() {
         Some(Commands::Project(cmd)) => cli_handlers::handle_project(cmd).await,
 
         Some(Commands::Calendar(cmd)) => cli_handlers::handle_calendar(cmd).await,
+
+        Some(Commands::Goal(cmd)) => cli_handlers::handle_goal(cmd).await,
 
         None => {
             // No command specified, show brief status

@@ -16,6 +16,7 @@ scheduling.workspace = true
 heartbeat.workspace = true
 session.workspace = true
 tools.workspace = true
+goal.workspace = true
 clap = { workspace = true }
 rustyline.workspace = true
 tokio = { workspace = true }
@@ -36,6 +37,7 @@ tokio-native-tls = { workspace = true }
 lettre = { workspace = true }
 crossterm = { workspace = true }
 chrono-tz = { workspace = true }
+uuid = { workspace = true }
 
 [dev-dependencies]
 tempfile.workspace = true

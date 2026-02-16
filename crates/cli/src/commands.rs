@@ -75,6 +75,10 @@ pub enum Commands {
     /// Calendar operations (sync, reconcile, status)
     #[command(subcommand)]
     Calendar(CalendarCommands),
+
+    /// Manage goals (create, list, show, update, delete, progress)
+    #[command(subcommand)]
+    Goal(GoalCommands),
 }
 
 #[derive(Subcommand, Debug)]
@@ -619,4 +623,80 @@ pub enum ProjectCommands {
 pub enum CalendarCommands {
     /// Manually trigger calendar reconciliation (check event status and update linked todos)
     Reconcile,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum GoalCommands {
+    /// Create a new goal
+    Create {
+        /// Goal title
+        title: String,
+
+        /// Goal description
+        #[arg(short, long)]
+        description: Option<String>,
+
+        /// Priority (1-5)
+        #[arg(short, long, default_value = "3")]
+        priority: u8,
+
+        /// Target date (YYYY-MM-DD)
+        #[arg(short = 'D', long)]
+        target_date: Option<String>,
+
+        /// Tags (comma-separated)
+        #[arg(short, long)]
+        tags: Option<String>,
+    },
+
+    /// List goals
+    List {
+        /// Filter by status (active, paused, achieved, abandoned)
+        #[arg(short, long)]
+        status: Option<String>,
+    },
+
+    /// Show goal details and progress
+    Show {
+        /// Goal ID
+        id: String,
+    },
+
+    /// Update goal fields
+    Update {
+        /// Goal ID
+        id: String,
+
+        /// New title
+        #[arg(short, long)]
+        title: Option<String>,
+
+        /// New description
+        #[arg(short, long)]
+        description: Option<String>,
+
+        /// New priority (1-5)
+        #[arg(short, long)]
+        priority: Option<u8>,
+
+        /// New status (active, paused, achieved, abandoned)
+        #[arg(short, long)]
+        status: Option<String>,
+
+        /// New target date (YYYY-MM-DD)
+        #[arg(short = 'D', long)]
+        target_date: Option<String>,
+    },
+
+    /// Delete a goal
+    Delete {
+        /// Goal ID
+        id: String,
+    },
+
+    /// Show progress for a goal
+    Progress {
+        /// Goal ID
+        id: String,
+    },
 }

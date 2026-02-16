@@ -8,6 +8,7 @@ pub mod chat;
 pub mod commands;
 pub mod config_cmd;
 pub mod cron;
+pub mod goal;
 pub mod interactive;
 pub mod project;
 pub mod serve;

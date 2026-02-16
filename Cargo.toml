@@ -104,6 +104,7 @@ providers.workspace = true
 session.workspace = true
 scheduling.workspace = true
 calendar.workspace = true
+goal.workspace = true
 tools.workspace = true
 channels.workspace = true
 heartbeat.workspace = true

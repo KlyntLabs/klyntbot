@@ -172,6 +172,14 @@ impl Config {
             .join("projects.jsonl")
     }
 
+    /// Get the standardized goal store path
+    pub fn goal_store_path(&self) -> PathBuf {
+        dirs::home_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join(".klyntbot")
+            .join("goals.jsonl")
+    }
+
     /// Set the API key for a provider by name.
     pub fn set_provider_key(&mut self, provider_name: &str, key: String) {
         match provider_name {
