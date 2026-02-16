@@ -93,20 +93,12 @@ impl SkillManager {
 
     /// Load skills from workspace and built-in directories
     pub async fn load(&mut self, workspace_path: PathBuf) -> Result<()> {
-        // Ensure workspace/skills directory exists
-        let workspace_skills_dir = workspace_path.join("skills");
-        if !workspace_skills_dir.exists() {
-            tokio::fs::create_dir_all(&workspace_skills_dir).await?;
-        }
-
-        // Auto-migrate built-in skills to workspace (one-time, on first run)
-        self.migrate_builtin_skills(&workspace_skills_dir).await?;
-
         // Load built-in skills first (as fallback)
         debug!("Loading built-in skills");
         self.load_builtin_skills()?;
 
         // Load workspace skills (these override built-in skills)
+        let workspace_skills_dir = workspace_path.join("skills");
         if workspace_skills_dir.exists() {
             debug!("Loading workspace skills from {:?}", workspace_skills_dir);
             self.load_from_directory(&workspace_skills_dir).await?;
@@ -114,21 +106,6 @@ impl SkillManager {
 
         debug!("Loaded {} skills total", self.skills.len());
 
-        Ok(())
-    }
-
-    /// Migrate built-in skills to workspace/skills/ if they don't exist
-    async fn migrate_builtin_skills(&self, workspace_skills_dir: &std::path::Path) -> Result<()> {
-        for (name, content) in BUILTIN_SKILLS {
-            let skill_dir = workspace_skills_dir.join(name);
-            let skill_file = skill_dir.join("SKILL.md");
-
-            if !skill_file.exists() {
-                tokio::fs::create_dir_all(&skill_dir).await?;
-                tokio::fs::write(&skill_file, content).await?;
-                debug!("Migrated built-in skill '{}' to workspace", name);
-            }
-        }
         Ok(())
     }
 
