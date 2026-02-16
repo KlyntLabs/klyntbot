@@ -9,6 +9,7 @@ pub mod cron_tool;
 pub mod embedding_engine;
 pub mod embedding_store;
 pub mod enrichment;
+pub mod goal_tool;
 pub mod plan_response;
 pub mod filesystem;
 pub mod memory_tool;
@@ -43,6 +44,9 @@ pub use embedding_store::{EmbeddingRecord, EmbeddingStore};
 
 // Re-export enrichment types for use by agent crate
 pub use enrichment::{EnrichmentHandler, EnrichmentResult, EnrichmentSuggestion};
+
+// Re-export goal types for use by agent crate
+pub use goal_tool::{GoalHandler, GoalTool};
 
 // Re-export memory tool
 pub use memory_tool::MemoryTool;

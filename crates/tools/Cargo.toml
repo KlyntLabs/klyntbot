@@ -10,6 +10,7 @@ common.workspace = true
 bus.workspace = true
 scheduling.workspace = true
 calendar.workspace = true
+goal.workspace = true
 async-trait.workspace = true
 serde_json = { workspace = true }
 tokio = { workspace = true }
