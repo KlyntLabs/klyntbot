@@ -102,6 +102,8 @@ pub struct AgentLoop {
     calendar_adapter: Option<Arc<CalendarSyncAdapter>>,
     /// Conversation embedding handler for semantic memory (Phase 4.1)
     conversation_embedding_handler: Option<Arc<dyn tools::ConversationEmbeddingHandler>>,
+    /// Plan executor for structured multi-step execution (Phase 2)
+    plan_executor: Option<super::PlanExecutor>,
 }
 
 impl AgentLoop {
@@ -113,6 +115,7 @@ impl AgentLoop {
         cron_service: Option<Arc<scheduling::CronService>>,
         todo_store: Arc<RwLock<tools::todo_store::TodoStore>>,
         goal_store: Option<Arc<RwLock<goal::GoalStore>>>,
+        plan_store: Option<Arc<RwLock<plan::PlanStore>>>,
         notification_handle: Option<LastActiveChannel>,
     ) -> Result<Self> {
         let workspace = config.workspace_path();
@@ -291,6 +294,18 @@ impl AgentLoop {
             )));
         }
 
+        // Register plan tool and create plan executor (if plan_store is provided)
+        let plan_executor = if let Some(ps) = plan_store {
+            let plan_handler = Arc::new(super::PlanHandlerImpl::new(ps));
+            tool_registry.register(tools::plan_tool::PlanTool::new(Some(
+                plan_handler as Arc<dyn tools::plan_tool::PlanHandler>,
+            )));
+            // Create PlanExecutor (will be fully functional in Phase 4)
+            Some(super::PlanExecutor::new())
+        } else {
+            None
+        };
+
         // Register conversation embedding handler (Phase 4.1)
         let conversation_embedding_handler = if config.conversation.embedding.enabled {
             let conv_store_path = dirs::home_dir()
@@ -391,6 +406,7 @@ impl AgentLoop {
             notification_dispatcher,
             calendar_adapter,
             conversation_embedding_handler,
+            plan_executor,
         })
     }
 
@@ -400,7 +416,23 @@ impl AgentLoop {
         let todo_store = Arc::new(RwLock::new(tools::todo_store::TodoStore::new(todo_path)));
         let goal_path = config.goal_store_path();
         let goal_store = Some(Arc::new(RwLock::new(goal::GoalStore::new(goal_path))));
-        Self::new_with_cron(bus, provider, config, None, todo_store, goal_store, None).await
+        let plan_path = dirs::home_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join(".klyntbot")
+            .join("data")
+            .join("plans.jsonl");
+        let plan_store = Some(Arc::new(RwLock::new(plan::PlanStore::new(plan_path))));
+        Self::new_with_cron(bus, provider, config, None, todo_store, goal_store, plan_store, None).await
+    }
+
+    /// Check if a plan is currently executing.
+    /// Returns true if plan mode is active, false for normal chat mode.
+    /// This determines the iteration limit: 50 for plans, 20 for chat.
+    fn is_plan_executing(&self) -> bool {
+        // TODO: Track active plan execution state
+        // For now, return false (chat mode)
+        // Will be set to true when run_plan_execution() is called
+        false
     }
 
     /// Run the agent loop, processing messages from the bus
@@ -749,19 +781,22 @@ impl AgentLoop {
         let mut current_messages = messages;
         let mut final_content = None;
 
-        for iteration in 0..MAX_TOOL_ITERATIONS {
+        // Dynamic iteration limit: 50 for plan mode, 20 for chat mode
+        let max_iterations = if self.is_plan_executing() { 50 } else { MAX_TOOL_ITERATIONS };
+
+        for iteration in 0..max_iterations {
             // Check for cancellation before each iteration
             if cancel_token.is_cancelled() {
                 debug!("Agent loop cancelled at iteration {}", iteration);
                 break;
             }
 
-            debug!("Agent iteration {}/{}", iteration + 1, MAX_TOOL_ITERATIONS);
+            debug!("Agent iteration {}/{}", iteration + 1, max_iterations);
             emit!(
                 channels.event_tx,
                 AgentEvent::IterationStart {
                     iteration: iteration + 1,
-                    max: MAX_TOOL_ITERATIONS,
+                    max: max_iterations,
                 }
             );
 

@@ -10,6 +10,7 @@ pub mod config_cmd;
 pub mod cron;
 pub mod goal;
 pub mod interactive;
+pub mod plan;
 pub mod project;
 pub mod serve;
 pub mod skills;

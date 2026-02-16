@@ -79,6 +79,10 @@ pub enum Commands {
     /// Manage goals (create, list, show, update, delete, progress)
     #[command(subcommand)]
     Goal(GoalCommands),
+
+    /// Manage multi-step execution plans (create, show, approve, abandon, status)
+    #[command(subcommand)]
+    Plan(PlanCommands),
 }
 
 #[derive(Subcommand, Debug)]
@@ -699,4 +703,42 @@ pub enum GoalCommands {
         /// Goal ID
         id: String,
     },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum PlanCommands {
+    /// Create a new execution plan
+    Create {
+        /// Plan title
+        title: String,
+
+        /// Plan description
+        #[arg(short, long)]
+        description: Option<String>,
+
+        /// Link to goal ID (optional)
+        #[arg(short, long)]
+        goal_id: Option<String>,
+    },
+
+    /// Show plan details
+    Show {
+        /// Plan ID (supports prefix matching)
+        id: String,
+    },
+
+    /// Approve a plan for execution
+    Approve {
+        /// Plan ID (supports prefix matching)
+        id: String,
+    },
+
+    /// Abandon a plan
+    Abandon {
+        /// Plan ID (supports prefix matching)
+        id: String,
+    },
+
+    /// Show active plan status for current session
+    Status,
 }

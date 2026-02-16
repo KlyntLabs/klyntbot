@@ -41,6 +41,14 @@ pub async fn handle_serve(port: u16) -> Result<()> {
     let goal_path = config.goal_store_path();
     let goal_store = Arc::new(RwLock::new(goal::GoalStore::new(goal_path)));
 
+    // Create SHARED PlanStore
+    let plan_path = dirs::home_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join(".klyntbot")
+        .join("data")
+        .join("plans.jsonl");
+    let plan_store = Arc::new(RwLock::new(plan::PlanStore::new(plan_path)));
+
     // Create SHARED NotificationDispatcher
     let notification_dispatcher = Arc::new(agent::NotificationDispatcher::new(
         bus.outbound_sender(),
@@ -342,6 +350,7 @@ pub async fn handle_serve(port: u16) -> Result<()> {
             Some(cron_service.clone()),
             todo_store.clone(),
             Some(goal_store.clone()),
+            Some(plan_store.clone()),
             Some(notification_dispatcher.last_active_handle()),
         )
         .await?,

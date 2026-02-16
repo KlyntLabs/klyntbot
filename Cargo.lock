@@ -658,6 +658,7 @@ dependencies = [
  "heartbeat",
  "lettre",
  "native-tls",
+ "plan",
  "providers",
  "reqwest 0.13.2",
  "rustyline",

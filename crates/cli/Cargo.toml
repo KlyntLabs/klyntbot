@@ -17,6 +17,7 @@ heartbeat.workspace = true
 session.workspace = true
 tools.workspace = true
 goal.workspace = true
+plan.workspace = true
 clap = { workspace = true }
 rustyline.workspace = true
 tokio = { workspace = true }

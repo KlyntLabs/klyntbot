@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use tokio::fs;
 use tracing::{debug, warn};
 
+use plan;
 use providers::{ContentPart, ImageUrl, Message};
 use session::SessionMessage;
 
@@ -383,4 +384,42 @@ You are klyntbot, a personal AI assistant powered by advanced language models.
 
         None
     }
+}
+
+/// Build system prompt addendum with plan context (current step + next 3 steps).
+/// This is injected into the LLM context during plan execution.
+pub fn build_plan_context(plan: &plan::Plan) -> String {
+    let idx = plan.current_step_index;
+    let window_end = (idx + 4).min(plan.steps.len());
+
+    if idx >= plan.steps.len() {
+        return String::from("Plan completed - no active step");
+    }
+
+    let steps_window = &plan.steps[idx..window_end];
+
+    let mut ctx = format!("## Active Plan: {}\n", plan.title);
+    ctx.push_str(&format!(
+        "Progress: step {}/{}\n\n",
+        idx + 1,
+        plan.steps.len()
+    ));
+
+    for (i, step) in steps_window.iter().enumerate() {
+        let marker = if i == 0 {
+            ">>> CURRENT"
+        } else {
+            match i {
+                1 => "    NEXT 1",
+                2 => "    NEXT 2",
+                3 => "    NEXT 3",
+                _ => "    NEXT",
+            }
+        };
+        ctx.push_str(&format!(
+            "{}: {}\n  Reasoning: {}\n",
+            marker, step.description, step.reasoning
+        ));
+    }
+    ctx
 }
