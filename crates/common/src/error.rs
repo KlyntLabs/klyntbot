@@ -35,6 +35,9 @@ pub enum KlyntbotError {
     #[error("Goal error: {0}")]
     Goal(#[from] GoalError),
 
+    #[error("Plan error: {0}")]
+    Plan(#[from] PlanError),
+
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
@@ -183,6 +186,28 @@ pub enum GoalError {
 
     #[error("Goal validation failed: {0}")]
     ValidationFailed(String),
+}
+
+/// Plan-specific errors
+#[derive(Error, Debug)]
+pub enum PlanError {
+    #[error("Plan not found: {0}")]
+    NotFound(String),
+
+    #[error("Plan generation failed: {0}")]
+    GenerationFailed(String),
+
+    #[error("Invalid plan state: {0}")]
+    InvalidState(String),
+
+    #[error("Execution stalled at step {step_index}: {reason}")]
+    ExecutionStalled { step_index: usize, reason: String },
+
+    #[error("Backtrack limit reached at step {0}")]
+    BacktrackLimitReached(usize),
+
+    #[error("Plan store error: {0}")]
+    StoreFailed(String),
 }
 
 /// Type alias for Result with KlyntbotError

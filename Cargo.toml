@@ -9,6 +9,7 @@ members = [
     "crates/scheduling",
     "crates/calendar",
     "crates/goal",
+    "crates/plan",
     "crates/tools",
     "crates/channels",
     "crates/heartbeat",

@@ -1,0 +1,15 @@
+[package]
+name = "plan"
+version = "0.2.0"
+edition = "2021"
+
+[dependencies]
+common = { path = "../common" }
+uuid = { version = "1.11", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.43", features = ["fs", "io-util"] }
+
+[dev-dependencies]
+tempfile = "3.15"

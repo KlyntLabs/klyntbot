@@ -22,6 +22,7 @@ dependencies = [
  "config",
  "dirs",
  "futures-util",
+ "goal",
  "mime_guess",
  "providers",
  "scheduling",
@@ -652,6 +653,7 @@ dependencies = [
  "config",
  "crossterm",
  "dirs",
+ "goal",
  "heartbeat",
  "lettre",
  "native-tls",
@@ -671,6 +673,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "url",
+ "uuid",
 ]
 
 [[package]]
@@ -1585,6 +1588,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "goal"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "common",
+ "config",
+ "dirs",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "h2"
 version = "0.4.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2196,6 +2216,7 @@ dependencies = [
  "common",
  "config",
  "criterion",
+ "goal",
  "heartbeat",
  "providers",
  "scheduling",
@@ -2206,6 +2227,7 @@ dependencies = [
  "tools",
  "tracing",
  "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]
@@ -2946,6 +2968,19 @@ name = "pkg-config"
 version = "0.3.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7edddbd0b52d732b21ad9a5fab5c704c14cd949e5e9a1ec5929a24fded1b904c"
+
+[[package]]
+name = "plan"
+version = "0.2.0"
+dependencies = [
+ "chrono",
+ "common",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "uuid",
+]
 
 [[package]]
 name = "plotters"
@@ -4361,6 +4396,7 @@ dependencies = [
  "chrono",
  "common",
  "fastembed",
+ "goal",
  "html2text",
  "once_cell",
  "regex",
