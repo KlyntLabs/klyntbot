@@ -153,6 +153,14 @@ impl Config {
             .join("todos.jsonl")
     }
 
+    /// Get the standardized embedding store path
+    pub fn embedding_store_path(&self) -> PathBuf {
+        dirs::home_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join(".klyntbot")
+            .join("todos_embeddings.jsonl")
+    }
+
     /// Get the standardized project store path
     pub fn project_store_path(&self) -> PathBuf {
         dirs::home_dir()
@@ -343,6 +351,8 @@ pub struct TodoConfig {
     pub focus: TodoFocusConfig,
     #[serde(default)]
     pub enrichment: TodoEnrichmentConfig,
+    #[serde(default)]
+    pub search: TodoSearchConfig,
 }
 
 /// Smart enrichment configuration for auto-inferring task metadata
@@ -878,6 +888,45 @@ fn default_conflict_resolution() -> String {
 /// Auto-detect system timezone, fallback to UTC
 fn default_timezone() -> String {
     iana_time_zone::get_timezone().unwrap_or_else(|_| "UTC".to_string())
+}
+
+/// Semantic search configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TodoSearchConfig {
+    /// Cosine similarity threshold for semantic search results (0.0-1.0, default: 0.5)
+    #[serde(default = "default_semantic_threshold")]
+    pub semantic_threshold: f64,
+
+    /// Embedding model name (default: "paraphrase-multilingual-MiniLM-L12-v2")
+    #[serde(default = "default_embedding_model")]
+    pub embedding_model: String,
+
+    /// RRF k parameter for hybrid search (default: 60)
+    #[serde(default = "default_rrf_k")]
+    pub rrf_k: u32,
+}
+
+impl Default for TodoSearchConfig {
+    fn default() -> Self {
+        Self {
+            semantic_threshold: default_semantic_threshold(),
+            embedding_model: default_embedding_model(),
+            rrf_k: default_rrf_k(),
+        }
+    }
+}
+
+fn default_semantic_threshold() -> f64 {
+    0.5
+}
+
+fn default_embedding_model() -> String {
+    "paraphrase-multilingual-MiniLM-L12-v2".to_string()
+}
+
+fn default_rrf_k() -> u32 {
+    60
 }
 
 /// Project management configuration

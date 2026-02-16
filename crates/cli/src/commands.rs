@@ -310,7 +310,7 @@ pub enum TodoCommands {
         depth: Option<usize>,
     },
 
-    /// Search tasks by keyword
+    /// Search tasks by keyword, semantically, or both
     Search {
         /// Search query
         query: String,
@@ -318,6 +318,22 @@ pub enum TodoCommands {
         /// Also search attachment content
         #[arg(short, long)]
         include_attachments: bool,
+
+        /// Use semantic search (finds related concepts, not just exact matches)
+        #[arg(long, short = 's', conflicts_with = "hybrid")]
+        semantic: bool,
+
+        /// Combine keyword + semantic search for best results
+        #[arg(long, conflicts_with = "semantic")]
+        hybrid: bool,
+
+        /// Similarity threshold for semantic search (0.0-1.0)
+        #[arg(long, short = 't')]
+        threshold: Option<f64>,
+
+        /// Maximum results to return
+        #[arg(long, short = 'l')]
+        limit: Option<u64>,
     },
 
     /// Update task fields
@@ -461,6 +477,9 @@ pub enum TodoCommands {
     /// Manage recurring task templates
     #[command(subcommand)]
     Recur(RecurCommands),
+
+    /// Generate embeddings for tasks that don't have them (enables semantic search)
+    BackfillEmbeddings,
 }
 
 #[derive(Subcommand, Debug)]

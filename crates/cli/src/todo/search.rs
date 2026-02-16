@@ -1,9 +1,14 @@
-//! Task search command.
+//! Task search command — keyword, semantic, and hybrid search.
 
 use anyhow::Result;
 use common::utils::terminal::*;
+use serde_json::json;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use tools::todo::TodoTool;
 use tools::todo_store::TodoStore;
 use tools::todo_types::{Todo, TodoFilter};
+use tools::{RoutingContext, Tool};
 
 use super::render_priority;
 
@@ -108,6 +113,108 @@ fn find_match<'a>(
     }
 
     None
+}
+
+/// Handle `--semantic` flag: route to TodoTool's search_semantic action.
+pub async fn handle_semantic_search(
+    query: String,
+    threshold: Option<f64>,
+    limit: Option<u64>,
+) -> Result<()> {
+    let config = config::load().await?;
+    let store_path = config.todo_store_path();
+    let emb_store_path = config.embedding_store_path();
+
+    let store = Arc::new(RwLock::new(TodoStore::new(store_path)));
+    let emb_store = Arc::new(RwLock::new(tools::EmbeddingStore::new(emb_store_path)));
+
+    // Create embedding engine + handler
+    let engine = Arc::new(tools::EmbeddingEngine::new());
+    let handler = Arc::new(tools::EmbeddingEngineImpl::new(engine, emb_store.clone()));
+
+    let tool = TodoTool::new(
+        store,
+        config.todo.focus.max_slots,
+        config.todo.focus.deadline_hours,
+        config.timezone.clone(),
+    )
+    .with_embedding_handler(handler)
+    .with_embedding_store(emb_store)
+    .with_search_config(
+        config.todo.search.semantic_threshold,
+        config.todo.search.rrf_k,
+    );
+
+    let mut args = json!({
+        "action": "search_semantic",
+        "query": query,
+    });
+
+    if let Some(t) = threshold {
+        args["threshold"] = json!(t);
+    }
+    if let Some(l) = limit {
+        args["limit"] = json!(l);
+    }
+
+    let ctx = RoutingContext::new(
+        common::ChannelName::new("cli"),
+        common::ChatId::new("search"),
+    );
+
+    match tool.execute(args, &ctx).await {
+        Ok(output) => println!("{}", output),
+        Err(e) => eprintln!("Error: {}", e),
+    }
+
+    Ok(())
+}
+
+/// Handle `--hybrid` flag: route to TodoTool's search_hybrid action.
+pub async fn handle_hybrid_search(query: String, limit: Option<u64>) -> Result<()> {
+    let config = config::load().await?;
+    let store_path = config.todo_store_path();
+    let emb_store_path = config.embedding_store_path();
+
+    let store = Arc::new(RwLock::new(TodoStore::new(store_path)));
+    let emb_store = Arc::new(RwLock::new(tools::EmbeddingStore::new(emb_store_path)));
+
+    let engine = Arc::new(tools::EmbeddingEngine::new());
+    let handler = Arc::new(tools::EmbeddingEngineImpl::new(engine, emb_store.clone()));
+
+    let tool = TodoTool::new(
+        store,
+        config.todo.focus.max_slots,
+        config.todo.focus.deadline_hours,
+        config.timezone.clone(),
+    )
+    .with_embedding_handler(handler)
+    .with_embedding_store(emb_store)
+    .with_search_config(
+        config.todo.search.semantic_threshold,
+        config.todo.search.rrf_k,
+    );
+
+    let mut args = json!({
+        "action": "search_hybrid",
+        "query": query,
+    });
+
+    if let Some(l) = limit {
+        args["limit"] = json!(l);
+    }
+
+    let ctx = RoutingContext::new(
+        common::ChannelName::new("cli"),
+        common::ChatId::new("search"),
+    );
+
+    match tool.execute(args, &ctx).await {
+        Ok(output) => println!("{}", output),
+        Err(e) => eprintln!("Error: {}", e),
+    }
+
+    Ok(())
 }
 
 /// Extract a short excerpt around the first occurrence of `query` in `text`.

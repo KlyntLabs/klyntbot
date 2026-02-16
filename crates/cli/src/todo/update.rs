@@ -2,8 +2,10 @@
 
 use anyhow::Result;
 use common::utils::terminal::*;
+use std::sync::Arc;
 use tools::todo_store::TodoStore;
 use tools::todo_types::TodoPatch;
+use tools::{EmbeddingEngine, EmbeddingEngineImpl, EmbeddingHandler, EmbeddingStore};
 
 use super::{format_date_local, parse_due_date, render_priority};
 
@@ -105,6 +107,19 @@ pub async fn handle_update(
 
     match result {
         Some(new_todo) => {
+            // Auto-generate embedding if text fields changed (Sprint 5)
+            if title.is_some() || description.is_some() || tags.is_some() {
+                let emb_store_path = config.embedding_store_path();
+                let emb_store = Arc::new(tokio::sync::RwLock::new(EmbeddingStore::new(emb_store_path)));
+                let engine = Arc::new(EmbeddingEngine::new());
+                let handler = EmbeddingEngineImpl::new(engine, emb_store);
+
+                // Best-effort embedding generation
+                if let Err(e) = handler.embed_todo(&new_todo).await {
+                    tracing::warn!("Failed to generate embedding for todo {}: {}", new_todo.id, e);
+                }
+            }
+
             println!(
                 "{} Updated {}:",
                 status_success(),

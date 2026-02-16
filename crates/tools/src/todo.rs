@@ -1,15 +1,19 @@
 //! TodoTool - Tool interface for todo system
 //!
-//! Provides 22 actions for complete todo management through the Tool trait.
+//! Provides 24 actions for complete todo management through the Tool trait.
+//! Sprint 5 adds: search_semantic, search_hybrid (semantic search with embeddings).
 
 use async_trait::async_trait;
 use chrono::Utc;
 use serde_json::Value;
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use super::{RoutingContext, Tool};
 use crate::calendar_tool::CalendarHandler;
+use crate::embedding_engine::{self, EmbeddingHandler};
+use crate::embedding_store::EmbeddingStore;
 use crate::enrichment::EnrichmentHandler;
 use crate::params::ParamExtractor;
 use crate::rrule_utils;
@@ -17,7 +21,7 @@ use crate::todo_store::TodoStore;
 use crate::todo_types::{Todo, TodoFilter, TodoPatch, TodoStatus};
 use common::utils::date::parse_datetime;
 use common::{Result, ToolError};
-use tracing::warn;
+use tracing::{debug, info, warn};
 
 /// TodoTool with config-driven focus values (ADR-008)
 pub struct TodoTool {
@@ -26,6 +30,12 @@ pub struct TodoTool {
     focus_deadline_hours: u64,
     calendar_handler: Option<Arc<dyn CalendarHandler>>,
     enrichment_handler: Option<Arc<dyn EnrichmentHandler>>,
+    embedding_handler: Option<Arc<dyn EmbeddingHandler>>,
+    embedding_store: Option<Arc<RwLock<EmbeddingStore>>>,
+    /// Default cosine similarity threshold for semantic search (from config)
+    semantic_threshold: f64,
+    /// RRF k parameter for hybrid search (from config)
+    rrf_k: u32,
     timezone: String,
 }
 
@@ -43,6 +53,10 @@ impl TodoTool {
             focus_deadline_hours,
             calendar_handler: None,
             enrichment_handler: None,
+            embedding_handler: None,
+            embedding_store: None,
+            semantic_threshold: 0.5,
+            rrf_k: 60,
             timezone,
         }
     }
@@ -59,6 +73,25 @@ impl TodoTool {
         self
     }
 
+    /// Add embedding handler for auto-generating embeddings on add/update
+    pub fn with_embedding_handler(mut self, handler: Arc<dyn EmbeddingHandler>) -> Self {
+        self.embedding_handler = Some(handler);
+        self
+    }
+
+    /// Add embedding store for semantic search
+    pub fn with_embedding_store(mut self, store: Arc<RwLock<EmbeddingStore>>) -> Self {
+        self.embedding_store = Some(store);
+        self
+    }
+
+    /// Set semantic search config values (threshold and RRF k)
+    pub fn with_search_config(mut self, threshold: f64, rrf_k: u32) -> Self {
+        self.semantic_threshold = threshold;
+        self.rrf_k = rrf_k;
+        self
+    }
+
     /// Trigger immediate calendar sync (best-effort, don't fail if sync fails)
     async fn trigger_sync_async(&self) {
         if let Some(handler) = &self.calendar_handler {
@@ -66,6 +99,53 @@ impl TodoTool {
                 warn!("Immediate calendar sync failed: {}", e);
             }
         }
+    }
+
+    /// Reciprocal Rank Fusion: merge keyword and semantic ranked lists.
+    ///
+    /// RRF formula: score(d) = sum(1 / (k + rank_i)) for each list where d appears.
+    fn reciprocal_rank_fusion(
+        keyword_results: &[Todo],
+        semantic_results: &[(String, f64)],
+        k: u32,
+        todos_by_id: &HashMap<String, Todo>,
+    ) -> Vec<(Todo, f64, &'static str)> {
+        let mut scores: HashMap<String, f64> = HashMap::new();
+        let mut sources: HashMap<String, u8> = HashMap::new(); // bitmask: 1=keyword, 2=semantic
+
+        for (rank, todo) in keyword_results.iter().enumerate() {
+            *scores.entry(todo.id.clone()).or_insert(0.0) += 1.0 / (k as f64 + rank as f64 + 1.0);
+            *sources.entry(todo.id.clone()).or_insert(0) |= 1;
+        }
+
+        for (rank, (id, _sim)) in semantic_results.iter().enumerate() {
+            *scores.entry(id.clone()).or_insert(0.0) += 1.0 / (k as f64 + rank as f64 + 1.0);
+            *sources.entry(id.clone()).or_insert(0) |= 2;
+        }
+
+        let mut ranked: Vec<_> = scores.into_iter().collect();
+        ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+        ranked
+            .into_iter()
+            .filter_map(|(id, score)| {
+                let todo = keyword_results
+                    .iter()
+                    .find(|t| t.id == id)
+                    .cloned()
+                    .or_else(|| todos_by_id.get(&id).cloned());
+
+                let source_bits = sources.get(&id).copied().unwrap_or(0);
+                let source = match source_bits {
+                    3 => "both",
+                    2 => "semantic",
+                    1 => "keyword",
+                    _ => "unknown",
+                };
+
+                todo.map(|t| (t, score, source))
+            })
+            .collect()
     }
 }
 
@@ -76,7 +156,7 @@ impl Tool for TodoTool {
     }
 
     fn description(&self) -> &str {
-        "Manage tasks and todos. Actions: add, list, update, complete, delete, show, summary, focus, unfocus, add_subtask, move, attach, detach, log_time, tree, search, report, add_dependency, remove_dependency, recur, list_recurring, delete_recurring, enrich."
+        "Manage tasks and todos. Actions: add, list, update, complete, delete, show, summary, focus, unfocus, add_subtask, move, attach, detach, log_time, tree, search, search_semantic, search_hybrid, report, add_dependency, remove_dependency, recur, list_recurring, delete_recurring, enrich."
     }
 
     fn parameters(&self) -> Value {
@@ -85,7 +165,7 @@ impl Tool for TodoTool {
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": ["add", "list", "update", "complete", "delete", "show", "summary", "focus", "unfocus", "add_subtask", "move", "attach", "detach", "log_time", "tree", "search", "report", "add_dependency", "remove_dependency", "recur", "list_recurring", "delete_recurring", "enrich"],
+                    "enum": ["add", "list", "update", "complete", "delete", "show", "summary", "focus", "unfocus", "add_subtask", "move", "attach", "detach", "log_time", "tree", "search", "search_semantic", "search_hybrid", "report", "add_dependency", "remove_dependency", "recur", "list_recurring", "delete_recurring", "enrich"],
                     "description": "Action to perform"
                 },
                 "id": {
@@ -175,7 +255,11 @@ impl Tool for TodoTool {
                 },
                 "query": {
                     "type": "string",
-                    "description": "Search query for titles/descriptions/attachments (for search)"
+                    "description": "Search query (for search/search_semantic/search_hybrid)"
+                },
+                "threshold": {
+                    "type": "number",
+                    "description": "Similarity threshold for semantic search (0.0-1.0, default: config value)"
                 },
                 "period": {
                     "type": "string",
@@ -292,6 +376,16 @@ impl Tool for TodoTool {
                     drop(store);
                 }
 
+                // Auto-embed (best-effort — failure doesn't block task creation)
+                if let Some(ref emb) = self.embedding_handler {
+                    if let Err(e) = emb.embed_todo(&created).await {
+                        warn!(
+                            "Failed to generate embedding for todo {}: {}",
+                            created.id, e
+                        );
+                    }
+                }
+
                 // Trigger immediate calendar sync
                 self.trigger_sync_async().await;
 
@@ -370,20 +464,25 @@ impl Tool for TodoTool {
                     estimated_minutes: p.optional_u64("estimated_minutes")?.map(|v| Some(v as u32)),
                 };
 
-                let result = match store.update(id, patch).await? {
-                    Some(todo) => Ok(format!("Updated task: {}", todo.title)),
+                let updated_todo = store.update(id, patch).await?;
+                drop(store);
+
+                match updated_todo {
+                    Some(todo) => {
+                        // Auto-embed updated task (best-effort)
+                        if let Some(ref emb) = self.embedding_handler {
+                            if let Err(e) = emb.embed_todo(&todo).await {
+                                warn!("Failed to regenerate embedding for todo {}: {}", todo.id, e);
+                            }
+                        }
+
+                        self.trigger_sync_async().await;
+                        Ok(format!("Updated task: {}", todo.title))
+                    }
                     None => {
                         Err(ToolError::ExecutionFailed(format!("Task not found: {}", id)).into())
                     }
-                };
-
-                // Drop lock and trigger sync on success
-                drop(store);
-                if result.is_ok() {
-                    self.trigger_sync_async().await;
                 }
-
-                result
             }
 
             "complete" => {
@@ -1009,6 +1108,278 @@ impl Tool for TodoTool {
                         todo.status
                     ));
                 }
+                Ok(output)
+            }
+
+            "search_semantic" => {
+                let query = p.required_str("query")?;
+                let query = query.trim();
+                let limit = p.optional_u64("limit")?.unwrap_or(10) as usize;
+                let threshold = p
+                    .optional_f64("threshold")?
+                    .unwrap_or(self.semantic_threshold);
+
+                // Validation (EC-1, EC-2)
+                if query.is_empty() {
+                    return Err(ToolError::InvalidParams(
+                        "Search query cannot be empty".to_string(),
+                    )
+                    .into());
+                }
+                if query.len() > 1000 {
+                    return Err(ToolError::InvalidParams(
+                        "Query too long (max 1000 characters)".to_string(),
+                    )
+                    .into());
+                }
+                if !(0.0..=1.0).contains(&threshold) {
+                    return Err(ToolError::InvalidParams(
+                        "Threshold must be between 0.0 and 1.0".to_string(),
+                    )
+                    .into());
+                }
+                if limit == 0 || limit > 1000 {
+                    return Err(ToolError::InvalidParams(
+                        "Limit must be between 1 and 1000".to_string(),
+                    )
+                    .into());
+                }
+
+                let search_start = std::time::Instant::now();
+
+                // Check embedding handler is available
+                let emb = self.embedding_handler.as_ref().ok_or_else(|| {
+                    ToolError::ExecutionFailed(
+                        "Semantic search unavailable: embedding engine not initialized. Use plain 'search' for keyword search.".to_string(),
+                    )
+                })?;
+
+                // Check embedding store is available
+                let emb_store = self.embedding_store.as_ref().ok_or_else(|| {
+                    ToolError::ExecutionFailed(
+                        "Semantic search unavailable: embedding store not configured".to_string(),
+                    )
+                })?;
+
+                // Get total task count for partial-coverage note
+                let total_tasks = store.list(&TodoFilter::default()).await?.len();
+                drop(store); // Release todo store lock before embedding operations
+
+                // 1. Embed query
+                debug!(
+                    query = query,
+                    "Generating query embedding for semantic search"
+                );
+                let query_vec = emb.embed_query(query).await?;
+
+                // 2. Load all embeddings
+                let emb_store_guard = emb_store.read().await;
+                // We need a write lock for ensure_loaded (lazy loading)
+                drop(emb_store_guard);
+                let mut emb_store_guard = emb_store.write().await;
+                let all_embeddings = emb_store_guard.get_all().await?;
+
+                // EC-3: No embeddings exist
+                if all_embeddings.is_empty() {
+                    return Ok("No task embeddings found. Run `klyntbot todo backfill-embeddings` to generate embeddings for existing tasks, or add new tasks (embeddings are auto-generated).".to_string());
+                }
+
+                let embedding_count = all_embeddings.len();
+
+                // 3. Compute cosine similarity for each embedding
+                let mut scored: Vec<(String, f64)> = all_embeddings
+                    .iter()
+                    .map(|(id, rec)| {
+                        let sim = embedding_engine::EmbeddingEngine::cosine_similarity(
+                            &query_vec,
+                            &rec.embedding,
+                        );
+                        (id.clone(), sim)
+                    })
+                    .filter(|(_, sim)| *sim >= threshold)
+                    .collect();
+
+                // 4. Sort descending by similarity, take limit
+                scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+                scored.truncate(limit);
+
+                // EC-5: All results below threshold
+                if scored.is_empty() {
+                    let mut msg = format!(
+                        "No semantically similar tasks found for '{}' (threshold: {:.2}).",
+                        query, threshold,
+                    );
+                    if threshold > 0.7 {
+                        msg.push_str(" Try lowering the threshold.");
+                    }
+                    return Ok(msg);
+                }
+
+                // 5. Join with TodoStore to get full Todo objects
+                let mut store = self.store.write().await;
+                let mut output = format!(
+                    "{} task(s) matching '{}' (semantic, threshold: {:.2}):\n",
+                    scored.len(),
+                    query,
+                    threshold,
+                );
+
+                for (id, sim) in &scored {
+                    if let Ok(Some(todo)) = store.get(id).await {
+                        output.push_str(&format!(
+                            "\n- [{}] {} (P{}, {:?}, sim: {:.2})",
+                            todo.id,
+                            todo.title,
+                            todo.priority.unwrap_or(3),
+                            todo.status,
+                            sim,
+                        ));
+                    }
+                }
+
+                // EC-4: Partial embedding coverage note
+                if embedding_count < total_tasks {
+                    output.push_str(&format!(
+                        "\n\nNote: {} of {} tasks have embeddings. Run `todo backfill-embeddings` to index all tasks.",
+                        embedding_count, total_tasks,
+                    ));
+                }
+
+                info!(
+                    query = query,
+                    results = scored.len(),
+                    embeddings_searched = embedding_count,
+                    elapsed_ms = search_start.elapsed().as_millis() as u64,
+                    "Semantic search completed"
+                );
+
+                Ok(output)
+            }
+
+            "search_hybrid" => {
+                let query = p.required_str("query")?;
+                let query_trimmed = query.trim();
+                let limit = p.optional_u64("limit")?.unwrap_or(10) as usize;
+
+                // Validation
+                if query_trimmed.is_empty() {
+                    return Err(ToolError::InvalidParams(
+                        "Search query cannot be empty".to_string(),
+                    )
+                    .into());
+                }
+                if query_trimmed.len() > 1000 {
+                    return Err(ToolError::InvalidParams(
+                        "Query too long (max 1000 characters)".to_string(),
+                    )
+                    .into());
+                }
+                if limit == 0 || limit > 1000 {
+                    return Err(ToolError::InvalidParams(
+                        "Limit must be between 1 and 1000".to_string(),
+                    )
+                    .into());
+                }
+
+                let search_start = std::time::Instant::now();
+
+                // 1. Run keyword search (existing logic)
+                let query_lower = query_trimmed.to_lowercase();
+                let all_todos = store.list(&TodoFilter::default()).await?;
+                let keyword_results: Vec<Todo> = all_todos
+                    .iter()
+                    .filter(|t| {
+                        if t.title.to_lowercase().contains(&query_lower) {
+                            return true;
+                        }
+                        if let Some(desc) = &t.description {
+                            if desc.to_lowercase().contains(&query_lower) {
+                                return true;
+                            }
+                        }
+                        false
+                    })
+                    .cloned()
+                    .collect();
+
+                // Build ID-to-Todo map for RRF lookups
+                let todos_by_id: HashMap<String, Todo> =
+                    all_todos.into_iter().map(|t| (t.id.clone(), t)).collect();
+
+                drop(store); // Release lock before embedding operations
+
+                // 2. Run semantic search (if available)
+                let semantic_results: Vec<(String, f64)> = if let (Some(emb), Some(emb_store)) =
+                    (&self.embedding_handler, &self.embedding_store)
+                {
+                    let query_vec = emb.embed_query(query_trimmed).await?;
+                    let mut emb_store_guard = emb_store.write().await;
+                    let all_embeddings = emb_store_guard.get_all().await?;
+
+                    let mut scored: Vec<(String, f64)> = all_embeddings
+                        .iter()
+                        .map(|(id, rec)| {
+                            let sim = embedding_engine::EmbeddingEngine::cosine_similarity(
+                                &query_vec,
+                                &rec.embedding,
+                            );
+                            (id.clone(), sim)
+                        })
+                        .filter(|(_, sim)| *sim >= self.semantic_threshold)
+                        .collect();
+
+                    scored
+                        .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+                    scored
+                } else {
+                    Vec::new()
+                };
+
+                // EC-15/EC-16: One side may be empty — RRF handles gracefully
+
+                // 3. Merge via Reciprocal Rank Fusion
+                let merged = Self::reciprocal_rank_fusion(
+                    &keyword_results,
+                    &semantic_results,
+                    self.rrf_k,
+                    &todos_by_id,
+                );
+
+                if merged.is_empty() {
+                    return Ok(format!(
+                        "No tasks found matching '{}' (hybrid: keyword + semantic).",
+                        query_trimmed,
+                    ));
+                }
+
+                let results: Vec<_> = merged.into_iter().take(limit).collect();
+                let mut output = format!(
+                    "{} task(s) matching '{}' (hybrid: keyword + semantic):\n",
+                    results.len(),
+                    query_trimmed,
+                );
+
+                for (todo, _rrf_score, source) in &results {
+                    output.push_str(&format!(
+                        "\n- [{}] {} (P{}, {:?}, match: {})",
+                        todo.id,
+                        todo.title,
+                        todo.priority.unwrap_or(3),
+                        todo.status,
+                        source,
+                    ));
+                }
+
+                let has_semantic = self.embedding_handler.is_some();
+                info!(
+                    query = query_trimmed,
+                    results = results.len(),
+                    keyword_results = keyword_results.len(),
+                    semantic_available = has_semantic,
+                    elapsed_ms = search_start.elapsed().as_millis() as u64,
+                    "Hybrid search completed"
+                );
+
                 Ok(output)
             }
 
@@ -2569,5 +2940,192 @@ mod tests {
         let result = tool.execute(report_args, &ctx()).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("period must be"));
+    }
+
+    // ─── Semantic Search Validation Tests ────────────────────────
+
+    #[tokio::test]
+    async fn test_search_semantic_empty_query() {
+        let (tool, _dir) = create_test_tool().await;
+        let args = serde_json::json!({
+            "action": "search_semantic",
+            "query": "   "
+        });
+        let result = tool.execute(args, &ctx()).await;
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("query cannot be empty"));
+    }
+
+    #[tokio::test]
+    async fn test_search_semantic_query_too_long() {
+        let (tool, _dir) = create_test_tool().await;
+        let long_query = "a".repeat(1001);
+        let args = serde_json::json!({
+            "action": "search_semantic",
+            "query": long_query
+        });
+        let result = tool.execute(args, &ctx()).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Query too long"));
+    }
+
+    #[tokio::test]
+    async fn test_search_semantic_invalid_threshold() {
+        let (tool, _dir) = create_test_tool().await;
+        let args = serde_json::json!({
+            "action": "search_semantic",
+            "query": "test",
+            "threshold": 1.5
+        });
+        let result = tool.execute(args, &ctx()).await;
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Threshold must be between"));
+    }
+
+    #[tokio::test]
+    async fn test_search_semantic_limit_zero() {
+        let (tool, _dir) = create_test_tool().await;
+        let args = serde_json::json!({
+            "action": "search_semantic",
+            "query": "test",
+            "limit": 0
+        });
+        let result = tool.execute(args, &ctx()).await;
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Limit must be between 1 and 1000"));
+    }
+
+    #[tokio::test]
+    async fn test_search_semantic_limit_too_large() {
+        let (tool, _dir) = create_test_tool().await;
+        let args = serde_json::json!({
+            "action": "search_semantic",
+            "query": "test",
+            "limit": 1001
+        });
+        let result = tool.execute(args, &ctx()).await;
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Limit must be between 1 and 1000"));
+    }
+
+    #[tokio::test]
+    async fn test_search_semantic_no_handler() {
+        let (tool, _dir) = create_test_tool().await;
+        let args = serde_json::json!({
+            "action": "search_semantic",
+            "query": "test query"
+        });
+        let result = tool.execute(args, &ctx()).await;
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("embedding engine not initialized"));
+    }
+
+    // ─── Hybrid Search Validation Tests ─────────────────────────
+
+    #[tokio::test]
+    async fn test_search_hybrid_empty_query() {
+        let (tool, _dir) = create_test_tool().await;
+        let args = serde_json::json!({
+            "action": "search_hybrid",
+            "query": ""
+        });
+        let result = tool.execute(args, &ctx()).await;
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("query cannot be empty"));
+    }
+
+    #[tokio::test]
+    async fn test_search_hybrid_query_too_long() {
+        let (tool, _dir) = create_test_tool().await;
+        let long_query = "b".repeat(1001);
+        let args = serde_json::json!({
+            "action": "search_hybrid",
+            "query": long_query
+        });
+        let result = tool.execute(args, &ctx()).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Query too long"));
+    }
+
+    #[tokio::test]
+    async fn test_search_hybrid_limit_zero() {
+        let (tool, _dir) = create_test_tool().await;
+        let args = serde_json::json!({
+            "action": "search_hybrid",
+            "query": "test",
+            "limit": 0
+        });
+        let result = tool.execute(args, &ctx()).await;
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Limit must be between 1 and 1000"));
+    }
+
+    #[tokio::test]
+    async fn test_search_hybrid_limit_too_large() {
+        let (tool, _dir) = create_test_tool().await;
+        let args = serde_json::json!({
+            "action": "search_hybrid",
+            "query": "test",
+            "limit": 1001
+        });
+        let result = tool.execute(args, &ctx()).await;
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Limit must be between 1 and 1000"));
+    }
+
+    #[tokio::test]
+    async fn test_search_hybrid_no_results() {
+        let (tool, _dir) = create_test_tool().await;
+        let args = serde_json::json!({
+            "action": "search_hybrid",
+            "query": "nonexistent_xyz_query"
+        });
+        let result = tool.execute(args, &ctx()).await.unwrap();
+        assert!(result.contains("No tasks found"));
+    }
+
+    #[tokio::test]
+    async fn test_search_hybrid_keyword_fallback_without_embeddings() {
+        let (tool, _dir) = create_test_tool().await;
+
+        // Add a task first
+        let add_args = serde_json::json!({
+            "action": "add",
+            "title": "Fix authentication bug"
+        });
+        tool.execute(add_args, &ctx()).await.unwrap();
+
+        // Hybrid search falls back to keyword-only when no embedding handler
+        let args = serde_json::json!({
+            "action": "search_hybrid",
+            "query": "authentication"
+        });
+        let result = tool.execute(args, &ctx()).await.unwrap();
+        assert!(result.contains("Fix authentication bug"));
+        assert!(result.contains("keyword"));
     }
 }

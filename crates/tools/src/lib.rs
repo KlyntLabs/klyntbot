@@ -5,6 +5,8 @@
 pub mod ask_user;
 pub mod calendar_tool;
 pub mod cron_tool;
+pub mod embedding_engine;
+pub mod embedding_store;
 pub mod enrichment;
 pub mod filesystem;
 pub mod message;
@@ -24,6 +26,10 @@ pub mod web;
 
 // Re-export calendar types for use by agent crate
 pub use calendar_tool::{CalendarHandler, CalendarTool};
+
+// Re-export embedding types for use by agent crate
+pub use embedding_engine::{EmbeddingEngine, EmbeddingEngineImpl, EmbeddingHandler, EMBEDDING_DIM};
+pub use embedding_store::{EmbeddingRecord, EmbeddingStore};
 
 // Re-export enrichment types for use by agent crate
 pub use enrichment::{EnrichmentHandler, EnrichmentResult, EnrichmentSuggestion};

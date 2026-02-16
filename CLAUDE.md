@@ -83,7 +83,7 @@ klyntbot serve --port 8080       # Start HTTP server (default port from config)
 klyntbot init                    # Interactive setup wizard (includes calendar setup in Step 7)
 klyntbot status [--verbose]      # Show agent/config status
 
-# Task Management (23 commands)
+# Task Management (25 commands)
 klyntbot todo add <title> [--description TEXT] [--priority N] [--due DATE] [--tags CSV]
 klyntbot todo list [--status doing|todo|done] [--tag TAG] [--priority-min N] [--limit N]
 klyntbot todo show ID
@@ -95,6 +95,8 @@ klyntbot todo unfocus ID
 klyntbot todo summary
 klyntbot todo tree [--project ID] [--depth N]
 klyntbot todo search QUERY [--include-attachments]
+klyntbot todo search-semantic QUERY [--limit N] [--threshold 0.0-1.0]
+klyntbot todo search-hybrid QUERY [--limit N]
 klyntbot todo add-subtask PARENT_ID <title> [--description TEXT] [--priority N] [--due DATE] [--tags CSV]
 klyntbot todo move ID [--parent ID|none] [--project ID|none]
 klyntbot todo attach ID --file PATH | --url URL | --note TEXT [--title TEXT]
@@ -184,6 +186,51 @@ klyntbot todo add "URGENT: Fix production auth bug"
 - **Enrichment not working?** Check `config.todo.enrichment.enabled` is `true`
 - **Suggestions not applied?** Lower `autoApplyThreshold` or manually approve via `todo enrich <id>`
 - **Wrong suggestions?** Adjust task title keywords or set fields manually
+
+## Semantic Search
+
+Semantic search uses local embeddings (fastembed, paraphrase-multilingual-MiniLM-L12-v2, 384 dimensions) for meaning-based task retrieval. The model (~420MB) downloads on first use.
+
+**Config schema** (`~/.klyntbot/config.json`):
+```json
+{
+  "todo": {
+    "search": {
+      "semanticThreshold": 0.5,
+      "embeddingModel": "paraphrase-multilingual-MiniLM-L12-v2",
+      "rrfK": 60
+    }
+  }
+}
+```
+
+**Fields:**
+- `semanticThreshold`: Minimum cosine similarity for results (0.0-1.0, default: `0.5`)
+- `embeddingModel`: Model name stored in embedding records (default: `paraphrase-multilingual-MiniLM-L12-v2`)
+- `rrfK`: Reciprocal Rank Fusion k parameter for hybrid search (default: `60`)
+
+**Search modes:**
+- `search` — keyword matching (title + description substring)
+- `search-semantic` — cosine similarity on embeddings only
+- `search-hybrid` — merges keyword + semantic via Reciprocal Rank Fusion (RRF)
+
+**CLI usage:**
+```bash
+klyntbot todo search-semantic "fix login issues" --threshold 0.6 --limit 5
+klyntbot todo search-hybrid "authentication bug"
+```
+
+**How it works:**
+1. Embeddings auto-generate when tasks are created or updated (best-effort, non-blocking)
+2. Embeddings persist in `~/.klyntbot/data/embeddings.jsonl` (append-only journal, auto-compacts)
+3. Semantic search embeds the query, then computes cosine similarity against all stored embeddings
+4. Hybrid search runs both keyword and semantic, merges via RRF
+
+**Troubleshooting:**
+- **First search is slow?** Model downloads ~420MB on first use. Subsequent searches are fast.
+- **No results?** Lower the threshold (e.g., `--threshold 0.3`) or use `search-hybrid` for broader matching.
+- **Missing embeddings?** New tasks auto-embed. For existing tasks, run `todo backfill-embeddings`.
+- **Semantic search unavailable?** Falls back with a clear error suggesting keyword search.
 
 ## Skills
 

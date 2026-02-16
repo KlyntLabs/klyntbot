@@ -275,6 +275,7 @@ mod tests {
                 ..Default::default()
             },
             enrichment: TodoEnrichmentConfig::default(),
+            search: TodoSearchConfig::default(),
         };
 
         let json = serde_json::to_string(&config).unwrap();

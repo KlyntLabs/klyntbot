@@ -154,6 +154,17 @@ impl<'a> ParamExtractor<'a> {
         }
     }
 
+    /// Extract an optional f64 parameter.
+    pub fn optional_f64(&self, name: &str) -> Result<Option<f64>, KlyntbotError> {
+        match self.args.get(name) {
+            None | Some(Value::Null) => Ok(None),
+            Some(v) => v
+                .as_f64()
+                .map(Some)
+                .ok_or_else(|| wrong_type(name, "a number")),
+        }
+    }
+
     /// Extract an optional boolean parameter.
     pub fn optional_bool(&self, name: &str) -> Result<Option<bool>, KlyntbotError> {
         match self.args.get(name) {

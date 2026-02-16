@@ -5,6 +5,7 @@
 
 mod add;
 mod attach;
+mod backfill;
 mod complete;
 mod depend;
 mod enrich;
@@ -52,7 +53,19 @@ pub async fn handle_todo(cmd: TodoCommands) -> Result<()> {
         TodoCommands::Search {
             query,
             include_attachments,
-        } => search::handle_search(query, include_attachments).await,
+            semantic,
+            hybrid,
+            threshold,
+            limit,
+        } => {
+            if semantic {
+                search::handle_semantic_search(query, threshold, limit).await
+            } else if hybrid {
+                search::handle_hybrid_search(query, limit).await
+            } else {
+                search::handle_search(query, include_attachments).await
+            }
+        }
         TodoCommands::Update {
             id,
             title,
@@ -92,6 +105,7 @@ pub async fn handle_todo(cmd: TodoCommands) -> Result<()> {
         TodoCommands::Depend { id, on, remove } => depend::handle_depend(id, on, remove).await,
         TodoCommands::Enrich { id } => enrich::handle_enrich(id).await,
         TodoCommands::Recur(cmd) => recur::handle_recur(cmd).await,
+        TodoCommands::BackfillEmbeddings => backfill::handle_backfill().await,
     }
 }
 
