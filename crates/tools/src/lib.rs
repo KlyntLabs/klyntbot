@@ -11,6 +11,7 @@ pub mod embedding_store;
 pub mod enrichment;
 pub mod goal_tool;
 pub mod plan_response;
+pub mod plan_tool;
 pub mod filesystem;
 pub mod memory_tool;
 pub mod message;
@@ -47,6 +48,9 @@ pub use enrichment::{EnrichmentHandler, EnrichmentResult, EnrichmentSuggestion};
 
 // Re-export goal types for use by agent crate
 pub use goal_tool::{GoalHandler, GoalTool};
+
+// Re-export plan types for use by agent crate
+pub use plan_tool::{PlanHandler, PlanTool};
 
 // Re-export memory tool
 pub use memory_tool::MemoryTool;

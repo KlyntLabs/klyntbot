@@ -33,6 +33,7 @@ session = { path = "crates/session" }
 scheduling = { path = "crates/scheduling" }
 calendar = { path = "crates/calendar" }
 goal = { path = "crates/goal" }
+plan = { path = "crates/plan" }
 tools = { path = "crates/tools" }
 channels = { path = "crates/channels" }
 heartbeat = { path = "crates/heartbeat" }
@@ -106,6 +107,7 @@ session.workspace = true
 scheduling.workspace = true
 calendar.workspace = true
 goal.workspace = true
+plan.workspace = true
 tools.workspace = true
 channels.workspace = true
 heartbeat.workspace = true
