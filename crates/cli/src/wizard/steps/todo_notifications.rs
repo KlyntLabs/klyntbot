@@ -101,5 +101,23 @@ pub fn run_todo_notification_step(state: &mut WizardState) -> Result<StepResult>
         state.config.todo.notifications.daily_digest_time = time;
     }
 
+    // Configure daily planning (default from current config)
+    let enable_planning = prompt_yes_no(
+        "Enable daily planning (AI-powered morning task suggestions)?",
+        state.config.todo.daily_planning.enabled,
+    )?;
+    state.config.todo.daily_planning.enabled = enable_planning;
+
+    if enable_planning {
+        let current_time = &state.config.todo.daily_planning.planning_time;
+        let default_time = if current_time.is_empty() {
+            "08:00"
+        } else {
+            current_time
+        };
+        let time = prompt_text("Daily planning time (HH:MM)", Some(default_time), false)?;
+        state.config.todo.daily_planning.planning_time = time;
+    }
+
     Ok(StepResult::Next)
 }
