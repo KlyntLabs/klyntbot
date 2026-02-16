@@ -8,6 +8,7 @@ members = [
     "crates/session",
     "crates/scheduling",
     "crates/calendar",
+    "crates/goal",
     "crates/tools",
     "crates/channels",
     "crates/heartbeat",
@@ -30,6 +31,7 @@ providers = { path = "crates/providers" }
 session = { path = "crates/session" }
 scheduling = { path = "crates/scheduling" }
 calendar = { path = "crates/calendar" }
+goal = { path = "crates/goal" }
 tools = { path = "crates/tools" }
 channels = { path = "crates/channels" }
 heartbeat = { path = "crates/heartbeat" }
