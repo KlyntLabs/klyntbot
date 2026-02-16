@@ -25,6 +25,7 @@ pub mod calendar;
 pub mod channels;
 pub mod daemon;
 pub mod framework;
+pub mod memory;
 pub mod oauth;
 pub mod prompts;
 pub mod provider;
@@ -109,6 +110,7 @@ pub async fn run_wizard() -> Result<()> {
         ("Workspace & Notifications", true, true),
         ("Calendar Sync", false, true),
         ("Semantic Search", false, true),
+        ("Conversation Memory", false, true),
         (
             "Background Service",
             false,
@@ -138,7 +140,7 @@ pub async fn run_wizard() -> Result<()> {
 
         // Dispatch to the right module. Step indices correspond to `all_steps`:
         // 0=provider, 1=channels (async), 2=tools, 3=workspace+notifications,
-        // 4=calendar (async), 5=semantic_search, 6=daemon, 7=review.
+        // 4=calendar (async), 5=semantic_search, 6=conversation_memory, 7=daemon, 8=review.
         // Ctrl+C in raw-mode prompts surfaces as an Err containing "Ctrl+C".
         let result = match match step_idx {
             0 => provider::ProviderModule.run(&mut state),
@@ -147,8 +149,9 @@ pub async fn run_wizard() -> Result<()> {
             3 => WorkspaceModule.run(&mut state),
             4 => run_calendar_step(&mut state).await,
             5 => run_search_step(&mut state),
-            6 => daemon::DaemonModule.run(&mut state),
-            7 => steps::review::ReviewModule.run(&mut state),
+            6 => run_memory_step(&mut state),
+            7 => daemon::DaemonModule.run(&mut state),
+            8 => steps::review::ReviewModule.run(&mut state),
             _ => unreachable!(),
         } {
             Ok(r) => r,
@@ -215,6 +218,19 @@ async fn run_calendar_step(state: &mut WizardState) -> Result<StepResult> {
 fn run_search_step(state: &mut WizardState) -> Result<StepResult> {
     let can_go_back = state.current_step > 1;
     let outcome = search::configure_semantic_search(&mut state.config, can_go_back)?;
+    Ok(if outcome == ui::MenuOutcome::Back {
+        StepResult::Back
+    } else {
+        StepResult::Next
+    })
+}
+
+/// Conversation memory wizard step (sync, reuses semantic search model).
+///
+/// Shows enable/disable menu for conversation embedding and search.
+fn run_memory_step(state: &mut WizardState) -> Result<StepResult> {
+    let can_go_back = state.current_step > 1;
+    let outcome = memory::configure_conversation_memory(&mut state.config, can_go_back)?;
     Ok(if outcome == ui::MenuOutcome::Back {
         StepResult::Back
     } else {

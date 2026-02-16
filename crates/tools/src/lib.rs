@@ -4,12 +4,14 @@
 
 pub mod ask_user;
 pub mod calendar_tool;
+pub mod conversation_embedding;
 pub mod cron_tool;
 pub mod embedding_engine;
 pub mod embedding_store;
 pub mod enrichment;
 pub mod plan_response;
 pub mod filesystem;
+pub mod memory_tool;
 pub mod message;
 pub mod params;
 pub use params::ParamExtractor;
@@ -18,6 +20,7 @@ pub mod project_tool;
 pub mod project_types;
 pub mod registry;
 pub mod rrule_utils;
+pub mod search_utils;
 pub mod shell;
 pub mod spawn;
 pub mod todo;
@@ -28,12 +31,24 @@ pub mod web;
 // Re-export calendar types for use by agent crate
 pub use calendar_tool::{CalendarHandler, CalendarTool};
 
+// Re-export conversation embedding types for use by agent crate
+pub use conversation_embedding::{
+    ConversationEmbeddingHandler, ConversationEmbeddingRecord, ConversationEmbeddingStatus,
+    ConversationEmbeddingStore, PurgeFilter,
+};
+
 // Re-export embedding types for use by agent crate
 pub use embedding_engine::{EmbeddingEngine, EmbeddingEngineImpl, EmbeddingHandler, EMBEDDING_DIM};
 pub use embedding_store::{EmbeddingRecord, EmbeddingStore};
 
 // Re-export enrichment types for use by agent crate
 pub use enrichment::{EnrichmentHandler, EnrichmentResult, EnrichmentSuggestion};
+
+// Re-export memory tool
+pub use memory_tool::MemoryTool;
+
+// Re-export search utilities
+pub use search_utils::{rrf_merge, SearchResult};
 
 // Dependency inversion traits (to avoid circular dependencies)
 /// Trait for spawning subagents (implemented by klyntbot-agent)

@@ -7,6 +7,7 @@ pub mod calendar_reconcile;
 pub mod calendar_sync_adapter;
 pub mod confidence;
 pub mod context;
+pub mod conversation_embedding_handler;
 pub mod cron_handler_adapter;
 pub mod enrichment;
 pub mod events;
@@ -22,6 +23,7 @@ pub use calendar_reconcile::{reconcile_calendar_events, ReconcileAction, Reconci
 pub use calendar_sync_adapter::CalendarSyncAdapter;
 pub use confidence::{ConfidenceAssessment, ConfidenceEvaluator, DecisionAction, DecisionLogger};
 pub use context::ContextBuilder;
+pub use conversation_embedding_handler::ConversationEmbeddingHandlerImpl;
 pub use cron_handler_adapter::CronHandlerAdapter;
 pub use enrichment::EnrichmentEngine;
 pub use events::AgentEvent;

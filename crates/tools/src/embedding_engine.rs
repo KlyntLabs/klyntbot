@@ -98,6 +98,24 @@ impl EmbeddingEngine {
         Ok(results)
     }
 
+    /// Check if the embedding model is initialized and available.
+    ///
+    /// Returns `true` if the model has been loaded (either on first use or explicitly).
+    /// Returns `false` if the model hasn't been initialized yet.
+    pub fn is_available(&self) -> bool {
+        self.model
+            .lock()
+            .map(|guard| guard.is_some())
+            .unwrap_or(false)
+    }
+
+    /// Get the name of the embedding model being used.
+    ///
+    /// Returns the model identifier for metadata and logging purposes.
+    pub fn model_name(&self) -> &str {
+        "paraphrase-multilingual-MiniLM-L12-v2"
+    }
+
     /// Cosine similarity between two vectors.
     ///
     /// Returns 0.0 for zero-norm vectors (avoids NaN).

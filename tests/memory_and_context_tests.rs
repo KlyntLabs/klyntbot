@@ -134,11 +134,13 @@ async fn test_context_builder_with_history() {
     // Create conversation history
     let history = vec![
         SessionMessage {
+            id: "test-msg-1".to_string(),
             role: "user".to_string(),
             content: "What is Rust?".to_string(),
             timestamp: chrono::Utc::now(),
         },
         SessionMessage {
+            id: "test-msg-2".to_string(),
             role: "assistant".to_string(),
             content: "Rust is a systems programming language.".to_string(),
             timestamp: chrono::Utc::now(),
@@ -336,11 +338,13 @@ async fn test_long_conversation_history() {
     let mut history = Vec::new();
     for i in 0..50 {
         history.push(SessionMessage {
+            id: format!("test-msg-{}-user", i),
             role: "user".to_string(),
             content: format!("Message {}", i),
             timestamp: chrono::Utc::now(),
         });
         history.push(SessionMessage {
+            id: format!("test-msg-{}-assistant", i),
             role: "assistant".to_string(),
             content: format!("Response {}", i),
             timestamp: chrono::Utc::now(),

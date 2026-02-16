@@ -204,52 +204,6 @@ impl TodoTool {
         (urgency * priority_wt) + (age_days * 0.1)
     }
 
-    /// Reciprocal Rank Fusion: merge keyword and semantic ranked lists.
-    ///
-    /// RRF formula: score(d) = sum(1 / (k + rank_i)) for each list where d appears.
-    fn reciprocal_rank_fusion(
-        keyword_results: &[Todo],
-        semantic_results: &[(String, f64)],
-        k: u32,
-        todos_by_id: &HashMap<String, Todo>,
-    ) -> Vec<(Todo, f64, &'static str)> {
-        let mut scores: HashMap<String, f64> = HashMap::new();
-        let mut sources: HashMap<String, u8> = HashMap::new(); // bitmask: 1=keyword, 2=semantic
-
-        for (rank, todo) in keyword_results.iter().enumerate() {
-            *scores.entry(todo.id.clone()).or_insert(0.0) += 1.0 / (k as f64 + rank as f64 + 1.0);
-            *sources.entry(todo.id.clone()).or_insert(0) |= 1;
-        }
-
-        for (rank, (id, _sim)) in semantic_results.iter().enumerate() {
-            *scores.entry(id.clone()).or_insert(0.0) += 1.0 / (k as f64 + rank as f64 + 1.0);
-            *sources.entry(id.clone()).or_insert(0) |= 2;
-        }
-
-        let mut ranked: Vec<_> = scores.into_iter().collect();
-        ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-
-        ranked
-            .into_iter()
-            .filter_map(|(id, score)| {
-                let todo = keyword_results
-                    .iter()
-                    .find(|t| t.id == id)
-                    .cloned()
-                    .or_else(|| todos_by_id.get(&id).cloned());
-
-                let source_bits = sources.get(&id).copied().unwrap_or(0);
-                let source = match source_bits {
-                    3 => "both",
-                    2 => "semantic",
-                    1 => "keyword",
-                    _ => "unknown",
-                };
-
-                todo.map(|t| (t, score, source))
-            })
-            .collect()
-    }
 }
 
 #[async_trait]
@@ -1410,8 +1364,8 @@ impl Tool for TodoTool {
                     .collect();
 
                 // Build ID-to-Todo map for RRF lookups
-                let todos_by_id: HashMap<String, Todo> =
-                    all_todos.into_iter().map(|t| (t.id.clone(), t)).collect();
+                let todos_by_id: HashMap<String, crate::search_utils::SearchResult> =
+                    all_todos.into_iter().map(|t| (t.id.clone(), crate::search_utils::SearchResult::Todo(t))).collect();
 
                 drop(store); // Release lock before embedding operations
 
@@ -1444,9 +1398,15 @@ impl Tool for TodoTool {
 
                 // EC-15/EC-16: One side may be empty — RRF handles gracefully
 
-                // 3. Merge via Reciprocal Rank Fusion
-                let merged = Self::reciprocal_rank_fusion(
-                    &keyword_results,
+                // 3. Merge via Reciprocal Rank Fusion (using generic search_utils)
+                let keyword_count = keyword_results.len(); // Save for logging
+                let keyword_search_results: Vec<crate::search_utils::SearchResult> = keyword_results
+                    .into_iter()
+                    .map(crate::search_utils::SearchResult::Todo)
+                    .collect();
+
+                let merged = crate::search_utils::rrf_merge(
+                    &keyword_search_results,
                     &semantic_results,
                     self.rrf_k,
                     &todos_by_id,
@@ -1466,7 +1426,9 @@ impl Tool for TodoTool {
                     query_trimmed,
                 );
 
-                for (todo, _rrf_score, source) in &results {
+                for (search_result, _rrf_score, source) in &results {
+                    // Extract Todo from SearchResult (currently only variant)
+                    let crate::search_utils::SearchResult::Todo(todo) = search_result;
                     output.push_str(&format!(
                         "\n- [{}] {} (P{}, {:?}, match: {})",
                         todo.id,
@@ -1481,7 +1443,7 @@ impl Tool for TodoTool {
                 info!(
                     query = query_trimmed,
                     results = results.len(),
-                    keyword_results = keyword_results.len(),
+                    keyword_results = keyword_count,
                     semantic_available = has_semantic,
                     elapsed_ms = search_start.elapsed().as_millis() as u64,
                     "Hybrid search completed"

@@ -6,8 +6,14 @@ use std::collections::{HashMap, VecDeque};
 use std::path::PathBuf;
 use tokio::fs;
 use tracing::{debug, warn};
+use uuid::Uuid;
 
 use common::{Result, SessionError};
+
+/// Generate a unique message ID (UUID v4)
+fn generate_message_id() -> String {
+    Uuid::new_v4().to_string()
+}
 
 /// A conversation session
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -45,6 +51,7 @@ impl Session {
     /// Add a message to the session
     pub fn add_message(&mut self, role: impl Into<String>, content: impl Into<String>) {
         self.messages.push(SessionMessage {
+            id: generate_message_id(),
             role: role.into(),
             content: content.into(),
             timestamp: Utc::now(),
@@ -68,6 +75,10 @@ impl Session {
 /// A single message in a session
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionMessage {
+    /// Unique message ID (UUID v4)
+    #[serde(default = "generate_message_id")]
+    pub id: String,
+
     /// Message role (system, user, assistant, tool)
     pub role: String,
 
@@ -489,5 +500,62 @@ mod tests {
             assert!(session_info.key.starts_with("test:chat"));
             assert_eq!(session_info.message_count, 1);
         }
+    }
+
+    #[test]
+    fn test_message_id_generated() {
+        let mut session = Session::new("test:chat123");
+        session.add_message("user", "Hello");
+
+        // Verify message has an ID
+        assert!(!session.messages[0].id.is_empty());
+
+        // Verify ID looks like a UUID (36 chars with hyphens)
+        assert_eq!(session.messages[0].id.len(), 36);
+        assert!(session.messages[0].id.contains('-'));
+    }
+
+    #[test]
+    fn test_message_id_unique() {
+        let mut session = Session::new("test:chat123");
+        session.add_message("user", "Message 1");
+        session.add_message("user", "Message 2");
+        session.add_message("user", "Message 3");
+
+        // Verify each message has a unique ID
+        let id1 = &session.messages[0].id;
+        let id2 = &session.messages[1].id;
+        let id3 = &session.messages[2].id;
+
+        assert_ne!(id1, id2);
+        assert_ne!(id2, id3);
+        assert_ne!(id1, id3);
+    }
+
+    #[tokio::test]
+    async fn test_message_id_persists_to_jsonl() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut manager = SessionManager::new(temp_dir.path()).await;
+
+        // Create session and add messages
+        let original_id = {
+            let session = manager.get_or_create("test:chat123").await.unwrap();
+            session.add_message("user", "Hello");
+            session.add_message("assistant", "Hi there!");
+            session.messages[0].id.clone()
+        };
+
+        // Save session
+        let session = manager.get_or_create("test:chat123").await.unwrap();
+        let session_clone = session.clone();
+        manager.save(&session_clone).await.unwrap();
+
+        // Reload from disk
+        let mut manager2 = SessionManager::new(temp_dir.path()).await;
+        let loaded_session = manager2.get_or_create("test:chat123").await.unwrap();
+
+        // Verify IDs persisted
+        assert_eq!(loaded_session.messages[0].id, original_id);
+        assert!(!loaded_session.messages[1].id.is_empty());
     }
 }

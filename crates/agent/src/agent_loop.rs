@@ -98,6 +98,8 @@ pub struct AgentLoop {
     recurring_task_spawner: Option<Arc<RwLock<super::RecurringTaskSpawner>>>,
     #[allow(dead_code)] // Held for lifetime; shared with CalendarSyncAdapter
     notification_dispatcher: Option<Arc<super::NotificationDispatcher>>,
+    /// Conversation embedding handler for semantic memory (Phase 4.1)
+    conversation_embedding_handler: Option<Arc<dyn tools::ConversationEmbeddingHandler>>,
 }
 
 impl AgentLoop {
@@ -239,13 +241,15 @@ impl AgentLoop {
             );
         }
 
-        // Register embedding engine for semantic search (Sprint 5)
+        // Create shared embedding engine (used by both todo and conversation embedding)
+        let embedding_engine = Arc::new(tools::EmbeddingEngine::new());
+
+        // Register todo embedding (if enabled)
         if config.todo.search.enabled {
             let emb_store_path = config.embedding_store_path();
             let emb_store = Arc::new(RwLock::new(tools::EmbeddingStore::new(emb_store_path)));
-            let embedding_engine = Arc::new(tools::EmbeddingEngine::new());
             let embedding_handler = Arc::new(tools::EmbeddingEngineImpl::new(
-                embedding_engine,
+                Arc::clone(&embedding_engine),
                 Arc::clone(&emb_store),
             ));
 
@@ -259,6 +263,34 @@ impl AgentLoop {
         }
 
         tool_registry.register(todo_tool);
+
+        // Register conversation embedding handler (Phase 4.1)
+        let conversation_embedding_handler = if config.conversation.embedding.enabled {
+            let conv_store_path = dirs::home_dir()
+                .unwrap_or_else(|| PathBuf::from("."))
+                .join(".klyntbot")
+                .join("data")
+                .join("conversation_embeddings.jsonl");
+
+            let conv_store = Arc::new(RwLock::new(tools::ConversationEmbeddingStore::new(conv_store_path)));
+            let handler = Arc::new(super::conversation_embedding_handler::ConversationEmbeddingHandlerImpl::new(
+                Arc::clone(&embedding_engine),
+                conv_store,
+            ));
+            Some(handler as Arc<dyn tools::ConversationEmbeddingHandler>)
+        } else {
+            None
+        };
+
+        // Register MemoryTool (Phase 4.1) - if conversation search is enabled
+        if config.conversation.search.enabled {
+            if let Some(ref handler) = conversation_embedding_handler {
+                let memory_tool = tools::MemoryTool::new()
+                    .with_conversation_handler(Arc::clone(handler))
+                    .with_threshold(config.conversation.search.semantic_threshold);
+                tool_registry.register(memory_tool);
+            }
+        }
 
         // Confidence evaluator
         let confidence_evaluator = if config.confidence.enabled {
@@ -316,6 +348,7 @@ impl AgentLoop {
             reminder_engine,
             recurring_task_spawner,
             notification_dispatcher,
+            conversation_embedding_handler,
         })
     }
 
@@ -412,6 +445,23 @@ impl AgentLoop {
 
         // Add user message to session
         session.add_message("user", &msg.content);
+
+        // Phase 4.1: Async conversation embedding hook for user message
+        if let Some(handler) = &self.conversation_embedding_handler {
+            if self.should_embed_conversation(session_key.as_str(), "user") {
+                let h = handler.clone();
+                let sk = session_key.to_string();
+                let role = "user".to_string();
+                let content_str = msg.content.clone();
+                let msg_id = session.messages.last().expect("Message should exist after add_message").id.clone();
+
+                tokio::spawn(async move {
+                    if let Err(e) = h.embed_message(&sk, &role, &content_str, &msg_id).await {
+                        warn!("Failed to embed user message: {}", e);
+                    }
+                });
+            }
+        }
 
         // Get session history
         let history = session.get_history(DEFAULT_HISTORY_LIMIT).to_vec();
@@ -557,10 +607,58 @@ impl AgentLoop {
     }
 
     /// Save an assistant response to the session.
+    /// Check if a conversation message should be embedded based on config.
+    fn should_embed_conversation(&self, session_key: &str, role: &str) -> bool {
+        // Check if role is excluded
+        if self
+            .config
+            .conversation
+            .embedding
+            .exclude_roles
+            .contains(&role.to_string())
+        {
+            return false;
+        }
+
+        // Check if channel is excluded
+        if let Some(channel) = session_key.split(':').next() {
+            if self
+                .config
+                .conversation
+                .embedding
+                .exclude_channels
+                .contains(&channel.to_string())
+            {
+                return false;
+            }
+        }
+
+        true
+    }
+
     async fn save_to_session(&self, session_key: &str, content: &str) {
         let mut session_manager = self.session_manager.write().await;
         if let Ok(session) = session_manager.get_or_create(session_key).await {
             session.add_message("assistant", content);
+
+            // Phase 4.1: Async conversation embedding hook
+            if let Some(handler) = &self.conversation_embedding_handler {
+                if self.should_embed_conversation(session_key, "assistant") {
+                    let h = handler.clone();
+                    let sk = session_key.to_string();
+                    let role = "assistant".to_string();
+                    let content_str = content.to_string();
+                    // Get the ID of the message we just added
+                    let msg_id = session.messages.last().expect("Message should exist after add_message").id.clone();
+
+                    tokio::spawn(async move {
+                        if let Err(e) = h.embed_message(&sk, &role, &content_str, &msg_id).await {
+                            warn!("Failed to embed conversation: {}", e);
+                        }
+                    });
+                }
+            }
+
             let session_clone = session.clone();
             if let Err(e) = session_manager.save(&session_clone).await {
                 warn!("Failed to save session: {}", e);
@@ -1039,6 +1137,24 @@ impl AgentLoop {
         let mut session_manager = self.session_manager.write().await;
         let session = session_manager.get_or_create(&session_key).await?;
         session.add_message("user", &content);
+
+        // Phase 4.1: Async conversation embedding hook for user message (CLI)
+        if let Some(handler) = &self.conversation_embedding_handler {
+            if self.should_embed_conversation(&session_key, "user") {
+                let h = handler.clone();
+                let sk = session_key.clone();
+                let role = "user".to_string();
+                let content_str = content.clone();
+                let msg_id = session.messages.last().expect("Message should exist after add_message").id.clone();
+
+                tokio::spawn(async move {
+                    if let Err(e) = h.embed_message(&sk, &role, &content_str, &msg_id).await {
+                        warn!("Failed to embed user message (CLI): {}", e);
+                    }
+                });
+            }
+        }
+
         let history = session.get_history(DEFAULT_HISTORY_LIMIT).to_vec();
         drop(session_manager);
 
@@ -1092,6 +1208,24 @@ impl AgentLoop {
         let mut session_manager = self.session_manager.write().await;
         let session = session_manager.get_or_create(&session_key).await?;
         session.add_message("user", &content);
+
+        // Phase 4.1: Async conversation embedding hook for user message (CLI streaming)
+        if let Some(handler) = &self.conversation_embedding_handler {
+            if self.should_embed_conversation(&session_key, "user") {
+                let h = handler.clone();
+                let sk = session_key.clone();
+                let role = "user".to_string();
+                let content_str = content.clone();
+                let msg_id = session.messages.last().expect("Message should exist after add_message").id.clone();
+
+                tokio::spawn(async move {
+                    if let Err(e) = h.embed_message(&sk, &role, &content_str, &msg_id).await {
+                        warn!("Failed to embed user message (CLI streaming): {}", e);
+                    }
+                });
+            }
+        }
+
         let history = session.get_history(DEFAULT_HISTORY_LIMIT).to_vec();
         drop(session_manager);
 

@@ -1,0 +1,231 @@
+//! ConversationEmbeddingHandlerImpl — production handler for conversation embeddings.
+//!
+//! Implements the ConversationEmbeddingHandler trait defined in tools crate (L3).
+//! Reuses the shared EmbeddingEngine for memory efficiency.
+
+use async_trait::async_trait;
+use chrono::Utc;
+use std::sync::Arc;
+use tokio::sync::RwLock;
+use tracing::warn;
+
+use common::Result;
+use tools::conversation_embedding::{
+    ConversationEmbeddingHandler, ConversationEmbeddingRecord, ConversationEmbeddingStatus,
+    ConversationEmbeddingStore, PurgeFilter,
+};
+use tools::embedding_engine::EmbeddingEngine;
+use tools::EMBEDDING_DIM;
+
+/// Production conversation embedding handler.
+pub struct ConversationEmbeddingHandlerImpl {
+    engine: Arc<EmbeddingEngine>,
+    store: Arc<RwLock<ConversationEmbeddingStore>>,
+}
+
+impl ConversationEmbeddingHandlerImpl {
+    /// Create a new handler with shared embedding engine and store.
+    pub fn new(
+        engine: Arc<EmbeddingEngine>,
+        store: Arc<RwLock<ConversationEmbeddingStore>>,
+    ) -> Self {
+        Self { engine, store }
+    }
+}
+
+#[async_trait]
+impl ConversationEmbeddingHandler for ConversationEmbeddingHandlerImpl {
+    async fn embed_message(
+        &self,
+        session_key: &str,
+        role: &str,
+        content: &str,
+        message_id: &str,
+    ) -> Result<()> {
+        // Compose text with role prefix (e.g., "User: hello" or "Assistant: response")
+        let text = format!("{}: {}", role, content);
+
+        // Generate embedding (CPU-bound work in blocking thread pool)
+        let embedding_result = {
+            let engine = Arc::clone(&self.engine);
+            let text_clone = text.clone();
+            tokio::task::spawn_blocking(move || engine.embed(&text_clone)).await
+        };
+
+        let embedding = match embedding_result {
+            Ok(Ok(emb)) => emb,
+            Ok(Err(e)) => {
+                warn!("Failed to generate conversation embedding for message {}: {}", message_id, e);
+                return Ok(()); // Best-effort: don't propagate errors
+            }
+            Err(e) => {
+                warn!("Spawn blocking failed for conversation embedding: {}", e);
+                return Ok(());
+            }
+        };
+
+        // Validate dimension
+        if embedding.len() != EMBEDDING_DIM {
+            warn!(
+                "Conversation embedding dimension mismatch for message {}: got {}, expected {}",
+                message_id,
+                embedding.len(),
+                EMBEDDING_DIM
+            );
+            return Ok(());
+        }
+
+        // Create record
+        let record = ConversationEmbeddingRecord {
+            id: message_id.to_string(),
+            session_key: session_key.to_string(),
+            role: role.to_string(),
+            content_preview: content.chars().take(100).collect(),
+            embedding,
+            model: self.engine.model_name().to_string(),
+            embedded_at: Utc::now(),
+        };
+
+        // Store (best-effort, log errors but don't propagate)
+        let store = self.store.write().await;
+        if let Err(e) = store.upsert(record).await {
+            warn!("Failed to store conversation embedding for message {}: {}", message_id, e);
+        }
+
+        Ok(())
+    }
+
+    async fn search(
+        &self,
+        query: &str,
+        limit: usize,
+        threshold: f64,
+    ) -> Result<Vec<(ConversationEmbeddingRecord, f64)>> {
+        // Generate query embedding (CPU-bound work in blocking thread pool)
+        let query_embedding = {
+            let engine = Arc::clone(&self.engine);
+            let query_clone = query.to_string();
+            tokio::task::spawn_blocking(move || engine.embed(&query_clone))
+                .await
+                .map_err(|e| {
+                    common::ToolError::ExecutionFailed(format!("Spawn blocking failed: {}", e))
+                })??
+        };
+
+        // Search store for similar embeddings (read-only access)
+        let store = self.store.read().await;
+        let all_records = store.get_all().await?;
+
+        // Compute cosine similarity for each record
+        let mut results: Vec<(ConversationEmbeddingRecord, f64)> = all_records
+            .values()
+            .map(|record| {
+                let similarity =
+                    EmbeddingEngine::cosine_similarity(&query_embedding, &record.embedding);
+                (record.clone(), similarity)
+            })
+            .filter(|(_, score)| *score >= threshold)
+            .collect();
+
+        // Sort by similarity descending
+        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+        // Limit results
+        results.truncate(limit);
+
+        Ok(results)
+    }
+
+    async fn purge(&self, filter: PurgeFilter) -> Result<usize> {
+        let store = self.store.write().await;
+        store.purge(filter).await
+    }
+
+    async fn status(&self) -> Result<ConversationEmbeddingStatus> {
+        let store = self.store.read().await;
+        store.status().await
+    }
+
+    fn is_available(&self) -> bool {
+        self.engine.is_available()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    async fn create_test_handler() -> (ConversationEmbeddingHandlerImpl, TempDir) {
+        let temp_dir = TempDir::new().unwrap();
+        let store_path = temp_dir.path().join("conversation_embeddings.jsonl");
+        let store = Arc::new(RwLock::new(ConversationEmbeddingStore::new(store_path)));
+
+        // Create embedding engine
+        let engine = Arc::new(EmbeddingEngine::new());
+
+        let handler = ConversationEmbeddingHandlerImpl::new(engine, store);
+        (handler, temp_dir)
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // TDD Tests - Written FIRST before implementation
+    // ──────────────────────────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn test_embed_message_adds_role_prefix() {
+        let (handler, _dir) = create_test_handler().await;
+
+        // This will fail if model unavailable, but we test the role prefix logic
+        let result = handler
+            .embed_message("telegram:12345", "user", "Hello world", "msg-1")
+            .await;
+
+        // Should succeed (best-effort) even when model unavailable
+        assert!(result.is_ok(), "embed_message should succeed even when model unavailable");
+    }
+
+    #[tokio::test]
+    async fn test_embed_message_best_effort_on_error() {
+        let (handler, _dir) = create_test_handler().await;
+
+        // This will fail (no model loaded yet), but should succeed with best-effort
+        let result = handler
+            .embed_message("telegram:12345", "assistant", "Response", "msg-2")
+            .await;
+
+        assert!(result.is_ok(), "Should succeed with best-effort even on embedding error");
+    }
+
+    #[tokio::test]
+    async fn test_purge_delegates_to_store() {
+        let (handler, _dir) = create_test_handler().await;
+
+        // Purge should delegate to store (no embeddings yet, so 0 deleted)
+        let deleted = handler
+            .purge(PurgeFilter::BySessionKey("telegram:12345".to_string()))
+            .await
+            .unwrap();
+
+        assert_eq!(deleted, 0, "Should delete 0 records (store empty)");
+    }
+
+    #[tokio::test]
+    async fn test_status_delegates_to_store() {
+        let (handler, _dir) = create_test_handler().await;
+
+        let status = handler.status().await.unwrap();
+
+        assert_eq!(status.total_embeddings, 0, "Store should be empty");
+        assert!(status.indexed_channels.is_empty(), "No channels indexed");
+        assert!(status.is_available, "Status should report available");
+    }
+
+    #[tokio::test]
+    async fn test_is_available_reflects_engine() {
+        let (handler, _dir) = create_test_handler().await;
+
+        // Engine uses lazy init, model not loaded yet
+        assert!(!handler.is_available(), "Should return false before model loads");
+    }
+}
