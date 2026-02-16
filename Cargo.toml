@@ -125,6 +125,7 @@ serde_json.workspace = true
 chrono.workspace = true
 criterion = { version = "0.5", features = ["async_tokio"] }
 tokio.workspace = true
+uuid.workspace = true
 
 [[bench]]
 name = "core_benchmarks"
