@@ -108,6 +108,7 @@ pub struct AgentLoop {
 
 impl AgentLoop {
     /// Create a new agent loop with optional cron service and shared instances
+    #[allow(clippy::too_many_arguments)] // Architectural decision: follows existing goal_store pattern
     pub async fn new_with_cron(
         bus: Arc<MessageBus>,
         provider: DynProvider,
