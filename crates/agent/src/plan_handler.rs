@@ -286,4 +286,84 @@ mod tests {
         let abandoned = handler.get_plan(&plan.id).await.unwrap().unwrap();
         assert_eq!(abandoned.status, PlanStatus::Abandoned);
     }
+
+    #[tokio::test]
+    async fn test_plan_handler_abandon_completed_fails() {
+        // Test 17: Cannot abandon a Completed plan (final state)
+        // Given: a Plan with status Completed
+        // When: abandon_plan() is called
+        // Then: PlanError::InvalidState is returned
+        // And: Plan status remains Completed
+        // Maps to: Critical Fix 2 - State machine validation
+
+        let dir = tempdir().unwrap();
+        let store_arc = Arc::new(RwLock::new(PlanStore::new(
+            dir.path().join("plans.jsonl"),
+        )));
+        let handler = PlanHandlerImpl::new(Arc::clone(&store_arc));
+
+        let mut plan = handler
+            .create_plan("Completed Plan", "Test", "test-session", None)
+            .await
+            .unwrap();
+
+        // Manually set to Completed
+        plan.status = PlanStatus::Completed;
+        {
+            let mut store = store_arc.write().await;
+            store.upsert(plan.clone()).await.unwrap();
+        }
+
+        // Attempt to abandon - should fail
+        let result = handler.abandon_plan(&plan.id).await;
+        assert!(result.is_err());
+
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("Invalid plan state"));
+        assert!(err_msg.contains("Completed"));
+
+        // Verify status unchanged
+        let unchanged = handler.get_plan(&plan.id).await.unwrap().unwrap();
+        assert_eq!(unchanged.status, PlanStatus::Completed);
+    }
+
+    #[tokio::test]
+    async fn test_plan_handler_abandon_failed_fails() {
+        // Test 18: Cannot abandon a Failed plan (final state)
+        // Given: a Plan with status Failed
+        // When: abandon_plan() is called
+        // Then: PlanError::InvalidState is returned
+        // And: Plan status remains Failed
+        // Maps to: Critical Fix 2 - State machine validation
+
+        let dir = tempdir().unwrap();
+        let store_arc = Arc::new(RwLock::new(PlanStore::new(
+            dir.path().join("plans.jsonl"),
+        )));
+        let handler = PlanHandlerImpl::new(Arc::clone(&store_arc));
+
+        let mut plan = handler
+            .create_plan("Failed Plan", "Test", "test-session", None)
+            .await
+            .unwrap();
+
+        // Manually set to Failed
+        plan.status = PlanStatus::Failed;
+        {
+            let mut store = store_arc.write().await;
+            store.upsert(plan.clone()).await.unwrap();
+        }
+
+        // Attempt to abandon - should fail
+        let result = handler.abandon_plan(&plan.id).await;
+        assert!(result.is_err());
+
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("Invalid plan state"));
+        assert!(err_msg.contains("Failed"));
+
+        // Verify status unchanged
+        let unchanged = handler.get_plan(&plan.id).await.unwrap().unwrap();
+        assert_eq!(unchanged.status, PlanStatus::Failed);
+    }
 }
