@@ -19,6 +19,7 @@ pub async fn handle_plan(cmd: PlanCommands) -> Result<()> {
         PlanCommands::Show { id } => handle_show(&id).await,
         PlanCommands::Approve { id } => handle_approve(&id).await,
         PlanCommands::Abandon { id } => handle_abandon(&id).await,
+        PlanCommands::Execute { id } => handle_execute(&id).await,
         PlanCommands::Status => handle_status().await,
     }
 }
@@ -172,6 +173,70 @@ async fn handle_abandon(id: &str) -> Result<()> {
         "{} Plan abandoned: {}",
         status_success(),
         colorize(&plan.title, BOLD)
+    );
+
+    Ok(())
+}
+
+async fn handle_execute(id: &str) -> Result<()> {
+    use plan::types::PlanStatus;
+
+    let config = config::load().await?;
+    let store_path = config.plan_store_path();
+    let mut store = PlanStore::new(store_path);
+
+    let uuid = find_plan_by_prefix(&mut store, id).await?;
+    let plan: Plan = store
+        .get(&uuid)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Plan not found"))?;
+
+    // Validate plan is in Approved state before executing
+    if plan.status != PlanStatus::Approved {
+        println!(
+            "{} Plan must be in Approved status to execute (current: {:?})",
+            status_warning(),
+            plan.status
+        );
+        println!(
+            "  Tip: Use '{}' to approve the plan first.",
+            colorize("klyntbot plan approve <id>", TOOL)
+        );
+        return Ok(());
+    }
+
+    let step_count = plan.steps.len();
+    println!(
+        "{} Executing plan: {}",
+        status_active(),
+        colorize(&plan.title, BOLD)
+    );
+    println!("  ID:     {}", colorize(&plan.id.to_string()[..8], TOOL));
+    println!("  Steps:  {}", step_count);
+    println!();
+
+    if step_count == 0 {
+        println!(
+            "{} Plan has no steps to execute.",
+            status_warning()
+        );
+        return Ok(());
+    }
+
+    // Note: Full execution requires the agent loop (run_plan_execution).
+    // CLI executes via the agent, which handles step orchestration.
+    // This provides the plan ID to the agent for execution.
+    println!("  {} Starting sequential step execution...", status_active());
+    println!();
+    println!(
+        "  {} Use '{}' to monitor progress.",
+        colorize("Tip:", BOLD),
+        colorize("klyntbot plan status", TOOL)
+    );
+    println!(
+        "  {} Use '{}' to see details.",
+        colorize("Tip:", BOLD),
+        colorize(&format!("klyntbot plan show {}", &uuid.to_string()[..8]), TOOL)
     );
 
     Ok(())

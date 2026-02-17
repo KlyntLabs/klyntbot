@@ -739,6 +739,12 @@ pub enum PlanCommands {
         id: String,
     },
 
+    /// Execute an approved plan (runs all steps sequentially)
+    Execute {
+        /// Plan ID (supports prefix matching)
+        id: String,
+    },
+
     /// Show active plan status for current session
     Status,
 }

@@ -103,8 +103,11 @@ pub struct AgentLoop {
     /// Conversation embedding handler for semantic memory (Phase 4.1)
     conversation_embedding_handler: Option<Arc<dyn tools::ConversationEmbeddingHandler>>,
     /// Plan executor for structured multi-step execution (Phase 2)
-    #[allow(dead_code)] // Will be used in Phase 4A execution flow
     plan_executor: Option<super::PlanExecutor>,
+    /// Plan store for direct plan state management during execution
+    plan_store: Option<Arc<RwLock<plan::PlanStore>>>,
+    /// Tracks if a plan is currently executing (affects iteration limit)
+    plan_executing: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl AgentLoop {
@@ -297,15 +300,16 @@ impl AgentLoop {
         }
 
         // Register plan tool and create plan executor (if plan_store is provided)
-        let plan_executor = if let Some(ps) = plan_store {
+        let (plan_executor, stored_plan_store) = if let Some(ps) = plan_store {
+            let ps_clone = Arc::clone(&ps);
             let plan_handler = Arc::new(super::PlanHandlerImpl::new(ps));
             tool_registry.register(tools::plan_tool::PlanTool::new(Some(
                 plan_handler as Arc<dyn tools::plan_tool::PlanHandler>,
             )));
-            // Create PlanExecutor (will be fully functional in Phase 4)
-            Some(super::PlanExecutor::new())
+            // Create PlanExecutor and keep plan_store reference for run_plan_execution()
+            (Some(super::PlanExecutor::new()), Some(ps_clone))
         } else {
-            None
+            (None, None)
         };
 
         // Register conversation embedding handler (Phase 4.1)
@@ -409,6 +413,8 @@ impl AgentLoop {
             calendar_adapter,
             conversation_embedding_handler,
             plan_executor,
+            plan_store: stored_plan_store,
+            plan_executing: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         })
     }
 
@@ -427,10 +433,7 @@ impl AgentLoop {
     /// Returns true if plan mode is active, false for normal chat mode.
     /// This determines the iteration limit: 50 for plans, 20 for chat.
     fn is_plan_executing(&self) -> bool {
-        // TODO: Track active plan execution state
-        // For now, return false (chat mode)
-        // Will be set to true when run_plan_execution() is called
-        false
+        self.plan_executing.load(Ordering::SeqCst)
     }
 
     /// Run the agent loop, processing messages from the bus
@@ -500,6 +503,228 @@ impl AgentLoop {
         }
 
         Ok(())
+    }
+
+    /// Execute an approved plan sequentially, step by step.
+    ///
+    /// State machine: Approved → Executing → (Completed | Failed)
+    ///
+    /// For each step:
+    /// 1. Marks step as Executing
+    /// 2. Calls plan_executor.execute_step() to run the step
+    /// 3. Updates step status (Completed or Failed)
+    /// 4. Advances current_step_index
+    /// 5. Persists plan after each step
+    ///
+    /// On completion, sets plan.completed_at and transitions to Completed.
+    /// If any step fails beyond max_attempts, transitions to Failed.
+    pub async fn run_plan_execution(
+        &self,
+        plan_id: &uuid::Uuid,
+        routing_ctx: &RoutingContext,
+    ) -> Result<String> {
+        use chrono::Utc;
+        use plan::{PlanStatus, StepStatus};
+
+        let (executor, store_arc) = match (&self.plan_executor, &self.plan_store) {
+            (Some(e), Some(s)) => (e, Arc::clone(s)),
+            _ => {
+                return Err(common::KlyntbotError::Tool(
+                    common::ToolError::ExecutionFailed(
+                        "Plan execution not configured (missing plan_store or plan_executor)".into(),
+                    ),
+                ))
+            }
+        };
+
+        // Load and validate the plan
+        let mut plan = {
+            let mut store = store_arc.write().await;
+            store
+                .get(plan_id)
+                .await?
+                .ok_or_else(|| {
+                    common::KlyntbotError::Plan(common::PlanError::NotFound(plan_id.to_string()))
+                })?
+        };
+
+        // Validate: must be in Approved state
+        PlanStatus::validate_transition(&plan.status, &PlanStatus::Executing)?;
+
+        // Transition plan → Executing
+        plan.status = PlanStatus::Executing;
+        plan.updated_at = Utc::now();
+        {
+            let mut store = store_arc.write().await;
+            store.upsert(plan.clone()).await?;
+        }
+
+        // Set executing flag (affects iteration limit in run_agent_loop)
+        self.plan_executing.store(true, Ordering::SeqCst);
+
+        info!(
+            "Starting plan execution: '{}' ({} steps)",
+            plan.title,
+            plan.steps.len()
+        );
+
+        // Execute steps sequentially
+        let mut step_idx = plan.current_step_index;
+        let step_count = plan.steps.len();
+
+        let result = loop {
+            if step_idx >= step_count {
+                break Ok(format!(
+                    "Plan '{}' completed: all {} steps executed.",
+                    plan.title, step_count
+                ));
+            }
+
+            // Build context window (current + next 3 steps)
+            let plan_context = executor.build_step_context(&plan, step_idx);
+
+            debug!(
+                "Executing step {}/{}: {}",
+                step_idx + 1,
+                step_count,
+                plan.steps[step_idx].description
+            );
+
+            // Mark step as Executing
+            plan.steps[step_idx].status = StepStatus::Executing;
+            plan.steps[step_idx].started_at = Some(Utc::now());
+            plan.steps[step_idx].attempt_count += 1;
+            plan.updated_at = Utc::now();
+            {
+                let mut store = store_arc.write().await;
+                store.upsert(plan.clone()).await?;
+            }
+
+            // Execute the step
+            let step_result = executor
+                .execute_step(
+                    &plan.steps[step_idx],
+                    &plan_context,
+                    &self.provider,
+                    &self.tool_registry,
+                    routing_ctx,
+                )
+                .await;
+
+            match step_result {
+                Ok(result) if result.success => {
+                    info!("Step {}/{} completed successfully", step_idx + 1, step_count);
+
+                    // Mark step Completed
+                    plan.steps[step_idx].status = StepStatus::Completed;
+                    plan.steps[step_idx].result = Some(result.output);
+                    plan.steps[step_idx].completed_at = Some(Utc::now());
+                    step_idx += 1;
+                    plan.current_step_index = step_idx;
+                    plan.updated_at = Utc::now();
+                    {
+                        let mut store = store_arc.write().await;
+                        store.upsert(plan.clone()).await?;
+                    }
+                }
+                Ok(result) => {
+                    // Step failed — check if we can retry
+                    let attempt = plan.steps[step_idx].attempt_count;
+                    let max_attempts = plan.steps[step_idx].max_attempts;
+                    let failure_reason = result.failure_reason.unwrap_or(result.output);
+
+                    warn!(
+                        "Step {}/{} failed (attempt {}/{}): {}",
+                        step_idx + 1,
+                        step_count,
+                        attempt,
+                        max_attempts,
+                        failure_reason
+                    );
+
+                    // Record backtrack entry
+                    plan.backtrack_history.push(plan::BacktrackEntry {
+                        step_index: step_idx,
+                        attempt,
+                        failure_reason: failure_reason.clone(),
+                        timestamp: Utc::now(),
+                    });
+
+                    if attempt >= max_attempts {
+                        // Max attempts exceeded — fail the plan
+                        plan.steps[step_idx].status = StepStatus::Failed;
+                        plan.updated_at = Utc::now();
+                        {
+                            let mut store = store_arc.write().await;
+                            store.upsert(plan.clone()).await?;
+                        }
+                        break Ok(format!(
+                            "Plan '{}' failed at step {}: {} (max attempts exceeded)",
+                            plan.title,
+                            step_idx + 1,
+                            failure_reason
+                        ));
+                    } else {
+                        // Retry: persist state and continue loop
+                        plan.updated_at = Utc::now();
+                        let mut store = store_arc.write().await;
+                        store.upsert(plan.clone()).await?;
+                    }
+                }
+                Err(e) => {
+                    // Hard error (not a soft failure) — fail the plan immediately
+                    plan.steps[step_idx].status = StepStatus::Failed;
+                    plan.status = PlanStatus::Failed;
+                    plan.updated_at = Utc::now();
+                    {
+                        let mut store = store_arc.write().await;
+                        store.upsert(plan.clone()).await?;
+                    }
+                    break Err(e);
+                }
+            }
+
+            // Guard against exceeding iteration limit
+            if plan.backtrack_history.len() >= plan.iteration_limit {
+                plan.steps[step_idx].status = StepStatus::Failed;
+                break Ok(format!(
+                    "Plan '{}' halted: iteration limit ({}) reached.",
+                    plan.title, plan.iteration_limit
+                ));
+            }
+        };
+
+        // Clear executing flag
+        self.plan_executing.store(false, Ordering::SeqCst);
+
+        // Finalize plan state based on execution result
+        let summary = match &result {
+            Ok(msg) if msg.contains("completed: all") => {
+                plan.status = PlanStatus::Completed;
+                plan.completed_at = Some(Utc::now());
+                plan.updated_at = Utc::now();
+                msg.clone()
+            }
+            Ok(msg) => {
+                // Partial completion (halted or failed)
+                plan.status = PlanStatus::Failed;
+                plan.updated_at = Utc::now();
+                msg.clone()
+            }
+            Err(_) => {
+                plan.status = PlanStatus::Failed;
+                plan.updated_at = Utc::now();
+                format!("Plan '{}' failed with an error.", plan.title)
+            }
+        };
+
+        {
+            let mut store = store_arc.write().await;
+            store.upsert(plan).await?;
+        }
+
+        info!("{}", summary);
+        result.map(|_| summary)
     }
 
     /// Process a single inbound message
