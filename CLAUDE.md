@@ -250,3 +250,62 @@ Built-in skills live in `skills/` as `SKILL.md` files (summarize, skill-creator,
 - **Dependency inversion gotcha**: When adding new tools that need agent context (spawn/cron handlers), inject via `Arc<dyn Trait>` at construction to avoid circular deps.
 - **Calendar conflicts are informational**: Detected conflicts are logged to `calendar_conflicts.jsonl` but don't block sync. Review and resolve manually.
 - **Race condition warning**: Concurrent access (CLI + `serve` running simultaneously) can corrupt JSONL data files (`todos.jsonl`, `projects.jsonl`, `plans.jsonl`). Avoid running CLI commands while `klyntbot serve` is active, or ensure only one process accesses data files at a time. Future enhancement: file locking.
+
+## Planning Engine (Phase 4 — v0.3.0)
+
+### Plan Lifecycle
+
+Plans follow this state machine (enforced by `PlanStatus::validate_transition`):
+
+```
+Draft → Approved → Executing → Completed
+                ↘               ↘
+             Abandoned         Failed
+```
+
+Any state can transition to `Abandoned`. From `Completed`, `Failed`, or `Abandoned` — no further transitions are allowed.
+
+### Creating and Executing Plans
+
+```bash
+# Create a plan (starts in Draft)
+klyntbot plan create --title "My Plan" --description "What to accomplish"
+
+# Approve the plan (Draft → Approved)
+klyntbot plan approve <plan-id>
+
+# Execute the plan (Approved → Executing → Completed/Failed)
+klyntbot plan execute <plan-id>
+
+# Check status
+klyntbot plan status
+klyntbot plan show <plan-id>
+```
+
+### How Plan Execution Works
+
+1. `PlanTool` action `"execute"` calls `PlanHandler::execute_plan()` → transitions to `Executing`
+2. `AgentLoop::run_plan_execution()` in `agent/agent_loop.rs` drives the step-by-step loop
+3. For each step: `PlanExecutor::execute_step()` in `agent/plan_executor.rs`:
+   - Builds a system prompt from the plan context window (current + next 3 steps)
+   - Calls the LLM provider to generate tool calls
+   - Executes tool calls via `ToolRegistry` (Arc<dyn Tool> cloned before lock release)
+   - Falls back to LLM text response when no tool calls are generated
+4. Step state (status, timestamps, results, attempt_count) is updated by `run_plan_execution()` after each `execute_step()` call
+5. On step failure: up to `MAX_BACKTRACK_ATTEMPTS` (3) backtracking events via `PlanExecutor::regenerate_from()`
+6. After all steps complete: plan transitions to `Completed` with `completed_at` timestamp
+
+### Backtracking
+
+When a step exceeds `max_attempts` (default: 3 retries per step):
+1. A `BacktrackEntry` is recorded in `plan.backtrack_history`
+2. `regenerate_from()` prompts the LLM for replacement steps from the failure point
+3. If LLM returns invalid JSON, a single "Retry: <step>" fallback step is inserted
+4. After `MAX_BACKTRACK_ATTEMPTS` (3) full backtrack events, the plan is marked `Failed`
+
+### Known Limitations
+
+- **No LLM parameter generation**: `execute_step()` passes `{}` as tool arguments. Tools must work without explicit parameters, or parameter generation needs Phase 5 enhancement.
+- **Iteration limit enforcement**: `iteration_limit` field persists but is checked in `run_plan_execution()` — exceeded limits mark the plan as `Failed`.
+- **No real-time progress**: Plan progress is only visible via `klyntbot plan show <id>` between executions; there's no streaming progress update.
+- **JSONL race conditions**: See race condition warning above — applies equally to `plans.jsonl`.

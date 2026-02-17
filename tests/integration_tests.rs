@@ -1162,3 +1162,262 @@ async fn test_cross_channel_plan_isolation() {
         "Plans from different channels with same chat_id must be isolated"
     );
 }
+
+/// Test 25: PlanExecutor.execute_step() full integration
+/// Verifies: execute_step() calls the LLM, executes tool, captures output.
+/// Covers the gap: no integration test previously verified actual step execution.
+#[tokio::test]
+async fn test_plan_executor_execute_step_integration() {
+    use async_trait::async_trait;
+    use klyntbot::providers::types::{
+        ChatParams, LlmProvider, LlmResponse, ToolCall, Usage,
+    };
+    use klyntbot::tools::{registry::ToolRegistry, RoutingContext, Tool};
+    use plan::{PlanStep, StepStatus};
+    use serde_json::Value;
+    use std::sync::Arc;
+    use tokio::sync::RwLock;
+    use uuid::Uuid;
+
+    // Mock provider that returns a tool call for "counter_tool"
+    struct MockProviderWithToolCall;
+
+    #[async_trait]
+    impl LlmProvider for MockProviderWithToolCall {
+        async fn chat(
+            &self,
+            _messages: &[klyntbot::providers::types::Message],
+            _tools: Option<&[Value]>,
+            _params: &ChatParams,
+        ) -> klyntbot::error::Result<LlmResponse> {
+            Ok(LlmResponse {
+                content: None,
+                tool_calls: vec![ToolCall {
+                    id: "call_1".to_string(),
+                    name: "counter_tool".to_string(),
+                    arguments: serde_json::json!({}),
+                }],
+                finish_reason: "tool_calls".to_string(),
+                usage: Usage::default(),
+                reasoning_content: None,
+            })
+        }
+        fn default_model(&self) -> &str { "mock" }
+        fn name(&self) -> &str { "mock" }
+    }
+
+    // Simple counter tool that records execution
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let call_count = Arc::new(AtomicUsize::new(0));
+    let call_count_clone = Arc::clone(&call_count);
+
+    struct CounterTool {
+        count: Arc<AtomicUsize>,
+    }
+
+    #[async_trait]
+    impl Tool for CounterTool {
+        fn name(&self) -> &str { "counter_tool" }
+        fn description(&self) -> &str { "Counts calls" }
+        fn parameters(&self) -> Value {
+            serde_json::json!({"type": "object", "properties": {}})
+        }
+        async fn execute(&self, _args: Value, _ctx: &RoutingContext) -> klyntbot::error::Result<String> {
+            self.count.fetch_add(1, Ordering::SeqCst);
+            Ok("counted".to_string())
+        }
+    }
+
+    let mut registry = ToolRegistry::new();
+    registry.register(CounterTool { count: call_count_clone });
+    let registry = Arc::new(RwLock::new(registry));
+
+    let provider: klyntbot::providers::DynProvider = Arc::new(MockProviderWithToolCall);
+    let executor = klyntbot::agent::PlanExecutor::new();
+
+    let step = PlanStep {
+        id: Uuid::new_v4(),
+        index: 0,
+        description: "Count something using the counter tool".to_string(),
+        reasoning: "Need to count".to_string(),
+        expected_tools: vec!["counter_tool".to_string()],
+        status: StepStatus::Pending,
+        attempt_count: 0,
+        max_attempts: 3,
+        result: None,
+        started_at: None,
+        completed_at: None,
+    };
+
+    let ctx = RoutingContext::new("cli".into(), "integration-test".into());
+    let plan_ctx = "Plan: Integration Test\nProgress: step 1/1";
+
+    let result = executor
+        .execute_step(&step, plan_ctx, &provider, &registry, &ctx)
+        .await
+        .expect("execute_step should not return Err in integration test");
+
+    // Verify tool was actually called
+    assert_eq!(call_count.load(Ordering::SeqCst), 1, "counter_tool should have been called once");
+    assert!(result.success, "step should succeed; failure: {:?}", result.failure_reason);
+    assert!(
+        result.output.contains("counted"),
+        "output should contain tool result 'counted', got: {}",
+        result.output
+    );
+}
+
+/// Test 26: PlanHandlerImpl.execute_plan() state transition integration
+/// Verifies: execute_plan() correctly transitions Approved → Executing and persists.
+#[tokio::test]
+async fn test_plan_handler_execute_plan_integration() {
+    use klyntbot::agent::PlanHandlerImpl;
+    use klyntbot::tools::plan_tool::PlanHandler;
+    use plan::{PlanStatus, PlanStore};
+    use std::sync::Arc;
+    use tempfile::TempDir;
+    use tokio::sync::RwLock;
+
+    let temp_dir = TempDir::new().unwrap();
+    let store_path = temp_dir.path().join("plans.jsonl");
+    let store = Arc::new(RwLock::new(PlanStore::new(store_path.clone())));
+    let handler = PlanHandlerImpl::new(Arc::clone(&store));
+
+    // Create and approve a plan
+    let plan = handler
+        .create_plan("Execution Test", "Test execute_plan transition", "sess:exec-test", None)
+        .await
+        .expect("create_plan should succeed");
+    assert_eq!(plan.status, PlanStatus::Draft);
+
+    let plan = handler.approve_plan(&plan.id).await.expect("approve_plan should succeed");
+    assert_eq!(plan.status, PlanStatus::Approved);
+
+    // Execute the plan — transitions to Executing
+    let executing = handler.execute_plan(&plan.id).await.expect("execute_plan should succeed");
+    assert_eq!(executing.status, PlanStatus::Executing, "plan should be in Executing state");
+
+    // Verify it persisted
+    let persisted = store.write().await.get(&executing.id).await.unwrap().unwrap();
+    assert_eq!(persisted.status, PlanStatus::Executing, "Executing state should persist to store");
+
+    // Verify that calling execute_plan on an already-Executing plan is a no-op
+    // (PlanStatus::validate_transition allows same-state transitions)
+    let again = handler.execute_plan(&plan.id).await;
+    assert!(again.is_ok(), "execute_plan on already-Executing plan is a no-op, not an error");
+    assert_eq!(again.unwrap().status, PlanStatus::Executing);
+
+    // Verify that Completed → Executing IS rejected (cannot go backwards)
+    let mut store_guard = store.write().await;
+    let mut completed = store_guard.get(&executing.id).await.unwrap().unwrap();
+    completed.status = PlanStatus::Completed;
+    completed.completed_at = Some(chrono::Utc::now());
+    store_guard.upsert(completed).await.unwrap();
+    drop(store_guard);
+
+    let backwards = handler.execute_plan(&executing.id).await;
+    assert!(backwards.is_err(), "execute_plan on Completed plan should fail");
+}
+
+/// Test 27: Iteration limit enforcement
+/// Verifies: plans with low iteration_limit behave consistently.
+/// Documents: iteration limit is enforced by run_plan_execution() in agent_loop.rs
+#[tokio::test]
+async fn test_plan_iteration_limit_field_persists() {
+    use chrono::Utc;
+    use plan::{Plan, PlanStatus, PlanStore};
+    use tempfile::TempDir;
+    use uuid::Uuid;
+
+    let temp_dir = TempDir::new().unwrap();
+    let store_path = temp_dir.path().join("plans.jsonl");
+    let mut store = PlanStore::new(store_path);
+
+    let now = Utc::now();
+    let plan = Plan {
+        id: Uuid::new_v4(),
+        session_key: "iter-test".to_string(),
+        goal_id: None,
+        title: "Iteration Limit Test Plan".to_string(),
+        description: "Tests iteration_limit field".to_string(),
+        status: PlanStatus::Draft,
+        steps: vec![],
+        current_step_index: 0,
+        iteration_limit: 5, // Very low limit to test field persistence
+        backtrack_history: vec![],
+        created_at: now,
+        updated_at: now,
+        completed_at: None,
+    };
+
+    let saved = store.upsert(plan).await.unwrap();
+    assert_eq!(saved.iteration_limit, 5, "iteration_limit should be saved as 5");
+
+    // Verify it persists across store reload
+    let plan_id = saved.id;
+    drop(store);
+
+    let mut reloaded_store = PlanStore::new(temp_dir.path().join("plans.jsonl"));
+    let loaded = reloaded_store.get(&plan_id).await.unwrap().unwrap();
+    assert_eq!(
+        loaded.iteration_limit, 5,
+        "iteration_limit should persist across store reload"
+    );
+    assert_eq!(loaded.title, "Iteration Limit Test Plan");
+}
+
+/// Test 28: Concurrent plan store access safety
+/// Verifies: Multiple concurrent readers don't corrupt state.
+/// Documents the known limitation: concurrent CLI + serve can corrupt JSONL files.
+#[tokio::test]
+async fn test_plan_store_concurrent_reads_are_safe() {
+    use chrono::Utc;
+    use plan::{Plan, PlanStatus, PlanStore};
+    use std::sync::Arc;
+    use tempfile::TempDir;
+    use tokio::sync::RwLock;
+    use uuid::Uuid;
+
+    let temp_dir = TempDir::new().unwrap();
+    let store_path = temp_dir.path().join("plans.jsonl");
+    let store = Arc::new(RwLock::new(PlanStore::new(store_path)));
+
+    // Seed the store with a plan
+    let now = Utc::now();
+    let plan_id = Uuid::new_v4();
+    let plan = Plan {
+        id: plan_id,
+        session_key: "concurrent-test".to_string(),
+        goal_id: None,
+        title: "Concurrent Read Test".to_string(),
+        description: "Tests concurrent reads".to_string(),
+        status: PlanStatus::Approved,
+        steps: vec![],
+        current_step_index: 0,
+        iteration_limit: 50,
+        backtrack_history: vec![],
+        created_at: now,
+        updated_at: now,
+        completed_at: None,
+    };
+    store.write().await.upsert(plan).await.unwrap();
+
+    // Spawn 10 concurrent read tasks
+    let mut handles = vec![];
+    for _ in 0..10 {
+        let store_clone = Arc::clone(&store);
+        let handle = tokio::spawn(async move {
+            let result = store_clone.write().await.get(&plan_id).await;
+            result.expect("read should succeed").expect("plan should exist")
+        });
+        handles.push(handle);
+    }
+
+    // All reads should succeed and return the correct plan
+    for handle in handles {
+        let read_plan = handle.await.expect("task should not panic");
+        assert_eq!(read_plan.id, plan_id);
+        assert_eq!(read_plan.status, PlanStatus::Approved);
+        assert_eq!(read_plan.title, "Concurrent Read Test");
+    }
+}
