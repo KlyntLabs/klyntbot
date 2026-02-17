@@ -185,6 +185,7 @@ impl Config {
         dirs::home_dir()
             .unwrap_or_else(|| PathBuf::from("."))
             .join(".klyntbot")
+            .join("data")
             .join("plans.jsonl")
     }
 

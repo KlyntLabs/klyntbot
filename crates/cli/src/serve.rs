@@ -42,11 +42,7 @@ pub async fn handle_serve(port: u16) -> Result<()> {
     let goal_store = Arc::new(RwLock::new(goal::GoalStore::new(goal_path)));
 
     // Create SHARED PlanStore
-    let plan_path = dirs::home_dir()
-        .unwrap_or_else(|| std::path::PathBuf::from("."))
-        .join(".klyntbot")
-        .join("data")
-        .join("plans.jsonl");
+    let plan_path = config.plan_store_path();
     let plan_store = Arc::new(RwLock::new(plan::PlanStore::new(plan_path)));
 
     // Create SHARED NotificationDispatcher

@@ -103,6 +103,7 @@ pub struct AgentLoop {
     /// Conversation embedding handler for semantic memory (Phase 4.1)
     conversation_embedding_handler: Option<Arc<dyn tools::ConversationEmbeddingHandler>>,
     /// Plan executor for structured multi-step execution (Phase 2)
+    #[allow(dead_code)] // Will be used in Phase 4A execution flow
     plan_executor: Option<super::PlanExecutor>,
 }
 
@@ -417,11 +418,7 @@ impl AgentLoop {
         let todo_store = Arc::new(RwLock::new(tools::todo_store::TodoStore::new(todo_path)));
         let goal_path = config.goal_store_path();
         let goal_store = Some(Arc::new(RwLock::new(goal::GoalStore::new(goal_path))));
-        let plan_path = dirs::home_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join(".klyntbot")
-            .join("data")
-            .join("plans.jsonl");
+        let plan_path = config.plan_store_path();
         let plan_store = Some(Arc::new(RwLock::new(plan::PlanStore::new(plan_path))));
         Self::new_with_cron(bus, provider, config, None, todo_store, goal_store, plan_store, None).await
     }

@@ -943,3 +943,209 @@ async fn test_session_isolation() {
     let loaded_b = store.get(&plan_b.id).await.unwrap().unwrap();
     assert_ne!(loaded_a.session_key, loaded_b.session_key);
 }
+
+/// Test 23: Verify plan store path consistency (Critical Fix 3)
+/// Verifies: config.plan_store_path() returns ~/.klyntbot/data/plans.jsonl
+/// Bug: Config returned ~/.klyntbot/plans.jsonl while code used ~/.klyntbot/data/plans.jsonl
+/// Fix: Updated config method to include "data" subdirectory for consistency
+#[tokio::test]
+async fn test_plan_store_path_consistency() {
+    use config::Config;
+
+    // Load config (creates default if needed)
+    let config = Config::default();
+
+    // Verify the plan store path includes the "data" subdirectory
+    let plan_path = config.plan_store_path();
+    let path_str = plan_path.to_str().unwrap();
+
+    // Path should end with .klyntbot/data/plans.jsonl
+    assert!(
+        path_str.ends_with(".klyntbot/data/plans.jsonl"),
+        "Expected path to end with .klyntbot/data/plans.jsonl, got: {}",
+        path_str
+    );
+
+    // Path should NOT be the old incorrect path
+    assert!(
+        !path_str.ends_with(".klyntbot/plans.jsonl") || path_str.ends_with("data/plans.jsonl"),
+        "Path should not use the old .klyntbot/plans.jsonl format without 'data' subdirectory"
+    );
+}
+
+/// Test 24: Cross-channel isolation (fixes session key collision bug)
+/// Verifies: Telegram chat "123" and Discord chat "123" have isolated session keys
+/// Bug: Previously used ctx.chat_id alone, causing collisions across channels
+/// Fix: Use format!("{}:{}", ctx.channel, ctx.chat_id) for session keys
+#[tokio::test]
+async fn test_cross_channel_plan_isolation() {
+    use chrono::Utc;
+    use common::ChannelName;
+    use klyntbot::tools::{plan_tool::PlanHandler, plan_tool::PlanTool, RoutingContext, Tool};
+    use plan::{Plan, PlanStatus, PlanStore};
+    use std::sync::Arc;
+    use tempfile::TempDir;
+    use uuid::Uuid;
+
+    // Mock PlanHandler that records session keys
+    struct MockPlanHandler {
+        store: Arc<tokio::sync::Mutex<PlanStore>>,
+    }
+
+    #[async_trait::async_trait]
+    impl PlanHandler for MockPlanHandler {
+        async fn create_plan(
+            &self,
+            title: &str,
+            description: &str,
+            session_key: &str,
+            goal_id: Option<Uuid>,
+        ) -> common::Result<Plan> {
+            let now = Utc::now();
+            let plan = Plan {
+                id: Uuid::new_v4(),
+                session_key: session_key.to_string(),
+                goal_id,
+                title: title.to_string(),
+                description: description.to_string(),
+                status: PlanStatus::Draft,
+                steps: vec![],
+                current_step_index: 0,
+                iteration_limit: 50,
+                backtrack_history: vec![],
+                created_at: now,
+                updated_at: now,
+                completed_at: None,
+            };
+
+            let mut store = self.store.lock().await;
+            let saved = store.upsert(plan).await?;
+            Ok(saved)
+        }
+
+        async fn get_plan(&self, id: &Uuid) -> common::Result<Option<Plan>> {
+            let mut store = self.store.lock().await;
+            store.get(id).await
+        }
+
+        async fn get_active_plan(&self, session_key: &str) -> common::Result<Option<Plan>> {
+            let mut store = self.store.lock().await;
+            store.get_active_plan(session_key).await
+        }
+
+        async fn approve_plan(&self, id: &Uuid) -> common::Result<Plan> {
+            let mut store = self.store.lock().await;
+            let mut plan = store
+                .get(id)
+                .await?
+                .ok_or_else(|| common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(
+                    "Plan not found".into(),
+                )))?;
+            plan.status = PlanStatus::Approved;
+            store.upsert(plan.clone()).await?;
+            Ok(plan)
+        }
+
+        async fn abandon_plan(&self, id: &Uuid) -> common::Result<()> {
+            let mut store = self.store.lock().await;
+            let mut plan = store
+                .get(id)
+                .await?
+                .ok_or_else(|| common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(
+                    "Plan not found".into(),
+                )))?;
+            plan.status = PlanStatus::Abandoned;
+            store.upsert(plan).await?;
+            Ok(())
+        }
+
+        async fn get_step_context(&self, _id: &Uuid) -> common::Result<String> {
+            Ok("Mock step context".to_string())
+        }
+    }
+
+    // Setup
+    let temp_dir = TempDir::new().unwrap();
+    let store_path = temp_dir.path().join("plans.jsonl");
+    let store = PlanStore::new(store_path);
+    let handler = Arc::new(MockPlanHandler {
+        store: Arc::new(tokio::sync::Mutex::new(store)),
+    });
+
+    let plan_tool = PlanTool::new(Some(handler.clone()));
+
+    // Create plan in Telegram chat "123"
+    let telegram_ctx = RoutingContext::new(ChannelName::new("telegram"), "123".into());
+    let telegram_args = serde_json::json!({
+        "action": "create",
+        "title": "Telegram Plan",
+        "description": "Plan from Telegram"
+    });
+
+    let telegram_result = plan_tool
+        .execute(telegram_args, &telegram_ctx)
+        .await
+        .unwrap();
+    assert!(telegram_result.contains("Telegram Plan"));
+
+    // Create plan in Discord chat "123" (same chat_id, different channel)
+    let discord_ctx = RoutingContext::new(ChannelName::new("discord"), "123".into());
+    let discord_args = serde_json::json!({
+        "action": "create",
+        "title": "Discord Plan",
+        "description": "Plan from Discord"
+    });
+
+    let discord_result = plan_tool
+        .execute(discord_args, &discord_ctx)
+        .await
+        .unwrap();
+    assert!(discord_result.contains("Discord Plan"));
+
+    // Verify cross-channel isolation: each channel should have its own active plan
+    // Expected session keys: "telegram:123" and "discord:123" (NOT just "123")
+
+    // Get active plan for Telegram session
+    let telegram_active = handler
+        .get_active_plan("telegram:123")
+        .await
+        .unwrap();
+    assert!(
+        telegram_active.is_some(),
+        "Should have active plan for telegram:123"
+    );
+    assert_eq!(
+        telegram_active.as_ref().unwrap().title,
+        "Telegram Plan",
+        "Telegram session should have Telegram plan"
+    );
+    assert_eq!(
+        telegram_active.as_ref().unwrap().session_key,
+        "telegram:123",
+        "Session key should be 'telegram:123'"
+    );
+
+    // Get active plan for Discord session
+    let discord_active = handler.get_active_plan("discord:123").await.unwrap();
+    assert!(
+        discord_active.is_some(),
+        "Should have active plan for discord:123"
+    );
+    assert_eq!(
+        discord_active.as_ref().unwrap().title,
+        "Discord Plan",
+        "Discord session should have Discord plan"
+    );
+    assert_eq!(
+        discord_active.as_ref().unwrap().session_key,
+        "discord:123",
+        "Session key should be 'discord:123'"
+    );
+
+    // CRITICAL: Verify they're truly isolated (different plans)
+    assert_ne!(
+        telegram_active.unwrap().id,
+        discord_active.unwrap().id,
+        "Plans from different channels with same chat_id must be isolated"
+    );
+}
