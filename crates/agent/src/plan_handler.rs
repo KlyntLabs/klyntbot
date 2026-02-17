@@ -93,6 +93,9 @@ impl PlanHandler for PlanHandlerImpl {
             .await?
             .ok_or_else(|| PlanError::NotFound(id.to_string()))?;
 
+        // Validate state transition before changing status
+        PlanStatus::validate_transition(&plan.status, &PlanStatus::Abandoned)?;
+
         plan.status = PlanStatus::Abandoned;
         plan.updated_at = Utc::now();
 

@@ -1,6 +1,7 @@
 //! Plan types for structured multi-step execution.
 
 use chrono::{DateTime, Utc};
+use common::{error::PlanError, Result};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -32,6 +33,45 @@ pub enum PlanStatus {
     Completed,
     Failed,
     Abandoned,
+}
+
+impl PlanStatus {
+    /// Validate if a transition from one status to another is allowed.
+    ///
+    /// Valid transitions:
+    /// - Draft → Approved, Abandoned
+    /// - Approved → Executing, Abandoned
+    /// - Executing → Completed, Failed, Abandoned
+    /// - Completed → (final state, no transitions allowed)
+    /// - Failed → (final state, no transitions allowed)
+    /// - Abandoned → (final state, no transitions allowed)
+    pub fn validate_transition(from: &PlanStatus, to: &PlanStatus) -> Result<()> {
+        // Allow no-op transitions (same state)
+        if from == to {
+            return Ok(());
+        }
+
+        let valid = match from {
+            PlanStatus::Draft => matches!(to, PlanStatus::Approved | PlanStatus::Abandoned),
+            PlanStatus::Approved => matches!(to, PlanStatus::Executing | PlanStatus::Abandoned),
+            PlanStatus::Executing => matches!(
+                to,
+                PlanStatus::Completed | PlanStatus::Failed | PlanStatus::Abandoned
+            ),
+            // Final states - no transitions allowed
+            PlanStatus::Completed | PlanStatus::Failed | PlanStatus::Abandoned => false,
+        };
+
+        if valid {
+            Ok(())
+        } else {
+            Err(PlanError::InvalidState(format!(
+                "Invalid state transition: {:?} → {:?}",
+                from, to
+            ))
+            .into())
+        }
+    }
 }
 
 /// A single step in a plan
@@ -245,5 +285,124 @@ mod tests {
         assert_eq!(deserialized.backtrack_history[0].step_index, 0);
         assert_eq!(deserialized.current_step_index, 0);
         assert_eq!(deserialized.iteration_limit, 50);
+    }
+
+    #[test]
+    fn test_valid_status_transitions() {
+        // Test all valid transitions succeed
+        assert!(PlanStatus::validate_transition(&PlanStatus::Draft, &PlanStatus::Approved).is_ok());
+        assert!(
+            PlanStatus::validate_transition(&PlanStatus::Draft, &PlanStatus::Abandoned).is_ok()
+        );
+        assert!(
+            PlanStatus::validate_transition(&PlanStatus::Approved, &PlanStatus::Executing).is_ok()
+        );
+        assert!(
+            PlanStatus::validate_transition(&PlanStatus::Approved, &PlanStatus::Abandoned).is_ok()
+        );
+        assert!(
+            PlanStatus::validate_transition(&PlanStatus::Executing, &PlanStatus::Completed)
+                .is_ok()
+        );
+        assert!(
+            PlanStatus::validate_transition(&PlanStatus::Executing, &PlanStatus::Failed).is_ok()
+        );
+        assert!(
+            PlanStatus::validate_transition(&PlanStatus::Executing, &PlanStatus::Abandoned)
+                .is_ok()
+        );
+
+        // No-op transitions (same state) should succeed
+        assert!(
+            PlanStatus::validate_transition(&PlanStatus::Draft, &PlanStatus::Draft).is_ok()
+        );
+        assert!(
+            PlanStatus::validate_transition(&PlanStatus::Approved, &PlanStatus::Approved).is_ok()
+        );
+    }
+
+    #[test]
+    fn test_invalid_status_transitions_from_completed() {
+        // Cannot transition from Completed to any other state
+        assert!(
+            PlanStatus::validate_transition(&PlanStatus::Completed, &PlanStatus::Draft).is_err()
+        );
+        assert!(
+            PlanStatus::validate_transition(&PlanStatus::Completed, &PlanStatus::Approved)
+                .is_err()
+        );
+        assert!(
+            PlanStatus::validate_transition(&PlanStatus::Completed, &PlanStatus::Executing)
+                .is_err()
+        );
+        assert!(
+            PlanStatus::validate_transition(&PlanStatus::Completed, &PlanStatus::Failed).is_err()
+        );
+        assert!(
+            PlanStatus::validate_transition(&PlanStatus::Completed, &PlanStatus::Abandoned)
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn test_invalid_status_transitions_from_failed() {
+        // Cannot transition from Failed to any other state
+        assert!(PlanStatus::validate_transition(&PlanStatus::Failed, &PlanStatus::Draft).is_err());
+        assert!(
+            PlanStatus::validate_transition(&PlanStatus::Failed, &PlanStatus::Approved).is_err()
+        );
+        assert!(
+            PlanStatus::validate_transition(&PlanStatus::Failed, &PlanStatus::Executing).is_err()
+        );
+        assert!(
+            PlanStatus::validate_transition(&PlanStatus::Failed, &PlanStatus::Completed).is_err()
+        );
+        assert!(
+            PlanStatus::validate_transition(&PlanStatus::Failed, &PlanStatus::Abandoned).is_err()
+        );
+    }
+
+    #[test]
+    fn test_invalid_status_transitions_from_abandoned() {
+        // Cannot transition from Abandoned to any other state
+        assert!(
+            PlanStatus::validate_transition(&PlanStatus::Abandoned, &PlanStatus::Draft).is_err()
+        );
+        assert!(
+            PlanStatus::validate_transition(&PlanStatus::Abandoned, &PlanStatus::Approved)
+                .is_err()
+        );
+        assert!(
+            PlanStatus::validate_transition(&PlanStatus::Abandoned, &PlanStatus::Executing)
+                .is_err()
+        );
+        assert!(
+            PlanStatus::validate_transition(&PlanStatus::Abandoned, &PlanStatus::Completed)
+                .is_err()
+        );
+        assert!(
+            PlanStatus::validate_transition(&PlanStatus::Abandoned, &PlanStatus::Failed).is_err()
+        );
+    }
+
+    #[test]
+    fn test_invalid_status_transitions_skipping_states() {
+        // Cannot skip states in the normal flow
+        assert!(
+            PlanStatus::validate_transition(&PlanStatus::Draft, &PlanStatus::Executing).is_err()
+        );
+        assert!(
+            PlanStatus::validate_transition(&PlanStatus::Draft, &PlanStatus::Completed).is_err()
+        );
+        assert!(
+            PlanStatus::validate_transition(&PlanStatus::Draft, &PlanStatus::Failed).is_err()
+        );
+        assert!(
+            PlanStatus::validate_transition(&PlanStatus::Approved, &PlanStatus::Completed)
+                .is_err()
+        );
+        assert!(
+            PlanStatus::validate_transition(&PlanStatus::Approved, &PlanStatus::Failed).is_err()
+        );
     }
 }

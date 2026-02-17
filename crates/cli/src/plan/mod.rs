@@ -162,6 +162,9 @@ async fn handle_abandon(id: &str) -> Result<()> {
         .await?
         .ok_or_else(|| anyhow::anyhow!("Plan not found"))?;
 
+    // Validate state transition before changing status
+    PlanStatus::validate_transition(&plan.status, &PlanStatus::Abandoned)?;
+
     plan.status = PlanStatus::Abandoned;
     store.upsert(plan.clone()).await?;
 
