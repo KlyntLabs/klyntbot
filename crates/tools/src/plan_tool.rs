@@ -112,10 +112,11 @@ impl Tool for PlanTool {
                     .and_then(|v| v.as_str())
                     .and_then(|s| Uuid::parse_str(s).ok());
 
+                let default_session_key = format!("{}:{}", ctx.channel, ctx.chat_id);
                 let session_key = args
                     .get("session_key")
                     .and_then(|v| v.as_str())
-                    .unwrap_or(ctx.chat_id.as_str());
+                    .unwrap_or(&default_session_key);
 
                 let plan = handler
                     .create_plan(title, description, session_key, goal_id)
@@ -170,10 +171,11 @@ impl Tool for PlanTool {
             }
 
             "status" => {
+                let default_session_key = format!("{}:{}", ctx.channel, ctx.chat_id);
                 let session_key = args
                     .get("session_key")
                     .and_then(|v| v.as_str())
-                    .unwrap_or(ctx.chat_id.as_str());
+                    .unwrap_or(&default_session_key);
 
                 let plan = handler.get_active_plan(session_key).await?;
                 match plan {
