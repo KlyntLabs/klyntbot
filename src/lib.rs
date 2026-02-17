@@ -12,6 +12,7 @@ pub use common;
 pub use config;
 pub use goal;
 pub use heartbeat;
+pub use plan;
 pub use providers;
 pub use scheduling;
 pub use session;
@@ -31,6 +32,7 @@ pub use common::{
 };
 pub use config::Config;
 pub use heartbeat::HeartbeatService;
+pub use plan::{Plan, PlanStatus, PlanStore};
 pub use providers::{
     create_provider, DynProvider, LlmProvider, LlmResponse, Message, ProviderRegistry,
 };

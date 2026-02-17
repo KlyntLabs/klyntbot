@@ -195,7 +195,9 @@ impl PlanStore {
             .values()
             .filter(|p| {
                 p.session_key == session_key
-                    && (p.status == PlanStatus::Draft || p.status == PlanStatus::Approved)
+                    && (p.status == PlanStatus::Draft
+                        || p.status == PlanStatus::Approved
+                        || p.status == PlanStatus::Executing)
             })
             .collect();
 

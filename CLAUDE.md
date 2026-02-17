@@ -249,3 +249,4 @@ Built-in skills live in `skills/` as `SKILL.md` files (summarize, skill-creator,
 - **Config changes require restart**: Modifying `~/.klyntbot/config.json` requires restarting `klyntbot serve` for changes to take effect.
 - **Dependency inversion gotcha**: When adding new tools that need agent context (spawn/cron handlers), inject via `Arc<dyn Trait>` at construction to avoid circular deps.
 - **Calendar conflicts are informational**: Detected conflicts are logged to `calendar_conflicts.jsonl` but don't block sync. Review and resolve manually.
+- **Race condition warning**: Concurrent access (CLI + `serve` running simultaneously) can corrupt JSONL data files (`todos.jsonl`, `projects.jsonl`, `plans.jsonl`). Avoid running CLI commands while `klyntbot serve` is active, or ensure only one process accesses data files at a time. Future enhancement: file locking.
