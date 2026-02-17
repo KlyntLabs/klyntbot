@@ -49,6 +49,7 @@ impl MockProvider {
     }
 
     /// Get the number of times the provider was called
+    #[allow(dead_code)]
     pub fn call_count(&self) -> usize {
         *self.call_count.lock().unwrap()
     }

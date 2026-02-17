@@ -1,5 +1,8 @@
 //! Confidence evaluator: parse, assess, decide.
 
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::Arc;
+
 use chrono::Utc;
 use tracing::debug;
 
@@ -8,21 +11,30 @@ use super::types::{
 };
 
 /// Evaluates LLM confidence and decides whether to proceed, clarify, or skip.
+///
+/// The threshold is stored as `Arc<AtomicU32>` (f32 bits) so the background
+/// `LearningService` can update it without locks on the hot path.
 pub struct ConfidenceEvaluator {
-    threshold: f32,
+    threshold: Arc<AtomicU32>,
 }
 
 impl ConfidenceEvaluator {
     /// Create a new evaluator with the given threshold.
     pub fn new(threshold: f32) -> Self {
         Self {
-            threshold: threshold.clamp(0.0, 1.0),
+            threshold: Arc::new(AtomicU32::new(threshold.clamp(0.0, 1.0).to_bits())),
         }
     }
 
-    /// Get the configured threshold.
+    /// Get the current threshold (lock-free read).
     pub fn threshold(&self) -> f32 {
-        self.threshold
+        f32::from_bits(self.threshold.load(Ordering::SeqCst))
+    }
+
+    /// Get a handle to the atomic threshold for external updates
+    /// (used by `LearningService` to adjust the threshold).
+    pub fn threshold_handle(&self) -> Arc<AtomicU32> {
+        Arc::clone(&self.threshold)
     }
 
     /// Parse a `<confidence>` JSON block from LLM response content.
@@ -48,7 +60,7 @@ impl ConfidenceEvaluator {
         assessment.action = self.decide(&assessment);
         debug!(
             score = assessment.score,
-            threshold = self.threshold,
+            threshold = self.threshold(),
             "Parsed confidence assessment"
         );
         Some(assessment)
@@ -56,25 +68,26 @@ impl ConfidenceEvaluator {
 
     /// Decide action based on assessment score and threshold.
     pub fn decide(&self, assessment: &ConfidenceAssessment) -> DecisionAction {
-        if assessment.score >= self.threshold {
+        let threshold = self.threshold();
+        if assessment.score >= threshold {
             DecisionAction::Proceed
         } else {
             // Build clarification questions from low-scoring dimensions
             let mut questions = Vec::new();
 
-            if assessment.dimensions.intent_clarity < self.threshold {
+            if assessment.dimensions.intent_clarity < threshold {
                 questions.push(
                     "Could you clarify what you'd like me to do? I want to make sure I understand your intent correctly.".to_string(),
                 );
             }
 
-            if assessment.dimensions.info_sufficiency < self.threshold {
+            if assessment.dimensions.info_sufficiency < threshold {
                 questions.push(
                     "I may be missing some information needed to complete this. Could you provide more details?".to_string(),
                 );
             }
 
-            if assessment.dimensions.tool_fit < self.threshold {
+            if assessment.dimensions.tool_fit < threshold {
                 questions.push(
                     "I'm not fully confident this is the best approach. Would you like me to try a different method?".to_string(),
                 );
@@ -204,6 +217,33 @@ mod tests {
     fn test_threshold_getter_clamped() {
         let evaluator = ConfidenceEvaluator::new(1.5);
         assert!((evaluator.threshold() - 1.0).abs() < f32::EPSILON);
+    }
+
+    // ─── AtomicU32 threshold tests (Task #12) ────────────────────────────────
+
+    #[test]
+    fn test_atomic_threshold_is_readable() {
+        let evaluator = ConfidenceEvaluator::new(0.65);
+        assert!((evaluator.threshold() - 0.65).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn test_threshold_handle_allows_external_update() {
+        let evaluator = ConfidenceEvaluator::new(0.65);
+        let handle = evaluator.threshold_handle();
+        handle.store(0.72_f32.to_bits(), std::sync::atomic::Ordering::SeqCst);
+        assert!(
+            (evaluator.threshold() - 0.72).abs() < f32::EPSILON,
+            "evaluator must reflect the externally updated threshold"
+        );
+    }
+
+    #[test]
+    fn test_threshold_clamped_to_valid_range() {
+        let below = ConfidenceEvaluator::new(-0.5);
+        assert!((below.threshold() - 0.0).abs() < f32::EPSILON);
+        let above = ConfidenceEvaluator::new(1.5);
+        assert!((above.threshold() - 1.0).abs() < f32::EPSILON);
     }
 
     #[test]

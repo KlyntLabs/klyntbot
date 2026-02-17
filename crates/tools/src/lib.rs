@@ -10,6 +10,7 @@ pub mod embedding_engine;
 pub mod embedding_store;
 pub mod enrichment;
 pub mod goal_tool;
+pub mod learning_feedback;
 pub mod plan_response;
 pub mod plan_tool;
 pub mod filesystem;
@@ -45,6 +46,9 @@ pub use embedding_store::{EmbeddingRecord, EmbeddingStore};
 
 // Re-export enrichment types for use by agent crate
 pub use enrichment::{EnrichmentHandler, EnrichmentResult, EnrichmentSuggestion};
+
+// Re-export learning feedback types for use by agent crate
+pub use learning_feedback::{EnrichmentFeedbackEntry, EnrichmentFeedbackHandler};
 
 // Re-export goal types for use by agent crate
 pub use goal_tool::{GoalHandler, GoalTool};

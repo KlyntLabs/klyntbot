@@ -10,6 +10,6 @@ pub use loader::{
 };
 pub use schema::{
     AppleCalendarConfig, CalendarConfig, CalendarProviderConfig, Config, DiscordConfig,
-    EmailConfig, GenericCalDavConfig, GoogleCalendarConfig, QQConfig, Secret, SlackConfig,
-    TelegramConfig, TodoEnrichmentConfig, WhatsAppConfig,
+    EmailConfig, GenericCalDavConfig, GoogleCalendarConfig, LearningConfig, QQConfig, Secret,
+    SlackConfig, TelegramConfig, TodoEnrichmentConfig, WhatsAppConfig,
 };

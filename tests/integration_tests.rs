@@ -1253,7 +1253,7 @@ async fn test_plan_executor_execute_step_integration() {
     let plan_ctx = "Plan: Integration Test\nProgress: step 1/1";
 
     let result = executor
-        .execute_step(&step, plan_ctx, &provider, &registry, &ctx)
+        .execute_step(&step, plan_ctx, &provider, &registry, &ctx, None)
         .await
         .expect("execute_step should not return Err in integration test");
 

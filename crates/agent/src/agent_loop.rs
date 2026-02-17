@@ -108,6 +108,10 @@ pub struct AgentLoop {
     plan_store: Option<Arc<RwLock<plan::PlanStore>>>,
     /// Tracks if a plan is currently executing (affects iteration limit)
     plan_executing: Arc<std::sync::atomic::AtomicBool>,
+    /// Outcome recorder for the learning system (None if learning disabled)
+    outcome_recorder: Option<Arc<crate::learning::OutcomeRecorder>>,
+    /// Background learning service for adaptive threshold updates (None if learning disabled)
+    learning_service: Option<Arc<RwLock<crate::learning::LearningService>>>,
 }
 
 impl AgentLoop {
@@ -258,6 +262,25 @@ impl AgentLoop {
             );
         }
 
+        // Create outcome store + recorder early so TodoTool can report enrichment feedback.
+        // The full LearningService is wired later using the same store.
+        let outcome_store = if config.learning.enabled {
+            let store_path = config.learning_outcomes_path();
+            Some(Arc::new(RwLock::new(crate::learning::OutcomeStore::new(store_path))))
+        } else {
+            None
+        };
+        let outcome_recorder = outcome_store.as_ref().map(|store| {
+            Arc::new(crate::learning::OutcomeRecorder::new(Arc::clone(store)))
+        });
+
+        // Wire enrichment feedback into learning system
+        if let Some(ref recorder) = outcome_recorder {
+            todo_tool = todo_tool.with_feedback_handler(
+                Arc::clone(recorder) as Arc<dyn tools::EnrichmentFeedbackHandler>,
+            );
+        }
+
         // Create shared embedding engine (used by both todo and conversation embedding)
         let embedding_engine = Arc::new(tools::EmbeddingEngine::new());
 
@@ -389,6 +412,32 @@ impl AgentLoop {
         recurring_spawner.start();
         let recurring_task_spawner = Some(Arc::new(RwLock::new(recurring_spawner)));
 
+        // Initialize learning background service (reuses outcome_store + recorder created earlier)
+        let learning_service = if let Some(ref store) = outcome_store {
+            let state_path = config.learning_state_path();
+            let adaptive = Arc::new(RwLock::new(
+                crate::learning::adaptive::AdaptiveThresholds::load(
+                    state_path,
+                    config.confidence.threshold,
+                    config.learning.min_threshold,
+                    config.learning.max_threshold,
+                    config.learning.min_outcomes_for_adaptation,
+                )
+                .await,
+            ));
+            let threshold_handle = confidence_evaluator.as_ref().map(|e| e.threshold_handle());
+            let mut service = crate::learning::LearningService::new(
+                Arc::clone(store),
+                adaptive,
+                threshold_handle,
+                Duration::from_secs(config.learning.analysis_interval_secs),
+            );
+            service.start();
+            Some(Arc::new(RwLock::new(service)))
+        } else {
+            None
+        };
+
         // Take ownership of the inbound receiver
         let inbound_rx = bus
             .take_inbound_rx()
@@ -415,6 +464,8 @@ impl AgentLoop {
             plan_executor,
             plan_store: stored_plan_store,
             plan_executing: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            outcome_recorder,
+            learning_service,
         })
     }
 
@@ -500,6 +551,12 @@ impl AgentLoop {
         if let Some(spawner) = &self.recurring_task_spawner {
             let mut spawner_guard = spawner.write().await;
             spawner_guard.stop().await;
+        }
+
+        // Stop the learning background service
+        if let Some(service) = &self.learning_service {
+            let mut service_guard = service.write().await;
+            service_guard.stop().await;
         }
 
         Ok(())
@@ -603,6 +660,7 @@ impl AgentLoop {
             }
 
             // Execute the step
+            let step_start = Instant::now();
             let step_result = executor
                 .execute_step(
                     &plan.steps[step_idx],
@@ -610,8 +668,39 @@ impl AgentLoop {
                     &self.provider,
                     &self.tool_registry,
                     routing_ctx,
+                    self.confidence_evaluator.as_ref(),
                 )
                 .await;
+            let step_duration_ms = step_start.elapsed().as_millis() as u64;
+
+            // Record plan step outcome for the learning system (best-effort)
+            if let Some(recorder) = &self.outcome_recorder {
+                let step_description = plan.steps[step_idx].description.clone();
+                let (success, error_cat, step_confidence, recorded_tool_name) = match &step_result {
+                    Ok(r) => (
+                        r.success,
+                        None,
+                        r.confidence.as_ref(),
+                        r.tool_name.clone().unwrap_or_else(|| step_description.clone()),
+                    ),
+                    Err(_) => (false, Some("execution_error"), None, step_description.clone()),
+                };
+                let session_key = format!("{}:{}", routing_ctx.channel, routing_ctx.chat_id);
+                recorder
+                    .record_tool_outcome(
+                        &recorded_tool_name,
+                        success,
+                        error_cat,
+                        step_duration_ms,
+                        step_confidence,
+                        crate::learning::ExecutionMode::PlanStep {
+                            plan_id: plan_id.to_string(),
+                            step_index: step_idx,
+                        },
+                        &session_key,
+                    )
+                    .await;
+            }
 
             match step_result {
                 Ok(result) if result.success => {
@@ -1139,7 +1228,8 @@ impl AgentLoop {
         if !response.tool_calls.is_empty() {
             debug!("LLM requested {} tool calls", response.tool_calls.len());
 
-            // Evaluate confidence if enabled
+            // Evaluate confidence if enabled; capture for outcome recording
+            let mut last_confidence: Option<crate::confidence::ConfidenceAssessment> = None;
             if let Some(evaluator) = &self.confidence_evaluator {
                 let content = response.content.as_deref().unwrap_or("");
                 if let Some(assessment) = evaluator.parse_assessment(content) {
@@ -1194,7 +1284,7 @@ impl AgentLoop {
                                     self.confidence_evaluator
                                         .as_ref()
                                         .map(|e| e.threshold())
-                                        .unwrap_or(0.7),
+                                        .expect("confidence_evaluator must exist in Clarify branch"),
                                 ),
                                 assessment.reasoning,
                             );
@@ -1205,7 +1295,9 @@ impl AgentLoop {
                             debug!(reason = %reason, "Skipping tool calls");
                             return Ok(IterationOutcome::FinalContent(reason.clone()));
                         }
-                        DecisionAction::Proceed => {}
+                        DecisionAction::Proceed => {
+                            last_confidence = Some(assessment);
+                        }
                     }
                 }
             }
@@ -1248,13 +1340,33 @@ impl AgentLoop {
                                 })
                                 .await;
                         }
-                        (id, name, result)
+                        (id, name, result, duration_ms)
                     }
                 })
                 .collect();
 
             let results = join_all(tool_futures).await;
-            for (id, name, result) in results {
+            let outcome_session_key =
+                format!("{}:{}", routing_ctx.channel, routing_ctx.chat_id);
+            for (id, name, result, duration_ms) in results {
+                // Record outcome for learning system (best-effort, privacy-by-omission)
+                if let Some(recorder) = &self.outcome_recorder {
+                    let success = result.is_ok();
+                    let error_cat = result.as_ref().err().map(|e| {
+                        crate::learning::recorder::categorize_error(&e.to_string())
+                    });
+                    recorder
+                        .record_tool_outcome(
+                            &name,
+                            success,
+                            error_cat,
+                            duration_ms,
+                            last_confidence.as_ref(),
+                            crate::learning::ExecutionMode::Chat,
+                            &outcome_session_key,
+                        )
+                        .await;
+                }
                 let result_str = match result {
                     Ok(r) => r,
                     Err(e) => format!("Error: {}", e),
@@ -1362,7 +1474,8 @@ impl AgentLoop {
         if !tool_calls.is_empty() {
             debug!("LLM requested {} tool calls", tool_calls.len());
 
-            // Evaluate confidence if enabled
+            // Evaluate confidence if enabled; capture for outcome recording
+            let mut last_confidence: Option<crate::confidence::ConfidenceAssessment> = None;
             if let Some(evaluator) = &self.confidence_evaluator {
                 if let Some(assessment) = evaluator.parse_assessment(&accumulated_content) {
                     let action_str = match &assessment.action {
@@ -1411,7 +1524,7 @@ impl AgentLoop {
                                     self.confidence_evaluator
                                         .as_ref()
                                         .map(|e| e.threshold())
-                                        .unwrap_or(0.7),
+                                        .expect("confidence_evaluator must exist in Clarify branch"),
                                 ),
                                 assessment.reasoning,
                             );
@@ -1421,7 +1534,9 @@ impl AgentLoop {
                         DecisionAction::Skip { reason } => {
                             return Ok(IterationOutcome::FinalContent(reason.clone()));
                         }
-                        DecisionAction::Proceed => {}
+                        DecisionAction::Proceed => {
+                            last_confidence = Some(assessment);
+                        }
                     }
                 }
             }
@@ -1463,13 +1578,33 @@ impl AgentLoop {
                                 })
                                 .await;
                         }
-                        (id, name, result)
+                        (id, name, result, duration_ms)
                     }
                 })
                 .collect();
 
             let results = join_all(tool_futures).await;
-            for (id, name, result) in results {
+            let outcome_session_key =
+                format!("{}:{}", routing_ctx.channel, routing_ctx.chat_id);
+            for (id, name, result, duration_ms) in results {
+                // Record outcome for learning system (best-effort, privacy-by-omission)
+                if let Some(recorder) = &self.outcome_recorder {
+                    let success = result.is_ok();
+                    let error_cat = result.as_ref().err().map(|e| {
+                        crate::learning::recorder::categorize_error(&e.to_string())
+                    });
+                    recorder
+                        .record_tool_outcome(
+                            &name,
+                            success,
+                            error_cat,
+                            duration_ms,
+                            last_confidence.as_ref(),
+                            crate::learning::ExecutionMode::Chat,
+                            &outcome_session_key,
+                        )
+                        .await;
+                }
                 let result_str = match result {
                     Ok(r) => r,
                     Err(e) => format!("Error: {}", e),

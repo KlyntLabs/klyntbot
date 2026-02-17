@@ -25,6 +25,11 @@ pub struct StepExecutionResult {
     pub output: String,
     /// Reason for failure if success is false
     pub failure_reason: Option<String>,
+    /// Confidence assessment from the LLM response, if available
+    pub confidence: Option<crate::confidence::ConfidenceAssessment>,
+    /// The actual tool name executed (first tool call), for outcome recording.
+    /// None when the step completed via LLM text response (no tool calls).
+    pub tool_name: Option<String>,
 }
 
 /// PlanExecutor handles step-by-step plan execution with backtracking.
@@ -66,6 +71,7 @@ impl PlanExecutor {
         provider: &DynProvider,
         tool_registry: &Arc<RwLock<ToolRegistry>>,
         routing_ctx: &RoutingContext,
+        confidence_evaluator: Option<&crate::confidence::ConfidenceEvaluator>,
     ) -> Result<StepExecutionResult> {
         // 1. Build prompt from plan context + step details
         let expected = if step.expected_tools.is_empty() {
@@ -101,8 +107,14 @@ impl PlanExecutor {
         };
         let response = provider.chat(&messages, tool_slice, &params).await?;
 
+        // Parse confidence assessment from LLM response content (best-effort)
+        let confidence = confidence_evaluator
+            .and_then(|ev| ev.parse_assessment(response.content.as_deref().unwrap_or("")));
+
         // 4. If the LLM returned tool calls, execute each one via the registry
         if !response.tool_calls.is_empty() {
+            // Capture the first tool name for outcome recording
+            let first_tool_name = response.tool_calls[0].name.clone();
             let mut results = Vec::new();
             for tool_call in &response.tool_calls {
                 // Clone the Arc<dyn Tool> out while holding the lock, then
@@ -123,6 +135,8 @@ impl PlanExecutor {
                                         "Tool '{}' execution failed: {e}",
                                         tool_call.name
                                     )),
+                                    confidence,
+                                    tool_name: Some(first_tool_name),
                                 });
                             }
                         }
@@ -135,6 +149,8 @@ impl PlanExecutor {
                                 "Tool '{}' not found in registry",
                                 tool_call.name
                             )),
+                            confidence,
+                            tool_name: Some(first_tool_name),
                         });
                     }
                 }
@@ -143,6 +159,8 @@ impl PlanExecutor {
                 success: true,
                 output: results.join("\n"),
                 failure_reason: None,
+                confidence,
+                tool_name: Some(first_tool_name),
             });
         }
 
@@ -154,6 +172,8 @@ impl PlanExecutor {
             success: true,
             output,
             failure_reason: None,
+            confidence,
+            tool_name: None,
         })
     }
 
@@ -499,6 +519,8 @@ mod tests {
             success: true,
             output: "Step completed with output".to_string(),
             failure_reason: None,
+            confidence: None,
+            tool_name: Some("echo_tool".to_string()),
         };
         assert!(success_result.success);
         assert_eq!(success_result.output, "Step completed with output");
@@ -508,6 +530,8 @@ mod tests {
             success: false,
             output: String::new(),
             failure_reason: Some("Tool execution failed".to_string()),
+            confidence: None,
+            tool_name: None,
         };
         assert!(!failure_result.success);
         assert!(failure_result.failure_reason.is_some());
@@ -727,7 +751,7 @@ mod tests {
         let ctx = RoutingContext::new("cli".into(), "test".into());
 
         let res = executor
-            .execute_step(&step, "plan ctx", &provider, &reg_with_echo(), &ctx)
+            .execute_step(&step, "plan ctx", &provider, &reg_with_echo(), &ctx, None)
             .await
             .expect("execute_step should not return Err");
 
@@ -748,7 +772,7 @@ mod tests {
         let ctx = RoutingContext::new("cli".into(), "test".into());
 
         let res = executor
-            .execute_step(&step, "plan ctx", &provider, &empty_reg, &ctx)
+            .execute_step(&step, "plan ctx", &provider, &empty_reg, &ctx, None)
             .await
             .expect("should not Err");
 
@@ -768,7 +792,7 @@ mod tests {
         let ctx = RoutingContext::new("cli".into(), "test".into());
 
         let res = executor
-            .execute_step(&step, "plan ctx", &provider, &empty_reg, &ctx)
+            .execute_step(&step, "plan ctx", &provider, &empty_reg, &ctx, None)
             .await
             .expect("execute_step must return Ok even on tool-not-found");
 
@@ -792,7 +816,7 @@ mod tests {
         let empty_reg = Arc::new(RwLock::new(ToolRegistry::new()));
 
         let res = executor
-            .execute_step(&step, "ctx", &provider, &empty_reg, &ctx)
+            .execute_step(&step, "ctx", &provider, &empty_reg, &ctx, None)
             .await
             .expect("should not Err");
 

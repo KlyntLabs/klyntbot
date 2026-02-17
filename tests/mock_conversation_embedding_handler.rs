@@ -180,7 +180,7 @@ impl ConversationEmbeddingHandler for MockConversationEmbeddingHandler {
                 model: "mock-model".to_string(),
                 embedded_at: Utc::now(),
             };
-            let mut store = store.write().await;
+            let store = store.write().await;
             store.upsert(record).await?;
         }
 
@@ -205,7 +205,7 @@ impl ConversationEmbeddingHandler for MockConversationEmbeddingHandler {
 
         // If we have a store, search it
         if let Some(ref store) = self.store {
-            let mut store = store.write().await;
+            let store = store.write().await;
             let query_embedding = Self::deterministic_embedding(query);
             let all_records = store.get_all().await?;
 
@@ -258,7 +258,7 @@ impl ConversationEmbeddingHandler for MockConversationEmbeddingHandler {
 
     async fn purge(&self, filter: PurgeFilter) -> Result<usize> {
         if let Some(ref store) = self.store {
-            let mut store = store.write().await;
+            let store = store.write().await;
             store.purge(filter).await
         } else {
             // No store: just clear in-memory embeddings
@@ -270,7 +270,7 @@ impl ConversationEmbeddingHandler for MockConversationEmbeddingHandler {
 
     async fn status(&self) -> Result<ConversationEmbeddingStatus> {
         if let Some(ref store) = self.store {
-            let mut store = store.write().await;
+            let store = store.write().await;
             store.status().await
         } else {
             Ok(ConversationEmbeddingStatus {

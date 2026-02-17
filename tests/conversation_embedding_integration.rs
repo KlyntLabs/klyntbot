@@ -109,7 +109,7 @@ async fn test_tc1_user_assistant_messages_embedded_on_save() {
     assert_eq!(calls[1].message_id, assistant_msg_id);
 
     // Verify 2 embeddings in store
-    let mut store_guard = store.write().await;
+    let store_guard = store.write().await;
 
     // Check user record
     let user_record = store_guard.get(&user_msg_id).await.unwrap();
@@ -321,7 +321,7 @@ async fn test_tc7_embedding_failure_non_blocking() {
     assert_eq!(session.messages[0].content, "Test message");
 
     // Verify embedding was NOT stored (failure was silent)
-    let mut store_guard = store.write().await;
+    let store_guard = store.write().await;
     let embedding_record = store_guard.get(&user_msg_id).await.unwrap();
     assert!(embedding_record.is_none(), "Embedding should NOT be in store when handler unavailable");
 
@@ -370,7 +370,7 @@ async fn test_tc8_corrupted_store_recovery() {
 
     // Load store — should skip corrupted line with warning
     // Store uses lazy loading, so we trigger it by calling a public method
-    let mut store = ConversationEmbeddingStore::new(emb_path);
+    let store = ConversationEmbeddingStore::new(emb_path);
 
     // Trigger lazy load by accessing data (ensure_loaded() is called internally)
     let msg1_result = store.get("msg1").await;
@@ -426,7 +426,7 @@ async fn test_role_prefix_included_in_embedding() {
     let expected_text = "user: Test message";
     let expected_embedding = MockConversationEmbeddingHandler::deterministic_embedding(expected_text);
 
-    let mut store_write = store.write().await;
+    let store_write = store.write().await;
     let record = store_write.get("msg1").await.unwrap().unwrap();
 
     // Verify embedding matches expected (with role prefix)
@@ -447,7 +447,7 @@ async fn test_metadata_fields_populated() {
         .await
         .unwrap();
 
-    let mut store_write = store.write().await;
+    let store_write = store.write().await;
     let record = store_write.get("msg1").await.unwrap().unwrap();
 
     assert_eq!(record.id, "msg1");

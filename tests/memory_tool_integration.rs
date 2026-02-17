@@ -589,7 +589,7 @@ async fn test_ec15_hybrid_zero_keyword() {
 async fn test_ec16_hybrid_zero_semantic() {
     let temp_dir = TempDir::new().unwrap();
     let emb_path = temp_dir.path().join("conversation_embeddings.jsonl");
-    let store = Arc::new(RwLock::new(ConversationEmbeddingStore::new(emb_path)));
+    let _store = Arc::new(RwLock::new(ConversationEmbeddingStore::new(emb_path)));
     let handler = Arc::new(MockConversationEmbeddingHandler::unavailable());
 
     let tool = MemoryTool::new()

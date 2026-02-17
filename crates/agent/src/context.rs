@@ -44,6 +44,8 @@ pub struct ContextBuilder {
     cached_memory: Option<CachedContext>,
     cached_todo: Option<CachedContext>,
     todo_store: Option<std::sync::Arc<tokio::sync::RwLock<tools::todo_store::TodoStore>>>,
+    /// Current adaptive confidence threshold — updated by LearningService.
+    confidence_threshold: f32,
 }
 
 impl ContextBuilder {
@@ -62,7 +64,14 @@ impl ContextBuilder {
             cached_memory: None,
             cached_todo: None,
             todo_store,
+            confidence_threshold: 0.7,
         }
+    }
+
+    /// Update the confidence threshold used in generated system prompts.
+    /// Called by `AgentLoop` when `LearningService` adjusts the threshold.
+    pub fn set_confidence_threshold(&mut self, threshold: f32) {
+        self.confidence_threshold = threshold;
     }
 
     /// Initialize skills
@@ -235,8 +244,10 @@ impl ContextBuilder {
             sections.push(todo_context);
         }
 
-        // Confidence evaluation instructions (internal)
-        sections.push(super::confidence::prompt::CONFIDENCE_PROMPT.to_string());
+        // Confidence evaluation instructions (internal, uses current adaptive threshold)
+        sections.push(super::confidence::prompt::confidence_prompt(
+            self.confidence_threshold,
+        ));
 
         // Skills (relatively stable)
         let skills_summary = self.skills.generate_summary();

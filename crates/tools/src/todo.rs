@@ -37,6 +37,8 @@ pub struct TodoTool {
     /// RRF k parameter for hybrid search (from config)
     rrf_k: u32,
     timezone: String,
+    /// Learning feedback handler for reporting enrichment outcomes
+    feedback_handler: Option<Arc<dyn crate::EnrichmentFeedbackHandler>>,
 }
 
 impl TodoTool {
@@ -58,6 +60,7 @@ impl TodoTool {
             semantic_threshold: 0.5,
             rrf_k: 60,
             timezone,
+            feedback_handler: None,
         }
     }
 
@@ -70,6 +73,12 @@ impl TodoTool {
     /// Add enrichment handler for AI-powered task suggestions
     pub fn with_enrichment_handler(mut self, handler: Arc<dyn EnrichmentHandler>) -> Self {
         self.enrichment_handler = Some(handler);
+        self
+    }
+
+    /// Add learning feedback handler for reporting enrichment outcomes
+    pub fn with_feedback_handler(mut self, handler: Arc<dyn crate::EnrichmentFeedbackHandler>) -> Self {
+        self.feedback_handler = Some(handler);
         self
     }
 
@@ -425,6 +434,48 @@ impl Tool for TodoTool {
                                 }
                                 drop(store);
                             }
+
+                            // Record enrichment feedback for the learning system
+                            if let Some(fb) = &self.feedback_handler {
+                                let now = chrono::Utc::now();
+                                let task_id = created.id.clone();
+                                if let Some(ref s) = suggestions.priority {
+                                    let accepted = s.confidence >= 0.7;
+                                    let _ = fb.record_feedback(crate::EnrichmentFeedbackEntry {
+                                        task_id: task_id.clone(),
+                                        field: "priority".to_string(),
+                                        suggested_value: s.value.to_string(),
+                                        actual_value: None,
+                                        accepted,
+                                        confidence: s.confidence,
+                                        timestamp: now,
+                                    }).await;
+                                }
+                                if let Some(ref s) = suggestions.estimated_minutes {
+                                    let accepted = s.confidence >= 0.7;
+                                    let _ = fb.record_feedback(crate::EnrichmentFeedbackEntry {
+                                        task_id: task_id.clone(),
+                                        field: "estimated_minutes".to_string(),
+                                        suggested_value: s.value.to_string(),
+                                        actual_value: None,
+                                        accepted,
+                                        confidence: s.confidence,
+                                        timestamp: now,
+                                    }).await;
+                                }
+                                if let Some(ref s) = suggestions.due_date {
+                                    let accepted = s.confidence >= 0.7;
+                                    let _ = fb.record_feedback(crate::EnrichmentFeedbackEntry {
+                                        task_id: task_id.clone(),
+                                        field: "due_date".to_string(),
+                                        suggested_value: s.value.to_string(),
+                                        actual_value: None,
+                                        accepted,
+                                        confidence: s.confidence,
+                                        timestamp: now,
+                                    }).await;
+                                }
+                            }
                         }
                         Ok(None) => {
                             // Enrichment disabled or nothing to suggest
@@ -738,6 +789,44 @@ impl Tool for TodoTool {
                         let mut store = self.store.write().await;
                         store.update(id, patch).await?;
                         drop(store);
+
+                        // Record enrichment feedback (manual enrich always accepted)
+                        if let Some(fb) = &self.feedback_handler {
+                            let now = chrono::Utc::now();
+                            if let Some(ref s) = result.priority {
+                                let _ = fb.record_feedback(crate::EnrichmentFeedbackEntry {
+                                    task_id: id.to_string(),
+                                    field: "priority".to_string(),
+                                    suggested_value: s.value.to_string(),
+                                    actual_value: None,
+                                    accepted: true,
+                                    confidence: s.confidence,
+                                    timestamp: now,
+                                }).await;
+                            }
+                            if let Some(ref s) = result.estimated_minutes {
+                                let _ = fb.record_feedback(crate::EnrichmentFeedbackEntry {
+                                    task_id: id.to_string(),
+                                    field: "estimated_minutes".to_string(),
+                                    suggested_value: s.value.to_string(),
+                                    actual_value: None,
+                                    accepted: true,
+                                    confidence: s.confidence,
+                                    timestamp: now,
+                                }).await;
+                            }
+                            if let Some(ref s) = result.due_date {
+                                let _ = fb.record_feedback(crate::EnrichmentFeedbackEntry {
+                                    task_id: id.to_string(),
+                                    field: "due_date".to_string(),
+                                    suggested_value: s.value.to_string(),
+                                    actual_value: None,
+                                    accepted: true,
+                                    confidence: s.confidence,
+                                    timestamp: now,
+                                }).await;
+                            }
+                        }
 
                         // Trigger calendar sync
                         self.trigger_sync_async().await;
