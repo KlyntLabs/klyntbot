@@ -27,6 +27,8 @@ pub trait PlanHandler: Send + Sync {
     async fn approve_plan(&self, id: &Uuid) -> Result<Plan>;
     async fn abandon_plan(&self, id: &Uuid) -> Result<()>;
     async fn get_step_context(&self, id: &Uuid) -> Result<String>;
+    /// Trigger execution of an approved plan. Returns the plan in Executing state.
+    async fn execute_plan(&self, id: &Uuid) -> Result<Plan>;
 }
 
 /// PlanTool — Tool interface for multi-step plan management.
@@ -56,7 +58,7 @@ impl Tool for PlanTool {
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": ["create", "show", "approve", "abandon", "status"],
+                    "enum": ["create", "show", "approve", "abandon", "status", "execute"],
                     "description": "The plan action to perform"
                 },
                 "title": {
@@ -187,6 +189,15 @@ impl Tool for PlanTool {
                 }
             }
 
+            "execute" => {
+                let plan_id = parse_plan_id(&args)?;
+                let plan = handler.execute_plan(&plan_id).await?;
+                Ok(format!(
+                    "Executing plan '{}' (id: {}, status: {:?})",
+                    plan.title, plan.id, plan.status
+                ))
+            }
+
             other => Err(ToolError::InvalidParams(format!("Unknown action: {}", other)).into()),
         }
     }
@@ -228,6 +239,7 @@ mod tests {
         assert!(action_enum.contains(&serde_json::json!("approve")));
         assert!(action_enum.contains(&serde_json::json!("abandon")));
         assert!(action_enum.contains(&serde_json::json!("status")));
+        assert!(action_enum.contains(&serde_json::json!("execute")));
     }
 
     #[tokio::test]

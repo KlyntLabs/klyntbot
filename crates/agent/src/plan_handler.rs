@@ -145,6 +145,22 @@ impl PlanHandler for PlanHandlerImpl {
         }
         Ok(ctx)
     }
+
+    async fn execute_plan(&self, id: &Uuid) -> Result<Plan> {
+        let mut store = self.store.write().await;
+        let mut plan = store
+            .get(id)
+            .await?
+            .ok_or_else(|| PlanError::NotFound(id.to_string()))?;
+
+        // Validate transition: only Approved → Executing is allowed here
+        PlanStatus::validate_transition(&plan.status, &PlanStatus::Executing)?;
+
+        plan.status = PlanStatus::Executing;
+        plan.updated_at = Utc::now();
+
+        store.upsert(plan).await
+    }
 }
 
 #[cfg(test)]

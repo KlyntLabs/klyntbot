@@ -571,6 +571,8 @@ impl AgentLoop {
         // Execute steps sequentially
         let mut step_idx = plan.current_step_index;
         let step_count = plan.steps.len();
+        // Tracks how many full plan regenerations have occurred (distinct from per-step retries)
+        let mut backtrack_count: usize = 0;
 
         let result = loop {
             if step_idx >= step_count {
@@ -650,25 +652,67 @@ impl AgentLoop {
                         timestamp: Utc::now(),
                     });
 
-                    if attempt >= max_attempts {
-                        // Max attempts exceeded — fail the plan
+                    if attempt < max_attempts {
+                        // Exponential backoff before retry: 2^(attempt-1) seconds
+                        let backoff_secs = 2u64.pow((attempt as u32).saturating_sub(1));
+                        debug!(
+                            "Retrying step {} in {}s (attempt {}/{})",
+                            step_idx + 1,
+                            backoff_secs,
+                            attempt + 1,
+                            max_attempts
+                        );
+                        tokio::time::sleep(tokio::time::Duration::from_secs(backoff_secs)).await;
+
+                        // Persist state before retry
+                        plan.updated_at = Utc::now();
+                        let mut store = store_arc.write().await;
+                        store.upsert(plan.clone()).await?;
+                    } else {
+                        // Max per-step attempts exhausted — check backtrack limit
+                        backtrack_count += 1;
+                        if backtrack_count >= super::plan_executor::MAX_BACKTRACK_ATTEMPTS {
+                            // Backtrack limit reached — fail the plan
+                            plan.steps[step_idx].status = StepStatus::Failed;
+                            plan.updated_at = Utc::now();
+                            {
+                                let mut store = store_arc.write().await;
+                                store.upsert(plan.clone()).await?;
+                            }
+                            break Err(common::KlyntbotError::Plan(
+                                common::PlanError::BacktrackLimitReached(
+                                    super::plan_executor::MAX_BACKTRACK_ATTEMPTS,
+                                ),
+                            ));
+                        }
+
+                        // Regenerate steps from this failure point forward
+                        warn!(
+                            "Regenerating steps from index {} after {} attempts (backtrack {}/{})",
+                            step_idx,
+                            attempt,
+                            backtrack_count,
+                            super::plan_executor::MAX_BACKTRACK_ATTEMPTS
+                        );
                         plan.steps[step_idx].status = StepStatus::Failed;
+                        let new_steps = executor
+                            .regenerate_from(&plan, step_idx, &failure_reason, &self.provider)
+                            .await?;
+
+                        // Replace steps from step_idx forward with new steps
+                        plan.steps.truncate(step_idx);
+                        plan.steps.extend(new_steps);
                         plan.updated_at = Utc::now();
                         {
                             let mut store = store_arc.write().await;
                             store.upsert(plan.clone()).await?;
                         }
-                        break Ok(format!(
-                            "Plan '{}' failed at step {}: {} (max attempts exceeded)",
-                            plan.title,
-                            step_idx + 1,
-                            failure_reason
-                        ));
-                    } else {
-                        // Retry: persist state and continue loop
-                        plan.updated_at = Utc::now();
-                        let mut store = store_arc.write().await;
-                        store.upsert(plan.clone()).await?;
+                        // step_idx stays the same — now points to first regenerated step
+                        info!(
+                            "Regenerated {} steps from index {}",
+                            plan.steps.len() - step_idx,
+                            step_idx
+                        );
                     }
                 }
                 Err(e) => {

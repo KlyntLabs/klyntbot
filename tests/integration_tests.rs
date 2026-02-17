@@ -1062,6 +1062,19 @@ async fn test_cross_channel_plan_isolation() {
         async fn get_step_context(&self, _id: &Uuid) -> common::Result<String> {
             Ok("Mock step context".to_string())
         }
+
+        async fn execute_plan(&self, id: &Uuid) -> common::Result<Plan> {
+            let mut store = self.store.lock().await;
+            let mut plan = store
+                .get(id)
+                .await?
+                .ok_or_else(|| common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(
+                    "Plan not found".into(),
+                )))?;
+            plan.status = PlanStatus::Executing;
+            store.upsert(plan.clone()).await?;
+            Ok(plan)
+        }
     }
 
     // Setup
