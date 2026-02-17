@@ -77,7 +77,10 @@ impl TodoTool {
     }
 
     /// Add learning feedback handler for reporting enrichment outcomes
-    pub fn with_feedback_handler(mut self, handler: Arc<dyn crate::EnrichmentFeedbackHandler>) -> Self {
+    pub fn with_feedback_handler(
+        mut self,
+        handler: Arc<dyn crate::EnrichmentFeedbackHandler>,
+    ) -> Self {
         self.feedback_handler = Some(handler);
         self
     }
@@ -133,7 +136,10 @@ impl TodoTool {
     /// **Rationale**: Exponential tiers (10/5/3/1 instead of linear 4/3/2/1) ensure
     /// that urgency dominates the score for time-sensitive work, preventing low-priority
     /// but overdue tasks from being ignored.
-    fn calculate_urgency(due_date: Option<chrono::DateTime<chrono::Utc>>, now: chrono::DateTime<chrono::Utc>) -> u32 {
+    fn calculate_urgency(
+        due_date: Option<chrono::DateTime<chrono::Utc>>,
+        now: chrono::DateTime<chrono::Utc>,
+    ) -> u32 {
         match due_date {
             None => 1, // No due date → future tier
             Some(due) => {
@@ -186,7 +192,10 @@ impl TodoTool {
     ///
     /// **Edge case**: If `created_at` is in the future (clock skew, bad data), age
     /// is clamped to 0 to prevent negative scores.
-    fn calculate_age_days(created_at: chrono::DateTime<chrono::Utc>, now: chrono::DateTime<chrono::Utc>) -> f64 {
+    fn calculate_age_days(
+        created_at: chrono::DateTime<chrono::Utc>,
+        now: chrono::DateTime<chrono::Utc>,
+    ) -> f64 {
         let duration = now.signed_duration_since(created_at);
         (duration.num_seconds().max(0) as f64) / 86400.0 // Clamp negative to 0
     }
@@ -212,7 +221,6 @@ impl TodoTool {
 
         (urgency * priority_wt) + (age_days * 0.1)
     }
-
 }
 
 #[async_trait]
@@ -441,39 +449,45 @@ impl Tool for TodoTool {
                                 let task_id = created.id.clone();
                                 if let Some(ref s) = suggestions.priority {
                                     let accepted = s.confidence >= 0.7;
-                                    let _ = fb.record_feedback(crate::EnrichmentFeedbackEntry {
-                                        task_id: task_id.clone(),
-                                        field: "priority".to_string(),
-                                        suggested_value: s.value.to_string(),
-                                        actual_value: None,
-                                        accepted,
-                                        confidence: s.confidence,
-                                        timestamp: now,
-                                    }).await;
+                                    let _ = fb
+                                        .record_feedback(crate::EnrichmentFeedbackEntry {
+                                            task_id: task_id.clone(),
+                                            field: "priority".to_string(),
+                                            suggested_value: s.value.to_string(),
+                                            actual_value: None,
+                                            accepted,
+                                            confidence: s.confidence,
+                                            timestamp: now,
+                                        })
+                                        .await;
                                 }
                                 if let Some(ref s) = suggestions.estimated_minutes {
                                     let accepted = s.confidence >= 0.7;
-                                    let _ = fb.record_feedback(crate::EnrichmentFeedbackEntry {
-                                        task_id: task_id.clone(),
-                                        field: "estimated_minutes".to_string(),
-                                        suggested_value: s.value.to_string(),
-                                        actual_value: None,
-                                        accepted,
-                                        confidence: s.confidence,
-                                        timestamp: now,
-                                    }).await;
+                                    let _ = fb
+                                        .record_feedback(crate::EnrichmentFeedbackEntry {
+                                            task_id: task_id.clone(),
+                                            field: "estimated_minutes".to_string(),
+                                            suggested_value: s.value.to_string(),
+                                            actual_value: None,
+                                            accepted,
+                                            confidence: s.confidence,
+                                            timestamp: now,
+                                        })
+                                        .await;
                                 }
                                 if let Some(ref s) = suggestions.due_date {
                                     let accepted = s.confidence >= 0.7;
-                                    let _ = fb.record_feedback(crate::EnrichmentFeedbackEntry {
-                                        task_id: task_id.clone(),
-                                        field: "due_date".to_string(),
-                                        suggested_value: s.value.to_string(),
-                                        actual_value: None,
-                                        accepted,
-                                        confidence: s.confidence,
-                                        timestamp: now,
-                                    }).await;
+                                    let _ = fb
+                                        .record_feedback(crate::EnrichmentFeedbackEntry {
+                                            task_id: task_id.clone(),
+                                            field: "due_date".to_string(),
+                                            suggested_value: s.value.to_string(),
+                                            actual_value: None,
+                                            accepted,
+                                            confidence: s.confidence,
+                                            timestamp: now,
+                                        })
+                                        .await;
                                 }
                             }
                         }
@@ -1453,8 +1467,15 @@ impl Tool for TodoTool {
                     .collect();
 
                 // Build ID-to-Todo map for RRF lookups
-                let todos_by_id: HashMap<String, crate::search_utils::SearchResult> =
-                    all_todos.into_iter().map(|t| (t.id.clone(), crate::search_utils::SearchResult::Todo(Box::new(t)))).collect();
+                let todos_by_id: HashMap<String, crate::search_utils::SearchResult> = all_todos
+                    .into_iter()
+                    .map(|t| {
+                        (
+                            t.id.clone(),
+                            crate::search_utils::SearchResult::Todo(Box::new(t)),
+                        )
+                    })
+                    .collect();
 
                 drop(store); // Release lock before embedding operations
 
@@ -1489,10 +1510,11 @@ impl Tool for TodoTool {
 
                 // 3. Merge via Reciprocal Rank Fusion (using generic search_utils)
                 let keyword_count = keyword_results.len(); // Save for logging
-                let keyword_search_results: Vec<crate::search_utils::SearchResult> = keyword_results
-                    .into_iter()
-                    .map(|t| crate::search_utils::SearchResult::Todo(Box::new(t)))
-                    .collect();
+                let keyword_search_results: Vec<crate::search_utils::SearchResult> =
+                    keyword_results
+                        .into_iter()
+                        .map(|t| crate::search_utils::SearchResult::Todo(Box::new(t)))
+                        .collect();
 
                 let merged = crate::search_utils::rrf_merge(
                     &keyword_search_results,
@@ -1907,7 +1929,10 @@ impl Tool for TodoTool {
                 // Format the plan output
                 let mut output = format!("Daily plan ({} tasks):\n\n", plan.len());
                 for (i, (task, score)) in plan.iter().enumerate() {
-                    let priority_label = task.priority.map(|p| format!("P{}", p)).unwrap_or_else(|| "P3".to_string());
+                    let priority_label = task
+                        .priority
+                        .map(|p| format!("P{}", p))
+                        .unwrap_or_else(|| "P3".to_string());
 
                     let due_context = if let Some(due) = task.due_date {
                         let due_date = due.date_naive();
@@ -3504,7 +3529,10 @@ mod tests {
     #[test]
     fn test_priority_weight_none_returns_3() {
         let weight = TodoTool::priority_weight(None);
-        assert_eq!(weight, 3, "Tasks with no priority should get default weight=3");
+        assert_eq!(
+            weight, 3,
+            "Tasks with no priority should get default weight=3"
+        );
     }
 
     /// Test full scoring formula: (urgency × priority_weight) + (age_days × 0.1)
@@ -3516,15 +3544,19 @@ mod tests {
         let mut task = Todo::default_instance();
         task.id = "test-1".to_string();
         task.title = "Overdue P1 task".to_string();
-        task.priority = Some(1);                      // P1 → weight=5
+        task.priority = Some(1); // P1 → weight=5
         task.due_date = Some(now - Duration::days(2)); // Overdue → urgency=10
-        task.created_at = now - Duration::days(5);    // Age=5 days
+        task.created_at = now - Duration::days(5); // Age=5 days
         task.status = TodoStatus::Todo;
 
         let score = TodoTool::calculate_score(&task, now);
 
         // Expected: (10 × 5) + (5 × 0.1) = 50.5
-        assert!((score - 50.5).abs() < 0.01, "Score should be ~50.5, got {}", score);
+        assert!(
+            (score - 50.5).abs() < 0.01,
+            "Score should be ~50.5, got {}",
+            score
+        );
     }
 
     /// Test age calculation
@@ -3536,7 +3568,11 @@ mod tests {
         let created_10_days_ago = now - Duration::days(10);
 
         let age = TodoTool::calculate_age_days(created_10_days_ago, now);
-        assert!((age - 10.0).abs() < 0.01, "Age should be ~10 days, got {}", age);
+        assert!(
+            (age - 10.0).abs() < 0.01,
+            "Age should be ~10 days, got {}",
+            age
+        );
     }
 
     /// Test age calculation with future timestamp (clock skew edge case)
@@ -3548,7 +3584,11 @@ mod tests {
         let created_in_future = now + Duration::days(5); // Clock skew or bad data
 
         let age = TodoTool::calculate_age_days(created_in_future, now);
-        assert_eq!(age, 0.0, "Age should be clamped to 0 for future timestamps, got {}", age);
+        assert_eq!(
+            age, 0.0,
+            "Age should be clamped to 0 for future timestamps, got {}",
+            age
+        );
     }
 
     /// Test plan action: generates top 3 tasks from eligible pool
@@ -3613,21 +3653,45 @@ mod tests {
         .unwrap();
 
         // Generate plan
-        let result = tool.execute(serde_json::json!({"action": "plan"}), &ctx()).await.unwrap();
+        let result = tool
+            .execute(serde_json::json!({"action": "plan"}), &ctx())
+            .await
+            .unwrap();
 
         // Verify plan includes top 3 tasks
-        assert!(result.contains("Daily plan (3 tasks)"), "Plan should have 3 tasks");
-        assert!(result.contains("Fix critical bug"), "Should include overdue P1 task");
-        assert!(result.contains("Implement feature"), "Should include today P2 task");
-        assert!(result.contains("Update docs"), "Should include tomorrow P3 task");
-        assert!(!result.contains("Refactor module"), "Should NOT include future P4 task");
+        assert!(
+            result.contains("Daily plan (3 tasks)"),
+            "Plan should have 3 tasks"
+        );
+        assert!(
+            result.contains("Fix critical bug"),
+            "Should include overdue P1 task"
+        );
+        assert!(
+            result.contains("Implement feature"),
+            "Should include today P2 task"
+        );
+        assert!(
+            result.contains("Update docs"),
+            "Should include tomorrow P3 task"
+        );
+        assert!(
+            !result.contains("Refactor module"),
+            "Should NOT include future P4 task"
+        );
 
         // Verify ordering: overdue P1 should be first
         let fix_pos = result.find("Fix critical bug").unwrap();
         let implement_pos = result.find("Implement feature").unwrap();
         let update_pos = result.find("Update docs").unwrap();
-        assert!(fix_pos < implement_pos, "Overdue P1 should rank before today P2");
-        assert!(implement_pos < update_pos, "Today P2 should rank before tomorrow P3");
+        assert!(
+            fix_pos < implement_pos,
+            "Overdue P1 should rank before today P2"
+        );
+        assert!(
+            implement_pos < update_pos,
+            "Today P2 should rank before tomorrow P3"
+        );
     }
 
     /// Test plan action: excludes completed tasks
@@ -3636,18 +3700,25 @@ mod tests {
         let (tool, _dir) = create_test_tool().await;
 
         // Create and complete a task
-        let result = tool.execute(
-            serde_json::json!({
-                "action": "add",
-                "title": "Completed task",
-                "priority": 1
-            }),
-            &ctx(),
-        )
-        .await
-        .unwrap();
+        let result = tool
+            .execute(
+                serde_json::json!({
+                    "action": "add",
+                    "title": "Completed task",
+                    "priority": 1
+                }),
+                &ctx(),
+            )
+            .await
+            .unwrap();
 
-        let id = result.split("ID: ").nth(1).unwrap().split(')').next().unwrap();
+        let id = result
+            .split("ID: ")
+            .nth(1)
+            .unwrap()
+            .split(')')
+            .next()
+            .unwrap();
 
         tool.execute(
             serde_json::json!({
@@ -3660,9 +3731,15 @@ mod tests {
         .unwrap();
 
         // Generate plan
-        let plan = tool.execute(serde_json::json!({"action": "plan"}), &ctx()).await.unwrap();
+        let plan = tool
+            .execute(serde_json::json!({"action": "plan"}), &ctx())
+            .await
+            .unwrap();
 
-        assert!(plan.contains("No eligible tasks"), "Completed tasks should be excluded");
+        assert!(
+            plan.contains("No eligible tasks"),
+            "Completed tasks should be excluded"
+        );
     }
 
     /// Test plan action: excludes focused tasks
@@ -3671,18 +3748,25 @@ mod tests {
         let (tool, _dir) = create_test_tool().await;
 
         // Create and focus a task
-        let result = tool.execute(
-            serde_json::json!({
-                "action": "add",
-                "title": "Already focused",
-                "priority": 1
-            }),
-            &ctx(),
-        )
-        .await
-        .unwrap();
+        let result = tool
+            .execute(
+                serde_json::json!({
+                    "action": "add",
+                    "title": "Already focused",
+                    "priority": 1
+                }),
+                &ctx(),
+            )
+            .await
+            .unwrap();
 
-        let id = result.split("ID: ").nth(1).unwrap().split(')').next().unwrap();
+        let id = result
+            .split("ID: ")
+            .nth(1)
+            .unwrap()
+            .split(')')
+            .next()
+            .unwrap();
 
         tool.execute(
             serde_json::json!({
@@ -3695,8 +3779,14 @@ mod tests {
         .unwrap();
 
         // Generate plan
-        let plan = tool.execute(serde_json::json!({"action": "plan"}), &ctx()).await.unwrap();
+        let plan = tool
+            .execute(serde_json::json!({"action": "plan"}), &ctx())
+            .await
+            .unwrap();
 
-        assert!(plan.contains("No eligible tasks"), "Focused tasks should be excluded");
+        assert!(
+            plan.contains("No eligible tasks"),
+            "Focused tasks should be excluded"
+        );
     }
 }

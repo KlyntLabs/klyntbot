@@ -503,17 +503,32 @@ mod tests {
         let store2 = ConversationEmbeddingStore::new(file_path);
         store2.load().await.unwrap(); // Should not panic
 
-        assert!(store2.get("valid1").await.unwrap().is_some(), "Should load valid1");
-        assert!(store2.get("valid2").await.unwrap().is_some(), "Should load valid2");
+        assert!(
+            store2.get("valid1").await.unwrap().is_some(),
+            "Should load valid1"
+        );
+        assert!(
+            store2.get("valid2").await.unwrap().is_some(),
+            "Should load valid2"
+        );
     }
 
     #[tokio::test]
     async fn test_search_by_session_key() {
         let (store, _dir) = create_test_store().await;
 
-        store.upsert(create_test_record("msg-1", "telegram:12345", "user")).await.unwrap();
-        store.upsert(create_test_record("msg-2", "telegram:12345", "assistant")).await.unwrap();
-        store.upsert(create_test_record("msg-3", "discord:67890", "user")).await.unwrap();
+        store
+            .upsert(create_test_record("msg-1", "telegram:12345", "user"))
+            .await
+            .unwrap();
+        store
+            .upsert(create_test_record("msg-2", "telegram:12345", "assistant"))
+            .await
+            .unwrap();
+        store
+            .upsert(create_test_record("msg-3", "discord:67890", "user"))
+            .await
+            .unwrap();
 
         let telegram_records = store.get_by_session_key("telegram:12345").await.unwrap();
         assert_eq!(telegram_records.len(), 2, "Should find 2 telegram messages");
@@ -526,16 +541,31 @@ mod tests {
     async fn test_purge_by_session_key() {
         let (store, _dir) = create_test_store().await;
 
-        store.upsert(create_test_record("msg-1", "telegram:12345", "user")).await.unwrap();
-        store.upsert(create_test_record("msg-2", "telegram:12345", "assistant")).await.unwrap();
-        store.upsert(create_test_record("msg-3", "discord:67890", "user")).await.unwrap();
+        store
+            .upsert(create_test_record("msg-1", "telegram:12345", "user"))
+            .await
+            .unwrap();
+        store
+            .upsert(create_test_record("msg-2", "telegram:12345", "assistant"))
+            .await
+            .unwrap();
+        store
+            .upsert(create_test_record("msg-3", "discord:67890", "user"))
+            .await
+            .unwrap();
 
-        let deleted = store.purge(PurgeFilter::BySessionKey("telegram:12345".to_string())).await.unwrap();
+        let deleted = store
+            .purge(PurgeFilter::BySessionKey("telegram:12345".to_string()))
+            .await
+            .unwrap();
         assert_eq!(deleted, 2, "Should delete 2 telegram messages");
 
         let remaining = store.get_all().await.unwrap();
         assert_eq!(remaining.len(), 1, "Should have 1 message remaining");
-        assert!(remaining.contains_key("msg-3"), "Discord message should remain");
+        assert!(
+            remaining.contains_key("msg-3"),
+            "Discord message should remain"
+        );
     }
 
     #[tokio::test]
@@ -559,7 +589,10 @@ mod tests {
 
         let remaining = store.get_all().await.unwrap();
         assert_eq!(remaining.len(), 1, "Should have 1 recent message remaining");
-        assert!(remaining.contains_key("msg-recent"), "Recent message should remain");
+        assert!(
+            remaining.contains_key("msg-recent"),
+            "Recent message should remain"
+        );
     }
 
     #[tokio::test]
@@ -577,11 +610,18 @@ mod tests {
         store.compact().await.unwrap();
         let size_after = std::fs::metadata(&store.file_path).unwrap().len();
 
-        assert!(size_after < size_before, "Compaction should reduce file size");
+        assert!(
+            size_after < size_before,
+            "Compaction should reduce file size"
+        );
 
         // Verify data integrity
         let loaded = store.get("msg-1").await.unwrap().unwrap();
-        assert_eq!(loaded.embedding[0], 99.0 / 100.0, "Should have latest embedding");
+        assert_eq!(
+            loaded.embedding[0],
+            99.0 / 100.0,
+            "Should have latest embedding"
+        );
     }
 
     // ──────────────────────────────────────────────────────────────────────

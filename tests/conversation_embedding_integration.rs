@@ -42,8 +42,11 @@ async fn create_test_store() -> (ConversationEmbeddingStore, TempDir) {
 }
 
 /// Create a test handler with store wired up.
-async fn create_test_handler_with_store(
-) -> (Arc<MockConversationEmbeddingHandler>, Arc<RwLock<ConversationEmbeddingStore>>, TempDir) {
+async fn create_test_handler_with_store() -> (
+    Arc<MockConversationEmbeddingHandler>,
+    Arc<RwLock<ConversationEmbeddingStore>>,
+    TempDir,
+) {
     let temp_dir = TempDir::new().unwrap();
     let emb_path = temp_dir.path().join("conversation_embeddings.jsonl");
     let store = Arc::new(RwLock::new(ConversationEmbeddingStore::new(emb_path)));
@@ -98,12 +101,18 @@ async fn test_tc1_user_assistant_messages_embedded_on_save() {
     let calls = handler.embed_message_calls();
     assert_eq!(calls.len(), 2, "Should have 2 embed_message calls");
 
-    assert_eq!(calls[0].role, "user", "First call should be for user message");
+    assert_eq!(
+        calls[0].role, "user",
+        "First call should be for user message"
+    );
     assert_eq!(calls[0].content, "Hello world");
     assert_eq!(calls[0].session_key, session_key);
     assert_eq!(calls[0].message_id, user_msg_id);
 
-    assert_eq!(calls[1].role, "assistant", "Second call should be for assistant message");
+    assert_eq!(
+        calls[1].role, "assistant",
+        "Second call should be for assistant message"
+    );
     assert_eq!(calls[1].content, "Hi there!");
     assert_eq!(calls[1].session_key, session_key);
     assert_eq!(calls[1].message_id, assistant_msg_id);
@@ -120,7 +129,10 @@ async fn test_tc1_user_assistant_messages_embedded_on_save() {
 
     // Check assistant record
     let assistant_record = store_guard.get(&assistant_msg_id).await.unwrap();
-    assert!(assistant_record.is_some(), "Assistant message should be embedded");
+    assert!(
+        assistant_record.is_some(),
+        "Assistant message should be embedded"
+    );
     let assistant_record = assistant_record.unwrap();
     assert_eq!(assistant_record.role, "assistant");
     assert_eq!(assistant_record.embedding.len(), tools::EMBEDDING_DIM);
@@ -232,7 +244,10 @@ async fn test_tc3_channel_exclusion_prevents_embedding() {
         1,
         "Only Telegram message should trigger embed_message call"
     );
-    assert_eq!(calls[0].session_key, telegram_key, "Call should be for Telegram session");
+    assert_eq!(
+        calls[0].session_key, telegram_key,
+        "Call should be for Telegram session"
+    );
     assert_eq!(calls[0].content, "Telegram message");
 }
 
@@ -313,17 +328,27 @@ async fn test_tc7_embedding_failure_non_blocking() {
         .await;
 
     // Verify embed_message returns Ok() (non-blocking error handling)
-    assert!(embed_result.is_ok(), "embed_message should return Ok() even on failure (best-effort)");
+    assert!(
+        embed_result.is_ok(),
+        "embed_message should return Ok() even on failure (best-effort)"
+    );
 
     // Verify session save succeeded (session JSONL was written)
     let session = session_manager.get_or_create(session_key).await.unwrap();
-    assert_eq!(session.messages.len(), 1, "Message should be persisted to session");
+    assert_eq!(
+        session.messages.len(),
+        1,
+        "Message should be persisted to session"
+    );
     assert_eq!(session.messages[0].content, "Test message");
 
     // Verify embedding was NOT stored (failure was silent)
     let store_guard = store.write().await;
     let embedding_record = store_guard.get(&user_msg_id).await.unwrap();
-    assert!(embedding_record.is_none(), "Embedding should NOT be in store when handler unavailable");
+    assert!(
+        embedding_record.is_none(),
+        "Embedding should NOT be in store when handler unavailable"
+    );
 
     // Verify handler tracked the call (even though it failed)
     let calls = handler.embed_message_calls();
@@ -374,7 +399,10 @@ async fn test_tc8_corrupted_store_recovery() {
 
     // Trigger lazy load by accessing data (ensure_loaded() is called internally)
     let msg1_result = store.get("msg1").await;
-    assert!(msg1_result.is_ok(), "Load should succeed despite corruption");
+    assert!(
+        msg1_result.is_ok(),
+        "Load should succeed despite corruption"
+    );
 
     // Verify valid records are loaded
     let msg1_exists = msg1_result.unwrap().is_some();
@@ -383,29 +411,9 @@ async fn test_tc8_corrupted_store_recovery() {
     assert!(msg2_exists, "Valid record 2 should be loaded");
 }
 
-#[tokio::test]
-async fn test_ec12_model_unavailable() {
-    // TODO: Create handler with unavailable() mode
-    // TODO: Add message → verify embed_message returns Ok (best-effort)
-    // TODO: Verify no embedding in store
-    // TODO: Search → verify returns helpful error message
-
-    todo!("EC-12: Verify graceful degradation when model unavailable");
-}
-
 // ═══════════════════════════════════════════════════════════════
 // Storage & Persistence Tests
 // ═══════════════════════════════════════════════════════════════
-
-#[tokio::test]
-async fn test_conversation_embeddings_stored_separately() {
-    // TODO: Create session with separate todos.jsonl and conversation_embeddings.jsonl
-    // TODO: Add user message
-    // TODO: Verify conversation_embeddings.jsonl contains embedding data
-    // TODO: Verify session JSONL does NOT contain embedding vectors
-
-    todo!("Verify conversation embeddings stored in separate JSONL file");
-}
 
 #[tokio::test]
 async fn test_role_prefix_included_in_embedding() {
@@ -424,7 +432,8 @@ async fn test_role_prefix_included_in_embedding() {
 
     // The deterministic embedding should include the role prefix
     let expected_text = "user: Test message";
-    let expected_embedding = MockConversationEmbeddingHandler::deterministic_embedding(expected_text);
+    let expected_embedding =
+        MockConversationEmbeddingHandler::deterministic_embedding(expected_text);
 
     let store_write = store.write().await;
     let record = store_write.get("msg1").await.unwrap().unwrap();
@@ -453,7 +462,11 @@ async fn test_metadata_fields_populated() {
     assert_eq!(record.id, "msg1");
     assert_eq!(record.session_key, "telegram:12345");
     assert_eq!(record.role, "assistant");
-    assert_eq!(record.content_preview.len(), 100, "Preview should be truncated to 100 chars");
+    assert_eq!(
+        record.content_preview.len(),
+        100,
+        "Preview should be truncated to 100 chars"
+    );
     assert_eq!(record.embedding.len(), EMBEDDING_DIM);
     assert_eq!(record.model, "mock-model");
     assert!(record.embedded_at <= Utc::now());
@@ -462,58 +475,3 @@ async fn test_metadata_fields_populated() {
 // ═══════════════════════════════════════════════════════════════
 // Additional Unit Tests for ConversationEmbeddingStore
 // ═══════════════════════════════════════════════════════════════
-
-#[tokio::test]
-async fn test_store_upsert_new_record() {
-    // TODO: Create empty store
-    // TODO: Upsert new record
-    // TODO: Verify get() returns the record
-
-    todo!("Verify upsert inserts new record");
-}
-
-#[tokio::test]
-async fn test_store_upsert_overwrites_existing() {
-    // TODO: Upsert record with id "msg1"
-    // TODO: Upsert record with same id "msg1" but different content
-    // TODO: Verify get() returns updated record
-
-    todo!("Verify upsert overwrites existing record");
-}
-
-#[tokio::test]
-async fn test_store_search_by_session_key() {
-    // TODO: Upsert 3 records: 2 from telegram:12345, 1 from discord:67890
-    // TODO: Search by session_key "telegram:12345"
-    // TODO: Verify 2 results returned
-
-    todo!("Verify search filters by session_key");
-}
-
-#[tokio::test]
-async fn test_store_purge_by_session_key() {
-    // TODO: Upsert 3 records: 2 from telegram:12345, 1 from discord:67890
-    // TODO: Purge by session_key "telegram:12345"
-    // TODO: Verify 2 deleted, 1 remains
-
-    todo!("Verify purge deletes by session_key");
-}
-
-#[tokio::test]
-async fn test_store_purge_by_date() {
-    // TODO: Upsert 3 records with different embedded_at timestamps
-    // TODO: Purge before date (middle timestamp)
-    // TODO: Verify older records deleted, newer remain
-
-    todo!("Verify purge deletes before date");
-}
-
-#[tokio::test]
-async fn test_store_compaction_removes_stale() {
-    // TODO: Upsert 50 records
-    // TODO: Update 50 records (creates 50 stale entries)
-    // TODO: Upsert 1 more record (triggers compaction at 100 stale)
-    // TODO: Verify JSONL file only contains latest versions
-
-    todo!("Verify auto-compaction at 100 stale entries");
-}

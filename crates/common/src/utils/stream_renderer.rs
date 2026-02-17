@@ -14,8 +14,7 @@ use crossterm::{
 };
 
 use super::terminal::{
-    colorize, colors_enabled, status_error, status_success, MarkdownRenderer, DIM,
-    SEPARATOR, TOOL,
+    colorize, colors_enabled, status_error, status_success, MarkdownRenderer, DIM, SEPARATOR, TOOL,
 };
 
 /// Tracks the state of a tool being executed.

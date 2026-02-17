@@ -320,6 +320,14 @@ async fn run_with_streaming(
                         clean_exit = true;
                         break;
                     }
+                    AgentEvent::PlanStepCompleted { step_index, .. } => {
+                        // Plan step completed — not displayed inline in CLI streaming
+                        tracing::debug!("Plan step {} completed", step_index);
+                    }
+                    AgentEvent::PlanCompleted { summary, .. } => {
+                        // Plan completed — not displayed inline in CLI streaming
+                        tracing::debug!("Plan completed: {}", summary);
+                    }
                 }
             }
 

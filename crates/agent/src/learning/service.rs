@@ -28,6 +28,7 @@ pub struct LearningService {
     task_handle: Option<JoinHandle<()>>,
     cancel_token: CancellationToken,
     analysis_trigger: Arc<Notify>,
+    event_bus: Option<Arc<bus::LearningEventBus>>,
 }
 
 impl LearningService {
@@ -45,7 +46,15 @@ impl LearningService {
             task_handle: None,
             cancel_token: CancellationToken::new(),
             analysis_trigger: Arc::new(Notify::new()),
+            event_bus: None,
         }
+    }
+
+    /// Attach a `LearningEventBus` so the service publishes `AnalysisCompleted`
+    /// (and `ThresholdChanged`) events after each analysis cycle.
+    pub fn with_event_bus(mut self, bus: Arc<bus::LearningEventBus>) -> Self {
+        self.event_bus = Some(bus);
+        self
     }
 
     /// Start the background analysis loop.
@@ -56,6 +65,7 @@ impl LearningService {
         let interval = self.check_interval;
         let cancel = self.cancel_token.clone();
         let trigger = Arc::clone(&self.analysis_trigger);
+        let event_bus = self.event_bus.clone();
 
         let handle = tokio::spawn(async move {
             info!(
@@ -71,10 +81,10 @@ impl LearningService {
                     }
                     _ = trigger.notified() => {
                         info!("Learning analysis triggered manually");
-                        Self::run_analysis(&store, &adaptive, &threshold).await;
+                        Self::run_analysis(&store, &adaptive, &threshold, event_bus.as_deref()).await;
                     }
                     _ = tokio::time::sleep(interval) => {
-                        Self::run_analysis(&store, &adaptive, &threshold).await;
+                        Self::run_analysis(&store, &adaptive, &threshold, event_bus.as_deref()).await;
                     }
                 }
             }
@@ -96,11 +106,12 @@ impl LearningService {
         self.analysis_trigger.notify_one();
     }
 
-    /// Run analysis, update adaptive thresholds, persist state.
+    /// Run analysis, update adaptive thresholds, persist state, and publish events.
     async fn run_analysis(
         store: &Arc<RwLock<OutcomeStore>>,
         adaptive: &Arc<RwLock<AdaptiveThresholds>>,
         threshold: &Option<Arc<AtomicU32>>,
+        event_bus: Option<&bus::LearningEventBus>,
     ) {
         // Read outcomes (acquire then release lock quickly)
         let (outcomes, feedback) = {
@@ -134,12 +145,32 @@ impl LearningService {
         let mut adaptive_guard = adaptive.write().await;
         if let Some(new_threshold) = adaptive_guard.apply_analysis(&analysis) {
             if let Some(threshold_atomic) = threshold {
+                let old_bits = threshold_atomic.load(Ordering::SeqCst);
+                let old_threshold = f32::from_bits(old_bits);
                 threshold_atomic.store(new_threshold.to_bits(), Ordering::SeqCst);
+
+                if let Some(bus) = event_bus {
+                    bus.publish(bus::LearningEvent::ThresholdChanged {
+                        old_threshold,
+                        new_threshold,
+                        reason: "adaptive_analysis".to_string(),
+                    })
+                    .await;
+                }
             }
         }
 
         if let Err(e) = adaptive_guard.save().await {
             warn!("Failed to save learning state: {}", e);
+        }
+
+        // Publish AnalysisCompleted regardless of whether threshold changed
+        if let Some(bus) = event_bus {
+            bus.publish(bus::LearningEvent::AnalysisCompleted {
+                total_outcomes: analysis.total_outcomes,
+                suggested_threshold: analysis.suggested_threshold,
+            })
+            .await;
         }
     }
 
@@ -149,6 +180,7 @@ impl LearningService {
             &self.outcome_store,
             &self.adaptive,
             &self.confidence_threshold,
+            self.event_bus.as_deref(),
         )
         .await;
         Ok(())
@@ -158,7 +190,42 @@ impl LearningService {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bus::LearningEvent;
     use tempfile::TempDir;
+
+    /// AC-I2.1/2.2: LearningService publishes AnalysisCompleted event when triggered.
+    #[tokio::test]
+    async fn test_publishes_analysis_completed_on_trigger() {
+        let dir = TempDir::new().unwrap();
+        let store = Arc::new(RwLock::new(OutcomeStore::new(
+            dir.path().join("outcomes.jsonl"),
+        )));
+        let adaptive = Arc::new(RwLock::new(
+            AdaptiveThresholds::load(dir.path().join("state.json"), 0.7, 0.4, 0.9, 50).await,
+        ));
+
+        let event_bus = Arc::new(bus::LearningEventBus::new(16));
+        let mut rx = event_bus.subscribe();
+
+        let mut service = LearningService::new(store, adaptive, None, StdDuration::from_secs(3600))
+            .with_event_bus(Arc::clone(&event_bus));
+
+        service.start();
+        service.trigger_analysis();
+
+        let event = tokio::time::timeout(StdDuration::from_millis(500), rx.recv())
+            .await
+            .expect("timeout waiting for AnalysisCompleted event")
+            .expect("channel closed");
+
+        assert!(
+            matches!(event, LearningEvent::AnalysisCompleted { .. }),
+            "Expected AnalysisCompleted, got {:?}",
+            event
+        );
+
+        service.stop().await;
+    }
 
     #[tokio::test]
     async fn test_start_stop_lifecycle() {
@@ -170,12 +237,7 @@ mod tests {
             AdaptiveThresholds::load(dir.path().join("state.json"), 0.7, 0.4, 0.9, 50).await,
         ));
 
-        let mut service = LearningService::new(
-            store,
-            adaptive,
-            None,
-            StdDuration::from_secs(3600),
-        );
+        let mut service = LearningService::new(store, adaptive, None, StdDuration::from_secs(3600));
 
         service.start();
         assert!(service.task_handle.is_some());
@@ -194,12 +256,7 @@ mod tests {
             AdaptiveThresholds::load(dir.path().join("state.json"), 0.7, 0.4, 0.9, 50).await,
         ));
 
-        let mut service = LearningService::new(
-            store,
-            adaptive,
-            None,
-            StdDuration::from_secs(3600),
-        );
+        let mut service = LearningService::new(store, adaptive, None, StdDuration::from_secs(3600));
 
         service.start();
         service.trigger_analysis();

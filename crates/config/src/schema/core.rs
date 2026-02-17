@@ -1424,8 +1424,14 @@ mod tests {
         // Verify embedding config
         assert!(!config.embedding.enabled);
         assert_eq!(config.embedding.exclude_channels.len(), 2);
-        assert!(config.embedding.exclude_channels.contains(&"whatsapp".to_string()));
-        assert!(config.embedding.exclude_channels.contains(&"telegram".to_string()));
+        assert!(config
+            .embedding
+            .exclude_channels
+            .contains(&"whatsapp".to_string()));
+        assert!(config
+            .embedding
+            .exclude_channels
+            .contains(&"telegram".to_string()));
         assert_eq!(config.embedding.exclude_roles, vec!["system"]);
 
         // Verify search config
@@ -1447,8 +1453,14 @@ mod tests {
 
         // Verify exclude_channels
         assert_eq!(config.embedding.exclude_channels.len(), 2);
-        assert!(config.embedding.exclude_channels.contains(&"discord".to_string()));
-        assert!(config.embedding.exclude_channels.contains(&"slack".to_string()));
+        assert!(config
+            .embedding
+            .exclude_channels
+            .contains(&"discord".to_string()));
+        assert!(config
+            .embedding
+            .exclude_channels
+            .contains(&"slack".to_string()));
 
         // Verify other fields use defaults
         assert!(config.embedding.enabled); // default: true

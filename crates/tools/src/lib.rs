@@ -9,14 +9,15 @@ pub mod cron_tool;
 pub mod embedding_engine;
 pub mod embedding_store;
 pub mod enrichment;
+pub mod filesystem;
 pub mod goal_tool;
 pub mod learning_feedback;
-pub mod plan_response;
-pub mod plan_tool;
-pub mod filesystem;
+pub mod learning_tool;
 pub mod memory_tool;
 pub mod message;
 pub mod params;
+pub mod plan_response;
+pub mod plan_tool;
 pub use params::ParamExtractor;
 pub mod project_store;
 pub mod project_tool;
@@ -53,8 +54,13 @@ pub use learning_feedback::{EnrichmentFeedbackEntry, EnrichmentFeedbackHandler};
 // Re-export goal types for use by agent crate
 pub use goal_tool::{GoalHandler, GoalTool};
 
+// Re-export learning tool types for use by agent crate
+pub use learning_tool::{
+    LearningHandler, LearningStatus, LearningTool, ThresholdEntry, ToolSummary,
+};
+
 // Re-export plan types for use by agent crate
-pub use plan_tool::{PlanHandler, PlanTool};
+pub use plan_tool::{PlanCompletionHandler, PlanHandler, PlanTool};
 
 // Re-export memory tool
 pub use memory_tool::MemoryTool;

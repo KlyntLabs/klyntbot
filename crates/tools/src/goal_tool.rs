@@ -36,7 +36,6 @@ impl GoalTool {
     }
 }
 
-
 /// Parse goal_id from args, returning a UUID.
 fn parse_goal_id(args: &Value) -> Result<Uuid> {
     let id_str = args
@@ -117,10 +116,7 @@ impl Tool for GoalTool {
                     .and_then(|v| v.as_str())
                     .unwrap_or("");
 
-                let priority = args
-                    .get("priority")
-                    .and_then(|v| v.as_u64())
-                    .unwrap_or(3) as u8;
+                let priority = args.get("priority").and_then(|v| v.as_u64()).unwrap_or(3) as u8;
 
                 let now = Utc::now();
                 let goal = Goal {
@@ -188,7 +184,10 @@ impl Tool for GoalTool {
                 if !goal.metrics.is_empty() {
                     lines.push(format!("Metrics: {}", goal.metrics.len()));
                 }
-                lines.push(format!("Created: {}", goal.created_at.format("%Y-%m-%d %H:%M")));
+                lines.push(format!(
+                    "Created: {}",
+                    goal.created_at.format("%Y-%m-%d %H:%M")
+                ));
                 Ok(lines.join("\n"))
             }
 
@@ -230,9 +229,10 @@ impl Tool for GoalTool {
                 let id = parse_goal_id(&args)?;
                 let progress = handler.calculate_progress(&id).await?;
 
-                let mut lines = vec![
-                    format!("Goal progress: {:.1}%", progress.completion_percentage),
-                ];
+                let mut lines = vec![format!(
+                    "Goal progress: {:.1}%",
+                    progress.completion_percentage
+                )];
                 if !progress.summary.is_empty() {
                     lines.push(format!("Summary: {}", progress.summary));
                 }
@@ -282,7 +282,13 @@ mod tests {
         }
 
         async fn get_goal(&self, id: &Uuid) -> Result<Option<Goal>> {
-            Ok(self.goals.lock().unwrap().iter().find(|g| g.id == *id).cloned())
+            Ok(self
+                .goals
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|g| g.id == *id)
+                .cloned())
         }
 
         async fn list_goals(&self, status: Option<GoalStatus>) -> Result<Vec<Goal>> {
@@ -391,7 +397,12 @@ mod tests {
         use crate::Tool;
 
         let (tool, handler) = make_tool();
-        tool.execute(serde_json::json!({"action": "create", "title": "Minimal"}), &ctx()).await.unwrap();
+        tool.execute(
+            serde_json::json!({"action": "create", "title": "Minimal"}),
+            &ctx(),
+        )
+        .await
+        .unwrap();
 
         let goals = handler.goals.lock().unwrap();
         assert_eq!(goals[0].priority, 3);
@@ -402,14 +413,20 @@ mod tests {
     async fn test_create_action_missing_title() {
         use crate::Tool;
         let (tool, _) = make_tool();
-        assert!(tool.execute(serde_json::json!({"action": "create"}), &ctx()).await.is_err());
+        assert!(tool
+            .execute(serde_json::json!({"action": "create"}), &ctx())
+            .await
+            .is_err());
     }
 
     #[tokio::test]
     async fn test_list_empty() {
         use crate::Tool;
         let (tool, _) = make_tool();
-        let result = tool.execute(serde_json::json!({"action": "list"}), &ctx()).await.unwrap();
+        let result = tool
+            .execute(serde_json::json!({"action": "list"}), &ctx())
+            .await
+            .unwrap();
         assert_eq!(result, "No goals found.");
     }
 
@@ -418,10 +435,23 @@ mod tests {
         use crate::Tool;
         let (tool, _) = make_tool();
 
-        tool.execute(serde_json::json!({"action": "create", "title": "A"}), &ctx()).await.unwrap();
-        tool.execute(serde_json::json!({"action": "create", "title": "B"}), &ctx()).await.unwrap();
+        tool.execute(
+            serde_json::json!({"action": "create", "title": "A"}),
+            &ctx(),
+        )
+        .await
+        .unwrap();
+        tool.execute(
+            serde_json::json!({"action": "create", "title": "B"}),
+            &ctx(),
+        )
+        .await
+        .unwrap();
 
-        let result = tool.execute(serde_json::json!({"action": "list"}), &ctx()).await.unwrap();
+        let result = tool
+            .execute(serde_json::json!({"action": "list"}), &ctx())
+            .await
+            .unwrap();
         assert!(result.contains("Found 2 goal(s)"));
         assert!(result.contains("A"));
         assert!(result.contains("B"));
@@ -437,7 +467,10 @@ mod tests {
         ).await.unwrap();
 
         let id = handler.goals.lock().unwrap()[0].id.to_string();
-        let result = tool.execute(serde_json::json!({"action": "show", "goal_id": id}), &ctx()).await.unwrap();
+        let result = tool
+            .execute(serde_json::json!({"action": "show", "goal_id": id}), &ctx())
+            .await
+            .unwrap();
 
         assert!(result.contains("Goal: Show Me"));
         assert!(result.contains("Priority: 1"));
@@ -448,10 +481,12 @@ mod tests {
     async fn test_show_not_found() {
         use crate::Tool;
         let (tool, _) = make_tool();
-        let result = tool.execute(
-            serde_json::json!({"action": "show", "goal_id": Uuid::new_v4().to_string()}),
-            &ctx(),
-        ).await;
+        let result = tool
+            .execute(
+                serde_json::json!({"action": "show", "goal_id": Uuid::new_v4().to_string()}),
+                &ctx(),
+            )
+            .await;
         assert!(result.is_err());
     }
 
@@ -459,7 +494,12 @@ mod tests {
     async fn test_update_action() {
         use crate::Tool;
         let (tool, handler) = make_tool();
-        tool.execute(serde_json::json!({"action": "create", "title": "Original"}), &ctx()).await.unwrap();
+        tool.execute(
+            serde_json::json!({"action": "create", "title": "Original"}),
+            &ctx(),
+        )
+        .await
+        .unwrap();
 
         let id = handler.goals.lock().unwrap()[0].id.to_string();
         tool.execute(
@@ -477,10 +517,20 @@ mod tests {
     async fn test_delete_action() {
         use crate::Tool;
         let (tool, handler) = make_tool();
-        tool.execute(serde_json::json!({"action": "create", "title": "Bye"}), &ctx()).await.unwrap();
+        tool.execute(
+            serde_json::json!({"action": "create", "title": "Bye"}),
+            &ctx(),
+        )
+        .await
+        .unwrap();
 
         let id = handler.goals.lock().unwrap()[0].id.to_string();
-        tool.execute(serde_json::json!({"action": "delete", "goal_id": id}), &ctx()).await.unwrap();
+        tool.execute(
+            serde_json::json!({"action": "delete", "goal_id": id}),
+            &ctx(),
+        )
+        .await
+        .unwrap();
         assert!(handler.goals.lock().unwrap().is_empty());
     }
 
@@ -488,10 +538,21 @@ mod tests {
     async fn test_progress_action() {
         use crate::Tool;
         let (tool, handler) = make_tool();
-        tool.execute(serde_json::json!({"action": "create", "title": "Track"}), &ctx()).await.unwrap();
+        tool.execute(
+            serde_json::json!({"action": "create", "title": "Track"}),
+            &ctx(),
+        )
+        .await
+        .unwrap();
 
         let id = handler.goals.lock().unwrap()[0].id.to_string();
-        let result = tool.execute(serde_json::json!({"action": "progress", "goal_id": id}), &ctx()).await.unwrap();
+        let result = tool
+            .execute(
+                serde_json::json!({"action": "progress", "goal_id": id}),
+                &ctx(),
+            )
+            .await
+            .unwrap();
         assert!(result.contains("50.0%"));
         assert!(result.contains("Half done"));
     }
@@ -500,13 +561,19 @@ mod tests {
     async fn test_unknown_action() {
         use crate::Tool;
         let (tool, _) = make_tool();
-        assert!(tool.execute(serde_json::json!({"action": "invalid"}), &ctx()).await.is_err());
+        assert!(tool
+            .execute(serde_json::json!({"action": "invalid"}), &ctx())
+            .await
+            .is_err());
     }
 
     #[test]
     fn test_parse_goal_id_valid() {
         let id = Uuid::new_v4();
-        assert_eq!(parse_goal_id(&serde_json::json!({"goal_id": id.to_string()})).unwrap(), id);
+        assert_eq!(
+            parse_goal_id(&serde_json::json!({"goal_id": id.to_string()})).unwrap(),
+            id
+        );
     }
 
     #[test]

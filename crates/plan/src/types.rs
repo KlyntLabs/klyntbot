@@ -65,11 +65,10 @@ impl PlanStatus {
         if valid {
             Ok(())
         } else {
-            Err(PlanError::InvalidState(format!(
-                "Invalid state transition: {:?} → {:?}",
-                from, to
-            ))
-            .into())
+            Err(
+                PlanError::InvalidState(format!("Invalid state transition: {:?} → {:?}", from, to))
+                    .into(),
+            )
         }
     }
 }
@@ -301,21 +300,17 @@ mod tests {
             PlanStatus::validate_transition(&PlanStatus::Approved, &PlanStatus::Abandoned).is_ok()
         );
         assert!(
-            PlanStatus::validate_transition(&PlanStatus::Executing, &PlanStatus::Completed)
-                .is_ok()
+            PlanStatus::validate_transition(&PlanStatus::Executing, &PlanStatus::Completed).is_ok()
         );
         assert!(
             PlanStatus::validate_transition(&PlanStatus::Executing, &PlanStatus::Failed).is_ok()
         );
         assert!(
-            PlanStatus::validate_transition(&PlanStatus::Executing, &PlanStatus::Abandoned)
-                .is_ok()
+            PlanStatus::validate_transition(&PlanStatus::Executing, &PlanStatus::Abandoned).is_ok()
         );
 
         // No-op transitions (same state) should succeed
-        assert!(
-            PlanStatus::validate_transition(&PlanStatus::Draft, &PlanStatus::Draft).is_ok()
-        );
+        assert!(PlanStatus::validate_transition(&PlanStatus::Draft, &PlanStatus::Draft).is_ok());
         assert!(
             PlanStatus::validate_transition(&PlanStatus::Approved, &PlanStatus::Approved).is_ok()
         );
@@ -328,8 +323,7 @@ mod tests {
             PlanStatus::validate_transition(&PlanStatus::Completed, &PlanStatus::Draft).is_err()
         );
         assert!(
-            PlanStatus::validate_transition(&PlanStatus::Completed, &PlanStatus::Approved)
-                .is_err()
+            PlanStatus::validate_transition(&PlanStatus::Completed, &PlanStatus::Approved).is_err()
         );
         assert!(
             PlanStatus::validate_transition(&PlanStatus::Completed, &PlanStatus::Executing)
@@ -369,8 +363,7 @@ mod tests {
             PlanStatus::validate_transition(&PlanStatus::Abandoned, &PlanStatus::Draft).is_err()
         );
         assert!(
-            PlanStatus::validate_transition(&PlanStatus::Abandoned, &PlanStatus::Approved)
-                .is_err()
+            PlanStatus::validate_transition(&PlanStatus::Abandoned, &PlanStatus::Approved).is_err()
         );
         assert!(
             PlanStatus::validate_transition(&PlanStatus::Abandoned, &PlanStatus::Executing)
@@ -394,12 +387,9 @@ mod tests {
         assert!(
             PlanStatus::validate_transition(&PlanStatus::Draft, &PlanStatus::Completed).is_err()
         );
+        assert!(PlanStatus::validate_transition(&PlanStatus::Draft, &PlanStatus::Failed).is_err());
         assert!(
-            PlanStatus::validate_transition(&PlanStatus::Draft, &PlanStatus::Failed).is_err()
-        );
-        assert!(
-            PlanStatus::validate_transition(&PlanStatus::Approved, &PlanStatus::Completed)
-                .is_err()
+            PlanStatus::validate_transition(&PlanStatus::Approved, &PlanStatus::Completed).is_err()
         );
         assert!(
             PlanStatus::validate_transition(&PlanStatus::Approved, &PlanStatus::Failed).is_err()

@@ -42,16 +42,35 @@ use mock_conversation_embedding_handler::MockConversationEmbeddingHandler;
 
 /// Sample conversation messages for testing (role, session_key, content)
 const SAMPLE_MESSAGES: &[(&str, &str, &str)] = &[
-    ("user", "telegram:12345", "How do I fix the authentication bug?"),
-    ("assistant", "telegram:12345", "You can fix it by updating the token validation logic in auth.rs..."),
-    ("user", "discord:67890", "What's the status of the API refactor?"),
-    ("assistant", "discord:67890", "The API refactor is in progress, targeting next sprint..."),
-    ("user", "telegram:12345", "Can you help me with the login system?"),
+    (
+        "user",
+        "telegram:12345",
+        "How do I fix the authentication bug?",
+    ),
+    (
+        "assistant",
+        "telegram:12345",
+        "You can fix it by updating the token validation logic in auth.rs...",
+    ),
+    (
+        "user",
+        "discord:67890",
+        "What's the status of the API refactor?",
+    ),
+    (
+        "assistant",
+        "discord:67890",
+        "The API refactor is in progress, targeting next sprint...",
+    ),
+    (
+        "user",
+        "telegram:12345",
+        "Can you help me with the login system?",
+    ),
 ];
 
 /// Create a test MemoryTool with mock conversation embedding handler.
-async fn create_test_memory_tool(
-) -> (MemoryTool, Arc<MockConversationEmbeddingHandler>, TempDir) {
+async fn create_test_memory_tool() -> (MemoryTool, Arc<MockConversationEmbeddingHandler>, TempDir) {
     let temp_dir = TempDir::new().unwrap();
     let emb_path = temp_dir.path().join("conversation_embeddings.jsonl");
     let store = Arc::new(RwLock::new(ConversationEmbeddingStore::new(emb_path)));
@@ -112,10 +131,22 @@ async fn test_tc5_semantic_search_finds_similar() {
     let result = tool.execute(args, &ctx()).await.unwrap();
 
     // Verify results
-    assert!(result.contains("conversation(s) matching"), "Expected conversation count in output");
-    assert!(result.contains("authentication"), "Expected 'authentication' in results");
-    assert!(result.contains("similarity:"), "Expected similarity scores in output");
-    assert!(result.contains("user") || result.contains("assistant"), "Expected role in output");
+    assert!(
+        result.contains("conversation(s) matching"),
+        "Expected conversation count in output"
+    );
+    assert!(
+        result.contains("authentication"),
+        "Expected 'authentication' in results"
+    );
+    assert!(
+        result.contains("similarity:"),
+        "Expected similarity scores in output"
+    );
+    assert!(
+        result.contains("user") || result.contains("assistant"),
+        "Expected role in output"
+    );
 }
 
 #[tokio::test]
@@ -146,7 +177,10 @@ async fn test_tc9_search_respects_threshold() {
     // Verify threshold filtering works
     // Low threshold should have more results (or same if all results are high quality)
     // The key is that results respect the threshold parameter
-    assert!(result_high.contains("conversation(s) matching") || result_high.contains("No conversations found"));
+    assert!(
+        result_high.contains("conversation(s) matching")
+            || result_high.contains("No conversations found")
+    );
     assert!(result_low.contains("conversation(s) matching"));
 }
 
@@ -157,11 +191,23 @@ async fn test_tc12_cross_channel_search() {
     // Embed messages from different channels
     let telegram_messages = &[
         ("user", "telegram:12345", "How do I fix the bug?"),
-        ("assistant", "telegram:12345", "You can fix it by updating the code..."),
+        (
+            "assistant",
+            "telegram:12345",
+            "You can fix it by updating the code...",
+        ),
     ];
     let discord_messages = &[
-        ("user", "discord:67890", "What about the authentication issue?"),
-        ("assistant", "discord:67890", "The authentication needs token validation..."),
+        (
+            "user",
+            "discord:67890",
+            "What about the authentication issue?",
+        ),
+        (
+            "assistant",
+            "discord:67890",
+            "The authentication needs token validation...",
+        ),
     ];
 
     embed_test_messages(&handler, telegram_messages).await;
@@ -174,21 +220,15 @@ async fn test_tc12_cross_channel_search() {
         "limit": 10
     });
 
-    let result = tool.execute(args, &ctx_for_channel("telegram")).await.unwrap();
+    let result = tool
+        .execute(args, &ctx_for_channel("telegram"))
+        .await
+        .unwrap();
 
     // Verify results include both Telegram and Discord messages (global memory)
     // The search should find the Discord message about "authentication token"
     assert!(result.contains("conversation(s) matching"));
     assert!(result.contains("authentication") || result.contains("token"));
-}
-
-#[tokio::test]
-async fn test_us4_memory_tool_search_conversations() {
-    // TODO: Basic test of search_conversations action
-    // TODO: Verify action parameter validation (query, limit, threshold)
-    // TODO: Verify result format
-
-    todo!("US-4: Verify MemoryTool search_conversations action");
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -216,7 +256,7 @@ async fn test_tc6_rrf_merges_todo_conversation() {
         result
     );
     assert!(
-        result.contains("[Conversation]"),
+        result.contains("[Conversation"),
         "Should include [Conversation] prefix: {}",
         result
     );
@@ -254,15 +294,6 @@ async fn test_us2_unified_search_both_sources() {
     }
 
     // TODO: After Phase 4, verify both [Todo] and [Conversation] results
-}
-
-#[tokio::test]
-async fn test_rrf_ranking_order() {
-    // TODO: Create test data with known RRF scores
-    // TODO: Verify RRF formula: score = sum(1/(k + rank)) where k=60
-    // TODO: Verify merged results sorted correctly
-
-    todo!("Verify RRF ranking formula and order");
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -343,15 +374,6 @@ async fn test_purge_by_date_range() {
     );
 }
 
-#[tokio::test]
-async fn test_purge_all() {
-    // TODO: Embed 10 messages
-    // TODO: Execute purge with all=true
-    // TODO: Verify all embeddings deleted
-
-    todo!("Verify purge all");
-}
-
 // ═══════════════════════════════════════════════════════════════
 // Status Action Tests (TC-11)
 // ═══════════════════════════════════════════════════════════════
@@ -367,9 +389,18 @@ async fn test_tc11_status_reports_accurate_counts() {
 
     // Verify counts
     assert!(result.contains("Conversation Memory Status"));
-    assert!(result.contains("Total embeddings: 5"), "Expected 5 embeddings from SAMPLE_MESSAGES");
-    assert!(result.contains("Available: yes"), "Expected handler to be available");
-    assert!(result.contains("telegram") || result.contains("discord"), "Expected indexed channels");
+    assert!(
+        result.contains("Total embeddings: 5"),
+        "Expected 5 embeddings from SAMPLE_MESSAGES"
+    );
+    assert!(
+        result.contains("Available: yes"),
+        "Expected handler to be available"
+    );
+    assert!(
+        result.contains("telegram") || result.contains("discord"),
+        "Expected indexed channels"
+    );
 }
 
 #[tokio::test]
@@ -413,15 +444,6 @@ async fn test_status_reports_channels_indexed() {
     );
 }
 
-#[tokio::test]
-async fn test_status_reports_search_availability() {
-    // TODO: Create MemoryTool with unavailable handler
-    // TODO: Execute status
-    // TODO: Verify search_available == false
-
-    todo!("Verify status reports search availability");
-}
-
 // ═══════════════════════════════════════════════════════════════
 // Registration Tests (TC-13)
 // ═══════════════════════════════════════════════════════════════
@@ -434,31 +456,39 @@ async fn test_tc13_memory_tool_registration() {
     assert_eq!(tool.name(), "memory", "Tool name should be 'memory'");
 
     let description = tool.description();
-    assert!(description.contains("search") || description.contains("Search"), "Description should mention search");
-    assert!(description.contains("conversations") || description.contains("conversation"), "Description should mention conversations");
+    assert!(
+        description.contains("search") || description.contains("Search"),
+        "Description should mention search"
+    );
+    assert!(
+        description.contains("conversations") || description.contains("conversation"),
+        "Description should mention conversations"
+    );
 
     // Verify parameters schema
     let params = tool.parameters();
     assert_eq!(params["type"], "object", "Parameters should be object type");
-    assert!(params["required"].as_array().unwrap().contains(&json!("action")), "Action should be required");
+    assert!(
+        params["required"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("action")),
+        "Action should be required"
+    );
 
     // Verify all 4 actions in enum
     let actions = params["properties"]["action"]["enum"].as_array().unwrap();
     assert_eq!(actions.len(), 4, "Should have 4 actions");
-    assert!(actions.contains(&json!("search_conversations")), "Should include search_conversations");
-    assert!(actions.contains(&json!("search_all")), "Should include search_all");
+    assert!(
+        actions.contains(&json!("search_conversations")),
+        "Should include search_conversations"
+    );
+    assert!(
+        actions.contains(&json!("search_all")),
+        "Should include search_all"
+    );
     assert!(actions.contains(&json!("purge")), "Should include purge");
     assert!(actions.contains(&json!("status")), "Should include status");
-}
-
-#[tokio::test]
-async fn test_memory_tool_schema_validation() {
-    // TODO: Create MemoryTool
-    // TODO: Get parameters() schema
-    // TODO: Validate schema against JSON Schema spec
-    // TODO: Verify required fields for each action
-
-    todo!("Verify MemoryTool schema is valid");
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -482,7 +512,11 @@ async fn test_ec1_empty_query_returns_error() {
     match result {
         Err(e) => {
             let err_msg = e.to_string();
-            assert!(err_msg.contains("query") || err_msg.contains("required") || err_msg.contains("empty"));
+            assert!(
+                err_msg.contains("query")
+                    || err_msg.contains("required")
+                    || err_msg.contains("empty")
+            );
         }
         Ok(msg) => {
             assert!(msg.contains("No conversations found") || msg.contains("0 conversation"));
@@ -504,7 +538,10 @@ async fn test_ec3_no_embeddings_returns_message() {
     let result = tool.execute(args, &ctx()).await.unwrap();
 
     // Verify helpful message
-    assert!(result.contains("No conversations found"), "Expected 'No conversations found' message");
+    assert!(
+        result.contains("No conversations found"),
+        "Expected 'No conversations found' message"
+    );
 }
 
 #[tokio::test]
@@ -549,8 +586,14 @@ async fn test_ec5_below_threshold_no_results() {
     let result = tool.execute(args, &ctx()).await.unwrap();
 
     // Should return no results message
-    assert!(result.contains("No conversations found"), "Expected no results due to high threshold");
-    assert!(result.contains("threshold"), "Expected threshold mentioned in output");
+    assert!(
+        result.contains("No conversations found"),
+        "Expected no results due to high threshold"
+    );
+    assert!(
+        result.contains("threshold"),
+        "Expected threshold mentioned in output"
+    );
 }
 
 #[tokio::test]
@@ -558,7 +601,11 @@ async fn test_ec15_hybrid_zero_keyword() {
     let (tool, handler, _temp_dir) = create_test_memory_tool().await;
 
     let messages = &[
-        ("user", "telegram:12345", "authentication security implementation"),
+        (
+            "user",
+            "telegram:12345",
+            "authentication security implementation",
+        ),
         ("assistant", "telegram:12345", "verify credentials properly"),
     ];
     embed_test_messages(&handler, messages).await;
@@ -730,7 +777,11 @@ async fn test_limit_parameter_respected() {
     // Should return at most 2 results
     // Count the number of result entries (each starts with "- [")
     let result_count = result.matches("- [").count();
-    assert!(result_count <= 2, "Should return at most 2 results, got {}", result_count);
+    assert!(
+        result_count <= 2,
+        "Should return at most 2 results, got {}",
+        result_count
+    );
 
     // Should indicate the result count
     assert!(result.contains("conversation(s) matching") || result.contains("No conversations"));

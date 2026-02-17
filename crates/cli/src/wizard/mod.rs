@@ -255,7 +255,6 @@ fn run_learning_step(state: &mut WizardState) -> Result<StepResult> {
     })
 }
 
-
 /// Print the global wizard header (shown once at the start).
 fn print_wizard_header() {
     println!();

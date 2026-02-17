@@ -108,15 +108,23 @@ pub async fn handle_update(
     match result {
         Some(new_todo) => {
             // Auto-generate embedding if text fields changed (Sprint 5) - only if enabled
-            if config.todo.search.enabled && (title.is_some() || description.is_some() || tags.is_some()) {
+            if config.todo.search.enabled
+                && (title.is_some() || description.is_some() || tags.is_some())
+            {
                 let emb_store_path = config.embedding_store_path();
-                let emb_store = Arc::new(tokio::sync::RwLock::new(EmbeddingStore::new(emb_store_path)));
+                let emb_store = Arc::new(tokio::sync::RwLock::new(EmbeddingStore::new(
+                    emb_store_path,
+                )));
                 let engine = Arc::new(EmbeddingEngine::new());
                 let handler = EmbeddingEngineImpl::new(engine, emb_store);
 
                 // Best-effort embedding generation
                 if let Err(e) = handler.embed_todo(&new_todo).await {
-                    tracing::warn!("Failed to generate embedding for todo {}: {}", new_todo.id, e);
+                    tracing::warn!(
+                        "Failed to generate embedding for todo {}: {}",
+                        new_todo.id,
+                        e
+                    );
                 }
             }
 

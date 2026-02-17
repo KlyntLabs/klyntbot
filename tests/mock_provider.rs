@@ -14,6 +14,7 @@ pub struct MockProvider {
 
 impl MockProvider {
     /// Create a new mock provider with a simple text response
+    #[allow(dead_code)]
     pub fn new(response: &str) -> Self {
         Self::with_responses(vec![LlmResponse {
             content: Some(response.to_string()),

@@ -299,7 +299,10 @@ impl SlackChannel {
             .send()
             .await
         {
-            warn!("Failed to add reaction to Slack message {}: {}", timestamp, e);
+            warn!(
+                "Failed to add reaction to Slack message {}: {}",
+                timestamp, e
+            );
         }
 
         Ok(())

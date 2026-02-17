@@ -393,9 +393,18 @@ fn run_learning_menu_fallback(config: &mut Config, _can_go_back: bool) -> Result
     println!();
     println!("Enable the learning system? (adapts behavior based on outcomes)");
     println!("  {} Records tool execution outcomes", colorize("•", DIM));
-    println!("  {} Tracks enrichment suggestion feedback", colorize("•", DIM));
-    println!("  {} Adapts confidence thresholds based on accuracy", colorize("•", DIM));
-    println!("  {} Privacy-safe: no user messages or arguments stored", colorize("•", DIM));
+    println!(
+        "  {} Tracks enrichment suggestion feedback",
+        colorize("•", DIM)
+    );
+    println!(
+        "  {} Adapts confidence thresholds based on accuracy",
+        colorize("•", DIM)
+    );
+    println!(
+        "  {} Privacy-safe: no user messages or arguments stored",
+        colorize("•", DIM)
+    );
     println!();
     print!("Enable [Y/n]: ");
     std::io::stdout().flush()?;

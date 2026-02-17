@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use tokio::fs;
 use tracing::{debug, warn};
 
+use goal::{GoalStatus, GoalStore};
 use plan;
 use providers::{ContentPart, ImageUrl, Message};
 use session::SessionMessage;
@@ -43,7 +44,9 @@ pub struct ContextBuilder {
     cached_bootstrap: Option<String>,
     cached_memory: Option<CachedContext>,
     cached_todo: Option<CachedContext>,
+    cached_goals: Option<CachedContext>,
     todo_store: Option<std::sync::Arc<tokio::sync::RwLock<tools::todo_store::TodoStore>>>,
+    goal_store: Option<std::sync::Arc<tokio::sync::RwLock<GoalStore>>>,
     /// Current adaptive confidence threshold — updated by LearningService.
     confidence_threshold: f32,
 }
@@ -54,6 +57,7 @@ impl ContextBuilder {
         workspace: PathBuf,
         timezone: String,
         todo_store: Option<std::sync::Arc<tokio::sync::RwLock<tools::todo_store::TodoStore>>>,
+        goal_store: Option<std::sync::Arc<tokio::sync::RwLock<GoalStore>>>,
     ) -> Self {
         Self {
             memory: MemoryStore::new(workspace.clone()).await,
@@ -63,7 +67,9 @@ impl ContextBuilder {
             cached_bootstrap: None,
             cached_memory: None,
             cached_todo: None,
+            cached_goals: None,
             todo_store,
+            goal_store,
             confidence_threshold: 0.7,
         }
     }
@@ -72,6 +78,11 @@ impl ContextBuilder {
     /// Called by `AgentLoop` when `LearningService` adjusts the threshold.
     pub fn set_confidence_threshold(&mut self, threshold: f32) {
         self.confidence_threshold = threshold;
+    }
+
+    /// Read the current confidence threshold (used in tests and diagnostics).
+    pub fn confidence_threshold(&self) -> f32 {
+        self.confidence_threshold
     }
 
     /// Initialize skills
@@ -172,6 +183,40 @@ impl ContextBuilder {
         content
     }
 
+    /// Get active goals context string from the store (with TTL cache).
+    ///
+    /// Returns an empty string when there are no active goals or no store is configured.
+    pub async fn get_goals_context(&mut self) -> String {
+        // Return cached if still valid
+        if let Some(ref cached) = self.cached_goals {
+            if cached.is_valid() {
+                return cached.content.clone();
+            }
+        }
+
+        let content = if let Some(store) = &self.goal_store {
+            let mut guard = store.write().await;
+            match guard.list(Some(GoalStatus::Active)).await {
+                Ok(goals) if !goals.is_empty() => {
+                    let mut buf = String::from("# Goals\n\n");
+                    for g in &goals {
+                        buf.push_str(&format!(
+                            "- [P{}] {}: {}\n",
+                            g.priority, g.title, g.description
+                        ));
+                    }
+                    buf
+                }
+                _ => String::new(),
+            }
+        } else {
+            String::new()
+        };
+
+        self.cached_goals = Some(CachedContext::new(content.clone(), CONTEXT_CACHE_TTL_SECS));
+        content
+    }
+
     /// Get memory context (with TTL cache)
     async fn get_memory_context_cached(&mut self) -> String {
         // Return cached if still valid
@@ -242,6 +287,12 @@ impl ContextBuilder {
         let todo_context = self.get_todo_context().await;
         if !todo_context.trim().is_empty() {
             sections.push(todo_context);
+        }
+
+        // Active goals (cached with TTL)
+        let goals_context = self.get_goals_context().await;
+        if !goals_context.trim().is_empty() {
+            sections.push(goals_context);
         }
 
         // Confidence evaluation instructions (internal, uses current adaptive threshold)
@@ -378,6 +429,12 @@ You are klyntbot, a personal AI assistant powered by advanced language models.
         debug!("Invalidated todo context cache");
     }
 
+    /// Invalidate only the goals context cache (call after goal mutations)
+    pub fn invalidate_goals_cache(&mut self) {
+        self.cached_goals = None;
+        debug!("Invalidated goals context cache");
+    }
+
     /// Match user message against skill triggers
     fn match_skill_triggers(&self, message: &str) -> Option<String> {
         let msg_lower = message.to_lowercase();
@@ -386,7 +443,9 @@ You are klyntbot, a personal AI assistant powered by advanced language models.
         for skill in self.skills.all() {
             for trigger in &skill.triggers {
                 // Case-insensitive exact match or substring match
-                if msg_lower == trigger.to_lowercase() || msg_lower.contains(&trigger.to_lowercase()) {
+                if msg_lower == trigger.to_lowercase()
+                    || msg_lower.contains(&trigger.to_lowercase())
+                {
                     debug!("Matched skill '{}' via trigger '{}'", skill.name, trigger);
                     return Some(skill.name.clone());
                 }

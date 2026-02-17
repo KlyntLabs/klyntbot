@@ -112,9 +112,7 @@ pub fn categorize_error(error_msg: &str) -> &'static str {
         "permission"
     } else if lower.contains("not found") || lower.contains("no such") {
         "not_found"
-    } else if lower.contains("validation")
-        || lower.contains("invalid")
-        || lower.contains("missing")
+    } else if lower.contains("validation") || lower.contains("invalid") || lower.contains("missing")
     {
         "validation"
     } else if lower.contains("network") || lower.contains("connection") {

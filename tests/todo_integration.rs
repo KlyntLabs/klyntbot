@@ -179,6 +179,7 @@ async fn test_todo_context_injection() {
         workspace.clone(),
         "UTC".to_string(),
         Some(Arc::clone(&todo_store_arc)),
+        None,
     )
     .await;
 
@@ -271,6 +272,7 @@ async fn test_todo_context_injection() {
         workspace,
         "UTC".to_string(),
         Some(Arc::clone(&empty_store_arc)),
+        None,
     )
     .await;
     empty_context_builder.init().await.unwrap();

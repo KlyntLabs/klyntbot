@@ -92,9 +92,7 @@ mod tests {
     #[tokio::test]
     async fn test_goal_handler_create_and_get() {
         let tmp = TempDir::new().unwrap();
-        let store = Arc::new(RwLock::new(GoalStore::new(
-            tmp.path().join("goals.jsonl"),
-        )));
+        let store = Arc::new(RwLock::new(GoalStore::new(tmp.path().join("goals.jsonl"))));
 
         let handler = GoalHandlerImpl::new(store);
 
@@ -109,14 +107,18 @@ mod tests {
     #[tokio::test]
     async fn test_goal_handler_list() {
         let tmp = TempDir::new().unwrap();
-        let store = Arc::new(RwLock::new(GoalStore::new(
-            tmp.path().join("goals.jsonl"),
-        )));
+        let store = Arc::new(RwLock::new(GoalStore::new(tmp.path().join("goals.jsonl"))));
 
         let handler = GoalHandlerImpl::new(store);
 
-        handler.create_goal(create_test_goal("Goal A")).await.unwrap();
-        handler.create_goal(create_test_goal("Goal B")).await.unwrap();
+        handler
+            .create_goal(create_test_goal("Goal A"))
+            .await
+            .unwrap();
+        handler
+            .create_goal(create_test_goal("Goal B"))
+            .await
+            .unwrap();
 
         let all = handler.list_goals(None).await.unwrap();
         assert_eq!(all.len(), 2);
@@ -128,9 +130,7 @@ mod tests {
     #[tokio::test]
     async fn test_goal_handler_update() {
         let tmp = TempDir::new().unwrap();
-        let store = Arc::new(RwLock::new(GoalStore::new(
-            tmp.path().join("goals.jsonl"),
-        )));
+        let store = Arc::new(RwLock::new(GoalStore::new(tmp.path().join("goals.jsonl"))));
 
         let handler = GoalHandlerImpl::new(store);
 
@@ -150,9 +150,7 @@ mod tests {
     #[tokio::test]
     async fn test_goal_handler_delete() {
         let tmp = TempDir::new().unwrap();
-        let store = Arc::new(RwLock::new(GoalStore::new(
-            tmp.path().join("goals.jsonl"),
-        )));
+        let store = Arc::new(RwLock::new(GoalStore::new(tmp.path().join("goals.jsonl"))));
 
         let handler = GoalHandlerImpl::new(store);
 
@@ -167,9 +165,7 @@ mod tests {
     #[tokio::test]
     async fn test_goal_handler_calculate_progress() {
         let tmp = TempDir::new().unwrap();
-        let store = Arc::new(RwLock::new(GoalStore::new(
-            tmp.path().join("goals.jsonl"),
-        )));
+        let store = Arc::new(RwLock::new(GoalStore::new(tmp.path().join("goals.jsonl"))));
 
         let handler = GoalHandlerImpl::new(store);
 

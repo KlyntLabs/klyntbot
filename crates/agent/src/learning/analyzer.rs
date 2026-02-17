@@ -5,18 +5,13 @@ use std::collections::HashMap;
 use chrono::Utc;
 
 use super::types::{
-    AnalysisResult, ConfidenceBand, EnrichmentFeedbackEntry, EnrichmentStats,
-    FieldAcceptanceStats, OutcomeRecord, ToolStats,
+    AnalysisResult, ConfidenceBand, EnrichmentFeedbackEntry, EnrichmentStats, FieldAcceptanceStats,
+    OutcomeRecord, ToolStats,
 };
 
 /// Confidence band boundaries for bucketing.
-const BAND_BOUNDARIES: &[(f32, f32)] = &[
-    (0.0, 0.3),
-    (0.3, 0.5),
-    (0.5, 0.7),
-    (0.7, 0.85),
-    (0.85, 1.0),
-];
+const BAND_BOUNDARIES: &[(f32, f32)] =
+    &[(0.0, 0.3), (0.3, 0.5), (0.5, 0.7), (0.7, 0.85), (0.85, 1.0)];
 
 pub struct LearningAnalyzer;
 
@@ -27,8 +22,7 @@ impl LearningAnalyzer {
         feedback: &[EnrichmentFeedbackEntry],
     ) -> AnalysisResult {
         let per_tool_stats = Self::compute_tool_stats(outcomes);
-        let (suggested_threshold, threshold_confidence) =
-            Self::suggest_threshold(&per_tool_stats);
+        let (suggested_threshold, threshold_confidence) = Self::suggest_threshold(&per_tool_stats);
         let enrichment_stats = Self::compute_enrichment_stats(feedback);
 
         AnalysisResult {
@@ -160,8 +154,7 @@ impl LearningAnalyzer {
 
         let mut per_field: HashMap<String, (usize, usize)> = HashMap::new();
         for entry in feedback {
-            let (field_total, field_accepted) =
-                per_field.entry(entry.field.clone()).or_default();
+            let (field_total, field_accepted) = per_field.entry(entry.field.clone()).or_default();
             *field_total += 1;
             if entry.accepted {
                 *field_accepted += 1;

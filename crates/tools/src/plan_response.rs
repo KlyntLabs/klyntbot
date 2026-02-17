@@ -55,7 +55,15 @@ pub fn parse_plan_response(input: &str, plan_size: usize) -> Result<PlanAction, 
     }
 
     // Defer patterns
-    let defer_patterns = ["defer", "defer all", "not today", "pass", "dismiss", "nah", "no"];
+    let defer_patterns = [
+        "defer",
+        "defer all",
+        "not today",
+        "pass",
+        "dismiss",
+        "nah",
+        "no",
+    ];
 
     if defer_patterns.contains(&trimmed.as_str()) {
         return Ok(PlanAction::DeferAll);
@@ -85,9 +93,7 @@ pub fn parse_plan_response(input: &str, plan_size: usize) -> Result<PlanAction, 
 
         // Validate positions are different
         if pos_a == pos_b {
-            return Err(
-                "Cannot swap the same position. Try swapping different tasks.".to_string(),
-            );
+            return Err("Cannot swap the same position. Try swapping different tasks.".to_string());
         }
 
         // Validate positions are within range (1-indexed)
@@ -116,10 +122,22 @@ mod tests {
 
     #[test]
     fn test_parse_accept_variants() {
-        let variants = ["y", "ok", "go", "looks good", "let's go", "confirm", "accept"];
+        let variants = [
+            "y",
+            "ok",
+            "go",
+            "looks good",
+            "let's go",
+            "confirm",
+            "accept",
+        ];
         for input in &variants {
             let action = parse_plan_response(input, 3).unwrap();
-            assert!(matches!(action, PlanAction::Accept), "Failed for: {}", input);
+            assert!(
+                matches!(action, PlanAction::Accept),
+                "Failed for: {}",
+                input
+            );
         }
     }
 
@@ -128,7 +146,11 @@ mod tests {
         let variants = ["YES", "Y", "Ok", "GO", "LOOKS GOOD"];
         for input in &variants {
             let action = parse_plan_response(input, 3).unwrap();
-            assert!(matches!(action, PlanAction::Accept), "Failed for: {}", input);
+            assert!(
+                matches!(action, PlanAction::Accept),
+                "Failed for: {}",
+                input
+            );
         }
     }
 
@@ -137,13 +159,25 @@ mod tests {
         let variants = ["  yes  ", " ok ", "\ty\t"];
         for input in &variants {
             let action = parse_plan_response(input, 3).unwrap();
-            assert!(matches!(action, PlanAction::Accept), "Failed for: {}", input);
+            assert!(
+                matches!(action, PlanAction::Accept),
+                "Failed for: {}",
+                input
+            );
         }
     }
 
     #[test]
     fn test_parse_defer_variants() {
-        let variants = ["defer", "defer all", "not today", "pass", "dismiss", "nah", "no"];
+        let variants = [
+            "defer",
+            "defer all",
+            "not today",
+            "pass",
+            "dismiss",
+            "nah",
+            "no",
+        ];
         for input in &variants {
             let action = parse_plan_response(input, 3).unwrap();
             assert!(

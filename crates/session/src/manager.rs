@@ -140,7 +140,10 @@ impl SessionManager {
             if let Some(old_key) = self.lru_order.pop_front() {
                 if let Some(session) = self.cache.remove(&old_key) {
                     if let Err(e) = self.save(&session).await {
-                        warn!("Failed to save evicted session {}: {}. Data may be lost.", old_key, e);
+                        warn!(
+                            "Failed to save evicted session {}: {}. Data may be lost.",
+                            old_key, e
+                        );
                     }
                     debug!("Evicted session from cache: {}", old_key);
                 }
@@ -602,10 +605,7 @@ mod tests {
         // Add third session to trigger eviction (should evict test:chat1)
         // This should NOT panic or fail even though save will fail on Unix
         let result = manager.get_or_create("test:chat3").await;
-        assert!(
-            result.is_ok(),
-            "Eviction should succeed even if save fails"
-        );
+        assert!(result.is_ok(), "Eviction should succeed even if save fails");
 
         {
             let session3 = result.unwrap();

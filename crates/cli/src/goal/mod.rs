@@ -67,8 +67,7 @@ async fn handle_create(
         linked_project_ids: vec![],
         metadata: tags
             .map(|t| {
-                let tag_list: Vec<String> =
-                    t.split(',').map(|s| s.trim().to_string()).collect();
+                let tag_list: Vec<String> = t.split(',').map(|s| s.trim().to_string()).collect();
                 HashMap::from([("tags".to_string(), tag_list.join(","))])
             })
             .unwrap_or_default(),
@@ -113,11 +112,7 @@ async fn handle_list(status_filter: Option<String>) -> Result<()> {
         return Ok(());
     }
 
-    println!(
-        "{} {} goal(s):\n",
-        status_active(),
-        goals.len()
-    );
+    println!("{} {} goal(s):\n", status_active(), goals.len());
 
     for goal in &goals {
         let status_str = format!("{:?}", goal.status);

@@ -27,4 +27,3 @@ Always include a <confidence> block before tool calls. After tool execution, inc
 <confidence> block assessing the result quality."#
     )
 }
-

@@ -47,15 +47,36 @@ fn create_builtin_skills(workspace: &Path) -> Result<usize> {
     // Built-in skills to copy (paths relative to workspace root)
     let builtin_skills = [
         ("cron", include_str!("../../../../../skills/cron/SKILL.md")),
-        ("daily-planning", include_str!("../../../../../skills/daily-planning/SKILL.md")),
-        ("github", include_str!("../../../../../skills/github/SKILL.md")),
-        ("skill-creator", include_str!("../../../../../skills/skill-creator/SKILL.md")),
-        ("summarize", include_str!("../../../../../skills/summarize/SKILL.md")),
+        (
+            "daily-planning",
+            include_str!("../../../../../skills/daily-planning/SKILL.md"),
+        ),
+        (
+            "github",
+            include_str!("../../../../../skills/github/SKILL.md"),
+        ),
+        (
+            "skill-creator",
+            include_str!("../../../../../skills/skill-creator/SKILL.md"),
+        ),
+        (
+            "summarize",
+            include_str!("../../../../../skills/summarize/SKILL.md"),
+        ),
         ("tmux", include_str!("../../../../../skills/tmux/SKILL.md")),
         ("todo", include_str!("../../../../../skills/todo/SKILL.md")),
-        ("todo-party", include_str!("../../../../../skills/todo-party/SKILL.md")),
-        ("todo-yolo", include_str!("../../../../../skills/todo-yolo/SKILL.md")),
-        ("weather", include_str!("../../../../../skills/weather/SKILL.md")),
+        (
+            "todo-party",
+            include_str!("../../../../../skills/todo-party/SKILL.md"),
+        ),
+        (
+            "todo-yolo",
+            include_str!("../../../../../skills/todo-yolo/SKILL.md"),
+        ),
+        (
+            "weather",
+            include_str!("../../../../../skills/weather/SKILL.md"),
+        ),
     ];
 
     for (name, content) in builtin_skills {

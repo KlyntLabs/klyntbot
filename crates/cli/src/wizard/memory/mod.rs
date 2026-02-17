@@ -23,10 +23,22 @@ pub(crate) fn configure_conversation_memory(
     println!();
     println!("Enable conversation memory for contextual recall?");
     println!();
-    println!("  {} Agent remembers past discussions across sessions", colorize("•", DIM));
-    println!("  {} Semantic search finds relevant conversations", colorize("•", DIM));
-    println!("  {} Reuses semantic search model (no extra download)", colorize("•", DIM));
-    println!("  {} Privacy controls: exclude channels, purge history", colorize("•", DIM));
+    println!(
+        "  {} Agent remembers past discussions across sessions",
+        colorize("•", DIM)
+    );
+    println!(
+        "  {} Semantic search finds relevant conversations",
+        colorize("•", DIM)
+    );
+    println!(
+        "  {} Reuses semantic search model (no extra download)",
+        colorize("•", DIM)
+    );
+    println!(
+        "  {} Privacy controls: exclude channels, purge history",
+        colorize("•", DIM)
+    );
     println!();
 
     print!(
@@ -47,7 +59,9 @@ pub(crate) fn configure_conversation_memory(
         println!("{} Conversation memory enabled", colorize("✓", SUCCESS));
         println!();
         println!("{}:", colorize("Privacy controls", BOLD));
-        println!("  Exclude channels: ~/.klyntbot/config.json → conversation.embedding.excludeChannels");
+        println!(
+            "  Exclude channels: ~/.klyntbot/config.json → conversation.embedding.excludeChannels"
+        );
         println!("  Purge history: klyntbot todo purge --filter <session|date|all>");
         println!();
         println!("{}:", colorize("Search your conversations", BOLD));

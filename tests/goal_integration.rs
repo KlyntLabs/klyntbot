@@ -38,9 +38,7 @@ fn create_goal(title: &str, priority: u8) -> Goal {
 #[tokio::test]
 async fn test_goal_full_lifecycle() {
     let tmp = TempDir::new().unwrap();
-    let store = Arc::new(RwLock::new(GoalStore::new(
-        tmp.path().join("goals.jsonl"),
-    )));
+    let store = Arc::new(RwLock::new(GoalStore::new(tmp.path().join("goals.jsonl"))));
     let handler = GoalHandlerImpl::new(store);
 
     // Create
@@ -142,7 +140,9 @@ async fn test_goal_suggestion_engine_integration() {
     let engine = GoalSuggestionEngine::new();
 
     // Should detect goal intent
-    let suggestion = engine.detect_goal_intent("I want to build a mobile app").unwrap();
+    let suggestion = engine
+        .detect_goal_intent("I want to build a mobile app")
+        .unwrap();
     assert!(!suggestion.proposed_title.is_empty());
     assert!(suggestion.confidence > 0.0);
     assert!(suggestion.linked_items.is_empty());
@@ -155,9 +155,7 @@ async fn test_goal_suggestion_engine_integration() {
 #[tokio::test]
 async fn test_multiple_goals_with_different_statuses() {
     let tmp = TempDir::new().unwrap();
-    let store = Arc::new(RwLock::new(GoalStore::new(
-        tmp.path().join("goals.jsonl"),
-    )));
+    let store = Arc::new(RwLock::new(GoalStore::new(tmp.path().join("goals.jsonl"))));
     let handler = GoalHandlerImpl::new(store);
 
     // Create goals with different priorities
@@ -178,7 +176,10 @@ async fn test_multiple_goals_with_different_statuses() {
     let active = handler.list_goals(Some(GoalStatus::Active)).await.unwrap();
     assert_eq!(active.len(), 2);
 
-    let achieved = handler.list_goals(Some(GoalStatus::Achieved)).await.unwrap();
+    let achieved = handler
+        .list_goals(Some(GoalStatus::Achieved))
+        .await
+        .unwrap();
     assert_eq!(achieved.len(), 1);
     assert_eq!(achieved[0].title, "High Priority");
 }

@@ -42,9 +42,7 @@ impl SearchSubAction {
         match self {
             Self::EnableAndDownload => "Enable & download model now (~60 sec, 420 MB)".to_string(),
             Self::Disable => "Disable semantic search".to_string(),
-            Self::ConfigureThreshold => {
-                "Configure similarity threshold".to_string()
-            }
+            Self::ConfigureThreshold => "Configure similarity threshold".to_string(),
             Self::Close => "Close".to_string(),
         }
     }
@@ -53,7 +51,10 @@ impl SearchSubAction {
 /// Configure semantic search (enable/disable + model download).
 ///
 /// Shows an expandable menu following the calendar step pattern.
-pub(crate) fn configure_semantic_search(config: &mut Config, can_go_back: bool) -> Result<MenuOutcome> {
+pub(crate) fn configure_semantic_search(
+    config: &mut Config,
+    can_go_back: bool,
+) -> Result<MenuOutcome> {
     menus::run_search_menu(config, can_go_back)
 }
 
@@ -127,8 +128,14 @@ pub(super) fn execute_configure_threshold(config: &mut Config) -> Result<()> {
     println!("Lower threshold = more results (less strict)");
     println!("Higher threshold = fewer results (more precise)");
     println!();
-    println!("  {} 0.3 — Loose (finds distant concepts)", colorize("•", DIM));
-    println!("  {} 0.5 — Moderate (balanced) ← default", colorize("•", BRAND));
+    println!(
+        "  {} 0.3 — Loose (finds distant concepts)",
+        colorize("•", DIM)
+    );
+    println!(
+        "  {} 0.5 — Moderate (balanced) ← default",
+        colorize("•", BRAND)
+    );
     println!("  {} 0.7 — Strict (only close matches)", colorize("•", DIM));
     println!();
 

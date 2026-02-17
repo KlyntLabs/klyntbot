@@ -10,6 +10,26 @@ use uuid::Uuid;
 use crate::{RoutingContext, Tool};
 use common::ToolError;
 
+/// PlanCompletionHandler trait for dependency inversion.
+/// Called by AgentLoop after a plan finishes (success or failure).
+/// Allows the agent crate to update goal metrics without a circular dep.
+#[async_trait]
+pub trait PlanCompletionHandler: Send + Sync {
+    /// Called once when a plan execution finishes.
+    ///
+    /// - `plan_id`: the plan that just finished
+    /// - `goal_id`: the goal this plan was linked to (may be `None`)
+    /// - `success`: whether the plan completed successfully
+    /// - `summary`: human-readable summary of what happened
+    async fn on_plan_completed(
+        &self,
+        plan_id: &Uuid,
+        goal_id: Option<Uuid>,
+        success: bool,
+        summary: &str,
+    ) -> Result<()>;
+}
+
 /// PlanHandler trait for dependency inversion.
 /// Implemented by PlanHandlerImpl in agent crate (Layer 5).
 /// Defined here in tools crate (Layer 3) to break circular dependency.
@@ -131,10 +151,9 @@ impl Tool for PlanTool {
 
             "show" => {
                 let plan_id = parse_plan_id(&args)?;
-                let plan = handler
-                    .get_plan(&plan_id)
-                    .await?
-                    .ok_or_else(|| ToolError::ExecutionFailed(format!("Plan {} not found", plan_id)))?;
+                let plan = handler.get_plan(&plan_id).await?.ok_or_else(|| {
+                    ToolError::ExecutionFailed(format!("Plan {} not found", plan_id))
+                })?;
 
                 let mut lines = vec![
                     format!("Plan: {}", plan.title),
@@ -153,7 +172,10 @@ impl Tool for PlanTool {
                     plan.current_step_index,
                     plan.steps.len()
                 ));
-                lines.push(format!("Created: {}", plan.created_at.format("%Y-%m-%d %H:%M")));
+                lines.push(format!(
+                    "Created: {}",
+                    plan.created_at.format("%Y-%m-%d %H:%M")
+                ));
                 Ok(lines.join("\n"))
             }
 
@@ -183,7 +205,11 @@ impl Tool for PlanTool {
                 match plan {
                     Some(p) => Ok(format!(
                         "Active plan: '{}' (id: {}, status: {:?}, progress: {}/{})",
-                        p.title, p.id, p.status, p.current_step_index, p.steps.len()
+                        p.title,
+                        p.id,
+                        p.status,
+                        p.current_step_index,
+                        p.steps.len()
                     )),
                     None => Ok("No active plan for this session.".to_string()),
                 }

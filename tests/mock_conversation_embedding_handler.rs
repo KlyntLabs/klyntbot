@@ -147,12 +147,15 @@ impl ConversationEmbeddingHandler for MockConversationEmbeddingHandler {
         message_id: &str,
     ) -> Result<()> {
         // Track the call
-        self.embed_message_calls.lock().unwrap().push(EmbedCallRecord {
-            session_key: session_key.to_string(),
-            role: role.to_string(),
-            content: content.to_string(),
-            message_id: message_id.to_string(),
-        });
+        self.embed_message_calls
+            .lock()
+            .unwrap()
+            .push(EmbedCallRecord {
+                session_key: session_key.to_string(),
+                role: role.to_string(),
+                content: content.to_string(),
+                message_id: message_id.to_string(),
+            });
 
         if !self.available {
             // Unavailable mode: return Ok(()) to simulate best-effort embedding
@@ -322,7 +325,10 @@ mod tests {
         let result = mock
             .embed_message("telegram:12345", "user", "test", "msg1")
             .await;
-        assert!(result.is_ok(), "Unavailable mode should return Ok (best-effort)");
+        assert!(
+            result.is_ok(),
+            "Unavailable mode should return Ok (best-effort)"
+        );
     }
 
     #[tokio::test]

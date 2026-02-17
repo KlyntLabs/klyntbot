@@ -1,9 +1,12 @@
 //! Plan management CLI commands.
 
 use anyhow::Result;
+use bus::MessageBus;
 use common::utils::terminal::*;
 use plan::store::PlanStore;
 use plan::types::{Plan, PlanStatus};
+use std::sync::Arc;
+use tools::RoutingContext;
 use uuid::Uuid;
 
 use crate::commands::PlanCommands;
@@ -179,8 +182,6 @@ async fn handle_abandon(id: &str) -> Result<()> {
 }
 
 async fn handle_execute(id: &str) -> Result<()> {
-    use plan::types::PlanStatus;
-
     let config = config::load().await?;
     let store_path = config.plan_store_path();
     let mut store = PlanStore::new(store_path);
@@ -216,28 +217,30 @@ async fn handle_execute(id: &str) -> Result<()> {
     println!();
 
     if step_count == 0 {
-        println!(
-            "{} Plan has no steps to execute.",
-            status_warning()
-        );
+        println!("{} Plan has no steps to execute.", status_warning());
         return Ok(());
     }
 
-    // Note: Full execution requires the agent loop (run_plan_execution).
-    // CLI executes via the agent, which handles step orchestration.
-    // This provides the plan ID to the agent for execution.
-    println!("  {} Starting sequential step execution...", status_active());
+    println!(
+        "  {} Starting sequential step execution...",
+        status_active()
+    );
     println!();
-    println!(
-        "  {} Use '{}' to monitor progress.",
-        colorize("Tip:", BOLD),
-        colorize("klyntbot plan status", TOOL)
-    );
-    println!(
-        "  {} Use '{}' to see details.",
-        colorize("Tip:", BOLD),
-        colorize(&format!("klyntbot plan show {}", &uuid.to_string()[..8]), TOOL)
-    );
+
+    // Wire up the agent loop and run actual plan execution
+    let provider = providers::create_provider(&config)?;
+    let bus = Arc::new(MessageBus::new(10));
+    let agent_loop = agent::AgentLoop::new(bus, provider, config).await?;
+    let routing_ctx = RoutingContext::new("cli".into(), "default".into());
+
+    match agent_loop.run_plan_execution(&uuid, &routing_ctx).await {
+        Ok(summary) => {
+            println!("{} {}", status_success(), summary);
+        }
+        Err(e) => {
+            println!("{} Plan execution failed: {}", status_error(), e);
+        }
+    }
 
     Ok(())
 }

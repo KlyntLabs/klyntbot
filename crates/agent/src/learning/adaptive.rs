@@ -107,17 +107,15 @@ impl AdaptiveThresholds {
         }
 
         let old = self.state.current_threshold;
-        self.state
-            .threshold_history
-            .push(ThresholdChange {
-                from: old,
-                to: new_threshold,
-                reason: format!(
-                    "Analysis suggested {:.3} (confidence {:.2}), step-limited from {:.3}",
-                    suggested, analysis.threshold_confidence, old
-                ),
-                timestamp: Utc::now(),
-            });
+        self.state.threshold_history.push(ThresholdChange {
+            from: old,
+            to: new_threshold,
+            reason: format!(
+                "Analysis suggested {:.3} (confidence {:.2}), step-limited from {:.3}",
+                suggested, analysis.threshold_confidence, old
+            ),
+            timestamp: Utc::now(),
+        });
         self.state.current_threshold = new_threshold;
         self.state.last_analysis = Some(analysis.clone());
         self.state.updated_at = Utc::now();
@@ -142,10 +140,7 @@ impl AdaptiveThresholds {
 
         let tmp_path = self.state_path.with_extension("json.tmp");
         let content = serde_json::to_string_pretty(&self.state).map_err(|e| {
-            common::ToolError::ExecutionFailed(format!(
-                "Failed to serialize learning state: {}",
-                e
-            ))
+            common::ToolError::ExecutionFailed(format!("Failed to serialize learning state: {}", e))
         })?;
 
         let mut file = tokio::fs::File::create(&tmp_path).await.map_err(|e| {
@@ -209,7 +204,10 @@ mod tests {
         }
     }
 
-    fn default_adaptive(path: PathBuf, initial: f32) -> impl std::future::Future<Output = AdaptiveThresholds> {
+    fn default_adaptive(
+        path: PathBuf,
+        initial: f32,
+    ) -> impl std::future::Future<Output = AdaptiveThresholds> {
         AdaptiveThresholds::load(path, initial, 0.4, 0.9, 50)
     }
 
@@ -306,7 +304,10 @@ mod tests {
 
         let analysis = make_analysis(100, 0.5, 0.9); // 100 < 200 min
         let result = adaptive.apply_analysis(&analysis);
-        assert!(result.is_none(), "Should not adapt with fewer than min_outcomes");
+        assert!(
+            result.is_none(),
+            "Should not adapt with fewer than min_outcomes"
+        );
     }
 
     #[tokio::test]

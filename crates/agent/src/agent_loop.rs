@@ -22,15 +22,16 @@ use tools::{
     calendar_tool::{CalendarHandler, CalendarTool},
     cron_tool::CronTool,
     enrichment::EnrichmentHandler,
-    goal_tool::{GoalHandler, GoalTool},
-    EmbeddingHandler,
     filesystem::register_fs_tools,
+    goal_tool::{GoalHandler, GoalTool},
+    learning_tool::{LearningHandler, LearningTool},
     message::MessageTool,
+    plan_tool::PlanCompletionHandler,
     registry::ToolRegistry,
     shell::ExecTool,
     spawn::SpawnTool,
     web::{WebFetchTool, WebSearchTool},
-    RoutingContext,
+    EmbeddingHandler, RoutingContext,
 };
 
 use super::confidence::{self, ConfidenceEvaluator, DecisionAction, DecisionLogger};
@@ -38,6 +39,17 @@ use super::{AgentEvent, CalendarSyncAdapter, ContextBuilder, CronHandlerAdapter,
 
 /// Maximum number of tool-calling iterations before returning final response
 const MAX_TOOL_ITERATIONS: usize = 20;
+
+/// A request to execute an approved plan via the execution queue.
+///
+/// Sent through the plan queue mpsc channel to the dedicated worker task,
+/// which calls `run_plan_execution()` for each request in order.
+pub struct PlanExecutionRequest {
+    /// The ID of the plan to execute (must be in Approved state).
+    pub plan_id: uuid::Uuid,
+    /// Routing context for channel/session routing during execution.
+    pub routing_ctx: tools::RoutingContext,
+}
 
 /// Default session history limit (number of messages)
 const DEFAULT_HISTORY_LIMIT: usize = 50;
@@ -112,6 +124,8 @@ pub struct AgentLoop {
     outcome_recorder: Option<Arc<crate::learning::OutcomeRecorder>>,
     /// Background learning service for adaptive threshold updates (None if learning disabled)
     learning_service: Option<Arc<RwLock<crate::learning::LearningService>>>,
+    /// Handler called after plan execution finishes (updates linked goal metrics)
+    plan_completion_handler: Option<Arc<dyn PlanCompletionHandler>>,
 }
 
 impl AgentLoop {
@@ -134,6 +148,7 @@ impl AgentLoop {
             workspace.clone(),
             config.timezone.clone(),
             Some(Arc::clone(&todo_store)),
+            goal_store.as_ref().map(Arc::clone),
         )
         .await;
         context_builder.init().await.map_err(|e| {
@@ -142,6 +157,8 @@ impl AgentLoop {
                 e
             )))
         })?;
+        // Wrap early so both the learning subscriber and Ok(Self{}) share the same Arc.
+        let context_builder = Arc::new(RwLock::new(context_builder));
 
         // Create session manager
         let sessions_dir = dirs::home_dir()
@@ -240,8 +257,8 @@ impl AgentLoop {
             );
 
             // Inject calendar handler into TodoTool for immediate sync
-            todo_tool = todo_tool
-                .with_calendar_handler(Arc::clone(&adapter) as Arc<dyn CalendarHandler>);
+            todo_tool =
+                todo_tool.with_calendar_handler(Arc::clone(&adapter) as Arc<dyn CalendarHandler>);
 
             tool_registry.register(CalendarTool::new(
                 Arc::clone(&adapter) as Arc<dyn CalendarHandler>
@@ -266,18 +283,20 @@ impl AgentLoop {
         // The full LearningService is wired later using the same store.
         let outcome_store = if config.learning.enabled {
             let store_path = config.learning_outcomes_path();
-            Some(Arc::new(RwLock::new(crate::learning::OutcomeStore::new(store_path))))
+            Some(Arc::new(RwLock::new(crate::learning::OutcomeStore::new(
+                store_path,
+            ))))
         } else {
             None
         };
-        let outcome_recorder = outcome_store.as_ref().map(|store| {
-            Arc::new(crate::learning::OutcomeRecorder::new(Arc::clone(store)))
-        });
+        let outcome_recorder = outcome_store
+            .as_ref()
+            .map(|store| Arc::new(crate::learning::OutcomeRecorder::new(Arc::clone(store))));
 
         // Wire enrichment feedback into learning system
         if let Some(ref recorder) = outcome_recorder {
             todo_tool = todo_tool.with_feedback_handler(
-                Arc::clone(recorder) as Arc<dyn tools::EnrichmentFeedbackHandler>,
+                Arc::clone(recorder) as Arc<dyn tools::EnrichmentFeedbackHandler>
             );
         }
 
@@ -305,7 +324,8 @@ impl AgentLoop {
                 );
 
             // Capture for MemoryTool unified search
-            todo_embedding_handler = Some(Arc::clone(&embedding_handler) as Arc<dyn EmbeddingHandler>);
+            todo_embedding_handler =
+                Some(Arc::clone(&embedding_handler) as Arc<dyn EmbeddingHandler>);
             todo_embedding_store = Some(emb_store);
         } else {
             todo_embedding_handler = None;
@@ -315,11 +335,9 @@ impl AgentLoop {
         tool_registry.register(todo_tool);
 
         // Register goal tool (if goal_store is provided)
-        if let Some(gs) = goal_store {
-            let goal_handler = Arc::new(super::GoalHandlerImpl::new(gs));
-            tool_registry.register(GoalTool::new(Some(
-                goal_handler as Arc<dyn GoalHandler>,
-            )));
+        if let Some(ref gs) = goal_store {
+            let goal_handler = Arc::new(super::GoalHandlerImpl::new(Arc::clone(gs)));
+            tool_registry.register(GoalTool::new(Some(goal_handler as Arc<dyn GoalHandler>)));
         }
 
         // Register plan tool and create plan executor (if plan_store is provided)
@@ -335,6 +353,14 @@ impl AgentLoop {
             (None, None)
         };
 
+        // Wire plan completion handler (updates linked goal when plan finishes)
+        let plan_completion_handler: Option<Arc<dyn PlanCompletionHandler>> =
+            goal_store.as_ref().map(|gs| {
+                Arc::new(
+                    super::plan_completion_handler::PlanCompletionHandlerImpl::new(Arc::clone(gs)),
+                ) as Arc<dyn PlanCompletionHandler>
+            });
+
         // Register conversation embedding handler (Phase 4.1)
         let conversation_embedding_handler = if config.conversation.embedding.enabled {
             let conv_store_path = dirs::home_dir()
@@ -343,11 +369,15 @@ impl AgentLoop {
                 .join("data")
                 .join("conversation_embeddings.jsonl");
 
-            let conv_store = Arc::new(RwLock::new(tools::ConversationEmbeddingStore::new(conv_store_path)));
-            let handler = Arc::new(super::conversation_embedding_handler::ConversationEmbeddingHandlerImpl::new(
-                Arc::clone(&embedding_engine),
-                conv_store,
-            ));
+            let conv_store = Arc::new(RwLock::new(tools::ConversationEmbeddingStore::new(
+                conv_store_path,
+            )));
+            let handler = Arc::new(
+                super::conversation_embedding_handler::ConversationEmbeddingHandlerImpl::new(
+                    Arc::clone(&embedding_engine),
+                    conv_store,
+                ),
+            );
             Some(handler as Arc<dyn tools::ConversationEmbeddingHandler>)
         } else {
             None
@@ -425,13 +455,44 @@ impl AgentLoop {
                 )
                 .await,
             ));
+
+            // Register LearningTool so the LLM can query learning insights
+            let learning_handler = Arc::new(super::LearningHandlerImpl::new(
+                Arc::clone(store),
+                Arc::clone(&adaptive),
+            ));
+            tool_registry.register(LearningTool::new(Some(
+                learning_handler as Arc<dyn LearningHandler>,
+            )));
+
+            // Create event bus: LearningService publishes, AgentLoop subscribes.
+            let event_bus = Arc::new(bus::LearningEventBus::new(16));
+
+            // Spawn subscriber task — updates ContextBuilder threshold on ThresholdChanged.
+            // Task self-terminates when the event bus sender drops (i.e., after LearningService stops).
+            let cb_for_subscriber = Arc::clone(&context_builder);
+            let mut event_rx = event_bus.subscribe();
+            tokio::spawn(async move {
+                while let Ok(event) = event_rx.recv().await {
+                    if let bus::LearningEvent::ThresholdChanged { new_threshold, .. } = event {
+                        let mut cb = cb_for_subscriber.write().await;
+                        cb.set_confidence_threshold(new_threshold);
+                        info!(
+                            "ContextBuilder threshold updated by LearningService: {:.3}",
+                            new_threshold
+                        );
+                    }
+                }
+            });
+
             let threshold_handle = confidence_evaluator.as_ref().map(|e| e.threshold_handle());
             let mut service = crate::learning::LearningService::new(
                 Arc::clone(store),
                 adaptive,
                 threshold_handle,
                 Duration::from_secs(config.learning.analysis_interval_secs),
-            );
+            )
+            .with_event_bus(event_bus);
             service.start();
             Some(Arc::new(RwLock::new(service)))
         } else {
@@ -448,7 +509,7 @@ impl AgentLoop {
             inbound_rx: Some(inbound_rx),
             provider,
             config,
-            context_builder: Arc::new(RwLock::new(context_builder)),
+            context_builder,
             session_manager: Arc::new(RwLock::new(session_manager)),
             tool_registry: Arc::new(RwLock::new(tool_registry)),
             subagent_manager,
@@ -466,6 +527,7 @@ impl AgentLoop {
             plan_executing: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             outcome_recorder,
             learning_service,
+            plan_completion_handler,
         })
     }
 
@@ -477,13 +539,16 @@ impl AgentLoop {
         let goal_store = Some(Arc::new(RwLock::new(goal::GoalStore::new(goal_path))));
         let plan_path = config.plan_store_path();
         let plan_store = Some(Arc::new(RwLock::new(plan::PlanStore::new(plan_path))));
-        Self::new_with_cron(bus, provider, config, None, todo_store, goal_store, plan_store, None).await
+        Self::new_with_cron(
+            bus, provider, config, None, todo_store, goal_store, plan_store, None,
+        )
+        .await
     }
 
     /// Check if a plan is currently executing.
     /// Returns true if plan mode is active, false for normal chat mode.
     /// This determines the iteration limit: 50 for plans, 20 for chat.
-    fn is_plan_executing(&self) -> bool {
+    pub fn is_plan_executing(&self) -> bool {
         self.plan_executing.load(Ordering::SeqCst)
     }
 
@@ -588,82 +653,117 @@ impl AgentLoop {
             _ => {
                 return Err(common::KlyntbotError::Tool(
                     common::ToolError::ExecutionFailed(
-                        "Plan execution not configured (missing plan_store or plan_executor)".into(),
+                        "Plan execution not configured (missing plan_store or plan_executor)"
+                            .into(),
                     ),
                 ))
             }
         };
 
-        // Load and validate the plan
-        let mut plan = {
+        // Load and validate, then transition to Executing in-place (zero-copy).
+        let (plan_title, initial_step_idx) = {
             let mut store = store_arc.write().await;
-            store
-                .get(plan_id)
-                .await?
-                .ok_or_else(|| {
+            let plan = store.get(plan_id).await?.ok_or_else(|| {
+                common::KlyntbotError::Plan(common::PlanError::NotFound(plan_id.to_string()))
+            })?;
+
+            // Validate: must be in Approved state
+            PlanStatus::validate_transition(&plan.status, &PlanStatus::Executing)?;
+
+            let title = plan.title.clone();
+            let step_idx = plan.current_step_index;
+
+            // Transition to Executing in-place — no Plan clone
+            {
+                let p = store.get_mut(plan_id).await?.ok_or_else(|| {
                     common::KlyntbotError::Plan(common::PlanError::NotFound(plan_id.to_string()))
-                })?
+                })?;
+                p.status = PlanStatus::Executing;
+                p.updated_at = Utc::now();
+            }
+            store.persist_latest(plan_id).await?;
+
+            (title, step_idx)
         };
-
-        // Validate: must be in Approved state
-        PlanStatus::validate_transition(&plan.status, &PlanStatus::Executing)?;
-
-        // Transition plan → Executing
-        plan.status = PlanStatus::Executing;
-        plan.updated_at = Utc::now();
-        {
-            let mut store = store_arc.write().await;
-            store.upsert(plan.clone()).await?;
-        }
 
         // Set executing flag (affects iteration limit in run_agent_loop)
         self.plan_executing.store(true, Ordering::SeqCst);
 
-        info!(
-            "Starting plan execution: '{}' ({} steps)",
-            plan.title,
-            plan.steps.len()
-        );
+        // RAII guard: clears the flag on ALL exit paths — normal return, break, and ? propagation.
+        // Without this guard, any ? operator inside the loop leaks the flag as true permanently.
+        struct PlanExecutingGuard(Arc<std::sync::atomic::AtomicBool>);
+        impl Drop for PlanExecutingGuard {
+            fn drop(&mut self) {
+                self.0.store(false, std::sync::atomic::Ordering::SeqCst);
+            }
+        }
+        let _flag_guard = PlanExecutingGuard(Arc::clone(&self.plan_executing));
 
-        // Execute steps sequentially
-        let mut step_idx = plan.current_step_index;
-        let step_count = plan.steps.len();
+        let mut step_idx = initial_step_idx;
         // Tracks how many full plan regenerations have occurred (distinct from per-step retries)
         let mut backtrack_count: usize = 0;
+        // step_count is re-read after regeneration
+        let mut step_count = {
+            let mut store = store_arc.write().await;
+            store
+                .get_mut(plan_id)
+                .await?
+                .map(|p| p.steps.len())
+                .unwrap_or(0)
+        };
 
-        let result = loop {
+        info!(
+            "Starting plan execution: '{}' ({} steps)",
+            plan_title, step_count
+        );
+
+        let result: Result<(String, bool)> = loop {
             if step_idx >= step_count {
-                break Ok(format!(
-                    "Plan '{}' completed: all {} steps executed.",
-                    plan.title, step_count
+                break Ok((
+                    format!(
+                        "Plan '{}' completed: all {} steps executed.",
+                        plan_title, step_count
+                    ),
+                    true,
                 ));
             }
 
-            // Build context window (current + next 3 steps)
-            let plan_context = executor.build_step_context(&plan, step_idx);
+            // Under one lock: build step context, clone just the PlanStep (not whole Plan),
+            // mark step Executing in-place, then persist. Lock released before LLM call.
+            let (plan_context, step_snapshot, step_description) = {
+                let mut store = store_arc.write().await;
+                let p = store.get_mut(plan_id).await?.ok_or_else(|| {
+                    common::KlyntbotError::Plan(common::PlanError::NotFound(plan_id.to_string()))
+                })?;
+
+                let ctx = executor.build_step_context(p, step_idx);
+                let step_desc = p.steps[step_idx].description.clone();
+                // Clone just the step for execute_step — far cheaper than cloning Plan
+                let step_snap = p.steps[step_idx].clone();
+
+                // Mark Executing in-place
+                p.steps[step_idx].status = StepStatus::Executing;
+                p.steps[step_idx].started_at = Some(Utc::now());
+                p.steps[step_idx].attempt_count += 1;
+                p.updated_at = Utc::now();
+                // NLL releases the borrow of store through p here (last use of p)
+                store.persist_latest(plan_id).await?;
+
+                (ctx, step_snap, step_desc)
+            };
 
             debug!(
                 "Executing step {}/{}: {}",
                 step_idx + 1,
                 step_count,
-                plan.steps[step_idx].description
+                step_description
             );
 
-            // Mark step as Executing
-            plan.steps[step_idx].status = StepStatus::Executing;
-            plan.steps[step_idx].started_at = Some(Utc::now());
-            plan.steps[step_idx].attempt_count += 1;
-            plan.updated_at = Utc::now();
-            {
-                let mut store = store_arc.write().await;
-                store.upsert(plan.clone()).await?;
-            }
-
-            // Execute the step
+            // Execute the step — no store lock held during the long-running LLM call
             let step_start = Instant::now();
             let step_result = executor
                 .execute_step(
-                    &plan.steps[step_idx],
+                    &step_snapshot,
                     &plan_context,
                     &self.provider,
                     &self.tool_registry,
@@ -675,15 +775,21 @@ impl AgentLoop {
 
             // Record plan step outcome for the learning system (best-effort)
             if let Some(recorder) = &self.outcome_recorder {
-                let step_description = plan.steps[step_idx].description.clone();
                 let (success, error_cat, step_confidence, recorded_tool_name) = match &step_result {
                     Ok(r) => (
                         r.success,
                         None,
                         r.confidence.as_ref(),
-                        r.tool_name.clone().unwrap_or_else(|| step_description.clone()),
+                        r.tool_name
+                            .clone()
+                            .unwrap_or_else(|| step_description.clone()),
                     ),
-                    Err(_) => (false, Some("execution_error"), None, step_description.clone()),
+                    Err(_) => (
+                        false,
+                        Some("execution_error"),
+                        None,
+                        step_description.clone(),
+                    ),
                 };
                 let session_key = format!("{}:{}", routing_ctx.channel, routing_ctx.chat_id);
                 recorder
@@ -704,24 +810,41 @@ impl AgentLoop {
 
             match step_result {
                 Ok(result) if result.success => {
-                    info!("Step {}/{} completed successfully", step_idx + 1, step_count);
+                    info!(
+                        "Step {}/{} completed successfully",
+                        step_idx + 1,
+                        step_count
+                    );
 
-                    // Mark step Completed
-                    plan.steps[step_idx].status = StepStatus::Completed;
-                    plan.steps[step_idx].result = Some(result.output);
-                    plan.steps[step_idx].completed_at = Some(Utc::now());
+                    // Mark step Completed in-place — no Plan clone
+                    let mut store = store_arc.write().await;
+                    let p = store.get_mut(plan_id).await?.ok_or_else(|| {
+                        common::KlyntbotError::Plan(common::PlanError::NotFound(
+                            plan_id.to_string(),
+                        ))
+                    })?;
+                    p.steps[step_idx].status = StepStatus::Completed;
+                    p.steps[step_idx].result = Some(result.output);
+                    p.steps[step_idx].completed_at = Some(Utc::now());
                     step_idx += 1;
-                    plan.current_step_index = step_idx;
-                    plan.updated_at = Utc::now();
-                    {
-                        let mut store = store_arc.write().await;
-                        store.upsert(plan.clone()).await?;
-                    }
+                    p.current_step_index = step_idx;
+                    p.updated_at = Utc::now();
+                    store.persist_latest(plan_id).await?;
                 }
                 Ok(result) => {
-                    // Step failed — check if we can retry
-                    let attempt = plan.steps[step_idx].attempt_count;
-                    let max_attempts = plan.steps[step_idx].max_attempts;
+                    // Step failed — read attempt info from store, then update in-place
+                    let (attempt, max_attempts) = {
+                        let mut store = store_arc.write().await;
+                        let p = store.get_mut(plan_id).await?.ok_or_else(|| {
+                            common::KlyntbotError::Plan(common::PlanError::NotFound(
+                                plan_id.to_string(),
+                            ))
+                        })?;
+                        (
+                            p.steps[step_idx].attempt_count,
+                            p.steps[step_idx].max_attempts,
+                        )
+                    };
                     let failure_reason = result.failure_reason.unwrap_or(result.output);
 
                     warn!(
@@ -733,13 +856,23 @@ impl AgentLoop {
                         failure_reason
                     );
 
-                    // Record backtrack entry
-                    plan.backtrack_history.push(plan::BacktrackEntry {
-                        step_index: step_idx,
-                        attempt,
-                        failure_reason: failure_reason.clone(),
-                        timestamp: Utc::now(),
-                    });
+                    // Record backtrack entry in-place
+                    {
+                        let mut store = store_arc.write().await;
+                        let p = store.get_mut(plan_id).await?.ok_or_else(|| {
+                            common::KlyntbotError::Plan(common::PlanError::NotFound(
+                                plan_id.to_string(),
+                            ))
+                        })?;
+                        p.backtrack_history.push(plan::BacktrackEntry {
+                            step_index: step_idx,
+                            attempt,
+                            failure_reason: failure_reason.clone(),
+                            timestamp: Utc::now(),
+                        });
+                        p.updated_at = Utc::now();
+                        store.persist_latest(plan_id).await?;
+                    }
 
                     if attempt < max_attempts {
                         // Exponential backoff before retry: 2^(attempt-1) seconds
@@ -752,22 +885,20 @@ impl AgentLoop {
                             max_attempts
                         );
                         tokio::time::sleep(tokio::time::Duration::from_secs(backoff_secs)).await;
-
-                        // Persist state before retry
-                        plan.updated_at = Utc::now();
-                        let mut store = store_arc.write().await;
-                        store.upsert(plan.clone()).await?;
                     } else {
                         // Max per-step attempts exhausted — check backtrack limit
                         backtrack_count += 1;
                         if backtrack_count >= super::plan_executor::MAX_BACKTRACK_ATTEMPTS {
-                            // Backtrack limit reached — fail the plan
-                            plan.steps[step_idx].status = StepStatus::Failed;
-                            plan.updated_at = Utc::now();
-                            {
-                                let mut store = store_arc.write().await;
-                                store.upsert(plan.clone()).await?;
-                            }
+                            // Backtrack limit reached — fail the plan in-place
+                            let mut store = store_arc.write().await;
+                            let p = store.get_mut(plan_id).await?.ok_or_else(|| {
+                                common::KlyntbotError::Plan(common::PlanError::NotFound(
+                                    plan_id.to_string(),
+                                ))
+                            })?;
+                            p.steps[step_idx].status = StepStatus::Failed;
+                            p.updated_at = Utc::now();
+                            store.persist_latest(plan_id).await?;
                             break Err(common::KlyntbotError::Plan(
                                 common::PlanError::BacktrackLimitReached(
                                     super::plan_executor::MAX_BACKTRACK_ATTEMPTS,
@@ -775,7 +906,6 @@ impl AgentLoop {
                             ));
                         }
 
-                        // Regenerate steps from this failure point forward
                         warn!(
                             "Regenerating steps from index {} after {} attempts (backtrack {}/{})",
                             step_idx,
@@ -783,46 +913,88 @@ impl AgentLoop {
                             backtrack_count,
                             super::plan_executor::MAX_BACKTRACK_ATTEMPTS
                         );
-                        plan.steps[step_idx].status = StepStatus::Failed;
+
+                        // Regeneration requires a Plan snapshot for the LLM call (one-time clone)
+                        let plan_snapshot = {
+                            let mut store = store_arc.write().await;
+                            let p = store.get_mut(plan_id).await?.ok_or_else(|| {
+                                common::KlyntbotError::Plan(common::PlanError::NotFound(
+                                    plan_id.to_string(),
+                                ))
+                            })?;
+                            p.steps[step_idx].status = StepStatus::Failed;
+                            p.clone() // One-time snapshot clone for the LLM regeneration call
+                        };
+
                         let new_steps = executor
-                            .regenerate_from(&plan, step_idx, &failure_reason, &self.provider)
+                            .regenerate_from(
+                                &plan_snapshot,
+                                step_idx,
+                                &failure_reason,
+                                &self.provider,
+                            )
                             .await?;
 
-                        // Replace steps from step_idx forward with new steps
-                        plan.steps.truncate(step_idx);
-                        plan.steps.extend(new_steps);
-                        plan.updated_at = Utc::now();
-                        {
-                            let mut store = store_arc.write().await;
-                            store.upsert(plan.clone()).await?;
-                        }
+                        // Replace steps from step_idx forward in-place
+                        let mut store = store_arc.write().await;
+                        let p = store.get_mut(plan_id).await?.ok_or_else(|| {
+                            common::KlyntbotError::Plan(common::PlanError::NotFound(
+                                plan_id.to_string(),
+                            ))
+                        })?;
+                        p.steps.truncate(step_idx);
+                        p.steps.extend(new_steps);
+                        step_count = p.steps.len();
+                        p.updated_at = Utc::now();
+                        store.persist_latest(plan_id).await?;
+
                         // step_idx stays the same — now points to first regenerated step
                         info!(
                             "Regenerated {} steps from index {}",
-                            plan.steps.len() - step_idx,
+                            step_count - step_idx,
                             step_idx
                         );
                     }
                 }
                 Err(e) => {
-                    // Hard error (not a soft failure) — fail the plan immediately
-                    plan.steps[step_idx].status = StepStatus::Failed;
-                    plan.status = PlanStatus::Failed;
-                    plan.updated_at = Utc::now();
-                    {
-                        let mut store = store_arc.write().await;
-                        store.upsert(plan.clone()).await?;
-                    }
+                    // Hard error — mark step Failed in-place, let finalizer own plan status
+                    let mut store = store_arc.write().await;
+                    let p = store.get_mut(plan_id).await?.ok_or_else(|| {
+                        common::KlyntbotError::Plan(common::PlanError::NotFound(
+                            plan_id.to_string(),
+                        ))
+                    })?;
+                    p.steps[step_idx].status = StepStatus::Failed;
+                    p.updated_at = Utc::now();
+                    store.persist_latest(plan_id).await?;
                     break Err(e);
                 }
             }
 
-            // Guard against exceeding iteration limit
-            if plan.backtrack_history.len() >= plan.iteration_limit {
-                plan.steps[step_idx].status = StepStatus::Failed;
-                break Ok(format!(
-                    "Plan '{}' halted: iteration limit ({}) reached.",
-                    plan.title, plan.iteration_limit
+            // Guard against exceeding iteration limit.
+            // Compare backtrack_count (plan regenerations) — NOT backtrack_history.len()
+            // (which counts every per-step retry and inflates the check prematurely).
+            let iter_limit = {
+                let mut store = store_arc.write().await;
+                let p = store.get_mut(plan_id).await?.ok_or_else(|| {
+                    common::KlyntbotError::Plan(common::PlanError::NotFound(plan_id.to_string()))
+                })?;
+                p.iteration_limit
+            };
+            if backtrack_count >= iter_limit {
+                let mut store = store_arc.write().await;
+                let p = store.get_mut(plan_id).await?.ok_or_else(|| {
+                    common::KlyntbotError::Plan(common::PlanError::NotFound(plan_id.to_string()))
+                })?;
+                p.steps[step_idx].status = StepStatus::Failed;
+                p.updated_at = Utc::now();
+                store.persist_latest(plan_id).await?;
+                break Ok((
+                    format!(
+                        "Plan '{}' halted: iteration limit ({}) reached.",
+                        plan_title, iter_limit
+                    ),
+                    false,
                 ));
             }
         };
@@ -830,34 +1002,50 @@ impl AgentLoop {
         // Clear executing flag
         self.plan_executing.store(false, Ordering::SeqCst);
 
-        // Finalize plan state based on execution result
-        let summary = match &result {
-            Ok(msg) if msg.contains("completed: all") => {
-                plan.status = PlanStatus::Completed;
-                plan.completed_at = Some(Utc::now());
-                plan.updated_at = Utc::now();
-                msg.clone()
-            }
-            Ok(msg) => {
-                // Partial completion (halted or failed)
-                plan.status = PlanStatus::Failed;
-                plan.updated_at = Utc::now();
-                msg.clone()
-            }
-            Err(_) => {
-                plan.status = PlanStatus::Failed;
-                plan.updated_at = Utc::now();
-                format!("Plan '{}' failed with an error.", plan.title)
-            }
+        // Finalize plan status in-place — no Plan clone
+        let (summary, plan_goal_id, plan_succeeded) = {
+            let mut store = store_arc.write().await;
+            let p = store.get_mut(plan_id).await?.ok_or_else(|| {
+                common::KlyntbotError::Plan(common::PlanError::NotFound(plan_id.to_string()))
+            })?;
+            let goal_id = p.goal_id;
+            let (msg, succeeded) = match &result {
+                Ok((msg, true)) => {
+                    p.status = PlanStatus::Completed;
+                    p.completed_at = Some(Utc::now());
+                    p.updated_at = Utc::now();
+                    ((*msg).clone(), true)
+                }
+                Ok((msg, _)) => {
+                    p.status = PlanStatus::Failed;
+                    p.updated_at = Utc::now();
+                    ((*msg).clone(), false)
+                }
+                Err(_) => {
+                    p.status = PlanStatus::Failed;
+                    p.updated_at = Utc::now();
+                    (
+                        format!("Plan '{}' failed with an error.", plan_title),
+                        false,
+                    )
+                }
+            };
+            store.persist_latest(plan_id).await?;
+            (msg, goal_id, succeeded)
         };
 
-        {
-            let mut store = store_arc.write().await;
-            store.upsert(plan).await?;
+        // Notify the completion handler (best-effort; updates linked goal metrics)
+        if let Some(handler) = &self.plan_completion_handler {
+            if let Err(e) = handler
+                .on_plan_completed(plan_id, plan_goal_id, plan_succeeded, &summary)
+                .await
+            {
+                warn!("PlanCompletionHandler failed (non-fatal): {}", e);
+            }
         }
 
         info!("{}", summary);
-        result.map(|_| summary)
+        result.map(|_| summary.clone())
     }
 
     /// Process a single inbound message
@@ -905,7 +1093,12 @@ impl AgentLoop {
                 let sk = session_key.to_string();
                 let role = "user".to_string();
                 let content_str = msg.content.clone();
-                let msg_id = session.messages.last().expect("Message should exist after add_message").id.clone();
+                let msg_id = session
+                    .messages
+                    .last()
+                    .expect("Message should exist after add_message")
+                    .id
+                    .clone();
 
                 tokio::spawn(async move {
                     if let Err(e) = h.embed_message(&sk, &role, &content_str, &msg_id).await {
@@ -1101,7 +1294,12 @@ impl AgentLoop {
                     let role = "assistant".to_string();
                     let content_str = content.to_string();
                     // Get the ID of the message we just added
-                    let msg_id = session.messages.last().expect("Message should exist after add_message").id.clone();
+                    let msg_id = session
+                        .messages
+                        .last()
+                        .expect("Message should exist after add_message")
+                        .id
+                        .clone();
 
                     tokio::spawn(async move {
                         if let Err(e) = h.embed_message(&sk, &role, &content_str, &msg_id).await {
@@ -1138,7 +1336,11 @@ impl AgentLoop {
         let mut final_content = None;
 
         // Dynamic iteration limit: 50 for plan mode, 20 for chat mode
-        let max_iterations = if self.is_plan_executing() { 50 } else { MAX_TOOL_ITERATIONS };
+        let max_iterations = if self.is_plan_executing() {
+            50
+        } else {
+            MAX_TOOL_ITERATIONS
+        };
 
         for iteration in 0..max_iterations {
             // Check for cancellation before each iteration
@@ -1284,7 +1486,9 @@ impl AgentLoop {
                                     self.confidence_evaluator
                                         .as_ref()
                                         .map(|e| e.threshold())
-                                        .expect("confidence_evaluator must exist in Clarify branch"),
+                                        .expect(
+                                            "confidence_evaluator must exist in Clarify branch"
+                                        ),
                                 ),
                                 assessment.reasoning,
                             );
@@ -1346,15 +1550,15 @@ impl AgentLoop {
                 .collect();
 
             let results = join_all(tool_futures).await;
-            let outcome_session_key =
-                format!("{}:{}", routing_ctx.channel, routing_ctx.chat_id);
+            let outcome_session_key = format!("{}:{}", routing_ctx.channel, routing_ctx.chat_id);
             for (id, name, result, duration_ms) in results {
                 // Record outcome for learning system (best-effort, privacy-by-omission)
                 if let Some(recorder) = &self.outcome_recorder {
                     let success = result.is_ok();
-                    let error_cat = result.as_ref().err().map(|e| {
-                        crate::learning::recorder::categorize_error(&e.to_string())
-                    });
+                    let error_cat = result
+                        .as_ref()
+                        .err()
+                        .map(|e| crate::learning::recorder::categorize_error(&e.to_string()));
                     recorder
                         .record_tool_outcome(
                             &name,
@@ -1524,7 +1728,9 @@ impl AgentLoop {
                                     self.confidence_evaluator
                                         .as_ref()
                                         .map(|e| e.threshold())
-                                        .expect("confidence_evaluator must exist in Clarify branch"),
+                                        .expect(
+                                            "confidence_evaluator must exist in Clarify branch"
+                                        ),
                                 ),
                                 assessment.reasoning,
                             );
@@ -1584,15 +1790,15 @@ impl AgentLoop {
                 .collect();
 
             let results = join_all(tool_futures).await;
-            let outcome_session_key =
-                format!("{}:{}", routing_ctx.channel, routing_ctx.chat_id);
+            let outcome_session_key = format!("{}:{}", routing_ctx.channel, routing_ctx.chat_id);
             for (id, name, result, duration_ms) in results {
                 // Record outcome for learning system (best-effort, privacy-by-omission)
                 if let Some(recorder) = &self.outcome_recorder {
                     let success = result.is_ok();
-                    let error_cat = result.as_ref().err().map(|e| {
-                        crate::learning::recorder::categorize_error(&e.to_string())
-                    });
+                    let error_cat = result
+                        .as_ref()
+                        .err()
+                        .map(|e| crate::learning::recorder::categorize_error(&e.to_string()));
                     recorder
                         .record_tool_outcome(
                             &name,
@@ -1646,7 +1852,12 @@ impl AgentLoop {
                 let sk = session_key.clone();
                 let role = "user".to_string();
                 let content_str = content.clone();
-                let msg_id = session.messages.last().expect("Message should exist after add_message").id.clone();
+                let msg_id = session
+                    .messages
+                    .last()
+                    .expect("Message should exist after add_message")
+                    .id
+                    .clone();
 
                 tokio::spawn(async move {
                     if let Err(e) = h.embed_message(&sk, &role, &content_str, &msg_id).await {
@@ -1717,7 +1928,12 @@ impl AgentLoop {
                 let sk = session_key.clone();
                 let role = "user".to_string();
                 let content_str = content.clone();
-                let msg_id = session.messages.last().expect("Message should exist after add_message").id.clone();
+                let msg_id = session
+                    .messages
+                    .last()
+                    .expect("Message should exist after add_message")
+                    .id
+                    .clone();
 
                 tokio::spawn(async move {
                     if let Err(e) = h.embed_message(&sk, &role, &content_str, &msg_id).await {
@@ -1850,6 +2066,7 @@ enum IterationOutcome {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use bus::{LearningEvent, LearningEventBus};
     use chrono::Utc;
     use confidence::types::{
         AssessmentPhase, ConfidenceAssessment, ConfidenceDimensions, DecisionAction,
@@ -1872,6 +2089,52 @@ mod tests {
             action: DecisionAction::default(),
             assessed_at: Utc::now(),
         }
+    }
+
+    /// AC-I2.3/2.4: AgentLoop subscriber task updates ContextBuilder threshold
+    /// when LearningService publishes a ThresholdChanged event.
+    #[tokio::test]
+    async fn test_learning_subscriber_updates_context_threshold() {
+        use crate::ContextBuilder;
+
+        let workspace = std::path::PathBuf::from("/tmp/test-subscriber-i2-agent");
+        let ctx = Arc::new(RwLock::new(
+            ContextBuilder::new(workspace, "UTC".to_string(), None, None).await,
+        ));
+
+        let event_bus = Arc::new(LearningEventBus::new(16));
+        let ctx_clone = Arc::clone(&ctx);
+        let mut rx = event_bus.subscribe();
+
+        // Spawn subscriber (same pattern as AgentLoop::new_with_cron wires it)
+        let handle = tokio::spawn(async move {
+            while let Ok(event) = rx.recv().await {
+                if let LearningEvent::ThresholdChanged { new_threshold, .. } = event {
+                    let mut cb = ctx_clone.write().await;
+                    cb.set_confidence_threshold(new_threshold);
+                }
+            }
+        });
+
+        // Publish threshold change (what LearningService will do)
+        event_bus
+            .publish(LearningEvent::ThresholdChanged {
+                old_threshold: 0.70,
+                new_threshold: 0.82,
+                reason: "test_subscriber".to_string(),
+            })
+            .await;
+
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        let cb = ctx.read().await;
+        assert!(
+            (cb.confidence_threshold() - 0.82).abs() < f32::EPSILON,
+            "Expected threshold 0.82, got {}",
+            cb.confidence_threshold()
+        );
+
+        handle.abort();
     }
 
     #[test]

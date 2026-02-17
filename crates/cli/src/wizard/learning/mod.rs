@@ -32,11 +32,11 @@ impl LearningSubAction {
     /// Check if this action is available given the current configuration state.
     pub(super) fn is_available(&self, enabled: bool) -> bool {
         match self {
-            Self::Enable => !enabled,              // Only show if currently disabled
-            Self::Disable => enabled,              // Only show if currently enabled
-            Self::ConfigureInterval => enabled,    // Only configurable when enabled
-            Self::ConfigureBounds => enabled,      // Only configurable when enabled
-            Self::Close => true,                   // Always available
+            Self::Enable => !enabled,           // Only show if currently disabled
+            Self::Disable => enabled,           // Only show if currently enabled
+            Self::ConfigureInterval => enabled, // Only configurable when enabled
+            Self::ConfigureBounds => enabled,   // Only configurable when enabled
+            Self::Close => true,                // Always available
         }
     }
 
@@ -69,16 +69,29 @@ pub(super) fn execute_enable(config: &mut Config) -> Result<()> {
     println!("{} Learning system enabled!", colorize("✓", SUCCESS));
     println!();
     println!("The learning system will:");
-    println!("  {} Record tool execution outcomes (privacy-safe)", colorize("•", BRAND));
-    println!("  {} Track enrichment suggestion feedback", colorize("•", BRAND));
-    println!("  {} Adapt confidence thresholds based on accuracy", colorize("•", BRAND));
-    println!("  {} Learn your preferences over time", colorize("•", BRAND));
+    println!(
+        "  {} Record tool execution outcomes (privacy-safe)",
+        colorize("•", BRAND)
+    );
+    println!(
+        "  {} Track enrichment suggestion feedback",
+        colorize("•", BRAND)
+    );
+    println!(
+        "  {} Adapt confidence thresholds based on accuracy",
+        colorize("•", BRAND)
+    );
+    println!(
+        "  {} Learn your preferences over time",
+        colorize("•", BRAND)
+    );
     println!();
     println!("{}", colorize("Privacy: ", BOLD));
     println!("Only metadata is stored (tool names, success rates).");
     println!("No user messages or tool arguments are persisted.");
     println!();
-    println!("Analysis runs every {} seconds ({})",
+    println!(
+        "Analysis runs every {} seconds ({})",
         config.learning.analysis_interval_secs,
         format_interval(config.learning.analysis_interval_secs)
     );
@@ -114,8 +127,14 @@ pub(super) fn execute_configure_interval(config: &mut Config) -> Result<()> {
     println!();
     println!("How often should the system analyze outcomes and adapt?");
     println!();
-    println!("  {} 3600 (1 hour) — Frequent adaptation", colorize("•", DIM));
-    println!("  {} 86400 (24 hours) — Daily analysis ← recommended", colorize("•", BRAND));
+    println!(
+        "  {} 3600 (1 hour) — Frequent adaptation",
+        colorize("•", DIM)
+    );
+    println!(
+        "  {} 86400 (24 hours) — Daily analysis ← recommended",
+        colorize("•", BRAND)
+    );
     println!("  {} 604800 (1 week) — Weekly analysis", colorize("•", DIM));
     println!();
 
@@ -134,7 +153,8 @@ pub(super) fn execute_configure_interval(config: &mut Config) -> Result<()> {
         match interval_str.parse::<u64>() {
             Ok(secs) if secs >= 60 => {
                 config.learning.analysis_interval_secs = secs;
-                println!("{} Interval set to {} ({})",
+                println!(
+                    "{} Interval set to {} ({})",
                     colorize("✓", SUCCESS),
                     secs,
                     format_interval(secs)
@@ -168,7 +188,10 @@ pub(super) fn execute_configure_bounds(config: &mut Config) -> Result<()> {
     println!();
     println!("The system adapts its confidence threshold within these bounds:");
     println!();
-    println!("Current: [{}, {}]", config.learning.min_threshold, config.learning.max_threshold);
+    println!(
+        "Current: [{}, {}]",
+        config.learning.min_threshold, config.learning.max_threshold
+    );
     println!();
     println!("  {} 0.4 — Minimum (asks less often)", colorize("•", DIM));
     println!("  {} 0.9 — Maximum (asks more often)", colorize("•", DIM));
@@ -193,7 +216,11 @@ pub(super) fn execute_configure_bounds(config: &mut Config) -> Result<()> {
                 println!("{} Min threshold set to {}", colorize("✓", SUCCESS), t);
             }
             _ => {
-                println!("{} Invalid threshold. Keeping {}", colorize("✗", ERROR), config.learning.min_threshold);
+                println!(
+                    "{} Invalid threshold. Keeping {}",
+                    colorize("✗", ERROR),
+                    config.learning.min_threshold
+                );
             }
         }
     }
@@ -217,13 +244,18 @@ pub(super) fn execute_configure_bounds(config: &mut Config) -> Result<()> {
                 println!("{} Max threshold set to {}", colorize("✓", SUCCESS), t);
             }
             _ => {
-                println!("{} Invalid threshold. Keeping {}", colorize("✗", ERROR), config.learning.max_threshold);
+                println!(
+                    "{} Invalid threshold. Keeping {}",
+                    colorize("✗", ERROR),
+                    config.learning.max_threshold
+                );
             }
         }
     }
 
     println!();
-    println!("{} Bounds: [{}, {}]",
+    println!(
+        "{} Bounds: [{}, {}]",
         colorize("✓", SUCCESS),
         config.learning.min_threshold,
         config.learning.max_threshold

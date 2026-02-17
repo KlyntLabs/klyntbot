@@ -3,9 +3,9 @@
 //! This module provides reusable search infrastructure for merging ranked lists from
 //! multiple sources (keyword, semantic, etc.) using the RRF algorithm.
 
-use std::collections::HashMap;
 use crate::conversation_embedding::ConversationEmbeddingRecord;
 use crate::todo_types::Todo;
+use std::collections::HashMap;
 
 /// Search result types that can be merged via RRF
 #[derive(Debug, Clone)]
@@ -100,8 +100,8 @@ mod tests {
 
     // Helper: Create a mock Todo for testing
     fn mock_todo(id: &str, title: &str) -> Todo {
-        use chrono::Utc;
         use crate::todo_types::TodoStatus;
+        use chrono::Utc;
         Todo {
             id: id.to_string(),
             title: title.to_string(),
@@ -143,7 +143,10 @@ mod tests {
         ];
         let semantic = vec![("1".to_string(), 0.9), ("3".to_string(), 0.8)];
         let mut map = HashMap::new();
-        map.insert("3".to_string(), SearchResult::Todo(Box::new(mock_todo("3", "Third"))));
+        map.insert(
+            "3".to_string(),
+            SearchResult::Todo(Box::new(mock_todo("3", "Third"))),
+        );
 
         let results = rrf_merge(&keyword, &semantic, k, &map);
 
@@ -165,7 +168,10 @@ mod tests {
 
         let results = rrf_merge(&keyword, &semantic, 60, &map);
 
-        assert!(results.is_empty(), "Empty inputs should return empty results");
+        assert!(
+            results.is_empty(),
+            "Empty inputs should return empty results"
+        );
     }
 
     #[test]
@@ -185,7 +191,10 @@ mod tests {
         let keyword = vec![];
         let semantic = vec![("2".to_string(), 0.9)];
         let mut map = HashMap::new();
-        map.insert("2".to_string(), SearchResult::Todo(Box::new(mock_todo("2", "Only semantic"))));
+        map.insert(
+            "2".to_string(),
+            SearchResult::Todo(Box::new(mock_todo("2", "Only semantic"))),
+        );
 
         let results = rrf_merge(&keyword, &semantic, 60, &map);
 
@@ -206,7 +215,10 @@ mod tests {
             ("C".to_string(), 0.85),
         ];
         let mut map = HashMap::new();
-        map.insert("C".to_string(), SearchResult::Todo(Box::new(mock_todo("C", "Gamma"))));
+        map.insert(
+            "C".to_string(),
+            SearchResult::Todo(Box::new(mock_todo("C", "Gamma"))),
+        );
 
         let results = rrf_merge(&keyword, &semantic, k, &map);
 

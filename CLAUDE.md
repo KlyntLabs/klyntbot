@@ -7,16 +7,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 cargo build --workspace              # Build all crates
 cargo build --release                # Optimized release build (LTO, stripped)
-cargo test --workspace               # Run all 910+ tests
-cargo test -p agent                  # Test a single crate
-cargo test -p calendar               # Test calendar crate specifically
-cargo test --test integration_tests  # Run a specific test file
-cargo test test_session_persistence  # Run a single test by name
-cargo test -- --nocapture            # Show test stdout
+cargo nextest run --workspace        # Run all 910+ tests (parallel, faster than cargo test)
+cargo nextest run -p agent           # Test a single crate
+cargo nextest run -p calendar        # Test calendar crate specifically
+cargo nextest run --test integration_tests  # Run a specific test file
+cargo nextest run -E 'test(session_persistence)'  # Run tests matching pattern
+cargo nextest run --nocapture        # Show test stdout (nextest captures by default)
+cargo nextest run --failure-output immediate  # Show failures as they happen
+cargo test --workspace --doc         # Run doctests (nextest doesn't support doctests, use cargo test)
 cargo clippy --workspace --all-targets --all-features  # Lint (must be 0 warnings)
 cargo fmt --all --check              # Check formatting
 cargo build --no-default-features    # Build without email channel
 ```
+
+**Why nextest?** Parallel test execution (faster), better output formatting, test retries, partition support for CI. Falls back to `cargo test --doc` for doctests only.
 
 ## Architecture
 

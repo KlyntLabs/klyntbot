@@ -33,4 +33,17 @@ pub enum AgentEvent {
 
     /// An error occurred during processing.
     Error(String),
+
+    /// A single plan step completed successfully.
+    PlanStepCompleted {
+        plan_id: uuid::Uuid,
+        step_index: usize,
+        result: String,
+    },
+
+    /// A plan execution finished (completed or failed).
+    PlanCompleted {
+        plan_id: uuid::Uuid,
+        summary: String,
+    },
 }

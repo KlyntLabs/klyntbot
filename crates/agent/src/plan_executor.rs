@@ -124,23 +124,21 @@ impl PlanExecutor {
                     registry.get(&tool_call.name)
                 };
                 match tool {
-                    Some(t) => {
-                        match t.execute(tool_call.arguments.clone(), routing_ctx).await {
-                            Ok(out) => results.push(format!("{}: {}", tool_call.name, out)),
-                            Err(e) => {
-                                return Ok(StepExecutionResult {
-                                    success: false,
-                                    output: String::new(),
-                                    failure_reason: Some(format!(
-                                        "Tool '{}' execution failed: {e}",
-                                        tool_call.name
-                                    )),
-                                    confidence,
-                                    tool_name: Some(first_tool_name),
-                                });
-                            }
+                    Some(t) => match t.execute(tool_call.arguments.clone(), routing_ctx).await {
+                        Ok(out) => results.push(format!("{}: {}", tool_call.name, out)),
+                        Err(e) => {
+                            return Ok(StepExecutionResult {
+                                success: false,
+                                output: String::new(),
+                                failure_reason: Some(format!(
+                                    "Tool '{}' execution failed: {e}",
+                                    tool_call.name
+                                )),
+                                confidence,
+                                tool_name: Some(first_tool_name),
+                            });
                         }
-                    }
+                    },
                     None => {
                         return Ok(StepExecutionResult {
                             success: false,
@@ -246,7 +244,9 @@ impl PlanExecutor {
         let content = response.content.unwrap_or_default();
 
         // Attempt to parse LLM response; fall back to a single retry step on failure
-        let steps = self.parse_steps_from_json(&content, failure_index).unwrap_or_default();
+        let steps = self
+            .parse_steps_from_json(&content, failure_index)
+            .unwrap_or_default();
 
         if steps.is_empty() {
             // LLM returned empty or unparseable output — create a minimal retry step
@@ -288,11 +288,7 @@ impl PlanExecutor {
     }
 
     /// Parse a JSON array of step objects returned by the LLM into PlanStep values.
-    fn parse_steps_from_json(
-        &self,
-        json_str: &str,
-        start_index: usize,
-    ) -> Result<Vec<PlanStep>> {
+    fn parse_steps_from_json(&self, json_str: &str, start_index: usize) -> Result<Vec<PlanStep>> {
         // Tolerate LLMs wrapping the array in markdown fences or prose
         let trimmed = self.extract_json_array(json_str);
 
@@ -564,8 +560,12 @@ mod tests {
                 reasoning_content: None,
             })
         }
-        fn default_model(&self) -> &str { "mock" }
-        fn name(&self) -> &str { "mock_regen" }
+        fn default_model(&self) -> &str {
+            "mock"
+        }
+        fn name(&self) -> &str {
+            "mock_regen"
+        }
     }
 
     // Test 18: regenerate_from() preserves completed steps and creates new steps
@@ -652,11 +652,15 @@ mod tests {
     // --- Tests 23-26: execute_step() behavioural tests (Phase 4A - dev-3) ---
 
     use async_trait::async_trait;
-    use providers::types::{ChatParams, LlmProvider, LlmResponse, ToolCall as ProviderToolCall, Usage};
+    use providers::types::{
+        ChatParams, LlmProvider, LlmResponse, ToolCall as ProviderToolCall, Usage,
+    };
     use serde_json::Value as JsonValue;
     use tools::{registry::ToolRegistry, RoutingContext, Tool};
 
-    struct MockLlmToolCall { tool_name: String }
+    struct MockLlmToolCall {
+        tool_name: String,
+    }
 
     #[async_trait]
     impl LlmProvider for MockLlmToolCall {
@@ -678,11 +682,17 @@ mod tests {
                 reasoning_content: None,
             })
         }
-        fn default_model(&self) -> &str { "mock" }
-        fn name(&self) -> &str { "mock" }
+        fn default_model(&self) -> &str {
+            "mock"
+        }
+        fn name(&self) -> &str {
+            "mock"
+        }
     }
 
-    struct MockLlmText { text: String }
+    struct MockLlmText {
+        text: String,
+    }
 
     #[async_trait]
     impl LlmProvider for MockLlmText {
@@ -700,16 +710,24 @@ mod tests {
                 reasoning_content: None,
             })
         }
-        fn default_model(&self) -> &str { "mock" }
-        fn name(&self) -> &str { "mock" }
+        fn default_model(&self) -> &str {
+            "mock"
+        }
+        fn name(&self) -> &str {
+            "mock"
+        }
     }
 
     struct EchoTool;
 
     #[async_trait]
     impl Tool for EchoTool {
-        fn name(&self) -> &str { "echo_tool" }
-        fn description(&self) -> &str { "Echoes back" }
+        fn name(&self) -> &str {
+            "echo_tool"
+        }
+        fn description(&self) -> &str {
+            "Echoes back"
+        }
         fn parameters(&self) -> JsonValue {
             serde_json::json!({"type": "object", "properties": {}})
         }
@@ -755,9 +773,16 @@ mod tests {
             .await
             .expect("execute_step should not return Err");
 
-        assert!(res.success, "expected success; failure: {:?}", res.failure_reason);
-        assert!(res.output.contains("echo result"),
-            "expected 'echo result' in output, got: {}", res.output);
+        assert!(
+            res.success,
+            "expected success; failure: {:?}",
+            res.failure_reason
+        );
+        assert!(
+            res.output.contains("echo result"),
+            "expected 'echo result' in output, got: {}",
+            res.output
+        );
     }
 
     // Test 24: provider returns text-only → text becomes output → success
@@ -799,7 +824,8 @@ mod tests {
         assert!(!res.success, "should fail when tool is missing");
         let reason = res.failure_reason.expect("failure_reason should be set");
         assert!(
-            reason.to_lowercase().contains("ghost_tool") || reason.to_lowercase().contains("not found"),
+            reason.to_lowercase().contains("ghost_tool")
+                || reason.to_lowercase().contains("not found"),
             "failure reason should mention the missing tool: {reason}"
         );
     }
@@ -829,8 +855,7 @@ mod tests {
         // The backtrack limit is 3: checked in run_plan_execution() before calling
         // regenerate_from(). After 3 full backtrack events the plan is marked Failed.
         assert_eq!(
-            MAX_BACKTRACK_ATTEMPTS,
-            3,
+            MAX_BACKTRACK_ATTEMPTS, 3,
             "MAX_BACKTRACK_ATTEMPTS should be 3 (architecture decision)"
         );
     }

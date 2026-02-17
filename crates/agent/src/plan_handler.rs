@@ -181,9 +181,7 @@ mod tests {
         // Maps to: US-1 (AC-1.2), Handler delegation
 
         let dir = tempdir().unwrap();
-        let store = Arc::new(RwLock::new(PlanStore::new(
-            dir.path().join("plans.jsonl"),
-        )));
+        let store = Arc::new(RwLock::new(PlanStore::new(dir.path().join("plans.jsonl"))));
         let handler = PlanHandlerImpl::new(store);
 
         let plan = handler
@@ -210,9 +208,7 @@ mod tests {
         // Maps to: US-1 (AC-1.2)
 
         let dir = tempdir().unwrap();
-        let store = Arc::new(RwLock::new(PlanStore::new(
-            dir.path().join("plans.jsonl"),
-        )));
+        let store = Arc::new(RwLock::new(PlanStore::new(dir.path().join("plans.jsonl"))));
         let handler = PlanHandlerImpl::new(store);
 
         let plan = handler
@@ -241,9 +237,7 @@ mod tests {
         // Decision: Strict validation - return error if not in Draft status
 
         let dir = tempdir().unwrap();
-        let store_arc = Arc::new(RwLock::new(PlanStore::new(
-            dir.path().join("plans.jsonl"),
-        )));
+        let store_arc = Arc::new(RwLock::new(PlanStore::new(dir.path().join("plans.jsonl"))));
         let handler = PlanHandlerImpl::new(Arc::clone(&store_arc));
 
         let mut plan = handler
@@ -280,9 +274,7 @@ mod tests {
         // Maps to: US-1 (AC-1.2)
 
         let dir = tempdir().unwrap();
-        let store_arc = Arc::new(RwLock::new(PlanStore::new(
-            dir.path().join("plans.jsonl"),
-        )));
+        let store_arc = Arc::new(RwLock::new(PlanStore::new(dir.path().join("plans.jsonl"))));
         let handler = PlanHandlerImpl::new(Arc::clone(&store_arc));
 
         let mut plan = handler
@@ -313,9 +305,7 @@ mod tests {
         // Maps to: Critical Fix 2 - State machine validation
 
         let dir = tempdir().unwrap();
-        let store_arc = Arc::new(RwLock::new(PlanStore::new(
-            dir.path().join("plans.jsonl"),
-        )));
+        let store_arc = Arc::new(RwLock::new(PlanStore::new(dir.path().join("plans.jsonl"))));
         let handler = PlanHandlerImpl::new(Arc::clone(&store_arc));
 
         let mut plan = handler
@@ -353,9 +343,7 @@ mod tests {
         // Maps to: Critical Fix 2 - State machine validation
 
         let dir = tempdir().unwrap();
-        let store_arc = Arc::new(RwLock::new(PlanStore::new(
-            dir.path().join("plans.jsonl"),
-        )));
+        let store_arc = Arc::new(RwLock::new(PlanStore::new(dir.path().join("plans.jsonl"))));
         let handler = PlanHandlerImpl::new(Arc::clone(&store_arc));
 
         let mut plan = handler

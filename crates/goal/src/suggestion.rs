@@ -134,7 +134,10 @@ mod tests {
         let result = engine.detect_goal_intent("I need to learn Rust programming");
         assert!(result.is_some());
         let suggestion = result.unwrap();
-        assert!(suggestion.proposed_title.contains("Learn") || suggestion.proposed_title.contains("learn"));
+        assert!(
+            suggestion.proposed_title.contains("Learn")
+                || suggestion.proposed_title.contains("learn")
+        );
         assert!(suggestion.confidence > 0.0);
     }
 

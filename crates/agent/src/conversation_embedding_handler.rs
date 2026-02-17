@@ -55,7 +55,10 @@ impl ConversationEmbeddingHandler for ConversationEmbeddingHandlerImpl {
         let embedding = match embedding_result {
             Ok(Ok(emb)) => emb,
             Ok(Err(e)) => {
-                warn!("Failed to generate conversation embedding for message {}: {}", message_id, e);
+                warn!(
+                    "Failed to generate conversation embedding for message {}: {}",
+                    message_id, e
+                );
                 return Ok(()); // Best-effort: don't propagate errors
             }
             Err(e) => {
@@ -89,7 +92,10 @@ impl ConversationEmbeddingHandler for ConversationEmbeddingHandlerImpl {
         // Store (best-effort, log errors but don't propagate)
         let store = self.store.write().await;
         if let Err(e) = store.upsert(record).await {
-            warn!("Failed to store conversation embedding for message {}: {}", message_id, e);
+            warn!(
+                "Failed to store conversation embedding for message {}: {}",
+                message_id, e
+            );
         }
 
         Ok(())
@@ -182,7 +188,10 @@ mod tests {
             .await;
 
         // Should succeed (best-effort) even when model unavailable
-        assert!(result.is_ok(), "embed_message should succeed even when model unavailable");
+        assert!(
+            result.is_ok(),
+            "embed_message should succeed even when model unavailable"
+        );
     }
 
     #[tokio::test]
@@ -194,7 +203,10 @@ mod tests {
             .embed_message("telegram:12345", "assistant", "Response", "msg-2")
             .await;
 
-        assert!(result.is_ok(), "Should succeed with best-effort even on embedding error");
+        assert!(
+            result.is_ok(),
+            "Should succeed with best-effort even on embedding error"
+        );
     }
 
     #[tokio::test]
@@ -226,6 +238,9 @@ mod tests {
         let (handler, _dir) = create_test_handler().await;
 
         // Engine uses lazy init, model not loaded yet
-        assert!(!handler.is_available(), "Should return false before model loads");
+        assert!(
+            !handler.is_available(),
+            "Should return false before model loads"
+        );
     }
 }

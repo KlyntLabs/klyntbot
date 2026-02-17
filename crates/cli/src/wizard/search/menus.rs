@@ -11,16 +11,16 @@ use super::{
     execute_configure_threshold, execute_disable, execute_enable_and_download, SearchSubAction,
     SUB_ACTIONS,
 };
-use crate::wizard::ui::MenuOutcome;
 use crate::wizard::ui;
+use crate::wizard::ui::MenuOutcome;
 
 /// Menu state for semantic search configuration.
 struct SearchMenuState {
-    cursor: usize,              // Main menu cursor position
-    expanded: Option<usize>,    // Which item is expanded (None = all collapsed)
-    sub_cursor: usize,          // Sub-menu cursor position
-    in_sub_menu: bool,          // Whether cursor is in sub-menu
-    can_go_back: bool,          // Whether "Back" option is available
+    cursor: usize,           // Main menu cursor position
+    expanded: Option<usize>, // Which item is expanded (None = all collapsed)
+    sub_cursor: usize,       // Sub-menu cursor position
+    in_sub_menu: bool,       // Whether cursor is in sub-menu
+    can_go_back: bool,       // Whether "Back" option is available
 }
 
 impl SearchMenuState {

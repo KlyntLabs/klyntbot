@@ -355,10 +355,7 @@ mod tests {
         assert_eq!(err.to_string(), "Goal store error: disk full");
 
         let err = GoalError::ValidationFailed("title is required".to_string());
-        assert_eq!(
-            err.to_string(),
-            "Goal validation failed: title is required"
-        );
+        assert_eq!(err.to_string(), "Goal validation failed: title is required");
     }
 
     #[test]

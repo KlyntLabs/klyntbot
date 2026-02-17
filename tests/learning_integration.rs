@@ -20,7 +20,7 @@ use klyntbot::agent::learning::adaptive::AdaptiveThresholds;
 use klyntbot::agent::learning::analyzer::LearningAnalyzer;
 use klyntbot::agent::learning::types::{AnalysisResult, EnrichmentStats};
 use klyntbot::agent::learning::{ExecutionMode, OutcomeRecord, OutcomeRecorder, OutcomeStore};
-use klyntbot::agent::{LearningService};
+use klyntbot::agent::LearningService;
 use klyntbot::config::Config;
 use klyntbot::{AgentLoop, MessageBus};
 use std::sync::atomic::Ordering;
@@ -40,9 +40,7 @@ use mock_provider::MockProvider;
 
 /// Create an agent loop with learning enabled, isolated to a temp directory.
 #[allow(dead_code)]
-async fn create_agent_with_learning(
-    provider: Arc<MockProvider>,
-) -> (AgentLoop, TempDir) {
+async fn create_agent_with_learning(provider: Arc<MockProvider>) -> (AgentLoop, TempDir) {
     let temp_dir = TempDir::new().unwrap();
     std::env::set_var("HOME", temp_dir.path());
 
@@ -89,7 +87,6 @@ fn text_response(text: &str) -> klyntbot::providers::types::LlmResponse {
     }
 }
 
-
 // ─────────────────────────────────────────────────────────────
 // AC: Per-tool-call tracking + duration (Decision #1)
 // ─────────────────────────────────────────────────────────────
@@ -121,7 +118,10 @@ async fn test_ac_tool_call_outcome_recorded_on_success() {
     let mut guard = store.write().await;
     let outcomes = guard.get_all_outcomes().await.unwrap();
 
-    assert!(!outcomes.is_empty(), "at least one outcome must be recorded");
+    assert!(
+        !outcomes.is_empty(),
+        "at least one outcome must be recorded"
+    );
     let rec = outcomes.iter().find(|o| o.tool_name == "todo").unwrap();
     assert!(rec.success, "outcome must record success=true");
     assert_eq!(rec.duration_ms, 42);
@@ -193,7 +193,6 @@ async fn test_ac_plan_step_outcomes_tagged_correctly() {
     // The agent loop records plan step outcomes using ExecutionMode::PlanStep.
     // This test verifies the type is correctly serialized (structural check).
 
-
     let mode = ExecutionMode::PlanStep {
         plan_id: "plan-test-001".to_string(),
         step_index: 2,
@@ -221,14 +220,11 @@ async fn test_ac_plan_step_outcomes_tagged_correctly() {
 /// it persists in the outcome store.
 #[tokio::test]
 async fn test_ac_enrichment_feedback_recorded_on_override() {
-
     use tools::EnrichmentFeedbackEntry;
 
     let temp_dir = TempDir::new().unwrap();
     let store_path = temp_dir.path().join("outcomes.jsonl");
-    let store = Arc::new(RwLock::new(OutcomeStore::new(
-        store_path.clone(),
-    )));
+    let store = Arc::new(RwLock::new(OutcomeStore::new(store_path.clone())));
     let recorder = Arc::new(OutcomeRecorder::new(Arc::clone(&store)));
 
     // Simulate: enrichment suggested priority=1, user overrode to priority=3
@@ -241,30 +237,27 @@ async fn test_ac_enrichment_feedback_recorded_on_override() {
         confidence: 0.85,
         timestamp: chrono::Utc::now(),
     };
-    recorder
-        .record_feedback(feedback)
-        .await
-        .unwrap();
+    recorder.record_feedback(feedback).await.unwrap();
 
     let mut guard = store.write().await;
     let all_fb = guard.get_all_feedback().await.unwrap();
     assert_eq!(all_fb.len(), 1, "one feedback entry must be stored");
     assert_eq!(all_fb[0].task_id, "todo-001");
-    assert!(!all_fb[0].accepted, "override must be recorded as not accepted");
+    assert!(
+        !all_fb[0].accepted,
+        "override must be recorded as not accepted"
+    );
     assert_eq!(all_fb[0].actual_value.as_deref(), Some("3"));
 }
 
 /// When the user keeps the enrichment suggestion, accepted=true is recorded.
 #[tokio::test]
 async fn test_ac_enrichment_feedback_recorded_on_accept() {
-
     use tools::EnrichmentFeedbackEntry;
 
     let temp_dir = TempDir::new().unwrap();
     let store_path = temp_dir.path().join("outcomes.jsonl");
-    let store = Arc::new(RwLock::new(OutcomeStore::new(
-        store_path,
-    )));
+    let store = Arc::new(RwLock::new(OutcomeStore::new(store_path)));
     let recorder = Arc::new(OutcomeRecorder::new(Arc::clone(&store)));
 
     let feedback = EnrichmentFeedbackEntry {
@@ -276,15 +269,15 @@ async fn test_ac_enrichment_feedback_recorded_on_accept() {
         confidence: 0.90,
         timestamp: chrono::Utc::now(),
     };
-    recorder
-        .record_feedback(feedback)
-        .await
-        .unwrap();
+    recorder.record_feedback(feedback).await.unwrap();
 
     let mut guard = store.write().await;
     let all_fb = guard.get_all_feedback().await.unwrap();
     assert_eq!(all_fb.len(), 1);
-    assert!(all_fb[0].accepted, "accepted suggestion must be recorded as accepted");
+    assert!(
+        all_fb[0].accepted,
+        "accepted suggestion must be recorded as accepted"
+    );
     assert!(all_fb[0].actual_value.is_none());
 }
 
@@ -295,11 +288,6 @@ async fn test_ac_enrichment_feedback_recorded_on_accept() {
 /// Analysis with outcomes that suggest a very low threshold is clamped to >= 0.4.
 #[tokio::test]
 async fn test_ac_threshold_never_below_min_bound() {
-
-
-
-
-
     let temp_dir = TempDir::new().unwrap();
     let state_path = temp_dir.path().join("state.json");
     let mut adaptive = AdaptiveThresholds::load(state_path, 0.42, 0.4, 0.9, 50).await;
@@ -338,11 +326,6 @@ async fn test_ac_threshold_never_below_min_bound() {
 /// Analysis suggesting very high threshold is clamped to <= 0.9.
 #[tokio::test]
 async fn test_ac_threshold_never_above_max_bound() {
-
-
-
-
-
     let temp_dir = TempDir::new().unwrap();
     let state_path = temp_dir.path().join("state.json");
     let mut adaptive = AdaptiveThresholds::load(state_path, 0.88, 0.4, 0.9, 50).await;
@@ -354,7 +337,11 @@ async fn test_ac_threshold_never_above_max_bound() {
             session_key: "test:abc".to_string(),
             tool_name: "todo".to_string(),
             success: i >= 55, // only succeed at highest confidence values
-            error_category: if i < 55 { Some("validation".to_string()) } else { None },
+            error_category: if i < 55 {
+                Some("validation".to_string())
+            } else {
+                None
+            },
             duration_ms: 10,
             confidence_score: Some(i as f32 / 60.0),
             confidence_dimensions: None,
@@ -381,9 +368,6 @@ async fn test_ac_threshold_never_above_max_bound() {
 /// A single analysis step never changes threshold by more than 0.05.
 #[tokio::test]
 async fn test_ac_threshold_step_limit_enforced() {
-
-
-
     let temp_dir = TempDir::new().unwrap();
     let state_path = temp_dir.path().join("state.json");
     let mut adaptive = AdaptiveThresholds::load(state_path, 0.7, 0.4, 0.9, 50).await;
@@ -416,9 +400,6 @@ async fn test_ac_threshold_step_limit_enforced() {
 /// Threshold does NOT adapt when fewer than 50 outcomes exist.
 #[tokio::test]
 async fn test_ac_cold_start_no_adaptation_below_minimum() {
-
-
-
     let temp_dir = TempDir::new().unwrap();
     let state_path = temp_dir.path().join("state.json");
     let mut adaptive = AdaptiveThresholds::load(state_path, 0.7, 0.4, 0.9, 50).await;
@@ -443,9 +424,6 @@ async fn test_ac_cold_start_no_adaptation_below_minimum() {
 /// Adaptation fires once exactly 50 outcomes are reached.
 #[tokio::test]
 async fn test_ac_adaptation_triggers_at_minimum_outcomes() {
-
-
-
     let temp_dir = TempDir::new().unwrap();
     let state_path = temp_dir.path().join("state.json");
     let mut adaptive = AdaptiveThresholds::load(state_path, 0.7, 0.4, 0.9, 50).await;
@@ -532,10 +510,7 @@ async fn test_ac_compaction_reduces_size_preserves_data() {
 
     // Size may be same since compact rewrites exactly the live records;
     // what matters is that data is preserved and no .tmp file lingers
-    assert!(
-        size_after > 0,
-        "compacted file must not be empty"
-    );
+    assert!(size_after > 0, "compacted file must not be empty");
     let tmp_path = path.with_extension("jsonl.tmp");
     assert!(
         !tmp_path.exists(),
@@ -603,9 +578,6 @@ async fn test_ac_corrupted_jsonl_line_is_skipped_gracefully() {
 /// OutcomeRecord JSON never contains "tool_args", "arguments", or "user_message".
 #[tokio::test]
 async fn test_ac_privacy_no_args_or_messages_in_outcomes() {
-
-
-
     let record = OutcomeRecord {
         id: "privacy-test".to_string(),
         session_key: "test:hash".to_string(),
@@ -641,14 +613,9 @@ async fn test_ac_privacy_no_args_or_messages_in_outcomes() {
 /// Session keys in stored records have hashed suffixes, not originals.
 #[tokio::test]
 async fn test_ac_privacy_session_key_is_hashed() {
-
-
-
     let temp_dir = TempDir::new().unwrap();
     let store_path = temp_dir.path().join("outcomes.jsonl");
-    let store = Arc::new(RwLock::new(OutcomeStore::new(
-        store_path,
-    )));
+    let store = Arc::new(RwLock::new(OutcomeStore::new(store_path)));
     let recorder = OutcomeRecorder::new(Arc::clone(&store));
 
     recorder
@@ -687,9 +654,6 @@ async fn test_ac_privacy_session_key_is_hashed() {
 /// analyze_now() runs synchronously and returns Ok.
 #[tokio::test]
 async fn test_ac_analyze_now_returns_immediate_result() {
-
-
-
     let temp_dir = TempDir::new().unwrap();
     let store = Arc::new(RwLock::new(OutcomeStore::new(
         temp_dir.path().join("outcomes.jsonl"),
@@ -700,7 +664,11 @@ async fn test_ac_analyze_now_returns_immediate_result() {
 
     let service = LearningService::new(store, adaptive, None, Duration::from_secs(9999));
     let result = service.analyze_now().await;
-    assert!(result.is_ok(), "analyze_now must return Ok: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "analyze_now must return Ok: {:?}",
+        result.err()
+    );
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -710,8 +678,6 @@ async fn test_ac_analyze_now_returns_immediate_result() {
 /// ConfidenceEvaluator reflects threshold updates via AtomicU32 handle.
 #[tokio::test]
 async fn test_ac_confidence_evaluator_uses_dynamic_threshold() {
-
-
     let evaluator = ConfidenceEvaluator::new(0.65);
     assert!(
         (evaluator.threshold() - 0.65).abs() < f32::EPSILON,
@@ -737,8 +703,6 @@ async fn test_ac_confidence_evaluator_uses_dynamic_threshold() {
 /// The confidence_prompt function takes a dynamic threshold and reflects it in output.
 #[tokio::test]
 async fn test_ac_confidence_prompt_has_no_hardcoded_threshold() {
-
-
     // With threshold 0.5, the prompt must mention 0.5 (not hardcoded 0.7)
     let prompt_50 = confidence_prompt(0.5);
     assert!(
@@ -781,8 +745,12 @@ async fn test_ac_learning_disabled_no_recording() {
 
     let provider = Arc::new(MockProvider::new("Hello!"));
     let mut config = Config::default();
-    config.agents.defaults.workspace =
-        temp_dir.path().join("workspace").to_str().unwrap().to_string();
+    config.agents.defaults.workspace = temp_dir
+        .path()
+        .join("workspace")
+        .to_str()
+        .unwrap()
+        .to_string();
     config.learning.enabled = false;
 
     let bus = Arc::new(MessageBus::new(10));
@@ -812,9 +780,6 @@ async fn test_ac_learning_disabled_no_recording() {
 /// Learning service starts and stops cleanly without panicking.
 #[tokio::test]
 async fn test_ac_learning_service_shutdown_is_clean() {
-
-
-
     let temp_dir = TempDir::new().unwrap();
     let store = Arc::new(RwLock::new(OutcomeStore::new(
         temp_dir.path().join("outcomes.jsonl"),
@@ -835,9 +800,6 @@ async fn test_ac_learning_service_shutdown_is_clean() {
 /// ThresholdChange records survive save/reload cycle.
 #[tokio::test]
 async fn test_ac_threshold_history_persisted_and_reloaded() {
-
-
-
     let temp_dir = TempDir::new().unwrap();
     let state_path = temp_dir.path().join("state.json");
 
@@ -879,10 +841,6 @@ async fn test_ac_threshold_history_persisted_and_reloaded() {
 /// Analyzer produces exactly 5 confidence bands per tool.
 #[tokio::test]
 async fn test_ac_analyzer_produces_five_confidence_bands() {
-
-
-
-
     // One record in each band
     let confidences = [0.1_f32, 0.4, 0.6, 0.75, 0.9];
     let outcomes: Vec<OutcomeRecord> = confidences
@@ -903,7 +861,10 @@ async fn test_ac_analyzer_produces_five_confidence_bands() {
         .collect();
 
     let result = LearningAnalyzer::analyze(&outcomes, &[]);
-    let stats = result.per_tool_stats.get("todo").expect("todo stats must exist");
+    let stats = result
+        .per_tool_stats
+        .get("todo")
+        .expect("todo stats must exist");
 
     assert_eq!(
         stats.success_rate_by_confidence_band.len(),
@@ -913,20 +874,26 @@ async fn test_ac_analyzer_produces_five_confidence_bands() {
 
     // Verify band boundaries are spec-correct
     let bands = &stats.success_rate_by_confidence_band;
-    assert!((bands[0].lower - 0.0).abs() < f32::EPSILON && (bands[0].upper - 0.3).abs() < f32::EPSILON);
-    assert!((bands[1].lower - 0.3).abs() < f32::EPSILON && (bands[1].upper - 0.5).abs() < f32::EPSILON);
-    assert!((bands[2].lower - 0.5).abs() < f32::EPSILON && (bands[2].upper - 0.7).abs() < f32::EPSILON);
-    assert!((bands[3].lower - 0.7).abs() < f32::EPSILON && (bands[3].upper - 0.85).abs() < f32::EPSILON);
-    assert!((bands[4].lower - 0.85).abs() < f32::EPSILON && (bands[4].upper - 1.0).abs() < f32::EPSILON);
+    assert!(
+        (bands[0].lower - 0.0).abs() < f32::EPSILON && (bands[0].upper - 0.3).abs() < f32::EPSILON
+    );
+    assert!(
+        (bands[1].lower - 0.3).abs() < f32::EPSILON && (bands[1].upper - 0.5).abs() < f32::EPSILON
+    );
+    assert!(
+        (bands[2].lower - 0.5).abs() < f32::EPSILON && (bands[2].upper - 0.7).abs() < f32::EPSILON
+    );
+    assert!(
+        (bands[3].lower - 0.7).abs() < f32::EPSILON && (bands[3].upper - 0.85).abs() < f32::EPSILON
+    );
+    assert!(
+        (bands[4].lower - 0.85).abs() < f32::EPSILON && (bands[4].upper - 1.0).abs() < f32::EPSILON
+    );
 }
 
 /// Analyzer's suggested_threshold always falls within [0.4, 0.9].
 #[tokio::test]
 async fn test_ac_analyzer_suggested_threshold_within_bounds() {
-
-
-
-
     // Test with various distributions
     let test_cases: Vec<(&str, bool, f32)> = vec![
         // (description, success, confidence)
@@ -968,8 +935,6 @@ async fn test_ac_analyzer_suggested_threshold_within_bounds() {
 /// EnrichmentStats acceptance_rate is computed correctly.
 #[tokio::test]
 async fn test_ac_enrichment_acceptance_rate_computed_correctly() {
-
-
     let feedback: Vec<_> = (0..10)
         .map(|i| make_feedback(&format!("task-{}", i), i < 7)) // 7 accepted, 3 overridden
         .collect();
@@ -992,7 +957,6 @@ async fn test_ac_enrichment_acceptance_rate_computed_correctly() {
 // ─────────────────────────────────────────────────────────────
 
 fn make_outcome(id: &str, tool: &str, success: bool) -> OutcomeRecord {
-
     OutcomeRecord {
         id: id.to_string(),
         session_key: "test:abc".to_string(),
@@ -1007,12 +971,19 @@ fn make_outcome(id: &str, tool: &str, success: bool) -> OutcomeRecord {
     }
 }
 
-fn make_feedback(task_id: &str, accepted: bool) -> tools::learning_feedback::EnrichmentFeedbackEntry {
+fn make_feedback(
+    task_id: &str,
+    accepted: bool,
+) -> tools::learning_feedback::EnrichmentFeedbackEntry {
     tools::learning_feedback::EnrichmentFeedbackEntry {
         task_id: task_id.to_string(),
         field: "priority".to_string(),
         suggested_value: "1".to_string(),
-        actual_value: if accepted { None } else { Some("3".to_string()) },
+        actual_value: if accepted {
+            None
+        } else {
+            Some("3".to_string())
+        },
         accepted,
         confidence: 0.85,
         timestamp: chrono::Utc::now(),

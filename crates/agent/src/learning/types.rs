@@ -36,10 +36,7 @@ pub struct OutcomeRecord {
 #[serde(rename_all = "snake_case")]
 pub enum ExecutionMode {
     Chat,
-    PlanStep {
-        plan_id: String,
-        step_index: usize,
-    },
+    PlanStep { plan_id: String, step_index: usize },
 }
 
 /// Analysis results computed by LearningAnalyzer.

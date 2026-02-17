@@ -20,8 +20,8 @@ pub use tools;
 
 // Re-export commonly used types for convenience
 pub use agent::{
-    AgentEvent, AgentLoop, ContextBuilder, MemoryStore, SkillManager, StreamingHandle,
-    SubagentManager,
+    AgentEvent, AgentLoop, ContextBuilder, MemoryStore, PlanCompletionHandlerImpl, SkillManager,
+    StreamingHandle, SubagentManager,
 };
 pub use bus::{InboundMessage, MessageBus, OutboundMessage};
 pub use channels::{Channel, ChannelManager, DynChannel};

@@ -695,7 +695,10 @@ impl TodoStore {
             }
 
             // Traverse upward to the next parent
-            current = self.index.get(parent_id).and_then(|t| t.parent_id.as_deref());
+            current = self
+                .index
+                .get(parent_id)
+                .and_then(|t| t.parent_id.as_deref());
         }
 
         false
@@ -2272,7 +2275,11 @@ mod tests {
         assert_eq!(b.parent_id, Some(id_d.clone()), "B's parent should be D");
 
         let c = store.get(&id_c).await.unwrap().unwrap();
-        assert_eq!(c.parent_id, Some(id_b.clone()), "C's parent should still be B");
+        assert_eq!(
+            c.parent_id,
+            Some(id_b.clone()),
+            "C's parent should still be B"
+        );
 
         let d = store.get(&id_d).await.unwrap().unwrap();
         assert_eq!(d.parent_id, None, "D should have no parent");

@@ -859,7 +859,10 @@ async fn test_plan_failure_recovery() {
     // Verify backtrack history is recorded
     let loaded = store.get(&plan_id).await.unwrap().unwrap();
     assert_eq!(loaded.backtrack_history.len(), 1);
-    assert_eq!(loaded.backtrack_history[0].failure_reason, "Simulated failure");
+    assert_eq!(
+        loaded.backtrack_history[0].failure_reason,
+        "Simulated failure"
+    );
 
     // Abandon the failed plan
     let mut abandoned_plan = loaded;
@@ -1035,12 +1038,11 @@ async fn test_cross_channel_plan_isolation() {
 
         async fn approve_plan(&self, id: &Uuid) -> common::Result<Plan> {
             let mut store = self.store.lock().await;
-            let mut plan = store
-                .get(id)
-                .await?
-                .ok_or_else(|| common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(
+            let mut plan = store.get(id).await?.ok_or_else(|| {
+                common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(
                     "Plan not found".into(),
-                )))?;
+                ))
+            })?;
             plan.status = PlanStatus::Approved;
             store.upsert(plan.clone()).await?;
             Ok(plan)
@@ -1048,12 +1050,11 @@ async fn test_cross_channel_plan_isolation() {
 
         async fn abandon_plan(&self, id: &Uuid) -> common::Result<()> {
             let mut store = self.store.lock().await;
-            let mut plan = store
-                .get(id)
-                .await?
-                .ok_or_else(|| common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(
+            let mut plan = store.get(id).await?.ok_or_else(|| {
+                common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(
                     "Plan not found".into(),
-                )))?;
+                ))
+            })?;
             plan.status = PlanStatus::Abandoned;
             store.upsert(plan).await?;
             Ok(())
@@ -1065,12 +1066,11 @@ async fn test_cross_channel_plan_isolation() {
 
         async fn execute_plan(&self, id: &Uuid) -> common::Result<Plan> {
             let mut store = self.store.lock().await;
-            let mut plan = store
-                .get(id)
-                .await?
-                .ok_or_else(|| common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(
+            let mut plan = store.get(id).await?.ok_or_else(|| {
+                common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(
                     "Plan not found".into(),
-                )))?;
+                ))
+            })?;
             plan.status = PlanStatus::Executing;
             store.upsert(plan.clone()).await?;
             Ok(plan)
@@ -1109,20 +1109,14 @@ async fn test_cross_channel_plan_isolation() {
         "description": "Plan from Discord"
     });
 
-    let discord_result = plan_tool
-        .execute(discord_args, &discord_ctx)
-        .await
-        .unwrap();
+    let discord_result = plan_tool.execute(discord_args, &discord_ctx).await.unwrap();
     assert!(discord_result.contains("Discord Plan"));
 
     // Verify cross-channel isolation: each channel should have its own active plan
     // Expected session keys: "telegram:123" and "discord:123" (NOT just "123")
 
     // Get active plan for Telegram session
-    let telegram_active = handler
-        .get_active_plan("telegram:123")
-        .await
-        .unwrap();
+    let telegram_active = handler.get_active_plan("telegram:123").await.unwrap();
     assert!(
         telegram_active.is_some(),
         "Should have active plan for telegram:123"
@@ -1169,9 +1163,7 @@ async fn test_cross_channel_plan_isolation() {
 #[tokio::test]
 async fn test_plan_executor_execute_step_integration() {
     use async_trait::async_trait;
-    use klyntbot::providers::types::{
-        ChatParams, LlmProvider, LlmResponse, ToolCall, Usage,
-    };
+    use klyntbot::providers::types::{ChatParams, LlmProvider, LlmResponse, ToolCall, Usage};
     use klyntbot::tools::{registry::ToolRegistry, RoutingContext, Tool};
     use plan::{PlanStep, StepStatus};
     use serde_json::Value;
@@ -1202,8 +1194,12 @@ async fn test_plan_executor_execute_step_integration() {
                 reasoning_content: None,
             })
         }
-        fn default_model(&self) -> &str { "mock" }
-        fn name(&self) -> &str { "mock" }
+        fn default_model(&self) -> &str {
+            "mock"
+        }
+        fn name(&self) -> &str {
+            "mock"
+        }
     }
 
     // Simple counter tool that records execution
@@ -1217,19 +1213,29 @@ async fn test_plan_executor_execute_step_integration() {
 
     #[async_trait]
     impl Tool for CounterTool {
-        fn name(&self) -> &str { "counter_tool" }
-        fn description(&self) -> &str { "Counts calls" }
+        fn name(&self) -> &str {
+            "counter_tool"
+        }
+        fn description(&self) -> &str {
+            "Counts calls"
+        }
         fn parameters(&self) -> Value {
             serde_json::json!({"type": "object", "properties": {}})
         }
-        async fn execute(&self, _args: Value, _ctx: &RoutingContext) -> klyntbot::error::Result<String> {
+        async fn execute(
+            &self,
+            _args: Value,
+            _ctx: &RoutingContext,
+        ) -> klyntbot::error::Result<String> {
             self.count.fetch_add(1, Ordering::SeqCst);
             Ok("counted".to_string())
         }
     }
 
     let mut registry = ToolRegistry::new();
-    registry.register(CounterTool { count: call_count_clone });
+    registry.register(CounterTool {
+        count: call_count_clone,
+    });
     let registry = Arc::new(RwLock::new(registry));
 
     let provider: klyntbot::providers::DynProvider = Arc::new(MockProviderWithToolCall);
@@ -1258,8 +1264,16 @@ async fn test_plan_executor_execute_step_integration() {
         .expect("execute_step should not return Err in integration test");
 
     // Verify tool was actually called
-    assert_eq!(call_count.load(Ordering::SeqCst), 1, "counter_tool should have been called once");
-    assert!(result.success, "step should succeed; failure: {:?}", result.failure_reason);
+    assert_eq!(
+        call_count.load(Ordering::SeqCst),
+        1,
+        "counter_tool should have been called once"
+    );
+    assert!(
+        result.success,
+        "step should succeed; failure: {:?}",
+        result.failure_reason
+    );
     assert!(
         result.output.contains("counted"),
         "output should contain tool result 'counted', got: {}",
@@ -1285,26 +1299,54 @@ async fn test_plan_handler_execute_plan_integration() {
 
     // Create and approve a plan
     let plan = handler
-        .create_plan("Execution Test", "Test execute_plan transition", "sess:exec-test", None)
+        .create_plan(
+            "Execution Test",
+            "Test execute_plan transition",
+            "sess:exec-test",
+            None,
+        )
         .await
         .expect("create_plan should succeed");
     assert_eq!(plan.status, PlanStatus::Draft);
 
-    let plan = handler.approve_plan(&plan.id).await.expect("approve_plan should succeed");
+    let plan = handler
+        .approve_plan(&plan.id)
+        .await
+        .expect("approve_plan should succeed");
     assert_eq!(plan.status, PlanStatus::Approved);
 
     // Execute the plan — transitions to Executing
-    let executing = handler.execute_plan(&plan.id).await.expect("execute_plan should succeed");
-    assert_eq!(executing.status, PlanStatus::Executing, "plan should be in Executing state");
+    let executing = handler
+        .execute_plan(&plan.id)
+        .await
+        .expect("execute_plan should succeed");
+    assert_eq!(
+        executing.status,
+        PlanStatus::Executing,
+        "plan should be in Executing state"
+    );
 
     // Verify it persisted
-    let persisted = store.write().await.get(&executing.id).await.unwrap().unwrap();
-    assert_eq!(persisted.status, PlanStatus::Executing, "Executing state should persist to store");
+    let persisted = store
+        .write()
+        .await
+        .get(&executing.id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        persisted.status,
+        PlanStatus::Executing,
+        "Executing state should persist to store"
+    );
 
     // Verify that calling execute_plan on an already-Executing plan is a no-op
     // (PlanStatus::validate_transition allows same-state transitions)
     let again = handler.execute_plan(&plan.id).await;
-    assert!(again.is_ok(), "execute_plan on already-Executing plan is a no-op, not an error");
+    assert!(
+        again.is_ok(),
+        "execute_plan on already-Executing plan is a no-op, not an error"
+    );
     assert_eq!(again.unwrap().status, PlanStatus::Executing);
 
     // Verify that Completed → Executing IS rejected (cannot go backwards)
@@ -1316,7 +1358,10 @@ async fn test_plan_handler_execute_plan_integration() {
     drop(store_guard);
 
     let backwards = handler.execute_plan(&executing.id).await;
-    assert!(backwards.is_err(), "execute_plan on Completed plan should fail");
+    assert!(
+        backwards.is_err(),
+        "execute_plan on Completed plan should fail"
+    );
 }
 
 /// Test 27: Iteration limit enforcement
@@ -1351,7 +1396,10 @@ async fn test_plan_iteration_limit_field_persists() {
     };
 
     let saved = store.upsert(plan).await.unwrap();
-    assert_eq!(saved.iteration_limit, 5, "iteration_limit should be saved as 5");
+    assert_eq!(
+        saved.iteration_limit, 5,
+        "iteration_limit should be saved as 5"
+    );
 
     // Verify it persists across store reload
     let plan_id = saved.id;
@@ -1408,7 +1456,9 @@ async fn test_plan_store_concurrent_reads_are_safe() {
         let store_clone = Arc::clone(&store);
         let handle = tokio::spawn(async move {
             let result = store_clone.write().await.get(&plan_id).await;
-            result.expect("read should succeed").expect("plan should exist")
+            result
+                .expect("read should succeed")
+                .expect("plan should exist")
         });
         handles.push(handle);
     }

@@ -213,14 +213,12 @@ mod tests {
         let progress = GoalProgress {
             goal_id,
             completion_percentage: 45.0,
-            metrics: vec![
-                Metric {
-                    name: "Projects done".to_string(),
-                    current: 2.0,
-                    target: 5.0,
-                    unit: "projects".to_string(),
-                },
-            ],
+            metrics: vec![Metric {
+                name: "Projects done".to_string(),
+                current: 2.0,
+                target: 5.0,
+                unit: "projects".to_string(),
+            }],
             summary: "2 of 5 projects completed".to_string(),
         };
 
@@ -260,7 +258,10 @@ mod tests {
         assert!(matches!(deserialized.status, GoalStatus::Active));
         assert_eq!(deserialized.metrics.len(), 1);
         assert_eq!(deserialized.linked_project_ids.len(), 1);
-        assert_eq!(deserialized.metadata.get("category").unwrap(), "engineering");
+        assert_eq!(
+            deserialized.metadata.get("category").unwrap(),
+            "engineering"
+        );
     }
 
     #[test]

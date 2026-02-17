@@ -67,10 +67,7 @@ impl OutcomeStore {
         let content = tokio::fs::read_to_string(&self.file_path)
             .await
             .map_err(|e| {
-                common::ToolError::ExecutionFailed(format!(
-                    "Failed to read outcomes file: {}",
-                    e
-                ))
+                common::ToolError::ExecutionFailed(format!("Failed to read outcomes file: {}", e))
             })?;
 
         for (line_num, line) in content.lines().enumerate() {
@@ -156,10 +153,7 @@ impl OutcomeStore {
     }
 
     /// Get outcomes recorded after a given timestamp.
-    pub async fn outcomes_since(
-        &mut self,
-        cutoff: DateTime<Utc>,
-    ) -> Result<Vec<OutcomeRecord>> {
+    pub async fn outcomes_since(&mut self, cutoff: DateTime<Utc>) -> Result<Vec<OutcomeRecord>> {
         self.ensure_loaded().await?;
         Ok(self
             .outcomes
@@ -175,10 +169,7 @@ impl OutcomeStore {
 
         let tmp_path = self.file_path.with_extension("jsonl.tmp");
         let mut file = tokio::fs::File::create(&tmp_path).await.map_err(|e| {
-            common::ToolError::ExecutionFailed(format!(
-                "Failed to create compact temp file: {}",
-                e
-            ))
+            common::ToolError::ExecutionFailed(format!("Failed to create compact temp file: {}", e))
         })?;
 
         for outcome in &self.outcomes {
@@ -186,16 +177,10 @@ impl OutcomeStore {
                 outcome: outcome.clone(),
             };
             let line = serde_json::to_string(&entry).map_err(|e| {
-                common::ToolError::ExecutionFailed(format!(
-                    "Failed to serialize outcome: {}",
-                    e
-                ))
+                common::ToolError::ExecutionFailed(format!("Failed to serialize outcome: {}", e))
             })?;
             file.write_all(line.as_bytes()).await.map_err(|e| {
-                common::ToolError::ExecutionFailed(format!(
-                    "Failed to write compact entry: {}",
-                    e
-                ))
+                common::ToolError::ExecutionFailed(format!("Failed to write compact entry: {}", e))
             })?;
             file.write_all(b"\n").await.map_err(|e| {
                 common::ToolError::ExecutionFailed(format!(
@@ -208,16 +193,10 @@ impl OutcomeStore {
         for fb in &self.feedback {
             let entry = OutcomeJournalEntry::Feedback { entry: fb.clone() };
             let line = serde_json::to_string(&entry).map_err(|e| {
-                common::ToolError::ExecutionFailed(format!(
-                    "Failed to serialize feedback: {}",
-                    e
-                ))
+                common::ToolError::ExecutionFailed(format!("Failed to serialize feedback: {}", e))
             })?;
             file.write_all(line.as_bytes()).await.map_err(|e| {
-                common::ToolError::ExecutionFailed(format!(
-                    "Failed to write compact entry: {}",
-                    e
-                ))
+                common::ToolError::ExecutionFailed(format!("Failed to write compact entry: {}", e))
             })?;
             file.write_all(b"\n").await.map_err(|e| {
                 common::ToolError::ExecutionFailed(format!(
@@ -228,26 +207,17 @@ impl OutcomeStore {
         }
 
         file.flush().await.map_err(|e| {
-            common::ToolError::ExecutionFailed(format!(
-                "Failed to flush compact file: {}",
-                e
-            ))
+            common::ToolError::ExecutionFailed(format!("Failed to flush compact file: {}", e))
         })?;
 
         file.sync_data().await.map_err(|e| {
-            common::ToolError::ExecutionFailed(format!(
-                "Failed to sync compact file: {}",
-                e
-            ))
+            common::ToolError::ExecutionFailed(format!("Failed to sync compact file: {}", e))
         })?;
 
         tokio::fs::rename(&tmp_path, &self.file_path)
             .await
             .map_err(|e| {
-                common::ToolError::ExecutionFailed(format!(
-                    "Failed to rename compact file: {}",
-                    e
-                ))
+                common::ToolError::ExecutionFailed(format!("Failed to rename compact file: {}", e))
             })?;
 
         self.journal_len = self.outcomes.len() + self.feedback.len();
@@ -266,10 +236,7 @@ impl OutcomeStore {
         }
 
         let line = serde_json::to_string(entry).map_err(|e| {
-            common::ToolError::ExecutionFailed(format!(
-                "Failed to serialize outcome entry: {}",
-                e
-            ))
+            common::ToolError::ExecutionFailed(format!("Failed to serialize outcome entry: {}", e))
         })?;
 
         let mut file = tokio::fs::OpenOptions::new()
@@ -278,23 +245,14 @@ impl OutcomeStore {
             .open(&self.file_path)
             .await
             .map_err(|e| {
-                common::ToolError::ExecutionFailed(format!(
-                    "Failed to open outcomes file: {}",
-                    e
-                ))
+                common::ToolError::ExecutionFailed(format!("Failed to open outcomes file: {}", e))
             })?;
 
         file.write_all(line.as_bytes()).await.map_err(|e| {
-            common::ToolError::ExecutionFailed(format!(
-                "Failed to write outcome entry: {}",
-                e
-            ))
+            common::ToolError::ExecutionFailed(format!("Failed to write outcome entry: {}", e))
         })?;
         file.write_all(b"\n").await.map_err(|e| {
-            common::ToolError::ExecutionFailed(format!(
-                "Failed to write outcome newline: {}",
-                e
-            ))
+            common::ToolError::ExecutionFailed(format!("Failed to write outcome newline: {}", e))
         })?;
 
         self.journal_len += 1;
@@ -459,7 +417,10 @@ mod tests {
         // Small delay to ensure timestamp ordering
         tokio::time::sleep(std::time::Duration::from_millis(10)).await;
 
-        store.record(create_test_outcome("after-cutoff")).await.unwrap();
+        store
+            .record(create_test_outcome("after-cutoff"))
+            .await
+            .unwrap();
 
         let filtered = store.outcomes_since(cutoff).await.unwrap();
         assert_eq!(filtered.len(), 1);

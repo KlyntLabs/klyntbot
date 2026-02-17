@@ -149,21 +149,30 @@ async fn test_scoring_overdue_p1_ranks_highest() {
     let (store, _dir, _ids) = create_planning_test_data().await;
     let tool = TodoTool::new(store, 3, 18, "UTC".to_string());
 
-    let ctx = RoutingContext::new(
-        ChannelName::new("cli"),
-        ChatId::new("test"),
-    );
+    let ctx = RoutingContext::new(ChannelName::new("cli"), ChatId::new("test"));
 
-    let result = tool.execute(serde_json::json!({"action": "plan"}), &ctx).await.unwrap();
+    let result = tool
+        .execute(serde_json::json!({"action": "plan"}), &ctx)
+        .await
+        .unwrap();
 
     // Verify overdue P1 task appears first with correct score
-    assert!(result.contains("1. Fix auth token expiry bug"), "Overdue P1 should be ranked #1");
-    assert!(result.contains("Score: 50.5"), "Overdue P1 should have score 50.5");
+    assert!(
+        result.contains("1. Fix auth token expiry bug"),
+        "Overdue P1 should be ranked #1"
+    );
+    assert!(
+        result.contains("Score: 50.5"),
+        "Overdue P1 should have score 50.5"
+    );
 
     // Verify it outranks the today P2 task
     let overdue_pos = result.find("Fix auth token expiry bug").unwrap();
     let today_pos = result.find("Implement user settings page").unwrap();
-    assert!(overdue_pos < today_pos, "Overdue P1 should appear before today P2");
+    assert!(
+        overdue_pos < today_pos,
+        "Overdue P1 should appear before today P2"
+    );
 }
 
 #[tokio::test]
@@ -198,16 +207,22 @@ async fn test_scoring_no_priority_uses_default_weight() {
     let (store, _dir, _ids) = create_planning_test_data().await;
     let tool = TodoTool::new(store, 3, 18, "UTC".to_string());
 
-    let ctx = RoutingContext::new(
-        ChannelName::new("cli"),
-        ChatId::new("test"),
-    );
+    let ctx = RoutingContext::new(ChannelName::new("cli"), ChatId::new("test"));
 
-    let result = tool.execute(serde_json::json!({"action": "plan"}), &ctx).await.unwrap();
+    let result = tool
+        .execute(serde_json::json!({"action": "plan"}), &ctx)
+        .await
+        .unwrap();
 
     // Verify no-priority task "Triage incoming tickets" appears with correct score
-    assert!(result.contains("Triage incoming tickets"), "No-priority task should be in plan");
-    assert!(result.contains("Score: 30.4"), "No-priority task should have score 30.4 (using P3 default)");
+    assert!(
+        result.contains("Triage incoming tickets"),
+        "No-priority task should be in plan"
+    );
+    assert!(
+        result.contains("Score: 30.4"),
+        "No-priority task should have score 30.4 (using P3 default)"
+    );
 
     // Verify it's displayed as P3
     let triage_section = result.split("Triage incoming tickets").next().unwrap();
@@ -239,28 +254,39 @@ async fn test_plan_suggests_top_3_tasks() {
     let (store, _dir, _ids) = create_planning_test_data().await;
     let tool = TodoTool::new(store, 3, 18, "UTC".to_string());
 
-    let ctx = RoutingContext::new(
-        ChannelName::new("cli"),
-        ChatId::new("test"),
-    );
+    let ctx = RoutingContext::new(ChannelName::new("cli"), ChatId::new("test"));
 
-    let result = tool.execute(serde_json::json!({"action": "plan"}), &ctx).await.unwrap();
+    let result = tool
+        .execute(serde_json::json!({"action": "plan"}), &ctx)
+        .await
+        .unwrap();
 
     // Verify the plan contains expected content
     assert!(result.contains("Daily plan"), "Plan should have header");
     assert!(result.contains("(3 tasks)"), "Plan should indicate 3 tasks");
 
     // Verify the top-ranked tasks appear (based on scoring algorithm)
-    assert!(result.contains("Fix auth token expiry bug"), "Overdue P1 should be #1");
-    assert!(result.contains("Triage incoming tickets") || result.contains("Implement user settings"),
-            "Plan should include high-scoring tasks");
+    assert!(
+        result.contains("Fix auth token expiry bug"),
+        "Overdue P1 should be #1"
+    );
+    assert!(
+        result.contains("Triage incoming tickets") || result.contains("Implement user settings"),
+        "Plan should include high-scoring tasks"
+    );
 
     // Verify scoring information is included
     assert!(result.contains("Score:"), "Plan should show scores");
-    assert!(result.contains("Overdue"), "Plan should show urgency context");
+    assert!(
+        result.contains("Overdue"),
+        "Plan should show urgency context"
+    );
 
     // Future P4 task should NOT appear in top 3
-    assert!(!result.contains("Refactor database module"), "Future P4 task should not be in top 3");
+    assert!(
+        !result.contains("Refactor database module"),
+        "Future P4 task should not be in top 3"
+    );
 }
 
 #[tokio::test]
@@ -272,15 +298,18 @@ async fn test_plan_excludes_completed_tasks() {
     let (store, _dir, _ids) = create_planning_test_data().await;
     let tool = TodoTool::new(store, 3, 18, "UTC".to_string());
 
-    let ctx = RoutingContext::new(
-        ChannelName::new("cli"),
-        ChatId::new("test"),
-    );
+    let ctx = RoutingContext::new(ChannelName::new("cli"), ChatId::new("test"));
 
-    let result = tool.execute(serde_json::json!({"action": "plan"}), &ctx).await.unwrap();
+    let result = tool
+        .execute(serde_json::json!({"action": "plan"}), &ctx)
+        .await
+        .unwrap();
 
     // Completed task "Already done task" should NOT appear in plan
-    assert!(!result.contains("Already done task"), "Completed tasks should be excluded from plan");
+    assert!(
+        !result.contains("Already done task"),
+        "Completed tasks should be excluded from plan"
+    );
 }
 
 #[tokio::test]
@@ -292,15 +321,18 @@ async fn test_plan_excludes_template_tasks() {
     let (store, _dir, _ids) = create_planning_test_data().await;
     let tool = TodoTool::new(store, 3, 18, "UTC".to_string());
 
-    let ctx = RoutingContext::new(
-        ChannelName::new("cli"),
-        ChatId::new("test"),
-    );
+    let ctx = RoutingContext::new(ChannelName::new("cli"), ChatId::new("test"));
 
-    let result = tool.execute(serde_json::json!({"action": "plan"}), &ctx).await.unwrap();
+    let result = tool
+        .execute(serde_json::json!({"action": "plan"}), &ctx)
+        .await
+        .unwrap();
 
     // Template task "Daily standup template" should NOT appear in plan
-    assert!(!result.contains("Daily standup template"), "Template tasks should be excluded from plan");
+    assert!(
+        !result.contains("Daily standup template"),
+        "Template tasks should be excluded from plan"
+    );
 }
 
 #[tokio::test]
@@ -388,10 +420,23 @@ async fn test_response_accept_variants() {
     use tools::plan_response::{parse_plan_response, PlanAction};
 
     // UX §4.1: "yes", "y", "ok", "go", "looks good", "let's go", "confirm", "accept"
-    let accept_inputs = ["yes", "y", "ok", "go", "looks good", "let's go", "confirm", "accept"];
+    let accept_inputs = [
+        "yes",
+        "y",
+        "ok",
+        "go",
+        "looks good",
+        "let's go",
+        "confirm",
+        "accept",
+    ];
     for input in &accept_inputs {
         let action = parse_plan_response(input, 3).unwrap();
-        assert!(matches!(action, PlanAction::Accept), "Failed for: {}", input);
+        assert!(
+            matches!(action, PlanAction::Accept),
+            "Failed for: {}",
+            input
+        );
     }
 }
 
@@ -439,10 +484,22 @@ async fn test_response_defer_variants() {
     use tools::plan_response::{parse_plan_response, PlanAction};
 
     // UX §4.1: "defer", "defer all", "not today", "pass", "dismiss", "nah", "no"
-    let defer_inputs = ["defer", "defer all", "not today", "pass", "dismiss", "nah", "no"];
+    let defer_inputs = [
+        "defer",
+        "defer all",
+        "not today",
+        "pass",
+        "dismiss",
+        "nah",
+        "no",
+    ];
     for input in &defer_inputs {
         let action = parse_plan_response(input, 3).unwrap();
-        assert!(matches!(action, PlanAction::DeferAll), "Failed for: {}", input);
+        assert!(
+            matches!(action, PlanAction::DeferAll),
+            "Failed for: {}",
+            input
+        );
     }
 }
 
@@ -667,12 +724,12 @@ async fn test_cli_todo_plan_command() {
     let (store, _dir, _ids) = create_planning_test_data().await;
     let tool = TodoTool::new(store, 3, 18, "UTC".to_string());
 
-    let ctx = RoutingContext::new(
-        ChannelName::new("cli"),
-        ChatId::new("test"),
-    );
+    let ctx = RoutingContext::new(ChannelName::new("cli"), ChatId::new("test"));
 
-    let result = tool.execute(serde_json::json!({"action": "plan"}), &ctx).await.unwrap();
+    let result = tool
+        .execute(serde_json::json!({"action": "plan"}), &ctx)
+        .await
+        .unwrap();
 
     // Verify the result contains plan-related content
     assert!(

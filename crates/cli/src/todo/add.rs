@@ -65,13 +65,19 @@ pub async fn handle_add(
     // Auto-generate embedding (Sprint 5) - only if enabled
     if config.todo.search.enabled {
         let emb_store_path = config.embedding_store_path();
-        let emb_store = Arc::new(tokio::sync::RwLock::new(EmbeddingStore::new(emb_store_path)));
+        let emb_store = Arc::new(tokio::sync::RwLock::new(EmbeddingStore::new(
+            emb_store_path,
+        )));
         let engine = Arc::new(EmbeddingEngine::new());
         let handler = EmbeddingEngineImpl::new(engine, emb_store);
 
         // Best-effort embedding generation (don't fail if it errors)
         if let Err(e) = handler.embed_todo(&saved_todo).await {
-            tracing::warn!("Failed to generate embedding for todo {}: {}", saved_todo.id, e);
+            tracing::warn!(
+                "Failed to generate embedding for todo {}: {}",
+                saved_todo.id,
+                e
+            );
         }
     }
 

@@ -9,7 +9,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
-use crate::conversation_embedding::{ConversationEmbeddingHandler, ConversationEmbeddingRecord, PurgeFilter};
+use crate::conversation_embedding::{
+    ConversationEmbeddingHandler, ConversationEmbeddingRecord, PurgeFilter,
+};
 use crate::embedding_engine::{self, EmbeddingHandler};
 use crate::embedding_store::EmbeddingStore;
 use crate::todo_store::TodoStore;
@@ -154,10 +156,9 @@ impl Tool for MemoryTool {
             "search_all" => self.search_all(&args).await,
             "purge" => self.purge_embeddings(&args).await,
             "status" => self.show_status().await,
-            _ => Err(common::KlyntbotError::Tool(common::ToolError::InvalidParams(format!(
-                "Unknown action: {}",
-                action
-            )))),
+            _ => Err(common::KlyntbotError::Tool(
+                common::ToolError::InvalidParams(format!("Unknown action: {}", action)),
+            )),
         }
     }
 }
@@ -172,7 +173,9 @@ impl MemoryTool {
         })?;
 
         if !handler.is_available() {
-            return Ok("Semantic search is not available (embedding model not loaded).".to_string());
+            return Ok(
+                "Semantic search is not available (embedding model not loaded).".to_string(),
+            );
         }
 
         let query = args
@@ -180,17 +183,15 @@ impl MemoryTool {
             .and_then(|v| v.as_str())
             .ok_or_else(|| common::ToolError::InvalidParams("query required".to_string()))?;
 
-        let limit = args
-            .get("limit")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(10) as usize;
+        let limit = args.get("limit").and_then(|v| v.as_u64()).unwrap_or(10) as usize;
 
         let threshold = args
             .get("threshold")
             .and_then(|v| v.as_f64())
             .unwrap_or(self.semantic_threshold);
 
-        let results: Vec<(ConversationEmbeddingRecord, f64)> = handler.search(query, limit, threshold).await?;
+        let results: Vec<(ConversationEmbeddingRecord, f64)> =
+            handler.search(query, limit, threshold).await?;
 
         if results.is_empty() {
             return Ok(format!(
@@ -199,20 +200,12 @@ impl MemoryTool {
             ));
         }
 
-        let mut output = format!(
-            "{} conversation(s) matching '{}':\n",
-            results.len(),
-            query
-        );
+        let mut output = format!("{} conversation(s) matching '{}':\n", results.len(), query);
 
         for (record, similarity) in &results {
             output.push_str(&format!(
                 "\n- [{}] {} said: \"{}\" (similarity: {:.3}, session: {})",
-                record.id,
-                record.role,
-                record.content_preview,
-                similarity,
-                record.session_key
+                record.id, record.role, record.content_preview, similarity, record.session_key
             ));
         }
 
@@ -232,10 +225,7 @@ impl MemoryTool {
             .and_then(|v| v.as_str())
             .ok_or_else(|| common::ToolError::InvalidParams("query required".to_string()))?;
 
-        let limit = args
-            .get("limit")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(10) as usize;
+        let limit = args.get("limit").and_then(|v| v.as_u64()).unwrap_or(10) as usize;
 
         let threshold = args
             .get("threshold")
@@ -243,11 +233,14 @@ impl MemoryTool {
             .unwrap_or(self.semantic_threshold);
 
         if !handler.is_available() {
-            return Ok("Semantic search is not available (embedding model not loaded).".to_string());
+            return Ok(
+                "Semantic search is not available (embedding model not loaded).".to_string(),
+            );
         }
 
         // 1. Search conversations
-        let conversation_results: Vec<(ConversationEmbeddingRecord, f64)> = handler.search(query, limit * 2, threshold).await?;
+        let conversation_results: Vec<(ConversationEmbeddingRecord, f64)> =
+            handler.search(query, limit * 2, threshold).await?;
 
         // 2. Search todos (keyword + semantic if available)
         let todo_results: Vec<(Todo, f64)> = if let Some(todo_store) = &self.todo_store {
@@ -260,7 +253,9 @@ impl MemoryTool {
                 .iter()
                 .filter(|t| {
                     t.title.to_lowercase().contains(&query_lower)
-                        || t.description.as_ref().is_some_and(|d| d.to_lowercase().contains(&query_lower))
+                        || t.description
+                            .as_ref()
+                            .is_some_and(|d| d.to_lowercase().contains(&query_lower))
                 })
                 .cloned()
                 .collect();
@@ -295,8 +290,15 @@ impl MemoryTool {
 
             // Merge keyword and semantic results using RRF
             if !semantic_todos.is_empty() {
-                let todos_by_id: HashMap<String, crate::search_utils::SearchResult> =
-                    all_todos.into_iter().map(|t| (t.id.clone(), crate::search_utils::SearchResult::Todo(Box::new(t)))).collect();
+                let todos_by_id: HashMap<String, crate::search_utils::SearchResult> = all_todos
+                    .into_iter()
+                    .map(|t| {
+                        (
+                            t.id.clone(),
+                            crate::search_utils::SearchResult::Todo(Box::new(t)),
+                        )
+                    })
+                    .collect();
 
                 let keyword_search_results: Vec<crate::search_utils::SearchResult> = keyword_todos
                     .into_iter()
@@ -310,15 +312,17 @@ impl MemoryTool {
                     &todos_by_id,
                 );
 
-                merged.into_iter().map(|(result, score, _source)| {
-                    match result {
+                merged
+                    .into_iter()
+                    .map(|(result, score, _source)| match result {
                         crate::search_utils::SearchResult::Todo(todo) => (*todo, score),
                         _ => unreachable!("Expected Todo result"),
-                    }
-                }).collect()
+                    })
+                    .collect()
             } else {
                 // Keyword-only results with simple scoring
-                keyword_todos.into_iter()
+                keyword_todos
+                    .into_iter()
                     .enumerate()
                     .map(|(rank, todo)| {
                         let score = 1.0 / (self.rrf_k as f64 + rank as f64 + 1.0);
@@ -331,10 +335,11 @@ impl MemoryTool {
         };
 
         // 3. Convert to SearchResult and merge using RRF
-        let conversation_search_results: Vec<crate::search_utils::SearchResult> = conversation_results
-            .iter()
-            .map(|(rec, _)| crate::search_utils::SearchResult::Conversation(rec.clone()))
-            .collect();
+        let conversation_search_results: Vec<crate::search_utils::SearchResult> =
+            conversation_results
+                .iter()
+                .map(|(rec, _)| crate::search_utils::SearchResult::Conversation(rec.clone()))
+                .collect();
 
         let todo_search_results: Vec<crate::search_utils::SearchResult> = todo_results
             .iter()
@@ -344,10 +349,16 @@ impl MemoryTool {
         // Build ID lookup map for conversations
         let mut results_by_id: HashMap<String, crate::search_utils::SearchResult> = HashMap::new();
         for (rec, _) in &conversation_results {
-            results_by_id.insert(rec.id.clone(), crate::search_utils::SearchResult::Conversation(rec.clone()));
+            results_by_id.insert(
+                rec.id.clone(),
+                crate::search_utils::SearchResult::Conversation(rec.clone()),
+            );
         }
         for (todo, _) in &todo_results {
-            results_by_id.insert(todo.id.clone(), crate::search_utils::SearchResult::Todo(Box::new(todo.clone())));
+            results_by_id.insert(
+                todo.id.clone(),
+                crate::search_utils::SearchResult::Todo(Box::new(todo.clone())),
+            );
         }
 
         // Prepare semantic results for RRF (both conversations and todos)
@@ -355,13 +366,18 @@ impl MemoryTool {
             .iter()
             .map(|(rec, sim)| (rec.id.clone(), *sim))
             .collect();
-        semantic_results.extend(todo_results.iter().map(|(todo, score)| (todo.id.clone(), *score)));
+        semantic_results.extend(
+            todo_results
+                .iter()
+                .map(|(todo, score)| (todo.id.clone(), *score)),
+        );
 
         // Merge all results using RRF
-        let all_keyword_results: Vec<crate::search_utils::SearchResult> = conversation_search_results
-            .into_iter()
-            .chain(todo_search_results.into_iter())
-            .collect();
+        let all_keyword_results: Vec<crate::search_utils::SearchResult> =
+            conversation_search_results
+                .into_iter()
+                .chain(todo_search_results.into_iter())
+                .collect();
 
         let merged = crate::search_utils::rrf_merge(
             &all_keyword_results,
@@ -389,25 +405,22 @@ impl MemoryTool {
                 crate::search_utils::SearchResult::Conversation(record) => {
                     output.push_str(&format!(
                         "\n- [Conversation|{}] {} said: \"{}\" (score: {:.4}, session: {})",
-                        source,
-                        record.role,
-                        record.content_preview,
-                        rrf_score,
-                        record.session_key
+                        source, record.role, record.content_preview, rrf_score, record.session_key
                     ));
                 }
                 crate::search_utils::SearchResult::Todo(todo) => {
                     let preview = if let Some(desc) = &todo.description {
-                        format!("{} - {}", todo.title, &desc.chars().take(50).collect::<String>())
+                        format!(
+                            "{} - {}",
+                            todo.title,
+                            &desc.chars().take(50).collect::<String>()
+                        )
                     } else {
                         todo.title.clone()
                     };
                     output.push_str(&format!(
                         "\n- [Todo|{}] {} (score: {:.4}, status: {:?})",
-                        source,
-                        preview,
-                        rrf_score,
-                        todo.status
+                        source, preview, rrf_score, todo.status
                     ));
                 }
             }
@@ -436,15 +449,25 @@ impl MemoryTool {
 
         let filter = match filter_type {
             "session" => {
-                let session_key = args.get("session_key").and_then(|v| v.as_str()).ok_or_else(|| {
-                    common::ToolError::InvalidParams("session_key required for session filter".to_string())
-                })?;
+                let session_key = args
+                    .get("session_key")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        common::ToolError::InvalidParams(
+                            "session_key required for session filter".to_string(),
+                        )
+                    })?;
                 PurgeFilter::BySessionKey(session_key.to_string())
             }
             "before_date" => {
-                let date_str = args.get("before_date").and_then(|v| v.as_str()).ok_or_else(|| {
-                    common::ToolError::InvalidParams("before_date required for before_date filter".to_string())
-                })?;
+                let date_str = args
+                    .get("before_date")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        common::ToolError::InvalidParams(
+                            "before_date required for before_date filter".to_string(),
+                        )
+                    })?;
                 let date = chrono::DateTime::parse_from_rfc3339(date_str)
                     .map_err(|e| common::ToolError::InvalidParams(format!("Invalid date: {}", e)))?
                     .with_timezone(&chrono::Utc);
@@ -452,10 +475,12 @@ impl MemoryTool {
             }
             "all" => PurgeFilter::All,
             _ => {
-                return Err(common::KlyntbotError::Tool(common::ToolError::InvalidParams(format!(
-                    "Unknown filter type: {}",
-                    filter_type
-                ))))
+                return Err(common::KlyntbotError::Tool(
+                    common::ToolError::InvalidParams(format!(
+                        "Unknown filter type: {}",
+                        filter_type
+                    )),
+                ))
             }
         };
 

@@ -27,6 +27,15 @@ enum JournalEntry {
     Delete { id: Uuid },
 }
 
+/// Borrowing version of JournalEntry — used by persist_latest to serialize
+/// without cloning the Plan. Produces identical JSON to JournalEntry::Upsert.
+#[derive(Serialize)]
+#[serde(tag = "_op")]
+enum JournalEntryRef<'a> {
+    #[serde(rename = "upsert")]
+    Upsert { plan: &'a Plan },
+}
+
 /// Append-only JSONL-backed plan storage with lazy loading and automatic compaction.
 pub struct PlanStore {
     file_path: PathBuf,
@@ -183,6 +192,47 @@ impl PlanStore {
     pub async fn get(&mut self, id: &Uuid) -> Result<Option<Plan>> {
         self.ensure_loaded().await?;
         Ok(self.index.get(id).cloned())
+    }
+
+    /// Get a mutable reference to a plan for in-place mutation (zero-copy).
+    ///
+    /// Returns `None` if the plan does not exist. After mutating via the returned
+    /// reference, call `persist_latest(id)` to write the updated state to the journal.
+    pub async fn get_mut(&mut self, id: &Uuid) -> Result<Option<&mut Plan>> {
+        self.ensure_loaded().await?;
+        Ok(self.index.get_mut(id))
+    }
+
+    /// Append the current in-memory plan state to the journal without cloning.
+    ///
+    /// Uses `JournalEntryRef` to serialize from a `&Plan` reference, avoiding
+    /// an allocation of a full Plan clone. If the plan does not exist, this is
+    /// a no-op.
+    pub async fn persist_latest(&mut self, id: &Uuid) -> Result<()> {
+        self.ensure_loaded().await?;
+
+        if let Some(plan) = self.index.get(id) {
+            let entry = JournalEntryRef::Upsert { plan };
+            let mut line = serde_json::to_string(&entry)?;
+            line.push('\n');
+
+            if let Some(parent) = self.file_path.parent() {
+                fs::create_dir_all(parent).await?;
+            }
+
+            let mut file = fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open(&self.file_path)
+                .await?;
+            file.write_all(line.as_bytes()).await?;
+            file.flush().await?;
+
+            self.journal_len += 1;
+            self.maybe_compact().await?;
+        }
+
+        Ok(())
     }
 
     /// Get the most recent active plan for a session (by updated_at timestamp).
