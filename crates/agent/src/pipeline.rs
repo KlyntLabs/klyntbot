@@ -331,4 +331,100 @@ mod tests {
         // Empty response should trigger validation warnings
         assert!(!result.validation.is_valid);
     }
+
+    #[tokio::test]
+    async fn test_e2e_escalation_from_direct_to_tool_assisted() {
+        // "hello" → DirectResponse, but LLM requests tool calls → escalation
+        let provider = MockPipelineProvider::new(vec![
+            // First call: tool call response (triggers escalation)
+            LlmResponse {
+                content: None,
+                tool_calls: vec![providers::ToolCall {
+                    id: "call_1".to_string(),
+                    name: "web_search".to_string(),
+                    arguments: serde_json::json!({}),
+                }],
+                finish_reason: "tool_calls".to_string(),
+                usage: Usage::default(),
+                reasoning_content: None,
+            },
+            // Second call: final text response after escalation
+            text_response("I found the answer after escalation"),
+        ]);
+        let pipeline = make_pipeline(provider);
+
+        let result = pipeline
+            .process_message("hello", vec![], &[], &[], &routing_ctx())
+            .await
+            .unwrap();
+
+        assert_eq!(result.escalations, 1);
+        assert!(result.strategy_used.contains("ToolAssisted"));
+        assert!(result.content.contains("found the answer"));
+    }
+
+    #[tokio::test]
+    async fn test_e2e_autonomous_task_path() {
+        // "write me a script to automate deployments" → AutonomousTask
+        let provider = MockPipelineProvider::new(vec![text_response(
+            "Here is the deployment script:\n```bash\necho deploy\n```",
+        )]);
+        let pipeline = make_pipeline(provider);
+
+        let result = pipeline
+            .process_message(
+                "write me a script to automate deployments",
+                vec![],
+                &[],
+                &[],
+                &routing_ctx(),
+            )
+            .await
+            .unwrap();
+
+        assert!(result.strategy_used.contains("AutonomousTask"));
+        assert!(result.content.contains("deployment script"));
+        assert_eq!(result.escalations, 0);
+    }
+
+    #[tokio::test]
+    async fn test_e2e_with_conversation_history() {
+        // Pipeline works with conversation history
+        let provider = MockPipelineProvider::new(vec![text_response(
+            "Based on our earlier discussion, here's my answer.",
+        )]);
+        let pipeline = make_pipeline(provider);
+
+        let history = vec![
+            Message::user("Tell me about Rust"),
+            Message::assistant("Rust is a systems programming language..."),
+        ];
+
+        let result = pipeline
+            .process_message("what is Rust?", history, &[], &[], &routing_ctx())
+            .await
+            .unwrap();
+
+        assert!(result.validation.is_valid);
+        assert!(result.content.contains("earlier discussion"));
+    }
+
+    #[tokio::test]
+    async fn test_e2e_classification_confidence_tracking() {
+        // Verify classification metadata is preserved
+        let provider = MockPipelineProvider::new(vec![text_response("Done")]);
+        let pipeline = make_pipeline(provider);
+
+        let result = pipeline
+            .process_message("hello", vec![], &[], &[], &routing_ctx())
+            .await
+            .unwrap();
+
+        // "hello" is classified by heuristic with confidence 1.0
+        assert!((result.classification.confidence - 1.0f32).abs() < f32::EPSILON);
+        assert_eq!(
+            result.classification.source,
+            crate::orchestrator::ClassificationSource::Heuristic
+        );
+    }
 }
