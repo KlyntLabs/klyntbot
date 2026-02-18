@@ -16,6 +16,7 @@ scheduling.workspace = true
 calendar.workspace = true
 goal.workspace = true
 plan.workspace = true
+context_engine.workspace = true
 tokio = { workspace = true }
 tracing.workspace = true
 uuid = { workspace = true }
