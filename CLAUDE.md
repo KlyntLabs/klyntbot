@@ -26,16 +26,16 @@ cargo build --no-default-features    # Build without email channel
 
 Klyntbot is a Rust AI agent framework — a single binary that connects to 6+ chat platforms, calls LLMs, executes tools, manages tasks/projects, syncs with Apple Calendar, and manages persistent memory.
 
-### Workspace layout (12 crates in 8 dependency layers)
+### Workspace layout (13 crates in 8 dependency layers)
 
 ```
 Layer 0: common        — Error types (KlyntbotError with 11 variants including CalendarError), MessageRole, ChannelName, ChatId, SessionKey
 Layer 1: config, bus   — Config schema (camelCase JSON serde + CalendarConfig, ProjectConfig), async message bus (tokio::mpsc)
-Layer 2: providers, session, scheduling, calendar — LLM HTTP client, JSONL session persistence, cron service, CalDAV client + sync engine
+Layer 2: providers, session, scheduling, calendar, context_engine — LLM HTTP client, JSONL session persistence, cron service, CalDAV client + sync engine, token budget allocator + context assembler
 Layer 3: tools         — Tool trait + 12 implementations (file I/O ×4, shell, web ×2, message, spawn, cron, todo, project, calendar)
 Layer 4: channels, heartbeat — Chat platform integrations (Telegram, Discord, WhatsApp, Slack, Email, QQ)
-Layer 5: agent         — Agent loop, context builder, memory store, skill manager, subagent manager, calendar handler adapter, reminder engine
-Layer 6: cli           — Clap-derived CLI, REPL, command handlers (TodoCommands, ProjectCommands, CalendarCommands)
+Layer 5: agent         — Agent loop, context builder, memory store, skill manager, subagent manager, calendar handler adapter, reminder engine, orchestrator, execution engines, pipeline
+Layer 6: cli           — Clap-derived CLI, REPL, command handlers (TodoCommands, ProjectCommands, CalendarCommands, UsageCommands, LearningCommands, ProviderCommands)
 Layer 7: klyntbot      — Re-export facade (src/lib.rs) + binary entry point (src/main.rs)
 ```
 
@@ -48,6 +48,19 @@ Dependencies flow strictly upward. No circular dependencies — enforced by Carg
 - `CalendarTool` (4 actions) for sync control
 - Extended `Todo` struct with 8 new fields (parent_id, project_id, attachments, time_entries, etc.)
 - New JSONL stores: `todos.jsonl`, `projects.jsonl`, `calendar_sync.json`, `calendar_conflicts.jsonl`
+
+**New in v0.3.0 (Adaptive Orchestrator — `feat/adaptive-orchestrator` branch):**
+- `context_engine` crate at Layer 2: token budget allocator, history compressor, context assembler
+- `ProviderManager` with failover, retry, and circuit breaker logic
+- `Orchestrator` module: heuristic pre-filter + LLM classifier for intent classification
+- Execution engines: `DirectEngine`, `ReactPlusEngine` (with scratchpad + reflection), `PlanExecuteEngine`
+- `EngineDispatch`: maps `ExecutionStrategy` → engine with automatic escalation (Direct → ToolAssisted → Autonomous)
+- `AgentPipeline`: full pipeline wiring (Orchestrator → ContextEngine → EngineDispatch → ResponseValidator → CostTracker)
+- `AgentLoop.process_message_v2()`: opt-in pipeline route alongside legacy `process_message()`
+- `ResponseValidator` with safety checks (system prompt leak detection, length truncation, quality)
+- `CostTracker` with JSONL usage recording and per-model pricing
+- `StrategyLearningStore` for recording strategy effectiveness
+- Multi-axis learning system: per-tool confidence, strategy tracking, behavioral signals, user profiles
 
 ### Key patterns
 
@@ -62,12 +75,13 @@ Dependencies flow strictly upward. No circular dependencies — enforced by Carg
 | Trait | Defined in | Purpose |
 |-------|-----------|---------|
 | `Tool` | `tools` | `fn name()`, `fn description()`, `fn parameters() -> Value`, `async fn execute()` |
-| `LlmProvider` | `providers` | `async fn chat()`, `async fn chat_stream()`, `fn name()`, `fn default_model()` |
+| `LlmProvider` | `providers` | `async fn chat()`, `async fn chat_stream()`, `fn name()`, `fn default_model()`, `fn capabilities()`, `fn context_window()`, `async fn count_tokens()` |
 | `Channel` | `channels` | `async fn start()`, `async fn stop()`, `async fn send()`, `fn name()`, `fn is_allowed()` |
 | `SpawnHandler` | `tools` | Dependency inversion for subagent spawning |
 | `CronHandler` | `tools` | Dependency inversion for cron job management |
 | `CalendarHandler` | `tools` | Dependency inversion for calendar sync (NEW: `async fn sync_now()`, `async fn get_status()`, `async fn list_events()`, etc.) |
 | `EnrichmentHandler` | `tools` | Dependency inversion for AI-powered task enrichment (NEW: `async fn enrich_task()`) |
+| `AgentPipeline` | `agent` | Full orchestration pipeline: Orchestrator → ContextEngine → EngineDispatch → ResponseValidator → CostTracker (`async fn process_message()`) |
 
 ### Conventions
 
@@ -120,6 +134,11 @@ klyntbot project show ID
 klyntbot project update ID [--name TEXT] [--description TEXT] [--color COLOR] [--status STATUS] [--tags CSV]
 klyntbot project archive ID
 klyntbot project tasks ID [--tree] [--limit N]
+
+# Monitoring & Observability (v0.3.0)
+klyntbot usage report [--days 30]    # LLM cost/token report (by model, by day)
+klyntbot learning status [--days 7]  # Strategy effectiveness, outcome history, tool confidence
+klyntbot provider status             # Provider config, routing, circuit breaker state
 
 # Other Commands
 klyntbot channels list|login|test
