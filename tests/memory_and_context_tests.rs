@@ -138,12 +138,14 @@ async fn test_context_builder_with_history() {
             role: "user".to_string(),
             content: "What is Rust?".to_string(),
             timestamp: chrono::Utc::now(),
+            request_id: None,
         },
         SessionMessage {
             id: "test-msg-2".to_string(),
             role: "assistant".to_string(),
             content: "Rust is a systems programming language.".to_string(),
             timestamp: chrono::Utc::now(),
+            request_id: None,
         },
     ];
 
@@ -342,12 +344,14 @@ async fn test_long_conversation_history() {
             role: "user".to_string(),
             content: format!("Message {}", i),
             timestamp: chrono::Utc::now(),
+            request_id: None,
         });
         history.push(SessionMessage {
             id: format!("test-msg-{}-assistant", i),
             role: "assistant".to_string(),
             content: format!("Response {}", i),
             timestamp: chrono::Utc::now(),
+            request_id: None,
         });
     }
 
