@@ -12,9 +12,11 @@ pub mod analyzer;
 pub mod outcome_store;
 pub mod recorder;
 pub mod service;
+pub mod strategy_store;
 pub mod types;
 
 pub use outcome_store::OutcomeStore;
 pub use recorder::OutcomeRecorder;
 pub use service::LearningService;
+pub use strategy_store::{StrategyLearningStore, StrategyRecord};
 pub use types::*;
