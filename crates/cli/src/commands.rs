@@ -83,6 +83,14 @@ pub enum Commands {
     /// Manage multi-step execution plans (create, show, approve, abandon, status)
     #[command(subcommand)]
     Plan(PlanCommands),
+
+    /// View LLM usage and cost reports
+    #[command(subcommand)]
+    Usage(UsageCommands),
+
+    /// View learning system status and strategy effectiveness
+    #[command(subcommand)]
+    Learning(LearningCommands),
 }
 
 #[derive(Subcommand, Debug)]
@@ -747,4 +755,24 @@ pub enum PlanCommands {
 
     /// Show active plan status for current session
     Status,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum UsageCommands {
+    /// Show LLM usage and cost report
+    Report {
+        /// Number of days to include in the report (default: 30)
+        #[arg(short, long, default_value = "30")]
+        days: u32,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum LearningCommands {
+    /// Show learning system status and strategy effectiveness
+    Status {
+        /// Number of days to include in strategy stats (default: 7)
+        #[arg(short, long, default_value = "7")]
+        days: u32,
+    },
 }
