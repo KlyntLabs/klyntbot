@@ -77,6 +77,7 @@ fn strip_markdown(content: &str) -> String {
 }
 
 /// Truncate content at a word boundary, appending "..." if truncated.
+/// Uses char boundaries to avoid panicking on multi-byte UTF-8 characters.
 fn truncate_at_boundary(content: &str, max_chars: usize) -> String {
     if content.len() <= max_chars {
         return content.to_string();
@@ -84,12 +85,27 @@ fn truncate_at_boundary(content: &str, max_chars: usize) -> String {
 
     // Leave room for "..."
     let limit = max_chars.saturating_sub(3);
-    let truncated = &content[..limit];
+
+    // Find a valid UTF-8 boundary at or before `limit`
+    let safe_limit = floor_char_boundary(content, limit);
+    let truncated = &content[..safe_limit];
 
     // Find last whitespace for clean break
-    let cut_point = truncated.rfind(char::is_whitespace).unwrap_or(limit);
+    let cut_point = truncated.rfind(char::is_whitespace).unwrap_or(safe_limit);
 
     format!("{}...", &content[..cut_point])
+}
+
+/// Find the largest byte index <= `index` that is a valid char boundary.
+fn floor_char_boundary(s: &str, index: usize) -> usize {
+    if index >= s.len() {
+        return s.len();
+    }
+    let mut i = index;
+    while i > 0 && !s.is_char_boundary(i) {
+        i -= 1;
+    }
+    i
 }
 
 #[cfg(test)]

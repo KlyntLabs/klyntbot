@@ -185,11 +185,11 @@ impl LlmProvider for ProviderManager {
         }
         match self.primary.chat_stream(messages, tools, params).await {
             Ok(s) => Ok(s),
-            Err(_) => {
+            Err(e) => {
                 if let Some(fb) = &self.fallback {
                     fb.chat_stream(messages, tools, params).await
                 } else {
-                    self.primary.chat_stream(messages, tools, params).await
+                    Err(e)
                 }
             }
         }

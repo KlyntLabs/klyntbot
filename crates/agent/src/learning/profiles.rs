@@ -7,17 +7,12 @@ use serde::{Deserialize, Serialize};
 use common::Result;
 
 /// Preferred response verbosity.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ResponseLength {
     Short,
+    #[default]
     Medium,
     Long,
-}
-
-impl Default for ResponseLength {
-    fn default() -> Self {
-        Self::Medium
-    }
 }
 
 /// Persistent user profile with preferences and usage patterns.
@@ -73,10 +68,10 @@ impl ProfileStore {
 
         if path.exists() {
             let content = tokio::fs::read_to_string(&path).await?;
-            match serde_json::from_str::<UserProfile>(&content) {
-                Ok(profile) => return Ok(profile),
-                Err(_) => {} // corrupt file, create fresh
+            if let Ok(profile) = serde_json::from_str::<UserProfile>(&content) {
+                return Ok(profile);
             }
+            // corrupt file, create fresh
         }
 
         Ok(UserProfile::new(user_id))

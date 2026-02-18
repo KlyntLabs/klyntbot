@@ -1839,6 +1839,11 @@ impl AgentLoop {
     /// When set, `process_message_v2()` becomes available, routing through the
     /// new classify → assemble → dispatch → validate → record pipeline instead
     /// of the legacy `run_agent_loop` iteration loop.
+    ///
+    /// TODO: Wire `process_message_v2` into the main `run()` message bus loop
+    /// (currently only the legacy `process_message` path is used by `run()`).
+    /// The v2 path is accessible programmatically via `process_message_v2()`
+    /// or through CLI `chat` when pipeline is set.
     pub fn set_pipeline(&mut self, pipeline: Arc<crate::pipeline::AgentPipeline>) {
         self.pipeline = Some(pipeline);
     }
@@ -1860,7 +1865,13 @@ impl AgentLoop {
         };
 
         let preview = if content.len() > 80 {
-            format!("{}...", &content[..80])
+            let end = content
+                .char_indices()
+                .map(|(i, _)| i)
+                .take_while(|&i| i <= 80)
+                .last()
+                .unwrap_or(0);
+            format!("{}...", &content[..end])
         } else {
             content.clone()
         };
@@ -1922,7 +1933,13 @@ impl AgentLoop {
     /// Returns the agent's response text directly instead of publishing to the bus.
     pub async fn process_direct(&self, content: String, session_key: String) -> Result<String> {
         let preview = if content.len() > 80 {
-            format!("{}...", &content[..80])
+            let end = content
+                .char_indices()
+                .map(|(i, _)| i)
+                .take_while(|&i| i <= 80)
+                .last()
+                .unwrap_or(0);
+            format!("{}...", &content[..end])
         } else {
             content.clone()
         };

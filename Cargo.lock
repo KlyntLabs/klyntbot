@@ -1045,7 +1045,6 @@ dependencies = [
  "providers",
  "serde",
  "serde_json",
- "session",
  "tempfile",
  "tokio",
  "tracing",

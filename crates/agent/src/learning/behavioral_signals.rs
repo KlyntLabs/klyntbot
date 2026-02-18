@@ -40,20 +40,40 @@ const NEGATIVE_KEYWORDS: &[&str] = &[
     "revert",
 ];
 
-/// Detect behavioral signal from a user message using keyword matching.
+/// Detect behavioral signal from a user message using word-boundary-aware matching.
 pub fn detect_signal(message: &str) -> BehavioralSignal {
     let msg = message.trim().to_lowercase();
 
     // Check negative first (more actionable)
-    if NEGATIVE_KEYWORDS.iter().any(|k| msg.contains(k)) {
+    if NEGATIVE_KEYWORDS
+        .iter()
+        .any(|k| contains_word_boundary(&msg, k))
+    {
         return BehavioralSignal::Negative;
     }
 
-    if POSITIVE_KEYWORDS.iter().any(|k| msg.contains(k)) {
+    if POSITIVE_KEYWORDS
+        .iter()
+        .any(|k| contains_word_boundary(&msg, k))
+    {
         return BehavioralSignal::Positive;
     }
 
     BehavioralSignal::Neutral
+}
+
+/// Check if `text` contains `keyword` at a word boundary.
+/// Prevents false positives like "I know" matching "no" or "bypass" matching "yes".
+fn contains_word_boundary(text: &str, keyword: &str) -> bool {
+    for (start, _) in text.match_indices(keyword) {
+        let end = start + keyword.len();
+        let before_ok = start == 0 || !text.as_bytes()[start - 1].is_ascii_alphanumeric();
+        let after_ok = end >= text.len() || !text.as_bytes()[end].is_ascii_alphanumeric();
+        if before_ok && after_ok {
+            return true;
+        }
+    }
+    false
 }
 
 #[cfg(test)]

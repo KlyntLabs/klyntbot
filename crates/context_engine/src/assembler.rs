@@ -51,11 +51,17 @@ pub struct ContextEngine {
     compressor: HistoryCompressor,
 }
 
-impl ContextEngine {
-    pub fn new() -> Self {
+impl Default for ContextEngine {
+    fn default() -> Self {
         Self {
             compressor: HistoryCompressor::new(4),
         }
+    }
+}
+
+impl ContextEngine {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn assemble(&self, request: ContextRequest) -> AssembledContext {
@@ -91,7 +97,7 @@ impl ContextEngine {
         let recent_tokens: usize = compressed
             .recent_messages
             .iter()
-            .map(|m| estimate_message_tokens(m))
+            .map(estimate_message_tokens)
             .sum();
         allocator.allocate(Priority::RecentHistory, recent_tokens);
 
@@ -124,7 +130,7 @@ impl ContextEngine {
 }
 
 fn estimate_tokens(text: &str) -> usize {
-    (text.len() + 3) / 4
+    text.len().div_ceil(4)
 }
 
 fn estimate_message_tokens(msg: &Message) -> usize {

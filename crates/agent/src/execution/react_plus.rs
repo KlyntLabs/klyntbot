@@ -77,7 +77,7 @@ impl ReactPlusEngine {
         let escalation_threshold = (self.max_iterations as f32 * 0.8).ceil() as u32;
 
         for iteration in 1..=self.max_iterations {
-            let outcome = self
+            let (outcome, _cycle_usage) = self
                 .core
                 .run_cycle(&mut messages, tools, params, ctx)
                 .await?;

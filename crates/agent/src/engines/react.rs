@@ -46,7 +46,7 @@ impl ReactEngine {
         };
 
         for cycle in 0..max_iterations {
-            let outcome = self
+            let (outcome, _cycle_usage) = self
                 .core
                 .run_cycle(&mut messages, tools, params, ctx)
                 .await?;

@@ -145,7 +145,7 @@ impl MemoryRetriever {
 
     /// Rough token estimate: ~4 chars per token.
     pub fn estimate_tokens(text: &str) -> usize {
-        (text.len() + 3) / 4 // ceiling division
+        text.len().div_ceil(4)
     }
 }
 

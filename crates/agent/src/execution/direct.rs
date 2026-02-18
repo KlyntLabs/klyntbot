@@ -39,7 +39,7 @@ impl DirectEngine {
         params: &ExecutionParams,
         ctx: &RoutingContext,
     ) -> Result<DirectOutcome> {
-        let outcome = self.core.run_cycle(&mut messages, &[], params, ctx).await?;
+        let (outcome, _usage) = self.core.run_cycle(&mut messages, &[], params, ctx).await?;
 
         match outcome {
             CycleOutcome::FinalResponse { content } => Ok(DirectOutcome::Response(content)),

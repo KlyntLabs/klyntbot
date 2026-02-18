@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use common::Result;
 use context_engine::ExecutionStrategy;
-use providers::Message;
+use providers::{Message, Usage};
 use tools::RoutingContext;
 use tracing::{debug, warn};
 
@@ -25,6 +25,8 @@ pub struct DispatchResult {
     pub final_strategy: ExecutionStrategy,
     /// Number of escalations that occurred.
     pub escalation_count: u32,
+    /// Accumulated token usage across all engine cycles.
+    pub usage: Usage,
 }
 
 /// Dispatches execution to the appropriate engine based on strategy,
@@ -80,6 +82,7 @@ impl EngineDispatch {
                                 content,
                                 final_strategy: current_strategy,
                                 escalation_count,
+                                usage: Usage::default(),
                             });
                         }
                         DirectOutcome::EscalateToToolAssisted { messages } => {
@@ -88,6 +91,7 @@ impl EngineDispatch {
                                     content: String::new(),
                                     final_strategy: current_strategy,
                                     escalation_count,
+                                    usage: Usage::default(),
                                 });
                             }
                             debug!("DirectEngine escalated to ToolAssisted");
@@ -115,6 +119,7 @@ impl EngineDispatch {
                                 content,
                                 final_strategy: current_strategy,
                                 escalation_count,
+                                usage: Usage::default(),
                             });
                         }
                         ReactOutcome::EscalateToAutonomous { reason } => {
@@ -127,6 +132,7 @@ impl EngineDispatch {
                                     content: format!("Task exceeded complexity limits: {}", reason),
                                     final_strategy: current_strategy,
                                     escalation_count,
+                                    usage: Usage::default(),
                                 });
                             }
                             debug!("ReactPlusEngine escalated: {}", reason);
@@ -141,6 +147,7 @@ impl EngineDispatch {
                                     .unwrap_or_else(|| "Max iterations reached".to_string()),
                                 final_strategy: current_strategy,
                                 escalation_count,
+                                usage: Usage::default(),
                             });
                         }
                     }
@@ -172,6 +179,7 @@ impl EngineDispatch {
                         content,
                         final_strategy: current_strategy,
                         escalation_count,
+                        usage: Usage::default(),
                     });
                 }
 
@@ -180,6 +188,7 @@ impl EngineDispatch {
                         content: reason.clone(),
                         final_strategy: current_strategy,
                         escalation_count: 0,
+                        usage: Usage::default(),
                     });
                 }
             }

@@ -10,6 +10,8 @@ use common::Result;
 use providers::{tool_calls_to_messages, DynProvider, Message};
 use tools::{registry::ToolRegistry, RoutingContext};
 
+use providers::Usage;
+
 use crate::execution::types::{CycleOutcome, ExecutionParams, ToolExecutionResult};
 
 /// Drives a single LLM-tool execution cycle.
@@ -41,11 +43,13 @@ impl ExecutionCore {
         tools: &[serde_json::Value],
         params: &ExecutionParams,
         routing_ctx: &RoutingContext,
-    ) -> Result<CycleOutcome> {
+    ) -> Result<(CycleOutcome, Usage)> {
         let response = self
             .provider
             .chat(messages, Some(tools), &params.chat_params)
             .await?;
+
+        let usage = response.usage.clone();
 
         if !response.tool_calls.is_empty() {
             // Append assistant message with tool calls
@@ -108,17 +112,17 @@ impl ExecutionCore {
                 ));
             }
 
-            return Ok(CycleOutcome::ToolsExecuted { results });
+            return Ok((CycleOutcome::ToolsExecuted { results }, usage));
         }
 
         // No tool calls — check for text content
         if let Some(content) = response.content {
             if !content.trim().is_empty() {
-                return Ok(CycleOutcome::FinalResponse { content });
+                return Ok((CycleOutcome::FinalResponse { content }, usage));
             }
         }
 
-        Ok(CycleOutcome::EmptyResponse)
+        Ok((CycleOutcome::EmptyResponse, usage))
     }
 }
 
@@ -253,7 +257,7 @@ mod tests {
         let params = ExecutionParams::new("mock");
         let tools = vec![];
 
-        let outcome = core
+        let (outcome, _usage) = core
             .run_cycle(&mut messages, &tools, &params, &routing_ctx())
             .await
             .unwrap();
@@ -276,7 +280,7 @@ mod tests {
         let params = ExecutionParams::new("mock");
         let tools = vec![];
 
-        let outcome = core
+        let (outcome, _usage) = core
             .run_cycle(&mut messages, &tools, &params, &routing_ctx())
             .await
             .unwrap();
@@ -305,7 +309,7 @@ mod tests {
         let params = ExecutionParams::new("mock").with_timeout(Duration::from_millis(100));
         let tools = vec![];
 
-        let outcome = core
+        let (outcome, _usage) = core
             .run_cycle(&mut messages, &tools, &params, &routing_ctx())
             .await
             .unwrap();
@@ -338,7 +342,7 @@ mod tests {
         let params = ExecutionParams::new("mock");
         let tools = vec![];
 
-        let outcome = core
+        let (outcome, _usage) = core
             .run_cycle(&mut messages, &tools, &params, &routing_ctx())
             .await
             .unwrap();

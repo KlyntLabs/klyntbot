@@ -70,15 +70,21 @@ impl ResponseValidator {
             warnings.push(ValidationWarning::LengthTruncated {
                 original_chars: filtered.len(),
             });
+            // Find a valid UTF-8 boundary at or before the limit
+            let safe_limit = {
+                let mut i = self.max_response_chars;
+                while i > 0 && !filtered.is_char_boundary(i) {
+                    i -= 1;
+                }
+                i
+            };
             // Truncate at a word boundary if possible
-            let truncated = &filtered[..self.max_response_chars];
-            let cut_point = truncated
-                .rfind(char::is_whitespace)
-                .unwrap_or(self.max_response_chars);
+            let truncated = &filtered[..safe_limit];
+            let cut_point = truncated.rfind(char::is_whitespace).unwrap_or(safe_limit);
             filtered = format!("{}…", &filtered[..cut_point]);
         }
 
-        // 2. System prompt leak detection
+        // 2. System prompt leak detection — redact matched patterns
         if self.check_leaked_system_prompt {
             let lower = filtered.to_lowercase();
             for pattern in SYSTEM_LEAK_PATTERNS {
@@ -86,6 +92,19 @@ impl ResponseValidator {
                     warnings.push(ValidationWarning::PotentialSystemLeak {
                         pattern: pattern.to_string(),
                     });
+                    // Redact the leaked pattern from the output
+                    let redacted = "[redacted]";
+                    // Case-insensitive replacement
+                    let mut result = String::with_capacity(filtered.len());
+                    let lower_filtered = filtered.to_lowercase();
+                    let mut last_end = 0;
+                    for (start, _) in lower_filtered.match_indices(pattern) {
+                        result.push_str(&filtered[last_end..start]);
+                        result.push_str(redacted);
+                        last_end = start + pattern.len();
+                    }
+                    result.push_str(&filtered[last_end..]);
+                    filtered = result;
                 }
             }
         }

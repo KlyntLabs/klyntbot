@@ -224,7 +224,7 @@ impl PlanExecuteEngine {
         ctx: &RoutingContext,
     ) -> Result<String> {
         for _cycle in 0..MAX_CYCLES_PER_STEP {
-            let outcome = self.core.run_cycle(messages, tools, params, ctx).await?;
+            let (outcome, _cycle_usage) = self.core.run_cycle(messages, tools, params, ctx).await?;
 
             match outcome {
                 CycleOutcome::FinalResponse { content } => {
@@ -465,14 +465,21 @@ mod tests {
         }
     }
 
-    async fn make_plan_store_with(plan: &Plan) -> Arc<RwLock<PlanStore>> {
+    /// Holds the tempdir alongside the plan store to keep it alive for the test duration.
+    struct TestPlanStore {
+        store: Arc<RwLock<PlanStore>>,
+        _dir: tempfile::TempDir,
+    }
+
+    async fn make_plan_store_with(plan: &Plan) -> TestPlanStore {
         let dir = tempdir().unwrap();
         let path = dir.path().join("plans.jsonl");
         let mut store = PlanStore::new(path);
         store.upsert(plan.clone()).await.unwrap();
-        // Leak the tempdir so it doesn't get cleaned up during the test
-        std::mem::forget(dir);
-        Arc::new(RwLock::new(store))
+        TestPlanStore {
+            store: Arc::new(RwLock::new(store)),
+            _dir: dir,
+        }
     }
 
     fn routing_ctx() -> RoutingContext {
@@ -514,9 +521,9 @@ mod tests {
             },
         ]);
 
-        let store = make_plan_store_with(&plan).await;
+        let test_store = make_plan_store_with(&plan).await;
         let registry = Arc::new(RwLock::new(ToolRegistry::new()));
-        let engine = PlanExecuteEngine::new(provider, registry, store.clone());
+        let engine = PlanExecuteEngine::new(provider, registry, test_store.store.clone());
 
         let result = engine
             .execute_plan(&plan_id, &[], &ExecutionParams::new("mock"), &routing_ctx())
@@ -531,7 +538,7 @@ mod tests {
         }
 
         // Verify step statuses in store
-        let mut store = store.write().await;
+        let mut store = test_store.store.write().await;
         let updated_plan = store.get(&plan.id).await.unwrap().unwrap();
         assert_eq!(updated_plan.steps[0].status, StepStatus::Completed);
         assert_eq!(updated_plan.steps[1].status, StepStatus::Completed);
@@ -550,9 +557,9 @@ mod tests {
 
         // Fail on the second call (step 2, index 1)
         let provider = FailOnStepProvider::new(1);
-        let store = make_plan_store_with(&plan).await;
+        let test_store = make_plan_store_with(&plan).await;
         let registry = Arc::new(RwLock::new(ToolRegistry::new()));
-        let engine = PlanExecuteEngine::new(provider, registry, store.clone());
+        let engine = PlanExecuteEngine::new(provider, registry, test_store.store.clone());
 
         let result = engine
             .execute_plan(&plan_id, &[], &ExecutionParams::new("mock"), &routing_ctx())
@@ -568,7 +575,7 @@ mod tests {
         }
 
         // Step 0 should be completed, step 1 failed, step 2 still pending
-        let mut store = store.write().await;
+        let mut store = test_store.store.write().await;
         let updated_plan = store.get(&plan.id).await.unwrap().unwrap();
         assert_eq!(updated_plan.steps[0].status, StepStatus::Completed);
         assert_eq!(updated_plan.steps[1].status, StepStatus::Failed);
@@ -592,9 +599,9 @@ mod tests {
             usage: Usage::default(),
             reasoning_content: None,
         }]);
-        let store = make_plan_store_with(&plan).await;
+        let test_store = make_plan_store_with(&plan).await;
         let registry = Arc::new(RwLock::new(ToolRegistry::new()));
-        let engine = PlanExecuteEngine::new(provider, registry, store);
+        let engine = PlanExecuteEngine::new(provider, registry, test_store.store.clone());
 
         let result = engine
             .execute_plan(&plan_id, &[], &ExecutionParams::new("mock"), &routing_ctx())
@@ -622,9 +629,9 @@ mod tests {
         let plan_id = plan.id.to_string();
 
         let provider = SequencePlanProvider::new(vec![]);
-        let store = make_plan_store_with(&plan).await;
+        let test_store = make_plan_store_with(&plan).await;
         let registry = Arc::new(RwLock::new(ToolRegistry::new()));
-        let engine = PlanExecuteEngine::new(provider, registry, store);
+        let engine = PlanExecuteEngine::new(provider, registry, test_store.store.clone());
 
         let result = engine
             .execute_plan(&plan_id, &[], &ExecutionParams::new("mock"), &routing_ctx())

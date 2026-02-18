@@ -95,7 +95,7 @@ impl PlanExecuteEngine {
             let mut last_error = String::new();
 
             for attempt in 0..self.max_retries_per_step {
-                let outcome = self
+                let (outcome, _cycle_usage) = self
                     .core
                     .run_cycle(&mut messages, tools, params, ctx)
                     .await?;

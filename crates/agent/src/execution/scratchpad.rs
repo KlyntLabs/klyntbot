@@ -50,13 +50,23 @@ impl Scratchpad {
     }
 
     /// Produce a brief summary string suitable for context injection.
+    ///
+    /// Caps output to the last 20 traces to prevent unbounded growth
+    /// when injected into the context window during long execution runs.
     pub fn summarize(&self) -> String {
         if self.traces.is_empty() {
             return String::new();
         }
 
+        const MAX_SUMMARY_TRACES: usize = 20;
+        let traces = self.last_n(MAX_SUMMARY_TRACES);
+        let skipped = self.traces.len().saturating_sub(MAX_SUMMARY_TRACES);
+
         let mut summary = format!("Reasoning trace ({} cycles):\n", self.traces.len());
-        for t in &self.traces {
+        if skipped > 0 {
+            summary.push_str(&format!("  ({} earlier cycles omitted)\n", skipped));
+        }
+        for t in traces {
             summary.push_str(&format!(
                 "- Cycle {}: {} → {}\n",
                 t.cycle, t.thought, t.actual_action

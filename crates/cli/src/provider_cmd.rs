@@ -41,7 +41,7 @@ async fn handle_provider_status() -> Result<()> {
         let status = if *configured {
             format!("{} configured", status_success())
         } else {
-            format!("{}", colorize("not configured", DIM))
+            colorize("not configured", DIM).to_string()
         };
         println!("{:<20} {:>12}", name, status);
     }
@@ -77,9 +77,8 @@ async fn handle_provider_status() -> Result<()> {
     println!("Circuit Breaker");
     println!("{}", "─".repeat(50));
     println!(
-        "State:       {} {}",
+        "State:       {} closed (static — live state requires running agent)",
         status_success(),
-        "closed (static — live state requires running agent)"
     );
     println!("Threshold:   5 consecutive failures");
     println!("Reset:       60s timeout");

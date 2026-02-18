@@ -46,7 +46,8 @@ pub fn classify_heuristic(message: &str) -> Option<ExecutionStrategy> {
         }
     }
 
-    // 3. Plan keywords → AutonomousTask (checked before general keywords)
+    // 3. Plan keywords → AutonomousTask with high iteration budget (50)
+    //    These are explicit planning requests, higher confidence than general autonomous keywords (15).
     const PLAN_KEYWORDS: &[&str] = &[
         "create a plan",
         "plan and implement",
@@ -134,6 +135,8 @@ fn classify_by_keywords(msg: &str) -> Option<ExecutionStrategy> {
 
     // Autonomous phrases are high-confidence multi-word patterns — they take priority
     // over single-word code/tool keywords that may co-occur incidentally.
+    // Lower iteration budget (15) than plan keywords (50) since these are
+    // general autonomous tasks, not explicit multi-step planning requests.
     if has_autonomous {
         return Some(ExecutionStrategy::AutonomousTask { max_iterations: 15 });
     }

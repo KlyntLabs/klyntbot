@@ -68,10 +68,12 @@ mod tests {
     use serde_json::Value;
     use std::sync::{Arc, Mutex};
 
+    type CallRecord = Vec<(Vec<Message>, Option<Vec<Value>>)>;
+
     /// Mock provider that records calls and returns configured responses.
     struct MockProvider {
         response: LlmResponse,
-        calls: Mutex<Vec<(Vec<Message>, Option<Vec<Value>>)>>,
+        calls: Mutex<CallRecord>,
         model: String,
     }
 

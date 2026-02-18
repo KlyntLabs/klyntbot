@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use common::Result;
 use context_engine::{ContextEngine, ContextRequest};
-use providers::{Message, Usage};
+use providers::Message;
 use tools::RoutingContext;
 use tracing::{debug, info, warn};
 
@@ -161,11 +161,11 @@ impl AgentPipeline {
         let strategy_name = format!("{:?}", dispatch_result.final_strategy);
 
         // Step 5: Record usage (best-effort, don't fail the pipeline)
-        let usage = Usage::default(); // actual usage would come from provider responses
+        let usage = &dispatch_result.usage;
         if let Err(e) = self
             .cost_tracker
             .record(
-                &usage,
+                usage,
                 &self.config.execution_model,
                 &self.config.provider_name,
                 &strategy_name,
@@ -190,7 +190,7 @@ impl AgentPipeline {
 mod tests {
     use super::*;
     use async_trait::async_trait;
-    use providers::{ChatParams, LlmProvider, LlmResponse};
+    use providers::{ChatParams, LlmProvider, LlmResponse, Usage};
     use serde_json::Value;
     use std::sync::Mutex;
     use tokio::sync::RwLock;
