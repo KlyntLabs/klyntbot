@@ -4,7 +4,6 @@
 //! the entire klyntbot workspace.
 
 pub mod error;
-pub mod interaction;
 pub mod prompts;
 pub mod types;
 pub mod utils;
@@ -14,7 +13,6 @@ pub use error::{
     CalendarError, ChannelError, ConfigError, CronError, GoalError, KlyntbotError, PlanError,
     ProviderError, Result, SessionError, ToolError,
 };
-pub use interaction::InteractionRenderer;
 pub use prompts::{
     Answer, AnswerOption, AnswerType, AnswerValue, FormResponse, InteractionRequest, Question,
 };

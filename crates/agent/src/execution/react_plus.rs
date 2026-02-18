@@ -6,12 +6,12 @@ use std::sync::Arc;
 use chrono::Utc;
 
 use common::Result;
-use providers::Message;
+use providers::{Message, Usage};
 use tools::RoutingContext;
 
 use super::core::ExecutionCore;
 use super::scratchpad::{ReasoningTrace, Scratchpad};
-use super::types::{CycleOutcome, ExecutionParams};
+use super::types::{accumulate_usage, CycleOutcome, ExecutionParams};
 
 /// When to inject a reflection prompt into the conversation.
 #[derive(Debug, Clone)]
@@ -32,11 +32,15 @@ pub enum ReactOutcome {
         content: String,
         traces: Vec<ReasoningTrace>,
         iterations: u32,
+        usage: Usage,
     },
     /// Complexity exceeds ReAct+ capacity; escalate to autonomous planner.
-    EscalateToAutonomous { reason: String },
+    EscalateToAutonomous { reason: String, usage: Usage },
     /// Hit the iteration limit without a final response.
-    MaxIterationsReached { partial_content: Option<String> },
+    MaxIterationsReached {
+        partial_content: Option<String>,
+        usage: Usage,
+    },
 }
 
 /// Enhanced ReAct loop with scratchpad, reflection, and escalation.
@@ -75,12 +79,14 @@ impl ReactPlusEngine {
     ) -> Result<ReactOutcome> {
         let mut scratchpad = Scratchpad::new();
         let escalation_threshold = (self.max_iterations as f32 * 0.8).ceil() as u32;
+        let mut accumulated_usage = Usage::default();
 
         for iteration in 1..=self.max_iterations {
-            let (outcome, _cycle_usage) = self
+            let (outcome, cycle_usage) = self
                 .core
                 .run_cycle(&mut messages, tools, params, ctx)
                 .await?;
+            accumulate_usage(&mut accumulated_usage, &cycle_usage);
 
             match outcome {
                 CycleOutcome::FinalResponse { content } => {
@@ -97,6 +103,7 @@ impl ReactPlusEngine {
                         content,
                         traces: scratchpad.traces().to_vec(),
                         iterations: iteration,
+                        usage: accumulated_usage,
                     });
                 }
 
@@ -153,6 +160,7 @@ impl ReactPlusEngine {
                                 iteration,
                                 self.max_iterations
                             ),
+                            usage: accumulated_usage,
                         });
                     }
                 }
@@ -173,6 +181,7 @@ impl ReactPlusEngine {
 
         Ok(ReactOutcome::MaxIterationsReached {
             partial_content: None,
+            usage: accumulated_usage,
         })
     }
 }
@@ -343,6 +352,7 @@ mod tests {
                 content,
                 traces,
                 iterations,
+                ..
             } => {
                 assert!(content.contains("Done"));
                 assert_eq!(iterations, 2); // tool call + final response
@@ -418,7 +428,7 @@ mod tests {
             .unwrap();
 
         match outcome {
-            ReactOutcome::EscalateToAutonomous { reason } => {
+            ReactOutcome::EscalateToAutonomous { reason, .. } => {
                 assert!(reason.contains("80%"));
             }
             other => panic!("Expected EscalateToAutonomous, got {:?}", other),

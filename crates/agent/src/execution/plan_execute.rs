@@ -224,6 +224,8 @@ impl PlanExecuteEngine {
         ctx: &RoutingContext,
     ) -> Result<String> {
         for _cycle in 0..MAX_CYCLES_PER_STEP {
+            // Usage is tracked at the provider level; cycle usage intentionally
+            // not accumulated here as PlanExecuteEngine operates outside dispatch.
             let (outcome, _cycle_usage) = self.core.run_cycle(messages, tools, params, ctx).await?;
 
             match outcome {

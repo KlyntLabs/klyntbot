@@ -147,10 +147,7 @@ impl HeartbeatService {
     async fn run_loop(&self) {
         while *self.running.read().await {
             tokio::time::sleep(Duration::from_secs(self.interval_s)).await;
-
-            if *self.running.read().await {
-                self.tick().await;
-            }
+            self.tick().await;
         }
     }
 

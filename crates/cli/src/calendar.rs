@@ -20,7 +20,7 @@ async fn handle_reconcile() -> Result<()> {
     let config = config::load().await?;
 
     // Check if bidirectional sync is enabled
-    if !config.calendar.bidirectional_sync() {
+    if !config.calendar.bidirectional_sync {
         println!("Bidirectional sync is disabled in config.");
         println!(
             "Enable it by setting calendar.bidirectionalSync to true in ~/.klyntbot/config.json"

@@ -44,9 +44,9 @@ pub enum ProjectColor {
 }
 
 impl Project {
-    /// Generate short ID (8 chars) from UUID - same pattern as Todo
+    /// Generate short ID (8 chars) from UUID — delegates to shared helper.
     pub fn generate_id() -> String {
-        uuid::Uuid::new_v4().to_string()[..8].to_string()
+        crate::todo_types::generate_short_id()
     }
 }
 

@@ -7,7 +7,22 @@ use serde_json::Value;
 use std::pin::Pin;
 use std::sync::Arc;
 
-use common::{MessageRole, Result};
+use common::{KlyntbotError, MessageRole, ProviderError, Result};
+
+/// Map an HTTP status code to the appropriate provider error.
+///
+/// Centralizes the status → error mapping that was previously duplicated
+/// across openai_compat, anthropic_native, and transcription modules.
+pub(crate) fn map_http_error(status_code: u16, body: String) -> KlyntbotError {
+    match status_code {
+        429 => KlyntbotError::Provider(ProviderError::RateLimited),
+        401 | 403 => KlyntbotError::Provider(ProviderError::AuthFailed),
+        _ => KlyntbotError::Provider(ProviderError::InvalidResponse(format!(
+            "HTTP {}: {}",
+            status_code, body
+        ))),
+    }
+}
 
 /// Streaming chunk from LLM
 #[derive(Debug, Clone, Serialize, Deserialize)]

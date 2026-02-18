@@ -78,12 +78,12 @@ impl ChannelManager {
             DiscordChannel::new(self.config.channels.discord.clone())
         );
 
-        // WhatsApp doesn't return Result, so handle separately
-        if self.config.channels.whatsapp.enabled {
-            info!("Initializing WhatsApp channel");
-            let channel = WhatsAppChannel::new(self.config.channels.whatsapp.clone());
-            channels.insert("whatsapp".to_string(), Arc::new(channel));
-        }
+        init_channel!(
+            channels,
+            self.config.channels.whatsapp,
+            "whatsapp",
+            WhatsAppChannel::new(self.config.channels.whatsapp.clone())
+        );
 
         init_channel!(
             channels,

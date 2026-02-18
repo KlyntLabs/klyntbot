@@ -208,6 +208,7 @@ impl SessionManager {
         let mut metadata = HashMap::with_capacity(4);
         let mut created_at = None;
         let mut updated_at = None;
+        let mut stored_key: Option<String> = None;
 
         for line in content.lines() {
             let line = line.trim();
@@ -220,6 +221,9 @@ impl SessionManager {
 
             if let Some(msg_type) = value.get("_type").and_then(|v| v.as_str()) {
                 if msg_type == "metadata" {
+                    if let Some(k) = value.get("key").and_then(|v| v.as_str()) {
+                        stored_key = Some(k.to_string());
+                    }
                     if let Some(meta) = value.get("metadata") {
                         if let Some(obj) = meta.as_object() {
                             metadata = obj.clone().into_iter().collect();
@@ -246,7 +250,7 @@ impl SessionManager {
         }
 
         Ok(Session {
-            key: key.to_string(),
+            key: stored_key.unwrap_or_else(|| key.to_string()),
             messages,
             created_at: created_at.unwrap_or_else(Utc::now),
             updated_at: updated_at.unwrap_or_else(Utc::now),
@@ -279,9 +283,10 @@ impl SessionManager {
 
         let mut content = String::new();
 
-        // Write metadata line
+        // Write metadata line (includes session key for lossless round-trip)
         let metadata_line = serde_json::json!({
             "_type": "metadata",
+            "key": session.key,
             "created_at": session.created_at.to_rfc3339(),
             "updated_at": session.updated_at.to_rfc3339(),
             "metadata": session.metadata,
@@ -359,14 +364,10 @@ impl SessionManager {
             let path = entry.path();
 
             if path.extension().and_then(|s| s.to_str()) == Some("jsonl") {
-                if let Ok(key) = path
-                    .file_stem()
-                    .and_then(|s| s.to_str())
-                    .map(|s| s.replace('_', ":"))
-                    .ok_or_else(|| SessionError::LoadFailed("Invalid filename".to_string()))
-                {
-                    // Try to read metadata
-                    if let Ok(session) = self.load(&key).await {
+                if let Some(safe_key) = path.file_stem().and_then(|s| s.to_str()) {
+                    // Use the safe (sanitized) key for loading — the real key is
+                    // stored inside the metadata line and will be returned by load().
+                    if let Ok(session) = self.load(safe_key).await {
                         sessions.push(SessionInfo {
                             key: session.key,
                             created_at: session.created_at,

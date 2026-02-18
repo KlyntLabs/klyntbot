@@ -275,7 +275,7 @@ impl Tool for ProjectTool {
                     output.push_str(&format!(
                         "• {} [{}] (ID: {})\n",
                         task.title,
-                        format_todo_status(&task.status),
+                        task.status.display_name(),
                         task.id
                     ));
                 }
@@ -320,17 +320,6 @@ fn format_status(status: &ProjectStatus) -> &'static str {
         ProjectStatus::Paused => "Paused",
         ProjectStatus::Completed => "Completed",
         ProjectStatus::Archived => "Archived",
-    }
-}
-
-/// Format todo status for display
-fn format_todo_status(status: &crate::todo_types::TodoStatus) -> &'static str {
-    use crate::todo_types::TodoStatus;
-    match status {
-        TodoStatus::Todo => "Todo",
-        TodoStatus::Doing => "Doing",
-        TodoStatus::Done => "Done",
-        TodoStatus::Archived => "Archived",
     }
 }
 

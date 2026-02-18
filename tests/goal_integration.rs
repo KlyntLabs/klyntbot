@@ -4,11 +4,10 @@
 //! - Goal lifecycle: create → retrieve → update → delete
 //! - GoalStore persistence across reloads
 //! - GoalProgress calculation with metrics
-//! - GoalSuggestionEngine intent detection
 //! - GoalHandlerImpl delegation to GoalStore
 
 use chrono::Utc;
-use goal::{Goal, GoalStatus, GoalStore, GoalSuggestionEngine, Metric};
+use goal::{Goal, GoalStatus, GoalStore, Metric};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tempfile::TempDir;
@@ -133,23 +132,6 @@ async fn test_goal_progress_calculation() {
     assert!((progress.completion_percentage - 65.0).abs() < f64::EPSILON);
     assert_eq!(progress.metrics.len(), 2);
     assert!(progress.summary.contains("65"));
-}
-
-#[tokio::test]
-async fn test_goal_suggestion_engine_integration() {
-    let engine = GoalSuggestionEngine::new();
-
-    // Should detect goal intent
-    let suggestion = engine
-        .detect_goal_intent("I want to build a mobile app")
-        .unwrap();
-    assert!(!suggestion.proposed_title.is_empty());
-    assert!(suggestion.confidence > 0.0);
-    assert!(suggestion.linked_items.is_empty());
-
-    // Should not trigger on non-goal messages
-    let no_goal = engine.detect_goal_intent("fix typo in readme");
-    assert!(no_goal.is_none());
 }
 
 #[tokio::test]

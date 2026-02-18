@@ -2,34 +2,29 @@
 
 use crate::types::CalendarEvent;
 
-/// SyncEngine handles two-way synchronization between CalDAV server and local todos
-pub struct SyncEngine;
-
-impl SyncEngine {
-    /// Detect if two events conflict (same UID but different content)
-    pub fn detect_conflict(server_event: &CalendarEvent, local_event: &CalendarEvent) -> bool {
-        if server_event.uid != local_event.uid {
-            return false; // Different events, no conflict
-        }
-
-        // Same UID - check if content differs
-        server_event.summary != local_event.summary
-            || server_event.description != local_event.description
-            || server_event.start != local_event.start
-            || server_event.end != local_event.end
-            || server_event.etag != local_event.etag
-            || server_event.status != local_event.status
+/// Detect if two events conflict (same UID but different content)
+pub fn detect_conflict(server_event: &CalendarEvent, local_event: &CalendarEvent) -> bool {
+    if server_event.uid != local_event.uid {
+        return false; // Different events, no conflict
     }
 
-    /// Resolve conflict using server-wins strategy
-    /// Returns the server version of the event
-    pub fn resolve_conflict(
-        server_event: &CalendarEvent,
-        _local_event: &CalendarEvent,
-    ) -> CalendarEvent {
-        // Server-wins conflict resolution: always use server version
-        server_event.clone()
-    }
+    // Same UID - check if content differs
+    server_event.summary != local_event.summary
+        || server_event.description != local_event.description
+        || server_event.start != local_event.start
+        || server_event.end != local_event.end
+        || server_event.etag != local_event.etag
+        || server_event.status != local_event.status
+}
+
+/// Resolve conflict using server-wins strategy
+/// Returns the server version of the event
+pub fn resolve_conflict(
+    server_event: &CalendarEvent,
+    _local_event: &CalendarEvent,
+) -> CalendarEvent {
+    // Server-wins conflict resolution: always use server version
+    server_event.clone()
 }
 
 #[cfg(test)]
@@ -90,7 +85,7 @@ mod tests {
             status: None,
         };
 
-        let conflict = SyncEngine::detect_conflict(&server_event, &local_event);
+        let conflict = detect_conflict(&server_event, &local_event);
         assert!(!conflict); // Different UIDs = no conflict
     }
 
@@ -118,7 +113,7 @@ mod tests {
             status: None,
         };
 
-        let conflict = SyncEngine::detect_conflict(&server_event, &local_event);
+        let conflict = detect_conflict(&server_event, &local_event);
         assert!(conflict); // Same UID + different content = conflict
     }
 
@@ -146,7 +141,7 @@ mod tests {
             status: None,
         };
 
-        let resolved = SyncEngine::resolve_conflict(&server_event, &local_event);
+        let resolved = resolve_conflict(&server_event, &local_event);
 
         // Server-wins strategy: should return server version
         assert_eq!(resolved.uid, server_event.uid);

@@ -1,7 +1,7 @@
 //! Box drawing, banner, wizard UI components, and error display.
 
 use super::colors::{
-    color, colorize, BoxChars, BOLD, BRAND, DIM, ERROR, RESET, SEPARATOR, SUCCESS, WARNING,
+    color, colorize, BoxChars, BOLD, BRAND, DIM, ERROR, RESET, SEPARATOR, SUCCESS,
 };
 
 // ============================================================================
@@ -114,49 +114,10 @@ pub fn draw_wizard_step_header(current: usize, total: usize, title: &str) -> Str
     result
 }
 
-/// Draws a validation result with color-coded status
-pub fn draw_validation_result(label: &str, success: bool, message: &str) -> String {
-    let icon = if success {
-        colorize("✓", SUCCESS)
-    } else {
-        colorize("✗", ERROR)
-    };
-
-    let label_colored = if success {
-        colorize(label, SUCCESS)
-    } else {
-        colorize(label, ERROR)
-    };
-
-    format!("  {} {} {}", icon, label_colored, colorize(message, DIM))
-}
-
-/// Draws a section header with orange accent
-pub fn draw_section_header(title: &str) -> String {
-    let chars = BoxChars::get();
-    format!(
-        "{} {} {}\n",
-        colorize(chars.vertical, BRAND),
-        colorize(chars.vertical_right, BRAND),
-        colorize(title, BOLD)
-    )
-}
-
 /// Draws text with vertical line prefix (for content within a step)
 pub fn draw_step_line(text: &str) -> String {
     let chars = BoxChars::get();
     format!("{} {}", colorize(chars.vertical, BRAND), text)
-}
-
-/// Draws a sub-step with vertical line and bullet
-pub fn draw_sub_step(text: &str, completed: bool) -> String {
-    let chars = BoxChars::get();
-    let icon = if completed {
-        colorize("✓", SUCCESS)
-    } else {
-        colorize("○", DIM)
-    };
-    format!("{} {} {}", colorize(chars.vertical, BRAND), icon, text)
 }
 
 /// Draws the bottom connector for a step (vertical line continues to next step)
@@ -168,85 +129,6 @@ pub fn draw_step_footer() -> String {
 // ============================================================================
 // Box Drawing Functions
 // ============================================================================
-
-/// Draws an info box with orange border
-pub fn draw_info_box(content: &str) -> String {
-    draw_themed_box(content, BRAND, None)
-}
-
-/// Draws a warning box with yellow border and warning icon
-pub fn draw_warning_box(content: &str) -> String {
-    draw_themed_box(content, WARNING, Some("⚠"))
-}
-
-/// Draws an error box with red border and error icon
-pub fn draw_error_box(content: &str) -> String {
-    draw_themed_box(content, ERROR, Some("✗"))
-}
-
-/// Draws a success box with green border and checkmark
-pub fn draw_success_box(content: &str) -> String {
-    draw_themed_box(content, SUCCESS, Some("✓"))
-}
-
-/// Generic themed box renderer — consolidates the duplicated draw_*_box logic.
-fn draw_themed_box(content: &str, theme_color: &str, icon: Option<&str>) -> String {
-    let chars = BoxChars::get();
-    let lines: Vec<&str> = content.lines().collect();
-
-    let max_width = lines
-        .iter()
-        .map(|line| line.chars().count())
-        .max()
-        .unwrap_or(0);
-
-    let mut result = String::new();
-
-    // Top border (with or without icon)
-    if let Some(icon_str) = icon {
-        result.push_str(&format!(
-            "  {} {} {}\n",
-            colorize(chars.top_left, theme_color),
-            colorize(icon_str, theme_color),
-            colorize(
-                &format!("{}{}", chars.horizontal.repeat(max_width), chars.top_right),
-                theme_color
-            )
-        ));
-    } else {
-        result.push_str(&format!(
-            "  {}{}{}{}\n",
-            colorize(chars.top_left, theme_color),
-            colorize(&chars.horizontal.repeat(max_width + 2), theme_color),
-            colorize(chars.top_right, theme_color),
-            color(RESET)
-        ));
-    }
-
-    // Content lines
-    for line in lines {
-        let padding = max_width.saturating_sub(line.chars().count());
-        result.push_str(&format!(
-            "  {}{} {}{}{}",
-            colorize(chars.vertical, theme_color),
-            color(RESET),
-            line,
-            " ".repeat(padding),
-            colorize(chars.vertical, theme_color)
-        ));
-        result.push('\n');
-    }
-
-    // Bottom border
-    result.push_str(&format!(
-        "  {}{}{}\n",
-        colorize(chars.bottom_left, theme_color),
-        colorize(&chars.horizontal.repeat(max_width + 2), theme_color),
-        colorize(chars.bottom_right, theme_color)
-    ));
-
-    result
-}
 
 /// Wraps text in a box with an optional header
 pub fn draw_box(content: &str, header: Option<&str>) -> String {

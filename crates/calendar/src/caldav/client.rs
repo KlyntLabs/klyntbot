@@ -627,19 +627,6 @@ impl CalDavClient {
         }
     }
 
-    /// Build PROPFIND XML body for calendar discovery
-    #[allow(dead_code)]
-    fn build_propfind_body(&self) -> String {
-        r#"<?xml version="1.0" encoding="utf-8" ?>
-<D:propfind xmlns:D="DAV:">
-  <D:prop>
-    <D:displayname/>
-    <D:resourcetype/>
-  </D:prop>
-</D:propfind>"#
-            .to_string()
-    }
-
     /// Build calendar-query REPORT XML body with optional sync token
     fn build_report_body(&self, sync_token: Option<&str>) -> String {
         if let Some(token) = sync_token {
@@ -820,21 +807,6 @@ mod tests {
         let body = client.build_report_body(Some("token-abc-123"));
         assert!(body.contains("sync-collection"));
         assert!(body.contains("token-abc-123"));
-    }
-
-    #[test]
-    fn test_build_propfind_body() {
-        let client = CalDavClient::new(
-            "https://caldav.example.com/calendar".to_string(),
-            "user".to_string(),
-            "pass".to_string(),
-            "UTC".to_string(),
-        );
-
-        let body = client.build_propfind_body();
-        assert!(body.contains("propfind"));
-        assert!(body.contains("displayname"));
-        assert!(body.contains("resourcetype"));
     }
 
     #[test]

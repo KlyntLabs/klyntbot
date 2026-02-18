@@ -82,15 +82,7 @@ impl TranscriptionProvider {
 
             warn!("Transcription failed: HTTP {}: {}", status, error_text);
 
-            return if status.as_u16() == 429 {
-                Err(KlyntbotError::Provider(ProviderError::RateLimited))
-            } else if status.as_u16() == 401 || status.as_u16() == 403 {
-                Err(KlyntbotError::Provider(ProviderError::AuthFailed))
-            } else {
-                Err(KlyntbotError::Provider(ProviderError::InvalidResponse(
-                    format!("HTTP {}: {}", status, error_text),
-                )))
-            };
+            return Err(super::types::map_http_error(status.as_u16(), error_text));
         }
 
         // Parse response

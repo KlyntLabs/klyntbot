@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-use providers::ChatParams;
+use providers::{ChatParams, Usage};
 
 /// Parameters controlling a single LLM-tool execution cycle.
 #[derive(Debug, Clone)]
@@ -44,4 +44,13 @@ pub enum CycleOutcome {
     FinalResponse { content: String },
     /// LLM returned an empty response.
     EmptyResponse,
+}
+
+/// Accumulate token usage from one cycle into a running total.
+pub fn accumulate_usage(total: &mut Usage, cycle: &Usage) {
+    total.prompt_tokens += cycle.prompt_tokens;
+    total.completion_tokens += cycle.completion_tokens;
+    total.total_tokens += cycle.total_tokens;
+    total.cache_read_tokens += cycle.cache_read_tokens;
+    total.cache_write_tokens += cycle.cache_write_tokens;
 }

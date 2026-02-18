@@ -114,15 +114,15 @@ impl EngineDispatch {
                         .await?;
 
                     match outcome {
-                        ReactOutcome::Response { content, .. } => {
+                        ReactOutcome::Response { content, usage, .. } => {
                             return Ok(DispatchResult {
                                 content,
                                 final_strategy: current_strategy,
                                 escalation_count,
-                                usage: Usage::default(),
+                                usage,
                             });
                         }
-                        ReactOutcome::EscalateToAutonomous { reason } => {
+                        ReactOutcome::EscalateToAutonomous { reason, usage } => {
                             if escalation_count >= self.max_escalations {
                                 warn!(
                                     "Escalation limit reached ({}), returning partial",
@@ -132,7 +132,7 @@ impl EngineDispatch {
                                     content: format!("Task exceeded complexity limits: {}", reason),
                                     final_strategy: current_strategy,
                                     escalation_count,
-                                    usage: Usage::default(),
+                                    usage,
                                 });
                             }
                             debug!("ReactPlusEngine escalated: {}", reason);
@@ -141,13 +141,16 @@ impl EngineDispatch {
                                 ExecutionStrategy::AutonomousTask { max_iterations: 50 };
                             continue;
                         }
-                        ReactOutcome::MaxIterationsReached { partial_content } => {
+                        ReactOutcome::MaxIterationsReached {
+                            partial_content,
+                            usage,
+                        } => {
                             return Ok(DispatchResult {
                                 content: partial_content
                                     .unwrap_or_else(|| "Max iterations reached".to_string()),
                                 final_strategy: current_strategy,
                                 escalation_count,
-                                usage: Usage::default(),
+                                usage,
                             });
                         }
                     }
@@ -165,21 +168,31 @@ impl EngineDispatch {
                         .execute(current_messages.clone(), tools, params, ctx)
                         .await?;
 
-                    let content = match outcome {
-                        ReactOutcome::Response { content, .. } => content,
-                        ReactOutcome::EscalateToAutonomous { reason } => {
+                    let (content, usage) = match outcome {
+                        ReactOutcome::Response { content, usage, .. } => (content, usage),
+                        ReactOutcome::EscalateToAutonomous { reason, usage } => {
                             warn!("Autonomous task hit escalation: {}", reason);
-                            format!("Task complexity exceeded autonomous capacity: {}", reason)
+                            (
+                                format!("Task complexity exceeded autonomous capacity: {}", reason),
+                                usage,
+                            )
                         }
-                        ReactOutcome::MaxIterationsReached { partial_content } => partial_content
-                            .unwrap_or_else(|| "Autonomous task hit iteration limit".to_string()),
+                        ReactOutcome::MaxIterationsReached {
+                            partial_content,
+                            usage,
+                        } => (
+                            partial_content.unwrap_or_else(|| {
+                                "Autonomous task hit iteration limit".to_string()
+                            }),
+                            usage,
+                        ),
                     };
 
                     return Ok(DispatchResult {
                         content,
                         final_strategy: current_strategy,
                         escalation_count,
-                        usage: Usage::default(),
+                        usage,
                     });
                 }
 

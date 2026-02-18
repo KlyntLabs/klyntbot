@@ -25,7 +25,7 @@ pub struct Todo {
     pub updated_at: DateTime<Utc>,
     pub completed_at: Option<DateTime<Utc>>,
 
-    // ── New fields (Phase 1 additions) ──
+    // ── Extended fields ──
     #[serde(default)]
     pub parent_id: Option<String>, // Hierarchical: links to parent todo
 
@@ -50,7 +50,7 @@ pub struct Todo {
     #[serde(default)]
     pub last_reminded_at: Option<DateTime<Utc>>, // Notification dedup
 
-    // ── Sprint 2: Recurring tasks ──
+    // ── Recurring tasks ──
     #[serde(default)]
     pub recurrence_rule: Option<String>, // RRULE string, e.g. "FREQ=DAILY;BYHOUR=9"
 
@@ -63,7 +63,7 @@ pub struct Todo {
     #[serde(default)]
     pub next_instance_date: Option<DateTime<Utc>>, // Cached next occurrence
 
-    // ── Sprint 2: Task dependencies ──
+    // ── Task dependencies ──
     #[serde(default)]
     pub blocked_by: Vec<String>, // IDs of tasks this task depends on
 
@@ -81,10 +81,39 @@ pub enum TodoStatus {
     Archived,
 }
 
+impl TodoStatus {
+    /// Parse a status string loosely (case-insensitive, common aliases).
+    pub fn from_str_loose(s: &str) -> Option<Self> {
+        match s.to_lowercase().as_str() {
+            "todo" => Some(Self::Todo),
+            "doing" => Some(Self::Doing),
+            "done" => Some(Self::Done),
+            "archived" => Some(Self::Archived),
+            _ => None,
+        }
+    }
+
+    /// Human-readable display name.
+    pub fn display_name(self) -> &'static str {
+        match self {
+            Self::Todo => "Todo",
+            Self::Doing => "Doing",
+            Self::Done => "Done",
+            Self::Archived => "Archived",
+        }
+    }
+}
+
+/// Generate a short 8-character ID from a random UUID.
+/// Used by both `Todo` and `Project` for ID generation.
+pub fn generate_short_id() -> String {
+    uuid::Uuid::new_v4().to_string()[..8].to_string()
+}
+
 impl Todo {
     /// Generate short ID (8 chars) from UUID
     pub fn generate_id() -> String {
-        uuid::Uuid::new_v4().to_string()[..8].to_string()
+        generate_short_id()
     }
 
     /// Create a default instance suitable for spawning from a template.
@@ -146,10 +175,9 @@ pub struct TodoFilter {
     pub priority_min: Option<u8>,
     pub tag: Option<String>,
     pub limit: Option<usize>,
-    // Phase 2 additions
     pub project_id: Option<String>,
     pub parent_id: Option<String>,
-    // Sprint 2: template filtering (default false — templates hidden from normal lists)
+    // Template filtering (default false — templates hidden from normal lists)
     pub include_templates: bool,
 }
 

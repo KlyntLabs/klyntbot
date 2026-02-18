@@ -409,11 +409,12 @@ You are klyntbot, a personal AI assistant powered by advanced language models.
         &self.memory
     }
 
-    /// Invalidate all caches (bootstrap, memory, todo)
+    /// Invalidate all caches (bootstrap, memory, todo, goals)
     pub fn invalidate_cache(&mut self) {
         self.cached_bootstrap = None;
         self.cached_memory = None;
         self.cached_todo = None;
+        self.cached_goals = None;
         debug!("Invalidated all context caches");
     }
 

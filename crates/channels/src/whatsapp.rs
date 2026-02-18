@@ -26,13 +26,13 @@ pub struct WhatsAppChannel {
 
 impl WhatsAppChannel {
     /// Create a new WhatsApp channel
-    pub fn new(config: WhatsAppConfig) -> Self {
-        Self {
+    pub fn new(config: WhatsAppConfig) -> Result<Self> {
+        Ok(Self {
             config,
             running: Arc::new(AtomicBool::new(false)),
             bus: Mutex::new(None),
             ws_writer: Arc::new(Mutex::new(None)),
-        }
+        })
     }
 
     /// Handle a message from the bridge

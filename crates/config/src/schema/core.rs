@@ -4,6 +4,23 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::path::PathBuf;
 
+/// Get the klyntbot data directory (~/.klyntbot), falling back to "./.klyntbot".
+fn data_dir() -> PathBuf {
+    dirs::home_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join(".klyntbot")
+}
+
+/// Expand a leading `~` in a path to the user's home directory.
+fn expand_tilde(path: &str) -> PathBuf {
+    if path.starts_with('~') {
+        if let Some(home) = dirs::home_dir() {
+            return home.join(path.trim_start_matches("~/"));
+        }
+    }
+    PathBuf::from(path)
+}
+
 use super::channels::ChannelsConfig;
 use super::providers::{ProviderManagerConfig, ProvidersConfig};
 
@@ -100,16 +117,25 @@ pub struct Config {
 impl Config {
     /// Get the workspace path (expanded)
     pub fn workspace_path(&self) -> PathBuf {
-        let path = &self.agents.defaults.workspace;
-        if path.starts_with('~') {
-            if let Some(home) = dirs::home_dir() {
-                home.join(path.trim_start_matches("~/"))
-            } else {
-                PathBuf::from(path)
-            }
-        } else {
-            PathBuf::from(path)
-        }
+        expand_tilde(&self.agents.defaults.workspace)
+    }
+
+    /// Return all provider configs keyed by name (detection priority order).
+    fn all_providers(&self) -> [(&str, &super::providers::ProviderConfig); 12] {
+        [
+            ("anthropic", &self.providers.anthropic),
+            ("openai", &self.providers.openai),
+            ("openrouter", &self.providers.openrouter),
+            ("deepseek", &self.providers.deepseek),
+            ("gemini", &self.providers.gemini),
+            ("groq", &self.providers.groq),
+            ("vllm", &self.providers.vllm),
+            ("zhipu", &self.providers.zhipu),
+            ("dashscope", &self.providers.dashscope),
+            ("moonshot", &self.providers.moonshot),
+            ("minimax", &self.providers.minimax),
+            ("aihubmix", &self.providers.aihubmix),
+        ]
     }
 
     /// Detect the active provider.
@@ -124,105 +150,73 @@ impl Config {
             }
         }
 
-        // Fall back to auto-detection
-        if !self.providers.anthropic.api_key.is_empty() {
-            "anthropic"
-        } else if !self.providers.openai.api_key.is_empty() {
-            "openai"
-        } else if !self.providers.openrouter.api_key.is_empty() {
-            "openrouter"
-        } else if !self.providers.deepseek.api_key.is_empty() {
-            "deepseek"
-        } else if !self.providers.gemini.api_key.is_empty() {
-            "gemini"
-        } else if !self.providers.groq.api_key.is_empty() {
-            "groq"
-        } else {
-            "none"
+        // Fall back to auto-detection: first provider with a non-empty key
+        for (name, pc) in &self.all_providers() {
+            if !pc.api_key.is_empty() {
+                return name;
+            }
         }
+        "none"
     }
 
     /// Check if a provider has an API key configured.
     pub fn is_provider_configured(&self, name: &str) -> bool {
-        match name {
-            "anthropic" => !self.providers.anthropic.api_key.is_empty(),
-            "openai" => !self.providers.openai.api_key.is_empty(),
-            "deepseek" => !self.providers.deepseek.api_key.is_empty(),
-            "gemini" => !self.providers.gemini.api_key.is_empty(),
-            "openrouter" => !self.providers.openrouter.api_key.is_empty(),
-            "groq" => !self.providers.groq.api_key.is_empty(),
-            _ => false,
-        }
+        self.all_providers()
+            .iter()
+            .any(|(n, pc)| *n == name && !pc.api_key.is_empty())
     }
 
     /// Get the standardized todo store path (P0 fix for path inconsistency)
     pub fn todo_store_path(&self) -> PathBuf {
-        dirs::home_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join(".klyntbot")
-            .join("todos.jsonl")
+        data_dir().join("todos.jsonl")
     }
 
     /// Get the standardized embedding store path
     pub fn embedding_store_path(&self) -> PathBuf {
-        dirs::home_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join(".klyntbot")
-            .join("todos_embeddings.jsonl")
+        data_dir().join("todos_embeddings.jsonl")
     }
 
     /// Get the standardized project store path
     pub fn project_store_path(&self) -> PathBuf {
-        dirs::home_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join(".klyntbot")
-            .join("projects.jsonl")
+        data_dir().join("projects.jsonl")
     }
 
     /// Get the standardized goal store path
     pub fn goal_store_path(&self) -> PathBuf {
-        dirs::home_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join(".klyntbot")
-            .join("goals.jsonl")
+        data_dir().join("goals.jsonl")
     }
 
     /// Get the standardized plan store path
     pub fn plan_store_path(&self) -> PathBuf {
-        dirs::home_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join(".klyntbot")
-            .join("data")
-            .join("plans.jsonl")
+        data_dir().join("data").join("plans.jsonl")
     }
 
     /// Get the learning outcomes JSONL store path.
     pub fn learning_outcomes_path(&self) -> PathBuf {
-        dirs::home_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join(".klyntbot")
-            .join("data")
-            .join("outcomes.jsonl")
+        data_dir().join("data").join("outcomes.jsonl")
     }
 
     /// Get the learning state JSON file path.
     pub fn learning_state_path(&self) -> PathBuf {
-        dirs::home_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join(".klyntbot")
-            .join("data")
-            .join("learning_state.json")
+        data_dir().join("data").join("learning_state.json")
     }
 
     /// Set the API key for a provider by name.
     pub fn set_provider_key(&mut self, provider_name: &str, key: String) {
+        let secret = Secret::new(key);
         match provider_name {
-            "anthropic" => self.providers.anthropic.api_key = Secret::new(key),
-            "openai" => self.providers.openai.api_key = Secret::new(key),
-            "deepseek" => self.providers.deepseek.api_key = Secret::new(key),
-            "gemini" => self.providers.gemini.api_key = Secret::new(key),
-            "openrouter" => self.providers.openrouter.api_key = Secret::new(key),
-            "groq" => self.providers.groq.api_key = Secret::new(key),
+            "anthropic" => self.providers.anthropic.api_key = secret,
+            "openai" => self.providers.openai.api_key = secret,
+            "openrouter" => self.providers.openrouter.api_key = secret,
+            "deepseek" => self.providers.deepseek.api_key = secret,
+            "gemini" => self.providers.gemini.api_key = secret,
+            "groq" => self.providers.groq.api_key = secret,
+            "vllm" => self.providers.vllm.api_key = secret,
+            "zhipu" => self.providers.zhipu.api_key = secret,
+            "dashscope" => self.providers.dashscope.api_key = secret,
+            "moonshot" => self.providers.moonshot.api_key = secret,
+            "minimax" => self.providers.minimax.api_key = secret,
+            "aihubmix" => self.providers.aihubmix.api_key = secret,
             _ => {}
         }
     }
@@ -574,7 +568,7 @@ fn default_deadline_hours() -> u64 {
 #[serde(rename_all = "camelCase")]
 pub struct CalendarConfig {
     /// Calendar providers (Apple, Google, Generic CalDAV).
-    #[serde(default, deserialize_with = "deserialize_providers")]
+    #[serde(default)]
     pub providers: Vec<CalendarProviderConfig>,
 
     #[serde(default = "default_conflict_resolution")]
@@ -697,11 +691,6 @@ impl CalendarConfig {
             .map(|p| p.sync_interval_secs())
             .min()
             .unwrap_or(300)
-    }
-
-    /// Check if bidirectional sync reconciliation is enabled.
-    pub fn bidirectional_sync(&self) -> bool {
-        self.bidirectional_sync
     }
 }
 
@@ -888,83 +877,6 @@ pub struct GenericCalDavConfig {
     pub auto_sync_due_dates: bool,
 }
 
-/// Custom deserializer that handles both old (flat) and new (providers array) formats.
-fn deserialize_providers<'de, D>(
-    deserializer: D,
-) -> std::result::Result<Vec<CalendarProviderConfig>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    // Try to deserialize as the new format (Vec<CalendarProviderConfig>)
-    Vec::<CalendarProviderConfig>::deserialize(deserializer)
-}
-
-/// Deserialize a CalendarConfig that might be in the old flat format.
-/// This is handled by CalendarConfig's serde derive — the old format will have
-/// `username`, `password`, etc. at the top level instead of a `providers` array.
-/// We detect this by checking for the presence of `username` in the raw JSON.
-impl CalendarConfig {
-    /// Migrate from old flat format to new providers format.
-    /// Call this after deserialization if the config might be in the old format.
-    pub fn migrate_from_legacy(json: &serde_json::Value) -> Self {
-        // Check if this is old format (has "username" at top level)
-        if let Some(username) = json.get("username").and_then(|v| v.as_str()) {
-            if !username.is_empty() {
-                let password = json
-                    .get("password")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or_default();
-                let caldav_url = json
-                    .get("caldavUrl")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("https://caldav.icloud.com");
-                let calendar_name = json
-                    .get("calendarName")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("Klyntbot Tasks");
-                let sync_interval_secs = json
-                    .get("syncIntervalSecs")
-                    .and_then(|v| v.as_u64())
-                    .unwrap_or(300);
-                let auto_sync_due_dates = json
-                    .get("autoSyncDueDates")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(true);
-                let enabled = json
-                    .get("enabled")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(false);
-
-                let apple = AppleCalendarConfig {
-                    enabled,
-                    username: username.to_string(),
-                    password: Secret::new(password.to_string()),
-                    caldav_url: caldav_url.to_string(),
-                    calendar_name: calendar_name.to_string(),
-                    sync_interval_secs,
-                    auto_sync_due_dates,
-                };
-
-                let conflict_resolution = json
-                    .get("conflictResolution")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("server_wins")
-                    .to_string();
-
-                return CalendarConfig {
-                    providers: vec![CalendarProviderConfig::Apple(apple)],
-                    conflict_resolution,
-                    bidirectional_sync: true, // Default to true for migrated configs
-                    legacy_migrated: true,
-                };
-            }
-        }
-
-        // Try new format
-        serde_json::from_value(json.clone()).unwrap_or_default()
-    }
-}
-
 fn default_caldav_url() -> String {
     "https://caldav.icloud.com".to_string()
 }
@@ -1147,7 +1059,6 @@ mod tests {
         assert!(!config.is_any_enabled());
         assert_eq!(config.conflict_resolution, "server_wins");
         assert!(config.bidirectional_sync); // Defaults to true
-        assert!(config.bidirectional_sync()); // Accessor works
     }
 
     #[test]
@@ -1286,31 +1197,6 @@ mod tests {
             original.conflict_resolution,
             deserialized.conflict_resolution
         );
-    }
-
-    #[test]
-    fn test_calendar_config_legacy_migration() {
-        let legacy_json = serde_json::json!({
-            "enabled": true,
-            "username": "test@apple.com",
-            "password": "app-password-123",
-            "caldavUrl": "https://caldav.icloud.com",
-            "calendarName": "Work Tasks",
-            "syncIntervalSecs": 900,
-            "conflictResolution": "server_wins",
-            "autoSyncDueDates": true
-        });
-
-        let config = CalendarConfig::migrate_from_legacy(&legacy_json);
-        assert_eq!(config.providers.len(), 1);
-        assert!(config.is_any_enabled());
-
-        let apple = config.apple().unwrap();
-        assert!(apple.enabled);
-        assert_eq!(apple.username, "test@apple.com");
-        assert_eq!(apple.password.expose(), "app-password-123");
-        assert_eq!(apple.calendar_name, "Work Tasks");
-        assert_eq!(apple.sync_interval_secs, 900);
     }
 
     #[test]

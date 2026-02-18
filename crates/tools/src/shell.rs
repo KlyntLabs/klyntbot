@@ -50,7 +50,6 @@ static POSIX_PATH_RE: Lazy<Regex> =
 pub struct ExecTool {
     timeout: Duration,
     working_dir: Option<PathBuf>,
-    allow_patterns: Vec<Regex>,
     restrict_to_workspace: bool,
 }
 
@@ -63,7 +62,6 @@ impl ExecTool {
         Self {
             timeout: Duration::from_secs(timeout_secs),
             working_dir,
-            allow_patterns: Vec::new(),
             restrict_to_workspace,
         }
     }
@@ -84,14 +82,6 @@ impl ExecTool {
                 return Err(
                     "Command blocked by safety guard (dangerous pattern detected)".to_string(),
                 );
-            }
-        }
-
-        // Check allow patterns if configured
-        if !self.allow_patterns.is_empty() {
-            let allowed = self.allow_patterns.iter().any(|p| p.is_match(&lower));
-            if !allowed {
-                return Err("Command blocked by safety guard (not in allowlist)".to_string());
             }
         }
 

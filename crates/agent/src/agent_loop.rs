@@ -99,19 +99,16 @@ pub struct AgentLoop {
     context_builder: Arc<RwLock<ContextBuilder>>,
     session_manager: Arc<RwLock<SessionManager>>,
     tool_registry: Arc<RwLock<ToolRegistry>>,
-    #[allow(dead_code)] // Will be used when full agent loop implementation is completed
-    subagent_manager: Arc<SubagentManager>,
     confidence_evaluator: Option<ConfidenceEvaluator>,
     decision_logger: DecisionLogger,
     running: Arc<AtomicBool>,
     last_active_channel: Option<LastActiveChannel>,
     reminder_engine: Option<Arc<RwLock<super::ReminderEngine>>>,
     recurring_task_spawner: Option<Arc<RwLock<super::RecurringTaskSpawner>>>,
-    #[allow(dead_code)] // Held for lifetime; shared with CalendarSyncAdapter
-    notification_dispatcher: Option<Arc<super::NotificationDispatcher>>,
+    /// Held for lifetime; shared with CalendarSyncAdapter
+    _notification_dispatcher: Option<Arc<super::NotificationDispatcher>>,
     /// Calendar sync adapter (shared with ReminderEngine)
-    #[allow(dead_code)] // Held for lifetime; shared with ReminderEngine
-    calendar_adapter: Option<Arc<CalendarSyncAdapter>>,
+    _calendar_adapter: Option<Arc<CalendarSyncAdapter>>,
     /// Conversation embedding handler for semantic memory (Phase 4.1)
     conversation_embedding_handler: Option<Arc<dyn tools::ConversationEmbeddingHandler>>,
     /// Plan executor for structured multi-step execution (Phase 2)
@@ -255,7 +252,7 @@ impl AgentLoop {
                     &config.calendar,
                     config.timezone.clone(),
                     notification_dispatcher.clone(),
-                    config.calendar.bidirectional_sync(),
+                    config.calendar.bidirectional_sync,
                 )
                 .await?,
             );
@@ -511,9 +508,10 @@ impl AgentLoop {
         // Build the adaptive orchestrator pipeline.
         // All dependencies (provider, tool_registry, config) are already available.
         let tool_registry = Arc::new(RwLock::new(tool_registry));
-        let execution_core = Arc::new(
-            crate::execution::ExecutionCore::new(provider.clone(), Arc::clone(&tool_registry)),
-        );
+        let execution_core = Arc::new(crate::execution::ExecutionCore::new(
+            provider.clone(),
+            Arc::clone(&tool_registry),
+        ));
         let engine_dispatch = Arc::new(crate::execution::EngineDispatch::new(execution_core));
         let orchestrator = Arc::new(crate::orchestrator::Orchestrator::new(
             provider.clone(),
@@ -550,15 +548,14 @@ impl AgentLoop {
             context_builder,
             session_manager: Arc::new(RwLock::new(session_manager)),
             tool_registry,
-            subagent_manager,
             confidence_evaluator,
             decision_logger,
             running: Arc::new(AtomicBool::new(false)),
             last_active_channel: notification_handle,
             reminder_engine,
             recurring_task_spawner,
-            notification_dispatcher,
-            calendar_adapter,
+            _notification_dispatcher: notification_dispatcher,
+            _calendar_adapter: calendar_adapter,
             conversation_embedding_handler,
             plan_executor,
             plan_store: stored_plan_store,
@@ -1038,8 +1035,7 @@ impl AgentLoop {
             }
         };
 
-        // Clear executing flag
-        self.plan_executing.store(false, Ordering::SeqCst);
+        // _flag_guard (PlanExecutingGuard) clears plan_executing on drop.
 
         // Finalize plan status in-place — no Plan clone
         let (summary, plan_goal_id, plan_succeeded) = {
@@ -1107,7 +1103,7 @@ impl AgentLoop {
         }
 
         let preview = if msg.content.len() > 80 {
-            format!("{}...", &msg.content[..80])
+            format!("{}...", truncate_safe(&msg.content, 80))
         } else {
             msg.content.clone()
         };
@@ -1125,26 +1121,15 @@ impl AgentLoop {
         // Add user message to session
         session.add_message("user", &msg.content);
 
-        // Phase 4.1: Async conversation embedding hook for user message
-        if let Some(handler) = &self.conversation_embedding_handler {
-            if self.should_embed_conversation(session_key.as_str(), "user") {
-                let h = handler.clone();
-                let sk = session_key.to_string();
-                let role = "user".to_string();
-                let content_str = msg.content.clone();
-                let msg_id = session
-                    .messages
-                    .last()
-                    .expect("Message should exist after add_message")
-                    .id
-                    .clone();
-
-                tokio::spawn(async move {
-                    if let Err(e) = h.embed_message(&sk, &role, &content_str, &msg_id).await {
-                        warn!("Failed to embed user message: {}", e);
-                    }
-                });
-            }
+        // Async conversation embedding hook for user message
+        {
+            let msg_id = session
+                .messages
+                .last()
+                .expect("Message should exist after add_message")
+                .id
+                .clone();
+            self.spawn_embed_message(session_key.as_str(), "user", &msg.content, &msg_id);
         }
 
         // Get session history
@@ -1359,33 +1344,40 @@ impl AgentLoop {
         true
     }
 
+    /// Fire-and-forget embedding of a conversation message.
+    ///
+    /// Spawns a background task to embed the message if a handler is configured
+    /// and the session/role is not excluded.
+    fn spawn_embed_message(&self, session_key: &str, role: &str, content: &str, msg_id: &str) {
+        if let Some(handler) = &self.conversation_embedding_handler {
+            if self.should_embed_conversation(session_key, role) {
+                let h = handler.clone();
+                let sk = session_key.to_string();
+                let r = role.to_string();
+                let c = content.to_string();
+                let id = msg_id.to_string();
+
+                tokio::spawn(async move {
+                    if let Err(e) = h.embed_message(&sk, &r, &c, &id).await {
+                        warn!("Failed to embed {} message: {}", r, e);
+                    }
+                });
+            }
+        }
+    }
+
     async fn save_to_session(&self, session_key: &str, content: &str) {
         let mut session_manager = self.session_manager.write().await;
         if let Ok(session) = session_manager.get_or_create(session_key).await {
             session.add_message("assistant", content);
 
-            // Phase 4.1: Async conversation embedding hook
-            if let Some(handler) = &self.conversation_embedding_handler {
-                if self.should_embed_conversation(session_key, "assistant") {
-                    let h = handler.clone();
-                    let sk = session_key.to_string();
-                    let role = "assistant".to_string();
-                    let content_str = content.to_string();
-                    // Get the ID of the message we just added
-                    let msg_id = session
-                        .messages
-                        .last()
-                        .expect("Message should exist after add_message")
-                        .id
-                        .clone();
-
-                    tokio::spawn(async move {
-                        if let Err(e) = h.embed_message(&sk, &role, &content_str, &msg_id).await {
-                            warn!("Failed to embed conversation: {}", e);
-                        }
-                    });
-                }
-            }
+            let msg_id = session
+                .messages
+                .last()
+                .expect("Message should exist after add_message")
+                .id
+                .clone();
+            self.spawn_embed_message(session_key, "assistant", content, &msg_id);
 
             let session_clone = session.clone();
             if let Err(e) = session_manager.save(&session_clone).await {
@@ -1493,6 +1485,206 @@ impl AgentLoop {
         Ok(result)
     }
 
+    /// Evaluate confidence for a set of tool calls.
+    ///
+    /// Returns `Some(IterationOutcome)` if confidence handling short-circuits
+    /// (Clarify → nudge, Skip → final content). Returns `None` if we should
+    /// proceed with tool execution, along with the optional assessment.
+    async fn evaluate_confidence(
+        &self,
+        content: &str,
+        tool_names: &[String],
+        routing_ctx: &RoutingContext,
+        event_tx: &Option<mpsc::Sender<AgentEvent>>,
+        messages: &mut Vec<Message>,
+    ) -> (
+        Option<IterationOutcome>,
+        Option<crate::confidence::ConfidenceAssessment>,
+    ) {
+        let evaluator = match &self.confidence_evaluator {
+            Some(ev) => ev,
+            None => return (None, None),
+        };
+
+        let assessment = match evaluator.parse_assessment(content) {
+            Some(a) => a,
+            None => return (None, None),
+        };
+
+        let action_str = match &assessment.action {
+            DecisionAction::Proceed => "proceed",
+            DecisionAction::Clarify { .. } => "clarify",
+            DecisionAction::Skip { .. } => "skip",
+        };
+        emit!(
+            event_tx,
+            AgentEvent::ConfidenceAssessed {
+                score: assessment.score,
+                action: action_str.to_string(),
+            }
+        );
+
+        // Log the assessment
+        let entry = confidence::types::DecisionLogEntry {
+            id: uuid::Uuid::new_v4().to_string(),
+            session_key: routing_ctx.chat_id.to_string(),
+            iteration: 0,
+            tool_names: tool_names.to_vec(),
+            user_message_preview: String::new(),
+            assessment: assessment.clone(),
+            outcome: None,
+            created_at: chrono::Utc::now(),
+        };
+        self.decision_logger.log(&entry).await;
+
+        match &assessment.action {
+            DecisionAction::Clarify { .. } => {
+                debug!(
+                    score = assessment.score,
+                    "Low confidence — nudging LLM to call ask_user"
+                );
+                let nudge = format!(
+                    "Your confidence assessment was low (score: {:.2}). \
+                     Low dimensions: {}. Reasoning: \"{}\"\n\n\
+                     You MUST call the ask_user tool to clarify with the user \
+                     before proceeding. Ask contextually relevant questions \
+                     using appropriate types (single_select, yes_no, free_text). \
+                     Do NOT proceed with other tools until you have clarified.",
+                    assessment.score,
+                    low_dimensions_summary(
+                        &assessment,
+                        self.confidence_evaluator
+                            .as_ref()
+                            .map(|e| e.threshold())
+                            .expect("confidence_evaluator must exist in Clarify branch"),
+                    ),
+                    assessment.reasoning,
+                );
+                messages.push(Message::system(nudge));
+                (Some(IterationOutcome::ToolCallsProcessed), None)
+            }
+            DecisionAction::Skip { reason } => {
+                debug!(reason = %reason, "Skipping tool calls");
+                (Some(IterationOutcome::FinalContent(reason.clone())), None)
+            }
+            DecisionAction::Proceed => (None, Some(assessment)),
+        }
+    }
+
+    /// Execute tool calls in parallel and append results to the message history.
+    ///
+    /// Also records outcomes to the learning system and invalidates context
+    /// caches for mutating tools.
+    async fn execute_tool_calls(
+        &self,
+        tool_calls: &[providers::ToolCall],
+        messages: &mut Vec<Message>,
+        routing_ctx: &RoutingContext,
+        event_tx: &Option<mpsc::Sender<AgentEvent>>,
+        last_confidence: Option<&crate::confidence::ConfidenceAssessment>,
+    ) {
+        let tool_call_messages = tool_calls_to_messages(tool_calls);
+        messages.push(Message::assistant_with_tools(tool_call_messages));
+
+        let tool_futures: Vec<_> = tool_calls
+            .iter()
+            .map(|tc| {
+                let registry = self.tool_registry.clone();
+                let name = tc.name.clone();
+                let args = tc.arguments.clone();
+                let ctx = routing_ctx.clone();
+                let id = tc.id.clone();
+                let etx = event_tx.clone();
+                async move {
+                    debug!("Executing tool: {}", name);
+                    if let Some(tx) = &etx {
+                        let _ = tx
+                            .send(AgentEvent::ToolStart {
+                                name: name.clone(),
+                                args: args.clone(),
+                            })
+                            .await;
+                    }
+                    let start = Instant::now();
+                    let reg = registry.read().await;
+                    let result = reg.execute(&name, args, &ctx).await;
+                    let duration_ms = start.elapsed().as_millis() as u64;
+                    let success = result.is_ok();
+                    if let Some(tx) = &etx {
+                        let _ = tx
+                            .send(AgentEvent::ToolEnd {
+                                name: name.clone(),
+                                success,
+                                duration_ms,
+                            })
+                            .await;
+                    }
+                    (id, name, result, duration_ms)
+                }
+            })
+            .collect();
+
+        let results = join_all(tool_futures).await;
+
+        // Track which caches need invalidation
+        let mut invalidate_todo = false;
+        let mut invalidate_memory = false;
+        let mut invalidate_goals = false;
+
+        let outcome_session_key = format!("{}:{}", routing_ctx.channel, routing_ctx.chat_id);
+        for (id, name, result, duration_ms) in results {
+            // Record outcome for learning system (best-effort, privacy-by-omission)
+            if let Some(recorder) = &self.outcome_recorder {
+                let success = result.is_ok();
+                let error_cat = result
+                    .as_ref()
+                    .err()
+                    .map(|e| crate::learning::recorder::categorize_error(&e.to_string()));
+                recorder
+                    .record_tool_outcome(
+                        &name,
+                        success,
+                        error_cat,
+                        duration_ms,
+                        last_confidence,
+                        crate::learning::ExecutionMode::Chat,
+                        &outcome_session_key,
+                    )
+                    .await;
+            }
+
+            // Track cache invalidation needs based on tool names
+            if result.is_ok() {
+                match name.as_str() {
+                    "todo" => invalidate_todo = true,
+                    "memory_write" | "memory" => invalidate_memory = true,
+                    "goal" => invalidate_goals = true,
+                    _ => {}
+                }
+            }
+
+            let result_str = match result {
+                Ok(r) => r,
+                Err(e) => format!("Error: {}", e),
+            };
+            messages.push(Message::tool(id, name, result_str));
+        }
+
+        // Invalidate caches after mutating tool calls
+        if invalidate_todo || invalidate_memory || invalidate_goals {
+            let mut ctx_builder = self.context_builder.write().await;
+            if invalidate_todo {
+                ctx_builder.invalidate_todo_cache();
+            }
+            if invalidate_memory {
+                ctx_builder.invalidate_memory_cache();
+            }
+            if invalidate_goals {
+                ctx_builder.invalidate_goals_cache();
+            }
+        }
+    }
+
     /// Run a single standard (non-streaming) iteration.
     async fn run_standard_iteration(
         &self,
@@ -1508,153 +1700,28 @@ impl AgentLoop {
         if !response.tool_calls.is_empty() {
             debug!("LLM requested {} tool calls", response.tool_calls.len());
 
-            // Evaluate confidence if enabled; capture for outcome recording
-            let mut last_confidence: Option<crate::confidence::ConfidenceAssessment> = None;
-            if let Some(evaluator) = &self.confidence_evaluator {
-                let content = response.content.as_deref().unwrap_or("");
-                if let Some(assessment) = evaluator.parse_assessment(content) {
-                    let action_str = match &assessment.action {
-                        DecisionAction::Proceed => "proceed",
-                        DecisionAction::Clarify { .. } => "clarify",
-                        DecisionAction::Skip { .. } => "skip",
-                    };
-                    emit!(
-                        event_tx,
-                        AgentEvent::ConfidenceAssessed {
-                            score: assessment.score,
-                            action: action_str.to_string(),
-                        }
-                    );
-
-                    // Log the assessment
-                    let tool_names: Vec<String> = response
-                        .tool_calls
-                        .iter()
-                        .map(|tc| tc.name.clone())
-                        .collect();
-                    let entry = confidence::types::DecisionLogEntry {
-                        id: uuid::Uuid::new_v4().to_string(),
-                        session_key: routing_ctx.chat_id.to_string(),
-                        iteration: 0,
-                        tool_names,
-                        user_message_preview: String::new(),
-                        assessment: assessment.clone(),
-                        outcome: None,
-                        created_at: chrono::Utc::now(),
-                    };
-                    self.decision_logger.log(&entry).await;
-
-                    // Act on confidence
-                    match &assessment.action {
-                        DecisionAction::Clarify { .. } => {
-                            debug!(
-                                score = assessment.score,
-                                "Low confidence — nudging LLM to call ask_user"
-                            );
-                            let nudge = format!(
-                                "Your confidence assessment was low (score: {:.2}). \
-                                 Low dimensions: {}. Reasoning: \"{}\"\n\n\
-                                 You MUST call the ask_user tool to clarify with the user \
-                                 before proceeding. Ask contextually relevant questions \
-                                 using appropriate types (single_select, yes_no, free_text). \
-                                 Do NOT proceed with other tools until you have clarified.",
-                                assessment.score,
-                                low_dimensions_summary(
-                                    &assessment,
-                                    self.confidence_evaluator
-                                        .as_ref()
-                                        .map(|e| e.threshold())
-                                        .expect(
-                                            "confidence_evaluator must exist in Clarify branch"
-                                        ),
-                                ),
-                                assessment.reasoning,
-                            );
-                            messages.push(Message::system(nudge));
-                            return Ok(IterationOutcome::ToolCallsProcessed);
-                        }
-                        DecisionAction::Skip { reason } => {
-                            debug!(reason = %reason, "Skipping tool calls");
-                            return Ok(IterationOutcome::FinalContent(reason.clone()));
-                        }
-                        DecisionAction::Proceed => {
-                            last_confidence = Some(assessment);
-                        }
-                    }
-                }
-            }
-
-            let tool_call_messages = tool_calls_to_messages(&response.tool_calls);
-            messages.push(Message::assistant_with_tools(tool_call_messages));
-
-            // Execute tools in parallel
-            let tool_futures: Vec<_> = response
+            let content = response.content.as_deref().unwrap_or("");
+            let tool_names: Vec<String> = response
                 .tool_calls
                 .iter()
-                .map(|tc| {
-                    let registry = self.tool_registry.clone();
-                    let name = tc.name.clone();
-                    let args = tc.arguments.clone();
-                    let ctx = routing_ctx.clone();
-                    let id = tc.id.clone();
-                    let etx = event_tx.clone();
-                    async move {
-                        debug!("Executing tool: {}", name);
-                        if let Some(tx) = &etx {
-                            let _ = tx
-                                .send(AgentEvent::ToolStart {
-                                    name: name.clone(),
-                                    args: args.clone(),
-                                })
-                                .await;
-                        }
-                        let start = Instant::now();
-                        let reg = registry.read().await;
-                        let result = reg.execute(&name, args, &ctx).await;
-                        let duration_ms = start.elapsed().as_millis() as u64;
-                        let success = result.is_ok();
-                        if let Some(tx) = &etx {
-                            let _ = tx
-                                .send(AgentEvent::ToolEnd {
-                                    name: name.clone(),
-                                    success,
-                                    duration_ms,
-                                })
-                                .await;
-                        }
-                        (id, name, result, duration_ms)
-                    }
-                })
+                .map(|tc| tc.name.clone())
                 .collect();
 
-            let results = join_all(tool_futures).await;
-            let outcome_session_key = format!("{}:{}", routing_ctx.channel, routing_ctx.chat_id);
-            for (id, name, result, duration_ms) in results {
-                // Record outcome for learning system (best-effort, privacy-by-omission)
-                if let Some(recorder) = &self.outcome_recorder {
-                    let success = result.is_ok();
-                    let error_cat = result
-                        .as_ref()
-                        .err()
-                        .map(|e| crate::learning::recorder::categorize_error(&e.to_string()));
-                    recorder
-                        .record_tool_outcome(
-                            &name,
-                            success,
-                            error_cat,
-                            duration_ms,
-                            last_confidence.as_ref(),
-                            crate::learning::ExecutionMode::Chat,
-                            &outcome_session_key,
-                        )
-                        .await;
-                }
-                let result_str = match result {
-                    Ok(r) => r,
-                    Err(e) => format!("Error: {}", e),
-                };
-                messages.push(Message::tool(id, name, result_str));
+            let (short_circuit, last_confidence) = self
+                .evaluate_confidence(content, &tool_names, routing_ctx, event_tx, messages)
+                .await;
+            if let Some(outcome) = short_circuit {
+                return Ok(outcome);
             }
+
+            self.execute_tool_calls(
+                &response.tool_calls,
+                messages,
+                routing_ctx,
+                event_tx,
+                last_confidence.as_ref(),
+            )
+            .await;
 
             return Ok(IterationOutcome::ToolCallsProcessed);
         }
@@ -1756,145 +1823,29 @@ impl AgentLoop {
         if !tool_calls.is_empty() {
             debug!("LLM requested {} tool calls", tool_calls.len());
 
-            // Evaluate confidence if enabled; capture for outcome recording
-            let mut last_confidence: Option<crate::confidence::ConfidenceAssessment> = None;
-            if let Some(evaluator) = &self.confidence_evaluator {
-                if let Some(assessment) = evaluator.parse_assessment(&accumulated_content) {
-                    let action_str = match &assessment.action {
-                        DecisionAction::Proceed => "proceed",
-                        DecisionAction::Clarify { .. } => "clarify",
-                        DecisionAction::Skip { .. } => "skip",
-                    };
-                    emit!(
-                        event_tx,
-                        AgentEvent::ConfidenceAssessed {
-                            score: assessment.score,
-                            action: action_str.to_string(),
-                        }
-                    );
+            let tool_names: Vec<String> = tool_calls.iter().map(|tc| tc.name.clone()).collect();
 
-                    let tool_names: Vec<String> =
-                        tool_calls.iter().map(|tc| tc.name.clone()).collect();
-                    let entry = confidence::types::DecisionLogEntry {
-                        id: uuid::Uuid::new_v4().to_string(),
-                        session_key: routing_ctx.chat_id.to_string(),
-                        iteration: 0,
-                        tool_names,
-                        user_message_preview: String::new(),
-                        assessment: assessment.clone(),
-                        outcome: None,
-                        created_at: chrono::Utc::now(),
-                    };
-                    self.decision_logger.log(&entry).await;
-
-                    match &assessment.action {
-                        DecisionAction::Clarify { .. } => {
-                            debug!(
-                                score = assessment.score,
-                                "Low confidence — nudging LLM to call ask_user"
-                            );
-                            let nudge = format!(
-                                "Your confidence assessment was low (score: {:.2}). \
-                                 Low dimensions: {}. Reasoning: \"{}\"\n\n\
-                                 You MUST call the ask_user tool to clarify with the user \
-                                 before proceeding. Ask contextually relevant questions \
-                                 using appropriate types (single_select, yes_no, free_text). \
-                                 Do NOT proceed with other tools until you have clarified.",
-                                assessment.score,
-                                low_dimensions_summary(
-                                    &assessment,
-                                    self.confidence_evaluator
-                                        .as_ref()
-                                        .map(|e| e.threshold())
-                                        .expect(
-                                            "confidence_evaluator must exist in Clarify branch"
-                                        ),
-                                ),
-                                assessment.reasoning,
-                            );
-                            messages.push(Message::system(nudge));
-                            return Ok(IterationOutcome::ToolCallsProcessed);
-                        }
-                        DecisionAction::Skip { reason } => {
-                            return Ok(IterationOutcome::FinalContent(reason.clone()));
-                        }
-                        DecisionAction::Proceed => {
-                            last_confidence = Some(assessment);
-                        }
-                    }
-                }
+            let (short_circuit, last_confidence) = self
+                .evaluate_confidence(
+                    &accumulated_content,
+                    &tool_names,
+                    routing_ctx,
+                    event_tx,
+                    messages,
+                )
+                .await;
+            if let Some(outcome) = short_circuit {
+                return Ok(outcome);
             }
 
-            let tool_call_messages = tool_calls_to_messages(&tool_calls);
-            messages.push(Message::assistant_with_tools(tool_call_messages));
-
-            // Execute tools in parallel
-            let tool_futures: Vec<_> = tool_calls
-                .iter()
-                .map(|tc| {
-                    let registry = self.tool_registry.clone();
-                    let name = tc.name.clone();
-                    let args = tc.arguments.clone();
-                    let ctx = routing_ctx.clone();
-                    let id = tc.id.clone();
-                    let etx = event_tx.clone();
-                    async move {
-                        debug!("Executing tool: {}", name);
-                        if let Some(tx) = &etx {
-                            let _ = tx
-                                .send(AgentEvent::ToolStart {
-                                    name: name.clone(),
-                                    args: args.clone(),
-                                })
-                                .await;
-                        }
-                        let start = Instant::now();
-                        let reg = registry.read().await;
-                        let result = reg.execute(&name, args, &ctx).await;
-                        let duration_ms = start.elapsed().as_millis() as u64;
-                        let success = result.is_ok();
-                        if let Some(tx) = &etx {
-                            let _ = tx
-                                .send(AgentEvent::ToolEnd {
-                                    name: name.clone(),
-                                    success,
-                                    duration_ms,
-                                })
-                                .await;
-                        }
-                        (id, name, result, duration_ms)
-                    }
-                })
-                .collect();
-
-            let results = join_all(tool_futures).await;
-            let outcome_session_key = format!("{}:{}", routing_ctx.channel, routing_ctx.chat_id);
-            for (id, name, result, duration_ms) in results {
-                // Record outcome for learning system (best-effort, privacy-by-omission)
-                if let Some(recorder) = &self.outcome_recorder {
-                    let success = result.is_ok();
-                    let error_cat = result
-                        .as_ref()
-                        .err()
-                        .map(|e| crate::learning::recorder::categorize_error(&e.to_string()));
-                    recorder
-                        .record_tool_outcome(
-                            &name,
-                            success,
-                            error_cat,
-                            duration_ms,
-                            last_confidence.as_ref(),
-                            crate::learning::ExecutionMode::Chat,
-                            &outcome_session_key,
-                        )
-                        .await;
-                }
-                let result_str = match result {
-                    Ok(r) => r,
-                    Err(e) => format!("Error: {}", e),
-                };
-                messages.push(Message::tool(id, name, result_str));
-            }
+            self.execute_tool_calls(
+                &tool_calls,
+                messages,
+                routing_ctx,
+                event_tx,
+                last_confidence.as_ref(),
+            )
+            .await;
 
             return Ok(IterationOutcome::ToolCallsProcessed);
         }
@@ -1913,10 +1864,9 @@ impl AgentLoop {
     /// new classify → assemble → dispatch → validate → record pipeline instead
     /// of the legacy `run_agent_loop` iteration loop.
     ///
-    /// TODO: Wire `process_message_v2` into the main `run()` message bus loop
-    /// (currently only the legacy `process_message` path is used by `run()`).
     /// The v2 path is accessible programmatically via `process_message_v2()`
-    /// or through CLI `chat` when pipeline is set.
+    /// or through CLI `chat` when pipeline is set. The `run()` bus loop
+    /// already routes through the pipeline when set (via `process_message`).
     pub fn set_pipeline(&mut self, pipeline: Arc<crate::pipeline::AgentPipeline>) {
         self.pipeline = Some(pipeline);
     }
@@ -1938,13 +1888,7 @@ impl AgentLoop {
         };
 
         let preview = if content.len() > 80 {
-            let end = content
-                .char_indices()
-                .map(|(i, _)| i)
-                .take_while(|&i| i <= 80)
-                .last()
-                .unwrap_or(0);
-            format!("{}...", &content[..end])
+            format!("{}...", truncate_safe(&content, 80))
         } else {
             content.clone()
         };
@@ -2007,13 +1951,7 @@ impl AgentLoop {
     /// Returns the agent's response text directly instead of publishing to the bus.
     pub async fn process_direct(&self, content: String, session_key: String) -> Result<String> {
         let preview = if content.len() > 80 {
-            let end = content
-                .char_indices()
-                .map(|(i, _)| i)
-                .take_while(|&i| i <= 80)
-                .last()
-                .unwrap_or(0);
-            format!("{}...", &content[..end])
+            format!("{}...", truncate_safe(&content, 80))
         } else {
             content.clone()
         };
@@ -2024,26 +1962,15 @@ impl AgentLoop {
         let session = session_manager.get_or_create(&session_key).await?;
         session.add_message("user", &content);
 
-        // Phase 4.1: Async conversation embedding hook for user message (CLI)
-        if let Some(handler) = &self.conversation_embedding_handler {
-            if self.should_embed_conversation(&session_key, "user") {
-                let h = handler.clone();
-                let sk = session_key.clone();
-                let role = "user".to_string();
-                let content_str = content.clone();
-                let msg_id = session
-                    .messages
-                    .last()
-                    .expect("Message should exist after add_message")
-                    .id
-                    .clone();
-
-                tokio::spawn(async move {
-                    if let Err(e) = h.embed_message(&sk, &role, &content_str, &msg_id).await {
-                        warn!("Failed to embed user message (CLI): {}", e);
-                    }
-                });
-            }
+        // Async conversation embedding hook for user message (CLI)
+        {
+            let msg_id = session
+                .messages
+                .last()
+                .expect("Message should exist after add_message")
+                .id
+                .clone();
+            self.spawn_embed_message(&session_key, "user", &content, &msg_id);
         }
 
         let history = session.get_history(DEFAULT_HISTORY_LIMIT).to_vec();
@@ -2089,7 +2016,7 @@ impl AgentLoop {
         session_key: String,
     ) -> Result<StreamingHandle> {
         let preview = if content.len() > 80 {
-            format!("{}...", &content[..80])
+            format!("{}...", truncate_safe(&content, 80))
         } else {
             content.clone()
         };
@@ -2100,26 +2027,15 @@ impl AgentLoop {
         let session = session_manager.get_or_create(&session_key).await?;
         session.add_message("user", &content);
 
-        // Phase 4.1: Async conversation embedding hook for user message (CLI streaming)
-        if let Some(handler) = &self.conversation_embedding_handler {
-            if self.should_embed_conversation(&session_key, "user") {
-                let h = handler.clone();
-                let sk = session_key.clone();
-                let role = "user".to_string();
-                let content_str = content.clone();
-                let msg_id = session
-                    .messages
-                    .last()
-                    .expect("Message should exist after add_message")
-                    .id
-                    .clone();
-
-                tokio::spawn(async move {
-                    if let Err(e) = h.embed_message(&sk, &role, &content_str, &msg_id).await {
-                        warn!("Failed to embed user message (CLI streaming): {}", e);
-                    }
-                });
-            }
+        // Async conversation embedding hook for user message (CLI streaming)
+        {
+            let msg_id = session
+                .messages
+                .last()
+                .expect("Message should exist after add_message")
+                .id
+                .clone();
+            self.spawn_embed_message(&session_key, "user", &content, &msg_id);
         }
 
         let history = session.get_history(DEFAULT_HISTORY_LIMIT).to_vec();
@@ -2147,9 +2063,7 @@ impl AgentLoop {
             let result = if let Some(pipeline) = &agent.pipeline {
                 // Pipeline path: non-streaming for now, but usage is tracked
                 let mut context_builder = agent.context_builder.write().await;
-                let system_prompt = context_builder
-                    .build_system_prompt("cli", &sk)
-                    .await;
+                let system_prompt = context_builder.build_system_prompt("cli", &sk).await;
                 drop(context_builder);
 
                 let history_messages: Vec<Message> = history
@@ -2166,8 +2080,7 @@ impl AgentLoop {
                 let tool_defs = tool_registry.get_definitions();
                 let tool_names: Vec<String> = tool_registry.tool_names();
                 drop(tool_registry);
-                let tool_name_refs: Vec<&str> =
-                    tool_names.iter().map(|s| s.as_str()).collect();
+                let tool_name_refs: Vec<&str> = tool_names.iter().map(|s| s.as_str()).collect();
 
                 match pipeline
                     .process_message(
@@ -2188,9 +2101,7 @@ impl AgentLoop {
 
                         // Emit the full response for the CLI renderer
                         let _ = event_tx
-                            .send(AgentEvent::ContentChunk(
-                                pipeline_result.content.clone(),
-                            ))
+                            .send(AgentEvent::ContentChunk(pipeline_result.content.clone()))
                             .await;
                         let _ = event_tx
                             .send(AgentEvent::Done(pipeline_result.content.clone()))
@@ -2199,9 +2110,7 @@ impl AgentLoop {
                         Ok(pipeline_result.content)
                     }
                     Err(e) => {
-                        let _ = event_tx
-                            .send(AgentEvent::Error(e.to_string()))
-                            .await;
+                        let _ = event_tx.send(AgentEvent::Error(e.to_string())).await;
                         Err(e)
                     }
                 }
@@ -2277,6 +2186,21 @@ fn low_dimensions_summary(
     } else {
         low.join(", ")
     }
+}
+
+/// Safely truncate a string to approximately `max_bytes` without splitting
+/// multi-byte UTF-8 characters. Returns the original string if already short enough.
+fn truncate_safe(s: &str, max_bytes: usize) -> &str {
+    if s.len() <= max_bytes {
+        return s;
+    }
+    let end = s
+        .char_indices()
+        .map(|(i, _)| i)
+        .take_while(|&i| i <= max_bytes)
+        .last()
+        .unwrap_or(0);
+    &s[..end]
 }
 
 /// Helper to accumulate tool call data across chunks

@@ -6,7 +6,7 @@
 //! - Invalid ETags
 //! - CalDAV protocol edge cases
 
-use calendar::{CalendarEvent, EventSource, SyncEngine, SyncState};
+use calendar::{detect_conflict, resolve_conflict, CalendarEvent, EventSource, SyncState};
 use chrono::{TimeZone, Utc};
 
 #[test]
@@ -45,7 +45,7 @@ fn test_conflict_detection_identical_events() {
         status: None,
     };
 
-    let conflict = SyncEngine::detect_conflict(&event1, &event2);
+    let conflict = detect_conflict(&event1, &event2);
     assert!(!conflict, "Identical events should not conflict");
 }
 
@@ -74,7 +74,7 @@ fn test_conflict_detection_different_summary() {
         status: None,
     };
 
-    let conflict = SyncEngine::detect_conflict(&event1, &event2);
+    let conflict = detect_conflict(&event1, &event2);
     assert!(conflict, "Different summaries should conflict");
 }
 
@@ -103,7 +103,7 @@ fn test_conflict_detection_different_description() {
         status: None,
     };
 
-    let conflict = SyncEngine::detect_conflict(&event1, &event2);
+    let conflict = detect_conflict(&event1, &event2);
     assert!(conflict, "Different descriptions should conflict");
 }
 
@@ -132,7 +132,7 @@ fn test_conflict_detection_none_vs_some_description() {
         status: None,
     };
 
-    let conflict = SyncEngine::detect_conflict(&event1, &event2);
+    let conflict = detect_conflict(&event1, &event2);
     assert!(conflict, "None vs Some description should conflict");
 }
 
@@ -161,7 +161,7 @@ fn test_conflict_detection_different_start_time() {
         status: None,
     };
 
-    let conflict = SyncEngine::detect_conflict(&event1, &event2);
+    let conflict = detect_conflict(&event1, &event2);
     assert!(conflict, "Different start times should conflict");
 }
 
@@ -190,7 +190,7 @@ fn test_conflict_detection_different_end_time() {
         status: None,
     };
 
-    let conflict = SyncEngine::detect_conflict(&event1, &event2);
+    let conflict = detect_conflict(&event1, &event2);
     assert!(conflict, "Different end times should conflict");
 }
 
@@ -219,7 +219,7 @@ fn test_conflict_detection_different_etag() {
         status: None,
     };
 
-    let conflict = SyncEngine::detect_conflict(&event1, &event2);
+    let conflict = detect_conflict(&event1, &event2);
     assert!(conflict, "Different etags should conflict");
 }
 
@@ -248,7 +248,7 @@ fn test_conflict_detection_none_vs_some_etag() {
         status: None,
     };
 
-    let conflict = SyncEngine::detect_conflict(&event1, &event2);
+    let conflict = detect_conflict(&event1, &event2);
     assert!(conflict, "None vs Some etag should conflict");
 }
 
@@ -277,7 +277,7 @@ fn test_resolve_conflict_preserves_server_data() {
         status: None,
     };
 
-    let resolved = SyncEngine::resolve_conflict(&server_event, &local_event);
+    let resolved = resolve_conflict(&server_event, &local_event);
 
     assert_eq!(resolved.summary, "Server Summary");
     assert_eq!(resolved.description, Some("Server description".to_string()));

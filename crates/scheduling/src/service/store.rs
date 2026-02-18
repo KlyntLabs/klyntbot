@@ -1,6 +1,5 @@
 //! Persistence layer for the cron store (load/save to JSON on disk).
 
-use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -15,11 +14,16 @@ use super::CronService;
 impl CronService {
     /// Load jobs from disk
     pub(crate) async fn load_store(&self) -> Result<()> {
-        if !self.store_path.exists() {
+        if !tokio::fs::try_exists(&self.store_path)
+            .await
+            .unwrap_or(false)
+        {
             return Ok(());
         }
 
-        let content = fs::read_to_string(&self.store_path).map_err(CronError::Io)?;
+        let content = tokio::fs::read_to_string(&self.store_path)
+            .await
+            .map_err(CronError::Io)?;
 
         let loaded_store: CronStore = serde_json::from_str(&content).map_err(CronError::Json)?;
 
@@ -40,12 +44,16 @@ impl CronService {
         store_path: &PathBuf,
     ) -> Result<()> {
         if let Some(parent) = store_path.parent() {
-            fs::create_dir_all(parent).map_err(CronError::Io)?;
+            tokio::fs::create_dir_all(parent)
+                .await
+                .map_err(CronError::Io)?;
         }
 
         let store = store.read().await;
         let content = serde_json::to_string_pretty(&*store).map_err(CronError::Json)?;
-        fs::write(store_path, content).map_err(CronError::Io)?;
+        tokio::fs::write(store_path, content)
+            .await
+            .map_err(CronError::Io)?;
 
         Ok(())
     }

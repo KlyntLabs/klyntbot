@@ -9,11 +9,42 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 use tokio::sync::RwLock;
 use tokio::time::sleep;
 use tracing::{debug, error, info, warn};
+
+/// Cached compiled regexes for markdown-to-HTML conversion.
+struct MarkdownRegexes {
+    code_block: Regex,
+    inline_code: Regex,
+    header: Regex,
+    blockquote: Regex,
+    link: Regex,
+    bold_star: Regex,
+    bold_underscore: Regex,
+    italic: Regex,
+    strikethrough: Regex,
+    bullet: Regex,
+}
+
+fn markdown_regexes() -> &'static MarkdownRegexes {
+    static REGEXES: OnceLock<MarkdownRegexes> = OnceLock::new();
+    REGEXES.get_or_init(|| MarkdownRegexes {
+        code_block: Regex::new(r"```[\w]*\n?([\s\S]*?)```").unwrap(),
+        inline_code: Regex::new(r"`([^`]+)`").unwrap(),
+        header: Regex::new(r"(?m)^#{1,6}\s+(.+)$").unwrap(),
+        blockquote: Regex::new(r"(?m)^>\s*(.*)$").unwrap(),
+        link: Regex::new(r"\[([^\]]+)\]\(([^)]+)\)").unwrap(),
+        bold_star: Regex::new(r"\*\*(.+?)\*\*").unwrap(),
+        bold_underscore: Regex::new(r"__(.+?)__").unwrap(),
+        italic: Regex::new(r"(?:^|(?P<pre>[^a-zA-Z0-9]))_([^_]+)_(?:$|(?P<post>[^a-zA-Z0-9]))")
+            .unwrap(),
+        strikethrough: Regex::new(r"~~(.+?)~~").unwrap(),
+        bullet: Regex::new(r"(?m)^[-*]\s+").unwrap(),
+    })
+}
 
 use crate::{check_allowlist, Channel};
 use bus::{InboundMessage, MessageBus, OutboundMessage};
@@ -293,8 +324,8 @@ impl TelegramChannel {
         );
 
         // Publish to bus
-        let inbound = InboundMessage::new("telegram", sender_id, chat_id_str, content)
-            .with_media(media_paths);
+        let mut inbound = InboundMessage::new("telegram", sender_id, chat_id_str, content);
+        inbound.media = media_paths;
 
         bus.publish_inbound(inbound)
             .await
@@ -568,12 +599,13 @@ impl TelegramChannel {
             return String::new();
         }
 
+        let re = markdown_regexes();
         let mut result = text.to_string();
 
         // 1. Extract and protect code blocks first (preserve from other processing)
         let mut code_blocks: Vec<String> = Vec::new();
-        let code_block_re = Regex::new(r"```[\w]*\n?([\s\S]*?)```").unwrap();
-        result = code_block_re
+        result = re
+            .code_block
             .replace_all(&result, |caps: &regex::Captures| {
                 code_blocks.push(caps.get(1).unwrap().as_str().to_string());
                 format!("\x00CB{}\x00", code_blocks.len() - 1)
@@ -582,8 +614,8 @@ impl TelegramChannel {
 
         // 2. Extract and protect inline code
         let mut inline_codes: Vec<String> = Vec::new();
-        let inline_code_re = Regex::new(r"`([^`]+)`").unwrap();
-        result = inline_code_re
+        result = re
+            .inline_code
             .replace_all(&result, |caps: &regex::Captures| {
                 inline_codes.push(caps.get(1).unwrap().as_str().to_string());
                 format!("\x00IC{}\x00", inline_codes.len() - 1)
@@ -591,12 +623,10 @@ impl TelegramChannel {
             .to_string();
 
         // 3. Headers # Title -> just the title text
-        let header_re = Regex::new(r"(?m)^#{1,6}\s+(.+)$").unwrap();
-        result = header_re.replace_all(&result, "$1").to_string();
+        result = re.header.replace_all(&result, "$1").to_string();
 
         // 4. Blockquotes > text -> just the text
-        let blockquote_re = Regex::new(r"(?m)^>\s*(.*)$").unwrap();
-        result = blockquote_re.replace_all(&result, "$1").to_string();
+        result = re.blockquote.replace_all(&result, "$1").to_string();
 
         // 5. Escape HTML special characters
         result = result
@@ -605,40 +635,35 @@ impl TelegramChannel {
             .replace('>', "&gt;");
 
         // 6. Links [text](url) - before bold/italic to handle nested cases
-        let link_re = Regex::new(r"\[([^\]]+)\]\(([^)]+)\)").unwrap();
-        result = link_re
+        result = re
+            .link
             .replace_all(&result, r#"<a href="$2">$1</a>"#)
             .to_string();
 
         // 7. Bold **text** or __text__
-        let bold_re = Regex::new(r"\*\*(.+?)\*\*").unwrap();
-        result = bold_re.replace_all(&result, "<b>$1</b>").to_string();
-        let bold_underscore_re = Regex::new(r"__(.+?)__").unwrap();
-        result = bold_underscore_re
+        result = re.bold_star.replace_all(&result, "<b>$1</b>").to_string();
+        result = re
+            .bold_underscore
             .replace_all(&result, "<b>$1</b>")
             .to_string();
 
         // 8. Italic _text_ (avoid matching inside words like some_var_name)
-        // Rust regex doesn't support look-around, so use word boundary approach:
-        // Match _text_ only at word boundaries or start/end of string
-        let italic_re =
-            Regex::new(r"(?:^|(?P<pre>[^a-zA-Z0-9]))_([^_]+)_(?:$|(?P<post>[^a-zA-Z0-9]))")
-                .unwrap();
-        result = italic_re
+        result = re
+            .italic
             .replace_all(&result, "${pre}<i>$2</i>${post}")
             .to_string();
 
         // 9. Strikethrough ~~text~~
-        let strike_re = Regex::new(r"~~(.+?)~~").unwrap();
-        result = strike_re.replace_all(&result, "<s>$1</s>").to_string();
+        result = re
+            .strikethrough
+            .replace_all(&result, "<s>$1</s>")
+            .to_string();
 
         // 10. Bullet lists - item -> • item
-        let bullet_re = Regex::new(r"(?m)^[-*]\s+").unwrap();
-        result = bullet_re.replace_all(&result, "• ").to_string();
+        result = re.bullet.replace_all(&result, "• ").to_string();
 
         // 11. Restore inline code with HTML tags
         for (i, code) in inline_codes.iter().enumerate() {
-            // Escape HTML in code content
             let escaped = code
                 .replace('&', "&amp;")
                 .replace('<', "&lt;")
@@ -651,7 +676,6 @@ impl TelegramChannel {
 
         // 12. Restore code blocks with HTML tags
         for (i, code) in code_blocks.iter().enumerate() {
-            // Escape HTML in code content
             let escaped = code
                 .replace('&', "&amp;")
                 .replace('<', "&lt;")
@@ -756,18 +780,6 @@ struct TelegramResponse {
     ok: bool,
     result: Value,
     description: Option<String>,
-}
-
-/// Helper trait to add media to InboundMessage
-trait InboundMessageExt {
-    fn with_media(self, media: Vec<String>) -> Self;
-}
-
-impl InboundMessageExt for InboundMessage {
-    fn with_media(mut self, media: Vec<String>) -> Self {
-        self.media = media;
-        self
-    }
 }
 
 #[cfg(test)]

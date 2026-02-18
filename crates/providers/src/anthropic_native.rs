@@ -9,7 +9,7 @@ use serde_json::{json, Value};
 use std::time::Duration;
 use tracing::{debug, warn};
 
-use common::{KlyntbotError, ProviderError, Result};
+use common::{ProviderError, Result};
 use config::Secret;
 
 use crate::types::{
@@ -305,15 +305,7 @@ impl LlmProvider for AnthropicNativeProvider {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
 
-            return if status.as_u16() == 429 {
-                Err(KlyntbotError::Provider(ProviderError::RateLimited))
-            } else if status.as_u16() == 401 || status.as_u16() == 403 {
-                Err(KlyntbotError::Provider(ProviderError::AuthFailed))
-            } else {
-                Err(KlyntbotError::Provider(ProviderError::InvalidResponse(
-                    format!("HTTP {}: {}", status, error_text),
-                )))
-            };
+            return Err(super::types::map_http_error(status.as_u16(), error_text));
         }
 
         let response_body: Value = response.json().await.map_err(|e| {

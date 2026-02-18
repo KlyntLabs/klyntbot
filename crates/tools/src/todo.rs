@@ -18,7 +18,9 @@ use crate::enrichment::EnrichmentHandler;
 use crate::params::ParamExtractor;
 use crate::rrule_utils;
 use crate::todo_store::TodoStore;
-use crate::todo_types::{Todo, TodoFilter, TodoPatch, TodoStatus};
+use crate::todo_types::{
+    Attachment, AttachmentType, TimeEntry, TimeEntrySource, Todo, TodoFilter, TodoPatch, TodoStatus,
+};
 use common::utils::date::parse_datetime;
 use common::{Result, ToolError};
 use tracing::{debug, info, warn};
@@ -110,6 +112,55 @@ impl TodoTool {
             if let Err(e) = handler.sync_calendar().await {
                 warn!("Immediate calendar sync failed: {}", e);
             }
+        }
+    }
+
+    /// Record enrichment feedback for all suggestion fields (priority, duration, due date).
+    /// When `accepted_override` is `Some(true)`, all fields are marked accepted (manual enrich).
+    /// When `None`, each field's confidence is checked against 0.7 threshold (auto-enrich).
+    async fn record_enrichment_feedback(
+        &self,
+        task_id: &str,
+        result: &crate::enrichment::EnrichmentResult,
+        accepted_override: Option<bool>,
+    ) {
+        let Some(fb) = &self.feedback_handler else {
+            return;
+        };
+        let now = chrono::Utc::now();
+
+        // Collect (field, stringified_value, confidence) tuples eagerly to stay Send
+        let fields: Vec<(&str, String, f64)> = [
+            result
+                .priority
+                .as_ref()
+                .map(|s| ("priority", s.value.to_string(), s.confidence)),
+            result
+                .estimated_minutes
+                .as_ref()
+                .map(|s| ("estimated_minutes", s.value.to_string(), s.confidence)),
+            result
+                .due_date
+                .as_ref()
+                .map(|s| ("due_date", s.value.to_string(), s.confidence)),
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
+
+        for (field, suggested_value, conf) in fields {
+            let accepted = accepted_override.unwrap_or(conf >= 0.7);
+            let _ = fb
+                .record_feedback(crate::EnrichmentFeedbackEntry {
+                    task_id: task_id.to_string(),
+                    field: field.to_string(),
+                    suggested_value,
+                    actual_value: None,
+                    accepted,
+                    confidence: conf,
+                    timestamp: now,
+                })
+                .await;
         }
     }
 
@@ -367,38 +418,15 @@ impl Tool for TodoTool {
             "add" => {
                 let title = p.required_str("title")?;
 
-                let todo = Todo {
-                    id: Todo::generate_id(),
-                    title: title.to_string(),
-                    description: p.optional_str("description")?.map(String::from),
-                    priority: p.optional_u64("priority")?.map(|v| v as u8),
-                    due_date: p
-                        .optional_str("due_date")?
-                        .and_then(|s| parse_datetime(s, &self.timezone)),
-                    tags: p.string_array_or_empty("tags")?,
-                    status: TodoStatus::Todo,
-                    focused_at: None,
-                    focus_deadline: None,
-                    focus_expired_count: 0,
-                    created_at: Utc::now(),
-                    updated_at: Utc::now(),
-                    completed_at: None,
-                    // Phase 1/2 new fields
-                    parent_id: None,
-                    project_id: p.optional_str("project_id")?.map(String::from), // Phase 2: support project_id in add
-                    attachments: Vec::new(),
-                    time_entries: Vec::new(),
-                    total_tracked_secs: 0,
-                    estimated_minutes: None,
-                    calendar_event_uid: None,
-                    last_reminded_at: None,
-                    recurrence_rule: None,
-                    recurrence_parent_id: None,
-                    is_template: false,
-                    next_instance_date: None,
-                    blocked_by: Vec::new(),
-                    blocks: Vec::new(),
-                };
+                let mut todo = Todo::default_instance();
+                todo.title = title.to_string();
+                todo.description = p.optional_str("description")?.map(String::from);
+                todo.priority = p.optional_u64("priority")?.map(|v| v as u8);
+                todo.due_date = p
+                    .optional_str("due_date")?
+                    .and_then(|s| parse_datetime(s, &self.timezone));
+                todo.tags = p.string_array_or_empty("tags")?;
+                todo.project_id = p.optional_str("project_id")?.map(String::from);
 
                 let created = store.add(todo).await?;
 
@@ -444,52 +472,8 @@ impl Tool for TodoTool {
                             }
 
                             // Record enrichment feedback for the learning system
-                            if let Some(fb) = &self.feedback_handler {
-                                let now = chrono::Utc::now();
-                                let task_id = created.id.clone();
-                                if let Some(ref s) = suggestions.priority {
-                                    let accepted = s.confidence >= 0.7;
-                                    let _ = fb
-                                        .record_feedback(crate::EnrichmentFeedbackEntry {
-                                            task_id: task_id.clone(),
-                                            field: "priority".to_string(),
-                                            suggested_value: s.value.to_string(),
-                                            actual_value: None,
-                                            accepted,
-                                            confidence: s.confidence,
-                                            timestamp: now,
-                                        })
-                                        .await;
-                                }
-                                if let Some(ref s) = suggestions.estimated_minutes {
-                                    let accepted = s.confidence >= 0.7;
-                                    let _ = fb
-                                        .record_feedback(crate::EnrichmentFeedbackEntry {
-                                            task_id: task_id.clone(),
-                                            field: "estimated_minutes".to_string(),
-                                            suggested_value: s.value.to_string(),
-                                            actual_value: None,
-                                            accepted,
-                                            confidence: s.confidence,
-                                            timestamp: now,
-                                        })
-                                        .await;
-                                }
-                                if let Some(ref s) = suggestions.due_date {
-                                    let accepted = s.confidence >= 0.7;
-                                    let _ = fb
-                                        .record_feedback(crate::EnrichmentFeedbackEntry {
-                                            task_id: task_id.clone(),
-                                            field: "due_date".to_string(),
-                                            suggested_value: s.value.to_string(),
-                                            actual_value: None,
-                                            accepted,
-                                            confidence: s.confidence,
-                                            timestamp: now,
-                                        })
-                                        .await;
-                                }
-                            }
+                            self.record_enrichment_feedback(&created.id, &suggestions, None)
+                                .await;
                         }
                         Ok(None) => {
                             // Enrichment disabled or nothing to suggest
@@ -523,17 +507,13 @@ impl Tool for TodoTool {
 
             "list" => {
                 let filter = TodoFilter {
-                    status: p.optional_str("status")?.and_then(|s| match s {
-                        "todo" => Some(TodoStatus::Todo),
-                        "doing" => Some(TodoStatus::Doing),
-                        "done" => Some(TodoStatus::Done),
-                        "archived" => Some(TodoStatus::Archived),
-                        _ => None,
-                    }),
+                    status: p
+                        .optional_str("status")?
+                        .and_then(TodoStatus::from_str_loose),
                     priority_min: p.optional_u64("priority_min")?.map(|v| v as u8),
                     tag: p.optional_str("tag")?.map(String::from),
                     limit: p.optional_u64("limit")?.map(|l| l as usize),
-                    // Phase 2: new filters
+
                     project_id: p.optional_str("project_id")?.map(String::from),
                     parent_id: p.optional_str("parent_id")?.map(String::from),
                     include_templates: false,
@@ -578,13 +558,9 @@ impl Tool for TodoTool {
                             .filter_map(|v| v.as_str().map(String::from))
                             .collect()
                     }),
-                    status: p.optional_str("status")?.and_then(|s| match s {
-                        "todo" => Some(TodoStatus::Todo),
-                        "doing" => Some(TodoStatus::Doing),
-                        "done" => Some(TodoStatus::Done),
-                        "archived" => Some(TodoStatus::Archived),
-                        _ => None,
-                    }),
+                    status: p
+                        .optional_str("status")?
+                        .and_then(TodoStatus::from_str_loose),
                     last_reminded_at: None,
                     calendar_event_uid: None,
                     estimated_minutes: p.optional_u64("estimated_minutes")?.map(|v| Some(v as u32)),
@@ -629,7 +605,7 @@ impl Tool for TodoTool {
                     .into());
                 }
 
-                // Phase 2: Close any running time entries before completing
+                // Close any running time entries before completing
                 if let Some(todo) = store.get(id).await? {
                     for entry in &todo.time_entries {
                         if entry.ended_at.is_none() {
@@ -652,7 +628,7 @@ impl Tool for TodoTool {
 
                 let result = match store.update(id, patch).await? {
                     Some(todo) => {
-                        // Phase 2: Cascade completion to subtasks
+                        // Cascade completion to subtasks
                         let completed_children = store.cascade_complete(id).await?;
 
                         let mut msg = if completed_children.is_empty() {
@@ -805,42 +781,8 @@ impl Tool for TodoTool {
                         drop(store);
 
                         // Record enrichment feedback (manual enrich always accepted)
-                        if let Some(fb) = &self.feedback_handler {
-                            let now = chrono::Utc::now();
-                            if let Some(ref s) = result.priority {
-                                let _ = fb.record_feedback(crate::EnrichmentFeedbackEntry {
-                                    task_id: id.to_string(),
-                                    field: "priority".to_string(),
-                                    suggested_value: s.value.to_string(),
-                                    actual_value: None,
-                                    accepted: true,
-                                    confidence: s.confidence,
-                                    timestamp: now,
-                                }).await;
-                            }
-                            if let Some(ref s) = result.estimated_minutes {
-                                let _ = fb.record_feedback(crate::EnrichmentFeedbackEntry {
-                                    task_id: id.to_string(),
-                                    field: "estimated_minutes".to_string(),
-                                    suggested_value: s.value.to_string(),
-                                    actual_value: None,
-                                    accepted: true,
-                                    confidence: s.confidence,
-                                    timestamp: now,
-                                }).await;
-                            }
-                            if let Some(ref s) = result.due_date {
-                                let _ = fb.record_feedback(crate::EnrichmentFeedbackEntry {
-                                    task_id: id.to_string(),
-                                    field: "due_date".to_string(),
-                                    suggested_value: s.value.to_string(),
-                                    actual_value: None,
-                                    accepted: true,
-                                    confidence: s.confidence,
-                                    timestamp: now,
-                                }).await;
-                            }
-                        }
+                        self.record_enrichment_feedback(id, &result, Some(true))
+                            .await;
 
                         // Trigger calendar sync
                         self.trigger_sync_async().await;
@@ -903,14 +845,13 @@ impl Tool for TodoTool {
                     .focus(id, self.max_focus_slots, self.focus_deadline_hours)
                     .await?
                 {
-                    // Phase 2: Auto-start TimeEntry on focus
+                    // Auto-start TimeEntry on focus
                     if let Some(todo) = store.get(id).await? {
                         // Only start time entry if there isn't one already running
                         let has_running_entry =
                             todo.time_entries.iter().any(|e| e.ended_at.is_none());
 
                         if !has_running_entry {
-                            use crate::todo_types::{TimeEntry, TimeEntrySource, Todo};
                             let time_entry = TimeEntry {
                                 id: Todo::generate_id(),
                                 started_at: Utc::now(),
@@ -932,7 +873,7 @@ impl Tool for TodoTool {
             "unfocus" => {
                 let id = p.required_str("id")?;
 
-                // Phase 2: Auto-close any running time entries before unfocusing
+                // Auto-close any running time entries before unfocusing
                 if let Some(todo) = store.get(id).await? {
                     // Find and close all running time entries
                     for entry in &todo.time_entries {
@@ -962,38 +903,16 @@ impl Tool for TodoTool {
                     .into());
                 }
 
-                use crate::todo_types::Todo;
-                let todo = Todo {
-                    id: Todo::generate_id(),
-                    title: title.to_string(),
-                    description: p.optional_str("description")?.map(String::from),
-                    priority: p.optional_u64("priority")?.map(|v| v as u8),
-                    due_date: p
-                        .optional_str("due_date")?
-                        .and_then(|s| parse_datetime(s, &self.timezone)),
-                    tags: p.string_array_or_empty("tags")?,
-                    status: TodoStatus::Todo,
-                    focused_at: None,
-                    focus_deadline: None,
-                    focus_expired_count: 0,
-                    created_at: Utc::now(),
-                    updated_at: Utc::now(),
-                    completed_at: None,
-                    parent_id: Some(parent_id.to_string()),
-                    project_id: p.optional_str("project_id")?.map(String::from),
-                    attachments: Vec::new(),
-                    time_entries: Vec::new(),
-                    total_tracked_secs: 0,
-                    estimated_minutes: None,
-                    calendar_event_uid: None,
-                    last_reminded_at: None,
-                    recurrence_rule: None,
-                    recurrence_parent_id: None,
-                    is_template: false,
-                    next_instance_date: None,
-                    blocked_by: Vec::new(),
-                    blocks: Vec::new(),
-                };
+                let mut todo = Todo::default_instance();
+                todo.title = title.to_string();
+                todo.description = p.optional_str("description")?.map(String::from);
+                todo.priority = p.optional_u64("priority")?.map(|v| v as u8);
+                todo.due_date = p
+                    .optional_str("due_date")?
+                    .and_then(|s| parse_datetime(s, &self.timezone));
+                todo.tags = p.string_array_or_empty("tags")?;
+                todo.parent_id = Some(parent_id.to_string());
+                todo.project_id = p.optional_str("project_id")?.map(String::from);
 
                 let created = store.add(todo).await?;
                 let result = format!(
@@ -1060,7 +979,6 @@ impl Tool for TodoTool {
                 let attachment_type_str = p.required_str("attachment_type")?;
                 let value = p.required_str("value")?;
 
-                use crate::todo_types::{Attachment, AttachmentType, Todo};
                 let attachment_type = match attachment_type_str {
                     "file" => AttachmentType::File,
                     "url" => AttachmentType::Url,
@@ -1113,7 +1031,6 @@ impl Tool for TodoTool {
                 let id = p.required_str("id")?;
                 let duration_minutes = p.required_u64("duration_minutes")?;
 
-                use crate::todo_types::{TimeEntry, TimeEntrySource, Todo};
                 let now = Utc::now();
                 let duration_secs = duration_minutes * 60;
                 let started_at = now - chrono::Duration::seconds(duration_secs as i64);
@@ -1595,7 +1512,6 @@ impl Tool for TodoTool {
                 };
 
                 // Group todos by project
-                use std::collections::HashMap;
                 let mut projects: HashMap<String, Vec<&Todo>> = HashMap::new();
                 for todo in &todos {
                     let project_key = todo
@@ -1738,35 +1654,15 @@ impl Tool for TodoTool {
                 let now = Utc::now();
                 let next_date = rrule_utils::next_occurrence(rule, now)?;
 
-                let template = Todo {
-                    id: Todo::generate_id(),
-                    title: title.to_string(),
-                    description: p.optional_str("description")?.map(String::from),
-                    priority: p.optional_u64("priority")?.map(|v| v as u8),
-                    due_date: None,
-                    tags: p.string_array_or_empty("tags")?,
-                    status: TodoStatus::Todo,
-                    focused_at: None,
-                    focus_deadline: None,
-                    focus_expired_count: 0,
-                    created_at: now,
-                    updated_at: now,
-                    completed_at: None,
-                    parent_id: None,
-                    project_id: p.optional_str("project_id")?.map(String::from),
-                    attachments: Vec::new(),
-                    time_entries: Vec::new(),
-                    total_tracked_secs: 0,
-                    estimated_minutes: None,
-                    calendar_event_uid: None,
-                    last_reminded_at: None,
-                    recurrence_rule: Some(rule.to_string()),
-                    recurrence_parent_id: None,
-                    is_template: true,
-                    next_instance_date: next_date,
-                    blocked_by: Vec::new(),
-                    blocks: Vec::new(),
-                };
+                let mut template = Todo::default_instance();
+                template.title = title.to_string();
+                template.description = p.optional_str("description")?.map(String::from);
+                template.priority = p.optional_u64("priority")?.map(|v| v as u8);
+                template.tags = p.string_array_or_empty("tags")?;
+                template.project_id = p.optional_str("project_id")?.map(String::from);
+                template.recurrence_rule = Some(rule.to_string());
+                template.is_template = true;
+                template.next_instance_date = next_date;
 
                 let created = store.add(template).await?;
                 let human_rule = rrule_utils::humanize_rrule(rule);
@@ -2339,7 +2235,7 @@ mod tests {
         assert_eq!(tool.timezone, "Asia/Bangkok");
     }
 
-    // ── Phase 2: New actions tests ──────────────────────────────────────
+    // ── Hierarchical & time tracking tests ────────────────────────────────
 
     #[tokio::test]
     async fn test_add_subtask() {
@@ -2768,7 +2664,7 @@ mod tests {
         assert!(result.contains("No tasks found matching"));
     }
 
-    // ── Phase 2: Enhanced actions tests ─────────────────────────────────
+    // ── Enhanced actions tests ─────────────────────────────────────────
 
     #[tokio::test]
     async fn test_focus_starts_time_entry() {

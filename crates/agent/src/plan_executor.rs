@@ -58,12 +58,10 @@ impl PlanExecutor {
     /// - `tool_registry`: Registry of available tools
     /// - `routing_ctx`: Channel/chat routing context
     ///
-    /// # Implementation (Phase 4A - dev-3)
-    /// TODO: Implement full ReAct loop:
-    /// 1. Build system prompt with plan context + step description
-    /// 2. Call provider.chat() to get tool calls
-    /// 3. Execute tools via tool_registry.execute()
-    /// 4. Capture and return results
+    /// # Known limitation
+    /// This is a single-cycle implementation: one LLM call per step.
+    /// A full ReAct loop (multi-cycle with reflection) is available via
+    /// `PlanExecuteEngine` in `execution/plan_execute.rs`.
     pub async fn execute_step(
         &self,
         step: &PlanStep,

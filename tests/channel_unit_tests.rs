@@ -242,15 +242,14 @@ fn test_whatsapp_config_defaults() {
 fn test_whatsapp_channel_creation() {
     use klyntbot::channels::WhatsAppChannel;
     let config = WhatsAppConfig::default();
-    // WhatsAppChannel::new doesn't return Result
-    let _channel = WhatsAppChannel::new(config);
+    let _channel = WhatsAppChannel::new(config).unwrap();
 }
 
 #[test]
 fn test_whatsapp_channel_name() {
     use klyntbot::channels::{Channel, WhatsAppChannel};
     let config = WhatsAppConfig::default();
-    let channel = WhatsAppChannel::new(config);
+    let channel = WhatsAppChannel::new(config).unwrap();
     assert_eq!(channel.name(), "whatsapp");
 }
 
@@ -258,7 +257,7 @@ fn test_whatsapp_channel_name() {
 fn test_whatsapp_is_allowed_empty_allowlist() {
     use klyntbot::channels::{Channel, WhatsAppChannel};
     let config = WhatsAppConfig::default();
-    let channel = WhatsAppChannel::new(config);
+    let channel = WhatsAppChannel::new(config).unwrap();
     assert!(channel.is_allowed("628123456789@s.whatsapp.net"));
 }
 
@@ -269,7 +268,7 @@ fn test_whatsapp_is_allowed_with_allowlist() {
         allow_from: vec!["628123456789@s.whatsapp.net".to_string()],
         ..Default::default()
     };
-    let channel = WhatsAppChannel::new(config);
+    let channel = WhatsAppChannel::new(config).unwrap();
     assert!(channel.is_allowed("628123456789@s.whatsapp.net"));
     assert!(!channel.is_allowed("other@s.whatsapp.net"));
 }
@@ -278,7 +277,7 @@ fn test_whatsapp_is_allowed_with_allowlist() {
 async fn test_whatsapp_send_fails_without_connection() {
     use klyntbot::channels::{Channel, WhatsAppChannel};
     let config = WhatsAppConfig::default();
-    let channel = WhatsAppChannel::new(config);
+    let channel = WhatsAppChannel::new(config).unwrap();
     let msg = OutboundMessage::new("whatsapp", "628123@s.whatsapp.net", "Hello");
     let result = channel.send(&msg).await;
     assert!(result.is_err());

@@ -2,8 +2,9 @@
 
 use async_trait::async_trait;
 use calendar::{
-    load_provider_sync_state, save_provider_sync_state, AppleCalendarProvider, CalendarEvent,
-    CalendarProvider, EventSource, GenericCalDavProvider, GoogleCalendarProvider, SyncEngine,
+    detect_conflict, load_provider_sync_state, resolve_conflict, save_provider_sync_state,
+    AppleCalendarProvider, CalendarEvent, CalendarProvider, EventSource, GenericCalDavProvider,
+    GoogleCalendarProvider,
 };
 use chrono::{Duration, Local, Utc};
 use common::Result;
@@ -23,8 +24,7 @@ use tools::{
 /// with multiple CalDAV providers.
 pub struct CalendarSyncAdapter {
     providers: Vec<(String, Box<dyn CalendarProvider>)>,
-    #[allow(dead_code)]
-    provider_configs: Vec<CalendarProviderConfig>,
+    _provider_configs: Vec<CalendarProviderConfig>,
     todo_store: Arc<RwLock<TodoStore>>,
     conflicts_path: PathBuf,
     auto_sync_due_dates: bool,
@@ -92,7 +92,7 @@ impl CalendarSyncAdapter {
 
         Ok(Self {
             providers,
-            provider_configs,
+            _provider_configs: provider_configs,
             todo_store,
             conflicts_path,
             auto_sync_due_dates: any_auto_sync,
@@ -272,11 +272,10 @@ impl CalendarSyncAdapter {
                 .await
             {
                 if let Some(local_event) = self.todo_to_event(&local_todo) {
-                    if SyncEngine::detect_conflict(remote_event, &local_event) {
+                    if detect_conflict(remote_event, &local_event) {
                         conflicts_detected += 1;
                         self.log_conflict(remote_event, &local_event).await?;
-                        let resolved_event =
-                            SyncEngine::resolve_conflict(remote_event, &local_event);
+                        let resolved_event = resolve_conflict(remote_event, &local_event);
                         self.update_todo_from_event(&mut store, &local_todo.id, &resolved_event)
                             .await?;
                     } else {

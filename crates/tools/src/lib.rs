@@ -68,17 +68,6 @@ pub use memory_tool::MemoryTool;
 // Re-export search utilities
 pub use search_utils::{rrf_merge, SearchResult};
 
-// Dependency inversion traits (to avoid circular dependencies)
-/// Trait for spawning subagents (implemented by klyntbot-agent)
-pub trait SpawnHandler: Send + Sync {
-    // Will be defined when klyntbot-agent is implemented
-}
-
-/// Trait for managing cron jobs (implemented by klyntbot-cron)
-pub trait CronHandler: Send + Sync {
-    // Will be defined when klyntbot-cron is implemented
-}
-
 use async_trait::async_trait;
 use serde_json::Value;
 use std::sync::Arc;

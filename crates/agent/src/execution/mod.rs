@@ -14,4 +14,4 @@ pub use dispatch::{DispatchResult, EngineDispatch};
 pub use plan_execute::{PlanExecuteEngine, PlanExecuteOutcome};
 pub use react_plus::{ReactOutcome, ReactPlusEngine, ReflectionMode};
 pub use scratchpad::{ReasoningTrace, Scratchpad};
-pub use types::{CycleOutcome, ExecutionParams, ToolExecutionResult};
+pub use types::{accumulate_usage, CycleOutcome, ExecutionParams, ToolExecutionResult};

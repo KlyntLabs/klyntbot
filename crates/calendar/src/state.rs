@@ -19,14 +19,6 @@ pub fn get_provider_sync_state_path(provider_id: &str) -> PathBuf {
     sync_states_dir().join(format!("{}.json", provider_id))
 }
 
-/// Legacy path for backward compatibility (~/.klyntbot/calendar_sync.json).
-pub fn get_sync_state_path() -> PathBuf {
-    dirs::home_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join(".klyntbot")
-        .join("calendar_sync.json")
-}
-
 /// Load sync state for a specific provider.
 pub async fn load_provider_sync_state(provider_id: &str) -> Result<SyncState> {
     let path = get_provider_sync_state_path(provider_id);
@@ -56,46 +48,10 @@ pub async fn save_provider_sync_state(provider_id: &str, state: &SyncState) -> R
     Ok(())
 }
 
-/// Load sync state from the legacy file (backward compat).
-pub async fn load_sync_state() -> Result<SyncState> {
-    let path = get_sync_state_path();
-
-    if !path.exists() {
-        return Ok(SyncState {
-            sync_token: None,
-            last_sync: None,
-        });
-    }
-
-    let contents = fs::read_to_string(&path).await?;
-    let state: SyncState = serde_json::from_str(&contents)?;
-    Ok(state)
-}
-
-/// Save sync state to the legacy file (backward compat).
-pub async fn save_sync_state(state: &SyncState) -> Result<()> {
-    let path = get_sync_state_path();
-
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent).await?;
-    }
-
-    let contents = serde_json::to_string_pretty(state)?;
-    fs::write(&path, contents).await?;
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use chrono::Utc;
-
-    #[test]
-    fn test_sync_state_path() {
-        let path = get_sync_state_path();
-        assert!(path.to_string_lossy().contains(".klyntbot"));
-        assert!(path.to_string_lossy().ends_with("calendar_sync.json"));
-    }
 
     #[test]
     fn test_provider_sync_state_path() {

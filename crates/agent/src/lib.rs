@@ -10,7 +10,6 @@ pub mod confidence;
 pub mod context;
 pub mod conversation_embedding_handler;
 pub mod cron_handler_adapter;
-pub mod engines;
 pub mod enrichment;
 pub mod events;
 pub mod execution;

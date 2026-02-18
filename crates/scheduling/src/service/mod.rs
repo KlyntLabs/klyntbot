@@ -98,7 +98,12 @@ impl CronService {
 
     /// Get the earliest next run time across all jobs
     async fn get_next_wake_ms(&self) -> Option<i64> {
-        let store = self.store.read().await;
+        Self::next_wake_ms_static(&self.store).await
+    }
+
+    /// Compute the earliest next run time from a store handle (avoids &self).
+    async fn next_wake_ms_static(store: &Arc<RwLock<CronStore>>) -> Option<i64> {
+        let store = store.read().await;
         store
             .jobs
             .iter()
@@ -122,16 +127,8 @@ impl CronService {
                     break;
                 }
 
-                // Get next wake time
-                let next_wake_ms = {
-                    let store = store.read().await;
-                    store
-                        .jobs
-                        .iter()
-                        .filter(|j| j.enabled && j.state.next_run_at_ms.is_some())
-                        .filter_map(|j| j.state.next_run_at_ms)
-                        .min()
-                };
+                // Get next wake time (reuses the shared helper)
+                let next_wake_ms = CronService::next_wake_ms_static(&store).await;
 
                 if let Some(next_wake) = next_wake_ms {
                     let now = now_ms();
