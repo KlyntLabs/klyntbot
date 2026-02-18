@@ -1,9 +1,13 @@
 //! Execution engine — drives LLM-tool cycles.
 
 pub mod core;
+pub mod plan_execute;
+pub mod react_plus;
 pub mod scratchpad;
 pub mod types;
 
 pub use core::ExecutionCore;
+pub use plan_execute::{PlanExecuteEngine, PlanExecuteOutcome};
+pub use react_plus::{ReactOutcome, ReactPlusEngine, ReflectionMode};
 pub use scratchpad::{ReasoningTrace, Scratchpad};
 pub use types::{CycleOutcome, ExecutionParams, ToolExecutionResult};
