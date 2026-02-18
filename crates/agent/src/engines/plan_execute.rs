@@ -28,10 +28,7 @@ pub enum PlanExecuteOutcome {
         reason: String,
     },
     /// Need more information to continue.
-    NeedsMoreInfo {
-        plan_id: String,
-        question: String,
-    },
+    NeedsMoreInfo { plan_id: String, question: String },
 }
 
 /// A step in a plan to execute.
@@ -462,9 +459,7 @@ mod tests {
             .unwrap();
 
         match result {
-            PlanExecuteOutcome::Completed {
-                steps_executed, ..
-            } => {
+            PlanExecuteOutcome::Completed { steps_executed, .. } => {
                 assert_eq!(steps_executed, 0);
             }
             other => panic!("Expected Completed, got {:?}", other),

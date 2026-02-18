@@ -162,14 +162,15 @@ pub fn create_provider_manager(config: &Config) -> Result<Arc<ProviderManager>> 
         classifier.as_ref().map_or("none", |c| c.name()),
     );
 
-    Ok(Arc::new(ProviderManager::new(primary, fallback, classifier)))
+    Ok(Arc::new(ProviderManager::new(
+        primary, fallback, classifier,
+    )))
 }
 
 /// Create a named provider by looking up config for that provider name.
 fn create_named_provider(config: &Config, name: &str, model: &str) -> Result<DynProvider> {
-    let spec = ProviderRegistry::find_by_name(name).ok_or_else(|| {
-        common::ConfigError::Invalid(format!("Unknown provider: {}", name))
-    })?;
+    let spec = ProviderRegistry::find_by_name(name)
+        .ok_or_else(|| common::ConfigError::Invalid(format!("Unknown provider: {}", name)))?;
 
     try_create_from_spec(spec, config, model).ok_or_else(|| {
         common::ConfigError::MissingField(format!(

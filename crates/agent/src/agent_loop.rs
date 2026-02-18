@@ -1850,11 +1850,7 @@ impl AgentLoop {
     ///
     /// Pipeline flow: Orchestrator → ContextEngine → EngineDispatch →
     /// ResponseValidator → CostTracker
-    pub async fn process_message_v2(
-        &self,
-        content: String,
-        session_key: String,
-    ) -> Result<String> {
+    pub async fn process_message_v2(&self, content: String, session_key: String) -> Result<String> {
         let pipeline = match &self.pipeline {
             Some(p) => Arc::clone(p),
             None => {

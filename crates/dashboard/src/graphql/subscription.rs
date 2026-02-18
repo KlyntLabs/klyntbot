@@ -14,14 +14,14 @@ use async_graphql::{Context, Enum, SimpleObject, Subscription};
 use futures_util::Stream;
 use tokio::sync::broadcast;
 
-use crate::events::{ChangeAction, DashboardEvent};
-use super::DashboardContext;
 use super::types::config::GqlConfig;
 use super::types::goal::GqlGoal;
 use super::types::plan::GqlPlan;
 use super::types::project::GqlProject;
 use super::types::system::GqlSystemStatus;
 use super::types::todo::GqlTodo;
+use super::DashboardContext;
+use crate::events::{ChangeAction, DashboardEvent};
 
 // ── Change action enum ────────────────────────────────────────────────────────
 
@@ -97,10 +97,7 @@ pub struct SubscriptionRoot;
 #[Subscription]
 impl SubscriptionRoot {
     /// Real-time todo change events (created, updated, deleted).
-    async fn todo_changed(
-        &self,
-        ctx: &Context<'_>,
-    ) -> impl Stream<Item = GqlTodoChangeEvent> {
+    async fn todo_changed(&self, ctx: &Context<'_>) -> impl Stream<Item = GqlTodoChangeEvent> {
         let ctx_data = ctx.data_unchecked::<DashboardContext>().clone();
         let mut rx = ctx_data.event_tx.subscribe();
 
@@ -149,10 +146,7 @@ impl SubscriptionRoot {
     }
 
     /// Real-time goal change events (created, updated, metric changed).
-    async fn goal_changed(
-        &self,
-        ctx: &Context<'_>,
-    ) -> impl Stream<Item = GqlGoalChangeEvent> {
+    async fn goal_changed(&self, ctx: &Context<'_>) -> impl Stream<Item = GqlGoalChangeEvent> {
         let ctx_data = ctx.data_unchecked::<DashboardContext>().clone();
         let mut rx = ctx_data.event_tx.subscribe();
 
@@ -180,10 +174,7 @@ impl SubscriptionRoot {
     }
 
     /// Real-time plan change events (step completed, backtrack, status transition).
-    async fn plan_changed(
-        &self,
-        ctx: &Context<'_>,
-    ) -> impl Stream<Item = GqlPlanChangeEvent> {
+    async fn plan_changed(&self, ctx: &Context<'_>) -> impl Stream<Item = GqlPlanChangeEvent> {
         let ctx_data = ctx.data_unchecked::<DashboardContext>().clone();
         let mut rx = ctx_data.event_tx.subscribe();
 
@@ -211,10 +202,7 @@ impl SubscriptionRoot {
     }
 
     /// Push notifications (task overdue, reminders, agent alerts).
-    async fn notification(
-        &self,
-        ctx: &Context<'_>,
-    ) -> impl Stream<Item = GqlNotification> {
+    async fn notification(&self, ctx: &Context<'_>) -> impl Stream<Item = GqlNotification> {
         let ctx_data = ctx.data_unchecked::<DashboardContext>().clone();
         let mut rx = ctx_data.event_tx.subscribe();
 
@@ -233,10 +221,7 @@ impl SubscriptionRoot {
 
     /// Config hot-reload events — emits the full config after each `updateConfig`
     /// call or file-watcher reload.
-    async fn config_changed(
-        &self,
-        ctx: &Context<'_>,
-    ) -> impl Stream<Item = GqlConfig> {
+    async fn config_changed(&self, ctx: &Context<'_>) -> impl Stream<Item = GqlConfig> {
         let ctx_data = ctx.data_unchecked::<DashboardContext>().clone();
         let mut rx = ctx_data.event_tx.subscribe();
 
@@ -256,10 +241,7 @@ impl SubscriptionRoot {
 
     /// Live system-status updates — emits a snapshot on each agent event
     /// (channel connect/disconnect, tool execution, etc.)
-    async fn system_status(
-        &self,
-        ctx: &Context<'_>,
-    ) -> impl Stream<Item = GqlSystemStatus> {
+    async fn system_status(&self, ctx: &Context<'_>) -> impl Stream<Item = GqlSystemStatus> {
         let ctx_data = ctx.data_unchecked::<DashboardContext>().clone();
         let mut rx = ctx_data.event_tx.subscribe();
 

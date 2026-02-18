@@ -205,7 +205,7 @@ mod tests {
         let compressor = HistoryCompressor::new(4);
         let history = make_history(10);
         let result = compressor.compress(&history, 1); // tiny budget
-        // Even with tiny budget, we keep min_recent messages
+                                                       // Even with tiny budget, we keep min_recent messages
         assert!(result.recent_messages.len() >= 4_usize.min(history.len()));
     }
 

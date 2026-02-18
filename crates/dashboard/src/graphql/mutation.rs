@@ -7,11 +7,9 @@ use async_graphql::{Context, Error, Object, Result, ID};
 use chrono::Utc;
 
 use tools::project_types::{Project, ProjectPatch};
-use tools::todo_types::{TimeEntry, Todo, TodoPatch, TodoStatus, TimeEntrySource};
+use tools::todo_types::{TimeEntry, TimeEntrySource, Todo, TodoPatch, TodoStatus};
 
-use super::filters::{
-    CreateProjectInput, CreateTodoInput, UpdateProjectInput, UpdateTodoInput,
-};
+use super::filters::{CreateProjectInput, CreateTodoInput, UpdateProjectInput, UpdateTodoInput};
 use super::types::chat::{GqlCalendarSyncResult, GqlChatMessage};
 use super::types::config::GqlConfig;
 use super::types::goal::{CreateGoalInput, GqlGoal, UpdateGoalInput};
@@ -31,8 +29,7 @@ async fn do_plan_transition(
     use crate::events::{ChangeAction, DashboardEvent};
 
     let ctx_data = ctx.data_unchecked::<DashboardContext>();
-    let uuid = uuid::Uuid::parse_str(id)
-        .map_err(|e| async_graphql::Error::new(e.to_string()))?;
+    let uuid = uuid::Uuid::parse_str(id).map_err(|e| async_graphql::Error::new(e.to_string()))?;
 
     let mut store = ctx_data.plan_store.write().await;
     let mut p = store
@@ -49,9 +46,10 @@ async fn do_plan_transition(
     let pid = updated.id.to_string();
     drop(store);
 
-    let _ = ctx_data
-        .event_tx
-        .send(DashboardEvent::PlanChanged { action: ChangeAction::Updated, id: pid });
+    let _ = ctx_data.event_tx.send(DashboardEvent::PlanChanged {
+        action: ChangeAction::Updated,
+        id: pid,
+    });
 
     Ok(GqlPlan(updated))
 }
@@ -80,11 +78,7 @@ impl MutationRoot {
     // ── Create Todo ───────────────────────────────────────────────────────────
 
     /// Create a new todo. Title is required (max 200 chars).
-    async fn create_todo(
-        &self,
-        ctx: &Context<'_>,
-        input: CreateTodoInput,
-    ) -> Result<GqlTodo> {
+    async fn create_todo(&self, ctx: &Context<'_>, input: CreateTodoInput) -> Result<GqlTodo> {
         if input.title.trim().is_empty() {
             return Err(Error::new("Title is required"));
         }
@@ -282,11 +276,7 @@ impl MutationRoot {
         let mut store = ctx_data.todo_store.write().await;
 
         let updated = store
-            .move_todo(
-                &id.0,
-                parent_id.map(|id| id.0),
-                project_id.map(|id| id.0),
-            )
+            .move_todo(&id.0, parent_id.map(|id| id.0), project_id.map(|id| id.0))
             .await?
             .ok_or_else(|| Error::new(format!("Todo not found: {}", id.0)))?;
 
@@ -518,9 +508,10 @@ impl MutationRoot {
         let gid = created.id.to_string();
         drop(store);
 
-        let _ = ctx_data
-            .event_tx
-            .send(DashboardEvent::GoalChanged { action: ChangeAction::Created, id: gid });
+        let _ = ctx_data.event_tx.send(DashboardEvent::GoalChanged {
+            action: ChangeAction::Created,
+            id: gid,
+        });
 
         Ok(GqlGoal(created))
     }
@@ -542,19 +533,30 @@ impl MutationRoot {
             .await?
             .ok_or_else(|| Error::new(format!("Goal not found: {}", id.0)))?;
 
-        if let Some(t) = input.title { g.title = t; }
-        if let Some(d) = input.description { g.description = d; }
-        if let Some(p) = input.priority { g.priority = p as u8; }
-        if let Some(td) = input.target_date { g.target_date = Some(td); }
-        if let Some(s) = input.status { g.status = s.into(); }
+        if let Some(t) = input.title {
+            g.title = t;
+        }
+        if let Some(d) = input.description {
+            g.description = d;
+        }
+        if let Some(p) = input.priority {
+            g.priority = p as u8;
+        }
+        if let Some(td) = input.target_date {
+            g.target_date = Some(td);
+        }
+        if let Some(s) = input.status {
+            g.status = s.into();
+        }
 
         let updated = store.update(g).await?.unwrap();
         let gid = updated.id.to_string();
         drop(store);
 
-        let _ = ctx_data
-            .event_tx
-            .send(DashboardEvent::GoalChanged { action: ChangeAction::Updated, id: gid });
+        let _ = ctx_data.event_tx.send(DashboardEvent::GoalChanged {
+            action: ChangeAction::Updated,
+            id: gid,
+        });
 
         Ok(GqlGoal(updated))
     }
@@ -588,9 +590,10 @@ impl MutationRoot {
         let gid = updated.id.to_string();
         drop(store);
 
-        let _ = ctx_data
-            .event_tx
-            .send(DashboardEvent::GoalChanged { action: ChangeAction::Updated, id: gid });
+        let _ = ctx_data.event_tx.send(DashboardEvent::GoalChanged {
+            action: ChangeAction::Updated,
+            id: gid,
+        });
 
         Ok(GqlGoal(updated))
     }
@@ -628,7 +631,10 @@ impl MutationRoot {
         let new_plan = plan::Plan {
             id: uuid::Uuid::new_v4(),
             session_key: input.session_key.unwrap_or_else(|| "default".to_string()),
-            goal_id: input.goal_id.as_deref().and_then(|g| uuid::Uuid::parse_str(g).ok()),
+            goal_id: input
+                .goal_id
+                .as_deref()
+                .and_then(|g| uuid::Uuid::parse_str(g).ok()),
             title: input.title,
             description: input.description.unwrap_or_default(),
             status: plan::PlanStatus::Draft,
@@ -646,9 +652,10 @@ impl MutationRoot {
         let pid = created.id.to_string();
         drop(store);
 
-        let _ = ctx_data
-            .event_tx
-            .send(DashboardEvent::PlanChanged { action: ChangeAction::Created, id: pid });
+        let _ = ctx_data.event_tx.send(DashboardEvent::PlanChanged {
+            action: ChangeAction::Created,
+            id: pid,
+        });
 
         Ok(GqlPlan(created))
     }
@@ -728,5 +735,3 @@ impl MutationRoot {
         })
     }
 }
-
-

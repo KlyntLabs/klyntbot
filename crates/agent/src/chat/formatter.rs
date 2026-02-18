@@ -87,9 +87,7 @@ fn truncate_at_boundary(content: &str, max_chars: usize) -> String {
     let truncated = &content[..limit];
 
     // Find last whitespace for clean break
-    let cut_point = truncated
-        .rfind(char::is_whitespace)
-        .unwrap_or(limit);
+    let cut_point = truncated.rfind(char::is_whitespace).unwrap_or(limit);
 
     format!("{}...", &content[..cut_point])
 }

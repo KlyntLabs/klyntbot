@@ -36,9 +36,7 @@ pub enum ReactOutcome {
     /// Complexity exceeds ReAct+ capacity; escalate to autonomous planner.
     EscalateToAutonomous { reason: String },
     /// Hit the iteration limit without a final response.
-    MaxIterationsReached {
-        partial_content: Option<String>,
-    },
+    MaxIterationsReached { partial_content: Option<String> },
 }
 
 /// Enhanced ReAct loop with scratchpad, reflection, and escalation.
@@ -79,7 +77,10 @@ impl ReactPlusEngine {
         let escalation_threshold = (self.max_iterations as f32 * 0.8).ceil() as u32;
 
         for iteration in 1..=self.max_iterations {
-            let outcome = self.core.run_cycle(&mut messages, tools, params, ctx).await?;
+            let outcome = self
+                .core
+                .run_cycle(&mut messages, tools, params, ctx)
+                .await?;
 
             match outcome {
                 CycleOutcome::FinalResponse { content } => {
@@ -265,7 +266,9 @@ mod tests {
             serde_json::json!({"type": "object", "properties": {}})
         }
         async fn execute(&self, _args: Value, _ctx: &RoutingContext) -> common::Result<String> {
-            Err(common::KlyntbotError::Tool(common::ToolError::ExecutionFailed("deliberate error".to_string())))
+            Err(common::KlyntbotError::Tool(
+                common::ToolError::ExecutionFailed("deliberate error".to_string()),
+            ))
         }
     }
 
@@ -399,8 +402,9 @@ mod tests {
     async fn test_escalate_at_80_percent() {
         // With max_iterations=5, escalation at ceil(4.0) = 4
         // So after tool call on iteration 4, should escalate
-        let responses: Vec<LlmResponse> =
-            (0..10).map(|_| make_tool_call_response("ok_tool")).collect();
+        let responses: Vec<LlmResponse> = (0..10)
+            .map(|_| make_tool_call_response("ok_tool"))
+            .collect();
         let provider = SequenceProvider::new(responses);
         let registry = make_registry_with_ok();
         let core = Arc::new(ExecutionCore::new(provider, registry));
@@ -444,9 +448,7 @@ mod tests {
 
         match outcome {
             ReactOutcome::Response {
-                traces,
-                iterations,
-                ..
+                traces, iterations, ..
             } => {
                 assert_eq!(traces.len(), 4);
                 assert_eq!(iterations, 4);

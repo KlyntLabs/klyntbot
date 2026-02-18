@@ -43,7 +43,10 @@ pub enum DashboardEvent {
     Notification { title: String, body: String },
 
     /// A cron job executed.
-    CronJobRan { name: String, result: Option<String> },
+    CronJobRan {
+        name: String,
+        result: Option<String>,
+    },
 }
 
 /// Broadcast bus for `DashboardEvent`s.

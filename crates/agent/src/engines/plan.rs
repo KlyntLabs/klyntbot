@@ -138,7 +138,10 @@ mod tests {
         let registry = Arc::new(RwLock::new(ToolRegistry::new()));
         let engine = PlanExecuteEngine::new(provider, registry);
 
-        let result = engine.execute(make_context(), &routing_ctx()).await.unwrap();
+        let result = engine
+            .execute(make_context(), &routing_ctx())
+            .await
+            .unwrap();
         assert!(result.contains("Plan execution delegated"));
         assert!(result.contains("plan executor"));
     }
@@ -151,6 +154,10 @@ mod tests {
 
         // Even with minimal context, should not error (stub always succeeds)
         let result = engine.execute(make_context(), &routing_ctx()).await;
-        assert!(result.is_ok(), "Stub should not return error: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "Stub should not return error: {:?}",
+            result.err()
+        );
     }
 }

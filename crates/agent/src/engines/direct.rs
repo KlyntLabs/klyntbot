@@ -34,10 +34,7 @@ impl DirectResponseEngine {
             context.token_count
         );
 
-        let response = self
-            .provider
-            .chat(&context.messages, None, params)
-            .await?;
+        let response = self.provider.chat(&context.messages, None, params).await?;
 
         let content = response.content.ok_or_else(|| {
             ProviderError::InvalidResponse("LLM returned empty content".to_string())
@@ -67,9 +64,7 @@ mod tests {
     use super::*;
     use async_trait::async_trait;
     use context_engine::budget::{BudgetReport, Priority};
-    use providers::{
-        ChatParams, LlmProvider, LlmResponse, Message, Usage,
-    };
+    use providers::{ChatParams, LlmProvider, LlmResponse, Message, Usage};
     use serde_json::Value;
     use std::sync::{Arc, Mutex};
 

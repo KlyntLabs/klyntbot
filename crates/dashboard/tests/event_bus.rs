@@ -5,8 +5,8 @@ mod common;
 use std::sync::Arc;
 use tokio::time::{timeout, Duration};
 
-use dashboard::events::{ChangeAction, DashboardEvent, DashboardEventBus};
 use agent::AgentEvent;
+use dashboard::events::{ChangeAction, DashboardEvent, DashboardEventBus};
 
 #[tokio::test]
 async fn test_event_bus_publish_and_receive() {
@@ -51,13 +51,22 @@ async fn test_event_bus_multiple_event_types() {
     });
 
     // Should receive all 3 events in order.
-    let ev1 = timeout(Duration::from_secs(1), rx.recv()).await.unwrap().unwrap();
+    let ev1 = timeout(Duration::from_secs(1), rx.recv())
+        .await
+        .unwrap()
+        .unwrap();
     assert!(matches!(ev1, DashboardEvent::TodoChanged { .. }));
 
-    let ev2 = timeout(Duration::from_secs(1), rx.recv()).await.unwrap().unwrap();
+    let ev2 = timeout(Duration::from_secs(1), rx.recv())
+        .await
+        .unwrap()
+        .unwrap();
     assert!(matches!(ev2, DashboardEvent::ProjectChanged { .. }));
 
-    let ev3 = timeout(Duration::from_secs(1), rx.recv()).await.unwrap().unwrap();
+    let ev3 = timeout(Duration::from_secs(1), rx.recv())
+        .await
+        .unwrap()
+        .unwrap();
     assert!(matches!(ev3, DashboardEvent::Notification { .. }));
 }
 
@@ -91,10 +100,16 @@ async fn test_event_bus_subscriber_drop_does_not_affect_others() {
     bus.publish(DashboardEvent::ConfigReloaded);
 
     // Both remaining subscribers still receive the event.
-    let ev1 = timeout(Duration::from_secs(1), rx1.recv()).await.unwrap().unwrap();
+    let ev1 = timeout(Duration::from_secs(1), rx1.recv())
+        .await
+        .unwrap()
+        .unwrap();
     assert!(matches!(ev1, DashboardEvent::ConfigReloaded));
 
-    let ev2 = timeout(Duration::from_secs(1), rx2.recv()).await.unwrap().unwrap();
+    let ev2 = timeout(Duration::from_secs(1), rx2.recv())
+        .await
+        .unwrap()
+        .unwrap();
     assert!(matches!(ev2, DashboardEvent::ConfigReloaded));
 }
 

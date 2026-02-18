@@ -50,10 +50,7 @@ pub enum PlanExecuteOutcome {
         reason: String,
     },
     /// The plan needs more information to continue.
-    NeedsMoreInfo {
-        plan_id: String,
-        question: String,
-    },
+    NeedsMoreInfo { plan_id: String, question: String },
 }
 
 impl PlanExecuteEngine {
@@ -150,13 +147,17 @@ impl PlanExecuteEngine {
             ];
 
             // Run cycles for this step
-            let step_result =
-                self.run_step_cycles(&mut messages, tools, params, ctx).await;
+            let step_result = self
+                .run_step_cycles(&mut messages, tools, params, ctx)
+                .await;
 
             match step_result {
                 Ok(content) => {
-                    accumulated_results
-                        .push(format!("Step {} result: {}", step_index + 1, content));
+                    accumulated_results.push(format!(
+                        "Step {} result: {}",
+                        step_index + 1,
+                        content
+                    ));
 
                     // Mark step completed
                     {
@@ -174,15 +175,12 @@ impl PlanExecuteEngine {
                     steps_executed += 1;
 
                     // Reflection checkpoint
-                    if steps_executed as usize % REFLECTION_INTERVAL == 0
-                        && i + 1 < steps.len()
-                    {
+                    if steps_executed as usize % REFLECTION_INTERVAL == 0 && i + 1 < steps.len() {
                         let reflection = self
                             .run_reflection(&accumulated_results, &steps[i + 1..], params)
                             .await;
                         if let Ok(ref text) = reflection {
-                            accumulated_results
-                                .push(format!("Reflection: {}", text));
+                            accumulated_results.push(format!("Reflection: {}", text));
                         }
                     }
                 }
@@ -313,7 +311,10 @@ fn build_step_prompt(
             prompt.push_str(&format!("- Step {}: {}\n", idx + 1, desc));
         }
         if remaining_steps.len() > 3 {
-            prompt.push_str(&format!("  ... and {} more steps\n", remaining_steps.len() - 3));
+            prompt.push_str(&format!(
+                "  ... and {} more steps\n",
+                remaining_steps.len() - 3
+            ));
         }
     }
 
@@ -523,9 +524,7 @@ mod tests {
             .unwrap();
 
         match result {
-            PlanExecuteOutcome::Completed {
-                steps_executed, ..
-            } => {
+            PlanExecuteOutcome::Completed { steps_executed, .. } => {
                 assert_eq!(steps_executed, 3);
             }
             other => panic!("Expected Completed, got {:?}", other),
@@ -561,9 +560,7 @@ mod tests {
             .unwrap();
 
         match result {
-            PlanExecuteOutcome::Failed {
-                step, reason, ..
-            } => {
+            PlanExecuteOutcome::Failed { step, reason, .. } => {
                 assert_eq!(step, 1);
                 assert!(reason.contains("LLM call failed"));
             }
@@ -582,9 +579,10 @@ mod tests {
     async fn test_parameter_generation_in_prompt() {
         // Verify that build_step_prompt includes step description, expected tools,
         // and that the engine passes this to the LLM by executing successfully
-        let plan = make_plan(vec![
-            make_step(0, "Read the auth.rs file and analyze the authentication flow"),
-        ]);
+        let plan = make_plan(vec![make_step(
+            0,
+            "Read the auth.rs file and analyze the authentication flow",
+        )]);
         let plan_id = plan.id.to_string();
 
         let provider = SequencePlanProvider::new(vec![LlmResponse {
@@ -634,9 +632,7 @@ mod tests {
             .unwrap();
 
         match result {
-            PlanExecuteOutcome::Completed {
-                steps_executed, ..
-            } => {
+            PlanExecuteOutcome::Completed { steps_executed, .. } => {
                 assert_eq!(steps_executed, 0);
             }
             other => panic!("Expected Completed with 0 steps, got {:?}", other),
@@ -669,12 +665,8 @@ mod tests {
 
     #[test]
     fn test_build_step_prompt_includes_description() {
-        let prompt = build_step_prompt(
-            "Read the config file",
-            &["read_file".to_string()],
-            &[],
-            &[],
-        );
+        let prompt =
+            build_step_prompt("Read the config file", &["read_file".to_string()], &[], &[]);
 
         assert!(prompt.contains("Read the config file"));
         assert!(prompt.contains("read_file"));
@@ -709,9 +701,8 @@ mod tests {
 
     #[test]
     fn test_build_step_prompt_caps_remaining_at_3() {
-        let remaining: Vec<(usize, String, Vec<String>)> = (0..6)
-            .map(|i| (i, format!("Step {}", i), vec![]))
-            .collect();
+        let remaining: Vec<(usize, String, Vec<String>)> =
+            (0..6).map(|i| (i, format!("Step {}", i), vec![])).collect();
         let prompt = build_step_prompt("Current", &[], &[], &remaining);
 
         assert!(prompt.contains("and 3 more steps"));

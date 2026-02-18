@@ -14,7 +14,6 @@ use config::Secret;
 
 use crate::types::{
     ChatParams, LlmProvider, LlmResponse, Message, ProviderCapabilities, ToolCall, Usage,
-    DEFAULT_CONTEXT_WINDOW,
 };
 
 const ANTHROPIC_CONTEXT_WINDOW: usize = 200_000;
@@ -219,9 +218,8 @@ impl AnthropicNativeProvider {
                 total_tokens: (usage_obj["input_tokens"].as_u64().unwrap_or(0)
                     + usage_obj["output_tokens"].as_u64().unwrap_or(0))
                     as u32,
-                cache_read_tokens: usage_obj["cache_read_input_tokens"]
-                    .as_u64()
-                    .unwrap_or(0) as u32,
+                cache_read_tokens: usage_obj["cache_read_input_tokens"].as_u64().unwrap_or(0)
+                    as u32,
                 cache_write_tokens: usage_obj["cache_creation_input_tokens"]
                     .as_u64()
                     .unwrap_or(0) as u32,
@@ -325,11 +323,7 @@ impl LlmProvider for AnthropicNativeProvider {
         self.parse_response(response_body)
     }
 
-    async fn count_tokens(
-        &self,
-        messages: &[Message],
-        tools: Option<&[Value]>,
-    ) -> Result<usize> {
+    async fn count_tokens(&self, messages: &[Message], tools: Option<&[Value]>) -> Result<usize> {
         let url = format!("{}/v1/messages/count_tokens", self.base_url);
 
         let mut body = json!({
@@ -426,10 +420,7 @@ mod tests {
     #[test]
     fn test_convert_messages_to_anthropic_format() {
         let provider = test_provider();
-        let messages = vec![
-            Message::user("Hello"),
-            Message::assistant("Hi there"),
-        ];
+        let messages = vec![Message::user("Hello"), Message::assistant("Hi there")];
         let result = provider.convert_messages(&messages);
         assert_eq!(result.len(), 2);
         assert_eq!(result[0]["role"], "user");
@@ -454,10 +445,7 @@ mod tests {
 
     #[test]
     fn test_extract_system_prompt() {
-        let messages = vec![
-            Message::system("You are helpful"),
-            Message::user("Hi"),
-        ];
+        let messages = vec![Message::system("You are helpful"), Message::user("Hi")];
         let system = AnthropicNativeProvider::extract_system_prompt(&messages);
         assert_eq!(system, Some("You are helpful".to_string()));
     }

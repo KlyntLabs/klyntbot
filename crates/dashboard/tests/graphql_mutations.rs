@@ -11,11 +11,7 @@ use tools::todo_types::TodoStatus;
 macro_rules! execute {
     ($schema:expr, $query:expr) => {{
         let res = $schema.execute(Request::new($query)).await;
-        assert!(
-            res.errors.is_empty(),
-            "GraphQL errors: {:?}",
-            res.errors
-        );
+        assert!(res.errors.is_empty(), "GraphQL errors: {:?}", res.errors);
         res.data.into_json().unwrap()
     }};
 }
@@ -77,7 +73,10 @@ async fn test_create_todo_with_all_fields() {
 
     let todo = &data["createTodo"];
     assert_eq!(todo["title"].as_str().unwrap(), "Full task");
-    assert_eq!(todo["description"].as_str().unwrap(), "A detailed description");
+    assert_eq!(
+        todo["description"].as_str().unwrap(),
+        "A detailed description"
+    );
     assert_eq!(todo["priority"].as_i64().unwrap(), 2);
     assert_eq!(todo["projectId"].as_str().unwrap(), "proj-001");
     let tags = todo["tags"].as_array().unwrap();
@@ -120,7 +119,11 @@ async fn test_update_todo_status() {
     let ctx = common::create_test_context(&tmp).await;
     let todo_id = {
         let mut store = ctx.todo_store.write().await;
-        store.add(common::make_todo("Status test")).await.unwrap().id
+        store
+            .add(common::make_todo("Status test"))
+            .await
+            .unwrap()
+            .id
     };
     let schema = common::create_test_schema(ctx);
 
@@ -141,7 +144,11 @@ async fn test_update_todo_multiple_fields() {
     let ctx = common::create_test_context(&tmp).await;
     let todo_id = {
         let mut store = ctx.todo_store.write().await;
-        store.add(common::make_todo("Original title")).await.unwrap().id
+        store
+            .add(common::make_todo("Original title"))
+            .await
+            .unwrap()
+            .id
     };
     let schema = common::create_test_schema(ctx);
 
@@ -204,7 +211,10 @@ async fn test_complete_todo() {
 
     let data = execute!(
         schema,
-        &format!(r#"mutation {{ completeTodo(id: "{}") {{ id status }} }}"#, todo_id)
+        &format!(
+            r#"mutation {{ completeTodo(id: "{}") {{ id status }} }}"#,
+            todo_id
+        )
     );
     assert_eq!(data["completeTodo"]["status"].as_str().unwrap(), "DONE");
 }
@@ -230,7 +240,10 @@ async fn test_focus_todo() {
     );
     let todo = &data["focusTodo"];
     assert_eq!(todo["status"].as_str().unwrap(), "DOING");
-    assert!(!todo["focusDeadline"].is_null(), "focusDeadline should be set");
+    assert!(
+        !todo["focusDeadline"].is_null(),
+        "focusDeadline should be set"
+    );
 }
 
 #[tokio::test]
@@ -282,10 +295,7 @@ async fn test_move_todo_parent() {
             todo_id, parent_id
         )
     );
-    assert_eq!(
-        data["moveTodo"]["parentId"].as_str().unwrap(),
-        parent_id
-    );
+    assert_eq!(data["moveTodo"]["parentId"].as_str().unwrap(), parent_id);
 }
 
 #[tokio::test]
@@ -477,7 +487,11 @@ async fn test_update_project() {
     let ctx = common::create_test_context(&tmp).await;
     let project_id = {
         let mut store = ctx.project_store.write().await;
-        store.add(common::make_project("Old Name")).await.unwrap().id
+        store
+            .add(common::make_project("Old Name"))
+            .await
+            .unwrap()
+            .id
     };
     let schema = common::create_test_schema(ctx);
 
@@ -500,7 +514,11 @@ async fn test_archive_project() {
     let ctx = common::create_test_context(&tmp).await;
     let project_id = {
         let mut store = ctx.project_store.write().await;
-        store.add(common::make_project("Active Project")).await.unwrap().id
+        store
+            .add(common::make_project("Active Project"))
+            .await
+            .unwrap()
+            .id
     };
     let schema = common::create_test_schema(ctx);
 
@@ -591,7 +609,10 @@ async fn test_approve_plan() {
 
     let data2 = execute!(
         schema,
-        &format!(r#"mutation {{ approvePlan(id: "{}") {{ id status }} }}"#, plan_id)
+        &format!(
+            r#"mutation {{ approvePlan(id: "{}") {{ id status }} }}"#,
+            plan_id
+        )
     );
     assert_eq!(data2["approvePlan"]["status"].as_str().unwrap(), "APPROVED");
 }
@@ -632,9 +653,15 @@ async fn test_execute_plan() {
     // Execute
     let data3 = execute!(
         schema,
-        &format!(r#"mutation {{ executePlan(id: "{}") {{ id status }} }}"#, plan_id)
+        &format!(
+            r#"mutation {{ executePlan(id: "{}") {{ id status }} }}"#,
+            plan_id
+        )
     );
-    assert_eq!(data3["executePlan"]["status"].as_str().unwrap(), "EXECUTING");
+    assert_eq!(
+        data3["executePlan"]["status"].as_str().unwrap(),
+        "EXECUTING"
+    );
 }
 
 #[tokio::test]
@@ -652,9 +679,15 @@ async fn test_abandon_plan() {
 
     let data2 = execute!(
         schema,
-        &format!(r#"mutation {{ abandonPlan(id: "{}") {{ id status }} }}"#, plan_id)
+        &format!(
+            r#"mutation {{ abandonPlan(id: "{}") {{ id status }} }}"#,
+            plan_id
+        )
     );
-    assert_eq!(data2["abandonPlan"]["status"].as_str().unwrap(), "ABANDONED");
+    assert_eq!(
+        data2["abandonPlan"]["status"].as_str().unwrap(),
+        "ABANDONED"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════

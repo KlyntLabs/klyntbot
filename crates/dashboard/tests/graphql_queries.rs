@@ -12,11 +12,7 @@ use tools::todo_types::TodoStatus;
 macro_rules! execute {
     ($schema:expr, $query:expr) => {{
         let res = $schema.execute(Request::new($query)).await;
-        assert!(
-            res.errors.is_empty(),
-            "GraphQL errors: {:?}",
-            res.errors
-        );
+        assert!(res.errors.is_empty(), "GraphQL errors: {:?}", res.errors);
         res.data.into_json().unwrap()
     }};
 }
@@ -338,10 +334,7 @@ async fn test_todo_tree_query_with_project_filter() {
     );
     let nodes = data["todoTree"].as_array().unwrap();
     assert_eq!(nodes.len(), 1);
-    assert_eq!(
-        nodes[0]["todo"]["projectId"].as_str().unwrap(),
-        "proj-a"
-    );
+    assert_eq!(nodes[0]["todo"]["projectId"].as_str().unwrap(), "proj-a");
 }
 
 #[tokio::test]
@@ -564,7 +557,10 @@ async fn test_single_goal_query_with_metrics() {
     let schema = common::create_test_schema(ctx);
 
     // Nonexistent goal → null
-    let data = execute!(schema, r#"{ goal(id: "00000000-0000-0000-0000-000000000000") { id } }"#);
+    let data = execute!(
+        schema,
+        r#"{ goal(id: "00000000-0000-0000-0000-000000000000") { id } }"#
+    );
     assert!(data["goal"].is_null());
 }
 
@@ -590,10 +586,7 @@ async fn test_plans_query_with_status_filter() {
     let ctx = common::create_test_context(&tmp).await;
     let schema = common::create_test_schema(ctx);
 
-    let data = execute!(
-        schema,
-        r#"{ plans(filter: { status: EXECUTING }) { id } }"#
-    );
+    let data = execute!(schema, r#"{ plans(filter: { status: EXECUTING }) { id } }"#);
     let _ = data["plans"].as_array().unwrap();
 }
 
@@ -636,7 +629,10 @@ async fn test_config_query() {
     let ctx = common::create_test_context(&tmp).await;
     let schema = common::create_test_schema(ctx);
 
-    let data = execute!(schema, "{ config { enrichmentEnabled searchEnabled rrfK embeddingModel } }");
+    let data = execute!(
+        schema,
+        "{ config { enrichmentEnabled searchEnabled rrfK embeddingModel } }"
+    );
     let _ = &data["config"];
 }
 

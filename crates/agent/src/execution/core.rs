@@ -297,8 +297,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_tool_timeout() {
-        let provider =
-            MockProvider::with_tool_call("slow_tool", serde_json::json!({}));
+        let provider = MockProvider::with_tool_call("slow_tool", serde_json::json!({}));
         let registry = make_registry_with(SlowTool);
         let core = ExecutionCore::new(provider, registry);
 

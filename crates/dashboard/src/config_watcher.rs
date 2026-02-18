@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
-use notify::event::{ModifyKind, EventKind};
+use notify::event::{EventKind, ModifyKind};
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use tokio::sync::mpsc;
 use tracing::{debug, warn};
@@ -61,7 +61,9 @@ impl ConfigWatcher {
 
         // Canonicalize the config path so OS-level symlinks (e.g. /var → /private/var
         // on macOS) don't cause the path comparison to fail when notify resolves them.
-        let config_path = self.config_path.canonicalize()
+        let config_path = self
+            .config_path
+            .canonicalize()
             .unwrap_or_else(|_| self.config_path.clone());
 
         // Watcher runs on a blocking thread (notify uses OS file system events).
@@ -75,9 +77,7 @@ impl ConfigWatcher {
         )?;
 
         // Watch the parent directory so we catch atomic writes (rename-based saves).
-        let watch_dir = config_path
-            .parent()
-            .ok_or("config path has no parent")?;
+        let watch_dir = config_path.parent().ok_or("config path has no parent")?;
 
         watcher.watch(watch_dir, RecursiveMode::NonRecursive)?;
         debug!(
@@ -92,9 +92,10 @@ impl ConfigWatcher {
         while let Some(event) = rx.recv().await {
             // Only care about modify/create events on our specific file.
             // Canonicalize event paths to handle symlinks (e.g. /var → /private/var on macOS).
-            let is_our_file = event.paths.iter().any(|p| {
-                p.canonicalize().unwrap_or_else(|_| p.clone()) == config_path
-            });
+            let is_our_file = event
+                .paths
+                .iter()
+                .any(|p| p.canonicalize().unwrap_or_else(|_| p.clone()) == config_path);
             if !is_our_file {
                 continue;
             }
@@ -126,7 +127,10 @@ impl ConfigWatcher {
                         self.event_bus.publish(DashboardEvent::ConfigReloaded);
                         last_emit = Some(now);
                     } else {
-                        warn!("ConfigWatcher: invalid JSON in {:?}, skipping reload", config_path);
+                        warn!(
+                            "ConfigWatcher: invalid JSON in {:?}, skipping reload",
+                            config_path
+                        );
                     }
                 }
                 Err(e) => {

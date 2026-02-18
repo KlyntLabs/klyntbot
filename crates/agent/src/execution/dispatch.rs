@@ -93,9 +93,8 @@ impl EngineDispatch {
                             debug!("DirectEngine escalated to ToolAssisted");
                             escalation_count += 1;
                             current_messages = messages;
-                            current_strategy = ExecutionStrategy::ToolAssisted {
-                                max_iterations: 5,
-                            };
+                            current_strategy =
+                                ExecutionStrategy::ToolAssisted { max_iterations: 5 };
                             continue;
                         }
                     }
@@ -125,19 +124,15 @@ impl EngineDispatch {
                                     self.max_escalations
                                 );
                                 return Ok(DispatchResult {
-                                    content: format!(
-                                        "Task exceeded complexity limits: {}",
-                                        reason
-                                    ),
+                                    content: format!("Task exceeded complexity limits: {}", reason),
                                     final_strategy: current_strategy,
                                     escalation_count,
                                 });
                             }
                             debug!("ReactPlusEngine escalated: {}", reason);
                             escalation_count += 1;
-                            current_strategy = ExecutionStrategy::AutonomousTask {
-                                max_iterations: 50,
-                            };
+                            current_strategy =
+                                ExecutionStrategy::AutonomousTask { max_iterations: 50 };
                             continue;
                         }
                         ReactOutcome::MaxIterationsReached { partial_content } => {
@@ -169,10 +164,8 @@ impl EngineDispatch {
                             warn!("Autonomous task hit escalation: {}", reason);
                             format!("Task complexity exceeded autonomous capacity: {}", reason)
                         }
-                        ReactOutcome::MaxIterationsReached { partial_content } => {
-                            partial_content
-                                .unwrap_or_else(|| "Autonomous task hit iteration limit".to_string())
-                        }
+                        ReactOutcome::MaxIterationsReached { partial_content } => partial_content
+                            .unwrap_or_else(|| "Autonomous task hit iteration limit".to_string()),
                     };
 
                     return Ok(DispatchResult {

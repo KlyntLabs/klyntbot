@@ -118,7 +118,10 @@ async fn test_observable_store_event_failure_does_not_block_write() {
 
     let todo = make_todo("No subscribers");
     let result = store.add(todo).await;
-    assert!(result.is_ok(), "Write should succeed even with no subscribers");
+    assert!(
+        result.is_ok(),
+        "Write should succeed even with no subscribers"
+    );
 }
 
 #[tokio::test]
@@ -148,7 +151,10 @@ async fn test_observable_store_complete_emits_updated_event() {
         DashboardEvent::TodoChanged { action, .. } => {
             assert_eq!(action, ChangeAction::Updated);
         }
-        _ => panic!("Expected TodoChanged(Updated) from complete, got {:?}", event),
+        _ => panic!(
+            "Expected TodoChanged(Updated) from complete, got {:?}",
+            event
+        ),
     }
 }
 
@@ -199,7 +205,10 @@ async fn test_observable_store_multiple_subscribers() {
             .expect("Channel closed");
         assert!(matches!(
             event,
-            DashboardEvent::TodoChanged { action: ChangeAction::Created, .. }
+            DashboardEvent::TodoChanged {
+                action: ChangeAction::Created,
+                ..
+            }
         ));
     }
 }

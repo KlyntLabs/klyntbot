@@ -25,10 +25,7 @@ async fn handle_usage_report(days: u32) -> Result<()> {
 
     println!("Total requests:  {}", report.total_requests);
     println!("Total tokens:    {}", format_tokens(report.total_tokens));
-    println!(
-        "Estimated cost:  ${}",
-        format_cost(report.total_cost_usd)
-    );
+    println!("Estimated cost:  ${}", format_cost(report.total_cost_usd));
     println!();
 
     if !report.by_model.is_empty() {

@@ -14,6 +14,6 @@ pub mod ws;
 
 // Public re-exports for convenience.
 pub use config_watcher::ConfigWatcher;
-pub use events::{ChangeAction, DashboardEvent, DashboardEventBus};
 pub use events::store_events::{ObservableProjectStore, ObservableTodoStore};
+pub use events::{ChangeAction, DashboardEvent, DashboardEventBus};
 pub use server::{DashboardConfig, DashboardServer};

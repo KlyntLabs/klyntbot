@@ -60,7 +60,10 @@ async fn handle_learning_status(days: u32) -> Result<()> {
                 let stats = compute_stats(strategy, &strategy_records);
                 let accuracy_pct = (stats.accuracy * 100.0) as u32;
                 let avg_time = if stats.sample_count > 0 {
-                    strategy_records.iter().map(|r| r.response_time_ms).sum::<u64>()
+                    strategy_records
+                        .iter()
+                        .map(|r| r.response_time_ms)
+                        .sum::<u64>()
                         / stats.sample_count as u64
                 } else {
                     0
@@ -109,10 +112,7 @@ async fn handle_learning_status(days: u32) -> Result<()> {
         "Default threshold: {:.0}%",
         confidence_map.default_threshold() * 100.0
     );
-    println!(
-        "Custom overrides:  {}",
-        confidence_map.overrides_count()
-    );
+    println!("Custom overrides:  {}", confidence_map.overrides_count());
     println!();
 
     Ok(())

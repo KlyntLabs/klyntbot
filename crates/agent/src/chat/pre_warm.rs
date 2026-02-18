@@ -107,11 +107,7 @@ mod tests {
             fn parameters(&self) -> Value {
                 serde_json::json!({"type": "object", "properties": {}})
             }
-            async fn execute(
-                &self,
-                _args: Value,
-                _ctx: &RoutingContext,
-            ) -> common::Result<String> {
+            async fn execute(&self, _args: Value, _ctx: &RoutingContext) -> common::Result<String> {
                 Ok("ok".to_string())
             }
         }

@@ -5,9 +5,9 @@ use common::create_test_bus;
 
 use std::sync::Arc;
 
+use bus::MessageBus;
 use dashboard::events::DashboardEventBus;
 use dashboard::server::{DashboardConfig, DashboardServer};
-use bus::MessageBus;
 
 fn make_server() -> DashboardServer {
     let bus = Arc::new(MessageBus::new(32));
@@ -55,11 +55,7 @@ async fn test_server_serves_static_assets() {
         .await
         .expect("Request failed");
 
-    assert_eq!(
-        res.status(),
-        200,
-        "GET / should return 200 with index.html"
-    );
+    assert_eq!(res.status(), 200, "GET / should return 200 with index.html");
 
     let body = res.text().await.unwrap();
     assert!(

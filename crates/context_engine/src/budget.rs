@@ -69,7 +69,9 @@ impl BudgetAllocator {
 
     /// Tokens still available for allocation.
     pub fn remaining(&self) -> usize {
-        self.config.available_input().saturating_sub(self.total_allocated())
+        self.config
+            .available_input()
+            .saturating_sub(self.total_allocated())
     }
 
     /// Allocate up to `tokens` for the given priority, capped at remaining budget.
@@ -103,7 +105,10 @@ impl BudgetAllocator {
         BudgetReport {
             total_window: self.config.total_context_window,
             total_allocated,
-            remaining: self.config.available_input().saturating_sub(total_allocated),
+            remaining: self
+                .config
+                .available_input()
+                .saturating_sub(total_allocated),
             per_priority,
         }
     }

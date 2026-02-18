@@ -158,7 +158,12 @@ impl GqlPlan {
     }
 
     async fn steps(&self) -> Vec<GqlPlanStep> {
-        self.0.steps.iter().cloned().map(GqlPlanStep::from).collect()
+        self.0
+            .steps
+            .iter()
+            .cloned()
+            .map(GqlPlanStep::from)
+            .collect()
     }
 
     async fn current_step_index(&self) -> i32 {

@@ -632,6 +632,7 @@ fn test_provider_extra_headers() {
         api_key: Secret::new("test-key".to_string()),
         api_base: None,
         extra_headers: Some(headers.clone()),
+        ..Default::default()
     };
 
     // Serialize

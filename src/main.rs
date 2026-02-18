@@ -13,11 +13,11 @@ mod cli_handlers {
     pub use cli::learning_cmd::handle_learning;
     pub use cli::plan::handle_plan;
     pub use cli::project::handle_project;
+    pub use cli::provider_cmd::handle_provider;
     pub use cli::serve::handle_serve;
     pub use cli::skills::handle_skills;
     pub use cli::status::{handle_brief_status, handle_status};
     pub use cli::todo::handle_todo;
-    pub use cli::provider_cmd::handle_provider;
     pub use cli::usage_cmd::handle_usage;
 }
 

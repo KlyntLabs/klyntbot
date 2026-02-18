@@ -157,7 +157,10 @@ mod tests {
     fn test_cosine_similarity_identical() {
         let v = vec![1.0, 2.0, 3.0];
         let sim = MemoryRetriever::cosine_similarity(&v, &v);
-        assert!((sim - 1.0).abs() < 1e-6, "Identical vectors should have similarity 1.0");
+        assert!(
+            (sim - 1.0).abs() < 1e-6,
+            "Identical vectors should have similarity 1.0"
+        );
     }
 
     #[test]
@@ -165,7 +168,10 @@ mod tests {
         let a = vec![1.0, 0.0];
         let b = vec![0.0, 1.0];
         let sim = MemoryRetriever::cosine_similarity(&a, &b);
-        assert!(sim.abs() < 1e-6, "Orthogonal vectors should have similarity 0.0");
+        assert!(
+            sim.abs() < 1e-6,
+            "Orthogonal vectors should have similarity 0.0"
+        );
     }
 
     #[test]
@@ -173,7 +179,10 @@ mod tests {
         let a = vec![1.0, 0.0];
         let b = vec![-1.0, 0.0];
         let sim = MemoryRetriever::cosine_similarity(&a, &b);
-        assert!((sim - (-1.0)).abs() < 1e-6, "Opposite vectors should have similarity -1.0");
+        assert!(
+            (sim - (-1.0)).abs() < 1e-6,
+            "Opposite vectors should have similarity -1.0"
+        );
     }
 
     #[test]
@@ -265,7 +274,11 @@ mod tests {
         assert!(!results.is_empty(), "Should return at least one chunk");
         // Total tokens should not exceed budget
         let total: usize = results.iter().map(|c| c.token_estimate).sum();
-        assert!(total <= 150, "Total tokens {} should not exceed budget 150", total);
+        assert!(
+            total <= 150,
+            "Total tokens {} should not exceed budget 150",
+            total
+        );
     }
 
     #[tokio::test]

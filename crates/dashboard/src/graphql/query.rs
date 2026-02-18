@@ -5,8 +5,8 @@
 
 use async_graphql::{Context, MergedObject, Object, Result, ID};
 
-use tools::todo_types::TodoFilter;
 use tools::project_types::ProjectFilter;
+use tools::todo_types::TodoFilter;
 
 use super::filters::{ProjectFilterInput, TodoFilterInput};
 use super::types::project::GqlProject;
@@ -194,9 +194,9 @@ impl TodoProjectQueries {
 
 // ── dev-2: Goals, Plans, Config, System queries ───────────────────────────────
 
+use super::types::config::GqlConfig;
 use super::types::goal::{GoalFilter, GqlGoal};
 use super::types::plan::{GqlPlan, PlanFilter};
-use super::types::config::GqlConfig;
 use super::types::system::{GqlCronJob, GqlSession, GqlSystemStatus};
 
 /// Goal, Plan, Config, and System query resolvers (dev-2).
@@ -218,8 +218,8 @@ impl GoalPlanSystemQueries {
     async fn goal(&self, ctx: &Context<'_>, id: ID) -> Result<Option<GqlGoal>> {
         let ctx_data = ctx.data_unchecked::<DashboardContext>();
         let mut store = ctx_data.goal_store.write().await;
-        let uuid = uuid::Uuid::parse_str(&id.0)
-            .map_err(|e| async_graphql::Error::new(e.to_string()))?;
+        let uuid =
+            uuid::Uuid::parse_str(&id.0).map_err(|e| async_graphql::Error::new(e.to_string()))?;
         Ok(store.get(&uuid).await?.map(GqlGoal))
     }
 
@@ -264,8 +264,8 @@ impl GoalPlanSystemQueries {
     async fn plan(&self, ctx: &Context<'_>, id: ID) -> Result<Option<GqlPlan>> {
         let ctx_data = ctx.data_unchecked::<DashboardContext>();
         let mut store = ctx_data.plan_store.write().await;
-        let uuid = uuid::Uuid::parse_str(&id.0)
-            .map_err(|e| async_graphql::Error::new(e.to_string()))?;
+        let uuid =
+            uuid::Uuid::parse_str(&id.0).map_err(|e| async_graphql::Error::new(e.to_string()))?;
         Ok(store.get(&uuid).await?.map(GqlPlan))
     }
 
@@ -330,10 +330,7 @@ fn project_filter_to_native(f: ProjectFilterInput) -> ProjectFilter {
     }
 }
 
-fn build_tree_node(
-    root: tools::todo_types::Todo,
-    all: &[tools::todo_types::Todo],
-) -> GqlTodoNode {
+fn build_tree_node(root: tools::todo_types::Todo, all: &[tools::todo_types::Todo]) -> GqlTodoNode {
     let root_id = root.id.clone();
     let children: Vec<GqlTodoNode> = all
         .iter()

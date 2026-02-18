@@ -103,11 +103,20 @@ impl GqlGoal {
     }
 
     async fn metrics(&self) -> Vec<GqlMetric> {
-        self.0.metrics.iter().cloned().map(GqlMetric::from).collect()
+        self.0
+            .metrics
+            .iter()
+            .cloned()
+            .map(GqlMetric::from)
+            .collect()
     }
 
     async fn linked_project_ids(&self) -> Vec<String> {
-        self.0.linked_project_ids.iter().map(Uuid::to_string).collect()
+        self.0
+            .linked_project_ids
+            .iter()
+            .map(Uuid::to_string)
+            .collect()
     }
 
     async fn progress_percentage(&self) -> f64 {

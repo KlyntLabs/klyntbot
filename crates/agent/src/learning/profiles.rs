@@ -56,7 +56,13 @@ impl ProfileStore {
         // Sanitize user_id for filename
         let safe_id: String = user_id
             .chars()
-            .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+            .map(|c| {
+                if c.is_alphanumeric() || c == '-' || c == '_' {
+                    c
+                } else {
+                    '_'
+                }
+            })
             .collect();
         self.data_dir.join(format!("profile_{}.json", safe_id))
     }

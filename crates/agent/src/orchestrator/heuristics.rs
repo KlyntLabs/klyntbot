@@ -27,9 +27,7 @@ pub fn classify_heuristic(message: &str) -> Option<ExecutionStrategy> {
     ];
     if msg.len() < 20
         && GREETINGS.iter().any(|g| {
-            msg == *g
-                || msg.starts_with(&format!("{} ", g))
-                || msg.starts_with(&format!("{}!", g))
+            msg == *g || msg.starts_with(&format!("{} ", g)) || msg.starts_with(&format!("{}!", g))
         })
     {
         return Some(ExecutionStrategy::DirectResponse);
@@ -58,9 +56,7 @@ pub fn classify_heuristic(message: &str) -> Option<ExecutionStrategy> {
         "architect and",
     ];
     if PLAN_KEYWORDS.iter().any(|k| msg.contains(k)) {
-        return Some(ExecutionStrategy::AutonomousTask {
-            max_iterations: 50,
-        });
+        return Some(ExecutionStrategy::AutonomousTask { max_iterations: 50 });
     }
 
     // 4. Keyword-based classification with conflict detection
@@ -98,8 +94,22 @@ const TOOL_KEYWORDS: &[&str] = &[
 
 /// Keywords that indicate code/task work (tool-assisted).
 const CODE_KEYWORDS: &[&str] = &[
-    "fix", "build", "implement", "create", "add", "update", "refactor", "debug", "git", ".rs",
-    ".py", ".ts", "function", "class", "struct", "file",
+    "fix",
+    "build",
+    "implement",
+    "create",
+    "add",
+    "update",
+    "refactor",
+    "debug",
+    "git",
+    ".rs",
+    ".py",
+    ".ts",
+    "function",
+    "class",
+    "struct",
+    "file",
 ];
 
 /// Keywords that indicate a direct response (questions, explanations).
@@ -125,9 +135,7 @@ fn classify_by_keywords(msg: &str) -> Option<ExecutionStrategy> {
     // Autonomous phrases are high-confidence multi-word patterns — they take priority
     // over single-word code/tool keywords that may co-occur incidentally.
     if has_autonomous {
-        return Some(ExecutionStrategy::AutonomousTask {
-            max_iterations: 15,
-        });
+        return Some(ExecutionStrategy::AutonomousTask { max_iterations: 15 });
     }
 
     // For the remaining categories, conflicting signals → defer to LLM
@@ -141,9 +149,7 @@ fn classify_by_keywords(msg: &str) -> Option<ExecutionStrategy> {
     }
 
     if has_code {
-        return Some(ExecutionStrategy::ToolAssisted {
-            max_iterations: 10,
-        });
+        return Some(ExecutionStrategy::ToolAssisted { max_iterations: 10 });
     }
 
     if has_direct {
@@ -223,12 +229,8 @@ mod tests {
 
     #[test]
     fn test_ambiguous_falls_through() {
-        assert!(
-            classify_heuristic("what do you think about the architecture decision?").is_none()
-        );
-        assert!(
-            classify_heuristic("can you help me understand this concept better?").is_none()
-        );
+        assert!(classify_heuristic("what do you think about the architecture decision?").is_none());
+        assert!(classify_heuristic("can you help me understand this concept better?").is_none());
     }
 
     #[test]

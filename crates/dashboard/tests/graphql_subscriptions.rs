@@ -368,10 +368,12 @@ async fn test_system_status_subscription() {
 
     // Publish an AgentEvent to simulate status change (agent iteration started)
     event_tx
-        .send(DashboardEvent::AgentEvent(agent::AgentEvent::IterationStart {
-            iteration: 1,
-            max: 10,
-        }))
+        .send(DashboardEvent::AgentEvent(
+            agent::AgentEvent::IterationStart {
+                iteration: 1,
+                max: 10,
+            },
+        ))
         .ok();
 
     let event = recv_event!(rx);

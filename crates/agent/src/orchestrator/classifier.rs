@@ -58,9 +58,7 @@ impl LlmClassifier {
 
     /// Safe default when classification fails or times out.
     pub fn fallback_strategy() -> ExecutionStrategy {
-        ExecutionStrategy::ToolAssisted {
-            max_iterations: 10,
-        }
+        ExecutionStrategy::ToolAssisted { max_iterations: 10 }
     }
 
     /// Classify a user message using an LLM call.
@@ -76,8 +74,8 @@ impl LlmClassifier {
 
         let messages = vec![Message::user(prompt)];
 
-        let result = tokio::time::timeout(self.timeout, self.provider.chat(&messages, None, params))
-            .await;
+        let result =
+            tokio::time::timeout(self.timeout, self.provider.chat(&messages, None, params)).await;
 
         let response = match result {
             Ok(Ok(r)) => r,
@@ -105,15 +103,13 @@ impl LlmClassifier {
 
                     let strategy = match strategy_str {
                         "direct_response" => ExecutionStrategy::DirectResponse,
-                        "autonomous_task" => ExecutionStrategy::AutonomousTask {
-                            max_iterations: 50,
-                        },
+                        "autonomous_task" => {
+                            ExecutionStrategy::AutonomousTask { max_iterations: 50 }
+                        }
                         "clarification" => ExecutionStrategy::Clarification {
                             reason: reasoning.clone(),
                         },
-                        _ => ExecutionStrategy::ToolAssisted {
-                            max_iterations: 10,
-                        },
+                        _ => ExecutionStrategy::ToolAssisted { max_iterations: 10 },
                     };
 
                     return ClassificationResult {
@@ -140,8 +136,8 @@ mod tests {
     use super::*;
     use async_trait::async_trait;
     use providers::{LlmProvider, LlmResponse, Usage};
-    use std::sync::Arc;
     use serde_json::Value;
+    use std::sync::Arc;
 
     /// Minimal mock provider for classifier tests.
     struct MockClassifierProvider {
@@ -183,7 +179,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_classifier_returns_tool_assisted_strategy() {
-        let mock_json = r#"{"strategy":"tool_assisted","reasoning":"User wants tasks","confidence":0.9}"#;
+        let mock_json =
+            r#"{"strategy":"tool_assisted","reasoning":"User wants tasks","confidence":0.9}"#;
         let classifier = LlmClassifier::new(Arc::new(MockClassifierProvider::new(mock_json)));
         let result = classifier
             .classify("show my tasks", &[], &ChatParams::new("haiku"))
@@ -229,7 +226,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_classifier_returns_clarification() {
-        let mock_json = r#"{"strategy":"clarification","reasoning":"Need more context","confidence":0.6}"#;
+        let mock_json =
+            r#"{"strategy":"clarification","reasoning":"Need more context","confidence":0.6}"#;
         let classifier = LlmClassifier::new(Arc::new(MockClassifierProvider::new(mock_json)));
         let result = classifier
             .classify("do that thing", &[], &ChatParams::new("haiku"))

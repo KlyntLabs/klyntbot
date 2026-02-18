@@ -3,9 +3,7 @@
 use async_graphql::{Enum, Object, SimpleObject, ID};
 use chrono::{DateTime, Utc};
 
-use tools::todo_types::{
-    Attachment, AttachmentType, TimeEntry, TimeEntrySource, Todo, TodoStatus,
-};
+use tools::todo_types::{Attachment, AttachmentType, TimeEntry, TimeEntrySource, Todo, TodoStatus};
 
 // ── Status Enum ─────────────────────────────────────────────────────────────
 
@@ -183,7 +181,12 @@ impl GqlTodo {
         self.0.attachments.iter().cloned().map(Into::into).collect()
     }
     async fn time_entries(&self) -> Vec<GqlTimeEntry> {
-        self.0.time_entries.iter().cloned().map(Into::into).collect()
+        self.0
+            .time_entries
+            .iter()
+            .cloned()
+            .map(Into::into)
+            .collect()
     }
     async fn total_tracked_secs(&self) -> i32 {
         self.0.total_tracked_secs as i32

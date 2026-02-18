@@ -58,9 +58,7 @@ impl InterruptHandler {
     /// - Merge: combines pending messages with the new one
     pub fn handle(&self, pending: &[String], new_message: &str) -> String {
         match self.policy {
-            InterruptPolicy::Queue | InterruptPolicy::CancelAndSwitch => {
-                new_message.to_string()
-            }
+            InterruptPolicy::Queue | InterruptPolicy::CancelAndSwitch => new_message.to_string(),
             InterruptPolicy::Merge => {
                 if pending.is_empty() {
                     return new_message.to_string();
@@ -126,10 +124,7 @@ mod tests {
     #[test]
     fn test_handle_merge_combines_messages() {
         let handler = InterruptHandler::new(InterruptPolicy::Merge);
-        let pending = vec![
-            "first message".to_string(),
-            "second message".to_string(),
-        ];
+        let pending = vec!["first message".to_string(), "second message".to_string()];
         let result = handler.handle(&pending, "third message");
         assert!(result.contains("first message"));
         assert!(result.contains("second message"));

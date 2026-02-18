@@ -154,8 +154,7 @@ impl CostTracker {
                 }
 
                 total_requests += 1;
-                let tokens =
-                    (record.prompt_tokens + record.completion_tokens) as u64;
+                let tokens = (record.prompt_tokens + record.completion_tokens) as u64;
                 total_tokens += tokens;
                 total_cost += record.estimated_cost_usd;
 
@@ -188,7 +187,7 @@ mod tests {
     #[test]
     fn test_cost_calculation_claude_sonnet() {
         let usage = Usage {
-            prompt_tokens: 1_000_000, // 1M input tokens
+            prompt_tokens: 1_000_000,   // 1M input tokens
             completion_tokens: 100_000, // 100K output tokens
             total_tokens: 1_100_000,
             cache_read_tokens: 0,
@@ -197,7 +196,11 @@ mod tests {
         let cost = estimate_cost(&usage, "claude-sonnet-4");
         // Input: 1M * $3/MTok = $3.00
         // Output: 0.1M * $15/MTok = $1.50
-        assert!((cost - 4.5).abs() < 0.001, "Expected $4.50, got ${:.4}", cost);
+        assert!(
+            (cost - 4.5).abs() < 0.001,
+            "Expected $4.50, got ${:.4}",
+            cost
+        );
     }
 
     #[test]
@@ -212,7 +215,11 @@ mod tests {
         let cost = estimate_cost(&usage, "claude-opus-4");
         // Input: 0.5M * $15/MTok = $7.50
         // Output: 0.05M * $75/MTok = $3.75
-        assert!((cost - 11.25).abs() < 0.001, "Expected $11.25, got ${:.4}", cost);
+        assert!(
+            (cost - 11.25).abs() < 0.001,
+            "Expected $11.25, got ${:.4}",
+            cost
+        );
     }
 
     #[test]
@@ -256,7 +263,13 @@ mod tests {
         };
 
         tracker
-            .record(&usage, "claude-sonnet-4", "anthropic", "tool_assisted", "telegram")
+            .record(
+                &usage,
+                "claude-sonnet-4",
+                "anthropic",
+                "tool_assisted",
+                "telegram",
+            )
             .await
             .unwrap();
 
@@ -292,9 +305,24 @@ mod tests {
             cache_write_tokens: 0,
         };
 
-        tracker.record(&usage1, "claude-sonnet-4", "anthropic", "direct", "slack").await.unwrap();
-        tracker.record(&usage2, "claude-haiku-3", "anthropic", "tool_assisted", "telegram").await.unwrap();
-        tracker.record(&usage1, "claude-sonnet-4", "anthropic", "direct", "discord").await.unwrap();
+        tracker
+            .record(&usage1, "claude-sonnet-4", "anthropic", "direct", "slack")
+            .await
+            .unwrap();
+        tracker
+            .record(
+                &usage2,
+                "claude-haiku-3",
+                "anthropic",
+                "tool_assisted",
+                "telegram",
+            )
+            .await
+            .unwrap();
+        tracker
+            .record(&usage1, "claude-sonnet-4", "anthropic", "direct", "discord")
+            .await
+            .unwrap();
 
         let report = tracker.report(30).await.unwrap();
         assert_eq!(report.total_requests, 3);

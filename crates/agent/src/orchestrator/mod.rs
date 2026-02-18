@@ -31,11 +31,7 @@ impl Orchestrator {
     ///
     /// Tries heuristics first (free), then falls back to LLM classification.
     /// Low-confidence LLM results get overridden with a safe default.
-    pub async fn classify(
-        &self,
-        message: &str,
-        tool_names: &[&str],
-    ) -> ClassificationResult {
+    pub async fn classify(&self, message: &str, tool_names: &[&str]) -> ClassificationResult {
         // Step 1: Heuristic pre-filter (zero cost)
         if let Some(strategy) = classify_heuristic(message) {
             return ClassificationResult {
@@ -57,9 +53,7 @@ impl Orchestrator {
                 // Step 3: Confidence gate
                 if r.confidence < 0.5 {
                     ClassificationResult {
-                        strategy: ExecutionStrategy::ToolAssisted {
-                            max_iterations: 10,
-                        },
+                        strategy: ExecutionStrategy::ToolAssisted { max_iterations: 10 },
                         reasoning: format!(
                             "low confidence ({:.2}), using safe default",
                             r.confidence
@@ -169,12 +163,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_orchestrator_low_confidence_falls_back() {
-        let mock_json =
-            r#"{"strategy":"autonomous_task","reasoning":"Maybe","confidence":0.3}"#;
+        let mock_json = r#"{"strategy":"autonomous_task","reasoning":"Maybe","confidence":0.3}"#;
         let orch = mock_orchestrator(mock_json);
-        let result = orch
-            .classify("something ambiguous and unclear", &[])
-            .await;
+        let result = orch.classify("something ambiguous and unclear", &[]).await;
         // Low confidence should override to safe default
         assert!(matches!(
             result.strategy,

@@ -4,7 +4,7 @@ use std::sync::Arc;
 use tempfile::TempDir;
 use tokio::sync::{broadcast, RwLock};
 
-use dashboard::events::{DashboardEvent, DashboardEventBus, store_events::ObservableTodoStore};
+use dashboard::events::{store_events::ObservableTodoStore, DashboardEvent, DashboardEventBus};
 use dashboard::graphql::{build_schema, DashboardContext, DashboardSchema};
 use goal::GoalStore;
 use plan::PlanStore;
@@ -26,10 +26,7 @@ pub fn create_test_todo_store(tmp: &TempDir) -> Arc<RwLock<TodoStore>> {
 }
 
 /// Create an ObservableTodoStore wrapping a temp TodoStore.
-pub fn create_observable_store(
-    tmp: &TempDir,
-    bus: Arc<DashboardEventBus>,
-) -> ObservableTodoStore {
+pub fn create_observable_store(tmp: &TempDir, bus: Arc<DashboardEventBus>) -> ObservableTodoStore {
     let inner = create_test_todo_store(tmp);
     ObservableTodoStore::new(inner, bus)
 }

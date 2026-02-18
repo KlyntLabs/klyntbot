@@ -10,7 +10,7 @@ pub mod todo;
 
 pub use chat::{GqlCalendarSyncResult, GqlChatMessage, MessageRole};
 pub use config::{GqlConfig, GqlConfigUpdateResult};
-pub use goal::{CreateGoalInput, GqlGoal, GqlGoalStatus, GqlMetric, GoalFilter, UpdateGoalInput};
+pub use goal::{CreateGoalInput, GoalFilter, GqlGoal, GqlGoalStatus, GqlMetric, UpdateGoalInput};
 pub use plan::{
     CreatePlanInput, CreatePlanStepInput, GqlBacktrackEntry, GqlPlan, GqlPlanStatus, GqlPlanStep,
     GqlStepStatus, PlanFilter,

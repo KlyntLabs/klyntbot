@@ -2,10 +2,10 @@
 
 use std::sync::Arc;
 
-use dashboard::events::{DashboardEvent, DashboardEventBus};
-use dashboard::server::{DashboardConfig, DashboardServer};
 use agent::AgentEvent;
 use bus::MessageBus;
+use dashboard::events::{DashboardEvent, DashboardEventBus};
+use dashboard::server::{DashboardConfig, DashboardServer};
 use futures_util::{SinkExt, StreamExt};
 use tokio::time::{timeout, Duration};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
@@ -257,17 +257,15 @@ async fn test_ws_chat_session_id_routing() {
 
     // Both connections should be alive (not closed due to routing errors).
     // Verify by sending a message on ws1 and checking the bus receives it.
-    ws1.send(
-        Message::Text(
-            serde_json::json!({
-                "type": "message",
-                "content": "hello from A",
-                "session_id": "web-session-A"
-            })
-            .to_string()
-            .into(),
-        ),
-    )
+    ws1.send(Message::Text(
+        serde_json::json!({
+            "type": "message",
+            "content": "hello from A",
+            "session_id": "web-session-A"
+        })
+        .to_string()
+        .into(),
+    ))
     .await
     .unwrap();
 
@@ -371,8 +369,13 @@ async fn test_ws_chat_reconnection_resumes_session() {
         ws.send(Message::Text(msg.into())).await.unwrap();
 
         // Should still work — message published to bus.
-        let inbound = timeout(Duration::from_secs(1), inbound_rx.recv()).await.expect("Timed out");
-        assert!(inbound.is_some(), "Reconnected session should publish messages");
+        let inbound = timeout(Duration::from_secs(1), inbound_rx.recv())
+            .await
+            .expect("Timed out");
+        assert!(
+            inbound.is_some(),
+            "Reconnected session should publish messages"
+        );
         ws.close(None).await.ok();
     }
 }

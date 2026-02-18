@@ -215,7 +215,10 @@ mod tests {
 
         match result {
             DirectOutcome::Response(content) => {
-                assert!(content.is_empty(), "Empty response should yield empty string");
+                assert!(
+                    content.is_empty(),
+                    "Empty response should yield empty string"
+                );
             }
             other => panic!("Expected empty Response, got {:?}", other),
         }

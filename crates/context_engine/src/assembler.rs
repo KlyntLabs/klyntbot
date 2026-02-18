@@ -59,8 +59,7 @@ impl ContextEngine {
     }
 
     pub fn assemble(&self, request: ContextRequest) -> AssembledContext {
-        let mut allocator =
-            BudgetAllocator::new(BudgetConfig::standard(request.context_window));
+        let mut allocator = BudgetAllocator::new(BudgetConfig::standard(request.context_window));
 
         // 1. System prompt always gets allocated first
         let system_tokens = estimate_tokens(&request.system_prompt);
@@ -69,7 +68,9 @@ impl ContextEngine {
         // 2. Tool definitions budget depends on strategy
         let tool_tokens = match &request.strategy {
             ExecutionStrategy::DirectResponse | ExecutionStrategy::Clarification { .. } => 0,
-            ExecutionStrategy::ToolAssisted { .. } => estimate_tool_tokens(&request.tool_definitions),
+            ExecutionStrategy::ToolAssisted { .. } => {
+                estimate_tool_tokens(&request.tool_definitions)
+            }
             ExecutionStrategy::AutonomousTask { .. } => {
                 estimate_tool_tokens(&request.tool_definitions)
             }
@@ -231,7 +232,10 @@ mod tests {
             .per_priority
             .iter()
             .find(|(p, _)| *p == Priority::ToolDefinitions);
-        assert!(tool_alloc.is_some(), "ToolAssisted should allocate tool budget");
+        assert!(
+            tool_alloc.is_some(),
+            "ToolAssisted should allocate tool budget"
+        );
         assert!(tool_alloc.unwrap().1 > 0, "Tool budget should be non-zero");
     }
 

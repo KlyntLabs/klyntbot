@@ -298,7 +298,11 @@ impl SessionManager {
         // Atomic write: write to temp file, then rename
         let tmp_path = path.with_extension("jsonl.tmp");
         fs::write(&tmp_path, &content).await.map_err(|e| {
-            SessionError::SaveFailed(format!("Failed to write temp {}: {}", tmp_path.display(), e))
+            SessionError::SaveFailed(format!(
+                "Failed to write temp {}: {}",
+                tmp_path.display(),
+                e
+            ))
         })?;
 
         fs::rename(&tmp_path, &path).await.map_err(|e| {
@@ -674,15 +678,9 @@ mod tests {
             loaded.messages.len()
         );
         // The last message should be the most recent one
-        assert_eq!(
-            loaded.messages.last().unwrap().content,
-            "Message 1000"
-        );
+        assert_eq!(loaded.messages.last().unwrap().content, "Message 1000");
         // The first message should be Message 501 (keeping last 500 of 0..1000)
-        assert_eq!(
-            loaded.messages.first().unwrap().content,
-            "Message 501"
-        );
+        assert_eq!(loaded.messages.first().unwrap().content, "Message 501");
     }
 
     #[tokio::test]
@@ -690,7 +688,10 @@ mod tests {
         let mut session = Session::new("test:reqid");
         session.add_message_with_request_id("user", "Hello", Some("req-abc-123".to_string()));
 
-        assert_eq!(session.messages[0].request_id, Some("req-abc-123".to_string()));
+        assert_eq!(
+            session.messages[0].request_id,
+            Some("req-abc-123".to_string())
+        );
 
         // Regular add_message should have None request_id
         session.add_message("assistant", "Hi");

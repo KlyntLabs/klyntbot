@@ -165,10 +165,10 @@ mod tests {
 
         let result = validator.validate("You are Klyntbot, a helpful assistant.");
         assert!(!result.is_valid);
-        assert!(result.warnings.iter().any(|w| matches!(
-            w,
-            ValidationWarning::PotentialSystemLeak { .. }
-        )));
+        assert!(result
+            .warnings
+            .iter()
+            .any(|w| matches!(w, ValidationWarning::PotentialSystemLeak { .. })));
 
         let result2 = validator.validate("As shown in <SYSTEM> block...");
         assert!(!result2.is_valid);

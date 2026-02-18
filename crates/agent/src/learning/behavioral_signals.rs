@@ -64,14 +64,26 @@ mod tests {
     fn test_positive_signals() {
         assert_eq!(detect_signal("thanks!"), BehavioralSignal::Positive);
         assert_eq!(detect_signal("That's perfect"), BehavioralSignal::Positive);
-        assert_eq!(detect_signal("Yes, exactly what I needed"), BehavioralSignal::Positive);
+        assert_eq!(
+            detect_signal("Yes, exactly what I needed"),
+            BehavioralSignal::Positive
+        );
     }
 
     #[test]
     fn test_negative_signals() {
-        assert_eq!(detect_signal("No, that's wrong"), BehavioralSignal::Negative);
-        assert_eq!(detect_signal("Try again please"), BehavioralSignal::Negative);
-        assert_eq!(detect_signal("That doesn't work"), BehavioralSignal::Negative);
+        assert_eq!(
+            detect_signal("No, that's wrong"),
+            BehavioralSignal::Negative
+        );
+        assert_eq!(
+            detect_signal("Try again please"),
+            BehavioralSignal::Negative
+        );
+        assert_eq!(
+            detect_signal("That doesn't work"),
+            BehavioralSignal::Negative
+        );
     }
 
     #[test]

@@ -52,7 +52,12 @@ mod tests {
     use super::*;
     use chrono::Utc;
 
-    fn make_record(predicted: &str, actual: &str, escalations: u32, iterations: u32) -> StrategyRecord {
+    fn make_record(
+        predicted: &str,
+        actual: &str,
+        escalations: u32,
+        iterations: u32,
+    ) -> StrategyRecord {
         StrategyRecord {
             timestamp: Utc::now(),
             request_id: "test".to_string(),

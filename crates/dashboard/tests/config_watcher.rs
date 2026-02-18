@@ -69,11 +69,7 @@ async fn test_config_watcher_validates_before_emitting() {
     let bus = create_test_bus();
     let mut rx = bus.subscribe();
 
-    let watcher = ConfigWatcher::new(
-        config_path.clone(),
-        bus.clone(),
-        Duration::from_millis(50),
-    );
+    let watcher = ConfigWatcher::new(config_path.clone(), bus.clone(), Duration::from_millis(50));
     let _handle = watcher.start();
 
     sleep(Duration::from_millis(100)).await;
@@ -101,11 +97,7 @@ async fn test_config_watcher_debounces_rapid_changes() {
     let mut rx = bus.subscribe();
 
     // Large debounce window so rapid writes are coalesced.
-    let watcher = ConfigWatcher::new(
-        config_path.clone(),
-        bus.clone(),
-        Duration::from_millis(300),
-    );
+    let watcher = ConfigWatcher::new(config_path.clone(), bus.clone(), Duration::from_millis(300));
     let _handle = watcher.start();
 
     sleep(Duration::from_millis(100)).await;
@@ -150,11 +142,7 @@ async fn test_config_watcher_ignores_non_config_files() {
     let bus = create_test_bus();
     let mut rx = bus.subscribe();
 
-    let watcher = ConfigWatcher::new(
-        config_path.clone(),
-        bus.clone(),
-        Duration::from_millis(50),
-    );
+    let watcher = ConfigWatcher::new(config_path.clone(), bus.clone(), Duration::from_millis(50));
     let _handle = watcher.start();
 
     sleep(Duration::from_millis(100)).await;

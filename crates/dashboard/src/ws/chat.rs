@@ -51,12 +51,27 @@ pub enum ClientMessage {
 #[derive(Debug, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ServerMessage {
-    Chunk { content: String },
-    ToolStart { name: String, args: serde_json::Value },
-    ToolEnd { name: String, success: bool, duration_ms: u64 },
-    Done { content: String },
-    Error { message: String },
-    Session { session_id: String },
+    Chunk {
+        content: String,
+    },
+    ToolStart {
+        name: String,
+        args: serde_json::Value,
+    },
+    ToolEnd {
+        name: String,
+        success: bool,
+        duration_ms: u64,
+    },
+    Done {
+        content: String,
+    },
+    Error {
+        message: String,
+    },
+    Session {
+        session_id: String,
+    },
 }
 
 /// axum handler: upgrades HTTP connection to WebSocket for the chat protocol.
@@ -171,9 +186,15 @@ fn agent_event_to_server_message(event: AgentEvent) -> Option<ServerMessage> {
     match event {
         AgentEvent::ContentChunk(content) => Some(ServerMessage::Chunk { content }),
         AgentEvent::ToolStart { name, args } => Some(ServerMessage::ToolStart { name, args }),
-        AgentEvent::ToolEnd { name, success, duration_ms } => {
-            Some(ServerMessage::ToolEnd { name, success, duration_ms })
-        }
+        AgentEvent::ToolEnd {
+            name,
+            success,
+            duration_ms,
+        } => Some(ServerMessage::ToolEnd {
+            name,
+            success,
+            duration_ms,
+        }),
         AgentEvent::Done(content) => Some(ServerMessage::Done { content }),
         AgentEvent::Error(message) => Some(ServerMessage::Error { message }),
         _ => None, // iteration progress, confidence, plan events — not forwarded to chat UI

@@ -63,8 +63,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_typing_lifecycle() {
-        let mut reporter =
-            ProgressReporter::new(ChannelName::new("telegram"), ChatId::new("123"));
+        let mut reporter = ProgressReporter::new(ChannelName::new("telegram"), ChatId::new("123"));
 
         assert!(!reporter.is_typing());
 
@@ -80,8 +79,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_progress_reporter_creation() {
-        let reporter =
-            ProgressReporter::new(ChannelName::new("discord"), ChatId::new("456"));
+        let reporter = ProgressReporter::new(ChannelName::new("discord"), ChatId::new("456"));
         assert!(!reporter.is_typing());
     }
 }
