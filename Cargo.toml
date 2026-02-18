@@ -16,6 +16,7 @@ members = [
     "crates/agent",
     "crates/cli",
     "crates/dashboard",
+    "crates/context_engine",
 ]
 
 [workspace.package]
@@ -40,6 +41,7 @@ channels = { path = "crates/channels" }
 heartbeat = { path = "crates/heartbeat" }
 agent = { path = "crates/agent" }
 cli = { path = "crates/cli" }
+context_engine = { path = "crates/context_engine" }
 
 # Shared external dependencies (version pinned at workspace level)
 tokio = { version = "1.49.0", features = ["rt-multi-thread", "macros", "time", "sync", "io-util", "net", "signal", "fs", "process"] }
