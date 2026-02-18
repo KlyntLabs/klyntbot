@@ -17,6 +17,7 @@ members = [
     "crates/cli",
     "crates/dashboard",
     "crates/context_engine",
+    "crates/storage",
 ]
 
 [workspace.package]
@@ -42,6 +43,7 @@ heartbeat = { path = "crates/heartbeat" }
 agent = { path = "crates/agent" }
 cli = { path = "crates/cli" }
 context_engine = { path = "crates/context_engine" }
+storage = { path = "crates/storage" }
 
 # Shared external dependencies (version pinned at workspace level)
 tokio = { version = "1.49.0", features = ["rt-multi-thread", "macros", "time", "sync", "io-util", "net", "signal", "fs", "process", "test-util"] }
@@ -80,6 +82,7 @@ chrono-tz = "0.10"
 iana-time-zone = "0.1"
 rrule = "0.14"
 fastembed = "5"
+pgvector = { version = "0.4", features = ["sqlx"] }
 axum = { version = "0.8", features = ["ws", "macros"] }
 tower-http = { version = "0.6", features = ["cors"] }
 async-graphql = { version = "7", features = ["chrono", "uuid"] }
@@ -121,6 +124,7 @@ channels.workspace = true
 heartbeat.workspace = true
 agent.workspace = true
 cli.workspace = true
+storage.workspace = true
 
 # Binary-specific dependencies
 clap.workspace = true
@@ -137,6 +141,7 @@ chrono.workspace = true
 criterion = { version = "0.5", features = ["async_tokio"] }
 tokio.workspace = true
 uuid.workspace = true
+assert_cmd = "2.1.2"
 
 [[bench]]
 name = "core_benchmarks"

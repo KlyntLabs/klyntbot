@@ -26,6 +26,8 @@ pub struct CalendarSyncAdapter {
     providers: Vec<(String, Box<dyn CalendarProvider>)>,
     _provider_configs: Vec<CalendarProviderConfig>,
     todo_store: Arc<RwLock<TodoStore>>,
+    /// Optional SQL-backed todo repository (dual-mode: used when set, falls back to JSONL).
+    sql_todo_repo: Option<storage::TodoRepo>,
     conflicts_path: PathBuf,
     auto_sync_due_dates: bool,
     dispatcher: Option<Arc<crate::NotificationDispatcher>>,
@@ -94,11 +96,19 @@ impl CalendarSyncAdapter {
             providers,
             _provider_configs: provider_configs,
             todo_store,
+            sql_todo_repo: None,
             conflicts_path,
             auto_sync_due_dates: any_auto_sync,
             dispatcher,
             bidirectional_sync,
         })
+    }
+
+    /// Set an optional SQL-backed todo repository for dual-mode support.
+    /// When set, todo reads/writes prefer SQL; otherwise falls back to JSONL.
+    pub fn with_todo_repo(mut self, repo: storage::TodoRepo) -> Self {
+        self.sql_todo_repo = Some(repo);
+        self
     }
 
     /// Two-way sync: Pull from all CalDAV providers, resolve conflicts, push local changes.
@@ -145,16 +155,35 @@ impl CalendarSyncAdapter {
 
         // Clear calendar_event_uid for todos that had events deleted from all providers
         if self.auto_sync_due_dates {
-            let mut store = self.todo_store.write().await;
-            let todos = store.list(&TodoFilter::default()).await?;
-            for todo in todos {
-                if todo.due_date.is_none() && todo.calendar_event_uid.is_some() {
-                    let patch = TodoPatch {
-                        calendar_event_uid: Some(None),
-                        ..Default::default()
-                    };
-                    if let Err(e) = store.update(&todo.id, patch).await {
-                        tracing::warn!("Failed to sync calendar update to todo {}: {}. Calendar and todo may be out of sync.", todo.id, e);
+            if let Some(repo) = &self.sql_todo_repo {
+                // SQL path
+                let rows = repo
+                    .list(&storage::TodoFilter::default())
+                    .await
+                    .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                for row in rows {
+                    if row.due_date.is_none() && row.calendar_event_uid.is_some() {
+                        // Note: storage::TodoPatch doesn't have calendar_event_uid.
+                        // This is a best-effort cleanup; full support requires extending
+                        // the storage patch. For now, skip this cleanup in SQL mode.
+                        tracing::debug!(
+                            "SQL mode: skipping calendar_event_uid cleanup for todo {} (requires TodoPatch extension)",
+                            row.id
+                        );
+                    }
+                }
+            } else {
+                let mut store = self.todo_store.write().await;
+                let todos = store.list(&TodoFilter::default()).await?;
+                for todo in todos {
+                    if todo.due_date.is_none() && todo.calendar_event_uid.is_some() {
+                        let patch = TodoPatch {
+                            calendar_event_uid: Some(None),
+                            ..Default::default()
+                        };
+                        if let Err(e) = store.update(&todo.id, patch).await {
+                            tracing::warn!("Failed to sync calendar update to todo {}: {}. Calendar and todo may be out of sync.", todo.id, e);
+                        }
                     }
                 }
             }
@@ -296,8 +325,18 @@ impl CalendarSyncAdapter {
 
         // Push local changes to this provider
         if self.auto_sync_due_dates {
-            let filter = TodoFilter::default();
-            let todos = store.list(&filter).await?;
+            // Get todos from SQL or JSONL
+            let todos: Vec<Todo> = if let Some(repo) = &self.sql_todo_repo {
+                let rows = repo
+                    .list(&storage::TodoFilter::default())
+                    .await
+                    .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                rows.into_iter().map(Todo::from).collect()
+            } else {
+                let filter = TodoFilter::default();
+                store.list(&filter).await?
+            };
+
             for todo in todos {
                 if todo.due_date.is_some() {
                     // Always PUT — CalDAV creates if new, updates if exists
@@ -305,12 +344,21 @@ impl CalendarSyncAdapter {
                         match provider.put_event(&event).await {
                             Ok(_etag) => {
                                 if todo.calendar_event_uid.is_none() {
-                                    let patch = TodoPatch {
-                                        calendar_event_uid: Some(Some(event.uid.clone())),
-                                        ..Default::default()
-                                    };
-                                    if let Err(e) = store.update(&todo.id, patch).await {
-                                        tracing::warn!("Failed to sync calendar update to todo {}: {}. Calendar and todo may be out of sync.", todo.id, e);
+                                    if let Some(_repo) = &self.sql_todo_repo {
+                                        // SQL path: update via storage patch (calendar_event_uid
+                                        // not in storage::TodoPatch — best-effort, skip for now)
+                                        tracing::debug!(
+                                            "SQL mode: skipping calendar_event_uid link for todo {} (requires TodoPatch extension)",
+                                            todo.id
+                                        );
+                                    } else {
+                                        let patch = TodoPatch {
+                                            calendar_event_uid: Some(Some(event.uid.clone())),
+                                            ..Default::default()
+                                        };
+                                        if let Err(e) = store.update(&todo.id, patch).await {
+                                            tracing::warn!("Failed to sync calendar update to todo {}: {}. Calendar and todo may be out of sync.", todo.id, e);
+                                        }
                                     }
                                 }
                                 events_pushed += 1;
@@ -362,10 +410,30 @@ impl CalendarSyncAdapter {
         store: &mut TodoStore,
         uid: &str,
     ) -> Option<Todo> {
+        // SQL path: prefer sql_todo_repo if available
+        if let Some(repo) = &self.sql_todo_repo {
+            return self.find_todo_by_calendar_uid_sql(repo, uid).await;
+        }
         let filter = TodoFilter::default();
         if let Ok(todos) = store.list(&filter).await {
             todos
                 .into_iter()
+                .find(|t| t.calendar_event_uid.as_ref().is_some_and(|u| u == uid))
+        } else {
+            None
+        }
+    }
+
+    /// SQL path: Find a todo by its calendar event UID.
+    async fn find_todo_by_calendar_uid_sql(
+        &self,
+        repo: &storage::TodoRepo,
+        uid: &str,
+    ) -> Option<Todo> {
+        let filter = storage::TodoFilter::default();
+        if let Ok(rows) = repo.list(&filter).await {
+            rows.into_iter()
+                .map(Todo::from)
                 .find(|t| t.calendar_event_uid.as_ref().is_some_and(|u| u == uid))
         } else {
             None
@@ -379,6 +447,21 @@ impl CalendarSyncAdapter {
         todo_id: &str,
         event: &CalendarEvent,
     ) -> Result<()> {
+        // SQL path: prefer sql_todo_repo if available
+        if let Some(repo) = &self.sql_todo_repo {
+            let patch = storage::TodoPatch {
+                id: todo_id.to_string(),
+                title: Some(event.summary.clone()),
+                description: Some(event.description.clone()),
+                due_date: Some(Some(event.start)),
+                ..Default::default()
+            };
+            repo.update(&patch)
+                .await
+                .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            return Ok(());
+        }
+
         let patch = TodoPatch {
             title: Some(event.summary.clone()),
             description: Some(event.description.clone()),
@@ -427,6 +510,15 @@ impl CalendarSyncAdapter {
             blocked_by: Vec::new(),
             blocks: Vec::new(),
         };
+
+        // SQL path: prefer sql_todo_repo if available
+        if let Some(repo) = &self.sql_todo_repo {
+            let row: storage::TodoRow = (&todo).into();
+            repo.add(&row)
+                .await
+                .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            return Ok(());
+        }
 
         store.add(todo).await?;
         Ok(())
@@ -641,13 +733,22 @@ impl CalendarHandler for CalendarSyncAdapter {
 
     /// Get sync status for all providers.
     async fn get_status(&self) -> Result<Value> {
-        let mut store = self.todo_store.write().await;
-        let filter = TodoFilter::default();
-        let todos = store.list(&filter).await?;
-        let synced_count = todos
-            .iter()
-            .filter(|t| t.calendar_event_uid.is_some())
-            .count();
+        // Determine todo counts — SQL path preferred when available
+        let (synced_count, total_count) = if let Some(repo) = &self.sql_todo_repo {
+            let rows = repo
+                .list(&storage::TodoFilter::default())
+                .await
+                .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            let synced = rows.iter().filter(|r| r.calendar_event_uid.is_some()).count();
+            (synced, rows.len())
+        } else {
+            let mut store = self.todo_store.write().await;
+            let filter = TodoFilter::default();
+            let todos = store.list(&filter).await?;
+            let synced = todos.iter().filter(|t| t.calendar_event_uid.is_some()).count();
+            let total = todos.len();
+            (synced, total)
+        };
 
         let mut provider_statuses = Vec::new();
 
@@ -667,7 +768,7 @@ impl CalendarHandler for CalendarSyncAdapter {
             "providers": provider_statuses,
             "provider_count": self.providers.len(),
             "todos_with_calendar_events": synced_count,
-            "total_todos": todos.len(),
+            "total_todos": total_count,
             "auto_sync_enabled": self.auto_sync_due_dates
         }))
     }

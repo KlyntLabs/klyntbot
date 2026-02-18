@@ -7,14 +7,11 @@ use async_trait::async_trait;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::RwLock;
 
 use crate::conversation_embedding::{
     ConversationEmbeddingHandler, ConversationEmbeddingRecord, PurgeFilter,
 };
-use crate::embedding_engine::{self, EmbeddingHandler};
-use crate::embedding_store::EmbeddingStore;
-use crate::todo_store::TodoStore;
+use crate::embedding_engine::EmbeddingHandler;
 use crate::todo_types::{Todo, TodoFilter};
 use crate::{RoutingContext, Tool};
 use common::Result;
@@ -25,12 +22,12 @@ pub struct MemoryTool {
     semantic_threshold: f64,
     /// RRF k parameter for hybrid search (from config)
     rrf_k: u32,
-    /// Todo store for unified search
-    todo_store: Option<Arc<RwLock<TodoStore>>>,
+    /// Todo repo for unified search (SQL-backed)
+    todo_repo: Option<storage::TodoRepo>,
     /// Embedding handler for todo semantic search
     todo_embedding_handler: Option<Arc<dyn EmbeddingHandler>>,
-    /// Embedding store for todo semantic search
-    todo_embedding_store: Option<Arc<RwLock<EmbeddingStore>>>,
+    /// Embedding repo for todo semantic search (SQL-backed pgvector)
+    embedding_repo: Option<storage::EmbeddingRepo>,
 }
 
 impl MemoryTool {
@@ -40,9 +37,9 @@ impl MemoryTool {
             conversation_handler: None,
             semantic_threshold: 0.5,
             rrf_k: 60,
-            todo_store: None,
+            todo_repo: None,
             todo_embedding_handler: None,
-            todo_embedding_store: None,
+            embedding_repo: None,
         }
     }
 
@@ -67,9 +64,9 @@ impl MemoryTool {
         self
     }
 
-    /// Inject todo store for unified search.
-    pub fn with_todo_store(mut self, store: Arc<RwLock<TodoStore>>) -> Self {
-        self.todo_store = Some(store);
+    /// Inject todo repo for unified search.
+    pub fn with_todo_repo(mut self, repo: storage::TodoRepo) -> Self {
+        self.todo_repo = Some(repo);
         self
     }
 
@@ -79,9 +76,9 @@ impl MemoryTool {
         self
     }
 
-    /// Inject todo embedding store for unified search.
-    pub fn with_todo_embedding_store(mut self, store: Arc<RwLock<EmbeddingStore>>) -> Self {
-        self.todo_embedding_store = Some(store);
+    /// Inject embedding repo for todo semantic search.
+    pub fn with_embedding_repo(mut self, repo: storage::EmbeddingRepo) -> Self {
+        self.embedding_repo = Some(repo);
         self
     }
 }
@@ -243,12 +240,12 @@ impl MemoryTool {
             handler.search(query, limit * 2, threshold).await?;
 
         // 2. Search todos (keyword + semantic if available)
-        let todo_results: Vec<(Todo, f64)> = if let Some(todo_store) = &self.todo_store {
-            let mut store = todo_store.write().await;
-
-            // Keyword search
+        let todo_results: Vec<(Todo, f64)> = if let Some(todo_repo) = &self.todo_repo {
+            // Keyword search via repo
             let query_lower = query.to_lowercase();
-            let all_todos = store.list(&TodoFilter::default()).await?;
+            let filter = TodoFilter::default();
+            let all_rows = todo_repo.list(&filter.to_storage_filter()).await?;
+            let all_todos: Vec<Todo> = all_rows.into_iter().map(Todo::from).collect();
             let keyword_todos: Vec<Todo> = all_todos
                 .iter()
                 .filter(|t| {
@@ -260,30 +257,15 @@ impl MemoryTool {
                 .cloned()
                 .collect();
 
-            drop(store); // Release lock before embedding operations
-
-            // Semantic search (if available)
-            let semantic_todos: Vec<(String, f64)> = if let (Some(emb), Some(emb_store)) =
-                (&self.todo_embedding_handler, &self.todo_embedding_store)
+            // Semantic search via pgvector (if available)
+            let semantic_todos: Vec<(String, f64)> = if let (Some(emb), Some(emb_repo)) =
+                (&self.todo_embedding_handler, &self.embedding_repo)
             {
                 let query_vec = emb.embed_query(query).await?;
-                let mut emb_store_guard = emb_store.write().await;
-                let all_embeddings = emb_store_guard.get_all().await?;
-
-                let mut scored: Vec<(String, f64)> = all_embeddings
-                    .iter()
-                    .map(|(id, rec)| {
-                        let sim = embedding_engine::EmbeddingEngine::cosine_similarity(
-                            &query_vec,
-                            &rec.embedding,
-                        );
-                        (id.clone(), sim)
-                    })
-                    .filter(|(_, sim)| *sim >= threshold)
-                    .collect();
-
-                scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-                scored
+                emb_repo
+                    .search_similar_vec(&query_vec, 100, threshold)
+                    .await
+                    .unwrap_or_default()
             } else {
                 Vec::new()
             };

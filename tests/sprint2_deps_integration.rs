@@ -20,6 +20,7 @@
 use chrono::{TimeZone, Utc};
 use serde_json::json;
 use std::sync::Arc;
+use storage::{StoragePool, TodoRepo};
 use tempfile::TempDir;
 use tokio::sync::RwLock;
 use tools::{
@@ -75,7 +76,9 @@ async fn create_tool_and_store() -> (TodoTool, Arc<RwLock<TodoStore>>, TempDir, 
     let temp_dir = TempDir::new().unwrap();
     let file_path = temp_dir.path().join("todos.jsonl");
     let store = Arc::new(RwLock::new(TodoStore::new(file_path)));
-    let tool = TodoTool::new(store.clone(), 3, 18, "UTC".to_string());
+    let pool = StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
+    let repo = TodoRepo::new(pool.inner().clone());
+    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string());
     let ctx = RoutingContext::new(
         common::ChannelName::new("test"),
         common::ChatId::new("test-chat"),
@@ -417,6 +420,7 @@ async fn test_chain_dependency_no_false_cycle() {
 // ─── TodoTool-level: add_dependency action ─────────────────────
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_tool_add_dependency_action() {
     let (tool, store, _dir, ctx) = create_tool_and_store().await;
 
@@ -441,6 +445,7 @@ async fn test_tool_add_dependency_action() {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_tool_remove_dependency_action() {
     let (tool, store, _dir, ctx) = create_tool_and_store().await;
 
@@ -469,6 +474,7 @@ async fn test_tool_remove_dependency_action() {
 // ─── TodoTool-level: complete with blockers ────────────────────
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_tool_complete_blocked_task_fails() {
     let (tool, store, _dir, ctx) = create_tool_and_store().await;
 
@@ -496,6 +502,7 @@ async fn test_tool_complete_blocked_task_fails() {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_tool_complete_unblocked_task_succeeds() {
     let (tool, store, _dir, ctx) = create_tool_and_store().await;
 
@@ -528,6 +535,7 @@ async fn test_tool_complete_unblocked_task_succeeds() {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_tool_complete_reports_newly_unblocked() {
     let (tool, store, _dir, ctx) = create_tool_and_store().await;
 
@@ -562,6 +570,7 @@ async fn test_tool_complete_reports_newly_unblocked() {
 // ─── TodoTool-level: tree shows dependencies ───────────────────
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_tool_tree_shows_dependency_info() {
     let (tool, store, _dir, ctx) = create_tool_and_store().await;
 
@@ -1069,6 +1078,7 @@ async fn test_default_instance_has_clean_fields() {
 // ═══════════════════════════════════════════════════════════════
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_tool_recur_creates_template() {
     let (tool, store, _dir, ctx) = create_tool_and_store().await;
 
@@ -1103,6 +1113,7 @@ async fn test_tool_recur_creates_template() {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_tool_recur_with_optional_fields() {
     let (tool, store, _dir, ctx) = create_tool_and_store().await;
 
@@ -1129,6 +1140,7 @@ async fn test_tool_recur_with_optional_fields() {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_tool_recur_rejects_invalid_rule() {
     let (tool, _store, _dir, ctx) = create_tool_and_store().await;
 
@@ -1145,6 +1157,7 @@ async fn test_tool_recur_rejects_invalid_rule() {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_tool_recur_rejects_invalid_syntax() {
     let (tool, _store, _dir, ctx) = create_tool_and_store().await;
 
@@ -1159,6 +1172,7 @@ async fn test_tool_recur_rejects_invalid_syntax() {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_tool_list_recurring_empty() {
     let (tool, _store, _dir, ctx) = create_tool_and_store().await;
 
@@ -1172,6 +1186,7 @@ async fn test_tool_list_recurring_empty() {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_tool_list_recurring_shows_templates() {
     let (tool, _store, _dir, ctx) = create_tool_and_store().await;
 
@@ -1211,6 +1226,7 @@ async fn test_tool_list_recurring_shows_templates() {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_tool_delete_recurring_removes_template() {
     let (tool, store, _dir, ctx) = create_tool_and_store().await;
 
@@ -1248,6 +1264,7 @@ async fn test_tool_delete_recurring_removes_template() {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_tool_delete_recurring_rejects_non_template() {
     let (tool, store, _dir, ctx) = create_tool_and_store().await;
 
@@ -1269,6 +1286,7 @@ async fn test_tool_delete_recurring_rejects_non_template() {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_tool_delete_recurring_missing_template() {
     let (tool, _store, _dir, ctx) = create_tool_and_store().await;
 

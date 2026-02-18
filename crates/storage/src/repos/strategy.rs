@@ -1,0 +1,114 @@
+//! Strategy repository — strategy_records table.
+
+use chrono::{DateTime, Utc};
+use sqlx::PgPool;
+use uuid::Uuid;
+
+use crate::error::StorageError;
+use crate::rows::learning::StrategyRecordRow;
+
+/// Repository for strategy execution record persistence.
+#[derive(Debug, Clone)]
+pub struct StrategyRepo {
+    pool: PgPool,
+}
+
+impl StrategyRepo {
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
+
+    /// Insert a strategy record.
+    pub async fn create(&self, row: &StrategyRecordRow) -> Result<StrategyRecordRow, StorageError> {
+        let result = sqlx::query_as::<_, StrategyRecordRow>(
+            "INSERT INTO strategy_records (id, timestamp, request_id, predicted_strategy,
+                                           actual_strategy, escalation_count, iterations_used,
+                                           max_iterations, success, user_satisfaction, response_time_ms)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+             RETURNING *",
+        )
+        .bind(row.id)
+        .bind(row.timestamp)
+        .bind(&row.request_id)
+        .bind(&row.predicted_strategy)
+        .bind(&row.actual_strategy)
+        .bind(row.escalation_count)
+        .bind(row.iterations_used)
+        .bind(row.max_iterations)
+        .bind(row.success)
+        .bind(row.user_satisfaction)
+        .bind(row.response_time_ms)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(result)
+    }
+
+    /// Get a strategy record by ID.
+    pub async fn get(&self, id: Uuid) -> Result<StrategyRecordRow, StorageError> {
+        sqlx::query_as::<_, StrategyRecordRow>("SELECT * FROM strategy_records WHERE id = $1")
+            .bind(id)
+            .fetch_optional(&self.pool)
+            .await?
+            .ok_or_else(|| StorageError::NotFound(format!("strategy record '{}'", id)))
+    }
+
+    /// List strategy records by predicted strategy within a date range.
+    pub async fn list_by_strategy(
+        &self,
+        strategy: &str,
+        since: DateTime<Utc>,
+    ) -> Result<Vec<StrategyRecordRow>, StorageError> {
+        let rows = sqlx::query_as::<_, StrategyRecordRow>(
+            "SELECT * FROM strategy_records
+             WHERE predicted_strategy = $1 AND timestamp >= $2
+             ORDER BY timestamp DESC",
+        )
+        .bind(strategy)
+        .bind(since)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+
+    /// Get accuracy for a strategy (fraction where predicted == actual) over a date range.
+    pub async fn get_accuracy(
+        &self,
+        strategy: &str,
+        since: DateTime<Utc>,
+    ) -> Result<Option<f32>, StorageError> {
+        let row: (i64, i64) = sqlx::query_as(
+            "SELECT COUNT(*),
+                    COUNT(*) FILTER (WHERE predicted_strategy = actual_strategy)
+             FROM strategy_records
+             WHERE predicted_strategy = $1 AND timestamp >= $2",
+        )
+        .bind(strategy)
+        .bind(since)
+        .fetch_one(&self.pool)
+        .await?;
+
+        if row.0 == 0 {
+            Ok(None)
+        } else {
+            Ok(Some(row.1 as f32 / row.0 as f32))
+        }
+    }
+
+    /// List all records within a date range.
+    pub async fn list_by_date_range(
+        &self,
+        from: DateTime<Utc>,
+        to: DateTime<Utc>,
+    ) -> Result<Vec<StrategyRecordRow>, StorageError> {
+        let rows = sqlx::query_as::<_, StrategyRecordRow>(
+            "SELECT * FROM strategy_records
+             WHERE timestamp >= $1 AND timestamp <= $2
+             ORDER BY timestamp DESC",
+        )
+        .bind(from)
+        .bind(to)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+}

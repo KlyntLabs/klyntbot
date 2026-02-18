@@ -38,9 +38,10 @@ pub struct UsageReport {
     pub by_day: Vec<(String, f64)>,
 }
 
-/// Tracks LLM usage and costs, persisted to JSONL.
+/// Tracks LLM usage and costs, persisted to JSONL or SQL.
 pub struct CostTracker {
     data_dir: PathBuf,
+    sql_repo: Option<storage::UsageRepo>,
 }
 
 /// Per-million-token pricing: (input_per_mtok, output_per_mtok).
@@ -68,14 +69,25 @@ fn estimate_cost(usage: &Usage, model: &str) -> f64 {
 
 impl CostTracker {
     pub fn new(data_dir: PathBuf) -> Self {
-        Self { data_dir }
+        Self {
+            data_dir,
+            sql_repo: None,
+        }
+    }
+
+    /// Create a CostTracker backed by a SQL repository.
+    pub fn from_repo(repo: storage::UsageRepo) -> Self {
+        Self {
+            data_dir: PathBuf::new(),
+            sql_repo: Some(repo),
+        }
     }
 
     fn usage_path(&self) -> PathBuf {
         self.data_dir.join("usage.jsonl")
     }
 
-    /// Record a usage entry, appending to usage.jsonl.
+    /// Record a usage entry, appending to usage.jsonl or SQL.
     pub async fn record(
         &self,
         usage: &Usage,
@@ -84,16 +96,42 @@ impl CostTracker {
         strategy: &str,
         channel: &str,
     ) -> Result<()> {
+        let cost = estimate_cost(usage, model);
+        let request_id = uuid::Uuid::new_v4().to_string();
+
+        // SQL path
+        if let Some(repo) = &self.sql_repo {
+            let row = storage::UsageRecordRow {
+                id: uuid::Uuid::new_v4(),
+                timestamp: Utc::now(),
+                request_id,
+                model: model.to_string(),
+                provider: provider.to_string(),
+                prompt_tokens: usage.prompt_tokens as i32,
+                completion_tokens: usage.completion_tokens as i32,
+                cache_read_tokens: usage.cache_read_tokens as i32,
+                cache_write_tokens: usage.cache_write_tokens as i32,
+                estimated_cost_usd: cost,
+                channel: channel.to_string(),
+                strategy: strategy.to_string(),
+            };
+            repo.create(&row)
+                .await
+                .map_err(|e| common::ToolError::ExecutionFailed(e.to_string()))?;
+            return Ok(());
+        }
+
+        // JSONL path (original)
         let record = UsageRecord {
             timestamp: Utc::now(),
-            request_id: uuid::Uuid::new_v4().to_string(),
+            request_id,
             model: model.to_string(),
             provider: provider.to_string(),
             prompt_tokens: usage.prompt_tokens,
             completion_tokens: usage.completion_tokens,
             cache_read_tokens: usage.cache_read_tokens,
             cache_write_tokens: usage.cache_write_tokens,
-            estimated_cost_usd: estimate_cost(usage, model),
+            estimated_cost_usd: cost,
             channel: channel.to_string(),
             strategy: strategy.to_string(),
         };
@@ -128,8 +166,43 @@ impl CostTracker {
 
     /// Generate a usage report for the last N days.
     pub async fn report(&self, days: u32) -> Result<UsageReport> {
-        let path = self.usage_path();
         let cutoff = Utc::now() - chrono::Duration::days(days as i64);
+
+        // SQL path
+        if let Some(repo) = &self.sql_repo {
+            let (total_requests_i64, total_cost) = repo
+                .totals_since(cutoff)
+                .await
+                .map_err(|e| common::ToolError::ExecutionFailed(e.to_string()))?;
+
+            let model_aggs = repo
+                .aggregate_by_model(cutoff)
+                .await
+                .map_err(|e| common::ToolError::ExecutionFailed(e.to_string()))?;
+
+            let by_day = repo
+                .aggregate_by_day(cutoff)
+                .await
+                .map_err(|e| common::ToolError::ExecutionFailed(e.to_string()))?;
+
+            let mut by_model: HashMap<String, (u64, f64)> = HashMap::new();
+            let mut total_tokens = 0u64;
+            for (model, tokens, cost) in model_aggs {
+                total_tokens += tokens as u64;
+                by_model.insert(model, (tokens as u64, cost));
+            }
+
+            return Ok(UsageReport {
+                total_requests: total_requests_i64 as usize,
+                total_tokens,
+                total_cost_usd: total_cost,
+                by_model,
+                by_day,
+            });
+        }
+
+        // JSONL path (original)
+        let path = self.usage_path();
 
         let mut total_requests = 0usize;
         let mut total_tokens = 0u64;

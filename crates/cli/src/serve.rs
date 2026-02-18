@@ -11,6 +11,7 @@ use std::sync::Arc;
 use tokio::signal;
 use tokio::sync::{Mutex, RwLock};
 use tracing::{error, info};
+use storage::{StoragePool, Repos};
 
 /// Handle serve command
 pub async fn handle_serve(port: u16) -> Result<()> {
@@ -18,6 +19,17 @@ pub async fn handle_serve(port: u16) -> Result<()> {
 
     let config = config::load().await?;
     info!("Configuration loaded from: {:?}", config::config_path());
+
+    // Connect to database and create repos
+    let database_url = config.database_url.as_deref().ok_or_else(|| {
+        anyhow::anyhow!(
+            "Database not configured. Run `klyntbot init` to set up PostgreSQL.\n\
+             Or set KLYNTBOT_DATABASE_URL in your environment."
+        )
+    })?;
+    let storage_pool = StoragePool::connect(database_url).await?;
+    let repos = Repos::from_pool(&storage_pool);
+    info!("Database connected and migrations applied");
 
     // Initialize LLM provider
     let provider = providers::create_provider(&config)?;
@@ -27,23 +39,20 @@ pub async fn handle_serve(port: u16) -> Result<()> {
     let bus = Arc::new(MessageBus::new(100));
     info!("Message bus initialized");
 
-    // Initialize cron service BEFORE agent loop
-    let cron_store_path = config.workspace_path().join(".klyntbot").join("cron.json");
-    let mut cron_service = CronService::new(cron_store_path);
+    // Initialize cron service (SQL-backed via from_repo)
+    let mut cron_service = CronService::from_repo(repos.cron);
     cron_service.start().await?;
     info!("Cron service started");
 
-    // Create SHARED TodoStore (one instance for everything)
+    // Create SHARED TodoStore (legacy — still used by ContextBuilder, CalendarSyncAdapter, etc.)
     let todo_path = config.todo_store_path();
     let todo_store = Arc::new(RwLock::new(tools::todo_store::TodoStore::new(todo_path)));
 
-    // Create SHARED GoalStore
-    let goal_path = config.goal_store_path();
-    let goal_store = Arc::new(RwLock::new(goal::GoalStore::new(goal_path)));
+    // Create SHARED GoalStore (SQL-backed via from_repo)
+    let goal_store = Arc::new(RwLock::new(goal::GoalStore::from_repo(repos.goals)));
 
-    // Create SHARED PlanStore
-    let plan_path = config.plan_store_path();
-    let plan_store = Arc::new(RwLock::new(plan::PlanStore::new(plan_path)));
+    // Create SHARED PlanStore (SQL-backed via from_repo)
+    let plan_store = Arc::new(RwLock::new(plan::PlanStore::from_repo(repos.plans)));
 
     // Create SHARED NotificationDispatcher
     let notification_dispatcher = Arc::new(agent::NotificationDispatcher::new(
@@ -345,6 +354,8 @@ pub async fn handle_serve(port: u16) -> Result<()> {
             config.clone(),
             Some(cron_service.clone()),
             todo_store.clone(),
+            repos.todos,
+            Some(repos.embeddings),
             Some(goal_store.clone()),
             Some(plan_store.clone()),
             Some(notification_dispatcher.last_active_handle()),

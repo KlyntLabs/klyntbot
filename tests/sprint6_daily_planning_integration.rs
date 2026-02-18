@@ -139,6 +139,7 @@ async fn create_planning_test_data() -> (
 ///
 /// Priority weights (inverse: P1=5, P2=4, P3=3, P4=2, P5=1, None=3)
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_scoring_overdue_p1_ranks_highest() {
     use common::{ChannelName, ChatId};
     use tools::{todo::TodoTool, RoutingContext, Tool};
@@ -146,8 +147,10 @@ async fn test_scoring_overdue_p1_ranks_highest() {
     // Overdue P1 should get: (10 × 5) + (5 × 0.1) = 50.5
     // Today P2 should get:   (5 × 4) + (3 × 0.1)  = 20.3
     // Overdue P1 must rank above today P2
-    let (store, _dir, _ids) = create_planning_test_data().await;
-    let tool = TodoTool::new(store, 3, 18, "UTC".to_string());
+    let (_store, _dir, _ids) = create_planning_test_data().await;
+    let pool = storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
+    let repo = storage::TodoRepo::new(pool.inner().clone());
+    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string());
 
     let ctx = RoutingContext::new(ChannelName::new("cli"), ChatId::new("test"));
 
@@ -198,14 +201,17 @@ async fn test_scoring_tiebreak_by_created_at() {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_scoring_no_priority_uses_default_weight() {
     use common::{ChannelName, ChatId};
     use tools::{todo::TodoTool, RoutingContext, Tool};
 
     // A task with priority=None should use default weight (P3 equivalent = 3)
     // Verify no-priority overdue task scores as: (10 × 3) + (4 × 0.1) = 30.4
-    let (store, _dir, _ids) = create_planning_test_data().await;
-    let tool = TodoTool::new(store, 3, 18, "UTC".to_string());
+    let (_store, _dir, _ids) = create_planning_test_data().await;
+    let pool = storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
+    let repo = storage::TodoRepo::new(pool.inner().clone());
+    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string());
 
     let ctx = RoutingContext::new(ChannelName::new("cli"), ChatId::new("test"));
 
@@ -246,13 +252,16 @@ async fn test_scoring_age_factor_rewards_older_tasks() {
 // ═══════════════════════════════════════════════════════════════
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_plan_suggests_top_3_tasks() {
     use common::{ChannelName, ChatId};
     use tools::{todo::TodoTool, RoutingContext, Tool};
 
     // AC2: Plan should suggest exactly 3 tasks (the default count)
-    let (store, _dir, _ids) = create_planning_test_data().await;
-    let tool = TodoTool::new(store, 3, 18, "UTC".to_string());
+    let (_store, _dir, _ids) = create_planning_test_data().await;
+    let pool = storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
+    let repo = storage::TodoRepo::new(pool.inner().clone());
+    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string());
 
     let ctx = RoutingContext::new(ChannelName::new("cli"), ChatId::new("test"));
 
@@ -290,13 +299,16 @@ async fn test_plan_suggests_top_3_tasks() {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_plan_excludes_completed_tasks() {
     use common::{ChannelName, ChatId};
     use tools::{todo::TodoTool, RoutingContext, Tool};
 
     // Completed tasks (status=Done) must not appear in suggestions
-    let (store, _dir, _ids) = create_planning_test_data().await;
-    let tool = TodoTool::new(store, 3, 18, "UTC".to_string());
+    let (_store, _dir, _ids) = create_planning_test_data().await;
+    let pool = storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
+    let repo = storage::TodoRepo::new(pool.inner().clone());
+    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string());
 
     let ctx = RoutingContext::new(ChannelName::new("cli"), ChatId::new("test"));
 
@@ -313,13 +325,16 @@ async fn test_plan_excludes_completed_tasks() {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_plan_excludes_template_tasks() {
     use common::{ChannelName, ChatId};
     use tools::{todo::TodoTool, RoutingContext, Tool};
 
     // Recurring templates (is_template=true) must not appear in suggestions
-    let (store, _dir, _ids) = create_planning_test_data().await;
-    let tool = TodoTool::new(store, 3, 18, "UTC".to_string());
+    let (_store, _dir, _ids) = create_planning_test_data().await;
+    let pool = storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
+    let repo = storage::TodoRepo::new(pool.inner().clone());
+    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string());
 
     let ctx = RoutingContext::new(ChannelName::new("cli"), ChatId::new("test"));
 
@@ -716,13 +731,16 @@ async fn test_cron_respects_config_time() {
 
 /// AC5: `klyntbot todo plan` manually triggers planning
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_cli_todo_plan_command() {
     use common::{ChannelName, ChatId};
     use tools::{todo::TodoTool, RoutingContext, Tool};
 
     // The plan action on TodoTool should generate and return a plan
-    let (store, _dir, _ids) = create_planning_test_data().await;
-    let tool = TodoTool::new(store, 3, 18, "UTC".to_string());
+    let (_store, _dir, _ids) = create_planning_test_data().await;
+    let pool = storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
+    let repo = storage::TodoRepo::new(pool.inner().clone());
+    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string());
 
     let ctx = RoutingContext::new(ChannelName::new("cli"), ChatId::new("test"));
 

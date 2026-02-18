@@ -32,6 +32,7 @@
 //! | EC16| Hybrid with zero semantic results        | test_ec16_hybrid_zero_semantic_results         |
 
 use chrono::Utc;
+use klyntbot::storage::{EmbeddingRepo, StoragePool, TodoRepo};
 use serde_json::json;
 use std::sync::Arc;
 use tempfile::TempDir;
@@ -98,28 +99,34 @@ async fn create_test_store() -> (TodoStore, TempDir) {
     (store, temp_dir)
 }
 
+fn test_pool() -> StoragePool {
+    let url = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "postgres://localhost/klyntbot_test".to_string());
+    StoragePool::connect_lazy(&url).unwrap()
+}
+
 async fn create_test_tool() -> (TodoTool, TempDir) {
     let temp_dir = TempDir::new().unwrap();
-    let file_path = temp_dir.path().join("todos.jsonl");
-    let store = Arc::new(RwLock::new(TodoStore::new(file_path)));
-    let tool = TodoTool::new(store, 3, 18, "UTC".to_string());
+    let pool = test_pool();
+    let repo = TodoRepo::new(pool.inner().clone());
+    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string());
     (tool, temp_dir)
 }
 
-/// Create a TodoTool with mock embedding handler and store wired up.
+/// Create a TodoTool with mock embedding handler and repo wired up.
 /// The mock persists embeddings to the EmbeddingStore (like the real impl).
 async fn create_test_tool_with_embeddings() -> (TodoTool, Arc<MockEmbeddingHandler>, TempDir) {
     let temp_dir = TempDir::new().unwrap();
-    let todos_path = temp_dir.path().join("todos.jsonl");
     let emb_path = temp_dir.path().join("embeddings.jsonl");
 
-    let store = Arc::new(RwLock::new(TodoStore::new(todos_path)));
+    let pool = test_pool();
+    let repo = TodoRepo::new(pool.inner().clone());
     let emb_store = Arc::new(RwLock::new(EmbeddingStore::new(emb_path)));
     let mock = Arc::new(MockEmbeddingHandler::with_store(emb_store.clone()));
 
-    let tool = TodoTool::new(store, 3, 18, "UTC".to_string())
+    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string())
         .with_embedding_handler(mock.clone() as Arc<dyn EmbeddingHandler>)
-        .with_embedding_store(emb_store)
+        .with_embedding_repo(EmbeddingRepo::new(pool.inner().clone()))
         .with_search_config(0.0, 60); // Low threshold so mock embeddings match
 
     (tool, mock, temp_dir)
@@ -137,6 +144,7 @@ fn ctx() -> RoutingContext {
 // ═══════════════════════════════════════════════════════════════
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_ac1_semantic_search_finds_synonyms() {
     let (tool, mock, _dir) = create_test_tool_with_embeddings().await;
 
@@ -183,6 +191,7 @@ async fn test_ac1_semantic_search_finds_synonyms() {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_ac2_embedding_auto_generated_on_add() {
     let (tool, mock, _dir) = create_test_tool_with_embeddings().await;
 
@@ -201,6 +210,7 @@ async fn test_ac2_embedding_auto_generated_on_add() {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_ac2_embedding_auto_generated_on_update() {
     let (tool, mock, _dir) = create_test_tool_with_embeddings().await;
 
@@ -231,18 +241,19 @@ async fn test_ac2_embedding_auto_generated_on_update() {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_ac3_embeddings_stored_separately() {
     let temp_dir = TempDir::new().unwrap();
-    let todos_path = temp_dir.path().join("todos.jsonl");
     let embeddings_path = temp_dir.path().join("embeddings.jsonl");
 
-    let store = Arc::new(RwLock::new(TodoStore::new(todos_path.clone())));
+    let pool = test_pool();
+    let repo = TodoRepo::new(pool.inner().clone());
     let emb_store = Arc::new(RwLock::new(EmbeddingStore::new(embeddings_path.clone())));
     let mock = Arc::new(MockEmbeddingHandler::with_store(emb_store.clone()));
 
-    let tool = TodoTool::new(store, 3, 18, "UTC".to_string())
+    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string())
         .with_embedding_handler(mock as Arc<dyn EmbeddingHandler>)
-        .with_embedding_store(emb_store)
+        .with_embedding_repo(EmbeddingRepo::new(pool.inner().clone()))
         .with_search_config(0.5, 60);
 
     tool.execute(
@@ -252,12 +263,7 @@ async fn test_ac3_embeddings_stored_separately() {
     .await
     .unwrap();
 
-    let todos_content = std::fs::read_to_string(&todos_path).unwrap();
-    assert!(
-        !todos_content.contains("\"embedding\""),
-        "todos.jsonl should not contain embeddings"
-    );
-
+    // Embeddings written by the mock to the file store should contain embedding data
     let embeddings_content = std::fs::read_to_string(&embeddings_path).unwrap();
     assert!(
         embeddings_content.contains("\"embedding\""),
@@ -266,6 +272,7 @@ async fn test_ac3_embeddings_stored_separately() {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_ac4_hybrid_search_merges_results() {
     let (tool, _mock, _dir) = create_test_tool_with_embeddings().await;
 
@@ -350,30 +357,25 @@ async fn test_ac5_backfill_generates_missing_embeddings() {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_ac7_search_1000_todos_under_500ms() {
-    let temp_dir = TempDir::new().unwrap();
-    let todos_path = temp_dir.path().join("todos.jsonl");
-    let emb_path = temp_dir.path().join("embeddings.jsonl");
-
-    let mut store = TodoStore::new(todos_path);
-    let mut emb_store = EmbeddingStore::new(emb_path);
-
-    let mock = MockEmbeddingHandler::new();
-    for i in 0..1000 {
-        let todo = create_test_todo(&format!("Task {} — various keywords for testing", i));
-        let record = mock.embed_todo(&todo).await.unwrap().unwrap();
-        store.add(todo).await.unwrap();
-        emb_store.upsert(record).await.unwrap();
-    }
-
-    let store = Arc::new(RwLock::new(store));
-    let emb_store = Arc::new(RwLock::new(emb_store));
+    let pool = test_pool();
+    let repo = TodoRepo::new(pool.inner().clone());
     let mock_handler = Arc::new(MockEmbeddingHandler::new());
 
-    let tool = TodoTool::new(store, 3, 18, "UTC".to_string())
+    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string())
         .with_embedding_handler(mock_handler as Arc<dyn EmbeddingHandler>)
-        .with_embedding_store(emb_store)
+        .with_embedding_repo(EmbeddingRepo::new(pool.inner().clone()))
         .with_search_config(0.0, 60);
+
+    for i in 0..1000 {
+        tool.execute(
+            json!({"action": "add", "title": format!("Task {} — various keywords for testing", i)}),
+            &ctx(),
+        )
+        .await
+        .unwrap();
+    }
 
     let start = std::time::Instant::now();
     let result = tool
@@ -398,6 +400,7 @@ async fn test_ac7_search_1000_todos_under_500ms() {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_ac9_keyword_search_unchanged() {
     let (tool, _dir) = create_test_tool().await;
 
@@ -431,6 +434,7 @@ async fn test_ac9_keyword_search_unchanged() {
 // ═══════════════════════════════════════════════════════════════
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_ec1_empty_query_returns_error() {
     let (tool, _mock, _dir) = create_test_tool_with_embeddings().await;
     let result = tool
@@ -441,6 +445,7 @@ async fn test_ec1_empty_query_returns_error() {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_ec2_whitespace_query_returns_error() {
     let (tool, _mock, _dir) = create_test_tool_with_embeddings().await;
     let result = tool
@@ -451,17 +456,14 @@ async fn test_ec2_whitespace_query_returns_error() {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_ec3_no_embeddings_returns_message() {
-    let temp_dir = TempDir::new().unwrap();
-    let todos_path = temp_dir.path().join("todos.jsonl");
-    let emb_path = temp_dir.path().join("embeddings.jsonl");
-
-    let store = Arc::new(RwLock::new(TodoStore::new(todos_path)));
-    let emb_store = Arc::new(RwLock::new(EmbeddingStore::new(emb_path)));
+    let pool = test_pool();
     let mock = Arc::new(MockEmbeddingHandler::new());
 
     // Add task WITHOUT embedding handler so no auto-embed
-    let tool_no_emb = TodoTool::new(store.clone(), 3, 18, "UTC".to_string());
+    let repo = TodoRepo::new(pool.inner().clone());
+    let tool_no_emb = TodoTool::new(repo, 3, 18, "UTC".to_string());
     tool_no_emb
         .execute(
             json!({"action": "add", "title": "A task with no embedding"}),
@@ -471,9 +473,10 @@ async fn test_ec3_no_embeddings_returns_message() {
         .unwrap();
 
     // Search WITH embedding handler
-    let tool_with_emb = TodoTool::new(store, 3, 18, "UTC".to_string())
+    let repo2 = TodoRepo::new(pool.inner().clone());
+    let tool_with_emb = TodoTool::new(repo2, 3, 18, "UTC".to_string())
         .with_embedding_handler(mock as Arc<dyn EmbeddingHandler>)
-        .with_embedding_store(emb_store)
+        .with_embedding_repo(EmbeddingRepo::new(pool.inner().clone()))
         .with_search_config(0.5, 60);
 
     let result = tool_with_emb
@@ -492,17 +495,18 @@ async fn test_ec3_no_embeddings_returns_message() {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_ec4_partial_embeddings_noted_in_output() {
     let temp_dir = TempDir::new().unwrap();
-    let todos_path = temp_dir.path().join("todos.jsonl");
     let emb_path = temp_dir.path().join("embeddings.jsonl");
 
-    let store = Arc::new(RwLock::new(TodoStore::new(todos_path)));
+    let pool = test_pool();
     let emb_store = Arc::new(RwLock::new(EmbeddingStore::new(emb_path)));
     let mock = Arc::new(MockEmbeddingHandler::with_store(emb_store.clone()));
 
     // Add task WITHOUT embedding handler
-    let tool_no_emb = TodoTool::new(store.clone(), 3, 18, "UTC".to_string());
+    let repo = TodoRepo::new(pool.inner().clone());
+    let tool_no_emb = TodoTool::new(repo, 3, 18, "UTC".to_string());
     tool_no_emb
         .execute(
             json!({"action": "add", "title": "Task without embedding"}),
@@ -512,9 +516,10 @@ async fn test_ec4_partial_embeddings_noted_in_output() {
         .unwrap();
 
     // Add task WITH embedding handler
-    let tool_with_emb = TodoTool::new(store.clone(), 3, 18, "UTC".to_string())
+    let repo2 = TodoRepo::new(pool.inner().clone());
+    let tool_with_emb = TodoTool::new(repo2, 3, 18, "UTC".to_string())
         .with_embedding_handler(mock.clone() as Arc<dyn EmbeddingHandler>)
-        .with_embedding_store(emb_store.clone())
+        .with_embedding_repo(EmbeddingRepo::new(pool.inner().clone()))
         .with_search_config(0.0, 60);
 
     tool_with_emb
@@ -541,6 +546,7 @@ async fn test_ec4_partial_embeddings_noted_in_output() {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_ec5_below_threshold_no_results() {
     let (tool, _mock, _dir) = create_test_tool_with_embeddings().await;
 
@@ -605,18 +611,15 @@ async fn test_ec8_corrupted_embeddings_recovery() {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_ec12_graceful_degradation_model_unavailable() {
-    let temp_dir = TempDir::new().unwrap();
-    let todos_path = temp_dir.path().join("todos.jsonl");
-    let emb_path = temp_dir.path().join("embeddings.jsonl");
-
-    let store = Arc::new(RwLock::new(TodoStore::new(todos_path)));
-    let emb_store = Arc::new(RwLock::new(EmbeddingStore::new(emb_path)));
+    let pool = test_pool();
+    let repo = TodoRepo::new(pool.inner().clone());
     let mock = Arc::new(MockEmbeddingHandler::unavailable());
 
-    let tool = TodoTool::new(store, 3, 18, "UTC".to_string())
+    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string())
         .with_embedding_handler(mock as Arc<dyn EmbeddingHandler>)
-        .with_embedding_store(emb_store)
+        .with_embedding_repo(EmbeddingRepo::new(pool.inner().clone()))
         .with_search_config(0.5, 60);
 
     tool.execute(json!({"action": "add", "title": "Test task"}), &ctx())
@@ -645,6 +648,7 @@ async fn test_ec12_graceful_degradation_model_unavailable() {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_ec15_hybrid_zero_keyword_results() {
     let (tool, _mock, _dir) = create_test_tool_with_embeddings().await;
 
@@ -672,18 +676,15 @@ async fn test_ec15_hybrid_zero_keyword_results() {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_ec16_hybrid_zero_semantic_results() {
-    let temp_dir = TempDir::new().unwrap();
-    let todos_path = temp_dir.path().join("todos.jsonl");
-    let emb_path = temp_dir.path().join("embeddings.jsonl");
-
-    let store = Arc::new(RwLock::new(TodoStore::new(todos_path)));
-    let emb_store = Arc::new(RwLock::new(EmbeddingStore::new(emb_path)));
+    let pool = test_pool();
+    let repo = TodoRepo::new(pool.inner().clone());
     let mock = Arc::new(MockEmbeddingHandler::unavailable());
 
-    let tool = TodoTool::new(store, 3, 18, "UTC".to_string())
+    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string())
         .with_embedding_handler(mock as Arc<dyn EmbeddingHandler>)
-        .with_embedding_store(emb_store)
+        .with_embedding_repo(EmbeddingRepo::new(pool.inner().clone()))
         .with_search_config(0.5, 60);
 
     tool.execute(json!({"action": "add", "title": "Fix login bug"}), &ctx())
@@ -711,6 +712,7 @@ async fn test_ec16_hybrid_zero_semantic_results() {
 // ═══════════════════════════════════════════════════════════════
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_br1_embedding_includes_title_description_tags() {
     let (tool, mock, _dir) = create_test_tool_with_embeddings().await;
 
@@ -730,18 +732,15 @@ async fn test_br1_embedding_includes_title_description_tags() {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_br1_embedding_failure_does_not_block_add() {
-    let temp_dir = TempDir::new().unwrap();
-    let todos_path = temp_dir.path().join("todos.jsonl");
-    let emb_path = temp_dir.path().join("embeddings.jsonl");
-
-    let store = Arc::new(RwLock::new(TodoStore::new(todos_path)));
-    let emb_store = Arc::new(RwLock::new(EmbeddingStore::new(emb_path)));
+    let pool = test_pool();
+    let repo = TodoRepo::new(pool.inner().clone());
     let mock = Arc::new(MockEmbeddingHandler::unavailable());
 
-    let tool = TodoTool::new(store, 3, 18, "UTC".to_string())
+    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string())
         .with_embedding_handler(mock as Arc<dyn EmbeddingHandler>)
-        .with_embedding_store(emb_store)
+        .with_embedding_repo(EmbeddingRepo::new(pool.inner().clone()))
         .with_search_config(0.5, 60);
 
     let result = tool
@@ -764,6 +763,7 @@ async fn test_br1_embedding_failure_does_not_block_add() {
 // ═══════════════════════════════════════════════════════════════
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_threshold_filters_low_similarity() {
     let (tool, _mock, _dir) = create_test_tool_with_embeddings().await;
 
@@ -791,6 +791,7 @@ async fn test_threshold_filters_low_similarity() {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_limit_parameter_respected() {
     let (tool, _mock, _dir) = create_test_tool_with_embeddings().await;
 
@@ -828,6 +829,7 @@ async fn test_limit_parameter_respected() {
 // ═══════════════════════════════════════════════════════════════
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_query_too_long_returns_error() {
     let (tool, _mock, _dir) = create_test_tool_with_embeddings().await;
     let long_query = "a".repeat(1001);
@@ -842,6 +844,7 @@ async fn test_query_too_long_returns_error() {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_invalid_threshold_returns_error() {
     let (tool, _mock, _dir) = create_test_tool_with_embeddings().await;
     let result = tool

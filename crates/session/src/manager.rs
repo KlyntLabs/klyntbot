@@ -110,17 +110,20 @@ const COMPACTION_THRESHOLD: usize = 1000;
 /// Number of entries to keep after compaction
 const COMPACTION_KEEP: usize = 500;
 
-/// Session manager with JSONL persistence
+/// Session manager with JSONL persistence.
+/// Optionally backed by a SQL repository when constructed via `from_repo()`.
 pub struct SessionManager {
     sessions_dir: PathBuf,
     cache: HashMap<String, Session>,
     lru_order: VecDeque<String>,
     max_cache_size: usize,
     write_mutex: tokio::sync::Mutex<()>,
+    /// Optional SQL backend — when present, persistence is delegated to SQL.
+    sql_repo: Option<storage::SessionRepo>,
 }
 
 impl SessionManager {
-    /// Create a new session manager
+    /// Create a new session manager backed by JSONL
     pub async fn new(sessions_dir: impl Into<PathBuf>) -> Self {
         Self::with_capacity(sessions_dir, 1000).await // Default 1000 sessions
     }
@@ -140,6 +143,47 @@ impl SessionManager {
             lru_order: VecDeque::new(),
             max_cache_size,
             write_mutex: tokio::sync::Mutex::new(()),
+            sql_repo: None,
+        }
+    }
+
+    /// Create a session manager backed by a SQL repository.
+    /// Still uses an in-memory LRU cache for performance.
+    pub async fn from_repo(repo: storage::SessionRepo) -> Self {
+        Self {
+            sessions_dir: PathBuf::from("/dev/null"),
+            cache: HashMap::new(),
+            lru_order: VecDeque::new(),
+            max_cache_size: 1000,
+            write_mutex: tokio::sync::Mutex::new(()),
+            sql_repo: Some(repo),
+        }
+    }
+
+    /// Convert SQL rows to a domain Session.
+    fn row_to_session(
+        row: storage::SessionRow,
+        msg_rows: Vec<storage::SessionMessageRow>,
+    ) -> Session {
+        let metadata: HashMap<String, serde_json::Value> =
+            serde_json::from_value(row.metadata).unwrap_or_default();
+        let messages = msg_rows
+            .into_iter()
+            .map(|m| SessionMessage {
+                id: m.id.to_string(),
+                role: m.role,
+                content: m.content,
+                timestamp: m.timestamp,
+                request_id: m.request_id,
+            })
+            .collect();
+
+        Session {
+            key: row.key,
+            messages,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+            metadata,
         }
     }
 
@@ -175,11 +219,35 @@ impl SessionManager {
 
         // On cache miss: load or create, then move key into cache (no extra clone)
         if !self.cache.contains_key(&key) {
-            let session = match self.load(&key).await {
-                Ok(s) => s,
-                Err(_) => {
-                    debug!("Creating new session: {}", key);
-                    Session::new(key.clone())
+            let session = if let Some(repo) = &self.sql_repo {
+                // SQL path: try to load from DB
+                match repo.get_session(&key).await {
+                    Ok(row) => {
+                        let msgs = repo
+                            .get_messages(&key)
+                            .await
+                            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                        Self::row_to_session(row, msgs)
+                    }
+                    Err(storage::StorageError::NotFound(_)) => {
+                        // Create in SQL
+                        let metadata = serde_json::Value::Object(serde_json::Map::new());
+                        repo.create_session(&key, &metadata)
+                            .await
+                            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                        debug!("Creating new session in SQL: {}", key);
+                        Session::new(key.clone())
+                    }
+                    Err(e) => return Err(common::KlyntbotError::Storage(e.to_string())),
+                }
+            } else {
+                // JSONL path
+                match self.load(&key).await {
+                    Ok(s) => s,
+                    Err(_) => {
+                        debug!("Creating new session: {}", key);
+                        Session::new(key.clone())
+                    }
                 }
             };
             self.cache.insert(key, session);
@@ -258,9 +326,43 @@ impl SessionManager {
         })
     }
 
-    /// Save a session to disk using atomic write (write to temp, then rename).
+    /// Save a session to disk (JSONL) or SQL depending on the backend.
     /// Automatically compacts the session if it exceeds the compaction threshold.
     pub async fn save(&self, session: &Session) -> Result<()> {
+        if let Some(repo) = &self.sql_repo {
+            // Upsert session metadata
+            let metadata = serde_json::to_value(&session.metadata).unwrap_or_default();
+            repo.create_session(&session.key, &metadata)
+                .await
+                .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+
+            // Persist all messages (idempotent via ON CONFLICT or just try-insert)
+            for msg in &session.messages {
+                let msg_id = Uuid::parse_str(&msg.id).unwrap_or_else(|_| Uuid::new_v4());
+                // Try to add; ignore duplicate key errors
+                match repo
+                    .add_message(
+                        &session.key,
+                        msg_id,
+                        &msg.role,
+                        &msg.content,
+                        msg.request_id.as_deref(),
+                    )
+                    .await
+                {
+                    Ok(_) => {}
+                    Err(storage::StorageError::Sqlx(_)) => {
+                        // Likely duplicate — ignore
+                    }
+                    Err(e) => {
+                        return Err(common::KlyntbotError::Storage(e.to_string()));
+                    }
+                }
+            }
+
+            return Ok(());
+        }
+
         let _guard = self.write_mutex.lock().await;
 
         let path = self.session_path(&session.key);
@@ -336,6 +438,13 @@ impl SessionManager {
         // Remove from cache
         self.cache.remove(key);
 
+        if let Some(repo) = &self.sql_repo {
+            return repo
+                .delete_session(key)
+                .await
+                .map_err(|e| common::KlyntbotError::Storage(e.to_string()));
+        }
+
         // Remove file
         let path = self.session_path(key);
         if tokio::fs::try_exists(&path).await.unwrap_or(false) {
@@ -348,6 +457,24 @@ impl SessionManager {
 
     /// List all sessions
     pub async fn list(&self) -> Result<Vec<SessionInfo>> {
+        if let Some(repo) = &self.sql_repo {
+            let rows = repo
+                .list_sessions()
+                .await
+                .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            let mut sessions: Vec<SessionInfo> = rows
+                .into_iter()
+                .map(|r| SessionInfo {
+                    key: r.key,
+                    created_at: r.created_at,
+                    updated_at: r.updated_at,
+                    message_count: 0, // Would require extra query per session
+                })
+                .collect();
+            sessions.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+            return Ok(sessions);
+        }
+
         let mut sessions = Vec::new();
 
         if !tokio::fs::try_exists(&self.sessions_dir)

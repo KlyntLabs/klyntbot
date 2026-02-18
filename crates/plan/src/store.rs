@@ -11,7 +11,7 @@ use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use uuid::Uuid;
 
-use crate::types::{Plan, PlanStatus};
+use crate::types::{BacktrackEntry, Plan, PlanStatus, PlanStep, StepStatus};
 use common::Result;
 
 /// Compaction threshold: compact when journal has this many more entries than live plans
@@ -37,6 +37,7 @@ enum JournalEntryRef<'a> {
 }
 
 /// Append-only JSONL-backed plan storage with lazy loading and automatic compaction.
+/// Optionally backed by a SQL repository when constructed via `from_repo()`.
 pub struct PlanStore {
     file_path: PathBuf,
     /// In-memory index: id -> Plan (authoritative state after load)
@@ -46,10 +47,12 @@ pub struct PlanStore {
     loaded: bool,
     /// Number of journal entries on disk (including stale/overwritten ones)
     pub journal_len: usize,
+    /// Optional SQL backend — when present, all CRUD is delegated to SQL.
+    sql_repo: Option<storage::PlanRepo>,
 }
 
 impl PlanStore {
-    /// Create a new PlanStore (does not load from disk yet).
+    /// Create a new PlanStore backed by JSONL (does not load from disk yet).
     pub fn new(file_path: PathBuf) -> Self {
         Self {
             file_path,
@@ -57,7 +60,191 @@ impl PlanStore {
             order: Vec::new(),
             loaded: false,
             journal_len: 0,
+            sql_repo: None,
         }
+    }
+
+    /// Create a PlanStore backed by a SQL repository.
+    pub fn from_repo(repo: storage::PlanRepo) -> Self {
+        Self {
+            file_path: PathBuf::from("/dev/null"),
+            index: HashMap::new(),
+            order: Vec::new(),
+            loaded: true,
+            journal_len: 0,
+            sql_repo: Some(repo),
+        }
+    }
+
+    // ── SQL ↔ Domain conversion helpers ─────────────────────────
+
+    fn plan_status_to_str(status: &PlanStatus) -> &'static str {
+        match status {
+            PlanStatus::Draft => "draft",
+            PlanStatus::Approved => "approved",
+            PlanStatus::Executing => "executing",
+            PlanStatus::Completed => "completed",
+            PlanStatus::Failed => "failed",
+            PlanStatus::Abandoned => "abandoned",
+        }
+    }
+
+    fn str_to_plan_status(s: &str) -> PlanStatus {
+        match s.to_lowercase().as_str() {
+            "draft" => PlanStatus::Draft,
+            "approved" => PlanStatus::Approved,
+            "executing" => PlanStatus::Executing,
+            "completed" => PlanStatus::Completed,
+            "failed" => PlanStatus::Failed,
+            "abandoned" => PlanStatus::Abandoned,
+            _ => PlanStatus::Draft,
+        }
+    }
+
+    fn step_status_to_str(status: &StepStatus) -> &'static str {
+        match status {
+            StepStatus::Pending => "pending",
+            StepStatus::Executing => "executing",
+            StepStatus::Completed => "completed",
+            StepStatus::Failed => "failed",
+            StepStatus::Skipped => "skipped",
+        }
+    }
+
+    fn str_to_step_status(s: &str) -> StepStatus {
+        match s.to_lowercase().as_str() {
+            "pending" => StepStatus::Pending,
+            "executing" => StepStatus::Executing,
+            "completed" => StepStatus::Completed,
+            "failed" => StepStatus::Failed,
+            "skipped" => StepStatus::Skipped,
+            _ => StepStatus::Pending,
+        }
+    }
+
+    fn plan_to_row(plan: &Plan) -> storage::PlanRow {
+        storage::PlanRow {
+            id: plan.id,
+            session_key: plan.session_key.clone(),
+            goal_id: plan.goal_id,
+            title: plan.title.clone(),
+            description: plan.description.clone(),
+            status: Self::plan_status_to_str(&plan.status).to_string(),
+            current_step_index: plan.current_step_index as i32,
+            iteration_limit: plan.iteration_limit as i32,
+            backtrack_history: serde_json::to_value(&plan.backtrack_history).unwrap_or_default(),
+            created_at: plan.created_at,
+            updated_at: plan.updated_at,
+            completed_at: plan.completed_at,
+        }
+    }
+
+    fn step_to_row(step: &PlanStep, plan_id: Uuid) -> storage::PlanStepRow {
+        storage::PlanStepRow {
+            id: step.id,
+            plan_id,
+            step_index: step.index as i32,
+            description: step.description.clone(),
+            reasoning: step.reasoning.clone(),
+            expected_tools: step.expected_tools.clone(),
+            status: Self::step_status_to_str(&step.status).to_string(),
+            attempt_count: step.attempt_count as i16,
+            max_attempts: step.max_attempts as i16,
+            result: step.result.clone(),
+            started_at: step.started_at,
+            completed_at: step.completed_at,
+        }
+    }
+
+    fn row_to_plan(row: storage::PlanRow, step_rows: Vec<storage::PlanStepRow>) -> Plan {
+        let steps: Vec<PlanStep> = step_rows
+            .into_iter()
+            .map(|sr| PlanStep {
+                id: sr.id,
+                index: sr.step_index as usize,
+                description: sr.description,
+                reasoning: sr.reasoning,
+                expected_tools: sr.expected_tools,
+                status: Self::str_to_step_status(&sr.status),
+                attempt_count: sr.attempt_count as u8,
+                max_attempts: sr.max_attempts as u8,
+                result: sr.result,
+                started_at: sr.started_at,
+                completed_at: sr.completed_at,
+            })
+            .collect();
+
+        Plan {
+            id: row.id,
+            session_key: row.session_key,
+            goal_id: row.goal_id,
+            title: row.title,
+            description: row.description,
+            status: Self::str_to_plan_status(&row.status),
+            steps,
+            current_step_index: row.current_step_index as usize,
+            iteration_limit: row.iteration_limit as usize,
+            backtrack_history: serde_json::from_value::<Vec<BacktrackEntry>>(row.backtrack_history)
+                .unwrap_or_default(),
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+            completed_at: row.completed_at,
+        }
+    }
+
+    /// Helper: load a plan from SQL by ID, combining the plan row and its step rows.
+    async fn sql_get(&self, repo: &storage::PlanRepo, id: Uuid) -> Result<Option<Plan>> {
+        match repo.get(id).await {
+            Ok(row) => {
+                let steps = repo
+                    .get_steps(id)
+                    .await
+                    .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                Ok(Some(Self::row_to_plan(row, steps)))
+            }
+            Err(storage::StorageError::NotFound(_)) => Ok(None),
+            Err(e) => Err(common::KlyntbotError::Storage(e.to_string())),
+        }
+    }
+
+    /// Helper: upsert a plan + all steps into SQL.
+    async fn sql_upsert(&self, repo: &storage::PlanRepo, plan: &Plan) -> Result<()> {
+        let row = Self::plan_to_row(plan);
+
+        // Try create, fall back to update
+        match repo.create(&row).await {
+            Ok(_) => {}
+            Err(storage::StorageError::Sqlx(_)) => {
+                // Likely duplicate key — try update
+                repo.update(&row)
+                    .await
+                    .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            }
+            Err(e) => return Err(common::KlyntbotError::Storage(e.to_string())),
+        }
+
+        // Upsert steps: get existing, add or update each
+        let existing_steps = repo
+            .get_steps(plan.id)
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        let existing_ids: std::collections::HashSet<Uuid> =
+            existing_steps.iter().map(|s| s.id).collect();
+
+        for step in &plan.steps {
+            let step_row = Self::step_to_row(step, plan.id);
+            if existing_ids.contains(&step.id) {
+                repo.update_step(&step_row)
+                    .await
+                    .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            } else {
+                repo.add_step(&step_row)
+                    .await
+                    .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            }
+        }
+
+        Ok(())
     }
 
     /// Ensure the store is loaded before any read operation.
@@ -172,9 +359,14 @@ impl PlanStore {
 
     /// Upsert a plan (insert or update).
     pub async fn upsert(&mut self, mut plan: Plan) -> Result<Plan> {
-        self.ensure_loaded().await?;
-
         plan.updated_at = Utc::now();
+
+        if let Some(repo) = &self.sql_repo {
+            self.sql_upsert(repo, &plan).await?;
+            return Ok(plan);
+        }
+
+        self.ensure_loaded().await?;
 
         let entry = JournalEntry::Upsert { plan: plan.clone() };
         self.append_entry(&entry).await?;
@@ -190,6 +382,10 @@ impl PlanStore {
 
     /// Get a plan by ID (O(1) lookup).
     pub async fn get(&mut self, id: &Uuid) -> Result<Option<Plan>> {
+        if let Some(repo) = &self.sql_repo {
+            return self.sql_get(repo, *id).await;
+        }
+
         self.ensure_loaded().await?;
         Ok(self.index.get(id).cloned())
     }
@@ -198,17 +394,47 @@ impl PlanStore {
     ///
     /// Returns `None` if the plan does not exist. After mutating via the returned
     /// reference, call `persist_latest(id)` to write the updated state to the journal.
+    ///
+    /// For the SQL path: loads the plan into the in-memory index so callers can
+    /// mutate it. Call `persist_latest(id)` afterwards to write changes back to SQL.
     pub async fn get_mut(&mut self, id: &Uuid) -> Result<Option<&mut Plan>> {
+        if let Some(repo) = &self.sql_repo {
+            // Load from SQL into in-memory index if not already cached
+            if !self.index.contains_key(id) {
+                match repo.get(*id).await {
+                    Ok(row) => {
+                        let steps = repo
+                            .get_steps(*id)
+                            .await
+                            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                        let plan = Self::row_to_plan(row, steps);
+                        self.index.insert(*id, plan);
+                    }
+                    Err(storage::StorageError::NotFound(_)) => return Ok(None),
+                    Err(e) => return Err(common::KlyntbotError::Storage(e.to_string())),
+                }
+            }
+            return Ok(self.index.get_mut(id));
+        }
+
         self.ensure_loaded().await?;
         Ok(self.index.get_mut(id))
     }
 
-    /// Append the current in-memory plan state to the journal without cloning.
+    /// Persist the current in-memory plan state.
     ///
-    /// Uses `JournalEntryRef` to serialize from a `&Plan` reference, avoiding
-    /// an allocation of a full Plan clone. If the plan does not exist, this is
-    /// a no-op.
+    /// For JSONL: appends to journal without cloning (uses `JournalEntryRef`).
+    /// For SQL: writes the in-memory state back to the database.
+    /// If the plan does not exist in memory, this is a no-op.
     pub async fn persist_latest(&mut self, id: &Uuid) -> Result<()> {
+        if let Some(repo) = &self.sql_repo {
+            if let Some(plan) = self.index.get(id) {
+                let plan_clone = plan.clone();
+                self.sql_upsert(repo, &plan_clone).await?;
+            }
+            return Ok(());
+        }
+
         self.ensure_loaded().await?;
 
         if let Some(plan) = self.index.get(id) {
@@ -236,8 +462,28 @@ impl PlanStore {
     }
 
     /// Get the most recent active plan for a session (by updated_at timestamp).
-    /// Returns Draft or Approved plans only, sorted by most recent first.
+    /// Returns Draft, Approved, or Executing plans only, sorted by most recent first.
     pub async fn get_active_plan(&mut self, session_key: &str) -> Result<Option<Plan>> {
+        if let Some(repo) = &self.sql_repo {
+            // Try each active status and combine
+            let mut candidates = Vec::new();
+            for status in &["draft", "approved", "executing"] {
+                let rows = repo
+                    .list(Some(status), Some(session_key), None)
+                    .await
+                    .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                for row in rows {
+                    let steps = repo
+                        .get_steps(row.id)
+                        .await
+                        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                    candidates.push(Self::row_to_plan(row, steps));
+                }
+            }
+            candidates.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
+            return Ok(candidates.into_iter().next());
+        }
+
         self.ensure_loaded().await?;
 
         let mut active_plans: Vec<&Plan> = self
@@ -259,6 +505,22 @@ impl PlanStore {
 
     /// List all plans in insertion order.
     pub async fn all(&mut self) -> Result<Vec<Plan>> {
+        if let Some(repo) = &self.sql_repo {
+            let rows = repo
+                .list(None, None, None)
+                .await
+                .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            let mut plans = Vec::with_capacity(rows.len());
+            for row in rows {
+                let steps = repo
+                    .get_steps(row.id)
+                    .await
+                    .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                plans.push(Self::row_to_plan(row, steps));
+            }
+            return Ok(plans);
+        }
+
         self.ensure_loaded().await?;
         Ok(self
             .order
@@ -270,6 +532,23 @@ impl PlanStore {
 
     /// List plans filtered by status.
     pub async fn list_by_status(&mut self, status: &PlanStatus) -> Result<Vec<Plan>> {
+        if let Some(repo) = &self.sql_repo {
+            let status_str = Self::plan_status_to_str(status);
+            let rows = repo
+                .list(Some(status_str), None, None)
+                .await
+                .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            let mut plans = Vec::with_capacity(rows.len());
+            for row in rows {
+                let steps = repo
+                    .get_steps(row.id)
+                    .await
+                    .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                plans.push(Self::row_to_plan(row, steps));
+            }
+            return Ok(plans);
+        }
+
         self.ensure_loaded().await?;
         Ok(self
             .order
@@ -282,6 +561,14 @@ impl PlanStore {
 
     /// Delete a plan by ID.
     pub async fn delete(&mut self, id: &Uuid) -> Result<bool> {
+        if let Some(repo) = &self.sql_repo {
+            self.index.remove(id);
+            return repo
+                .delete(*id)
+                .await
+                .map_err(|e| common::KlyntbotError::Storage(e.to_string()));
+        }
+
         self.ensure_loaded().await?;
 
         if self.index.remove(id).is_some() {

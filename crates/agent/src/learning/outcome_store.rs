@@ -14,7 +14,58 @@ use tracing::warn;
 
 use common::Result;
 
-use super::types::{EnrichmentFeedbackEntry, OutcomeRecord};
+use super::types::{EnrichmentFeedbackEntry, ExecutionMode, OutcomeRecord};
+
+/// Convert an `OutcomeRecord` (domain) to an `OutcomeRow` (SQL row).
+fn outcome_to_row(outcome: &OutcomeRecord) -> Result<storage::OutcomeRow> {
+    let confidence_dimensions = outcome
+        .confidence_dimensions
+        .as_ref()
+        .map(serde_json::to_value)
+        .transpose()
+        .map_err(|e| common::ToolError::ExecutionFailed(format!("serialize confidence_dimensions: {}", e)))?;
+
+    let execution_mode = serde_json::to_value(&outcome.execution_mode)
+        .map_err(|e| common::ToolError::ExecutionFailed(format!("serialize execution_mode: {}", e)))?;
+
+    Ok(storage::OutcomeRow {
+        id: outcome.id.clone(),
+        session_key: outcome.session_key.clone(),
+        tool_name: outcome.tool_name.clone(),
+        success: outcome.success,
+        error_category: outcome.error_category.clone(),
+        duration_ms: outcome.duration_ms as i64,
+        confidence_score: outcome.confidence_score,
+        confidence_dimensions,
+        execution_mode,
+        created_at: outcome.created_at,
+    })
+}
+
+/// Convert an `OutcomeRow` (SQL row) back to an `OutcomeRecord` (domain).
+fn row_to_outcome(row: storage::OutcomeRow) -> Result<OutcomeRecord> {
+    let confidence_dimensions = row
+        .confidence_dimensions
+        .map(serde_json::from_value)
+        .transpose()
+        .map_err(|e| common::ToolError::ExecutionFailed(format!("deserialize confidence_dimensions: {}", e)))?;
+
+    let execution_mode: ExecutionMode = serde_json::from_value(row.execution_mode)
+        .map_err(|e| common::ToolError::ExecutionFailed(format!("deserialize execution_mode: {}", e)))?;
+
+    Ok(OutcomeRecord {
+        id: row.id,
+        session_key: row.session_key,
+        tool_name: row.tool_name,
+        success: row.success,
+        error_category: row.error_category,
+        duration_ms: row.duration_ms as u64,
+        confidence_score: row.confidence_score,
+        confidence_dimensions,
+        execution_mode,
+        created_at: row.created_at,
+    })
+}
 
 /// Journal entry for the JSONL outcome store.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -26,13 +77,14 @@ enum OutcomeJournalEntry {
     Feedback { entry: EnrichmentFeedbackEntry },
 }
 
-/// In-memory outcome index backed by a JSONL file.
+/// In-memory outcome index backed by a JSONL file or SQL database.
 pub struct OutcomeStore {
     file_path: PathBuf,
     outcomes: Vec<OutcomeRecord>,
     feedback: Vec<EnrichmentFeedbackEntry>,
     loaded: bool,
     journal_len: usize,
+    sql_repo: Option<storage::OutcomeRepo>,
 }
 
 impl OutcomeStore {
@@ -45,6 +97,19 @@ impl OutcomeStore {
             feedback: Vec::new(),
             loaded: false,
             journal_len: 0,
+            sql_repo: None,
+        }
+    }
+
+    /// Create a store backed by a SQL repository.
+    pub fn from_repo(repo: storage::OutcomeRepo) -> Self {
+        Self {
+            file_path: PathBuf::new(),
+            outcomes: Vec::new(),
+            feedback: Vec::new(),
+            loaded: true, // no JSONL to load
+            journal_len: 0,
+            sql_repo: Some(repo),
         }
     }
 
@@ -54,7 +119,12 @@ impl OutcomeStore {
     }
 
     /// Load (replay) the JSONL journal from disk into the in-memory index.
+    /// No-op for the SQL backend.
     pub async fn load(&mut self) -> Result<()> {
+        if self.sql_repo.is_some() {
+            return Ok(());
+        }
+
         self.outcomes.clear();
         self.feedback.clear();
         self.journal_len = 0;
@@ -110,6 +180,16 @@ impl OutcomeStore {
 
     /// Record a tool execution outcome.
     pub async fn record(&mut self, outcome: OutcomeRecord) -> Result<()> {
+        // SQL path
+        if let Some(repo) = &self.sql_repo {
+            let row = outcome_to_row(&outcome)?;
+            repo.create(&row)
+                .await
+                .map_err(|e| common::ToolError::ExecutionFailed(e.to_string()))?;
+            return Ok(());
+        }
+
+        // JSONL path (original)
         self.ensure_loaded().await?;
 
         let entry = OutcomeJournalEntry::Record {
@@ -129,6 +209,22 @@ impl OutcomeStore {
 
     /// Record enrichment feedback.
     pub async fn record_feedback(&mut self, feedback: EnrichmentFeedbackEntry) -> Result<()> {
+        // SQL path
+        if let Some(repo) = &self.sql_repo {
+            repo.create_enrichment_feedback(
+                &feedback.task_id,
+                &feedback.field,
+                &feedback.suggested_value,
+                feedback.actual_value.as_deref(),
+                feedback.accepted,
+                feedback.confidence,
+            )
+            .await
+            .map_err(|e| common::ToolError::ExecutionFailed(e.to_string()))?;
+            return Ok(());
+        }
+
+        // JSONL path (original)
         self.ensure_loaded().await?;
 
         let entry = OutcomeJournalEntry::Feedback {
@@ -141,19 +237,43 @@ impl OutcomeStore {
     }
 
     /// Get all outcome records.
+    ///
+    /// Note: For the SQL backend, returns only in-memory records (empty by default).
+    /// Use `outcomes_since` for date-range queries against the database.
     pub async fn get_all_outcomes(&mut self) -> Result<&[OutcomeRecord]> {
+        if self.sql_repo.is_some() {
+            return Ok(&self.outcomes);
+        }
         self.ensure_loaded().await?;
         Ok(&self.outcomes)
     }
 
     /// Get all enrichment feedback entries.
+    ///
+    /// Note: For the SQL backend, returns only in-memory feedback (empty by default).
     pub async fn get_all_feedback(&mut self) -> Result<&[EnrichmentFeedbackEntry]> {
+        if self.sql_repo.is_some() {
+            return Ok(&self.feedback);
+        }
         self.ensure_loaded().await?;
         Ok(&self.feedback)
     }
 
     /// Get outcomes recorded after a given timestamp.
     pub async fn outcomes_since(&mut self, cutoff: DateTime<Utc>) -> Result<Vec<OutcomeRecord>> {
+        // SQL path
+        if let Some(repo) = &self.sql_repo {
+            let rows = repo
+                .list_by_date_range(cutoff, Utc::now())
+                .await
+                .map_err(|e| common::ToolError::ExecutionFailed(e.to_string()))?;
+            return rows
+                .into_iter()
+                .map(row_to_outcome)
+                .collect::<Result<Vec<_>>>();
+        }
+
+        // JSONL path (original)
         self.ensure_loaded().await?;
         Ok(self
             .outcomes
@@ -163,8 +283,11 @@ impl OutcomeStore {
             .collect())
     }
 
-    /// Compact the JSONL file by rewriting only live records.
+    /// Compact the JSONL file by rewriting only live records. No-op for SQL backend.
     pub async fn compact(&mut self) -> Result<()> {
+        if self.sql_repo.is_some() {
+            return Ok(());
+        }
         self.ensure_loaded().await?;
 
         let tmp_path = self.file_path.with_extension("jsonl.tmp");

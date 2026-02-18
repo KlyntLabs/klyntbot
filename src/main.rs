@@ -4,21 +4,9 @@ use cli::{Cli, Commands};
 
 // Import CLI handlers
 mod cli_handlers {
-    pub use cli::calendar::handle_calendar;
-    pub use cli::channels::handle_channels;
     pub use cli::chat::handle_chat;
-    pub use cli::config_cmd::handle_config;
-    pub use cli::cron::handle_cron;
-    pub use cli::goal::handle_goal;
-    pub use cli::learning_cmd::handle_learning;
-    pub use cli::plan::handle_plan;
-    pub use cli::project::handle_project;
-    pub use cli::provider_cmd::handle_provider;
     pub use cli::serve::handle_serve;
-    pub use cli::skills::handle_skills;
     pub use cli::status::{handle_brief_status, handle_status};
-    pub use cli::todo::handle_todo;
-    pub use cli::usage_cmd::handle_usage;
 }
 
 #[tokio::main]
@@ -44,30 +32,6 @@ async fn main() {
         Some(Commands::Init) => handle_init().await,
 
         Some(Commands::Status { verbose }) => cli_handlers::handle_status(verbose).await,
-
-        Some(Commands::Channels(cmd)) => cli_handlers::handle_channels(cmd).await,
-
-        Some(Commands::Cron(cmd)) => cli_handlers::handle_cron(cmd).await,
-
-        Some(Commands::Config(cmd)) => cli_handlers::handle_config(cmd).await,
-
-        Some(Commands::Skills(cmd)) => cli_handlers::handle_skills(cmd).await,
-
-        Some(Commands::Todo(cmd)) => cli_handlers::handle_todo(cmd).await,
-
-        Some(Commands::Project(cmd)) => cli_handlers::handle_project(cmd).await,
-
-        Some(Commands::Calendar(cmd)) => cli_handlers::handle_calendar(cmd).await,
-
-        Some(Commands::Goal(cmd)) => cli_handlers::handle_goal(cmd).await,
-
-        Some(Commands::Plan(cmd)) => cli_handlers::handle_plan(cmd).await,
-
-        Some(Commands::Usage(cmd)) => cli_handlers::handle_usage(cmd).await,
-
-        Some(Commands::Learning(cmd)) => cli_handlers::handle_learning(cmd).await,
-
-        Some(Commands::Provider(cmd)) => cli_handlers::handle_provider(cmd).await,
 
         None => {
             // No command specified, show brief status

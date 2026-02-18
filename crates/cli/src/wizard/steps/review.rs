@@ -34,6 +34,23 @@ impl WizardModule for ReviewModule {
         );
         println!("{}", colorize(chars.vertical, BRAND));
 
+        // Database
+        if let Some(ref url) = state.config.database_url {
+            println!(
+                "{} {} Database: {}",
+                prefix.trim_end(),
+                colorize("✓", SUCCESS),
+                colorize(&format!("PostgreSQL ({})", mask_database_url(url)), DIM),
+            );
+        } else {
+            println!(
+                "{} {} Database: {}",
+                prefix.trim_end(),
+                colorize("○", DIM),
+                colorize("JSONL files (default)", DIM),
+            );
+        }
+
         // Provider
         let active = state.config.active_provider_name();
         if active != "none" {
@@ -307,6 +324,18 @@ fn shorten_path(path: &std::path::Path) -> String {
         }
     }
     path.display().to_string()
+}
+
+/// Mask credentials in a database URL for display.
+fn mask_database_url(url: &str) -> String {
+    if let Some(at_pos) = url.find('@') {
+        if let Some(scheme_end) = url.find("://") {
+            let scheme = &url[..scheme_end + 3];
+            let after_at = &url[at_pos..];
+            return format!("{}***{}", scheme, after_at);
+        }
+    }
+    url.to_string()
 }
 
 /// Capitalize the first letter of a string.

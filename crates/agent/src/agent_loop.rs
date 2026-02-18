@@ -138,6 +138,8 @@ impl AgentLoop {
         config: Config,
         cron_service: Option<Arc<scheduling::CronService>>,
         todo_store: Arc<RwLock<tools::todo_store::TodoStore>>,
+        todo_repo: storage::TodoRepo,
+        embedding_repo: Option<storage::EmbeddingRepo>,
         goal_store: Option<Arc<RwLock<goal::GoalStore>>>,
         plan_store: Option<Arc<RwLock<plan::PlanStore>>>,
         notification_handle: Option<LastActiveChannel>,
@@ -226,9 +228,12 @@ impl AgentLoop {
             tool_registry.register(CronTool::with_handler(adapter));
         }
 
-        // Register todo tool
+        // Clone todo_repo for MemoryTool before moving into TodoTool
+        let todo_repo_for_memory = todo_repo.clone();
+
+        // Register todo tool (uses SQL repo; todo_store is still used by other consumers)
         let mut todo_tool = tools::todo::TodoTool::new(
-            Arc::clone(&todo_store),
+            todo_repo,
             config.todo.focus.max_slots,
             config.todo.focus.deadline_hours,
             config.timezone.clone(),
@@ -306,31 +311,36 @@ impl AgentLoop {
 
         // Register todo embedding (if enabled) and capture for MemoryTool
         let todo_embedding_handler: Option<Arc<dyn EmbeddingHandler>>;
-        let todo_embedding_store: Option<Arc<RwLock<tools::EmbeddingStore>>>;
+        let todo_embedding_repo: Option<storage::EmbeddingRepo>;
 
         if config.todo.search.enabled {
-            let emb_store_path = config.embedding_store_path();
-            let emb_store = Arc::new(RwLock::new(tools::EmbeddingStore::new(emb_store_path)));
-            let embedding_handler = Arc::new(tools::EmbeddingEngineImpl::new(
-                Arc::clone(&embedding_engine),
-                Arc::clone(&emb_store),
-            ));
+            if let Some(emb_repo) = embedding_repo {
+                let embedding_handler = Arc::new(tools::EmbeddingEngineImpl::new(
+                    Arc::clone(&embedding_engine),
+                    emb_repo.clone(),
+                ));
 
-            todo_tool = todo_tool
-                .with_embedding_handler(Arc::clone(&embedding_handler) as Arc<dyn EmbeddingHandler>)
-                .with_embedding_store(Arc::clone(&emb_store))
-                .with_search_config(
-                    config.todo.search.semantic_threshold,
-                    config.todo.search.rrf_k,
-                );
+                // Clone for MemoryTool before moving into TodoTool
+                todo_embedding_repo = Some(emb_repo.clone());
 
-            // Capture for MemoryTool unified search
-            todo_embedding_handler =
-                Some(Arc::clone(&embedding_handler) as Arc<dyn EmbeddingHandler>);
-            todo_embedding_store = Some(emb_store);
+                todo_tool = todo_tool
+                    .with_embedding_handler(Arc::clone(&embedding_handler) as Arc<dyn EmbeddingHandler>)
+                    .with_embedding_repo(emb_repo)
+                    .with_search_config(
+                        config.todo.search.semantic_threshold,
+                        config.todo.search.rrf_k,
+                    );
+
+                // Capture for MemoryTool unified search
+                todo_embedding_handler =
+                    Some(Arc::clone(&embedding_handler) as Arc<dyn EmbeddingHandler>);
+            } else {
+                todo_embedding_handler = None;
+                todo_embedding_repo = None;
+            }
         } else {
             todo_embedding_handler = None;
-            todo_embedding_store = None;
+            todo_embedding_repo = None;
         }
 
         tool_registry.register(todo_tool);
@@ -389,7 +399,7 @@ impl AgentLoop {
             if let Some(ref handler) = conversation_embedding_handler {
                 let mut memory_tool = tools::MemoryTool::new()
                     .with_conversation_handler(Arc::clone(handler))
-                    .with_todo_store(Arc::clone(&todo_store))
+                    .with_todo_repo(todo_repo_for_memory)
                     .with_threshold(config.conversation.search.semantic_threshold)
                     .with_rrf_k(config.todo.search.rrf_k);
 
@@ -397,8 +407,8 @@ impl AgentLoop {
                 if let Some(ref h) = todo_embedding_handler {
                     memory_tool = memory_tool.with_todo_embedding_handler(Arc::clone(h));
                 }
-                if let Some(ref s) = todo_embedding_store {
-                    memory_tool = memory_tool.with_todo_embedding_store(Arc::clone(s));
+                if let Some(repo) = todo_embedding_repo {
+                    memory_tool = memory_tool.with_embedding_repo(repo);
                 }
 
                 tool_registry.register(memory_tool);
@@ -568,7 +578,13 @@ impl AgentLoop {
     }
 
     /// Create a new agent loop (without cron service)
-    pub async fn new(bus: Arc<MessageBus>, provider: DynProvider, config: Config) -> Result<Self> {
+    pub async fn new(
+        bus: Arc<MessageBus>,
+        provider: DynProvider,
+        config: Config,
+        todo_repo: storage::TodoRepo,
+        embedding_repo: Option<storage::EmbeddingRepo>,
+    ) -> Result<Self> {
         let todo_path = config.todo_store_path();
         let todo_store = Arc::new(RwLock::new(tools::todo_store::TodoStore::new(todo_path)));
         let goal_path = config.goal_store_path();
@@ -576,7 +592,7 @@ impl AgentLoop {
         let plan_path = config.plan_store_path();
         let plan_store = Some(Arc::new(RwLock::new(plan::PlanStore::new(plan_path))));
         Self::new_with_cron(
-            bus, provider, config, None, todo_store, goal_store, plan_store, None,
+            bus, provider, config, None, todo_store, todo_repo, embedding_repo, goal_store, plan_store, None,
         )
         .await
     }

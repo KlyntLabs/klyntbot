@@ -106,6 +106,7 @@ pub async fn run_wizard() -> Result<()> {
     // Index order must match the dispatch arms below.
     let all_steps: &[(&str, bool, bool)] = &[
         ("LLM Provider", true, true),
+        ("Database", false, true),
         ("Chat Channels", false, true),
         ("Tool Permissions", false, true),
         ("Workspace & Notifications", true, true),
@@ -141,21 +142,22 @@ pub async fn run_wizard() -> Result<()> {
         print_step_header(&state, name, required);
 
         // Dispatch to the right module. Step indices correspond to `all_steps`:
-        // 0=provider, 1=channels (async), 2=tools, 3=workspace+notifications,
-        // 4=calendar (async), 5=semantic_search, 6=conversation_memory, 7=learning,
-        // 8=daemon, 9=review.
+        // 0=provider, 1=database (async), 2=channels (async), 3=tools,
+        // 4=workspace+notifications, 5=calendar (async), 6=semantic_search,
+        // 7=conversation_memory, 8=learning, 9=daemon, 10=review.
         // Ctrl+C in raw-mode prompts surfaces as an Err containing "Ctrl+C".
         let result = match match step_idx {
             0 => provider::ProviderModule.run(&mut state),
-            1 => run_channels_step(&mut state).await,
-            2 => ToolsModule.run(&mut state),
-            3 => WorkspaceModule.run(&mut state),
-            4 => run_calendar_step(&mut state).await,
-            5 => run_search_step(&mut state),
-            6 => run_memory_step(&mut state),
-            7 => run_learning_step(&mut state),
-            8 => daemon::DaemonModule.run(&mut state),
-            9 => steps::review::ReviewModule.run(&mut state),
+            1 => steps::database::run_database_step(&mut state).await,
+            2 => run_channels_step(&mut state).await,
+            3 => ToolsModule.run(&mut state),
+            4 => WorkspaceModule.run(&mut state),
+            5 => run_calendar_step(&mut state).await,
+            6 => run_search_step(&mut state),
+            7 => run_memory_step(&mut state),
+            8 => run_learning_step(&mut state),
+            9 => daemon::DaemonModule.run(&mut state),
+            10 => steps::review::ReviewModule.run(&mut state),
             _ => unreachable!(),
         } {
             Ok(r) => r,

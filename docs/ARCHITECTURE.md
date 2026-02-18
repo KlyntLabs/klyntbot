@@ -17,7 +17,7 @@ This document describes the architecture of klyntbot's multi-crate workspace, ex
 
 ## Overview
 
-Klyntbot is structured as a Cargo workspace with 12 crates organized into 8 dependency layers. This architecture enables:
+Klyntbot is structured as a Cargo workspace with 15 crates organized into 9 dependency layers. All persistent state is stored in PostgreSQL (with pgvector for embeddings). This architecture enables:
 
 - **Parallel compilation** — Independent crates in the same layer compile simultaneously
 - **Incremental builds** — Changes to one crate only recompile dependents
@@ -41,18 +41,23 @@ Klyntbot is structured as a Cargo workspace with 12 crates organized into 8 depe
 klyntbot/
 ├── Cargo.toml              ← workspace root
 ├── crates/
-│   ├── common/      ← Layer 0: Foundation types
-│   ├── config/    ← Layer 1: Configuration
-│   ├── bus/       ← Layer 1: Message bus
-│   ├── providers/ ← Layer 2: LLM providers
-│   ├── session/   ← Layer 2: Session persistence
-│   ├── scheduling/      ← Layer 2: Scheduling
-│   ├── calendar/  ← Layer 2: CalDAV client & sync engine
-│   ├── tools/     ← Layer 3: Tool system
-│   ├── channels/  ← Layer 4: Chat platforms
-│   ├── heartbeat/ ← Layer 4: Periodic wake-up
-│   ├── agent/     ← Layer 5: Agent orchestration
-│   └── cli/       ← Layer 6: Command-line interface
+│   ├── common/         ← Layer 0: Foundation types
+│   ├── config/         ← Layer 1: Configuration
+│   ├── bus/            ← Layer 1: Message bus
+│   ├── storage/        ← Layer 1.5: PostgreSQL repos, migrations, connection pool
+│   ├── providers/      ← Layer 2: LLM providers
+│   ├── session/        ← Layer 2: Session persistence
+│   ├── scheduling/     ← Layer 2: Scheduling
+│   ├── calendar/       ← Layer 2: CalDAV client & sync engine
+│   ├── context_engine/ ← Layer 2: Token budget, context assembly
+│   ├── goal/           ← Layer 2: Goal management
+│   ├── plan/           ← Layer 2: Plan management
+│   ├── tools/          ← Layer 3: Tool system
+│   ├── channels/       ← Layer 4: Chat platforms
+│   ├── heartbeat/      ← Layer 4: Periodic wake-up
+│   ├── dashboard/      ← Layer 4: Web dashboard (GraphQL + WebSocket)
+│   ├── agent/          ← Layer 5: Agent orchestration
+│   └── cli/            ← Layer 6: 4 commands (chat, serve, init, status)
 ├── src/
 │   ├── lib.rs              ← Layer 7: Re-export facade
 │   └── main.rs             ← Binary entry point
@@ -88,35 +93,26 @@ klyntbot/
 Layer 0 (Foundation):
     common
         │
-        ├─────────────────────────────────┐
-        │                                 │
 Layer 1 (Data):
     config              bus
-        │                                 │
-        ├─────────────────────────────────┘
         │
-        ├─────────────────┬───────────────┬───────────────┐
-        │                 │               │               │
+Layer 1.5 (Storage):
+    storage  (PostgreSQL + pgvector)
+        │
 Layer 2 (Services):
-    providers  session  scheduling  calendar
-        │                 │               │               │
-        └─────────────────┴───────────────┴───────────────┘
+    providers  session  scheduling  calendar  context_engine  goal  plan
         │
 Layer 3 (Capabilities):
     tools
         │
-        ├─────────────────────────────────┐
-        │                                 │
 Layer 4 (Platforms):
-    channels          heartbeat
-        │                                 │
-        └─────────────────┬───────────────┘
-                          │
+    channels     heartbeat     dashboard
+        │
 Layer 5 (Orchestration):
     agent
         │
 Layer 6 (UI):
-    cli
+    cli  (4 commands: chat, serve, init, status)
         │
 Layer 7 (Binary):
     klyntbot (facade + bin)
@@ -152,6 +148,7 @@ pub enum KlyntbotError {
     Session(SessionError),
     Config(ConfigError),
     Cron(CronError),
+    Storage(StorageError),
     Internal(String),
 }
 
@@ -405,18 +402,19 @@ email = ["channels/email"]
 
 ### Compilation Parallelism
 
-With 12 crates in 8 layers, the compiler can parallelize:
+With 15 crates in 9 layers, the compiler can parallelize:
 
 - **Layer 0**: `common` (first, serial)
 - **Layer 1**: `config` + `bus` (parallel)
-- **Layer 2**: `providers` + `session` + `scheduling` + `calendar` (parallel)
+- **Layer 1.5**: `storage` (serial, depends on config)
+- **Layer 2**: `providers` + `session` + `scheduling` + `calendar` + `context_engine` + `goal` + `plan` (parallel)
 - **Layer 3**: `tools` (serial)
-- **Layer 4**: `channels` + `heartbeat` (parallel)
+- **Layer 4**: `channels` + `heartbeat` + `dashboard` (parallel)
 - **Layer 5**: `agent` (serial)
 - **Layer 6**: `cli` (serial)
 - **Layer 7**: `klyntbot` facade (serial)
 
-**Critical path**: 8 serial steps, but each step is smaller than the original monolith.
+**Critical path**: 9 serial steps, but each step is smaller than the original monolith.
 
 ### Incremental Builds
 
@@ -540,9 +538,10 @@ The root `klyntbot` crate re-exports all public types for backward compatibility
 // In klyntbot/src/lib.rs
 pub use common::{KlyntbotError, Result, ChannelName, ChatId, MessageRole};
 pub use config::Config;
+pub use storage::{Repos, StoragePool};
 pub use bus::{InboundMessage, OutboundMessage, MessageBus};
 pub use providers::{LlmProvider, create_provider};
-pub use tools::{Tool, ToolRegistry};
+pub use tools::{Tool, DynTool};
 pub use channels::{Channel, ChannelManager};
 pub use agent::{AgentLoop, ContextBuilder, MemoryStore};
 pub use session::SessionManager;
@@ -565,19 +564,24 @@ This keeps dependencies flowing upward while allowing runtime polymorphism.
 
 ## Rationale for Key Decisions
 
-### Why 12 crates?
+### Why 15 crates?
 
 Each crate represents a **logical boundary** with a single responsibility:
 - `common` = foundation types
 - `config` = configuration I/O
 - `bus` = message passing
+- `storage` = PostgreSQL connection pool, migrations, repositories
 - `providers` = LLM abstraction
 - `session` = conversation persistence
 - `scheduling` = cron jobs
 - `calendar` = CalDAV client & sync engine
+- `context_engine` = token budget allocation, context assembly
+- `goal` = goal management
+- `plan` = plan management
 - `tools` = agent capabilities
 - `channels` = platform integrations
 - `heartbeat` = periodic wake-up
+- `dashboard` = web dashboard (GraphQL + WebSocket)
 - `agent` = orchestration logic
 - `cli` = user interface
 
@@ -639,8 +643,9 @@ cargo build --features email
 ## Summary
 
 Klyntbot's workspace architecture achieves:
-- **Clear separation of concerns** via 12 focused crates
+- **Clear separation of concerns** via 15 focused crates
 - **No circular dependencies** via dependency inversion patterns
+- **SQL-backed persistence** via PostgreSQL with pgvector for embeddings
 - **Parallel compilation** via layered dependency graph
 - **Incremental builds** via crate-level isolation
 - **Extensibility** via trait-based abstractions

@@ -48,6 +48,42 @@ pub async fn save_provider_sync_state(provider_id: &str, state: &SyncState) -> R
     Ok(())
 }
 
+// ── SQL-backed variants ──────────────────────────────────────────────
+
+/// Load sync state for a provider from the SQL backend.
+pub async fn load_provider_sync_state_sql(
+    repo: &storage::CalendarSyncRepo,
+    provider_id: &str,
+) -> Result<SyncState> {
+    match repo.get(provider_id).await {
+        Ok(row) => Ok(SyncState {
+            sync_token: row.sync_token,
+            last_sync: row.last_sync_at,
+        }),
+        Err(storage::StorageError::NotFound(_)) => Ok(SyncState {
+            sync_token: None,
+            last_sync: None,
+        }),
+        Err(e) => Err(common::ToolError::ExecutionFailed(e.to_string()).into()),
+    }
+}
+
+/// Save sync state for a provider to the SQL backend.
+pub async fn save_provider_sync_state_sql(
+    repo: &storage::CalendarSyncRepo,
+    provider_id: &str,
+    state: &SyncState,
+) -> Result<()> {
+    repo.upsert(
+        provider_id,
+        state.sync_token.as_deref(),
+        state.last_sync,
+    )
+    .await
+    .map_err(|e| common::ToolError::ExecutionFailed(e.to_string()))?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

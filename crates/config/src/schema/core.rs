@@ -112,6 +112,10 @@ pub struct Config {
 
     #[serde(default = "default_timezone")]
     pub timezone: String,
+
+    /// PostgreSQL connection URL (optional — DB features disabled when absent).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub database_url: Option<String>,
 }
 
 impl Config {

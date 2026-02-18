@@ -36,8 +36,10 @@ async fn create_test_agent_with_todo() -> (AgentLoop, TempDir) {
     let bus = Arc::new(MessageBus::new(10));
     let provider = Arc::new(crate::mock_provider::MockProvider::new("Test response"));
 
-    // Create AgentLoop (automatically includes TodoStore)
-    let agent = AgentLoop::new(bus, provider, config).await.unwrap();
+    // Create AgentLoop with lazy pool (SQL queries will fail unless DATABASE_URL is valid)
+    let pool = klyntbot::storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
+    let todo_repo = klyntbot::storage::TodoRepo::new(pool.inner().clone());
+    let agent = AgentLoop::new(bus, provider, config, todo_repo, None).await.unwrap();
 
     (agent, temp_dir)
 }

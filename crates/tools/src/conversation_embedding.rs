@@ -64,13 +64,14 @@ pub struct ConversationEmbeddingStatus {
     pub is_available: bool,
 }
 
-/// In-memory conversation embedding index backed by a JSONL file.
+/// In-memory conversation embedding index backed by a JSONL file or SQL (pgvector).
 /// Uses interior mutability to allow concurrent reads via `&self` methods.
 pub struct ConversationEmbeddingStore {
     file_path: PathBuf,
     index: TokioRwLock<HashMap<String, ConversationEmbeddingRecord>>,
     loaded: AsyncOnceCell<()>,
     journal_len: TokioRwLock<usize>,
+    sql_repo: Option<storage::ConvEmbeddingRepo>,
 }
 
 impl ConversationEmbeddingStore {
@@ -82,6 +83,18 @@ impl ConversationEmbeddingStore {
             index: TokioRwLock::new(HashMap::new()),
             loaded: AsyncOnceCell::new(),
             journal_len: TokioRwLock::new(0),
+            sql_repo: None,
+        }
+    }
+
+    /// Create a store backed by SQL (pgvector) via `ConvEmbeddingRepo`.
+    pub fn from_repo(repo: storage::ConvEmbeddingRepo) -> Self {
+        Self {
+            file_path: PathBuf::from("/dev/null"),
+            index: TokioRwLock::new(HashMap::new()),
+            loaded: AsyncOnceCell::const_new_with(()),
+            journal_len: TokioRwLock::new(0),
+            sql_repo: Some(repo),
         }
     }
 
@@ -149,8 +162,22 @@ impl ConversationEmbeddingStore {
     }
 
     /// Upsert an embedding record (append to journal + update in-memory index).
+    /// In SQL mode, delegates to `ConvEmbeddingRepo::insert`.
     pub async fn upsert(&self, record: ConversationEmbeddingRecord) -> Result<()> {
         self.ensure_loaded().await?;
+
+        if let Some(repo) = &self.sql_repo {
+            let id = uuid::Uuid::parse_str(&record.id).unwrap_or_else(|_| uuid::Uuid::new_v4());
+            let vector = pgvector::Vector::from(record.embedding.clone());
+            // Delete existing first (upsert semantics)
+            let _ = repo.delete(id).await;
+            repo.insert(id, &record.session_key, &vector, &record.role, &record.content_preview)
+                .await
+                .map_err(|e| common::ToolError::ExecutionFailed(e.to_string()))?;
+            let mut index = self.index.write().await;
+            index.insert(record.id.clone(), record);
+            return Ok(());
+        }
 
         let entry = ConversationEmbeddingJournalEntry::Upsert {
             record: record.clone(),
@@ -232,8 +259,39 @@ impl ConversationEmbeddingStore {
     }
 
     /// Purge embeddings matching the filter.
+    /// In SQL mode, fetches matching IDs from the in-memory index and deletes via repo.
     pub async fn purge(&self, filter: PurgeFilter) -> Result<usize> {
         self.ensure_loaded().await?;
+
+        if let Some(repo) = &self.sql_repo {
+            let index = self.index.read().await;
+            let ids_to_delete: Vec<String> = match &filter {
+                PurgeFilter::BySessionKey(session_key) => index
+                    .values()
+                    .filter(|r| r.session_key == *session_key)
+                    .map(|r| r.id.clone())
+                    .collect(),
+                PurgeFilter::Before(cutoff) => index
+                    .values()
+                    .filter(|r| r.embedded_at < *cutoff)
+                    .map(|r| r.id.clone())
+                    .collect(),
+                PurgeFilter::All => index.keys().cloned().collect(),
+            };
+            drop(index);
+
+            let count = ids_to_delete.len();
+            for id in &ids_to_delete {
+                if let Ok(uuid) = uuid::Uuid::parse_str(id) {
+                    let _ = repo.delete(uuid).await;
+                }
+            }
+            let mut index = self.index.write().await;
+            for id in &ids_to_delete {
+                index.remove(id);
+            }
+            return Ok(count);
+        }
 
         let ids_to_delete: Vec<String> = {
             let index = self.index.read().await;
@@ -273,7 +331,11 @@ impl ConversationEmbeddingStore {
     }
 
     /// Compact the JSONL file by rewriting only live records.
+    /// In SQL mode, this is a no-op (no journal to compact).
     pub async fn compact(&self) -> Result<()> {
+        if self.sql_repo.is_some() {
+            return Ok(());
+        }
         self.ensure_loaded().await?;
 
         let tmp_path = self.file_path.with_extension("jsonl.tmp");

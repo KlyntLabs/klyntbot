@@ -8,10 +8,9 @@ use async_trait::async_trait;
 use chrono::Utc;
 use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
 use std::sync::{Arc, Mutex};
-use tokio::sync::RwLock;
 use tracing::{debug, info};
 
-use crate::embedding_store::{EmbeddingRecord, EmbeddingStore};
+use crate::embedding_store::EmbeddingRecord;
 use crate::todo_types::Todo;
 use common::Result;
 
@@ -160,16 +159,16 @@ pub trait EmbeddingHandler: Send + Sync {
 
 /// Production implementation of `EmbeddingHandler`.
 ///
-/// Wraps `EmbeddingEngine` (for vector generation) and `EmbeddingStore`
-/// (for persistence). Constructed in the agent crate and injected into `TodoTool`.
+/// Wraps `EmbeddingEngine` (for vector generation) and `EmbeddingRepo`
+/// (for SQL persistence). Constructed in the agent crate and injected into `TodoTool`.
 pub struct EmbeddingEngineImpl {
     engine: Arc<EmbeddingEngine>,
-    store: Arc<RwLock<EmbeddingStore>>,
+    repo: storage::EmbeddingRepo,
 }
 
 impl EmbeddingEngineImpl {
-    pub fn new(engine: Arc<EmbeddingEngine>, store: Arc<RwLock<EmbeddingStore>>) -> Self {
-        Self { engine, store }
+    pub fn new(engine: Arc<EmbeddingEngine>, repo: storage::EmbeddingRepo) -> Self {
+        Self { engine, repo }
     }
 
     /// Compose the searchable text for a todo: "{title} {description} {tags}".
@@ -206,16 +205,19 @@ impl EmbeddingHandler for EmbeddingEngineImpl {
             "Embedding generated for todo"
         );
 
+        let model_name = "paraphrase-multilingual-MiniLM-L12-v2";
+
+        // Persist to SQL via repo
+        self.repo
+            .upsert_vec(&todo_id, &embedding, model_name)
+            .await?;
+
         let record = EmbeddingRecord {
             id: todo_id,
             embedding,
-            model: "paraphrase-multilingual-MiniLM-L12-v2".to_string(),
+            model: model_name.to_string(),
             embedded_at: Utc::now(),
         };
-
-        // Persist to store
-        let mut store = self.store.write().await;
-        store.upsert(record.clone()).await?;
 
         Ok(Some(record))
     }

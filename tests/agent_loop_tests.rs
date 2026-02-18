@@ -9,6 +9,13 @@ use tempfile::TempDir;
 mod mock_provider;
 use mock_provider::{ErrorProvider, MockProvider};
 
+/// Create a TodoRepo backed by a lazy Postgres pool (no actual DB connection needed for unit tests).
+fn test_todo_repo() -> klyntbot::storage::TodoRepo {
+    let pool =
+        klyntbot::storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
+    klyntbot::storage::TodoRepo::new(pool.inner().clone())
+}
+
 /// Test basic message processing through agent loop
 #[tokio::test]
 async fn test_agent_loop_basic_processing() {
@@ -26,7 +33,9 @@ async fn test_agent_loop_basic_processing() {
         .unwrap()
         .to_string();
 
-    let agent_loop = AgentLoop::new(bus, provider.clone(), config).await.unwrap();
+    let agent_loop = AgentLoop::new(bus, provider.clone(), config, test_todo_repo(), None)
+        .await
+        .unwrap();
 
     // Process a direct message
     let response = agent_loop
@@ -84,7 +93,9 @@ async fn test_agent_loop_with_tool_execution() {
     let mut config = Config::default();
     config.agents.defaults.workspace = workspace.to_str().unwrap().to_string();
 
-    let agent_loop = AgentLoop::new(bus, provider.clone(), config).await.unwrap();
+    let agent_loop = AgentLoop::new(bus, provider.clone(), config, test_todo_repo(), None)
+        .await
+        .unwrap();
 
     let response = agent_loop
         .process_direct("Read test.txt".to_string(), "test:session2".to_string())
@@ -128,7 +139,9 @@ async fn test_agent_loop_max_iterations() {
         .to_string();
     config.agents.defaults.max_tool_iterations = 3;
 
-    let agent_loop = AgentLoop::new(bus, provider.clone(), config).await.unwrap();
+    let agent_loop = AgentLoop::new(bus, provider.clone(), config, test_todo_repo(), None)
+        .await
+        .unwrap();
 
     // This should hit max iterations and return an error or stop
     let result = agent_loop
@@ -185,7 +198,9 @@ async fn test_agent_loop_tool_error_handling() {
         .unwrap()
         .to_string();
 
-    let agent_loop = AgentLoop::new(bus, provider.clone(), config).await.unwrap();
+    let agent_loop = AgentLoop::new(bus, provider.clone(), config, test_todo_repo(), None)
+        .await
+        .unwrap();
 
     let response = agent_loop
         .process_direct(
@@ -226,9 +241,10 @@ async fn test_agent_loop_session_persistence() {
     // First agent loop
     {
         let bus = Arc::new(MessageBus::new(10));
-        let agent_loop = AgentLoop::new(bus, provider.clone(), config.clone())
-            .await
-            .unwrap();
+        let agent_loop =
+            AgentLoop::new(bus, provider.clone(), config.clone(), test_todo_repo(), None)
+                .await
+                .unwrap();
 
         // First message
         let _ = agent_loop
@@ -239,7 +255,7 @@ async fn test_agent_loop_session_persistence() {
 
     // Create a new agent loop with a new bus (simulating restart)
     let bus2 = Arc::new(MessageBus::new(10));
-    let agent_loop2 = AgentLoop::new(bus2, provider.clone(), config)
+    let agent_loop2 = AgentLoop::new(bus2, provider.clone(), config, test_todo_repo(), None)
         .await
         .unwrap();
 
@@ -269,7 +285,11 @@ async fn test_streaming_emits_done() {
         .unwrap()
         .to_string();
 
-    let agent_loop = Arc::new(AgentLoop::new(bus, provider, config).await.unwrap());
+    let agent_loop = Arc::new(
+        AgentLoop::new(bus, provider, config, test_todo_repo(), None)
+            .await
+            .unwrap(),
+    );
 
     let streaming_handle = agent_loop
         .process_direct_streaming("Hello".to_string(), "test:stream1".to_string())
@@ -320,7 +340,11 @@ async fn test_streaming_emits_error_on_failure() {
         .unwrap()
         .to_string();
 
-    let agent_loop = Arc::new(AgentLoop::new(bus, provider, config).await.unwrap());
+    let agent_loop = Arc::new(
+        AgentLoop::new(bus, provider, config, test_todo_repo(), None)
+            .await
+            .unwrap(),
+    );
 
     let streaming_handle = agent_loop
         .process_direct_streaming("Hello".to_string(), "test:stream2".to_string())

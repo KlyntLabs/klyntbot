@@ -15,6 +15,7 @@ use tracing::warn;
 
 use crate::embedding_engine::EMBEDDING_DIM;
 use common::Result;
+use storage::EmbeddingRepo;
 
 /// A single embedding record persisted to the JSONL store.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -35,12 +36,13 @@ enum EmbeddingJournalEntry {
     Delete { id: String },
 }
 
-/// In-memory embedding index backed by a JSONL file.
+/// In-memory embedding index backed by a JSONL file or SQL (pgvector).
 pub struct EmbeddingStore {
     file_path: PathBuf,
     index: HashMap<String, EmbeddingRecord>,
     loaded: bool,
     journal_len: usize,
+    sql_repo: Option<EmbeddingRepo>,
 }
 
 impl EmbeddingStore {
@@ -52,6 +54,19 @@ impl EmbeddingStore {
             index: HashMap::new(),
             loaded: false,
             journal_len: 0,
+            sql_repo: None,
+        }
+    }
+
+    /// Create a store backed by SQL (pgvector) via `EmbeddingRepo`.
+    /// The in-memory index is kept in sync for `get_all` and `ids_missing_embeddings`.
+    pub fn from_repo(repo: EmbeddingRepo) -> Self {
+        Self {
+            file_path: PathBuf::from("/dev/null"),
+            index: HashMap::new(),
+            loaded: true,
+            journal_len: 0,
+            sql_repo: Some(repo),
         }
     }
 
@@ -62,7 +77,15 @@ impl EmbeddingStore {
 
     /// Load (replay) the JSONL journal from disk into the in-memory index.
     /// Corrupted or dimension-mismatched lines are skipped with a warning.
+    /// In SQL mode, this is a no-op (the index is populated via upsert/delete calls).
     pub async fn load(&mut self) -> Result<()> {
+        if self.sql_repo.is_some() {
+            // SQL mode: no file to replay. The in-memory index is populated
+            // via upsert/delete calls. Mark as loaded.
+            self.loaded = true;
+            return Ok(());
+        }
+
         self.index.clear();
         self.journal_len = 0;
 
@@ -127,8 +150,18 @@ impl EmbeddingStore {
     }
 
     /// Upsert an embedding record (append to journal + update in-memory index).
+    /// In SQL mode, delegates to `EmbeddingRepo::upsert` and keeps the in-memory index in sync.
     pub async fn upsert(&mut self, record: EmbeddingRecord) -> Result<()> {
         self.ensure_loaded().await?;
+
+        if let Some(repo) = &self.sql_repo {
+            let vector = pgvector::Vector::from(record.embedding.clone());
+            repo.upsert(&record.id, &vector, &record.model)
+                .await
+                .map_err(|e| common::ToolError::ExecutionFailed(e.to_string()))?;
+            self.index.insert(record.id.clone(), record);
+            return Ok(());
+        }
 
         let entry = EmbeddingJournalEntry::Upsert {
             record: record.clone(),
@@ -146,8 +179,17 @@ impl EmbeddingStore {
     }
 
     /// Delete an embedding by ID (write tombstone + remove from index).
+    /// In SQL mode, delegates to `EmbeddingRepo::delete` and removes from the in-memory index.
     pub async fn delete(&mut self, id: &str) -> Result<()> {
         self.ensure_loaded().await?;
+
+        if let Some(repo) = &self.sql_repo {
+            repo.delete(id)
+                .await
+                .map_err(|e| common::ToolError::ExecutionFailed(e.to_string()))?;
+            self.index.remove(id);
+            return Ok(());
+        }
 
         let entry = EmbeddingJournalEntry::Delete { id: id.to_string() };
         self.append_entry(&entry).await?;
@@ -158,8 +200,34 @@ impl EmbeddingStore {
     }
 
     /// Get a single embedding record by ID.
+    /// In SQL mode, fetches from the repo, converts to `EmbeddingRecord`, and caches in the index.
     pub async fn get(&mut self, id: &str) -> Result<Option<&EmbeddingRecord>> {
         self.ensure_loaded().await?;
+
+        if let Some(repo) = &self.sql_repo {
+            // Check in-memory cache first
+            if self.index.contains_key(id) {
+                return Ok(self.index.get(id));
+            }
+            // Fetch from SQL
+            match repo.get(id).await {
+                Ok(row) => {
+                    let record = EmbeddingRecord {
+                        id: row.todo_id,
+                        embedding: row.embedding.as_slice().to_vec(),
+                        model: row.model,
+                        embedded_at: row.updated_at,
+                    };
+                    self.index.insert(record.id.clone(), record);
+                    return Ok(self.index.get(id));
+                }
+                Err(storage::StorageError::NotFound(_)) => return Ok(None),
+                Err(e) => {
+                    return Err(common::ToolError::ExecutionFailed(e.to_string()).into());
+                }
+            }
+        }
+
         Ok(self.index.get(id))
     }
 
@@ -170,7 +238,12 @@ impl EmbeddingStore {
     }
 
     /// Compact the JSONL file by rewriting only live records.
+    /// In SQL mode, this is a no-op (no journal to compact).
     pub async fn compact(&mut self) -> Result<()> {
+        if self.sql_repo.is_some() {
+            return Ok(());
+        }
+
         self.ensure_loaded().await?;
 
         let tmp_path = self.file_path.with_extension("jsonl.tmp");

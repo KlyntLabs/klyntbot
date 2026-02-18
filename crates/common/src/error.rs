@@ -38,6 +38,9 @@ pub enum KlyntbotError {
     #[error("Plan error: {0}")]
     Plan(#[from] PlanError),
 
+    #[error("Storage error: {0}")]
+    Storage(String),
+
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 

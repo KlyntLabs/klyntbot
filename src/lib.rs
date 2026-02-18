@@ -16,6 +16,7 @@ pub use plan;
 pub use providers;
 pub use scheduling;
 pub use session;
+pub use storage;
 pub use tools;
 
 // Re-export commonly used types for convenience
@@ -38,6 +39,7 @@ pub use providers::{
 };
 pub use scheduling::{CronJob, CronService};
 pub use session::{Session, SessionManager};
+pub use storage::{Repos, StoragePool};
 pub use tools::{DynTool, Tool};
 
 /// Version information

@@ -11,8 +11,9 @@ use tokio::fs;
 use tokio::io::AsyncWriteExt;
 use uuid::Uuid;
 
-use crate::types::{Goal, GoalProgress, GoalStatus};
+use crate::types::{Goal, GoalProgress, GoalStatus, Metric};
 use common::Result;
+use std::str::FromStr;
 
 /// Compaction threshold: compact when journal has this many more entries than live goals
 const COMPACTION_THRESHOLD: usize = 100;
@@ -28,6 +29,7 @@ enum JournalEntry {
 }
 
 /// Append-only JSONL-backed goal storage with lazy loading and automatic compaction.
+/// Optionally backed by a SQL repository when constructed via `from_repo()`.
 pub struct GoalStore {
     file_path: PathBuf,
     /// In-memory index: id -> Goal (authoritative state after load)
@@ -37,10 +39,12 @@ pub struct GoalStore {
     loaded: bool,
     /// Number of journal entries on disk (including stale/overwritten ones)
     journal_len: usize,
+    /// Optional SQL backend — when present, all CRUD is delegated to SQL.
+    sql_repo: Option<storage::GoalRepo>,
 }
 
 impl GoalStore {
-    /// Create a new GoalStore (does not load from disk yet).
+    /// Create a new GoalStore backed by JSONL (does not load from disk yet).
     pub fn new(file_path: PathBuf) -> Self {
         Self {
             file_path,
@@ -48,6 +52,52 @@ impl GoalStore {
             order: Vec::new(),
             loaded: false,
             journal_len: 0,
+            sql_repo: None,
+        }
+    }
+
+    /// Create a GoalStore backed by a SQL repository.
+    pub fn from_repo(repo: storage::GoalRepo) -> Self {
+        Self {
+            file_path: PathBuf::from("/dev/null"),
+            index: HashMap::new(),
+            order: Vec::new(),
+            loaded: true,
+            journal_len: 0,
+            sql_repo: Some(repo),
+        }
+    }
+
+    // ── SQL ↔ Domain conversion helpers ─────────────────────────
+
+    fn goal_to_row(goal: &Goal) -> storage::GoalRow {
+        storage::GoalRow {
+            id: goal.id,
+            title: goal.title.clone(),
+            description: goal.description.clone(),
+            status: goal.status.to_string(),
+            priority: goal.priority as i16,
+            target_date: goal.target_date,
+            created_at: goal.created_at,
+            updated_at: goal.updated_at,
+            metrics: serde_json::to_value(&goal.metrics).unwrap_or_default(),
+            metadata: serde_json::to_value(&goal.metadata).unwrap_or_default(),
+        }
+    }
+
+    fn row_to_goal(row: storage::GoalRow, linked_project_ids: Vec<Uuid>) -> Goal {
+        Goal {
+            id: row.id,
+            title: row.title,
+            description: row.description,
+            status: GoalStatus::from_str(&row.status).unwrap_or_default(),
+            priority: row.priority as u8,
+            target_date: row.target_date,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+            metrics: serde_json::from_value::<Vec<Metric>>(row.metrics).unwrap_or_default(),
+            linked_project_ids,
+            metadata: serde_json::from_value(row.metadata).unwrap_or_default(),
         }
     }
 
@@ -165,6 +215,21 @@ impl GoalStore {
 
     /// Add a new goal.
     pub async fn add(&mut self, mut goal: Goal) -> Result<Goal> {
+        if let Some(repo) = &self.sql_repo {
+            goal.updated_at = Utc::now();
+            let row = Self::goal_to_row(&goal);
+            repo.create(&row)
+                .await
+                .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            // Link projects
+            for pid in &goal.linked_project_ids {
+                repo.link_project(goal.id, &pid.to_string())
+                    .await
+                    .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            }
+            return Ok(goal);
+        }
+
         self.ensure_loaded().await?;
 
         goal.updated_at = Utc::now();
@@ -181,33 +246,84 @@ impl GoalStore {
 
     /// Get a goal by ID (O(1) lookup).
     pub async fn get(&mut self, id: &Uuid) -> Result<Option<Goal>> {
+        if let Some(repo) = &self.sql_repo {
+            return match repo.get(*id).await {
+                Ok(row) => {
+                    let links = repo
+                        .get_project_links(*id)
+                        .await
+                        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                    let project_ids = links
+                        .into_iter()
+                        .filter_map(|l| Uuid::parse_str(&l.project_id).ok())
+                        .collect();
+                    Ok(Some(Self::row_to_goal(row, project_ids)))
+                }
+                Err(storage::StorageError::NotFound(_)) => Ok(None),
+                Err(e) => Err(common::KlyntbotError::Storage(e.to_string())),
+            };
+        }
+
         self.ensure_loaded().await?;
         Ok(self.index.get(id).cloned())
     }
 
     /// Update a goal in place.
     pub async fn update(&mut self, goal: Goal) -> Result<Option<Goal>> {
-        self.ensure_loaded().await?;
+        if let Some(repo) = &self.sql_repo {
+            let mut updated = goal;
+            updated.updated_at = Utc::now();
+            let row = Self::goal_to_row(&updated);
+            match repo.update(&row).await {
+                Ok(_) => {
+                    // Sync project links: clear existing and re-link
+                    let existing = repo
+                        .get_project_links(updated.id)
+                        .await
+                        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                    for link in &existing {
+                        let _ = repo.unlink_project(updated.id, &link.project_id).await;
+                    }
+                    for pid in &updated.linked_project_ids {
+                        repo.link_project(updated.id, &pid.to_string())
+                            .await
+                            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                    }
+                    Ok(Some(updated))
+                }
+                Err(storage::StorageError::NotFound(_)) => Ok(None),
+                Err(e) => Err(common::KlyntbotError::Storage(e.to_string())),
+            }
+        } else {
+            self.ensure_loaded().await?;
 
-        if !self.index.contains_key(&goal.id) {
-            return Ok(None);
+            if !self.index.contains_key(&goal.id) {
+                return Ok(None);
+            }
+
+            let mut updated = goal;
+            updated.updated_at = Utc::now();
+
+            let entry = JournalEntry::Upsert {
+                goal: updated.clone(),
+            };
+            self.append_entry(&entry).await?;
+            self.index.insert(updated.id, updated.clone());
+
+            self.maybe_compact().await?;
+            Ok(Some(updated))
         }
-
-        let mut updated = goal;
-        updated.updated_at = Utc::now();
-
-        let entry = JournalEntry::Upsert {
-            goal: updated.clone(),
-        };
-        self.append_entry(&entry).await?;
-        self.index.insert(updated.id, updated.clone());
-
-        self.maybe_compact().await?;
-        Ok(Some(updated))
     }
 
     /// Delete a goal by ID.
     pub async fn delete(&mut self, id: &Uuid) -> Result<bool> {
+        if let Some(repo) = &self.sql_repo {
+            return repo
+                .delete(*id)
+                .await
+                .map_err(|e| common::KlyntbotError::Storage(e.to_string()));
+        }
+
         self.ensure_loaded().await?;
 
         if self.index.remove(id).is_some() {
@@ -224,6 +340,27 @@ impl GoalStore {
 
     /// List all goals, optionally filtered by status.
     pub async fn list(&mut self, status: Option<GoalStatus>) -> Result<Vec<Goal>> {
+        if let Some(repo) = &self.sql_repo {
+            let status_str = status.as_ref().map(|s| s.to_string());
+            let rows = repo
+                .list(status_str.as_deref())
+                .await
+                .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            let mut goals = Vec::with_capacity(rows.len());
+            for row in rows {
+                let links = repo
+                    .get_project_links(row.id)
+                    .await
+                    .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                let project_ids = links
+                    .into_iter()
+                    .filter_map(|l| Uuid::parse_str(&l.project_id).ok())
+                    .collect();
+                goals.push(Self::row_to_goal(row, project_ids));
+            }
+            return Ok(goals);
+        }
+
         self.ensure_loaded().await?;
 
         let filtered: Vec<Goal> = self
@@ -248,6 +385,15 @@ impl GoalStore {
     /// Completion percentage is the average of all metric progress percentages,
     /// or 0.0 if no metrics are defined.
     pub async fn calculate_progress(&mut self, id: &Uuid) -> Result<Option<GoalProgress>> {
+        if self.sql_repo.is_some() {
+            // Delegate to get() which handles SQL, then compute progress.
+            let goal = match self.get(id).await? {
+                Some(g) => g,
+                None => return Ok(None),
+            };
+            return Ok(Some(Self::compute_progress(id, &goal)));
+        }
+
         self.ensure_loaded().await?;
 
         let goal = match self.index.get(id) {
@@ -255,6 +401,11 @@ impl GoalStore {
             None => return Ok(None),
         };
 
+        Ok(Some(Self::compute_progress(id, goal)))
+    }
+
+    /// Compute a GoalProgress from a goal reference (shared by JSONL and SQL paths).
+    fn compute_progress(id: &Uuid, goal: &Goal) -> GoalProgress {
         let completion = if goal.metrics.is_empty() {
             0.0
         } else {
@@ -272,16 +423,20 @@ impl GoalStore {
             )
         };
 
-        Ok(Some(GoalProgress {
+        GoalProgress {
             goal_id: *id,
             completion_percentage: completion,
             metrics: goal.metrics.clone(),
             summary,
-        }))
+        }
     }
 
     /// Get all goals.
     pub async fn all(&mut self) -> Result<Vec<Goal>> {
+        if self.sql_repo.is_some() {
+            return self.list(None).await;
+        }
+
         self.ensure_loaded().await?;
         Ok(self.goals_ordered().into_iter().cloned().collect())
     }

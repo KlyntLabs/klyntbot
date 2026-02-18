@@ -67,13 +67,20 @@ cd klyntbot
 cargo build --release
 ```
 
-**2. Initialize**
+**2. Set up PostgreSQL** (with pgvector)
+
+```bash
+createdb klyntbot
+psql klyntbot -c "CREATE EXTENSION vector;"
+```
+
+**3. Initialize**
 
 ```bash
 ./target/release/klyntbot init
 ```
 
-**3. Configure** -- add your API key to `~/.klyntbot/config.json`:
+**4. Configure** -- add your API key to `~/.klyntbot/config.json`:
 
 ```json
 {
@@ -90,7 +97,7 @@ cargo build --release
 }
 ```
 
-**4. Chat**
+**5. Chat**
 
 ```bash
 ./target/release/klyntbot chat "Hello, what can you do?"
@@ -105,7 +112,7 @@ cargo build --release
 
 ## Work & Study Management
 
-klyntbot includes a comprehensive task and project management system with **22 CLI commands**, AI chat integration, and proactive intelligence. Manage tasks through the terminal or by chatting with the AI — both use the same system.
+klyntbot includes a comprehensive task and project management system, accessible entirely through **natural language chat**. All data is stored in PostgreSQL with pgvector for semantic search.
 
 > **[Read the full Task Management Guide →](docs/TASK_MANAGEMENT.md)** for detailed usage, examples, and tips.
 
@@ -113,35 +120,31 @@ klyntbot includes a comprehensive task and project management system with **22 C
 
 | Feature | What it does |
 |---------|-------------|
-| **22 todo commands** | Add, list, update, complete, focus, search, subtasks, attachments, time tracking, dependencies, recurring tasks, reports |
-| **6 project commands** | Create, list, show, update, archive, and view project tasks |
-| **Focus mode** | Time-boxed work sessions with automatic time tracking and visual progress bars |
-| **Subtask hierarchies** | Break down complex work up to 16 levels deep, view with `todo tree` |
+| **16+ task actions** | Add, list, update, complete, focus, search (keyword + semantic + hybrid), subtasks, attachments, time tracking, dependencies, recurring tasks, reports |
+| **6 project actions** | Create, list, show, update, archive, and view project tasks |
+| **Focus mode** | Time-boxed work sessions with automatic time tracking |
+| **Subtask hierarchies** | Break down complex work up to 16 levels deep |
 | **Recurring tasks** | RRULE-based schedules — daily, weekly, monthly — auto-spawned in the background |
 | **Task dependencies** | Mark blocking relationships, prevents completing blocked tasks |
 | **Smart reminders** | Proactive alerts at 2h, 1h, 30m, 15m before deadlines + overdue nags |
 | **Apple Calendar sync** | Two-way CalDAV sync — tasks appear on iPhone, Mac, and iPad |
-| **Attachments** | Attach files, URLs, or notes to any task with full-text search |
+| **Semantic search** | pgvector-powered meaning-based task retrieval (e.g., "login bug" finds "authentication issue") |
 | **AI chat interface** | Natural language task management through any connected channel |
-| **Reports** | Weekly/monthly analytics with time tracking, completion rates, and priority breakdown |
 
 ### Quick example
 
-```bash
-# Create a task with natural language dates
-klyntbot todo add "Review PR" --priority 4 --due tomorrow --tags work
+```
+You:  "Add a task to review the PR, priority 4, due tomorrow, tag it work"
+Bot:  Created task [abc123] "Review the PR" — P4, due Feb 19, tags: work
 
-# Start a focus session (auto-tracks time)
-klyntbot todo focus abc123
+You:  "Focus on that task"
+Bot:  Focus started on [abc123] — time tracking active
 
-# Break down work into subtasks
-klyntbot todo add-subtask abc123 "Check test coverage"
+You:  "Add a subtask: check test coverage"
+Bot:  Created subtask [def456] under [abc123]
 
-# Set up a recurring task
-klyntbot todo recur add "Daily standup" --rule "FREQ=DAILY;BYHOUR=9"
-
-# Generate a productivity report
-klyntbot todo report --period week
+You:  "Show my weekly report"
+Bot:  This week: 12 tasks completed, 3.5h tracked, 87% completion rate
 ```
 
 See also: [Calendar Setup Guide](docs/CALENDAR_SETUP.md)
@@ -404,8 +407,9 @@ Run with any OpenAI-compatible server (vLLM, Ollama, LM Studio):
 | Heartbeat Service|       +----------------------+
 +------------------+
                            +------------------+
-                           | Session Manager  |
-                           | (JSONL + cache)  |
+                           |   PostgreSQL     |
+                           | (pgvector, all   |
+                           |  persistent data)|
                            +------------------+
 ```
 
@@ -416,7 +420,8 @@ Run with any OpenAI-compatible server (vLLM, Ollama, LM Studio):
 | `tokio::mpsc` for message bus | Bounded channels with backpressure. Single consumer (agent loop) preserves message ordering. |
 | `reqwest` for LLM calls | Direct OpenAI-compatible HTTP. No LiteLLM overhead. All 12+ providers use the same `/v1/chat/completions` endpoint format. |
 | `serde` for config | Compile-time schema validation via derive macros. camelCase JSON serialization for consistent config format. |
-| `thiserror` for errors | 7 error types (Tool, Provider, Channel, Session, Config, Cron, Klyntbot) with automatic `From` conversions. |
+| `sqlx` + `pgvector` for storage | PostgreSQL with auto-migrations. pgvector for embedding ANN search. `PgPool` is Clone+Send+Sync, eliminating `Arc<RwLock<>>` wrappers. |
+| `thiserror` for errors | 8 error types (Tool, Provider, Channel, Session, Config, Cron, Storage, Klyntbot) with automatic `From` conversions. |
 | `Arc<dyn Trait>` for tools/providers | Runtime polymorphism with shared ownership across async tasks. `Send + Sync` bounds enforced at compile time. |
 | Feature-gated channels | Email deps (IMAP, SMTP, TLS) are optional. Minimal builds exclude unused channel code. |
 
@@ -424,47 +429,25 @@ Run with any OpenAI-compatible server (vLLM, Ollama, LM Studio):
 
 ## CLI Reference
 
+The CLI has 4 commands. All task/project/calendar management is done through natural language in chat.
+
 ```bash
 klyntbot chat                    # Interactive chat (REPL with history)
 klyntbot chat "message"          # Single message mode
+klyntbot chat --session my-sess  # Resume a named session
 klyntbot serve                   # Start gateway (all enabled channels)
 klyntbot serve --port 8080       # Custom gateway port
-klyntbot init                    # Initialize config and workspace
+klyntbot init                    # Initialize config, workspace, and database
 klyntbot status                  # Show config, provider, workspace info
-
-# Task Management
-klyntbot todo add "Task title" [--project ID] [--parent ID]
-klyntbot todo list [--project ID] [--status doing]
-klyntbot todo tree [--project ID] [--depth 3]
-klyntbot todo focus [ID]         # Start focus session (auto-tracks time)
-klyntbot todo log-time ID 45 --note "Work description"
-klyntbot todo add-subtask PARENT_ID "Subtask title"
-klyntbot todo search "query" [--include-attachments]
-
-# Project Management
-klyntbot project create "Project name" [--color blue]
-klyntbot project list [--status active]
-klyntbot project show ID
-klyntbot project report ID --period week
-
-# Calendar Sync
-klyntbot calendar sync           # Manual sync with Apple Calendar
-klyntbot calendar status         # Show sync status
-klyntbot calendar list --from 2026-02-14 --to 2026-02-21
-klyntbot calendar conflicts      # Show sync conflicts
-
-# Other Commands
-klyntbot channels                # Channel management
-klyntbot cron list               # List scheduled jobs
-klyntbot cron add --name "daily" --cron "0 9 * * *" --message "Good morning!"
-klyntbot config show             # Display current configuration
-klyntbot config validate         # Validate config file
-klyntbot skills list             # List available skills
+klyntbot status --verbose        # Detailed status with channel states
 ```
 
 ### Environment variables
 
 ```bash
+# Database (PostgreSQL with pgvector required)
+export KLYNTBOT_DATABASE_URL="postgres://user:pass@localhost/klyntbot"
+
 # Provider API keys (override config)
 export ANTHROPIC_API_KEY="sk-ant-..."
 export OPENAI_API_KEY="sk-..."
@@ -487,6 +470,7 @@ Config file: `~/.klyntbot/config.json`
 
 ```json
 {
+  "databaseUrl": "postgres://localhost/klyntbot",
   "agents": {
     "defaults": {
       "workspace": "~/.klyntbot/workspace",
@@ -544,15 +528,8 @@ Config file: `~/.klyntbot/config.json`
 
 ```
 ~/.klyntbot/
-  config.json                   # Main configuration
-  todos.jsonl                   # Task store (NEW)
-  projects.jsonl                # Project store (NEW)
-  calendar_sync.json            # CalDAV sync state (NEW)
-  calendar_conflicts.jsonl      # Conflict audit log (NEW)
-  sessions/                     # Conversation history (JSONL per session)
-  cron/jobs.json                # Scheduled job store
-  media/                        # Downloaded media files
-  history/cli_history           # REPL command history
+  config.json                   # Main configuration (includes database_url)
+  history.txt                   # REPL command history
   workspace/
     AGENTS.md                   # Agent instructions (behavior)
     SOUL.md                     # Personality definition
@@ -565,8 +542,9 @@ Config file: `~/.klyntbot/config.json`
       2026-02-14.md             # Daily notes (auto-dated)
     skills/
       custom-skill/SKILL.md     # User-defined skills
-      weekly-report.md          # Weekly progress reports (NEW)
 ```
+
+All persistent data (tasks, projects, sessions, embeddings, cron jobs, etc.) is stored in PostgreSQL.
 
 ---
 
@@ -680,19 +658,24 @@ cargo fmt --check
 ```
 klyntbot/
   Cargo.toml                    # Workspace root
-  crates/                       # 12 focused workspace crates
+  crates/                       # 15 focused workspace crates
     common/              # Foundation types and errors
     config/            # Configuration schema and loader
     bus/               # Async message bus
+    storage/           # PostgreSQL repos, migrations, pgvector
     providers/         # LLM provider abstraction
-    session/           # Session persistence (JSONL + cache)
-    scheduling/              # Cron scheduling service
-    calendar/          # CalDAV client and sync engine (NEW)
+    session/           # Session persistence
+    scheduling/        # Cron scheduling service
+    calendar/          # CalDAV client and sync engine
+    context_engine/    # Token budget, context assembly
+    goal/              # Goal management
+    plan/              # Plan management
     tools/             # Tool trait and implementations (12 tools)
     channels/          # Chat platform integrations
     heartbeat/         # Periodic wake-up service
+    dashboard/         # Web dashboard (GraphQL + WebSocket)
     agent/             # Agent loop and orchestration
-    cli/               # CLI commands and REPL
+    cli/               # 4 CLI commands (chat, serve, init, status)
   src/
     lib.rs                      # Re-export facade
     main.rs                     # Binary entry point
@@ -700,7 +683,6 @@ klyntbot/
   skills/                       # Built-in skill definitions
   tests/                        # Integration tests
   docs/                         # Architecture documentation
-    CALENDAR_SETUP.md           # Calendar setup guide (NEW)
 ```
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the complete dependency graph and design patterns.
@@ -709,34 +691,40 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the complete dependency gra
 
 | Metric | Value |
 |--------|-------|
-| Workspace crates | 12 |
-| Source lines | ~19,200 |
-| Test cases | 870+ |
+| Workspace crates | 15 |
+| Source lines | ~22,000+ |
+| Test cases | 910+ |
 | Clippy warnings | 0 |
 | Tools | 12 |
 | Providers | 12+ |
 | Channels | 6 ready, 3 planned |
+| Storage | PostgreSQL + pgvector |
 
 ---
 
 ## Workspace Structure
 
-Klyntbot is organized as a Cargo workspace with 12 focused crates:
+Klyntbot is organized as a Cargo workspace with 15 focused crates:
 
 ```
 crates/
 ├── common/         → Foundation types and error handling
 ├── config/         → Configuration schema and file I/O
 ├── bus/            → Async message bus
+├── storage/        → PostgreSQL repos, migrations, pgvector
 ├── providers/      → LLM provider abstraction (12+ providers)
-├── session/        → Session persistence (JSONL + cache)
+├── session/        → Session persistence
 ├── scheduling/     → Cron job scheduling
-├── calendar/       → CalDAV client and two-way sync (NEW)
-├── tools/          → Tool implementations (12 tools: file I/O, shell, web, todo, project, calendar)
+├── calendar/       → CalDAV client and two-way sync
+├── context_engine/ → Token budget, context assembly
+├── goal/           → Goal management
+├── plan/           → Plan management
+├── tools/          → Tool implementations (12 tools)
 ├── channels/       → Chat platform integrations (6 platforms)
 ├── heartbeat/      → Periodic wake-up service
+├── dashboard/      → Web dashboard (GraphQL + WebSocket)
 ├── agent/          → Agent orchestration
-└── cli/            → CLI commands and REPL
+└── cli/            → 4 CLI commands (chat, serve, init, status)
 ```
 
 **Key Benefits**:

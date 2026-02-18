@@ -17,8 +17,9 @@ use tokio::task::JoinHandle;
 use tracing::info;
 use uuid::Uuid;
 
-use crate::types::{CronJob, CronSchedule, CronStore};
+use crate::types::{CronJob, CronJobState, CronSchedule, CronStore};
 use common::Result;
+use storage::CronJobRow;
 
 /// Get current time in milliseconds
 fn now_ms() -> i64 {
@@ -65,10 +66,12 @@ pub struct CronService {
     pub(crate) on_job: Option<JobCallback>,
     pub(crate) running: Arc<RwLock<bool>>,
     pub(crate) timer_task: Arc<RwLock<Option<JoinHandle<()>>>>,
+    /// Optional SQL backend — when set, load/save delegate to CronRepo.
+    pub(crate) sql_repo: Option<storage::CronRepo>,
 }
 
 impl CronService {
-    /// Create a new cron service
+    /// Create a new cron service backed by a JSON file.
     pub fn new(store_path: impl Into<PathBuf>) -> Self {
         Self {
             store_path: store_path.into(),
@@ -76,6 +79,19 @@ impl CronService {
             on_job: None,
             running: Arc::new(RwLock::new(false)),
             timer_task: Arc::new(RwLock::new(None)),
+            sql_repo: None,
+        }
+    }
+
+    /// Create a new cron service backed by a SQL CronRepo.
+    pub fn from_repo(repo: storage::CronRepo) -> Self {
+        Self {
+            store_path: PathBuf::from("/dev/null"), // unused in SQL mode
+            store: Arc::new(RwLock::new(CronStore::default())),
+            on_job: None,
+            running: Arc::new(RwLock::new(false)),
+            timer_task: Arc::new(RwLock::new(None)),
+            sql_repo: Some(repo),
         }
     }
 
@@ -116,6 +132,7 @@ impl CronService {
     fn start_timer_loop(&self) {
         let store = self.store.clone();
         let store_path = self.store_path.clone();
+        let sql_repo = self.sql_repo.clone();
         let on_job = self.on_job.clone();
         let running = self.running.clone();
         let timer_task_ref = self.timer_task.clone();
@@ -142,7 +159,8 @@ impl CronService {
 
                     // Check if any jobs are due
                     if now_ms() >= next_wake {
-                        CronService::process_due_jobs(&store, &store_path, &on_job).await;
+                        CronService::process_due_jobs(&store, &store_path, &sql_repo, &on_job)
+                            .await;
                     }
                 } else {
                     // No jobs scheduled, sleep for a bit then check again
@@ -306,6 +324,46 @@ impl CronService {
             Ok(true)
         } else {
             Ok(false)
+        }
+    }
+
+    /// Convert a domain CronJob to a CronJobRow for SQL storage.
+    fn job_to_row(job: &CronJob) -> CronJobRow {
+        CronJobRow {
+            id: job.id.clone(),
+            name: job.name.clone(),
+            enabled: job.enabled,
+            schedule: serde_json::to_value(&job.schedule).unwrap_or_default(),
+            payload: serde_json::to_value(&job.payload).unwrap_or_default(),
+            next_run_at_ms: job.state.next_run_at_ms,
+            last_run_at_ms: job.state.last_run_at_ms,
+            last_status: job.state.last_status.clone(),
+            last_error: job.state.last_error.clone(),
+            created_at_ms: job.created_at_ms,
+            updated_at_ms: job.updated_at_ms,
+            delete_after_run: job.delete_after_run,
+        }
+    }
+
+    /// Convert a CronJobRow from SQL back to a domain CronJob.
+    fn row_to_job(row: CronJobRow) -> CronJob {
+        let schedule = serde_json::from_value(row.schedule).unwrap_or(CronSchedule::Every { every_ms: 0 });
+        let payload = serde_json::from_value(row.payload).unwrap_or_default();
+        CronJob {
+            id: row.id,
+            name: row.name,
+            enabled: row.enabled,
+            schedule,
+            payload,
+            state: CronJobState {
+                next_run_at_ms: row.next_run_at_ms,
+                last_run_at_ms: row.last_run_at_ms,
+                last_status: row.last_status,
+                last_error: row.last_error,
+            },
+            created_at_ms: row.created_at_ms,
+            updated_at_ms: row.updated_at_ms,
+            delete_after_run: row.delete_after_run,
         }
     }
 

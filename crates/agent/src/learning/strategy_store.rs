@@ -34,11 +34,12 @@ pub struct StrategyRecord {
     pub response_time_ms: u64,
 }
 
-/// JSONL-backed store for strategy execution records.
+/// JSONL-backed (or SQL-backed) store for strategy execution records.
 pub struct StrategyLearningStore {
     file_path: PathBuf,
     records: Vec<StrategyRecord>,
     loaded: bool,
+    sql_repo: Option<storage::StrategyRepo>,
 }
 
 impl StrategyLearningStore {
@@ -47,6 +48,17 @@ impl StrategyLearningStore {
             file_path,
             records: Vec::new(),
             loaded: false,
+            sql_repo: None,
+        }
+    }
+
+    /// Create a store backed by a SQL repository.
+    pub fn from_repo(repo: storage::StrategyRepo) -> Self {
+        Self {
+            file_path: PathBuf::new(),
+            records: Vec::new(),
+            loaded: true, // no JSONL to load
+            sql_repo: Some(repo),
         }
     }
 
@@ -54,8 +66,12 @@ impl StrategyLearningStore {
         &self.file_path
     }
 
-    /// Load existing records from the JSONL file.
+    /// Load existing records from the JSONL file (no-op for SQL backend).
     pub async fn load(&mut self) -> Result<()> {
+        if self.sql_repo.is_some() {
+            return Ok(());
+        }
+
         self.records.clear();
         self.loaded = true;
 
@@ -79,8 +95,31 @@ impl StrategyLearningStore {
         Ok(())
     }
 
-    /// Append a strategy record to the JSONL file and in-memory index.
+    /// Append a strategy record to the JSONL file (or SQL) and in-memory index.
     pub async fn record_strategy(&mut self, record: StrategyRecord) -> Result<()> {
+        // SQL path
+        if let Some(repo) = &self.sql_repo {
+            let row = storage::StrategyRecordRow {
+                id: uuid::Uuid::new_v4(),
+                timestamp: record.timestamp,
+                request_id: record.request_id.clone(),
+                predicted_strategy: record.predicted_strategy.clone(),
+                actual_strategy: record.actual_strategy.clone(),
+                escalation_count: record.escalation_count as i32,
+                iterations_used: record.iterations_used as i32,
+                max_iterations: record.max_iterations as i32,
+                success: record.success,
+                user_satisfaction: record.user_satisfaction,
+                response_time_ms: record.response_time_ms as i64,
+            };
+            repo.create(&row)
+                .await
+                .map_err(|e| common::ToolError::ExecutionFailed(e.to_string()))?;
+            self.records.push(record);
+            return Ok(());
+        }
+
+        // JSONL path (original)
         // Ensure parent directory exists
         if let Some(parent) = self.file_path.parent() {
             tokio::fs::create_dir_all(parent).await?;
@@ -107,7 +146,25 @@ impl StrategyLearningStore {
     /// (i.e., no escalation was needed).
     ///
     /// Returns `None` if no records exist for that strategy in the time window.
+    ///
+    /// For the SQL backend, this delegates to an async call internally using
+    /// `tokio::task::block_in_place`. Use `get_strategy_accuracy_async` for a
+    /// fully async version.
     pub fn get_strategy_accuracy(&self, strategy: &str, days: u32) -> Option<f32> {
+        // SQL path — delegate synchronously (callers are typically in async context)
+        if let Some(repo) = &self.sql_repo {
+            let cutoff = Utc::now() - Duration::days(days as i64);
+            let repo = repo.clone();
+            let strategy = strategy.to_string();
+            // Use block_in_place to bridge sync → async
+            return tokio::task::block_in_place(move || {
+                tokio::runtime::Handle::current().block_on(async {
+                    repo.get_accuracy(&strategy, cutoff).await.ok().flatten()
+                })
+            });
+        }
+
+        // JSONL path (original)
         let cutoff = Utc::now() - Duration::days(days as i64);
 
         let matching: Vec<&StrategyRecord> = self
@@ -128,7 +185,10 @@ impl StrategyLearningStore {
         Some(correct as f32 / matching.len() as f32)
     }
 
-    /// Get all records (for analysis).
+    /// Get all in-memory records (for analysis).
+    ///
+    /// Note: When using the SQL backend, only records created during this
+    /// session are available in-memory. Historical records live in the database.
     pub fn records(&self) -> &[StrategyRecord] {
         &self.records
     }

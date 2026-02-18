@@ -5,32 +5,28 @@
 use async_trait::async_trait;
 use chrono::Utc;
 use serde_json::Value;
-use std::sync::Arc;
-use tokio::sync::RwLock;
 
 use super::{RoutingContext, Tool};
 use crate::params::ParamExtractor;
-use crate::project_store::ProjectStore;
 use crate::project_types::{Project, ProjectColor, ProjectFilter, ProjectPatch, ProjectStatus};
-use crate::todo_store::TodoStore;
 use crate::todo_types::TodoFilter;
 use common::{Result, ToolError};
 
 /// ProjectTool for managing projects and project-task relationships
 pub struct ProjectTool {
-    project_store: Arc<RwLock<ProjectStore>>,
-    todo_store: Arc<RwLock<TodoStore>>,
+    project_repo: storage::ProjectRepo,
+    todo_repo: storage::TodoRepo,
 }
 
 impl ProjectTool {
     /// Create a new ProjectTool
     pub fn new(
-        project_store: Arc<RwLock<ProjectStore>>,
-        todo_store: Arc<RwLock<TodoStore>>,
+        project_repo: storage::ProjectRepo,
+        todo_repo: storage::TodoRepo,
     ) -> Self {
         Self {
-            project_store,
-            todo_store,
+            project_repo,
+            todo_repo,
         }
     }
 }
@@ -116,8 +112,9 @@ impl Tool for ProjectTool {
                     updated_at: Utc::now(),
                 };
 
-                let mut store = self.project_store.write().await;
-                let created = store.add(project).await?;
+                let row = storage::ProjectRow::from(&project);
+                let created_row = self.project_repo.create(&row).await?;
+                let created: Project = created_row.into();
                 Ok(format!(
                     "Project created: {} (ID: {})",
                     created.name, created.id
@@ -131,8 +128,8 @@ impl Tool for ProjectTool {
                     limit: p.optional_u64("limit")?.map(|v| v as usize),
                 };
 
-                let mut store = self.project_store.write().await;
-                let projects = store.list(&filter).await?;
+                let rows = self.project_repo.list(&filter.to_storage_filter()).await?;
+                let projects: Vec<Project> = rows.into_iter().map(Project::from).collect();
 
                 if projects.is_empty() {
                     return Ok("No projects found".to_string());
@@ -161,10 +158,11 @@ impl Tool for ProjectTool {
             "show" => {
                 let id = p.required_str("id")?;
 
-                let mut store = self.project_store.write().await;
-                let project = store
+                let project: Project = self
+                    .project_repo
                     .get(id)
                     .await?
+                    .map(Project::from)
                     .ok_or_else(|| ToolError::InvalidParams("Project not found".to_string()))?;
 
                 let mut output = String::new();
@@ -181,15 +179,10 @@ impl Tool for ProjectTool {
                 output.push_str(&format!("Created: {}\n", project.created_at));
                 output.push_str(&format!("Updated: {}\n", project.updated_at));
 
-                // Count tasks in this project
-                let mut todo_store = self.todo_store.write().await;
-                let tasks = todo_store
-                    .list(&TodoFilter::default())
-                    .await?
-                    .into_iter()
-                    .filter(|t| t.project_id.as_ref() == Some(&project.id))
-                    .collect::<Vec<_>>();
-                output.push_str(&format!("\nTasks: {}\n", tasks.len()));
+                // Use aggregated task counts from the repo (efficient single query)
+                let stats = self.project_repo.get_with_stats(id).await?;
+                let task_count = stats.map(|s| s.task_count_total).unwrap_or(0);
+                output.push_str(&format!("\nTasks: {}\n", task_count));
 
                 Ok(output)
             }
@@ -209,11 +202,9 @@ impl Tool for ProjectTool {
                     status: p.optional_str("status")?.and_then(parse_status),
                 };
 
-                let mut store = self.project_store.write().await;
-                let updated = store
-                    .update(id, patch)
-                    .await?
-                    .ok_or_else(|| ToolError::InvalidParams("Project not found".to_string()))?;
+                let storage_patch = patch.to_storage_patch(id);
+                let updated_row = self.project_repo.update(&storage_patch).await?;
+                let updated: Project = updated_row.into();
 
                 Ok(format!(
                     "Project updated: {} (ID: {})",
@@ -224,16 +215,8 @@ impl Tool for ProjectTool {
             "archive" => {
                 let id = p.required_str("id")?;
 
-                let patch = ProjectPatch {
-                    status: Some(ProjectStatus::Archived),
-                    ..Default::default()
-                };
-
-                let mut store = self.project_store.write().await;
-                let updated = store
-                    .update(id, patch)
-                    .await?
-                    .ok_or_else(|| ToolError::InvalidParams("Project not found".to_string()))?;
+                let updated_row = self.project_repo.archive(id).await?;
+                let updated: Project = updated_row.into();
 
                 Ok(format!("Project archived: {}", updated.name))
             }
@@ -242,24 +225,22 @@ impl Tool for ProjectTool {
                 let id = p.required_str("id")?;
 
                 // Verify project exists
-                let mut project_store = self.project_store.write().await;
-                let project = project_store
+                let project: Project = self
+                    .project_repo
                     .get(id)
                     .await?
+                    .map(Project::from)
                     .ok_or_else(|| ToolError::InvalidParams("Project not found".to_string()))?;
 
-                // Get tasks for this project
-                let mut todo_store = self.todo_store.write().await;
-                let mut tasks = todo_store
-                    .list(&TodoFilter::default())
-                    .await?
-                    .into_iter()
-                    .filter(|t| t.project_id.as_ref() == Some(&project.id))
-                    .collect::<Vec<_>>();
-
-                if let Some(limit) = p.optional_u64("limit")?.map(|v| v as usize) {
-                    tasks.truncate(limit);
-                }
+                // Get tasks for this project using a filtered query
+                let filter = TodoFilter {
+                    project_id: Some(project.id.clone()),
+                    limit: p.optional_u64("limit")?.map(|v| v as usize),
+                    ..Default::default()
+                };
+                let rows = self.todo_repo.list(&filter.to_storage_filter()).await?;
+                let tasks: Vec<crate::todo_types::Todo> =
+                    rows.into_iter().map(crate::todo_types::Todo::from).collect();
 
                 if tasks.is_empty() {
                     return Ok(format!("No tasks in project '{}'", project.name));
@@ -326,7 +307,6 @@ fn format_status(status: &ProjectStatus) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::tempdir;
 
     #[test]
     fn test_parse_color() {
@@ -342,63 +322,5 @@ mod tests {
         assert_eq!(parse_status("invalid"), None);
     }
 
-    #[tokio::test]
-    async fn test_create_project() {
-        let dir = tempdir().unwrap();
-        let project_path = dir.path().join("projects.jsonl");
-        let todo_path = dir.path().join("todos.jsonl");
-
-        let project_store = Arc::new(RwLock::new(ProjectStore::new(project_path)));
-        let todo_store = Arc::new(RwLock::new(TodoStore::new(todo_path)));
-        let tool = ProjectTool::new(project_store, todo_store);
-
-        let args = serde_json::json!({
-            "action": "create",
-            "name": "Test Project",
-            "description": "A test project",
-            "color": "blue"
-        });
-
-        let result = tool
-            .execute(args, &RoutingContext::new("cli".into(), "test".into()))
-            .await
-            .unwrap();
-
-        assert!(result.contains("Project created: Test Project"));
-    }
-
-    #[tokio::test]
-    async fn test_list_projects() {
-        let dir = tempdir().unwrap();
-        let project_path = dir.path().join("projects.jsonl");
-        let todo_path = dir.path().join("todos.jsonl");
-
-        let project_store = Arc::new(RwLock::new(ProjectStore::new(project_path)));
-        let todo_store = Arc::new(RwLock::new(TodoStore::new(todo_path)));
-        let tool = ProjectTool::new(Arc::clone(&project_store), Arc::clone(&todo_store));
-
-        // Create a project first
-        let p1 = Project {
-            id: Project::generate_id(),
-            name: "Project 1".to_string(),
-            description: None,
-            color: ProjectColor::Blue,
-            tags: vec![],
-            status: ProjectStatus::Active,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
-        };
-        project_store.write().await.add(p1).await.unwrap();
-
-        let args = serde_json::json!({
-            "action": "list"
-        });
-
-        let result = tool
-            .execute(args, &RoutingContext::new("cli".into(), "test".into()))
-            .await
-            .unwrap();
-
-        assert!(result.contains("Project 1"));
-    }
+    // Integration tests requiring a PgPool are in tests/storage_integration_test.rs
 }

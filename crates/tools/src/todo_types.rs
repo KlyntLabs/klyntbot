@@ -233,6 +233,154 @@ pub enum TimeEntrySource {
     Manual, // Created by log_time action
 }
 
+// ---------------------------------------------------------------------------
+// Row ↔ domain conversions (storage layer)
+// ---------------------------------------------------------------------------
+
+impl From<storage::TodoRow> for Todo {
+    fn from(row: storage::TodoRow) -> Self {
+        Self {
+            id: row.id,
+            title: row.title,
+            description: row.description,
+            priority: row.priority.map(|p| p as u8),
+            due_date: row.due_date,
+            tags: row.tags,
+            status: TodoStatus::from_str_loose(&row.status).unwrap_or(TodoStatus::Todo),
+            focused_at: row.focused_at,
+            focus_deadline: row.focus_deadline,
+            focus_expired_count: row.focus_expired_count as u32,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+            completed_at: row.completed_at,
+            parent_id: row.parent_id,
+            project_id: row.project_id,
+            attachments: Vec::new(),  // loaded separately from join table
+            time_entries: Vec::new(), // loaded separately from join table
+            total_tracked_secs: row.total_tracked_secs as u64,
+            estimated_minutes: row.estimated_minutes.map(|m| m as u32),
+            calendar_event_uid: row.calendar_event_uid,
+            last_reminded_at: row.last_reminded_at,
+            recurrence_rule: row.recurrence_rule,
+            recurrence_parent_id: row.recurrence_parent_id,
+            is_template: row.is_template,
+            next_instance_date: row.next_instance_date,
+            blocked_by: Vec::new(), // loaded separately from edge table
+            blocks: Vec::new(),     // loaded separately from edge table
+        }
+    }
+}
+
+impl From<&Todo> for storage::TodoRow {
+    fn from(todo: &Todo) -> Self {
+        Self {
+            id: todo.id.clone(),
+            title: todo.title.clone(),
+            description: todo.description.clone(),
+            priority: todo.priority.map(|p| p as i16),
+            due_date: todo.due_date,
+            tags: todo.tags.clone(),
+            status: match todo.status {
+                TodoStatus::Todo => "todo",
+                TodoStatus::Doing => "doing",
+                TodoStatus::Done => "done",
+                TodoStatus::Archived => "archived",
+            }
+            .to_string(),
+            focused_at: todo.focused_at,
+            focus_deadline: todo.focus_deadline,
+            focus_expired_count: todo.focus_expired_count as i32,
+            created_at: todo.created_at,
+            updated_at: todo.updated_at,
+            completed_at: todo.completed_at,
+            parent_id: todo.parent_id.clone(),
+            project_id: todo.project_id.clone(),
+            total_tracked_secs: todo.total_tracked_secs as i64,
+            estimated_minutes: todo.estimated_minutes.map(|m| m as i32),
+            calendar_event_uid: todo.calendar_event_uid.clone(),
+            last_reminded_at: todo.last_reminded_at,
+            recurrence_rule: todo.recurrence_rule.clone(),
+            recurrence_parent_id: todo.recurrence_parent_id.clone(),
+            is_template: todo.is_template,
+            next_instance_date: todo.next_instance_date,
+        }
+    }
+}
+
+impl From<storage::TodoAttachmentRow> for Attachment {
+    fn from(row: storage::TodoAttachmentRow) -> Self {
+        Self {
+            id: row.id.to_string(),
+            attachment_type: match row.attachment_type.as_str() {
+                "file" => AttachmentType::File,
+                "url" => AttachmentType::Url,
+                _ => AttachmentType::Note,
+            },
+            title: row.title,
+            value: row.value,
+            tags: row.tags,
+            created_at: row.created_at,
+        }
+    }
+}
+
+impl From<storage::TodoTimeEntryRow> for TimeEntry {
+    fn from(row: storage::TodoTimeEntryRow) -> Self {
+        Self {
+            id: row.id.to_string(),
+            started_at: row.started_at,
+            ended_at: row.ended_at,
+            duration_secs: row.duration_secs.map(|s| s as u64),
+            note: row.note,
+            source: match row.source.as_str() {
+                "manual" => TimeEntrySource::Manual,
+                _ => TimeEntrySource::Focus,
+            },
+        }
+    }
+}
+
+/// Convert a domain `TodoPatch` into a storage `TodoPatch`.
+impl TodoPatch {
+    pub fn to_storage_patch(&self, id: &str) -> storage::TodoPatch {
+        storage::TodoPatch {
+            id: id.to_string(),
+            title: self.title.clone(),
+            description: self.description.clone(),
+            priority: self.priority.map(|p| Some(p as i16)),
+            due_date: self.due_date,
+            tags: self.tags.clone(),
+            status: self.status.map(|s| match s {
+                TodoStatus::Todo => "todo",
+                TodoStatus::Doing => "doing",
+                TodoStatus::Done => "done",
+                TodoStatus::Archived => "archived",
+            }
+            .to_string()),
+        }
+    }
+}
+
+/// Convert a domain `TodoFilter` into a storage `TodoFilter`.
+impl TodoFilter {
+    pub fn to_storage_filter(&self) -> storage::TodoFilter {
+        storage::TodoFilter {
+            status: self.status.map(|s| match s {
+                TodoStatus::Todo => "todo",
+                TodoStatus::Doing => "doing",
+                TodoStatus::Done => "done",
+                TodoStatus::Archived => "archived",
+            }
+            .to_string()),
+            tags: self.tag.as_ref().map(|t| vec![t.clone()]),
+            project_id: self.project_id.clone(),
+            priority_min: self.priority_min.map(|p| p as i16),
+            limit: self.limit.map(|l| l as i64),
+            templates_only: self.include_templates,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -68,6 +68,113 @@ pub struct ProjectFilter {
     pub limit: Option<usize>,
 }
 
+// ---------------------------------------------------------------------------
+// Row ↔ domain conversions (storage layer)
+// ---------------------------------------------------------------------------
+
+impl ProjectStatus {
+    fn from_str_loose(s: &str) -> Self {
+        match s {
+            "active" => Self::Active,
+            "paused" => Self::Paused,
+            "completed" => Self::Completed,
+            "archived" => Self::Archived,
+            _ => Self::Active,
+        }
+    }
+
+    fn as_str(&self) -> &'static str {
+        match self {
+            Self::Active => "active",
+            Self::Paused => "paused",
+            Self::Completed => "completed",
+            Self::Archived => "archived",
+        }
+    }
+}
+
+impl ProjectColor {
+    fn from_str_loose(s: &str) -> Self {
+        match s {
+            "red" => Self::Red,
+            "orange" => Self::Orange,
+            "yellow" => Self::Yellow,
+            "green" => Self::Green,
+            "blue" => Self::Blue,
+            "purple" => Self::Purple,
+            "gray" => Self::Gray,
+            _ => Self::default(),
+        }
+    }
+
+    fn as_str(&self) -> &'static str {
+        match self {
+            Self::Red => "red",
+            Self::Orange => "orange",
+            Self::Yellow => "yellow",
+            Self::Green => "green",
+            Self::Blue => "blue",
+            Self::Purple => "purple",
+            Self::Gray => "gray",
+        }
+    }
+}
+
+impl From<storage::ProjectRow> for Project {
+    fn from(row: storage::ProjectRow) -> Self {
+        Self {
+            id: row.id,
+            name: row.name,
+            description: row.description,
+            color: ProjectColor::from_str_loose(&row.color),
+            tags: row.tags,
+            status: ProjectStatus::from_str_loose(&row.status),
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+        }
+    }
+}
+
+impl From<&Project> for storage::ProjectRow {
+    fn from(project: &Project) -> Self {
+        Self {
+            id: project.id.clone(),
+            name: project.name.clone(),
+            description: project.description.clone(),
+            color: project.color.as_str().to_string(),
+            tags: project.tags.clone(),
+            status: project.status.as_str().to_string(),
+            created_at: project.created_at,
+            updated_at: project.updated_at,
+        }
+    }
+}
+
+/// Convert a domain `ProjectPatch` into a storage `ProjectPatch`.
+impl ProjectPatch {
+    pub fn to_storage_patch(&self, id: &str) -> storage::ProjectPatch {
+        storage::ProjectPatch {
+            id: id.to_string(),
+            name: self.name.clone(),
+            description: self.description.clone(),
+            color: self.color.map(|c| c.as_str().to_string()),
+            tags: self.tags.clone(),
+            status: self.status.map(|s| s.as_str().to_string()),
+        }
+    }
+}
+
+/// Convert a domain `ProjectFilter` into a storage `ProjectFilter`.
+impl ProjectFilter {
+    pub fn to_storage_filter(&self) -> storage::ProjectFilter {
+        storage::ProjectFilter {
+            status: self.status.map(|s| s.as_str().to_string()),
+            tags: self.tag.as_ref().map(|t| vec![t.clone()]),
+            limit: self.limit.map(|l| l as i64),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

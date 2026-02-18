@@ -39,6 +39,8 @@ use mock_provider::MockProvider;
 // ─────────────────────────────────────────────────────────────
 
 /// Create an agent loop with learning enabled, isolated to a temp directory.
+/// Uses a lazy (non-connected) pool — tests that trigger DB queries will fail unless
+/// DATABASE_URL is set and points to a valid Postgres instance.
 #[allow(dead_code)]
 async fn create_agent_with_learning(provider: Arc<MockProvider>) -> (AgentLoop, TempDir) {
     let temp_dir = TempDir::new().unwrap();
@@ -56,7 +58,9 @@ async fn create_agent_with_learning(provider: Arc<MockProvider>) -> (AgentLoop, 
     config.learning.min_outcomes_for_adaptation = 5; // low for unit tests
 
     let bus = Arc::new(MessageBus::new(10));
-    let agent = AgentLoop::new(bus, provider, config).await.unwrap();
+    let pool = klyntbot::storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
+    let todo_repo = klyntbot::storage::TodoRepo::new(pool.inner().clone());
+    let agent = AgentLoop::new(bus, provider, config, todo_repo, None).await.unwrap();
     (agent, temp_dir)
 }
 
@@ -754,7 +758,9 @@ async fn test_ac_learning_disabled_no_recording() {
     config.learning.enabled = false;
 
     let bus = Arc::new(MessageBus::new(10));
-    let agent = AgentLoop::new(bus, provider.clone(), config).await.unwrap();
+    let pool = klyntbot::storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
+    let todo_repo = klyntbot::storage::TodoRepo::new(pool.inner().clone());
+    let agent = AgentLoop::new(bus, provider.clone(), config, todo_repo, None).await.unwrap();
 
     let response = agent
         .process_direct("Hi".to_string(), "test:sess".to_string())

@@ -9,19 +9,21 @@
 //! - crates/agent/src/confidence/types.rs (serialization)
 //! - crates/agent/src/confidence/log.rs (JSONL persistence)
 
+use klyntbot::storage::{StoragePool, TodoRepo};
 use klyntbot::tools::todo::TodoTool;
-use klyntbot::tools::todo_store::TodoStore;
 use klyntbot::tools::{RoutingContext, Tool};
-use std::sync::Arc;
 use tempfile::TempDir;
-use tokio::sync::RwLock;
 
-/// Helper to create a test TodoTool
-async fn create_test_tool() -> (TodoTool, TempDir) {
+/// Helper to create a test TodoTool.
+///
+/// Uses a lazy (non-connected) pool — queries that hit Postgres will fail at runtime.
+/// These tests exercise the tool's add/complete flow, which requires Postgres.
+/// They are `#[ignore]`d unless DATABASE_URL is set.
+fn create_test_tool() -> (TodoTool, TempDir) {
     let temp_dir = TempDir::new().unwrap();
-    let file_path = temp_dir.path().join("todos.jsonl");
-    let store = Arc::new(RwLock::new(TodoStore::new(file_path)));
-    let tool = TodoTool::new(store, 3, 18, "UTC".to_string());
+    let pool = StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
+    let repo = TodoRepo::new(pool.inner().clone());
+    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string());
     (tool, temp_dir)
 }
 
@@ -33,8 +35,9 @@ fn ctx() -> RoutingContext {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_add_task_returns_id() {
-    let (tool, _dir) = create_test_tool().await;
+    let (tool, _dir) = create_test_tool();
 
     let args = serde_json::json!({
         "action": "add",
@@ -56,8 +59,9 @@ async fn test_add_task_returns_id() {
 }
 
 #[tokio::test]
+#[ignore = "requires PostgreSQL (DATABASE_URL)"]
 async fn test_complete_task_returns_clean_output() {
-    let (tool, _dir) = create_test_tool().await;
+    let (tool, _dir) = create_test_tool();
 
     let args = serde_json::json!({
         "action": "add",
