@@ -10,6 +10,7 @@ use context_engine::ExecutionStrategy;
 use providers::{ChatParams, DynProvider, Message};
 
 /// Result of classification with metadata.
+#[derive(Debug)]
 pub struct ClassificationResult {
     pub strategy: ExecutionStrategy,
     pub reasoning: String,

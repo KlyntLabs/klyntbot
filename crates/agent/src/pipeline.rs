@@ -1,0 +1,334 @@
+//! Agent pipeline — wires together the full Adaptive Orchestrator pipeline:
+//! Orchestrator → ContextEngine → EngineDispatch → ResponseValidator → CostTracker
+//!
+//! This is the main entry point for processing user messages through the
+//! adaptive orchestration system.
+
+use std::sync::Arc;
+
+use common::Result;
+use context_engine::{ContextEngine, ContextRequest};
+use providers::{Message, Usage};
+use tools::RoutingContext;
+use tracing::{debug, info, warn};
+
+use crate::execution::{EngineDispatch, ExecutionParams};
+use crate::orchestrator::{ClassificationResult, Orchestrator};
+use crate::output::cost_tracker::CostTracker;
+use crate::output::validator::{ResponseValidator, ValidationResult};
+
+/// Result of processing a message through the full pipeline.
+#[derive(Debug)]
+pub struct PipelineResult {
+    /// The final response content.
+    pub content: String,
+    /// Which strategy was used (may differ from classified due to escalation).
+    pub strategy_used: String,
+    /// Classification details.
+    pub classification: ClassificationResult,
+    /// Number of escalations during execution.
+    pub escalations: u32,
+    /// Validation warnings (if any).
+    pub validation: ValidationResult,
+}
+
+/// Configuration for the pipeline.
+pub struct PipelineConfig {
+    /// Model name for execution (tool calls, responses).
+    pub execution_model: String,
+    /// System prompt to prepend.
+    pub system_prompt: String,
+    /// Context window size in tokens.
+    pub context_window: usize,
+    /// Maximum response tokens for validation.
+    pub max_response_tokens: usize,
+    /// Channel name for cost tracking.
+    pub channel: String,
+    /// Provider name for cost tracking.
+    pub provider_name: String,
+}
+
+impl Default for PipelineConfig {
+    fn default() -> Self {
+        Self {
+            execution_model: "claude-sonnet-4-20250514".to_string(),
+            system_prompt: "You are a helpful assistant.".to_string(),
+            context_window: 128_000,
+            max_response_tokens: 4096,
+            channel: "unknown".to_string(),
+            provider_name: "unknown".to_string(),
+        }
+    }
+}
+
+/// The main agent pipeline that wires together all orchestration components.
+pub struct AgentPipeline {
+    orchestrator: Arc<Orchestrator>,
+    context_engine: ContextEngine,
+    engine_dispatch: Arc<EngineDispatch>,
+    validator: ResponseValidator,
+    cost_tracker: Arc<CostTracker>,
+    config: PipelineConfig,
+}
+
+impl AgentPipeline {
+    pub fn new(
+        orchestrator: Arc<Orchestrator>,
+        engine_dispatch: Arc<EngineDispatch>,
+        cost_tracker: Arc<CostTracker>,
+        config: PipelineConfig,
+    ) -> Self {
+        Self {
+            orchestrator,
+            context_engine: ContextEngine::new(),
+            engine_dispatch,
+            validator: ResponseValidator::new(config.max_response_tokens),
+            cost_tracker,
+            config,
+        }
+    }
+
+    /// Process a user message through the full pipeline.
+    ///
+    /// 1. Classify intent (heuristics → LLM)
+    /// 2. Assemble context with budget allocation
+    /// 3. Execute with appropriate engine (with escalation)
+    /// 4. Validate response
+    /// 5. Record usage
+    pub async fn process_message(
+        &self,
+        message: &str,
+        history: Vec<Message>,
+        tool_definitions: &[serde_json::Value],
+        tool_names: &[&str],
+        ctx: &RoutingContext,
+    ) -> Result<PipelineResult> {
+        // Step 1: Classify
+        let classification = self.orchestrator.classify(message, tool_names).await;
+        debug!(
+            "Pipeline: classified as {:?} (source: {:?}, confidence: {:.2})",
+            classification.strategy, classification.source, classification.confidence
+        );
+
+        // Step 2: Assemble context
+        let context_request = ContextRequest {
+            message_text: message.to_string(),
+            history,
+            system_prompt: self.config.system_prompt.clone(),
+            strategy: classification.strategy.clone(),
+            tool_definitions: tool_definitions.to_vec(),
+            memory_path: None,
+            context_window: self.config.context_window,
+        };
+        let assembled = self.context_engine.assemble(context_request);
+
+        debug!(
+            "Pipeline: assembled context with {} messages, {} tokens",
+            assembled.messages.len(),
+            assembled.token_count
+        );
+
+        // Step 3: Execute
+        let params = ExecutionParams::new(&self.config.execution_model);
+        let dispatch_result = self
+            .engine_dispatch
+            .execute(
+                classification.strategy.clone(),
+                assembled.messages,
+                tool_definitions,
+                &params,
+                ctx,
+            )
+            .await?;
+
+        if dispatch_result.escalation_count > 0 {
+            info!(
+                "Pipeline: escalated {} time(s), final strategy: {:?}",
+                dispatch_result.escalation_count, dispatch_result.final_strategy
+            );
+        }
+
+        // Step 4: Validate
+        let validation = self.validator.validate(&dispatch_result.content);
+        if !validation.is_valid {
+            warn!(
+                "Pipeline: response validation failed with {} warning(s)",
+                validation.warnings.len()
+            );
+        }
+
+        let final_content = validation.filtered_content.clone();
+        let strategy_name = format!("{:?}", dispatch_result.final_strategy);
+
+        // Step 5: Record usage (best-effort, don't fail the pipeline)
+        let usage = Usage::default(); // actual usage would come from provider responses
+        if let Err(e) = self
+            .cost_tracker
+            .record(
+                &usage,
+                &self.config.execution_model,
+                &self.config.provider_name,
+                &strategy_name,
+                &self.config.channel,
+            )
+            .await
+        {
+            warn!("Pipeline: failed to record usage: {}", e);
+        }
+
+        Ok(PipelineResult {
+            content: final_content,
+            strategy_used: strategy_name,
+            classification,
+            escalations: dispatch_result.escalation_count,
+            validation,
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use async_trait::async_trait;
+    use providers::{ChatParams, LlmProvider, LlmResponse};
+    use serde_json::Value;
+    use std::sync::Mutex;
+    use tokio::sync::RwLock;
+    use tools::registry::ToolRegistry;
+
+    use crate::execution::ExecutionCore;
+
+    // ── Mock Provider ──
+
+    struct MockPipelineProvider {
+        responses: Mutex<Vec<LlmResponse>>,
+    }
+
+    impl MockPipelineProvider {
+        fn new(responses: Vec<LlmResponse>) -> Arc<Self> {
+            Arc::new(Self {
+                responses: Mutex::new(responses),
+            })
+        }
+    }
+
+    #[async_trait]
+    impl LlmProvider for MockPipelineProvider {
+        async fn chat(
+            &self,
+            _messages: &[Message],
+            _tools: Option<&[Value]>,
+            _params: &ChatParams,
+        ) -> common::Result<LlmResponse> {
+            let mut responses = self.responses.lock().unwrap();
+            if responses.is_empty() {
+                Ok(LlmResponse {
+                    content: Some("fallback response".to_string()),
+                    tool_calls: vec![],
+                    finish_reason: "stop".to_string(),
+                    usage: Usage::default(),
+                    reasoning_content: None,
+                })
+            } else {
+                Ok(responses.remove(0))
+            }
+        }
+        fn default_model(&self) -> &str {
+            "mock"
+        }
+        fn name(&self) -> &str {
+            "mock"
+        }
+    }
+
+    // ── Helpers ──
+
+    fn text_response(text: &str) -> LlmResponse {
+        LlmResponse {
+            content: Some(text.to_string()),
+            tool_calls: vec![],
+            finish_reason: "stop".to_string(),
+            usage: Usage::default(),
+            reasoning_content: None,
+        }
+    }
+
+    fn routing_ctx() -> RoutingContext {
+        RoutingContext::new("test".into(), "test".into())
+    }
+
+    fn make_pipeline(provider: Arc<dyn LlmProvider>) -> AgentPipeline {
+        let registry = Arc::new(RwLock::new(ToolRegistry::new()));
+        let core = Arc::new(ExecutionCore::new(provider.clone(), registry));
+        let orchestrator = Arc::new(Orchestrator::new(provider.clone(), "mock"));
+        let dispatch = Arc::new(EngineDispatch::new(core));
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().to_path_buf();
+        let cost_tracker = Arc::new(CostTracker::new(path));
+
+        AgentPipeline::new(
+            orchestrator,
+            dispatch,
+            cost_tracker,
+            PipelineConfig::default(),
+        )
+    }
+
+    // ── Tests ──
+
+    #[tokio::test]
+    async fn test_direct_response_pipeline() {
+        // "hello" → heuristic classifies as DirectResponse → single LLM call
+        let provider = MockPipelineProvider::new(vec![text_response("Hi there!")]);
+        let pipeline = make_pipeline(provider);
+
+        let result = pipeline
+            .process_message("hello", vec![], &[], &[], &routing_ctx())
+            .await
+            .unwrap();
+
+        assert_eq!(result.content, "Hi there!");
+        assert!(result.strategy_used.contains("DirectResponse"));
+        assert_eq!(result.escalations, 0);
+        assert!(result.validation.is_valid);
+    }
+
+    #[tokio::test]
+    async fn test_tool_assisted_pipeline() {
+        // "show my tasks" → heuristic classifies as ToolAssisted
+        // Provider returns a text response (no actual tool calls)
+        let provider = MockPipelineProvider::new(vec![text_response("Here are your tasks: ...")]);
+        let pipeline = make_pipeline(provider);
+
+        let result = pipeline
+            .process_message("show my tasks", vec![], &[], &[], &routing_ctx())
+            .await
+            .unwrap();
+
+        assert_eq!(result.content, "Here are your tasks: ...");
+        assert!(result.strategy_used.contains("ToolAssisted"));
+        assert_eq!(result.escalations, 0);
+    }
+
+    #[tokio::test]
+    async fn test_pipeline_validates_response() {
+        // Empty response triggers validation warning
+        let provider = MockPipelineProvider::new(vec![LlmResponse {
+            content: Some(String::new()),
+            tool_calls: vec![],
+            finish_reason: "stop".to_string(),
+            usage: Usage::default(),
+            reasoning_content: None,
+        }]);
+        let pipeline = make_pipeline(provider);
+
+        let result = pipeline
+            .process_message("hi", vec![], &[], &[], &routing_ctx())
+            .await
+            .unwrap();
+
+        // Empty response should trigger validation warnings
+        assert!(!result.validation.is_valid);
+    }
+}

@@ -14,6 +14,7 @@ pub struct ResponseValidator {
 }
 
 /// Result of validating a response.
+#[derive(Debug)]
 pub struct ValidationResult {
     pub is_valid: bool,
     pub warnings: Vec<ValidationWarning>,
