@@ -4,6 +4,7 @@
 
 pub mod agent_loop;
 pub mod calendar_reconcile;
+pub mod chat;
 pub mod engines;
 pub mod execution;
 pub mod calendar_sync_adapter;
