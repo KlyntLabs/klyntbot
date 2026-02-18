@@ -19,6 +19,7 @@ pub mod learning_handler;
 pub mod memory;
 pub mod notifications;
 pub mod orchestrator;
+pub mod output;
 pub mod plan_completion_handler;
 pub mod plan_executor;
 pub mod plan_handler;
