@@ -14,7 +14,7 @@ pub fn classify_heuristic(message: &str) -> Option<ExecutionStrategy> {
     let msg = message.trim().to_lowercase();
     let word_count = msg.split_whitespace().count();
 
-    // 1. Greeting pattern
+    // 1. Greeting pattern — fast path, no ambiguity
     const GREETINGS: &[&str] = &[
         "hi",
         "hello",
@@ -35,12 +35,20 @@ pub fn classify_heuristic(message: &str) -> Option<ExecutionStrategy> {
         return Some(ExecutionStrategy::DirectResponse);
     }
 
-    // 2. Very short, non-code messages -> DirectResponse
-    if msg.len() < 20 && word_count <= 4 && !contains_code_keywords(&msg) {
-        return Some(ExecutionStrategy::DirectResponse);
+    // 2. Very short, non-keyword messages → DirectResponse
+    if msg.len() < 20 && word_count <= 4 {
+        // Check no other keyword categories fire
+        if classify_by_keywords(&msg).is_none()
+            || matches!(
+                classify_by_keywords(&msg),
+                Some(ExecutionStrategy::DirectResponse)
+            )
+        {
+            return Some(ExecutionStrategy::DirectResponse);
+        }
     }
 
-    // 3. Plan keywords -> AutonomousTask
+    // 3. Plan keywords → AutonomousTask (checked before general keywords)
     const PLAN_KEYWORDS: &[&str] = &[
         "create a plan",
         "plan and implement",
@@ -55,40 +63,94 @@ pub fn classify_heuristic(message: &str) -> Option<ExecutionStrategy> {
         });
     }
 
-    // 4. Code/task keywords -> ToolAssisted
-    if contains_code_keywords(&msg) {
+    // 4. Keyword-based classification with conflict detection
+    classify_by_keywords(&msg)
+}
+
+/// Keywords that indicate autonomous multi-step execution.
+const AUTONOMOUS_KEYWORDS: &[&str] = &[
+    "write a script",
+    "write me a script",
+    "set up",
+    "deploy",
+    "implement a full",
+    "build a full",
+    "create a project",
+    "write a program",
+    "write a complete",
+];
+
+/// Keywords that indicate tool-assisted execution (search, lookup, etc.)
+const TOOL_KEYWORDS: &[&str] = &[
+    "search",
+    "find",
+    "list",
+    "show",
+    "fetch",
+    "get",
+    "read",
+    "look up",
+    "check",
+    "show my tasks",
+    "my todo",
+    "list tasks",
+];
+
+/// Keywords that indicate code/task work (tool-assisted).
+const CODE_KEYWORDS: &[&str] = &[
+    "fix", "build", "implement", "create", "add", "update", "refactor", "debug", "git", ".rs",
+    ".py", ".ts", "function", "class", "struct", "file",
+];
+
+/// Keywords that indicate a direct response (questions, explanations).
+const DIRECT_KEYWORDS: &[&str] = &[
+    "what is",
+    "what are",
+    "how does",
+    "explain",
+    "define",
+    "tell me about",
+    "who is",
+    "why is",
+    "when is",
+    "describe",
+];
+
+fn classify_by_keywords(msg: &str) -> Option<ExecutionStrategy> {
+    let has_autonomous = AUTONOMOUS_KEYWORDS.iter().any(|k| msg.contains(k));
+    let has_tool = TOOL_KEYWORDS.iter().any(|k| msg.contains(k));
+    let has_code = CODE_KEYWORDS.iter().any(|k| msg.contains(k));
+    let has_direct = DIRECT_KEYWORDS.iter().any(|k| msg.contains(k));
+
+    // Autonomous phrases are high-confidence multi-word patterns — they take priority
+    // over single-word code/tool keywords that may co-occur incidentally.
+    if has_autonomous {
+        return Some(ExecutionStrategy::AutonomousTask {
+            max_iterations: 15,
+        });
+    }
+
+    // For the remaining categories, conflicting signals → defer to LLM
+    let remaining_signals = has_tool as u8 + has_code as u8 + has_direct as u8;
+    if remaining_signals > 1 {
+        return None;
+    }
+
+    if has_tool {
+        return Some(ExecutionStrategy::ToolAssisted { max_iterations: 5 });
+    }
+
+    if has_code {
         return Some(ExecutionStrategy::ToolAssisted {
             max_iterations: 10,
         });
     }
 
-    // 5. Fall through to LLM classifier
-    None
-}
+    if has_direct {
+        return Some(ExecutionStrategy::DirectResponse);
+    }
 
-fn contains_code_keywords(msg: &str) -> bool {
-    const KEYWORDS: &[&str] = &[
-        "fix",
-        "build",
-        "implement",
-        "create",
-        "add",
-        "update",
-        "refactor",
-        "debug",
-        "show my tasks",
-        "my todo",
-        "list tasks",
-        "git",
-        ".rs",
-        ".py",
-        ".ts",
-        "function",
-        "class",
-        "struct",
-        "file",
-    ];
-    KEYWORDS.iter().any(|k| msg.contains(k))
+    None
 }
 
 #[cfg(test)]
@@ -188,6 +250,102 @@ mod tests {
             assert_eq!(max_iterations, 10);
         } else {
             panic!("Expected ToolAssisted");
+        }
+    }
+
+    // --- Task 4.1 spec tests ---
+
+    #[test]
+    fn test_heuristic_question_direct_response() {
+        // Simple questions → DirectResponse
+        assert!(matches!(
+            classify_heuristic("what is 2+2?"),
+            Some(ExecutionStrategy::DirectResponse)
+        ));
+        assert!(matches!(
+            classify_heuristic("what is Rust?"),
+            Some(ExecutionStrategy::DirectResponse)
+        ));
+        assert!(matches!(
+            classify_heuristic("how does async work?"),
+            Some(ExecutionStrategy::DirectResponse)
+        ));
+        assert!(matches!(
+            classify_heuristic("explain monads"),
+            Some(ExecutionStrategy::DirectResponse)
+        ));
+    }
+
+    #[test]
+    fn test_heuristic_search_tool_assisted() {
+        assert!(matches!(
+            classify_heuristic("search for Rust tutorials online"),
+            Some(ExecutionStrategy::ToolAssisted { .. })
+        ));
+    }
+
+    #[test]
+    fn test_heuristic_list_todos_tool_assisted() {
+        assert!(matches!(
+            classify_heuristic("list my todos"),
+            Some(ExecutionStrategy::ToolAssisted { .. })
+        ));
+    }
+
+    #[test]
+    fn test_heuristic_autonomous_write_script() {
+        assert!(matches!(
+            classify_heuristic("write me a script that processes CSV files"),
+            Some(ExecutionStrategy::AutonomousTask { .. })
+        ));
+    }
+
+    #[test]
+    fn test_heuristic_ambiguous_defers_to_llm() {
+        // "I need help with..." is ambiguous — no clear signal category
+        assert!(
+            classify_heuristic("I need help with understanding the codebase").is_none(),
+            "Ambiguous message should defer to LLM"
+        );
+    }
+
+    #[test]
+    fn test_heuristic_conflicting_signals_defers() {
+        // Message with both direct ("what is") and code ("implement") signals → None
+        assert!(
+            classify_heuristic("what is the best way to implement error handling").is_none(),
+            "Conflicting signals should defer to LLM"
+        );
+    }
+
+    #[test]
+    fn test_heuristic_tool_assisted_iterations_3_to_5() {
+        // Tool keyword matches should have max_iterations 3-5
+        if let Some(ExecutionStrategy::ToolAssisted { max_iterations }) =
+            classify_heuristic("search for recent commits")
+        {
+            assert!(
+                (3..=5).contains(&max_iterations),
+                "Tool-assisted iterations should be 3-5, got {}",
+                max_iterations
+            );
+        } else {
+            panic!("Expected ToolAssisted");
+        }
+    }
+
+    #[test]
+    fn test_heuristic_autonomous_iterations_10_to_15() {
+        if let Some(ExecutionStrategy::AutonomousTask { max_iterations }) =
+            classify_heuristic("write me a script to automate deployments")
+        {
+            assert!(
+                (10..=15).contains(&max_iterations),
+                "Autonomous iterations should be 10-15, got {}",
+                max_iterations
+            );
+        } else {
+            panic!("Expected AutonomousTask");
         }
     }
 }
