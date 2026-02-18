@@ -2,18 +2,22 @@
 //!
 //! This crate defines the LlmProvider trait and implementations for various LLM APIs.
 
+pub mod anthropic_native;
+pub mod manager;
 pub mod openai_compat;
 pub mod registry;
 pub mod transcription;
 pub mod types;
 
+pub use anthropic_native::AnthropicNativeProvider;
+pub use manager::{CircuitBreakerConfig, ProviderManager};
 pub use openai_compat::OpenAiCompatProvider;
 pub use registry::{ProviderRegistry, ProviderSpec, PROVIDERS};
 pub use transcription::TranscriptionProvider;
 pub use types::{
     tool_calls_to_messages, ChatParams, ContentPart, DynProvider, FunctionCall, ImageUrl,
-    LlmProvider, LlmResponse, LlmStream, LlmStreamChunk, Message, ToolCall, ToolCallDelta,
-    ToolCallMessage, Usage, UserContent,
+    LlmProvider, LlmResponse, LlmStream, LlmStreamChunk, Message, ProviderCapabilities, ToolCall,
+    ToolCallDelta, ToolCallMessage, Usage, UserContent, DEFAULT_CONTEXT_WINDOW,
 };
 
 use std::sync::Arc;
