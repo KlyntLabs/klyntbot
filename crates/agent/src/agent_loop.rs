@@ -126,6 +126,10 @@ pub struct AgentLoop {
     learning_service: Option<Arc<RwLock<crate::learning::LearningService>>>,
     /// Handler called after plan execution finishes (updates linked goal metrics)
     plan_completion_handler: Option<Arc<dyn PlanCompletionHandler>>,
+    /// Adaptive orchestrator pipeline (v2). When Some, `process_message_v2` routes
+    /// through classify → assemble → dispatch → validate → record instead of the
+    /// legacy `run_agent_loop` iteration loop.
+    pipeline: Option<Arc<crate::pipeline::AgentPipeline>>,
 }
 
 impl AgentLoop {
@@ -528,6 +532,7 @@ impl AgentLoop {
             outcome_recorder,
             learning_service,
             plan_completion_handler,
+            pipeline: None,
         })
     }
 
@@ -1827,6 +1832,93 @@ impl AgentLoop {
         } else {
             Ok(IterationOutcome::Empty)
         }
+    }
+
+    /// Set the adaptive orchestrator pipeline.
+    ///
+    /// When set, `process_message_v2()` becomes available, routing through the
+    /// new classify → assemble → dispatch → validate → record pipeline instead
+    /// of the legacy `run_agent_loop` iteration loop.
+    pub fn set_pipeline(&mut self, pipeline: Arc<crate::pipeline::AgentPipeline>) {
+        self.pipeline = Some(pipeline);
+    }
+
+    /// Process a message through the Adaptive Orchestrator pipeline (v2).
+    ///
+    /// Requires `set_pipeline()` to have been called first. Falls back to
+    /// the legacy `process_direct()` path if no pipeline is set.
+    ///
+    /// Pipeline flow: Orchestrator → ContextEngine → EngineDispatch →
+    /// ResponseValidator → CostTracker
+    pub async fn process_message_v2(
+        &self,
+        content: String,
+        session_key: String,
+    ) -> Result<String> {
+        let pipeline = match &self.pipeline {
+            Some(p) => Arc::clone(p),
+            None => {
+                debug!("No pipeline set, falling back to legacy process_direct");
+                return self.process_direct(content, session_key).await;
+            }
+        };
+
+        let preview = if content.len() > 80 {
+            format!("{}...", &content[..80])
+        } else {
+            content.clone()
+        };
+        debug!("Processing message (v2 pipeline): {}", preview);
+
+        // Get or create session + add user message
+        let mut session_manager = self.session_manager.write().await;
+        let session = session_manager.get_or_create(&session_key).await?;
+        session.add_message("user", &content);
+        let history = session.get_history(DEFAULT_HISTORY_LIMIT).to_vec();
+        drop(session_manager);
+
+        // Convert session history to provider Messages
+        let history_messages: Vec<Message> = history
+            .iter()
+            .map(|m| match m.role.as_str() {
+                "system" => Message::system(&m.content),
+                "user" => Message::user(&m.content),
+                "assistant" => Message::assistant(&m.content),
+                _ => Message::user(&m.content),
+            })
+            .collect();
+
+        // Get tool definitions and names
+        let tool_registry = self.tool_registry.read().await;
+        let tool_defs = tool_registry.get_definitions();
+        let tool_names: Vec<String> = tool_registry.tool_names();
+        drop(tool_registry);
+
+        let tool_name_refs: Vec<&str> = tool_names.iter().map(|s| s.as_str()).collect();
+
+        // Create routing context
+        let routing_ctx = RoutingContext::new("cli".into(), session_key.clone().into());
+
+        // Run through pipeline
+        let result = pipeline
+            .process_message(
+                &content,
+                history_messages,
+                &tool_defs,
+                &tool_name_refs,
+                &routing_ctx,
+            )
+            .await?;
+
+        info!(
+            "Pipeline v2: strategy={}, escalations={}, valid={}",
+            result.strategy_used, result.escalations, result.validation.is_valid
+        );
+
+        // Save to session
+        self.save_to_session(&session_key, &result.content).await;
+
+        Ok(result.content)
     }
 
     /// Process a message directly (for CLI mode).
