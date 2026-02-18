@@ -50,11 +50,22 @@ impl Session {
 
     /// Add a message to the session
     pub fn add_message(&mut self, role: impl Into<String>, content: impl Into<String>) {
+        self.add_message_with_request_id(role, content, None);
+    }
+
+    /// Add a message with an optional request ID for correlation
+    pub fn add_message_with_request_id(
+        &mut self,
+        role: impl Into<String>,
+        content: impl Into<String>,
+        request_id: Option<String>,
+    ) {
         self.messages.push(SessionMessage {
             id: generate_message_id(),
             role: role.into(),
             content: content.into(),
             timestamp: Utc::now(),
+            request_id,
         });
         self.updated_at = Utc::now();
     }
@@ -87,7 +98,17 @@ pub struct SessionMessage {
 
     /// Timestamp
     pub timestamp: DateTime<Utc>,
+
+    /// Optional request ID for correlation
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub request_id: Option<String>,
 }
+
+/// Compaction threshold: compact when entries exceed this count
+const COMPACTION_THRESHOLD: usize = 1000;
+
+/// Number of entries to keep after compaction
+const COMPACTION_KEEP: usize = 500;
 
 /// Session manager with JSONL persistence
 pub struct SessionManager {
@@ -95,6 +116,7 @@ pub struct SessionManager {
     cache: HashMap<String, Session>,
     lru_order: VecDeque<String>,
     max_cache_size: usize,
+    write_mutex: tokio::sync::Mutex<()>,
 }
 
 impl SessionManager {
@@ -117,6 +139,7 @@ impl SessionManager {
             cache: HashMap::new(),
             lru_order: VecDeque::new(),
             max_cache_size,
+            write_mutex: tokio::sync::Mutex::new(()),
         }
     }
 
@@ -231,11 +254,28 @@ impl SessionManager {
         })
     }
 
-    /// Save a session to disk
+    /// Save a session to disk using atomic write (write to temp, then rename).
+    /// Automatically compacts the session if it exceeds the compaction threshold.
     pub async fn save(&self, session: &Session) -> Result<()> {
+        let _guard = self.write_mutex.lock().await;
+
         let path = self.session_path(&session.key);
 
         debug!("Saving session to: {}", path.display());
+
+        // Apply compaction if needed: keep only the last COMPACTION_KEEP messages
+        let messages = if session.messages.len() > COMPACTION_THRESHOLD {
+            let start = session.messages.len() - COMPACTION_KEEP;
+            debug!(
+                "Compacting session {}: {} -> {} messages",
+                session.key,
+                session.messages.len(),
+                COMPACTION_KEEP
+            );
+            &session.messages[start..]
+        } else {
+            &session.messages
+        };
 
         let mut content = String::new();
 
@@ -250,13 +290,24 @@ impl SessionManager {
         content.push('\n');
 
         // Write message lines
-        for msg in &session.messages {
+        for msg in messages {
             content.push_str(&serde_json::to_string(msg).map_err(SessionError::Json)?);
             content.push('\n');
         }
 
-        fs::write(&path, content).await.map_err(|e| {
-            SessionError::SaveFailed(format!("Failed to write {}: {}", path.display(), e))
+        // Atomic write: write to temp file, then rename
+        let tmp_path = path.with_extension("jsonl.tmp");
+        fs::write(&tmp_path, &content).await.map_err(|e| {
+            SessionError::SaveFailed(format!("Failed to write temp {}: {}", tmp_path.display(), e))
+        })?;
+
+        fs::rename(&tmp_path, &path).await.map_err(|e| {
+            SessionError::SaveFailed(format!(
+                "Failed to rename {} -> {}: {}",
+                tmp_path.display(),
+                path.display(),
+                e
+            ))
         })?;
 
         Ok(())
@@ -562,6 +613,111 @@ mod tests {
         // Verify IDs persisted
         assert_eq!(loaded_session.messages[0].id, original_id);
         assert!(!loaded_session.messages[1].id.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_atomic_write_no_corruption() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut manager = SessionManager::new(temp_dir.path()).await;
+
+        // Create and save a valid session
+        {
+            let session = manager.get_or_create("test:atomic").await.unwrap();
+            session.add_message("user", "Important data");
+            session.add_message("assistant", "Response");
+        }
+        let session = manager.get_or_create("test:atomic").await.unwrap();
+        let session_clone = session.clone();
+        manager.save(&session_clone).await.unwrap();
+
+        // Verify the original file exists and is valid
+        let path = manager.session_path("test:atomic");
+        assert!(tokio::fs::try_exists(&path).await.unwrap());
+
+        // Verify no .tmp file left behind after successful write
+        let tmp_path = path.with_extension("jsonl.tmp");
+        assert!(!tokio::fs::try_exists(&tmp_path).await.unwrap_or(false));
+
+        // Reload from disk — should parse cleanly
+        let mut manager2 = SessionManager::new(temp_dir.path()).await;
+        let loaded = manager2.get_or_create("test:atomic").await.unwrap();
+        assert_eq!(loaded.messages.len(), 2);
+        assert_eq!(loaded.messages[0].content, "Important data");
+    }
+
+    #[tokio::test]
+    async fn test_session_compaction() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut manager = SessionManager::new(temp_dir.path()).await;
+
+        // Add 1001 messages to exceed the compaction threshold
+        {
+            let session = manager.get_or_create("test:compact").await.unwrap();
+            for i in 0..1001 {
+                session.add_message("user", format!("Message {}", i));
+            }
+        }
+
+        // Save — should trigger compaction
+        let session = manager.get_or_create("test:compact").await.unwrap();
+        let session_clone = session.clone();
+        manager.save(&session_clone).await.unwrap();
+
+        // Reload from disk
+        let mut manager2 = SessionManager::new(temp_dir.path()).await;
+        let loaded = manager2.get_or_create("test:compact").await.unwrap();
+
+        // After compaction: should have <= 500 messages (last 500 kept)
+        assert!(
+            loaded.messages.len() <= 500,
+            "Expected <= 500 messages after compaction, got {}",
+            loaded.messages.len()
+        );
+        // The last message should be the most recent one
+        assert_eq!(
+            loaded.messages.last().unwrap().content,
+            "Message 1000"
+        );
+        // The first message should be Message 501 (keeping last 500 of 0..1000)
+        assert_eq!(
+            loaded.messages.first().unwrap().content,
+            "Message 501"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_session_message_has_request_id() {
+        let mut session = Session::new("test:reqid");
+        session.add_message_with_request_id("user", "Hello", Some("req-abc-123".to_string()));
+
+        assert_eq!(session.messages[0].request_id, Some("req-abc-123".to_string()));
+
+        // Regular add_message should have None request_id
+        session.add_message("assistant", "Hi");
+        assert_eq!(session.messages[1].request_id, None);
+    }
+
+    #[tokio::test]
+    async fn test_session_below_compaction_threshold_not_compacted() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut manager = SessionManager::new(temp_dir.path()).await;
+
+        // Add 500 messages — below threshold
+        {
+            let session = manager.get_or_create("test:nocompact").await.unwrap();
+            for i in 0..500 {
+                session.add_message("user", format!("Message {}", i));
+            }
+        }
+
+        let session = manager.get_or_create("test:nocompact").await.unwrap();
+        let session_clone = session.clone();
+        manager.save(&session_clone).await.unwrap();
+
+        // Reload — should keep all 500
+        let mut manager2 = SessionManager::new(temp_dir.path()).await;
+        let loaded = manager2.get_or_create("test:nocompact").await.unwrap();
+        assert_eq!(loaded.messages.len(), 500);
     }
 
     #[tokio::test]

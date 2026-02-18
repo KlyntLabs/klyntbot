@@ -2,9 +2,7 @@ use std::path::PathBuf;
 
 use providers::Message;
 
-use crate::{
-    BudgetAllocator, BudgetConfig, BudgetReport, HistoryCompressor, MemoryRetriever, Priority,
-};
+use crate::{BudgetAllocator, BudgetConfig, BudgetReport, HistoryCompressor, Priority};
 
 /// Determines how the agent should process a request.
 #[derive(Debug, Clone)]
@@ -33,6 +31,8 @@ pub struct ContextRequest {
     pub tool_definitions: Vec<serde_json::Value>,
     /// Path to MEMORY.md for retrieval (optional).
     pub memory_path: Option<PathBuf>,
+    /// Model context window size (varies per model).
+    pub context_window: usize,
 }
 
 /// The assembled context ready to send to the LLM.
@@ -49,21 +49,18 @@ pub struct AssembledContext {
 /// into a single assembled context that fits within the model's context window.
 pub struct ContextEngine {
     compressor: HistoryCompressor,
-    _retriever: MemoryRetriever,
-    context_window: usize,
 }
 
 impl ContextEngine {
-    pub fn new(context_window: usize) -> Self {
+    pub fn new() -> Self {
         Self {
             compressor: HistoryCompressor::new(4),
-            _retriever: MemoryRetriever::new(PathBuf::from("")),
-            context_window,
         }
     }
 
     pub fn assemble(&self, request: ContextRequest) -> AssembledContext {
-        let mut allocator = BudgetAllocator::new(BudgetConfig::standard(self.context_window));
+        let mut allocator =
+            BudgetAllocator::new(BudgetConfig::standard(request.context_window));
 
         // 1. System prompt always gets allocated first
         let system_tokens = estimate_tokens(&request.system_prompt);
@@ -157,7 +154,11 @@ fn estimate_tool_tokens(tools: &[serde_json::Value]) -> usize {
 mod tests {
     use super::*;
 
-    fn make_request(strategy: ExecutionStrategy, tool_count: usize) -> ContextRequest {
+    fn make_request(
+        strategy: ExecutionStrategy,
+        tool_count: usize,
+        context_window: usize,
+    ) -> ContextRequest {
         let mut history = Vec::new();
         for i in 0..10 {
             if i % 2 == 0 {
@@ -184,13 +185,14 @@ mod tests {
             strategy,
             tool_definitions,
             memory_path: None,
+            context_window,
         }
     }
 
     #[test]
     fn test_direct_response_minimal_context() {
-        let engine = ContextEngine::new(128_000);
-        let request = make_request(ExecutionStrategy::DirectResponse, 5);
+        let engine = ContextEngine::new();
+        let request = make_request(ExecutionStrategy::DirectResponse, 5, 128_000);
         let result = engine.assemble(request);
 
         // Should have system message + history messages
@@ -215,10 +217,11 @@ mod tests {
 
     #[test]
     fn test_tool_assisted_includes_tools() {
-        let engine = ContextEngine::new(128_000);
+        let engine = ContextEngine::new();
         let request = make_request(
             ExecutionStrategy::ToolAssisted { max_iterations: 5 },
             3,
+            128_000,
         );
         let result = engine.assemble(request);
 
@@ -235,10 +238,11 @@ mod tests {
     #[test]
     fn test_context_fits_within_window() {
         let window = 4_000; // small window
-        let engine = ContextEngine::new(window);
+        let engine = ContextEngine::new();
         let request = make_request(
             ExecutionStrategy::ToolAssisted { max_iterations: 3 },
             2,
+            window,
         );
         let result = engine.assemble(request);
 
@@ -254,7 +258,7 @@ mod tests {
 
     #[test]
     fn test_empty_history_assembles() {
-        let engine = ContextEngine::new(128_000);
+        let engine = ContextEngine::new();
         let request = ContextRequest {
             message_text: "hello".to_string(),
             history: vec![],
@@ -262,6 +266,7 @@ mod tests {
             strategy: ExecutionStrategy::DirectResponse,
             tool_definitions: vec![],
             memory_path: None,
+            context_window: 128_000,
         };
         let result = engine.assemble(request);
         // Should have at least the system message
@@ -271,12 +276,13 @@ mod tests {
 
     #[test]
     fn test_clarification_strategy_no_tools() {
-        let engine = ContextEngine::new(128_000);
+        let engine = ContextEngine::new();
         let request = make_request(
             ExecutionStrategy::Clarification {
                 reason: "Ambiguous request".to_string(),
             },
             5,
+            128_000,
         );
         let result = engine.assemble(request);
 
