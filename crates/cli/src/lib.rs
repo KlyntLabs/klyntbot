@@ -13,6 +13,7 @@ pub mod interactive;
 pub mod learning_cmd;
 pub mod plan;
 pub mod project;
+pub mod provider_cmd;
 pub mod serve;
 pub mod skills;
 pub mod status;

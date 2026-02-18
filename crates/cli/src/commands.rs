@@ -91,6 +91,10 @@ pub enum Commands {
     /// View learning system status and strategy effectiveness
     #[command(subcommand)]
     Learning(LearningCommands),
+
+    /// View LLM provider status, routing, and circuit breaker state
+    #[command(subcommand)]
+    Provider(ProviderCommands),
 }
 
 #[derive(Subcommand, Debug)]
@@ -775,4 +779,10 @@ pub enum LearningCommands {
         #[arg(short, long, default_value = "7")]
         days: u32,
     },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum ProviderCommands {
+    /// Show LLM provider configuration, routing, and circuit breaker state
+    Status,
 }

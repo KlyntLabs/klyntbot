@@ -17,6 +17,7 @@ mod cli_handlers {
     pub use cli::skills::handle_skills;
     pub use cli::status::{handle_brief_status, handle_status};
     pub use cli::todo::handle_todo;
+    pub use cli::provider_cmd::handle_provider;
     pub use cli::usage_cmd::handle_usage;
 }
 
@@ -65,6 +66,8 @@ async fn main() {
         Some(Commands::Usage(cmd)) => cli_handlers::handle_usage(cmd).await,
 
         Some(Commands::Learning(cmd)) => cli_handlers::handle_learning(cmd).await,
+
+        Some(Commands::Provider(cmd)) => cli_handlers::handle_provider(cmd).await,
 
         None => {
             // No command specified, show brief status
