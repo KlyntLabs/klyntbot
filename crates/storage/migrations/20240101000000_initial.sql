@@ -1,8 +1,6 @@
 -- Initial schema for klyntbot PostgreSQL storage.
 -- Replaces all JSONL flat-file stores.
-
--- Enable pgvector for embedding similarity search.
-CREATE EXTENSION IF NOT EXISTS vector;
+-- Note: pgvector extension + embedding tables are in 20240101000001_pgvector.sql
 
 -- ============================================================
 -- Projects
@@ -185,36 +183,6 @@ CREATE TABLE plan_steps (
 );
 
 CREATE INDEX idx_plan_steps_plan_id ON plan_steps(plan_id);
-
--- ============================================================
--- Todo Embeddings (pgvector)
--- ============================================================
-CREATE TABLE todo_embeddings (
-    todo_id    VARCHAR(8) PRIMARY KEY REFERENCES todos(id) ON DELETE CASCADE,
-    embedding  vector(384) NOT NULL,
-    model      TEXT NOT NULL DEFAULT 'paraphrase-multilingual-MiniLM-L12-v2',
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
--- IVFFlat index for approximate nearest neighbor search.
--- Requires at least some rows to exist; safe to create on empty table.
-CREATE INDEX idx_todo_embeddings_ann ON todo_embeddings
-    USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
-
--- ============================================================
--- Conversation Embeddings (pgvector)
--- ============================================================
-CREATE TABLE conversation_embeddings (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    session_key     TEXT NOT NULL,
-    embedding       vector(384) NOT NULL,
-    role            TEXT NOT NULL,
-    content_preview TEXT NOT NULL,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE INDEX idx_conv_embeddings_ann ON conversation_embeddings
-    USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
 
 -- ============================================================
 -- Learning Outcomes

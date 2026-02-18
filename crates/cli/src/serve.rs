@@ -8,16 +8,16 @@ use heartbeat::HeartbeatService;
 use scheduling::CronService;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
+use storage::{Repos, StoragePool};
 use tokio::signal;
 use tokio::sync::{Mutex, RwLock};
 use tracing::{error, info};
-use storage::{StoragePool, Repos};
 
 /// Handle serve command
 pub async fn handle_serve(port: u16) -> Result<()> {
     info!("Starting klyntbot gateway on port {}", port);
 
-    let config = config::load().await?;
+    let config = config::load_with_env_overrides().await?;
     info!("Configuration loaded from: {:?}", config::config_path());
 
     // Connect to database and create repos

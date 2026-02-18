@@ -16,8 +16,8 @@ use crate::wizard::ask_user_prompt;
 
 /// Handle chat command
 pub async fn handle_chat(message: Option<String>, session: String) -> Result<()> {
-    // Load config
-    let config = config::load().await?;
+    // Load config (with KLYNTBOT_* env var overrides)
+    let config = config::load_with_env_overrides().await?;
     let model = config.agents.defaults.model.clone();
 
     // Startup banner
@@ -40,9 +40,8 @@ pub async fn handle_chat(message: Option<String>, session: String) -> Result<()>
     let repos = storage::Repos::from_pool(&storage_pool);
 
     // Initialize agent loop (Arc for streaming support)
-    let agent_loop = Arc::new(
-        AgentLoop::new(bus, provider, config, repos.todos, Some(repos.embeddings)).await?,
-    );
+    let agent_loop =
+        Arc::new(AgentLoop::new(bus, provider, config, repos.todos, Some(repos.embeddings)).await?);
 
     // Session key for CLI
     let session_key = format!("cli:{}", session);
