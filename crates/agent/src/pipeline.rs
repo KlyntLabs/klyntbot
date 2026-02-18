@@ -102,6 +102,7 @@ impl AgentPipeline {
         tool_definitions: &[serde_json::Value],
         tool_names: &[&str],
         ctx: &RoutingContext,
+        system_prompt: Option<&str>,
     ) -> Result<PipelineResult> {
         // Step 1: Classify
         let classification = self.orchestrator.classify(message, tool_names).await;
@@ -110,11 +111,14 @@ impl AgentPipeline {
             classification.strategy, classification.source, classification.confidence
         );
 
+        // Use provided system_prompt or fall back to config default
+        let prompt = system_prompt.unwrap_or(&self.config.system_prompt);
+
         // Step 2: Assemble context
         let context_request = ContextRequest {
             message_text: message.to_string(),
             history,
-            system_prompt: self.config.system_prompt.clone(),
+            system_prompt: prompt.to_string(),
             strategy: classification.strategy.clone(),
             tool_definitions: tool_definitions.to_vec(),
             memory_path: None,
@@ -169,7 +173,7 @@ impl AgentPipeline {
                 &self.config.execution_model,
                 &self.config.provider_name,
                 &strategy_name,
-                &self.config.channel,
+                ctx.channel.as_str(),
             )
             .await
         {
@@ -284,7 +288,7 @@ mod tests {
         let pipeline = make_pipeline(provider);
 
         let result = pipeline
-            .process_message("hello", vec![], &[], &[], &routing_ctx())
+            .process_message("hello", vec![], &[], &[], &routing_ctx(), None)
             .await
             .unwrap();
 
@@ -302,7 +306,7 @@ mod tests {
         let pipeline = make_pipeline(provider);
 
         let result = pipeline
-            .process_message("show my tasks", vec![], &[], &[], &routing_ctx())
+            .process_message("show my tasks", vec![], &[], &[], &routing_ctx(), None)
             .await
             .unwrap();
 
@@ -324,7 +328,7 @@ mod tests {
         let pipeline = make_pipeline(provider);
 
         let result = pipeline
-            .process_message("hi", vec![], &[], &[], &routing_ctx())
+            .process_message("hi", vec![], &[], &[], &routing_ctx(), None)
             .await
             .unwrap();
 
@@ -354,7 +358,7 @@ mod tests {
         let pipeline = make_pipeline(provider);
 
         let result = pipeline
-            .process_message("hello", vec![], &[], &[], &routing_ctx())
+            .process_message("hello", vec![], &[], &[], &routing_ctx(), None)
             .await
             .unwrap();
 
@@ -378,6 +382,7 @@ mod tests {
                 &[],
                 &[],
                 &routing_ctx(),
+                None,
             )
             .await
             .unwrap();
@@ -401,7 +406,7 @@ mod tests {
         ];
 
         let result = pipeline
-            .process_message("what is Rust?", history, &[], &[], &routing_ctx())
+            .process_message("what is Rust?", history, &[], &[], &routing_ctx(), None)
             .await
             .unwrap();
 
@@ -416,7 +421,7 @@ mod tests {
         let pipeline = make_pipeline(provider);
 
         let result = pipeline
-            .process_message("hello", vec![], &[], &[], &routing_ctx())
+            .process_message("hello", vec![], &[], &[], &routing_ctx(), None)
             .await
             .unwrap();
 

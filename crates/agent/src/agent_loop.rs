@@ -508,6 +508,40 @@ impl AgentLoop {
             .take_inbound_rx()
             .expect("Inbound receiver already taken");
 
+        // Build the adaptive orchestrator pipeline.
+        // All dependencies (provider, tool_registry, config) are already available.
+        let tool_registry = Arc::new(RwLock::new(tool_registry));
+        let execution_core = Arc::new(
+            crate::execution::ExecutionCore::new(provider.clone(), Arc::clone(&tool_registry)),
+        );
+        let engine_dispatch = Arc::new(crate::execution::EngineDispatch::new(execution_core));
+        let orchestrator = Arc::new(crate::orchestrator::Orchestrator::new(
+            provider.clone(),
+            &config.agents.defaults.model,
+        ));
+        let data_dir = config::config_dir()
+            .unwrap_or_else(|_| config.workspace_path())
+            .join("data");
+        let cost_tracker = Arc::new(crate::output::CostTracker::new(data_dir));
+
+        let pipeline_config = crate::pipeline::PipelineConfig {
+            execution_model: config.agents.defaults.model.clone(),
+            system_prompt: String::new(), // populated per-request from ContextBuilder
+            context_window: provider.context_window(),
+            max_response_tokens: config.agents.defaults.max_tokens as usize,
+            channel: "unknown".to_string(), // overridden per-request
+            provider_name: provider.name().to_string(),
+        };
+
+        let pipeline = Some(Arc::new(crate::pipeline::AgentPipeline::new(
+            orchestrator,
+            engine_dispatch,
+            cost_tracker,
+            pipeline_config,
+        )));
+
+        info!("Adaptive orchestrator pipeline initialized");
+
         Ok(Self {
             bus,
             inbound_rx: Some(inbound_rx),
@@ -515,7 +549,7 @@ impl AgentLoop {
             config,
             context_builder,
             session_manager: Arc::new(RwLock::new(session_manager)),
-            tool_registry: Arc::new(RwLock::new(tool_registry)),
+            tool_registry,
             subagent_manager,
             confidence_evaluator,
             decision_logger,
@@ -532,7 +566,7 @@ impl AgentLoop {
             outcome_recorder,
             learning_service,
             plan_completion_handler,
-            pipeline: None,
+            pipeline,
         })
     }
 
@@ -1122,35 +1156,74 @@ impl AgentLoop {
         // Create routing context for tools
         let routing_ctx = RoutingContext::new(msg.channel.clone(), msg.chat_id.clone());
 
-        // Build messages for LLM
-        let mut context_builder = self.context_builder.write().await;
-        let media = if msg.media.is_empty() {
-            None
+        let response_content = if let Some(pipeline) = &self.pipeline {
+            // Pipeline path: build system prompt separately, convert history, delegate
+            let mut context_builder = self.context_builder.write().await;
+            let system_prompt = context_builder
+                .build_system_prompt(msg.channel.as_str(), msg.chat_id.as_str())
+                .await;
+            drop(context_builder);
+
+            let history_messages: Vec<Message> = history
+                .iter()
+                .map(|m| match m.role.as_str() {
+                    "system" => Message::system(&m.content),
+                    "user" => Message::user(&m.content),
+                    "assistant" => Message::assistant(&m.content),
+                    _ => Message::user(&m.content),
+                })
+                .collect();
+
+            let tool_registry = self.tool_registry.read().await;
+            let tool_defs = tool_registry.get_definitions();
+            let tool_names: Vec<String> = tool_registry.tool_names();
+            drop(tool_registry);
+            let tool_name_refs: Vec<&str> = tool_names.iter().map(|s| s.as_str()).collect();
+
+            let result = pipeline
+                .process_message(
+                    &msg.content,
+                    history_messages,
+                    &tool_defs,
+                    &tool_name_refs,
+                    &routing_ctx,
+                    Some(&system_prompt),
+                )
+                .await?;
+
+            info!(
+                "Pipeline: strategy={}, escalations={}",
+                result.strategy_used, result.escalations
+            );
+            result.content
         } else {
-            Some(msg.media.clone())
-        };
-        let messages = context_builder
-            .build_messages(
-                history,
-                &msg.content,
-                media,
-                msg.channel.as_str(),
-                msg.chat_id.as_str(),
-            )
-            .await;
+            // Legacy path
+            let mut context_builder = self.context_builder.write().await;
+            let media = if msg.media.is_empty() {
+                None
+            } else {
+                Some(msg.media.clone())
+            };
+            let messages = context_builder
+                .build_messages(
+                    history,
+                    &msg.content,
+                    media,
+                    msg.channel.as_str(),
+                    msg.chat_id.as_str(),
+                )
+                .await;
+            drop(context_builder);
 
-        drop(context_builder);
-
-        // Run agent loop (no event/user/prompt channels for bus mode)
-        let response_content = self
-            .run_agent_loop(
+            self.run_agent_loop(
                 messages,
                 false,
                 &routing_ctx,
                 StreamingChannels::none(),
                 CancellationToken::new(),
             )
-            .await?;
+            .await?
+        };
 
         // Save assistant response to session
         self.save_to_session(session_key.as_str(), &response_content)
@@ -1906,7 +1979,7 @@ impl AgentLoop {
         // Create routing context
         let routing_ctx = RoutingContext::new("cli".into(), session_key.clone().into());
 
-        // Run through pipeline
+        // Run through pipeline (v2 uses config default system prompt)
         let result = pipeline
             .process_message(
                 &content,
@@ -1914,6 +1987,7 @@ impl AgentLoop {
                 &tool_defs,
                 &tool_name_refs,
                 &routing_ctx,
+                None,
             )
             .await?;
 
@@ -2062,12 +2136,6 @@ impl AgentLoop {
             interaction_tx,
         );
 
-        let mut context_builder = self.context_builder.write().await;
-        let messages = context_builder
-            .build_messages(history, &content, None, "cli", &session_key)
-            .await;
-        drop(context_builder);
-
         let cancel_token = CancellationToken::new();
 
         // Clone Arcs for the spawned task
@@ -2076,17 +2144,87 @@ impl AgentLoop {
         let sk = session_key.clone();
 
         let handle = tokio::spawn(async move {
-            let result = agent
-                .run_agent_loop(
-                    messages,
-                    true,
-                    &routing_ctx,
-                    StreamingChannels {
-                        event_tx: Some(event_tx),
-                    },
-                    cancel,
-                )
-                .await;
+            let result = if let Some(pipeline) = &agent.pipeline {
+                // Pipeline path: non-streaming for now, but usage is tracked
+                let mut context_builder = agent.context_builder.write().await;
+                let system_prompt = context_builder
+                    .build_system_prompt("cli", &sk)
+                    .await;
+                drop(context_builder);
+
+                let history_messages: Vec<Message> = history
+                    .iter()
+                    .map(|m| match m.role.as_str() {
+                        "system" => Message::system(&m.content),
+                        "user" => Message::user(&m.content),
+                        "assistant" => Message::assistant(&m.content),
+                        _ => Message::user(&m.content),
+                    })
+                    .collect();
+
+                let tool_registry = agent.tool_registry.read().await;
+                let tool_defs = tool_registry.get_definitions();
+                let tool_names: Vec<String> = tool_registry.tool_names();
+                drop(tool_registry);
+                let tool_name_refs: Vec<&str> =
+                    tool_names.iter().map(|s| s.as_str()).collect();
+
+                match pipeline
+                    .process_message(
+                        &content,
+                        history_messages,
+                        &tool_defs,
+                        &tool_name_refs,
+                        &routing_ctx,
+                        Some(&system_prompt),
+                    )
+                    .await
+                {
+                    Ok(pipeline_result) => {
+                        info!(
+                            "Pipeline (streaming): strategy={}, escalations={}",
+                            pipeline_result.strategy_used, pipeline_result.escalations
+                        );
+
+                        // Emit the full response for the CLI renderer
+                        let _ = event_tx
+                            .send(AgentEvent::ContentChunk(
+                                pipeline_result.content.clone(),
+                            ))
+                            .await;
+                        let _ = event_tx
+                            .send(AgentEvent::Done(pipeline_result.content.clone()))
+                            .await;
+
+                        Ok(pipeline_result.content)
+                    }
+                    Err(e) => {
+                        let _ = event_tx
+                            .send(AgentEvent::Error(e.to_string()))
+                            .await;
+                        Err(e)
+                    }
+                }
+            } else {
+                // Legacy streaming path
+                let mut context_builder = agent.context_builder.write().await;
+                let messages = context_builder
+                    .build_messages(history, &content, None, "cli", &sk)
+                    .await;
+                drop(context_builder);
+
+                agent
+                    .run_agent_loop(
+                        messages,
+                        true,
+                        &routing_ctx,
+                        StreamingChannels {
+                            event_tx: Some(event_tx),
+                        },
+                        cancel,
+                    )
+                    .await
+            };
 
             // Save to session regardless of success/failure
             if let Ok(ref content) = result {

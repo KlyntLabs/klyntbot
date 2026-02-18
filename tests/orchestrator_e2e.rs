@@ -48,7 +48,7 @@ async fn test_e2e_direct_response_path() {
     let (pipeline, _dir) = make_pipeline(provider);
 
     let result = pipeline
-        .process_message("hello", vec![], &[], &[], &routing_ctx())
+        .process_message("hello", vec![], &[], &[], &routing_ctx(), None)
         .await
         .unwrap();
 
@@ -72,7 +72,7 @@ async fn test_e2e_tool_assisted_path() {
     let (pipeline, _dir) = make_pipeline(provider);
 
     let result = pipeline
-        .process_message("show my tasks", vec![], &[], &[], &routing_ctx())
+        .process_message("show my tasks", vec![], &[], &[], &routing_ctx(), None)
         .await
         .unwrap();
 
@@ -102,6 +102,7 @@ async fn test_e2e_autonomous_task_path() {
             &[],
             &[],
             &routing_ctx(),
+            None,
         )
         .await
         .unwrap();
@@ -120,7 +121,7 @@ async fn test_e2e_pipeline_records_usage() {
     let (pipeline, dir) = make_pipeline(provider);
 
     pipeline
-        .process_message("hello", vec![], &[], &[], &routing_ctx())
+        .process_message("hello", vec![], &[], &[], &routing_ctx(), None)
         .await
         .unwrap();
 
@@ -153,11 +154,11 @@ async fn test_e2e_context_budget_respected() {
     // Create a history with many messages to test budget allocation
     let mut history = Vec::new();
     for i in 0..50 {
-        history.push(Message::user(&format!(
+        history.push(Message::user(format!(
             "This is user message number {} with some extra text to add token count",
             i
         )));
-        history.push(Message::assistant(&format!("Response to message {}", i)));
+        history.push(Message::assistant(format!("Response to message {}", i)));
     }
 
     let result = pipeline
@@ -167,6 +168,7 @@ async fn test_e2e_context_budget_respected() {
             &[],
             &[],
             &routing_ctx(),
+            None,
         )
         .await
         .unwrap();

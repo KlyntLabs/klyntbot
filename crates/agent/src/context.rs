@@ -232,7 +232,7 @@ impl ContextBuilder {
     }
 
     /// Build system prompt from all sources
-    async fn build_system_prompt(&mut self, channel: &str, chat_id: &str) -> String {
+    pub(crate) async fn build_system_prompt(&mut self, channel: &str, chat_id: &str) -> String {
         // identity + bootstrap + memory + todo + confidence + skills + always-loaded skills
         let mut sections = Vec::with_capacity(8);
 
