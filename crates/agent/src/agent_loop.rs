@@ -1358,7 +1358,7 @@ impl AgentLoop {
                 }
             );
 
-            let mut tool_registry = self.tool_registry.write().await;
+            let tool_registry = self.tool_registry.read().await;
             let tools = tool_registry.get_definitions();
             drop(tool_registry);
 

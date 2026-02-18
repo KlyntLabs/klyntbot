@@ -2,7 +2,7 @@
 
 use serde_json::Value;
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tracing::{debug, warn};
 
 use super::{DynTool, RoutingContext, Tool};
@@ -11,7 +11,7 @@ use common::{Result, ToolError};
 /// Registry for agent tools
 pub struct ToolRegistry {
     tools: HashMap<String, DynTool>,
-    cached_definitions: Option<Vec<Value>>,
+    cached_definitions: Mutex<Option<Vec<Value>>>,
 }
 
 impl ToolRegistry {
@@ -19,7 +19,7 @@ impl ToolRegistry {
     pub fn new() -> Self {
         Self {
             tools: HashMap::new(),
-            cached_definitions: None,
+            cached_definitions: Mutex::new(None),
         }
     }
 
@@ -29,14 +29,14 @@ impl ToolRegistry {
         debug!("Registering tool: {}", name);
         self.tools.insert(name, Arc::new(tool));
         // Invalidate cache when registry changes
-        self.cached_definitions = None;
+        *self.cached_definitions.lock().expect("cache lock poisoned") = None;
     }
 
     /// Unregister a tool by name
     pub fn unregister(&mut self, name: &str) {
         self.tools.remove(name);
         // Invalidate cache when registry changes
-        self.cached_definitions = None;
+        *self.cached_definitions.lock().expect("cache lock poisoned") = None;
     }
 
     /// Get a tool by name
@@ -49,16 +49,18 @@ impl ToolRegistry {
         self.tools.contains_key(name)
     }
 
-    /// Get all tool definitions in OpenAI function-calling format
-    pub fn get_definitions(&mut self) -> Vec<Value> {
-        if let Some(defs) = &self.cached_definitions {
+    /// Get all tool definitions in OpenAI function-calling format.
+    /// Uses interior mutability so only a shared reference is needed.
+    pub fn get_definitions(&self) -> Vec<Value> {
+        let mut cache = self.cached_definitions.lock().expect("cache lock poisoned");
+        if let Some(defs) = cache.as_ref() {
             return defs.clone();
         }
 
         // First time: build and cache all tool schemas
         let definitions: Vec<Value> = self.tools.values().map(|tool| tool.to_schema()).collect();
         debug!("Cached {} tool definitions", definitions.len());
-        self.cached_definitions = Some(definitions.clone());
+        *cache = Some(definitions.clone());
         definitions
     }
 

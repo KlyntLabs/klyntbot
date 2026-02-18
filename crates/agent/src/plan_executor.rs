@@ -85,9 +85,9 @@ impl PlanExecutor {
             reason = step.reasoning,
         );
 
-        // 2. Get tool definitions (brief lock, then release)
+        // 2. Get tool definitions (read lock only, then release)
         let tool_defs = {
-            let mut registry = tool_registry.write().await;
+            let registry = tool_registry.read().await;
             registry.get_definitions()
         };
 
