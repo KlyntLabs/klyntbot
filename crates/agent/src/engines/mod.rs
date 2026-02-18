@@ -7,6 +7,8 @@
 
 pub mod direct;
 pub mod plan;
+pub mod plan_execute;
 pub mod react;
 
+pub use plan_execute::{PlanExecuteEngine, PlanExecuteOutcome, PlanStep};
 pub use react::{ReactEngine, ReactResult};
