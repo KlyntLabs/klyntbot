@@ -6,5 +6,7 @@
 //! - `plan` — plan-then-execute with backtracking (TODO: Task 5.3)
 
 pub mod direct;
-// pub mod react;  // TODO: Task 5.2
 pub mod plan;
+pub mod react;
+
+pub use react::{ReactEngine, ReactResult};
