@@ -1,0 +1,263 @@
+[
+  {
+    "id": "todo-001",
+    "title": "Fix authentication regression",
+    "description": "Users unable to login after session token update. Check JWT validation logic.",
+    "status": "Doing",
+    "priority": 1,
+    "tags": ["bug", "auth", "urgent"],
+    "due_date": "2026-02-20T00:00:00Z",
+    "parent_id": null,
+    "project_id": "proj-001",
+    "attachments": [
+      {
+        "id": "att-001",
+        "type": "file",
+        "title": "error_screenshot.png",
+        "path": "/tmp/error_screenshot.png",
+        "created_at": "2026-02-18T10:00:00Z"
+      }
+    ],
+    "time_entries": [
+      {
+        "id": "te-001",
+        "minutes": 25,
+        "note": "Initial investigation",
+        "created_at": "2026-02-18T09:00:00Z"
+      }
+    ],
+    "dependencies": [],
+    "focus_deadline": "2026-02-18T17:00:00Z",
+    "created_at": "2026-02-17T08:00:00Z",
+    "updated_at": "2026-02-18T09:30:00Z"
+  },
+  {
+    "id": "todo-002",
+    "title": "Add dark theme support",
+    "description": "Implement dark mode color scheme following design tokens.",
+    "status": "Todo",
+    "priority": 3,
+    "tags": ["feature", "ui"],
+    "due_date": "2026-02-25T00:00:00Z",
+    "parent_id": null,
+    "project_id": "proj-001",
+    "attachments": [],
+    "time_entries": [],
+    "dependencies": ["todo-001"],
+    "focus_deadline": null,
+    "created_at": "2026-02-16T10:00:00Z",
+    "updated_at": "2026-02-16T10:00:00Z"
+  },
+  {
+    "id": "todo-003",
+    "title": "Write API documentation",
+    "description": "Document all GraphQL queries, mutations, and subscriptions.",
+    "status": "Todo",
+    "priority": 4,
+    "tags": ["docs"],
+    "due_date": "2026-03-01T00:00:00Z",
+    "parent_id": null,
+    "project_id": "proj-002",
+    "attachments": [],
+    "time_entries": [],
+    "dependencies": [],
+    "focus_deadline": null,
+    "created_at": "2026-02-15T14:00:00Z",
+    "updated_at": "2026-02-15T14:00:00Z"
+  },
+  {
+    "id": "todo-004",
+    "title": "Set up CI/CD pipeline",
+    "description": "Configure GitHub Actions for build, test, lint.",
+    "status": "Done",
+    "priority": 2,
+    "tags": ["infra", "ci"],
+    "due_date": "2026-02-15T00:00:00Z",
+    "parent_id": null,
+    "project_id": "proj-001",
+    "attachments": [],
+    "time_entries": [
+      {
+        "id": "te-002",
+        "minutes": 60,
+        "note": "Pipeline setup",
+        "created_at": "2026-02-14T10:00:00Z"
+      },
+      {
+        "id": "te-003",
+        "minutes": 30,
+        "note": "Fixed caching issue",
+        "created_at": "2026-02-15T09:00:00Z"
+      }
+    ],
+    "dependencies": [],
+    "focus_deadline": null,
+    "created_at": "2026-02-12T08:00:00Z",
+    "updated_at": "2026-02-15T11:00:00Z"
+  },
+  {
+    "id": "todo-005",
+    "title": "Implement task board drag-drop",
+    "description": "Kanban board with drag and drop for status changes.",
+    "status": "Doing",
+    "priority": 2,
+    "tags": ["feature", "ui"],
+    "due_date": "2026-02-22T00:00:00Z",
+    "parent_id": null,
+    "project_id": "proj-001",
+    "attachments": [],
+    "time_entries": [
+      {
+        "id": "te-004",
+        "minutes": 45,
+        "note": "Board layout",
+        "created_at": "2026-02-18T11:00:00Z"
+      }
+    ],
+    "dependencies": [],
+    "focus_deadline": null,
+    "created_at": "2026-02-17T09:00:00Z",
+    "updated_at": "2026-02-18T11:45:00Z"
+  },
+  {
+    "id": "todo-006",
+    "title": "Reproduce bug",
+    "description": "Reproduce the auth regression in a test environment.",
+    "status": "Done",
+    "priority": 1,
+    "tags": ["bug"],
+    "due_date": null,
+    "parent_id": "todo-001",
+    "project_id": "proj-001",
+    "attachments": [],
+    "time_entries": [],
+    "dependencies": [],
+    "focus_deadline": null,
+    "created_at": "2026-02-17T10:00:00Z",
+    "updated_at": "2026-02-17T11:00:00Z"
+  },
+  {
+    "id": "todo-007",
+    "title": "Write failing test",
+    "description": "Create regression test that demonstrates the auth bug.",
+    "status": "Done",
+    "priority": 1,
+    "tags": ["bug", "test"],
+    "due_date": null,
+    "parent_id": "todo-001",
+    "project_id": "proj-001",
+    "attachments": [],
+    "time_entries": [],
+    "dependencies": ["todo-006"],
+    "focus_deadline": null,
+    "created_at": "2026-02-17T11:00:00Z",
+    "updated_at": "2026-02-17T14:00:00Z"
+  },
+  {
+    "id": "todo-008",
+    "title": "Fix token validation",
+    "description": "Correct the JWT validation logic in auth middleware.",
+    "status": "Todo",
+    "priority": 1,
+    "tags": ["bug", "auth"],
+    "due_date": null,
+    "parent_id": "todo-001",
+    "project_id": "proj-001",
+    "attachments": [],
+    "time_entries": [],
+    "dependencies": ["todo-007"],
+    "focus_deadline": null,
+    "created_at": "2026-02-17T14:00:00Z",
+    "updated_at": "2026-02-17T14:00:00Z"
+  },
+  {
+    "id": "todo-009",
+    "title": "Add regression test",
+    "description": "Ensure the auth fix is covered by automated tests.",
+    "status": "Todo",
+    "priority": 2,
+    "tags": ["test"],
+    "due_date": null,
+    "parent_id": "todo-001",
+    "project_id": "proj-001",
+    "attachments": [],
+    "time_entries": [],
+    "dependencies": ["todo-008"],
+    "focus_deadline": null,
+    "created_at": "2026-02-17T14:30:00Z",
+    "updated_at": "2026-02-17T14:30:00Z"
+  },
+  {
+    "id": "todo-010",
+    "title": "Design settings page",
+    "description": "Tabbed settings interface for providers, channels, tools.",
+    "status": "Todo",
+    "priority": 3,
+    "tags": ["feature", "ui", "design"],
+    "due_date": "2026-02-28T00:00:00Z",
+    "parent_id": null,
+    "project_id": "proj-001",
+    "attachments": [
+      {
+        "id": "att-002",
+        "type": "url",
+        "title": "Design reference",
+        "path": "https://example.com/settings-ref",
+        "created_at": "2026-02-16T15:00:00Z"
+      }
+    ],
+    "time_entries": [],
+    "dependencies": [],
+    "focus_deadline": null,
+    "created_at": "2026-02-16T15:00:00Z",
+    "updated_at": "2026-02-16T15:00:00Z"
+  },
+  {
+    "id": "todo-011",
+    "title": "Optimize calendar sync",
+    "description": "Reduce CalDAV sync latency from 5s to under 2s.",
+    "status": "Doing",
+    "priority": 2,
+    "tags": ["performance", "calendar"],
+    "due_date": "2026-02-24T00:00:00Z",
+    "parent_id": null,
+    "project_id": "proj-003",
+    "attachments": [],
+    "time_entries": [
+      {
+        "id": "te-005",
+        "minutes": 20,
+        "note": "Profiling",
+        "created_at": "2026-02-18T14:00:00Z"
+      }
+    ],
+    "dependencies": [],
+    "focus_deadline": null,
+    "created_at": "2026-02-17T16:00:00Z",
+    "updated_at": "2026-02-18T14:20:00Z"
+  },
+  {
+    "id": "todo-012",
+    "title": "Create login page",
+    "description": "Landing page with basic login flow.",
+    "status": "Done",
+    "priority": 2,
+    "tags": ["feature", "auth"],
+    "due_date": "2026-02-10T00:00:00Z",
+    "parent_id": null,
+    "project_id": "proj-002",
+    "attachments": [],
+    "time_entries": [
+      {
+        "id": "te-006",
+        "minutes": 90,
+        "note": "Full implementation",
+        "created_at": "2026-02-09T10:00:00Z"
+      }
+    ],
+    "dependencies": [],
+    "focus_deadline": null,
+    "created_at": "2026-02-08T08:00:00Z",
+    "updated_at": "2026-02-10T16:00:00Z"
+  }
+]

@@ -1,0 +1,58 @@
+{
+  "description": "A typical chat interaction: user sends message, agent streams response with tool call",
+  "sequence": [
+    {
+      "direction": "client_to_server",
+      "message": {
+        "type": "message",
+        "content": "Show me my urgent tasks",
+        "session_id": "web-session-001"
+      }
+    },
+    {
+      "direction": "server_to_client",
+      "message": {
+        "type": "chunk",
+        "content": "Let me check "
+      }
+    },
+    {
+      "direction": "server_to_client",
+      "message": {
+        "type": "chunk",
+        "content": "your tasks..."
+      }
+    },
+    {
+      "direction": "server_to_client",
+      "message": {
+        "type": "tool_start",
+        "name": "todo",
+        "args": { "action": "list", "status": "todo", "priorityMin": 1 }
+      }
+    },
+    {
+      "direction": "server_to_client",
+      "message": {
+        "type": "tool_end",
+        "name": "todo",
+        "success": true,
+        "duration_ms": 42
+      }
+    },
+    {
+      "direction": "server_to_client",
+      "message": {
+        "type": "chunk",
+        "content": "You have 2 urgent tasks:\n1. Fix authentication regression (P1, due Feb 20)\n2. Fix token validation (P1)"
+      }
+    },
+    {
+      "direction": "server_to_client",
+      "message": {
+        "type": "done",
+        "content": "Let me check your tasks... You have 2 urgent tasks:\n1. Fix authentication regression (P1, due Feb 20)\n2. Fix token validation (P1)"
+      }
+    }
+  ]
+}

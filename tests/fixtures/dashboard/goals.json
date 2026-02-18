@@ -1,0 +1,60 @@
+[
+  {
+    "id": "goal-001",
+    "title": "Ship Dashboard v1",
+    "description": "Complete and deploy the web dashboard with core features.",
+    "status": "Active",
+    "priority": 1,
+    "target_date": "2026-03-15T00:00:00Z",
+    "metrics": [
+      { "name": "Features Complete", "current": 8.0, "target": 20.0, "unit": "features" },
+      { "name": "Test Coverage", "current": 45.0, "target": 80.0, "unit": "percent" }
+    ],
+    "linked_project_ids": ["proj-001"],
+    "created_at": "2026-02-01T00:00:00Z",
+    "updated_at": "2026-02-18T12:00:00Z"
+  },
+  {
+    "id": "goal-002",
+    "title": "Zero Critical Bugs",
+    "description": "Resolve all P1 bugs across the codebase.",
+    "status": "Active",
+    "priority": 1,
+    "target_date": "2026-02-28T00:00:00Z",
+    "metrics": [
+      { "name": "Open P1 Bugs", "current": 1.0, "target": 0.0, "unit": "bugs" }
+    ],
+    "linked_project_ids": ["proj-001", "proj-002"],
+    "created_at": "2026-02-10T00:00:00Z",
+    "updated_at": "2026-02-18T09:00:00Z"
+  },
+  {
+    "id": "goal-003",
+    "title": "Calendar Sync Reliability",
+    "description": "Achieve 99.5% sync success rate with sub-2s latency.",
+    "status": "Active",
+    "priority": 2,
+    "target_date": "2026-03-01T00:00:00Z",
+    "metrics": [
+      { "name": "Sync Success Rate", "current": 97.2, "target": 99.5, "unit": "percent" },
+      { "name": "Avg Sync Latency", "current": 3.1, "target": 2.0, "unit": "seconds" }
+    ],
+    "linked_project_ids": ["proj-003"],
+    "created_at": "2026-02-05T00:00:00Z",
+    "updated_at": "2026-02-18T14:00:00Z"
+  },
+  {
+    "id": "goal-004",
+    "title": "Complete Legacy Migration",
+    "description": "All v1 data migrated to v2 format.",
+    "status": "Achieved",
+    "priority": 3,
+    "target_date": "2026-01-31T00:00:00Z",
+    "metrics": [
+      { "name": "Records Migrated", "current": 1500.0, "target": 1500.0, "unit": "records" }
+    ],
+    "linked_project_ids": ["proj-004"],
+    "created_at": "2025-12-15T00:00:00Z",
+    "updated_at": "2026-01-30T00:00:00Z"
+  }
+]

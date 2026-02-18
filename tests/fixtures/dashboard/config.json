@@ -1,0 +1,59 @@
+{
+  "providers": {
+    "anthropic": {
+      "apiKey": "sk-ant-test-key-1234567890",
+      "defaultModel": "claude-opus-4-6"
+    },
+    "openai": {
+      "apiKey": "sk-test-key-0987654321",
+      "defaultModel": "gpt-4o"
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": "claude-opus-4-6",
+      "systemPrompt": "You are Klyntbot, a helpful AI assistant."
+    }
+  },
+  "channels": {
+    "telegram": { "enabled": true, "botToken": "test-telegram-token" },
+    "discord": { "enabled": true, "botToken": "test-discord-token" },
+    "slack": { "enabled": false },
+    "whatsapp": { "enabled": false },
+    "email": { "enabled": false }
+  },
+  "tools": {
+    "restrictToWorkspace": true,
+    "workspace": "/Users/test/workspace"
+  },
+  "calendar": {
+    "caldavUrl": "https://caldav.example.com/",
+    "username": "testuser",
+    "password": "testpass",
+    "syncIntervalSeconds": 300,
+    "autoSync": true
+  },
+  "todo": {
+    "enrichment": {
+      "enabled": true,
+      "autoApplyThreshold": 0.70
+    },
+    "search": {
+      "enabled": true,
+      "semanticThreshold": 0.5,
+      "embeddingModel": "paraphrase-multilingual-MiniLM-L12-v2",
+      "rrfK": 60
+    }
+  },
+  "notifications": {
+    "enabled": true,
+    "focusReminders": true,
+    "overdueAlerts": true,
+    "planUpdates": true,
+    "calendarSync": true,
+    "digest": { "enabled": true, "intervalHours": 24 }
+  },
+  "dashboard": {
+    "port": 8080
+  }
+}

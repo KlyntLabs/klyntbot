@@ -257,6 +257,29 @@ impl PlanStore {
         Ok(active_plans.first().map(|p| (*p).clone()))
     }
 
+    /// List all plans in insertion order.
+    pub async fn all(&mut self) -> Result<Vec<Plan>> {
+        self.ensure_loaded().await?;
+        Ok(self
+            .order
+            .iter()
+            .filter_map(|id| self.index.get(id))
+            .cloned()
+            .collect())
+    }
+
+    /// List plans filtered by status.
+    pub async fn list_by_status(&mut self, status: &PlanStatus) -> Result<Vec<Plan>> {
+        self.ensure_loaded().await?;
+        Ok(self
+            .order
+            .iter()
+            .filter_map(|id| self.index.get(id))
+            .filter(|p| &p.status == status)
+            .cloned()
+            .collect())
+    }
+
     /// Delete a plan by ID.
     pub async fn delete(&mut self, id: &Uuid) -> Result<bool> {
         self.ensure_loaded().await?;
