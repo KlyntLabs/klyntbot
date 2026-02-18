@@ -204,6 +204,8 @@ fn test_usage_struct() {
         prompt_tokens: 100,
         completion_tokens: 50,
         total_tokens: 150,
+        cache_read_tokens: 0,
+        cache_write_tokens: 0,
     };
 
     assert_eq!(usage.prompt_tokens, 100);
@@ -228,6 +230,8 @@ fn test_llm_response_serialization() {
             prompt_tokens: 50,
             completion_tokens: 20,
             total_tokens: 70,
+            cache_read_tokens: 0,
+            cache_write_tokens: 0,
         },
         reasoning_content: None,
     };

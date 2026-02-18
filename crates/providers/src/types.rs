@@ -113,6 +113,23 @@ pub trait LlmProvider: Send + Sync {
 
     /// Provider name (for logging)
     fn name(&self) -> &str;
+
+    /// Count tokens for the given messages and tools.
+    /// Default: character-based estimation (4 chars ≈ 1 token).
+    async fn count_tokens(&self, messages: &[Message], tools: Option<&[Value]>) -> Result<usize> {
+        let json = serde_json::to_string(&(messages, tools)).unwrap_or_default();
+        Ok(json.len() / 4)
+    }
+
+    /// Provider capabilities
+    fn capabilities(&self) -> ProviderCapabilities {
+        ProviderCapabilities::default()
+    }
+
+    /// Context window size for the current model
+    fn context_window(&self) -> usize {
+        DEFAULT_CONTEXT_WINDOW
+    }
 }
 
 /// Type alias for dynamic provider
@@ -171,12 +188,51 @@ pub fn tool_calls_to_messages(tool_calls: &[ToolCall]) -> Vec<ToolCallMessage> {
     tool_calls.iter().map(|tc| tc.to_message()).collect()
 }
 
+/// Provider capability flags for adaptive orchestration
+#[derive(Debug, Clone)]
+pub struct ProviderCapabilities {
+    pub extended_thinking: bool,
+    pub structured_outputs: bool,
+    pub prompt_caching: bool,
+    pub native_token_counting: bool,
+    pub vision: bool,
+    pub streaming: bool,
+    pub tool_choice_required: bool,
+    pub parallel_tool_calls: bool,
+}
+
+impl Default for ProviderCapabilities {
+    fn default() -> Self {
+        Self {
+            extended_thinking: false,
+            structured_outputs: false,
+            prompt_caching: false,
+            native_token_counting: false,
+            vision: true,
+            streaming: true,
+            tool_choice_required: false,
+            parallel_tool_calls: true,
+        }
+    }
+}
+
 /// Token usage information
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Usage {
     pub prompt_tokens: u32,
     pub completion_tokens: u32,
     pub total_tokens: u32,
+    #[serde(default)]
+    pub cache_read_tokens: u32,
+    #[serde(default)]
+    pub cache_write_tokens: u32,
+}
+
+impl Usage {
+    /// Get total token count
+    pub fn total(&self) -> u32 {
+        self.total_tokens
+    }
 }
 
 /// Message in a conversation
@@ -241,6 +297,8 @@ pub struct ImageUrl {
     pub url: String,
 }
 
+pub const DEFAULT_CONTEXT_WINDOW: usize = 128_000;
+
 impl Message {
     /// Create a system message
     pub fn system(content: impl Into<String>) -> Self {
@@ -302,5 +360,48 @@ impl Message {
             Message::Assistant { .. } => MessageRole::Assistant,
             Message::Tool { .. } => MessageRole::Tool,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_provider_capabilities_default() {
+        let caps = ProviderCapabilities::default();
+        assert!(!caps.extended_thinking);
+        assert!(!caps.structured_outputs);
+        assert!(!caps.prompt_caching);
+        assert!(!caps.native_token_counting);
+        assert!(caps.vision);
+        assert!(caps.streaming);
+        assert!(!caps.tool_choice_required);
+        assert!(caps.parallel_tool_calls);
+    }
+
+    #[test]
+    fn test_usage_has_cache_fields() {
+        let usage = Usage {
+            prompt_tokens: 100,
+            completion_tokens: 50,
+            total_tokens: 150,
+            cache_read_tokens: 10,
+            cache_write_tokens: 5,
+        };
+        assert_eq!(usage.total(), 150);
+        assert_eq!(usage.cache_read_tokens, 10);
+    }
+
+    #[test]
+    fn test_context_window_constant() {
+        assert_eq!(DEFAULT_CONTEXT_WINDOW, 128_000);
+    }
+
+    #[test]
+    fn test_usage_default_has_zero_cache_tokens() {
+        let usage = Usage::default();
+        assert_eq!(usage.cache_read_tokens, 0);
+        assert_eq!(usage.cache_write_tokens, 0);
     }
 }
