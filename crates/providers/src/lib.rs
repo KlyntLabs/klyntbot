@@ -108,7 +108,80 @@ pub fn create_provider(config: &Config) -> Result<DynProvider> {
     ).into())
 }
 
-/// Try to create a provider from a specific provider spec
+/// Create a ProviderManager from configuration.
+///
+/// Reads `config.provider_manager` for primary/fallback/classifier names,
+/// then creates each provider and wraps them in a `ProviderManager`.
+/// Falls back to `create_provider()` if no manager config is set.
+pub fn create_provider_manager(config: &Config) -> Result<Arc<ProviderManager>> {
+    let mgr_config = &config.provider_manager;
+
+    // Resolve primary: explicit manager config → default create_provider
+    let primary = if let Some(ref name) = mgr_config.primary {
+        create_named_provider(config, name, &config.agents.defaults.model)?
+    } else {
+        create_provider(config)?
+    };
+
+    // Resolve fallback (optional)
+    let fallback = if let Some(ref name) = mgr_config.fallback {
+        match create_named_provider(config, name, &config.agents.defaults.model) {
+            Ok(p) => Some(p),
+            Err(e) => {
+                tracing::warn!("Failed to create fallback provider '{}': {}", name, e);
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    // Resolve classifier (optional, uses its own model name)
+    let classifier = if let Some(ref model) = mgr_config.classifier_model {
+        // Detect the provider from the classifier model name
+        if let Some(spec) = ProviderRegistry::find_by_model(model) {
+            match try_create_from_spec(spec, config, model) {
+                Some(p) => Some(p),
+                None => {
+                    tracing::warn!("Failed to create classifier provider for model '{}'", model);
+                    None
+                }
+            }
+        } else {
+            // Use primary provider's API with classifier model
+            None
+        }
+    } else {
+        None
+    };
+
+    info!(
+        "ProviderManager: primary={}, fallback={}, classifier={}",
+        primary.name(),
+        fallback.as_ref().map_or("none", |f| f.name()),
+        classifier.as_ref().map_or("none", |c| c.name()),
+    );
+
+    Ok(Arc::new(ProviderManager::new(primary, fallback, classifier)))
+}
+
+/// Create a named provider by looking up config for that provider name.
+fn create_named_provider(config: &Config, name: &str, model: &str) -> Result<DynProvider> {
+    let spec = ProviderRegistry::find_by_name(name).ok_or_else(|| {
+        common::ConfigError::Invalid(format!("Unknown provider: {}", name))
+    })?;
+
+    try_create_from_spec(spec, config, model).ok_or_else(|| {
+        common::ConfigError::MissingField(format!(
+            "Provider '{}' configured but API key missing",
+            name
+        ))
+        .into()
+    })
+}
+
+/// Try to create a provider from a specific provider spec.
+/// When `native: true` and provider is anthropic, uses `AnthropicNativeProvider`.
 fn try_create_from_spec(spec: &ProviderSpec, config: &Config, model: &str) -> Option<DynProvider> {
     let pc = match spec.name {
         "anthropic" => &config.providers.anthropic,
@@ -123,6 +196,18 @@ fn try_create_from_spec(spec: &ProviderSpec, config: &Config, model: &str) -> Op
 
     if !pc.api_key.is_empty() {
         let api_base = pc.api_base.as_deref().unwrap_or(spec.default_api_base);
+
+        // Use native Anthropic provider when native: true
+        if pc.native && spec.name == "anthropic" {
+            let provider = AnthropicNativeProvider::new(
+                config::Secret::new(pc.api_key.expose().to_string()),
+                api_base.to_string(),
+                model.to_string(),
+            );
+            info!("Using native Anthropic provider with {}", model);
+            return Some(Arc::new(provider));
+        }
+
         match OpenAiCompatProvider::new(api_base, pc.api_key.expose(), model) {
             Ok(provider) => {
                 info!("Using {} provider with {}", spec.name, model);

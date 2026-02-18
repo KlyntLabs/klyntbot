@@ -5,7 +5,7 @@ use std::fmt;
 use std::path::PathBuf;
 
 use super::channels::ChannelsConfig;
-use super::providers::ProvidersConfig;
+use super::providers::{ProviderManagerConfig, ProvidersConfig};
 
 /// Wrapper that redacts sensitive values in Debug/Display output.
 /// Use `.expose()` to access the inner value.
@@ -88,6 +88,10 @@ pub struct Config {
 
     #[serde(default)]
     pub learning: LearningConfig,
+
+    /// Provider manager routing (primary/fallback/classifier)
+    #[serde(default)]
+    pub provider_manager: ProviderManagerConfig,
 
     #[serde(default = "default_timezone")]
     pub timezone: String,
