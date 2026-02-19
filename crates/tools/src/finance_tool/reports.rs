@@ -355,3 +355,81 @@ impl FinanceTool {
         derive_date_range(period, today)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{change_pct, derive_date_range};
+    use chrono::NaiveDate;
+
+    #[test]
+    fn test_derive_date_range_month() {
+        let today = NaiveDate::from_ymd_opt(2026, 2, 15).unwrap();
+        let (from, to, label) = derive_date_range("month", today).unwrap();
+        assert_eq!(from, NaiveDate::from_ymd_opt(2026, 2, 1).unwrap());
+        assert_eq!(to, NaiveDate::from_ymd_opt(2026, 2, 28).unwrap());
+        assert_eq!(label, "February 2026");
+    }
+
+    #[test]
+    fn test_derive_date_range_monthly_alias() {
+        let today = NaiveDate::from_ymd_opt(2026, 2, 15).unwrap();
+        let (from, to, _) = derive_date_range("monthly", today).unwrap();
+        assert_eq!(from, NaiveDate::from_ymd_opt(2026, 2, 1).unwrap());
+        assert_eq!(to, NaiveDate::from_ymd_opt(2026, 2, 28).unwrap());
+    }
+
+    #[test]
+    fn test_derive_date_range_week() {
+        // 2026-02-15 is a Sunday
+        let today = NaiveDate::from_ymd_opt(2026, 2, 15).unwrap();
+        let (from, to, label) = derive_date_range("week", today).unwrap();
+        assert_eq!(from, NaiveDate::from_ymd_opt(2026, 2, 9).unwrap()); // Monday
+        assert_eq!(to, NaiveDate::from_ymd_opt(2026, 2, 15).unwrap()); // Sunday
+        assert!(label.starts_with("Week of"));
+    }
+
+    #[test]
+    fn test_derive_date_range_year() {
+        let today = NaiveDate::from_ymd_opt(2026, 6, 15).unwrap();
+        let (from, to, label) = derive_date_range("year", today).unwrap();
+        assert_eq!(from, NaiveDate::from_ymd_opt(2026, 1, 1).unwrap());
+        assert_eq!(to, NaiveDate::from_ymd_opt(2026, 12, 31).unwrap());
+        assert_eq!(label, "2026");
+    }
+
+    #[test]
+    fn test_derive_date_range_quarter() {
+        let today = NaiveDate::from_ymd_opt(2026, 5, 20).unwrap();
+        let (from, to, label) = derive_date_range("quarter", today).unwrap();
+        assert_eq!(from, NaiveDate::from_ymd_opt(2026, 4, 1).unwrap());
+        assert_eq!(to, NaiveDate::from_ymd_opt(2026, 6, 30).unwrap());
+        assert_eq!(label, "Q2 2026");
+    }
+
+    #[test]
+    fn test_derive_date_range_last_30_days() {
+        let today = NaiveDate::from_ymd_opt(2026, 3, 1).unwrap();
+        let (from, _to, _) = derive_date_range("last_30_days", today).unwrap();
+        assert_eq!(from, NaiveDate::from_ymd_opt(2026, 1, 31).unwrap());
+    }
+
+    #[test]
+    fn test_derive_date_range_unknown_returns_error() {
+        let today = NaiveDate::from_ymd_opt(2026, 2, 15).unwrap();
+        assert!(derive_date_range("banana", today).is_err());
+    }
+
+    #[test]
+    fn test_derive_date_range_custom_returns_error() {
+        let today = NaiveDate::from_ymd_opt(2026, 2, 15).unwrap();
+        assert!(derive_date_range("custom", today).is_err());
+    }
+
+    #[test]
+    fn test_change_pct() {
+        assert_eq!(change_pct(200, 100), Some(100)); // +100%
+        assert_eq!(change_pct(50, 100), Some(-50)); // -50%
+        assert_eq!(change_pct(100, 0), None); // div by zero
+        assert_eq!(change_pct(100, 100), Some(0)); // no change
+    }
+}

@@ -457,4 +457,28 @@ mod tests {
         let p = ParamExtractor::new(&args);
         assert_eq!(p.i64_or("alert_threshold", 80).unwrap(), 90);
     }
+
+    #[test]
+    fn test_budget_period_from_str_loose() {
+        assert!(BudgetPeriod::from_str_loose("monthly").is_some());
+        assert!(BudgetPeriod::from_str_loose("weekly").is_some());
+        assert!(BudgetPeriod::from_str_loose("yearly").is_some());
+        assert!(BudgetPeriod::from_str_loose("custom").is_some());
+        assert!(BudgetPeriod::from_str_loose("invalid").is_none());
+    }
+
+    #[test]
+    fn test_budget_method_from_str_loose() {
+        assert!(BudgetMethod::from_str_loose("standard").is_some());
+        assert!(BudgetMethod::from_str_loose("six_jar").is_some());
+        assert!(BudgetMethod::from_str_loose("nope").is_none());
+    }
+
+    #[test]
+    fn test_jar_type_from_str_loose() {
+        assert!(JarType::from_str_loose("essentials").is_some());
+        assert!(JarType::from_str_loose("savings").is_some());
+        assert!(JarType::from_str_loose("entertainment").is_some());
+        assert!(JarType::from_str_loose("invalid").is_none());
+    }
 }
