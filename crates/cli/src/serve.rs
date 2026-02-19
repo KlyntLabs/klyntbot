@@ -44,10 +44,6 @@ pub async fn handle_serve(port: u16) -> Result<()> {
     cron_service.start().await?;
     info!("Cron service started");
 
-    // Create SHARED TodoStore (legacy — still used by ContextBuilder, CalendarSyncAdapter, etc.)
-    let todo_path = config.todo_store_path();
-    let todo_store = Arc::new(RwLock::new(tools::todo_store::TodoStore::new(todo_path)));
-
     // Create SHARED GoalStore (SQL-backed via from_repo)
     let goal_store = Arc::new(RwLock::new(goal::GoalStore::from_repo(repos.goals)));
 
@@ -62,14 +58,14 @@ pub async fn handle_serve(port: u16) -> Result<()> {
 
     // Set callback BEFORE wrapping in Arc (requires &mut self)
     {
-        let todo_store = Arc::clone(&todo_store);
+        let todo_repo = repos.todos.clone();
         let dispatcher = Arc::clone(&notification_dispatcher);
         let config_focus = config.todo.focus.clone();
         let bus_for_cron = bus.clone();
         let rt = tokio::runtime::Handle::current();
 
         cron_service.set_callback(Arc::new(move |job: &scheduling::CronJob| {
-            let todo_store = Arc::clone(&todo_store);
+            let todo_repo = todo_repo.clone();
             let dispatcher = Arc::clone(&dispatcher);
             let config_focus = config_focus.clone();
             let bus = Arc::clone(&bus_for_cron);
@@ -78,8 +74,8 @@ pub async fn handle_serve(port: u16) -> Result<()> {
             rt.block_on(async move {
                 match job_name.as_str() {
                     "todo_focus_check" => {
-                        let mut store = todo_store.write().await;
-                        let focused = store.focused().await?;
+                        let focused = todo_repo.list_focused().await
+                            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
                         for task in &focused {
                             if let Some(deadline) = task.focus_deadline {
                                 let remaining = deadline - chrono::Utc::now();
@@ -115,39 +111,37 @@ pub async fn handle_serve(port: u16) -> Result<()> {
                         Ok(Some(format!("Checked {} focused tasks", focused.len())))
                     }
                     "todo_daily_digest" => {
-                        let mut store = todo_store.write().await;
-                        let summary = store.summary().await?;
-                        // Use by_status HashMap for counts
-                        let todo_count = summary
-                            .by_status
-                            .get(&tools::todo_types::TodoStatus::Todo)
-                            .unwrap_or(&0);
-                        let doing_count = summary
-                            .by_status
-                            .get(&tools::todo_types::TodoStatus::Doing)
-                            .unwrap_or(&0);
-                        let done_count = summary
-                            .by_status
-                            .get(&tools::todo_types::TodoStatus::Done)
-                            .unwrap_or(&0);
+                        let summary = todo_repo.summary().await
+                            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                        let overdue = todo_repo.overdue().await
+                            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
                         let body = format!(
                             "Total: {} | Todo: {} | Doing: {} | Done: {} | Overdue: {}",
                             summary.total,
-                            todo_count,
-                            doing_count,
-                            done_count,
-                            summary.overdue.len()
+                            summary.todo,
+                            summary.doing,
+                            summary.done,
+                            overdue.len()
                         );
                         dispatcher.notify("📋 Daily Task Digest", &body).await.ok();
                         Ok(Some("Daily digest sent".to_string()))
                     }
                     "todo_overdue_check" => {
-                        let mut store = todo_store.write().await;
-                        let expired_ids = store.auto_unfocus_expired().await?;
-                        if !expired_ids.is_empty() {
+                        // Auto-unfocus tasks with expired focus deadlines
+                        let focused = todo_repo.list_focused().await
+                            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                        let now = chrono::Utc::now();
+                        let mut expired_count = 0u32;
+                        for task in &focused {
+                            if task.focus_deadline.map(|d| d < now).unwrap_or(false) {
+                                let _ = todo_repo.unfocus(&task.id).await;
+                                expired_count += 1;
+                            }
+                        }
+                        if expired_count > 0 {
                             let body = format!(
                                 "{} task(s) auto-unfocused due to {}h deadline",
-                                expired_ids.len(),
+                                expired_count,
                                 config_focus.deadline_hours
                             );
                             dispatcher
@@ -353,7 +347,6 @@ pub async fn handle_serve(port: u16) -> Result<()> {
             provider,
             config.clone(),
             Some(cron_service.clone()),
-            todo_store.clone(),
             repos.todos,
             Some(repos.embeddings),
             Some(goal_store.clone()),

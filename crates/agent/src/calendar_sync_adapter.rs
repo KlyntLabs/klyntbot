@@ -13,11 +13,9 @@ use serde_json::{json, Value};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::fs;
-use tokio::sync::RwLock;
 use tools::{
     calendar_tool::CalendarHandler,
-    todo_store::TodoStore,
-    todo_types::{Todo, TodoFilter, TodoPatch, TodoStatus},
+    todo_types::{Todo, TodoStatus},
 };
 
 /// CalendarSyncAdapter - implements two-way calendar synchronization
@@ -25,9 +23,7 @@ use tools::{
 pub struct CalendarSyncAdapter {
     providers: Vec<(String, Box<dyn CalendarProvider>)>,
     _provider_configs: Vec<CalendarProviderConfig>,
-    todo_store: Arc<RwLock<TodoStore>>,
-    /// Optional SQL-backed todo repository (dual-mode: used when set, falls back to JSONL).
-    sql_todo_repo: Option<storage::TodoRepo>,
+    todo_repo: storage::TodoRepo,
     conflicts_path: PathBuf,
     auto_sync_due_dates: bool,
     dispatcher: Option<Arc<crate::NotificationDispatcher>>,
@@ -37,7 +33,7 @@ pub struct CalendarSyncAdapter {
 impl CalendarSyncAdapter {
     /// Create a new CalendarSyncAdapter from the calendar config.
     pub async fn new(
-        todo_store: Arc<RwLock<TodoStore>>,
+        todo_repo: storage::TodoRepo,
         config: &CalendarConfig,
         timezone: String,
         dispatcher: Option<Arc<crate::NotificationDispatcher>>,
@@ -95,20 +91,12 @@ impl CalendarSyncAdapter {
         Ok(Self {
             providers,
             _provider_configs: provider_configs,
-            todo_store,
-            sql_todo_repo: None,
+            todo_repo,
             conflicts_path,
             auto_sync_due_dates: any_auto_sync,
             dispatcher,
             bidirectional_sync,
         })
-    }
-
-    /// Set an optional SQL-backed todo repository for dual-mode support.
-    /// When set, todo reads/writes prefer SQL; otherwise falls back to JSONL.
-    pub fn with_todo_repo(mut self, repo: storage::TodoRepo) -> Self {
-        self.sql_todo_repo = Some(repo);
-        self
     }
 
     /// Two-way sync: Pull from all CalDAV providers, resolve conflicts, push local changes.
@@ -155,36 +143,19 @@ impl CalendarSyncAdapter {
 
         // Clear calendar_event_uid for todos that had events deleted from all providers
         if self.auto_sync_due_dates {
-            if let Some(repo) = &self.sql_todo_repo {
-                // SQL path
-                let rows = repo
-                    .list(&storage::TodoFilter::default())
-                    .await
-                    .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
-                for row in rows {
-                    if row.due_date.is_none() && row.calendar_event_uid.is_some() {
-                        // Note: storage::TodoPatch doesn't have calendar_event_uid.
-                        // This is a best-effort cleanup; full support requires extending
-                        // the storage patch. For now, skip this cleanup in SQL mode.
-                        tracing::debug!(
-                            "SQL mode: skipping calendar_event_uid cleanup for todo {} (requires TodoPatch extension)",
-                            row.id
-                        );
-                    }
-                }
-            } else {
-                let mut store = self.todo_store.write().await;
-                let todos = store.list(&TodoFilter::default()).await?;
-                for todo in todos {
-                    if todo.due_date.is_none() && todo.calendar_event_uid.is_some() {
-                        let patch = TodoPatch {
-                            calendar_event_uid: Some(None),
-                            ..Default::default()
-                        };
-                        if let Err(e) = store.update(&todo.id, patch).await {
-                            tracing::warn!("Failed to sync calendar update to todo {}: {}. Calendar and todo may be out of sync.", todo.id, e);
-                        }
-                    }
+            let rows = self.todo_repo
+                .list(&storage::TodoFilter::default())
+                .await
+                .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            for row in rows {
+                if row.due_date.is_none() && row.calendar_event_uid.is_some() {
+                    // Note: storage::TodoPatch doesn't have calendar_event_uid.
+                    // This is a best-effort cleanup; full support requires extending
+                    // the storage patch.
+                    tracing::debug!(
+                        "Skipping calendar_event_uid cleanup for todo {} (requires TodoPatch extension)",
+                        row.id
+                    );
                 }
             }
         }
@@ -194,7 +165,7 @@ impl CalendarSyncAdapter {
         if self.bidirectional_sync {
             match self.get_events_for_reconciliation().await {
                 Ok(events) => {
-                    match crate::reconcile_calendar_events(self.todo_store.clone(), events).await {
+                    match crate::reconcile_calendar_events(&self.todo_repo, events).await {
                         Ok(report) => {
                             let changes_count = report.due_dates_updated
                                 + report.todos_completed
@@ -289,7 +260,6 @@ impl CalendarSyncAdapter {
             .get_events(sync_state.sync_token.as_deref())
             .await?;
 
-        let mut store = self.todo_store.write().await;
         let mut conflicts_detected = 0;
         let mut events_pulled = 0;
         let mut events_pushed = 0;
@@ -297,7 +267,7 @@ impl CalendarSyncAdapter {
         // Process remote changes
         for remote_event in &remote_events {
             if let Some(local_todo) = self
-                .find_todo_by_calendar_uid_async(&mut store, &remote_event.uid)
+                .find_todo_by_calendar_uid(&remote_event.uid)
                 .await
             {
                 if let Some(local_event) = self.todo_to_event(&local_todo) {
@@ -305,19 +275,19 @@ impl CalendarSyncAdapter {
                         conflicts_detected += 1;
                         self.log_conflict(remote_event, &local_event).await?;
                         let resolved_event = resolve_conflict(remote_event, &local_event);
-                        self.update_todo_from_event(&mut store, &local_todo.id, &resolved_event)
+                        self.update_todo_from_event(&local_todo.id, &resolved_event)
                             .await?;
                     } else {
-                        self.update_todo_from_event(&mut store, &local_todo.id, remote_event)
+                        self.update_todo_from_event(&local_todo.id, remote_event)
                             .await?;
                     }
                 } else {
-                    self.update_todo_from_event(&mut store, &local_todo.id, remote_event)
+                    self.update_todo_from_event(&local_todo.id, remote_event)
                         .await?;
                 }
                 events_pulled += 1;
             } else {
-                self.create_todo_from_event(&mut store, remote_event)
+                self.create_todo_from_event(remote_event)
                     .await?;
                 events_pulled += 1;
             }
@@ -325,17 +295,11 @@ impl CalendarSyncAdapter {
 
         // Push local changes to this provider
         if self.auto_sync_due_dates {
-            // Get todos from SQL or JSONL
-            let todos: Vec<Todo> = if let Some(repo) = &self.sql_todo_repo {
-                let rows = repo
-                    .list(&storage::TodoFilter::default())
-                    .await
-                    .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
-                rows.into_iter().map(Todo::from).collect()
-            } else {
-                let filter = TodoFilter::default();
-                store.list(&filter).await?
-            };
+            let rows = self.todo_repo
+                .list(&storage::TodoFilter::default())
+                .await
+                .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            let todos: Vec<Todo> = rows.into_iter().map(Todo::from).collect();
 
             for todo in todos {
                 if todo.due_date.is_some() {
@@ -344,22 +308,12 @@ impl CalendarSyncAdapter {
                         match provider.put_event(&event).await {
                             Ok(_etag) => {
                                 if todo.calendar_event_uid.is_none() {
-                                    if let Some(_repo) = &self.sql_todo_repo {
-                                        // SQL path: update via storage patch (calendar_event_uid
-                                        // not in storage::TodoPatch — best-effort, skip for now)
-                                        tracing::debug!(
-                                            "SQL mode: skipping calendar_event_uid link for todo {} (requires TodoPatch extension)",
-                                            todo.id
-                                        );
-                                    } else {
-                                        let patch = TodoPatch {
-                                            calendar_event_uid: Some(Some(event.uid.clone())),
-                                            ..Default::default()
-                                        };
-                                        if let Err(e) = store.update(&todo.id, patch).await {
-                                            tracing::warn!("Failed to sync calendar update to todo {}: {}. Calendar and todo may be out of sync.", todo.id, e);
-                                        }
-                                    }
+                                    // Note: storage::TodoPatch doesn't have calendar_event_uid.
+                                    // Best-effort: skip link for now (requires TodoPatch extension).
+                                    tracing::debug!(
+                                        "Skipping calendar_event_uid link for todo {} (requires TodoPatch extension)",
+                                        todo.id
+                                    );
                                 }
                                 events_pushed += 1;
                             }
@@ -404,34 +358,13 @@ impl CalendarSyncAdapter {
         }))
     }
 
-    /// Find a todo by its calendar event UID.
-    async fn find_todo_by_calendar_uid_async(
+    /// Find a todo by its calendar event UID via SQL.
+    async fn find_todo_by_calendar_uid(
         &self,
-        store: &mut TodoStore,
-        uid: &str,
-    ) -> Option<Todo> {
-        // SQL path: prefer sql_todo_repo if available
-        if let Some(repo) = &self.sql_todo_repo {
-            return self.find_todo_by_calendar_uid_sql(repo, uid).await;
-        }
-        let filter = TodoFilter::default();
-        if let Ok(todos) = store.list(&filter).await {
-            todos
-                .into_iter()
-                .find(|t| t.calendar_event_uid.as_ref().is_some_and(|u| u == uid))
-        } else {
-            None
-        }
-    }
-
-    /// SQL path: Find a todo by its calendar event UID.
-    async fn find_todo_by_calendar_uid_sql(
-        &self,
-        repo: &storage::TodoRepo,
         uid: &str,
     ) -> Option<Todo> {
         let filter = storage::TodoFilter::default();
-        if let Ok(rows) = repo.list(&filter).await {
+        if let Ok(rows) = self.todo_repo.list(&filter).await {
             rows.into_iter()
                 .map(Todo::from)
                 .find(|t| t.calendar_event_uid.as_ref().is_some_and(|u| u == uid))
@@ -440,44 +373,29 @@ impl CalendarSyncAdapter {
         }
     }
 
-    /// Update a todo from a calendar event.
+    /// Update a todo from a calendar event via SQL.
     async fn update_todo_from_event(
         &self,
-        store: &mut TodoStore,
         todo_id: &str,
         event: &CalendarEvent,
     ) -> Result<()> {
-        // SQL path: prefer sql_todo_repo if available
-        if let Some(repo) = &self.sql_todo_repo {
-            let patch = storage::TodoPatch {
-                id: todo_id.to_string(),
-                title: Some(event.summary.clone()),
-                description: Some(event.description.clone()),
-                due_date: Some(Some(event.start)),
-                ..Default::default()
-            };
-            repo.update(&patch)
-                .await
-                .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
-            return Ok(());
-        }
-
-        let patch = TodoPatch {
+        let patch = storage::TodoPatch {
+            id: todo_id.to_string(),
             title: Some(event.summary.clone()),
             description: Some(event.description.clone()),
             due_date: Some(Some(event.start)),
-            calendar_event_uid: Some(Some(event.uid.clone())),
             ..Default::default()
         };
-
-        store.update(todo_id, patch).await?;
+        self.todo_repo
+            .update(&patch)
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         Ok(())
     }
 
-    /// Create a new todo from a calendar event.
+    /// Create a new todo from a calendar event via SQL.
     async fn create_todo_from_event(
         &self,
-        store: &mut TodoStore,
         event: &CalendarEvent,
     ) -> Result<()> {
         let now = Utc::now();
@@ -511,16 +429,11 @@ impl CalendarSyncAdapter {
             blocks: Vec::new(),
         };
 
-        // SQL path: prefer sql_todo_repo if available
-        if let Some(repo) = &self.sql_todo_repo {
-            let row: storage::TodoRow = (&todo).into();
-            repo.add(&row)
-                .await
-                .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
-            return Ok(());
-        }
-
-        store.add(todo).await?;
+        let row: storage::TodoRow = (&todo).into();
+        self.todo_repo
+            .add(&row)
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         Ok(())
     }
 
@@ -733,22 +646,12 @@ impl CalendarHandler for CalendarSyncAdapter {
 
     /// Get sync status for all providers.
     async fn get_status(&self) -> Result<Value> {
-        // Determine todo counts — SQL path preferred when available
-        let (synced_count, total_count) = if let Some(repo) = &self.sql_todo_repo {
-            let rows = repo
-                .list(&storage::TodoFilter::default())
-                .await
-                .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
-            let synced = rows.iter().filter(|r| r.calendar_event_uid.is_some()).count();
-            (synced, rows.len())
-        } else {
-            let mut store = self.todo_store.write().await;
-            let filter = TodoFilter::default();
-            let todos = store.list(&filter).await?;
-            let synced = todos.iter().filter(|t| t.calendar_event_uid.is_some()).count();
-            let total = todos.len();
-            (synced, total)
-        };
+        let rows = self.todo_repo
+            .list(&storage::TodoFilter::default())
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        let synced_count = rows.iter().filter(|r| r.calendar_event_uid.is_some()).count();
+        let total_count = rows.len();
 
         let mut provider_statuses = Vec::new();
 
@@ -830,7 +733,17 @@ impl CalendarHandler for CalendarSyncAdapter {
 mod tests {
     use super::*;
     use config::{AppleCalendarConfig, Secret};
-    use tools::todo_store::TodoStore;
+
+    /// Try to connect to a test database. Returns None if no DB is available,
+    /// allowing tests to gracefully skip.
+    async fn test_todo_repo() -> Option<storage::TodoRepo> {
+        let url = std::env::var("DATABASE_URL")
+            .unwrap_or_else(|_| "postgres://localhost/klyntbot_test".to_string());
+        match storage::StoragePool::connect(&url).await {
+            Ok(pool) => Some(storage::Repos::from_pool(&pool).todos),
+            Err(_) => None,
+        }
+    }
 
     fn test_calendar_config() -> CalendarConfig {
         CalendarConfig {
@@ -850,13 +763,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_calendar_sync_adapter_creation() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let store_path = temp_dir.path().join("todos.jsonl");
-        let todo_store = Arc::new(RwLock::new(TodoStore::new(store_path)));
+        let Some(todo_repo) = test_todo_repo().await else { return };
         let config = test_calendar_config();
 
         let adapter =
-            CalendarSyncAdapter::new(todo_store, &config, "UTC".to_string(), None, false).await;
+            CalendarSyncAdapter::new(todo_repo, &config, "UTC".to_string(), None, false).await;
         assert!(adapter.is_ok());
 
         let adapter = adapter.unwrap();
@@ -866,12 +777,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_todo_to_event_conversion() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let store_path = temp_dir.path().join("todos.jsonl");
-        let todo_store = Arc::new(RwLock::new(TodoStore::new(store_path)));
+        let Some(todo_repo) = test_todo_repo().await else { return };
         let config = test_calendar_config();
 
-        let adapter = CalendarSyncAdapter::new(todo_store, &config, "UTC".to_string(), None, false)
+        let adapter = CalendarSyncAdapter::new(todo_repo, &config, "UTC".to_string(), None, false)
             .await
             .unwrap();
 
@@ -921,12 +830,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_todo_status_mapping() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let store_path = temp_dir.path().join("todos.jsonl");
-        let todo_store = Arc::new(RwLock::new(TodoStore::new(store_path)));
+        let Some(todo_repo) = test_todo_repo().await else { return };
         let config = test_calendar_config();
 
-        let adapter = CalendarSyncAdapter::new(todo_store, &config, "UTC".to_string(), None, false)
+        let adapter = CalendarSyncAdapter::new(todo_repo, &config, "UTC".to_string(), None, false)
             .await
             .unwrap();
 
@@ -985,12 +892,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_todo_to_event_no_due_date() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let store_path = temp_dir.path().join("todos.jsonl");
-        let todo_store = Arc::new(RwLock::new(TodoStore::new(store_path)));
+        let Some(todo_repo) = test_todo_repo().await else { return };
         let config = test_calendar_config();
 
-        let adapter = CalendarSyncAdapter::new(todo_store, &config, "UTC".to_string(), None, false)
+        let adapter = CalendarSyncAdapter::new(todo_repo, &config, "UTC".to_string(), None, false)
             .await
             .unwrap();
 
@@ -1032,9 +937,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_multi_provider_adapter() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let store_path = temp_dir.path().join("todos.jsonl");
-        let todo_store = Arc::new(RwLock::new(TodoStore::new(store_path)));
+        let Some(todo_repo) = test_todo_repo().await else { return };
 
         let config = CalendarConfig {
             providers: vec![
@@ -1057,7 +960,7 @@ mod tests {
             ..CalendarConfig::default()
         };
 
-        let adapter = CalendarSyncAdapter::new(todo_store, &config, "UTC".to_string(), None, false)
+        let adapter = CalendarSyncAdapter::new(todo_repo, &config, "UTC".to_string(), None, false)
             .await
             .unwrap();
         assert_eq!(adapter.providers.len(), 2);
@@ -1067,9 +970,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_disabled_provider_skipped() {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let store_path = temp_dir.path().join("todos.jsonl");
-        let todo_store = Arc::new(RwLock::new(TodoStore::new(store_path)));
+        let Some(todo_repo) = test_todo_repo().await else { return };
 
         let config = CalendarConfig {
             providers: vec![CalendarProviderConfig::Apple(AppleCalendarConfig {
@@ -1081,7 +982,7 @@ mod tests {
             ..CalendarConfig::default()
         };
 
-        let adapter = CalendarSyncAdapter::new(todo_store, &config, "UTC".to_string(), None, false)
+        let adapter = CalendarSyncAdapter::new(todo_repo, &config, "UTC".to_string(), None, false)
             .await
             .unwrap();
         assert_eq!(adapter.providers.len(), 0);

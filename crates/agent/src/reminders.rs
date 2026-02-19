@@ -4,13 +4,12 @@ use chrono::{DateTime, Duration, Utc};
 use serde::Deserialize;
 use std::sync::Arc;
 use std::time::Duration as StdDuration;
-use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error};
 
 use common::Result;
-use tools::{calendar_tool::CalendarHandler, todo_store::TodoStore, todo_types::Todo};
+use tools::{calendar_tool::CalendarHandler, todo_types::Todo};
 
 use super::NotificationDispatcher;
 
@@ -26,9 +25,7 @@ pub struct CalendarEvent {
 
 /// ReminderEngine - checks for todos and calendar events that need reminders
 pub struct ReminderEngine {
-    todo_store: Arc<RwLock<TodoStore>>,
-    /// Optional SQL-backed todo repository (dual-mode: used when set, falls back to JSONL).
-    sql_todo_repo: Option<storage::TodoRepo>,
+    todo_repo: storage::TodoRepo,
     calendar_handler: Option<Arc<dyn CalendarHandler>>,
     dispatcher: Arc<NotificationDispatcher>,
     check_interval: StdDuration,
@@ -37,35 +34,15 @@ pub struct ReminderEngine {
 }
 
 impl ReminderEngine {
-    /// Create a new ReminderEngine (JSONL backend).
-    pub fn new(
-        todo_store: Arc<RwLock<TodoStore>>,
-        calendar_handler: Option<Arc<dyn CalendarHandler>>,
-        dispatcher: Arc<NotificationDispatcher>,
-        check_interval: StdDuration,
-    ) -> Self {
-        Self {
-            todo_store,
-            sql_todo_repo: None,
-            calendar_handler,
-            dispatcher,
-            check_interval,
-            task_handle: None,
-            cancel_token: CancellationToken::new(),
-        }
-    }
-
     /// Create a new ReminderEngine backed by a SQL TodoRepo.
-    pub fn from_repo(
-        repo: storage::TodoRepo,
-        todo_store: Arc<RwLock<TodoStore>>,
+    pub fn new(
+        todo_repo: storage::TodoRepo,
         calendar_handler: Option<Arc<dyn CalendarHandler>>,
         dispatcher: Arc<NotificationDispatcher>,
         check_interval: StdDuration,
     ) -> Self {
         Self {
-            todo_store,
-            sql_todo_repo: Some(repo),
+            todo_repo,
             calendar_handler,
             dispatcher,
             check_interval,
@@ -76,8 +53,7 @@ impl ReminderEngine {
 
     /// Start the reminder engine background task
     pub fn start(&mut self) {
-        let todo_store = Arc::clone(&self.todo_store);
-        let sql_todo_repo = self.sql_todo_repo.clone();
+        let todo_repo = self.todo_repo.clone();
         let calendar_handler = self.calendar_handler.clone();
         let dispatcher = Arc::clone(&self.dispatcher);
         let check_interval = self.check_interval;
@@ -92,8 +68,7 @@ impl ReminderEngine {
                     }
                     _ = tokio::time::sleep(check_interval) => {
                         if let Err(e) = Self::check_and_send_reminders(
-                            &todo_store,
-                            sql_todo_repo.as_ref(),
+                            &todo_repo,
                             calendar_handler.as_ref(),
                             &dispatcher
                         ).await {
@@ -115,23 +90,8 @@ impl ReminderEngine {
         }
     }
 
-    /// Check all reminder rules and send notifications.
-    /// Prefers SQL backend when `sql_todo_repo` is provided; falls back to JSONL.
+    /// Check all reminder rules and send notifications via SQL TodoRepo.
     async fn check_and_send_reminders(
-        todo_store: &Arc<RwLock<TodoStore>>,
-        sql_todo_repo: Option<&storage::TodoRepo>,
-        calendar_handler: Option<&Arc<dyn CalendarHandler>>,
-        dispatcher: &Arc<NotificationDispatcher>,
-    ) -> Result<()> {
-        if let Some(repo) = sql_todo_repo {
-            Self::check_and_send_reminders_sql(repo, calendar_handler, dispatcher).await
-        } else {
-            Self::check_and_send_reminders_jsonl(todo_store, calendar_handler, dispatcher).await
-        }
-    }
-
-    /// SQL path for check_and_send_reminders.
-    async fn check_and_send_reminders_sql(
         repo: &storage::TodoRepo,
         calendar_handler: Option<&Arc<dyn CalendarHandler>>,
         dispatcher: &Arc<NotificationDispatcher>,
@@ -211,106 +171,6 @@ impl ReminderEngine {
                     .await?;
             }
         }
-
-        // Calendar event reminders (shared logic)
-        Self::check_calendar_reminders(calendar_handler, dispatcher).await?;
-
-        Ok(())
-    }
-
-    /// JSONL path for check_and_send_reminders (original implementation).
-    async fn check_and_send_reminders_jsonl(
-        todo_store: &Arc<RwLock<TodoStore>>,
-        calendar_handler: Option<&Arc<dyn CalendarHandler>>,
-        dispatcher: &Arc<NotificationDispatcher>,
-    ) -> Result<()> {
-        let mut store = todo_store.write().await;
-
-        // Get all active todos
-        let todos = store
-            .list(&tools::todo_types::TodoFilter::default())
-            .await?;
-
-        for todo in todos {
-            // Rule #1: Due date alerts (within 2 hours)
-            if Self::should_remind_due_date(&todo) {
-                let time_left = todo.due_date.unwrap().signed_duration_since(Utc::now());
-                let hours_left = time_left.num_hours();
-                let mins_left = time_left.num_minutes() % 60;
-
-                dispatcher
-                    .notify(
-                        "📅 Task Due Soon",
-                        &format!(
-                            "{} is due in {}h {}m\nPriority: P{}",
-                            todo.title,
-                            hours_left,
-                            mins_left,
-                            todo.priority.unwrap_or(3)
-                        ),
-                    )
-                    .await?;
-
-                // Update last_reminded_at to prevent duplicate reminders
-                let patch = tools::todo_types::TodoPatch {
-                    last_reminded_at: Some(Some(Utc::now())),
-                    ..Default::default()
-                };
-                let _ = store.update(&todo.id, patch).await;
-                // For now, reminders will be sent every check cycle if conditions are met
-            }
-
-            // Rule #2: Focused deadlines (within 1 hour)
-            if Self::should_remind_focused_deadline(&todo) {
-                let time_left = todo
-                    .focus_deadline
-                    .unwrap()
-                    .signed_duration_since(Utc::now());
-                let mins_left = time_left.num_minutes();
-
-                dispatcher
-                    .notify(
-                        "🎯 Focused Task Deadline Approaching",
-                        &format!("{} deadline in {} minutes!", todo.title, mins_left),
-                    )
-                    .await?;
-
-                // Update last_reminded_at to prevent duplicate reminders
-                let patch = tools::todo_types::TodoPatch {
-                    last_reminded_at: Some(Some(Utc::now())),
-                    ..Default::default()
-                };
-                let _ = store.update(&todo.id, patch).await;
-            }
-
-            // Rule #3: Overdue nagging (once per day)
-            if Self::should_remind_overdue(&todo) {
-                let overdue_by = Utc::now().signed_duration_since(todo.due_date.unwrap());
-                let days_overdue = overdue_by.num_days();
-
-                dispatcher
-                    .notify(
-                        "⚠️ Overdue Task",
-                        &format!(
-                            "{} is {} day(s) overdue\nPriority: P{}",
-                            todo.title,
-                            days_overdue,
-                            todo.priority.unwrap_or(3)
-                        ),
-                    )
-                    .await?;
-
-                // Update last_reminded_at to prevent duplicate reminders
-                let patch = tools::todo_types::TodoPatch {
-                    last_reminded_at: Some(Some(Utc::now())),
-                    ..Default::default()
-                };
-                let _ = store.update(&todo.id, patch).await;
-            }
-        }
-
-        // Release the store lock before calendar checks
-        drop(store);
 
         // Calendar event reminders (shared logic)
         Self::check_calendar_reminders(calendar_handler, dispatcher).await?;

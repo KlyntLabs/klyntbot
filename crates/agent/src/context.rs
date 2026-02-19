@@ -45,10 +45,8 @@ pub struct ContextBuilder {
     cached_memory: Option<CachedContext>,
     cached_todo: Option<CachedContext>,
     cached_goals: Option<CachedContext>,
-    todo_store: Option<std::sync::Arc<tokio::sync::RwLock<tools::todo_store::TodoStore>>>,
+    todo_repo: Option<storage::TodoRepo>,
     goal_store: Option<std::sync::Arc<tokio::sync::RwLock<GoalStore>>>,
-    /// Optional SQL-backed todo repository (dual-mode: used when set, falls back to JSONL).
-    sql_todo_repo: Option<storage::TodoRepo>,
     /// Current adaptive confidence threshold — updated by LearningService.
     confidence_threshold: f32,
 }
@@ -58,7 +56,7 @@ impl ContextBuilder {
     pub async fn new(
         workspace: PathBuf,
         timezone: String,
-        todo_store: Option<std::sync::Arc<tokio::sync::RwLock<tools::todo_store::TodoStore>>>,
+        todo_repo: Option<storage::TodoRepo>,
         goal_store: Option<std::sync::Arc<tokio::sync::RwLock<GoalStore>>>,
     ) -> Self {
         Self {
@@ -70,9 +68,8 @@ impl ContextBuilder {
             cached_memory: None,
             cached_todo: None,
             cached_goals: None,
-            todo_store,
+            todo_repo,
             goal_store,
-            sql_todo_repo: None,
             confidence_threshold: 0.7,
         }
     }
@@ -86,13 +83,6 @@ impl ContextBuilder {
     /// Read the current confidence threshold (used in tests and diagnostics).
     pub fn confidence_threshold(&self) -> f32 {
         self.confidence_threshold
-    }
-
-    /// Set an optional SQL-backed todo repository for dual-mode support.
-    /// When set, todo context is read from SQL; otherwise falls back to JSONL.
-    pub fn with_todo_repo(mut self, repo: storage::TodoRepo) -> Self {
-        self.sql_todo_repo = Some(repo);
-        self
     }
 
     /// Initialize skills
@@ -173,8 +163,7 @@ impl ContextBuilder {
         messages
     }
 
-    /// Get todo context string from the store (with TTL cache).
-    /// Prefers SQL backend when `sql_todo_repo` is set; falls back to JSONL.
+    /// Get todo context string from the SQL repo (with TTL cache).
     async fn get_todo_context(&mut self) -> String {
         // Return cached if still valid
         if let Some(ref cached) = self.cached_todo {
@@ -183,31 +172,20 @@ impl ContextBuilder {
             }
         }
 
-        let content = if let Some(repo) = &self.sql_todo_repo {
-            // SQL path: use TodoRepo::to_context_string()
+        let content = if let Some(repo) = &self.todo_repo {
             match repo.to_context_string().await {
                 Ok(ctx) => ctx,
                 Err(e) => {
-                    warn!("SQL todo context failed, falling back to JSONL: {}", e);
-                    self.get_todo_context_jsonl().await
+                    warn!("SQL todo context failed: {}", e);
+                    String::new()
                 }
             }
         } else {
-            self.get_todo_context_jsonl().await
+            String::new()
         };
 
         self.cached_todo = Some(CachedContext::new(content.clone(), CONTEXT_CACHE_TTL_SECS));
         content
-    }
-
-    /// JSONL fallback for todo context (original implementation).
-    async fn get_todo_context_jsonl(&self) -> String {
-        if let Some(store) = &self.todo_store {
-            let mut guard = store.write().await;
-            guard.to_context_string().await.unwrap_or_default()
-        } else {
-            String::new()
-        }
     }
 
     /// Get active goals context string from the store (with TTL cache).

@@ -70,9 +70,6 @@ async fn agent_with_plan_store(
 ) -> AgentLoop {
     let config = make_config(temp_dir);
     let bus = Arc::new(MessageBus::new(10));
-    let todo_store = Arc::new(RwLock::new(klyntbot::tools::todo_store::TodoStore::new(
-        config.todo_store_path(),
-    )));
     let pool = klyntbot::storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
     let todo_repo = klyntbot::storage::TodoRepo::new(pool.inner().clone());
     let goal_store = Some(Arc::new(RwLock::new(klyntbot::goal::GoalStore::new(
@@ -83,7 +80,6 @@ async fn agent_with_plan_store(
         Arc::new(provider),
         config,
         None,
-        todo_store,
         todo_repo,
         None,
         goal_store,

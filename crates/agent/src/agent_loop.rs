@@ -137,7 +137,6 @@ impl AgentLoop {
         provider: DynProvider,
         config: Config,
         cron_service: Option<Arc<scheduling::CronService>>,
-        todo_store: Arc<RwLock<tools::todo_store::TodoStore>>,
         todo_repo: storage::TodoRepo,
         embedding_repo: Option<storage::EmbeddingRepo>,
         goal_store: Option<Arc<RwLock<goal::GoalStore>>>,
@@ -150,7 +149,7 @@ impl AgentLoop {
         let mut context_builder = ContextBuilder::new(
             workspace.clone(),
             config.timezone.clone(),
-            Some(Arc::clone(&todo_store)),
+            Some(todo_repo.clone()),
             goal_store.as_ref().map(Arc::clone),
         )
         .await;
@@ -228,10 +227,11 @@ impl AgentLoop {
             tool_registry.register(CronTool::with_handler(adapter));
         }
 
-        // Clone todo_repo for MemoryTool before moving into TodoTool
+        // Clone todo_repo before moving into TodoTool (it's still needed by calendar, reminders, etc.)
         let todo_repo_for_memory = todo_repo.clone();
+        let todo_repo_shared = todo_repo.clone();
 
-        // Register todo tool (uses SQL repo; todo_store is still used by other consumers)
+        // Register todo tool (SQL repo)
         let mut todo_tool = tools::todo::TodoTool::new(
             todo_repo,
             config.todo.focus.max_slots,
@@ -253,7 +253,7 @@ impl AgentLoop {
         let calendar_adapter = if config.calendar.is_any_enabled() {
             let adapter = Arc::new(
                 CalendarSyncAdapter::new(
-                    Arc::clone(&todo_store),
+                    todo_repo_shared.clone(),
                     &config.calendar,
                     config.timezone.clone(),
                     notification_dispatcher.clone(),
@@ -433,7 +433,7 @@ impl AgentLoop {
                 .as_ref()
                 .map(|adapter| Arc::clone(adapter) as Arc<dyn CalendarHandler>);
             let mut engine = super::ReminderEngine::new(
-                Arc::clone(&todo_store),
+                todo_repo_shared.clone(),
                 calendar_handler_opt,
                 Arc::clone(dispatcher),
                 std::time::Duration::from_secs(300), // Check every 5 minutes
@@ -446,7 +446,7 @@ impl AgentLoop {
 
         // Start RecurringTaskSpawner (checks every 60s for due recurring templates)
         let mut recurring_spawner = super::RecurringTaskSpawner::new(
-            Arc::clone(&todo_store),
+            todo_repo_shared.clone(),
             config.timezone.clone(),
             std::time::Duration::from_secs(60),
         );
@@ -585,14 +585,12 @@ impl AgentLoop {
         todo_repo: storage::TodoRepo,
         embedding_repo: Option<storage::EmbeddingRepo>,
     ) -> Result<Self> {
-        let todo_path = config.todo_store_path();
-        let todo_store = Arc::new(RwLock::new(tools::todo_store::TodoStore::new(todo_path)));
         let goal_path = config.goal_store_path();
         let goal_store = Some(Arc::new(RwLock::new(goal::GoalStore::new(goal_path))));
         let plan_path = config.plan_store_path();
         let plan_store = Some(Arc::new(RwLock::new(plan::PlanStore::new(plan_path))));
         Self::new_with_cron(
-            bus, provider, config, None, todo_store, todo_repo, embedding_repo, goal_store, plan_store, None,
+            bus, provider, config, None, todo_repo, embedding_repo, goal_store, plan_store, None,
         )
         .await
     }
