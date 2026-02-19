@@ -278,7 +278,6 @@ async fn run_with_streaming(
     model: &str,
     verbose: bool,
 ) -> Result<()> {
-    let _verbose = verbose;
     let handle = agent_loop
         .process_direct_streaming(message, session_key)
         .await?;
@@ -292,14 +291,10 @@ async fn run_with_streaming(
 
     let mut renderer = StreamRenderer::new();
 
-    // Start thinking spinner (TTY only)
-    let mut spinner = if io::stdout().is_terminal() {
-        let mut s = Spinner::new(colorize("Thinking...", DIM));
-        s.start();
-        Some(s)
-    } else {
-        None
-    };
+    // Start thinking renderer (replaces spinner)
+    let is_tty = io::stdout().is_terminal();
+    let mut thinking = ThinkingRenderer::new(verbose, is_tty);
+    let mut thinking_active = true;
 
     // Spawn a task that cancels on Ctrl+C
     let cancel_for_signal = cancel_token.clone();
@@ -316,31 +311,32 @@ async fn run_with_streaming(
             event = event_rx.recv() => {
                 let Some(event) = event else { break };
                 match event {
+                    AgentEvent::ClassificationComplete { strategy, confidence, source, duration_ms } => {
+                        thinking.on_classification_complete(&strategy, confidence, &source, duration_ms);
+                    }
+                    AgentEvent::ContextAssembled { total_tokens, budget, duration_ms } => {
+                        thinking.on_context_assembled(total_tokens, budget, duration_ms);
+                    }
+                    AgentEvent::ExecutionStarted { engine, max_iterations } => {
+                        thinking.on_execution_started(&engine, max_iterations);
+                    }
+                    AgentEvent::ToolStart { name, .. } => {
+                        thinking.on_tool_start(&name);
+                    }
+                    AgentEvent::ToolEnd { name, success, duration_ms } => {
+                        thinking.on_tool_end(&name, success, duration_ms);
+                    }
+                    AgentEvent::IterationStart { iteration, max } => {
+                        thinking.on_iteration_start(iteration, max);
+                    }
                     AgentEvent::ContentChunk(chunk) => {
-                        if let Some(ref mut s) = spinner {
-                            s.stop();
-                            spinner = None;
+                        if thinking_active {
+                            // Collapse thinking trace before showing content
+                            thinking.collapse(model, renderer.elapsed_secs());
+                            thinking_active = false;
                         }
                         renderer.on_content_chunk(&chunk);
                     }
-                    AgentEvent::ToolStart { name, args } => {
-                        if let Some(ref mut s) = spinner {
-                            s.stop();
-                            spinner = None;
-                        }
-                        renderer.on_tool_start(&name, &args);
-                    }
-                    AgentEvent::ToolEnd {
-                        name,
-                        success,
-                        duration_ms,
-                    } => renderer.on_tool_end(&name, success, duration_ms),
-                    AgentEvent::IterationStart { iteration, max } => {
-                        renderer.on_iteration_start(iteration, max);
-                    }
-                    AgentEvent::ClassificationComplete { .. } => {}
-                    AgentEvent::ContextAssembled { .. } => {}
-                    AgentEvent::ExecutionStarted { .. } => {}
                     AgentEvent::Done(_) => {
                         clean_exit = true;
                         break;
@@ -354,11 +350,9 @@ async fn run_with_streaming(
                         break;
                     }
                     AgentEvent::PlanStepCompleted { step_index, .. } => {
-                        // Plan step completed — not displayed inline in CLI streaming
                         tracing::debug!("Plan step {} completed", step_index);
                     }
                     AgentEvent::PlanCompleted { summary, .. } => {
-                        // Plan completed — not displayed inline in CLI streaming
                         tracing::debug!("Plan completed: {}", summary);
                     }
                 }
@@ -368,10 +362,10 @@ async fn run_with_streaming(
             bundle = interaction_rx.recv() => {
                 let Some(InteractionBundle { request, response_tx }) = bundle else { break };
 
-                // Stop spinner if still running
-                if let Some(ref mut s) = spinner {
-                    s.stop();
-                    spinner = None;
+                // Collapse thinking if still active
+                if thinking_active {
+                    thinking.collapse(model, renderer.elapsed_secs());
+                    thinking_active = false;
                 }
 
                 // Pause streaming output to show interactive prompt
@@ -398,8 +392,10 @@ async fn run_with_streaming(
         }
     }
 
-    // Ensure spinner is stopped before printing results
-    drop(spinner);
+    // Collapse thinking trace if still active
+    if thinking_active && thinking.rendered_lines > 0 {
+        thinking.collapse(model, renderer.elapsed_secs());
+    }
 
     // Cancel the signal watcher (no longer needed)
     signal_handle.abort();
