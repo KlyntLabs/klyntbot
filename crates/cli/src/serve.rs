@@ -197,6 +197,66 @@ pub async fn handle_serve(port: u16) -> Result<()> {
                         })?;
                         Ok(Some("Daily planning triggered".to_string()))
                     }
+                    "__klyntbot_finance_daily_review" => {
+                        let msg = bus::InboundMessage::new(
+                            "system",
+                            "cron",
+                            "finance_daily_review",
+                            "Run finance daily review and send summary".to_string(),
+                        );
+                        bus.publish_inbound(msg).await.map_err(|e| {
+                            common::KlyntbotError::Bus(format!(
+                                "Failed to publish finance daily review: {}",
+                                e
+                            ))
+                        })?;
+                        Ok(Some("Finance daily review triggered".to_string()))
+                    }
+                    "__klyntbot_finance_budget_check" => {
+                        let msg = bus::InboundMessage::new(
+                            "system",
+                            "cron",
+                            "finance_budget_check",
+                            "Check budget thresholds and send alerts".to_string(),
+                        );
+                        bus.publish_inbound(msg).await.map_err(|e| {
+                            common::KlyntbotError::Bus(format!(
+                                "Failed to publish budget check: {}",
+                                e
+                            ))
+                        })?;
+                        Ok(Some("Finance budget check triggered".to_string()))
+                    }
+                    "__klyntbot_finance_price_refresh" => {
+                        let msg = bus::InboundMessage::new(
+                            "system",
+                            "cron",
+                            "finance_price_refresh",
+                            "Refresh investment prices".to_string(),
+                        );
+                        bus.publish_inbound(msg).await.map_err(|e| {
+                            common::KlyntbotError::Bus(format!(
+                                "Failed to publish price refresh: {}",
+                                e
+                            ))
+                        })?;
+                        Ok(Some("Finance price refresh triggered".to_string()))
+                    }
+                    "__klyntbot_finance_health_check" => {
+                        let msg = bus::InboundMessage::new(
+                            "system",
+                            "cron",
+                            "finance_health_check",
+                            "Run finance data health check".to_string(),
+                        );
+                        bus.publish_inbound(msg).await.map_err(|e| {
+                            common::KlyntbotError::Bus(format!(
+                                "Failed to publish health check: {}",
+                                e
+                            ))
+                        })?;
+                        Ok(Some("Finance health check triggered".to_string()))
+                    }
                     _ => Ok(None),
                 }
             })
@@ -333,6 +393,92 @@ pub async fn handle_serve(port: u16) -> Result<()> {
                 planning_time
             );
         }
+    }
+
+    // Register finance cron jobs (only when proactivity is not "reactive")
+    if config.finance.enabled && config.finance.proactivity_level != "reactive" {
+        // Daily financial review
+        let review_time = &config.finance.scheduling.daily_review_time;
+        let parts: Vec<&str> = review_time.split(':').collect();
+        if parts.len() == 2 {
+            if let (Ok(hour), Ok(minute)) = (parts[0].parse::<u8>(), parts[1].parse::<u8>()) {
+                if hour < 24 && minute < 60 {
+                    let cron_expr = format!("{} {} * * *", minute, hour);
+                    cron_service
+                        .add_job(
+                            "__klyntbot_finance_daily_review",
+                            scheduling::CronSchedule::Cron {
+                                expr: cron_expr,
+                                tz: None,
+                            },
+                            "Daily financial review",
+                            false,
+                            None,
+                            None,
+                            false,
+                        )
+                        .await?;
+                    info!(
+                        "Finance daily review cron registered (time: {})",
+                        review_time
+                    );
+                }
+            }
+        }
+
+        // Budget check every 6 hours
+        cron_service
+            .add_job(
+                "__klyntbot_finance_budget_check",
+                scheduling::CronSchedule::Every {
+                    every_ms: 6 * 60 * 60 * 1000,
+                },
+                "Check budget thresholds",
+                false,
+                None,
+                None,
+                false,
+            )
+            .await?;
+
+        // Price refresh (configurable interval)
+        if config.finance.price_refresh.enabled {
+            let interval_ms = config.finance.price_refresh.interval_hours as u64 * 60 * 60 * 1000;
+            cron_service
+                .add_job(
+                    "__klyntbot_finance_price_refresh",
+                    scheduling::CronSchedule::Every {
+                        every_ms: interval_ms,
+                    },
+                    "Refresh investment prices",
+                    false,
+                    None,
+                    None,
+                    false,
+                )
+                .await?;
+        }
+
+        // Daily health check at midnight
+        cron_service
+            .add_job(
+                "__klyntbot_finance_health_check",
+                scheduling::CronSchedule::Cron {
+                    expr: "0 0 * * *".to_string(),
+                    tz: None,
+                },
+                "Finance data health check",
+                false,
+                None,
+                None,
+                false,
+            )
+            .await?;
+
+        info!(
+            "Finance cron jobs registered (proactivity: {})",
+            config.finance.proactivity_level
+        );
     }
 
     info!("Todo cron jobs registered");
