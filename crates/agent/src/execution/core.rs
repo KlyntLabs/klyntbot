@@ -1,5 +1,6 @@
 //! Core execution engine that drives a single LLM→tool cycle.
 
+use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -120,6 +121,7 @@ impl ExecutionCore {
         params: &ExecutionParams,
         routing_ctx: &RoutingContext,
         event_tx: Option<&tokio::sync::mpsc::Sender<crate::events::AgentEvent>>,
+        seen_tool_calls: Option<&mut HashSet<String>>,
     ) -> Result<(CycleOutcome, Usage)> {
         let response = self
             .provider
@@ -138,11 +140,82 @@ impl ExecutionCore {
                     .map(|tc| &tc.name)
                     .collect::<Vec<_>>()
             );
+
+            // ── Duplicate tool call prevention ─────────────────────
+            // Build signature keys for each tool call: "name|canonical_args"
+            let current_keys: Vec<String> = response
+                .tool_calls
+                .iter()
+                .map(|tc| {
+                    let args_str =
+                        serde_json::to_string(&tc.arguments).unwrap_or_default();
+                    format!("{}|{}", tc.name, args_str)
+                })
+                .collect();
+
+            // If tracking is enabled, check whether ALL calls are repeats
+            let all_duplicates = match &seen_tool_calls {
+                Some(seen) => {
+                    !current_keys.is_empty()
+                        && current_keys.iter().all(|k| seen.contains(k))
+                }
+                None => false,
+            };
+
+            if all_duplicates {
+                debug!(
+                    "ExecutionCore: skipping duplicate tool calls: {:?}",
+                    response
+                        .tool_calls
+                        .iter()
+                        .map(|tc| &tc.name)
+                        .collect::<Vec<_>>()
+                );
+
+                // Append assistant message so the conversation stays coherent
+                let tool_call_msgs = tool_calls_to_messages(&response.tool_calls);
+                messages.push(Message::assistant_with_tools(tool_call_msgs));
+
+                // Append synthetic "already called" tool results
+                let mut results = Vec::new();
+                for tc in &response.tool_calls {
+                    let skip_msg = format!(
+                        "Skipped: '{}' was already called with identical arguments. \
+                         The results are already in this conversation — use them instead of calling again.",
+                        tc.name
+                    );
+                    messages.push(Message::tool(
+                        tc.id.clone(),
+                        tc.name.clone(),
+                        skip_msg.clone(),
+                    ));
+                    results.push(ToolExecutionResult {
+                        tool_call_id: tc.id.clone(),
+                        tool_name: tc.name.clone(),
+                        arguments: tc.arguments.clone(),
+                        result: skip_msg,
+                        duration_ms: 0,
+                        success: false,
+                    });
+                }
+
+                return Ok((CycleOutcome::ToolsExecuted { results }, usage));
+            }
+
+            // Register current calls for future duplicate detection
+            if let Some(seen) = seen_tool_calls {
+                for key in current_keys {
+                    seen.insert(key);
+                }
+            }
+
             // Append assistant message with tool calls
             let tool_call_msgs = tool_calls_to_messages(&response.tool_calls);
             messages.push(Message::assistant_with_tools(tool_call_msgs));
 
-            // Execute all tools in parallel, each with a timeout
+            // Execute all tools in parallel, each with a timeout.
+            // ToolStart/ToolEnd events are emitted inside each future so
+            // the spinner updates in real-time as tools run.
             let futures: Vec<_> = response
                 .tool_calls
                 .iter()
@@ -153,9 +226,21 @@ impl ExecutionCore {
                     let ctx = routing_ctx.clone();
                     let id = tc.id.clone();
                     let timeout_dur = params.tool_timeout;
+                    let tx = event_tx.cloned();
 
                     async move {
+                        // Emit ToolStart BEFORE executing
+                        if let Some(ref tx) = tx {
+                            let _ = tx
+                                .send(crate::events::AgentEvent::ToolStart {
+                                    name: name.clone(),
+                                    args: serde_json::Value::Null,
+                                })
+                                .await;
+                        }
+
                         let start = Instant::now();
+                        let args_snapshot = args.clone();
                         let exec_result = tokio::time::timeout(timeout_dur, async {
                             let reg = registry.read().await;
                             reg.execute(&name, args, &ctx).await
@@ -176,9 +261,21 @@ impl ExecutionCore {
                             ),
                         };
 
+                        // Emit ToolEnd AFTER executing
+                        if let Some(ref tx) = tx {
+                            let _ = tx
+                                .send(crate::events::AgentEvent::ToolEnd {
+                                    name: name.clone(),
+                                    success,
+                                    duration_ms,
+                                })
+                                .await;
+                        }
+
                         ToolExecutionResult {
                             tool_call_id: id,
                             tool_name: name,
+                            arguments: args_snapshot,
                             result: result_str,
                             duration_ms,
                             success,
@@ -188,25 +285,6 @@ impl ExecutionCore {
                 .collect();
 
             let results = join_all(futures).await;
-
-            // Emit events for each tool result
-            if let Some(tx) = event_tx {
-                for r in &results {
-                    let _ = tx
-                        .send(crate::events::AgentEvent::ToolStart {
-                            name: r.tool_name.clone(),
-                            args: serde_json::Value::Null,
-                        })
-                        .await;
-                    let _ = tx
-                        .send(crate::events::AgentEvent::ToolEnd {
-                            name: r.tool_name.clone(),
-                            success: r.success,
-                            duration_ms: r.duration_ms,
-                        })
-                        .await;
-                }
-            }
 
             // Append tool result messages
             for r in &results {
@@ -382,7 +460,7 @@ mod tests {
         let tools = vec![];
 
         let (outcome, _usage) = core
-            .run_cycle(&mut messages, &tools, &params, &routing_ctx(), None)
+            .run_cycle(&mut messages, &tools, &params, &routing_ctx(), None, None)
             .await
             .unwrap();
 
@@ -405,7 +483,7 @@ mod tests {
         let tools = vec![];
 
         let (outcome, _usage) = core
-            .run_cycle(&mut messages, &tools, &params, &routing_ctx(), None)
+            .run_cycle(&mut messages, &tools, &params, &routing_ctx(), None, None)
             .await
             .unwrap();
 
@@ -434,7 +512,7 @@ mod tests {
         let tools = vec![];
 
         let (outcome, _usage) = core
-            .run_cycle(&mut messages, &tools, &params, &routing_ctx(), None)
+            .run_cycle(&mut messages, &tools, &params, &routing_ctx(), None, None)
             .await
             .unwrap();
 
@@ -553,7 +631,7 @@ mod tests {
         let tools = vec![];
 
         let (outcome, _usage) = core
-            .run_cycle(&mut messages, &tools, &params, &routing_ctx(), None)
+            .run_cycle(&mut messages, &tools, &params, &routing_ctx(), None, None)
             .await
             .unwrap();
 
@@ -591,7 +669,7 @@ mod tests {
         })];
 
         let (outcome, _usage) = core
-            .run_cycle(&mut messages, &tools, &params, &routing_ctx(), None)
+            .run_cycle(&mut messages, &tools, &params, &routing_ctx(), None, None)
             .await
             .unwrap();
 
@@ -617,7 +695,7 @@ mod tests {
         })];
 
         let (outcome, _usage) = core
-            .run_cycle(&mut messages, &tools, &params, &routing_ctx(), None)
+            .run_cycle(&mut messages, &tools, &params, &routing_ctx(), None, None)
             .await
             .unwrap();
 

@@ -30,6 +30,7 @@ impl ExecutionParams {
 pub struct ToolExecutionResult {
     pub tool_call_id: String,
     pub tool_name: String,
+    pub arguments: serde_json::Value,
     pub result: String,
     pub duration_ms: u64,
     pub success: bool,

@@ -422,6 +422,12 @@ fn format_completed_response(answers: &[Answer], request: &InteractionRequest) -
         }
     }
 
+    // Explicit directive to prevent the LLM from re-asking the same question
+    output.push_str(
+        "\n---\nThe user has responded. Do NOT call ask_user again for this same question. \
+         Proceed with the action using the answers above.\n",
+    );
+
     output
 }
 
@@ -869,6 +875,19 @@ mod tests {
 
         let formatted = format_semantic_response(&response, &request);
         assert!(formatted.contains("Answer: Yes"));
+    }
+
+    #[test]
+    fn test_format_completed_response_includes_no_reask_directive() {
+        let request = make_test_request();
+        let response = FormResponse::Completed(vec![Answer {
+            question_id: "confirm".into(),
+            value: AnswerValue::YesNo { answer: true },
+        }]);
+
+        let formatted = format_semantic_response(&response, &request);
+        assert!(formatted.contains("Do NOT call ask_user again"));
+        assert!(formatted.contains("Proceed with the action"));
     }
 
     #[test]

@@ -1,6 +1,7 @@
 //! ReAct+ execution engine — enhanced ReAct loop with reasoning scratchpad,
 //! reflection checkpoints, and escalation to autonomous task execution.
 
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use chrono::Utc;
@@ -83,6 +84,10 @@ impl ReactPlusEngine {
         let escalation_threshold = (self.max_iterations as f32 * 0.8).ceil() as u32;
         let mut accumulated_usage = Usage::default();
         let mut force_retried = false;
+        // Track tool call signatures across iterations to detect duplicates.
+        // Each entry is a string key: "tool_name|canonical_args_json".
+        // Passed into run_cycle so duplicates are blocked BEFORE execution.
+        let mut seen_tool_calls: HashSet<String> = HashSet::new();
 
         for iteration in 1..=self.max_iterations {
             if let Some(ref tx) = event_tx {
@@ -96,7 +101,14 @@ impl ReactPlusEngine {
 
             let (outcome, cycle_usage) = self
                 .core
-                .run_cycle(&mut messages, tools, params, ctx, event_tx.as_ref())
+                .run_cycle(
+                    &mut messages,
+                    tools,
+                    params,
+                    ctx,
+                    event_tx.as_ref(),
+                    Some(&mut seen_tool_calls),
+                )
                 .await?;
             accumulate_usage(&mut accumulated_usage, &cycle_usage);
 
@@ -185,13 +197,44 @@ impl ReactPlusEngine {
                         .map(|r| format!("{}: {}", r.tool_name, r.result))
                         .collect();
 
+                    // ── Duplicate tool call handling ──────────────────
+                    // Duplicates are now blocked BEFORE execution inside
+                    // run_cycle (via the seen_tool_calls set). If run_cycle
+                    // detected a duplicate, it returns results with
+                    // success=false and "Skipped:" messages — no side effects.
+                    // We inject a clear directive for the LLM to move on.
+                    let all_skipped_duplicates = !results.is_empty()
+                        && results
+                            .iter()
+                            .all(|r| !r.success && r.result.starts_with("Skipped:"));
+
                     let mut reflection = None;
 
-                    // Check if reflection should trigger
-                    let should_reflect = match &self.reflection_mode {
-                        ReflectionMode::OnFailure => had_failure,
-                        ReflectionMode::EveryN(n) => iteration % n == 0,
-                        ReflectionMode::Never => false,
+                    if all_skipped_duplicates {
+                        debug!(
+                            "ReactPlus: run_cycle blocked duplicate tool calls on iteration {}: {:?}",
+                            iteration, tool_names
+                        );
+                        let dup_prompt = format!(
+                            "You just attempted to call the same tool(s) with the same arguments as a previous iteration: [{}]. \
+                             The calls were blocked — the results are already in the conversation above. \
+                             Do NOT repeat these calls. Either proceed with a final response using the results you already have, \
+                             or take a DIFFERENT action.",
+                            tool_names.join(", ")
+                        );
+                        messages.push(Message::user(&dup_prompt));
+                        reflection = Some(dup_prompt);
+                    }
+
+                    // Check if reflection should trigger (skip if we already injected a duplicate warning)
+                    let should_reflect = if reflection.is_none() {
+                        match &self.reflection_mode {
+                            ReflectionMode::OnFailure => had_failure,
+                            ReflectionMode::EveryN(n) => iteration % n == 0,
+                            ReflectionMode::Never => false,
+                        }
+                    } else {
+                        false
                     };
 
                     if should_reflect {
@@ -684,6 +727,99 @@ mod tests {
                 assert!(content.contains("Task Created"));
             }
             other => panic!("Expected graceful degradation Response, got {:?}", other),
+        }
+    }
+
+    // ── Duplicate tool call detection tests ──
+
+    #[tokio::test]
+    async fn test_duplicate_tool_calls_inject_reflection() {
+        // Iteration 1: LLM calls ok_tool with {} → tools executed
+        // Iteration 2: LLM calls ok_tool with {} again (duplicate) → reflection injected
+        // Iteration 3: LLM returns final response after seeing the warning
+        let responses = vec![
+            make_tool_call_response("ok_tool"),
+            make_tool_call_response("ok_tool"), // duplicate!
+            make_text_response("Done, using existing results."),
+        ];
+        let provider = SequenceProvider::new(responses);
+        let registry = make_registry_with_ok();
+        let core = Arc::new(ExecutionCore::new(provider, registry));
+
+        let engine = ReactPlusEngine::new(core)
+            .with_max_iterations(10)
+            .with_reflection_mode(ReflectionMode::Never);
+        let messages = vec![Message::user("do something")];
+
+        let outcome = engine
+            .execute(messages, &[], &default_params(), &routing_ctx(), None)
+            .await
+            .unwrap();
+
+        match outcome {
+            ReactOutcome::Response {
+                traces, iterations, ..
+            } => {
+                assert_eq!(iterations, 3);
+                // Second trace should have a reflection about duplicate detection
+                assert!(traces[1].reflection.is_some());
+                let refl = traces[1].reflection.as_ref().unwrap();
+                assert!(refl.contains("same tool"));
+            }
+            other => panic!("Expected Response, got {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_different_args_not_flagged_as_duplicate() {
+        // Two calls to ok_tool with different arguments should NOT trigger duplicate detection.
+        // Since our mock tool ignores args, we need a provider that returns different arg values.
+        let responses = vec![
+            LlmResponse {
+                content: None,
+                tool_calls: vec![ToolCall {
+                    id: "call_1".to_string(),
+                    name: "ok_tool".to_string(),
+                    arguments: serde_json::json!({"action": "search"}),
+                }],
+                finish_reason: "tool_calls".to_string(),
+                usage: Usage::default(),
+                reasoning_content: None,
+            },
+            LlmResponse {
+                content: None,
+                tool_calls: vec![ToolCall {
+                    id: "call_2".to_string(),
+                    name: "ok_tool".to_string(),
+                    arguments: serde_json::json!({"action": "add"}),
+                }],
+                finish_reason: "tool_calls".to_string(),
+                usage: Usage::default(),
+                reasoning_content: None,
+            },
+            make_text_response("All done."),
+        ];
+        let provider = SequenceProvider::new(responses);
+        let registry = make_registry_with_ok();
+        let core = Arc::new(ExecutionCore::new(provider, registry));
+
+        let engine = ReactPlusEngine::new(core)
+            .with_max_iterations(10)
+            .with_reflection_mode(ReflectionMode::Never);
+        let messages = vec![Message::user("do two things")];
+
+        let outcome = engine
+            .execute(messages, &[], &default_params(), &routing_ctx(), None)
+            .await
+            .unwrap();
+
+        match outcome {
+            ReactOutcome::Response { traces, .. } => {
+                // Neither trace should have a duplicate reflection
+                assert!(traces[0].reflection.is_none());
+                assert!(traces[1].reflection.is_none());
+            }
+            other => panic!("Expected Response, got {:?}", other),
         }
     }
 }

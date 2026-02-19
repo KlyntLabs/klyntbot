@@ -63,7 +63,9 @@ impl ResponseValidator {
     /// Validate the LLM response content.
     pub fn validate(&self, content: &str) -> ValidationResult {
         let mut warnings = Vec::new();
-        let mut filtered = content.to_string();
+
+        // 0. Strip internal <confidence> blocks (never shown to user)
+        let mut filtered = crate::confidence::evaluator::strip_confidence_blocks(content);
 
         // 1. Length check — truncate if needed
         if filtered.len() > self.max_response_chars {
@@ -152,7 +154,8 @@ mod tests {
     #[test]
     fn test_long_response_truncated() {
         let validator = ResponseValidator::new(100); // 100 tokens = 400 chars
-        let long_content = "word ".repeat(200); // 1000 chars
+        // Use "xword" to avoid trailing whitespace (strip_confidence_blocks trims)
+        let long_content = "xword".repeat(200); // 1000 chars, unaffected by trim
         let result = validator.validate(&long_content);
 
         assert!(result.warnings.iter().any(|w| matches!(

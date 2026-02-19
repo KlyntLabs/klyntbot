@@ -42,7 +42,7 @@ impl DirectEngine {
     ) -> Result<DirectOutcome> {
         let (outcome, _usage) = self
             .core
-            .run_cycle(&mut messages, &[], params, ctx, event_tx)
+            .run_cycle(&mut messages, &[], params, ctx, event_tx, None)
             .await?;
 
         match outcome {
