@@ -9,6 +9,7 @@ mod goals;
 mod investments;
 mod reports;
 mod settings;
+mod health;
 mod transactions;
 
 use async_trait::async_trait;
@@ -113,6 +114,7 @@ impl Tool for FinanceTool {
                         "goal_create", "goal_list", "goal_update", "goal_fire", "goal_whatif",
                         "report_spending", "report_income", "report_trends", "report_net_worth_history",
                         "daily_review",
+                        "finance_health_check",
                         "settings_get", "settings_update"
                     ],
                     "description": "Finance action to perform"
@@ -421,6 +423,9 @@ impl Tool for FinanceTool {
             | "report_trends"
             | "report_net_worth_history"
             | "daily_review" => self.handle_report(action, &p, ctx).await,
+
+            // ── Health check ─────────────────────────────────────────────
+            "finance_health_check" => self.finance_health_check(ctx).await,
 
             // ── Settings actions ───────────────────────────────────────────
             "settings_get" | "settings_update" => self.handle_settings(action, &p, ctx).await,
