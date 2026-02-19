@@ -27,11 +27,7 @@ async fn main() {
             cli_handlers::handle_chat(message, session).await
         }
 
-        Some(Commands::Serve {
-            port,
-            dashboard_port,
-            ..
-        }) => cli_handlers::handle_serve(port, dashboard_port).await,
+        Some(Commands::Serve { port, .. }) => cli_handlers::handle_serve(port).await,
 
         Some(Commands::Init) => handle_init().await,
 

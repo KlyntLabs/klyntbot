@@ -15,7 +15,6 @@ members = [
     "crates/heartbeat",
     "crates/agent",
     "crates/cli",
-    "crates/dashboard",
     "crates/context_engine",
     "crates/storage",
 ]
@@ -83,11 +82,6 @@ iana-time-zone = "0.1"
 rrule = "0.14"
 fastembed = "5"
 pgvector = { version = "0.4", features = ["sqlx"] }
-axum = { version = "0.8", features = ["ws", "macros"] }
-tower-http = { version = "0.6", features = ["cors"] }
-async-graphql = { version = "7", features = ["chrono", "uuid"] }
-async-graphql-axum = "7"
-notify = "6"
 
 # Optional email dependencies
 async-imap = { version = "0.11.2", default-features = false, features = ["runtime-tokio"] }

@@ -33,10 +33,6 @@ pub enum Commands {
         #[arg(short, long, default_value = "18790")]
         port: u16,
 
-        /// Port for the web dashboard
-        #[arg(long, default_value = "3001")]
-        dashboard_port: u16,
-
         /// Enable verbose debug logging
         #[arg(short, long)]
         verbose: bool,
