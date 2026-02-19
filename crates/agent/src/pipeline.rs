@@ -5,12 +5,15 @@
 //! adaptive orchestration system.
 
 use std::sync::Arc;
+use std::time::Instant;
 
 use common::Result;
 use context_engine::{ContextEngine, ContextRequest};
 use providers::Message;
 use tools::RoutingContext;
 use tracing::{debug, info, warn};
+
+use crate::events::AgentEvent;
 
 use crate::execution::{EngineDispatch, ExecutionParams};
 use crate::orchestrator::{ClassificationResult, Orchestrator};
@@ -103,18 +106,32 @@ impl AgentPipeline {
         tool_names: &[&str],
         ctx: &RoutingContext,
         system_prompt: Option<&str>,
+        event_tx: Option<tokio::sync::mpsc::Sender<AgentEvent>>,
     ) -> Result<PipelineResult> {
-        // Step 1: Classify
+        // Step 1: Classify (with timing)
+        let classify_start = Instant::now();
         let classification = self.orchestrator.classify(message, tool_names).await;
+        let classify_ms = classify_start.elapsed().as_millis() as u64;
         debug!(
             "Pipeline: classified as {:?} (source: {:?}, confidence: {:.2})",
             classification.strategy, classification.source, classification.confidence
         );
 
+        if let Some(ref tx) = event_tx {
+            let _ = tx
+                .send(AgentEvent::ClassificationComplete {
+                    strategy: format!("{:?}", classification.strategy),
+                    confidence: classification.confidence,
+                    source: format!("{:?}", classification.source),
+                    duration_ms: classify_ms,
+                })
+                .await;
+        }
+
         // Use provided system_prompt or fall back to config default
         let prompt = system_prompt.unwrap_or(&self.config.system_prompt);
 
-        // Step 2: Assemble context
+        // Step 2: Assemble context (with timing)
         let context_request = ContextRequest {
             message_text: message.to_string(),
             history,
@@ -124,7 +141,9 @@ impl AgentPipeline {
             memory_path: None,
             context_window: self.config.context_window,
         };
+        let assemble_start = Instant::now();
         let assembled = self.context_engine.assemble(context_request).await;
+        let assemble_ms = assemble_start.elapsed().as_millis() as u64;
 
         debug!(
             "Pipeline: assembled context with {} messages, {} tokens",
@@ -132,7 +151,36 @@ impl AgentPipeline {
             assembled.token_count
         );
 
+        if let Some(ref tx) = event_tx {
+            let _ = tx
+                .send(AgentEvent::ContextAssembled {
+                    total_tokens: assembled.token_count,
+                    budget: self.config.context_window,
+                    duration_ms: assemble_ms,
+                })
+                .await;
+        }
+
         // Step 3: Execute
+        if let Some(ref tx) = event_tx {
+            let engine_name = format!("{:?}", classification.strategy);
+            let max_iter = match &classification.strategy {
+                context_engine::ExecutionStrategy::ToolAssisted { max_iterations } => {
+                    *max_iterations as usize
+                }
+                context_engine::ExecutionStrategy::AutonomousTask { max_iterations } => {
+                    *max_iterations as usize
+                }
+                _ => 1,
+            };
+            let _ = tx
+                .send(AgentEvent::ExecutionStarted {
+                    engine: engine_name,
+                    max_iterations: max_iter,
+                })
+                .await;
+        }
+
         let params = ExecutionParams::new(&self.config.execution_model);
         let dispatch_result = self
             .engine_dispatch
@@ -288,7 +336,7 @@ mod tests {
         let pipeline = make_pipeline(provider);
 
         let result = pipeline
-            .process_message("hello", vec![], &[], &[], &routing_ctx(), None)
+            .process_message("hello", vec![], &[], &[], &routing_ctx(), None, None)
             .await
             .unwrap();
 
@@ -306,7 +354,7 @@ mod tests {
         let pipeline = make_pipeline(provider);
 
         let result = pipeline
-            .process_message("show my tasks", vec![], &[], &[], &routing_ctx(), None)
+            .process_message("show my tasks", vec![], &[], &[], &routing_ctx(), None, None)
             .await
             .unwrap();
 
@@ -328,7 +376,7 @@ mod tests {
         let pipeline = make_pipeline(provider);
 
         let result = pipeline
-            .process_message("hi", vec![], &[], &[], &routing_ctx(), None)
+            .process_message("hi", vec![], &[], &[], &routing_ctx(), None, None)
             .await
             .unwrap();
 
@@ -358,7 +406,7 @@ mod tests {
         let pipeline = make_pipeline(provider);
 
         let result = pipeline
-            .process_message("hello", vec![], &[], &[], &routing_ctx(), None)
+            .process_message("hello", vec![], &[], &[], &routing_ctx(), None, None)
             .await
             .unwrap();
 
@@ -383,6 +431,7 @@ mod tests {
                 &[],
                 &routing_ctx(),
                 None,
+                None,
             )
             .await
             .unwrap();
@@ -406,7 +455,7 @@ mod tests {
         ];
 
         let result = pipeline
-            .process_message("what is Rust?", history, &[], &[], &routing_ctx(), None)
+            .process_message("what is Rust?", history, &[], &[], &routing_ctx(), None, None)
             .await
             .unwrap();
 
@@ -421,7 +470,7 @@ mod tests {
         let pipeline = make_pipeline(provider);
 
         let result = pipeline
-            .process_message("hello", vec![], &[], &[], &routing_ctx(), None)
+            .process_message("hello", vec![], &[], &[], &routing_ctx(), None, None)
             .await
             .unwrap();
 
@@ -431,5 +480,37 @@ mod tests {
             result.classification.source,
             crate::orchestrator::ClassificationSource::Heuristic
         );
+    }
+
+    #[tokio::test]
+    async fn test_pipeline_emits_classification_event() {
+        use crate::events::AgentEvent;
+        use tokio::sync::mpsc;
+
+        let provider = MockPipelineProvider::new(vec![text_response("Hi!")]);
+        let pipeline = make_pipeline(provider);
+        let (event_tx, mut event_rx) = mpsc::channel(64);
+
+        let _result = pipeline
+            .process_message(
+                "hello",
+                vec![],
+                &[],
+                &[],
+                &routing_ctx(),
+                None,
+                Some(event_tx),
+            )
+            .await
+            .unwrap();
+
+        // Should have received ClassificationComplete event
+        let mut found_classification = false;
+        while let Ok(event) = event_rx.try_recv() {
+            if matches!(event, AgentEvent::ClassificationComplete { .. }) {
+                found_classification = true;
+            }
+        }
+        assert!(found_classification, "Expected ClassificationComplete event");
     }
 }

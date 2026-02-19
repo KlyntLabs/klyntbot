@@ -956,6 +956,7 @@ impl AgentLoop {
                 &tool_name_refs,
                 routing_ctx,
                 Some(&system_prompt),
+                None, // event_tx — wired in Task 6
             )
             .await?;
 

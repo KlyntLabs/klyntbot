@@ -48,7 +48,7 @@ async fn test_e2e_direct_response_path() {
     let (pipeline, _dir) = make_pipeline(provider);
 
     let result = pipeline
-        .process_message("hello", vec![], &[], &[], &routing_ctx(), None)
+        .process_message("hello", vec![], &[], &[], &routing_ctx(), None, None)
         .await
         .unwrap();
 
@@ -72,7 +72,7 @@ async fn test_e2e_tool_assisted_path() {
     let (pipeline, _dir) = make_pipeline(provider);
 
     let result = pipeline
-        .process_message("show my tasks", vec![], &[], &[], &routing_ctx(), None)
+        .process_message("show my tasks", vec![], &[], &[], &routing_ctx(), None, None)
         .await
         .unwrap();
 
@@ -103,6 +103,7 @@ async fn test_e2e_autonomous_task_path() {
             &[],
             &routing_ctx(),
             None,
+            None,
         )
         .await
         .unwrap();
@@ -121,7 +122,7 @@ async fn test_e2e_pipeline_records_usage() {
     let (pipeline, dir) = make_pipeline(provider);
 
     pipeline
-        .process_message("hello", vec![], &[], &[], &routing_ctx(), None)
+        .process_message("hello", vec![], &[], &[], &routing_ctx(), None, None)
         .await
         .unwrap();
 
@@ -168,6 +169,7 @@ async fn test_e2e_context_budget_respected() {
             &[],
             &[],
             &routing_ctx(),
+            None,
             None,
         )
         .await
