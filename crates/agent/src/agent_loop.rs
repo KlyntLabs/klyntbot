@@ -1001,7 +1001,9 @@ impl AgentLoop {
 
         // Run through pipeline
         let routing_ctx = RoutingContext::new("cli".into(), session_key.clone().into());
-        let response_content = self.run_pipeline(&content, history, &routing_ctx, None).await?;
+        let response_content = self
+            .run_pipeline(&content, history, &routing_ctx, None)
+            .await?;
 
         // Save to session
         self.save_to_session(&session_key, &response_content).await;

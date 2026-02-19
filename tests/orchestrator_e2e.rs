@@ -72,7 +72,15 @@ async fn test_e2e_tool_assisted_path() {
     let (pipeline, _dir) = make_pipeline(provider);
 
     let result = pipeline
-        .process_message("show my tasks", vec![], &[], &[], &routing_ctx(), None, None)
+        .process_message(
+            "show my tasks",
+            vec![],
+            &[],
+            &[],
+            &routing_ctx(),
+            None,
+            None,
+        )
         .await
         .unwrap();
 

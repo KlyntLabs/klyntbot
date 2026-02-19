@@ -98,6 +98,7 @@ impl AgentPipeline {
     /// 3. Execute with appropriate engine (with escalation)
     /// 4. Validate response
     /// 5. Record usage
+    #[allow(clippy::too_many_arguments)]
     pub async fn process_message(
         &self,
         message: &str,
@@ -355,7 +356,15 @@ mod tests {
         let pipeline = make_pipeline(provider);
 
         let result = pipeline
-            .process_message("show my tasks", vec![], &[], &[], &routing_ctx(), None, None)
+            .process_message(
+                "show my tasks",
+                vec![],
+                &[],
+                &[],
+                &routing_ctx(),
+                None,
+                None,
+            )
             .await
             .unwrap();
 
@@ -456,7 +465,15 @@ mod tests {
         ];
 
         let result = pipeline
-            .process_message("what is Rust?", history, &[], &[], &routing_ctx(), None, None)
+            .process_message(
+                "what is Rust?",
+                history,
+                &[],
+                &[],
+                &routing_ctx(),
+                None,
+                None,
+            )
             .await
             .unwrap();
 
@@ -512,6 +529,9 @@ mod tests {
                 found_classification = true;
             }
         }
-        assert!(found_classification, "Expected ClassificationComplete event");
+        assert!(
+            found_classification,
+            "Expected ClassificationComplete event"
+        );
     }
 }
