@@ -4,6 +4,7 @@
 use std::sync::Arc;
 
 use chrono::Utc;
+use tracing::debug;
 
 use common::Result;
 use providers::{Message, Usage};
@@ -80,6 +81,7 @@ impl ReactPlusEngine {
         let mut scratchpad = Scratchpad::new();
         let escalation_threshold = (self.max_iterations as f32 * 0.8).ceil() as u32;
         let mut accumulated_usage = Usage::default();
+        let mut force_retried = false;
 
         for iteration in 1..=self.max_iterations {
             let (outcome, cycle_usage) = self
@@ -89,8 +91,7 @@ impl ReactPlusEngine {
             accumulate_usage(&mut accumulated_usage, &cycle_usage);
 
             match outcome {
-                CycleOutcome::FinalResponse { content }
-                | CycleOutcome::FabricatedResponse { content } => {
+                CycleOutcome::FinalResponse { content } => {
                     scratchpad.add(ReasoningTrace {
                         cycle: iteration,
                         thought: "Received final response".to_string(),
@@ -106,6 +107,62 @@ impl ReactPlusEngine {
                         iterations: iteration,
                         usage: accumulated_usage,
                     });
+                }
+
+                CycleOutcome::FabricatedResponse { content } => {
+                    if force_retried {
+                        // Already retried once — graceful degradation
+                        debug!("ReactPlus: fabrication retry exhausted, returning text as-is");
+                        scratchpad.add(ReasoningTrace {
+                            cycle: iteration,
+                            thought: "Fabricated response after retry — giving up".to_string(),
+                            planned_actions: vec![],
+                            actual_action: "fabrication_degraded".to_string(),
+                            reflection: None,
+                            timestamp: Utc::now(),
+                        });
+                        return Ok(ReactOutcome::Response {
+                            content,
+                            traces: scratchpad.traces().to_vec(),
+                            iterations: iteration,
+                            usage: accumulated_usage,
+                        });
+                    }
+
+                    // First fabrication — inject force-tool-use prompt and retry
+                    debug!("ReactPlus: detected fabricated response, injecting force-tool prompt");
+                    force_retried = true;
+
+                    let tool_list: Vec<&str> = tools
+                        .iter()
+                        .filter_map(|t| {
+                            t.get("function")
+                                .and_then(|f| f.get("name"))
+                                .and_then(|n| n.as_str())
+                        })
+                        .collect();
+
+                    messages.push(Message::user(&format!(
+                        "You returned a text response instead of calling a tool. \
+                         You have these tools available: [{}]. \
+                         You MUST call the appropriate tool to complete the user's request. \
+                         Do NOT respond with text describing what you would do — actually call the tool.",
+                        tool_list.join(", ")
+                    )));
+
+                    scratchpad.add(ReasoningTrace {
+                        cycle: iteration,
+                        thought: "Detected fabricated tool response — forcing retry".to_string(),
+                        planned_actions: tool_list.iter().map(|s| s.to_string()).collect(),
+                        actual_action: "fabrication_retry".to_string(),
+                        reflection: Some(
+                            "LLM returned text instead of tool call, injecting force prompt"
+                                .to_string(),
+                        ),
+                        timestamp: Utc::now(),
+                    });
+
+                    // Continue to next iteration (the retry)
                 }
 
                 CycleOutcome::ToolsExecuted { results } => {
@@ -504,6 +561,119 @@ mod tests {
                     .contains("Reflection"));
             }
             other => panic!("Expected Response, got {:?}", other),
+        }
+    }
+
+    // ── Fabrication retry tests ──
+
+    #[tokio::test]
+    async fn test_fabricated_response_triggers_retry() {
+        // First call: LLM returns fabricated text (no tool calls)
+        // After force-retry prompt: LLM calls the tool correctly
+        // Third call: LLM returns final response
+        let responses = vec![
+            // Iteration 1: fabricated response
+            LlmResponse {
+                content: Some(
+                    "I've created the task:\n**Task Created:** Buy groceries (ID: 9c4e5f3b)\n- **Priority:** P3\n- **Due Date:** Tomorrow".to_string()
+                ),
+                tool_calls: vec![],
+                finish_reason: "stop".to_string(),
+                usage: Usage::default(),
+                reasoning_content: None,
+            },
+            // Iteration 2 (after force prompt): proper tool call
+            make_tool_call_response("ok_tool"),
+            // Iteration 3: final response
+            make_text_response("Done! Task created successfully."),
+        ];
+        let provider = SequenceProvider::new(responses);
+        let registry = make_registry_with_ok();
+        let core = Arc::new(ExecutionCore::new(provider, registry));
+
+        let engine = ReactPlusEngine::new(core).with_max_iterations(10);
+        let messages = vec![Message::user("create task: buy")];
+
+        // Need tool definitions so fabrication detection triggers
+        let tools = vec![serde_json::json!({
+            "type": "function",
+            "function": {
+                "name": "todo",
+                "description": "Manage tasks",
+                "parameters": {"type": "object", "properties": {}}
+            }
+        })];
+
+        let outcome = engine
+            .execute(messages, &tools, &default_params(), &routing_ctx())
+            .await
+            .unwrap();
+
+        match outcome {
+            ReactOutcome::Response {
+                content,
+                iterations,
+                ..
+            } => {
+                assert!(content.contains("Done"));
+                // Should have taken 3 iterations: fabricated → retry with tool → final
+                assert_eq!(iterations, 3);
+            }
+            other => panic!("Expected Response, got {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_fabricated_response_retry_only_once() {
+        // Both attempts return fabricated text — should give up after one retry
+        let responses = vec![
+            // Iteration 1: fabricated
+            LlmResponse {
+                content: Some(
+                    "Task Created: Buy groceries (ID: abcdef12)\n- Priority: P3\n- Due Date: Tomorrow".to_string()
+                ),
+                tool_calls: vec![],
+                finish_reason: "stop".to_string(),
+                usage: Usage::default(),
+                reasoning_content: None,
+            },
+            // Iteration 2 (after force prompt): still fabricated
+            LlmResponse {
+                content: Some(
+                    "Task Created: Buy groceries (ID: abcdef12)\n- Priority: P3\n- Due Date: Tomorrow".to_string()
+                ),
+                tool_calls: vec![],
+                finish_reason: "stop".to_string(),
+                usage: Usage::default(),
+                reasoning_content: None,
+            },
+        ];
+        let provider = SequenceProvider::new(responses);
+        let registry = make_registry_with_ok();
+        let core = Arc::new(ExecutionCore::new(provider, registry));
+
+        let engine = ReactPlusEngine::new(core).with_max_iterations(10);
+        let messages = vec![Message::user("create task: buy")];
+        let tools = vec![serde_json::json!({
+            "type": "function",
+            "function": {
+                "name": "todo",
+                "description": "Manage tasks",
+                "parameters": {"type": "object", "properties": {}}
+            }
+        })];
+
+        let outcome = engine
+            .execute(messages, &tools, &default_params(), &routing_ctx())
+            .await
+            .unwrap();
+
+        // Should gracefully degrade — return the text as FinalResponse after one retry
+        match outcome {
+            ReactOutcome::Response { content, .. } => {
+                assert!(content.contains("Task Created"));
+            }
+            other => panic!("Expected graceful degradation Response, got {:?}", other),
         }
     }
 }
