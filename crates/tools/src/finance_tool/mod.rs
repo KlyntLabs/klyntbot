@@ -11,11 +11,6 @@ mod reports;
 mod settings;
 mod transactions;
 
-// tests.rs contains todo!()-based skeletons that will be enabled once
-// the action handlers are implemented. Not compiled yet.
-// #[cfg(test)]
-// mod tests;
-
 use async_trait::async_trait;
 use serde_json::Value;
 use std::sync::Arc;
