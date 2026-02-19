@@ -93,12 +93,9 @@ fn is_fabricated_tool_response(text: &str, tool_names: &[&str]) -> bool {
         && lower.contains("\n1.")
         && lower.contains("\n2.");
 
-    // Decision: fabricated if (has fake ID AND structured result)
-    //   OR (structured result AND multiple fields)
-    //   OR search with numbered list
-    (has_fake_id && has_structured_result)
-        || (has_structured_result && has_multiple_fields)
-        || has_search_with_list
+    // Decision: fabricated if structured result with (fake ID or multiple fields),
+    // or search with numbered list
+    (has_structured_result && (has_fake_id || has_multiple_fields)) || has_search_with_list
 }
 
 /// Drives a single LLM-tool execution cycle.

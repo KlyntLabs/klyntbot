@@ -142,7 +142,7 @@ impl ReactPlusEngine {
                         })
                         .collect();
 
-                    messages.push(Message::user(&format!(
+                    messages.push(Message::user(format!(
                         "You returned a text response instead of calling a tool. \
                          You have these tools available: [{}]. \
                          You MUST call the appropriate tool to complete the user's request. \
