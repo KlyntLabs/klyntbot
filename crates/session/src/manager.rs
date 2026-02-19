@@ -258,20 +258,18 @@ impl SessionManager {
                     Ok(row) => {
                         let msgs = repo
                             .get_messages(&key)
-                            .await
-                            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                            .await?;
                         Self::row_to_session(row, msgs)
                     }
                     Err(storage::StorageError::NotFound(_)) => {
                         // Create in SQL
                         let metadata = serde_json::Value::Object(serde_json::Map::new());
                         repo.create_session(&key, &metadata)
-                            .await
-                            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                            .await?;
                         debug!("Creating new session in SQL: {}", key);
                         Session::new(key.clone())
                     }
-                    Err(e) => return Err(common::KlyntbotError::Storage(e.to_string())),
+                    Err(e) => return Err(e.into()),
                 }
             } else {
                 // JSONL path
@@ -366,8 +364,7 @@ impl SessionManager {
             // Upsert session metadata
             let metadata = serde_json::to_value(&session.metadata).unwrap_or_default();
             repo.create_session(&session.key, &metadata)
-                .await
-                .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                .await?;
 
             // Persist all messages (idempotent via ON CONFLICT or just try-insert)
             for msg in &session.messages {
@@ -390,7 +387,7 @@ impl SessionManager {
                         // Likely duplicate — ignore
                     }
                     Err(e) => {
-                        return Err(common::KlyntbotError::Storage(e.to_string()));
+                        return Err(e.into());
                     }
                 }
             }
@@ -477,7 +474,7 @@ impl SessionManager {
             return repo
                 .delete_session(key)
                 .await
-                .map_err(|e| common::KlyntbotError::Storage(e.to_string()));
+                .map_err(common::KlyntbotError::from);
         }
 
         // Remove file
@@ -495,8 +492,7 @@ impl SessionManager {
         if let Some(repo) = &self.sql_repo {
             let rows = repo
                 .list_sessions()
-                .await
-                .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                .await?;
             // Already sorted by updated_at DESC in the query
             let sessions: Vec<SessionInfo> = rows
                 .into_iter()

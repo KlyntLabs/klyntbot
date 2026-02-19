@@ -1,5 +1,6 @@
 //! Repository modules and aggregate struct.
 
+pub mod calendar_event_cache;
 pub mod calendar_sync;
 pub mod conv_embedding;
 pub mod cron;
@@ -19,6 +20,7 @@ pub mod usage;
 #[cfg(test)]
 pub mod tests;
 
+pub use calendar_event_cache::CalendarEventCacheRepo;
 pub use calendar_sync::CalendarSyncRepo;
 pub use conv_embedding::ConvEmbeddingRepo;
 pub use cron::CronRepo;
@@ -53,6 +55,7 @@ pub struct Repos {
     pub usage: UsageRepo,
     pub cron: CronRepo,
     pub calendar_sync: CalendarSyncRepo,
+    pub calendar_event_cache: CalendarEventCacheRepo,
     pub memory_notes: MemoryNoteRepo,
     pub learning_state: LearningStateRepo,
     pub decision_log: DecisionLogRepo,
@@ -75,6 +78,7 @@ impl Repos {
             usage: UsageRepo::new(pg.clone()),
             cron: CronRepo::new(pg.clone()),
             calendar_sync: CalendarSyncRepo::new(pg.clone()),
+            calendar_event_cache: CalendarEventCacheRepo::new(pg.clone()),
             memory_notes: MemoryNoteRepo::new(pg.clone()),
             learning_state: LearningStateRepo::new(pg.clone()),
             decision_log: DecisionLogRepo::new(pg.clone()),

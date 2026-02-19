@@ -6,17 +6,15 @@
 //! ## Mock Modes
 //!   1. `new()` — available, returns deterministic embeddings based on text hash
 //!   2. `unavailable()` — simulates model not loaded / download failure
-//!   3. `with_store(store)` — persists embeddings to ConversationEmbeddingStore (like real impl)
 
 use async_trait::async_trait;
 use chrono::Utc;
 use common::Result;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use tokio::sync::RwLock;
+use std::sync::Mutex;
 use tools::conversation_embedding::{
     ConversationEmbeddingHandler, ConversationEmbeddingRecord, ConversationEmbeddingStatus,
-    ConversationEmbeddingStore, PurgeFilter,
+    PurgeFilter,
 };
 use tools::EMBEDDING_DIM;
 
@@ -36,8 +34,6 @@ pub struct MockConversationEmbeddingHandler {
     pub embeddings: Mutex<HashMap<String, Vec<f32>>>,
     /// Whether the mock should report as available
     pub available: bool,
-    /// Optional store to persist embeddings (like the real impl)
-    pub store: Option<Arc<RwLock<ConversationEmbeddingStore>>>,
     /// Track embed_message calls for assertions
     pub embed_message_calls: Mutex<Vec<EmbedCallRecord>>,
     /// Track search calls for assertions
@@ -56,19 +52,6 @@ impl MockConversationEmbeddingHandler {
         Self {
             embeddings: Mutex::new(HashMap::new()),
             available: true,
-            store: None,
-            embed_message_calls: Mutex::new(Vec::new()),
-            search_calls: Mutex::new(Vec::new()),
-        }
-    }
-
-    /// Create an available mock backed by a ConversationEmbeddingStore (persists embeddings).
-    #[allow(dead_code)]
-    pub fn with_store(store: Arc<RwLock<ConversationEmbeddingStore>>) -> Self {
-        Self {
-            embeddings: Mutex::new(HashMap::new()),
-            available: true,
-            store: Some(store),
             embed_message_calls: Mutex::new(Vec::new()),
             search_calls: Mutex::new(Vec::new()),
         }
@@ -79,7 +62,6 @@ impl MockConversationEmbeddingHandler {
         Self {
             embeddings: Mutex::new(HashMap::new()),
             available: false,
-            store: None,
             embed_message_calls: Mutex::new(Vec::new()),
             search_calls: Mutex::new(Vec::new()),
         }
@@ -170,22 +152,7 @@ impl ConversationEmbeddingHandler for MockConversationEmbeddingHandler {
         self.embeddings
             .lock()
             .unwrap()
-            .insert(message_id.to_string(), embedding.clone());
-
-        // Persist to store if available
-        if let Some(ref store) = self.store {
-            let record = ConversationEmbeddingRecord {
-                id: message_id.to_string(),
-                session_key: session_key.to_string(),
-                role: role.to_string(),
-                content_preview: content.chars().take(100).collect(),
-                embedding,
-                model: "mock-model".to_string(),
-                embedded_at: Utc::now(),
-            };
-            let store = store.write().await;
-            store.upsert(record).await?;
-        }
+            .insert(message_id.to_string(), embedding);
 
         Ok(())
     }
@@ -206,84 +173,57 @@ impl ConversationEmbeddingHandler for MockConversationEmbeddingHandler {
             .into());
         }
 
-        // If we have a store, search it
-        if let Some(ref store) = self.store {
-            let store = store.write().await;
-            let query_embedding = Self::deterministic_embedding(query);
-            let all_records = store.get_all().await?;
+        // Search in-memory embeddings
+        let embeddings = self.embeddings.lock().unwrap();
+        let query_embedding = Self::deterministic_embedding(query);
 
-            // Compute cosine similarity for each record
-            let mut results: Vec<(ConversationEmbeddingRecord, f64)> = all_records
-                .values()
-                .map(|record| {
-                    let similarity = cosine_similarity(&query_embedding, &record.embedding);
-                    (record.clone(), similarity)
-                })
-                .filter(|(_, score)| *score >= threshold)
-                .collect();
+        let mut results: Vec<(ConversationEmbeddingRecord, f64)> = embeddings
+            .iter()
+            .map(|(id, emb)| {
+                let similarity = cosine_similarity(&query_embedding, emb);
+                let record = ConversationEmbeddingRecord {
+                    id: id.clone(),
+                    session_key: "mock:session".to_string(),
+                    role: "user".to_string(),
+                    content_preview: "Mock content".to_string(),
+                    embedding: emb.clone(),
+                    model: "mock-model".to_string(),
+                    embedded_at: Utc::now(),
+                };
+                (record, similarity)
+            })
+            .filter(|(_, score)| *score >= threshold)
+            .collect();
 
-            // Sort by similarity descending
-            results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        results.truncate(limit);
 
-            // Limit results
-            results.truncate(limit);
-
-            Ok(results)
-        } else {
-            // No store: search in-memory embeddings
-            let embeddings = self.embeddings.lock().unwrap();
-            let query_embedding = Self::deterministic_embedding(query);
-
-            let mut results: Vec<(ConversationEmbeddingRecord, f64)> = embeddings
-                .iter()
-                .map(|(id, emb)| {
-                    let similarity = cosine_similarity(&query_embedding, emb);
-                    let record = ConversationEmbeddingRecord {
-                        id: id.clone(),
-                        session_key: "mock:session".to_string(),
-                        role: "user".to_string(),
-                        content_preview: "Mock content".to_string(),
-                        embedding: emb.clone(),
-                        model: "mock-model".to_string(),
-                        embedded_at: Utc::now(),
-                    };
-                    (record, similarity)
-                })
-                .filter(|(_, score)| *score >= threshold)
-                .collect();
-
-            results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-            results.truncate(limit);
-
-            Ok(results)
-        }
+        Ok(results)
     }
 
-    async fn purge(&self, filter: PurgeFilter) -> Result<usize> {
-        if let Some(ref store) = self.store {
-            let store = store.write().await;
-            store.purge(filter).await
-        } else {
-            // No store: just clear in-memory embeddings
-            let count = self.embeddings.lock().unwrap().len();
-            self.embeddings.lock().unwrap().clear();
-            Ok(count)
-        }
+    async fn purge(&self, _filter: PurgeFilter) -> Result<usize> {
+        let count = self.embeddings.lock().unwrap().len();
+        self.embeddings.lock().unwrap().clear();
+        Ok(count)
     }
 
     async fn status(&self) -> Result<ConversationEmbeddingStatus> {
-        if let Some(ref store) = self.store {
-            let store = store.write().await;
-            store.status().await
-        } else {
-            Ok(ConversationEmbeddingStatus {
-                total_embeddings: self.embeddings.lock().unwrap().len(),
-                indexed_channels: vec![],
-                oldest_embedding: None,
-                newest_embedding: None,
-                is_available: self.available,
-            })
-        }
+        let calls = self.embed_message_calls.lock().unwrap();
+        let mut channels: Vec<String> = calls
+            .iter()
+            .filter_map(|c| c.session_key.split(':').next().map(String::from))
+            .collect::<std::collections::HashSet<_>>()
+            .into_iter()
+            .collect();
+        channels.sort();
+
+        Ok(ConversationEmbeddingStatus {
+            total_embeddings: self.embeddings.lock().unwrap().len(),
+            indexed_channels: channels,
+            oldest_embedding: None,
+            newest_embedding: None,
+            is_available: self.available,
+        })
     }
 
     fn is_available(&self) -> bool {

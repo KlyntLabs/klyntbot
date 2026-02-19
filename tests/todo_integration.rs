@@ -43,6 +43,8 @@ async fn create_test_agent_with_todo() -> (AgentLoop, TempDir) {
     let outcome_repo = klyntbot::storage::OutcomeRepo::new(pool.inner().clone());
     let learning_state_repo = klyntbot::storage::LearningStateRepo::new(pool.inner().clone());
     let memory_note_repo = klyntbot::storage::MemoryNoteRepo::new(pool.inner().clone());
+    let calendar_sync_repo = klyntbot::storage::CalendarSyncRepo::new(pool.inner().clone());
+    let event_cache_repo = klyntbot::storage::CalendarEventCacheRepo::new(pool.inner().clone());
     let agent = AgentLoop::new(
         bus,
         provider,
@@ -53,6 +55,9 @@ async fn create_test_agent_with_todo() -> (AgentLoop, TempDir) {
         learning_state_repo,
         memory_note_repo,
         None, // strategy_repo
+        calendar_sync_repo,
+        event_cache_repo,
+        None, // conv_embedding_repo
     )
     .await
     .unwrap();

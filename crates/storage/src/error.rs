@@ -20,6 +20,10 @@ pub enum StorageError {
 
 impl From<StorageError> for common::KlyntbotError {
     fn from(e: StorageError) -> Self {
-        common::KlyntbotError::Storage(e.to_string())
+        match e {
+            StorageError::NotFound(msg) => common::KlyntbotError::StorageNotFound(msg),
+            StorageError::Conflict(msg) => common::KlyntbotError::StorageConflict(msg),
+            other => common::KlyntbotError::Storage(other.to_string()),
+        }
     }
 }

@@ -136,45 +136,31 @@ impl ProjectRepo {
 
     /// List projects matching the given filter criteria.
     pub async fn list(&self, filter: &ProjectFilter) -> Result<Vec<ProjectRow>, StorageError> {
-        let mut conditions: Vec<String> = Vec::new();
-        let mut bind_values: Vec<ProjBindValue> = Vec::new();
-        let mut param_idx = 0u32;
+        let mut qb = sqlx::QueryBuilder::<sqlx::Postgres>::new("SELECT * FROM projects");
+        let mut has_where = false;
 
         if let Some(ref status) = filter.status {
-            param_idx += 1;
-            conditions.push(format!("status = ${param_idx}"));
-            bind_values.push(ProjBindValue::Text(status.clone()));
+            qb.push(" WHERE status = ");
+            qb.push_bind(status);
+            has_where = true;
         }
 
         if let Some(ref tags) = filter.tags {
-            param_idx += 1;
-            conditions.push(format!("tags @> ${param_idx}"));
-            bind_values.push(ProjBindValue::TextArray(tags.clone()));
+            qb.push(if has_where { " AND " } else { " WHERE " });
+            qb.push("tags @> ");
+            qb.push_bind(tags);
+            has_where = true;
         }
 
-        let mut sql = "SELECT * FROM projects".to_string();
-        if !conditions.is_empty() {
-            sql.push_str(" WHERE ");
-            sql.push_str(&conditions.join(" AND "));
-        }
-        sql.push_str(" ORDER BY created_at DESC");
+        let _ = has_where;
+        qb.push(" ORDER BY created_at DESC");
 
         if let Some(limit) = filter.limit {
-            param_idx += 1;
-            sql.push_str(&format!(" LIMIT ${param_idx}"));
-            bind_values.push(ProjBindValue::BigInt(limit));
+            qb.push(" LIMIT ");
+            qb.push_bind(limit);
         }
 
-        let mut query = sqlx::query_as::<_, ProjectRow>(&sql);
-        for v in &bind_values {
-            query = match v {
-                ProjBindValue::Text(s) => query.bind(s),
-                ProjBindValue::TextArray(a) => query.bind(a),
-                ProjBindValue::BigInt(n) => query.bind(n),
-            };
-        }
-
-        let rows = query.fetch_all(&self.pool).await?;
+        let rows = qb.build_query_as::<ProjectRow>().fetch_all(&self.pool).await?;
         Ok(rows)
     }
 
@@ -247,9 +233,3 @@ pub struct ProjectPatch {
     pub status: Option<String>,
 }
 
-/// Internal enum for dynamic query parameter binding.
-enum ProjBindValue {
-    Text(String),
-    TextArray(Vec<String>),
-    BigInt(i64),
-}

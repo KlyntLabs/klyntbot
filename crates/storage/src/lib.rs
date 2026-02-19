@@ -16,6 +16,7 @@ pub use repos::Repos;
 // Re-export repo types for consumer convenience.
 pub use repos::project_repo::{ProjectFilter, ProjectPatch, ProjectRepo, ProjectWithStats};
 pub use repos::todo_repo::{TodoFilter, TodoPatch, TodoRepo, TodoSummary};
+pub use repos::CalendarEventCacheRepo;
 pub use repos::CalendarSyncRepo;
 pub use repos::ConvEmbeddingRepo;
 pub use repos::CronRepo;
@@ -31,7 +32,7 @@ pub use repos::StrategyRepo;
 pub use repos::UsageRepo;
 
 // Re-export row structs for consumer convenience.
-pub use rows::calendar::CalendarSyncStateRow;
+pub use rows::calendar::{CalendarEventCacheRow, CalendarSyncStateRow};
 pub use rows::cron::CronJobRow;
 pub use rows::embedding::{ConvEmbeddingRow, EmbeddingRow};
 pub use rows::goal::{GoalProjectLinkRow, GoalRow};

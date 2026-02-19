@@ -117,6 +117,9 @@ impl AgentLoop {
         learning_state_repo: storage::LearningStateRepo,
         memory_note_repo: storage::MemoryNoteRepo,
         strategy_repo: Option<storage::StrategyRepo>,
+        calendar_sync_repo: storage::CalendarSyncRepo,
+        event_cache_repo: storage::CalendarEventCacheRepo,
+        conv_embedding_repo: Option<storage::ConvEmbeddingRepo>,
     ) -> Result<Self> {
         let workspace = config.workspace_path();
 
@@ -230,6 +233,8 @@ impl AgentLoop {
             let adapter = Arc::new(
                 CalendarSyncAdapter::new(
                     todo_repo_shared.clone(),
+                    calendar_sync_repo,
+                    event_cache_repo,
                     &config.calendar,
                     config.timezone.clone(),
                     notification_dispatcher.clone(),
@@ -350,22 +355,18 @@ impl AgentLoop {
 
         // Register conversation embedding handler (Phase 4.1)
         let conversation_embedding_handler = if config.conversation.embedding.enabled {
-            let conv_store_path = dirs::home_dir()
-                .unwrap_or_else(|| PathBuf::from("."))
-                .join(".klyntbot")
-                .join("data")
-                .join("conversation_embeddings.jsonl");
-
-            let conv_store = Arc::new(RwLock::new(tools::ConversationEmbeddingStore::new(
-                conv_store_path,
-            )));
-            let handler = Arc::new(
-                super::conversation_embedding_handler::ConversationEmbeddingHandlerImpl::new(
-                    Arc::clone(&embedding_engine),
-                    conv_store,
-                ),
-            );
-            Some(handler as Arc<dyn tools::ConversationEmbeddingHandler>)
+            if let Some(repo) = conv_embedding_repo {
+                let conv_store = tools::ConversationEmbeddingStore::new(repo);
+                let handler = Arc::new(
+                    super::conversation_embedding_handler::ConversationEmbeddingHandlerImpl::new(
+                        Arc::clone(&embedding_engine),
+                        conv_store,
+                    ),
+                );
+                Some(handler as Arc<dyn tools::ConversationEmbeddingHandler>)
+            } else {
+                None
+            }
         } else {
             None
         };
@@ -579,6 +580,9 @@ impl AgentLoop {
         learning_state_repo: storage::LearningStateRepo,
         memory_note_repo: storage::MemoryNoteRepo,
         strategy_repo: Option<storage::StrategyRepo>,
+        calendar_sync_repo: storage::CalendarSyncRepo,
+        event_cache_repo: storage::CalendarEventCacheRepo,
+        conv_embedding_repo: Option<storage::ConvEmbeddingRepo>,
     ) -> Result<Self> {
         let goal_path = config.goal_store_path();
         let goal_store = Some(Arc::new(RwLock::new(goal::GoalStore::new(goal_path))));
@@ -598,6 +602,9 @@ impl AgentLoop {
             learning_state_repo,
             memory_note_repo,
             strategy_repo,
+            calendar_sync_repo,
+            event_cache_repo,
+            conv_embedding_repo,
         )
         .await
     }

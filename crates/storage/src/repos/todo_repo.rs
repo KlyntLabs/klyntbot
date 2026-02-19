@@ -171,69 +171,42 @@ impl TodoRepo {
 
     /// List todos matching the given filter criteria.
     pub async fn list(&self, filter: &TodoFilter) -> Result<Vec<TodoRow>, StorageError> {
-        // Build a dynamic query. We use a base query and append WHERE clauses.
-        let mut conditions: Vec<String> = Vec::new();
+        let mut qb = sqlx::QueryBuilder::<sqlx::Postgres>::new("SELECT * FROM todos WHERE ");
 
         if filter.templates_only {
-            conditions.push("is_template = TRUE".to_string());
+            qb.push("is_template = TRUE");
         } else {
-            conditions.push("is_template = FALSE".to_string());
+            qb.push("is_template = FALSE");
         }
 
-        // We'll build the full SQL as a string, but bind parameters positionally.
-        // Since sqlx doesn't have a great dynamic query builder, we use raw SQL.
-        let mut sql = "SELECT * FROM todos".to_string();
-        let mut param_idx = 0u32;
-        let mut bind_values: Vec<BindValue> = Vec::new();
-
         if let Some(ref status) = filter.status {
-            param_idx += 1;
-            conditions.push(format!("status = ${param_idx}"));
-            bind_values.push(BindValue::Text(status.clone()));
+            qb.push(" AND status = ");
+            qb.push_bind(status);
         }
 
         if let Some(ref tags) = filter.tags {
-            param_idx += 1;
-            conditions.push(format!("tags @> ${param_idx}"));
-            bind_values.push(BindValue::TextArray(tags.clone()));
+            qb.push(" AND tags @> ");
+            qb.push_bind(tags);
         }
 
         if let Some(ref project_id) = filter.project_id {
-            param_idx += 1;
-            conditions.push(format!("project_id = ${param_idx}"));
-            bind_values.push(BindValue::Text(project_id.clone()));
+            qb.push(" AND project_id = ");
+            qb.push_bind(project_id);
         }
 
         if let Some(pmin) = filter.priority_min {
-            param_idx += 1;
-            conditions.push(format!("priority >= ${param_idx}"));
-            bind_values.push(BindValue::SmallInt(pmin));
+            qb.push(" AND priority >= ");
+            qb.push_bind(pmin);
         }
 
-        if !conditions.is_empty() {
-            sql.push_str(" WHERE ");
-            sql.push_str(&conditions.join(" AND "));
-        }
-
-        sql.push_str(" ORDER BY created_at DESC");
+        qb.push(" ORDER BY created_at DESC");
 
         if let Some(limit) = filter.limit {
-            param_idx += 1;
-            sql.push_str(&format!(" LIMIT ${param_idx}"));
-            bind_values.push(BindValue::BigInt(limit));
+            qb.push(" LIMIT ");
+            qb.push_bind(limit);
         }
 
-        let mut query = sqlx::query_as::<_, TodoRow>(&sql);
-        for v in &bind_values {
-            query = match v {
-                BindValue::Text(s) => query.bind(s),
-                BindValue::TextArray(a) => query.bind(a),
-                BindValue::SmallInt(n) => query.bind(n),
-                BindValue::BigInt(n) => query.bind(n),
-            };
-        }
-
-        let rows = query.fetch_all(&self.pool).await?;
+        let rows = qb.build_query_as::<TodoRow>().fetch_all(&self.pool).await?;
         Ok(rows)
     }
 
@@ -247,19 +220,48 @@ impl TodoRepo {
     }
 
     /// Search todos by keyword in title or description (case-insensitive).
-    pub async fn search_by_keyword(&self, query: &str) -> Result<Vec<TodoRow>, StorageError> {
-        let pattern = format!("%{query}%");
-        let rows = sqlx::query_as::<_, TodoRow>(
-            r#"
-            SELECT * FROM todos
-            WHERE is_template = FALSE
-              AND (title ILIKE $1 OR description ILIKE $1)
-            ORDER BY created_at DESC
-            "#,
-        )
-        .bind(&pattern)
-        .fetch_all(&self.pool)
-        .await?;
+    ///
+    /// ILIKE special characters (`%`, `_`, `\`) are escaped so the query is
+    /// treated as a literal substring match.
+    pub async fn search_by_keyword(
+        &self,
+        query: &str,
+        limit: Option<i64>,
+    ) -> Result<Vec<TodoRow>, StorageError> {
+        // Escape ILIKE special characters so the query is a literal substring
+        let escaped = query
+            .replace('\\', "\\\\")
+            .replace('%', "\\%")
+            .replace('_', "\\_");
+        let pattern = format!("%{escaped}%");
+
+        let rows = if let Some(lim) = limit {
+            sqlx::query_as::<_, TodoRow>(
+                r#"
+                SELECT * FROM todos
+                WHERE is_template = FALSE
+                  AND (title ILIKE $1 OR description ILIKE $1)
+                ORDER BY created_at DESC
+                LIMIT $2
+                "#,
+            )
+            .bind(&pattern)
+            .bind(lim)
+            .fetch_all(&self.pool)
+            .await?
+        } else {
+            sqlx::query_as::<_, TodoRow>(
+                r#"
+                SELECT * FROM todos
+                WHERE is_template = FALSE
+                  AND (title ILIKE $1 OR description ILIKE $1)
+                ORDER BY created_at DESC
+                "#,
+            )
+            .bind(&pattern)
+            .fetch_all(&self.pool)
+            .await?
+        };
         Ok(rows)
     }
 
@@ -845,10 +847,3 @@ pub struct TodoPatch {
     pub last_reminded_at: Option<Option<DateTime<Utc>>>,
 }
 
-/// Internal enum for dynamic query parameter binding.
-enum BindValue {
-    Text(String),
-    TextArray(Vec<String>),
-    SmallInt(i16),
-    BigInt(i64),
-}

@@ -142,7 +142,7 @@ pub async fn reconcile_calendar_events(
                     .map(|_| {
                         report.due_dates_updated += 1;
                     })
-                    .map_err(|e| common::KlyntbotError::Storage(e.to_string()))
+                    .map_err(common::KlyntbotError::from)
             }
             ReconcileAction::CompleteTodo { .. } => {
                 let patch = storage::TodoPatch {
@@ -156,7 +156,7 @@ pub async fn reconcile_calendar_events(
                     .map(|_| {
                         report.todos_completed += 1;
                     })
-                    .map_err(|e| common::KlyntbotError::Storage(e.to_string()))
+                    .map_err(common::KlyntbotError::from)
             }
             ReconcileAction::ClearCalendarLink { .. } => {
                 let patch = storage::TodoPatch {
@@ -170,7 +170,7 @@ pub async fn reconcile_calendar_events(
                     .map(|_| {
                         report.links_cleared += 1;
                     })
-                    .map_err(|e| common::KlyntbotError::Storage(e.to_string()))
+                    .map_err(common::KlyntbotError::from)
             }
             ReconcileAction::NoChange { .. } => Ok(()),
         };

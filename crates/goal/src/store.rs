@@ -177,7 +177,14 @@ impl GoalStore {
     }
 
     /// Compact the journal file: rewrite with only live entries.
+    /// Creates a `.jsonl.bak` backup before overwriting.
     async fn compact(&mut self) -> Result<()> {
+        // Create backup before compaction
+        let backup_path = self.file_path.with_extension("jsonl.bak");
+        if self.file_path.exists() {
+            fs::copy(&self.file_path, &backup_path).await?;
+        }
+
         let mut content = String::with_capacity(self.index.len() * 256);
         for id in &self.order {
             if let Some(goal) = self.index.get(id) {
@@ -219,13 +226,11 @@ impl GoalStore {
             goal.updated_at = Utc::now();
             let row = Self::goal_to_row(&goal);
             repo.create(&row)
-                .await
-                .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                .await?;
             // Link projects
             for pid in &goal.linked_project_ids {
                 repo.link_project(goal.id, &pid.to_string())
-                    .await
-                    .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                    .await?;
             }
             return Ok(goal);
         }
@@ -251,8 +256,7 @@ impl GoalStore {
                 Ok(row) => {
                     let links = repo
                         .get_project_links(*id)
-                        .await
-                        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                        .await?;
                     let project_ids = links
                         .into_iter()
                         .filter_map(|l| Uuid::parse_str(&l.project_id).ok())
@@ -260,7 +264,7 @@ impl GoalStore {
                     Ok(Some(Self::row_to_goal(row, project_ids)))
                 }
                 Err(storage::StorageError::NotFound(_)) => Ok(None),
-                Err(e) => Err(common::KlyntbotError::Storage(e.to_string())),
+                Err(e) => Err(e.into()),
             };
         }
 
@@ -268,9 +272,20 @@ impl GoalStore {
         Ok(self.index.get(id).cloned())
     }
 
-    /// Update a goal in place.
+    /// Update a goal in place. Validates status transitions.
     pub async fn update(&mut self, goal: Goal) -> Result<Option<Goal>> {
         if let Some(repo) = &self.sql_repo {
+            // Validate status transition
+            match repo.get(goal.id).await {
+                Ok(existing) => {
+                    let old_status =
+                        GoalStatus::from_str(&existing.status).unwrap_or_default();
+                    GoalStatus::validate_transition(&old_status, &goal.status)?;
+                }
+                Err(storage::StorageError::NotFound(_)) => return Ok(None),
+                Err(e) => return Err(e.into()),
+            }
+
             let mut updated = goal;
             updated.updated_at = Utc::now();
             let row = Self::goal_to_row(&updated);
@@ -279,26 +294,29 @@ impl GoalStore {
                     // Sync project links: clear existing and re-link
                     let existing = repo
                         .get_project_links(updated.id)
-                        .await
-                        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                        .await?;
                     for link in &existing {
                         let _ = repo.unlink_project(updated.id, &link.project_id).await;
                     }
                     for pid in &updated.linked_project_ids {
                         repo.link_project(updated.id, &pid.to_string())
-                            .await
-                            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                            .await?;
                     }
                     Ok(Some(updated))
                 }
                 Err(storage::StorageError::NotFound(_)) => Ok(None),
-                Err(e) => Err(common::KlyntbotError::Storage(e.to_string())),
+                Err(e) => Err(e.into()),
             }
         } else {
             self.ensure_loaded().await?;
 
             if !self.index.contains_key(&goal.id) {
                 return Ok(None);
+            }
+
+            // Validate status transition (JSONL path)
+            if let Some(existing) = self.index.get(&goal.id) {
+                GoalStatus::validate_transition(&existing.status, &goal.status)?;
             }
 
             let mut updated = goal;
@@ -321,7 +339,7 @@ impl GoalStore {
             return repo
                 .delete(*id)
                 .await
-                .map_err(|e| common::KlyntbotError::Storage(e.to_string()));
+                .map_err(common::KlyntbotError::from);
         }
 
         self.ensure_loaded().await?;
@@ -344,14 +362,12 @@ impl GoalStore {
             let status_str = status.as_ref().map(|s| s.to_string());
             let rows = repo
                 .list(status_str.as_deref())
-                .await
-                .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                .await?;
             let mut goals = Vec::with_capacity(rows.len());
             for row in rows {
                 let links = repo
                     .get_project_links(row.id)
-                    .await
-                    .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                    .await?;
                 let project_ids = links
                     .into_iter()
                     .filter_map(|l| Uuid::parse_str(&l.project_id).ok())
@@ -593,6 +609,10 @@ mod tests {
 
         // Journal should have been compacted (stale entries removed)
         assert!(store.journal_len < 150);
+
+        // Verify backup was created during compaction
+        let backup_path = dir.path().join("goals.jsonl.bak");
+        assert!(backup_path.exists());
     }
 
     #[tokio::test]
@@ -692,5 +712,57 @@ mod tests {
             assert_eq!(retrieved.metrics[0].name, "Tasks");
             assert_eq!(retrieved.metrics[0].current, 3.0);
         }
+    }
+
+    #[tokio::test]
+    async fn test_update_rejects_invalid_status_transition() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("goals.jsonl");
+        let mut store = GoalStore::new(path);
+
+        let mut goal = test_goal("Achieved Goal");
+        goal.status = GoalStatus::Active;
+        let id = goal.id;
+        store.add(goal).await.unwrap();
+
+        // Active → Achieved is valid
+        let mut to_achieve = store.get(&id).await.unwrap().unwrap();
+        to_achieve.status = GoalStatus::Achieved;
+        store.update(to_achieve).await.unwrap();
+
+        // Achieved → Active is invalid (final state)
+        let mut to_reactivate = store.get(&id).await.unwrap().unwrap();
+        to_reactivate.status = GoalStatus::Active;
+        let result = store.update(to_reactivate).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_update_allows_valid_status_transition() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("goals.jsonl");
+        let mut store = GoalStore::new(path);
+
+        let goal = test_goal("Pausable Goal");
+        let id = goal.id;
+        store.add(goal).await.unwrap();
+
+        // Active → Paused → Active → Abandoned
+        let mut g = store.get(&id).await.unwrap().unwrap();
+        g.status = GoalStatus::Paused;
+        store.update(g).await.unwrap();
+
+        let mut g = store.get(&id).await.unwrap().unwrap();
+        g.status = GoalStatus::Active;
+        store.update(g).await.unwrap();
+
+        let mut g = store.get(&id).await.unwrap().unwrap();
+        g.status = GoalStatus::Abandoned;
+        store.update(g).await.unwrap();
+
+        // Abandoned is final
+        let mut g = store.get(&id).await.unwrap().unwrap();
+        g.status = GoalStatus::Active;
+        assert!(store.update(g).await.is_err());
     }
 }

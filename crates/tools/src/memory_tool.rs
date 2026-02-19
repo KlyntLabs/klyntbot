@@ -12,7 +12,7 @@ use crate::conversation_embedding::{
     ConversationEmbeddingHandler, ConversationEmbeddingRecord, PurgeFilter,
 };
 use crate::embedding_engine::EmbeddingHandler;
-use crate::todo_types::{Todo, TodoFilter};
+use crate::todo_types::Todo;
 use crate::{RoutingContext, Tool};
 use common::Result;
 
@@ -241,21 +241,9 @@ impl MemoryTool {
 
         // 2. Search todos (keyword + semantic if available)
         let todo_results: Vec<(Todo, f64)> = if let Some(todo_repo) = &self.todo_repo {
-            // Keyword search via repo
-            let query_lower = query.to_lowercase();
-            let filter = TodoFilter::default();
-            let all_rows = todo_repo.list(&filter.to_storage_filter()).await?;
-            let all_todos: Vec<Todo> = all_rows.into_iter().map(Todo::from).collect();
-            let keyword_todos: Vec<Todo> = all_todos
-                .iter()
-                .filter(|t| {
-                    t.title.to_lowercase().contains(&query_lower)
-                        || t.description
-                            .as_ref()
-                            .is_some_and(|d| d.to_lowercase().contains(&query_lower))
-                })
-                .cloned()
-                .collect();
+            // Keyword search via SQL ILIKE (escapes special chars)
+            let keyword_rows = todo_repo.search_by_keyword(query, None).await?;
+            let keyword_todos: Vec<Todo> = keyword_rows.into_iter().map(Todo::from).collect();
 
             // Semantic search via pgvector (if available)
             let semantic_todos: Vec<(String, f64)> = if let (Some(emb), Some(emb_repo)) =
@@ -272,15 +260,30 @@ impl MemoryTool {
 
             // Merge keyword and semantic results using RRF
             if !semantic_todos.is_empty() {
-                let todos_by_id: HashMap<String, crate::search_utils::SearchResult> = all_todos
-                    .into_iter()
-                    .map(|t| {
-                        (
-                            t.id.clone(),
-                            crate::search_utils::SearchResult::Todo(Box::new(t)),
-                        )
-                    })
-                    .collect();
+                // Build lookup from keyword results
+                let mut todos_by_id: HashMap<String, crate::search_utils::SearchResult> =
+                    keyword_todos
+                        .iter()
+                        .map(|t| {
+                            (
+                                t.id.clone(),
+                                crate::search_utils::SearchResult::Todo(Box::new(t.clone())),
+                            )
+                        })
+                        .collect();
+
+                // Fetch any semantic-only todos not already in keyword results
+                for (id, _) in &semantic_todos {
+                    if !todos_by_id.contains_key(id) {
+                        if let Ok(Some(row)) = todo_repo.get(id).await {
+                            let todo = Todo::from(row);
+                            todos_by_id.insert(
+                                id.clone(),
+                                crate::search_utils::SearchResult::Todo(Box::new(todo)),
+                            );
+                        }
+                    }
+                }
 
                 let keyword_search_results: Vec<crate::search_utils::SearchResult> = keyword_todos
                     .into_iter()

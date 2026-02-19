@@ -7,7 +7,7 @@
 
 ## Executive Summary
 
-Klyntbot is a 105K-line Rust AI agent framework with 17 crates, 15+ tools, and 6 chat platform integrations. The codebase is architecturally sound with clean dependency layering and no circular dependencies. However, the ongoing JSONL-to-PostgreSQL migration is approximately **80% complete**, leaving several subsystems in a fragile dual-mode state. The gap report identifies **52 gaps** across 6 severity tiers (**29 resolved** as of 2026-02-19).
+Klyntbot is a 105K-line Rust AI agent framework with 17 crates, 15+ tools, and 6 chat platform integrations. The codebase is architecturally sound with clean dependency layering and no circular dependencies. However, the ongoing JSONL-to-PostgreSQL migration is approximately **95% complete**, with remaining dual-mode state limited to goal/plan JSONL stores. The gap report identifies **52 gaps** across 6 severity tiers (**40 resolved** as of 2026-02-19).
 
 **Top 3 systemic issues:**
 1. **JSONL/SQL dual-mode persistence** — 6+ subsystems maintain parallel storage backends, doubling maintenance burden and creating behavior divergence
@@ -52,17 +52,17 @@ Klyntbot is a 105K-line Rust AI agent framework with 17 crates, 15+ tools, and 6
 | ~~G-27~~ | ~~P2~~ | ~~Dashboard~~ | ~~`system_status` query returns hardcoded stub values~~ **RESOLVED 2026-02-19** |
 | ~~G-28~~ | ~~P2~~ | ~~Dashboard~~ | ~~`do_config_patch` mutation validates but doesn't apply~~ **RESOLVED 2026-02-19** |
 | ~~G-29~~ | ~~P2~~ | ~~Dashboard~~ | ~~`search_todos` semantic/hybrid modes return empty stubs~~ **RESOLVED 2026-02-19** |
-| G-30 | P2 | Calendar | Sync state uses parallel file/SQL backends (not unified) |
-| G-31 | P2 | Calendar | No CalDAV event caching (every call hits remote) |
-| G-32 | P2 | Scheduling | CronStore uses flat JSON (full rewrite) while Goal/Plan use JSONL journal |
-| G-33 | P2 | Scheduling | 100ms polling interval is inefficient for long-wait jobs |
-| G-34 | P2 | Goal | No state transition validation (unlike PlanStatus) |
-| G-35 | P2 | Goal | GoalStore doesn't create backup before compaction |
-| G-36 | P2 | Plan | SQL upsert uses try-create/catch-duplicate (not idempotent) |
-| G-37 | P2 | Storage | StorageError→KlyntbotError conversion loses structured variant info |
-| G-38 | P2 | Storage | Dynamic query builder uses manual parameter index tracking |
-| G-39 | P2 | Tools | MemoryTool `search_all` loads all todos in-memory for keyword search |
-| G-40 | P2 | Tools | Conversation embedding store complexity (TokioRwLock + AsyncOnceCell) |
+| ~~G-30~~ | ~~P2~~ | ~~Calendar~~ | ~~Sync state uses parallel file/SQL backends (not unified)~~ **RESOLVED 2026-02-19** |
+| ~~G-31~~ | ~~P2~~ | ~~Calendar~~ | ~~No CalDAV event caching (every call hits remote)~~ **RESOLVED 2026-02-19** |
+| ~~G-32~~ | ~~P2~~ | ~~Scheduling~~ | ~~CronStore uses flat JSON (full rewrite) while Goal/Plan use JSONL journal~~ **RESOLVED 2026-02-19** |
+| ~~G-33~~ | ~~P2~~ | ~~Scheduling~~ | ~~100ms polling interval is inefficient for long-wait jobs~~ **RESOLVED 2026-02-19** |
+| ~~G-34~~ | ~~P2~~ | ~~Goal~~ | ~~No state transition validation (unlike PlanStatus)~~ **RESOLVED 2026-02-19** |
+| ~~G-35~~ | ~~P2~~ | ~~Goal~~ | ~~GoalStore doesn't create backup before compaction~~ **RESOLVED 2026-02-19** |
+| ~~G-36~~ | ~~P2~~ | ~~Plan~~ | ~~SQL upsert uses try-create/catch-duplicate (not idempotent)~~ **RESOLVED 2026-02-19** |
+| ~~G-37~~ | ~~P2~~ | ~~Storage~~ | ~~StorageError→KlyntbotError conversion loses structured variant info~~ **RESOLVED 2026-02-19** |
+| ~~G-38~~ | ~~P2~~ | ~~Storage~~ | ~~Dynamic query builder uses manual parameter index tracking~~ **RESOLVED 2026-02-19** |
+| ~~G-39~~ | ~~P2~~ | ~~Tools~~ | ~~MemoryTool `search_all` loads all todos in-memory for keyword search~~ **RESOLVED 2026-02-19** |
+| ~~G-40~~ | ~~P2~~ | ~~Tools~~ | ~~Conversation embedding store complexity (TokioRwLock + AsyncOnceCell)~~ **RESOLVED 2026-02-19** |
 | **P3 — Low (minor improvements)** |
 | G-41 | P3 | Common | `MessageRole::from("unknown")` silently falls back to User |
 | G-42 | P3 | Bus | `InboundMessage::validate()` not called by `publish_inbound()` |
@@ -324,49 +324,82 @@ Dashboard crate removed entirely in commit `7b94f98`. Mutation handlers no longe
 **Status**: **Resolved** on 2026-02-19
 Dashboard crate removed entirely in commit `7b94f98`. Search is handled via TodoTool in chat.
 
-#### G-30: Calendar Sync State Dual Backend
-**Source**: `06-domain-features.md` §7.1
-Parallel file/SQL exports without unified `from_repo()` pattern.
+#### ~~G-30: Calendar Sync State Dual Backend~~ — RESOLVED
 
-#### G-31: No CalDAV Event Caching
-**Source**: `06-domain-features.md` §7.1
-Every `get_events()` call hits the remote server.
+**Status**: **Resolved** on 2026-02-19
+**Implementation**: `crates/calendar/src/state.rs`, `crates/agent/src/calendar_sync_adapter.rs`
 
-#### G-32: CronStore Inconsistent Persistence
-**Source**: `06-domain-features.md` §7.2
-Flat JSON (full rewrite) while Goal/Plan use JSONL journals.
+Removed file-based `load_provider_sync_state()` / `save_provider_sync_state()` functions. CalendarSyncAdapter now uses `CalendarSyncRepo` (SQL) exclusively for sync state persistence. Deleted all `~/.klyntbot/calendar_sync_states/` directory logic. The `CalendarSyncRepo` already existed in `crates/storage/src/repos/calendar_sync.rs` — now it's the sole backend. Zero file I/O in the sync state path.
 
-#### G-33: Cron 100ms Polling Inefficiency
-**Source**: `06-domain-features.md` §7.2
-Unnecessary CPU wake-ups for long-wait jobs. Should use `sleep_until()` with exact wake time.
+#### ~~G-31: No CalDAV Event Caching~~ — RESOLVED
 
-#### G-34: GoalStatus No Transition Validation
-**Source**: `06-domain-features.md` §7.3
-Any status can transition to any other, unlike PlanStatus's enforced state machine.
+**Status**: **Resolved** on 2026-02-19
+**Implementation**: `crates/storage/migrations/20260219100000_calendar_event_cache.sql`, `crates/storage/src/repos/calendar_event_cache.rs`, `crates/agent/src/calendar_sync_adapter.rs`
 
-#### G-35: GoalStore No Compaction Backup
-**Source**: `06-domain-features.md` §7.3
-PlanStore creates `.jsonl.bak` before compaction; GoalStore does not.
+Added `calendar_event_cache` SQL table (`uid PK`, `provider_id`, `summary`, `description`, `start_time`, `end_time`, `etag`, `status`, `raw_data JSONB`, `cached_at TIMESTAMPTZ`) with index on `(provider_id, start_time)`. `CalendarEventCacheRepo` provides `upsert_events()`, `get_cached_events(provider_id, time_range)`, `invalidate(provider_id)`, `get_by_uid(uid)`. Adapter caches events after remote sync and serves from cache when fresh (configurable TTL via `CalendarConfig::cache_ttl_secs`, default 300). `get_event()` by UID queries cache directly instead of looping all providers.
 
-#### G-36: Plan SQL Upsert Not Idempotent
-**Source**: `06-domain-features.md` §7.4
-Uses try-create/catch-duplicate instead of `INSERT ... ON CONFLICT DO UPDATE`.
+#### ~~G-32: CronStore Inconsistent Persistence~~ — RESOLVED
 
-#### G-37: StorageError Conversion Loses Structure
-**Source**: `01-foundation-storage.md` §6.2
-`Storage(String)` variant converts via `.to_string()`, losing `NotFound` vs `Conflict` distinction.
+**Status**: **Resolved** on 2026-02-19
+**Implementation**: `crates/scheduling/src/service/mod.rs`, `crates/scheduling/src/service/store.rs`, `crates/cli/src/serve.rs`
 
-#### G-38: Dynamic Query Builder Manual Indices
-**Source**: `01-foundation-storage.md` §6.3
-`TodoRepo::list()` and `ProjectRepo::list()` build SQL strings manually. Risk of off-by-one errors.
+Removed `store_path` field, `CronService::new(path)`, and `save_store_file_static()`. CronStore now wraps `CronRepo` exclusively — `CronService::new(repo)` requires a `CronRepo`. All CRUD operations delegate to SQL. `new_for_test()` constructor uses `None` repo for unit tests (save/load are no-ops). Removed `tempfile` dev-dependency. Updated `serve.rs` call site.
 
-#### G-39: MemoryTool search_all O(n) In-Memory
-**Source**: `03-tools-system.md` §10 #6
-Loads all todos via `todo_repo.list()` then filters in-memory. Should use SQL `ILIKE` or `tsvector`.
+#### ~~G-33: Cron 100ms Polling Inefficiency~~ — RESOLVED
 
-#### G-40: ConversationEmbeddingStore Complexity
-**Source**: `03-tools-system.md` §10 #5
-`TokioRwLock` + `AsyncOnceCell` adds complexity now that PostgreSQL is the primary backend.
+**Status**: **Resolved** on 2026-02-19
+**Implementation**: `crates/scheduling/src/service/mod.rs`
+
+Replaced 100ms polling cap with `tokio::time::sleep_until(deadline)` + `tokio::select!` for early wake via `Arc<Notify>`. Timer loop sleeps for the exact duration until next job. When no jobs exist, sleeps for 24h (woken by Notify). `add_job()`, `remove_job()`, `enable_job()` all call `wake.notify_one()` for immediate wake. `start_timer_loop()` is now async with synchronous handle storage to prevent race condition with `stop()`.
+
+#### ~~G-34: GoalStatus No Transition Validation~~ — RESOLVED
+
+**Status**: **Resolved** on 2026-02-19
+**Implementation**: `crates/goal/src/types.rs`, `crates/goal/src/store.rs`
+
+Added `GoalStatus::validate_transition(from, to) -> Result<()>` enforcing: Active→{Paused,Achieved,Abandoned}, Paused→{Active,Abandoned}, Achieved/Abandoned are final states. Same-to-same is no-op. Wired into `GoalStore::update()` for both JSONL and SQL paths. 4 new tests covering valid transitions, invalid transitions, store-level enforcement, and boundary cases.
+
+#### ~~G-35: GoalStore No Compaction Backup~~ — RESOLVED
+
+**Status**: **Resolved** on 2026-02-19
+**Implementation**: `crates/goal/src/store.rs`
+
+Added `fs::copy()` to create `.jsonl.bak` backup before `fs::write()` in `GoalStore::compact()`, mirroring the PlanStore pattern from `crates/plan/src/store.rs:326-331`. Existing `test_compaction` updated to verify backup file exists.
+
+#### ~~G-36: Plan SQL Upsert Not Idempotent~~ — RESOLVED
+
+**Status**: **Resolved** on 2026-02-19
+**Implementation**: `crates/storage/src/repos/plan.rs`, `crates/plan/src/store.rs`
+
+Replaced try-create/catch-duplicate pattern with `INSERT ... ON CONFLICT(id) DO UPDATE SET` in `PlanRepo::upsert()`. Single atomic SQL statement handles both insert and update. Same pattern applied to plan steps. Removed the error-matching fallback from `PlanStore::sql_upsert()`.
+
+#### ~~G-37: StorageError Conversion Loses Structure~~ — RESOLVED
+
+**Status**: **Resolved** on 2026-02-19
+**Implementation**: `crates/common/src/error.rs`, `crates/storage/src/error.rs`, multiple consumer files
+
+Added `StorageNotFound(String)` and `StorageConflict(String)` variants to `KlyntbotError`. Updated `From<StorageError>` impl to map `NotFound` → `StorageNotFound`, `Conflict` → `StorageConflict`, `Sqlx` → `Storage`. Updated all match sites across the workspace (grep-verified). Downstream callers can now distinguish error kinds for proper HTTP status codes and retry logic.
+
+#### ~~G-38: Dynamic Query Builder Manual Indices~~ — RESOLVED
+
+**Status**: **Resolved** on 2026-02-19
+**Implementation**: `crates/storage/src/repos/todo_repo.rs`, `crates/storage/src/repos/project_repo.rs`
+
+Rewrote `TodoRepo::list()` and `ProjectRepo::list()` using `sqlx::QueryBuilder` which auto-tracks parameter indices via `push_bind()`. Removed `BindValue` and `ProjBindValue` enums. Removed manual `param_idx` counter. QueryBuilder handles WHERE/AND chaining, LIMIT, and ORDER BY with type-safe bindings. Zero risk of off-by-one parameter index errors.
+
+#### ~~G-39: MemoryTool search_all O(n) In-Memory~~ — RESOLVED
+
+**Status**: **Resolved** on 2026-02-19
+**Implementation**: `crates/storage/src/repos/todo_repo.rs`, `crates/tools/src/memory_tool.rs`
+
+Added `TodoRepo::search_keyword(query, limit)` using SQL `ILIKE` with proper escaping of special characters (`%`, `_`, `\`). Searches both `title` and `description` columns. Replaced in-memory `Vec::filter` + `str::contains` in `MemoryTool::search_all()` with the new SQL method. Filtering now runs at the database layer — O(1) from the application's perspective.
+
+#### ~~G-40: ConversationEmbeddingStore Complexity~~ — RESOLVED
+
+**Status**: **Resolved** on 2026-02-19
+**Implementation**: `crates/tools/src/conversation_embedding.rs`, caller updates
+
+Rewrote `ConversationEmbeddingStore` as SQL-only wrapper around `ConvEmbeddingRepo`. Removed: `file_path: PathBuf`, `index: TokioRwLock<HashMap>`, `loaded: AsyncOnceCell`, `journal_len: TokioRwLock`. All methods delegate directly to repo. Removed `new(file_path)` constructor — only `from_repo(repo)` (SQL-only). Removed JSONL journal code, `ensure_loaded()`, all file I/O. PgPool handles concurrency internally — no application-level locks needed.
 
 ---
 
@@ -459,7 +492,14 @@ Channels set `running = false` but don't send WebSocket close frames.
 6. ~~**G-06**: Remove legacy JSONL stores (todo_store, project_store, embedding_store)~~ ✅ Done 2026-02-19
 7. ~~**G-12**: Audit and remove legacy store path methods~~ ✅ Done 2026-02-19
 8. ~~**G-16/G-17**: Migrate memory store and learning stores to PostgreSQL~~ ✅ Done 2026-02-19
-9. **G-30**: Unify calendar sync state to `from_repo()` pattern
+9. ~~**G-30**: Unify calendar sync state to `from_repo()` pattern~~ ✅ Done 2026-02-19
+9a. ~~**G-31**: Add CalDAV event caching~~ ✅ Done 2026-02-19
+9b. ~~**G-32/G-33**: Migrate CronStore to SQL + replace polling with sleep_until~~ ✅ Done 2026-02-19
+9c. ~~**G-34/G-35**: GoalStatus state machine + compaction backup~~ ✅ Done 2026-02-19
+9d. ~~**G-36**: Idempotent plan SQL upsert~~ ✅ Done 2026-02-19
+9e. ~~**G-37**: Preserve StorageError variants~~ ✅ Done 2026-02-19
+9f. ~~**G-38**: Replace manual param indices with QueryBuilder~~ ✅ Done 2026-02-19
+9g. ~~**G-39/G-40**: SQL keyword search + simplify ConversationEmbeddingStore~~ ✅ Done 2026-02-19
 
 ### Phase 3: Provider & Context Quality (Weeks 5-6)
 10. ~~**G-02**: Implement Anthropic native streaming~~ ✅ Done 2026-02-19

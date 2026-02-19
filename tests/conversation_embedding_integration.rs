@@ -11,7 +11,6 @@
 //! | TC-3 | Per-channel exclusion prevents embedding | test_tc3_channel_exclusion_prevents_embedding |
 //! | TC-4 | Global disable prevents all embedding    | test_tc4_global_disable_prevents_embedding   |
 //! | TC-7 | Embedding failure doesn't block response | test_tc7_embedding_failure_non_blocking      |
-//! | TC-8 | Corrupted store recovers gracefully      | test_tc8_corrupted_store_recovery            |
 //!
 //! ## Edge Cases
 //!
@@ -19,40 +18,13 @@
 //! |-----|------------------------------------------|-----------------------------------------------|
 //! | EC-12 | Model fails to initialize              | test_ec12_model_unavailable                   |
 
-use chrono::Utc;
 use std::sync::Arc;
 use tempfile::TempDir;
-use tokio::sync::RwLock;
-use tools::conversation_embedding::{ConversationEmbeddingHandler, ConversationEmbeddingStore};
-use tools::EMBEDDING_DIM;
+use tools::conversation_embedding::ConversationEmbeddingHandler;
 
 #[path = "mock_conversation_embedding_handler.rs"]
 mod mock_conversation_embedding_handler;
 use mock_conversation_embedding_handler::MockConversationEmbeddingHandler;
-
-// ─── Test Helpers ──────────────────────────────────────────────
-
-/// Create a test ConversationEmbeddingStore with a temporary file.
-#[allow(dead_code)]
-async fn create_test_store() -> (ConversationEmbeddingStore, TempDir) {
-    let temp_dir = TempDir::new().unwrap();
-    let file_path = temp_dir.path().join("conversation_embeddings.jsonl");
-    let store = ConversationEmbeddingStore::new(file_path);
-    (store, temp_dir)
-}
-
-/// Create a test handler with store wired up.
-async fn create_test_handler_with_store() -> (
-    Arc<MockConversationEmbeddingHandler>,
-    Arc<RwLock<ConversationEmbeddingStore>>,
-    TempDir,
-) {
-    let temp_dir = TempDir::new().unwrap();
-    let emb_path = temp_dir.path().join("conversation_embeddings.jsonl");
-    let store = Arc::new(RwLock::new(ConversationEmbeddingStore::new(emb_path)));
-    let handler = Arc::new(MockConversationEmbeddingHandler::with_store(store.clone()));
-    (handler, store, temp_dir)
-}
 
 // ═══════════════════════════════════════════════════════════════
 // Embedding Generation Tests (TC-1, TC-2, TC-3, TC-4)
@@ -62,7 +34,8 @@ async fn create_test_handler_with_store() -> (
 async fn test_tc1_user_assistant_messages_embedded_on_save() {
     use session::SessionManager;
 
-    let (handler, store, temp_dir) = create_test_handler_with_store().await;
+    let temp_dir = TempDir::new().unwrap();
+    let handler = Arc::new(MockConversationEmbeddingHandler::new());
 
     // Create session manager
     let session_dir = temp_dir.path().join("sessions");
@@ -74,7 +47,7 @@ async fn test_tc1_user_assistant_messages_embedded_on_save() {
         let session = session_manager.get_or_create(session_key).await.unwrap();
         session.add_message("user", "Hello world");
         session.messages.last().unwrap().id.clone()
-    }; // session reference dropped here
+    };
     session_manager.save_by_key(session_key).await.unwrap();
 
     // Embed user message (simulating AgentLoop behavior)
@@ -88,7 +61,7 @@ async fn test_tc1_user_assistant_messages_embedded_on_save() {
         let session = session_manager.get_or_create(session_key).await.unwrap();
         session.add_message("assistant", "Hi there!");
         session.messages.last().unwrap().id.clone()
-    }; // session reference dropped here
+    };
     session_manager.save_by_key(session_key).await.unwrap();
 
     // Embed assistant message (simulating AgentLoop behavior)
@@ -117,32 +90,29 @@ async fn test_tc1_user_assistant_messages_embedded_on_save() {
     assert_eq!(calls[1].session_key, session_key);
     assert_eq!(calls[1].message_id, assistant_msg_id);
 
-    // Verify 2 embeddings in store
-    let store_guard = store.write().await;
-
-    // Check user record
-    let user_record = store_guard.get(&user_msg_id).await.unwrap();
-    assert!(user_record.is_some(), "User message should be embedded");
-    let user_record = user_record.unwrap();
-    assert_eq!(user_record.role, "user");
-    assert_eq!(user_record.embedding.len(), tools::EMBEDDING_DIM);
-
-    // Check assistant record
-    let assistant_record = store_guard.get(&assistant_msg_id).await.unwrap();
+    // Verify embeddings were stored in mock
+    let embeddings = handler.embeddings.lock().unwrap();
     assert!(
-        assistant_record.is_some(),
-        "Assistant message should be embedded"
+        embeddings.contains_key(&user_msg_id),
+        "User embedding should be stored"
     );
-    let assistant_record = assistant_record.unwrap();
-    assert_eq!(assistant_record.role, "assistant");
-    assert_eq!(assistant_record.embedding.len(), tools::EMBEDDING_DIM);
+    assert!(
+        embeddings.contains_key(&assistant_msg_id),
+        "Assistant embedding should be stored"
+    );
+    assert_eq!(
+        embeddings[&user_msg_id].len(),
+        tools::EMBEDDING_DIM,
+        "Embedding dimension should be correct"
+    );
 }
 
 #[tokio::test]
 async fn test_tc2_system_tool_messages_not_embedded() {
     use session::SessionManager;
 
-    let (handler, _store, temp_dir) = create_test_handler_with_store().await;
+    let temp_dir = TempDir::new().unwrap();
+    let handler = Arc::new(MockConversationEmbeddingHandler::new());
 
     // Create session manager
     let session_dir = temp_dir.path().join("sessions");
@@ -154,7 +124,7 @@ async fn test_tc2_system_tool_messages_not_embedded() {
     {
         let session = session_manager.get_or_create(session_key).await.unwrap();
         session.add_message("system", "You are an AI assistant");
-    }; // session reference dropped here
+    };
     session_manager.save_by_key(session_key).await.unwrap();
 
     // DON'T call embed_message for system role (simulating AgentLoop filtering)
@@ -163,7 +133,7 @@ async fn test_tc2_system_tool_messages_not_embedded() {
     {
         let session = session_manager.get_or_create(session_key).await.unwrap();
         session.add_message("tool", "Tool result here");
-    }; // session reference dropped here
+    };
     session_manager.save_by_key(session_key).await.unwrap();
 
     // DON'T call embed_message for tool role (simulating AgentLoop filtering)
@@ -181,7 +151,7 @@ async fn test_tc2_system_tool_messages_not_embedded() {
         let session = session_manager.get_or_create(session_key).await.unwrap();
         session.add_message("user", "Test message");
         session.messages.last().unwrap().id.clone()
-    }; // session reference dropped here
+    };
     session_manager.save_by_key(session_key).await.unwrap();
 
     // NOW call embed_message for user role (simulating AgentLoop allowing user messages)
@@ -204,7 +174,8 @@ async fn test_tc2_system_tool_messages_not_embedded() {
 async fn test_tc3_channel_exclusion_prevents_embedding() {
     use session::SessionManager;
 
-    let (handler, _store, temp_dir) = create_test_handler_with_store().await;
+    let temp_dir = TempDir::new().unwrap();
+    let handler = Arc::new(MockConversationEmbeddingHandler::new());
 
     // Create session manager
     let session_dir = temp_dir.path().join("sessions");
@@ -255,7 +226,8 @@ async fn test_tc3_channel_exclusion_prevents_embedding() {
 async fn test_tc4_global_disable_prevents_embedding() {
     use session::SessionManager;
 
-    let (handler, _store, temp_dir) = create_test_handler_with_store().await;
+    let temp_dir = TempDir::new().unwrap();
+    let handler = Arc::new(MockConversationEmbeddingHandler::new());
 
     // Create session manager
     let session_dir = temp_dir.path().join("sessions");
@@ -291,21 +263,17 @@ async fn test_tc4_global_disable_prevents_embedding() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Error Handling & Resilience Tests (TC-7, TC-8, EC-12)
+// Error Handling & Resilience Tests (TC-7, EC-12)
 // ═══════════════════════════════════════════════════════════════
 
 #[tokio::test]
 async fn test_tc7_embedding_failure_non_blocking() {
     use session::SessionManager;
 
-    // Create handler in unavailable mode (simulates embedding failure)
     let temp_dir = TempDir::new().unwrap();
-    let emb_path = temp_dir.path().join("conversation_embeddings.jsonl");
-    let store = Arc::new(RwLock::new(ConversationEmbeddingStore::new(emb_path)));
 
     // Use unavailable() mode to simulate embedding failure
     let handler = Arc::new(MockConversationEmbeddingHandler::unavailable());
-    // Note: unavailable handler doesn't get store injected (simulates model not loaded)
 
     // Create session manager
     let session_dir = temp_dir.path().join("sessions");
@@ -342,73 +310,16 @@ async fn test_tc7_embedding_failure_non_blocking() {
     );
     assert_eq!(session.messages[0].content, "Test message");
 
-    // Verify embedding was NOT stored (failure was silent)
-    let store_guard = store.write().await;
-    let embedding_record = store_guard.get(&user_msg_id).await.unwrap();
+    // Verify embedding was NOT stored (handler was unavailable)
+    let embeddings = handler.embeddings.lock().unwrap();
     assert!(
-        embedding_record.is_none(),
-        "Embedding should NOT be in store when handler unavailable"
+        embeddings.is_empty(),
+        "No embedding should be stored when handler unavailable"
     );
 
     // Verify handler tracked the call (even though it failed)
     let calls = handler.embed_message_calls();
     assert_eq!(calls.len(), 1, "Handler should track call even on failure");
-}
-
-#[tokio::test]
-async fn test_tc8_corrupted_store_recovery() {
-    let temp_dir = TempDir::new().unwrap();
-    let emb_path = temp_dir.path().join("conversation_embeddings.jsonl");
-
-    // Write valid + corrupted JSONL lines
-    let valid_record = serde_json::json!({
-        "_op": "upsert",
-        "record": {
-            "id": "msg1",
-            "session_key": "telegram:12345",
-            "role": "user",
-            "content_preview": "Hello world",
-            "embedding": vec![0.1f32; EMBEDDING_DIM],
-            "model": "test",
-            "embedded_at": "2026-01-01T00:00:00Z"
-        }
-    });
-    let valid_record2 = serde_json::json!({
-        "_op": "upsert",
-        "record": {
-            "id": "msg2",
-            "session_key": "telegram:12345",
-            "role": "assistant",
-            "content_preview": "Hi there",
-            "embedding": vec![0.2f32; EMBEDDING_DIM],
-            "model": "test",
-            "embedded_at": "2026-01-01T00:00:00Z"
-        }
-    });
-
-    let content = format!(
-        "{}\nTHIS IS CORRUPTED LINE\n{}\n",
-        serde_json::to_string(&valid_record).unwrap(),
-        serde_json::to_string(&valid_record2).unwrap(),
-    );
-    std::fs::write(&emb_path, content).unwrap();
-
-    // Load store — should skip corrupted line with warning
-    // Store uses lazy loading, so we trigger it by calling a public method
-    let store = ConversationEmbeddingStore::new(emb_path);
-
-    // Trigger lazy load by accessing data (ensure_loaded() is called internally)
-    let msg1_result = store.get("msg1").await;
-    assert!(
-        msg1_result.is_ok(),
-        "Load should succeed despite corruption"
-    );
-
-    // Verify valid records are loaded
-    let msg1_exists = msg1_result.unwrap().is_some();
-    let msg2_exists = store.get("msg2").await.unwrap().is_some();
-    assert!(msg1_exists, "Valid record 1 should be loaded");
-    assert!(msg2_exists, "Valid record 2 should be loaded");
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -417,14 +328,14 @@ async fn test_tc8_corrupted_store_recovery() {
 
 #[tokio::test]
 async fn test_role_prefix_included_in_embedding() {
-    let (handler, store, _dir) = create_test_handler_with_store().await;
+    let handler = Arc::new(MockConversationEmbeddingHandler::new());
 
     handler
         .embed_message("telegram:12345", "user", "Test message", "msg1")
         .await
         .unwrap();
 
-    // Verify embedding was generated with "User: " prefix
+    // Verify embedding was generated with "user: " prefix
     let calls = handler.embed_message_calls();
     assert_eq!(calls.len(), 1);
     assert_eq!(calls[0].role, "user");
@@ -435,16 +346,16 @@ async fn test_role_prefix_included_in_embedding() {
     let expected_embedding =
         MockConversationEmbeddingHandler::deterministic_embedding(expected_text);
 
-    let store_write = store.write().await;
-    let record = store_write.get("msg1").await.unwrap().unwrap();
+    let embeddings = handler.embeddings.lock().unwrap();
+    let stored_embedding = embeddings.get("msg1").unwrap();
 
     // Verify embedding matches expected (with role prefix)
-    assert_eq!(record.embedding, expected_embedding);
+    assert_eq!(stored_embedding, &expected_embedding);
 }
 
 #[tokio::test]
 async fn test_metadata_fields_populated() {
-    let (handler, store, _dir) = create_test_handler_with_store().await;
+    let handler = Arc::new(MockConversationEmbeddingHandler::new());
 
     handler
         .embed_message(
@@ -456,22 +367,15 @@ async fn test_metadata_fields_populated() {
         .await
         .unwrap();
 
-    let store_write = store.write().await;
-    let record = store_write.get("msg1").await.unwrap().unwrap();
+    // Verify embed_message call recorded the metadata
+    let calls = handler.embed_message_calls();
+    assert_eq!(calls.len(), 1);
+    assert_eq!(calls[0].session_key, "telegram:12345");
+    assert_eq!(calls[0].role, "assistant");
+    assert_eq!(calls[0].message_id, "msg1");
 
-    assert_eq!(record.id, "msg1");
-    assert_eq!(record.session_key, "telegram:12345");
-    assert_eq!(record.role, "assistant");
-    assert_eq!(
-        record.content_preview.len(),
-        100,
-        "Preview should be truncated to 100 chars"
-    );
-    assert_eq!(record.embedding.len(), EMBEDDING_DIM);
-    assert_eq!(record.model, "mock-model");
-    assert!(record.embedded_at <= Utc::now());
+    // Verify embedding was stored with correct dimensions
+    let embeddings = handler.embeddings.lock().unwrap();
+    let stored_embedding = embeddings.get("msg1").unwrap();
+    assert_eq!(stored_embedding.len(), tools::EMBEDDING_DIM);
 }
-
-// ═══════════════════════════════════════════════════════════════
-// Additional Unit Tests for ConversationEmbeddingStore
-// ═══════════════════════════════════════════════════════════════

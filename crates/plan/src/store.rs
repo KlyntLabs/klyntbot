@@ -198,50 +198,22 @@ impl PlanStore {
             Ok(row) => {
                 let steps = repo
                     .get_steps(id)
-                    .await
-                    .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                    .await?;
                 Ok(Some(Self::row_to_plan(row, steps)))
             }
             Err(storage::StorageError::NotFound(_)) => Ok(None),
-            Err(e) => Err(common::KlyntbotError::Storage(e.to_string())),
+            Err(e) => Err(e.into()),
         }
     }
 
-    /// Helper: upsert a plan + all steps into SQL.
+    /// Helper: upsert a plan + all steps into SQL via ON CONFLICT.
     async fn sql_upsert(&self, repo: &storage::PlanRepo, plan: &Plan) -> Result<()> {
         let row = Self::plan_to_row(plan);
-
-        // Try create, fall back to update
-        match repo.create(&row).await {
-            Ok(_) => {}
-            Err(storage::StorageError::Sqlx(_)) => {
-                // Likely duplicate key — try update
-                repo.update(&row)
-                    .await
-                    .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
-            }
-            Err(e) => return Err(common::KlyntbotError::Storage(e.to_string())),
-        }
-
-        // Upsert steps: get existing, add or update each
-        let existing_steps = repo
-            .get_steps(plan.id)
-            .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
-        let existing_ids: std::collections::HashSet<Uuid> =
-            existing_steps.iter().map(|s| s.id).collect();
+        repo.upsert(&row).await?;
 
         for step in &plan.steps {
             let step_row = Self::step_to_row(step, plan.id);
-            if existing_ids.contains(&step.id) {
-                repo.update_step(&step_row)
-                    .await
-                    .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
-            } else {
-                repo.add_step(&step_row)
-                    .await
-                    .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
-            }
+            repo.upsert_step(&step_row).await?;
         }
 
         Ok(())
@@ -405,13 +377,12 @@ impl PlanStore {
                     Ok(row) => {
                         let steps = repo
                             .get_steps(*id)
-                            .await
-                            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                            .await?;
                         let plan = Self::row_to_plan(row, steps);
                         self.index.insert(*id, plan);
                     }
                     Err(storage::StorageError::NotFound(_)) => return Ok(None),
-                    Err(e) => return Err(common::KlyntbotError::Storage(e.to_string())),
+                    Err(e) => return Err(e.into()),
                 }
             }
             return Ok(self.index.get_mut(id));
@@ -470,13 +441,11 @@ impl PlanStore {
             for status in &["draft", "approved", "executing"] {
                 let rows = repo
                     .list(Some(status), Some(session_key), None)
-                    .await
-                    .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                    .await?;
                 for row in rows {
                     let steps = repo
                         .get_steps(row.id)
-                        .await
-                        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                        .await?;
                     candidates.push(Self::row_to_plan(row, steps));
                 }
             }
@@ -508,14 +477,12 @@ impl PlanStore {
         if let Some(repo) = &self.sql_repo {
             let rows = repo
                 .list(None, None, None)
-                .await
-                .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                .await?;
             let mut plans = Vec::with_capacity(rows.len());
             for row in rows {
                 let steps = repo
                     .get_steps(row.id)
-                    .await
-                    .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                    .await?;
                 plans.push(Self::row_to_plan(row, steps));
             }
             return Ok(plans);
@@ -536,14 +503,12 @@ impl PlanStore {
             let status_str = Self::plan_status_to_str(status);
             let rows = repo
                 .list(Some(status_str), None, None)
-                .await
-                .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                .await?;
             let mut plans = Vec::with_capacity(rows.len());
             for row in rows {
                 let steps = repo
                     .get_steps(row.id)
-                    .await
-                    .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                    .await?;
                 plans.push(Self::row_to_plan(row, steps));
             }
             return Ok(plans);
@@ -566,7 +531,7 @@ impl PlanStore {
             return repo
                 .delete(*id)
                 .await
-                .map_err(|e| common::KlyntbotError::Storage(e.to_string()));
+                .map_err(common::KlyntbotError::from);
         }
 
         self.ensure_loaded().await?;

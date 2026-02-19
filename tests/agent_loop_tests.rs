@@ -30,6 +30,14 @@ fn test_memory_note_repo() -> klyntbot::storage::MemoryNoteRepo {
     klyntbot::storage::MemoryNoteRepo::new(test_pool().inner().clone())
 }
 
+fn test_calendar_sync_repo() -> klyntbot::storage::CalendarSyncRepo {
+    klyntbot::storage::CalendarSyncRepo::new(test_pool().inner().clone())
+}
+
+fn test_event_cache_repo() -> klyntbot::storage::CalendarEventCacheRepo {
+    klyntbot::storage::CalendarEventCacheRepo::new(test_pool().inner().clone())
+}
+
 /// Test basic message processing through agent loop
 #[tokio::test]
 async fn test_agent_loop_basic_processing() {
@@ -57,6 +65,9 @@ async fn test_agent_loop_basic_processing() {
         test_learning_state_repo(),
         test_memory_note_repo(),
         None, // strategy_repo
+        test_calendar_sync_repo(),
+        test_event_cache_repo(),
+        None, // conv_embedding_repo
     )
     .await
     .unwrap();
@@ -127,6 +138,9 @@ async fn test_agent_loop_with_tool_execution() {
         test_learning_state_repo(),
         test_memory_note_repo(),
         None, // strategy_repo
+        test_calendar_sync_repo(),
+        test_event_cache_repo(),
+        None, // conv_embedding_repo
     )
     .await
     .unwrap();
@@ -183,6 +197,9 @@ async fn test_agent_loop_max_iterations() {
         test_learning_state_repo(),
         test_memory_note_repo(),
         None, // strategy_repo
+        test_calendar_sync_repo(),
+        test_event_cache_repo(),
+        None, // conv_embedding_repo
     )
     .await
     .unwrap();
@@ -252,6 +269,9 @@ async fn test_agent_loop_tool_error_handling() {
         test_learning_state_repo(),
         test_memory_note_repo(),
         None, // strategy_repo
+        test_calendar_sync_repo(),
+        test_event_cache_repo(),
+        None, // conv_embedding_repo
     )
     .await
     .unwrap();
@@ -305,6 +325,9 @@ async fn test_agent_loop_session_persistence() {
             test_learning_state_repo(),
             test_memory_note_repo(),
             None, // strategy_repo
+            test_calendar_sync_repo(),
+            test_event_cache_repo(),
+            None, // conv_embedding_repo
         )
         .await
         .unwrap();
@@ -328,6 +351,9 @@ async fn test_agent_loop_session_persistence() {
         test_learning_state_repo(),
         test_memory_note_repo(),
         None, // strategy_repo
+        test_calendar_sync_repo(),
+        test_event_cache_repo(),
+        None, // conv_embedding_repo
     )
     .await
     .unwrap();
@@ -369,6 +395,9 @@ async fn test_streaming_emits_done() {
             test_learning_state_repo(),
             test_memory_note_repo(),
             None, // strategy_repo
+            test_calendar_sync_repo(),
+            test_event_cache_repo(),
+            None, // conv_embedding_repo
         )
         .await
         .unwrap(),
@@ -434,6 +463,9 @@ async fn test_streaming_emits_error_on_failure() {
             test_learning_state_repo(),
             test_memory_note_repo(),
             None, // strategy_repo
+            test_calendar_sync_repo(),
+            test_event_cache_repo(),
+            None, // conv_embedding_repo
         )
         .await
         .unwrap(),

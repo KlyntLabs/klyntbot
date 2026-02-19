@@ -72,8 +72,7 @@ impl MemoryStore {
 
         self.repo
             .append(&key, content)
-            .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            .await?;
         debug!("Appended to today's memory note (SQL): {}", key);
         Ok(())
     }
@@ -98,8 +97,7 @@ impl MemoryStore {
     pub async fn write_long_term(&self, content: &str) -> Result<()> {
         self.repo
             .upsert(storage::repos::memory_note::LONG_TERM_KEY, content)
-            .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            .await?;
         debug!("Updated long-term memory (SQL)");
         Ok(())
     }

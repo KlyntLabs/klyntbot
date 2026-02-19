@@ -1078,7 +1078,7 @@ impl Tool for TodoTool {
             "search" => {
                 let query = p.required_str("query")?;
 
-                let rows = self.repo.search_by_keyword(query).await?;
+                let rows = self.repo.search_by_keyword(query, None).await?;
                 let results: Vec<Todo> = rows.into_iter().map(Todo::from).collect();
 
                 if results.is_empty() {
@@ -1242,7 +1242,7 @@ impl Tool for TodoTool {
                 let search_start = std::time::Instant::now();
 
                 // 1. Run keyword search
-                let keyword_rows = self.repo.search_by_keyword(query_trimmed).await?;
+                let keyword_rows = self.repo.search_by_keyword(query_trimmed, None).await?;
                 let keyword_results: Vec<Todo> = keyword_rows.into_iter().map(Todo::from).collect();
 
                 // Build ID-to-Todo map for RRF lookups

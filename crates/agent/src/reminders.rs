@@ -101,8 +101,7 @@ impl ReminderEngine {
         // Get all active todos via SQL
         let rows = repo
             .list(&storage::TodoFilter::default())
-            .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            .await?;
 
         let todos: Vec<Todo> = rows.into_iter().map(Todo::from).collect();
 

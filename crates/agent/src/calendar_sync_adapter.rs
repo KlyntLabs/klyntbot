@@ -24,6 +24,8 @@ pub struct CalendarSyncAdapter {
     providers: Vec<(String, Box<dyn CalendarProvider>)>,
     _provider_configs: Vec<CalendarProviderConfig>,
     todo_repo: storage::TodoRepo,
+    calendar_sync_repo: storage::CalendarSyncRepo,
+    event_cache_repo: storage::CalendarEventCacheRepo,
     conflicts_path: PathBuf,
     auto_sync_due_dates: bool,
     dispatcher: Option<Arc<crate::NotificationDispatcher>>,
@@ -35,6 +37,8 @@ impl CalendarSyncAdapter {
     /// Create a new CalendarSyncAdapter from the calendar config.
     pub async fn new(
         todo_repo: storage::TodoRepo,
+        calendar_sync_repo: storage::CalendarSyncRepo,
+        event_cache_repo: storage::CalendarEventCacheRepo,
         config: &CalendarConfig,
         timezone: String,
         dispatcher: Option<Arc<crate::NotificationDispatcher>>,
@@ -98,6 +102,8 @@ impl CalendarSyncAdapter {
             providers,
             _provider_configs: provider_configs,
             todo_repo,
+            calendar_sync_repo,
+            event_cache_repo,
             conflicts_path,
             auto_sync_due_dates: any_auto_sync,
             dispatcher,
@@ -153,8 +159,7 @@ impl CalendarSyncAdapter {
             let rows = self
                 .todo_repo
                 .list(&storage::TodoFilter::default())
-                .await
-                .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                .await?;
             for row in rows {
                 if row.due_date.is_none() && row.calendar_event_uid.is_some() {
                     let patch = storage::TodoPatch {
@@ -265,8 +270,9 @@ impl CalendarSyncAdapter {
         provider_id: &str,
         provider: &dyn CalendarProvider,
     ) -> Result<Value> {
-        // Load per-provider sync state
-        let mut sync_state = load_provider_sync_state(provider_id).await?;
+        // Load per-provider sync state from SQL
+        let mut sync_state =
+            load_provider_sync_state(&self.calendar_sync_repo, provider_id).await?;
 
         // Fetch remote events
         let (remote_events, new_sync_token) = provider
@@ -308,8 +314,7 @@ impl CalendarSyncAdapter {
             let rows = self
                 .todo_repo
                 .list(&storage::TodoFilter::default())
-                .await
-                .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                .await?;
             let todos: Vec<Todo> = rows.into_iter().map(Todo::from).collect();
 
             for todo in todos {
@@ -363,10 +368,13 @@ impl CalendarSyncAdapter {
             }
         }
 
-        // Save sync state
+        // Save sync state to SQL
         sync_state.sync_token = new_sync_token;
         sync_state.last_sync = Some(Utc::now());
-        save_provider_sync_state(provider_id, &sync_state).await?;
+        save_provider_sync_state(&self.calendar_sync_repo, provider_id, &sync_state).await?;
+
+        // Cache pulled events for fast lookups
+        self.cache_events(provider_id, &remote_events).await;
 
         Ok(json!({
             "events_pulled": events_pulled,
@@ -398,8 +406,7 @@ impl CalendarSyncAdapter {
         };
         self.todo_repo
             .update(&patch)
-            .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            .await?;
         Ok(())
     }
 
@@ -439,8 +446,7 @@ impl CalendarSyncAdapter {
         let row: storage::TodoRow = (&todo).into();
         self.todo_repo
             .add(&row)
-            .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            .await?;
         Ok(())
     }
 
@@ -469,6 +475,48 @@ impl CalendarSyncAdapter {
                 TodoStatus::Archived => "CANCELLED".to_string(),
             }),
         })
+    }
+
+    /// Cache a batch of events from a provider into the SQL event cache.
+    async fn cache_events(&self, provider_id: &str, events: &[CalendarEvent]) {
+        for event in events {
+            let source = format!("{:?}", event.source);
+            if let Err(e) = self
+                .event_cache_repo
+                .upsert(
+                    &event.uid,
+                    provider_id,
+                    &event.summary,
+                    event.description.as_deref(),
+                    event.start,
+                    event.end,
+                    &source,
+                    event.etag.as_deref(),
+                    event.status.as_deref(),
+                )
+                .await
+            {
+                tracing::warn!("Failed to cache event {}: {}", event.uid, e);
+            }
+        }
+    }
+
+    /// Convert a cached row back to a CalendarEvent.
+    fn row_to_event(row: &storage::CalendarEventCacheRow) -> CalendarEvent {
+        let source = match row.source.as_str() {
+            "CalDAV" => EventSource::CalDAV,
+            _ => EventSource::TodoItem,
+        };
+        CalendarEvent {
+            uid: row.uid.clone(),
+            summary: row.summary.clone(),
+            description: row.description.clone(),
+            start: row.start_at,
+            end: row.end_at,
+            source,
+            etag: row.etag.clone(),
+            status: row.status.clone(),
+        }
     }
 
     /// Log a conflict to the conflicts file.
@@ -522,29 +570,47 @@ impl CalendarHandler for CalendarSyncAdapter {
         self.sync_calendar_internal().await
     }
 
-    /// List upcoming calendar events from all enabled providers.
+    /// List upcoming calendar events, served from cache (falls back to remote on cache miss).
     async fn list_events(&self, limit: usize) -> Result<Value> {
-        let mut all_events = Vec::new();
+        // Try serving from cache first
+        let cached_rows = self
+            .event_cache_repo
+            .list_upcoming(limit as i64)
+            .await
+            .unwrap_or_default();
 
-        for (_provider_id, provider) in &self.providers {
-            match provider.get_events(None).await {
-                Ok((events, _)) => all_events.extend(events),
-                Err(e) => {
-                    tracing::warn!("Failed to list events from {}: {}", provider.name(), e);
+        let upcoming: Vec<CalendarEvent> = if cached_rows.is_empty() {
+            // Cache miss — fetch from providers and cache
+            let mut all_events = Vec::new();
+            for (provider_id, provider) in &self.providers {
+                match provider.get_events(None).await {
+                    Ok((events, _)) => {
+                        self.cache_events(provider_id, &events).await;
+                        all_events.extend(events);
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to list events from {}: {}", provider.name(), e);
+                    }
                 }
             }
-        }
-
-        // Deduplicate by UID, filter to upcoming, sort by start time
-        let now = Utc::now();
-        let mut seen_uids = std::collections::HashSet::new();
-        let mut upcoming: Vec<_> = all_events
-            .into_iter()
-            .filter(|e| e.start >= now && seen_uids.insert(e.uid.clone()))
-            .collect();
-
-        upcoming.sort_by_key(|e| e.start);
-        upcoming.truncate(limit);
+            let now = Utc::now();
+            let mut seen_uids = std::collections::HashSet::new();
+            let mut events: Vec<_> = all_events
+                .into_iter()
+                .filter(|e| e.start >= now && seen_uids.insert(e.uid.clone()))
+                .collect();
+            events.sort_by_key(|e| e.start);
+            events.truncate(limit);
+            events
+        } else {
+            // Deduplicate by UID (cache may have same UID from multiple providers)
+            let mut seen_uids = std::collections::HashSet::new();
+            cached_rows
+                .iter()
+                .filter(|r| seen_uids.insert(r.uid.clone()))
+                .map(Self::row_to_event)
+                .collect()
+        };
 
         let event_list: Vec<Value> = upcoming
             .iter()
@@ -656,8 +722,7 @@ impl CalendarHandler for CalendarSyncAdapter {
         let rows = self
             .todo_repo
             .list(&storage::TodoFilter::default())
-            .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            .await?;
         let synced_count = rows
             .iter()
             .filter(|r| r.calendar_event_uid.is_some())
@@ -667,7 +732,10 @@ impl CalendarHandler for CalendarSyncAdapter {
         let mut provider_statuses = Vec::new();
 
         for (provider_id, provider) in &self.providers {
-            let sync_state = load_provider_sync_state(provider_id).await.ok();
+            let sync_state =
+                load_provider_sync_state(&self.calendar_sync_repo, provider_id)
+                    .await
+                    .ok();
 
             provider_statuses.push(json!({
                 "provider": provider.name(),
@@ -687,12 +755,19 @@ impl CalendarHandler for CalendarSyncAdapter {
         }))
     }
 
-    /// Get a single calendar event by UID from any enabled provider.
-    /// Returns the first match found across all providers, or None if not found.
+    /// Get a single calendar event by UID, served from cache (O(1) lookup).
+    /// Falls back to remote provider scan on cache miss.
     async fn get_event(&self, uid: &str) -> Result<Option<CalendarEvent>> {
-        for (_provider_id, provider) in &self.providers {
+        // Fast path: cache lookup
+        if let Ok(row) = self.event_cache_repo.get_by_uid(uid).await {
+            return Ok(Some(Self::row_to_event(&row)));
+        }
+
+        // Fallback: scan remote providers (and cache for next time)
+        for (provider_id, provider) in &self.providers {
             match provider.get_events(None).await {
                 Ok((events, _sync_token)) => {
+                    self.cache_events(provider_id, &events).await;
                     if let Some(event) = events.into_iter().find(|e| e.uid == uid) {
                         return Ok(Some(event));
                     }
@@ -747,11 +822,18 @@ mod tests {
 
     /// Try to connect to a test database. Returns None if no DB is available,
     /// allowing tests to gracefully skip.
-    async fn test_todo_repo() -> Option<storage::TodoRepo> {
+    async fn test_repos() -> Option<(
+        storage::TodoRepo,
+        storage::CalendarSyncRepo,
+        storage::CalendarEventCacheRepo,
+    )> {
         let url = std::env::var("DATABASE_URL")
             .unwrap_or_else(|_| "postgres://localhost/klyntbot_test".to_string());
         match storage::StoragePool::connect(&url).await {
-            Ok(pool) => Some(storage::Repos::from_pool(&pool).todos),
+            Ok(pool) => {
+                let repos = storage::Repos::from_pool(&pool);
+                Some((repos.todos, repos.calendar_sync, repos.calendar_event_cache))
+            }
             Err(_) => None,
         }
     }
@@ -774,13 +856,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_calendar_sync_adapter_creation() {
-        let Some(todo_repo) = test_todo_repo().await else {
+        let Some((todo_repo, cal_repo, cache_repo)) = test_repos().await else {
             return;
         };
         let config = test_calendar_config();
 
-        let adapter =
-            CalendarSyncAdapter::new(todo_repo, &config, "UTC".to_string(), None, false).await;
+        let adapter = CalendarSyncAdapter::new(
+            todo_repo, cal_repo, cache_repo, &config, "UTC".to_string(), None, false,
+        )
+        .await;
         assert!(adapter.is_ok());
 
         let adapter = adapter.unwrap();
@@ -790,14 +874,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_todo_to_event_conversion() {
-        let Some(todo_repo) = test_todo_repo().await else {
+        let Some((todo_repo, cal_repo, cache_repo)) = test_repos().await else {
             return;
         };
         let config = test_calendar_config();
 
-        let adapter = CalendarSyncAdapter::new(todo_repo, &config, "UTC".to_string(), None, false)
-            .await
-            .unwrap();
+        let adapter = CalendarSyncAdapter::new(
+            todo_repo, cal_repo, cache_repo, &config, "UTC".to_string(), None, false,
+        )
+        .await
+        .unwrap();
 
         let now = Utc::now();
         let due_date = now + Duration::hours(2);
@@ -845,14 +931,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_todo_status_mapping() {
-        let Some(todo_repo) = test_todo_repo().await else {
+        let Some((todo_repo, cal_repo, cache_repo)) = test_repos().await else {
             return;
         };
         let config = test_calendar_config();
 
-        let adapter = CalendarSyncAdapter::new(todo_repo, &config, "UTC".to_string(), None, false)
-            .await
-            .unwrap();
+        let adapter = CalendarSyncAdapter::new(
+            todo_repo, cal_repo, cache_repo, &config, "UTC".to_string(), None, false,
+        )
+        .await
+        .unwrap();
 
         let now = Utc::now();
         let due_date = now + Duration::hours(2);
@@ -909,14 +997,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_todo_to_event_no_due_date() {
-        let Some(todo_repo) = test_todo_repo().await else {
+        let Some((todo_repo, cal_repo, cache_repo)) = test_repos().await else {
             return;
         };
         let config = test_calendar_config();
 
-        let adapter = CalendarSyncAdapter::new(todo_repo, &config, "UTC".to_string(), None, false)
-            .await
-            .unwrap();
+        let adapter = CalendarSyncAdapter::new(
+            todo_repo, cal_repo, cache_repo, &config, "UTC".to_string(), None, false,
+        )
+        .await
+        .unwrap();
 
         let now = Utc::now();
 
@@ -956,7 +1046,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_multi_provider_adapter() {
-        let Some(todo_repo) = test_todo_repo().await else {
+        let Some((todo_repo, cal_repo, cache_repo)) = test_repos().await else {
             return;
         };
 
@@ -981,9 +1071,11 @@ mod tests {
             ..CalendarConfig::default()
         };
 
-        let adapter = CalendarSyncAdapter::new(todo_repo, &config, "UTC".to_string(), None, false)
-            .await
-            .unwrap();
+        let adapter = CalendarSyncAdapter::new(
+            todo_repo, cal_repo, cache_repo, &config, "UTC".to_string(), None, false,
+        )
+        .await
+        .unwrap();
         assert_eq!(adapter.providers.len(), 2);
         assert_eq!(adapter.providers[0].0, "apple");
         assert_eq!(adapter.providers[1].0, "google");
@@ -991,7 +1083,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_disabled_provider_skipped() {
-        let Some(todo_repo) = test_todo_repo().await else {
+        let Some((todo_repo, cal_repo, cache_repo)) = test_repos().await else {
             return;
         };
 
@@ -1005,9 +1097,11 @@ mod tests {
             ..CalendarConfig::default()
         };
 
-        let adapter = CalendarSyncAdapter::new(todo_repo, &config, "UTC".to_string(), None, false)
-            .await
-            .unwrap();
+        let adapter = CalendarSyncAdapter::new(
+            todo_repo, cal_repo, cache_repo, &config, "UTC".to_string(), None, false,
+        )
+        .await
+        .unwrap();
         assert_eq!(adapter.providers.len(), 0);
     }
 }

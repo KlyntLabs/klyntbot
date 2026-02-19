@@ -77,7 +77,9 @@ async fn agent_with_plan_store(
     let todo_repo = klyntbot::storage::TodoRepo::new(pg.clone());
     let outcome_repo = klyntbot::storage::OutcomeRepo::new(pg.clone());
     let learning_state_repo = klyntbot::storage::LearningStateRepo::new(pg.clone());
-    let memory_note_repo = klyntbot::storage::MemoryNoteRepo::new(pg);
+    let memory_note_repo = klyntbot::storage::MemoryNoteRepo::new(pg.clone());
+    let calendar_sync_repo = klyntbot::storage::CalendarSyncRepo::new(pg.clone());
+    let event_cache_repo = klyntbot::storage::CalendarEventCacheRepo::new(pg);
     let goal_store = Some(Arc::new(RwLock::new(klyntbot::goal::GoalStore::new(
         config.goal_store_path(),
     ))));
@@ -95,6 +97,9 @@ async fn agent_with_plan_store(
         learning_state_repo,
         memory_note_repo,
         None, // strategy_repo
+        calendar_sync_repo,
+        event_cache_repo,
+        None, // conv_embedding_repo
     )
     .await
     .unwrap()

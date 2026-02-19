@@ -27,9 +27,7 @@
 
 use serde_json::json;
 use std::sync::Arc;
-use tempfile::TempDir;
-use tokio::sync::RwLock;
-use tools::conversation_embedding::{ConversationEmbeddingHandler, ConversationEmbeddingStore};
+use tools::conversation_embedding::ConversationEmbeddingHandler;
 use tools::memory_tool::MemoryTool;
 use tools::RoutingContext;
 use tools::Tool;
@@ -70,17 +68,14 @@ const SAMPLE_MESSAGES: &[(&str, &str, &str)] = &[
 ];
 
 /// Create a test MemoryTool with mock conversation embedding handler.
-async fn create_test_memory_tool() -> (MemoryTool, Arc<MockConversationEmbeddingHandler>, TempDir) {
-    let temp_dir = TempDir::new().unwrap();
-    let emb_path = temp_dir.path().join("conversation_embeddings.jsonl");
-    let store = Arc::new(RwLock::new(ConversationEmbeddingStore::new(emb_path)));
-    let handler = Arc::new(MockConversationEmbeddingHandler::with_store(store.clone()));
+async fn create_test_memory_tool() -> (MemoryTool, Arc<MockConversationEmbeddingHandler>) {
+    let handler = Arc::new(MockConversationEmbeddingHandler::new());
 
     let tool = MemoryTool::new()
         .with_conversation_handler(handler.clone())
         .with_threshold(0.5);
 
-    (tool, handler, temp_dir)
+    (tool, handler)
 }
 
 /// Embed test messages into the store using the mock handler.
@@ -116,9 +111,10 @@ fn ctx() -> RoutingContext {
 
 #[tokio::test]
 async fn test_tc5_semantic_search_finds_similar() {
-    let (tool, handler, _temp_dir) = create_test_memory_tool().await;
+    let (tool, handler) = create_test_memory_tool().await;
 
     // Embed sample messages
+
     embed_test_messages(&handler, SAMPLE_MESSAGES).await;
 
     // Execute search
@@ -151,7 +147,7 @@ async fn test_tc5_semantic_search_finds_similar() {
 
 #[tokio::test]
 async fn test_tc9_search_respects_threshold() {
-    let (tool, handler, _temp_dir) = create_test_memory_tool().await;
+    let (tool, handler) = create_test_memory_tool().await;
     embed_test_messages(&handler, SAMPLE_MESSAGES).await;
 
     // Search with high threshold - should return fewer/no results
@@ -186,7 +182,7 @@ async fn test_tc9_search_respects_threshold() {
 
 #[tokio::test]
 async fn test_tc12_cross_channel_search() {
-    let (tool, handler, _temp_dir) = create_test_memory_tool().await;
+    let (tool, handler) = create_test_memory_tool().await;
 
     // Embed messages from different channels
     let telegram_messages = &[
@@ -237,7 +233,7 @@ async fn test_tc12_cross_channel_search() {
 
 #[tokio::test]
 async fn test_tc6_rrf_merges_todo_conversation() {
-    let (tool, handler, _temp_dir) = create_test_memory_tool().await;
+    let (tool, handler) = create_test_memory_tool().await;
     embed_test_messages(&handler, SAMPLE_MESSAGES).await;
 
     // Search using unified search (conversation-only for Phase 4.1)
@@ -266,7 +262,7 @@ async fn test_tc6_rrf_merges_todo_conversation() {
 
 #[tokio::test]
 async fn test_us2_unified_search_both_sources() {
-    let (tool, handler, _temp_dir) = create_test_memory_tool().await;
+    let (tool, handler) = create_test_memory_tool().await;
     embed_test_messages(&handler, SAMPLE_MESSAGES).await;
 
     let args = json!({
@@ -302,7 +298,7 @@ async fn test_us2_unified_search_both_sources() {
 
 #[tokio::test]
 async fn test_tc10_purge_deletes_embeddings() {
-    let (tool, handler, _temp_dir) = create_test_memory_tool().await;
+    let (tool, handler) = create_test_memory_tool().await;
     embed_test_messages(&handler, SAMPLE_MESSAGES).await;
 
     // Verify embeddings exist before purge
@@ -330,7 +326,7 @@ async fn test_tc10_purge_deletes_embeddings() {
 
 #[tokio::test]
 async fn test_purge_by_date_range() {
-    let (tool, handler, _temp_dir) = create_test_memory_tool().await;
+    let (tool, handler) = create_test_memory_tool().await;
 
     // Embed 3 messages (all will have current timestamp in test)
     embed_test_messages(&handler, &SAMPLE_MESSAGES[0..3]).await;
@@ -380,7 +376,7 @@ async fn test_purge_by_date_range() {
 
 #[tokio::test]
 async fn test_tc11_status_reports_accurate_counts() {
-    let (tool, handler, _temp_dir) = create_test_memory_tool().await;
+    let (tool, handler) = create_test_memory_tool().await;
     embed_test_messages(&handler, SAMPLE_MESSAGES).await;
 
     // Execute status action
@@ -405,7 +401,7 @@ async fn test_tc11_status_reports_accurate_counts() {
 
 #[tokio::test]
 async fn test_status_reports_channels_indexed() {
-    let (tool, handler, _temp_dir) = create_test_memory_tool().await;
+    let (tool, handler) = create_test_memory_tool().await;
 
     // Embed messages from 3 different channels
     let multi_channel_messages = &[
@@ -450,7 +446,7 @@ async fn test_status_reports_channels_indexed() {
 
 #[tokio::test]
 async fn test_tc13_memory_tool_registration() {
-    let (tool, _handler, _temp_dir) = create_test_memory_tool().await;
+    let (tool, _handler) = create_test_memory_tool().await;
 
     // Verify Tool trait implementation
     assert_eq!(tool.name(), "memory", "Tool name should be 'memory'");
@@ -497,7 +493,7 @@ async fn test_tc13_memory_tool_registration() {
 
 #[tokio::test]
 async fn test_ec1_empty_query_returns_error() {
-    let (tool, _handler, _temp_dir) = create_test_memory_tool().await;
+    let (tool, _handler) = create_test_memory_tool().await;
 
     // Execute search with empty query
     let args = json!({
@@ -526,7 +522,7 @@ async fn test_ec1_empty_query_returns_error() {
 
 #[tokio::test]
 async fn test_ec3_no_embeddings_returns_message() {
-    let (tool, _handler, _temp_dir) = create_test_memory_tool().await;
+    let (tool, _handler) = create_test_memory_tool().await;
     // Don't embed any messages - store is empty
 
     // Execute search
@@ -550,7 +546,7 @@ async fn test_ec4_partial_embeddings_noted() {
     // The current implementation doesn't explicitly note "partial coverage" in output
     // but handles missing embeddings gracefully by searching available ones
 
-    let (tool, handler, _temp_dir) = create_test_memory_tool().await;
+    let (tool, handler) = create_test_memory_tool().await;
 
     // Embed only 2 out of 5 sample messages
     let partial_messages = &SAMPLE_MESSAGES[0..2];
@@ -572,7 +568,7 @@ async fn test_ec4_partial_embeddings_noted() {
 
 #[tokio::test]
 async fn test_ec5_below_threshold_no_results() {
-    let (tool, handler, _temp_dir) = create_test_memory_tool().await;
+    let (tool, handler) = create_test_memory_tool().await;
     embed_test_messages(&handler, SAMPLE_MESSAGES).await;
 
     // Search with very high threshold and unrelated query
@@ -598,7 +594,7 @@ async fn test_ec5_below_threshold_no_results() {
 
 #[tokio::test]
 async fn test_ec15_hybrid_zero_keyword() {
-    let (tool, handler, _temp_dir) = create_test_memory_tool().await;
+    let (tool, handler) = create_test_memory_tool().await;
 
     let messages = &[
         (
@@ -634,9 +630,6 @@ async fn test_ec15_hybrid_zero_keyword() {
 
 #[tokio::test]
 async fn test_ec16_hybrid_zero_semantic() {
-    let temp_dir = TempDir::new().unwrap();
-    let emb_path = temp_dir.path().join("conversation_embeddings.jsonl");
-    let _store = Arc::new(RwLock::new(ConversationEmbeddingStore::new(emb_path)));
     let handler = Arc::new(MockConversationEmbeddingHandler::unavailable());
 
     let tool = MemoryTool::new()
@@ -665,7 +658,7 @@ async fn test_ec16_hybrid_zero_semantic() {
 
 #[tokio::test]
 async fn test_query_too_long_returns_error() {
-    let (tool, handler, _temp_dir) = create_test_memory_tool().await;
+    let (tool, handler) = create_test_memory_tool().await;
     embed_test_messages(&handler, &SAMPLE_MESSAGES[0..2]).await;
 
     // Create query > 1000 chars
@@ -702,7 +695,7 @@ async fn test_query_too_long_returns_error() {
 
 #[tokio::test]
 async fn test_invalid_threshold_returns_error() {
-    let (tool, handler, _temp_dir) = create_test_memory_tool().await;
+    let (tool, handler) = create_test_memory_tool().await;
     embed_test_messages(&handler, &SAMPLE_MESSAGES[0..2]).await;
 
     // Test threshold > 1.0
@@ -759,7 +752,7 @@ async fn test_invalid_threshold_returns_error() {
 
 #[tokio::test]
 async fn test_limit_parameter_respected() {
-    let (tool, handler, _temp_dir) = create_test_memory_tool().await;
+    let (tool, handler) = create_test_memory_tool().await;
 
     // Embed all 5 sample messages
     embed_test_messages(&handler, SAMPLE_MESSAGES).await;

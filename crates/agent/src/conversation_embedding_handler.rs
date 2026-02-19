@@ -6,7 +6,6 @@
 use async_trait::async_trait;
 use chrono::Utc;
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use tracing::warn;
 
 use common::Result;
@@ -20,15 +19,12 @@ use tools::EMBEDDING_DIM;
 /// Production conversation embedding handler.
 pub struct ConversationEmbeddingHandlerImpl {
     engine: Arc<EmbeddingEngine>,
-    store: Arc<RwLock<ConversationEmbeddingStore>>,
+    store: ConversationEmbeddingStore,
 }
 
 impl ConversationEmbeddingHandlerImpl {
-    /// Create a new handler with shared embedding engine and store.
-    pub fn new(
-        engine: Arc<EmbeddingEngine>,
-        store: Arc<RwLock<ConversationEmbeddingStore>>,
-    ) -> Self {
+    /// Create a new handler with shared embedding engine and SQL-backed store.
+    pub fn new(engine: Arc<EmbeddingEngine>, store: ConversationEmbeddingStore) -> Self {
         Self { engine, store }
     }
 }
@@ -90,8 +86,7 @@ impl ConversationEmbeddingHandler for ConversationEmbeddingHandlerImpl {
         };
 
         // Store (best-effort, log errors but don't propagate)
-        let store = self.store.write().await;
-        if let Err(e) = store.upsert(record).await {
+        if let Err(e) = self.store.upsert(record).await {
             warn!(
                 "Failed to store conversation embedding for message {}: {}",
                 message_id, e
@@ -118,9 +113,8 @@ impl ConversationEmbeddingHandler for ConversationEmbeddingHandlerImpl {
                 })??
         };
 
-        // Search store for similar embeddings (read-only access)
-        let store = self.store.read().await;
-        let all_records = store.get_all().await?;
+        // Search store for similar embeddings
+        let all_records = self.store.get_all().await?;
 
         // Compute cosine similarity for each record
         let mut results: Vec<(ConversationEmbeddingRecord, f64)> = all_records
@@ -143,13 +137,11 @@ impl ConversationEmbeddingHandler for ConversationEmbeddingHandlerImpl {
     }
 
     async fn purge(&self, filter: PurgeFilter) -> Result<usize> {
-        let store = self.store.write().await;
-        store.purge(filter).await
+        self.store.purge(filter).await
     }
 
     async fn status(&self) -> Result<ConversationEmbeddingStatus> {
-        let store = self.store.read().await;
-        store.status().await
+        self.store.status().await
     }
 
     fn is_available(&self) -> bool {
@@ -160,18 +152,18 @@ impl ConversationEmbeddingHandler for ConversationEmbeddingHandlerImpl {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
 
-    async fn create_test_handler() -> (ConversationEmbeddingHandlerImpl, TempDir) {
-        let temp_dir = TempDir::new().unwrap();
-        let store_path = temp_dir.path().join("conversation_embeddings.jsonl");
-        let store = Arc::new(RwLock::new(ConversationEmbeddingStore::new(store_path)));
-
-        // Create embedding engine
+    async fn create_test_handler() -> ConversationEmbeddingHandlerImpl {
+        // Create embedding engine (model won't be loaded in tests)
         let engine = Arc::new(EmbeddingEngine::new());
 
-        let handler = ConversationEmbeddingHandlerImpl::new(engine, store);
-        (handler, temp_dir)
+        // Use a test database pool for the repo
+        let pool = storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test")
+            .expect("test pool");
+        let repo = storage::ConvEmbeddingRepo::new(pool.inner().clone());
+        let store = ConversationEmbeddingStore::new(repo);
+
+        ConversationEmbeddingHandlerImpl::new(engine, store)
     }
 
     // ──────────────────────────────────────────────────────────────────────
@@ -180,7 +172,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_embed_message_adds_role_prefix() {
-        let (handler, _dir) = create_test_handler().await;
+        let handler = create_test_handler().await;
 
         // This will fail if model unavailable, but we test the role prefix logic
         let result = handler
@@ -196,7 +188,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_embed_message_best_effort_on_error() {
-        let (handler, _dir) = create_test_handler().await;
+        let handler = create_test_handler().await;
 
         // This will fail (no model loaded yet), but should succeed with best-effort
         let result = handler
@@ -210,32 +202,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_purge_delegates_to_store() {
-        let (handler, _dir) = create_test_handler().await;
-
-        // Purge should delegate to store (no embeddings yet, so 0 deleted)
-        let deleted = handler
-            .purge(PurgeFilter::BySessionKey("telegram:12345".to_string()))
-            .await
-            .unwrap();
-
-        assert_eq!(deleted, 0, "Should delete 0 records (store empty)");
-    }
-
-    #[tokio::test]
-    async fn test_status_delegates_to_store() {
-        let (handler, _dir) = create_test_handler().await;
-
-        let status = handler.status().await.unwrap();
-
-        assert_eq!(status.total_embeddings, 0, "Store should be empty");
-        assert!(status.indexed_channels.is_empty(), "No channels indexed");
-        assert!(status.is_available, "Status should report available");
-    }
-
-    #[tokio::test]
     async fn test_is_available_reflects_engine() {
-        let (handler, _dir) = create_test_handler().await;
+        let handler = create_test_handler().await;
 
         // Engine uses lazy init, model not loaded yet
         assert!(

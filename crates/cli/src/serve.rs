@@ -39,8 +39,8 @@ pub async fn handle_serve(port: u16) -> Result<()> {
     let bus = Arc::new(MessageBus::new(100));
     info!("Message bus initialized");
 
-    // Initialize cron service (SQL-backed via from_repo)
-    let mut cron_service = CronService::from_repo(repos.cron);
+    // Initialize cron service (SQL-backed)
+    let mut cron_service = CronService::new(repos.cron);
     cron_service.start().await?;
     info!("Cron service started");
 
@@ -76,8 +76,7 @@ pub async fn handle_serve(port: u16) -> Result<()> {
                     "todo_focus_check" => {
                         let focused = todo_repo
                             .list_focused()
-                            .await
-                            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                            .await?;
                         for task in &focused {
                             if let Some(deadline) = task.focus_deadline {
                                 let remaining = deadline - chrono::Utc::now();
@@ -115,12 +114,10 @@ pub async fn handle_serve(port: u16) -> Result<()> {
                     "todo_daily_digest" => {
                         let summary = todo_repo
                             .summary()
-                            .await
-                            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                            .await?;
                         let overdue = todo_repo
                             .overdue()
-                            .await
-                            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                            .await?;
                         let body = format!(
                             "Total: {} | Todo: {} | Doing: {} | Done: {} | Overdue: {}",
                             summary.total,
@@ -136,8 +133,7 @@ pub async fn handle_serve(port: u16) -> Result<()> {
                         // Auto-unfocus tasks with expired focus deadlines
                         let focused = todo_repo
                             .list_focused()
-                            .await
-                            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                            .await?;
                         let now = chrono::Utc::now();
                         let mut expired_count = 0u32;
                         for task in &focused {
@@ -363,6 +359,9 @@ pub async fn handle_serve(port: u16) -> Result<()> {
             repos.learning_state,
             repos.memory_notes,
             Some(repos.strategies),
+            repos.calendar_sync,
+            repos.calendar_event_cache,
+            Some(repos.conv_embeddings),
         )
         .await?,
     ));

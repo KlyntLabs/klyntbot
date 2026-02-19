@@ -95,8 +95,7 @@ impl OutcomeStore {
             Backend::Pg(repo) => {
                 let row = outcome_to_row(&outcome)?;
                 repo.create(&row)
-                    .await
-                    .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                    .await?;
             }
             Backend::InMemory { outcomes, .. } => {
                 outcomes.lock().unwrap().push(outcome);
@@ -117,8 +116,7 @@ impl OutcomeStore {
                     feedback.accepted,
                     feedback.confidence,
                 )
-                .await
-                .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                .await?;
             }
             Backend::InMemory { feedback: fb, .. } => {
                 fb.lock().unwrap().push(feedback);
@@ -133,8 +131,7 @@ impl OutcomeStore {
             Backend::Pg(repo) => {
                 let rows = repo
                     .list_by_date_range(cutoff, Utc::now())
-                    .await
-                    .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                    .await?;
                 rows.into_iter()
                     .map(row_to_outcome)
                     .collect::<Result<Vec<_>>>()
@@ -164,8 +161,7 @@ impl OutcomeStore {
             Backend::Pg(repo) => {
                 let rows = repo
                     .list_enrichment_feedback()
-                    .await
-                    .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+                    .await?;
                 Ok(rows
                     .into_iter()
                     .map(|r| EnrichmentFeedbackEntry {

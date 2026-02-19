@@ -41,6 +41,12 @@ pub enum KlyntbotError {
     #[error("Storage error: {0}")]
     Storage(String),
 
+    #[error("Storage not found: {0}")]
+    StorageNotFound(String),
+
+    #[error("Storage conflict: {0}")]
+    StorageConflict(String),
+
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
@@ -329,6 +335,14 @@ mod tests {
         assert_eq!(
             KlyntbotError::BusDisconnected.to_string(),
             "Bus disconnected"
+        );
+        assert_eq!(
+            KlyntbotError::StorageNotFound("todo-123".into()).to_string(),
+            "Storage not found: todo-123"
+        );
+        assert_eq!(
+            KlyntbotError::StorageConflict("duplicate key".into()).to_string(),
+            "Storage conflict: duplicate key"
         );
     }
 

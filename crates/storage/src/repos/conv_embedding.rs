@@ -1,6 +1,6 @@
 //! Conversation embedding repository — conversation_embeddings table (pgvector).
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use pgvector::Vector;
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -100,6 +100,101 @@ impl ConvEmbeddingRepo {
                 (row, similarity)
             })
             .collect())
+    }
+
+    /// Get all conversation embeddings.
+    pub async fn get_all(&self) -> Result<Vec<ConvEmbeddingRow>, StorageError> {
+        let rows = sqlx::query_as::<_, ConvEmbeddingRow>(
+            "SELECT * FROM conversation_embeddings ORDER BY created_at",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+
+    /// Get conversation embeddings by session key.
+    pub async fn get_by_session_key(
+        &self,
+        session_key: &str,
+    ) -> Result<Vec<ConvEmbeddingRow>, StorageError> {
+        let rows = sqlx::query_as::<_, ConvEmbeddingRow>(
+            "SELECT * FROM conversation_embeddings WHERE session_key = $1 ORDER BY created_at",
+        )
+        .bind(session_key)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+
+    /// Count total conversation embeddings.
+    pub async fn count(&self) -> Result<i64, StorageError> {
+        let (count,): (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM conversation_embeddings")
+                .fetch_one(&self.pool)
+                .await?;
+        Ok(count)
+    }
+
+    /// List distinct session keys.
+    pub async fn list_session_keys(&self) -> Result<Vec<String>, StorageError> {
+        let rows: Vec<(String,)> = sqlx::query_as(
+            "SELECT DISTINCT session_key FROM conversation_embeddings ORDER BY session_key",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows.into_iter().map(|r| r.0).collect())
+    }
+
+    /// Get the oldest embedding timestamp.
+    pub async fn oldest_created_at(&self) -> Result<Option<DateTime<Utc>>, StorageError> {
+        let row: Option<(DateTime<Utc>,)> =
+            sqlx::query_as("SELECT MIN(created_at) FROM conversation_embeddings")
+                .fetch_optional(&self.pool)
+                .await?;
+        Ok(row.map(|r| r.0))
+    }
+
+    /// Get the newest embedding timestamp.
+    pub async fn newest_created_at(&self) -> Result<Option<DateTime<Utc>>, StorageError> {
+        let row: Option<(DateTime<Utc>,)> =
+            sqlx::query_as("SELECT MAX(created_at) FROM conversation_embeddings")
+                .fetch_optional(&self.pool)
+                .await?;
+        Ok(row.map(|r| r.0))
+    }
+
+    /// Delete all embeddings for a session key. Returns count deleted.
+    pub async fn purge_by_session_key(
+        &self,
+        session_key: &str,
+    ) -> Result<u64, StorageError> {
+        let result =
+            sqlx::query("DELETE FROM conversation_embeddings WHERE session_key = $1")
+                .bind(session_key)
+                .execute(&self.pool)
+                .await?;
+        Ok(result.rows_affected())
+    }
+
+    /// Delete all embeddings created before a cutoff date. Returns count deleted.
+    pub async fn purge_before(
+        &self,
+        cutoff: DateTime<Utc>,
+    ) -> Result<u64, StorageError> {
+        let result =
+            sqlx::query("DELETE FROM conversation_embeddings WHERE created_at < $1")
+                .bind(cutoff)
+                .execute(&self.pool)
+                .await?;
+        Ok(result.rows_affected())
+    }
+
+    /// Delete all conversation embeddings. Returns count deleted.
+    pub async fn purge_all(&self) -> Result<u64, StorageError> {
+        let result = sqlx::query("DELETE FROM conversation_embeddings")
+            .execute(&self.pool)
+            .await?;
+        Ok(result.rows_affected())
     }
 }
 

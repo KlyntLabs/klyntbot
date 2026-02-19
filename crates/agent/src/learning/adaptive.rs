@@ -168,8 +168,7 @@ impl AdaptiveThresholds {
         };
         let value = serde_json::to_value(&self.state)?;
         repo.set(ADAPTIVE_STATE_KEY, &value)
-            .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            .await?;
         Ok(())
     }
 }

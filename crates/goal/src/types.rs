@@ -41,6 +41,40 @@ pub enum GoalStatus {
     Abandoned,
 }
 
+impl GoalStatus {
+    /// Validate if a transition from one status to another is allowed.
+    ///
+    /// Valid transitions:
+    /// - Active → Paused, Achieved, Abandoned
+    /// - Paused → Active, Abandoned
+    /// - Achieved → (final state, no transitions allowed)
+    /// - Abandoned → (final state, no transitions allowed)
+    pub fn validate_transition(from: &GoalStatus, to: &GoalStatus) -> common::Result<()> {
+        if from == to {
+            return Ok(());
+        }
+
+        let valid = match from {
+            GoalStatus::Active => matches!(
+                to,
+                GoalStatus::Paused | GoalStatus::Achieved | GoalStatus::Abandoned
+            ),
+            GoalStatus::Paused => matches!(to, GoalStatus::Active | GoalStatus::Abandoned),
+            GoalStatus::Achieved | GoalStatus::Abandoned => false,
+        };
+
+        if valid {
+            Ok(())
+        } else {
+            Err(common::GoalError::InvalidState(format!(
+                "Invalid state transition: {} → {}",
+                from, to
+            ))
+            .into())
+        }
+    }
+}
+
 impl fmt::Display for GoalStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -119,22 +153,64 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_goal_status_transitions() {
-        // Active can transition to any state
-        let statuses = [
-            GoalStatus::Active,
-            GoalStatus::Paused,
-            GoalStatus::Achieved,
-            GoalStatus::Abandoned,
-        ];
+    fn test_goal_status_valid_transitions() {
+        // Active → Paused, Achieved, Abandoned
+        assert!(GoalStatus::validate_transition(&GoalStatus::Active, &GoalStatus::Paused).is_ok());
+        assert!(
+            GoalStatus::validate_transition(&GoalStatus::Active, &GoalStatus::Achieved).is_ok()
+        );
+        assert!(
+            GoalStatus::validate_transition(&GoalStatus::Active, &GoalStatus::Abandoned).is_ok()
+        );
 
-        // Verify all variants are distinct via display/debug
-        let debug_strings: Vec<String> = statuses.iter().map(|s| format!("{:?}", s)).collect();
-        assert_eq!(debug_strings.len(), 4);
-        assert!(debug_strings.contains(&"Active".to_string()));
-        assert!(debug_strings.contains(&"Paused".to_string()));
-        assert!(debug_strings.contains(&"Achieved".to_string()));
-        assert!(debug_strings.contains(&"Abandoned".to_string()));
+        // Paused → Active, Abandoned
+        assert!(GoalStatus::validate_transition(&GoalStatus::Paused, &GoalStatus::Active).is_ok());
+        assert!(
+            GoalStatus::validate_transition(&GoalStatus::Paused, &GoalStatus::Abandoned).is_ok()
+        );
+
+        // No-op transitions are valid
+        assert!(GoalStatus::validate_transition(&GoalStatus::Active, &GoalStatus::Active).is_ok());
+        assert!(GoalStatus::validate_transition(&GoalStatus::Paused, &GoalStatus::Paused).is_ok());
+        assert!(
+            GoalStatus::validate_transition(&GoalStatus::Achieved, &GoalStatus::Achieved).is_ok()
+        );
+        assert!(
+            GoalStatus::validate_transition(&GoalStatus::Abandoned, &GoalStatus::Abandoned)
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn test_goal_status_invalid_transitions() {
+        // Paused → Achieved (must go through Active first)
+        assert!(
+            GoalStatus::validate_transition(&GoalStatus::Paused, &GoalStatus::Achieved).is_err()
+        );
+
+        // Achieved → anything (final state)
+        assert!(
+            GoalStatus::validate_transition(&GoalStatus::Achieved, &GoalStatus::Active).is_err()
+        );
+        assert!(
+            GoalStatus::validate_transition(&GoalStatus::Achieved, &GoalStatus::Paused).is_err()
+        );
+        assert!(
+            GoalStatus::validate_transition(&GoalStatus::Achieved, &GoalStatus::Abandoned)
+                .is_err()
+        );
+
+        // Abandoned → anything (final state)
+        assert!(
+            GoalStatus::validate_transition(&GoalStatus::Abandoned, &GoalStatus::Active).is_err()
+        );
+        assert!(
+            GoalStatus::validate_transition(&GoalStatus::Abandoned, &GoalStatus::Paused).is_err()
+        );
+        assert!(
+            GoalStatus::validate_transition(&GoalStatus::Abandoned, &GoalStatus::Achieved)
+                .is_err()
+        );
     }
 
     #[test]

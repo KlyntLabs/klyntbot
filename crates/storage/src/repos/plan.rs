@@ -44,6 +44,39 @@ impl PlanRepo {
         Ok(result)
     }
 
+    /// Upsert a plan (insert or update on conflict).
+    pub async fn upsert(&self, row: &PlanRow) -> Result<PlanRow, StorageError> {
+        let result = sqlx::query_as::<_, PlanRow>(
+            "INSERT INTO plans (id, session_key, goal_id, title, description, status,
+                                current_step_index, iteration_limit, backtrack_history,
+                                created_at, updated_at, completed_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+             ON CONFLICT(id) DO UPDATE SET
+                status = EXCLUDED.status,
+                current_step_index = EXCLUDED.current_step_index,
+                iteration_limit = EXCLUDED.iteration_limit,
+                backtrack_history = EXCLUDED.backtrack_history,
+                updated_at = EXCLUDED.updated_at,
+                completed_at = EXCLUDED.completed_at
+             RETURNING *",
+        )
+        .bind(row.id)
+        .bind(&row.session_key)
+        .bind(row.goal_id)
+        .bind(&row.title)
+        .bind(&row.description)
+        .bind(&row.status)
+        .bind(row.current_step_index)
+        .bind(row.iteration_limit)
+        .bind(&row.backtrack_history)
+        .bind(row.created_at)
+        .bind(row.updated_at)
+        .bind(row.completed_at)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(result)
+    }
+
     /// Get a plan by ID.
     pub async fn get(&self, id: Uuid) -> Result<PlanRow, StorageError> {
         sqlx::query_as::<_, PlanRow>("SELECT * FROM plans WHERE id = $1")
@@ -60,35 +93,24 @@ impl PlanRepo {
         session_key: Option<&str>,
         goal_id: Option<Uuid>,
     ) -> Result<Vec<PlanRow>, StorageError> {
-        // Build dynamic query
-        let mut query = String::from("SELECT * FROM plans WHERE 1=1");
-        let mut param_idx = 1u32;
+        let mut qb = sqlx::QueryBuilder::<sqlx::Postgres>::new("SELECT * FROM plans WHERE 1=1");
 
-        if status.is_some() {
-            query.push_str(&format!(" AND status = ${}", param_idx));
-            param_idx += 1;
-        }
-        if session_key.is_some() {
-            query.push_str(&format!(" AND session_key = ${}", param_idx));
-            param_idx += 1;
-        }
-        if goal_id.is_some() {
-            query.push_str(&format!(" AND goal_id = ${}", param_idx));
-        }
-        query.push_str(" ORDER BY created_at DESC");
-
-        let mut q = sqlx::query_as::<_, PlanRow>(&query);
         if let Some(s) = status {
-            q = q.bind(s);
+            qb.push(" AND status = ");
+            qb.push_bind(s);
         }
         if let Some(sk) = session_key {
-            q = q.bind(sk);
+            qb.push(" AND session_key = ");
+            qb.push_bind(sk);
         }
         if let Some(gid) = goal_id {
-            q = q.bind(gid);
+            qb.push(" AND goal_id = ");
+            qb.push_bind(gid);
         }
 
-        let rows = q.fetch_all(&self.pool).await?;
+        qb.push(" ORDER BY created_at DESC");
+
+        let rows = qb.build_query_as::<PlanRow>().fetch_all(&self.pool).await?;
         Ok(rows)
     }
 
@@ -191,6 +213,38 @@ impl PlanRepo {
         .fetch_optional(&self.pool)
         .await?
         .ok_or_else(|| StorageError::NotFound(format!("plan_step '{}'", step.id)))?;
+        Ok(result)
+    }
+
+    /// Upsert a plan step (insert or update on conflict).
+    pub async fn upsert_step(&self, step: &PlanStepRow) -> Result<PlanStepRow, StorageError> {
+        let result = sqlx::query_as::<_, PlanStepRow>(
+            "INSERT INTO plan_steps (id, plan_id, step_index, description, reasoning,
+                                     expected_tools, status, attempt_count, max_attempts,
+                                     result, started_at, completed_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+             ON CONFLICT(id) DO UPDATE SET
+                status = EXCLUDED.status,
+                attempt_count = EXCLUDED.attempt_count,
+                result = EXCLUDED.result,
+                started_at = EXCLUDED.started_at,
+                completed_at = EXCLUDED.completed_at
+             RETURNING *",
+        )
+        .bind(step.id)
+        .bind(step.plan_id)
+        .bind(step.step_index)
+        .bind(&step.description)
+        .bind(&step.reasoning)
+        .bind(&step.expected_tools)
+        .bind(&step.status)
+        .bind(step.attempt_count)
+        .bind(step.max_attempts)
+        .bind(&step.result)
+        .bind(step.started_at)
+        .bind(step.completed_at)
+        .fetch_one(&self.pool)
+        .await?;
         Ok(result)
     }
 
