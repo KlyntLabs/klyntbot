@@ -115,7 +115,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_outcome_record_serde_round_trip() {
+    fn test_learning_types_serde_roundtrip() {
+        // OutcomeRecord roundtrip
         let record = OutcomeRecord {
             id: "test-001".to_string(),
             session_key: "telegram:a1b2c3".to_string(),
@@ -132,17 +133,13 @@ mod tests {
             execution_mode: ExecutionMode::Chat,
             created_at: Utc::now(),
         };
-
         let json = serde_json::to_string(&record).unwrap();
         let loaded: OutcomeRecord = serde_json::from_str(&json).unwrap();
-        assert_eq!(loaded.id, "test-001");
-        assert_eq!(loaded.tool_name, "todo");
-        assert!(loaded.success);
+        assert_eq!(loaded.id, "test-001", "failed for: OutcomeRecord.id");
+        assert_eq!(loaded.tool_name, "todo", "failed for: OutcomeRecord.tool_name");
         assert!((loaded.confidence_score.unwrap() - 0.85).abs() < f32::EPSILON);
-    }
 
-    #[test]
-    fn test_execution_mode_plan_step_serde() {
+        // ExecutionMode::PlanStep roundtrip
         let mode = ExecutionMode::PlanStep {
             plan_id: "plan-abc".to_string(),
             step_index: 3,
@@ -150,19 +147,14 @@ mod tests {
         let json = serde_json::to_string(&mode).unwrap();
         let loaded: ExecutionMode = serde_json::from_str(&json).unwrap();
         match loaded {
-            ExecutionMode::PlanStep {
-                plan_id,
-                step_index,
-            } => {
-                assert_eq!(plan_id, "plan-abc");
-                assert_eq!(step_index, 3);
+            ExecutionMode::PlanStep { plan_id, step_index } => {
+                assert_eq!(plan_id, "plan-abc", "failed for: PlanStep.plan_id");
+                assert_eq!(step_index, 3, "failed for: PlanStep.step_index");
             }
-            _ => panic!("Expected PlanStep"),
+            _ => panic!("Expected PlanStep variant"),
         }
-    }
 
-    #[test]
-    fn test_enrichment_feedback_serde() {
+        // EnrichmentFeedbackEntry roundtrip
         let entry = EnrichmentFeedbackEntry {
             task_id: "todo-123".to_string(),
             field: "priority".to_string(),
@@ -174,12 +166,10 @@ mod tests {
         };
         let json = serde_json::to_string(&entry).unwrap();
         let loaded: EnrichmentFeedbackEntry = serde_json::from_str(&json).unwrap();
-        assert_eq!(loaded.task_id, "todo-123");
-        assert!(!loaded.accepted);
-    }
+        assert_eq!(loaded.task_id, "todo-123", "failed for: EnrichmentFeedbackEntry.task_id");
+        assert!(!loaded.accepted, "failed for: EnrichmentFeedbackEntry.accepted");
 
-    #[test]
-    fn test_adaptive_threshold_state_serde() {
+        // AdaptiveThresholdState roundtrip
         let state = AdaptiveThresholdState {
             current_threshold: 0.72,
             last_analysis: None,
@@ -194,7 +184,7 @@ mod tests {
         let json = serde_json::to_string(&state).unwrap();
         let loaded: AdaptiveThresholdState = serde_json::from_str(&json).unwrap();
         assert!((loaded.current_threshold - 0.72).abs() < f32::EPSILON);
-        assert_eq!(loaded.threshold_history.len(), 1);
+        assert_eq!(loaded.threshold_history.len(), 1, "failed for: AdaptiveThresholdState.threshold_history");
     }
 
     #[test]
