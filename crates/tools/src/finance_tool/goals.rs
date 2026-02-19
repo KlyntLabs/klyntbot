@@ -652,3 +652,36 @@ fn fire_date_label(from: NaiveDate, months: f64) -> String {
     let month = (new_month0 % 12 + 1) as u32;
     format!("{year}-{month:02}")
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::finance_types::{GoalStatus, GoalType, LiabilityType};
+
+    #[test]
+    fn test_goal_type_from_str_loose() {
+        assert!(GoalType::from_str_loose("savings").is_some());
+        assert!(GoalType::from_str_loose("purchase").is_some());
+        assert!(GoalType::from_str_loose("debt_payoff").is_some());
+        assert!(GoalType::from_str_loose("fire").is_some());
+        assert!(GoalType::from_str_loose("custom").is_some());
+        assert!(GoalType::from_str_loose("invalid").is_none());
+    }
+
+    #[test]
+    fn test_goal_status_from_str_loose() {
+        assert!(GoalStatus::from_str_loose("active").is_some());
+        assert!(GoalStatus::from_str_loose("achieved").is_some());
+        assert!(GoalStatus::from_str_loose("abandoned").is_some());
+        assert!(GoalStatus::from_str_loose("nope").is_none());
+    }
+
+    #[test]
+    fn test_liability_type_from_str_loose() {
+        assert!(LiabilityType::from_str_loose("mortgage").is_some());
+        assert!(LiabilityType::from_str_loose("credit_card").is_some());
+        assert!(LiabilityType::from_str_loose("personal_loan").is_some());
+        assert!(LiabilityType::from_str_loose("student_loan").is_some());
+        assert!(LiabilityType::from_str_loose("other").is_some());
+        assert!(LiabilityType::from_str_loose("invalid").is_none());
+    }
+}
