@@ -108,9 +108,13 @@ impl FinanceTool {
         // Verify portfolio exists
         let portfolio_exists = self.investments.get_portfolio(portfolio_id).await?;
         if portfolio_exists.is_none() {
-            return Err(
-                ToolError::ExecutionFailed(format!("Portfolio not found: {portfolio_id}")).into(),
-            );
+            return Ok(serde_json::to_string_pretty(&json!({
+                "error": "portfolio_not_found",
+                "message": format!("Portfolio '{}' not found. Create one first or use portfolio_list to find IDs.", portfolio_id),
+                "suggested_action": "portfolio_create",
+                "example": {"action": "portfolio_create", "name": "My Portfolio", "currency": "USD"}
+            }))
+            .unwrap());
         }
 
         let asset_type_str = p.required_str("asset_type")?;
@@ -256,13 +260,18 @@ impl FinanceTool {
         };
 
         // Load existing investment for currency fallback and cost-basis computation
-        let inv = self
-            .investments
-            .get_investment(investment_id)
-            .await?
-            .ok_or_else(|| {
-                ToolError::InvalidParams(format!("Investment not found: {investment_id}"))
-            })?;
+        let inv = match self.investments.get_investment(investment_id).await? {
+            Some(inv) => inv,
+            None => {
+                return Ok(serde_json::to_string_pretty(&json!({
+                    "error": "investment_not_found",
+                    "message": format!("Investment '{}' not found. Use investment_summary to find IDs.", investment_id),
+                    "suggested_action": "investment_summary",
+                    "example": {"action": "investment_summary"}
+                }))
+                .unwrap());
+            }
+        };
 
         let currency = match p.optional_str("currency")? {
             Some(c) => c.to_string(),
@@ -796,6 +805,23 @@ mod tests {
         let args = json!({});
         let p = ParamExtractor::new(&args);
         assert_eq!(p.i64_or("fees", 0).unwrap(), 0);
+    }
+
+    #[test]
+    fn test_asset_type_from_str_loose() {
+        assert!(AssetType::from_str_loose("stock").is_some());
+        assert!(AssetType::from_str_loose("etf").is_some());
+        assert!(AssetType::from_str_loose("crypto").is_some());
+        assert!(AssetType::from_str_loose("STOCK").is_some());
+        assert!(AssetType::from_str_loose("invalid_type").is_none());
+    }
+
+    #[test]
+    fn test_investment_tx_type_from_str_loose() {
+        assert!(InvestmentTxType::from_str_loose("buy").is_some());
+        assert!(InvestmentTxType::from_str_loose("sell").is_some());
+        assert!(InvestmentTxType::from_str_loose("dividend").is_some());
+        assert!(InvestmentTxType::from_str_loose("nope").is_none());
     }
 
     #[test]
