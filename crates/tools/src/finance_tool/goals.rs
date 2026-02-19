@@ -424,9 +424,16 @@ impl FinanceTool {
             ToolError::InvalidParams(format!("Invalid liability type: {type_str}"))
         })?;
         let principal = p.required_i64("principal")?;
-        let remaining = p.required_i64("remaining")?;
-        if principal <= 0 || remaining <= 0 {
-            return Err(ToolError::InvalidParams("Amounts must be positive".to_string()).into());
+        if principal <= 0 {
+            return Err(
+                ToolError::InvalidParams("Principal must be positive".to_string()).into(),
+            );
+        }
+        let remaining = p.i64_or("remaining", principal)?;
+        if remaining <= 0 {
+            return Err(
+                ToolError::InvalidParams("Remaining must be positive".to_string()).into(),
+            );
         }
         let currency = p
             .optional_str("currency")?

@@ -338,7 +338,6 @@ impl FinanceTool {
         &self,
         p: &ParamExtractor<'_>,
     ) -> Result<(NaiveDate, NaiveDate, String)> {
-        let period = p.required_str("period")?;
         let date_from_str = p.optional_str("date_from")?;
         let date_to_str = p.optional_str("date_to")?;
 
@@ -352,6 +351,7 @@ impl FinanceTool {
         }
 
         let today = Local::now().date_naive();
+        let period = p.str_or("period", "monthly")?;
         derive_date_range(period, today)
     }
 }

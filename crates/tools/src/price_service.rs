@@ -169,7 +169,9 @@ impl PriceService {
 
     /// Fetch a cryptocurrency price from CoinGecko simple/price API.
     ///
-    /// `symbol` should be the CoinGecko coin ID (e.g. `"bitcoin"`, `"ethereum"`).
+    /// `symbol` can be a CoinGecko coin ID (e.g. `"bitcoin"`, `"ethereum"`) or
+    /// a common ticker (e.g. `"BTC"`, `"ETH"`). Common tickers are automatically
+    /// mapped to their CoinGecko ID.
     /// `vs_currency` is the target fiat/crypto (e.g. `"usd"`, `"eur"`).
     ///
     /// Endpoint: `GET https://api.coingecko.com/api/v3/simple/price?ids={symbol}&vs_currencies={vs_currency}`
@@ -178,10 +180,11 @@ impl PriceService {
         symbol: &str,
         vs_currency: &str,
     ) -> Result<PriceResult, String> {
-        let key = Self::cache_key(symbol, vs_currency);
+        let coin_id = ticker_to_coingecko_id(symbol);
+        let key = Self::cache_key(coin_id, vs_currency);
         if let Some(entry) = self.get_live(&key) {
             return Ok(PriceResult {
-                symbol: symbol.to_lowercase(),
+                symbol: coin_id.to_lowercase(),
                 price: entry.price,
                 currency: vs_currency.to_uppercase(),
                 source: "cache".to_string(),
@@ -190,7 +193,7 @@ impl PriceService {
 
         let url = format!(
             "https://api.coingecko.com/api/v3/simple/price?ids={}&vs_currencies={}",
-            urlencoding::encode(symbol),
+            urlencoding::encode(coin_id),
             urlencoding::encode(vs_currency)
         );
 
@@ -216,18 +219,18 @@ impl PriceService {
                     .map_err(|e| format!("JSON parse error: {e}"))?;
 
                 let price = json
-                    .get(symbol.to_lowercase().as_str())
+                    .get(coin_id.to_lowercase().as_str())
                     .and_then(|coin| coin.get(vs_currency.to_lowercase().as_str()))
                     .and_then(|v| v.as_f64())
                     .ok_or_else(|| {
-                        format!("price not found in response for {symbol}/{vs_currency}")
+                        format!("price not found in response for {coin_id}/{vs_currency}")
                     })?;
 
                 let currency = vs_currency.to_uppercase();
                 self.insert_cache(key, price, currency.clone());
 
                 Ok(PriceResult {
-                    symbol: symbol.to_lowercase(),
+                    symbol: coin_id.to_lowercase(),
                     price,
                     currency,
                     source: "coingecko".to_string(),
@@ -236,13 +239,13 @@ impl PriceService {
             Err(err) => {
                 if let Some(stale) = self.get_stale(&key) {
                     return Ok(PriceResult {
-                        symbol: symbol.to_lowercase(),
+                        symbol: coin_id.to_lowercase(),
                         price: stale.price,
                         currency: stale.currency,
                         source: "cache_stale".to_string(),
                     });
                 }
-                Err(format!("coingecko error for {symbol}/{vs_currency}: {err}"))
+                Err(format!("coingecko error for {coin_id}/{vs_currency}: {err}"))
             }
         }
     }
@@ -337,6 +340,40 @@ impl PriceService {
                 other
             )),
         }
+    }
+}
+
+/// Map common crypto ticker symbols to CoinGecko coin IDs.
+///
+/// CoinGecko uses full lowercase names (e.g. "bitcoin") while LLMs and users
+/// often use ticker symbols (e.g. "BTC"). This function converts known tickers
+/// and returns the input unchanged if no mapping exists.
+fn ticker_to_coingecko_id(symbol: &str) -> &str {
+    match symbol.to_uppercase().as_str() {
+        "BTC" | "BITCOIN" => "bitcoin",
+        "ETH" | "ETHEREUM" => "ethereum",
+        "BNB" => "binancecoin",
+        "SOL" | "SOLANA" => "solana",
+        "XRP" | "RIPPLE" => "ripple",
+        "ADA" | "CARDANO" => "cardano",
+        "DOGE" | "DOGECOIN" => "dogecoin",
+        "DOT" | "POLKADOT" => "polkadot",
+        "AVAX" | "AVALANCHE" => "avalanche-2",
+        "MATIC" | "POL" | "POLYGON" => "matic-network",
+        "LINK" | "CHAINLINK" => "chainlink",
+        "SHIB" => "shiba-inu",
+        "UNI" | "UNISWAP" => "uniswap",
+        "LTC" | "LITECOIN" => "litecoin",
+        "ATOM" | "COSMOS" => "cosmos",
+        "XLM" | "STELLAR" => "stellar",
+        "NEAR" => "near",
+        "APT" | "APTOS" => "aptos",
+        "SUI" => "sui",
+        "ARB" | "ARBITRUM" => "arbitrum",
+        "OP" | "OPTIMISM" => "optimism",
+        "PEPE" => "pepe",
+        "TRX" | "TRON" => "tron",
+        _ => symbol, // Already a CoinGecko ID or unknown — pass through
     }
 }
 
@@ -461,6 +498,21 @@ mod tests {
         assert_eq!(k3, k4);
     }
 
+    #[test]
+    fn test_ticker_to_coingecko_id_maps_common_tickers() {
+        assert_eq!(ticker_to_coingecko_id("BTC"), "bitcoin");
+        assert_eq!(ticker_to_coingecko_id("btc"), "bitcoin");
+        assert_eq!(ticker_to_coingecko_id("ETH"), "ethereum");
+        assert_eq!(ticker_to_coingecko_id("SOL"), "solana");
+        assert_eq!(ticker_to_coingecko_id("DOGE"), "dogecoin");
+    }
+
+    #[test]
+    fn test_ticker_to_coingecko_id_passes_through_unknown() {
+        assert_eq!(ticker_to_coingecko_id("bitcoin"), "bitcoin");
+        assert_eq!(ticker_to_coingecko_id("some-new-coin"), "some-new-coin");
+    }
+
     // ─── network-dependent tests (skipped in CI) ──────────────────────────────
 
     #[tokio::test]
@@ -523,6 +575,19 @@ mod tests {
             .expect("fetch_price crypto failed");
         assert_eq!(result.symbol, "ethereum");
         assert!(result.price > 0.0);
+    }
+
+    #[tokio::test]
+    #[ignore = "requires network — run manually with `cargo nextest run -p tools -- --include-ignored`"]
+    async fn test_fetch_crypto_ticker_btc() {
+        let svc = service_with_ttl(5);
+        let result = svc
+            .fetch_crypto("BTC", "usd")
+            .await
+            .expect("fetch_crypto with BTC ticker failed");
+        assert_eq!(result.symbol, "bitcoin");
+        assert!(result.price > 0.0, "BTC price should be positive");
+        assert_eq!(result.currency, "USD");
     }
 
     #[tokio::test]
