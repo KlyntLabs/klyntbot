@@ -237,7 +237,6 @@ impl AgentLoop {
             config.todo.focus.max_slots,
             config.todo.focus.deadline_hours,
             config.timezone.clone(),
-            config.todo.creation_mode.clone(),
         );
 
         // Create NotificationDispatcher early so it can be shared with calendar adapter

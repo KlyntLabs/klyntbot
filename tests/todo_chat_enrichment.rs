@@ -23,7 +23,7 @@ fn create_test_tool() -> (TodoTool, TempDir) {
     let temp_dir = TempDir::new().unwrap();
     let pool = StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
     let repo = TodoRepo::new(pool.inner().clone());
-    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string(), klyntbot::config::CreationMode::default());
+    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string());
     (tool, temp_dir)
 }
 
