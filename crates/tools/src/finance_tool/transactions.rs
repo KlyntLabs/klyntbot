@@ -50,7 +50,18 @@ impl FinanceTool {
                     .map(|a| a.id.clone())
                     .ok_or_else(|| {
                         ToolError::InvalidParams(
-                            "No active accounts found. Create an account first.".to_string(),
+                            serde_json::to_string(&json!({
+                                "error": "no_accounts",
+                                "message": "No active accounts found. Create an account first.",
+                                "suggested_action": "account_add",
+                                "example": {
+                                    "action": "account_add",
+                                    "name": "Main Bank",
+                                    "type": "bank",
+                                    "currency": "USD"
+                                }
+                            }))
+                            .unwrap(),
                         )
                     })?
             }
@@ -694,7 +705,18 @@ impl FinanceTool {
                     .map(|a| a.id.clone())
                     .ok_or_else(|| {
                         ToolError::InvalidParams(
-                            "No active accounts found. Create an account first.".to_string(),
+                            serde_json::to_string(&json!({
+                                "error": "no_accounts",
+                                "message": "No active accounts found. Create an account first.",
+                                "suggested_action": "account_add",
+                                "example": {
+                                    "action": "account_add",
+                                    "name": "Main Bank",
+                                    "type": "bank",
+                                    "currency": "USD"
+                                }
+                            }))
+                            .unwrap(),
                         )
                     })?
             }
@@ -991,5 +1013,24 @@ mod tests {
         assert_eq!(p.optional_str("category").unwrap(), Some("food"));
         assert_eq!(p.optional_str("type").unwrap(), Some("expense"));
         assert_eq!(p.optional_i64("limit").unwrap(), Some(25));
+    }
+
+    #[test]
+    fn test_tx_type_alias_accepted() {
+        // Verify that both "type" and "tx_type" keys resolve to the same value.
+        let args = json!({"action": "tx_add", "tx_type": "expense", "amount": 5000});
+        let p = ParamExtractor::new(&args);
+        // "tx_type" should be accessible via optional_str
+        let tx_type = p.optional_str("tx_type").unwrap();
+        assert_eq!(tx_type, Some("expense"));
+    }
+
+    #[test]
+    fn test_transaction_type_from_str_loose() {
+        assert!(TransactionType::from_str_loose("income").is_some());
+        assert!(TransactionType::from_str_loose("expense").is_some());
+        assert!(TransactionType::from_str_loose("transfer").is_some());
+        assert!(TransactionType::from_str_loose("INCOME").is_some());
+        assert!(TransactionType::from_str_loose("invalid").is_none());
     }
 }
