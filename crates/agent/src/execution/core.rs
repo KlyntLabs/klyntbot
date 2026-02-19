@@ -210,6 +210,26 @@ impl ExecutionCore {
         debug!("ExecutionCore: LLM returned text response (no tool calls)");
         if let Some(content) = response.content {
             if !content.trim().is_empty() {
+                // Extract tool names from the tool definitions for fabrication check
+                let tool_names: Vec<&str> = tools
+                    .iter()
+                    .filter_map(|t| {
+                        t.get("function")
+                            .and_then(|f| f.get("name"))
+                            .and_then(|n| n.as_str())
+                    })
+                    .collect();
+
+                if !tool_names.is_empty()
+                    && is_fabricated_tool_response(&content, &tool_names)
+                {
+                    debug!(
+                        "ExecutionCore: detected fabricated tool response (tools available: {:?})",
+                        tool_names
+                    );
+                    return Ok((CycleOutcome::FabricatedResponse { content }, usage));
+                }
+
                 return Ok((CycleOutcome::FinalResponse { content }, usage));
             }
         }
@@ -484,5 +504,68 @@ mod tests {
             .unwrap();
 
         assert!(matches!(outcome, CycleOutcome::EmptyResponse));
+    }
+
+    // ── Fabrication detection integration tests ──────────────────
+
+    #[tokio::test]
+    async fn test_cycle_detects_fabricated_response() {
+        // Provider returns text that looks like a fabricated todo result
+        let provider = Arc::new(MockProvider {
+            responses: Mutex::new(vec![LlmResponse {
+                content: Some(
+                    "I've created the task for you:\n\n**Task Created:** Buy groceries (ID: 9c4e5f3b)\n- **Priority:** P3\n- **Due Date:** Tomorrow".to_string()
+                ),
+                tool_calls: vec![],
+                finish_reason: "stop".to_string(),
+                usage: Usage::default(),
+                reasoning_content: None,
+            }]),
+        });
+        let registry = make_registry_with(EchoTool);
+        let core = ExecutionCore::new(provider, registry);
+
+        let mut messages = vec![Message::user("create task: buy")];
+        let params = ExecutionParams::new("mock");
+        let tools = vec![serde_json::json!({
+            "type": "function",
+            "function": {
+                "name": "todo",
+                "description": "Manage tasks",
+                "parameters": {"type": "object", "properties": {}}
+            }
+        })];
+
+        let (outcome, _usage) = core
+            .run_cycle(&mut messages, &tools, &params, &routing_ctx())
+            .await
+            .unwrap();
+
+        assert!(matches!(outcome, CycleOutcome::FabricatedResponse { .. }));
+    }
+
+    #[tokio::test]
+    async fn test_cycle_normal_text_not_flagged() {
+        let provider = MockProvider::with_text("Sure, I can help you create a task. What would you like?");
+        let registry = make_registry_with(EchoTool);
+        let core = ExecutionCore::new(provider, registry);
+
+        let mut messages = vec![Message::user("create task: buy")];
+        let params = ExecutionParams::new("mock");
+        let tools = vec![serde_json::json!({
+            "type": "function",
+            "function": {
+                "name": "todo",
+                "description": "Manage tasks",
+                "parameters": {"type": "object", "properties": {}}
+            }
+        })];
+
+        let (outcome, _usage) = core
+            .run_cycle(&mut messages, &tools, &params, &routing_ctx())
+            .await
+            .unwrap();
+
+        assert!(matches!(outcome, CycleOutcome::FinalResponse { .. }));
     }
 }
