@@ -29,6 +29,8 @@ pub async fn handle_serve(port: u16) -> Result<()> {
     })?;
     let storage_pool = StoragePool::connect(database_url).await?;
     let repos = Repos::from_pool(&storage_pool);
+    // Clone repos for the finance handler before partially moving individual repos below.
+    let finance_repos = repos.clone();
     info!("Database connected and migrations applied");
 
     // Initialize LLM provider
@@ -354,6 +356,7 @@ pub async fn handle_serve(port: u16) -> Result<()> {
             repos.calendar_sync,
             repos.calendar_event_cache,
             Some(repos.conv_embeddings),
+            Some(finance_repos),
         )
         .await?,
     ));

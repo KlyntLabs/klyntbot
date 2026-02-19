@@ -154,7 +154,7 @@ mod tests {
     #[test]
     fn test_long_response_truncated() {
         let validator = ResponseValidator::new(100); // 100 tokens = 400 chars
-        // Use "xword" to avoid trailing whitespace (strip_confidence_blocks trims)
+                                                     // Use "xword" to avoid trailing whitespace (strip_confidence_blocks trims)
         let long_content = "xword".repeat(200); // 1000 chars, unaffected by trim
         let result = validator.validate(&long_content);
 

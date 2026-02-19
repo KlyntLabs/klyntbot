@@ -10,7 +10,9 @@ pub use loader::{
 };
 pub use schema::{
     AppleCalendarConfig, CalendarConfig, CalendarProviderConfig, Config, CreationMode,
-    DiscordConfig, EmailConfig, ExtendedThinkingConfig, GenericCalDavConfig, GoogleCalendarConfig,
-    LearningConfig, PermissionsConfig, ProviderManagerConfig, QQConfig, Secret, SlackConfig,
-    TelegramConfig, TodoEnrichmentConfig, WhatsAppConfig,
+    DiscordConfig, EmailConfig, ExtendedThinkingConfig, FinanceBudgetingConfig,
+    FinanceCategoryConfig, FinanceConfig, FinanceExpectedReturnsConfig, FinanceInflationConfig,
+    FinancePriceRefreshConfig, FinanceSchedulingConfig, GenericCalDavConfig, GoogleCalendarConfig,
+    LearningConfig, PermissionsConfig, ProviderManagerConfig, QQConfig, Secret, SixJarRatios,
+    SlackConfig, TelegramConfig, TodoEnrichmentConfig, WhatsAppConfig,
 };

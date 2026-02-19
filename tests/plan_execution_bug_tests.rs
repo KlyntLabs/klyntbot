@@ -100,6 +100,7 @@ async fn agent_with_plan_store(
         calendar_sync_repo,
         event_cache_repo,
         None, // conv_embedding_repo
+        None, // finance_repos
     )
     .await
     .unwrap()

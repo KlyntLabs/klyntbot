@@ -39,6 +39,8 @@ pub async fn handle_chat(message: Option<String>, session: String, verbose: bool
     })?;
     let storage_pool = storage::StoragePool::connect(database_url).await?;
     let repos = storage::Repos::from_pool(&storage_pool);
+    // Clone repos for the finance handler before partially moving individual repos below.
+    let finance_repos = repos.clone();
 
     // Initialize agent loop (Arc for streaming support)
     let agent_loop = Arc::new(
@@ -55,6 +57,7 @@ pub async fn handle_chat(message: Option<String>, session: String, verbose: bool
             repos.calendar_sync,
             repos.calendar_event_cache,
             Some(repos.conv_embeddings),
+            Some(finance_repos),
         )
         .await?,
     );
@@ -439,10 +442,7 @@ async fn run_with_streaming(
     // Show elapsed time with model, tool count, and iteration count
     let elapsed = renderer.elapsed_secs();
     let label = thinking.separator_label(model, elapsed);
-    println!(
-        "{}\n",
-        StreamRenderer::draw_separator(Some(&label))
-    );
+    println!("{}\n", StreamRenderer::draw_separator(Some(&label)));
 
     Ok(())
 }

@@ -2,6 +2,9 @@
 //!
 //! This crate provides the Tool trait and various tool implementations.
 
+// The FinanceTool parameters() JSON schema is large; increase the macro recursion limit.
+#![recursion_limit = "256"]
+
 pub mod ask_user;
 pub mod calendar_tool;
 pub mod conversation_embedding;
@@ -10,6 +13,9 @@ pub mod embedding_engine;
 pub mod embedding_store;
 pub mod enrichment;
 pub mod filesystem;
+pub mod finance_handler;
+pub mod finance_tool;
+pub mod finance_types;
 pub mod goal_tool;
 pub mod learning_feedback;
 pub mod learning_tool;
@@ -18,6 +24,7 @@ pub mod message;
 pub mod params;
 pub mod plan_response;
 pub mod plan_tool;
+pub mod price_service;
 pub use params::ParamExtractor;
 pub mod permissions;
 pub mod project_store;
@@ -35,6 +42,23 @@ pub mod web;
 
 // Re-export calendar types for use by agent crate
 pub use calendar_tool::{CalendarHandler, CalendarTool};
+
+// Re-export finance handler types for use by agent crate
+pub use finance_handler::{BudgetAlert, FinanceHandler, PriceUpdateSummary, ProactivityLevel};
+
+// Re-export finance domain types
+pub use finance_types::{
+    AccountType, AssetType, BudgetMethod, BudgetPeriod, FinanceAccount, FinanceBudget, FinanceGoal,
+    FinanceInvestment, FinanceInvestmentDomainFilter, FinanceInvestmentTx, FinanceLiability,
+    FinancePortfolio, FinanceTransaction, FinanceTransactionFilter, GoalStatus, GoalType,
+    InvestmentTxType, JarType, LiabilityType, TransactionType,
+};
+
+// Re-export FinanceTool
+pub use finance_tool::FinanceTool;
+
+// Re-export price service types for use by agent crate
+pub use price_service::{CachedPrice, PriceResult, PriceService};
 
 // Re-export conversation embedding types for use by agent crate
 pub use conversation_embedding::{

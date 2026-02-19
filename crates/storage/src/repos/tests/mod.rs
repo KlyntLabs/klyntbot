@@ -7,3 +7,11 @@
 
 pub mod fixtures;
 pub mod todo_repo_tests;
+
+// Finance module repo tests — TDD skeletons, fail until implementation is added.
+pub mod finance_account_repo_tests;
+pub mod finance_budget_repo_tests;
+pub mod finance_goal_repo_tests;
+pub mod finance_investment_repo_tests;
+pub mod finance_liability_repo_tests;
+pub mod finance_transaction_repo_tests;

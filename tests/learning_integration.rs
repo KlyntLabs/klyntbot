@@ -78,6 +78,7 @@ async fn create_agent_with_learning(provider: Arc<MockProvider>) -> (AgentLoop, 
         calendar_sync_repo,
         event_cache_repo,
         None, // conv_embedding_repo
+        None, // finance_repos
     )
     .await
     .unwrap();
@@ -657,6 +658,7 @@ async fn test_ac_learning_disabled_no_recording() {
         calendar_sync_repo,
         event_cache_repo,
         None, // conv_embedding_repo
+        None, // finance_repos
     )
     .await
     .unwrap();

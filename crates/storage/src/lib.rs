@@ -35,6 +35,13 @@ pub use repos::UsageRepo;
 pub use rows::calendar::{CalendarEventCacheRow, CalendarSyncStateRow};
 pub use rows::cron::CronJobRow;
 pub use rows::embedding::{ConvEmbeddingRow, EmbeddingRow};
+pub use rows::finance::{
+    BudgetUsageRow, FinanceAccountPatch, FinanceAccountRow, FinanceBudgetPatch, FinanceBudgetRow,
+    FinanceGoalPatch, FinanceGoalRow, FinanceInvestmentFilter, FinanceInvestmentPatch,
+    FinanceInvestmentRow, FinanceInvestmentTxRow, FinanceLiabilityPatch, FinanceLiabilityRow,
+    FinancePortfolioRow, FinanceTransactionFilter, FinanceTransactionPatch, FinanceTransactionRow,
+    PortfolioSummaryRow,
+};
 pub use rows::goal::{GoalProjectLinkRow, GoalRow};
 pub use rows::learning::{
     DecisionLogRow, EnrichmentFeedbackRow, LearningStateRow, OutcomeRow, StrategyRecordRow,
@@ -46,3 +53,11 @@ pub use rows::project::ProjectRow;
 pub use rows::session::{SessionListRow, SessionMessageRow, SessionRow};
 pub use rows::todo::{TodoAttachmentRow, TodoDependencyRow, TodoRow, TodoTimeEntryRow};
 pub use rows::usage::UsageRecordRow;
+
+// Re-export finance repo types.
+pub use repos::FinanceAccountRepo;
+pub use repos::FinanceBudgetRepo;
+pub use repos::FinanceGoalRepo;
+pub use repos::FinanceInvestmentRepo;
+pub use repos::FinanceLiabilityRepo;
+pub use repos::FinanceTransactionRepo;

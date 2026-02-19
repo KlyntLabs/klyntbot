@@ -147,8 +147,7 @@ impl ExecutionCore {
                 .tool_calls
                 .iter()
                 .map(|tc| {
-                    let args_str =
-                        serde_json::to_string(&tc.arguments).unwrap_or_default();
+                    let args_str = serde_json::to_string(&tc.arguments).unwrap_or_default();
                     format!("{}|{}", tc.name, args_str)
                 })
                 .collect();
@@ -156,8 +155,7 @@ impl ExecutionCore {
             // If tracking is enabled, check whether ALL calls are repeats
             let all_duplicates = match &seen_tool_calls {
                 Some(seen) => {
-                    !current_keys.is_empty()
-                        && current_keys.iter().all(|k| seen.contains(k))
+                    !current_keys.is_empty() && current_keys.iter().all(|k| seen.contains(k))
                 }
                 None => false,
             };

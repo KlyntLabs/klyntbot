@@ -6,6 +6,12 @@ pub mod conv_embedding;
 pub mod cron;
 pub mod decision_log;
 pub mod embedding;
+pub mod finance_account_repo;
+pub mod finance_budget_repo;
+pub mod finance_goal_repo;
+pub mod finance_investment_repo;
+pub mod finance_liability_repo;
+pub mod finance_transaction_repo;
 pub mod goal;
 pub mod learning_state;
 pub mod memory_note;
@@ -26,6 +32,12 @@ pub use conv_embedding::ConvEmbeddingRepo;
 pub use cron::CronRepo;
 pub use decision_log::DecisionLogRepo;
 pub use embedding::EmbeddingRepo;
+pub use finance_account_repo::FinanceAccountRepo;
+pub use finance_budget_repo::FinanceBudgetRepo;
+pub use finance_goal_repo::FinanceGoalRepo;
+pub use finance_investment_repo::FinanceInvestmentRepo;
+pub use finance_liability_repo::FinanceLiabilityRepo;
+pub use finance_transaction_repo::FinanceTransactionRepo;
 pub use goal::GoalRepo;
 pub use learning_state::LearningStateRepo;
 pub use memory_note::MemoryNoteRepo;
@@ -59,6 +71,13 @@ pub struct Repos {
     pub memory_notes: MemoryNoteRepo,
     pub learning_state: LearningStateRepo,
     pub decision_log: DecisionLogRepo,
+    // Finance repos
+    pub finance_accounts: FinanceAccountRepo,
+    pub finance_transactions: FinanceTransactionRepo,
+    pub finance_budgets: FinanceBudgetRepo,
+    pub finance_investments: FinanceInvestmentRepo,
+    pub finance_goals: FinanceGoalRepo,
+    pub finance_liabilities: FinanceLiabilityRepo,
 }
 
 impl Repos {
@@ -82,6 +101,12 @@ impl Repos {
             memory_notes: MemoryNoteRepo::new(pg.clone()),
             learning_state: LearningStateRepo::new(pg.clone()),
             decision_log: DecisionLogRepo::new(pg.clone()),
+            finance_accounts: FinanceAccountRepo::new(pg.clone()),
+            finance_transactions: FinanceTransactionRepo::new(pg.clone()),
+            finance_budgets: FinanceBudgetRepo::new(pg.clone()),
+            finance_investments: FinanceInvestmentRepo::new(pg.clone()),
+            finance_goals: FinanceGoalRepo::new(pg.clone()),
+            finance_liabilities: FinanceLiabilityRepo::new(pg.clone()),
             pool: pg,
         }
     }

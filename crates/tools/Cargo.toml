@@ -32,6 +32,7 @@ serde = { workspace = true }
 rrule.workspace = true
 fastembed.workspace = true
 pgvector.workspace = true
+dashmap.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

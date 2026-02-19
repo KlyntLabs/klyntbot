@@ -68,6 +68,7 @@ async fn test_agent_loop_basic_processing() {
         test_calendar_sync_repo(),
         test_event_cache_repo(),
         None, // conv_embedding_repo
+        None, // finance_repos
     )
     .await
     .unwrap();
@@ -141,6 +142,7 @@ async fn test_agent_loop_with_tool_execution() {
         test_calendar_sync_repo(),
         test_event_cache_repo(),
         None, // conv_embedding_repo
+        None, // finance_repos
     )
     .await
     .unwrap();
@@ -200,6 +202,7 @@ async fn test_agent_loop_max_iterations() {
         test_calendar_sync_repo(),
         test_event_cache_repo(),
         None, // conv_embedding_repo
+        None, // finance_repos
     )
     .await
     .unwrap();
@@ -272,6 +275,7 @@ async fn test_agent_loop_tool_error_handling() {
         test_calendar_sync_repo(),
         test_event_cache_repo(),
         None, // conv_embedding_repo
+        None, // finance_repos
     )
     .await
     .unwrap();
@@ -328,6 +332,7 @@ async fn test_agent_loop_session_persistence() {
             test_calendar_sync_repo(),
             test_event_cache_repo(),
             None, // conv_embedding_repo
+            None, // finance_repos
         )
         .await
         .unwrap();
@@ -354,6 +359,7 @@ async fn test_agent_loop_session_persistence() {
         test_calendar_sync_repo(),
         test_event_cache_repo(),
         None, // conv_embedding_repo
+        None, // finance_repos
     )
     .await
     .unwrap();
@@ -398,6 +404,7 @@ async fn test_streaming_emits_done() {
             test_calendar_sync_repo(),
             test_event_cache_repo(),
             None, // conv_embedding_repo
+            None, // finance_repos
         )
         .await
         .unwrap(),
@@ -466,6 +473,7 @@ async fn test_streaming_emits_error_on_failure() {
             test_calendar_sync_repo(),
             test_event_cache_repo(),
             None, // conv_embedding_repo
+            None, // finance_repos
         )
         .await
         .unwrap(),

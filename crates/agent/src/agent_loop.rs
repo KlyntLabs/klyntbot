@@ -28,7 +28,7 @@ use tools::{
     shell::ExecTool,
     spawn::SpawnTool,
     web::{WebFetchTool, WebSearchTool},
-    EmbeddingHandler, RoutingContext,
+    EmbeddingHandler, FinanceHandler, RoutingContext,
 };
 
 use super::confidence::ConfidenceEvaluator;
@@ -120,6 +120,7 @@ impl AgentLoop {
         calendar_sync_repo: storage::CalendarSyncRepo,
         event_cache_repo: storage::CalendarEventCacheRepo,
         conv_embedding_repo: Option<storage::ConvEmbeddingRepo>,
+        finance_repos: Option<storage::Repos>,
     ) -> Result<Self> {
         let workspace = config.workspace_path();
 
@@ -392,6 +393,36 @@ impl AgentLoop {
             }
         }
 
+        // ── Finance Tool Registration ──────────────────────────────────────────
+        if config.finance.enabled {
+            if let Some(fin_repos) = finance_repos {
+                let price_service =
+                    tools::PriceService::new(config.finance.price_refresh.cache_ttl_minutes);
+
+                let finance_handler_impl =
+                    Arc::new(crate::finance_adapter::FinanceHandlerImpl::new(
+                        fin_repos.clone(),
+                        price_service.clone(),
+                        config.finance.clone(),
+                    ));
+
+                let finance_tool = tools::FinanceTool::new(
+                    fin_repos.finance_accounts,
+                    fin_repos.finance_transactions,
+                    fin_repos.finance_budgets,
+                    fin_repos.finance_investments,
+                    fin_repos.finance_goals,
+                    fin_repos.finance_liabilities,
+                    price_service,
+                    config.finance.default_currency.clone(),
+                    config.timezone.clone(),
+                )
+                .with_finance_handler(Arc::clone(&finance_handler_impl) as Arc<dyn FinanceHandler>);
+
+                tool_registry.register(finance_tool);
+            }
+        }
+
         // Confidence evaluator (with per-tool overrides if configured)
         let confidence_evaluator = if config.confidence.enabled {
             if config.confidence.tool_overrides.is_empty() {
@@ -583,6 +614,7 @@ impl AgentLoop {
         calendar_sync_repo: storage::CalendarSyncRepo,
         event_cache_repo: storage::CalendarEventCacheRepo,
         conv_embedding_repo: Option<storage::ConvEmbeddingRepo>,
+        finance_repos: Option<storage::Repos>,
     ) -> Result<Self> {
         let goal_path = config.goal_store_path();
         let goal_store = Some(Arc::new(RwLock::new(goal::GoalStore::new(goal_path))));
@@ -605,6 +637,7 @@ impl AgentLoop {
             calendar_sync_repo,
             event_cache_repo,
             conv_embedding_repo,
+            finance_repos,
         )
         .await
     }
