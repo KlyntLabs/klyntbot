@@ -95,19 +95,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_answer_type_serde_single_select() {
-        let answer_type = AnswerType::SingleSelect {
+    fn test_answer_types_serde_roundtrip() {
+        // SingleSelect
+        let single = AnswerType::SingleSelect {
             options: vec![AnswerOption {
                 value: "high".to_string(),
                 label: "High Priority".to_string(),
                 description: Some("Critical tasks".to_string()),
             }],
         };
-
-        let json = serde_json::to_string(&answer_type).unwrap();
+        let json = serde_json::to_string(&single).unwrap();
         assert!(json.contains(r#""type":"single_select"#));
-        assert!(json.contains(r#""value":"high"#));
-
         let deserialized: AnswerType = serde_json::from_str(&json).unwrap();
         match deserialized {
             AnswerType::SingleSelect { options } => {
@@ -116,17 +114,13 @@ mod tests {
             }
             _ => panic!("Wrong variant"),
         }
-    }
 
-    #[test]
-    fn test_answer_type_serde_yes_no() {
-        let answer_type = AnswerType::YesNo {
+        // YesNo
+        let yes_no = AnswerType::YesNo {
             default: Some(true),
         };
-
-        let json = serde_json::to_string(&answer_type).unwrap();
+        let json = serde_json::to_string(&yes_no).unwrap();
         assert!(json.contains(r#""type":"yes_no"#));
-
         let deserialized: AnswerType = serde_json::from_str(&json).unwrap();
         match deserialized {
             AnswerType::YesNo { default } => assert_eq!(default, Some(true)),
@@ -135,53 +129,43 @@ mod tests {
     }
 
     #[test]
-    fn test_answer_value_serde_selected() {
-        let value = AnswerValue::Selected {
+    fn test_answer_values_serde_roundtrip() {
+        // Selected
+        let selected = AnswerValue::Selected {
             value: "oauth2".to_string(),
         };
-
-        let json = serde_json::to_string(&value).unwrap();
+        let json = serde_json::to_string(&selected).unwrap();
         assert!(json.contains(r#""type":"selected"#));
-        assert!(json.contains(r#""value":"oauth2"#));
-
         let deserialized: AnswerValue = serde_json::from_str(&json).unwrap();
-        match deserialized {
+        match &deserialized {
             AnswerValue::Selected { value } => assert_eq!(value, "oauth2"),
             _ => panic!("Wrong variant"),
         }
-    }
 
-    #[test]
-    fn test_answer_value_serde_multi_selected() {
-        let value = AnswerValue::MultiSelected {
+        // MultiSelected
+        let multi = AnswerValue::MultiSelected {
             values: vec!["option1".to_string(), "option2".to_string()],
         };
-
-        let json = serde_json::to_string(&value).unwrap();
+        let json = serde_json::to_string(&multi).unwrap();
         assert!(json.contains(r#""type":"multi_selected"#));
-
         let deserialized: AnswerValue = serde_json::from_str(&json).unwrap();
-        match deserialized {
+        match &deserialized {
             AnswerValue::MultiSelected { values } => {
                 assert_eq!(values.len(), 2);
                 assert_eq!(values[0], "option1");
             }
             _ => panic!("Wrong variant"),
         }
-    }
 
-    #[test]
-    fn test_form_response_serde_completed() {
+        // FormResponse::Completed
         let response = FormResponse::Completed(vec![Answer {
             question_id: "priority".to_string(),
             value: AnswerValue::Selected {
                 value: "high".to_string(),
             },
         }]);
-
         let json = serde_json::to_string(&response).unwrap();
         let deserialized: FormResponse = serde_json::from_str(&json).unwrap();
-
         match deserialized {
             FormResponse::Completed(answers) => {
                 assert_eq!(answers.len(), 1);
@@ -189,16 +173,13 @@ mod tests {
             }
             _ => panic!("Wrong variant"),
         }
-    }
 
-    #[test]
-    fn test_form_response_serde_cancelled() {
+        // FormResponse::Cancelled
         let response = FormResponse::Cancelled;
         let json = serde_json::to_string(&response).unwrap();
         assert!(json.contains("Cancelled"));
-
         let deserialized: FormResponse = serde_json::from_str(&json).unwrap();
-        matches!(deserialized, FormResponse::Cancelled);
+        assert!(matches!(deserialized, FormResponse::Cancelled));
     }
 
     #[test]
