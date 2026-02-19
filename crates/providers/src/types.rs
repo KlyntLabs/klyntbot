@@ -101,6 +101,19 @@ impl ChatParams {
     }
 }
 
+/// Health status of an LLM provider.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProviderHealth {
+    /// Provider is healthy and responding normally.
+    Healthy,
+    /// Provider is responding but with degraded performance (e.g., high latency).
+    Degraded(String),
+    /// Provider is not responding or returning errors.
+    Unhealthy(String),
+    /// Health status is unknown (no check implemented).
+    Unknown,
+}
+
 /// Trait for LLM providers
 #[async_trait]
 pub trait LlmProvider: Send + Sync {
@@ -162,6 +175,11 @@ pub trait LlmProvider: Send + Sync {
     /// Context window size for the current model
     fn context_window(&self) -> usize {
         DEFAULT_CONTEXT_WINDOW
+    }
+
+    /// Check provider health. Default returns `Unknown`.
+    async fn health_check(&self) -> Result<ProviderHealth> {
+        Ok(ProviderHealth::Unknown)
     }
 }
 

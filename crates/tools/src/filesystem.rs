@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use tokio::fs;
 use tracing::debug;
 
-use super::{RoutingContext, Tool};
+use super::{PermissionLevel, RoutingContext, Tool};
 use crate::params::ParamExtractor;
 use common::{Result, ToolError};
 
@@ -72,6 +72,10 @@ impl Tool for ReadFileTool {
         "Read the contents of a file at the given path."
     }
 
+    fn permission_level(&self) -> PermissionLevel {
+        PermissionLevel::ReadOnly
+    }
+
     fn parameters(&self) -> Value {
         serde_json::json!({
             "type": "object",
@@ -128,6 +132,10 @@ impl Tool for WriteFileTool {
 
     fn description(&self) -> &str {
         "Write content to a file at the given path. Creates parent directories if needed."
+    }
+
+    fn permission_level(&self) -> PermissionLevel {
+        PermissionLevel::Elevated
     }
 
     fn parameters(&self) -> Value {
@@ -196,6 +204,10 @@ impl Tool for EditFileTool {
 
     fn description(&self) -> &str {
         "Edit a file by replacing old_text with new_text. The old_text must exist exactly in the file."
+    }
+
+    fn permission_level(&self) -> PermissionLevel {
+        PermissionLevel::Elevated
     }
 
     fn parameters(&self) -> Value {
@@ -285,6 +297,10 @@ impl Tool for ListDirTool {
 
     fn description(&self) -> &str {
         "List the contents of a directory."
+    }
+
+    fn permission_level(&self) -> PermissionLevel {
+        PermissionLevel::ReadOnly
     }
 
     fn parameters(&self) -> Value {

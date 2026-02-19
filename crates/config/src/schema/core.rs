@@ -316,6 +316,30 @@ pub struct ToolsConfig {
 
     #[serde(default)]
     pub restrict_to_workspace: bool,
+
+    /// Optional per-channel permission levels for tool access control.
+    /// Keys are channel names (e.g., "telegram", "discord", "cli").
+    /// Values are permission levels: "readOnly", "standard", "elevated", "admin".
+    /// When absent, all tools are allowed on all channels.
+    #[serde(default)]
+    pub permissions: Option<PermissionsConfig>,
+}
+
+/// Permission configuration for tool access control.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PermissionsConfig {
+    /// Default permission level for channels not explicitly listed.
+    #[serde(default = "default_permission_level")]
+    pub default_level: String,
+
+    /// Per-channel permission level overrides.
+    #[serde(default)]
+    pub channels: HashMap<String, String>,
+}
+
+fn default_permission_level() -> String {
+    "standard".to_string()
 }
 
 /// Web tools configuration

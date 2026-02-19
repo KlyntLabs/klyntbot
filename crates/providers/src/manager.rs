@@ -173,6 +173,26 @@ impl ProviderManager {
         Err(last_err.unwrap())
     }
 
+    /// Check health of primary and fallback providers.
+    ///
+    /// Returns a tuple of `(primary_health, fallback_health)`.
+    /// If no fallback is configured, the second element is `None`.
+    pub async fn check_health(&self) -> (ProviderHealth, Option<ProviderHealth>) {
+        let primary_health = self
+            .primary
+            .health_check()
+            .await
+            .unwrap_or(ProviderHealth::Unknown);
+
+        let fallback_health = if let Some(fb) = &self.fallback {
+            Some(fb.health_check().await.unwrap_or(ProviderHealth::Unknown))
+        } else {
+            None
+        };
+
+        (primary_health, fallback_health)
+    }
+
     /// Route to fallback if available, otherwise return the original error.
     async fn try_fallback(
         &self,
@@ -252,6 +272,11 @@ impl LlmProvider for ProviderManager {
 
     fn context_window(&self) -> usize {
         self.primary.context_window()
+    }
+
+    async fn health_check(&self) -> Result<ProviderHealth> {
+        let (primary, _fallback) = self.check_health().await;
+        Ok(primary)
     }
 }
 
@@ -923,5 +948,100 @@ mod tests {
         assert!(result.is_ok());
         assert_eq!(primary_stream.load(AtomicOrdering::SeqCst), 2); // unchanged
         assert_eq!(fallback_stream.load(AtomicOrdering::SeqCst), 3); // 2 failover + 1 bypass
+    }
+
+    // ── Health check tests ─────────────────────────────────
+
+    /// A provider that returns a specific health status.
+    struct HealthProvider {
+        health: ProviderHealth,
+    }
+
+    #[async_trait]
+    impl LlmProvider for HealthProvider {
+        async fn chat(
+            &self,
+            _: &[Message],
+            _: Option<&[Value]>,
+            _: &ChatParams,
+        ) -> Result<LlmResponse> {
+            Ok(dummy_response())
+        }
+        fn default_model(&self) -> &str {
+            "test"
+        }
+        fn name(&self) -> &str {
+            "health-provider"
+        }
+        async fn health_check(&self) -> Result<ProviderHealth> {
+            Ok(self.health.clone())
+        }
+    }
+
+    #[tokio::test]
+    async fn test_check_health_primary_only() {
+        let manager = ProviderManager::new(
+            Arc::new(HealthProvider {
+                health: ProviderHealth::Healthy,
+            }),
+            None,
+            None,
+        );
+        let (primary, fallback) = manager.check_health().await;
+        assert_eq!(primary, ProviderHealth::Healthy);
+        assert!(fallback.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_check_health_primary_and_fallback() {
+        let manager = ProviderManager::new(
+            Arc::new(HealthProvider {
+                health: ProviderHealth::Degraded("slow".to_string()),
+            }),
+            Some(Arc::new(HealthProvider {
+                health: ProviderHealth::Healthy,
+            })),
+            None,
+        );
+        let (primary, fallback) = manager.check_health().await;
+        assert_eq!(primary, ProviderHealth::Degraded("slow".to_string()));
+        assert_eq!(fallback, Some(ProviderHealth::Healthy));
+    }
+
+    #[tokio::test]
+    async fn test_check_health_unhealthy() {
+        let manager = ProviderManager::new(
+            Arc::new(HealthProvider {
+                health: ProviderHealth::Unhealthy("down".to_string()),
+            }),
+            Some(Arc::new(HealthProvider {
+                health: ProviderHealth::Unknown,
+            })),
+            None,
+        );
+        let (primary, fallback) = manager.check_health().await;
+        assert_eq!(primary, ProviderHealth::Unhealthy("down".to_string()));
+        assert_eq!(fallback, Some(ProviderHealth::Unknown));
+    }
+
+    #[tokio::test]
+    async fn test_health_check_via_trait_delegates_to_primary() {
+        let manager = ProviderManager::new(
+            Arc::new(HealthProvider {
+                health: ProviderHealth::Healthy,
+            }),
+            None,
+            None,
+        );
+        let health = manager.health_check().await.unwrap();
+        assert_eq!(health, ProviderHealth::Healthy);
+    }
+
+    #[tokio::test]
+    async fn test_default_health_check_returns_unknown() {
+        // CountingProvider doesn't override health_check, so default returns Unknown
+        let provider = CountingProvider::ok("test", Arc::new(AtomicUsize::new(0)));
+        let health = provider.health_check().await.unwrap();
+        assert_eq!(health, ProviderHealth::Unknown);
     }
 }

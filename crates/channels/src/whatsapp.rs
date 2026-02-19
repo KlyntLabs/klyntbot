@@ -186,3 +186,164 @@ impl Channel for WhatsAppChannel {
         check_allowlist(&self.config.allow_from, sender_id)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_config() -> WhatsAppConfig {
+        WhatsAppConfig::default()
+    }
+
+    fn make_config_with_allowlist(allow: Vec<String>) -> WhatsAppConfig {
+        WhatsAppConfig {
+            allow_from: allow,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_channel_name() {
+        let channel = WhatsAppChannel::new(make_config()).unwrap();
+        assert_eq!(channel.name(), "whatsapp");
+    }
+
+    #[test]
+    fn test_default_config_values() {
+        let config = WhatsAppConfig::default();
+        assert!(!config.enabled);
+        assert_eq!(config.bridge_url, "ws://localhost:3001");
+        assert!(config.allow_from.is_empty());
+    }
+
+    #[test]
+    fn test_is_allowed_empty_allowlist() {
+        let channel = WhatsAppChannel::new(make_config()).unwrap();
+        assert!(channel.is_allowed("anyone"));
+        assert!(channel.is_allowed("+1234567890"));
+    }
+
+    #[test]
+    fn test_is_allowed_with_allowlist() {
+        let channel = WhatsAppChannel::new(make_config_with_allowlist(vec![
+            "+1234567890".to_string(),
+        ]))
+        .unwrap();
+        assert!(channel.is_allowed("+1234567890"));
+        assert!(!channel.is_allowed("+9876543210"));
+    }
+
+    #[test]
+    fn test_is_allowed_compound_id() {
+        let channel = WhatsAppChannel::new(make_config_with_allowlist(vec![
+            "+1234567890".to_string(),
+        ]))
+        .unwrap();
+        assert!(channel.is_allowed("+1234567890|name"));
+        assert!(!channel.is_allowed("+0000000000|name"));
+    }
+
+    #[test]
+    fn test_message_parse_incoming() {
+        let payload = json!({
+            "type": "message",
+            "from": "+1234567890",
+            "chatId": "chat123",
+            "body": "Hello there!"
+        });
+
+        let msg_type = payload.get("type").and_then(|v| v.as_str()).unwrap();
+        assert_eq!(msg_type, "message");
+        let from = payload.get("from").and_then(|v| v.as_str()).unwrap();
+        assert_eq!(from, "+1234567890");
+        let body = payload.get("body").and_then(|v| v.as_str()).unwrap();
+        assert_eq!(body, "Hello there!");
+    }
+
+    #[test]
+    fn test_message_parse_qr() {
+        let payload = json!({
+            "type": "qr",
+            "qr": "2@abc123"
+        });
+
+        let msg_type = payload.get("type").and_then(|v| v.as_str()).unwrap();
+        assert_eq!(msg_type, "qr");
+        let qr = payload.get("qr").and_then(|v| v.as_str()).unwrap();
+        assert!(!qr.is_empty());
+    }
+
+    #[test]
+    fn test_message_parse_status() {
+        let payload = json!({
+            "type": "status",
+            "status": "connected"
+        });
+
+        let msg_type = payload.get("type").and_then(|v| v.as_str()).unwrap();
+        assert_eq!(msg_type, "status");
+    }
+
+    #[test]
+    fn test_message_parse_error() {
+        let payload = json!({
+            "type": "error",
+            "error": "connection lost"
+        });
+
+        let msg_type = payload.get("type").and_then(|v| v.as_str()).unwrap();
+        assert_eq!(msg_type, "error");
+    }
+
+    #[test]
+    fn test_empty_sender_ignored() {
+        let payload = json!({
+            "type": "message",
+            "from": "",
+            "chatId": "chat1",
+            "body": "test"
+        });
+
+        let from = payload.get("from").and_then(|v| v.as_str()).unwrap_or("");
+        assert!(from.is_empty());
+    }
+
+    #[test]
+    fn test_send_payload_format() {
+        let chat_id = "+1234567890";
+        let content = "Hello!";
+        let payload = json!({
+            "type": "send",
+            "to": chat_id,
+            "text": content
+        });
+
+        assert_eq!(payload["type"], "send");
+        assert_eq!(payload["to"], chat_id);
+        assert_eq!(payload["text"], content);
+    }
+
+    #[tokio::test]
+    async fn test_stop_sets_running_false() {
+        let channel = WhatsAppChannel::new(make_config()).unwrap();
+        channel.running.store(true, Ordering::SeqCst);
+        channel.stop().await.unwrap();
+        assert!(!channel.running.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn test_chat_id_falls_back_to_sender() {
+        let payload = json!({
+            "type": "message",
+            "from": "+1234567890",
+            "body": "test"
+        });
+
+        let sender_id = payload.get("from").and_then(|v| v.as_str()).unwrap_or("");
+        let chat_id = payload
+            .get("chatId")
+            .and_then(|v| v.as_str())
+            .unwrap_or(sender_id);
+        assert_eq!(chat_id, "+1234567890");
+    }
+}

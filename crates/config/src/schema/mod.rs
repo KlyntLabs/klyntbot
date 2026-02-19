@@ -357,4 +357,40 @@ mod tests {
         let config: Config = serde_json::from_str(json).unwrap();
         assert!(!config.todo.notifications.focus_reminders);
     }
+
+    #[test]
+    fn test_tools_permissions_config() {
+        let json = r#"{
+            "tools": {
+                "permissions": {
+                    "defaultLevel": "standard",
+                    "channels": {
+                        "cli": "admin",
+                        "telegram": "readOnly"
+                    }
+                }
+            },
+            "agents": {
+                "defaults": {
+                    "workspace": "~/.klyntbot/workspace",
+                    "model": "anthropic/claude-opus-4-5",
+                    "maxTokens": 8192,
+                    "temperature": 0.7,
+                    "maxToolIterations": 20
+                }
+            }
+        }"#;
+
+        let config: Config = serde_json::from_str(json).unwrap();
+        let perms = config.tools.permissions.unwrap();
+        assert_eq!(perms.default_level, "standard");
+        assert_eq!(perms.channels.get("cli").unwrap(), "admin");
+        assert_eq!(perms.channels.get("telegram").unwrap(), "readOnly");
+    }
+
+    #[test]
+    fn test_tools_no_permissions_defaults_to_none() {
+        let config = Config::default();
+        assert!(config.tools.permissions.is_none());
+    }
 }

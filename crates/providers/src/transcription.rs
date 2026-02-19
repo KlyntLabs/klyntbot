@@ -8,14 +8,18 @@ use tracing::{debug, warn};
 
 use common::{KlyntbotError, ProviderError, Result};
 
+/// Default API base URL for Groq
+const DEFAULT_GROQ_API_BASE: &str = "https://api.groq.com/openai/v1";
+
 /// Transcription provider using Groq Whisper
 pub struct TranscriptionProvider {
     client: Client,
     api_key: String,
+    api_base: String,
 }
 
 impl TranscriptionProvider {
-    /// Create a new transcription provider
+    /// Create a new transcription provider with the default Groq API base.
     pub fn new(api_key: impl Into<String>) -> Result<Self> {
         let client = Client::builder()
             .timeout(Duration::from_secs(60))
@@ -25,7 +29,14 @@ impl TranscriptionProvider {
         Ok(Self {
             client,
             api_key: api_key.into(),
+            api_base: DEFAULT_GROQ_API_BASE.to_string(),
         })
+    }
+
+    /// Set a custom API base URL.
+    pub fn with_api_base(mut self, api_base: impl Into<String>) -> Self {
+        self.api_base = api_base.into();
+        self
     }
 
     /// Transcribe an audio file using Groq Whisper
@@ -65,7 +76,10 @@ impl TranscriptionProvider {
         // Send request
         let response = self
             .client
-            .post("https://api.groq.com/openai/v1/audio/transcriptions")
+            .post(format!(
+                "{}/audio/transcriptions",
+                self.api_base.trim_end_matches('/')
+            ))
             .header("Authorization", format!("Bearer {}", self.api_key))
             .multipart(form)
             .send()
@@ -98,4 +112,39 @@ impl TranscriptionProvider {
 #[derive(Debug, Deserialize, Serialize)]
 struct TranscriptionResponse {
     text: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_api_base() {
+        let provider = TranscriptionProvider::new("test-key").unwrap();
+        assert_eq!(provider.api_base, "https://api.groq.com/openai/v1");
+    }
+
+    #[test]
+    fn test_custom_api_base() {
+        let provider = TranscriptionProvider::new("test-key")
+            .unwrap()
+            .with_api_base("https://custom.api.com/v1");
+        assert_eq!(provider.api_base, "https://custom.api.com/v1");
+    }
+
+    #[test]
+    fn test_trailing_slash_stripped_in_url() {
+        let provider = TranscriptionProvider::new("test-key")
+            .unwrap()
+            .with_api_base("https://custom.api.com/v1/");
+        // The trim_end_matches('/') in transcribe() handles this
+        let expected_base = "https://custom.api.com/v1/";
+        assert_eq!(provider.api_base, expected_base);
+        // The actual URL built will strip the trailing slash:
+        let url = format!(
+            "{}/audio/transcriptions",
+            provider.api_base.trim_end_matches('/')
+        );
+        assert_eq!(url, "https://custom.api.com/v1/audio/transcriptions");
+    }
 }

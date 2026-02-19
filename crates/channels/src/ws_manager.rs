@@ -14,7 +14,12 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
 use tokio_tungstenite::{
-    connect_async, tungstenite::Message as WsMessage, MaybeTlsStream, WebSocketStream,
+    connect_async,
+    tungstenite::{
+        protocol::{frame::coding::CloseCode, CloseFrame},
+        Message as WsMessage,
+    },
+    MaybeTlsStream, WebSocketStream,
 };
 use tracing::{debug, error, warn};
 
@@ -118,7 +123,17 @@ impl WebSocketManager {
             .read_loop(read, &write, heartbeat_override.as_ref(), config, handler)
             .await;
 
-        // 4. Cleanup
+        // 4. Send graceful close frame
+        if let Ok(mut writer) = write.try_lock() {
+            let _ = writer
+                .send(WsMessage::Close(Some(CloseFrame {
+                    code: CloseCode::Normal,
+                    reason: "shutdown".into(),
+                })))
+                .await;
+        }
+
+        // 5. Cleanup
         handler.on_disconnected().await;
 
         result
@@ -177,15 +192,26 @@ impl WebSocketManager {
                 },
             };
 
-            if let WsMessage::Text(text) = msg {
-                match handler.on_text_message(&text, write).await {
-                    Ok(true) => continue,
-                    Ok(false) => break,
-                    Err(e) => {
-                        error!("Handler error: {}", e);
-                        // Continue on handler errors; break only on connection errors
+            match msg {
+                WsMessage::Text(text) => {
+                    match handler.on_text_message(&text, write).await {
+                        Ok(true) => continue,
+                        Ok(false) => break,
+                        Err(e) => {
+                            error!("Handler error: {}", e);
+                            // Continue on handler errors; break only on connection errors
+                        }
                     }
                 }
+                WsMessage::Close(frame) => {
+                    debug!("Received close frame: {:?}", frame);
+                    // Respond with close per RFC 6455
+                    if let Ok(mut writer) = write.try_lock() {
+                        let _ = writer.send(WsMessage::Close(frame)).await;
+                    }
+                    break;
+                }
+                _ => {}
             }
         }
 
@@ -325,5 +351,32 @@ mod tests {
 
         // Should fail on connect, not hang
         let _ = manager.run(&config, &handler).await;
+    }
+
+    #[test]
+    fn test_close_frame_construction() {
+        let frame = CloseFrame {
+            code: CloseCode::Normal,
+            reason: "shutdown".into(),
+        };
+        assert_eq!(frame.code, CloseCode::Normal);
+        let reason: &str = frame.reason.as_ref();
+        assert_eq!(reason, "shutdown");
+    }
+
+    #[test]
+    fn test_close_message_wraps_frame() {
+        let frame = CloseFrame {
+            code: CloseCode::Normal,
+            reason: "shutdown".into(),
+        };
+        let msg = WsMessage::Close(Some(frame));
+        assert!(msg.is_close());
+    }
+
+    #[test]
+    fn test_close_message_without_frame() {
+        let msg = WsMessage::Close(None);
+        assert!(msg.is_close());
     }
 }

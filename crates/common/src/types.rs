@@ -6,6 +6,8 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
+use crate::KlyntbotError;
+
 /// Channel name (e.g., "telegram", "discord")
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ChannelName(String);
@@ -144,7 +146,26 @@ impl From<&str> for MessageRole {
             "user" => MessageRole::User,
             "assistant" => MessageRole::Assistant,
             "tool" => MessageRole::Tool,
-            _ => MessageRole::User, // Default fallback
+            _ => {
+                tracing::warn!("Unknown message role '{}', defaulting to User", s);
+                MessageRole::User
+            }
+        }
+    }
+}
+
+impl MessageRole {
+    /// Strict parsing that returns an error for unknown role strings.
+    ///
+    /// Unlike `From<&str>` which silently defaults to `User`, this method
+    /// rejects unknown values — useful at system boundaries.
+    pub fn parse_strict(s: &str) -> crate::Result<Self> {
+        match s {
+            "system" => Ok(MessageRole::System),
+            "user" => Ok(MessageRole::User),
+            "assistant" => Ok(MessageRole::Assistant),
+            "tool" => Ok(MessageRole::Tool),
+            _ => Err(KlyntbotError::Bus(format!("Unknown message role: '{}'", s))),
         }
     }
 }
@@ -152,6 +173,61 @@ impl From<&str> for MessageRole {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_message_role_from_known_strings() {
+        assert_eq!(MessageRole::from("system"), MessageRole::System);
+        assert_eq!(MessageRole::from("user"), MessageRole::User);
+        assert_eq!(MessageRole::from("assistant"), MessageRole::Assistant);
+        assert_eq!(MessageRole::from("tool"), MessageRole::Tool);
+    }
+
+    #[test]
+    fn test_message_role_from_unknown_defaults_to_user() {
+        assert_eq!(MessageRole::from("unknown"), MessageRole::User);
+        assert_eq!(MessageRole::from(""), MessageRole::User);
+        assert_eq!(MessageRole::from("SYSTEM"), MessageRole::User);
+    }
+
+    #[test]
+    fn test_message_role_parse_strict_known_strings() {
+        assert_eq!(
+            MessageRole::parse_strict("system").unwrap(),
+            MessageRole::System
+        );
+        assert_eq!(
+            MessageRole::parse_strict("user").unwrap(),
+            MessageRole::User
+        );
+        assert_eq!(
+            MessageRole::parse_strict("assistant").unwrap(),
+            MessageRole::Assistant
+        );
+        assert_eq!(
+            MessageRole::parse_strict("tool").unwrap(),
+            MessageRole::Tool
+        );
+    }
+
+    #[test]
+    fn test_message_role_parse_strict_unknown_returns_error() {
+        let err = MessageRole::parse_strict("unknown").unwrap_err();
+        assert!(err.to_string().contains("Unknown message role: 'unknown'"));
+
+        let err = MessageRole::parse_strict("").unwrap_err();
+        assert!(err.to_string().contains("Unknown message role: ''"));
+
+        let err = MessageRole::parse_strict("SYSTEM").unwrap_err();
+        assert!(err.to_string().contains("Unknown message role: 'SYSTEM'"));
+    }
+
+    #[test]
+    fn test_message_role_display() {
+        assert_eq!(MessageRole::System.to_string(), "system");
+        assert_eq!(MessageRole::User.to_string(), "user");
+        assert_eq!(MessageRole::Assistant.to_string(), "assistant");
+        assert_eq!(MessageRole::Tool.to_string(), "tool");
+    }
 
     #[test]
     fn test_session_key() {

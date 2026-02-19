@@ -551,3 +551,185 @@ impl Channel for DiscordChannel {
         check_allowlist(&self.config.allow_from, sender_id)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_config() -> DiscordConfig {
+        DiscordConfig::default()
+    }
+
+    fn make_config_with_allowlist(allow: Vec<String>) -> DiscordConfig {
+        DiscordConfig {
+            allow_from: allow,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_channel_name() {
+        let channel = DiscordChannel::new(make_config()).unwrap();
+        assert_eq!(channel.name(), "discord");
+    }
+
+    #[test]
+    fn test_is_allowed_empty_allowlist() {
+        let channel = DiscordChannel::new(make_config()).unwrap();
+        assert!(channel.is_allowed("anyone"));
+        assert!(channel.is_allowed("12345"));
+    }
+
+    #[test]
+    fn test_is_allowed_with_allowlist() {
+        let channel =
+            DiscordChannel::new(make_config_with_allowlist(vec!["12345".to_string()])).unwrap();
+        assert!(channel.is_allowed("12345"));
+        assert!(!channel.is_allowed("99999"));
+    }
+
+    #[test]
+    fn test_is_allowed_compound_id() {
+        let channel =
+            DiscordChannel::new(make_config_with_allowlist(vec!["user1".to_string()])).unwrap();
+        assert!(channel.is_allowed("user1|extra"));
+        assert!(!channel.is_allowed("user2|extra"));
+    }
+
+    #[test]
+    fn test_default_config_values() {
+        let config = DiscordConfig::default();
+        assert!(!config.enabled);
+        assert_eq!(config.token.expose(), "");
+        assert!(config.allow_from.is_empty());
+        assert_eq!(
+            config.gateway_url,
+            "wss://gateway.discord.gg/?v=10&encoding=json"
+        );
+        assert_eq!(config.intents, 37377);
+    }
+
+    #[test]
+    fn test_media_dir() {
+        let path = DiscordChannel::media_dir();
+        assert!(path.to_string_lossy().contains(".klyntbot"));
+        assert!(path.to_string_lossy().ends_with("media"));
+    }
+
+    #[test]
+    fn test_invalid_json_parse_fallback() {
+        let data: std::result::Result<Value, _> = serde_json::from_str("not-json");
+        assert!(data.is_err());
+    }
+
+    #[test]
+    fn test_gateway_hello_parse() {
+        let hello = r#"{"op":10,"d":{"heartbeat_interval":41250}}"#;
+        let data: Value = serde_json::from_str(hello).unwrap();
+        let op = data.get("op").and_then(|v| v.as_i64()).unwrap();
+        assert_eq!(op, 10);
+        let interval = data
+            .get("d")
+            .and_then(|d| d.get("heartbeat_interval"))
+            .and_then(|v| v.as_i64())
+            .unwrap();
+        assert_eq!(interval, 41250);
+    }
+
+    #[test]
+    fn test_gateway_message_create_parse() {
+        let payload = json!({
+            "op": 0,
+            "t": "MESSAGE_CREATE",
+            "s": 42,
+            "d": {
+                "id": "msg123",
+                "channel_id": "chan456",
+                "content": "Hello bot!",
+                "author": {
+                    "id": "user789",
+                    "bot": false
+                }
+            }
+        });
+
+        let op = payload.get("op").and_then(|v| v.as_i64()).unwrap();
+        assert_eq!(op, 0);
+        let t = payload.get("t").and_then(|v| v.as_str()).unwrap();
+        assert_eq!(t, "MESSAGE_CREATE");
+        let d = payload.get("d").unwrap();
+        let content = d.get("content").and_then(|v| v.as_str()).unwrap();
+        assert_eq!(content, "Hello bot!");
+        let author = d.get("author").unwrap();
+        assert!(!author.get("bot").and_then(|v| v.as_bool()).unwrap());
+    }
+
+    #[test]
+    fn test_gateway_bot_message_ignored() {
+        let payload = json!({
+            "author": {
+                "id": "bot123",
+                "bot": true
+            },
+            "content": "bot reply",
+            "channel_id": "chan1"
+        });
+
+        let author = payload.get("author").unwrap();
+        let is_bot = author.get("bot").and_then(|v| v.as_bool()).unwrap_or(false);
+        assert!(is_bot);
+    }
+
+    #[test]
+    fn test_gateway_reconnect_opcode() {
+        let msg = r#"{"op":7,"d":null}"#;
+        let data: Value = serde_json::from_str(msg).unwrap();
+        let op = data.get("op").and_then(|v| v.as_i64()).unwrap();
+        assert_eq!(op, 7); // RECONNECT
+    }
+
+    #[test]
+    fn test_gateway_invalid_session_opcode() {
+        let msg = r#"{"op":9,"d":false}"#;
+        let data: Value = serde_json::from_str(msg).unwrap();
+        let op = data.get("op").and_then(|v| v.as_i64()).unwrap();
+        assert_eq!(op, 9); // INVALID_SESSION
+    }
+
+    #[test]
+    fn test_empty_sender_ignored() {
+        let payload = json!({
+            "author": { "id": "" },
+            "channel_id": "chan1",
+            "content": "test"
+        });
+
+        let sender_id = payload
+            .get("author")
+            .and_then(|a| a.get("id"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        assert!(sender_id.is_empty());
+    }
+
+    #[test]
+    fn test_attachment_too_large() {
+        let attachment = json!({
+            "url": "https://example.com/big.zip",
+            "filename": "big.zip",
+            "size": 25_000_000,
+            "id": "att1"
+        });
+
+        let size = attachment.get("size").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+        assert!(size > MAX_ATTACHMENT_BYTES);
+    }
+
+    #[tokio::test]
+    async fn test_stop_sets_running_false() {
+        let channel = DiscordChannel::new(make_config()).unwrap();
+        channel.running.store(true, Ordering::SeqCst);
+        channel.stop().await.unwrap();
+        assert!(!channel.running.load(Ordering::SeqCst));
+    }
+}

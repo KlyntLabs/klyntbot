@@ -4,6 +4,9 @@ use providers::{Message, UserContent};
 
 use crate::token_counter::{default_token_counter, TokenCounter};
 
+/// Default snippet length for extractive summaries (characters).
+const DEFAULT_SNIPPET_LENGTH: usize = 200;
+
 /// Summary of a range of compressed messages.
 pub struct HistorySummary {
     /// The summarized content text.
@@ -24,6 +27,33 @@ pub struct CompressedHistory {
     pub total_tokens: usize,
 }
 
+/// Configuration for the history compressor.
+#[derive(Debug, Clone)]
+pub struct CompressorConfig {
+    /// Maximum snippet length in characters for extractive summaries.
+    pub snippet_length: usize,
+    /// Compression mode.
+    pub mode: CompressorMode,
+}
+
+impl Default for CompressorConfig {
+    fn default() -> Self {
+        Self {
+            snippet_length: DEFAULT_SNIPPET_LENGTH,
+            mode: CompressorMode::Extractive,
+        }
+    }
+}
+
+/// Compression mode for history summarization.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CompressorMode {
+    /// Extractive: takes a snippet from each message (no LLM call).
+    Extractive,
+    /// Abstractive: future mode, currently falls back to Extractive.
+    Abstractive,
+}
+
 /// Compresses conversation history to fit within a token budget.
 ///
 /// Strategy:
@@ -33,6 +63,7 @@ pub struct CompressedHistory {
 pub struct HistoryCompressor {
     min_recent_messages: usize,
     token_counter: Arc<dyn TokenCounter>,
+    config: CompressorConfig,
 }
 
 impl HistoryCompressor {
@@ -40,6 +71,20 @@ impl HistoryCompressor {
         Self {
             min_recent_messages: min_recent,
             token_counter,
+            config: CompressorConfig::default(),
+        }
+    }
+
+    /// Create with a custom configuration.
+    pub fn with_config(
+        min_recent: usize,
+        token_counter: Arc<dyn TokenCounter>,
+        config: CompressorConfig,
+    ) -> Self {
+        Self {
+            min_recent_messages: min_recent,
+            token_counter,
+            config,
         }
     }
 
@@ -93,8 +138,9 @@ impl HistoryCompressor {
         let mut summaries = Vec::new();
         if !to_summarize.is_empty() {
             let chunk_size = 5;
+            let snippet_len = self.config.snippet_length;
             for (chunk_idx, chunk) in to_summarize.chunks(chunk_size).enumerate() {
-                let content = Self::extractive_summary(chunk);
+                let content = Self::extractive_summary_with_length(chunk, snippet_len);
                 let token_count = self.token_counter.estimate_text(&content);
                 let start = chunk_idx * chunk_size;
                 let end = (start + chunk.len()).min(split_point);
@@ -117,7 +163,13 @@ impl HistoryCompressor {
     }
 
     /// Extractive summary: takes the first sentence/snippet from each message.
+    /// Uses the default snippet length (200 chars).
     pub fn extractive_summary(messages: &[Message]) -> String {
+        Self::extractive_summary_with_length(messages, DEFAULT_SNIPPET_LENGTH)
+    }
+
+    /// Extractive summary with a configurable snippet length.
+    pub fn extractive_summary_with_length(messages: &[Message], snippet_length: usize) -> String {
         let mut lines = vec!["Earlier in this conversation:".to_string()];
         for msg in messages {
             match msg {
@@ -126,14 +178,14 @@ impl HistoryCompressor {
                         UserContent::Text(t) => t.clone(),
                         UserContent::MultiPart(_) => "[multipart message]".to_string(),
                     };
-                    let snippet = first_snippet(&text, 100);
+                    let snippet = first_snippet(&text, snippet_length);
                     lines.push(format!("- User: {}", snippet));
                 }
                 Message::Assistant {
                     content: Some(text),
                     ..
                 } => {
-                    let snippet = first_snippet(text, 100);
+                    let snippet = first_snippet(text, snippet_length);
                     lines.push(format!("- Assistant: {}", snippet));
                 }
                 _ => {}
@@ -161,17 +213,61 @@ impl HistoryCompressor {
     }
 }
 
-/// Extract the first sentence or up to `max_chars` characters.
+/// Extract the first sentence or up to `max_chars` characters,
+/// preferring to cut at the last complete sentence boundary within the limit.
+///
+/// Strategy:
+/// 1. If the text fits within `max_chars`, return it as-is.
+/// 2. Look for sentence-ending punctuation (`. `, `! `, `? `, or newline) within the limit.
+///    Prefer the *last* such boundary to capture as much content as possible.
+/// 3. If no sentence boundary is found, fall back to the last word boundary (space).
+/// 4. If no word boundary either, hard-cut at `max_chars`.
 fn first_snippet(text: &str, max_chars: usize) -> String {
     let trimmed = text.trim();
     if trimmed.len() <= max_chars {
-        trimmed.to_string()
-    } else {
-        let cut = trimmed[..max_chars]
-            .rfind(['.', '!', '?', '\n'])
-            .unwrap_or(max_chars);
-        format!("{}…", &trimmed[..cut])
+        return trimmed.to_string();
     }
+
+    let window = &trimmed[..max_chars];
+
+    // Look for sentence-ending punctuation followed by a space or end-of-window,
+    // to avoid cutting mid-abbreviation (e.g., "Dr.Smith").
+    let sentence_end = window
+        .rmatch_indices(['.', '!', '?'])
+        .find(|&(pos, _)| {
+            // Accept if it's the last char in window, or followed by whitespace
+            pos + 1 >= window.len() || window.as_bytes().get(pos + 1).is_some_and(|b| b.is_ascii_whitespace())
+        })
+        .map(|(pos, _)| pos + 1); // include the punctuation
+
+    // Also check for newline boundaries
+    let newline_end = window.rfind('\n');
+
+    // Pick the best sentence boundary (whichever is later/longer)
+    let best_sentence = match (sentence_end, newline_end) {
+        (Some(a), Some(b)) => Some(a.max(b)),
+        (Some(a), None) => Some(a),
+        (None, Some(b)) => Some(b),
+        (None, None) => None,
+    };
+
+    // Require a minimum cut position to avoid degenerate snippets (e.g., "I.")
+    let min_cut = max_chars / 4;
+    if let Some(cut) = best_sentence {
+        if cut >= min_cut {
+            return format!("{}…", trimmed[..cut].trim_end());
+        }
+    }
+
+    // Fall back to word boundary
+    if let Some(space_pos) = window.rfind(' ') {
+        if space_pos >= min_cut {
+            return format!("{}…", &trimmed[..space_pos]);
+        }
+    }
+
+    // Hard cut
+    format!("{}…", window)
 }
 
 #[cfg(test)]
@@ -277,5 +373,130 @@ mod tests {
         for summary in &result.summaries {
             assert_eq!(summary.token_count, 1);
         }
+    }
+
+    // --- G-44: CompressorConfig and CompressorMode tests ---
+
+    #[test]
+    fn test_compressor_config_default() {
+        let config = CompressorConfig::default();
+        assert_eq!(config.snippet_length, 200);
+        assert_eq!(config.mode, CompressorMode::Extractive);
+    }
+
+    #[test]
+    fn test_compressor_mode_abstractive_falls_back() {
+        // Abstractive mode currently falls back to Extractive behavior
+        let config = CompressorConfig {
+            snippet_length: 200,
+            mode: CompressorMode::Abstractive,
+        };
+        let compressor =
+            HistoryCompressor::with_config(4, default_token_counter(), config);
+        let history = make_history(10);
+        let result = compressor.compress(&history, 50_000);
+        // Should still produce results (falls back to extractive)
+        assert!(!result.recent_messages.is_empty());
+    }
+
+    #[test]
+    fn test_custom_snippet_length_in_config() {
+        let config = CompressorConfig {
+            snippet_length: 50,
+            mode: CompressorMode::Extractive,
+        };
+        let compressor =
+            HistoryCompressor::with_config(2, default_token_counter(), config);
+
+        // Use the compressor to verify it was created with the custom config
+        let history = make_history(10);
+        let result = compressor.compress(&history, 50_000);
+        assert!(!result.recent_messages.is_empty());
+
+        // Also verify the static method with custom length
+        let long_text = "A".repeat(300);
+        let msgs = vec![Message::user(long_text)];
+        let summary = HistoryCompressor::extractive_summary_with_length(&msgs, 50);
+        // The user snippet should be truncated
+        assert!(summary.len() < 300);
+    }
+
+    // --- G-44: Sentence boundary tests ---
+
+    #[test]
+    fn test_snippet_cuts_at_sentence_boundary() {
+        let text = "First sentence here. Second sentence here. Third sentence that goes on and on and on to fill up more characters beyond the limit.";
+        let snippet = first_snippet(text, 60);
+        // Should cut at a sentence boundary
+        assert!(
+            snippet.ends_with("here.…") || snippet.ends_with("here.…"),
+            "Expected sentence boundary cut, got: {}",
+            snippet
+        );
+    }
+
+    #[test]
+    fn test_snippet_prefers_later_sentence_boundary() {
+        let text = "Short. A longer second sentence that fits. Third sentence is also here but extends well past the allowed character limit we set.";
+        let snippet = first_snippet(text, 80);
+        // Should include as much as possible up to the last sentence boundary within 80 chars
+        assert!(snippet.contains("second sentence"), "Got: {}", snippet);
+    }
+
+    #[test]
+    fn test_snippet_falls_back_to_word_boundary() {
+        // No sentence-ending punctuation within limit
+        let text = "This is a long message without any sentence-ending punctuation within the first part of the text that just keeps going and going and going";
+        let snippet = first_snippet(text, 60);
+        // Should cut at a word boundary
+        assert!(
+            !snippet.contains("  "),
+            "Should not have trailing spaces: {}",
+            snippet
+        );
+        assert!(snippet.ends_with('…'), "Should end with ellipsis: {}", snippet);
+    }
+
+    #[test]
+    fn test_snippet_short_text_unchanged() {
+        let text = "Hello!";
+        let snippet = first_snippet(text, 200);
+        assert_eq!(snippet, "Hello!");
+    }
+
+    #[test]
+    fn test_snippet_exact_limit_unchanged() {
+        let text = "X".repeat(200);
+        let snippet = first_snippet(&text, 200);
+        assert_eq!(snippet, text);
+    }
+
+    #[test]
+    fn test_snippet_respects_newline_boundary() {
+        let text = "First line\nSecond line that is much much longer and goes way past the character limit we have set for this test";
+        let snippet = first_snippet(text, 40);
+        assert!(
+            snippet.contains("First line") || snippet.contains("Second"),
+            "Got: {}",
+            snippet
+        );
+    }
+
+    #[test]
+    fn test_snippet_does_not_cut_mid_abbreviation() {
+        // "Dr.Smith" should not be treated as sentence end because no space follows
+        let text = "Talk to Dr.Smith about the project details and scheduling requirements that go on for a while.";
+        let snippet = first_snippet(text, 50);
+        // Should NOT cut at "Dr." since no space follows
+        assert!(
+            !snippet.ends_with("Dr.…"),
+            "Should not cut at abbreviation: {}",
+            snippet
+        );
+    }
+
+    #[test]
+    fn test_default_snippet_length_is_200() {
+        assert_eq!(DEFAULT_SNIPPET_LENGTH, 200);
     }
 }

@@ -42,6 +42,8 @@ impl MessageBus {
 
     /// Publish an inbound message to the bus
     pub async fn publish_inbound(&self, msg: InboundMessage) -> Result<()> {
+        msg.validate().map_err(KlyntbotError::Bus)?;
+
         debug!(
             channel = %msg.channel,
             sender = %msg.sender_id,
@@ -86,6 +88,32 @@ impl MessageBus {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn test_publish_inbound_rejects_oversized_message() {
+        let bus = MessageBus::new(10);
+        let oversized_content = "x".repeat(crate::events::MAX_MESSAGE_SIZE + 1);
+        let msg = InboundMessage::new("telegram", "user123", "chat456", oversized_content);
+
+        let result = bus.publish_inbound(msg).await;
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("too large"),
+            "Expected 'too large' in error: {}",
+            err
+        );
+    }
+
+    #[tokio::test]
+    async fn test_publish_inbound_accepts_max_size_message() {
+        let bus = MessageBus::new(10);
+        let max_content = "x".repeat(crate::events::MAX_MESSAGE_SIZE);
+        let msg = InboundMessage::new("telegram", "user123", "chat456", max_content);
+
+        let result = bus.publish_inbound(msg).await;
+        assert!(result.is_ok());
+    }
 
     #[tokio::test]
     async fn test_message_bus() {

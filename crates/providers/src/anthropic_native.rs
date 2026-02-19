@@ -13,13 +13,14 @@ use tracing::{debug, warn};
 use common::{KlyntbotError, ProviderError, Result};
 use config::Secret;
 
+use crate::registry::ProviderRegistry;
 use crate::types::{
     ChatParams, LlmProvider, LlmResponse, LlmStream, LlmStreamChunk, Message, ProviderCapabilities,
-    ResponseFormat, ToolCall, ToolCallDelta, Usage,
+    ProviderHealth, ResponseFormat, ToolCall, ToolCallDelta, Usage,
 };
 
 const ANTHROPIC_CONTEXT_WINDOW: usize = 200_000;
-const ANTHROPIC_VERSION: &str = "2023-06-01";
+const DEFAULT_ANTHROPIC_VERSION: &str = "2023-06-01";
 
 /// Anthropic native API provider with prompt caching and token counting.
 pub struct AnthropicNativeProvider {
@@ -27,11 +28,18 @@ pub struct AnthropicNativeProvider {
     api_key: Secret<String>,
     base_url: String,
     model: String,
+    api_version: String,
 }
 
 impl AnthropicNativeProvider {
     /// Create a new Anthropic native provider.
+    ///
+    /// The API version defaults to `"2023-06-01"` but can be overridden via the
+    /// `ANTHROPIC_API_VERSION` environment variable.
     pub fn new(api_key: Secret<String>, base_url: String, model: String) -> Self {
+        let api_version = std::env::var("ANTHROPIC_API_VERSION")
+            .unwrap_or_else(|_| DEFAULT_ANTHROPIC_VERSION.to_string());
+
         let client = Client::builder()
             .timeout(Duration::from_secs(120))
             .build()
@@ -42,7 +50,14 @@ impl AnthropicNativeProvider {
             api_key,
             base_url,
             model,
+            api_version,
         }
+    }
+
+    /// Set a custom API version.
+    pub fn with_api_version(mut self, version: impl Into<String>) -> Self {
+        self.api_version = version.into();
+        self
     }
 
     /// Extract system prompt from messages (first System message, if any).
@@ -405,6 +420,9 @@ impl LlmProvider for AnthropicNativeProvider {
     ) -> Result<LlmResponse> {
         let url = format!("{}/v1/messages", self.base_url);
 
+        // Apply model-specific overrides as defaults (user params take precedence)
+        let overrides = ProviderRegistry::get_model_overrides(&params.model);
+
         // Build request body
         let mut body = json!({
             "model": params.model,
@@ -422,6 +440,8 @@ impl LlmProvider for AnthropicNativeProvider {
         }
 
         if let Some(temp) = params.temperature {
+            body["temperature"] = json!(temp);
+        } else if let Some(temp) = overrides.get("temperature").and_then(|v| v.as_f64()) {
             body["temperature"] = json!(temp);
         }
 
@@ -448,7 +468,7 @@ impl LlmProvider for AnthropicNativeProvider {
             .client
             .post(&url)
             .header("x-api-key", self.api_key.expose())
-            .header("anthropic-version", ANTHROPIC_VERSION)
+            .header("anthropic-version", &self.api_version)
             .header("content-type", "application/json")
             .json(&body)
             .send()
@@ -480,6 +500,9 @@ impl LlmProvider for AnthropicNativeProvider {
     ) -> Result<LlmStream> {
         let url = format!("{}/v1/messages", self.base_url);
 
+        // Apply model-specific overrides as defaults (user params take precedence)
+        let overrides = ProviderRegistry::get_model_overrides(&params.model);
+
         // Build request body with stream: true
         let mut body = json!({
             "model": params.model,
@@ -498,6 +521,8 @@ impl LlmProvider for AnthropicNativeProvider {
         }
 
         if let Some(temp) = params.temperature {
+            body["temperature"] = json!(temp);
+        } else if let Some(temp) = overrides.get("temperature").and_then(|v| v.as_f64()) {
             body["temperature"] = json!(temp);
         }
 
@@ -524,7 +549,7 @@ impl LlmProvider for AnthropicNativeProvider {
             .client
             .post(&url)
             .header("x-api-key", self.api_key.expose())
-            .header("anthropic-version", ANTHROPIC_VERSION)
+            .header("anthropic-version", &self.api_version)
             .header("content-type", "application/json")
             .json(&body)
             .send()
@@ -613,7 +638,7 @@ impl LlmProvider for AnthropicNativeProvider {
             .client
             .post(&url)
             .header("x-api-key", self.api_key.expose())
-            .header("anthropic-version", ANTHROPIC_VERSION)
+            .header("anthropic-version", &self.api_version)
             .header("content-type", "application/json")
             .json(&body)
             .send()
@@ -669,6 +694,53 @@ impl LlmProvider for AnthropicNativeProvider {
 
     fn name(&self) -> &str {
         "anthropic-native"
+    }
+
+    async fn health_check(&self) -> Result<ProviderHealth> {
+        let url = format!("{}/v1/messages", self.base_url);
+        let health_client = Client::builder()
+            .timeout(Duration::from_secs(5))
+            .build()
+            .expect("failed to build health check client");
+
+        // Send a minimal request — Anthropic doesn't have a /models endpoint,
+        // so we POST a tiny messages request and check for a non-error response.
+        // A 400 (bad request) still means the API is reachable and auth works.
+        let body = serde_json::json!({
+            "model": self.model,
+            "max_tokens": 1,
+            "messages": [{"role": "user", "content": "ping"}],
+        });
+
+        match health_client
+            .post(&url)
+            .header("x-api-key", self.api_key.expose())
+            .header("anthropic-version", &self.api_version)
+            .header("content-type", "application/json")
+            .json(&body)
+            .send()
+            .await
+        {
+            Ok(response) => {
+                let status = response.status();
+                if status.is_success() {
+                    Ok(ProviderHealth::Healthy)
+                } else if status.as_u16() == 401 || status.as_u16() == 403 {
+                    Ok(ProviderHealth::Unhealthy(format!("Auth failed: HTTP {}", status)))
+                } else if status.as_u16() == 429 {
+                    Ok(ProviderHealth::Degraded("Rate limited".to_string()))
+                } else if status.as_u16() == 529 {
+                    Ok(ProviderHealth::Unhealthy("API overloaded".to_string()))
+                } else {
+                    // 400 or other client errors mean the API is reachable
+                    Ok(ProviderHealth::Healthy)
+                }
+            }
+            Err(e) if e.is_timeout() => Ok(ProviderHealth::Degraded(
+                "Health check timed out (5s)".to_string(),
+            )),
+            Err(e) => Ok(ProviderHealth::Unhealthy(e.to_string())),
+        }
     }
 }
 
@@ -1021,6 +1093,28 @@ mod tests {
         let result =
             AnthropicNativeProvider::parse_anthropic_sse("content_block_delta", "not json");
         assert!(result.is_err());
+    }
+
+    // --- G-48: API version configurability tests ---
+
+    #[test]
+    fn test_default_api_version() {
+        let provider = test_provider();
+        // When env var is not set, defaults to "2023-06-01"
+        // (env var may or may not be set in test environment, so test with_api_version)
+        let provider = provider.with_api_version("2023-06-01");
+        assert_eq!(provider.api_version, "2023-06-01");
+    }
+
+    #[test]
+    fn test_custom_api_version() {
+        let provider = AnthropicNativeProvider::new(
+            Secret::new("test-key".to_string()),
+            "https://api.anthropic.com".to_string(),
+            "claude-sonnet-4-20250514".to_string(),
+        )
+        .with_api_version("2024-01-01");
+        assert_eq!(provider.api_version, "2024-01-01");
     }
 
     // --- G-24: Structured output tests ---

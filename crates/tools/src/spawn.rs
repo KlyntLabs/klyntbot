@@ -5,7 +5,7 @@ use serde_json::Value;
 use std::sync::Arc;
 use tracing::debug;
 
-use super::{RoutingContext, Tool};
+use super::{PermissionLevel, RoutingContext, Tool};
 use crate::params::ParamExtractor;
 use common::{Result, ToolError};
 
@@ -56,6 +56,10 @@ impl Tool for SpawnTool {
 
     fn description(&self) -> &str {
         "Spawn a subagent to handle a task in the background. Use this for complex or time-consuming tasks that can run independently. The subagent will complete the task and report back when done."
+    }
+
+    fn permission_level(&self) -> PermissionLevel {
+        PermissionLevel::Admin
     }
 
     fn parameters(&self) -> Value {

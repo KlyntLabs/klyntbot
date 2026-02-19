@@ -5,13 +5,14 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tracing::{debug, warn};
 
-use super::{DynTool, RoutingContext, Tool};
+use super::{DynTool, RoutingContext, Tool, ToolPermissions};
 use common::{Result, ToolError};
 
 /// Registry for agent tools
 pub struct ToolRegistry {
     tools: HashMap<String, DynTool>,
     cached_definitions: Mutex<Option<Vec<Value>>>,
+    permissions: Option<ToolPermissions>,
 }
 
 impl ToolRegistry {
@@ -20,7 +21,13 @@ impl ToolRegistry {
         Self {
             tools: HashMap::new(),
             cached_definitions: Mutex::new(None),
+            permissions: None,
         }
+    }
+
+    /// Set the permission configuration for this registry.
+    pub fn set_permissions(&mut self, permissions: ToolPermissions) {
+        self.permissions = Some(permissions);
     }
 
     /// Register a tool
@@ -71,6 +78,19 @@ impl ToolRegistry {
             .get(name)
             .ok_or_else(|| ToolError::NotFound(name.to_string()))?;
 
+        // Check permissions if configured
+        if let Some(ref perms) = self.permissions {
+            let required = tool.permission_level();
+            let channel = ctx.channel.as_str();
+            if !perms.is_allowed(channel, required) {
+                return Err(ToolError::PermissionDenied(format!(
+                    "Tool '{}' requires {} permission, channel '{}' has insufficient access",
+                    name, required, channel
+                ))
+                .into());
+            }
+        }
+
         // Validate parameters
         let errors = tool.validate_params(&params);
         if !errors.is_empty() {
@@ -112,6 +132,7 @@ impl Default for ToolRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::PermissionLevel;
     use async_trait::async_trait;
 
     struct MockTool;
@@ -144,6 +165,31 @@ mod tests {
         }
     }
 
+    struct ElevatedMockTool;
+
+    #[async_trait]
+    impl Tool for ElevatedMockTool {
+        fn name(&self) -> &str {
+            "elevated_tool"
+        }
+
+        fn description(&self) -> &str {
+            "A tool requiring elevated permissions"
+        }
+
+        fn parameters(&self) -> Value {
+            serde_json::json!({"type": "object", "properties": {}})
+        }
+
+        fn permission_level(&self) -> PermissionLevel {
+            PermissionLevel::Elevated
+        }
+
+        async fn execute(&self, _args: Value, _ctx: &RoutingContext) -> Result<String> {
+            Ok("elevated result".to_string())
+        }
+    }
+
     #[tokio::test]
     async fn test_registry() {
         let mut registry = ToolRegistry::new();
@@ -163,5 +209,56 @@ mod tests {
 
         registry.unregister("mock_tool");
         assert!(registry.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_no_permissions_allows_all() {
+        let mut registry = ToolRegistry::new();
+        registry.register(ElevatedMockTool);
+
+        let ctx = RoutingContext::new("telegram".into(), "test".into());
+        let result = registry
+            .execute("elevated_tool", serde_json::json!({}), &ctx)
+            .await;
+        assert!(result.is_ok(), "No permissions configured = allow all");
+    }
+
+    #[tokio::test]
+    async fn test_permission_granted() {
+        let mut registry = ToolRegistry::new();
+        registry.register(ElevatedMockTool);
+
+        let mut perms = ToolPermissions::new(PermissionLevel::ReadOnly);
+        perms.set_channel_level("cli", PermissionLevel::Admin);
+        registry.set_permissions(perms);
+
+        let ctx = RoutingContext::new("cli".into(), "test".into());
+        let result = registry
+            .execute("elevated_tool", serde_json::json!({}), &ctx)
+            .await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_permission_denied() {
+        let mut registry = ToolRegistry::new();
+        registry.register(ElevatedMockTool);
+
+        let perms = ToolPermissions::new(PermissionLevel::ReadOnly);
+        registry.set_permissions(perms);
+
+        let ctx = RoutingContext::new("telegram".into(), "test".into());
+        let result = registry
+            .execute("elevated_tool", serde_json::json!({}), &ctx)
+            .await;
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("Permission denied"),
+            "Error should mention permission denied: {}",
+            err
+        );
+        assert!(err.contains("elevated_tool"));
+        assert!(err.contains("telegram"));
     }
 }

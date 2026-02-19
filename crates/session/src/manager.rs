@@ -392,6 +392,56 @@ impl SessionManager {
                 }
             }
 
+            // SQL compaction: if message count exceeds threshold, compact
+            match repo.count_messages(&session.key).await {
+                Ok(count) if count as usize > COMPACTION_THRESHOLD => {
+                    let removed = count as usize - COMPACTION_KEEP;
+                    debug!(
+                        "Compacting SQL session {}: {} -> ~{} messages",
+                        session.key, count, COMPACTION_KEEP
+                    );
+
+                    // Insert a compaction marker before deleting
+                    let marker_id = Uuid::new_v4();
+                    let marker_content =
+                        format!("[Session compacted: {} older messages removed]", removed);
+                    let _ = repo
+                        .add_message(
+                            &session.key,
+                            marker_id,
+                            "system",
+                            &marker_content,
+                            None,
+                            None,
+                            None,
+                        )
+                        .await;
+
+                    // keep_count includes the marker we just added
+                    match repo
+                        .compact_session(&session.key, COMPACTION_KEEP as i64)
+                        .await
+                    {
+                        Ok(deleted) => {
+                            debug!(
+                                "SQL compaction complete for {}: {} messages deleted",
+                                session.key, deleted
+                            );
+                        }
+                        Err(e) => {
+                            warn!(
+                                "SQL compaction failed for {}: {}",
+                                session.key, e
+                            );
+                        }
+                    }
+                }
+                Ok(_) => {} // below threshold, no compaction needed
+                Err(e) => {
+                    warn!("Failed to count messages for compaction check: {}", e);
+                }
+            }
+
             return Ok(());
         }
 

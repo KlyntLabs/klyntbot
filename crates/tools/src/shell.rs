@@ -10,7 +10,7 @@ use tokio::process::Command;
 use tokio::time::timeout;
 use tracing::{debug, warn};
 
-use super::{RoutingContext, Tool};
+use super::{PermissionLevel, RoutingContext, Tool};
 use crate::params::ParamExtractor;
 use common::{Result, ToolError};
 
@@ -133,6 +133,10 @@ impl Tool for ExecTool {
 
     fn description(&self) -> &str {
         "Execute a shell command and return its output. Use with caution."
+    }
+
+    fn permission_level(&self) -> PermissionLevel {
+        PermissionLevel::Elevated
     }
 
     fn parameters(&self) -> Value {

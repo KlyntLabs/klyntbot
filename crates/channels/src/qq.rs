@@ -336,3 +336,182 @@ impl Channel for QQChannel {
         check_allowlist(&self.config.allow_from, sender_id)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_config() -> QQConfig {
+        QQConfig::default()
+    }
+
+    fn make_config_with_allowlist(allow: Vec<String>) -> QQConfig {
+        QQConfig {
+            allow_from: allow,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_channel_name() {
+        let channel = QQChannel::new(make_config()).unwrap();
+        assert_eq!(channel.name(), "qq");
+    }
+
+    #[test]
+    fn test_default_config_values() {
+        let config = QQConfig::default();
+        assert!(!config.enabled);
+        assert_eq!(config.app_id, "");
+        assert_eq!(config.secret.expose(), "");
+        assert!(config.allow_from.is_empty());
+    }
+
+    #[test]
+    fn test_is_allowed_empty_allowlist() {
+        let channel = QQChannel::new(make_config()).unwrap();
+        assert!(channel.is_allowed("anyone"));
+        assert!(channel.is_allowed("12345"));
+    }
+
+    #[test]
+    fn test_is_allowed_with_allowlist() {
+        let channel =
+            QQChannel::new(make_config_with_allowlist(vec!["user1".to_string()])).unwrap();
+        assert!(channel.is_allowed("user1"));
+        assert!(!channel.is_allowed("user2"));
+    }
+
+    #[test]
+    fn test_is_allowed_compound_id() {
+        let channel =
+            QQChannel::new(make_config_with_allowlist(vec!["user1".to_string()])).unwrap();
+        assert!(channel.is_allowed("user1|openid"));
+        assert!(!channel.is_allowed("user2|openid"));
+    }
+
+    #[test]
+    fn test_gateway_hello_parse() {
+        let msg = r#"{"op":10,"d":{"heartbeat_interval":41250},"s":null,"t":null}"#;
+        let payload: WsPayload = serde_json::from_str(msg).unwrap();
+        assert_eq!(payload.op, 10);
+        let hello: HelloPayload = serde_json::from_value(payload.d.unwrap()).unwrap();
+        assert_eq!(hello.heartbeat_interval, 41250);
+    }
+
+    #[test]
+    fn test_gateway_dispatch_parse() {
+        let msg = json!({
+            "op": 0,
+            "s": 5,
+            "t": "C2C_MESSAGE_CREATE",
+            "d": {
+                "id": "msg1",
+                "author": { "id": "user123", "user_openid": null },
+                "content": "Hi!"
+            }
+        });
+
+        let payload: WsPayload = serde_json::from_value(msg).unwrap();
+        assert_eq!(payload.op, 0);
+        assert_eq!(payload.s, Some(5));
+        assert_eq!(payload.t.as_deref(), Some("C2C_MESSAGE_CREATE"));
+    }
+
+    #[test]
+    fn test_c2c_message_parse() {
+        let data = json!({
+            "id": "msg1",
+            "author": { "id": "user123", "user_openid": "open456" },
+            "content": "Hello bot!"
+        });
+
+        let msg: C2CMessageCreate = serde_json::from_value(data).unwrap();
+        assert_eq!(msg.id, "msg1");
+        assert_eq!(msg.author.id, Some("user123".to_string()));
+        assert_eq!(msg.author.user_openid, Some("open456".to_string()));
+        assert_eq!(msg.content, "Hello bot!");
+    }
+
+    #[test]
+    fn test_c2c_message_uses_openid_fallback() {
+        let data = json!({
+            "id": "msg2",
+            "author": { "user_openid": "open789" },
+            "content": "test"
+        });
+
+        let msg: C2CMessageCreate = serde_json::from_value(data).unwrap();
+        let user_id = msg
+            .author
+            .id
+            .or(msg.author.user_openid)
+            .unwrap_or_else(|| "unknown".to_string());
+        assert_eq!(user_id, "open789");
+    }
+
+    #[test]
+    fn test_gateway_reconnect_opcode() {
+        let msg = r#"{"op":7,"d":null,"s":null,"t":null}"#;
+        let payload: WsPayload = serde_json::from_str(msg).unwrap();
+        assert_eq!(payload.op, 7);
+    }
+
+    #[test]
+    fn test_gateway_invalid_session_opcode() {
+        let msg = r#"{"op":9,"d":false,"s":null,"t":null}"#;
+        let payload: WsPayload = serde_json::from_str(msg).unwrap();
+        assert_eq!(payload.op, 9);
+    }
+
+    #[test]
+    fn test_gateway_heartbeat_ack() {
+        let msg = r#"{"op":11,"d":null,"s":null,"t":null}"#;
+        let payload: WsPayload = serde_json::from_str(msg).unwrap();
+        assert_eq!(payload.op, 11);
+    }
+
+    #[test]
+    fn test_empty_content_ignored() {
+        let data = json!({
+            "id": "msg3",
+            "author": { "id": "user1" },
+            "content": "   "
+        });
+
+        let msg: C2CMessageCreate = serde_json::from_value(data).unwrap();
+        assert!(msg.content.trim().is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_deduplication() {
+        let channel = QQChannel::new(make_config()).unwrap();
+        let mut processed = channel.processed_ids.write().await;
+        processed.push_back("msg1".to_string());
+        assert!(processed.contains(&"msg1".to_string()));
+        assert!(!processed.contains(&"msg2".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_deduplication_cap() {
+        let channel = QQChannel::new(make_config()).unwrap();
+        let mut processed = channel.processed_ids.write().await;
+        for i in 0..1001 {
+            processed.push_back(format!("msg{}", i));
+            if processed.len() > 1000 {
+                processed.pop_front();
+            }
+        }
+        assert_eq!(processed.len(), 1000);
+        assert!(!processed.contains(&"msg0".to_string()));
+        assert!(processed.contains(&"msg1000".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_stop_sets_running_false() {
+        let channel = QQChannel::new(make_config()).unwrap();
+        channel.running.store(true, Ordering::SeqCst);
+        channel.stop().await.unwrap();
+        assert!(!channel.running.load(Ordering::SeqCst));
+    }
+}

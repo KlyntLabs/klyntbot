@@ -436,3 +436,225 @@ impl Channel for SlackChannel {
         check_allowlist(&self.config.allow_from, sender_id)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_config() -> SlackConfig {
+        SlackConfig::default()
+    }
+
+    fn make_config_with_allowlist(allow: Vec<String>) -> SlackConfig {
+        SlackConfig {
+            allow_from: allow,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_channel_name() {
+        let channel = SlackChannel::new(make_config()).unwrap();
+        assert_eq!(channel.name(), "slack");
+    }
+
+    #[test]
+    fn test_default_config_values() {
+        let config = SlackConfig::default();
+        assert!(!config.enabled);
+        assert_eq!(config.bot_token.expose(), "");
+        assert_eq!(config.app_token.expose(), "");
+        assert!(config.allow_from.is_empty());
+        assert_eq!(config.mode, "socket");
+        assert_eq!(config.group_policy, "none");
+    }
+
+    #[test]
+    fn test_is_allowed_empty_allowlist() {
+        let channel = SlackChannel::new(make_config()).unwrap();
+        assert!(channel.is_allowed("U12345"));
+        assert!(channel.is_allowed("anyone"));
+    }
+
+    #[test]
+    fn test_is_allowed_with_allowlist() {
+        let channel =
+            SlackChannel::new(make_config_with_allowlist(vec!["U12345".to_string()])).unwrap();
+        assert!(channel.is_allowed("U12345"));
+        assert!(!channel.is_allowed("U99999"));
+    }
+
+    #[test]
+    fn test_is_allowed_compound_id() {
+        let channel =
+            SlackChannel::new(make_config_with_allowlist(vec!["U12345".to_string()])).unwrap();
+        assert!(channel.is_allowed("U12345|name"));
+        assert!(!channel.is_allowed("U99999|name"));
+    }
+
+    #[test]
+    fn test_socket_envelope_parse() {
+        let raw = json!({
+            "envelope_id": "env-123",
+            "type": "events_api",
+            "payload": {
+                "event": {
+                    "type": "message",
+                    "user": "U123",
+                    "channel": "C456",
+                    "text": "Hello!"
+                }
+            }
+        });
+
+        let envelope: SocketEnvelope = serde_json::from_value(raw).unwrap();
+        assert_eq!(envelope.envelope_id, "env-123");
+        assert_eq!(envelope.envelope_type, "events_api");
+        assert!(envelope.payload.is_some());
+    }
+
+    #[test]
+    fn test_socket_envelope_without_payload() {
+        let raw = json!({
+            "envelope_id": "env-456",
+            "type": "hello"
+        });
+
+        let envelope: SocketEnvelope = serde_json::from_value(raw).unwrap();
+        assert_eq!(envelope.envelope_type, "hello");
+        assert!(envelope.payload.is_none());
+    }
+
+    #[test]
+    fn test_event_payload_message_parse() {
+        let payload = json!({
+            "event": {
+                "type": "message",
+                "user": "U123",
+                "channel": "C456",
+                "text": "Hello bot!",
+                "channel_type": "im",
+                "ts": "1234567890.123456"
+            }
+        });
+
+        let event = payload.get("event").unwrap();
+        let event_type = event.get("type").and_then(|v| v.as_str()).unwrap();
+        assert_eq!(event_type, "message");
+        let user = event.get("user").and_then(|v| v.as_str()).unwrap();
+        assert_eq!(user, "U123");
+        let channel_type = event.get("channel_type").and_then(|v| v.as_str()).unwrap();
+        assert_eq!(channel_type, "im");
+    }
+
+    #[test]
+    fn test_event_payload_app_mention_parse() {
+        let payload = json!({
+            "event": {
+                "type": "app_mention",
+                "user": "U123",
+                "channel": "C456",
+                "text": "<@BOTID> help me",
+                "channel_type": "channel",
+                "ts": "1234567890.123456"
+            }
+        });
+
+        let event = payload.get("event").unwrap();
+        let event_type = event.get("type").and_then(|v| v.as_str()).unwrap();
+        assert_eq!(event_type, "app_mention");
+    }
+
+    #[test]
+    fn test_subtype_messages_ignored() {
+        let payload = json!({
+            "event": {
+                "type": "message",
+                "subtype": "bot_message",
+                "user": "U123",
+                "channel": "C456",
+                "text": "bot reply"
+            }
+        });
+
+        let event = payload.get("event").unwrap();
+        let subtype = event.get("subtype").and_then(|v| v.as_str());
+        assert!(subtype.is_some()); // Should be filtered out
+    }
+
+    #[test]
+    fn test_bot_mention_strip() {
+        let bot_user_id = "UBOT123";
+        let text = format!("<@{}> help me with this", bot_user_id);
+        let re = regex::Regex::new(&format!(r"<@{}>\s*", regex::escape(bot_user_id))).unwrap();
+        let cleaned = re.replace_all(&text, "").trim().to_string();
+        assert_eq!(cleaned, "help me with this");
+    }
+
+    #[test]
+    fn test_thread_ts_extraction() {
+        let event = json!({
+            "type": "message",
+            "user": "U123",
+            "channel": "C456",
+            "text": "reply",
+            "thread_ts": "1234567890.000001",
+            "ts": "1234567890.000002"
+        });
+
+        let thread_ts = event
+            .get("thread_ts")
+            .or(event.get("ts"))
+            .and_then(|v| v.as_str())
+            .unwrap();
+        assert_eq!(thread_ts, "1234567890.000001");
+    }
+
+    #[test]
+    fn test_thread_ts_falls_back_to_ts() {
+        let event = json!({
+            "type": "message",
+            "user": "U123",
+            "channel": "C456",
+            "text": "new message",
+            "ts": "1234567890.000002"
+        });
+
+        let thread_ts = event
+            .get("thread_ts")
+            .or(event.get("ts"))
+            .and_then(|v| v.as_str())
+            .unwrap();
+        assert_eq!(thread_ts, "1234567890.000002");
+    }
+
+    #[tokio::test]
+    async fn test_stop_sets_running_false() {
+        let channel = SlackChannel::new(make_config()).unwrap();
+        channel.running.store(true, Ordering::SeqCst);
+        channel.stop().await.unwrap();
+        assert!(!channel.running.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn test_auth_response_parse_success() {
+        let raw = json!({
+            "ok": true,
+            "user_id": "UBOT123"
+        });
+        let auth: AuthTestResponse = serde_json::from_value(raw).unwrap();
+        assert!(auth.ok);
+        assert_eq!(auth.user_id.unwrap(), "UBOT123");
+    }
+
+    #[test]
+    fn test_auth_response_parse_failure() {
+        let raw = json!({
+            "ok": false,
+            "error": "invalid_auth"
+        });
+        let auth: AuthTestResponse = serde_json::from_value(raw).unwrap();
+        assert!(!auth.ok);
+        assert_eq!(auth.error.unwrap(), "invalid_auth");
+    }
+}

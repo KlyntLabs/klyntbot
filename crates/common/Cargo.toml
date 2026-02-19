@@ -15,6 +15,7 @@ crossterm = { workspace = true }
 unicode-width = { workspace = true }
 tokio = { workspace = true }
 async-trait = { workspace = true }
+tracing = { workspace = true }
 
 chrono-tz = { workspace = true }
 iana-time-zone = { workspace = true }

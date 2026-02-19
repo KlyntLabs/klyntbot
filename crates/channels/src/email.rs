@@ -479,3 +479,175 @@ impl Channel for EmailChannel {
         check_allowlist(&self.config.allow_from, sender_id)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_config() -> EmailConfig {
+        EmailConfig::default()
+    }
+
+    fn make_config_with_allowlist(allow: Vec<String>) -> EmailConfig {
+        EmailConfig {
+            allow_from: allow,
+            ..Default::default()
+        }
+    }
+
+    fn make_valid_config() -> EmailConfig {
+        EmailConfig {
+            consent_granted: true,
+            imap_host: "imap.example.com".to_string(),
+            imap_username: "user@example.com".to_string(),
+            imap_password: config::Secret::new("pass".to_string()),
+            smtp_host: "smtp.example.com".to_string(),
+            smtp_username: "user@example.com".to_string(),
+            smtp_password: config::Secret::new("pass".to_string()),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn test_channel_name() {
+        let channel = EmailChannel::new(make_config()).unwrap();
+        assert_eq!(channel.name(), "email");
+    }
+
+    #[test]
+    fn test_default_config_values() {
+        let config = EmailConfig::default();
+        assert!(!config.enabled);
+        assert_eq!(config.imap_port, 993);
+        assert_eq!(config.smtp_port, 587);
+        assert!(config.imap_host.is_empty());
+        assert!(config.smtp_host.is_empty());
+        assert_eq!(config.imap_mailbox, "INBOX");
+        assert!(config.imap_use_ssl);
+        assert!(config.smtp_use_tls);
+        assert!(!config.consent_granted);
+        assert!(config.auto_reply_enabled);
+        assert_eq!(config.max_body_chars, 12000);
+        assert!(config.mark_seen);
+        assert_eq!(config.poll_interval_seconds, 30);
+        assert_eq!(config.subject_prefix, "Re: ");
+    }
+
+    #[test]
+    fn test_is_allowed_empty_allowlist() {
+        let channel = EmailChannel::new(make_config()).unwrap();
+        assert!(channel.is_allowed("anyone@example.com"));
+    }
+
+    #[test]
+    fn test_is_allowed_with_allowlist() {
+        let channel = EmailChannel::new(make_config_with_allowlist(vec![
+            "trusted@example.com".to_string(),
+        ]))
+        .unwrap();
+        assert!(channel.is_allowed("trusted@example.com"));
+        assert!(!channel.is_allowed("untrusted@example.com"));
+    }
+
+    #[test]
+    fn test_validate_config_no_consent() {
+        let channel = EmailChannel::new(make_config()).unwrap();
+        let result = channel.validate_config();
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("consent"), "Expected consent error: {}", err);
+    }
+
+    #[test]
+    fn test_validate_config_missing_fields() {
+        let config = EmailConfig {
+            consent_granted: true,
+            ..Default::default()
+        };
+        let channel = EmailChannel::new(config).unwrap();
+        let result = channel.validate_config();
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("imap_host"),
+            "Expected imap_host in error: {}",
+            err
+        );
+        assert!(
+            err.contains("smtp_host"),
+            "Expected smtp_host in error: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_validate_config_valid() {
+        let channel = EmailChannel::new(make_valid_config()).unwrap();
+        let result = channel.validate_config();
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_reply_subject_adds_prefix() {
+        let channel = EmailChannel::new(make_config()).unwrap();
+        let subject = channel.reply_subject("Hello");
+        assert_eq!(subject, "Re: Hello");
+    }
+
+    #[test]
+    fn test_reply_subject_no_double_re() {
+        let channel = EmailChannel::new(make_config()).unwrap();
+        let subject = channel.reply_subject("Re: Hello");
+        assert_eq!(subject, "Re: Hello"); // Should not add another Re:
+    }
+
+    #[test]
+    fn test_reply_subject_case_insensitive_re() {
+        let channel = EmailChannel::new(make_config()).unwrap();
+        let subject = channel.reply_subject("RE: Hello");
+        assert_eq!(subject, "RE: Hello"); // Should not add another Re:
+    }
+
+    #[test]
+    fn test_reply_subject_empty() {
+        let channel = EmailChannel::new(make_config()).unwrap();
+        let subject = channel.reply_subject("");
+        assert_eq!(subject, "Re: klyntbot reply");
+    }
+
+    #[test]
+    fn test_reply_subject_custom_prefix() {
+        let config = EmailConfig {
+            subject_prefix: "[Bot] ".to_string(),
+            ..Default::default()
+        };
+        let channel = EmailChannel::new(config).unwrap();
+        let subject = channel.reply_subject("Hello");
+        assert_eq!(subject, "[Bot] Hello");
+    }
+
+    #[tokio::test]
+    async fn test_stop_sets_running_false() {
+        let channel = EmailChannel::new(make_config()).unwrap();
+        channel.running.store(true, Ordering::SeqCst);
+        channel.stop().await.unwrap();
+        assert!(!channel.running.load(Ordering::SeqCst));
+    }
+
+    #[tokio::test]
+    async fn test_processed_uids_deduplication() {
+        let channel = EmailChannel::new(make_config()).unwrap();
+        let mut processed = channel.processed_uids.write().await;
+        processed.insert("uid1".to_string());
+        assert!(processed.contains("uid1"));
+        assert!(!processed.contains("uid2"));
+    }
+
+    #[tokio::test]
+    async fn test_last_subject_tracking() {
+        let channel = EmailChannel::new(make_config()).unwrap();
+        let mut subjects = channel.last_subject_by_chat.write().await;
+        subjects.insert("user@example.com".to_string(), "Test Subject".to_string());
+        assert_eq!(subjects.get("user@example.com").unwrap(), "Test Subject");
+    }
+}

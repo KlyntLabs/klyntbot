@@ -22,6 +22,7 @@ pub use params::ParamExtractor;
 pub mod project_store;
 pub mod project_tool;
 pub mod project_types;
+pub mod permissions;
 pub mod registry;
 pub mod rrule_utils;
 pub mod search_utils;
@@ -64,6 +65,12 @@ pub use plan_tool::{PlanCompletionHandler, PlanHandler, PlanTool};
 
 // Re-export memory tool
 pub use memory_tool::MemoryTool;
+
+// Re-export permissions types
+pub use permissions::{PermissionLevel, ToolPermissions};
+
+// Re-export rrule types
+pub use rrule_utils::{Frequency, RRule};
 
 // Re-export search utilities
 pub use search_utils::{rrf_merge, SearchResult};
@@ -136,6 +143,12 @@ pub trait Tool: Send + Sync {
 
     /// Execute the tool with given arguments and routing context
     async fn execute(&self, args: Value, ctx: &RoutingContext) -> Result<String>;
+
+    /// Permission level required to use this tool.
+    /// Defaults to `Standard`. Override for sensitive tools.
+    fn permission_level(&self) -> PermissionLevel {
+        PermissionLevel::Standard
+    }
 
     /// Convert to OpenAI function schema format
     fn to_schema(&self) -> Value {

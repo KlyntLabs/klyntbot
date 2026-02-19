@@ -71,6 +71,10 @@ pub struct ProviderConfig {
     /// Extended thinking / chain-of-thought configuration
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub extended_thinking: Option<ExtendedThinkingConfig>,
+
+    /// API version header override (Anthropic-specific, e.g., "2023-06-01")
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub api_version: Option<String>,
 }
 
 /// Extended thinking (chain-of-thought) configuration for supported providers

@@ -13,9 +13,11 @@ use tracing::{debug, warn};
 
 use common::{KlyntbotError, ProviderError, Result};
 
+use crate::registry::ProviderRegistry;
 use crate::types::{
     ChatParams, LlmProvider, LlmResponse, LlmStream, LlmStreamChunk, Message, ProviderCapabilities,
-    ResponseFormat, ToolCall, ToolCallDelta, ToolCallMessage, Usage, DEFAULT_CONTEXT_WINDOW,
+    ProviderHealth, ResponseFormat, ToolCall, ToolCallDelta, ToolCallMessage, Usage,
+    DEFAULT_CONTEXT_WINDOW,
 };
 
 /// OpenAI-compatible provider using direct HTTP
@@ -238,18 +240,25 @@ impl LlmProvider for OpenAiCompatProvider {
     ) -> Result<LlmResponse> {
         let url = format!("{}/chat/completions", self.api_base);
 
+        // Apply model-specific overrides as defaults (user params take precedence)
+        let overrides = ProviderRegistry::get_model_overrides(&params.model);
+
         // Build request body
         let mut body = json!({
             "model": params.model,
             "messages": messages,
         });
 
-        // Add optional parameters
+        // Add optional parameters (user-provided take precedence over overrides)
         if let Some(temp) = params.temperature {
+            body["temperature"] = json!(temp);
+        } else if let Some(temp) = overrides.get("temperature").and_then(|v| v.as_f64()) {
             body["temperature"] = json!(temp);
         }
         if let Some(max_tokens) = params.max_tokens {
             body["max_tokens"] = json!(max_tokens);
+        } else if let Some(mt) = overrides.get("max_tokens").and_then(|v| v.as_u64()) {
+            body["max_tokens"] = json!(mt);
         }
 
         // Add tools if provided
@@ -319,6 +328,9 @@ impl LlmProvider for OpenAiCompatProvider {
     ) -> Result<LlmStream> {
         let url = format!("{}/chat/completions", self.api_base);
 
+        // Apply model-specific overrides as defaults (user params take precedence)
+        let overrides = ProviderRegistry::get_model_overrides(&params.model);
+
         // Build request body with stream: true
         let mut body = json!({
             "model": params.model,
@@ -326,12 +338,16 @@ impl LlmProvider for OpenAiCompatProvider {
             "stream": true,
         });
 
-        // Add optional parameters
+        // Add optional parameters (user-provided take precedence over overrides)
         if let Some(temp) = params.temperature {
+            body["temperature"] = json!(temp);
+        } else if let Some(temp) = overrides.get("temperature").and_then(|v| v.as_f64()) {
             body["temperature"] = json!(temp);
         }
         if let Some(max_tokens) = params.max_tokens {
             body["max_tokens"] = json!(max_tokens);
+        } else if let Some(mt) = overrides.get("max_tokens").and_then(|v| v.as_u64()) {
+            body["max_tokens"] = json!(mt);
         }
 
         if let Some(tools) = tools {
@@ -446,6 +462,34 @@ impl LlmProvider for OpenAiCompatProvider {
 
     fn context_window(&self) -> usize {
         Self::model_context_window(&self.default_model)
+    }
+
+    async fn health_check(&self) -> Result<ProviderHealth> {
+        let url = format!("{}/models", self.api_base);
+        let health_client = Client::builder()
+            .timeout(Duration::from_secs(5))
+            .build()
+            .map_err(|e| ProviderError::Http(e.to_string()))?;
+
+        let mut request = health_client
+            .get(&url)
+            .header("Authorization", format!("Bearer {}", self.api_key));
+
+        for (key, value) in &self.extra_headers {
+            request = request.header(key, value);
+        }
+
+        match request.send().await {
+            Ok(response) if response.status().is_success() => Ok(ProviderHealth::Healthy),
+            Ok(response) => Ok(ProviderHealth::Unhealthy(format!(
+                "HTTP {}",
+                response.status()
+            ))),
+            Err(e) if e.is_timeout() => Ok(ProviderHealth::Degraded(
+                "Health check timed out (5s)".to_string(),
+            )),
+            Err(e) => Ok(ProviderHealth::Unhealthy(e.to_string())),
+        }
     }
 }
 
@@ -652,5 +696,22 @@ mod tests {
         let provider = test_provider("gpt-4o");
         assert_eq!(provider.name(), "openai-compat");
         assert_eq!(provider.default_model(), "gpt-4o");
+    }
+
+    // --- G-47: Model override resolution tests ---
+
+    #[test]
+    fn test_model_overrides_returned_for_kimi() {
+        use crate::registry::ProviderRegistry;
+        let overrides = ProviderRegistry::get_model_overrides("kimi-k2.5");
+        assert!(overrides.contains_key("temperature"));
+        assert_eq!(overrides["temperature"].as_f64().unwrap(), 1.0);
+    }
+
+    #[test]
+    fn test_model_overrides_empty_for_standard_models() {
+        use crate::registry::ProviderRegistry;
+        let overrides = ProviderRegistry::get_model_overrides("gpt-4o");
+        assert!(overrides.is_empty());
     }
 }

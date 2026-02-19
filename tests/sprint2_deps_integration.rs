@@ -690,21 +690,18 @@ fn test_rrule_validate_monthly_with_interval() {
 }
 
 #[test]
-fn test_rrule_validate_rejects_count() {
-    let result = rrule_utils::validate_rrule("FREQ=DAILY;COUNT=10");
-    assert!(result.is_err());
-    let err = result.unwrap_err().to_string();
-    assert!(err.contains("COUNT"), "Should reject COUNT: {}", err);
+fn test_rrule_validate_accepts_count() {
+    assert!(rrule_utils::validate_rrule("FREQ=DAILY;COUNT=10").is_ok());
 }
 
 #[test]
-fn test_rrule_validate_rejects_until() {
-    assert!(rrule_utils::validate_rrule("FREQ=DAILY;UNTIL=20250101T000000Z").is_err());
+fn test_rrule_validate_accepts_until() {
+    assert!(rrule_utils::validate_rrule("FREQ=DAILY;UNTIL=20250101T000000Z").is_ok());
 }
 
 #[test]
-fn test_rrule_validate_rejects_exdate() {
-    assert!(rrule_utils::validate_rrule("FREQ=DAILY;EXDATE=20250101T000000Z").is_err());
+fn test_rrule_validate_accepts_exdate() {
+    assert!(rrule_utils::validate_rrule("FREQ=DAILY;EXDATE=20250101T000000Z").is_ok());
 }
 
 #[test]

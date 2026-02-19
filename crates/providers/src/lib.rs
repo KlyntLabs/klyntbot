@@ -17,7 +17,7 @@ pub use transcription::TranscriptionProvider;
 pub use types::{
     tool_calls_to_messages, ChatParams, ContentPart, DynProvider, FunctionCall, ImageUrl,
     LlmProvider, LlmResponse, LlmStream, LlmStreamChunk, Message, ProviderCapabilities,
-    ResponseFormat, ToolCall, ToolCallDelta, ToolCallMessage, Usage, UserContent,
+    ProviderHealth, ResponseFormat, ToolCall, ToolCallDelta, ToolCallMessage, Usage, UserContent,
     DEFAULT_CONTEXT_WINDOW,
 };
 
@@ -192,11 +192,14 @@ fn try_create_from_spec(spec: &ProviderSpec, config: &Config, model: &str) -> Op
 
         // Use native Anthropic provider when native: true
         if pc.native && spec.name == "anthropic" {
-            let provider = AnthropicNativeProvider::new(
+            let mut provider = AnthropicNativeProvider::new(
                 config::Secret::new(pc.api_key.expose().to_string()),
                 api_base.to_string(),
                 model.to_string(),
             );
+            if let Some(ref version) = pc.api_version {
+                provider = provider.with_api_version(version);
+            }
             info!("Using native Anthropic provider with {}", model);
             return Some(Arc::new(provider));
         }
