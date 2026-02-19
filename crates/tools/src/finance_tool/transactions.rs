@@ -164,6 +164,7 @@ impl FinanceTool {
 
         // Check budget impact for expense transactions with a category.
         let mut budget_impact: Option<serde_json::Value> = None;
+        let mut nudge = String::new();
         if tx_type == TransactionType::Expense {
             if let Some(ref cat) = category {
                 if let Ok(Some(budget)) = self.budgets.get_by_category(cat).await {
@@ -179,6 +180,12 @@ impl FinanceTool {
                             "limit": usage.amount,
                             "percentage": percentage,
                         }));
+                        if percentage >= usage.alert_threshold as i64 {
+                            nudge = format!(
+                                "\nNote: Your \"{}\" budget is now at {}% ({} / {} {}).",
+                                usage.name, percentage, usage.spent, usage.amount, usage.currency,
+                            );
+                        }
                     }
                 }
             }
@@ -204,7 +211,11 @@ impl FinanceTool {
             result["budget_impact"] = impact;
         }
 
-        Ok(serde_json::to_string_pretty(&result).unwrap())
+        let mut response = serde_json::to_string_pretty(&result).unwrap();
+        if !nudge.is_empty() {
+            response.push_str(&nudge);
+        }
+        Ok(response)
     }
 
     #[allow(clippy::too_many_arguments)]
