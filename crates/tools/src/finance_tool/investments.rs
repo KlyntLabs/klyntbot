@@ -230,7 +230,15 @@ impl FinanceTool {
     // ── Investment transactions ────────────────────────────────────────────────
 
     async fn investment_tx(&self, p: &ParamExtractor<'_>) -> Result<String> {
-        let investment_id = p.required_str("investment_id")?;
+        // Accept either "id" (from schema) or "investment_id" (explicit).
+        let investment_id = p
+            .optional_str("investment_id")?
+            .or(p.optional_str("id")?)
+            .ok_or_else(|| {
+                ToolError::InvalidParams(
+                    "missing required 'id' (investment ID) parameter".to_string(),
+                )
+            })?;
         let tx_type_str = p.required_str("tx_type")?;
         let tx_type = InvestmentTxType::from_str_loose(tx_type_str)
             .ok_or_else(|| ToolError::InvalidParams(format!("Invalid tx_type: {tx_type_str}")))?;
@@ -676,16 +684,18 @@ mod tests {
     }
 
     #[test]
-    fn investment_tx_requires_investment_id_and_tx_type_and_total_amount() {
+    fn investment_tx_requires_id_and_tx_type_and_total_amount() {
+        // Accepts either "id" or "investment_id"
         let args = json!({});
         let p = ParamExtractor::new(&args);
-        assert!(p.required_str("investment_id").is_err());
+        assert!(p.optional_str("id").unwrap().is_none());
+        assert!(p.optional_str("investment_id").unwrap().is_none());
 
-        let args = json!({"investment_id": "i1"});
+        let args = json!({"id": "i1"});
         let p = ParamExtractor::new(&args);
         assert!(p.required_str("tx_type").is_err());
 
-        let args = json!({"investment_id": "i1", "tx_type": "buy"});
+        let args = json!({"id": "i1", "tx_type": "buy"});
         let p = ParamExtractor::new(&args);
         assert!(p.required_i64("total_amount").is_err());
     }
