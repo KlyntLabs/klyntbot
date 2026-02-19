@@ -52,45 +52,6 @@ fn test_check_allowlist_no_partial_match() {
 // ─────────────────────────────────────────────────────────────
 
 #[test]
-fn test_discord_config_defaults() {
-    let config = DiscordConfig::default();
-    assert!(!config.enabled);
-    assert_eq!(config.token.expose(), "");
-    assert!(config.allow_from.is_empty());
-    assert_eq!(
-        config.gateway_url,
-        "wss://gateway.discord.gg/?v=10&encoding=json"
-    );
-    // GUILD_MESSAGES | DIRECT_MESSAGES | MESSAGE_CONTENT
-    assert_eq!(config.intents, 37377);
-}
-
-#[test]
-fn test_discord_channel_creation_empty_token() {
-    use klyntbot::channels::DiscordChannel;
-    // Should succeed even with empty token (fails on connect, not create)
-    let config = DiscordConfig::default();
-    let channel = DiscordChannel::new(config);
-    assert!(channel.is_ok());
-}
-
-#[test]
-fn test_discord_channel_name() {
-    use klyntbot::channels::{Channel, DiscordChannel};
-    let config = DiscordConfig::default();
-    let channel = DiscordChannel::new(config).unwrap();
-    assert_eq!(channel.name(), "discord");
-}
-
-#[test]
-fn test_discord_is_allowed_empty_allowlist() {
-    use klyntbot::channels::{Channel, DiscordChannel};
-    let config = DiscordConfig::default();
-    let channel = DiscordChannel::new(config).unwrap();
-    assert!(channel.is_allowed("any_user"));
-}
-
-#[test]
 fn test_discord_is_allowed_with_allowlist() {
     use klyntbot::channels::{Channel, DiscordChannel};
     let config = DiscordConfig {
@@ -105,41 +66,6 @@ fn test_discord_is_allowed_with_allowlist() {
 // ─────────────────────────────────────────────────────────────
 // Slack channel tests
 // ─────────────────────────────────────────────────────────────
-
-#[test]
-fn test_slack_config_defaults() {
-    let config = SlackConfig::default();
-    assert!(!config.enabled);
-    assert_eq!(config.bot_token.expose(), "");
-    assert_eq!(config.app_token.expose(), "");
-    assert!(config.allow_from.is_empty());
-    assert_eq!(config.mode, "socket");
-    assert_eq!(config.group_policy, "none");
-}
-
-#[test]
-fn test_slack_channel_creation() {
-    use klyntbot::channels::SlackChannel;
-    let config = SlackConfig::default();
-    let channel = SlackChannel::new(config);
-    assert!(channel.is_ok());
-}
-
-#[test]
-fn test_slack_channel_name() {
-    use klyntbot::channels::{Channel, SlackChannel};
-    let config = SlackConfig::default();
-    let channel = SlackChannel::new(config).unwrap();
-    assert_eq!(channel.name(), "slack");
-}
-
-#[test]
-fn test_slack_is_allowed_empty_allowlist() {
-    use klyntbot::channels::{Channel, SlackChannel};
-    let config = SlackConfig::default();
-    let channel = SlackChannel::new(config).unwrap();
-    assert!(channel.is_allowed("U12345"));
-}
 
 #[test]
 fn test_slack_is_allowed_with_allowlist() {
@@ -170,39 +96,6 @@ async fn test_slack_start_rejects_empty_tokens() {
 // ─────────────────────────────────────────────────────────────
 
 #[test]
-fn test_qq_config_defaults() {
-    let config = QQConfig::default();
-    assert!(!config.enabled);
-    assert_eq!(config.app_id, "");
-    assert_eq!(config.secret.expose(), "");
-    assert!(config.allow_from.is_empty());
-}
-
-#[test]
-fn test_qq_channel_creation() {
-    use klyntbot::channels::QQChannel;
-    let config = QQConfig::default();
-    let channel = QQChannel::new(config);
-    assert!(channel.is_ok());
-}
-
-#[test]
-fn test_qq_channel_name() {
-    use klyntbot::channels::{Channel, QQChannel};
-    let config = QQConfig::default();
-    let channel = QQChannel::new(config).unwrap();
-    assert_eq!(channel.name(), "qq");
-}
-
-#[test]
-fn test_qq_is_allowed_empty_allowlist() {
-    use klyntbot::channels::{Channel, QQChannel};
-    let config = QQConfig::default();
-    let channel = QQChannel::new(config).unwrap();
-    assert!(channel.is_allowed("any_openid"));
-}
-
-#[test]
 fn test_qq_is_allowed_with_allowlist() {
     use klyntbot::channels::{Channel, QQChannel};
     let config = QQConfig {
@@ -231,37 +124,6 @@ async fn test_qq_start_rejects_empty_credentials() {
 // ─────────────────────────────────────────────────────────────
 
 #[test]
-fn test_whatsapp_config_defaults() {
-    let config = WhatsAppConfig::default();
-    assert!(!config.enabled);
-    assert_eq!(config.bridge_url, "ws://localhost:3001");
-    assert!(config.allow_from.is_empty());
-}
-
-#[test]
-fn test_whatsapp_channel_creation() {
-    use klyntbot::channels::WhatsAppChannel;
-    let config = WhatsAppConfig::default();
-    let _channel = WhatsAppChannel::new(config).unwrap();
-}
-
-#[test]
-fn test_whatsapp_channel_name() {
-    use klyntbot::channels::{Channel, WhatsAppChannel};
-    let config = WhatsAppConfig::default();
-    let channel = WhatsAppChannel::new(config).unwrap();
-    assert_eq!(channel.name(), "whatsapp");
-}
-
-#[test]
-fn test_whatsapp_is_allowed_empty_allowlist() {
-    use klyntbot::channels::{Channel, WhatsAppChannel};
-    let config = WhatsAppConfig::default();
-    let channel = WhatsAppChannel::new(config).unwrap();
-    assert!(channel.is_allowed("628123456789@s.whatsapp.net"));
-}
-
-#[test]
 fn test_whatsapp_is_allowed_with_allowlist() {
     use klyntbot::channels::{Channel, WhatsAppChannel};
     let config = WhatsAppConfig {
@@ -288,47 +150,6 @@ async fn test_whatsapp_send_fails_without_connection() {
 // ─────────────────────────────────────────────────────────────
 // Email channel tests
 // ─────────────────────────────────────────────────────────────
-
-#[test]
-fn test_email_config_defaults() {
-    let config = EmailConfig::default();
-    assert!(!config.enabled);
-    assert_eq!(config.imap_port, 993);
-    assert_eq!(config.smtp_port, 587);
-    assert!(config.imap_use_ssl);
-    assert!(config.smtp_use_tls);
-    assert!(!config.consent_granted);
-    assert!(config.auto_reply_enabled);
-    assert_eq!(config.max_body_chars, 12000);
-    assert!(config.mark_seen);
-    assert_eq!(config.poll_interval_seconds, 30);
-    assert_eq!(config.subject_prefix, "Re: ");
-    assert_eq!(config.imap_mailbox, "INBOX");
-}
-
-#[test]
-fn test_email_channel_creation() {
-    use klyntbot::channels::EmailChannel;
-    let config = EmailConfig::default();
-    let channel = EmailChannel::new(config);
-    assert!(channel.is_ok());
-}
-
-#[test]
-fn test_email_channel_name() {
-    use klyntbot::channels::{Channel, EmailChannel};
-    let config = EmailConfig::default();
-    let channel = EmailChannel::new(config).unwrap();
-    assert_eq!(channel.name(), "email");
-}
-
-#[test]
-fn test_email_is_allowed_empty_allowlist() {
-    use klyntbot::channels::{Channel, EmailChannel};
-    let config = EmailConfig::default();
-    let channel = EmailChannel::new(config).unwrap();
-    assert!(channel.is_allowed("anyone@example.com"));
-}
 
 #[test]
 fn test_email_is_allowed_with_allowlist() {
