@@ -49,7 +49,9 @@ impl FinanceTool {
                 ToolError::InvalidParams("Target amount must be positive".to_string()).into(),
             );
         }
-        let currency = p.required_str("currency")?;
+        let currency = p
+            .optional_str("currency")?
+            .unwrap_or(&self.default_currency);
         let current_amount = p.i64_or("current_amount", 0)?;
         let deadline = p
             .optional_str("deadline")?
@@ -426,7 +428,9 @@ impl FinanceTool {
         if principal <= 0 || remaining <= 0 {
             return Err(ToolError::InvalidParams("Amounts must be positive".to_string()).into());
         }
-        let currency = p.required_str("currency")?;
+        let currency = p
+            .optional_str("currency")?
+            .unwrap_or(&self.default_currency);
         let interest_rate = p.optional_f64("interest_rate")?;
         let monthly_payment = p.optional_i64("monthly_payment")?;
         let due_date = p

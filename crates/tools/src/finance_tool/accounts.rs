@@ -42,7 +42,9 @@ impl FinanceTool {
             ToolError::InvalidParams(format!("Invalid account type: {}", type_str))
         })?;
 
-        let currency = p.required_str("currency")?;
+        let currency = p
+            .optional_str("currency")?
+            .unwrap_or(&self.default_currency);
         if currency.is_empty() || currency.len() > 3 {
             return Err(ToolError::InvalidParams(
                 "Currency must be a valid ISO 4217 code".to_string(),
@@ -99,12 +101,12 @@ impl FinanceTool {
             self.accounts
                 .list_by_currency(c)
                 .await
-                .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?
+                .map_err(|e| ToolError::ExecutionFailed(format!("list_by_currency: {}", e)))?
         } else {
             self.accounts
                 .list(include_archived)
                 .await
-                .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?
+                .map_err(|e| ToolError::ExecutionFailed(format!("list: {}", e)))?
         };
 
         if rows.is_empty() {
@@ -117,7 +119,7 @@ impl FinanceTool {
             .accounts
             .total_balance_by_currency()
             .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+            .map_err(|e| ToolError::ExecutionFailed(format!("total_balance_by_currency: {}", e)))?;
 
         let total_map: serde_json::Map<String, serde_json::Value> = total_by_currency
             .into_iter()

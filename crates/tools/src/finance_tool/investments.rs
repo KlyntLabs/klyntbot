@@ -128,7 +128,11 @@ impl FinanceTool {
             .into());
         }
 
-        let name = p.required_str("name")?;
+        // Default name to symbol if not provided (common for stocks/ETFs).
+        let name = match p.optional_str("name")? {
+            Some(n) => n,
+            None => symbol.unwrap_or("Unnamed Investment"),
+        };
         // quantity is type `number` (f64) in the schema
         let quantity = p.optional_f64("quantity")?.ok_or_else(|| {
             ToolError::InvalidParams("missing required 'quantity' parameter".to_string())
@@ -137,7 +141,9 @@ impl FinanceTool {
             return Err(ToolError::InvalidParams("Quantity must be positive".to_string()).into());
         }
         let cost_basis = p.required_i64("cost_basis")?;
-        let currency = p.required_str("currency")?;
+        let currency = p
+            .optional_str("currency")?
+            .unwrap_or(&self.default_currency);
         let purchase_date = match p.optional_str("purchase_date")? {
             Some(s) => Some(
                 NaiveDate::parse_from_str(s, "%Y-%m-%d")
@@ -629,10 +635,10 @@ mod tests {
         let p = ParamExtractor::new(&args);
         assert!(p.required_str("asset_type").is_err());
 
-        // name
+        // name is now optional (defaults to symbol or "Unnamed Investment")
         let args = json!({"portfolio_id": "p1", "asset_type": "stock"});
         let p = ParamExtractor::new(&args);
-        assert!(p.required_str("name").is_err());
+        assert!(p.optional_str("name").unwrap().is_none());
 
         // cost_basis
         let args = json!({"portfolio_id": "p1", "asset_type": "stock", "name": "Apple"});
