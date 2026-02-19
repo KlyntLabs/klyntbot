@@ -68,7 +68,11 @@ impl FinanceTool {
         }
 
         // 3. Stale investment prices
-        let investments = self.investments.list_with_symbols().await.unwrap_or_default();
+        let investments = self
+            .investments
+            .list_with_symbols()
+            .await
+            .unwrap_or_default();
         let stale_threshold = Local::now() - Duration::hours(24);
         let stale_count = investments
             .iter()
@@ -164,10 +168,7 @@ impl FinanceTool {
                 check: "empty_portfolios",
                 severity: Severity::Info,
                 count: empty_count,
-                detail: format!(
-                    "{} portfolio(s) have no investment holdings.",
-                    empty_count
-                ),
+                detail: format!("{} portfolio(s) have no investment holdings.", empty_count),
             });
         }
 

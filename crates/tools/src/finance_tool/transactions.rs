@@ -45,25 +45,22 @@ impl FinanceTool {
                     .list(false)
                     .await
                     .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
-                accounts
-                    .first()
-                    .map(|a| a.id.clone())
-                    .ok_or_else(|| {
-                        ToolError::InvalidParams(
-                            serde_json::to_string(&json!({
-                                "error": "no_accounts",
-                                "message": "No active accounts found. Create an account first.",
-                                "suggested_action": "account_add",
-                                "example": {
-                                    "action": "account_add",
-                                    "name": "Main Bank",
-                                    "type": "bank",
-                                    "currency": "USD"
-                                }
-                            }))
-                            .unwrap(),
-                        )
-                    })?
+                accounts.first().map(|a| a.id.clone()).ok_or_else(|| {
+                    ToolError::InvalidParams(
+                        serde_json::to_string(&json!({
+                            "error": "no_accounts",
+                            "message": "No active accounts found. Create an account first.",
+                            "suggested_action": "account_add",
+                            "example": {
+                                "action": "account_add",
+                                "name": "Main Bank",
+                                "type": "bank",
+                                "currency": "USD"
+                            }
+                        }))
+                        .unwrap(),
+                    )
+                })?
             }
         };
         let account_id = account_id.as_str();
@@ -711,25 +708,22 @@ impl FinanceTool {
                     .list(false)
                     .await
                     .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
-                accounts
-                    .first()
-                    .map(|a| a.id.clone())
-                    .ok_or_else(|| {
-                        ToolError::InvalidParams(
-                            serde_json::to_string(&json!({
-                                "error": "no_accounts",
-                                "message": "No active accounts found. Create an account first.",
-                                "suggested_action": "account_add",
-                                "example": {
-                                    "action": "account_add",
-                                    "name": "Main Bank",
-                                    "type": "bank",
-                                    "currency": "USD"
-                                }
-                            }))
-                            .unwrap(),
-                        )
-                    })?
+                accounts.first().map(|a| a.id.clone()).ok_or_else(|| {
+                    ToolError::InvalidParams(
+                        serde_json::to_string(&json!({
+                            "error": "no_accounts",
+                            "message": "No active accounts found. Create an account first.",
+                            "suggested_action": "account_add",
+                            "example": {
+                                "action": "account_add",
+                                "name": "Main Bank",
+                                "type": "bank",
+                                "currency": "USD"
+                            }
+                        }))
+                        .unwrap(),
+                    )
+                })?
             }
         };
         let account_id = account_id.as_str();
@@ -738,7 +732,9 @@ impl FinanceTool {
         let type_str = p
             .optional_str("type")?
             .or(p.optional_str("tx_type")?)
-            .ok_or_else(|| ToolError::InvalidParams("Missing required 'type' parameter".to_string()))?;
+            .ok_or_else(|| {
+                ToolError::InvalidParams("Missing required 'type' parameter".to_string())
+            })?;
         let tx_type = TransactionType::from_str_loose(type_str).ok_or_else(|| {
             ToolError::InvalidParams(format!("Invalid transaction type: {}", type_str))
         })?;

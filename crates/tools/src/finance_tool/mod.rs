@@ -6,10 +6,10 @@
 mod accounts;
 mod budgets;
 mod goals;
+mod health;
 mod investments;
 mod reports;
 mod settings;
-mod health;
 mod transactions;
 
 use async_trait::async_trait;

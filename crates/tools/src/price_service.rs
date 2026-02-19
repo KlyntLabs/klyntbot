@@ -246,7 +246,9 @@ impl PriceService {
                         source: "cache_stale".to_string(),
                     });
                 }
-                Err(format!("coingecko error for {coin_id}/{vs_currency}: {err}"))
+                Err(format!(
+                    "coingecko error for {coin_id}/{vs_currency}: {err}"
+                ))
             }
         }
     }

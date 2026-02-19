@@ -425,15 +425,11 @@ impl FinanceTool {
         })?;
         let principal = p.required_i64("principal")?;
         if principal <= 0 {
-            return Err(
-                ToolError::InvalidParams("Principal must be positive".to_string()).into(),
-            );
+            return Err(ToolError::InvalidParams("Principal must be positive".to_string()).into());
         }
         let remaining = p.i64_or("remaining", principal)?;
         if remaining <= 0 {
-            return Err(
-                ToolError::InvalidParams("Remaining must be positive".to_string()).into(),
-            );
+            return Err(ToolError::InvalidParams("Remaining must be positive".to_string()).into());
         }
         let currency = p
             .optional_str("currency")?
