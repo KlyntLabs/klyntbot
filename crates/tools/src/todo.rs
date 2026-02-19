@@ -173,8 +173,10 @@ impl TodoTool {
     /// - Title is short (≤ 3 words)
     /// - 2+ optional fields are filled (description, priority, due_date, tags)
     /// - The LLM did NOT set `confirmed: true`
+    ///
+    /// Title-only creation (0-1 optional fields) always passes through.
+    /// The word count of the title is NOT checked — LLMs can pad titles.
     pub fn should_guard_creation(
-        title: &str,
         has_description: bool,
         has_priority: bool,
         has_due_date: bool,
@@ -182,11 +184,6 @@ impl TodoTool {
         confirmed: bool,
     ) -> bool {
         if confirmed {
-            return false;
-        }
-
-        let word_count = title.split_whitespace().count();
-        if word_count > 3 {
             return false;
         }
 
@@ -446,7 +443,6 @@ impl Tool for TodoTool {
                 if self.creation_mode == config::CreationMode::AskFirst {
                     let confirmed = p.optional_bool("confirmed")?.unwrap_or(false);
                     if Self::should_guard_creation(
-                        title,
                         todo.description.is_some(),
                         todo.priority.is_some(),
                         todo.due_date.is_some(),
@@ -1877,37 +1873,41 @@ mod tests {
     }
 
     #[test]
-    fn test_guard_triggers_on_vague_unconfirmed_task() {
+    fn test_guard_triggers_on_unconfirmed_with_2_fields() {
+        // 2+ optional fields without confirmed → should trigger
         assert!(TodoTool::should_guard_creation(
-            "buy", true, true, false, false, false,
+            true, true, false, false, false,
+        ));
+    }
+
+    #[test]
+    fn test_guard_triggers_on_all_fields_unconfirmed() {
+        // All 4 optional fields filled, even long title — still triggers
+        assert!(TodoTool::should_guard_creation(
+            true, true, true, true, false,
         ));
     }
 
     #[test]
     fn test_guard_skips_when_confirmed() {
         assert!(!TodoTool::should_guard_creation(
-            "buy", true, true, false, false, true,
-        ));
-    }
-
-    #[test]
-    fn test_guard_skips_for_detailed_title() {
-        assert!(!TodoTool::should_guard_creation(
-            "buy milk from the store", true, true, true, true, false,
+            true, true, true, true, true,
         ));
     }
 
     #[test]
     fn test_guard_skips_when_few_optional_fields() {
+        // Only 1 optional field → should NOT trigger
         assert!(!TodoTool::should_guard_creation(
-            "buy", true, false, false, false, false,
+            true, false, false, false, false,
         ));
     }
 
     #[test]
     fn test_guard_skips_for_title_only() {
+        // No optional fields → should NOT trigger
         assert!(!TodoTool::should_guard_creation(
-            "buy", false, false, false, false, false,
+            false, false, false, false, false,
         ));
     }
 

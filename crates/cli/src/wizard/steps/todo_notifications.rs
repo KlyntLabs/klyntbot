@@ -8,8 +8,9 @@ use anyhow::Result;
 
 use crate::wizard::framework::{StepResult, WizardState};
 use crate::wizard::prompts::{
-    prompt_multi_select_with_defaults, prompt_text, prompt_yes_no, SelectOption,
+    prompt_multi_select_with_defaults, prompt_select, prompt_text, prompt_yes_no, SelectOption,
 };
+use config::CreationMode;
 
 /// Run the todo notifications configuration step.
 ///
@@ -100,6 +101,33 @@ pub fn run_todo_notification_step(state: &mut WizardState) -> Result<StepResult>
         let time = prompt_text("Daily digest time (HH:MM)", Some(default_time), false)?;
         state.config.todo.notifications.daily_digest_time = time;
     }
+
+    // Configure task creation mode
+    let creation_mode_options = [
+        SelectOption {
+            label: "Ask First",
+            description: "Ask for details before creating vague tasks (recommended)",
+        },
+        SelectOption {
+            label: "YOLO",
+            description: "Auto-enrich from conversation context, confirm before applying",
+        },
+        SelectOption {
+            label: "Party",
+            description: "Interactive brainstorming — one question at a time",
+        },
+    ];
+    let current_mode_idx = match state.config.todo.creation_mode {
+        CreationMode::AskFirst => 0,
+        CreationMode::Yolo => 1,
+        CreationMode::Party => 2,
+    };
+    let mode_idx = prompt_select("Task creation mode", &creation_mode_options, current_mode_idx)?;
+    state.config.todo.creation_mode = match mode_idx {
+        1 => CreationMode::Yolo,
+        2 => CreationMode::Party,
+        _ => CreationMode::AskFirst,
+    };
 
     // Configure daily planning (default from current config)
     let enable_planning = prompt_yes_no(
