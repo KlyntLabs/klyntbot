@@ -27,16 +27,17 @@ fn is_fabricated_tool_response(text: &str, tool_names: &[&str]) -> bool {
     }
 
     let lower = text.to_lowercase();
+    let has_todo = tool_names.iter().any(|t| *t == "todo");
+    let has_search = tool_names.iter().any(|t| t.contains("search"));
+    let has_calendar = tool_names.iter().any(|t| *t == "calendar");
 
     // Pattern 1: Contains a fake ID pattern (hex ID like "9c4e5f3b" or "a1b2c3d4")
     let has_fake_id = {
         let mut found = false;
-        // Look for "ID:" or "(ID:" followed by hex-like string
         for pattern in &["id:", "(id:"] {
             if let Some(pos) = lower.find(pattern) {
                 let after = &lower[pos + pattern.len()..];
                 let trimmed = after.trim_start();
-                // Check if next chars are hex-like (at least 6 hex chars)
                 let hex_chars = trimmed
                     .chars()
                     .take(10)
@@ -51,22 +52,21 @@ fn is_fabricated_tool_response(text: &str, tool_names: &[&str]) -> bool {
         found
     };
 
-    // Pattern 2: Structured result patterns that indicate fabricated output
-    let structured_result_indicators = [
-        "task created",
-        "task added",
-        "i've created the task",
+    // Pattern 2: Context-aware structured result indicators
+    let todo_indicators = ["task created", "task added", "i've created the task"];
+    let search_indicators = [
         "i searched the web",
         "search results:",
         "here are the results",
         "i found these results",
-        "event created",
-        "reminder set",
-        "calendar event added",
     ];
-    let has_structured_result = structured_result_indicators
-        .iter()
-        .any(|p| lower.contains(p));
+    let calendar_indicators = ["event created", "reminder set", "calendar event added"];
+
+    let has_todo_result = has_todo && todo_indicators.iter().any(|p| lower.contains(p));
+    let has_search_result = has_search && search_indicators.iter().any(|p| lower.contains(p));
+    let has_calendar_result =
+        has_calendar && calendar_indicators.iter().any(|p| lower.contains(p));
+    let has_structured_result = has_todo_result || has_search_result || has_calendar_result;
 
     // Pattern 3: Has multiple field-like patterns (Priority:, Due Date:, Description:, Tags:)
     let field_patterns = [
@@ -82,19 +82,14 @@ fn is_fabricated_tool_response(text: &str, tool_names: &[&str]) -> bool {
         .count();
     let has_multiple_fields = field_count >= 2;
 
-    // Pattern 4: Numbered list after a search indicator (e.g. "1. Result\n2. Result")
-    let search_indicators = [
-        "i searched the web",
-        "search results:",
-        "here are the results",
-        "i found these results",
-    ];
-    let has_search_with_list = search_indicators.iter().any(|p| lower.contains(p))
+    // Pattern 4: Search with numbered list — requires fake ID for corroboration
+    let has_search_with_list = has_search_result
+        && has_fake_id
         && lower.contains("\n1.")
         && lower.contains("\n2.");
 
     // Decision: fabricated if structured result with (fake ID or multiple fields),
-    // or search with numbered list
+    // or search with numbered list and corroborating fake ID
     (has_structured_result && (has_fake_id || has_multiple_fields)) || has_search_with_list
 }
 
@@ -445,7 +440,8 @@ mod tests {
     #[test]
     fn test_detects_fabricated_search_response() {
         let tool_names = vec!["todo", "calendar", "web_search"];
-        let fabricated = "I searched the web for you and found these results:\n1. Rust programming language\n2. Rust game";
+        // Search fabrication with fake ID for corroboration
+        let fabricated = "I searched the web for you (ID: abcdef12) and found these results:\n1. Rust programming language\n2. Rust game";
         assert!(is_fabricated_tool_response(fabricated, &tool_names));
     }
 
@@ -475,6 +471,46 @@ mod tests {
         let tool_names: Vec<&str> = vec![];
         let text = "Task Created: Buy groceries (ID: 9c4e5f3b)";
         assert!(!is_fabricated_tool_response(text, &tool_names));
+    }
+
+    #[test]
+    fn test_task_fabrication_not_flagged_without_todo_tool() {
+        // "web_search" is available but NOT "todo" — task patterns should NOT trigger
+        let tool_names = vec!["web_search", "calendar"];
+        let fabricated = "I've created the task for you:\n\n**Task Created:** Buy groceries (ID: 9c4e5f3b)\n- **Description:** Weekly shopping\n- **Priority:** P3 (Medium)\n- **Due Date:** Tomorrow";
+        assert!(!is_fabricated_tool_response(fabricated, &tool_names));
+    }
+
+    #[test]
+    fn test_search_fabrication_not_flagged_without_search_tool() {
+        // "todo" is available but NOT "web_search" — search patterns should NOT trigger
+        let tool_names = vec!["todo", "calendar"];
+        let fabricated = "I searched the web for you and found these results:\n1. Rust programming language\n2. Rust game";
+        assert!(!is_fabricated_tool_response(fabricated, &tool_names));
+    }
+
+    #[test]
+    fn test_calendar_fabrication_not_flagged_without_calendar_tool() {
+        // Only "todo" available — calendar patterns should NOT trigger
+        let tool_names = vec!["todo"];
+        let fabricated = "Event created: Team meeting (ID: abcdef12)\n- Priority: High\n- Due Date: Tomorrow";
+        assert!(!is_fabricated_tool_response(fabricated, &tool_names));
+    }
+
+    #[test]
+    fn test_search_with_list_requires_fake_id() {
+        // Search with numbered list but NO fake ID — should NOT trigger
+        let tool_names = vec!["web_search"];
+        let text = "I searched the web for you and found these results:\n1. Rust programming language\n2. Rust game";
+        assert!(!is_fabricated_tool_response(text, &tool_names));
+    }
+
+    #[test]
+    fn test_search_with_list_and_fake_id_triggers() {
+        // Search with numbered list AND fake ID — should trigger
+        let tool_names = vec!["web_search"];
+        let text = "I searched the web for you (ID: abcdef12) and found these results:\n1. Rust programming language\n2. Rust game";
+        assert!(is_fabricated_tool_response(text, &tool_names));
     }
 
     #[tokio::test]
