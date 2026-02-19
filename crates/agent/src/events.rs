@@ -25,6 +25,27 @@ pub enum AgentEvent {
     /// A new agent iteration has started.
     IterationStart { iteration: usize, max: usize },
 
+    /// Pipeline classification step completed.
+    ClassificationComplete {
+        strategy: String,
+        confidence: f32,
+        source: String,
+        duration_ms: u64,
+    },
+
+    /// Context assembly step completed.
+    ContextAssembled {
+        total_tokens: usize,
+        budget: usize,
+        duration_ms: u64,
+    },
+
+    /// Execution engine selected and starting.
+    ExecutionStarted {
+        engine: String,
+        max_iterations: usize,
+    },
+
     /// Processing is complete with the final accumulated content.
     Done(String),
 

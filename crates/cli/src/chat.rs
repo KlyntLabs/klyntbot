@@ -15,7 +15,7 @@ use crate::interactive::SlashCommandHelper;
 use crate::wizard::ask_user_prompt;
 
 /// Handle chat command
-pub async fn handle_chat(message: Option<String>, session: String) -> Result<()> {
+pub async fn handle_chat(message: Option<String>, session: String, verbose: bool) -> Result<()> {
     // Load config (with KLYNTBOT_* env var overrides)
     let config = config::load_with_env_overrides().await?;
     let model = config.agents.defaults.model.clone();
@@ -72,7 +72,7 @@ pub async fn handle_chat(message: Option<String>, session: String) -> Result<()>
         println!("\n{} {}", badge, msg);
         println!();
 
-        run_with_streaming(&agent_loop, msg, session_key, &model).await?;
+        run_with_streaming(&agent_loop, msg, session_key, &model, verbose).await?;
     } else {
         // Interactive REPL mode with rustyline
         let history_path = dirs::home_dir()
@@ -334,6 +334,9 @@ async fn run_with_streaming(
                     AgentEvent::IterationStart { iteration, max } => {
                         renderer.on_iteration_start(iteration, max);
                     }
+                    AgentEvent::ClassificationComplete { .. } => {}
+                    AgentEvent::ContextAssembled { .. } => {}
+                    AgentEvent::ExecutionStarted { .. } => {}
                     AgentEvent::Done(_) => {
                         clean_exit = true;
                         break;
