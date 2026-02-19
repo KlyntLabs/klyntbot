@@ -7,7 +7,7 @@
 
 ## Executive Summary
 
-Klyntbot is a 105K-line Rust AI agent framework with 17 crates, 15+ tools, and 6 chat platform integrations. The codebase is architecturally sound with clean dependency layering and no circular dependencies. However, the ongoing JSONL-to-PostgreSQL migration is approximately **80% complete**, leaving several subsystems in a fragile dual-mode state. The gap report identifies **52 gaps** across 6 severity tiers (**18 resolved** as of 2026-02-19).
+Klyntbot is a 105K-line Rust AI agent framework with 17 crates, 15+ tools, and 6 chat platform integrations. The codebase is architecturally sound with clean dependency layering and no circular dependencies. However, the ongoing JSONL-to-PostgreSQL migration is approximately **80% complete**, leaving several subsystems in a fragile dual-mode state. The gap report identifies **52 gaps** across 6 severity tiers (**29 resolved** as of 2026-02-19).
 
 **Top 3 systemic issues:**
 1. **JSONL/SQL dual-mode persistence** — 6+ subsystems maintain parallel storage backends, doubling maintenance burden and creating behavior divergence
@@ -41,17 +41,17 @@ Klyntbot is a 105K-line Rust AI agent framework with 17 crates, 15+ tools, and 6
 | ~~G-16~~ | ~~P2~~ | ~~Agent~~ | ~~File-based memory (daily notes + MEMORY.md) not in PostgreSQL~~ **RESOLVED 2026-02-19** |
 | ~~G-17~~ | ~~P2~~ | ~~Agent~~ | ~~File-based learning stores (outcomes, thresholds, decision log)~~ **RESOLVED 2026-02-19** |
 | ~~G-18~~ | ~~P2~~ | ~~Agent~~ | ~~ToolConfidenceMap exists but not wired into ConfidenceEvaluator~~ **RESOLVED 2026-02-19** |
-| G-19 | P2 | Agent | StrategyTracker computes stats but doesn't feed back into classification |
-| G-20 | P2 | Provider | Session stores string roles, losing tool_calls/multipart/reasoning |
-| G-21 | P2 | Provider | ProviderManager streaming has no retry logic |
-| G-22 | P2 | Provider | No per-model context window mapping (all return default 128K) |
-| G-23 | P2 | Provider | SQL session `list()` always returns `message_count: 0` |
-| G-24 | P2 | Provider | No structured output support (`response_format` parameter) |
-| G-25 | P2 | Provider | `create_provider()` doesn't create ProviderManager with failover |
-| G-26 | P2 | Dashboard | Dashboard uses legacy JSONL stores instead of SQL repos |
-| G-27 | P2 | Dashboard | `system_status` query returns hardcoded stub values |
-| G-28 | P2 | Dashboard | `do_config_patch` mutation validates but doesn't apply |
-| G-29 | P2 | Dashboard | `search_todos` semantic/hybrid modes return empty stubs |
+| ~~G-19~~ | ~~P2~~ | ~~Agent~~ | ~~StrategyTracker computes stats but doesn't feed back into classification~~ **RESOLVED 2026-02-19** |
+| ~~G-20~~ | ~~P2~~ | ~~Provider~~ | ~~Session stores string roles, losing tool_calls/multipart/reasoning~~ **RESOLVED 2026-02-19** |
+| ~~G-21~~ | ~~P2~~ | ~~Provider~~ | ~~ProviderManager streaming has no retry logic~~ **RESOLVED 2026-02-19** |
+| ~~G-22~~ | ~~P2~~ | ~~Provider~~ | ~~No per-model context window mapping (all return default 128K)~~ **RESOLVED 2026-02-19** |
+| ~~G-23~~ | ~~P2~~ | ~~Provider~~ | ~~SQL session `list()` always returns `message_count: 0`~~ **RESOLVED 2026-02-19** |
+| ~~G-24~~ | ~~P2~~ | ~~Provider~~ | ~~No structured output support (`response_format` parameter)~~ **RESOLVED 2026-02-19** |
+| ~~G-25~~ | ~~P2~~ | ~~Provider~~ | ~~`create_provider()` doesn't create ProviderManager with failover~~ **RESOLVED 2026-02-19** |
+| ~~G-26~~ | ~~P2~~ | ~~Dashboard~~ | ~~Dashboard uses legacy JSONL stores instead of SQL repos~~ **RESOLVED 2026-02-19** |
+| ~~G-27~~ | ~~P2~~ | ~~Dashboard~~ | ~~`system_status` query returns hardcoded stub values~~ **RESOLVED 2026-02-19** |
+| ~~G-28~~ | ~~P2~~ | ~~Dashboard~~ | ~~`do_config_patch` mutation validates but doesn't apply~~ **RESOLVED 2026-02-19** |
+| ~~G-29~~ | ~~P2~~ | ~~Dashboard~~ | ~~`search_todos` semantic/hybrid modes return empty stubs~~ **RESOLVED 2026-02-19** |
 | G-30 | P2 | Calendar | Sync state uses parallel file/SQL backends (not unified) |
 | G-31 | P2 | Calendar | No CalDAV event caching (every call hits remote) |
 | G-32 | P2 | Scheduling | CronStore uses flat JSON (full rewrite) while Goal/Plan use JSONL journal |
@@ -255,49 +255,74 @@ Deprecated config methods `learning_outcomes_path()` and `learning_state_path()`
 
 Integrated `ToolConfidenceMap` into `ConfidenceEvaluator`: added `tool_map: Option<ToolConfidenceMap>` field, `new_with_map()` constructor, and `decide_for_tool(assessment, tool_name)` method that uses per-tool thresholds with fallback to global. Added `tool_overrides: HashMap<String, f32>` to `ConfidenceConfig`. Agent loop constructor loads overrides from config and creates evaluator with map when overrides exist. 4 new tests covering per-tool threshold selection, global fallback, and boundary behavior.
 
-#### G-19: StrategyTracker No Feedback Loop
-**Source**: `04-agent-core.md` §19.3 #14
-Accuracy stats computed but not used to adjust orchestrator strategy selection.
+#### ~~G-19: StrategyTracker No Feedback Loop~~ — RESOLVED
 
-#### G-20: Session Loses Structured Message Data
-**Source**: `02-providers-context.md` §9.1 G4
-Sessions store `role: String` + `content: String`, losing tool calls, multipart content, and reasoning content.
+**Status**: **Resolved** on 2026-02-19
+**Implementation**: `crates/storage/src/repos/strategy.rs`, `crates/agent/src/orchestrator/mod.rs`, `crates/agent/src/orchestrator/classifier.rs`
 
-#### G-21: ProviderManager Streaming No Retry
-**Source**: `02-providers-context.md` §9.2 G5
-Rate-limited streaming requests fail immediately. Non-streaming has 3-attempt retry with exponential backoff.
+Added `StrategySummaryRow` and `get_strategy_summaries()` SQL query (GROUP BY with 30-day lookback). `Orchestrator` accepts optional `StrategyRepo` via builder pattern. During classification, `build_strategy_context()` fetches per-strategy accuracy stats and injects them into the LLM classifier prompt, enabling data-driven strategy selection. Graceful degradation when no historical data exists. 2 new unit tests for formatting.
 
-#### G-22: No Per-Model Context Window Mapping
-**Source**: `02-providers-context.md` §9.2 G6
-`OpenAiCompatProvider` returns default 128K for all models (GPT-4 is 8K, GPT-3.5 is 16K).
+#### ~~G-20: Session Loses Structured Message Data~~ — RESOLVED
 
-#### G-23: SQL Session List Missing Message Count
-**Source**: `02-providers-context.md` §9.2 G7
-`list_sessions()` returns `message_count: 0` for all sessions in SQL mode.
+**Status**: **Resolved** on 2026-02-19
+**Implementation**: `crates/storage/migrations/20260219000002_session_message_format.sql`, `crates/session/src/manager.rs`, `crates/storage/src/repos/session.rs`
 
-#### G-24: No Structured Output Support
-**Source**: `02-providers-context.md` §9.2 G8
-`ProviderCapabilities.structured_outputs` always `false`. No JSON mode parameter.
+Added nullable `tool_calls JSONB` and `metadata JSONB` columns to `session_messages` table. `SessionMessage` struct extended with `Option<serde_json::Value>` fields (skip_serializing_if None). New `add_structured_message()` method preserves full message structure. SQL save/load paths updated. 3 new tests covering structured messages, JSONL roundtrip, and plain message defaults.
 
-#### G-25: create_provider() Doesn't Create ProviderManager
-**Source**: `02-providers-context.md` §9.2 G9
-Factory returns single provider without failover wrapping.
+#### ~~G-21: ProviderManager Streaming No Retry~~ — RESOLVED
 
-#### G-26: Dashboard Uses Legacy JSONL Stores
-**Source**: `05-channels-cli-dashboard.md` §5.3 #1
-`DashboardContext` holds `Arc<RwLock<TodoStore>>` and `Arc<RwLock<ProjectStore>>` (legacy) instead of SQL repos.
+**Status**: **Resolved** on 2026-02-19
+**Implementation**: `crates/providers/src/manager.rs` — `try_primary_stream_with_retry()`
 
-#### G-27: Dashboard system_status Stub
-**Source**: `05-channels-cli-dashboard.md` §5.1
-Returns hardcoded values, not live agent data.
+Added streaming retry with exponential backoff (500ms→1s→2s) for rate-limited errors, mirroring existing non-streaming retry logic. Non-rate-limit errors fail fast. Circuit breaker interaction preserved. `chat_stream()` updated with proper fallback routing. 6 new tests covering all streaming retry paths.
 
-#### G-28: Dashboard config_patch Stub
-**Source**: `05-channels-cli-dashboard.md` §5.1
-Validates section name but doesn't apply the JSON patch.
+#### ~~G-22: No Per-Model Context Window Mapping~~ — RESOLVED
 
-#### G-29: Dashboard search_todos Semantic/Hybrid Stubs
-**Source**: `05-channels-cli-dashboard.md` §5.1
-Non-keyword search modes return empty vectors.
+**Status**: **Resolved** on 2026-02-19
+**Implementation**: `crates/providers/src/openai_compat.rs` — `model_context_window()`
+
+Added static model→context_window mapping via prefix matching: GPT-4 (8K), GPT-4-32K (32K), GPT-4-turbo (128K), GPT-4o (128K), GPT-3.5-turbo (16K), o1 (200K), o1-mini/preview (128K), o3 (200K), o3-mini (200K), o4 (200K). Case-insensitive matching. Unknown models fall back to 128K default. 8+ new tests covering all model families.
+
+#### ~~G-23: SQL Session List Missing Message Count~~ — RESOLVED
+
+**Status**: **Resolved** on 2026-02-19
+**Implementation**: `crates/storage/src/repos/session.rs`, `crates/session/src/manager.rs`
+
+Added `SessionListRow` with `message_count: i64` field. `list_sessions()` now uses efficient COUNT subquery (single query, no N+1). Session manager maps real count instead of hardcoded 0. Existing composite index on `(session_key, timestamp)` supports the subquery.
+
+#### ~~G-24: No Structured Output Support~~ — RESOLVED
+
+**Status**: **Resolved** on 2026-02-19
+**Implementation**: `crates/providers/src/types.rs`, `crates/providers/src/openai_compat.rs`, `crates/providers/src/anthropic_native.rs`
+
+Added `ResponseFormat` enum (Text, JsonObject, JsonSchema) and `response_format` field to `ChatParams`. OpenAI-compatible provider serializes to native `response_format` API parameter with `strict: true` for JSON schema. Anthropic provider uses synthetic tool injection with forced `tool_choice` for JsonSchema, and system instruction for JsonObject. Both providers report `structured_outputs: true` in capabilities. Both streaming and non-streaming paths supported. 6+ new tests.
+
+#### ~~G-25: create_provider() Doesn't Create ProviderManager~~ — RESOLVED
+
+**Status**: **Resolved** on 2026-02-19
+**Implementation**: `crates/providers/src/lib.rs` — `create_provider_with_failover()`
+
+Added factory function that creates `ProviderManager` with primary + fallback when `config.provider_manager.fallback` is configured. Helper functions `create_fallback_provider()` and `create_classifier_provider()` for clean separation. Falls back to plain `DynProvider` when no failover config exists. Re-exported from facade crate.
+
+#### ~~G-26: Dashboard Uses Legacy JSONL Stores~~ — RESOLVED
+
+**Status**: **Resolved** on 2026-02-19
+Dashboard crate removed entirely in commit `7b94f98` (`chore: remove dashboard crate and frontend`). No dashboard code remains in the codebase — all 52 files deleted including Svelte frontend, GraphQL schema, and axum server.
+
+#### ~~G-27: Dashboard system_status Stub~~ — RESOLVED
+
+**Status**: **Resolved** on 2026-02-19
+Dashboard crate removed entirely in commit `7b94f98`. Stub resolvers no longer exist.
+
+#### ~~G-28: Dashboard config_patch Stub~~ — RESOLVED
+
+**Status**: **Resolved** on 2026-02-19
+Dashboard crate removed entirely in commit `7b94f98`. Mutation handlers no longer exist.
+
+#### ~~G-29: Dashboard search_todos Semantic/Hybrid Stubs~~ — RESOLVED
+
+**Status**: **Resolved** on 2026-02-19
+Dashboard crate removed entirely in commit `7b94f98`. Search is handled via TodoTool in chat.
 
 #### G-30: Calendar Sync State Dual Backend
 **Source**: `06-domain-features.md` §7.1
@@ -440,13 +465,13 @@ Channels set `running = false` but don't send WebSocket close frames.
 10. ~~**G-02**: Implement Anthropic native streaming~~ ✅ Done 2026-02-19
 11. ~~**G-07**: Wire provider token counting into ContextEngine~~ ✅ Done 2026-02-19
 12. ~~**G-08**: Implement memory retrieval in context assembly~~ ✅ Done 2026-02-19
-13. **G-20**: Extend session message format to preserve tool calls/reasoning
-14. **G-22**: Add per-model context window mapping
+13. ~~**G-20**: Extend session message format to preserve tool calls/reasoning~~ ✅ Done 2026-02-19
+14. ~~**G-22**: Add per-model context window mapping~~ ✅ Done 2026-02-19
 
 ### Phase 4: Dashboard & Integration (Weeks 7-8)
 15. ~~**G-09**: Wire DashboardServer into serve.rs~~ ✅ Done 2026-02-19
-16. **G-26**: Migrate dashboard to use SQL repos
-17. **G-27/G-28/G-29**: Implement dashboard stub resolvers
+16. ~~**G-26**: Migrate dashboard to use SQL repos~~ ✅ Resolved 2026-02-19 (dashboard crate removed)
+17. ~~**G-27/G-28/G-29**: Implement dashboard stub resolvers~~ ✅ Resolved 2026-02-19 (dashboard crate removed)
 18. ~~**G-13/G-14**: Refactor AgentLoop into focused subcomponents~~ ✅ Done 2026-02-19
 
 ### Phase 5: Polish & Hardening (Ongoing)

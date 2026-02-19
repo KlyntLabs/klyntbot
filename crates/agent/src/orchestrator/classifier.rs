@@ -62,15 +62,24 @@ impl LlmClassifier {
     }
 
     /// Classify a user message using an LLM call.
+    ///
+    /// `strategy_context` optionally provides historical strategy performance
+    /// data to help the LLM make better classification decisions.
     pub async fn classify(
         &self,
         message: &str,
         tool_names: &[&str],
         params: &ChatParams,
+        strategy_context: Option<&str>,
     ) -> Result<ClassificationResult> {
-        let prompt = CLASSIFICATION_PROMPT
+        let mut prompt = CLASSIFICATION_PROMPT
             .replace("{message}", message)
             .replace("{tools}", &tool_names.join(", "));
+
+        if let Some(ctx) = strategy_context {
+            prompt.push_str("\n\n");
+            prompt.push_str(ctx);
+        }
 
         let messages = vec![Message::user(prompt)];
 
@@ -183,7 +192,7 @@ mod tests {
             r#"{"strategy":"tool_assisted","reasoning":"User wants tasks","confidence":0.9}"#;
         let classifier = LlmClassifier::new(Arc::new(MockClassifierProvider::new(mock_json)));
         let result = classifier
-            .classify("show my tasks", &[], &ChatParams::new("haiku"))
+            .classify("show my tasks", &[], &ChatParams::new("haiku"), None)
             .await
             .unwrap();
         assert!(matches!(
@@ -200,7 +209,7 @@ mod tests {
             r#"{"strategy":"direct_response","reasoning":"Greeting","confidence":0.95}"#;
         let classifier = LlmClassifier::new(Arc::new(MockClassifierProvider::new(mock_json)));
         let result = classifier
-            .classify("hello", &[], &ChatParams::new("haiku"))
+            .classify("hello", &[], &ChatParams::new("haiku"), None)
             .await
             .unwrap();
         assert!(matches!(result.strategy, ExecutionStrategy::DirectResponse));
@@ -215,6 +224,7 @@ mod tests {
                 "design the new microservices architecture",
                 &[],
                 &ChatParams::new("haiku"),
+                None,
             )
             .await
             .unwrap();
@@ -230,7 +240,7 @@ mod tests {
             r#"{"strategy":"clarification","reasoning":"Need more context","confidence":0.6}"#;
         let classifier = LlmClassifier::new(Arc::new(MockClassifierProvider::new(mock_json)));
         let result = classifier
-            .classify("do that thing", &[], &ChatParams::new("haiku"))
+            .classify("do that thing", &[], &ChatParams::new("haiku"), None)
             .await
             .unwrap();
         assert!(matches!(
@@ -245,7 +255,7 @@ mod tests {
             "I can't classify this",
         )));
         let result = classifier
-            .classify("hello", &[], &ChatParams::new("haiku"))
+            .classify("hello", &[], &ChatParams::new("haiku"), None)
             .await
             .unwrap();
         assert!(matches!(
@@ -260,7 +270,7 @@ mod tests {
         let response = r#"Sure, here's my classification: {"strategy":"direct_response","reasoning":"Simple greeting","confidence":0.9} Hope that helps!"#;
         let classifier = LlmClassifier::new(Arc::new(MockClassifierProvider::new(response)));
         let result = classifier
-            .classify("hi there", &[], &ChatParams::new("haiku"))
+            .classify("hi there", &[], &ChatParams::new("haiku"), None)
             .await
             .unwrap();
         assert!(matches!(result.strategy, ExecutionStrategy::DirectResponse));

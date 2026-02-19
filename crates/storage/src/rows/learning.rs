@@ -56,6 +56,15 @@ pub struct LearningStateRow {
     pub updated_at: DateTime<Utc>,
 }
 
+/// Aggregated strategy performance summary (from GROUP BY query).
+#[derive(Debug, Clone, FromRow)]
+pub struct StrategySummaryRow {
+    pub predicted_strategy: String,
+    pub sample_count: i64,
+    pub correct_count: i64,
+    pub avg_escalations: f32,
+}
+
 /// Row struct for the `decision_log` table.
 #[derive(Debug, Clone, FromRow)]
 pub struct DecisionLogRow {

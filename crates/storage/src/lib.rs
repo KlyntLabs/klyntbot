@@ -37,10 +37,11 @@ pub use rows::embedding::{ConvEmbeddingRow, EmbeddingRow};
 pub use rows::goal::{GoalProjectLinkRow, GoalRow};
 pub use rows::learning::{
     DecisionLogRow, EnrichmentFeedbackRow, LearningStateRow, OutcomeRow, StrategyRecordRow,
+    StrategySummaryRow,
 };
 pub use rows::memory::MemoryNoteRow;
 pub use rows::plan::{PlanRow, PlanStepRow};
 pub use rows::project::ProjectRow;
-pub use rows::session::{SessionMessageRow, SessionRow};
+pub use rows::session::{SessionListRow, SessionMessageRow, SessionRow};
 pub use rows::todo::{TodoAttachmentRow, TodoDependencyRow, TodoRow, TodoTimeEntryRow};
 pub use rows::usage::UsageRecordRow;

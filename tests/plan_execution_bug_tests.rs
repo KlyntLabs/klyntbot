@@ -94,6 +94,7 @@ async fn agent_with_plan_store(
         outcome_repo,
         learning_state_repo,
         memory_note_repo,
+        None, // strategy_repo
     )
     .await
     .unwrap()

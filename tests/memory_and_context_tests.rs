@@ -173,6 +173,8 @@ async fn test_context_builder_with_history() {
             content: "What is Rust?".to_string(),
             timestamp: chrono::Utc::now(),
             request_id: None,
+            tool_calls: None,
+            metadata: None,
         },
         SessionMessage {
             id: "test-msg-2".to_string(),
@@ -180,6 +182,8 @@ async fn test_context_builder_with_history() {
             content: "Rust is a systems programming language.".to_string(),
             timestamp: chrono::Utc::now(),
             request_id: None,
+            tool_calls: None,
+            metadata: None,
         },
     ];
 
@@ -427,6 +431,8 @@ async fn test_long_conversation_history() {
             content: format!("Message {}", i),
             timestamp: chrono::Utc::now(),
             request_id: None,
+            tool_calls: None,
+            metadata: None,
         });
         history.push(SessionMessage {
             id: format!("test-msg-{}-assistant", i),
@@ -434,6 +440,8 @@ async fn test_long_conversation_history() {
             content: format!("Response {}", i),
             timestamp: chrono::Utc::now(),
             request_id: None,
+            tool_calls: None,
+            metadata: None,
         });
     }
 

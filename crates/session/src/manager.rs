@@ -66,6 +66,29 @@ impl Session {
             content: content.into(),
             timestamp: Utc::now(),
             request_id,
+            tool_calls: None,
+            metadata: None,
+        });
+        self.updated_at = Utc::now();
+    }
+
+    /// Add a message with full structured data (tool calls, metadata).
+    pub fn add_structured_message(
+        &mut self,
+        role: impl Into<String>,
+        content: impl Into<String>,
+        request_id: Option<String>,
+        tool_calls: Option<serde_json::Value>,
+        metadata: Option<serde_json::Value>,
+    ) {
+        self.messages.push(SessionMessage {
+            id: generate_message_id(),
+            role: role.into(),
+            content: content.into(),
+            timestamp: Utc::now(),
+            request_id,
+            tool_calls,
+            metadata,
         });
         self.updated_at = Utc::now();
     }
@@ -102,6 +125,14 @@ pub struct SessionMessage {
     /// Optional request ID for correlation
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub request_id: Option<String>,
+
+    /// Structured tool call data (function name, arguments, result)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_calls: Option<serde_json::Value>,
+
+    /// Extensible message metadata (reasoning, content parts, etc.)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<serde_json::Value>,
 }
 
 /// Compaction threshold: compact when entries exceed this count
@@ -175,6 +206,8 @@ impl SessionManager {
                 content: m.content,
                 timestamp: m.timestamp,
                 request_id: m.request_id,
+                tool_calls: m.tool_calls,
+                metadata: m.metadata,
             })
             .collect();
 
@@ -347,6 +380,8 @@ impl SessionManager {
                         &msg.role,
                         &msg.content,
                         msg.request_id.as_deref(),
+                        msg.tool_calls.as_ref(),
+                        msg.metadata.as_ref(),
                     )
                     .await
                 {
@@ -462,16 +497,16 @@ impl SessionManager {
                 .list_sessions()
                 .await
                 .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
-            let mut sessions: Vec<SessionInfo> = rows
+            // Already sorted by updated_at DESC in the query
+            let sessions: Vec<SessionInfo> = rows
                 .into_iter()
                 .map(|r| SessionInfo {
                     key: r.key,
                     created_at: r.created_at,
                     updated_at: r.updated_at,
-                    message_count: 0, // Would require extra query per session
+                    message_count: r.message_count as usize,
                 })
                 .collect();
-            sessions.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
             return Ok(sessions);
         }
 
@@ -914,5 +949,83 @@ mod tests {
 
         // Note: The warning log "Failed to save evicted session test:chat1: ... Data may be lost."
         // will be emitted to stderr during test run on Unix systems
+    }
+
+    #[test]
+    fn test_add_structured_message() {
+        let mut session = Session::new("test:structured");
+        let tool_calls = serde_json::json!([{"name": "search", "arguments": {"query": "rust"}}]);
+        let metadata = serde_json::json!({"reasoning": "User wants search results"});
+
+        session.add_structured_message(
+            "assistant",
+            "Here are your results",
+            Some("req-123".to_string()),
+            Some(tool_calls.clone()),
+            Some(metadata.clone()),
+        );
+
+        assert_eq!(session.messages.len(), 1);
+        let msg = &session.messages[0];
+        assert_eq!(msg.role, "assistant");
+        assert_eq!(msg.content, "Here are your results");
+        assert_eq!(msg.request_id, Some("req-123".to_string()));
+        assert_eq!(msg.tool_calls, Some(tool_calls));
+        assert_eq!(msg.metadata, Some(metadata));
+    }
+
+    #[tokio::test]
+    async fn test_structured_message_roundtrip_jsonl() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut manager = SessionManager::new(temp_dir.path()).await;
+
+        // Add structured message
+        {
+            let session = manager.get_or_create("test:structured").await.unwrap();
+            let tool_calls = serde_json::json!([{"name": "web_fetch", "result": "ok"}]);
+            session.add_structured_message(
+                "assistant",
+                "Done",
+                None,
+                Some(tool_calls),
+                Some(serde_json::json!({"reasoning": "fetch page"})),
+            );
+            // Also add a plain message (tool_calls/metadata should be None)
+            session.add_message("user", "Thanks");
+        }
+
+        // Save
+        let session = manager.get_or_create("test:structured").await.unwrap();
+        let session_clone = session.clone();
+        manager.save(&session_clone).await.unwrap();
+
+        // Reload from disk
+        let mut manager2 = SessionManager::new(temp_dir.path()).await;
+        let loaded = manager2.get_or_create("test:structured").await.unwrap();
+
+        assert_eq!(loaded.messages.len(), 2);
+        // Structured message preserved
+        assert!(loaded.messages[0].tool_calls.is_some());
+        assert_eq!(
+            loaded.messages[0].tool_calls.as_ref().unwrap()[0]["name"],
+            "web_fetch"
+        );
+        assert!(loaded.messages[0].metadata.is_some());
+        // Plain message has no structured data
+        assert!(loaded.messages[1].tool_calls.is_none());
+        assert!(loaded.messages[1].metadata.is_none());
+    }
+
+    #[test]
+    fn test_add_message_has_none_structured_fields() {
+        let mut session = Session::new("test:plain");
+        session.add_message("user", "Hello");
+        session.add_message_with_request_id("user", "World", Some("req-1".to_string()));
+
+        // Both methods should set tool_calls and metadata to None
+        assert!(session.messages[0].tool_calls.is_none());
+        assert!(session.messages[0].metadata.is_none());
+        assert!(session.messages[1].tool_calls.is_none());
+        assert!(session.messages[1].metadata.is_none());
     }
 }

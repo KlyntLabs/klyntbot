@@ -15,7 +15,7 @@ use config::Secret;
 
 use crate::types::{
     ChatParams, LlmProvider, LlmResponse, LlmStream, LlmStreamChunk, Message, ProviderCapabilities,
-    ToolCall, ToolCallDelta, Usage,
+    ResponseFormat, ToolCall, ToolCallDelta, Usage,
 };
 
 const ANTHROPIC_CONTEXT_WINDOW: usize = 200_000;
@@ -285,6 +285,40 @@ impl AnthropicNativeProvider {
         }
     }
 
+    /// Apply structured output configuration to the request body.
+    ///
+    /// For `JsonSchema`: injects a synthetic tool with the given schema and
+    /// forces `tool_choice` so the model must call it, producing conformant JSON.
+    /// For `JsonObject`: adds a system instruction requesting JSON output.
+    fn apply_response_format(body: &mut Value, format: &ResponseFormat, tools: &mut Vec<Value>) {
+        match format {
+            ResponseFormat::Text => {}
+            ResponseFormat::JsonObject => {
+                // Prepend a JSON instruction to the system prompt
+                let instruction = "You must respond with valid JSON only. No markdown, no explanation, just JSON.";
+                if let Some(system) = body.get_mut("system") {
+                    if let Some(arr) = system.as_array_mut() {
+                        arr.insert(0, json!({"type": "text", "text": instruction}));
+                    }
+                } else {
+                    body["system"] = json!([{"type": "text", "text": instruction}]);
+                }
+            }
+            ResponseFormat::JsonSchema { name, schema } => {
+                // Add a synthetic tool whose input_schema is the desired JSON schema
+                let tool = json!({
+                    "name": name,
+                    "description": format!("Produce output conforming to the {} schema", name),
+                    "input_schema": schema,
+                });
+                tools.push(tool);
+                // Force the model to call this specific tool
+                body["tool_choice"] = json!({"type": "tool", "name": name});
+                body["tools"] = json!(tools);
+            }
+        }
+    }
+
     /// Parse Anthropic Messages API response into LlmResponse.
     fn parse_response(&self, body: Value) -> Result<LlmResponse> {
         let mut text_content = String::new();
@@ -391,11 +425,17 @@ impl LlmProvider for AnthropicNativeProvider {
             body["temperature"] = json!(temp);
         }
 
-        // Convert and add tools
-        if let Some(tools) = tools {
-            if !tools.is_empty() {
-                body["tools"] = json!(self.convert_tools(tools));
-            }
+        // Convert and collect tools (mutable for response_format injection)
+        let mut anthropic_tools: Vec<Value> =
+            tools.map(|t| self.convert_tools(t)).unwrap_or_default();
+
+        if !anthropic_tools.is_empty() {
+            body["tools"] = json!(&anthropic_tools);
+        }
+
+        // Apply structured output format (may inject synthetic tool + tool_choice)
+        if let Some(ref format) = params.response_format {
+            Self::apply_response_format(&mut body, format, &mut anthropic_tools);
         }
 
         debug!(
@@ -461,11 +501,17 @@ impl LlmProvider for AnthropicNativeProvider {
             body["temperature"] = json!(temp);
         }
 
-        // Convert and add tools
-        if let Some(tools) = tools {
-            if !tools.is_empty() {
-                body["tools"] = json!(self.convert_tools(tools));
-            }
+        // Convert and collect tools (mutable for response_format injection)
+        let mut anthropic_tools: Vec<Value> =
+            tools.map(|t| self.convert_tools(t)).unwrap_or_default();
+
+        if !anthropic_tools.is_empty() {
+            body["tools"] = json!(&anthropic_tools);
+        }
+
+        // Apply structured output format (may inject synthetic tool + tool_choice)
+        if let Some(ref format) = params.response_format {
+            Self::apply_response_format(&mut body, format, &mut anthropic_tools);
         }
 
         debug!(
@@ -599,7 +645,7 @@ impl LlmProvider for AnthropicNativeProvider {
     fn capabilities(&self) -> ProviderCapabilities {
         ProviderCapabilities {
             extended_thinking: true,
-            structured_outputs: false,
+            structured_outputs: true,
             prompt_caching: true,
             native_token_counting: true,
             vision: true,
@@ -823,7 +869,7 @@ mod tests {
         assert!(caps.vision);
         assert!(caps.streaming);
         assert!(caps.parallel_tool_calls);
-        assert!(!caps.structured_outputs);
+        assert!(caps.structured_outputs);
     }
 
     #[test]
@@ -975,5 +1021,108 @@ mod tests {
         let result =
             AnthropicNativeProvider::parse_anthropic_sse("content_block_delta", "not json");
         assert!(result.is_err());
+    }
+
+    // --- G-24: Structured output tests ---
+
+    #[test]
+    fn test_apply_response_format_text_is_noop() {
+        let mut body = json!({"model": "claude-sonnet-4-20250514"});
+        let mut tools = vec![];
+        AnthropicNativeProvider::apply_response_format(
+            &mut body,
+            &ResponseFormat::Text,
+            &mut tools,
+        );
+        assert!(body.get("tool_choice").is_none());
+        assert!(tools.is_empty());
+    }
+
+    #[test]
+    fn test_apply_response_format_json_object_adds_system_instruction() {
+        let mut body = json!({"model": "claude-sonnet-4-20250514"});
+        let mut tools = vec![];
+        AnthropicNativeProvider::apply_response_format(
+            &mut body,
+            &ResponseFormat::JsonObject,
+            &mut tools,
+        );
+        let system = body["system"].as_array().unwrap();
+        assert_eq!(system.len(), 1);
+        assert!(system[0]["text"].as_str().unwrap().contains("valid JSON"));
+    }
+
+    #[test]
+    fn test_apply_response_format_json_object_prepends_to_existing_system() {
+        let mut body = json!({
+            "model": "claude-sonnet-4-20250514",
+            "system": [{"type": "text", "text": "You are a helpful assistant."}]
+        });
+        let mut tools = vec![];
+        AnthropicNativeProvider::apply_response_format(
+            &mut body,
+            &ResponseFormat::JsonObject,
+            &mut tools,
+        );
+        let system = body["system"].as_array().unwrap();
+        assert_eq!(system.len(), 2);
+        // JSON instruction is first
+        assert!(system[0]["text"].as_str().unwrap().contains("valid JSON"));
+        // Original system prompt is second
+        assert_eq!(system[1]["text"], "You are a helpful assistant.");
+    }
+
+    #[test]
+    fn test_apply_response_format_json_schema_injects_tool() {
+        let schema = json!({
+            "type": "object",
+            "properties": {"name": {"type": "string"}},
+            "required": ["name"]
+        });
+        let mut body = json!({"model": "claude-sonnet-4-20250514"});
+        let mut tools = vec![];
+        AnthropicNativeProvider::apply_response_format(
+            &mut body,
+            &ResponseFormat::JsonSchema {
+                name: "person".to_string(),
+                schema: schema.clone(),
+            },
+            &mut tools,
+        );
+
+        // Tool was injected
+        assert_eq!(tools.len(), 1);
+        assert_eq!(tools[0]["name"], "person");
+        assert_eq!(tools[0]["input_schema"], schema);
+
+        // tool_choice forces the synthetic tool
+        assert_eq!(body["tool_choice"]["type"], "tool");
+        assert_eq!(body["tool_choice"]["name"], "person");
+
+        // tools array in body is updated
+        assert_eq!(body["tools"].as_array().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_apply_response_format_json_schema_appends_to_existing_tools() {
+        let schema = json!({"type": "object", "properties": {}});
+        let mut body = json!({"model": "claude-sonnet-4-20250514"});
+        let mut tools = vec![json!({"name": "existing_tool", "input_schema": {}})];
+        AnthropicNativeProvider::apply_response_format(
+            &mut body,
+            &ResponseFormat::JsonSchema {
+                name: "output".to_string(),
+                schema,
+            },
+            &mut tools,
+        );
+
+        // Both the existing tool and the synthetic tool are present
+        assert_eq!(tools.len(), 2);
+        assert_eq!(tools[0]["name"], "existing_tool");
+        assert_eq!(tools[1]["name"], "output");
+
+        // tool_choice forces the synthetic tool
+        assert_eq!(body["tool_choice"]["name"], "output");
     }
 }

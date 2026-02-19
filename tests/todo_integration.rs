@@ -52,6 +52,7 @@ async fn create_test_agent_with_todo() -> (AgentLoop, TempDir) {
         outcome_repo,
         learning_state_repo,
         memory_note_repo,
+        None, // strategy_repo
     )
     .await
     .unwrap();

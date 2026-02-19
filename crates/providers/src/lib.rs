@@ -16,8 +16,9 @@ pub use registry::{ProviderRegistry, ProviderSpec, PROVIDERS};
 pub use transcription::TranscriptionProvider;
 pub use types::{
     tool_calls_to_messages, ChatParams, ContentPart, DynProvider, FunctionCall, ImageUrl,
-    LlmProvider, LlmResponse, LlmStream, LlmStreamChunk, Message, ProviderCapabilities, ToolCall,
-    ToolCallDelta, ToolCallMessage, Usage, UserContent, DEFAULT_CONTEXT_WINDOW,
+    LlmProvider, LlmResponse, LlmStream, LlmStreamChunk, Message, ProviderCapabilities,
+    ResponseFormat, ToolCall, ToolCallDelta, ToolCallMessage, Usage, UserContent,
+    DEFAULT_CONTEXT_WINDOW,
 };
 
 use std::sync::Arc;
@@ -111,6 +112,60 @@ pub fn create_provider(config: &Config) -> Result<DynProvider> {
     Err(ConfigError::MissingField(
         "No LLM provider configured. Add an API key to config.json (e.g., providers.anthropic.api_key)".to_string(),
     ).into())
+}
+
+/// Create a provider with failover support.
+///
+/// When `config.provider_manager.fallback` is set, wraps the primary provider
+/// in a [`ProviderManager`] with retry, failover, and circuit breaker logic.
+/// When no fallback is configured, returns a plain `DynProvider` (identical to
+/// [`create_provider`]).
+pub fn create_provider_with_failover(config: &Config) -> Result<DynProvider> {
+    let primary = create_provider(config)?;
+
+    let pm_config = &config.provider_manager;
+    let fallback_name = match &pm_config.fallback {
+        Some(name) if !name.is_empty() => name,
+        _ => return Ok(primary),
+    };
+
+    let fallback = create_fallback_provider(config, fallback_name)?;
+
+    let classifier = pm_config
+        .classifier_model
+        .as_deref()
+        .and_then(|model| create_classifier_provider(config, model));
+
+    info!(
+        "Created ProviderManager with fallback provider: {}",
+        fallback_name
+    );
+    Ok(Arc::new(ProviderManager::new(
+        primary,
+        Some(fallback),
+        classifier,
+    )))
+}
+
+/// Create a fallback provider by name from config.
+fn create_fallback_provider(config: &Config, provider_name: &str) -> Result<DynProvider> {
+    let spec = ProviderRegistry::find_by_name(provider_name).ok_or_else(|| {
+        ConfigError::MissingField(format!("Unknown fallback provider: {provider_name}"))
+    })?;
+
+    try_create_from_spec(spec, config, &config.agents.defaults.model).ok_or_else(|| {
+        ConfigError::MissingField(format!(
+            "Fallback provider '{}' has no API key configured",
+            provider_name
+        ))
+        .into()
+    })
+}
+
+/// Try to create a classifier provider for the given model name.
+fn create_classifier_provider(config: &Config, model: &str) -> Option<DynProvider> {
+    let spec = ProviderRegistry::find_by_model(model)?;
+    try_create_from_spec(spec, config, model)
 }
 
 /// Try to create a provider from a specific provider spec.

@@ -72,6 +72,7 @@ async fn create_agent_with_learning(provider: Arc<MockProvider>) -> (AgentLoop, 
         outcome_repo,
         learning_state_repo,
         memory_note_repo,
+        None, // strategy_repo
     )
     .await
     .unwrap();
@@ -645,6 +646,7 @@ async fn test_ac_learning_disabled_no_recording() {
         outcome_repo,
         learning_state_repo,
         memory_note_repo,
+        None, // strategy_repo
     )
     .await
     .unwrap();

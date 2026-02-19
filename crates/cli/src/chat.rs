@@ -50,6 +50,7 @@ pub async fn handle_chat(message: Option<String>, session: String) -> Result<()>
             repos.outcomes,
             repos.learning_state,
             repos.memory_notes,
+            Some(repos.strategies),
         )
         .await?,
     );

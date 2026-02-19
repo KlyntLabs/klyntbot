@@ -362,6 +362,7 @@ pub async fn handle_serve(port: u16) -> Result<()> {
             repos.outcomes,
             repos.learning_state,
             repos.memory_notes,
+            Some(repos.strategies),
         )
         .await?,
     ));

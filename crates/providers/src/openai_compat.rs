@@ -14,8 +14,8 @@ use tracing::{debug, warn};
 use common::{KlyntbotError, ProviderError, Result};
 
 use crate::types::{
-    ChatParams, LlmProvider, LlmResponse, LlmStream, LlmStreamChunk, Message, ToolCall,
-    ToolCallDelta, ToolCallMessage, Usage,
+    ChatParams, LlmProvider, LlmResponse, LlmStream, LlmStreamChunk, Message, ProviderCapabilities,
+    ResponseFormat, ToolCall, ToolCallDelta, ToolCallMessage, Usage, DEFAULT_CONTEXT_WINDOW,
 };
 
 /// OpenAI-compatible provider using direct HTTP
@@ -52,6 +52,74 @@ impl OpenAiCompatProvider {
     pub fn with_extra_headers(mut self, headers: Vec<(String, String)>) -> Self {
         self.extra_headers = headers;
         self
+    }
+
+    /// Look up the context window size for common models.
+    ///
+    /// Uses prefix matching against known model families. Returns
+    /// `DEFAULT_CONTEXT_WINDOW` (128K) for unrecognized models.
+    fn model_context_window(model: &str) -> usize {
+        let model = model.to_lowercase();
+
+        // o-series reasoning models
+        if model.starts_with("o1-") {
+            return 128_000;
+        }
+        if model.starts_with("o1") {
+            return 200_000;
+        }
+        if model.starts_with("o3-mini") {
+            return 200_000;
+        }
+        if model.starts_with("o3") || model.starts_with("o4") {
+            return 200_000;
+        }
+
+        // GPT-4o family
+        if model.starts_with("gpt-4o") || model.starts_with("chatgpt-4o") {
+            return 128_000;
+        }
+
+        // GPT-4 turbo variants (must check before generic gpt-4)
+        if model.starts_with("gpt-4-turbo")
+            || model.starts_with("gpt-4-1106")
+            || model.starts_with("gpt-4-0125")
+        {
+            return 128_000;
+        }
+
+        // GPT-4 32K
+        if model.starts_with("gpt-4-32k") {
+            return 32_768;
+        }
+
+        // GPT-4 base (8K)
+        if model.starts_with("gpt-4") {
+            return 8_192;
+        }
+
+        // GPT-3.5 turbo
+        if model.starts_with("gpt-3.5-turbo") {
+            return 16_385;
+        }
+
+        DEFAULT_CONTEXT_WINDOW
+    }
+
+    /// Serialize a `ResponseFormat` to the OpenAI `response_format` JSON field.
+    fn serialize_response_format(format: &ResponseFormat) -> Value {
+        match format {
+            ResponseFormat::Text => json!({"type": "text"}),
+            ResponseFormat::JsonObject => json!({"type": "json_object"}),
+            ResponseFormat::JsonSchema { name, schema } => json!({
+                "type": "json_schema",
+                "json_schema": {
+                    "name": name,
+                    "schema": schema,
+                    "strict": true,
+                }
+            }),
+        }
     }
 
     /// Parse OpenAI API response into our LlmResponse
@@ -192,6 +260,13 @@ impl LlmProvider for OpenAiCompatProvider {
             }
         }
 
+        // Add response format for structured output
+        if let Some(ref format) = params.response_format {
+            if !matches!(format, ResponseFormat::Text) {
+                body["response_format"] = Self::serialize_response_format(format);
+            }
+        }
+
         debug!(
             "Calling LLM: model={}, messages={}",
             params.model,
@@ -263,6 +338,13 @@ impl LlmProvider for OpenAiCompatProvider {
             if !tools.is_empty() {
                 body["tools"] = json!(tools);
                 body["tool_choice"] = json!("auto");
+            }
+        }
+
+        // Add response format for structured output
+        if let Some(ref format) = params.response_format {
+            if !matches!(format, ResponseFormat::Text) {
+                body["response_format"] = Self::serialize_response_format(format);
             }
         }
 
@@ -354,6 +436,17 @@ impl LlmProvider for OpenAiCompatProvider {
     fn name(&self) -> &str {
         "openai-compat"
     }
+
+    fn capabilities(&self) -> ProviderCapabilities {
+        ProviderCapabilities {
+            structured_outputs: true,
+            ..ProviderCapabilities::default()
+        }
+    }
+
+    fn context_window(&self) -> usize {
+        Self::model_context_window(&self.default_model)
+    }
 }
 
 /// OpenAI API chat completion response
@@ -376,4 +469,188 @@ struct ResponseMessage {
     content: Option<String>,
     tool_calls: Option<Vec<ToolCallMessage>>,
     reasoning_content: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_provider(model: &str) -> OpenAiCompatProvider {
+        OpenAiCompatProvider::new("https://api.openai.com/v1", "test-key", model).unwrap()
+    }
+
+    // --- G-22: Context window mapping tests ---
+
+    #[test]
+    fn test_context_window_gpt4_base() {
+        assert_eq!(OpenAiCompatProvider::model_context_window("gpt-4"), 8_192);
+        assert_eq!(
+            OpenAiCompatProvider::model_context_window("gpt-4-0613"),
+            8_192
+        );
+    }
+
+    #[test]
+    fn test_context_window_gpt4_32k() {
+        assert_eq!(
+            OpenAiCompatProvider::model_context_window("gpt-4-32k"),
+            32_768
+        );
+        assert_eq!(
+            OpenAiCompatProvider::model_context_window("gpt-4-32k-0613"),
+            32_768
+        );
+    }
+
+    #[test]
+    fn test_context_window_gpt4_turbo() {
+        assert_eq!(
+            OpenAiCompatProvider::model_context_window("gpt-4-turbo"),
+            128_000
+        );
+        assert_eq!(
+            OpenAiCompatProvider::model_context_window("gpt-4-turbo-preview"),
+            128_000
+        );
+        assert_eq!(
+            OpenAiCompatProvider::model_context_window("gpt-4-1106-preview"),
+            128_000
+        );
+        assert_eq!(
+            OpenAiCompatProvider::model_context_window("gpt-4-0125-preview"),
+            128_000
+        );
+    }
+
+    #[test]
+    fn test_context_window_gpt4o() {
+        assert_eq!(
+            OpenAiCompatProvider::model_context_window("gpt-4o"),
+            128_000
+        );
+        assert_eq!(
+            OpenAiCompatProvider::model_context_window("gpt-4o-mini"),
+            128_000
+        );
+        assert_eq!(
+            OpenAiCompatProvider::model_context_window("gpt-4o-2024-05-13"),
+            128_000
+        );
+        assert_eq!(
+            OpenAiCompatProvider::model_context_window("chatgpt-4o-latest"),
+            128_000
+        );
+    }
+
+    #[test]
+    fn test_context_window_gpt35() {
+        assert_eq!(
+            OpenAiCompatProvider::model_context_window("gpt-3.5-turbo"),
+            16_385
+        );
+        assert_eq!(
+            OpenAiCompatProvider::model_context_window("gpt-3.5-turbo-0125"),
+            16_385
+        );
+    }
+
+    #[test]
+    fn test_context_window_o_series() {
+        assert_eq!(OpenAiCompatProvider::model_context_window("o1"), 200_000);
+        assert_eq!(
+            OpenAiCompatProvider::model_context_window("o1-mini"),
+            128_000
+        );
+        assert_eq!(
+            OpenAiCompatProvider::model_context_window("o1-preview"),
+            128_000
+        );
+        assert_eq!(
+            OpenAiCompatProvider::model_context_window("o3-mini"),
+            200_000
+        );
+        assert_eq!(OpenAiCompatProvider::model_context_window("o3"), 200_000);
+    }
+
+    #[test]
+    fn test_context_window_unknown_model_defaults() {
+        assert_eq!(
+            OpenAiCompatProvider::model_context_window("some-custom-model"),
+            DEFAULT_CONTEXT_WINDOW
+        );
+    }
+
+    #[test]
+    fn test_context_window_case_insensitive() {
+        assert_eq!(OpenAiCompatProvider::model_context_window("GPT-4"), 8_192);
+        assert_eq!(
+            OpenAiCompatProvider::model_context_window("GPT-4O-Mini"),
+            128_000
+        );
+    }
+
+    #[test]
+    fn test_context_window_on_provider_instance() {
+        let provider = test_provider("gpt-4");
+        assert_eq!(provider.context_window(), 8_192);
+
+        let provider = test_provider("gpt-4o");
+        assert_eq!(provider.context_window(), 128_000);
+
+        let provider = test_provider("unknown-model");
+        assert_eq!(provider.context_window(), DEFAULT_CONTEXT_WINDOW);
+    }
+
+    // --- G-24: Structured output tests ---
+
+    #[test]
+    fn test_capabilities_reports_structured_outputs() {
+        let provider = test_provider("gpt-4o");
+        let caps = provider.capabilities();
+        assert!(caps.structured_outputs);
+        assert!(caps.streaming);
+        assert!(caps.vision);
+    }
+
+    #[test]
+    fn test_serialize_response_format_text() {
+        let result = OpenAiCompatProvider::serialize_response_format(&ResponseFormat::Text);
+        assert_eq!(result, json!({"type": "text"}));
+    }
+
+    #[test]
+    fn test_serialize_response_format_json_object() {
+        let result = OpenAiCompatProvider::serialize_response_format(&ResponseFormat::JsonObject);
+        assert_eq!(result, json!({"type": "json_object"}));
+    }
+
+    #[test]
+    fn test_serialize_response_format_json_schema() {
+        let schema = json!({
+            "type": "object",
+            "properties": {"name": {"type": "string"}},
+            "required": ["name"]
+        });
+        let result = OpenAiCompatProvider::serialize_response_format(&ResponseFormat::JsonSchema {
+            name: "person".to_string(),
+            schema: schema.clone(),
+        });
+        assert_eq!(result["type"], "json_schema");
+        assert_eq!(result["json_schema"]["name"], "person");
+        assert_eq!(result["json_schema"]["schema"], schema);
+        assert_eq!(result["json_schema"]["strict"], true);
+    }
+
+    #[test]
+    fn test_parse_sse_done_marker() {
+        let result = OpenAiCompatProvider::parse_sse_chunk("[DONE]").unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_provider_name() {
+        let provider = test_provider("gpt-4o");
+        assert_eq!(provider.name(), "openai-compat");
+        assert_eq!(provider.default_model(), "gpt-4o");
+    }
 }

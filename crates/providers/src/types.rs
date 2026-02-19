@@ -55,12 +55,24 @@ pub struct ToolCallDelta {
 /// Stream type alias
 pub type LlmStream = Pin<Box<dyn Stream<Item = Result<LlmStreamChunk>> + Send>>;
 
+/// Response format for structured output
+#[derive(Debug, Clone)]
+pub enum ResponseFormat {
+    /// Plain text response (default)
+    Text,
+    /// JSON object response (model outputs valid JSON)
+    JsonObject,
+    /// JSON schema response (model outputs JSON conforming to schema)
+    JsonSchema { name: String, schema: Value },
+}
+
 /// Parameters for chat completion requests
 #[derive(Debug, Clone)]
 pub struct ChatParams {
     pub model: String,
     pub temperature: Option<f32>,
     pub max_tokens: Option<u32>,
+    pub response_format: Option<ResponseFormat>,
 }
 
 impl ChatParams {
@@ -69,6 +81,7 @@ impl ChatParams {
             model: model.into(),
             temperature: None,
             max_tokens: None,
+            response_format: None,
         }
     }
 
@@ -79,6 +92,11 @@ impl ChatParams {
 
     pub fn with_max_tokens(mut self, tokens: u32) -> Self {
         self.max_tokens = Some(tokens);
+        self
+    }
+
+    pub fn with_response_format(mut self, format: ResponseFormat) -> Self {
+        self.response_format = Some(format);
         self
     }
 }
@@ -398,5 +416,41 @@ mod tests {
     #[test]
     fn test_context_window_constant() {
         assert_eq!(DEFAULT_CONTEXT_WINDOW, 128_000);
+    }
+
+    #[test]
+    fn test_chat_params_with_response_format() {
+        let params = ChatParams::new("gpt-4o").with_response_format(ResponseFormat::JsonObject);
+        assert!(params.response_format.is_some());
+        assert!(matches!(
+            params.response_format,
+            Some(ResponseFormat::JsonObject)
+        ));
+    }
+
+    #[test]
+    fn test_chat_params_default_no_response_format() {
+        let params = ChatParams::new("gpt-4o");
+        assert!(params.response_format.is_none());
+    }
+
+    #[test]
+    fn test_response_format_json_schema() {
+        let schema = serde_json::json!({
+            "type": "object",
+            "properties": { "name": { "type": "string" } },
+            "required": ["name"]
+        });
+        let format = ResponseFormat::JsonSchema {
+            name: "person".to_string(),
+            schema: schema.clone(),
+        };
+        match format {
+            ResponseFormat::JsonSchema { name, schema: s } => {
+                assert_eq!(name, "person");
+                assert_eq!(s, schema);
+            }
+            _ => panic!("Expected JsonSchema variant"),
+        }
     }
 }

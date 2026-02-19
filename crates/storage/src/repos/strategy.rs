@@ -5,7 +5,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::error::StorageError;
-use crate::rows::learning::StrategyRecordRow;
+use crate::rows::learning::{StrategyRecordRow, StrategySummaryRow};
 
 /// Repository for strategy execution record persistence.
 #[derive(Debug, Clone)]
@@ -92,6 +92,30 @@ impl StrategyRepo {
         } else {
             Ok(Some(row.1 as f32 / row.0 as f32))
         }
+    }
+
+    /// Get aggregated strategy performance summaries since a given date.
+    ///
+    /// Returns per-strategy accuracy, sample count, and average escalations.
+    pub async fn get_strategy_summaries(
+        &self,
+        since: DateTime<Utc>,
+    ) -> Result<Vec<StrategySummaryRow>, StorageError> {
+        let rows = sqlx::query_as::<_, StrategySummaryRow>(
+            "SELECT predicted_strategy,
+                    COUNT(*)::BIGINT AS sample_count,
+                    COUNT(*) FILTER (WHERE predicted_strategy = actual_strategy)::BIGINT
+                        AS correct_count,
+                    AVG(escalation_count)::REAL AS avg_escalations
+             FROM strategy_records
+             WHERE timestamp >= $1
+             GROUP BY predicted_strategy
+             ORDER BY sample_count DESC",
+        )
+        .bind(since)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
     }
 
     /// List all records within a date range.

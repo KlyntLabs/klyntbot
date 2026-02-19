@@ -4,7 +4,7 @@ use chrono::Utc;
 use sqlx::PgPool;
 
 use crate::error::StorageError;
-use crate::rows::session::{SessionMessageRow, SessionRow};
+use crate::rows::session::{SessionListRow, SessionMessageRow, SessionRow};
 
 /// Repository for session and message persistence.
 #[derive(Debug, Clone)]
@@ -48,16 +48,22 @@ impl SessionRepo {
             .ok_or_else(|| StorageError::NotFound(format!("session '{}'", key)))
     }
 
-    /// List all sessions ordered by updated_at descending.
-    pub async fn list_sessions(&self) -> Result<Vec<SessionRow>, StorageError> {
-        let rows =
-            sqlx::query_as::<_, SessionRow>("SELECT * FROM sessions ORDER BY updated_at DESC")
-                .fetch_all(&self.pool)
-                .await?;
+    /// List all sessions with message counts, ordered by updated_at descending.
+    pub async fn list_sessions(&self) -> Result<Vec<SessionListRow>, StorageError> {
+        let rows = sqlx::query_as::<_, SessionListRow>(
+            "SELECT s.key, s.metadata, s.created_at, s.updated_at,
+                    (SELECT COUNT(*) FROM session_messages sm
+                     WHERE sm.session_key = s.key) AS message_count
+             FROM sessions s
+             ORDER BY updated_at DESC",
+        )
+        .fetch_all(&self.pool)
+        .await?;
         Ok(rows)
     }
 
     /// Add a message to a session.
+    #[allow(clippy::too_many_arguments)]
     pub async fn add_message(
         &self,
         session_key: &str,
@@ -65,6 +71,8 @@ impl SessionRepo {
         role: &str,
         content: &str,
         request_id: Option<&str>,
+        tool_calls: Option<&serde_json::Value>,
+        metadata: Option<&serde_json::Value>,
     ) -> Result<SessionMessageRow, StorageError> {
         let now = Utc::now();
         // Touch session updated_at
@@ -75,8 +83,9 @@ impl SessionRepo {
             .await?;
 
         let row = sqlx::query_as::<_, SessionMessageRow>(
-            "INSERT INTO session_messages (id, session_key, role, content, timestamp, request_id)
-             VALUES ($1, $2, $3, $4, $5, $6)
+            "INSERT INTO session_messages
+                 (id, session_key, role, content, timestamp, request_id, tool_calls, metadata)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
              RETURNING *",
         )
         .bind(id)
@@ -85,6 +94,8 @@ impl SessionRepo {
         .bind(content)
         .bind(now)
         .bind(request_id)
+        .bind(tool_calls)
+        .bind(metadata)
         .fetch_one(&self.pool)
         .await?;
         Ok(row)

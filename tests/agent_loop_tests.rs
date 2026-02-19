@@ -56,6 +56,7 @@ async fn test_agent_loop_basic_processing() {
         test_outcome_repo(),
         test_learning_state_repo(),
         test_memory_note_repo(),
+        None, // strategy_repo
     )
     .await
     .unwrap();
@@ -125,6 +126,7 @@ async fn test_agent_loop_with_tool_execution() {
         test_outcome_repo(),
         test_learning_state_repo(),
         test_memory_note_repo(),
+        None, // strategy_repo
     )
     .await
     .unwrap();
@@ -180,6 +182,7 @@ async fn test_agent_loop_max_iterations() {
         test_outcome_repo(),
         test_learning_state_repo(),
         test_memory_note_repo(),
+        None, // strategy_repo
     )
     .await
     .unwrap();
@@ -248,6 +251,7 @@ async fn test_agent_loop_tool_error_handling() {
         test_outcome_repo(),
         test_learning_state_repo(),
         test_memory_note_repo(),
+        None, // strategy_repo
     )
     .await
     .unwrap();
@@ -300,6 +304,7 @@ async fn test_agent_loop_session_persistence() {
             test_outcome_repo(),
             test_learning_state_repo(),
             test_memory_note_repo(),
+            None, // strategy_repo
         )
         .await
         .unwrap();
@@ -322,6 +327,7 @@ async fn test_agent_loop_session_persistence() {
         test_outcome_repo(),
         test_learning_state_repo(),
         test_memory_note_repo(),
+        None, // strategy_repo
     )
     .await
     .unwrap();
@@ -362,6 +368,7 @@ async fn test_streaming_emits_done() {
             test_outcome_repo(),
             test_learning_state_repo(),
             test_memory_note_repo(),
+            None, // strategy_repo
         )
         .await
         .unwrap(),
@@ -426,6 +433,7 @@ async fn test_streaming_emits_error_on_failure() {
             test_outcome_repo(),
             test_learning_state_repo(),
             test_memory_note_repo(),
+            None, // strategy_repo
         )
         .await
         .unwrap(),

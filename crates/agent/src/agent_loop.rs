@@ -116,6 +116,7 @@ impl AgentLoop {
         outcome_repo: storage::OutcomeRepo,
         learning_state_repo: storage::LearningStateRepo,
         memory_note_repo: storage::MemoryNoteRepo,
+        strategy_repo: Option<storage::StrategyRepo>,
     ) -> Result<Self> {
         let workspace = config.workspace_path();
 
@@ -510,10 +511,12 @@ impl AgentLoop {
             None
         };
         let engine_dispatch = Arc::new(crate::execution::EngineDispatch::new(execution_core));
-        let orchestrator = Arc::new(crate::orchestrator::Orchestrator::new(
-            provider.clone(),
-            &config.agents.defaults.model,
-        ));
+        let mut orchestrator =
+            crate::orchestrator::Orchestrator::new(provider.clone(), &config.agents.defaults.model);
+        if let Some(repo) = strategy_repo {
+            orchestrator = orchestrator.with_strategy_repo(repo);
+        }
+        let orchestrator = Arc::new(orchestrator);
         let data_dir = config::config_dir()
             .unwrap_or_else(|_| config.workspace_path())
             .join("data");
@@ -575,6 +578,7 @@ impl AgentLoop {
         outcome_repo: storage::OutcomeRepo,
         learning_state_repo: storage::LearningStateRepo,
         memory_note_repo: storage::MemoryNoteRepo,
+        strategy_repo: Option<storage::StrategyRepo>,
     ) -> Result<Self> {
         let goal_path = config.goal_store_path();
         let goal_store = Some(Arc::new(RwLock::new(goal::GoalStore::new(goal_path))));
@@ -593,6 +597,7 @@ impl AgentLoop {
             outcome_repo,
             learning_state_repo,
             memory_note_repo,
+            strategy_repo,
         )
         .await
     }

@@ -136,6 +136,43 @@ impl ProviderManager {
         Err(last_err.unwrap())
     }
 
+    /// Try primary streaming with exponential backoff on rate-limit errors.
+    /// 3 attempts max, delays: 500ms → 1s → 2s. Non-rate-limit errors fail fast.
+    async fn try_primary_stream_with_retry(
+        &self,
+        messages: &[Message],
+        tools: Option<&[Value]>,
+        params: &ChatParams,
+    ) -> Result<LlmStream> {
+        let delays = [
+            std::time::Duration::from_millis(500),
+            std::time::Duration::from_secs(1),
+            std::time::Duration::from_secs(2),
+        ];
+
+        let mut last_err = None;
+        for (attempt, delay) in delays.iter().enumerate() {
+            match self.primary.chat_stream(messages, tools, params).await {
+                Ok(stream) => {
+                    self.reset_failures();
+                    return Ok(stream);
+                }
+                Err(KlyntbotError::Provider(ProviderError::RateLimited)) => {
+                    last_err = Some(KlyntbotError::Provider(ProviderError::RateLimited));
+                    if attempt < delays.len() - 1 {
+                        tokio::time::sleep(*delay).await;
+                    }
+                }
+                Err(e) => {
+                    self.record_failure().await;
+                    return Err(e);
+                }
+            }
+        }
+        self.record_failure().await;
+        Err(last_err.unwrap())
+    }
+
     /// Route to fallback if available, otherwise return the original error.
     async fn try_fallback(
         &self,
@@ -178,20 +215,22 @@ impl LlmProvider for ProviderManager {
         tools: Option<&[Value]>,
         params: &ChatParams,
     ) -> Result<LlmStream> {
+        // Circuit open → skip primary entirely
         if self.is_circuit_open().await {
             if let Some(fb) = &self.fallback {
                 return fb.chat_stream(messages, tools, params).await;
             }
         }
-        match self.primary.chat_stream(messages, tools, params).await {
+
+        match self
+            .try_primary_stream_with_retry(messages, tools, params)
+            .await
+        {
             Ok(s) => Ok(s),
-            Err(e) => {
-                if let Some(fb) = &self.fallback {
-                    fb.chat_stream(messages, tools, params).await
-                } else {
-                    Err(e)
-                }
-            }
+            Err(e) => match &self.fallback {
+                Some(fb) => fb.chat_stream(messages, tools, params).await,
+                None => Err(e),
+            },
         }
     }
 
@@ -222,8 +261,10 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
 
     /// A test provider that counts calls and optionally returns a configured error.
+    /// Tracks chat and chat_stream calls via separate counters.
     struct CountingProvider {
         call_count: Arc<AtomicUsize>,
+        stream_call_count: Arc<AtomicUsize>,
         fail_with: Option<fn() -> KlyntbotError>,
         label: &'static str,
     }
@@ -232,6 +273,20 @@ mod tests {
         fn ok(label: &'static str, counter: Arc<AtomicUsize>) -> Self {
             Self {
                 call_count: counter,
+                stream_call_count: Arc::new(AtomicUsize::new(0)),
+                fail_with: None,
+                label,
+            }
+        }
+
+        fn ok_streaming(
+            label: &'static str,
+            counter: Arc<AtomicUsize>,
+            stream_counter: Arc<AtomicUsize>,
+        ) -> Self {
+            Self {
+                call_count: counter,
+                stream_call_count: stream_counter,
                 fail_with: None,
                 label,
             }
@@ -244,6 +299,20 @@ mod tests {
         ) -> Self {
             Self {
                 call_count: counter,
+                stream_call_count: Arc::new(AtomicUsize::new(0)),
+                fail_with: Some(err_fn),
+                label,
+            }
+        }
+
+        fn failing_streaming(
+            label: &'static str,
+            stream_counter: Arc<AtomicUsize>,
+            err_fn: fn() -> KlyntbotError,
+        ) -> Self {
+            Self {
+                call_count: Arc::new(AtomicUsize::new(0)),
+                stream_call_count: stream_counter,
                 fail_with: Some(err_fn),
                 label,
             }
@@ -258,6 +327,17 @@ mod tests {
             usage: Usage::default(),
             reasoning_content: None,
         }
+    }
+
+    fn dummy_stream() -> LlmStream {
+        let chunk = LlmStreamChunk {
+            content: Some("ok".to_string()),
+            tool_call_delta: None,
+            is_final: true,
+            finish_reason: Some("stop".to_string()),
+            reasoning_content: None,
+        };
+        Box::pin(futures_util::stream::once(async move { Ok(chunk) }))
     }
 
     fn rate_limited_error() -> KlyntbotError {
@@ -280,6 +360,19 @@ mod tests {
             match self.fail_with {
                 Some(err_fn) => Err(err_fn()),
                 None => Ok(dummy_response()),
+            }
+        }
+
+        async fn chat_stream(
+            &self,
+            _messages: &[Message],
+            _tools: Option<&[Value]>,
+            _params: &ChatParams,
+        ) -> Result<LlmStream> {
+            self.stream_call_count.fetch_add(1, AtomicOrdering::SeqCst);
+            match self.fail_with {
+                Some(err_fn) => Err(err_fn()),
+                None => Ok(dummy_stream()),
             }
         }
 
@@ -621,5 +714,214 @@ mod tests {
 
         assert_eq!(manager.name(), "provider-manager");
         assert_eq!(manager.default_model(), "my-model-v1");
+    }
+
+    // ── Streaming retry tests ─────────────────────────────
+
+    #[tokio::test]
+    async fn test_stream_primary_used_first() {
+        let primary_stream = Arc::new(AtomicUsize::new(0));
+        let fallback_stream = Arc::new(AtomicUsize::new(0));
+
+        let manager = ProviderManager::new(
+            Arc::new(CountingProvider::ok_streaming(
+                "primary",
+                Arc::new(AtomicUsize::new(0)),
+                primary_stream.clone(),
+            )),
+            Some(Arc::new(CountingProvider::ok_streaming(
+                "fallback",
+                Arc::new(AtomicUsize::new(0)),
+                fallback_stream.clone(),
+            ))),
+            None,
+        );
+
+        let result = manager
+            .chat_stream(&[], None, &ChatParams::new("test-model"))
+            .await;
+        assert!(result.is_ok());
+        assert_eq!(primary_stream.load(AtomicOrdering::SeqCst), 1);
+        assert_eq!(fallback_stream.load(AtomicOrdering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn test_stream_fallback_on_rate_limit() {
+        tokio::time::pause();
+
+        let primary_stream = Arc::new(AtomicUsize::new(0));
+        let fallback_stream = Arc::new(AtomicUsize::new(0));
+
+        let manager = ProviderManager::new(
+            Arc::new(CountingProvider::failing_streaming(
+                "primary",
+                primary_stream.clone(),
+                rate_limited_error,
+            )),
+            Some(Arc::new(CountingProvider::ok_streaming(
+                "fallback",
+                Arc::new(AtomicUsize::new(0)),
+                fallback_stream.clone(),
+            ))),
+            None,
+        );
+
+        let result = manager
+            .chat_stream(&[], None, &ChatParams::new("test-model"))
+            .await;
+        assert!(result.is_ok());
+        // Primary retried 3 times with backoff
+        assert_eq!(primary_stream.load(AtomicOrdering::SeqCst), 3);
+        // Fallback called once after retries exhausted
+        assert_eq!(fallback_stream.load(AtomicOrdering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn test_stream_no_retry_on_non_retryable_error() {
+        let primary_stream = Arc::new(AtomicUsize::new(0));
+        let fallback_stream = Arc::new(AtomicUsize::new(0));
+
+        let manager = ProviderManager::new(
+            Arc::new(CountingProvider::failing_streaming(
+                "primary",
+                primary_stream.clone(),
+                auth_error,
+            )),
+            Some(Arc::new(CountingProvider::ok_streaming(
+                "fallback",
+                Arc::new(AtomicUsize::new(0)),
+                fallback_stream.clone(),
+            ))),
+            None,
+        );
+
+        let result = manager
+            .chat_stream(&[], None, &ChatParams::new("test-model"))
+            .await;
+        assert!(result.is_ok());
+        // Non-retryable: primary tried once, then fallback
+        assert_eq!(primary_stream.load(AtomicOrdering::SeqCst), 1);
+        assert_eq!(fallback_stream.load(AtomicOrdering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn test_stream_no_fallback_returns_error() {
+        let primary_stream = Arc::new(AtomicUsize::new(0));
+
+        let manager = ProviderManager::new(
+            Arc::new(CountingProvider::failing_streaming(
+                "primary",
+                primary_stream.clone(),
+                auth_error,
+            )),
+            None,
+            None,
+        );
+
+        let result = manager
+            .chat_stream(&[], None, &ChatParams::new("test-model"))
+            .await;
+        assert!(result.is_err());
+        assert_eq!(primary_stream.load(AtomicOrdering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn test_stream_retry_succeeds_on_second_attempt() {
+        tokio::time::pause();
+
+        let stream_count = Arc::new(AtomicUsize::new(0));
+        let stream_count_clone = stream_count.clone();
+
+        struct FirstFailStreamProvider {
+            stream_count: Arc<AtomicUsize>,
+        }
+
+        #[async_trait]
+        impl LlmProvider for FirstFailStreamProvider {
+            async fn chat(
+                &self,
+                _: &[Message],
+                _: Option<&[Value]>,
+                _: &ChatParams,
+            ) -> Result<LlmResponse> {
+                Ok(dummy_response())
+            }
+            async fn chat_stream(
+                &self,
+                _: &[Message],
+                _: Option<&[Value]>,
+                _: &ChatParams,
+            ) -> Result<LlmStream> {
+                let n = self.stream_count.fetch_add(1, AtomicOrdering::SeqCst);
+                if n == 0 {
+                    Err(KlyntbotError::Provider(ProviderError::RateLimited))
+                } else {
+                    Ok(dummy_stream())
+                }
+            }
+            fn default_model(&self) -> &str {
+                "test"
+            }
+            fn name(&self) -> &str {
+                "first-fail-stream"
+            }
+        }
+
+        let manager = ProviderManager::new(
+            Arc::new(FirstFailStreamProvider {
+                stream_count: stream_count_clone,
+            }),
+            None,
+            None,
+        );
+
+        let result = manager
+            .chat_stream(&[], None, &ChatParams::new("test-model"))
+            .await;
+        assert!(result.is_ok());
+        assert_eq!(stream_count.load(AtomicOrdering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn test_stream_circuit_open_bypasses_primary() {
+        tokio::time::pause();
+
+        let primary_stream = Arc::new(AtomicUsize::new(0));
+        let fallback_stream = Arc::new(AtomicUsize::new(0));
+
+        let manager = ProviderManager::with_config(
+            Arc::new(CountingProvider::failing_streaming(
+                "primary",
+                primary_stream.clone(),
+                auth_error,
+            )),
+            Some(Arc::new(CountingProvider::ok_streaming(
+                "fallback",
+                Arc::new(AtomicUsize::new(0)),
+                fallback_stream.clone(),
+            ))),
+            None,
+            CircuitBreakerConfig {
+                failure_threshold: 2,
+                reset_timeout_secs: 60,
+            },
+        );
+
+        // Trip the circuit with streaming calls (2 non-retryable failures)
+        let _ = manager
+            .chat_stream(&[], None, &ChatParams::new("test-model"))
+            .await;
+        let _ = manager
+            .chat_stream(&[], None, &ChatParams::new("test-model"))
+            .await;
+        assert_eq!(primary_stream.load(AtomicOrdering::SeqCst), 2);
+
+        // Circuit is now open → primary skipped
+        let result = manager
+            .chat_stream(&[], None, &ChatParams::new("test-model"))
+            .await;
+        assert!(result.is_ok());
+        assert_eq!(primary_stream.load(AtomicOrdering::SeqCst), 2); // unchanged
+        assert_eq!(fallback_stream.load(AtomicOrdering::SeqCst), 3); // 2 failover + 1 bypass
     }
 }

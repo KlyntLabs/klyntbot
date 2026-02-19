@@ -21,4 +21,16 @@ pub struct SessionMessageRow {
     pub content: String,
     pub timestamp: DateTime<Utc>,
     pub request_id: Option<String>,
+    pub tool_calls: Option<serde_json::Value>,
+    pub metadata: Option<serde_json::Value>,
+}
+
+/// Row struct for session listing with message count (aggregated query).
+#[derive(Debug, Clone, FromRow)]
+pub struct SessionListRow {
+    pub key: String,
+    pub metadata: serde_json::Value,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub message_count: i64,
 }
