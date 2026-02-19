@@ -1,4 +1,8 @@
+use std::sync::Arc;
+
 use providers::{Message, UserContent};
+
+use crate::token_counter::{default_token_counter, TokenCounter};
 
 /// Summary of a range of compressed messages.
 pub struct HistorySummary {
@@ -28,13 +32,20 @@ pub struct CompressedHistory {
 /// - Summarize older messages using extractive summarization (no LLM call)
 pub struct HistoryCompressor {
     min_recent_messages: usize,
+    token_counter: Arc<dyn TokenCounter>,
 }
 
 impl HistoryCompressor {
-    pub fn new(min_recent: usize) -> Self {
+    pub fn new(min_recent: usize, token_counter: Arc<dyn TokenCounter>) -> Self {
         Self {
             min_recent_messages: min_recent,
+            token_counter,
         }
+    }
+
+    /// Create with the default character-based token counter.
+    pub fn with_defaults(min_recent: usize) -> Self {
+        Self::new(min_recent, default_token_counter())
     }
 
     pub fn compress(&self, history: &[Message], budget_tokens: usize) -> CompressedHistory {
@@ -52,7 +63,7 @@ impl HistoryCompressor {
         // Count tokens for the minimum recent messages
         let mut recent_tokens: usize = history[history.len() - min_keep..]
             .iter()
-            .map(Self::estimate_tokens)
+            .map(|m| self.estimate_message_tokens(m))
             .sum();
 
         // Try to include more recent messages if budget allows (use half budget for extra)
@@ -62,7 +73,7 @@ impl HistoryCompressor {
         let mut extra_tokens = 0;
 
         for msg in older_messages.iter().rev() {
-            let t = Self::estimate_tokens(msg);
+            let t = self.estimate_message_tokens(msg);
             if extra_tokens + t <= half_remaining {
                 extra_tokens += t;
                 extra_count += 1;
@@ -84,7 +95,7 @@ impl HistoryCompressor {
             let chunk_size = 5;
             for (chunk_idx, chunk) in to_summarize.chunks(chunk_size).enumerate() {
                 let content = Self::extractive_summary(chunk);
-                let token_count = content.len() / 4;
+                let token_count = self.token_counter.estimate_text(&content);
                 let start = chunk_idx * chunk_size;
                 let end = (start + chunk.len()).min(split_point);
                 summaries.push(HistorySummary {
@@ -131,17 +142,21 @@ impl HistoryCompressor {
         lines.join("\n")
     }
 
-    fn estimate_tokens(msg: &Message) -> usize {
+    fn estimate_message_tokens(&self, msg: &Message) -> usize {
         match msg {
-            Message::System { content } => content.len() / 4,
+            Message::System { content } => self.token_counter.estimate_text(content),
             Message::User { content } => match content {
-                UserContent::Text(t) => t.len() / 4,
+                UserContent::Text(t) => self.token_counter.estimate_text(t),
                 UserContent::MultiPart(parts) => parts.len() * 10,
             },
             Message::Assistant { content, .. } => {
-                content.as_deref().map(|t| t.len() / 4).unwrap_or(0) + 20
+                content
+                    .as_deref()
+                    .map(|t| self.token_counter.estimate_text(t))
+                    .unwrap_or(0)
+                    + 20
             }
-            Message::Tool { content, .. } => content.len() / 4 + 10,
+            Message::Tool { content, .. } => self.token_counter.estimate_text(content) + 10,
         }
     }
 }
@@ -162,6 +177,11 @@ fn first_snippet(text: &str, max_chars: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::token_counter::default_token_counter;
+
+    fn make_compressor() -> HistoryCompressor {
+        HistoryCompressor::new(4, default_token_counter())
+    }
 
     fn make_history(n: usize) -> Vec<Message> {
         let mut msgs = Vec::new();
@@ -177,7 +197,7 @@ mod tests {
 
     #[test]
     fn test_recent_messages_kept_verbatim() {
-        let compressor = HistoryCompressor::new(4);
+        let compressor = make_compressor();
         let history = make_history(20);
         let result = compressor.compress(&history, 50_000);
 
@@ -202,7 +222,7 @@ mod tests {
 
     #[test]
     fn test_min_recent_always_enforced() {
-        let compressor = HistoryCompressor::new(4);
+        let compressor = make_compressor();
         let history = make_history(10);
         let result = compressor.compress(&history, 1); // tiny budget
                                                        // Even with tiny budget, we keep min_recent messages
@@ -211,7 +231,7 @@ mod tests {
 
     #[test]
     fn test_empty_history_returns_empty() {
-        let compressor = HistoryCompressor::new(4);
+        let compressor = make_compressor();
         let result = compressor.compress(&[], 10_000);
         assert!(result.recent_messages.is_empty());
         assert!(result.summaries.is_empty());
@@ -220,7 +240,7 @@ mod tests {
 
     #[test]
     fn test_small_history_all_verbatim() {
-        let compressor = HistoryCompressor::new(4);
+        let compressor = make_compressor();
         let history = make_history(3);
         let result = compressor.compress(&history, 50_000);
         assert_eq!(result.recent_messages.len(), 3);
@@ -236,5 +256,26 @@ mod tests {
         let summary = HistoryCompressor::extractive_summary(&msgs);
         assert!(summary.starts_with("Earlier in this conversation:"));
         assert!(summary.contains("Hello there") || summary.contains("Hi!"));
+    }
+
+    #[test]
+    fn test_custom_token_counter_used() {
+        use crate::token_counter::TokenCounter;
+
+        // A counter that always returns 1 per text unit
+        struct OnePerCall;
+        impl TokenCounter for OnePerCall {
+            fn estimate_text(&self, _text: &str) -> usize {
+                1
+            }
+        }
+
+        let compressor = HistoryCompressor::new(2, Arc::new(OnePerCall));
+        let history = make_history(6);
+        let result = compressor.compress(&history, 100);
+        // All summaries should have token_count == 1 (our custom counter returns 1)
+        for summary in &result.summaries {
+            assert_eq!(summary.token_count, 1);
+        }
     }
 }

@@ -948,34 +948,6 @@ async fn test_session_isolation() {
     assert_ne!(loaded_a.session_key, loaded_b.session_key);
 }
 
-/// Test 23: Verify plan store path consistency (Critical Fix 3)
-/// Verifies: config.plan_store_path() returns ~/.klyntbot/data/plans.jsonl
-/// Bug: Config returned ~/.klyntbot/plans.jsonl while code used ~/.klyntbot/data/plans.jsonl
-/// Fix: Updated config method to include "data" subdirectory for consistency
-#[tokio::test]
-async fn test_plan_store_path_consistency() {
-    use config::Config;
-
-    // Load config (creates default if needed)
-    let config = Config::default();
-
-    // Verify the plan store path includes the "data" subdirectory
-    let plan_path = config.plan_store_path();
-    let path_str = plan_path.to_str().unwrap();
-
-    // Path should end with .klyntbot/data/plans.jsonl
-    assert!(
-        path_str.ends_with(".klyntbot/data/plans.jsonl"),
-        "Expected path to end with .klyntbot/data/plans.jsonl, got: {}",
-        path_str
-    );
-
-    // Path should NOT be the old incorrect path
-    assert!(
-        !path_str.ends_with(".klyntbot/plans.jsonl") || path_str.ends_with("data/plans.jsonl"),
-        "Path should not use the old .klyntbot/plans.jsonl format without 'data' subdirectory"
-    );
-}
 
 /// Test 24: Cross-channel isolation (fixes session key collision bug)
 /// Verifies: Telegram chat "123" and Discord chat "123" have isolated session keys

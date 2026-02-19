@@ -13,4 +13,4 @@ pub use state::{
     save_provider_sync_state, save_provider_sync_state_sql,
 };
 pub use sync_engine::{detect_conflict, resolve_conflict};
-pub use types::{CalendarEvent, EventSource, SyncState};
+pub use types::{CalendarEvent, ConflictResolutionStrategy, EventSource, SyncState};

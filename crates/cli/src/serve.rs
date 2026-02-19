@@ -4,6 +4,7 @@ use agent::AgentLoop;
 use anyhow::Result;
 use bus::MessageBus;
 use channels::ChannelManager;
+use dashboard::{DashboardConfig, DashboardEventBus, DashboardServer};
 use heartbeat::HeartbeatService;
 use scheduling::CronService;
 use std::sync::atomic::Ordering;
@@ -14,7 +15,7 @@ use tokio::sync::{Mutex, RwLock};
 use tracing::{error, info};
 
 /// Handle serve command
-pub async fn handle_serve(port: u16) -> Result<()> {
+pub async fn handle_serve(port: u16, dashboard_port: u16) -> Result<()> {
     info!("Starting klyntbot gateway on port {}", port);
 
     let config = config::load_with_env_overrides().await?;
@@ -38,6 +39,9 @@ pub async fn handle_serve(port: u16) -> Result<()> {
     // Initialize message bus
     let bus = Arc::new(MessageBus::new(100));
     info!("Message bus initialized");
+
+    // Initialize dashboard event bus
+    let event_bus = Arc::new(DashboardEventBus::new(256));
 
     // Initialize cron service (SQL-backed via from_repo)
     let mut cron_service = CronService::from_repo(repos.cron);
@@ -392,6 +396,14 @@ pub async fn handle_serve(port: u16) -> Result<()> {
     heartbeat_service.start().await;
     info!("Heartbeat service started");
 
+    // Initialize dashboard server
+    let dashboard_server = DashboardServer::new(DashboardConfig {
+        port: dashboard_port,
+        bus: bus.clone(),
+        event_bus: event_bus.clone(),
+    });
+    info!("Dashboard server initialized on port {}", dashboard_port);
+
     // Grab the agent's shutdown flag before spawning — this lets us signal
     // stop without acquiring the Mutex (which run() holds for its lifetime).
     let agent_shutdown = agent_loop.lock().await.shutdown_flag();
@@ -416,11 +428,19 @@ pub async fn handle_serve(port: u16) -> Result<()> {
         })
     };
 
+    // Start dashboard server in background
+    let dashboard_handle = tokio::spawn(async move {
+        if let Err(e) = dashboard_server.start().await {
+            error!("Dashboard server error: {}", e);
+        }
+    });
+
     println!("\nklyntbot gateway running on port {}", port);
     println!("\nServices:");
     println!("  Agent loop");
     println!("  Cron scheduler");
     println!("  Heartbeat monitor");
+    println!("  Dashboard (http://localhost:{})", dashboard_port);
     println!("\nChannels:");
     for (name, enabled) in [
         ("Telegram", config.channels.telegram.enabled),
@@ -460,6 +480,7 @@ pub async fn handle_serve(port: u16) -> Result<()> {
     {
         info!("Shutdown timeout — aborting remaining tasks");
     }
+    dashboard_handle.abort();
 
     info!("All services stopped");
     println!("klyntbot stopped");

@@ -1,5 +1,38 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
+
+/// Strategy used to resolve conflicts when the same event differs on server and client.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum ConflictResolutionStrategy {
+    /// Always keep the server version (default, safest option).
+    #[default]
+    ServerWins,
+    /// Always keep the local (client) version.
+    ClientWins,
+    /// Keep whichever version was modified most recently.
+    /// Uses CalDAV ETag lexicographic ordering as a recency proxy;
+    /// falls back to `ServerWins` when ordering cannot be determined.
+    LastWriteWins,
+    /// Flag the conflict for manual resolution.
+    /// Returns the server version as a safe placeholder until the user resolves it.
+    Manual,
+}
+
+impl FromStr for ConflictResolutionStrategy {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "serverWins" | "server_wins" | "ServerWins" => Ok(Self::ServerWins),
+            "clientWins" | "client_wins" | "ClientWins" => Ok(Self::ClientWins),
+            "lastWriteWins" | "last_write_wins" | "LastWriteWins" => Ok(Self::LastWriteWins),
+            "manual" | "Manual" => Ok(Self::Manual),
+            _ => Err(()),
+        }
+    }
+}
 
 /// Represents a calendar event from CalDAV or converted from a todo item
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

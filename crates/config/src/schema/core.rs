@@ -170,37 +170,26 @@ impl Config {
             .any(|(n, pc)| *n == name && !pc.api_key.is_empty())
     }
 
-    /// Get the standardized todo store path (P0 fix for path inconsistency)
-    pub fn todo_store_path(&self) -> PathBuf {
-        data_dir().join("todos.jsonl")
-    }
-
-    /// Get the standardized embedding store path
-    pub fn embedding_store_path(&self) -> PathBuf {
-        data_dir().join("todos_embeddings.jsonl")
-    }
-
-    /// Get the standardized project store path
-    pub fn project_store_path(&self) -> PathBuf {
-        data_dir().join("projects.jsonl")
-    }
-
-    /// Get the standardized goal store path
+    /// Get the standardized goal store path.
+    #[deprecated(note = "JSONL flat-file store superseded by PostgreSQL. Will be migrated in G-17.")]
     pub fn goal_store_path(&self) -> PathBuf {
         data_dir().join("goals.jsonl")
     }
 
-    /// Get the standardized plan store path
+    /// Get the standardized plan store path.
+    #[deprecated(note = "JSONL flat-file store superseded by PostgreSQL. Will be migrated in G-17.")]
     pub fn plan_store_path(&self) -> PathBuf {
         data_dir().join("data").join("plans.jsonl")
     }
 
     /// Get the learning outcomes JSONL store path.
+    #[deprecated(note = "JSONL flat-file store superseded by PostgreSQL. Will be migrated in G-17.")]
     pub fn learning_outcomes_path(&self) -> PathBuf {
         data_dir().join("data").join("outcomes.jsonl")
     }
 
     /// Get the learning state JSON file path.
+    #[deprecated(note = "JSONL flat-file store superseded by PostgreSQL. Will be migrated in G-17.")]
     pub fn learning_state_path(&self) -> PathBuf {
         data_dir().join("data").join("learning_state.json")
     }

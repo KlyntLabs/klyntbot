@@ -124,7 +124,7 @@ impl AgentPipeline {
             memory_path: None,
             context_window: self.config.context_window,
         };
-        let assembled = self.context_engine.assemble(context_request);
+        let assembled = self.context_engine.assemble(context_request).await;
 
         debug!(
             "Pipeline: assembled context with {} messages, {} tokens",

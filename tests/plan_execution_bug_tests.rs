@@ -63,6 +63,7 @@ fn approved_plan_with_step(step_desc: &str, max_attempts: u8) -> Plan {
     }
 }
 
+#[allow(deprecated)] // goal_store_path pending G-17 SQL migration
 async fn agent_with_plan_store(
     plan_store: Arc<RwLock<PlanStore>>,
     provider: impl LlmProvider + 'static,

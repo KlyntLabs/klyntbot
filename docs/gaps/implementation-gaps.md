@@ -7,7 +7,7 @@
 
 ## Executive Summary
 
-Klyntbot is a 105K-line Rust AI agent framework with 17 crates, 15+ tools, and 6 chat platform integrations. The codebase is architecturally sound with clean dependency layering and no circular dependencies. However, the ongoing JSONL-to-PostgreSQL migration is approximately **80% complete**, leaving several subsystems in a fragile dual-mode state. The gap report identifies **52 gaps** across 6 severity tiers (**6 resolved** as of 2026-02-19).
+Klyntbot is a 105K-line Rust AI agent framework with 17 crates, 15+ tools, and 6 chat platform integrations. The codebase is architecturally sound with clean dependency layering and no circular dependencies. However, the ongoing JSONL-to-PostgreSQL migration is approximately **80% complete**, leaving several subsystems in a fragile dual-mode state. The gap report identifies **52 gaps** across 6 severity tiers (**12 resolved** as of 2026-02-19).
 
 **Top 3 systemic issues:**
 1. **JSONL/SQL dual-mode persistence** — 6+ subsystems maintain parallel storage backends, doubling maintenance burden and creating behavior divergence
@@ -28,12 +28,12 @@ Klyntbot is a 105K-line Rust AI agent framework with 17 crates, 15+ tools, and 6
 | ~~G-04~~ | ~~P1~~ | ~~Cross-cutting~~ | ~~All SQL backend paths lack integration test coverage~~ **RESOLVED 2026-02-19** |
 | ~~G-05~~ | ~~P1~~ | ~~Cross-cutting~~ | ~~No migration utility from JSONL files to SQL~~ **RESOLVED 2026-02-19** |
 | ~~G-06~~ | ~~P1~~ | ~~Cross-cutting~~ | ~~Legacy JSONL stores still present (~3,000 lines of dead code)~~ **RESOLVED 2026-02-19** |
-| G-07 | P1 | Provider | Context assembly uses char/4 estimation, not provider token counting |
-| G-08 | P1 | Provider | Memory retrieval not wired in ContextEngine (3 budget priorities unused) |
-| G-09 | P1 | Dashboard | Dashboard not wired into `serve.rs` |
-| G-10 | P1 | Calendar | Server-wins is the only conflict resolution strategy |
-| G-11 | P1 | Scheduling | CronSchedule timezone field parsed but silently ignored |
-| G-12 | P1 | Config | 7 legacy `*_store_path()` methods still exposed |
+| ~~G-07~~ | ~~P1~~ | ~~Provider~~ | ~~Context assembly uses char/4 estimation, not provider token counting~~ **RESOLVED 2026-02-19** |
+| ~~G-08~~ | ~~P1~~ | ~~Provider~~ | ~~Memory retrieval not wired in ContextEngine (3 budget priorities unused)~~ **RESOLVED 2026-02-19** |
+| ~~G-09~~ | ~~P1~~ | ~~Dashboard~~ | ~~Dashboard not wired into `serve.rs`~~ **RESOLVED 2026-02-19** |
+| ~~G-10~~ | ~~P1~~ | ~~Calendar~~ | ~~Server-wins is the only conflict resolution strategy~~ **RESOLVED 2026-02-19** |
+| ~~G-11~~ | ~~P1~~ | ~~Scheduling~~ | ~~CronSchedule timezone field parsed but silently ignored~~ **RESOLVED 2026-02-19** |
+| ~~G-12~~ | ~~P1~~ | ~~Config~~ | ~~7 legacy `*_store_path()` methods still exposed~~ **RESOLVED 2026-02-19** |
 | **P2 — Medium (quality/maintainability)** |
 | G-13 | P2 | Agent | AgentLoop is 2,357 lines — god object pattern |
 | G-14 | P2 | Agent | Legacy vs Pipeline (v2) dual processing path |
@@ -162,53 +162,47 @@ Migrated all production code paths from `Arc<RwLock<TodoStore>>` (JSONL) to SQL 
 - Legacy store files (`todo_store.rs`, `project_store.rs`, `embedding_store.rs`) still exist as dead code — only referenced by legacy integration tests. Dashboard crate references tracked separately as G-09/G-26.
 - Zero new clippy warnings, workspace builds cleanly
 
-#### G-07: Context Assembly Uses Character Estimation
-**Subsystem**: Provider / Context Engine
-**Source**: `02-providers-context.md` §9.1 G2
+#### ~~G-07: Context Assembly Uses Character Estimation~~ — RESOLVED
 
-`ContextEngine::assemble()` uses `text.len() / 4` for token estimation regardless of provider. Anthropic has a real token counting API, but it's only used at the provider level, not in context assembly. Budget allocation can be 25%+ off.
+**Status**: **Resolved** on 2026-02-19
+**Implementation**: `crates/context_engine/src/token_counter.rs` (new), `crates/context_engine/src/assembler.rs`, `crates/context_engine/src/history_compressor.rs`
 
-**Fix**: Wire the active provider's `count_tokens()` into `ContextEngine`. Use char estimation as fallback only.
+Added `TokenCounter` trait (sync, `Send + Sync`) with `estimate_text(&str) -> usize` method. `CharTokenCounter` implements the default `div_ceil(4)` heuristic. `ContextEngine` accepts an optional `Arc<dyn TokenCounter>` via builder pattern (`with_token_counter()`). `HistoryCompressor` refactored to use injected counter instead of hardcoded `len() / 4`. Provider-specific counters can now be wired in at construction time. 7 new unit tests, 29/29 context_engine tests pass.
 
-#### G-08: Memory Retrieval Not Wired in ContextEngine
-**Subsystem**: Provider / Context Engine
-**Source**: `02-providers-context.md` §9.1 G3
+#### ~~G-08: Memory Retrieval Not Wired in ContextEngine~~ — RESOLVED
 
-`ContextRequest.memory_path` is accepted but never used. `Priority::RetrievedMemory`, `Priority::BootstrapPersona`, and `Priority::Skills` are defined in the budget allocator but never allocated tokens. 3 of 8 priority levels are dead code.
+**Status**: **Resolved** on 2026-02-19
+**Implementation**: `crates/context_engine/src/memory_retriever.rs` (new), `crates/context_engine/src/assembler.rs`
 
-**Fix**: Implement embedding-based memory retrieval via `EmbeddingRepo` and integrate into assembly pipeline.
+Added `MemoryRetriever` async trait with `retrieve(&str, usize) -> Vec<MemoryEntry>`. `ContextEngine` accepts an optional `Arc<dyn MemoryRetriever>` via `with_memory_retriever()`. During `assemble()`, retrieved memories are budgeted under `Priority::RetrievedMemory` and injected as system messages. Preference order: embedding retriever > file-based `memory_path` fallback. Higher layers (agent/storage) implement the trait with actual `EmbeddingRepo` lookups. 4 new integration tests covering retrieval, empty results, file fallback, and precedence.
 
-#### G-09: Dashboard Not Wired to `serve.rs`
-**Subsystem**: Dashboard / CLI
-**Source**: `05-channels-cli-dashboard.md` §5.1
+#### ~~G-09: Dashboard Not Wired to `serve.rs`~~ — RESOLVED
 
-The dashboard crate has a complete GraphQL schema, WebSocket chat, event bus, and config watcher, but `serve.rs` does not create or start `DashboardServer`. The entire dashboard is unreachable.
+**Status**: **Resolved** on 2026-02-19
+**Implementation**: `crates/cli/src/serve.rs`, `crates/cli/src/commands.rs`, `crates/cli/Cargo.toml`, `src/main.rs`
 
-**Fix**: Add `DashboardServer::start()` to the serve command alongside existing services.
+Added `dashboard` dependency to CLI crate. `DashboardServer` now constructed and started via `tokio::spawn` alongside agent loop, channel manager, and heartbeat in `handle_serve()`. Dashboard port configurable via `--dashboard-port` CLI arg (default: 3001). `DashboardEventBus` (capacity 256) created in serve.rs and passed to dashboard config. Dashboard handle aborted on graceful shutdown. Status output now prints dashboard URL.
 
-#### G-10: Server-Wins Only Conflict Resolution
-**Subsystem**: Calendar
-**Source**: `06-domain-features.md` §7.1
+#### ~~G-10: Server-Wins Only Conflict Resolution~~ — RESOLVED
 
-The sync engine's `resolve_conflict()` always returns the server version. Local user changes to calendar events may be silently overwritten.
+**Status**: **Resolved** on 2026-02-19
+**Implementation**: `crates/calendar/src/types.rs`, `crates/calendar/src/sync_engine.rs`, `crates/config/src/schema/core.rs`, `crates/agent/src/calendar_sync_adapter.rs`
 
-**Fix**: Add configurable strategies: `ServerWins`, `ClientWins`, `LastWriteWins`, `Manual`.
+Added `ConflictResolutionStrategy` enum with 4 variants: `ServerWins` (default), `ClientWins`, `LastWriteWins` (ETag-based recency proxy), `Manual` (safe placeholder for user intervention). Enum supports `serde(rename_all = "camelCase")`, `FromStr` (camelCase + snake_case compat), and `Default`. `resolve_conflict()` signature extended to accept strategy. Config schema has `conflict_resolution` field under `CalendarConfig` (default: `"server_wins"`). `CalendarSyncAdapter` parses config string to enum at construction. 8 new strategy tests + 3 serde/FromStr tests.
 
-#### G-11: Cron Timezone Silently Ignored
-**Subsystem**: Scheduling
-**Source**: `06-domain-features.md` §7.2
+#### ~~G-11: Cron Timezone Silently Ignored~~ — RESOLVED
 
-`CronSchedule::Cron` has a `tz: Option<String>` field that is parsed and stored but ignored in `compute_next_run()`. All cron expressions evaluate in UTC regardless of configured timezone.
+**Status**: **Resolved** on 2026-02-19
+**Implementation**: `crates/scheduling/src/service/mod.rs`, `crates/scheduling/Cargo.toml`
 
-**Fix**: Pass the timezone to `cron::Schedule` computation.
+Added `chrono-tz` dependency. `compute_next_run()` now destructures `tz` from `CronSchedule::Cron` and uses it: when `Some(tz_str)`, parses via `chrono_tz::Tz`, computes next run in that timezone, converts to UTC millis. When `None`, keeps existing UTC behavior. Invalid timezone strings log `tracing::warn!` and fall back to UTC. 5 new tests: named timezone, UTC explicit, None fallback, timezone differs from UTC, invalid tz handling.
 
-#### G-12: Legacy Store Path Methods Still Exposed
-**Subsystem**: Config
-**Source**: `01-foundation-storage.md` §6.1
+#### ~~G-12: Legacy Store Path Methods Still Exposed~~ — RESOLVED
 
-`Config` still exposes 7 methods pointing to JSONL flat files (`todo_store_path()`, `embedding_store_path()`, etc.) that are superseded by PostgreSQL. These may still have active callers.
+**Status**: **Resolved** on 2026-02-19
+**Implementation**: `crates/config/src/schema/core.rs`, `crates/agent/src/agent_loop.rs`
 
-**Fix**: Audit all callers. Deprecate with `#[deprecated]`, then remove.
+Audited all 7 `*_store_path()` methods. 3 methods with zero callers fully removed: `todo_store_path()`, `embedding_store_path()`, `project_store_path()`. 4 methods still used by `agent_loop.rs` for file-based learning stores marked `#[deprecated(note = "...G-17")]`: `goal_store_path()`, `plan_store_path()`, `learning_outcomes_path()`, `learning_state_path()`. Callers annotated with `#[allow(deprecated)]` with migration note. No test files reference removed methods.
 
 ---
 
@@ -416,30 +410,30 @@ Channels set `running = false` but don't send WebSocket close frames.
 1. ~~**G-01**: Add missing fields to `storage::TodoPatch`~~ ✅ Done 2026-02-19
 2. ~~**G-03/G-15**: Choose v2 plan executor, deprecate legacy~~ ✅ G-03 done 2026-02-19 (context-enriched prompts; G-15 remains open)
 3. ~~**G-04**: Set up shared SQL test fixture; add tests for critical repos~~ ✅ Done 2026-02-19
-4. **G-11**: Wire timezone into cron schedule computation
+4. ~~**G-11**: Wire timezone into cron schedule computation~~ ✅ Done 2026-02-19
 
 ### Phase 2: Complete SQL Migration (Weeks 3-4)
 5. ~~**G-05**: Build `klyntbot migrate` CLI command~~ ✅ Done 2026-02-19
 6. ~~**G-06**: Remove legacy JSONL stores (todo_store, project_store, embedding_store)~~ ✅ Done 2026-02-19
-7. **G-12**: Audit and remove legacy store path methods
+7. ~~**G-12**: Audit and remove legacy store path methods~~ ✅ Done 2026-02-19
 8. **G-16/G-17**: Migrate memory store and learning stores to PostgreSQL
 9. **G-30**: Unify calendar sync state to `from_repo()` pattern
 
 ### Phase 3: Provider & Context Quality (Weeks 5-6)
 10. ~~**G-02**: Implement Anthropic native streaming~~ ✅ Done 2026-02-19
-11. **G-07**: Wire provider token counting into ContextEngine
-12. **G-08**: Implement memory retrieval in context assembly
+11. ~~**G-07**: Wire provider token counting into ContextEngine~~ ✅ Done 2026-02-19
+12. ~~**G-08**: Implement memory retrieval in context assembly~~ ✅ Done 2026-02-19
 13. **G-20**: Extend session message format to preserve tool calls/reasoning
 14. **G-22**: Add per-model context window mapping
 
 ### Phase 4: Dashboard & Integration (Weeks 7-8)
-15. **G-09**: Wire DashboardServer into serve.rs
+15. ~~**G-09**: Wire DashboardServer into serve.rs~~ ✅ Done 2026-02-19
 16. **G-26**: Migrate dashboard to use SQL repos
 17. **G-27/G-28/G-29**: Implement dashboard stub resolvers
 18. **G-13/G-14**: Refactor AgentLoop into focused subcomponents
 
 ### Phase 5: Polish & Hardening (Ongoing)
-19. **G-10**: Add configurable conflict resolution strategies
+19. ~~**G-10**: Add configurable conflict resolution strategies~~ ✅ Done 2026-02-19
 20. **G-51**: Add channel integration tests (Discord, Slack priority)
 21. **G-50**: Add tool authorization model
 22. Remaining P3 items as capacity allows

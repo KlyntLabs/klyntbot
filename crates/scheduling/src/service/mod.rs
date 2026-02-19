@@ -12,6 +12,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use chrono::Utc;
+use chrono_tz::Tz;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use tracing::info;
@@ -43,14 +44,40 @@ fn compute_next_run(schedule: &CronSchedule, now_ms: i64) -> Option<i64> {
                 None
             }
         }
-        CronSchedule::Cron { expr, .. } => {
-            // Use cron crate to compute next run
-            match cron::Schedule::try_from(expr.as_str()) {
-                Ok(schedule) => schedule
-                    .upcoming(Utc)
-                    .next()
-                    .map(|dt| dt.timestamp_millis()),
-                Err(_) => None,
+        CronSchedule::Cron { expr, tz } => {
+            // Use cron crate to compute next run, optionally in the specified timezone.
+            let cron_schedule = match cron::Schedule::try_from(expr.as_str()) {
+                Ok(s) => s,
+                Err(_) => return None,
+            };
+
+            match tz.as_deref() {
+                None => {
+                    // No timezone specified — compute directly in UTC.
+                    cron_schedule
+                        .upcoming(Utc)
+                        .next()
+                        .map(|dt| dt.timestamp_millis())
+                }
+                Some(tz_str) => {
+                    // Parse the timezone string; fall back to UTC with a warning on failure.
+                    match tz_str.parse::<Tz>() {
+                        Ok(tz) => cron_schedule
+                            .upcoming(tz)
+                            .next()
+                            .map(|dt| dt.timestamp_millis()),
+                        Err(_) => {
+                            tracing::warn!(
+                                "CronSchedule: unrecognised timezone {:?}, falling back to UTC",
+                                tz_str
+                            );
+                            cron_schedule
+                                .upcoming(Utc)
+                                .next()
+                                .map(|dt| dt.timestamp_millis())
+                        }
+                    }
+                }
             }
         }
     }
@@ -858,5 +885,100 @@ mod tests {
 
         let next = compute_next_run(&schedule, now);
         assert!(next.is_none());
+    }
+
+    // ---- Timezone-aware cron tests ----
+
+    #[test]
+    fn test_compute_next_run_cron_utc_explicit() {
+        let now = now_ms();
+        let schedule = CronSchedule::Cron {
+            expr: "0 0 0 * * *".to_string(),
+            tz: Some("UTC".to_string()),
+        };
+
+        let next = compute_next_run(&schedule, now);
+        assert!(next.is_some());
+        assert!(next.unwrap() > now);
+    }
+
+    #[test]
+    fn test_compute_next_run_cron_named_timezone() {
+        let now = now_ms();
+        let schedule = CronSchedule::Cron {
+            expr: "0 0 9 * * *".to_string(), // 09:00 daily
+            tz: Some("America/New_York".to_string()),
+        };
+
+        let next = compute_next_run(&schedule, now);
+        // Should produce a valid future timestamp
+        assert!(next.is_some());
+        assert!(next.unwrap() > now);
+    }
+
+    #[test]
+    fn test_compute_next_run_cron_timezone_differs_from_utc() {
+        // Compute next run for the same hour spec in two different timezones.
+        // The results must differ because the timezones have different UTC offsets.
+        let now = now_ms();
+        let expr = "0 0 12 * * *".to_string(); // Noon
+
+        let utc_schedule = CronSchedule::Cron {
+            expr: expr.clone(),
+            tz: Some("UTC".to_string()),
+        };
+        let tokyo_schedule = CronSchedule::Cron {
+            expr,
+            tz: Some("Asia/Tokyo".to_string()), // UTC+9
+        };
+
+        let utc_next = compute_next_run(&utc_schedule, now).unwrap();
+        let tokyo_next = compute_next_run(&tokyo_schedule, now).unwrap();
+
+        // The two timestamps should differ by UTC offset (9 hours = 32_400_000 ms).
+        // We just assert they are not equal; both must be in the future.
+        assert!(utc_next > now);
+        assert!(tokyo_next > now);
+        assert_ne!(utc_next, tokyo_next);
+    }
+
+    #[test]
+    fn test_compute_next_run_cron_invalid_timezone_falls_back_to_utc() {
+        let now = now_ms();
+        let schedule_invalid_tz = CronSchedule::Cron {
+            expr: "0 0 0 * * *".to_string(),
+            tz: Some("Not/A/Timezone".to_string()),
+        };
+        let schedule_utc = CronSchedule::Cron {
+            expr: "0 0 0 * * *".to_string(),
+            tz: None,
+        };
+
+        let next_invalid = compute_next_run(&schedule_invalid_tz, now);
+        let next_utc = compute_next_run(&schedule_utc, now);
+
+        // Both should return Some (fallback to UTC on invalid tz)
+        assert!(next_invalid.is_some());
+        assert!(next_utc.is_some());
+        // Results should be equal since both end up using UTC
+        assert_eq!(next_invalid, next_utc);
+    }
+
+    #[test]
+    fn test_compute_next_run_cron_none_timezone_same_as_utc() {
+        let now = now_ms();
+        let schedule_none = CronSchedule::Cron {
+            expr: "0 0 6 * * *".to_string(),
+            tz: None,
+        };
+        let schedule_utc = CronSchedule::Cron {
+            expr: "0 0 6 * * *".to_string(),
+            tz: Some("UTC".to_string()),
+        };
+
+        let next_none = compute_next_run(&schedule_none, now);
+        let next_utc = compute_next_run(&schedule_utc, now);
+
+        assert_eq!(next_none, next_utc);
     }
 }

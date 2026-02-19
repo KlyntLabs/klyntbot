@@ -3,8 +3,8 @@
 use async_trait::async_trait;
 use calendar::{
     detect_conflict, load_provider_sync_state, resolve_conflict, save_provider_sync_state,
-    AppleCalendarProvider, CalendarEvent, CalendarProvider, EventSource, GenericCalDavProvider,
-    GoogleCalendarProvider,
+    AppleCalendarProvider, CalendarEvent, CalendarProvider, ConflictResolutionStrategy,
+    EventSource, GenericCalDavProvider, GoogleCalendarProvider,
 };
 use chrono::{Duration, Local, Utc};
 use common::Result;
@@ -28,6 +28,7 @@ pub struct CalendarSyncAdapter {
     auto_sync_due_dates: bool,
     dispatcher: Option<Arc<crate::NotificationDispatcher>>,
     bidirectional_sync: bool,
+    conflict_strategy: ConflictResolutionStrategy,
 }
 
 impl CalendarSyncAdapter {
@@ -88,6 +89,11 @@ impl CalendarSyncAdapter {
             .join(".klyntbot")
             .join("calendar_conflicts.jsonl");
 
+        let conflict_strategy = config
+            .conflict_resolution
+            .parse::<ConflictResolutionStrategy>()
+            .unwrap_or_default();
+
         Ok(Self {
             providers,
             _provider_configs: provider_configs,
@@ -96,6 +102,7 @@ impl CalendarSyncAdapter {
             auto_sync_due_dates: any_auto_sync,
             dispatcher,
             bidirectional_sync,
+            conflict_strategy,
         })
     }
 
@@ -279,7 +286,7 @@ impl CalendarSyncAdapter {
                     if detect_conflict(remote_event, &local_event) {
                         conflicts_detected += 1;
                         self.log_conflict(remote_event, &local_event).await?;
-                        let resolved_event = resolve_conflict(remote_event, &local_event);
+                        let resolved_event = resolve_conflict(remote_event, &local_event, self.conflict_strategy);
                         self.update_todo_from_event(&local_todo.id, &resolved_event)
                             .await?;
                     } else {

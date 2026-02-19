@@ -6,7 +6,10 @@
 //! - Invalid ETags
 //! - CalDAV protocol edge cases
 
-use calendar::{detect_conflict, resolve_conflict, CalendarEvent, EventSource, SyncState};
+use calendar::{
+    detect_conflict, resolve_conflict, CalendarEvent, ConflictResolutionStrategy, EventSource,
+    SyncState,
+};
 use chrono::{TimeZone, Utc};
 
 #[test]
@@ -277,7 +280,7 @@ fn test_resolve_conflict_preserves_server_data() {
         status: None,
     };
 
-    let resolved = resolve_conflict(&server_event, &local_event);
+    let resolved = resolve_conflict(&server_event, &local_event, ConflictResolutionStrategy::ServerWins);
 
     assert_eq!(resolved.summary, "Server Summary");
     assert_eq!(resolved.description, Some("Server description".to_string()));
