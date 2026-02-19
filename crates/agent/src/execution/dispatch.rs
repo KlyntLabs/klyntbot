@@ -58,6 +58,7 @@ impl EngineDispatch {
         tools: &[serde_json::Value],
         params: &ExecutionParams,
         ctx: &RoutingContext,
+        event_tx: Option<tokio::sync::mpsc::Sender<crate::events::AgentEvent>>,
     ) -> Result<DispatchResult> {
         let mut current_strategy = strategy;
         let mut current_messages = messages;
@@ -73,7 +74,7 @@ impl EngineDispatch {
                 ExecutionStrategy::DirectResponse => {
                     let engine = DirectEngine::new(self.core.clone());
                     let outcome = engine
-                        .execute(current_messages.clone(), params, ctx)
+                        .execute(current_messages.clone(), params, ctx, event_tx.as_ref())
                         .await?;
 
                     match outcome {
@@ -110,7 +111,13 @@ impl EngineDispatch {
                         .with_reflection_mode(ReflectionMode::OnFailure);
 
                     let outcome = engine
-                        .execute(current_messages.clone(), tools, params, ctx)
+                        .execute(
+                            current_messages.clone(),
+                            tools,
+                            params,
+                            ctx,
+                            event_tx.clone(),
+                        )
                         .await?;
 
                     match outcome {
@@ -165,7 +172,13 @@ impl EngineDispatch {
                         .with_reflection_mode(ReflectionMode::EveryN(5));
 
                     let outcome = engine
-                        .execute(current_messages.clone(), tools, params, ctx)
+                        .execute(
+                            current_messages.clone(),
+                            tools,
+                            params,
+                            ctx,
+                            event_tx.clone(),
+                        )
                         .await?;
 
                     let (content, usage) = match outcome {
@@ -315,6 +328,7 @@ mod tests {
                 &[],
                 &default_params(),
                 &routing_ctx(),
+                None,
             )
             .await
             .unwrap();
@@ -344,6 +358,7 @@ mod tests {
                 &[],
                 &default_params(),
                 &routing_ctx(),
+                None,
             )
             .await
             .unwrap();
@@ -369,6 +384,7 @@ mod tests {
                 &[],
                 &default_params(),
                 &routing_ctx(),
+                None,
             )
             .await
             .unwrap();
@@ -393,6 +409,7 @@ mod tests {
                 &[],
                 &default_params(),
                 &routing_ctx(),
+                None,
             )
             .await
             .unwrap();
@@ -419,6 +436,7 @@ mod tests {
                 &[],
                 &default_params(),
                 &routing_ctx(),
+                None,
             )
             .await
             .unwrap();

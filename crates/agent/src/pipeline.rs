@@ -190,6 +190,7 @@ impl AgentPipeline {
                 tool_definitions,
                 &params,
                 ctx,
+                event_tx,
             )
             .await?;
 

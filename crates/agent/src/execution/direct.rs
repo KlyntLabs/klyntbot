@@ -38,8 +38,12 @@ impl DirectEngine {
         mut messages: Vec<Message>,
         params: &ExecutionParams,
         ctx: &RoutingContext,
+        event_tx: Option<&tokio::sync::mpsc::Sender<crate::events::AgentEvent>>,
     ) -> Result<DirectOutcome> {
-        let (outcome, _usage) = self.core.run_cycle(&mut messages, &[], params, ctx).await?;
+        let (outcome, _usage) = self
+            .core
+            .run_cycle(&mut messages, &[], params, ctx, event_tx)
+            .await?;
 
         match outcome {
             CycleOutcome::FinalResponse { content } => Ok(DirectOutcome::Response(content)),
@@ -167,6 +171,7 @@ mod tests {
                 vec![Message::user("hi")],
                 &ExecutionParams::new("mock"),
                 &routing_ctx(),
+                None,
             )
             .await
             .unwrap();
@@ -188,6 +193,7 @@ mod tests {
                 vec![Message::user("search for Rust docs")],
                 &ExecutionParams::new("mock"),
                 &routing_ctx(),
+                None,
             )
             .await
             .unwrap();
@@ -210,6 +216,7 @@ mod tests {
                 vec![Message::user("...")],
                 &ExecutionParams::new("mock"),
                 &routing_ctx(),
+                None,
             )
             .await
             .unwrap();

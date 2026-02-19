@@ -77,6 +77,7 @@ impl ReactPlusEngine {
         tools: &[serde_json::Value],
         params: &ExecutionParams,
         ctx: &RoutingContext,
+        event_tx: Option<tokio::sync::mpsc::Sender<crate::events::AgentEvent>>,
     ) -> Result<ReactOutcome> {
         let mut scratchpad = Scratchpad::new();
         let escalation_threshold = (self.max_iterations as f32 * 0.8).ceil() as u32;
@@ -84,9 +85,18 @@ impl ReactPlusEngine {
         let mut force_retried = false;
 
         for iteration in 1..=self.max_iterations {
+            if let Some(ref tx) = event_tx {
+                let _ = tx
+                    .send(crate::events::AgentEvent::IterationStart {
+                        iteration: iteration as usize,
+                        max: self.max_iterations as usize,
+                    })
+                    .await;
+            }
+
             let (outcome, cycle_usage) = self
                 .core
-                .run_cycle(&mut messages, tools, params, ctx)
+                .run_cycle(&mut messages, tools, params, ctx, event_tx.as_ref())
                 .await?;
             accumulate_usage(&mut accumulated_usage, &cycle_usage);
 
@@ -401,7 +411,7 @@ mod tests {
         let messages = vec![Message::user("do something")];
 
         let outcome = engine
-            .execute(messages, &[], &default_params(), &routing_ctx())
+            .execute(messages, &[], &default_params(), &routing_ctx(), None)
             .await
             .unwrap();
 
@@ -459,7 +469,7 @@ mod tests {
 
         let messages = vec![Message::user("do something")];
         let outcome = engine
-            .execute(messages, &[], &default_params(), &routing_ctx())
+            .execute(messages, &[], &default_params(), &routing_ctx(), None)
             .await
             .unwrap();
 
@@ -481,7 +491,7 @@ mod tests {
         let messages = vec![Message::user("complex task")];
 
         let outcome = engine
-            .execute(messages, &[], &default_params(), &routing_ctx())
+            .execute(messages, &[], &default_params(), &routing_ctx(), None)
             .await
             .unwrap();
 
@@ -510,7 +520,7 @@ mod tests {
         let messages = vec![Message::user("multi-step task")];
 
         let outcome = engine
-            .execute(messages, &[], &default_params(), &routing_ctx())
+            .execute(messages, &[], &default_params(), &routing_ctx(), None)
             .await
             .unwrap();
 
@@ -546,7 +556,7 @@ mod tests {
         let messages = vec![Message::user("try something")];
 
         let outcome = engine
-            .execute(messages, &[], &default_params(), &routing_ctx())
+            .execute(messages, &[], &default_params(), &routing_ctx(), None)
             .await
             .unwrap();
 
@@ -605,7 +615,7 @@ mod tests {
         })];
 
         let outcome = engine
-            .execute(messages, &tools, &default_params(), &routing_ctx())
+            .execute(messages, &tools, &default_params(), &routing_ctx(), None)
             .await
             .unwrap();
 
@@ -664,7 +674,7 @@ mod tests {
         })];
 
         let outcome = engine
-            .execute(messages, &tools, &default_params(), &routing_ctx())
+            .execute(messages, &tools, &default_params(), &routing_ctx(), None)
             .await
             .unwrap();
 

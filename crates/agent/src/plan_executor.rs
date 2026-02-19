@@ -94,7 +94,7 @@ pub async fn run_step(
 
     for _cycle in 0..MAX_CYCLES_PER_STEP {
         let (outcome, _usage) = core
-            .run_cycle(&mut messages, &tool_defs, &params, routing_ctx)
+            .run_cycle(&mut messages, &tool_defs, &params, routing_ctx, None)
             .await?;
 
         match outcome {

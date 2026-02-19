@@ -119,6 +119,7 @@ impl ExecutionCore {
         tools: &[serde_json::Value],
         params: &ExecutionParams,
         routing_ctx: &RoutingContext,
+        event_tx: Option<&tokio::sync::mpsc::Sender<crate::events::AgentEvent>>,
     ) -> Result<(CycleOutcome, Usage)> {
         let response = self
             .provider
@@ -187,6 +188,25 @@ impl ExecutionCore {
                 .collect();
 
             let results = join_all(futures).await;
+
+            // Emit events for each tool result
+            if let Some(tx) = event_tx {
+                for r in &results {
+                    let _ = tx
+                        .send(crate::events::AgentEvent::ToolStart {
+                            name: r.tool_name.clone(),
+                            args: serde_json::Value::Null,
+                        })
+                        .await;
+                    let _ = tx
+                        .send(crate::events::AgentEvent::ToolEnd {
+                            name: r.tool_name.clone(),
+                            success: r.success,
+                            duration_ms: r.duration_ms,
+                        })
+                        .await;
+                }
+            }
 
             // Append tool result messages
             for r in &results {
@@ -362,7 +382,7 @@ mod tests {
         let tools = vec![];
 
         let (outcome, _usage) = core
-            .run_cycle(&mut messages, &tools, &params, &routing_ctx())
+            .run_cycle(&mut messages, &tools, &params, &routing_ctx(), None)
             .await
             .unwrap();
 
@@ -385,7 +405,7 @@ mod tests {
         let tools = vec![];
 
         let (outcome, _usage) = core
-            .run_cycle(&mut messages, &tools, &params, &routing_ctx())
+            .run_cycle(&mut messages, &tools, &params, &routing_ctx(), None)
             .await
             .unwrap();
 
@@ -414,7 +434,7 @@ mod tests {
         let tools = vec![];
 
         let (outcome, _usage) = core
-            .run_cycle(&mut messages, &tools, &params, &routing_ctx())
+            .run_cycle(&mut messages, &tools, &params, &routing_ctx(), None)
             .await
             .unwrap();
 
@@ -533,7 +553,7 @@ mod tests {
         let tools = vec![];
 
         let (outcome, _usage) = core
-            .run_cycle(&mut messages, &tools, &params, &routing_ctx())
+            .run_cycle(&mut messages, &tools, &params, &routing_ctx(), None)
             .await
             .unwrap();
 
@@ -571,7 +591,7 @@ mod tests {
         })];
 
         let (outcome, _usage) = core
-            .run_cycle(&mut messages, &tools, &params, &routing_ctx())
+            .run_cycle(&mut messages, &tools, &params, &routing_ctx(), None)
             .await
             .unwrap();
 
@@ -597,7 +617,7 @@ mod tests {
         })];
 
         let (outcome, _usage) = core
-            .run_cycle(&mut messages, &tools, &params, &routing_ctx())
+            .run_cycle(&mut messages, &tools, &params, &routing_ctx(), None)
             .await
             .unwrap();
 
