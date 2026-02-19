@@ -130,6 +130,67 @@ impl FinanceHandler for FinanceHandlerImpl {
         })
     }
 
+    async fn run_health_check(&self) -> Result<String> {
+        // Health check runs in the autonomous context (no FinanceTool instance).
+        // We check a subset of validations that don't require the full tool.
+
+        let mut issues = Vec::new();
+
+        // Check for empty accounts
+        let accounts = self.repos.finance_accounts.list(false).await?;
+        if accounts.is_empty() {
+            issues.push("No finance accounts configured.".to_string());
+        }
+
+        // Check stale investment prices
+        let investments = self.repos.finance_investments.list_with_symbols().await?;
+        let stale_threshold = chrono::Local::now() - chrono::Duration::hours(24);
+        let stale_count = investments
+            .iter()
+            .filter(|inv| inv.updated_at < stale_threshold.to_utc())
+            .count();
+        if stale_count > 0 {
+            issues.push(format!(
+                "{} investment(s) have stale prices (>24h old).",
+                stale_count
+            ));
+        }
+
+        // Check overdue goals
+        let goals = self.repos.finance_goals.list_active().await?;
+        let today = chrono::Local::now().date_naive();
+        let overdue = goals
+            .iter()
+            .filter(|g| g.deadline.map(|d| d < today).unwrap_or(false))
+            .count();
+        if overdue > 0 {
+            issues.push(format!(
+                "{} active goal(s) are past their deadline.",
+                overdue
+            ));
+        }
+
+        // Check negative liability remaining
+        let liabilities = self.repos.finance_liabilities.list_all().await?;
+        let neg = liabilities.iter().filter(|l| l.remaining < 0).count();
+        if neg > 0 {
+            issues.push(format!(
+                "{} liability(ies) have negative remaining balance.",
+                neg
+            ));
+        }
+
+        if issues.is_empty() {
+            Ok("Health check passed: no issues found.".to_string())
+        } else {
+            Ok(format!(
+                "Health check found {} issue(s):\n- {}",
+                issues.len(),
+                issues.join("\n- ")
+            ))
+        }
+    }
+
     async fn analyze_spending(&self, _period: &str) -> Result<String> {
         // Placeholder: full spending analysis is surfaced through FinanceTool's
         // report_spending action rather than via the handler.

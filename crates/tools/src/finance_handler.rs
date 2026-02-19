@@ -99,6 +99,10 @@ pub trait FinanceHandler: Send + Sync {
     /// Analyse spending patterns for the given period (e.g. "this_month", "last_30_days").
     async fn analyze_spending(&self, period: &str) -> Result<String>;
 
+    /// Run all data integrity checks and return a summary string.
+    /// Used by scheduled health checks and daily review (proactivity=full).
+    async fn run_health_check(&self) -> Result<String>;
+
     /// Return the configured proactivity level for this handler instance.
     fn proactivity_level(&self) -> ProactivityLevel;
 }
