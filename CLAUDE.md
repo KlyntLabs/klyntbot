@@ -156,6 +156,31 @@ Enrichment runs automatically on task creation if enabled. Ask the agent to "enr
 - **Suggestions not applied?** Lower `autoApplyThreshold` (default 0.70)
 - **Wrong suggestions?** Adjust task title keywords or set fields manually
 
+## Task Creation Mode
+
+Controls how klyntbot handles task creation — whether it asks for details first or auto-fills.
+
+**Config schema** (`~/.klyntbot/config.json`):
+```json
+{
+  "todo": {
+    "creationMode": "ask-first"
+  }
+}
+```
+
+**Values:**
+- `"ask-first"` (default): Uses `ask_user` to gather details before creating vague tasks. The `confirmed` parameter must be set on `todo add` calls with optional fields.
+- `"yolo"`: Auto-enriches from conversation context, presents suggestions for approval before applying.
+- `"party"`: Interactive brainstorming — asks targeted questions one at a time to build up the task.
+
+**How it works:**
+1. User says "create task: buy"
+2. In `ask-first` mode: agent calls `ask_user` to clarify title, priority, due date
+3. User responds with details
+4. Agent calls `todo add` with gathered details + `confirmed: true`
+5. Enrichment engine adds any remaining fields (estimated time, etc.)
+
 ## Semantic Search
 
 Semantic search uses local embeddings (fastembed, paraphrase-multilingual-MiniLM-L12-v2, 384 dimensions) for meaning-based task retrieval. Finds related concepts, not just keywords (e.g., "login bug" finds "authentication issue").
