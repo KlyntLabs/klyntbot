@@ -87,6 +87,35 @@ impl PriceService {
         );
     }
 
+    // ─── HTTP helper ─────────────────────────────────────────────────────────
+
+    /// GET with retry on 429 (rate-limited). Retries up to 2 times with
+    /// exponential backoff (1s, 3s).
+    async fn get_with_retry(&self, url: &str) -> std::result::Result<reqwest::Response, String> {
+        let delays = [
+            tokio::time::Duration::from_secs(1),
+            tokio::time::Duration::from_secs(3),
+        ];
+        let mut last_err = String::new();
+
+        for attempt in 0..=delays.len() {
+            match self.client.get(url).send().await {
+                Ok(resp) if resp.status() == reqwest::StatusCode::TOO_MANY_REQUESTS => {
+                    if attempt < delays.len() {
+                        tokio::time::sleep(delays[attempt]).await;
+                        last_err = "HTTP 429 Too Many Requests".to_string();
+                        continue;
+                    }
+                    return Err("HTTP 429 Too Many Requests (after retries)".to_string());
+                }
+                Ok(resp) if resp.status().is_success() => return Ok(resp),
+                Ok(resp) => return Err(format!("HTTP {}", resp.status())),
+                Err(e) => return Err(e.to_string()),
+            }
+        }
+        Err(last_err)
+    }
+
     // ─── public API ───────────────────────────────────────────────────────────
 
     /// Fetch a stock price from Yahoo Finance chart API.
@@ -108,21 +137,7 @@ impl PriceService {
             urlencoding::encode(symbol)
         );
 
-        let result = self
-            .client
-            .get(&url)
-            .send()
-            .await
-            .map_err(|e| e.to_string())
-            .and_then(|r| {
-                if r.status().is_success() {
-                    Ok(r)
-                } else {
-                    Err(format!("HTTP {}", r.status()))
-                }
-            });
-
-        match result {
+        match self.get_with_retry(&url).await {
             Ok(response) => {
                 let json: serde_json::Value = response
                     .json()
@@ -197,21 +212,7 @@ impl PriceService {
             urlencoding::encode(vs_currency)
         );
 
-        let result = self
-            .client
-            .get(&url)
-            .send()
-            .await
-            .map_err(|e| e.to_string())
-            .and_then(|r| {
-                if r.status().is_success() {
-                    Ok(r)
-                } else {
-                    Err(format!("HTTP {}", r.status()))
-                }
-            });
-
-        match result {
+        match self.get_with_retry(&url).await {
             Ok(response) => {
                 let json: serde_json::Value = response
                     .json()
@@ -266,21 +267,7 @@ impl PriceService {
             urlencoding::encode(from)
         );
 
-        let result = self
-            .client
-            .get(&url)
-            .send()
-            .await
-            .map_err(|e| e.to_string())
-            .and_then(|r| {
-                if r.status().is_success() {
-                    Ok(r)
-                } else {
-                    Err(format!("HTTP {}", r.status()))
-                }
-            });
-
-        match result {
+        match self.get_with_retry(&url).await {
             Ok(response) => {
                 let json: serde_json::Value = response
                     .json()
