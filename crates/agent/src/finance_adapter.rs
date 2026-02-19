@@ -35,33 +35,91 @@ impl FinanceHandlerImpl {
 #[async_trait]
 impl FinanceHandler for FinanceHandlerImpl {
     async fn daily_review(&self) -> Result<String> {
-        // Gather today's budget usage and build a brief narrative.
+        let mut sections = Vec::new();
+
+        // Section 1: Budget status
         let usages = self.repos.finance_budgets.all_budget_usage().await?;
-
-        if usages.is_empty() {
-            return Ok("No active budgets found for daily review.".to_string());
+        if !usages.is_empty() {
+            let mut budget_lines = vec!["### Budget Status".to_string()];
+            for u in &usages {
+                let pct = if u.amount > 0 {
+                    (u.spent as f64 / u.amount as f64) * 100.0
+                } else {
+                    0.0
+                };
+                let status = if pct >= 100.0 {
+                    "OVER BUDGET"
+                } else if pct >= self.config.budgeting.alert_threshold as f64 {
+                    "Near limit"
+                } else {
+                    "On track"
+                };
+                budget_lines.push(format!(
+                    "- **{}**: {:.0}% ({} / {} {}) — {}",
+                    u.name, pct, u.spent, u.amount, u.currency, status,
+                ));
+            }
+            sections.push(budget_lines.join("\n"));
         }
 
-        let mut lines = vec!["## Daily Financial Review\n".to_string()];
-        for u in &usages {
-            let pct = if u.amount > 0 {
-                (u.spent as f64 / u.amount as f64) * 100.0
-            } else {
-                0.0
-            };
-            let status = if pct >= 100.0 {
-                "⚠️ OVER BUDGET"
-            } else if pct >= self.config.budgeting.alert_threshold as f64 {
-                "⚠️ Near limit"
-            } else {
-                "✅ On track"
-            };
-            lines.push(format!(
-                "- **{}**: {:.0}% used ({} / {} {}) — {}",
-                u.name, pct, u.spent, u.amount, u.currency, status,
-            ));
+        // Section 2: Yesterday's spending (top categories)
+        let yesterday = chrono::Local::now().date_naive() - chrono::Duration::days(1);
+        let spending = self
+            .repos
+            .finance_transactions
+            .sum_by_category(yesterday, yesterday, "expense")
+            .await
+            .unwrap_or_default();
+        if !spending.is_empty() {
+            let total: i64 = spending.iter().map(|(_, v)| v).sum();
+            let mut spend_lines = vec![format!("### Yesterday's Spending: {}", total)];
+            for (cat, amount) in spending.iter().take(3) {
+                spend_lines.push(format!("- {}: {}", cat, amount));
+            }
+            sections.push(spend_lines.join("\n"));
         }
-        Ok(lines.join("\n"))
+
+        // Section 3: Goals approaching deadline (within 7 days)
+        let goals = self.repos.finance_goals.list_active().await?;
+        let today = chrono::Local::now().date_naive();
+        let approaching: Vec<_> = goals
+            .iter()
+            .filter(|g| {
+                g.deadline
+                    .map(|d| {
+                        let days_left = (d - today).num_days();
+                        (0..=7).contains(&days_left)
+                    })
+                    .unwrap_or(false)
+            })
+            .collect();
+        if !approaching.is_empty() {
+            let mut goal_lines = vec!["### Goals Approaching Deadline".to_string()];
+            for g in &approaching {
+                let days = (g.deadline.unwrap() - today).num_days();
+                let pct = if g.target_amount > 0 {
+                    (g.current_amount as f64 / g.target_amount as f64) * 100.0
+                } else {
+                    0.0
+                };
+                goal_lines.push(format!(
+                    "- **{}**: {:.0}% complete, {} day(s) left",
+                    g.name, pct, days
+                ));
+            }
+            sections.push(goal_lines.join("\n"));
+        }
+
+        if sections.is_empty() {
+            return Ok(
+                "No financial activity to review. Create accounts and budgets to get started."
+                    .to_string(),
+            );
+        }
+
+        let mut result = vec!["## Daily Financial Review\n".to_string()];
+        result.extend(sections);
+        Ok(result.join("\n\n"))
     }
 
     async fn check_budgets(&self) -> Result<Vec<BudgetAlert>> {
