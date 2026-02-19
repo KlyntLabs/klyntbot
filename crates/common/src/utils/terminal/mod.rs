@@ -15,6 +15,7 @@ pub mod colors;
 pub mod markdown;
 pub mod spinners;
 pub mod tables;
+pub mod thinking_renderer;
 
 // Re-export all public items to preserve the existing `use terminal::*` API.
 pub use boxes::*;
@@ -22,3 +23,4 @@ pub use colors::*;
 pub use markdown::*;
 pub use spinners::*;
 pub use tables::*;
+pub use thinking_renderer::*;
