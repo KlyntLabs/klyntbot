@@ -23,9 +23,11 @@ async fn main() {
     init_tracing(log_level);
 
     let result = match cli.command {
-        Some(Commands::Chat { message, session }) => {
-            cli_handlers::handle_chat(message, session).await
-        }
+        Some(Commands::Chat {
+            message,
+            session,
+            verbose,
+        }) => cli_handlers::handle_chat(message, session, verbose).await,
 
         Some(Commands::Serve { port, .. }) => cli_handlers::handle_serve(port).await,
 

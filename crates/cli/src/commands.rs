@@ -25,6 +25,10 @@ pub enum Commands {
         /// Session ID for conversation continuity
         #[arg(short, long, default_value = "cli:default")]
         session: String,
+
+        /// Show detailed thinking trace (tool args, token counts, timing)
+        #[arg(short = 'V', long)]
+        verbose: bool,
     },
 
     /// Start the gateway daemon to enable channel integrations

@@ -205,6 +205,7 @@ pub async fn handle_chat(message: Option<String>, session: String, verbose: bool
                                     paste_message,
                                     session_key.clone(),
                                     &model,
+                                    verbose,
                                 )
                                 .await
                                 {
@@ -238,6 +239,7 @@ pub async fn handle_chat(message: Option<String>, session: String, verbose: bool
                         trimmed.to_string(),
                         session_key.clone(),
                         &model,
+                        verbose,
                     )
                     .await
                     {
@@ -274,7 +276,9 @@ async fn run_with_streaming(
     message: String,
     session_key: String,
     model: &str,
+    verbose: bool,
 ) -> Result<()> {
+    let _verbose = verbose;
     let handle = agent_loop
         .process_direct_streaming(message, session_key)
         .await?;
