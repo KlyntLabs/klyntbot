@@ -89,7 +89,8 @@ impl ReactPlusEngine {
             accumulate_usage(&mut accumulated_usage, &cycle_usage);
 
             match outcome {
-                CycleOutcome::FinalResponse { content } => {
+                CycleOutcome::FinalResponse { content }
+                | CycleOutcome::FabricatedResponse { content } => {
                     scratchpad.add(ReasoningTrace {
                         cycle: iteration,
                         thought: "Received final response".to_string(),

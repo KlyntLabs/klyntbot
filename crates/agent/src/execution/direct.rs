@@ -43,6 +43,7 @@ impl DirectEngine {
 
         match outcome {
             CycleOutcome::FinalResponse { content } => Ok(DirectOutcome::Response(content)),
+            CycleOutcome::FabricatedResponse { content } => Ok(DirectOutcome::Response(content)),
             CycleOutcome::ToolsExecuted { .. } => {
                 // LLM wanted tools despite being given none — escalate
                 Ok(DirectOutcome::EscalateToToolAssisted { messages })

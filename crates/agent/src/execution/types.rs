@@ -44,6 +44,8 @@ pub enum CycleOutcome {
     FinalResponse { content: String },
     /// LLM returned an empty response.
     EmptyResponse,
+    /// LLM returned text that looks like a fabricated tool response.
+    FabricatedResponse { content: String },
 }
 
 /// Accumulate token usage from one cycle into a running total.

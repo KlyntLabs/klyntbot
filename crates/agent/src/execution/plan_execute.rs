@@ -229,7 +229,8 @@ impl PlanExecuteEngine {
             let (outcome, _cycle_usage) = self.core.run_cycle(messages, tools, params, ctx).await?;
 
             match outcome {
-                CycleOutcome::FinalResponse { content } => {
+                CycleOutcome::FinalResponse { content }
+                | CycleOutcome::FabricatedResponse { content } => {
                     return Ok(content);
                 }
                 CycleOutcome::ToolsExecuted { .. } => {
