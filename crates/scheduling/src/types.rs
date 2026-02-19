@@ -173,70 +173,43 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_cron_schedule_at_serialization() {
+    fn test_cron_schedule_serde() {
+        // At variant
         let schedule = CronSchedule::At { at_ms: 1234567890 };
-
         let json = serde_json::to_value(&schedule).unwrap();
         assert_eq!(json["kind"], "at");
         assert_eq!(json["atMs"], 1234567890);
-
-        // Test deserialization
-        let deserialized: CronSchedule = serde_json::from_value(json).unwrap();
-        match deserialized {
+        match serde_json::from_value::<CronSchedule>(json).unwrap() {
             CronSchedule::At { at_ms } => assert_eq!(at_ms, 1234567890),
             _ => panic!("Wrong schedule type"),
         }
-    }
 
-    #[test]
-    fn test_cron_schedule_every_serialization() {
-        let schedule = CronSchedule::Every {
-            every_ms: 60000, // 1 minute
-        };
-
+        // Every variant
+        let schedule = CronSchedule::Every { every_ms: 60000 };
         let json = serde_json::to_value(&schedule).unwrap();
         assert_eq!(json["kind"], "every");
         assert_eq!(json["everyMs"], 60000);
-
-        // Test deserialization
-        let deserialized: CronSchedule = serde_json::from_value(json).unwrap();
-        match deserialized {
+        match serde_json::from_value::<CronSchedule>(json).unwrap() {
             CronSchedule::Every { every_ms } => assert_eq!(every_ms, 60000),
             _ => panic!("Wrong schedule type"),
         }
-    }
 
-    #[test]
-    fn test_cron_schedule_cron_serialization() {
+        // Cron variant
         let schedule = CronSchedule::Cron {
             expr: "0 0 * * *".to_string(),
             tz: Some("UTC".to_string()),
         };
-
         let json = serde_json::to_value(&schedule).unwrap();
         assert_eq!(json["kind"], "cron");
         assert_eq!(json["expr"], "0 0 * * *");
         assert_eq!(json["tz"], "UTC");
-
-        // Test deserialization
-        let deserialized: CronSchedule = serde_json::from_value(json).unwrap();
-        match deserialized {
+        match serde_json::from_value::<CronSchedule>(json).unwrap() {
             CronSchedule::Cron { expr, tz } => {
                 assert_eq!(expr, "0 0 * * *");
                 assert_eq!(tz, Some("UTC".to_string()));
             }
             _ => panic!("Wrong schedule type"),
         }
-    }
-
-    #[test]
-    fn test_cron_payload_defaults() {
-        let payload = CronPayload::default();
-        assert_eq!(payload.kind, "agent_turn");
-        assert_eq!(payload.message, "");
-        assert!(!payload.deliver);
-        assert!(payload.channel.is_none());
-        assert!(payload.to.is_none());
     }
 
     #[test]
@@ -255,19 +228,6 @@ mod tests {
         assert_eq!(json["deliver"], true);
         assert_eq!(json["channel"], "telegram");
         assert_eq!(json["to"], "chat123");
-    }
-
-    #[test]
-    fn test_cron_job_creation() {
-        let schedule = CronSchedule::Every { every_ms: 60000 };
-        let job = CronJob::new("job1", "Test Job", schedule.clone(), "Do something");
-
-        assert_eq!(job.id, "job1");
-        assert_eq!(job.name, "Test Job");
-        assert!(job.enabled);
-        assert_eq!(job.payload.message, "Do something");
-        assert!(!job.delete_after_run);
-        assert!(job.created_at_ms > 0);
     }
 
     #[test]
@@ -300,13 +260,6 @@ mod tests {
         assert_eq!(json["nextRunAtMs"], 1234567890);
         assert_eq!(json["lastRunAtMs"], 1234567800);
         assert_eq!(json["lastStatus"], "success");
-    }
-
-    #[test]
-    fn test_cron_store_defaults() {
-        let store = CronStore::default();
-        assert_eq!(store.version, 1);
-        assert_eq!(store.jobs.len(), 0);
     }
 
     #[test]

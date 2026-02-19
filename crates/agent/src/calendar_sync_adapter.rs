@@ -149,13 +149,18 @@ impl CalendarSyncAdapter {
                 .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
             for row in rows {
                 if row.due_date.is_none() && row.calendar_event_uid.is_some() {
-                    // Note: storage::TodoPatch doesn't have calendar_event_uid.
-                    // This is a best-effort cleanup; full support requires extending
-                    // the storage patch.
-                    tracing::debug!(
-                        "Skipping calendar_event_uid cleanup for todo {} (requires TodoPatch extension)",
-                        row.id
-                    );
+                    let patch = storage::TodoPatch {
+                        id: row.id.clone(),
+                        calendar_event_uid: Some(None),
+                        ..Default::default()
+                    };
+                    if let Err(e) = self.todo_repo.update(&patch).await {
+                        tracing::warn!(
+                            "Failed to clear calendar_event_uid for todo {}: {}",
+                            row.id,
+                            e
+                        );
+                    }
                 }
             }
         }
@@ -308,12 +313,18 @@ impl CalendarSyncAdapter {
                         match provider.put_event(&event).await {
                             Ok(_etag) => {
                                 if todo.calendar_event_uid.is_none() {
-                                    // Note: storage::TodoPatch doesn't have calendar_event_uid.
-                                    // Best-effort: skip link for now (requires TodoPatch extension).
-                                    tracing::debug!(
-                                        "Skipping calendar_event_uid link for todo {} (requires TodoPatch extension)",
-                                        todo.id
-                                    );
+                                    let patch = storage::TodoPatch {
+                                        id: todo.id.clone(),
+                                        calendar_event_uid: Some(Some(event.uid.clone())),
+                                        ..Default::default()
+                                    };
+                                    if let Err(e) = self.todo_repo.update(&patch).await {
+                                        tracing::warn!(
+                                            "Failed to set calendar_event_uid for todo {}: {}",
+                                            todo.id,
+                                            e
+                                        );
+                                    }
                                 }
                                 events_pushed += 1;
                             }

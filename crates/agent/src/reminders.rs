@@ -129,11 +129,9 @@ impl ReminderEngine {
                 // Update last_reminded_at via SQL
                 let patch = storage::TodoPatch {
                     id: todo.id.clone(),
+                    last_reminded_at: Some(Some(Utc::now())),
                     ..Default::default()
                 };
-                // Note: storage::TodoPatch doesn't have last_reminded_at — use a
-                // targeted SQL update for reminder-specific fields would require
-                // extending TodoPatch. For now, the reminder timestamp is best-effort.
                 let _ = repo.update(&patch).await;
             }
 

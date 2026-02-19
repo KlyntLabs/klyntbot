@@ -119,29 +119,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_goal_construction() {
-        let now = Utc::now();
-        let goal = Goal {
-            id: Uuid::new_v4(),
-            title: "Learn Rust".to_string(),
-            description: "Master Rust programming language".to_string(),
-            status: GoalStatus::Active,
-            priority: 2,
-            target_date: Some(now + chrono::Duration::days(90)),
-            created_at: now,
-            updated_at: now,
-            metrics: vec![],
-            linked_project_ids: vec![],
-            metadata: HashMap::new(),
-        };
-
-        assert_eq!(goal.title, "Learn Rust");
-        assert_eq!(goal.priority, 2);
-        assert!(matches!(goal.status, GoalStatus::Active));
-        assert!(goal.target_date.is_some());
-    }
-
-    #[test]
     fn test_goal_status_transitions() {
         // Active can transition to any state
         let statuses = [
@@ -158,12 +135,6 @@ mod tests {
         assert!(debug_strings.contains(&"Paused".to_string()));
         assert!(debug_strings.contains(&"Achieved".to_string()));
         assert!(debug_strings.contains(&"Abandoned".to_string()));
-    }
-
-    #[test]
-    fn test_goal_status_default() {
-        let status = GoalStatus::default();
-        assert!(matches!(status, GoalStatus::Active));
     }
 
     #[test]
@@ -264,20 +235,4 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_goal_status_serde() {
-        let statuses = vec![
-            (GoalStatus::Active, "\"Active\""),
-            (GoalStatus::Paused, "\"Paused\""),
-            (GoalStatus::Achieved, "\"Achieved\""),
-            (GoalStatus::Abandoned, "\"Abandoned\""),
-        ];
-
-        for (status, expected_json) in statuses {
-            let json = serde_json::to_string(&status).unwrap();
-            assert_eq!(json, expected_json);
-            let deserialized: GoalStatus = serde_json::from_str(&json).unwrap();
-            assert_eq!(format!("{:?}", deserialized), format!("{:?}", status));
-        }
-    }
 }

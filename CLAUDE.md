@@ -280,6 +280,6 @@ When a step exceeds `max_attempts` (default: 3 retries per step):
 
 ### Known Limitations
 
-- **No LLM parameter generation**: `execute_step()` passes `{}` as tool arguments. Tools must work without explicit parameters, or parameter generation needs Phase 5 enhancement.
+- **Single-cycle execution**: `execute_step()` makes one LLM call per step. The LLM generates tool calls with arguments from step context (description, previous results, plan goal). A multi-cycle ReAct loop is available via `PlanExecuteEngine`.
 - **Iteration limit enforcement**: `iteration_limit` field persists but is checked in `run_plan_execution()` — exceeded limits mark the plan as `Failed`.
 - **No real-time progress**: Plan progress is only visible between executions; there's no streaming progress update.

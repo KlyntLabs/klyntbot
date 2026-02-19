@@ -117,31 +117,23 @@ impl RecurringTaskSpawner {
 
             // Advance next_instance_date via update patch
             let next = rrule_utils::next_occurrence(&rule, now)?;
-            // Use a TodoPatch that only sets title (no-op) to touch updated_at,
-            // and rely on a direct approach — TodoPatch doesn't have next_instance_date,
-            // so we fetch, modify, and re-add. For now, use the JSONL pattern of a
-            // targeted field update. Since storage::TodoPatch doesn't include
-            // next_instance_date, we'll do a minimal update through the repo.
-            // TODO: extend storage::TodoPatch with next_instance_date field.
             let patch = storage::TodoPatch {
                 id: tpl_row.id.clone(),
-                title: Some(tpl_row.title.clone()), // no-op, keeps existing title
+                next_instance_date: Some(next),
                 ..Default::default()
             };
-            let _ = repo
-                .update(&patch)
-                .await
-                .map_err(|e| common::KlyntbotError::Storage(e.to_string()));
+            if let Err(e) = repo.update(&patch).await {
+                tracing::warn!(
+                    "Failed to advance next_instance_date for template [{}]: {}",
+                    tpl_row.id,
+                    e
+                );
+            }
 
             info!(
                 "Spawned recurring instance [{}] from template [{}] '{}'",
                 instance_id, tpl_row.id, tpl_row.title
             );
-
-            // Note: next_instance_date advancement requires extending storage::TodoPatch.
-            // The instance is created correctly; template date advancement is best-effort
-            // until the patch struct is extended.
-            let _ = next; // suppress unused warning until TodoPatch is extended
         }
 
         Ok(())

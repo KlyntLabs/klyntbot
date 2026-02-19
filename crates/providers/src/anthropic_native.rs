@@ -4,16 +4,18 @@
 //! native features: prompt caching, token counting, extended thinking.
 
 use async_trait::async_trait;
+use futures_util::StreamExt;
 use reqwest::Client;
 use serde_json::{json, Value};
 use std::time::Duration;
 use tracing::{debug, warn};
 
-use common::{ProviderError, Result};
+use common::{KlyntbotError, ProviderError, Result};
 use config::Secret;
 
 use crate::types::{
-    ChatParams, LlmProvider, LlmResponse, Message, ProviderCapabilities, ToolCall, Usage,
+    ChatParams, LlmProvider, LlmResponse, LlmStream, LlmStreamChunk, Message,
+    ProviderCapabilities, ToolCall, ToolCallDelta, Usage,
 };
 
 const ANTHROPIC_CONTEXT_WINDOW: usize = 200_000;
@@ -168,6 +170,122 @@ impl AnthropicNativeProvider {
             .collect()
     }
 
+    /// Parse an Anthropic SSE event into an optional stream chunk.
+    ///
+    /// Anthropic SSE format uses named events:
+    /// - `message_start` — initial message metadata
+    /// - `content_block_start` — new content block (text, tool_use, thinking)
+    /// - `content_block_delta` — streaming delta (text_delta, input_json_delta, thinking_delta)
+    /// - `content_block_stop` — block complete
+    /// - `message_delta` — stop reason and output usage
+    /// - `message_stop` — final event
+    /// - `ping` — keepalive (ignored)
+    /// - `error` — error in stream
+    fn parse_anthropic_sse(event_type: &str, data: &str) -> Result<Option<LlmStreamChunk>> {
+        let value: Value = serde_json::from_str(data)
+            .map_err(|e| ProviderError::InvalidResponse(format!("Invalid SSE JSON: {}", e)))?;
+
+        match event_type {
+            "content_block_start" => {
+                let block = &value["content_block"];
+                match block["type"].as_str() {
+                    Some("tool_use") => {
+                        let index = value["index"].as_u64().unwrap_or(0) as usize;
+                        let id = block["id"].as_str().map(|s| s.to_string());
+                        let name = block["name"].as_str().map(|s| s.to_string());
+                        Ok(Some(LlmStreamChunk {
+                            content: None,
+                            tool_call_delta: Some(ToolCallDelta {
+                                index,
+                                id,
+                                name,
+                                arguments: None,
+                            }),
+                            is_final: false,
+                            finish_reason: None,
+                            reasoning_content: None,
+                        }))
+                    }
+                    // text and thinking blocks will emit content via deltas
+                    _ => Ok(None),
+                }
+            }
+            "content_block_delta" => {
+                let delta = &value["delta"];
+                match delta["type"].as_str() {
+                    Some("text_delta") => {
+                        let text = delta["text"].as_str().map(|s| s.to_string());
+                        Ok(Some(LlmStreamChunk {
+                            content: text,
+                            tool_call_delta: None,
+                            is_final: false,
+                            finish_reason: None,
+                            reasoning_content: None,
+                        }))
+                    }
+                    Some("input_json_delta") => {
+                        let index = value["index"].as_u64().unwrap_or(0) as usize;
+                        let partial_json =
+                            delta["partial_json"].as_str().map(|s| s.to_string());
+                        Ok(Some(LlmStreamChunk {
+                            content: None,
+                            tool_call_delta: Some(ToolCallDelta {
+                                index,
+                                id: None,
+                                name: None,
+                                arguments: partial_json,
+                            }),
+                            is_final: false,
+                            finish_reason: None,
+                            reasoning_content: None,
+                        }))
+                    }
+                    Some("thinking_delta") => {
+                        let thinking = delta["thinking"].as_str().map(|s| s.to_string());
+                        Ok(Some(LlmStreamChunk {
+                            content: None,
+                            tool_call_delta: None,
+                            is_final: false,
+                            finish_reason: None,
+                            reasoning_content: thinking,
+                        }))
+                    }
+                    _ => Ok(None),
+                }
+            }
+            "message_delta" => {
+                // Contains stop_reason and output usage
+                let stop_reason = value["delta"]["stop_reason"].as_str();
+                let finish_reason = match stop_reason {
+                    Some("end_turn") => Some("stop".to_string()),
+                    Some("tool_use") => Some("tool_calls".to_string()),
+                    Some("max_tokens") => Some("length".to_string()),
+                    Some(other) => Some(other.to_string()),
+                    None => None,
+                };
+                Ok(Some(LlmStreamChunk {
+                    content: None,
+                    tool_call_delta: None,
+                    is_final: true,
+                    finish_reason,
+                    reasoning_content: None,
+                }))
+            }
+            "error" => {
+                let error_msg = value["error"]["message"]
+                    .as_str()
+                    .unwrap_or("Unknown streaming error");
+                Err(ProviderError::InvalidResponse(format!(
+                    "Anthropic stream error: {}",
+                    error_msg
+                ))
+                .into())
+            }
+            // message_start, content_block_stop, message_stop, ping — no chunk needed
+            _ => Ok(None),
+        }
+    }
+
     /// Parse Anthropic Messages API response into LlmResponse.
     fn parse_response(&self, body: Value) -> Result<LlmResponse> {
         let mut text_content = String::new();
@@ -313,6 +431,119 @@ impl LlmProvider for AnthropicNativeProvider {
         })?;
 
         self.parse_response(response_body)
+    }
+
+    async fn chat_stream(
+        &self,
+        messages: &[Message],
+        tools: Option<&[Value]>,
+        params: &ChatParams,
+    ) -> Result<LlmStream> {
+        let url = format!("{}/v1/messages", self.base_url);
+
+        // Build request body with stream: true
+        let mut body = json!({
+            "model": params.model,
+            "messages": self.convert_messages(messages),
+            "max_tokens": params.max_tokens.unwrap_or(4096),
+            "stream": true,
+        });
+
+        // System prompt with cache_control for prompt caching
+        if let Some(system_prompt) = Self::extract_system_prompt(messages) {
+            body["system"] = json!([{
+                "type": "text",
+                "text": system_prompt,
+                "cache_control": {"type": "ephemeral"}
+            }]);
+        }
+
+        if let Some(temp) = params.temperature {
+            body["temperature"] = json!(temp);
+        }
+
+        // Convert and add tools
+        if let Some(tools) = tools {
+            if !tools.is_empty() {
+                body["tools"] = json!(self.convert_tools(tools));
+            }
+        }
+
+        debug!(
+            "Calling Anthropic native (streaming): model={}, messages={}",
+            params.model,
+            messages.len()
+        );
+
+        let response = self
+            .client
+            .post(&url)
+            .header("x-api-key", self.api_key.expose())
+            .header("anthropic-version", ANTHROPIC_VERSION)
+            .header("content-type", "application/json")
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| ProviderError::Http(e.to_string()))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+
+            return Err(super::types::map_http_error(status.as_u16(), error_text));
+        }
+
+        // Create SSE stream from response bytes
+        let stream = response.bytes_stream();
+
+        // Anthropic SSE has both `event:` and `data:` lines.
+        // We track the current event type across data lines.
+        let chunk_stream = stream.scan(
+            (String::new(), String::new()), // (line_buffer, current_event_type)
+            |state, result| {
+                let (line_buffer, current_event) = state;
+                let chunks_result = match result {
+                    Ok(bytes) => {
+                        let text = String::from_utf8_lossy(&bytes);
+                        line_buffer.push_str(&text);
+
+                        let mut chunks = Vec::new();
+                        while let Some(newline_pos) = line_buffer.find('\n') {
+                            let line = line_buffer.drain(..=newline_pos).collect::<String>();
+                            let line = line.trim();
+
+                            if line.is_empty() {
+                                continue;
+                            }
+
+                            if let Some(event_type) = line.strip_prefix("event: ") {
+                                *current_event = event_type.to_string();
+                            } else if let Some(data) = line.strip_prefix("data: ") {
+                                match Self::parse_anthropic_sse(current_event, data) {
+                                    Ok(Some(chunk)) => chunks.push(Ok(chunk)),
+                                    Ok(None) => {}
+                                    Err(e) => {
+                                        warn!("Failed to parse Anthropic SSE: {}", e);
+                                        chunks.push(Err(e));
+                                    }
+                                }
+                            }
+                        }
+                        chunks
+                    }
+                    Err(e) => vec![Err(KlyntbotError::Provider(ProviderError::Http(
+                        e.to_string(),
+                    )))],
+                };
+
+                async move { Some(futures_util::stream::iter(chunks_result)) }
+            },
+        );
+
+        Ok(Box::pin(chunk_stream.flatten()))
     }
 
     async fn count_tokens(&self, messages: &[Message], tools: Option<&[Value]>) -> Result<usize> {
@@ -607,5 +838,148 @@ mod tests {
         let provider = test_provider();
         assert_eq!(provider.name(), "anthropic-native");
         assert_eq!(provider.default_model(), "claude-sonnet-4-20250514");
+    }
+
+    // SSE streaming tests
+
+    #[test]
+    fn test_parse_sse_text_delta() {
+        let data = r#"{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello"}}"#;
+        let chunk = AnthropicNativeProvider::parse_anthropic_sse("content_block_delta", data)
+            .unwrap()
+            .unwrap();
+        assert_eq!(chunk.content, Some("Hello".to_string()));
+        assert!(chunk.tool_call_delta.is_none());
+        assert!(!chunk.is_final);
+        assert!(chunk.finish_reason.is_none());
+        assert!(chunk.reasoning_content.is_none());
+    }
+
+    #[test]
+    fn test_parse_sse_thinking_delta() {
+        let data = r#"{"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"Let me think..."}}"#;
+        let chunk = AnthropicNativeProvider::parse_anthropic_sse("content_block_delta", data)
+            .unwrap()
+            .unwrap();
+        assert!(chunk.content.is_none());
+        assert_eq!(
+            chunk.reasoning_content,
+            Some("Let me think...".to_string())
+        );
+        assert!(!chunk.is_final);
+    }
+
+    #[test]
+    fn test_parse_sse_tool_use_start() {
+        let data = r#"{"type":"content_block_start","index":1,"content_block":{"type":"tool_use","id":"toolu_01","name":"get_weather","input":{}}}"#;
+        let chunk = AnthropicNativeProvider::parse_anthropic_sse("content_block_start", data)
+            .unwrap()
+            .unwrap();
+        assert!(chunk.content.is_none());
+        let delta = chunk.tool_call_delta.unwrap();
+        assert_eq!(delta.index, 1);
+        assert_eq!(delta.id, Some("toolu_01".to_string()));
+        assert_eq!(delta.name, Some("get_weather".to_string()));
+        assert!(delta.arguments.is_none());
+        assert!(!chunk.is_final);
+    }
+
+    #[test]
+    fn test_parse_sse_tool_use_json_delta() {
+        let data = r#"{"type":"content_block_delta","index":1,"delta":{"type":"input_json_delta","partial_json":"{\"location\":"}}"#;
+        let chunk = AnthropicNativeProvider::parse_anthropic_sse("content_block_delta", data)
+            .unwrap()
+            .unwrap();
+        let delta = chunk.tool_call_delta.unwrap();
+        assert_eq!(delta.index, 1);
+        assert!(delta.id.is_none());
+        assert!(delta.name.is_none());
+        assert_eq!(delta.arguments, Some("{\"location\":".to_string()));
+    }
+
+    #[test]
+    fn test_parse_sse_message_delta_end_turn() {
+        let data = r#"{"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"output_tokens":15}}"#;
+        let chunk = AnthropicNativeProvider::parse_anthropic_sse("message_delta", data)
+            .unwrap()
+            .unwrap();
+        assert!(chunk.is_final);
+        assert_eq!(chunk.finish_reason, Some("stop".to_string()));
+    }
+
+    #[test]
+    fn test_parse_sse_message_delta_tool_use() {
+        let data = r#"{"type":"message_delta","delta":{"stop_reason":"tool_use","stop_sequence":null},"usage":{"output_tokens":42}}"#;
+        let chunk = AnthropicNativeProvider::parse_anthropic_sse("message_delta", data)
+            .unwrap()
+            .unwrap();
+        assert!(chunk.is_final);
+        assert_eq!(chunk.finish_reason, Some("tool_calls".to_string()));
+    }
+
+    #[test]
+    fn test_parse_sse_message_delta_max_tokens() {
+        let data = r#"{"type":"message_delta","delta":{"stop_reason":"max_tokens","stop_sequence":null},"usage":{"output_tokens":4096}}"#;
+        let chunk = AnthropicNativeProvider::parse_anthropic_sse("message_delta", data)
+            .unwrap()
+            .unwrap();
+        assert!(chunk.is_final);
+        assert_eq!(chunk.finish_reason, Some("length".to_string()));
+    }
+
+    #[test]
+    fn test_parse_sse_message_start_returns_none() {
+        let data = r#"{"type":"message_start","message":{"id":"msg_01","type":"message","role":"assistant","content":[],"model":"claude-sonnet-4-20250514","stop_reason":null,"usage":{"input_tokens":25,"output_tokens":1}}}"#;
+        let result =
+            AnthropicNativeProvider::parse_anthropic_sse("message_start", data).unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_parse_sse_content_block_stop_returns_none() {
+        let data = r#"{"type":"content_block_stop","index":0}"#;
+        let result =
+            AnthropicNativeProvider::parse_anthropic_sse("content_block_stop", data).unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_parse_sse_message_stop_returns_none() {
+        let data = r#"{"type":"message_stop"}"#;
+        let result =
+            AnthropicNativeProvider::parse_anthropic_sse("message_stop", data).unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_parse_sse_ping_returns_none() {
+        let data = r#"{"type":"ping"}"#;
+        let result = AnthropicNativeProvider::parse_anthropic_sse("ping", data).unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_parse_sse_error_event() {
+        let data = r#"{"type":"error","error":{"type":"overloaded_error","message":"Overloaded"}}"#;
+        let result = AnthropicNativeProvider::parse_anthropic_sse("error", data);
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("Overloaded"));
+    }
+
+    #[test]
+    fn test_parse_sse_text_block_start_returns_none() {
+        let data =
+            r#"{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}"#;
+        let result =
+            AnthropicNativeProvider::parse_anthropic_sse("content_block_start", data).unwrap();
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_parse_sse_invalid_json() {
+        let result =
+            AnthropicNativeProvider::parse_anthropic_sse("content_block_delta", "not json");
+        assert!(result.is_err());
     }
 }

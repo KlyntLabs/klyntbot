@@ -58,7 +58,7 @@ impl PlanExecutor {
     /// - `tool_registry`: Registry of available tools
     /// - `routing_ctx`: Channel/chat routing context
     ///
-    /// # Known limitation
+    /// # Note
     /// This is a single-cycle implementation: one LLM call per step.
     /// A full ReAct loop (multi-cycle with reflection) is available via
     /// `PlanExecuteEngine` in `execution/plan_execute.rs`.
@@ -78,7 +78,13 @@ impl PlanExecutor {
             step.expected_tools.join(", ")
         };
         let prompt = format!(
-            "{plan_context}\n\nCurrent step: {desc}\nReasoning: {reason}\nExpected tools: {expected}",
+            "{plan_context}\n\n\
+             ## Current Step\n\
+             {desc}\n\n\
+             Reasoning: {reason}\n\
+             Suggested tools: {expected}\n\n\
+             Use the tools above with the correct arguments to accomplish this step. \
+             Refer to the previous results for any values, paths, or IDs needed as arguments.",
             desc = step.description,
             reason = step.reasoning,
         );
@@ -93,7 +99,8 @@ impl PlanExecutor {
         let messages = vec![
             Message::system(
                 "You are executing a single step of a multi-step plan. \
-                 Use the available tools to complete the step, then stop.",
+                 Call the appropriate tools with the correct arguments based on the step \
+                 description and previous step results. When done, provide a concise summary.",
             ),
             Message::user(prompt),
         ];
@@ -349,8 +356,10 @@ impl PlanExecutor {
         s
     }
 
-    /// Build context window: current step + next 3 steps.
-    /// Returns formatted context string for LLM.
+    /// Build context window: completed step results + current step + next 3 steps.
+    ///
+    /// Includes results from the last 3 completed steps so the LLM has context
+    /// to generate proper tool arguments for the current step.
     pub fn build_step_context(&self, plan: &Plan, current_index: usize) -> String {
         let window_end = (current_index + 4).min(plan.steps.len());
 
@@ -361,12 +370,40 @@ impl PlanExecutor {
         let steps_window = &plan.steps[current_index..window_end];
 
         let mut ctx = format!("## Active Plan: {}\n", plan.title);
+        ctx.push_str(&format!("Goal: {}\n", plan.description));
         ctx.push_str(&format!(
-            "Progress: step {}/{}\n\n",
+            "Progress: step {}/{}\n",
             current_index + 1,
             plan.steps.len()
         ));
 
+        // Include results from the last 3 completed steps for context
+        let completed_start = current_index.saturating_sub(3);
+        let completed_steps: Vec<_> = plan.steps[completed_start..current_index]
+            .iter()
+            .filter(|s| s.result.is_some())
+            .collect();
+        if !completed_steps.is_empty() {
+            ctx.push_str("\n## Previous Results\n");
+            for step in &completed_steps {
+                if let Some(ref result) = step.result {
+                    // Truncate long results to keep context manageable
+                    let truncated = if result.len() > 500 {
+                        format!("{}...(truncated)", &result[..500])
+                    } else {
+                        result.clone()
+                    };
+                    ctx.push_str(&format!(
+                        "- Step {}: {}\n  Result: {}\n",
+                        step.index + 1,
+                        step.description,
+                        truncated
+                    ));
+                }
+            }
+        }
+
+        ctx.push('\n');
         for (i, step) in steps_window.iter().enumerate() {
             let marker = if i == 0 {
                 ">>> CURRENT"
@@ -496,6 +533,62 @@ mod tests {
         let context = executor.build_step_context(&plan, 5); // Beyond steps
 
         assert_eq!(context, "Plan completed - no active step");
+    }
+
+    #[test]
+    fn test_step_context_includes_completed_results() {
+        // Given: a Plan with 5 steps where steps 0-2 are completed with results
+        // When: build_step_context() is called for step 3
+        // Then: context includes results from completed steps (last 3)
+        let mut plan = test_plan_with_steps(5, "test-session");
+
+        // Mark steps 0-2 as completed with results
+        plan.steps[0].status = StepStatus::Completed;
+        plan.steps[0].result = Some("Found 3 config files".to_string());
+        plan.steps[1].status = StepStatus::Completed;
+        plan.steps[1].result = Some("Modified auth.rs".to_string());
+        plan.steps[2].status = StepStatus::Completed;
+        plan.steps[2].result = Some("Tests pass".to_string());
+
+        let executor = PlanExecutor::new();
+        let context = executor.build_step_context(&plan, 3);
+
+        // Should include the plan goal
+        assert!(context.contains("Goal: Test"));
+
+        // Should include previous results section
+        assert!(context.contains("Previous Results"));
+        assert!(context.contains("Found 3 config files"));
+        assert!(context.contains("Modified auth.rs"));
+        assert!(context.contains("Tests pass"));
+
+        // Should still have current step
+        assert!(context.contains(">>> CURRENT: Step 3"));
+    }
+
+    #[test]
+    fn test_step_context_caps_completed_results_at_3() {
+        // Given: a Plan with 6 steps where all 5 prior steps are completed
+        // When: build_step_context() is called for step 5
+        // Then: only the last 3 completed steps are included
+        let mut plan = test_plan_with_steps(6, "test-session");
+
+        for i in 0..5 {
+            plan.steps[i].status = StepStatus::Completed;
+            plan.steps[i].result = Some(format!("Result of step {}", i));
+        }
+
+        let executor = PlanExecutor::new();
+        let context = executor.build_step_context(&plan, 5);
+
+        // Should include steps 2, 3, 4 (last 3 before current_index 5)
+        assert!(context.contains("Result of step 2"));
+        assert!(context.contains("Result of step 3"));
+        assert!(context.contains("Result of step 4"));
+
+        // Should NOT include steps 0 or 1 (outside the 3-step window)
+        assert!(!context.contains("Result of step 0"));
+        assert!(!context.contains("Result of step 1"));
     }
 
     // NOTE: Tests 18-19 (backtracking) will be implemented in Phase 4 (Agent Integration)

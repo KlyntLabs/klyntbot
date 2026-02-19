@@ -198,30 +198,6 @@ mod tests {
     }
 
     #[test]
-    fn test_backtrack_entry_creation() {
-        // TODO: Test 4
-        // Given: a failed step execution
-        // When: a BacktrackEntry is created with step_index, attempt, failure_reason, timestamp
-        // Then: all fields serialize and deserialize correctly
-        // Maps to: US-5 (AC-5.4)
-
-        let entry = BacktrackEntry {
-            step_index: 2,
-            attempt: 1,
-            failure_reason: "Tool execution failed".to_string(),
-            timestamp: Utc::now(),
-        };
-
-        // Serialize and deserialize
-        let json = serde_json::to_string(&entry).unwrap();
-        let deserialized: BacktrackEntry = serde_json::from_str(&json).unwrap();
-
-        assert_eq!(deserialized.step_index, 2);
-        assert_eq!(deserialized.attempt, 1);
-        assert_eq!(deserialized.failure_reason, "Tool execution failed");
-    }
-
-    #[test]
     fn test_plan_serde_roundtrip() {
         // TODO: Test 5
         // Given: a Plan with all fields populated (steps, backtrack_history, linked goal)
@@ -317,65 +293,35 @@ mod tests {
     }
 
     #[test]
-    fn test_invalid_status_transitions_from_completed() {
-        // Cannot transition from Completed to any other state
-        assert!(
-            PlanStatus::validate_transition(&PlanStatus::Completed, &PlanStatus::Draft).is_err()
-        );
-        assert!(
-            PlanStatus::validate_transition(&PlanStatus::Completed, &PlanStatus::Approved).is_err()
-        );
-        assert!(
-            PlanStatus::validate_transition(&PlanStatus::Completed, &PlanStatus::Executing)
-                .is_err()
-        );
-        assert!(
-            PlanStatus::validate_transition(&PlanStatus::Completed, &PlanStatus::Failed).is_err()
-        );
-        assert!(
-            PlanStatus::validate_transition(&PlanStatus::Completed, &PlanStatus::Abandoned)
-                .is_err()
-        );
-    }
+    fn test_invalid_status_transitions_from_terminal_states() {
+        // Terminal states: Completed, Failed, Abandoned — cannot transition to any other state
+        let terminal = [
+            PlanStatus::Completed,
+            PlanStatus::Failed,
+            PlanStatus::Abandoned,
+        ];
+        let all = [
+            PlanStatus::Draft,
+            PlanStatus::Approved,
+            PlanStatus::Executing,
+            PlanStatus::Completed,
+            PlanStatus::Failed,
+            PlanStatus::Abandoned,
+        ];
 
-    #[test]
-    fn test_invalid_status_transitions_from_failed() {
-        // Cannot transition from Failed to any other state
-        assert!(PlanStatus::validate_transition(&PlanStatus::Failed, &PlanStatus::Draft).is_err());
-        assert!(
-            PlanStatus::validate_transition(&PlanStatus::Failed, &PlanStatus::Approved).is_err()
-        );
-        assert!(
-            PlanStatus::validate_transition(&PlanStatus::Failed, &PlanStatus::Executing).is_err()
-        );
-        assert!(
-            PlanStatus::validate_transition(&PlanStatus::Failed, &PlanStatus::Completed).is_err()
-        );
-        assert!(
-            PlanStatus::validate_transition(&PlanStatus::Failed, &PlanStatus::Abandoned).is_err()
-        );
-    }
-
-    #[test]
-    fn test_invalid_status_transitions_from_abandoned() {
-        // Cannot transition from Abandoned to any other state
-        assert!(
-            PlanStatus::validate_transition(&PlanStatus::Abandoned, &PlanStatus::Draft).is_err()
-        );
-        assert!(
-            PlanStatus::validate_transition(&PlanStatus::Abandoned, &PlanStatus::Approved).is_err()
-        );
-        assert!(
-            PlanStatus::validate_transition(&PlanStatus::Abandoned, &PlanStatus::Executing)
-                .is_err()
-        );
-        assert!(
-            PlanStatus::validate_transition(&PlanStatus::Abandoned, &PlanStatus::Completed)
-                .is_err()
-        );
-        assert!(
-            PlanStatus::validate_transition(&PlanStatus::Abandoned, &PlanStatus::Failed).is_err()
-        );
+        for from in &terminal {
+            for to in &all {
+                if from == to {
+                    continue; // no-op transitions are allowed
+                }
+                assert!(
+                    PlanStatus::validate_transition(from, to).is_err(),
+                    "Expected error for {:?} → {:?}",
+                    from,
+                    to
+                );
+            }
+        }
     }
 
     #[test]

@@ -159,11 +159,18 @@ pub async fn reconcile_calendar_events(
                     .map_err(|e| common::KlyntbotError::Storage(e.to_string()))
             }
             ReconcileAction::ClearCalendarLink { .. } => {
-                // Note: storage::TodoPatch doesn't have calendar_event_uid field.
-                // Best-effort: count as cleared but actual field update requires
-                // extending storage::TodoPatch.
-                report.links_cleared += 1;
-                Ok(())
+                let patch = storage::TodoPatch {
+                    id: todo.id.clone(),
+                    calendar_event_uid: Some(None),
+                    ..Default::default()
+                };
+                todo_repo
+                    .update(&patch)
+                    .await
+                    .map(|_| {
+                        report.links_cleared += 1;
+                    })
+                    .map_err(|e| common::KlyntbotError::Storage(e.to_string()))
             }
             ReconcileAction::NoChange { .. } => Ok(()),
         };

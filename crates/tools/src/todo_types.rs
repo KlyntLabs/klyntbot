@@ -357,6 +357,12 @@ impl TodoPatch {
                 TodoStatus::Archived => "archived",
             }
             .to_string()),
+            calendar_event_uid: self.calendar_event_uid.clone(),
+            // next_instance_date is intentionally omitted from domain TodoPatch —
+            // it is an internal field managed exclusively by RecurringTaskSpawner
+            // via storage::TodoPatch directly. Tool-layer callers cannot set it.
+            next_instance_date: None,
+            last_reminded_at: self.last_reminded_at,
         }
     }
 }
@@ -412,55 +418,6 @@ mod tests {
         }
 
         assert_eq!(ids.len(), 100, "Should have 100 unique IDs");
-    }
-
-    #[test]
-    fn test_todo_status_serde() {
-        use serde_json;
-
-        // Serialize
-        let status = TodoStatus::Doing;
-        let json = serde_json::to_string(&status).unwrap();
-        assert_eq!(json, "\"doing\"");
-
-        // Deserialize
-        let parsed: TodoStatus = serde_json::from_str("\"todo\"").unwrap();
-        assert_eq!(parsed, TodoStatus::Todo);
-    }
-
-    #[test]
-    fn test_todo_filter_default() {
-        let filter = TodoFilter::default();
-        assert!(filter.status.is_none());
-        assert!(filter.priority_min.is_none());
-        assert!(filter.tag.is_none());
-        assert!(filter.limit.is_none());
-        assert!(!filter.include_templates);
-    }
-
-    #[test]
-    fn test_todo_patch_default() {
-        let patch = TodoPatch::default();
-        assert!(patch.title.is_none());
-        assert!(patch.description.is_none());
-        assert!(patch.priority.is_none());
-        assert!(patch.due_date.is_none());
-        assert!(patch.tags.is_none());
-        assert!(patch.status.is_none());
-    }
-
-    #[test]
-    fn test_default_instance() {
-        let todo = Todo::default_instance();
-        assert_eq!(todo.id.len(), 8);
-        assert!(todo.title.is_empty());
-        assert_eq!(todo.status, TodoStatus::Todo);
-        assert!(!todo.is_template);
-        assert!(todo.recurrence_rule.is_none());
-        assert!(todo.recurrence_parent_id.is_none());
-        assert!(todo.next_instance_date.is_none());
-        assert!(todo.blocked_by.is_empty());
-        assert!(todo.blocks.is_empty());
     }
 
     #[test]

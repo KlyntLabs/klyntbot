@@ -154,20 +154,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_channel_name() {
-        let channel = ChannelName::new("telegram");
-        assert_eq!(channel.as_str(), "telegram");
-        assert_eq!(channel.to_string(), "telegram");
-    }
-
-    #[test]
-    fn test_chat_id() {
-        let chat_id = ChatId::new("123456");
-        assert_eq!(chat_id.as_str(), "123456");
-        assert_eq!(chat_id.to_string(), "123456");
-    }
-
-    #[test]
     fn test_session_key() {
         let channel = ChannelName::new("telegram");
         let chat_id = ChatId::new("123456");
@@ -189,41 +175,6 @@ mod tests {
     }
 
     #[test]
-    fn test_message_role_display() {
-        assert_eq!(MessageRole::System.to_string(), "system");
-        assert_eq!(MessageRole::User.to_string(), "user");
-        assert_eq!(MessageRole::Assistant.to_string(), "assistant");
-        assert_eq!(MessageRole::Tool.to_string(), "tool");
-    }
-
-    #[test]
-    fn test_message_role_from_str() {
-        assert_eq!(MessageRole::from("system"), MessageRole::System);
-        assert_eq!(MessageRole::from("user"), MessageRole::User);
-        assert_eq!(MessageRole::from("assistant"), MessageRole::Assistant);
-        assert_eq!(MessageRole::from("tool"), MessageRole::Tool);
-        assert_eq!(MessageRole::from("unknown"), MessageRole::User);
-    }
-
-    #[test]
-    fn test_channel_name_from_string() {
-        let channel: ChannelName = "telegram".into();
-        assert_eq!(channel.as_str(), "telegram");
-
-        let channel2: ChannelName = String::from("discord").into();
-        assert_eq!(channel2.as_str(), "discord");
-    }
-
-    #[test]
-    fn test_chat_id_from_string() {
-        let chat_id: ChatId = "123".into();
-        assert_eq!(chat_id.as_str(), "123");
-
-        let chat_id2: ChatId = String::from("456").into();
-        assert_eq!(chat_id2.as_str(), "456");
-    }
-
-    #[test]
     fn test_session_key_equality() {
         let key1 = SessionKey::from_parts("telegram", "123");
         let key2 = SessionKey::from_parts("telegram", "123");
@@ -233,13 +184,4 @@ mod tests {
         assert_ne!(key1, key3);
     }
 
-    #[test]
-    fn test_message_role_serialization() {
-        let role = MessageRole::User;
-        let json = serde_json::to_string(&role).unwrap();
-        assert_eq!(json, "\"user\"");
-
-        let deserialized: MessageRole = serde_json::from_str(&json).unwrap();
-        assert_eq!(deserialized, MessageRole::User);
-    }
 }

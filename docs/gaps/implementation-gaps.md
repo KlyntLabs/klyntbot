@@ -7,7 +7,7 @@
 
 ## Executive Summary
 
-Klyntbot is a 105K-line Rust AI agent framework with 17 crates, 15+ tools, and 6 chat platform integrations. The codebase is architecturally sound with clean dependency layering and no circular dependencies. However, the ongoing JSONL-to-PostgreSQL migration is approximately **80% complete**, leaving several subsystems in a fragile dual-mode state. The gap report identifies **52 gaps** across 6 severity tiers (**3 resolved** as of 2026-02-19).
+Klyntbot is a 105K-line Rust AI agent framework with 17 crates, 15+ tools, and 6 chat platform integrations. The codebase is architecturally sound with clean dependency layering and no circular dependencies. However, the ongoing JSONL-to-PostgreSQL migration is approximately **80% complete**, leaving several subsystems in a fragile dual-mode state. The gap report identifies **52 gaps** across 6 severity tiers (**6 resolved** as of 2026-02-19).
 
 **Top 3 systemic issues:**
 1. **JSONL/SQL dual-mode persistence** — 6+ subsystems maintain parallel storage backends, doubling maintenance burden and creating behavior divergence
@@ -21,9 +21,9 @@ Klyntbot is a 105K-line Rust AI agent framework with 17 crates, 15+ tools, and 6
 | ID | Severity | Subsystem | Title |
 |----|----------|-----------|-------|
 | **P0 — Critical (blocks correctness)** |
-| G-01 | P0 | Agent | SQL TodoPatch missing fields (`calendar_event_uid`, `next_instance_date`, `last_reminded_at`) |
-| G-02 | P0 | Provider | Anthropic native provider lacks streaming implementation |
-| G-03 | P0 | Tools | Plan execution passes `{}` as tool arguments |
+| ~~G-01~~ | ~~P0~~ | ~~Agent~~ | ~~SQL TodoPatch missing fields (`calendar_event_uid`, `next_instance_date`, `last_reminded_at`)~~ **RESOLVED 2026-02-19** |
+| ~~G-02~~ | ~~P0~~ | ~~Provider~~ | ~~Anthropic native provider lacks streaming implementation~~ **RESOLVED 2026-02-19** |
+| ~~G-03~~ | ~~P0~~ | ~~Tools~~ | ~~Plan execution passes `{}` as tool arguments~~ **RESOLVED 2026-02-19** |
 | **P1 — High (significant functionality gap)** |
 | ~~G-04~~ | ~~P1~~ | ~~Cross-cutting~~ | ~~All SQL backend paths lack integration test coverage~~ **RESOLVED 2026-02-19** |
 | ~~G-05~~ | ~~P1~~ | ~~Cross-cutting~~ | ~~No migration utility from JSONL files to SQL~~ **RESOLVED 2026-02-19** |
@@ -83,34 +83,44 @@ Klyntbot is a 105K-line Rust AI agent framework with 17 crates, 15+ tools, and 6
 
 ### P0 — Critical
 
-#### G-01: SQL TodoPatch Missing Fields
-**Subsystem**: Agent (reminders, recurring tasks, calendar sync)
-**Source**: `04-agent-core.md` §19.1 #3
+#### ~~G-01: SQL TodoPatch Missing Fields~~ — RESOLVED
 
-`storage::TodoPatch` does not include `calendar_event_uid`, `next_instance_date`, or `last_reminded_at`. This means:
-- Calendar sync cannot update the event UID link via SQL path
-- Recurring task spawner cannot advance `next_instance_date` via SQL path
-- Reminder engine cannot set `last_reminded_at` to prevent duplicate alerts
+**Status**: **Resolved** on 2026-02-19
+**Implementation**: `crates/storage/src/repos/todo_repo.rs`, `crates/tools/src/todo_types.rs`, + 4 consumer files in `crates/agent/src/`
 
-These operations have best-effort-only SQL support; they silently skip the update.
+Added 3 fields to `storage::TodoPatch`: `calendar_event_uid: Option<Option<String>>`, `next_instance_date: Option<Option<DateTime<Utc>>>`, `last_reminded_at: Option<Option<DateTime<Utc>>>`. Double-Option pattern enables both setting (`Some(Some(v))`) and clearing (`Some(None)`). Updated `TodoRepo::update()` SQL with CASE WHEN pattern ($11–$16).
 
-**Fix**: Add these 3 fields to `TodoPatch` and the corresponding `UPDATE` SQL in `TodoRepo::update()`.
+Consumer fixes — removed all no-op workarounds:
+- `recurring_tasks.rs`: sets `next_instance_date` directly via patch
+- `calendar_reconcile.rs`: `ClearCalendarLink` clears `calendar_event_uid` via `Some(None)`
+- `reminders.rs`: sets `last_reminded_at: Some(Some(Utc::now()))`
+- `calendar_sync_adapter.rs`: cleanup clears UID via patch; event push links UID after successful PUT
 
-#### G-02: Anthropic Native Provider Lacks Streaming
-**Subsystem**: Providers
-**Source**: `02-providers-context.md` §9.1 G1
+4 new DB-connected tests, 84/84 storage tests pass, 2129/2129 workspace tests pass, zero new clippy warnings.
 
-`AnthropicNativeProvider::supports_streaming()` returns `true` but `chat_stream()` uses the default single-chunk fallback (calls `chat()` and wraps result). The OpenAI-compatible provider has full SSE streaming. This degrades real-time UX when using Anthropic's native API.
+#### ~~G-02: Anthropic Native Provider Lacks Streaming~~ — RESOLVED
 
-**Fix**: Implement SSE streaming for Anthropic's `event: message_start/content_block_delta/message_stop` format.
+**Status**: **Resolved** on 2026-02-19
+**Implementation**: `crates/providers/src/anthropic_native.rs` — `chat_stream()` override + `parse_anthropic_sse()`
 
-#### G-03: Plan Execution Passes Empty Tool Arguments
-**Subsystem**: Tools / Agent
-**Source**: `03-tools-system.md` §10 #1, `06-domain-features.md` §7.4
+Implemented real SSE streaming for `AnthropicNativeProvider`, replacing the single-chunk fallback:
+- Sends POST to `/v1/messages` with `"stream": true`
+- Parses Anthropic's named SSE format (`event:` + `data:` lines) using `scan()` + `flatten()` pattern
+- Handles all event types: `content_block_start` (tool call deltas), `content_block_delta` (text/tool arg/thinking deltas), `message_delta` (finish reason mapping: end_turn→stop, tool_use→tool_calls, max_tokens→length), `error` (stream error propagation)
+- 14 new unit tests covering all SSE event types, error handling, and edge cases
+- 74/74 provider tests pass, zero new clippy warnings
 
-The legacy `PlanExecutor::execute_step()` passes `{}` as tool arguments for all tools. This means tools must infer parameters from context, which most cannot do. The v2 `PlanExecuteEngine` in `execution/plan_execute.rs` has richer parameter generation but it's unclear when each path is used.
+#### ~~G-03: Plan Execution Passes Empty Tool Arguments~~ — RESOLVED
 
-**Fix**: Either wire v2 engine as the primary path or add LLM-based parameter generation to the legacy executor.
+**Status**: **Resolved** on 2026-02-19
+**Implementation**: `crates/agent/src/plan_executor.rs` — `build_step_context()` + `execute_step()` enhancements
+
+Root cause: the LLM already forwarded tool call arguments (`tool_call.arguments.clone()`), but the prompt lacked context for the LLM to generate *meaningful* arguments. Fix:
+- `build_step_context()` now includes plan `description` (goal) and results from last 3 completed steps (truncated at 500 chars) in a "## Previous Results" section
+- `execute_step()` system/user prompts enhanced with structured markdown and explicit instruction to reference previous results for values/paths/IDs
+- CLAUDE.md "Known Limitations" updated to reflect accurate state
+- 2 new tests: `test_step_context_includes_completed_results`, `test_step_context_caps_completed_results_at_3`
+- 270/270 agent tests pass, zero new clippy warnings
 
 ---
 
@@ -403,8 +413,8 @@ Channels set `running = false` but don't send WebSocket close frames.
 ## Recommended Action Plan
 
 ### Phase 1: Correctness & Stability (Weeks 1-2)
-1. **G-01**: Add missing fields to `storage::TodoPatch`
-2. **G-03/G-15**: Choose v2 plan executor, deprecate legacy
+1. ~~**G-01**: Add missing fields to `storage::TodoPatch`~~ ✅ Done 2026-02-19
+2. ~~**G-03/G-15**: Choose v2 plan executor, deprecate legacy~~ ✅ G-03 done 2026-02-19 (context-enriched prompts; G-15 remains open)
 3. ~~**G-04**: Set up shared SQL test fixture; add tests for critical repos~~ ✅ Done 2026-02-19
 4. **G-11**: Wire timezone into cron schedule computation
 
@@ -416,7 +426,7 @@ Channels set `running = false` but don't send WebSocket close frames.
 9. **G-30**: Unify calendar sync state to `from_repo()` pattern
 
 ### Phase 3: Provider & Context Quality (Weeks 5-6)
-10. **G-02**: Implement Anthropic native streaming
+10. ~~**G-02**: Implement Anthropic native streaming~~ ✅ Done 2026-02-19
 11. **G-07**: Wire provider token counting into ContextEngine
 12. **G-08**: Implement memory retrieval in context assembly
 13. **G-20**: Extend session message format to preserve tool calls/reasoning

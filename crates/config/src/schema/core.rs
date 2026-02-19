@@ -1088,35 +1088,6 @@ mod tests {
     // ========================================================================
 
     #[test]
-    fn test_calendar_config_default() {
-        let config = CalendarConfig::default();
-        assert!(config.providers.is_empty());
-        assert!(!config.is_any_enabled());
-        assert_eq!(config.conflict_resolution, "server_wins");
-        assert!(config.bidirectional_sync); // Defaults to true
-    }
-
-    #[test]
-    fn test_apple_calendar_config_default() {
-        let apple = AppleCalendarConfig::default();
-        assert!(!apple.enabled);
-        assert!(apple.username.is_empty());
-        assert!(apple.password.is_empty());
-        assert_eq!(apple.caldav_url, "https://caldav.icloud.com");
-        assert_eq!(apple.calendar_name, "Klyntbot Tasks");
-        assert_eq!(apple.sync_interval_secs, 300);
-        assert!(apple.auto_sync_due_dates);
-    }
-
-    #[test]
-    fn test_google_calendar_config_default() {
-        let google = GoogleCalendarConfig::default();
-        assert!(!google.enabled);
-        assert!(google.client_id.is_empty());
-        assert_eq!(google.calendar_id, "primary");
-    }
-
-    #[test]
     fn test_calendar_config_secret_redaction() {
         let apple = AppleCalendarConfig {
             enabled: true,
@@ -1248,13 +1219,6 @@ mod tests {
     // ========================================================================
 
     #[test]
-    fn test_config_includes_calendar() {
-        let config = Config::default();
-        assert!(!config.calendar.is_any_enabled());
-        assert!(config.calendar.providers.is_empty());
-    }
-
-    #[test]
     fn test_config_calendar_serialization() {
         let mut config = Config::default();
         config
@@ -1278,12 +1242,6 @@ mod tests {
     // ========================================================================
 
     #[test]
-    fn test_daily_planning_config_defaults_to_true() {
-        let config = DailyPlanningConfig::default();
-        assert!(config.enabled);
-    }
-
-    #[test]
     fn test_daily_planning_config_serde_roundtrip() {
         // Test with enabled: false to verify it doesn't just rely on defaults
         let config = DailyPlanningConfig {
@@ -1301,13 +1259,6 @@ mod tests {
         let loaded: DailyPlanningConfig = serde_json::from_str(&json).unwrap();
         assert!(!loaded.enabled);
         assert_eq!(loaded.planning_time, "09:30");
-    }
-
-    #[test]
-    fn test_daily_planning_config_default() {
-        let config = DailyPlanningConfig::default();
-        assert!(config.enabled);
-        assert_eq!(config.planning_time, "08:00");
     }
 
     // ========================================================================

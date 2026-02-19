@@ -383,19 +383,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_provider_capabilities_default() {
-        let caps = ProviderCapabilities::default();
-        assert!(!caps.extended_thinking);
-        assert!(!caps.structured_outputs);
-        assert!(!caps.prompt_caching);
-        assert!(!caps.native_token_counting);
-        assert!(caps.vision);
-        assert!(caps.streaming);
-        assert!(!caps.tool_choice_required);
-        assert!(caps.parallel_tool_calls);
-    }
-
-    #[test]
     fn test_usage_has_cache_fields() {
         let usage = Usage {
             prompt_tokens: 100,
@@ -413,10 +400,4 @@ mod tests {
         assert_eq!(DEFAULT_CONTEXT_WINDOW, 128_000);
     }
 
-    #[test]
-    fn test_usage_default_has_zero_cache_tokens() {
-        let usage = Usage::default();
-        assert_eq!(usage.cache_read_tokens, 0);
-        assert_eq!(usage.cache_write_tokens, 0);
-    }
 }

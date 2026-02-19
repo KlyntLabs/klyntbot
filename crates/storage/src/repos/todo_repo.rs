@@ -114,18 +114,21 @@ impl TodoRepo {
         let row = sqlx::query_as::<_, TodoRow>(
             r#"
             UPDATE todos SET
-                title       = COALESCE($2, title),
-                description = CASE WHEN $3 THEN $4 ELSE description END,
-                priority    = CASE WHEN $5 THEN $6 ELSE priority END,
-                due_date    = CASE WHEN $7 THEN $8 ELSE due_date END,
-                tags        = COALESCE($9, tags),
-                status      = COALESCE($10, status),
-                completed_at = CASE
+                title              = COALESCE($2, title),
+                description        = CASE WHEN $3 THEN $4 ELSE description END,
+                priority           = CASE WHEN $5 THEN $6 ELSE priority END,
+                due_date           = CASE WHEN $7 THEN $8 ELSE due_date END,
+                tags               = COALESCE($9, tags),
+                status             = COALESCE($10, status),
+                completed_at       = CASE
                     WHEN $10 = 'done' AND completed_at IS NULL THEN now()
                     WHEN $10 IS NOT NULL AND $10 != 'done' THEN NULL
                     ELSE completed_at
                 END,
-                updated_at  = now()
+                calendar_event_uid = CASE WHEN $11 THEN $12 ELSE calendar_event_uid END,
+                next_instance_date = CASE WHEN $13 THEN $14 ELSE next_instance_date END,
+                last_reminded_at   = CASE WHEN $15 THEN $16 ELSE last_reminded_at END,
+                updated_at         = now()
             WHERE id = $1
             RETURNING *
             "#,
@@ -133,19 +136,19 @@ impl TodoRepo {
         .bind(&patch.id)
         .bind(&patch.title)
         .bind(patch.description.is_some())
-        .bind(
-            patch
-                .description
-                .as_ref()
-                .and_then(|d| d.as_deref())
-                .unwrap_or_default(),
-        )
+        .bind(patch.description.as_ref().and_then(|d| d.as_deref()))
         .bind(patch.priority.is_some())
         .bind(patch.priority.unwrap_or_default())
         .bind(patch.due_date.is_some())
         .bind(patch.due_date.unwrap_or_default())
         .bind(&patch.tags)
         .bind(&patch.status)
+        .bind(patch.calendar_event_uid.is_some())
+        .bind(patch.calendar_event_uid.as_ref().and_then(|v| v.as_deref()))
+        .bind(patch.next_instance_date.is_some())
+        .bind(patch.next_instance_date.unwrap_or_default())
+        .bind(patch.last_reminded_at.is_some())
+        .bind(patch.last_reminded_at.unwrap_or_default())
         .fetch_optional(&self.pool)
         .await?
         .ok_or_else(|| StorageError::NotFound(format!("todo {}", patch.id)))?;
@@ -837,6 +840,9 @@ pub struct TodoPatch {
     pub due_date: Option<Option<DateTime<Utc>>>,
     pub tags: Option<Vec<String>>,
     pub status: Option<String>,
+    pub calendar_event_uid: Option<Option<String>>,
+    pub next_instance_date: Option<Option<DateTime<Utc>>>,
+    pub last_reminded_at: Option<Option<DateTime<Utc>>>,
 }
 
 /// Internal enum for dynamic query parameter binding.
