@@ -33,9 +33,9 @@ impl LearningHandlerImpl {
     /// Run analysis and build a LearningStatus from the result.
     async fn build_status(&self) -> Result<LearningStatus> {
         let (outcomes, feedback) = {
-            let mut store = self.outcome_store.write().await;
-            let outcomes = store.get_all_outcomes().await?.to_vec();
-            let feedback = store.get_all_feedback().await?.to_vec();
+            let store = self.outcome_store.read().await;
+            let outcomes = store.get_all_outcomes().await?;
+            let feedback = store.get_all_feedback().await?;
             (outcomes, feedback)
         };
 
@@ -72,7 +72,7 @@ impl LearningHandlerImpl {
 impl LearningHandler for LearningHandlerImpl {
     async fn get_status(&self) -> Result<Option<LearningStatus>> {
         let has_outcomes = {
-            let mut store = self.outcome_store.write().await;
+            let store = self.outcome_store.read().await;
             let outcomes = store.get_all_outcomes().await?;
             !outcomes.is_empty()
         };
@@ -109,34 +109,29 @@ mod tests {
     use super::*;
     use crate::learning::{ExecutionMode, OutcomeRecord};
     use chrono::Utc;
-    use tempfile::TempDir;
 
-    async fn make_handler(tmp: &TempDir) -> (LearningHandlerImpl, Arc<RwLock<OutcomeStore>>) {
-        let store = Arc::new(RwLock::new(OutcomeStore::new(
-            tmp.path().join("outcomes.jsonl"),
+    fn make_handler() -> (LearningHandlerImpl, Arc<RwLock<OutcomeStore>>) {
+        let store = Arc::new(RwLock::new(OutcomeStore::new_in_memory()));
+        let adaptive = Arc::new(RwLock::new(AdaptiveThresholds::new_in_memory(
+            0.7, 0.4, 0.9, 50,
         )));
-        let adaptive = Arc::new(RwLock::new(
-            AdaptiveThresholds::load(tmp.path().join("state.json"), 0.7, 0.4, 0.9, 50).await,
-        ));
         let handler = LearningHandlerImpl::new(Arc::clone(&store), adaptive);
         (handler, store)
     }
 
     #[tokio::test]
     async fn test_get_status_empty() {
-        let tmp = TempDir::new().unwrap();
-        let (handler, _store) = make_handler(&tmp).await;
+        let (handler, _store) = make_handler();
         let status = handler.get_status().await.unwrap();
         assert!(status.is_none());
     }
 
     #[tokio::test]
     async fn test_get_status_with_outcomes() {
-        let tmp = TempDir::new().unwrap();
-        let (handler, store) = make_handler(&tmp).await;
+        let (handler, store) = make_handler();
 
         {
-            let mut sg = store.write().await;
+            let sg = store.write().await;
             sg.record(OutcomeRecord {
                 id: "t1".to_string(),
                 session_key: "cli:abc".to_string(),

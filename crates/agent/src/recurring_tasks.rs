@@ -77,10 +77,7 @@ impl RecurringTaskSpawner {
     }
 
     /// Check all templates and spawn instances that are due via SQL.
-    async fn check_and_spawn(
-        repo: &storage::TodoRepo,
-        _timezone: &str,
-    ) -> common::Result<()> {
+    async fn check_and_spawn(repo: &storage::TodoRepo, _timezone: &str) -> common::Result<()> {
         let template_rows = repo
             .list_templates()
             .await
@@ -167,7 +164,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_spawns_due_instance() {
-        let Some(repo) = test_todo_repo().await else { return };
+        let Some(repo) = test_todo_repo().await else {
+            return;
+        };
         let past = Utc::now() - Duration::hours(1);
         let template = create_template("Daily standup", "FREQ=DAILY", past);
         let template_id = template.id.clone();
@@ -183,8 +182,16 @@ mod tests {
             templates_only: false,
             ..Default::default()
         };
-        let all: Vec<Todo> = repo.list(&filter).await.unwrap().into_iter().map(Todo::from).collect();
-        let instance = all.iter().find(|t| !t.is_template && t.title == "Daily standup");
+        let all: Vec<Todo> = repo
+            .list(&filter)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(Todo::from)
+            .collect();
+        let instance = all
+            .iter()
+            .find(|t| !t.is_template && t.title == "Daily standup");
         assert!(instance.is_some(), "Should have spawned an instance");
         let instance = instance.unwrap();
         assert_eq!(instance.recurrence_parent_id, Some(template_id));
@@ -197,7 +204,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_does_not_spawn_future_instance() {
-        let Some(repo) = test_todo_repo().await else { return };
+        let Some(repo) = test_todo_repo().await else {
+            return;
+        };
         let future = Utc::now() + Duration::hours(24);
         let template = create_template("Weekly review", "FREQ=WEEKLY", future);
         let template_id = template.id.clone();
@@ -210,8 +219,16 @@ mod tests {
             .unwrap();
 
         let filter = storage::TodoFilter::default();
-        let all: Vec<Todo> = repo.list(&filter).await.unwrap().into_iter().map(Todo::from).collect();
-        let instance = all.iter().find(|t| t.recurrence_parent_id.as_deref() == Some(&template_id));
+        let all: Vec<Todo> = repo
+            .list(&filter)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(Todo::from)
+            .collect();
+        let instance = all
+            .iter()
+            .find(|t| t.recurrence_parent_id.as_deref() == Some(&template_id));
         assert!(instance.is_none(), "Should not spawn future instance");
 
         // Cleanup
@@ -220,7 +237,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_skips_template_without_rule() {
-        let Some(repo) = test_todo_repo().await else { return };
+        let Some(repo) = test_todo_repo().await else {
+            return;
+        };
 
         let mut todo = Todo::default_instance();
         todo.title = "No rule".to_string();
@@ -236,8 +255,16 @@ mod tests {
             .unwrap();
 
         let filter = storage::TodoFilter::default();
-        let all: Vec<Todo> = repo.list(&filter).await.unwrap().into_iter().map(Todo::from).collect();
-        let instance = all.iter().find(|t| t.recurrence_parent_id.as_deref() == Some(&todo_id));
+        let all: Vec<Todo> = repo
+            .list(&filter)
+            .await
+            .unwrap()
+            .into_iter()
+            .map(Todo::from)
+            .collect();
+        let instance = all
+            .iter()
+            .find(|t| t.recurrence_parent_id.as_deref() == Some(&todo_id));
         assert!(instance.is_none(), "Should not spawn without a rule");
 
         // Cleanup
@@ -246,7 +273,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_start_stop_lifecycle() {
-        let Some(repo) = test_todo_repo().await else { return };
+        let Some(repo) = test_todo_repo().await else {
+            return;
+        };
         let mut spawner =
             RecurringTaskSpawner::new(repo, "UTC".to_string(), StdDuration::from_secs(60));
 

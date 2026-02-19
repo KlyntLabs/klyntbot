@@ -1,6 +1,7 @@
 //! Core configuration types: Secret, Config, AgentsConfig, ToolsConfig, GatewayConfig, TodoConfig.
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fmt;
 use std::path::PathBuf;
 
@@ -171,27 +172,19 @@ impl Config {
     }
 
     /// Get the standardized goal store path.
-    #[deprecated(note = "JSONL flat-file store superseded by PostgreSQL. Will be migrated in G-17.")]
+    #[deprecated(
+        note = "JSONL flat-file store superseded by PostgreSQL. Will be migrated in G-17."
+    )]
     pub fn goal_store_path(&self) -> PathBuf {
         data_dir().join("goals.jsonl")
     }
 
     /// Get the standardized plan store path.
-    #[deprecated(note = "JSONL flat-file store superseded by PostgreSQL. Will be migrated in G-17.")]
+    #[deprecated(
+        note = "JSONL flat-file store superseded by PostgreSQL. Will be migrated in G-17."
+    )]
     pub fn plan_store_path(&self) -> PathBuf {
         data_dir().join("data").join("plans.jsonl")
-    }
-
-    /// Get the learning outcomes JSONL store path.
-    #[deprecated(note = "JSONL flat-file store superseded by PostgreSQL. Will be migrated in G-17.")]
-    pub fn learning_outcomes_path(&self) -> PathBuf {
-        data_dir().join("data").join("outcomes.jsonl")
-    }
-
-    /// Get the learning state JSON file path.
-    #[deprecated(note = "JSONL flat-file store superseded by PostgreSQL. Will be migrated in G-17.")]
-    pub fn learning_state_path(&self) -> PathBuf {
-        data_dir().join("data").join("learning_state.json")
     }
 
     /// Set the API key for a provider by name.
@@ -455,9 +448,10 @@ pub struct ConfidenceConfig {
     /// Enable/disable confidence evaluation (default: true)
     #[serde(default = "default_true")]
     pub enabled: bool,
-    /// Path to decision log file (default: ~/.klyntbot/decision_log.jsonl)
+    /// Per-tool confidence threshold overrides (tool_name → threshold).
+    /// Tools not listed here fall back to the global `threshold`.
     #[serde(default)]
-    pub log_path: Option<PathBuf>,
+    pub tool_overrides: HashMap<String, f32>,
 }
 
 impl Default for ConfidenceConfig {
@@ -465,7 +459,7 @@ impl Default for ConfidenceConfig {
         Self {
             threshold: default_confidence_threshold(),
             enabled: true,
-            log_path: None,
+            tool_overrides: HashMap::new(),
         }
     }
 }

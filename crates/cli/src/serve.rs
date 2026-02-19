@@ -74,7 +74,9 @@ pub async fn handle_serve(port: u16) -> Result<()> {
             rt.block_on(async move {
                 match job_name.as_str() {
                     "todo_focus_check" => {
-                        let focused = todo_repo.list_focused().await
+                        let focused = todo_repo
+                            .list_focused()
+                            .await
                             .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
                         for task in &focused {
                             if let Some(deadline) = task.focus_deadline {
@@ -111,9 +113,13 @@ pub async fn handle_serve(port: u16) -> Result<()> {
                         Ok(Some(format!("Checked {} focused tasks", focused.len())))
                     }
                     "todo_daily_digest" => {
-                        let summary = todo_repo.summary().await
+                        let summary = todo_repo
+                            .summary()
+                            .await
                             .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
-                        let overdue = todo_repo.overdue().await
+                        let overdue = todo_repo
+                            .overdue()
+                            .await
                             .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
                         let body = format!(
                             "Total: {} | Todo: {} | Doing: {} | Done: {} | Overdue: {}",
@@ -128,7 +134,9 @@ pub async fn handle_serve(port: u16) -> Result<()> {
                     }
                     "todo_overdue_check" => {
                         // Auto-unfocus tasks with expired focus deadlines
-                        let focused = todo_repo.list_focused().await
+                        let focused = todo_repo
+                            .list_focused()
+                            .await
                             .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
                         let now = chrono::Utc::now();
                         let mut expired_count = 0u32;
@@ -141,8 +149,7 @@ pub async fn handle_serve(port: u16) -> Result<()> {
                         if expired_count > 0 {
                             let body = format!(
                                 "{} task(s) auto-unfocused due to {}h deadline",
-                                expired_count,
-                                config_focus.deadline_hours
+                                expired_count, config_focus.deadline_hours
                             );
                             dispatcher
                                 .notify("⏰ Focus Tasks Expired", &body)

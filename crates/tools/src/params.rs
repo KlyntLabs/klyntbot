@@ -350,10 +350,26 @@ mod tests {
         });
         let p = ParamExtractor::new(&present);
 
-        assert_eq!(p.optional_str("s").unwrap(), Some("hello"), "optional_str present");
-        assert_eq!(p.optional_i64("i").unwrap(), Some(5), "optional_i64 present");
-        assert_eq!(p.optional_u64("u").unwrap(), Some(60), "optional_u64 present");
-        assert_eq!(p.optional_bool("b").unwrap(), Some(false), "optional_bool present");
+        assert_eq!(
+            p.optional_str("s").unwrap(),
+            Some("hello"),
+            "optional_str present"
+        );
+        assert_eq!(
+            p.optional_i64("i").unwrap(),
+            Some(5),
+            "optional_i64 present"
+        );
+        assert_eq!(
+            p.optional_u64("u").unwrap(),
+            Some(60),
+            "optional_u64 present"
+        );
+        assert_eq!(
+            p.optional_bool("b").unwrap(),
+            Some(false),
+            "optional_bool present"
+        );
         assert_eq!(
             p.optional_array("a").unwrap().unwrap().len(),
             3,
@@ -368,12 +384,20 @@ mod tests {
         assert_eq!(p.optional_i64("i").unwrap(), None, "optional_i64 absent");
         assert_eq!(p.optional_u64("u").unwrap(), None, "optional_u64 absent");
         assert_eq!(p.optional_bool("b").unwrap(), None, "optional_bool absent");
-        assert_eq!(p.optional_array("a").unwrap(), None, "optional_array absent");
+        assert_eq!(
+            p.optional_array("a").unwrap(),
+            None,
+            "optional_array absent"
+        );
 
         // null also returns None (test with optional_str)
         let null_val = json!({"s": null});
         let p = ParamExtractor::new(&null_val);
-        assert_eq!(p.optional_str("s").unwrap(), None, "optional_str null is None");
+        assert_eq!(
+            p.optional_str("s").unwrap(),
+            None,
+            "optional_str null is None"
+        );
     }
 
     #[test]
@@ -413,11 +437,19 @@ mod tests {
         // str_or: present returns value, absent returns default, wrong type errors
         let args = json!({"name": "custom"});
         let p = ParamExtractor::new(&args);
-        assert_eq!(p.str_or("name", "default").unwrap(), "custom", "str_or present");
+        assert_eq!(
+            p.str_or("name", "default").unwrap(),
+            "custom",
+            "str_or present"
+        );
 
         let args = json!({});
         let p = ParamExtractor::new(&args);
-        assert_eq!(p.str_or("name", "default").unwrap(), "default", "str_or absent");
+        assert_eq!(
+            p.str_or("name", "default").unwrap(),
+            "default",
+            "str_or absent"
+        );
 
         let args = json!({"name": 42});
         let p = ParamExtractor::new(&args);

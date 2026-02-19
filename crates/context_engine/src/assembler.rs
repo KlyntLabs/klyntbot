@@ -119,9 +119,7 @@ impl ContextEngine {
 
         // 4. Compress history to fit remaining budget
         let history_budget = allocator.remaining();
-        let compressed = self
-            .compressor
-            .compress(&request.history, history_budget);
+        let compressed = self.compressor.compress(&request.history, history_budget);
 
         // Track actual allocations
         let recent_tokens: usize = compressed

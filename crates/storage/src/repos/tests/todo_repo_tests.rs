@@ -520,9 +520,7 @@ mod tests {
         done_row.status = "done".to_string();
         done_row.completed_at = Some(Utc::now());
         repo.add(&done_row).await.unwrap();
-        repo.add(&sample_todo(&c, "Active blocker"))
-            .await
-            .unwrap();
+        repo.add(&sample_todo(&c, "Active blocker")).await.unwrap();
         repo.add_dependency(&a, &b).await.unwrap();
         repo.add_dependency(&a, &c).await.unwrap();
 

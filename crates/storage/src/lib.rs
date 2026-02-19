@@ -19,8 +19,11 @@ pub use repos::todo_repo::{TodoFilter, TodoPatch, TodoRepo, TodoSummary};
 pub use repos::CalendarSyncRepo;
 pub use repos::ConvEmbeddingRepo;
 pub use repos::CronRepo;
+pub use repos::DecisionLogRepo;
 pub use repos::EmbeddingRepo;
 pub use repos::GoalRepo;
+pub use repos::LearningStateRepo;
+pub use repos::MemoryNoteRepo;
 pub use repos::OutcomeRepo;
 pub use repos::PlanRepo;
 pub use repos::SessionRepo;
@@ -32,7 +35,10 @@ pub use rows::calendar::CalendarSyncStateRow;
 pub use rows::cron::CronJobRow;
 pub use rows::embedding::{ConvEmbeddingRow, EmbeddingRow};
 pub use rows::goal::{GoalProjectLinkRow, GoalRow};
-pub use rows::learning::{EnrichmentFeedbackRow, OutcomeRow, StrategyRecordRow};
+pub use rows::learning::{
+    DecisionLogRow, EnrichmentFeedbackRow, LearningStateRow, OutcomeRow, StrategyRecordRow,
+};
+pub use rows::memory::MemoryNoteRow;
 pub use rows::plan::{PlanRow, PlanStepRow};
 pub use rows::project::ProjectRow;
 pub use rows::session::{SessionMessageRow, SessionRow};

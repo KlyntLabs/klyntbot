@@ -223,44 +223,113 @@ mod tests {
     #[test]
     fn test_error_display() {
         // ToolError
-        assert_eq!(ToolError::NotFound("test_tool".into()).to_string(), "Tool not found: test_tool");
-        assert_eq!(ToolError::InvalidParams("missing param".into()).to_string(), "Invalid parameters: missing param");
-        assert_eq!(ToolError::ExecutionFailed("command failed".into()).to_string(), "Execution failed: command failed");
-        assert_eq!(ToolError::PermissionDenied("access denied".into()).to_string(), "Permission denied: access denied");
+        assert_eq!(
+            ToolError::NotFound("test_tool".into()).to_string(),
+            "Tool not found: test_tool"
+        );
+        assert_eq!(
+            ToolError::InvalidParams("missing param".into()).to_string(),
+            "Invalid parameters: missing param"
+        );
+        assert_eq!(
+            ToolError::ExecutionFailed("command failed".into()).to_string(),
+            "Execution failed: command failed"
+        );
+        assert_eq!(
+            ToolError::PermissionDenied("access denied".into()).to_string(),
+            "Permission denied: access denied"
+        );
 
         // ProviderError
-        assert_eq!(ProviderError::InvalidResponse("bad JSON".into()).to_string(), "Invalid response: bad JSON");
+        assert_eq!(
+            ProviderError::InvalidResponse("bad JSON".into()).to_string(),
+            "Invalid response: bad JSON"
+        );
         assert_eq!(ProviderError::RateLimited.to_string(), "Rate limited");
-        assert_eq!(ProviderError::AuthFailed.to_string(), "Authentication failed");
+        assert_eq!(
+            ProviderError::AuthFailed.to_string(),
+            "Authentication failed"
+        );
 
         // ChannelError
-        assert_eq!(ChannelError::ConnectionFailed("timeout".into()).to_string(), "Connection failed: timeout");
-        assert_eq!(ChannelError::SendFailed("network error".into()).to_string(), "Send failed: network error");
-        assert_eq!(ChannelError::InvalidConfig("missing token".into()).to_string(), "Invalid configuration: missing token");
+        assert_eq!(
+            ChannelError::ConnectionFailed("timeout".into()).to_string(),
+            "Connection failed: timeout"
+        );
+        assert_eq!(
+            ChannelError::SendFailed("network error".into()).to_string(),
+            "Send failed: network error"
+        );
+        assert_eq!(
+            ChannelError::InvalidConfig("missing token".into()).to_string(),
+            "Invalid configuration: missing token"
+        );
 
         // SessionError
-        assert_eq!(SessionError::NotFound("session123".into()).to_string(), "Session not found: session123");
-        assert_eq!(SessionError::LoadFailed("corrupt file".into()).to_string(), "Failed to load session: corrupt file");
-        assert_eq!(SessionError::SaveFailed("disk full".into()).to_string(), "Failed to save session: disk full");
+        assert_eq!(
+            SessionError::NotFound("session123".into()).to_string(),
+            "Session not found: session123"
+        );
+        assert_eq!(
+            SessionError::LoadFailed("corrupt file".into()).to_string(),
+            "Failed to load session: corrupt file"
+        );
+        assert_eq!(
+            SessionError::SaveFailed("disk full".into()).to_string(),
+            "Failed to save session: disk full"
+        );
 
         // ConfigError
-        assert_eq!(ConfigError::NotFound("config.json".into()).to_string(), "Config file not found: config.json");
-        assert_eq!(ConfigError::Invalid("bad format".into()).to_string(), "Invalid configuration: bad format");
-        assert_eq!(ConfigError::MissingField("api_key".into()).to_string(), "Missing required field: api_key");
+        assert_eq!(
+            ConfigError::NotFound("config.json".into()).to_string(),
+            "Config file not found: config.json"
+        );
+        assert_eq!(
+            ConfigError::Invalid("bad format".into()).to_string(),
+            "Invalid configuration: bad format"
+        );
+        assert_eq!(
+            ConfigError::MissingField("api_key".into()).to_string(),
+            "Missing required field: api_key"
+        );
 
         // CronError
-        assert_eq!(CronError::InvalidExpression("bad cron".into()).to_string(), "Invalid cron expression: bad cron");
-        assert_eq!(CronError::JobNotFound("job123".into()).to_string(), "Job not found: job123");
-        assert_eq!(CronError::ExecutionFailed("timeout".into()).to_string(), "Job execution failed: timeout");
+        assert_eq!(
+            CronError::InvalidExpression("bad cron".into()).to_string(),
+            "Invalid cron expression: bad cron"
+        );
+        assert_eq!(
+            CronError::JobNotFound("job123".into()).to_string(),
+            "Job not found: job123"
+        );
+        assert_eq!(
+            CronError::ExecutionFailed("timeout".into()).to_string(),
+            "Job execution failed: timeout"
+        );
 
         // GoalError
-        assert_eq!(GoalError::NotFound("goal-123".into()).to_string(), "Goal not found: goal-123");
-        assert_eq!(GoalError::InvalidState("cannot transition from active to draft".into()).to_string(), "Invalid goal state: cannot transition from active to draft");
-        assert_eq!(GoalError::StoreFailed("disk full".into()).to_string(), "Goal store error: disk full");
-        assert_eq!(GoalError::ValidationFailed("title is required".into()).to_string(), "Goal validation failed: title is required");
+        assert_eq!(
+            GoalError::NotFound("goal-123".into()).to_string(),
+            "Goal not found: goal-123"
+        );
+        assert_eq!(
+            GoalError::InvalidState("cannot transition from active to draft".into()).to_string(),
+            "Invalid goal state: cannot transition from active to draft"
+        );
+        assert_eq!(
+            GoalError::StoreFailed("disk full".into()).to_string(),
+            "Goal store error: disk full"
+        );
+        assert_eq!(
+            GoalError::ValidationFailed("title is required".into()).to_string(),
+            "Goal validation failed: title is required"
+        );
 
         // KlyntbotError direct variants
-        assert_eq!(KlyntbotError::BusDisconnected.to_string(), "Bus disconnected");
+        assert_eq!(
+            KlyntbotError::BusDisconnected.to_string(),
+            "Bus disconnected"
+        );
     }
 
     #[test]
@@ -268,10 +337,19 @@ mod tests {
         let cases: Vec<(&str, KlyntbotError)> = vec![
             ("Tool error", ToolError::NotFound("test".into()).into()),
             ("Provider error", ProviderError::AuthFailed.into()),
-            ("Channel error", ChannelError::SendFailed("test".into()).into()),
-            ("Session error", SessionError::NotFound("test".into()).into()),
+            (
+                "Channel error",
+                ChannelError::SendFailed("test".into()).into(),
+            ),
+            (
+                "Session error",
+                SessionError::NotFound("test".into()).into(),
+            ),
             ("Config error", ConfigError::Invalid("test".into()).into()),
-            ("Cron error", CronError::InvalidExpression("test".into()).into()),
+            (
+                "Cron error",
+                CronError::InvalidExpression("test".into()).into(),
+            ),
             ("Goal error", GoalError::NotFound("test".into()).into()),
         ];
 

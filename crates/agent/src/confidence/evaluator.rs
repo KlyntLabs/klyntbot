@@ -9,20 +9,32 @@ use tracing::debug;
 use super::types::{
     AssessmentPhase, ConfidenceAssessment, ConfidenceDimensions, DecisionAction, RawConfidenceBlock,
 };
+use crate::learning::ToolConfidenceMap;
 
 /// Evaluates LLM confidence and decides whether to proceed, clarify, or skip.
 ///
 /// The threshold is stored as `Arc<AtomicU32>` (f32 bits) so the background
 /// `LearningService` can update it without locks on the hot path.
+/// An optional `ToolConfidenceMap` provides per-tool threshold overrides.
 pub struct ConfidenceEvaluator {
     threshold: Arc<AtomicU32>,
+    tool_map: Option<ToolConfidenceMap>,
 }
 
 impl ConfidenceEvaluator {
-    /// Create a new evaluator with the given threshold.
+    /// Create a new evaluator with the given global threshold (no per-tool overrides).
     pub fn new(threshold: f32) -> Self {
         Self {
             threshold: Arc::new(AtomicU32::new(threshold.clamp(0.0, 1.0).to_bits())),
+            tool_map: None,
+        }
+    }
+
+    /// Create a new evaluator with per-tool threshold overrides.
+    pub fn new_with_map(threshold: f32, tool_map: ToolConfidenceMap) -> Self {
+        Self {
+            threshold: Arc::new(AtomicU32::new(threshold.clamp(0.0, 1.0).to_bits())),
+            tool_map: Some(tool_map),
         }
     }
 
@@ -67,8 +79,33 @@ impl ConfidenceEvaluator {
     }
 
     /// Decide action based on assessment score and threshold.
+    ///
+    /// When `tool_name` is provided and a per-tool threshold exists in the
+    /// `ToolConfidenceMap`, that threshold is used instead of the global one.
+    pub fn decide_for_tool(
+        &self,
+        assessment: &ConfidenceAssessment,
+        tool_name: Option<&str>,
+    ) -> DecisionAction {
+        let threshold = match (tool_name, &self.tool_map) {
+            (Some(name), Some(map)) => map.get_threshold(name),
+            _ => self.threshold(),
+        };
+        self.decide_with_threshold(assessment, threshold)
+    }
+
+    /// Decide action based on assessment score and threshold (global threshold only).
     pub fn decide(&self, assessment: &ConfidenceAssessment) -> DecisionAction {
         let threshold = self.threshold();
+        self.decide_with_threshold(assessment, threshold)
+    }
+
+    /// Internal: apply threshold logic against an assessment.
+    fn decide_with_threshold(
+        &self,
+        assessment: &ConfidenceAssessment,
+        threshold: f32,
+    ) -> DecisionAction {
         if assessment.score >= threshold {
             DecisionAction::Proceed
         } else {
@@ -126,13 +163,17 @@ fn extract_confidence_block(content: &str) -> Option<String> {
 /// Returns cleaned content suitable for user display.
 pub fn strip_confidence_blocks(content: &str) -> String {
     let mut result = content.to_string();
-    while let (Some(start), Some(_)) = (result.find("<confidence>"), result.find("</confidence>")) {
-        let end = result.find("</confidence>").unwrap() + "</confidence>".len();
+    while let Some(start) = result.find("<confidence>") {
+        let search_from = start + "<confidence>".len();
+        let end = match result[search_from..].find("</confidence>") {
+            Some(e) => search_from + e + "</confidence>".len(),
+            None => break, // malformed — no matching close tag, stop
+        };
         result.replace_range(start..end, "");
     }
     // Clean up leftover blank lines
-    while result.contains("\n\n\n") {
-        result = result.replace("\n\n\n", "\n\n");
+    while let Some(pos) = result.find("\n\n\n") {
+        result.replace_range(pos..pos + 1, "");
     }
     result.trim().to_string()
 }
@@ -186,6 +227,26 @@ mod tests {
         let cleaned = strip_confidence_blocks(content);
         assert_eq!(cleaned, "Hello\n\nWorld");
         assert!(!cleaned.contains("confidence"));
+    }
+
+    #[test]
+    fn test_strip_confidence_blocks_misordered_tags() {
+        // </confidence> appears before <confidence> — must not panic or infinite-loop.
+        // The stray closing tag is left in place; no content is stripped.
+        let content = "</confidence>hello<confidence>content";
+        let cleaned = strip_confidence_blocks(content);
+        // The <confidence> tag has no matching close tag after it, so nothing is stripped.
+        assert!(cleaned.contains("hello"));
+        // Must terminate (no infinite loop).
+    }
+
+    #[test]
+    fn test_strip_confidence_blocks_unclosed_tag() {
+        // <confidence> with no closing tag — must not panic or infinite-loop.
+        let content = "Hello <confidence>dangling content";
+        let cleaned = strip_confidence_blocks(content);
+        assert!(cleaned.contains("Hello"));
+        // Must terminate.
     }
 
     #[test]
@@ -246,5 +307,61 @@ mod tests {
             evaluator.decide(&low),
             DecisionAction::Clarify { .. }
         ));
+    }
+
+    #[test]
+    fn test_decide_for_tool_uses_per_tool_threshold() {
+        use crate::learning::ToolConfidenceMap;
+
+        let mut tool_map = ToolConfidenceMap::new(0.7);
+        tool_map.set_threshold("shell", 0.9);
+        tool_map.set_threshold("web_search", 0.5);
+        let evaluator = ConfidenceEvaluator::new_with_map(0.7, tool_map);
+
+        let assessment = ConfidenceAssessment {
+            score: 0.75,
+            phase: AssessmentPhase::PreTool,
+            reasoning: String::new(),
+            dimensions: ConfidenceDimensions {
+                intent_clarity: 0.8,
+                tool_fit: 0.8,
+                info_sufficiency: 0.8,
+            },
+            action: DecisionAction::default(),
+            assessed_at: Utc::now(),
+        };
+
+        // shell requires 0.9 — 0.75 should Clarify
+        assert!(matches!(
+            evaluator.decide_for_tool(&assessment, Some("shell")),
+            DecisionAction::Clarify { .. }
+        ));
+
+        // web_search requires 0.5 — 0.75 should Proceed
+        assert!(matches!(
+            evaluator.decide_for_tool(&assessment, Some("web_search")),
+            DecisionAction::Proceed
+        ));
+
+        // unknown tool falls back to global 0.7 — 0.75 should Proceed
+        assert!(matches!(
+            evaluator.decide_for_tool(&assessment, Some("read_file")),
+            DecisionAction::Proceed
+        ));
+
+        // None tool_name falls back to global 0.7 — 0.75 should Proceed
+        assert!(matches!(
+            evaluator.decide_for_tool(&assessment, None),
+            DecisionAction::Proceed
+        ));
+    }
+
+    #[test]
+    fn test_new_with_map_preserves_global_threshold() {
+        use crate::learning::ToolConfidenceMap;
+
+        let tool_map = ToolConfidenceMap::new(0.7);
+        let evaluator = ConfidenceEvaluator::new_with_map(0.65, tool_map);
+        assert!((evaluator.threshold() - 0.65).abs() < f32::EPSILON);
     }
 }

@@ -8,7 +8,6 @@
 //! - Cold start protection (AC #6)
 //! - Threshold bounds [0.4, 0.9] (AC #7)
 //! - Confidence bands (AC #8)
-//! - Atomic compaction (AC #9)
 //! - Background service lifecycle (AC #14)
 //! - Bug fix: dynamic threshold in evaluator and prompt (AC #16/#17)
 //!
@@ -58,9 +57,24 @@ async fn create_agent_with_learning(provider: Arc<MockProvider>) -> (AgentLoop, 
     config.learning.min_outcomes_for_adaptation = 5; // low for unit tests
 
     let bus = Arc::new(MessageBus::new(10));
-    let pool = klyntbot::storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
+    let pool =
+        klyntbot::storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
     let todo_repo = klyntbot::storage::TodoRepo::new(pool.inner().clone());
-    let agent = AgentLoop::new(bus, provider, config, todo_repo, None).await.unwrap();
+    let outcome_repo = klyntbot::storage::OutcomeRepo::new(pool.inner().clone());
+    let learning_state_repo = klyntbot::storage::LearningStateRepo::new(pool.inner().clone());
+    let memory_note_repo = klyntbot::storage::MemoryNoteRepo::new(pool.inner().clone());
+    let agent = AgentLoop::new(
+        bus,
+        provider,
+        config,
+        todo_repo,
+        None,
+        outcome_repo,
+        learning_state_repo,
+        memory_note_repo,
+    )
+    .await
+    .unwrap();
     (agent, temp_dir)
 }
 
@@ -102,9 +116,7 @@ fn text_response(text: &str) -> klyntbot::providers::types::LlmResponse {
 async fn test_ac_tool_call_outcome_recorded_on_success() {
     // Test via OutcomeRecorder directly — verifies the hook path without
     // relying on global HOME env var (avoids parallel test races).
-    let temp_dir = TempDir::new().unwrap();
-    let store_path = temp_dir.path().join("outcomes.jsonl");
-    let store = Arc::new(RwLock::new(OutcomeStore::new(store_path)));
+    let store = Arc::new(RwLock::new(OutcomeStore::new_in_memory()));
     let recorder = OutcomeRecorder::new(Arc::clone(&store));
 
     recorder
@@ -119,7 +131,7 @@ async fn test_ac_tool_call_outcome_recorded_on_success() {
         )
         .await;
 
-    let mut guard = store.write().await;
+    let guard = store.read().await;
     let outcomes = guard.get_all_outcomes().await.unwrap();
 
     assert!(
@@ -134,9 +146,7 @@ async fn test_ac_tool_call_outcome_recorded_on_success() {
 /// Failed tool call is recorded with success=false and an error_category.
 #[tokio::test]
 async fn test_ac_tool_call_outcome_recorded_on_failure() {
-    let temp_dir = TempDir::new().unwrap();
-    let store_path = temp_dir.path().join("outcomes.jsonl");
-    let store = Arc::new(RwLock::new(OutcomeStore::new(store_path)));
+    let store = Arc::new(RwLock::new(OutcomeStore::new_in_memory()));
     let recorder = OutcomeRecorder::new(Arc::clone(&store));
 
     recorder
@@ -151,7 +161,7 @@ async fn test_ac_tool_call_outcome_recorded_on_failure() {
         )
         .await;
 
-    let mut guard = store.write().await;
+    let guard = store.read().await;
     let outcomes = guard.get_all_outcomes().await.unwrap();
 
     assert!(!outcomes.is_empty(), "failed tool call must be recorded");
@@ -166,16 +176,14 @@ async fn test_ac_tool_call_outcome_recorded_on_failure() {
 /// Recorded duration_ms is present in serialized outcome.
 #[tokio::test]
 async fn test_ac_outcome_duration_is_captured() {
-    let temp_dir = TempDir::new().unwrap();
-    let store_path = temp_dir.path().join("outcomes.jsonl");
-    let store = Arc::new(RwLock::new(OutcomeStore::new(store_path)));
+    let store = Arc::new(RwLock::new(OutcomeStore::new_in_memory()));
     let recorder = OutcomeRecorder::new(Arc::clone(&store));
 
     recorder
         .record_tool_outcome("todo", true, None, 123, None, ExecutionMode::Chat, "cli:s")
         .await;
 
-    let mut guard = store.write().await;
+    let guard = store.read().await;
     let outcomes = guard.get_all_outcomes().await.unwrap();
 
     let json = serde_json::to_string(&outcomes[0]).unwrap();
@@ -226,9 +234,7 @@ async fn test_ac_plan_step_outcomes_tagged_correctly() {
 async fn test_ac_enrichment_feedback_recorded_on_override() {
     use tools::EnrichmentFeedbackEntry;
 
-    let temp_dir = TempDir::new().unwrap();
-    let store_path = temp_dir.path().join("outcomes.jsonl");
-    let store = Arc::new(RwLock::new(OutcomeStore::new(store_path.clone())));
+    let store = Arc::new(RwLock::new(OutcomeStore::new_in_memory()));
     let recorder = Arc::new(OutcomeRecorder::new(Arc::clone(&store)));
 
     // Simulate: enrichment suggested priority=1, user overrode to priority=3
@@ -243,7 +249,7 @@ async fn test_ac_enrichment_feedback_recorded_on_override() {
     };
     recorder.record_feedback(feedback).await.unwrap();
 
-    let mut guard = store.write().await;
+    let guard = store.read().await;
     let all_fb = guard.get_all_feedback().await.unwrap();
     assert_eq!(all_fb.len(), 1, "one feedback entry must be stored");
     assert_eq!(all_fb[0].task_id, "todo-001");
@@ -259,9 +265,7 @@ async fn test_ac_enrichment_feedback_recorded_on_override() {
 async fn test_ac_enrichment_feedback_recorded_on_accept() {
     use tools::EnrichmentFeedbackEntry;
 
-    let temp_dir = TempDir::new().unwrap();
-    let store_path = temp_dir.path().join("outcomes.jsonl");
-    let store = Arc::new(RwLock::new(OutcomeStore::new(store_path)));
+    let store = Arc::new(RwLock::new(OutcomeStore::new_in_memory()));
     let recorder = Arc::new(OutcomeRecorder::new(Arc::clone(&store)));
 
     let feedback = EnrichmentFeedbackEntry {
@@ -275,7 +279,7 @@ async fn test_ac_enrichment_feedback_recorded_on_accept() {
     };
     recorder.record_feedback(feedback).await.unwrap();
 
-    let mut guard = store.write().await;
+    let guard = store.read().await;
     let all_fb = guard.get_all_feedback().await.unwrap();
     assert_eq!(all_fb.len(), 1);
     assert!(
@@ -292,9 +296,7 @@ async fn test_ac_enrichment_feedback_recorded_on_accept() {
 /// Analysis with outcomes that suggest a very low threshold is clamped to >= 0.4.
 #[tokio::test]
 async fn test_ac_threshold_never_below_min_bound() {
-    let temp_dir = TempDir::new().unwrap();
-    let state_path = temp_dir.path().join("state.json");
-    let mut adaptive = AdaptiveThresholds::load(state_path, 0.42, 0.4, 0.9, 50).await;
+    let mut adaptive = AdaptiveThresholds::new_in_memory(0.42, 0.4, 0.9, 50);
 
     // Build 60 outcomes: all succeed at very low confidence → suggests pushing threshold down
     let outcomes: Vec<OutcomeRecord> = (0..60)
@@ -330,9 +332,7 @@ async fn test_ac_threshold_never_below_min_bound() {
 /// Analysis suggesting very high threshold is clamped to <= 0.9.
 #[tokio::test]
 async fn test_ac_threshold_never_above_max_bound() {
-    let temp_dir = TempDir::new().unwrap();
-    let state_path = temp_dir.path().join("state.json");
-    let mut adaptive = AdaptiveThresholds::load(state_path, 0.88, 0.4, 0.9, 50).await;
+    let mut adaptive = AdaptiveThresholds::new_in_memory(0.88, 0.4, 0.9, 50);
 
     // Outcomes: all fail at low confidence, succeed only at very high → pushes threshold up
     let outcomes: Vec<OutcomeRecord> = (0..60)
@@ -372,9 +372,7 @@ async fn test_ac_threshold_never_above_max_bound() {
 /// A single analysis step never changes threshold by more than 0.05.
 #[tokio::test]
 async fn test_ac_threshold_step_limit_enforced() {
-    let temp_dir = TempDir::new().unwrap();
-    let state_path = temp_dir.path().join("state.json");
-    let mut adaptive = AdaptiveThresholds::load(state_path, 0.7, 0.4, 0.9, 50).await;
+    let mut adaptive = AdaptiveThresholds::new_in_memory(0.7, 0.4, 0.9, 50);
     let old_threshold = adaptive.current_threshold();
 
     // Suggest a massive jump
@@ -404,9 +402,7 @@ async fn test_ac_threshold_step_limit_enforced() {
 /// Threshold does NOT adapt when fewer than 50 outcomes exist.
 #[tokio::test]
 async fn test_ac_cold_start_no_adaptation_below_minimum() {
-    let temp_dir = TempDir::new().unwrap();
-    let state_path = temp_dir.path().join("state.json");
-    let mut adaptive = AdaptiveThresholds::load(state_path, 0.7, 0.4, 0.9, 50).await;
+    let mut adaptive = AdaptiveThresholds::new_in_memory(0.7, 0.4, 0.9, 50);
 
     let analysis = AnalysisResult {
         computed_at: chrono::Utc::now(),
@@ -428,9 +424,7 @@ async fn test_ac_cold_start_no_adaptation_below_minimum() {
 /// Adaptation fires once exactly 50 outcomes are reached.
 #[tokio::test]
 async fn test_ac_adaptation_triggers_at_minimum_outcomes() {
-    let temp_dir = TempDir::new().unwrap();
-    let state_path = temp_dir.path().join("state.json");
-    let mut adaptive = AdaptiveThresholds::load(state_path, 0.7, 0.4, 0.9, 50).await;
+    let mut adaptive = AdaptiveThresholds::new_in_memory(0.7, 0.4, 0.9, 50);
 
     let analysis = AnalysisResult {
         computed_at: chrono::Utc::now(),
@@ -455,123 +449,6 @@ async fn test_ac_adaptation_triggers_at_minimum_outcomes() {
     assert!(
         result.is_some(),
         "50 outcomes with suggested=0.5 should produce a threshold change"
-    );
-}
-
-// ─────────────────────────────────────────────────────────────
-// AC: Crash-safe JSONL storage + atomic compaction (Decision #9)
-// ─────────────────────────────────────────────────────────────
-
-/// Records written before a simulated restart are recoverable on reload.
-#[tokio::test]
-async fn test_ac_outcomes_survive_process_restart() {
-    let temp_dir = TempDir::new().unwrap();
-    let path = temp_dir.path().join("outcomes.jsonl");
-
-    // Write 5 records then "drop" the store (simulate restart)
-    {
-        let mut store = OutcomeStore::new(path.clone());
-        for i in 0..5 {
-            store
-                .record(make_outcome(&format!("r{}", i), "todo", true))
-                .await
-                .unwrap();
-        }
-    }
-
-    // Reload from disk
-    let mut store2 = OutcomeStore::new(path);
-    store2.load().await.unwrap();
-    let outcomes = store2.get_all_outcomes().await.unwrap();
-    assert_eq!(outcomes.len(), 5, "all records must survive restart");
-}
-
-/// Manual compaction reduces file size without losing data.
-#[tokio::test]
-async fn test_ac_compaction_reduces_size_preserves_data() {
-    let temp_dir = TempDir::new().unwrap();
-    let path = temp_dir.path().join("outcomes.jsonl");
-    let mut store = OutcomeStore::new(path.clone());
-
-    // Write 20 records (to have a meaningful file)
-    for i in 0..20 {
-        store
-            .record(make_outcome(&format!("r{}", i), "todo", true))
-            .await
-            .unwrap();
-    }
-    // Write 20 feedback entries
-    for i in 0..20 {
-        store
-            .record_feedback(make_feedback(&format!("task-{}", i), true))
-            .await
-            .unwrap();
-    }
-
-    let size_before = std::fs::metadata(&path).unwrap().len();
-    store.compact().await.unwrap();
-    let size_after = std::fs::metadata(&path).unwrap().len();
-
-    // Size may be same since compact rewrites exactly the live records;
-    // what matters is that data is preserved and no .tmp file lingers
-    assert!(size_after > 0, "compacted file must not be empty");
-    let tmp_path = path.with_extension("jsonl.tmp");
-    assert!(
-        !tmp_path.exists(),
-        ".jsonl.tmp must be cleaned up after compaction"
-    );
-
-    // Reload and verify all data survived
-    let mut store2 = OutcomeStore::new(path);
-    store2.load().await.unwrap();
-    assert_eq!(store2.get_all_outcomes().await.unwrap().len(), 20);
-    assert_eq!(store2.get_all_feedback().await.unwrap().len(), 20);
-
-    // Suppress unused warning for size_before in edge case where file doesn't shrink
-    let _ = size_before;
-}
-
-/// A corrupted line in JSONL does not crash the store; valid records are still loaded.
-#[tokio::test]
-async fn test_ac_corrupted_jsonl_line_is_skipped_gracefully() {
-    let temp_dir = TempDir::new().unwrap();
-    let outcomes_path = temp_dir.path().join("outcomes.jsonl");
-
-    let valid_line = serde_json::json!({
-        "_op": "record",
-        "outcome": {
-            "id": "valid-001",
-            "session_key": "telegram:abc",
-            "tool_name": "todo",
-            "success": true,
-            "error_category": null,
-            "duration_ms": 42,
-            "confidence_score": 0.8,
-            "confidence_dimensions": null,
-            "execution_mode": "chat",
-            "created_at": "2026-02-17T00:00:00Z"
-        }
-    });
-    let content = format!(
-        "{}\nTHIS IS NOT JSON\n{}\n",
-        serde_json::to_string(&valid_line).unwrap(),
-        serde_json::to_string(&valid_line).unwrap(),
-    );
-    std::fs::write(&outcomes_path, content).unwrap();
-
-    let mut store = OutcomeStore::new(outcomes_path);
-    // Must not panic
-    store.load().await.unwrap();
-
-    let outcomes = store.get_all_outcomes().await.unwrap();
-    // Two valid records with same id — both appended (no dedup on load for simple store)
-    assert!(
-        !outcomes.is_empty(),
-        "valid records must survive despite corrupted line"
-    );
-    assert!(
-        outcomes.iter().any(|o| o.id == "valid-001"),
-        "valid-001 must be present"
     );
 }
 
@@ -617,9 +494,7 @@ async fn test_ac_privacy_no_args_or_messages_in_outcomes() {
 /// Session keys in stored records have hashed suffixes, not originals.
 #[tokio::test]
 async fn test_ac_privacy_session_key_is_hashed() {
-    let temp_dir = TempDir::new().unwrap();
-    let store_path = temp_dir.path().join("outcomes.jsonl");
-    let store = Arc::new(RwLock::new(OutcomeStore::new(store_path)));
+    let store = Arc::new(RwLock::new(OutcomeStore::new_in_memory()));
     let recorder = OutcomeRecorder::new(Arc::clone(&store));
 
     recorder
@@ -634,7 +509,7 @@ async fn test_ac_privacy_session_key_is_hashed() {
         )
         .await;
 
-    let mut guard = store.write().await;
+    let guard = store.read().await;
     let outcomes = guard.get_all_outcomes().await.unwrap();
     assert_eq!(outcomes.len(), 1);
 
@@ -658,13 +533,10 @@ async fn test_ac_privacy_session_key_is_hashed() {
 /// analyze_now() runs synchronously and returns Ok.
 #[tokio::test]
 async fn test_ac_analyze_now_returns_immediate_result() {
-    let temp_dir = TempDir::new().unwrap();
-    let store = Arc::new(RwLock::new(OutcomeStore::new(
-        temp_dir.path().join("outcomes.jsonl"),
+    let store = Arc::new(RwLock::new(OutcomeStore::new_in_memory()));
+    let adaptive = Arc::new(RwLock::new(AdaptiveThresholds::new_in_memory(
+        0.7, 0.4, 0.9, 50,
     )));
-    let adaptive = Arc::new(RwLock::new(
-        AdaptiveThresholds::load(temp_dir.path().join("state.json"), 0.7, 0.4, 0.9, 50).await,
-    ));
 
     let service = LearningService::new(store, adaptive, None, Duration::from_secs(9999));
     let result = service.analyze_now().await;
@@ -741,7 +613,7 @@ async fn test_ac_confidence_prompt_has_no_hardcoded_threshold() {
 // AC: Learning disabled gracefully (Decision #13)
 // ─────────────────────────────────────────────────────────────
 
-/// When learning is disabled, agent works and outcomes.jsonl is not created.
+/// When learning is disabled, agent works and no outcomes are recorded.
 #[tokio::test]
 async fn test_ac_learning_disabled_no_recording() {
     let temp_dir = TempDir::new().unwrap();
@@ -758,9 +630,24 @@ async fn test_ac_learning_disabled_no_recording() {
     config.learning.enabled = false;
 
     let bus = Arc::new(MessageBus::new(10));
-    let pool = klyntbot::storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
+    let pool =
+        klyntbot::storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
     let todo_repo = klyntbot::storage::TodoRepo::new(pool.inner().clone());
-    let agent = AgentLoop::new(bus, provider.clone(), config, todo_repo, None).await.unwrap();
+    let outcome_repo = klyntbot::storage::OutcomeRepo::new(pool.inner().clone());
+    let learning_state_repo = klyntbot::storage::LearningStateRepo::new(pool.inner().clone());
+    let memory_note_repo = klyntbot::storage::MemoryNoteRepo::new(pool.inner().clone());
+    let agent = AgentLoop::new(
+        bus,
+        provider.clone(),
+        config,
+        todo_repo,
+        None,
+        outcome_repo,
+        learning_state_repo,
+        memory_note_repo,
+    )
+    .await
+    .unwrap();
 
     let response = agent
         .process_direct("Hi".to_string(), "test:sess".to_string())
@@ -786,13 +673,10 @@ async fn test_ac_learning_disabled_no_recording() {
 /// Learning service starts and stops cleanly without panicking.
 #[tokio::test]
 async fn test_ac_learning_service_shutdown_is_clean() {
-    let temp_dir = TempDir::new().unwrap();
-    let store = Arc::new(RwLock::new(OutcomeStore::new(
-        temp_dir.path().join("outcomes.jsonl"),
+    let store = Arc::new(RwLock::new(OutcomeStore::new_in_memory()));
+    let adaptive = Arc::new(RwLock::new(AdaptiveThresholds::new_in_memory(
+        0.7, 0.4, 0.9, 50,
     )));
-    let adaptive = Arc::new(RwLock::new(
-        AdaptiveThresholds::load(temp_dir.path().join("state.json"), 0.7, 0.4, 0.9, 50).await,
-    ));
 
     let mut service = LearningService::new(store, adaptive, None, Duration::from_secs(3600));
     service.start();
@@ -800,44 +684,38 @@ async fn test_ac_learning_service_shutdown_is_clean() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// AC: Threshold history persisted across restarts
+// AC: Threshold history tracked in memory
 // ─────────────────────────────────────────────────────────────
 
-/// ThresholdChange records survive save/reload cycle.
+/// ThresholdChange records are tracked after apply_analysis.
 #[tokio::test]
-async fn test_ac_threshold_history_persisted_and_reloaded() {
-    let temp_dir = TempDir::new().unwrap();
-    let state_path = temp_dir.path().join("state.json");
+async fn test_ac_threshold_history_tracked() {
+    let mut adaptive = AdaptiveThresholds::new_in_memory(0.7, 0.4, 0.9, 50);
 
-    let saved_threshold = {
-        let mut adaptive = AdaptiveThresholds::load(state_path.clone(), 0.7, 0.4, 0.9, 50).await;
-
-        // Force a threshold change (50 outcomes, suggest 0.6 → step-limited to 0.65)
-        let analysis = AnalysisResult {
-            computed_at: chrono::Utc::now(),
-            total_outcomes: 100,
-            per_tool_stats: Default::default(),
-            suggested_threshold: 0.5,
-            threshold_confidence: 0.9,
-            enrichment_stats: EnrichmentStats::default(),
-        };
-        adaptive.apply_analysis(&analysis);
-        adaptive.save().await.unwrap();
-        adaptive.current_threshold()
+    // Force a threshold change (100 outcomes, suggest 0.5 → step-limited to 0.65)
+    let analysis = AnalysisResult {
+        computed_at: chrono::Utc::now(),
+        total_outcomes: 100,
+        per_tool_stats: Default::default(),
+        suggested_threshold: 0.5,
+        threshold_confidence: 0.9,
+        enrichment_stats: EnrichmentStats::default(),
     };
+    let result = adaptive.apply_analysis(&analysis);
+    assert!(result.is_some(), "threshold should change");
 
-    // Reload from same path
-    let reloaded = AdaptiveThresholds::load(state_path, 0.7, 0.4, 0.9, 50).await;
+    let saved_threshold = adaptive.current_threshold();
     assert!(
-        (reloaded.current_threshold() - saved_threshold).abs() < f32::EPSILON,
-        "reloaded threshold must match saved: {} vs {}",
-        reloaded.current_threshold(),
-        saved_threshold
+        (saved_threshold - 0.7).abs() > f32::EPSILON,
+        "threshold must have changed from initial 0.7"
     );
     assert!(
-        !reloaded.state().threshold_history.is_empty(),
-        "threshold history must survive save/reload"
+        !adaptive.state().threshold_history.is_empty(),
+        "threshold history must record the change"
     );
+    let change = &adaptive.state().threshold_history[0];
+    assert!((change.from - 0.7).abs() < f32::EPSILON);
+    assert!((change.to - saved_threshold).abs() < f32::EPSILON);
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -962,6 +840,7 @@ async fn test_ac_enrichment_acceptance_rate_computed_correctly() {
 // Test fixtures
 // ─────────────────────────────────────────────────────────────
 
+#[allow(dead_code)]
 fn make_outcome(id: &str, tool: &str, success: bool) -> OutcomeRecord {
     OutcomeRecord {
         id: id.to_string(),

@@ -187,10 +187,7 @@ async fn test_e2e_concurrent_plans_reach_different_final_states() {
 
 #[tokio::test]
 async fn test_e2e_concurrent_outcome_recording_consistent() {
-    let tmp = TempDir::new().unwrap();
-    let outcome_store = Arc::new(RwLock::new(OutcomeStore::new(
-        tmp.path().join("outcomes.jsonl"),
-    )));
+    let outcome_store = Arc::new(RwLock::new(OutcomeStore::new_in_memory()));
 
     let recorder = Arc::new(OutcomeRecorder::new(Arc::clone(&outcome_store)));
 
@@ -221,7 +218,7 @@ async fn test_e2e_concurrent_outcome_recording_consistent() {
         h.await.unwrap();
     }
 
-    let mut s = outcome_store.write().await;
+    let s = outcome_store.read().await;
     let outcomes = s.get_all_outcomes().await.unwrap();
 
     assert_eq!(outcomes.len(), 10, "all 10 outcomes must be recorded");

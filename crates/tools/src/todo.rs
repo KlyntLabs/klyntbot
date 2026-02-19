@@ -786,10 +786,8 @@ impl Tool for TodoTool {
             "focus" => {
                 let id = p.required_str("id")?;
 
-                let deadline = Some(
-                    Utc::now()
-                        + chrono::Duration::hours(self.focus_deadline_hours as i64),
-                );
+                let deadline =
+                    Some(Utc::now() + chrono::Duration::hours(self.focus_deadline_hours as i64));
                 if self
                     .repo
                     .focus(id, self.max_focus_slots as i64, deadline)
@@ -1245,8 +1243,7 @@ impl Tool for TodoTool {
 
                 // 1. Run keyword search
                 let keyword_rows = self.repo.search_by_keyword(query_trimmed).await?;
-                let keyword_results: Vec<Todo> =
-                    keyword_rows.into_iter().map(Todo::from).collect();
+                let keyword_results: Vec<Todo> = keyword_rows.into_iter().map(Todo::from).collect();
 
                 // Build ID-to-Todo map for RRF lookups
                 let all_rows = self.repo.list(&storage::TodoFilter::default()).await?;

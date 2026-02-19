@@ -136,7 +136,10 @@ mod tests {
         let json = serde_json::to_string(&record).unwrap();
         let loaded: OutcomeRecord = serde_json::from_str(&json).unwrap();
         assert_eq!(loaded.id, "test-001", "failed for: OutcomeRecord.id");
-        assert_eq!(loaded.tool_name, "todo", "failed for: OutcomeRecord.tool_name");
+        assert_eq!(
+            loaded.tool_name, "todo",
+            "failed for: OutcomeRecord.tool_name"
+        );
         assert!((loaded.confidence_score.unwrap() - 0.85).abs() < f32::EPSILON);
 
         // ExecutionMode::PlanStep roundtrip
@@ -147,7 +150,10 @@ mod tests {
         let json = serde_json::to_string(&mode).unwrap();
         let loaded: ExecutionMode = serde_json::from_str(&json).unwrap();
         match loaded {
-            ExecutionMode::PlanStep { plan_id, step_index } => {
+            ExecutionMode::PlanStep {
+                plan_id,
+                step_index,
+            } => {
                 assert_eq!(plan_id, "plan-abc", "failed for: PlanStep.plan_id");
                 assert_eq!(step_index, 3, "failed for: PlanStep.step_index");
             }
@@ -166,8 +172,14 @@ mod tests {
         };
         let json = serde_json::to_string(&entry).unwrap();
         let loaded: EnrichmentFeedbackEntry = serde_json::from_str(&json).unwrap();
-        assert_eq!(loaded.task_id, "todo-123", "failed for: EnrichmentFeedbackEntry.task_id");
-        assert!(!loaded.accepted, "failed for: EnrichmentFeedbackEntry.accepted");
+        assert_eq!(
+            loaded.task_id, "todo-123",
+            "failed for: EnrichmentFeedbackEntry.task_id"
+        );
+        assert!(
+            !loaded.accepted,
+            "failed for: EnrichmentFeedbackEntry.accepted"
+        );
 
         // AdaptiveThresholdState roundtrip
         let state = AdaptiveThresholdState {
@@ -184,7 +196,11 @@ mod tests {
         let json = serde_json::to_string(&state).unwrap();
         let loaded: AdaptiveThresholdState = serde_json::from_str(&json).unwrap();
         assert!((loaded.current_threshold - 0.72).abs() < f32::EPSILON);
-        assert_eq!(loaded.threshold_history.len(), 1, "failed for: AdaptiveThresholdState.threshold_history");
+        assert_eq!(
+            loaded.threshold_history.len(),
+            1,
+            "failed for: AdaptiveThresholdState.threshold_history"
+        );
     }
 
     #[test]

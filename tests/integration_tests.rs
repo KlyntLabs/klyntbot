@@ -775,7 +775,6 @@ async fn test_session_isolation() {
     assert_ne!(loaded_a.session_key, loaded_b.session_key);
 }
 
-
 /// Test 24: Cross-channel isolation (fixes session key collision bug)
 /// Verifies: Telegram chat "123" and Discord chat "123" have isolated session keys
 /// Bug: Previously used ctx.chat_id alone, causing collisions across channels
@@ -957,8 +956,8 @@ async fn test_cross_channel_plan_isolation() {
     );
 }
 
-/// Test 25: PlanExecutor.execute_step() full integration
-/// Verifies: execute_step() calls the LLM, executes tool, captures output.
+/// Test 25: run_step() full integration (multi-cycle plan step execution)
+/// Verifies: run_step() calls the LLM via ExecutionCore, executes tool, captures output.
 /// Covers the gap: no integration test previously verified actual step execution.
 #[tokio::test]
 async fn test_plan_executor_execute_step_integration() {
@@ -971,8 +970,11 @@ async fn test_plan_executor_execute_step_integration() {
     use tokio::sync::RwLock;
     use uuid::Uuid;
 
-    // Mock provider that returns a tool call for "counter_tool"
-    struct MockProviderWithToolCall;
+    // Mock provider that returns a tool call on first call, then a final text response.
+    // This mirrors real LLM behavior: call tool → summarize result.
+    struct MockProviderWithToolCall {
+        call_count: std::sync::atomic::AtomicUsize,
+    }
 
     #[async_trait]
     impl LlmProvider for MockProviderWithToolCall {
@@ -982,17 +984,32 @@ async fn test_plan_executor_execute_step_integration() {
             _tools: Option<&[Value]>,
             _params: &ChatParams,
         ) -> klyntbot::error::Result<LlmResponse> {
-            Ok(LlmResponse {
-                content: None,
-                tool_calls: vec![ToolCall {
-                    id: "call_1".to_string(),
-                    name: "counter_tool".to_string(),
-                    arguments: serde_json::json!({}),
-                }],
-                finish_reason: "tool_calls".to_string(),
-                usage: Usage::default(),
-                reasoning_content: None,
-            })
+            let n = self
+                .call_count
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            if n == 0 {
+                // First call: return tool call
+                Ok(LlmResponse {
+                    content: None,
+                    tool_calls: vec![ToolCall {
+                        id: "call_1".to_string(),
+                        name: "counter_tool".to_string(),
+                        arguments: serde_json::json!({}),
+                    }],
+                    finish_reason: "tool_calls".to_string(),
+                    usage: Usage::default(),
+                    reasoning_content: None,
+                })
+            } else {
+                // Subsequent calls: final text (stops the cycle loop)
+                Ok(LlmResponse {
+                    content: Some("Step complete: counted".to_string()),
+                    tool_calls: vec![],
+                    finish_reason: "stop".to_string(),
+                    usage: Usage::default(),
+                    reasoning_content: None,
+                })
+            }
         }
         fn default_model(&self) -> &str {
             "mock"
@@ -1038,8 +1055,10 @@ async fn test_plan_executor_execute_step_integration() {
     });
     let registry = Arc::new(RwLock::new(registry));
 
-    let provider: klyntbot::providers::DynProvider = Arc::new(MockProviderWithToolCall);
-    let executor = klyntbot::agent::PlanExecutor::new();
+    let provider: klyntbot::providers::DynProvider = Arc::new(MockProviderWithToolCall {
+        call_count: std::sync::atomic::AtomicUsize::new(0),
+    });
+    let core = klyntbot::agent::execution::ExecutionCore::new(provider, registry);
 
     let step = PlanStep {
         id: Uuid::new_v4(),
@@ -1058,10 +1077,9 @@ async fn test_plan_executor_execute_step_integration() {
     let ctx = RoutingContext::new("cli".into(), "integration-test".into());
     let plan_ctx = "Plan: Integration Test\nProgress: step 1/1";
 
-    let result = executor
-        .execute_step(&step, plan_ctx, &provider, &registry, &ctx, None)
+    let result = klyntbot::agent::run_step(&core, &step, plan_ctx, &ctx, None)
         .await
-        .expect("execute_step should not return Err in integration test");
+        .expect("run_step should not return Err in integration test");
 
     // Verify tool was actually called
     assert_eq!(

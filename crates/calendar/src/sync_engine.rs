@@ -204,8 +204,7 @@ mod tests {
         server.etag = Some("etag-200".to_string());
         local.etag = Some("etag-100".to_string());
 
-        let resolved =
-            resolve_conflict(&server, &local, ConflictResolutionStrategy::LastWriteWins);
+        let resolved = resolve_conflict(&server, &local, ConflictResolutionStrategy::LastWriteWins);
 
         assert_eq!(resolved.summary, "Server Version");
         assert_eq!(resolved.etag, Some("etag-200".to_string()));
@@ -219,8 +218,7 @@ mod tests {
         server.etag = Some("etag-100".to_string());
         local.etag = Some("etag-200".to_string());
 
-        let resolved =
-            resolve_conflict(&server, &local, ConflictResolutionStrategy::LastWriteWins);
+        let resolved = resolve_conflict(&server, &local, ConflictResolutionStrategy::LastWriteWins);
 
         assert_eq!(resolved.summary, "Local Version");
         assert_eq!(resolved.etag, Some("etag-200".to_string()));
@@ -232,8 +230,7 @@ mod tests {
         let local = make_local_event();
         server.etag = None; // server lacks etag
 
-        let resolved =
-            resolve_conflict(&server, &local, ConflictResolutionStrategy::LastWriteWins);
+        let resolved = resolve_conflict(&server, &local, ConflictResolutionStrategy::LastWriteWins);
 
         // Local has an etag (confirmed server-side previously) → local wins
         assert_eq!(resolved.summary, "Local Version");
@@ -246,8 +243,7 @@ mod tests {
         server.etag = None;
         local.etag = None;
 
-        let resolved =
-            resolve_conflict(&server, &local, ConflictResolutionStrategy::LastWriteWins);
+        let resolved = resolve_conflict(&server, &local, ConflictResolutionStrategy::LastWriteWins);
 
         // Cannot determine recency → fall back to server
         assert_eq!(resolved.summary, "Server Version");
@@ -272,14 +268,8 @@ mod tests {
         use serde_json;
 
         let cases = [
-            (
-                ConflictResolutionStrategy::ServerWins,
-                "\"serverWins\"",
-            ),
-            (
-                ConflictResolutionStrategy::ClientWins,
-                "\"clientWins\"",
-            ),
+            (ConflictResolutionStrategy::ServerWins, "\"serverWins\""),
+            (ConflictResolutionStrategy::ClientWins, "\"clientWins\""),
             (
                 ConflictResolutionStrategy::LastWriteWins,
                 "\"lastWriteWins\"",

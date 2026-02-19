@@ -158,9 +158,8 @@ impl StrategyLearningStore {
             let strategy = strategy.to_string();
             // Use block_in_place to bridge sync → async
             return tokio::task::block_in_place(move || {
-                tokio::runtime::Handle::current().block_on(async {
-                    repo.get_accuracy(&strategy, cutoff).await.ok().flatten()
-                })
+                tokio::runtime::Handle::current()
+                    .block_on(async { repo.get_accuracy(&strategy, cutoff).await.ok().flatten() })
             });
         }
 

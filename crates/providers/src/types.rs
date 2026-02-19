@@ -399,5 +399,4 @@ mod tests {
     fn test_context_window_constant() {
         assert_eq!(DEFAULT_CONTEXT_WINDOW, 128_000);
     }
-
 }

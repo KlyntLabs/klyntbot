@@ -86,7 +86,7 @@ mod tests {
     #[test]
     fn test_duration_prediction_from_keywords() {
         let cases = [
-            ("Fix typo in header", 15),             // quick (typo)
+            ("Fix typo in header", 15),              // quick (typo)
             ("Fix login validation", 30),            // small (fix, but no quick keyword)
             ("Implement user notifications", 60),    // medium (implement)
             ("Refactor authentication system", 120), // large (refactor)

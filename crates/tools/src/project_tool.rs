@@ -20,10 +20,7 @@ pub struct ProjectTool {
 
 impl ProjectTool {
     /// Create a new ProjectTool
-    pub fn new(
-        project_repo: storage::ProjectRepo,
-        todo_repo: storage::TodoRepo,
-    ) -> Self {
+    pub fn new(project_repo: storage::ProjectRepo, todo_repo: storage::TodoRepo) -> Self {
         Self {
             project_repo,
             todo_repo,
@@ -239,8 +236,10 @@ impl Tool for ProjectTool {
                     ..Default::default()
                 };
                 let rows = self.todo_repo.list(&filter.to_storage_filter()).await?;
-                let tasks: Vec<crate::todo_types::Todo> =
-                    rows.into_iter().map(crate::todo_types::Todo::from).collect();
+                let tasks: Vec<crate::todo_types::Todo> = rows
+                    .into_iter()
+                    .map(crate::todo_types::Todo::from)
+                    .collect();
 
                 if tasks.is_empty() {
                     return Ok(format!("No tasks in project '{}'", project.name));

@@ -115,16 +115,16 @@ impl LearningService {
     ) {
         // Read outcomes (acquire then release lock quickly)
         let (outcomes, feedback) = {
-            let mut store_guard = store.write().await;
+            let store_guard = store.read().await;
             let outcomes = match store_guard.get_all_outcomes().await {
-                Ok(o) => o.to_vec(),
+                Ok(o) => o,
                 Err(e) => {
                     warn!("Failed to read outcomes for analysis: {}", e);
                     return;
                 }
             };
             let feedback = match store_guard.get_all_feedback().await {
-                Ok(f) => f.to_vec(),
+                Ok(f) => f,
                 Err(e) => {
                     warn!("Failed to read feedback for analysis: {}", e);
                     return;
@@ -191,18 +191,19 @@ impl LearningService {
 mod tests {
     use super::*;
     use bus::LearningEvent;
-    use tempfile::TempDir;
+
+    fn make_test_stores() -> (Arc<RwLock<OutcomeStore>>, Arc<RwLock<AdaptiveThresholds>>) {
+        let store = Arc::new(RwLock::new(OutcomeStore::new_in_memory()));
+        let adaptive = Arc::new(RwLock::new(AdaptiveThresholds::new_in_memory(
+            0.7, 0.4, 0.9, 50,
+        )));
+        (store, adaptive)
+    }
 
     /// AC-I2.1/2.2: LearningService publishes AnalysisCompleted event when triggered.
     #[tokio::test]
     async fn test_publishes_analysis_completed_on_trigger() {
-        let dir = TempDir::new().unwrap();
-        let store = Arc::new(RwLock::new(OutcomeStore::new(
-            dir.path().join("outcomes.jsonl"),
-        )));
-        let adaptive = Arc::new(RwLock::new(
-            AdaptiveThresholds::load(dir.path().join("state.json"), 0.7, 0.4, 0.9, 50).await,
-        ));
+        let (store, adaptive) = make_test_stores();
 
         let event_bus = Arc::new(bus::LearningEventBus::new(16));
         let mut rx = event_bus.subscribe();
@@ -229,13 +230,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_start_stop_lifecycle() {
-        let dir = TempDir::new().unwrap();
-        let store = Arc::new(RwLock::new(OutcomeStore::new(
-            dir.path().join("outcomes.jsonl"),
-        )));
-        let adaptive = Arc::new(RwLock::new(
-            AdaptiveThresholds::load(dir.path().join("state.json"), 0.7, 0.4, 0.9, 50).await,
-        ));
+        let (store, adaptive) = make_test_stores();
 
         let mut service = LearningService::new(store, adaptive, None, StdDuration::from_secs(3600));
 
@@ -248,13 +243,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_trigger_analysis() {
-        let dir = TempDir::new().unwrap();
-        let store = Arc::new(RwLock::new(OutcomeStore::new(
-            dir.path().join("outcomes.jsonl"),
-        )));
-        let adaptive = Arc::new(RwLock::new(
-            AdaptiveThresholds::load(dir.path().join("state.json"), 0.7, 0.4, 0.9, 50).await,
-        ));
+        let (store, adaptive) = make_test_stores();
 
         let mut service = LearningService::new(store, adaptive, None, StdDuration::from_secs(3600));
 

@@ -9,11 +9,25 @@ use tempfile::TempDir;
 mod mock_provider;
 use mock_provider::{ErrorProvider, MockProvider};
 
-/// Create a TodoRepo backed by a lazy Postgres pool (no actual DB connection needed for unit tests).
+/// Create repos backed by a lazy Postgres pool (no actual DB connection needed for unit tests).
+fn test_pool() -> klyntbot::storage::StoragePool {
+    klyntbot::storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap()
+}
+
 fn test_todo_repo() -> klyntbot::storage::TodoRepo {
-    let pool =
-        klyntbot::storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
-    klyntbot::storage::TodoRepo::new(pool.inner().clone())
+    klyntbot::storage::TodoRepo::new(test_pool().inner().clone())
+}
+
+fn test_outcome_repo() -> klyntbot::storage::OutcomeRepo {
+    klyntbot::storage::OutcomeRepo::new(test_pool().inner().clone())
+}
+
+fn test_learning_state_repo() -> klyntbot::storage::LearningStateRepo {
+    klyntbot::storage::LearningStateRepo::new(test_pool().inner().clone())
+}
+
+fn test_memory_note_repo() -> klyntbot::storage::MemoryNoteRepo {
+    klyntbot::storage::MemoryNoteRepo::new(test_pool().inner().clone())
 }
 
 /// Test basic message processing through agent loop
@@ -33,9 +47,18 @@ async fn test_agent_loop_basic_processing() {
         .unwrap()
         .to_string();
 
-    let agent_loop = AgentLoop::new(bus, provider.clone(), config, test_todo_repo(), None)
-        .await
-        .unwrap();
+    let agent_loop = AgentLoop::new(
+        bus,
+        provider.clone(),
+        config,
+        test_todo_repo(),
+        None,
+        test_outcome_repo(),
+        test_learning_state_repo(),
+        test_memory_note_repo(),
+    )
+    .await
+    .unwrap();
 
     // Process a direct message
     let response = agent_loop
@@ -93,9 +116,18 @@ async fn test_agent_loop_with_tool_execution() {
     let mut config = Config::default();
     config.agents.defaults.workspace = workspace.to_str().unwrap().to_string();
 
-    let agent_loop = AgentLoop::new(bus, provider.clone(), config, test_todo_repo(), None)
-        .await
-        .unwrap();
+    let agent_loop = AgentLoop::new(
+        bus,
+        provider.clone(),
+        config,
+        test_todo_repo(),
+        None,
+        test_outcome_repo(),
+        test_learning_state_repo(),
+        test_memory_note_repo(),
+    )
+    .await
+    .unwrap();
 
     let response = agent_loop
         .process_direct("Read test.txt".to_string(), "test:session2".to_string())
@@ -139,9 +171,18 @@ async fn test_agent_loop_max_iterations() {
         .to_string();
     config.agents.defaults.max_tool_iterations = 3;
 
-    let agent_loop = AgentLoop::new(bus, provider.clone(), config, test_todo_repo(), None)
-        .await
-        .unwrap();
+    let agent_loop = AgentLoop::new(
+        bus,
+        provider.clone(),
+        config,
+        test_todo_repo(),
+        None,
+        test_outcome_repo(),
+        test_learning_state_repo(),
+        test_memory_note_repo(),
+    )
+    .await
+    .unwrap();
 
     // This should hit max iterations and return an error or stop
     let result = agent_loop
@@ -198,9 +239,18 @@ async fn test_agent_loop_tool_error_handling() {
         .unwrap()
         .to_string();
 
-    let agent_loop = AgentLoop::new(bus, provider.clone(), config, test_todo_repo(), None)
-        .await
-        .unwrap();
+    let agent_loop = AgentLoop::new(
+        bus,
+        provider.clone(),
+        config,
+        test_todo_repo(),
+        None,
+        test_outcome_repo(),
+        test_learning_state_repo(),
+        test_memory_note_repo(),
+    )
+    .await
+    .unwrap();
 
     let response = agent_loop
         .process_direct(
@@ -241,10 +291,18 @@ async fn test_agent_loop_session_persistence() {
     // First agent loop
     {
         let bus = Arc::new(MessageBus::new(10));
-        let agent_loop =
-            AgentLoop::new(bus, provider.clone(), config.clone(), test_todo_repo(), None)
-                .await
-                .unwrap();
+        let agent_loop = AgentLoop::new(
+            bus,
+            provider.clone(),
+            config.clone(),
+            test_todo_repo(),
+            None,
+            test_outcome_repo(),
+            test_learning_state_repo(),
+            test_memory_note_repo(),
+        )
+        .await
+        .unwrap();
 
         // First message
         let _ = agent_loop
@@ -255,9 +313,18 @@ async fn test_agent_loop_session_persistence() {
 
     // Create a new agent loop with a new bus (simulating restart)
     let bus2 = Arc::new(MessageBus::new(10));
-    let agent_loop2 = AgentLoop::new(bus2, provider.clone(), config, test_todo_repo(), None)
-        .await
-        .unwrap();
+    let agent_loop2 = AgentLoop::new(
+        bus2,
+        provider.clone(),
+        config,
+        test_todo_repo(),
+        None,
+        test_outcome_repo(),
+        test_learning_state_repo(),
+        test_memory_note_repo(),
+    )
+    .await
+    .unwrap();
 
     // Second message - should have access to session history
     let response = agent_loop2
@@ -286,9 +353,18 @@ async fn test_streaming_emits_done() {
         .to_string();
 
     let agent_loop = Arc::new(
-        AgentLoop::new(bus, provider, config, test_todo_repo(), None)
-            .await
-            .unwrap(),
+        AgentLoop::new(
+            bus,
+            provider,
+            config,
+            test_todo_repo(),
+            None,
+            test_outcome_repo(),
+            test_learning_state_repo(),
+            test_memory_note_repo(),
+        )
+        .await
+        .unwrap(),
     );
 
     let streaming_handle = agent_loop
@@ -341,9 +417,18 @@ async fn test_streaming_emits_error_on_failure() {
         .to_string();
 
     let agent_loop = Arc::new(
-        AgentLoop::new(bus, provider, config, test_todo_repo(), None)
-            .await
-            .unwrap(),
+        AgentLoop::new(
+            bus,
+            provider,
+            config,
+            test_todo_repo(),
+            None,
+            test_outcome_repo(),
+            test_learning_state_repo(),
+            test_memory_note_repo(),
+        )
+        .await
+        .unwrap(),
     );
 
     let streaming_handle = agent_loop

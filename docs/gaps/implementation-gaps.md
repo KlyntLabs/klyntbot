@@ -7,12 +7,12 @@
 
 ## Executive Summary
 
-Klyntbot is a 105K-line Rust AI agent framework with 17 crates, 15+ tools, and 6 chat platform integrations. The codebase is architecturally sound with clean dependency layering and no circular dependencies. However, the ongoing JSONL-to-PostgreSQL migration is approximately **80% complete**, leaving several subsystems in a fragile dual-mode state. The gap report identifies **52 gaps** across 6 severity tiers (**12 resolved** as of 2026-02-19).
+Klyntbot is a 105K-line Rust AI agent framework with 17 crates, 15+ tools, and 6 chat platform integrations. The codebase is architecturally sound with clean dependency layering and no circular dependencies. However, the ongoing JSONL-to-PostgreSQL migration is approximately **80% complete**, leaving several subsystems in a fragile dual-mode state. The gap report identifies **52 gaps** across 6 severity tiers (**18 resolved** as of 2026-02-19).
 
 **Top 3 systemic issues:**
 1. **JSONL/SQL dual-mode persistence** — 6+ subsystems maintain parallel storage backends, doubling maintenance burden and creating behavior divergence
 2. ~~**Zero SQL integration test coverage**~~ — **RESOLVED**: 90+ SQL integration tests added across 12 repo modules
-3. **AgentLoop god object** — 2,357-line file with ~30 fields, ~450-line constructor, and two parallel processing paths
+3. ~~**AgentLoop god object**~~ — **RESOLVED**: Refactored to 1,144 lines (51% reduction), legacy path removed, pipeline-only processing
 
 ---
 
@@ -35,12 +35,12 @@ Klyntbot is a 105K-line Rust AI agent framework with 17 crates, 15+ tools, and 6
 | ~~G-11~~ | ~~P1~~ | ~~Scheduling~~ | ~~CronSchedule timezone field parsed but silently ignored~~ **RESOLVED 2026-02-19** |
 | ~~G-12~~ | ~~P1~~ | ~~Config~~ | ~~7 legacy `*_store_path()` methods still exposed~~ **RESOLVED 2026-02-19** |
 | **P2 — Medium (quality/maintainability)** |
-| G-13 | P2 | Agent | AgentLoop is 2,357 lines — god object pattern |
-| G-14 | P2 | Agent | Legacy vs Pipeline (v2) dual processing path |
-| G-15 | P2 | Agent | Two plan executors maintained simultaneously |
-| G-16 | P2 | Agent | File-based memory (daily notes + MEMORY.md) not in PostgreSQL |
-| G-17 | P2 | Agent | File-based learning stores (outcomes, thresholds, decision log) |
-| G-18 | P2 | Agent | ToolConfidenceMap exists but not wired into ConfidenceEvaluator |
+| ~~G-13~~ | ~~P2~~ | ~~Agent~~ | ~~AgentLoop is 2,357 lines — god object pattern~~ **RESOLVED 2026-02-19** |
+| ~~G-14~~ | ~~P2~~ | ~~Agent~~ | ~~Legacy vs Pipeline (v2) dual processing path~~ **RESOLVED 2026-02-19** |
+| ~~G-15~~ | ~~P2~~ | ~~Agent~~ | ~~Two plan executors maintained simultaneously~~ **RESOLVED 2026-02-19** |
+| ~~G-16~~ | ~~P2~~ | ~~Agent~~ | ~~File-based memory (daily notes + MEMORY.md) not in PostgreSQL~~ **RESOLVED 2026-02-19** |
+| ~~G-17~~ | ~~P2~~ | ~~Agent~~ | ~~File-based learning stores (outcomes, thresholds, decision log)~~ **RESOLVED 2026-02-19** |
+| ~~G-18~~ | ~~P2~~ | ~~Agent~~ | ~~ToolConfidenceMap exists but not wired into ConfidenceEvaluator~~ **RESOLVED 2026-02-19** |
 | G-19 | P2 | Agent | StrategyTracker computes stats but doesn't feed back into classification |
 | G-20 | P2 | Provider | Session stores string roles, losing tool_calls/multipart/reasoning |
 | G-21 | P2 | Provider | ProviderManager streaming has no retry logic |
@@ -208,35 +208,52 @@ Audited all 7 `*_store_path()` methods. 3 methods with zero callers fully remove
 
 ### P2 — Medium
 
-#### G-13: AgentLoop God Object
-**Source**: `04-agent-core.md` §19.1 #1
-2,357 lines, ~30 fields, ~450-line constructor. Hard to test, reason about, or modify safely.
+#### ~~G-13: AgentLoop God Object~~ — RESOLVED
 
-**Fix**: Split into focused subcomponents (MessageProcessor, PlanRunner, ToolExecutor, SessionHandler).
+**Status**: **Resolved** on 2026-02-19
+**Implementation**: `crates/agent/src/agent_loop.rs` (2,355→1,144 lines, 51% reduction), `crates/agent/src/plan_runner.rs` (new, 433 lines)
 
-#### G-14: Legacy vs Pipeline Dual Processing Path
-**Source**: `04-agent-core.md` §19.1 #2
-Both `run_agent_loop()` (legacy) and `pipeline.process_message()` (v2) are maintained simultaneously. Unclear which is active in production.
+Refactored the AgentLoop god object: removed legacy processing path (`run_agent_loop()`, `run_standard_iteration()`, `run_streaming_iteration()`), extracted plan execution into `plan_runner.rs` as `impl AgentLoop` extension, made `pipeline` field non-optional (`Arc<AgentPipeline>`), removed `decision_logger` field. AgentLoop struct reduced from 19 to 17 fields. All processing now routes through the 5-stage pipeline (classify→assemble→execute→validate→record). 229/229 agent tests pass, zero clippy warnings.
 
-**Fix**: Choose one path, deprecate the other.
+#### ~~G-14: Legacy vs Pipeline Dual Processing Path~~ — RESOLVED
 
-#### G-15: Two Plan Executors
-**Source**: `04-agent-core.md` §19.2 #6
-`plan_executor.rs` (legacy, single-cycle, `{}` args) and `execution/plan_execute.rs` (v2, multi-cycle, reflection) coexist.
+**Status**: **Resolved** on 2026-02-19
+**Implementation**: `crates/agent/src/agent_loop.rs` — legacy path fully removed
 
-**Fix**: Migrate to v2 engine exclusively.
+Removed the legacy `run_agent_loop()` iteration loop (20-50 iterations per request) and all supporting methods. The `pipeline` field changed from `Option<Arc<AgentPipeline>>` to `Arc<AgentPipeline>` (always present). All message processing now routes through the v2 pipeline: Orchestrator (heuristic + LLM classification) → ContextEngine → EngineDispatch (Direct/ReactPlus/PlanExecute with escalation) → ResponseValidator → CostTracker.
 
-#### G-16: File-Based Memory Not in PostgreSQL
-**Source**: `04-agent-core.md` §19.2 #8
-Daily notes (`workspace/memory/YYYY-MM-DD.md`) and `MEMORY.md` live on the filesystem, inconsistent with the "all state in PostgreSQL" goal.
+#### ~~G-15: Two Plan Executors~~ — RESOLVED
 
-#### G-17: File-Based Learning Stores
-**Source**: `04-agent-core.md` §19.2 #9
-OutcomeStore JSONL, AdaptiveThresholds file, DecisionLogger JSONL all persist to filesystem.
+**Status**: **Resolved** on 2026-02-19
+**Implementation**: `crates/agent/src/plan_executor.rs` (rewritten as free functions), `crates/agent/src/execution/plan_execute.rs` (deleted)
 
-#### G-18: ToolConfidenceMap Not Wired
-**Source**: `04-agent-core.md` §19.3 #13
-Struct exists for per-tool confidence thresholds but not integrated into `ConfidenceEvaluator` decision logic.
+Consolidated into a single plan executor in `plan_executor.rs` using free functions (`run_step`, `build_step_context`, `regenerate_from`). Uses `ExecutionCore` for multi-cycle execution (MAX_CYCLES_PER_STEP=5), preserving backtracking from the legacy executor and multi-cycle support from the v2 engine. Dormant `execution/plan_execute.rs` (721 lines) deleted entirely. `StepExecutionResult` now includes `tool_name: Option<String>` for outcome recording.
+
+#### ~~G-16: File-Based Memory Not in PostgreSQL~~ — RESOLVED
+
+**Status**: **Resolved** on 2026-02-19
+**Implementation**: `crates/storage/src/repos/memory_note.rs` (new), `crates/storage/migrations/20260219000000_memory_and_learning_state.sql`, `crates/agent/src/memory.rs` (rewritten SQL-only)
+
+Created `memory_notes` SQL table (TEXT PK `note_key`, TEXT `content`, timestamps) and `MemoryNoteRepo` with methods: `get()`, `upsert()`, `append()` (SQL-level content concatenation), `list_recent()`, `list_keys()`, `search()` (ILIKE with proper escaping), `delete()`. `MemoryStore` rewritten as SQL-only wrapper (135 lines, zero filesystem code). Long-term memory uses `LONG_TERM` key. Daily notes use `YYYY-MM-DD` keys.
+
+#### ~~G-17: File-Based Learning Stores~~ — RESOLVED
+
+**Status**: **Resolved** on 2026-02-19
+**Implementation**: `crates/storage/src/repos/learning_state.rs` (new), `crates/storage/src/repos/decision_log.rs` (new), `crates/storage/migrations/20260219000001_decision_log.sql`, multiple agent files rewritten SQL-only
+
+Three stores migrated to PostgreSQL:
+1. **OutcomeStore**: Removed JSONL journal, file I/O, `ensure_loaded()`/`compact()`. Now wraps `OutcomeRepo` directly (SQL-only). Added `new_in_memory()` for tests.
+2. **AdaptiveThresholds**: Removed file-based `load()`/`save()`, `state_path`. Now uses `LearningStateRepo` exclusively via JSONB key-value store (`adaptive_thresholds` key).
+3. **DecisionLogger**: Removed file-based JSONL logging. New `decision_log` SQL table with `DecisionLogRepo` (create, list_recent, list_by_date_range). JSONB columns for `tool_names` and `assessment`.
+
+Deprecated config methods `learning_outcomes_path()` and `learning_state_path()` deleted. Net -2,385 lines of dead code removed across the migration.
+
+#### ~~G-18: ToolConfidenceMap Not Wired~~ — RESOLVED
+
+**Status**: **Resolved** on 2026-02-19
+**Implementation**: `crates/agent/src/confidence/evaluator.rs`, `crates/config/src/schema/core.rs`
+
+Integrated `ToolConfidenceMap` into `ConfidenceEvaluator`: added `tool_map: Option<ToolConfidenceMap>` field, `new_with_map()` constructor, and `decide_for_tool(assessment, tool_name)` method that uses per-tool thresholds with fallback to global. Added `tool_overrides: HashMap<String, f32>` to `ConfidenceConfig`. Agent loop constructor loads overrides from config and creates evaluator with map when overrides exist. 4 new tests covering per-tool threshold selection, global fallback, and boundary behavior.
 
 #### G-19: StrategyTracker No Feedback Loop
 **Source**: `04-agent-core.md` §19.3 #14
@@ -408,7 +425,7 @@ Channels set `running = false` but don't send WebSocket close frames.
 
 ### Phase 1: Correctness & Stability (Weeks 1-2)
 1. ~~**G-01**: Add missing fields to `storage::TodoPatch`~~ ✅ Done 2026-02-19
-2. ~~**G-03/G-15**: Choose v2 plan executor, deprecate legacy~~ ✅ G-03 done 2026-02-19 (context-enriched prompts; G-15 remains open)
+2. ~~**G-03/G-15**: Choose v2 plan executor, deprecate legacy~~ ✅ G-03 done 2026-02-19, G-15 done 2026-02-19 (consolidated into single executor with multi-cycle support)
 3. ~~**G-04**: Set up shared SQL test fixture; add tests for critical repos~~ ✅ Done 2026-02-19
 4. ~~**G-11**: Wire timezone into cron schedule computation~~ ✅ Done 2026-02-19
 
@@ -416,7 +433,7 @@ Channels set `running = false` but don't send WebSocket close frames.
 5. ~~**G-05**: Build `klyntbot migrate` CLI command~~ ✅ Done 2026-02-19
 6. ~~**G-06**: Remove legacy JSONL stores (todo_store, project_store, embedding_store)~~ ✅ Done 2026-02-19
 7. ~~**G-12**: Audit and remove legacy store path methods~~ ✅ Done 2026-02-19
-8. **G-16/G-17**: Migrate memory store and learning stores to PostgreSQL
+8. ~~**G-16/G-17**: Migrate memory store and learning stores to PostgreSQL~~ ✅ Done 2026-02-19
 9. **G-30**: Unify calendar sync state to `from_repo()` pattern
 
 ### Phase 3: Provider & Context Quality (Weeks 5-6)
@@ -430,7 +447,7 @@ Channels set `running = false` but don't send WebSocket close frames.
 15. ~~**G-09**: Wire DashboardServer into serve.rs~~ ✅ Done 2026-02-19
 16. **G-26**: Migrate dashboard to use SQL repos
 17. **G-27/G-28/G-29**: Implement dashboard stub resolvers
-18. **G-13/G-14**: Refactor AgentLoop into focused subcomponents
+18. ~~**G-13/G-14**: Refactor AgentLoop into focused subcomponents~~ ✅ Done 2026-02-19
 
 ### Phase 5: Polish & Hardening (Ongoing)
 19. ~~**G-10**: Add configurable conflict resolution strategies~~ ✅ Done 2026-02-19

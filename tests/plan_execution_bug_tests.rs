@@ -71,8 +71,13 @@ async fn agent_with_plan_store(
 ) -> AgentLoop {
     let config = make_config(temp_dir);
     let bus = Arc::new(MessageBus::new(10));
-    let pool = klyntbot::storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
-    let todo_repo = klyntbot::storage::TodoRepo::new(pool.inner().clone());
+    let pool =
+        klyntbot::storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
+    let pg = pool.inner().clone();
+    let todo_repo = klyntbot::storage::TodoRepo::new(pg.clone());
+    let outcome_repo = klyntbot::storage::OutcomeRepo::new(pg.clone());
+    let learning_state_repo = klyntbot::storage::LearningStateRepo::new(pg.clone());
+    let memory_note_repo = klyntbot::storage::MemoryNoteRepo::new(pg);
     let goal_store = Some(Arc::new(RwLock::new(klyntbot::goal::GoalStore::new(
         config.goal_store_path(),
     ))));
@@ -86,6 +91,9 @@ async fn agent_with_plan_store(
         goal_store,
         Some(plan_store),
         None,
+        outcome_repo,
+        learning_state_repo,
+        memory_note_repo,
     )
     .await
     .unwrap()

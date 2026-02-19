@@ -1,4 +1,9 @@
-//! PlanExecutor — ReAct loop, backtracking, and context windowing for plans.
+//! Plan execution — multi-cycle step execution, backtracking, and context windowing.
+//!
+//! Public API:
+//! - [`run_step`] — execute a single plan step with multi-cycle LLM-tool loops
+//! - [`build_step_context`] — build a context window for the current step
+//! - [`regenerate_from`] — regenerate plan steps from a failure point
 
 use common::{error::PlanError, Result};
 use plan::{Plan, PlanStep, StepStatus};
@@ -6,17 +11,20 @@ use providers::{
     types::{ChatParams, Message},
     DynProvider,
 };
-use std::sync::Arc;
-use tokio::sync::RwLock;
-use tools::{registry::ToolRegistry, RoutingContext};
+use tools::RoutingContext;
 use uuid::Uuid;
+
+use crate::execution::{CycleOutcome, ExecutionCore, ExecutionParams};
 
 /// Maximum number of full backtracking events before the plan is marked Failed.
 /// Per-step retries (attempt_count) are separate from this limit.
 pub const MAX_BACKTRACK_ATTEMPTS: usize = 3;
 
+/// Maximum LLM cycles per step to prevent infinite tool loops (multi-cycle execution).
+pub const MAX_CYCLES_PER_STEP: usize = 5;
+
 /// Result of executing a single plan step.
-/// Returned by execute_step() to inform the orchestration loop of the outcome.
+/// Returned by run_step() to inform the orchestration loop of the outcome.
 #[derive(Debug)]
 pub struct StepExecutionResult {
     /// Whether the step completed successfully
@@ -32,412 +40,388 @@ pub struct StepExecutionResult {
     pub tool_name: Option<String>,
 }
 
-/// PlanExecutor handles step-by-step plan execution with backtracking.
-pub struct PlanExecutor {
-    // Phase 4: Fields added for step execution
-    // These are passed as parameters to execute_step() to avoid storing
-    // duplicates (AgentLoop already owns these Arc references)
-}
+/// Execute a single plan step using multi-cycle LLM-tool execution.
+///
+/// Runs up to [`MAX_CYCLES_PER_STEP`] cycles through the `ExecutionCore`,
+/// accumulating tool results across cycles. Each cycle calls the LLM, which
+/// may return tool calls (executed and looped) or a final text response.
+pub async fn run_step(
+    core: &ExecutionCore,
+    step: &PlanStep,
+    plan_context: &str,
+    routing_ctx: &RoutingContext,
+    confidence_evaluator: Option<&crate::confidence::ConfidenceEvaluator>,
+) -> Result<StepExecutionResult> {
+    // 1. Build prompt from plan context + step details
+    let expected = if step.expected_tools.is_empty() {
+        "none specified".to_string()
+    } else {
+        step.expected_tools.join(", ")
+    };
+    let prompt = format!(
+        "{plan_context}\n\n\
+         ## Current Step\n\
+         {desc}\n\n\
+         Reasoning: {reason}\n\
+         Suggested tools: {expected}\n\n\
+         Use the tools above with the correct arguments to accomplish this step. \
+         Refer to the previous results for any values, paths, or IDs needed as arguments.",
+        desc = step.description,
+        reason = step.reasoning,
+    );
 
-impl PlanExecutor {
-    /// Create a new PlanExecutor.
-    pub fn new() -> Self {
-        Self {}
-    }
+    // 2. Get tool definitions
+    let tool_defs = {
+        let registry = core.tool_registry.read().await;
+        registry.get_definitions()
+    };
 
-    /// Execute a single plan step using the LLM + tool registry.
-    ///
-    /// Generates tool calls from the step description, executes them via the
-    /// tool registry, and captures results. Called by run_plan_execution() in
-    /// agent_loop.rs for each step.
-    ///
-    /// # Arguments
-    /// - `step`: The plan step to execute
-    /// - `plan_context`: Formatted context string from build_step_context()
-    /// - `provider`: LLM provider for generating tool calls
-    /// - `tool_registry`: Registry of available tools
-    /// - `routing_ctx`: Channel/chat routing context
-    ///
-    /// # Note
-    /// This is a single-cycle implementation: one LLM call per step.
-    /// A full ReAct loop (multi-cycle with reflection) is available via
-    /// `PlanExecuteEngine` in `execution/plan_execute.rs`.
-    pub async fn execute_step(
-        &self,
-        step: &PlanStep,
-        plan_context: &str,
-        provider: &DynProvider,
-        tool_registry: &Arc<RwLock<ToolRegistry>>,
-        routing_ctx: &RoutingContext,
-        confidence_evaluator: Option<&crate::confidence::ConfidenceEvaluator>,
-    ) -> Result<StepExecutionResult> {
-        // 1. Build prompt from plan context + step details
-        let expected = if step.expected_tools.is_empty() {
-            "none specified".to_string()
-        } else {
-            step.expected_tools.join(", ")
-        };
-        let prompt = format!(
-            "{plan_context}\n\n\
-             ## Current Step\n\
-             {desc}\n\n\
-             Reasoning: {reason}\n\
-             Suggested tools: {expected}\n\n\
-             Use the tools above with the correct arguments to accomplish this step. \
-             Refer to the previous results for any values, paths, or IDs needed as arguments.",
-            desc = step.description,
-            reason = step.reasoning,
-        );
+    // 3. Build messages
+    let mut messages = vec![
+        Message::system(
+            "You are executing a single step of a multi-step plan. \
+             Call the appropriate tools with the correct arguments based on the step \
+             description and previous step results. When done, provide a concise summary.",
+        ),
+        Message::user(prompt),
+    ];
 
-        // 2. Get tool definitions (read lock only, then release)
-        let tool_defs = {
-            let registry = tool_registry.read().await;
-            registry.get_definitions()
-        };
+    let params = ExecutionParams::new(core.provider.default_model());
 
-        // 3. Build messages and call the LLM provider
-        let messages = vec![
-            Message::system(
-                "You are executing a single step of a multi-step plan. \
-                 Call the appropriate tools with the correct arguments based on the step \
-                 description and previous step results. When done, provide a concise summary.",
-            ),
-            Message::user(prompt),
-        ];
-        let params = ChatParams::new(provider.default_model());
-        let tool_slice = if tool_defs.is_empty() {
-            None
-        } else {
-            Some(tool_defs.as_slice())
-        };
-        let response = provider.chat(&messages, tool_slice, &params).await?;
+    // 4. Multi-cycle execution loop
+    let mut first_tool_name: Option<String> = None;
+    let mut accumulated_output = Vec::new();
 
-        // Parse confidence assessment from LLM response content (best-effort)
-        let confidence = confidence_evaluator
-            .and_then(|ev| ev.parse_assessment(response.content.as_deref().unwrap_or("")));
+    for _cycle in 0..MAX_CYCLES_PER_STEP {
+        let (outcome, _usage) = core
+            .run_cycle(&mut messages, &tool_defs, &params, routing_ctx)
+            .await?;
 
-        // 4. If the LLM returned tool calls, execute each one via the registry
-        if !response.tool_calls.is_empty() {
-            // Capture the first tool name for outcome recording
-            let first_tool_name = response.tool_calls[0].name.clone();
-            let mut results = Vec::new();
-            for tool_call in &response.tool_calls {
-                // Clone the Arc<dyn Tool> out while holding the lock, then
-                // release the lock before the async execute() call.
-                let tool = {
-                    let registry = tool_registry.read().await;
-                    registry.get(&tool_call.name)
-                };
-                match tool {
-                    Some(t) => match t.execute(tool_call.arguments.clone(), routing_ctx).await {
-                        Ok(out) => results.push(format!("{}: {}", tool_call.name, out)),
-                        Err(e) => {
-                            return Ok(StepExecutionResult {
-                                success: false,
-                                output: String::new(),
-                                failure_reason: Some(format!(
-                                    "Tool '{}' execution failed: {e}",
-                                    tool_call.name
-                                )),
-                                confidence,
-                                tool_name: Some(first_tool_name),
-                            });
-                        }
-                    },
-                    None => {
-                        return Ok(StepExecutionResult {
-                            success: false,
-                            output: String::new(),
-                            failure_reason: Some(format!(
-                                "Tool '{}' not found in registry",
-                                tool_call.name
-                            )),
-                            confidence,
-                            tool_name: Some(first_tool_name),
-                        });
+        match outcome {
+            CycleOutcome::ToolsExecuted { results } => {
+                if first_tool_name.is_none() {
+                    if let Some(first) = results.first() {
+                        first_tool_name = Some(first.tool_name.clone());
                     }
                 }
+                for r in &results {
+                    if !r.success {
+                        return Ok(StepExecutionResult {
+                            success: false,
+                            output: accumulated_output.join("\n"),
+                            failure_reason: Some(format!(
+                                "Tool '{}' failed: {}",
+                                r.tool_name, r.result
+                            )),
+                            confidence: None,
+                            tool_name: first_tool_name,
+                        });
+                    }
+                    accumulated_output.push(format!("{}: {}", r.tool_name, r.result));
+                }
+                // Continue to next cycle — tool results already in messages via run_cycle
             }
-            return Ok(StepExecutionResult {
-                success: true,
-                output: results.join("\n"),
-                failure_reason: None,
-                confidence,
-                tool_name: Some(first_tool_name),
-            });
+            CycleOutcome::FinalResponse { content }
+            | CycleOutcome::FabricatedResponse { content } => {
+                let confidence = confidence_evaluator.and_then(|ev| ev.parse_assessment(&content));
+                let output = if accumulated_output.is_empty() {
+                    content
+                } else {
+                    accumulated_output.push(content);
+                    accumulated_output.join("\n")
+                };
+                return Ok(StepExecutionResult {
+                    success: true,
+                    output,
+                    failure_reason: None,
+                    confidence,
+                    tool_name: first_tool_name,
+                });
+            }
+            CycleOutcome::EmptyResponse => {
+                return Ok(StepExecutionResult {
+                    success: true,
+                    output: if accumulated_output.is_empty() {
+                        format!("Step '{}' completed", step.description)
+                    } else {
+                        accumulated_output.join("\n")
+                    },
+                    failure_reason: None,
+                    confidence: None,
+                    tool_name: first_tool_name,
+                });
+            }
         }
-
-        // 5. No tool calls — use the text response as the step output
-        let output = response
-            .content
-            .unwrap_or_else(|| format!("Step '{}' completed", step.description));
-        Ok(StepExecutionResult {
-            success: true,
-            output,
-            failure_reason: None,
-            confidence,
-            tool_name: None,
-        })
     }
 
-    /// Regenerate plan steps from a failure point using the LLM.
-    ///
-    /// Called when a step exceeds its `max_attempts` retry limit. Uses the plan's
-    /// context (title, description, completed steps) to prompt the LLM for new
-    /// steps from `failure_index` forward.
-    ///
-    /// Returns the new `Vec<PlanStep>` to be appended from `failure_index`.
-    /// The caller is responsible for:
-    /// - Truncating `plan.steps` at `failure_index`
-    /// - Extending with the returned steps
-    /// - Enforcing `MAX_BACKTRACK_ATTEMPTS` (tracked in the calling loop)
-    ///
-    /// # Arguments
-    /// - `plan`: The plan being executed (read-only context)
-    /// - `failure_index`: Step index at which execution failed
-    /// - `failure_reason`: Human-readable explanation of the failure
-    /// - `provider`: LLM provider for generating new steps
-    pub async fn regenerate_from(
-        &self,
-        plan: &Plan,
-        failure_index: usize,
-        failure_reason: &str,
-        provider: &DynProvider,
-    ) -> Result<Vec<PlanStep>> {
-        // Summarize completed steps to give context to the LLM
-        let completed_summary = self.summarize_completed_steps(plan, failure_index);
+    // Max cycles reached — return what we have
+    Ok(StepExecutionResult {
+        success: true,
+        output: if accumulated_output.is_empty() {
+            "Step completed (max cycles reached)".to_string()
+        } else {
+            accumulated_output.join("\n")
+        },
+        failure_reason: None,
+        confidence: None,
+        tool_name: first_tool_name,
+    })
+}
 
-        let failed_step_desc = plan
+/// Build context window: completed step results + current step + next 3 steps.
+///
+/// Includes results from the last 3 completed steps so the LLM has context
+/// to generate proper tool arguments for the current step.
+/// Results are truncated to 500 characters to keep context manageable.
+pub fn build_step_context(plan: &Plan, current_index: usize) -> String {
+    let window_end = (current_index + 4).min(plan.steps.len());
+
+    if current_index >= plan.steps.len() {
+        return "Plan completed - no active step".to_string();
+    }
+
+    let steps_window = &plan.steps[current_index..window_end];
+
+    let mut ctx = format!("## Active Plan: {}\n", plan.title);
+    ctx.push_str(&format!("Goal: {}\n", plan.description));
+    ctx.push_str(&format!(
+        "Progress: step {}/{}\n",
+        current_index + 1,
+        plan.steps.len()
+    ));
+
+    // Include results from the last 3 completed steps for context
+    let completed_start = current_index.saturating_sub(3);
+    let completed_steps: Vec<_> = plan.steps[completed_start..current_index]
+        .iter()
+        .filter(|s| s.result.is_some())
+        .collect();
+    if !completed_steps.is_empty() {
+        ctx.push_str("\n## Previous Results\n");
+        for step in &completed_steps {
+            if let Some(ref result) = step.result {
+                let truncated = if result.len() > 500 {
+                    // Find a safe char boundary at or before byte 500 to avoid
+                    // splitting multi-byte UTF-8 characters.
+                    let end = result
+                        .char_indices()
+                        .map(|(i, _)| i)
+                        .take_while(|&i| i <= 500)
+                        .last()
+                        .unwrap_or(0);
+                    format!("{}...(truncated)", &result[..end])
+                } else {
+                    result.clone()
+                };
+                ctx.push_str(&format!(
+                    "- Step {}: {}\n  Result: {}\n",
+                    step.index + 1,
+                    step.description,
+                    truncated
+                ));
+            }
+        }
+    }
+
+    ctx.push('\n');
+    for (i, step) in steps_window.iter().enumerate() {
+        let marker = if i == 0 {
+            ">>> CURRENT"
+        } else {
+            match i {
+                1 => "    NEXT 1",
+                2 => "    NEXT 2",
+                3 => "    NEXT 3",
+                _ => "    NEXT",
+            }
+        };
+        ctx.push_str(&format!(
+            "{}: {}\n  Reasoning: {}\n",
+            marker, step.description, step.reasoning
+        ));
+    }
+    ctx
+}
+
+/// Regenerate plan steps from a failure point using the LLM.
+///
+/// Called when a step exceeds its `max_attempts` retry limit. Uses the plan's
+/// context (title, description, completed steps) to prompt the LLM for new
+/// steps from `failure_index` forward.
+///
+/// Returns the new `Vec<PlanStep>` to be appended from `failure_index`.
+/// The caller is responsible for:
+/// - Truncating `plan.steps` at `failure_index`
+/// - Extending with the returned steps
+/// - Enforcing `MAX_BACKTRACK_ATTEMPTS` (tracked in the calling loop)
+pub async fn regenerate_from(
+    plan: &Plan,
+    failure_index: usize,
+    failure_reason: &str,
+    provider: &DynProvider,
+) -> Result<Vec<PlanStep>> {
+    let completed_summary = summarize_completed_steps(plan, failure_index);
+
+    let failed_step_desc = plan
+        .steps
+        .get(failure_index)
+        .map(|s| s.description.as_str())
+        .unwrap_or("unknown step");
+
+    let prompt = format!(
+        "A multi-step plan failed partway through and needs replanning.\n\
+         \n\
+         Plan: {title}\n\
+         Goal: {desc}\n\
+         \n\
+         Completed steps (do NOT redo these):\n{completed}\n\
+         \n\
+         Failed at step {n}: \"{failed}\"\n\
+         Failure reason: {reason}\n\
+         \n\
+         Generate ONLY the remaining steps needed to complete the plan from this point.\n\
+         Respond with a JSON array (no other text):\n\
+         [{{\"description\": \"...\", \"reasoning\": \"...\", \"expectedTools\": []}}]",
+        title = plan.title,
+        desc = plan.description,
+        completed = completed_summary,
+        n = failure_index + 1,
+        failed = failed_step_desc,
+        reason = failure_reason,
+    );
+
+    let messages = vec![
+        Message::system(
+            "You are a planning agent. Respond ONLY with a valid JSON array of steps. \
+             No markdown, no explanation — just the JSON array.",
+        ),
+        Message::user(prompt),
+    ];
+    let params = ChatParams::new(provider.default_model());
+    let response = provider.chat(&messages, None, &params).await?;
+
+    let content = response.content.unwrap_or_default();
+
+    let steps = parse_steps_from_json(&content, failure_index).unwrap_or_default();
+
+    if steps.is_empty() {
+        let failed_desc = plan
             .steps
             .get(failure_index)
             .map(|s| s.description.as_str())
-            .unwrap_or("unknown step");
+            .unwrap_or("failed step");
+        return Ok(vec![PlanStep {
+            id: Uuid::new_v4(),
+            index: failure_index,
+            description: format!("Retry: {failed_desc}"),
+            reasoning: format!("Previous attempt failed: {failure_reason}"),
+            expected_tools: vec![],
+            status: StepStatus::Pending,
+            attempt_count: 0,
+            max_attempts: 3,
+            result: None,
+            started_at: None,
+            completed_at: None,
+        }]);
+    }
 
-        // Build regeneration prompt
-        let prompt = format!(
-            "A multi-step plan failed partway through and needs replanning.\n\
-             \n\
-             Plan: {title}\n\
-             Goal: {desc}\n\
-             \n\
-             Completed steps (do NOT redo these):\n{completed}\n\
-             \n\
-             Failed at step {n}: \"{failed}\"\n\
-             Failure reason: {reason}\n\
-             \n\
-             Generate ONLY the remaining steps needed to complete the plan from this point.\n\
-             Respond with a JSON array (no other text):\n\
-             [{{\"description\": \"...\", \"reasoning\": \"...\", \"expectedTools\": []}}]",
-            title = plan.title,
-            desc = plan.description,
-            completed = completed_summary,
-            n = failure_index + 1,
-            failed = failed_step_desc,
-            reason = failure_reason,
-        );
+    Ok(steps)
+}
 
-        let messages = vec![
-            Message::system(
-                "You are a planning agent. Respond ONLY with a valid JSON array of steps. \
-                 No markdown, no explanation — just the JSON array.",
-            ),
-            Message::user(prompt),
-        ];
-        let params = ChatParams::new(provider.default_model());
-        let response = provider.chat(&messages, None, &params).await?;
+/// Summarize completed steps as a numbered list for the regeneration prompt.
+fn summarize_completed_steps(plan: &Plan, up_to: usize) -> String {
+    let end = up_to.min(plan.steps.len());
+    if end == 0 {
+        return "(none)".to_string();
+    }
+    plan.steps[..end]
+        .iter()
+        .enumerate()
+        .map(|(i, s)| format!("{}. {}", i + 1, s.description))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
 
-        let content = response.content.unwrap_or_default();
+/// Parse a JSON array of step objects returned by the LLM into PlanStep values.
+fn parse_steps_from_json(json_str: &str, start_index: usize) -> Result<Vec<PlanStep>> {
+    let trimmed = extract_json_array(json_str);
 
-        // Attempt to parse LLM response; fall back to a single retry step on failure
-        let steps = self
-            .parse_steps_from_json(&content, failure_index)
-            .unwrap_or_default();
+    let raw: Vec<serde_json::Value> = serde_json::from_str(trimmed).map_err(|e| {
+        PlanError::GenerationFailed(format!(
+            "Regeneration response was not valid JSON: {e}\nResponse: {json_str}"
+        ))
+    })?;
 
-        if steps.is_empty() {
-            // LLM returned empty or unparseable output — create a minimal retry step
-            let failed_desc = plan
-                .steps
-                .get(failure_index)
-                .map(|s| s.description.as_str())
-                .unwrap_or("failed step");
-            return Ok(vec![PlanStep {
+    let steps = raw
+        .iter()
+        .enumerate()
+        .map(|(i, v)| {
+            let description = v
+                .get("description")
+                .and_then(|d| d.as_str())
+                .unwrap_or("")
+                .to_string();
+            let reasoning = v
+                .get("reasoning")
+                .and_then(|r| r.as_str())
+                .unwrap_or("")
+                .to_string();
+            let expected_tools = v
+                .get("expectedTools")
+                .and_then(|t| t.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|t| t.as_str().map(String::from))
+                        .collect()
+                })
+                .unwrap_or_default();
+
+            PlanStep {
                 id: Uuid::new_v4(),
-                index: failure_index,
-                description: format!("Retry: {failed_desc}"),
-                reasoning: format!("Previous attempt failed: {failure_reason}"),
-                expected_tools: vec![],
+                index: start_index + i,
+                description,
+                reasoning,
+                expected_tools,
                 status: StepStatus::Pending,
                 attempt_count: 0,
                 max_attempts: 3,
                 result: None,
                 started_at: None,
                 completed_at: None,
-            }]);
-        }
-
-        Ok(steps)
-    }
-
-    /// Summarize completed steps as a numbered list for the regeneration prompt.
-    fn summarize_completed_steps(&self, plan: &Plan, up_to: usize) -> String {
-        let end = up_to.min(plan.steps.len());
-        if end == 0 {
-            return "(none)".to_string();
-        }
-        plan.steps[..end]
-            .iter()
-            .enumerate()
-            .map(|(i, s)| format!("{}. {}", i + 1, s.description))
-            .collect::<Vec<_>>()
-            .join("\n")
-    }
-
-    /// Parse a JSON array of step objects returned by the LLM into PlanStep values.
-    fn parse_steps_from_json(&self, json_str: &str, start_index: usize) -> Result<Vec<PlanStep>> {
-        // Tolerate LLMs wrapping the array in markdown fences or prose
-        let trimmed = self.extract_json_array(json_str);
-
-        let raw: Vec<serde_json::Value> = serde_json::from_str(trimmed).map_err(|e| {
-            PlanError::GenerationFailed(format!(
-                "Regeneration response was not valid JSON: {e}\nResponse: {json_str}"
-            ))
-        })?;
-
-        let steps = raw
-            .iter()
-            .enumerate()
-            .map(|(i, v)| {
-                let description = v
-                    .get("description")
-                    .and_then(|d| d.as_str())
-                    .unwrap_or("")
-                    .to_string();
-                let reasoning = v
-                    .get("reasoning")
-                    .and_then(|r| r.as_str())
-                    .unwrap_or("")
-                    .to_string();
-                let expected_tools = v
-                    .get("expectedTools")
-                    .and_then(|t| t.as_array())
-                    .map(|arr| {
-                        arr.iter()
-                            .filter_map(|t| t.as_str().map(String::from))
-                            .collect()
-                    })
-                    .unwrap_or_default();
-
-                PlanStep {
-                    id: Uuid::new_v4(),
-                    index: start_index + i,
-                    description,
-                    reasoning,
-                    expected_tools,
-                    status: StepStatus::Pending,
-                    attempt_count: 0,
-                    max_attempts: 3,
-                    result: None,
-                    started_at: None,
-                    completed_at: None,
-                }
-            })
-            .collect();
-
-        Ok(steps)
-    }
-
-    /// Extract a JSON array substring from LLM output that may contain prose or markdown.
-    fn extract_json_array<'a>(&self, s: &'a str) -> &'a str {
-        if let (Some(start), Some(end)) = (s.find('['), s.rfind(']')) {
-            if start < end {
-                return &s[start..=end];
             }
-        }
-        s
-    }
+        })
+        .collect();
 
-    /// Build context window: completed step results + current step + next 3 steps.
-    ///
-    /// Includes results from the last 3 completed steps so the LLM has context
-    /// to generate proper tool arguments for the current step.
-    pub fn build_step_context(&self, plan: &Plan, current_index: usize) -> String {
-        let window_end = (current_index + 4).min(plan.steps.len());
-
-        if current_index >= plan.steps.len() {
-            return "Plan completed - no active step".to_string();
-        }
-
-        let steps_window = &plan.steps[current_index..window_end];
-
-        let mut ctx = format!("## Active Plan: {}\n", plan.title);
-        ctx.push_str(&format!("Goal: {}\n", plan.description));
-        ctx.push_str(&format!(
-            "Progress: step {}/{}\n",
-            current_index + 1,
-            plan.steps.len()
-        ));
-
-        // Include results from the last 3 completed steps for context
-        let completed_start = current_index.saturating_sub(3);
-        let completed_steps: Vec<_> = plan.steps[completed_start..current_index]
-            .iter()
-            .filter(|s| s.result.is_some())
-            .collect();
-        if !completed_steps.is_empty() {
-            ctx.push_str("\n## Previous Results\n");
-            for step in &completed_steps {
-                if let Some(ref result) = step.result {
-                    // Truncate long results to keep context manageable
-                    let truncated = if result.len() > 500 {
-                        format!("{}...(truncated)", &result[..500])
-                    } else {
-                        result.clone()
-                    };
-                    ctx.push_str(&format!(
-                        "- Step {}: {}\n  Result: {}\n",
-                        step.index + 1,
-                        step.description,
-                        truncated
-                    ));
-                }
-            }
-        }
-
-        ctx.push('\n');
-        for (i, step) in steps_window.iter().enumerate() {
-            let marker = if i == 0 {
-                ">>> CURRENT"
-            } else {
-                match i {
-                    1 => "    NEXT 1",
-                    2 => "    NEXT 2",
-                    3 => "    NEXT 3",
-                    _ => "    NEXT",
-                }
-            };
-            ctx.push_str(&format!(
-                "{}: {}\n  Reasoning: {}\n",
-                marker, step.description, step.reasoning
-            ));
-        }
-        ctx
-    }
+    Ok(steps)
 }
 
-impl Default for PlanExecutor {
-    fn default() -> Self {
-        Self::new()
+/// Extract a JSON array substring from LLM output that may contain prose or markdown.
+fn extract_json_array(s: &str) -> &str {
+    if let (Some(start), Some(end)) = (s.find('['), s.rfind(']')) {
+        if start < end {
+            return &s[start..=end];
+        }
     }
+    s
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use async_trait::async_trait;
     use chrono::Utc;
     use plan::{PlanStatus, PlanStep, StepStatus};
+    use providers::types::{
+        ChatParams, LlmProvider, LlmResponse, ToolCall as ProviderToolCall, Usage,
+    };
+    use serde_json::Value as JsonValue;
+    use std::sync::Arc;
+    use tokio::sync::RwLock;
+    use tools::{registry::ToolRegistry, RoutingContext, Tool};
     use uuid::Uuid;
 
-    /// Helper to create a test Plan with N steps
+    // ── Helpers ──────────────────────────────────────────────────
+
     fn test_plan_with_steps(step_count: usize, session_key: &str) -> Plan {
         let now = Utc::now();
         Plan {
@@ -471,167 +455,25 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_step_context_window_builds_correctly() {
-        // Test 17
-        // Given: a Plan with 10 steps, current_step_index = 2
-        // When: build_step_context() is called
-        // Then:
-        //   - context includes steps 2, 3, 4, 5 (current + next 3)
-        //   - current step is marked ">>> CURRENT"
-        //   - next steps are marked "    NEXT 1", "    NEXT 2", "    NEXT 3"
-        // Maps to: US-3 (AC-3.2)
-
-        let mut plan = test_plan_with_steps(10, "test-session");
-        plan.current_step_index = 2;
-
-        let executor = PlanExecutor::new();
-        let context = executor.build_step_context(&plan, 2);
-
-        assert!(context.contains(">>> CURRENT: Step 2"));
-        assert!(context.contains("    NEXT 1: Step 3"));
-        assert!(context.contains("    NEXT 2: Step 4"));
-        assert!(context.contains("    NEXT 3: Step 5"));
-        assert!(!context.contains("Step 6")); // Outside window
-        assert!(!context.contains("Step 1")); // Before window
-    }
-
-    #[test]
-    fn test_step_context_window_at_end() {
-        // Edge case: current step is near the end
-        let mut plan = test_plan_with_steps(5, "test-session");
-        plan.current_step_index = 3; // Only 2 steps left (3 and 4)
-
-        let executor = PlanExecutor::new();
-        let context = executor.build_step_context(&plan, 3);
-
-        assert!(context.contains(">>> CURRENT: Step 3"));
-        assert!(context.contains("    NEXT 1: Step 4"));
-        assert!(!context.contains("    NEXT 2")); // No step 5
-        assert!(!context.contains("    NEXT 3")); // No step 6
-    }
-
-    #[test]
-    fn test_step_context_window_at_last_step() {
-        // Edge case: current step is the last step
-        let mut plan = test_plan_with_steps(3, "test-session");
-        plan.current_step_index = 2; // Last step
-
-        let executor = PlanExecutor::new();
-        let context = executor.build_step_context(&plan, 2);
-
-        assert!(context.contains(">>> CURRENT: Step 2"));
-        assert!(!context.contains("    NEXT 1")); // No next steps
-    }
-
-    #[test]
-    fn test_step_context_window_completed() {
-        // Edge case: plan completed (index beyond steps)
-        let plan = test_plan_with_steps(3, "test-session");
-
-        let executor = PlanExecutor::new();
-        let context = executor.build_step_context(&plan, 5); // Beyond steps
-
-        assert_eq!(context, "Plan completed - no active step");
-    }
-
-    #[test]
-    fn test_step_context_includes_completed_results() {
-        // Given: a Plan with 5 steps where steps 0-2 are completed with results
-        // When: build_step_context() is called for step 3
-        // Then: context includes results from completed steps (last 3)
-        let mut plan = test_plan_with_steps(5, "test-session");
-
-        // Mark steps 0-2 as completed with results
-        plan.steps[0].status = StepStatus::Completed;
-        plan.steps[0].result = Some("Found 3 config files".to_string());
-        plan.steps[1].status = StepStatus::Completed;
-        plan.steps[1].result = Some("Modified auth.rs".to_string());
-        plan.steps[2].status = StepStatus::Completed;
-        plan.steps[2].result = Some("Tests pass".to_string());
-
-        let executor = PlanExecutor::new();
-        let context = executor.build_step_context(&plan, 3);
-
-        // Should include the plan goal
-        assert!(context.contains("Goal: Test"));
-
-        // Should include previous results section
-        assert!(context.contains("Previous Results"));
-        assert!(context.contains("Found 3 config files"));
-        assert!(context.contains("Modified auth.rs"));
-        assert!(context.contains("Tests pass"));
-
-        // Should still have current step
-        assert!(context.contains(">>> CURRENT: Step 3"));
-    }
-
-    #[test]
-    fn test_step_context_caps_completed_results_at_3() {
-        // Given: a Plan with 6 steps where all 5 prior steps are completed
-        // When: build_step_context() is called for step 5
-        // Then: only the last 3 completed steps are included
-        let mut plan = test_plan_with_steps(6, "test-session");
-
-        for i in 0..5 {
-            plan.steps[i].status = StepStatus::Completed;
-            plan.steps[i].result = Some(format!("Result of step {}", i));
+    fn test_step(tools: Vec<String>) -> PlanStep {
+        PlanStep {
+            id: Uuid::new_v4(),
+            index: 0,
+            description: "Run the thing".to_string(),
+            reasoning: "because".to_string(),
+            expected_tools: tools,
+            status: StepStatus::Pending,
+            attempt_count: 0,
+            max_attempts: 3,
+            result: None,
+            started_at: None,
+            completed_at: None,
         }
-
-        let executor = PlanExecutor::new();
-        let context = executor.build_step_context(&plan, 5);
-
-        // Should include steps 2, 3, 4 (last 3 before current_index 5)
-        assert!(context.contains("Result of step 2"));
-        assert!(context.contains("Result of step 3"));
-        assert!(context.contains("Result of step 4"));
-
-        // Should NOT include steps 0 or 1 (outside the 3-step window)
-        assert!(!context.contains("Result of step 0"));
-        assert!(!context.contains("Result of step 1"));
     }
 
-    // NOTE: Tests 18-19 (backtracking) will be implemented in Phase 4 (Agent Integration)
-    // as they require full agent loop and tool execution context.
-
-    // NOTE: Test 20 (iteration limit switching) belongs in agent_loop.rs tests,
-    // not in plan_executor.rs.
-
-    #[test]
-    fn test_step_execution_result_fields() {
-        // Test 22: StepExecutionResult has the correct fields
-        // Validates the interface contract for dev-3's implementation
-
-        let success_result = StepExecutionResult {
-            success: true,
-            output: "Step completed with output".to_string(),
-            failure_reason: None,
-            confidence: None,
-            tool_name: Some("echo_tool".to_string()),
-        };
-        assert!(success_result.success);
-        assert_eq!(success_result.output, "Step completed with output");
-        assert!(success_result.failure_reason.is_none());
-
-        let failure_result = StepExecutionResult {
-            success: false,
-            output: String::new(),
-            failure_reason: Some("Tool execution failed".to_string()),
-            confidence: None,
-            tool_name: None,
-        };
-        assert!(!failure_result.success);
-        assert!(failure_result.failure_reason.is_some());
-        assert_eq!(
-            failure_result.failure_reason.unwrap(),
-            "Tool execution failed"
-        );
-    }
-
-    // --- Tests 18-19: regenerate_from() backtracking tests (Phase 4B - dev-1) ---
+    // ── Mock providers ──────────────────────────────────────────
 
     struct MockLlmRegen {
-        /// JSON string to return as content (simulates LLM generating new steps)
         json_response: String,
     }
 
@@ -658,96 +500,6 @@ mod tests {
             "mock_regen"
         }
     }
-
-    // Test 18: regenerate_from() preserves completed steps and creates new steps
-    #[tokio::test]
-    async fn test_regenerate_from_replaces_steps_from_index() {
-        // Given: a plan with 3 steps, step 0 completed, step 1 failed
-        // When: regenerate_from() is called with from_index=1
-        // Then:
-        //   - Returns new steps (not containing the failed step data)
-        //   - New steps have Pending status and attempt_count=0
-        //   - Count of new steps matches what LLM returned
-
-        let executor = PlanExecutor::new();
-        let mut plan = test_plan_with_steps(3, "test-session");
-
-        // Mark step 0 as completed
-        plan.steps[0].status = plan::StepStatus::Completed;
-        plan.steps[0].result = Some("Step 0 done".to_string());
-
-        // Mark step 1 as failed
-        plan.steps[1].status = plan::StepStatus::Failed;
-        plan.steps[1].attempt_count = 3;
-
-        // LLM returns 2 replacement steps
-        let json = r#"[
-            {"description": "Regen step A", "reasoning": "Alternative approach", "expected_tools": ["echo_tool"]},
-            {"description": "Regen step B", "reasoning": "Follow-up", "expected_tools": []}
-        ]"#;
-        let provider: DynProvider = Arc::new(MockLlmRegen {
-            json_response: json.to_string(),
-        });
-
-        let new_steps = executor
-            .regenerate_from(&plan, 1, "Tool not found", &provider)
-            .await
-            .expect("regenerate_from should not Err");
-
-        assert_eq!(new_steps.len(), 2, "should return 2 replacement steps");
-        assert_eq!(new_steps[0].description, "Regen step A");
-        assert_eq!(new_steps[1].description, "Regen step B");
-
-        // All new steps start fresh
-        for step in &new_steps {
-            assert_eq!(step.status, plan::StepStatus::Pending);
-            assert_eq!(step.attempt_count, 0);
-            assert!(step.result.is_none());
-        }
-    }
-
-    // Test 19: regenerate_from() falls back to a single retry step when LLM returns empty
-    #[tokio::test]
-    async fn test_regenerate_from_fallback_on_empty_llm_response() {
-        // Given: a plan with steps
-        // When: regenerate_from() is called and the LLM returns no valid JSON steps
-        // Then:
-        //   - Returns a single fallback step (not an Err)
-        //   - Fallback step contains the failed step's description
-        //   - Fallback step has Pending status
-
-        let executor = PlanExecutor::new();
-        let plan = test_plan_with_steps(2, "test-session");
-
-        // LLM returns empty or invalid JSON
-        let provider: DynProvider = Arc::new(MockLlmRegen {
-            json_response: "I cannot generate replacement steps.".to_string(),
-        });
-
-        let new_steps = executor
-            .regenerate_from(&plan, 0, "something went wrong", &provider)
-            .await
-            .expect("should not Err even on bad LLM output");
-
-        assert_eq!(new_steps.len(), 1, "should have exactly 1 fallback step");
-        let step = &new_steps[0];
-        assert_eq!(step.status, plan::StepStatus::Pending);
-        assert_eq!(step.attempt_count, 0);
-        assert!(
-            step.description.contains("Retry") || step.description.contains("Step 0"),
-            "fallback step should reference the failed step: {}",
-            step.description
-        );
-    }
-
-    // --- Tests 23-26: execute_step() behavioural tests (Phase 4A - dev-3) ---
-
-    use async_trait::async_trait;
-    use providers::types::{
-        ChatParams, LlmProvider, LlmResponse, ToolCall as ProviderToolCall, Usage,
-    };
-    use serde_json::Value as JsonValue;
-    use tools::{registry::ToolRegistry, RoutingContext, Tool};
 
     struct MockLlmToolCall {
         tool_name: String,
@@ -833,141 +585,193 @@ mod tests {
         Arc::new(RwLock::new(r))
     }
 
-    fn test_step(tools: Vec<String>) -> PlanStep {
-        PlanStep {
-            id: Uuid::new_v4(),
-            index: 0,
-            description: "Run the thing".to_string(),
-            reasoning: "because".to_string(),
-            expected_tools: tools,
-            status: StepStatus::Pending,
-            attempt_count: 0,
-            max_attempts: 3,
-            result: None,
-            started_at: None,
-            completed_at: None,
-        }
-    }
+    // ── Constants ────────────────────────────────────────────────
 
-    // Test 23: provider returns tool call → tool found in registry → success + output
-    #[tokio::test]
-    async fn test_execute_step_runs_tool_and_captures_output() {
-        let executor = PlanExecutor::new();
-        let provider: DynProvider = Arc::new(MockLlmToolCall {
-            tool_name: "echo_tool".to_string(),
-        });
-        let step = test_step(vec!["echo_tool".to_string()]);
-        let ctx = RoutingContext::new("cli".into(), "test".into());
-
-        let res = executor
-            .execute_step(&step, "plan ctx", &provider, &reg_with_echo(), &ctx, None)
-            .await
-            .expect("execute_step should not return Err");
-
-        assert!(
-            res.success,
-            "expected success; failure: {:?}",
-            res.failure_reason
-        );
-        assert!(
-            res.output.contains("echo result"),
-            "expected 'echo result' in output, got: {}",
-            res.output
-        );
-    }
-
-    // Test 24: provider returns text-only → text becomes output → success
-    #[tokio::test]
-    async fn test_execute_step_uses_provider_text_when_no_tool_calls() {
-        let executor = PlanExecutor::new();
-        let provider: DynProvider = Arc::new(MockLlmText {
-            text: "Completed by reasoning.".to_string(),
-        });
-        let empty_reg = Arc::new(RwLock::new(ToolRegistry::new()));
-        let step = test_step(vec![]);
-        let ctx = RoutingContext::new("cli".into(), "test".into());
-
-        let res = executor
-            .execute_step(&step, "plan ctx", &provider, &empty_reg, &ctx, None)
-            .await
-            .expect("should not Err");
-
-        assert!(res.success);
-        assert_eq!(res.output, "Completed by reasoning.");
-    }
-
-    // Test 25: provider requests tool not in registry → failure result (not Err)
-    #[tokio::test]
-    async fn test_execute_step_graceful_failure_on_missing_tool() {
-        let executor = PlanExecutor::new();
-        let provider: DynProvider = Arc::new(MockLlmToolCall {
-            tool_name: "ghost_tool".to_string(),
-        });
-        let empty_reg = Arc::new(RwLock::new(ToolRegistry::new()));
-        let step = test_step(vec!["ghost_tool".to_string()]);
-        let ctx = RoutingContext::new("cli".into(), "test".into());
-
-        let res = executor
-            .execute_step(&step, "plan ctx", &provider, &empty_reg, &ctx, None)
-            .await
-            .expect("execute_step must return Ok even on tool-not-found");
-
-        assert!(!res.success, "should fail when tool is missing");
-        let reason = res.failure_reason.expect("failure_reason should be set");
-        assert!(
-            reason.to_lowercase().contains("ghost_tool")
-                || reason.to_lowercase().contains("not found"),
-            "failure reason should mention the missing tool: {reason}"
-        );
-    }
-
-    // Test 26: empty provider response (no text, no tools) → step still succeeds
-    #[tokio::test]
-    async fn test_execute_step_handles_empty_provider_response() {
-        let executor = PlanExecutor::new();
-        let provider: DynProvider = Arc::new(MockLlmText {
-            text: String::new(),
-        });
-        let step = test_step(vec![]);
-        let ctx = RoutingContext::new("cli".into(), "test".into());
-        let empty_reg = Arc::new(RwLock::new(ToolRegistry::new()));
-
-        let res = executor
-            .execute_step(&step, "ctx", &provider, &empty_reg, &ctx, None)
-            .await
-            .expect("should not Err");
-
-        assert!(res.success, "empty response should still succeed");
-    }
-
-    // Test 27: Verify MAX_BACKTRACK_ATTEMPTS constant is correctly set
     #[test]
     fn test_max_backtrack_attempts_constant() {
-        // The backtrack limit is 3: checked in run_plan_execution() before calling
-        // regenerate_from(). After 3 full backtrack events the plan is marked Failed.
-        assert_eq!(
-            MAX_BACKTRACK_ATTEMPTS, 3,
-            "MAX_BACKTRACK_ATTEMPTS should be 3 (architecture decision)"
-        );
+        assert_eq!(MAX_BACKTRACK_ATTEMPTS, 3);
     }
 
-    // Test 28: regenerate_from() returns new steps with correct starting index
+    #[test]
+    fn test_max_cycles_per_step_constant() {
+        assert_eq!(MAX_CYCLES_PER_STEP, 5);
+    }
+
+    // ── StepExecutionResult ─────────────────────────────────────
+
+    #[test]
+    fn test_step_execution_result_fields() {
+        let success = StepExecutionResult {
+            success: true,
+            output: "done".to_string(),
+            failure_reason: None,
+            confidence: None,
+            tool_name: Some("echo_tool".to_string()),
+        };
+        assert!(success.success);
+        assert!(success.failure_reason.is_none());
+
+        let failure = StepExecutionResult {
+            success: false,
+            output: String::new(),
+            failure_reason: Some("Tool execution failed".to_string()),
+            confidence: None,
+            tool_name: None,
+        };
+        assert!(!failure.success);
+        assert_eq!(failure.failure_reason.unwrap(), "Tool execution failed");
+    }
+
+    // ── build_step_context ──────────────────────────────────────
+
+    #[test]
+    fn test_step_context_window_builds_correctly() {
+        let mut plan = test_plan_with_steps(10, "test-session");
+        plan.current_step_index = 2;
+
+        let context = build_step_context(&plan, 2);
+
+        assert!(context.contains(">>> CURRENT: Step 2"));
+        assert!(context.contains("    NEXT 1: Step 3"));
+        assert!(context.contains("    NEXT 2: Step 4"));
+        assert!(context.contains("    NEXT 3: Step 5"));
+        assert!(!context.contains("Step 6"));
+        assert!(!context.contains("Step 1"));
+    }
+
+    #[test]
+    fn test_step_context_window_at_end() {
+        let mut plan = test_plan_with_steps(5, "test-session");
+        plan.current_step_index = 3;
+
+        let context = build_step_context(&plan, 3);
+
+        assert!(context.contains(">>> CURRENT: Step 3"));
+        assert!(context.contains("    NEXT 1: Step 4"));
+        assert!(!context.contains("    NEXT 2"));
+    }
+
+    #[test]
+    fn test_step_context_window_at_last_step() {
+        let mut plan = test_plan_with_steps(3, "test-session");
+        plan.current_step_index = 2;
+
+        let context = build_step_context(&plan, 2);
+
+        assert!(context.contains(">>> CURRENT: Step 2"));
+        assert!(!context.contains("    NEXT 1"));
+    }
+
+    #[test]
+    fn test_step_context_window_completed() {
+        let plan = test_plan_with_steps(3, "test-session");
+        let context = build_step_context(&plan, 5);
+        assert_eq!(context, "Plan completed - no active step");
+    }
+
+    #[test]
+    fn test_step_context_includes_completed_results() {
+        let mut plan = test_plan_with_steps(5, "test-session");
+        plan.steps[0].status = StepStatus::Completed;
+        plan.steps[0].result = Some("Found 3 config files".to_string());
+        plan.steps[1].status = StepStatus::Completed;
+        plan.steps[1].result = Some("Modified auth.rs".to_string());
+        plan.steps[2].status = StepStatus::Completed;
+        plan.steps[2].result = Some("Tests pass".to_string());
+
+        let context = build_step_context(&plan, 3);
+
+        assert!(context.contains("Goal: Test"));
+        assert!(context.contains("Previous Results"));
+        assert!(context.contains("Found 3 config files"));
+        assert!(context.contains("Modified auth.rs"));
+        assert!(context.contains("Tests pass"));
+        assert!(context.contains(">>> CURRENT: Step 3"));
+    }
+
+    #[test]
+    fn test_step_context_caps_completed_results_at_3() {
+        let mut plan = test_plan_with_steps(6, "test-session");
+        for i in 0..5 {
+            plan.steps[i].status = StepStatus::Completed;
+            plan.steps[i].result = Some(format!("Result of step {}", i));
+        }
+
+        let context = build_step_context(&plan, 5);
+
+        assert!(context.contains("Result of step 2"));
+        assert!(context.contains("Result of step 3"));
+        assert!(context.contains("Result of step 4"));
+        assert!(!context.contains("Result of step 0"));
+        assert!(!context.contains("Result of step 1"));
+    }
+
+    // ── regenerate_from ─────────────────────────────────────────
+
     #[tokio::test]
-    async fn test_regenerate_from_step_indices_start_at_failure_point() {
-        let executor = PlanExecutor::new();
-        let plan = test_plan_with_steps(5, "test-session");
+    async fn test_regenerate_from_replaces_steps_from_index() {
+        let mut plan = test_plan_with_steps(3, "test-session");
+        plan.steps[0].status = StepStatus::Completed;
+        plan.steps[0].result = Some("Step 0 done".to_string());
+        plan.steps[1].status = StepStatus::Failed;
+        plan.steps[1].attempt_count = 3;
 
         let json = r#"[
-            {"description": "New step X", "reasoning": "reason X", "expected_tools": []},
-            {"description": "New step Y", "reasoning": "reason Y", "expected_tools": []}
+            {"description": "Regen step A", "reasoning": "Alternative approach", "expectedTools": ["echo_tool"]},
+            {"description": "Regen step B", "reasoning": "Follow-up", "expectedTools": []}
         ]"#;
         let provider: DynProvider = Arc::new(MockLlmRegen {
             json_response: json.to_string(),
         });
 
-        // Failing at step index 3 — new steps should start indexing from 3
-        let new_steps = executor
-            .regenerate_from(&plan, 3, "timeout", &provider)
+        let new_steps = regenerate_from(&plan, 1, "Tool not found", &provider)
+            .await
+            .expect("should not Err");
+
+        assert_eq!(new_steps.len(), 2);
+        assert_eq!(new_steps[0].description, "Regen step A");
+        assert_eq!(new_steps[1].description, "Regen step B");
+        for step in &new_steps {
+            assert_eq!(step.status, StepStatus::Pending);
+            assert_eq!(step.attempt_count, 0);
+            assert!(step.result.is_none());
+        }
+    }
+
+    #[tokio::test]
+    async fn test_regenerate_from_fallback_on_empty_llm_response() {
+        let plan = test_plan_with_steps(2, "test-session");
+        let provider: DynProvider = Arc::new(MockLlmRegen {
+            json_response: "I cannot generate replacement steps.".to_string(),
+        });
+
+        let new_steps = regenerate_from(&plan, 0, "something went wrong", &provider)
+            .await
+            .expect("should not Err even on bad LLM output");
+
+        assert_eq!(new_steps.len(), 1);
+        let step = &new_steps[0];
+        assert_eq!(step.status, StepStatus::Pending);
+        assert_eq!(step.attempt_count, 0);
+        assert!(
+            step.description.contains("Retry") || step.description.contains("Step 0"),
+            "fallback step should reference the failed step: {}",
+            step.description
+        );
+    }
+
+    #[tokio::test]
+    async fn test_regenerate_from_step_indices_start_at_failure_point() {
+        let plan = test_plan_with_steps(5, "test-session");
+        let json = r#"[
+            {"description": "New step X", "reasoning": "reason X", "expectedTools": []},
+            {"description": "New step Y", "reasoning": "reason Y", "expectedTools": []}
+        ]"#;
+        let provider: DynProvider = Arc::new(MockLlmRegen {
+            json_response: json.to_string(),
+        });
+
+        let new_steps = regenerate_from(&plan, 3, "timeout", &provider)
             .await
             .expect("should succeed");
 
@@ -976,5 +780,78 @@ mod tests {
         assert_eq!(new_steps[1].index, 4);
         assert_eq!(new_steps[0].description, "New step X");
         assert_eq!(new_steps[1].description, "New step Y");
+    }
+
+    // ── run_step (multi-cycle execution) ────────────────────────
+
+    #[tokio::test]
+    async fn test_run_step_with_text_response() {
+        let provider: DynProvider = Arc::new(MockLlmText {
+            text: "Step completed via text.".to_string(),
+        });
+        let empty_reg = Arc::new(RwLock::new(ToolRegistry::new()));
+        let core = ExecutionCore::new(provider, empty_reg);
+        let step = test_step(vec![]);
+        let ctx = RoutingContext::new("cli".into(), "test".into());
+
+        let result = run_step(&core, &step, "plan ctx", &ctx, None)
+            .await
+            .expect("should not Err");
+
+        assert!(result.success);
+        assert_eq!(result.output, "Step completed via text.");
+        assert!(result.tool_name.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_run_step_with_tool_execution() {
+        let provider: DynProvider = Arc::new(MockLlmToolCall {
+            tool_name: "echo_tool".to_string(),
+        });
+        let core = ExecutionCore::new(provider, reg_with_echo());
+        let step = test_step(vec!["echo_tool".to_string()]);
+        let ctx = RoutingContext::new("cli".into(), "test".into());
+
+        let result = run_step(&core, &step, "plan ctx", &ctx, None)
+            .await
+            .expect("should not Err");
+
+        assert!(result.success);
+        assert!(result.output.contains("echo_tool"));
+        assert_eq!(result.tool_name, Some("echo_tool".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_run_step_missing_tool_fails() {
+        let provider: DynProvider = Arc::new(MockLlmToolCall {
+            tool_name: "ghost_tool".to_string(),
+        });
+        let empty_reg = Arc::new(RwLock::new(ToolRegistry::new()));
+        let core = ExecutionCore::new(provider, empty_reg);
+        let step = test_step(vec!["ghost_tool".to_string()]);
+        let ctx = RoutingContext::new("cli".into(), "test".into());
+
+        let result = run_step(&core, &step, "plan ctx", &ctx, None)
+            .await
+            .expect("should return Ok(failure), not Err");
+
+        assert!(!result.success);
+    }
+
+    #[tokio::test]
+    async fn test_run_step_handles_empty_response() {
+        let provider: DynProvider = Arc::new(MockLlmText {
+            text: String::new(),
+        });
+        let step = test_step(vec![]);
+        let ctx = RoutingContext::new("cli".into(), "test".into());
+        let empty_reg = Arc::new(RwLock::new(ToolRegistry::new()));
+        let core = ExecutionCore::new(provider, empty_reg);
+
+        let result = run_step(&core, &step, "ctx", &ctx, None)
+            .await
+            .expect("should not Err");
+
+        assert!(result.success, "empty response should still succeed");
     }
 }

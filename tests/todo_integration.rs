@@ -37,9 +37,24 @@ async fn create_test_agent_with_todo() -> (AgentLoop, TempDir) {
     let provider = Arc::new(crate::mock_provider::MockProvider::new("Test response"));
 
     // Create AgentLoop with lazy pool (SQL queries will fail unless DATABASE_URL is valid)
-    let pool = klyntbot::storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
+    let pool =
+        klyntbot::storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
     let todo_repo = klyntbot::storage::TodoRepo::new(pool.inner().clone());
-    let agent = AgentLoop::new(bus, provider, config, todo_repo, None).await.unwrap();
+    let outcome_repo = klyntbot::storage::OutcomeRepo::new(pool.inner().clone());
+    let learning_state_repo = klyntbot::storage::LearningStateRepo::new(pool.inner().clone());
+    let memory_note_repo = klyntbot::storage::MemoryNoteRepo::new(pool.inner().clone());
+    let agent = AgentLoop::new(
+        bus,
+        provider,
+        config,
+        todo_repo,
+        None,
+        outcome_repo,
+        learning_state_repo,
+        memory_note_repo,
+    )
+    .await
+    .unwrap();
 
     (agent, temp_dir)
 }
@@ -157,11 +172,13 @@ async fn test_todo_context_injection() {
     todo_repo.focus(&task2_id, 3, Some(deadline)).await.unwrap();
 
     // Create ContextBuilder with the todo repo
+    let memory_note_repo2 = klyntbot::storage::MemoryNoteRepo::new(pool.inner().clone());
     let mut context_builder = ContextBuilder::new(
         workspace.clone(),
         "UTC".to_string(),
         Some(todo_repo.clone()),
         None,
+        memory_note_repo2,
     )
     .await;
 
@@ -248,11 +265,13 @@ async fn test_todo_context_injection() {
     );
 
     // Test no-repo scenario - verify no todo context leaks through
+    let memory_note_repo3 = klyntbot::storage::MemoryNoteRepo::new(pool.inner().clone());
     let mut empty_context_builder = ContextBuilder::new(
         workspace,
         "UTC".to_string(),
         None, // No todo repo
         None,
+        memory_note_repo3,
     )
     .await;
     empty_context_builder.init().await.unwrap();

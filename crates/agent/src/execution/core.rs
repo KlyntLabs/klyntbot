@@ -27,9 +27,9 @@ fn is_fabricated_tool_response(text: &str, tool_names: &[&str]) -> bool {
     }
 
     let lower = text.to_lowercase();
-    let has_todo = tool_names.iter().any(|t| *t == "todo");
+    let has_todo = tool_names.contains(&"todo");
     let has_search = tool_names.iter().any(|t| t.contains("search"));
-    let has_calendar = tool_names.iter().any(|t| *t == "calendar");
+    let has_calendar = tool_names.contains(&"calendar");
 
     // Pattern 1: Contains a fake ID pattern (hex ID like "9c4e5f3b" or "a1b2c3d4")
     let has_fake_id = {
@@ -64,8 +64,7 @@ fn is_fabricated_tool_response(text: &str, tool_names: &[&str]) -> bool {
 
     let has_todo_result = has_todo && todo_indicators.iter().any(|p| lower.contains(p));
     let has_search_result = has_search && search_indicators.iter().any(|p| lower.contains(p));
-    let has_calendar_result =
-        has_calendar && calendar_indicators.iter().any(|p| lower.contains(p));
+    let has_calendar_result = has_calendar && calendar_indicators.iter().any(|p| lower.contains(p));
     let has_structured_result = has_todo_result || has_search_result || has_calendar_result;
 
     // Pattern 3: Has multiple field-like patterns (Priority:, Due Date:, Description:, Tags:)
@@ -83,10 +82,8 @@ fn is_fabricated_tool_response(text: &str, tool_names: &[&str]) -> bool {
     let has_multiple_fields = field_count >= 2;
 
     // Pattern 4: Search with numbered list — requires fake ID for corroboration
-    let has_search_with_list = has_search_result
-        && has_fake_id
-        && lower.contains("\n1.")
-        && lower.contains("\n2.");
+    let has_search_with_list =
+        has_search_result && has_fake_id && lower.contains("\n1.") && lower.contains("\n2.");
 
     // Decision: fabricated if structured result with (fake ID or multiple fields),
     // or search with numbered list and corroborating fake ID
@@ -131,9 +128,14 @@ impl ExecutionCore {
         let usage = response.usage.clone();
 
         if !response.tool_calls.is_empty() {
-            debug!("ExecutionCore: LLM returned {} tool calls: {:?}",
+            debug!(
+                "ExecutionCore: LLM returned {} tool calls: {:?}",
                 response.tool_calls.len(),
-                response.tool_calls.iter().map(|tc| &tc.name).collect::<Vec<_>>()
+                response
+                    .tool_calls
+                    .iter()
+                    .map(|tc| &tc.name)
+                    .collect::<Vec<_>>()
             );
             // Append assistant message with tool calls
             let tool_call_msgs = tool_calls_to_messages(&response.tool_calls);
@@ -212,9 +214,7 @@ impl ExecutionCore {
                     })
                     .collect();
 
-                if !tool_names.is_empty()
-                    && is_fabricated_tool_response(&content, &tool_names)
-                {
+                if !tool_names.is_empty() && is_fabricated_tool_response(&content, &tool_names) {
                     debug!(
                         "ExecutionCore: detected fabricated tool response (tools available: {:?})",
                         tool_names
@@ -493,7 +493,8 @@ mod tests {
     fn test_calendar_fabrication_not_flagged_without_calendar_tool() {
         // Only "todo" available — calendar patterns should NOT trigger
         let tool_names = vec!["todo"];
-        let fabricated = "Event created: Team meeting (ID: abcdef12)\n- Priority: High\n- Due Date: Tomorrow";
+        let fabricated =
+            "Event created: Team meeting (ID: abcdef12)\n- Priority: High\n- Due Date: Tomorrow";
         assert!(!is_fabricated_tool_response(fabricated, &tool_names));
     }
 
@@ -579,7 +580,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_cycle_normal_text_not_flagged() {
-        let provider = MockProvider::with_text("Sure, I can help you create a task. What would you like?");
+        let provider =
+            MockProvider::with_text("Sure, I can help you create a task. What would you like?");
         let registry = make_registry_with(EchoTool);
         let core = ExecutionCore::new(provider, registry);
 

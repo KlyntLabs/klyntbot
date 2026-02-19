@@ -15,6 +15,11 @@ use tempfile::TempDir;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
+fn make_memory_note_repo() -> storage::MemoryNoteRepo {
+    let pool = storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
+    storage::MemoryNoteRepo::new(pool.inner().clone())
+}
+
 fn make_goal(title: &str, status: GoalStatus) -> Goal {
     let now = Utc::now();
     Goal {
@@ -47,6 +52,7 @@ async fn test_context_builder_accepts_goal_store() {
         "UTC".to_string(),
         None, // todo_store
         Some(goal_store),
+        make_memory_note_repo(),
     )
     .await;
 }
@@ -63,6 +69,7 @@ async fn test_context_builder_accepts_no_goal_store() {
         "UTC".to_string(),
         None, // todo_store
         None, // goal_store
+        make_memory_note_repo(),
     )
     .await;
 }
@@ -76,7 +83,14 @@ async fn test_goals_context_empty_when_no_goals() {
 
     let goal_store = Arc::new(RwLock::new(GoalStore::new(tmp.path().join("goals.jsonl"))));
 
-    let mut ctx = ContextBuilder::new(workspace, "UTC".to_string(), None, Some(goal_store)).await;
+    let mut ctx = ContextBuilder::new(
+        workspace,
+        "UTC".to_string(),
+        None,
+        Some(goal_store),
+        make_memory_note_repo(),
+    )
+    .await;
 
     let result = ctx.get_goals_context().await;
     assert!(
@@ -108,7 +122,14 @@ async fn test_goals_context_includes_active_goals_only() {
             .unwrap();
     }
 
-    let mut ctx = ContextBuilder::new(workspace, "UTC".to_string(), None, Some(goal_store)).await;
+    let mut ctx = ContextBuilder::new(
+        workspace,
+        "UTC".to_string(),
+        None,
+        Some(goal_store),
+        make_memory_note_repo(),
+    )
+    .await;
 
     let result = ctx.get_goals_context().await;
     assert!(
@@ -145,7 +166,14 @@ async fn test_system_prompt_includes_goals_section() {
             .unwrap();
     }
 
-    let mut ctx = ContextBuilder::new(workspace, "UTC".to_string(), None, Some(goal_store)).await;
+    let mut ctx = ContextBuilder::new(
+        workspace,
+        "UTC".to_string(),
+        None,
+        Some(goal_store),
+        make_memory_note_repo(),
+    )
+    .await;
     ctx.init().await.unwrap();
 
     let messages = ctx
@@ -176,8 +204,14 @@ async fn test_invalidate_goals_cache_refreshes_context() {
 
     let goal_store = Arc::new(RwLock::new(GoalStore::new(tmp.path().join("goals.jsonl"))));
 
-    let mut ctx =
-        ContextBuilder::new(workspace, "UTC".to_string(), None, Some(goal_store.clone())).await;
+    let mut ctx = ContextBuilder::new(
+        workspace,
+        "UTC".to_string(),
+        None,
+        Some(goal_store.clone()),
+        make_memory_note_repo(),
+    )
+    .await;
 
     // First call: no goals → empty result, cached
     let first = ctx.get_goals_context().await;

@@ -4,6 +4,13 @@ use klyntbot::agent::{ContextBuilder, MemoryStore};
 use klyntbot::session::SessionMessage;
 use tempfile::TempDir;
 
+/// Helper: create a lazy MemoryNoteRepo for tests (no actual DB connection).
+fn test_memory_note_repo() -> klyntbot::storage::MemoryNoteRepo {
+    let pool =
+        klyntbot::storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
+    klyntbot::storage::MemoryNoteRepo::new(pool.inner().clone())
+}
+
 /// Test context builder initialization
 #[tokio::test]
 async fn test_context_builder_init() {
@@ -11,7 +18,14 @@ async fn test_context_builder_init() {
     let workspace = temp_dir.path().join("workspace");
     std::fs::create_dir_all(&workspace).unwrap();
 
-    let mut context_builder = ContextBuilder::new(workspace, "UTC".to_string(), None, None).await;
+    let mut context_builder = ContextBuilder::new(
+        workspace,
+        "UTC".to_string(),
+        None,
+        None,
+        test_memory_note_repo(),
+    )
+    .await;
     let result = context_builder.init().await;
     assert!(result.is_ok());
 }
@@ -39,7 +53,14 @@ async fn test_context_builder_with_bootstrap_files() {
     let tools_md = workspace.join("TOOLS.md");
     std::fs::write(&tools_md, "# Tools\n\nUse tools when needed.").unwrap();
 
-    let mut context_builder = ContextBuilder::new(workspace, "UTC".to_string(), None, None).await;
+    let mut context_builder = ContextBuilder::new(
+        workspace,
+        "UTC".to_string(),
+        None,
+        None,
+        test_memory_note_repo(),
+    )
+    .await;
     context_builder.init().await.unwrap();
 
     // Build messages
@@ -73,10 +94,9 @@ async fn test_memory_store() {
 "#;
     std::fs::write(&memory_file, memory_content).unwrap();
 
-    let _memory_store = MemoryStore::new(workspace.clone());
+    let _memory_store = MemoryStore::new(test_memory_note_repo());
 
     // Memory store should be able to access the memory files
-    // The actual implementation details depend on MemoryStore's API
     assert!(memory_file.exists());
 }
 
@@ -110,7 +130,14 @@ async fn test_daily_notes_structure() {
     // Verify file exists
     assert!(daily_note.exists());
 
-    let mut context_builder = ContextBuilder::new(workspace, "UTC".to_string(), None, None).await;
+    let mut context_builder = ContextBuilder::new(
+        workspace,
+        "UTC".to_string(),
+        None,
+        None,
+        test_memory_note_repo(),
+    )
+    .await;
     context_builder.init().await.unwrap();
 
     // Build messages
@@ -128,7 +155,14 @@ async fn test_context_builder_with_history() {
     let workspace = temp_dir.path().join("workspace");
     std::fs::create_dir_all(&workspace).unwrap();
 
-    let mut context_builder = ContextBuilder::new(workspace, "UTC".to_string(), None, None).await;
+    let mut context_builder = ContextBuilder::new(
+        workspace,
+        "UTC".to_string(),
+        None,
+        None,
+        test_memory_note_repo(),
+    )
+    .await;
     context_builder.init().await.unwrap();
 
     // Create conversation history
@@ -179,7 +213,14 @@ async fn test_bootstrap_files_optional() {
 
     // Don't create any bootstrap files - should still work
 
-    let mut context_builder = ContextBuilder::new(workspace, "UTC".to_string(), None, None).await;
+    let mut context_builder = ContextBuilder::new(
+        workspace,
+        "UTC".to_string(),
+        None,
+        None,
+        test_memory_note_repo(),
+    )
+    .await;
     let result = context_builder.init().await;
 
     // Should initialize successfully even without bootstrap files
@@ -215,16 +256,15 @@ fn test_memory_directory_structure() {
 }
 
 /// Test memory store initialization
-#[test]
-fn test_memory_store_initialization() {
+#[tokio::test]
+async fn test_memory_store_initialization() {
     let temp_dir = TempDir::new().unwrap();
     let workspace = temp_dir.path().join("workspace");
     std::fs::create_dir_all(&workspace).unwrap();
 
-    let _memory_store = MemoryStore::new(workspace.clone());
+    let _memory_store = MemoryStore::new(test_memory_note_repo());
 
     // Memory store should initialize without error
-    // The actual implementation details depend on MemoryStore's API
     assert!(workspace.exists());
 }
 
@@ -235,7 +275,14 @@ async fn test_context_builder_with_media() {
     let workspace = temp_dir.path().join("workspace");
     std::fs::create_dir_all(&workspace).unwrap();
 
-    let mut context_builder = ContextBuilder::new(workspace, "UTC".to_string(), None, None).await;
+    let mut context_builder = ContextBuilder::new(
+        workspace,
+        "UTC".to_string(),
+        None,
+        None,
+        test_memory_note_repo(),
+    )
+    .await;
     context_builder.init().await.unwrap();
 
     // Create test media paths
@@ -264,8 +311,22 @@ async fn test_multiple_context_builders() {
     std::fs::create_dir_all(&workspace).unwrap();
 
     // Create two context builders
-    let mut builder1 = ContextBuilder::new(workspace.clone(), "UTC".to_string(), None, None).await;
-    let mut builder2 = ContextBuilder::new(workspace.clone(), "UTC".to_string(), None, None).await;
+    let mut builder1 = ContextBuilder::new(
+        workspace.clone(),
+        "UTC".to_string(),
+        None,
+        None,
+        test_memory_note_repo(),
+    )
+    .await;
+    let mut builder2 = ContextBuilder::new(
+        workspace.clone(),
+        "UTC".to_string(),
+        None,
+        None,
+        test_memory_note_repo(),
+    )
+    .await;
 
     // Both should initialize successfully
     assert!(builder1.init().await.is_ok());
@@ -290,7 +351,14 @@ async fn test_context_with_channel_info() {
     let workspace = temp_dir.path().join("workspace");
     std::fs::create_dir_all(&workspace).unwrap();
 
-    let mut context_builder = ContextBuilder::new(workspace, "UTC".to_string(), None, None).await;
+    let mut context_builder = ContextBuilder::new(
+        workspace,
+        "UTC".to_string(),
+        None,
+        None,
+        test_memory_note_repo(),
+    )
+    .await;
     context_builder.init().await.unwrap();
 
     // Build messages with different channel/chat combinations
@@ -314,7 +382,14 @@ async fn test_empty_conversation_history() {
     let workspace = temp_dir.path().join("workspace");
     std::fs::create_dir_all(&workspace).unwrap();
 
-    let mut context_builder = ContextBuilder::new(workspace, "UTC".to_string(), None, None).await;
+    let mut context_builder = ContextBuilder::new(
+        workspace,
+        "UTC".to_string(),
+        None,
+        None,
+        test_memory_note_repo(),
+    )
+    .await;
     context_builder.init().await.unwrap();
 
     // Build messages with empty history
@@ -333,7 +408,14 @@ async fn test_long_conversation_history() {
     let workspace = temp_dir.path().join("workspace");
     std::fs::create_dir_all(&workspace).unwrap();
 
-    let mut context_builder = ContextBuilder::new(workspace, "UTC".to_string(), None, None).await;
+    let mut context_builder = ContextBuilder::new(
+        workspace,
+        "UTC".to_string(),
+        None,
+        None,
+        test_memory_note_repo(),
+    )
+    .await;
     context_builder.init().await.unwrap();
 
     // Create long history

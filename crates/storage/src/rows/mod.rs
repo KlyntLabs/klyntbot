@@ -5,6 +5,7 @@ pub mod cron;
 pub mod embedding;
 pub mod goal;
 pub mod learning;
+pub mod memory;
 pub mod plan;
 pub mod project;
 pub mod session;

@@ -122,7 +122,11 @@ pub fn run_todo_notification_step(state: &mut WizardState) -> Result<StepResult>
         CreationMode::Yolo => 1,
         CreationMode::Party => 2,
     };
-    let mode_idx = prompt_select("Task creation mode", &creation_mode_options, current_mode_idx)?;
+    let mode_idx = prompt_select(
+        "Task creation mode",
+        &creation_mode_options,
+        current_mode_idx,
+    )?;
     state.config.todo.creation_mode = match mode_idx {
         1 => CreationMode::Yolo,
         2 => CreationMode::Party,

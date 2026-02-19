@@ -251,10 +251,7 @@ async fn test_e2e_completion_handler_updates_goal() {
 
 #[tokio::test]
 async fn test_e2e_plan_step_outcomes_recorded() {
-    let tmp = TempDir::new().unwrap();
-    let outcome_store = Arc::new(RwLock::new(OutcomeStore::new(
-        tmp.path().join("outcomes.jsonl"),
-    )));
+    let outcome_store = Arc::new(RwLock::new(OutcomeStore::new_in_memory()));
     let recorder = OutcomeRecorder::new(Arc::clone(&outcome_store));
 
     let plan_id = Uuid::new_v4().to_string();
@@ -277,7 +274,7 @@ async fn test_e2e_plan_step_outcomes_recorded() {
             .await;
     }
 
-    let mut s = outcome_store.write().await;
+    let s = outcome_store.read().await;
     let outcomes = s.get_all_outcomes().await.unwrap();
 
     assert_eq!(outcomes.len(), 2, "two step outcomes must be recorded");
@@ -304,9 +301,7 @@ async fn test_e2e_full_pipeline_goal_plan_learn() {
     // Setup stores
     let goal_store = Arc::new(RwLock::new(GoalStore::new(tmp.path().join("goals.jsonl"))));
     let plan_store = Arc::new(RwLock::new(PlanStore::new(tmp.path().join("plans.jsonl"))));
-    let outcome_store = Arc::new(RwLock::new(OutcomeStore::new(
-        tmp.path().join("outcomes.jsonl"),
-    )));
+    let outcome_store = Arc::new(RwLock::new(OutcomeStore::new_in_memory()));
 
     // 1. Create a goal
     let goal = make_goal("Full Pipeline Goal");
@@ -375,7 +370,7 @@ async fn test_e2e_full_pipeline_goal_plan_learn() {
         s.get(&plan_id).await.unwrap().unwrap()
     };
     // Keep guard alive while using borrowed slice
-    let mut os = outcome_store.write().await;
+    let os = outcome_store.read().await;
     let outcomes = os.get_all_outcomes().await.unwrap();
 
     assert_eq!(

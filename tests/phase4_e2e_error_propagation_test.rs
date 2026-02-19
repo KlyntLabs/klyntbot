@@ -293,10 +293,7 @@ async fn test_e2e_failed_plan_updates_goal_failure_metadata() {
 
 #[tokio::test]
 async fn test_e2e_error_categories_captured_in_outcomes() {
-    let tmp = TempDir::new().unwrap();
-    let outcome_store = Arc::new(RwLock::new(OutcomeStore::new(
-        tmp.path().join("outcomes.jsonl"),
-    )));
+    let outcome_store = Arc::new(RwLock::new(OutcomeStore::new_in_memory()));
     let recorder = OutcomeRecorder::new(Arc::clone(&outcome_store));
 
     // Record failures with distinct error categories
@@ -324,7 +321,7 @@ async fn test_e2e_error_categories_captured_in_outcomes() {
             .await;
     }
 
-    let mut s = outcome_store.write().await;
+    let s = outcome_store.read().await;
     let outcomes = s.get_all_outcomes().await.unwrap();
 
     assert_eq!(outcomes.len(), 4, "four error outcomes must be recorded");

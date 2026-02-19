@@ -14,8 +14,8 @@ use common::{KlyntbotError, ProviderError, Result};
 use config::Secret;
 
 use crate::types::{
-    ChatParams, LlmProvider, LlmResponse, LlmStream, LlmStreamChunk, Message,
-    ProviderCapabilities, ToolCall, ToolCallDelta, Usage,
+    ChatParams, LlmProvider, LlmResponse, LlmStream, LlmStreamChunk, Message, ProviderCapabilities,
+    ToolCall, ToolCallDelta, Usage,
 };
 
 const ANTHROPIC_CONTEXT_WINDOW: usize = 200_000;
@@ -225,8 +225,7 @@ impl AnthropicNativeProvider {
                     }
                     Some("input_json_delta") => {
                         let index = value["index"].as_u64().unwrap_or(0) as usize;
-                        let partial_json =
-                            delta["partial_json"].as_str().map(|s| s.to_string());
+                        let partial_json = delta["partial_json"].as_str().map(|s| s.to_string());
                         Ok(Some(LlmStreamChunk {
                             content: None,
                             tool_call_delta: Some(ToolCallDelta {
@@ -862,10 +861,7 @@ mod tests {
             .unwrap()
             .unwrap();
         assert!(chunk.content.is_none());
-        assert_eq!(
-            chunk.reasoning_content,
-            Some("Let me think...".to_string())
-        );
+        assert_eq!(chunk.reasoning_content, Some("Let me think...".to_string()));
         assert!(!chunk.is_final);
     }
 
@@ -930,8 +926,7 @@ mod tests {
     #[test]
     fn test_parse_sse_message_start_returns_none() {
         let data = r#"{"type":"message_start","message":{"id":"msg_01","type":"message","role":"assistant","content":[],"model":"claude-sonnet-4-20250514","stop_reason":null,"usage":{"input_tokens":25,"output_tokens":1}}}"#;
-        let result =
-            AnthropicNativeProvider::parse_anthropic_sse("message_start", data).unwrap();
+        let result = AnthropicNativeProvider::parse_anthropic_sse("message_start", data).unwrap();
         assert!(result.is_none());
     }
 
@@ -946,8 +941,7 @@ mod tests {
     #[test]
     fn test_parse_sse_message_stop_returns_none() {
         let data = r#"{"type":"message_stop"}"#;
-        let result =
-            AnthropicNativeProvider::parse_anthropic_sse("message_stop", data).unwrap();
+        let result = AnthropicNativeProvider::parse_anthropic_sse("message_stop", data).unwrap();
         assert!(result.is_none());
     }
 

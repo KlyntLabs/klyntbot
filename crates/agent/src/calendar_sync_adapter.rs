@@ -150,7 +150,8 @@ impl CalendarSyncAdapter {
 
         // Clear calendar_event_uid for todos that had events deleted from all providers
         if self.auto_sync_due_dates {
-            let rows = self.todo_repo
+            let rows = self
+                .todo_repo
                 .list(&storage::TodoFilter::default())
                 .await
                 .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
@@ -278,15 +279,13 @@ impl CalendarSyncAdapter {
 
         // Process remote changes
         for remote_event in &remote_events {
-            if let Some(local_todo) = self
-                .find_todo_by_calendar_uid(&remote_event.uid)
-                .await
-            {
+            if let Some(local_todo) = self.find_todo_by_calendar_uid(&remote_event.uid).await {
                 if let Some(local_event) = self.todo_to_event(&local_todo) {
                     if detect_conflict(remote_event, &local_event) {
                         conflicts_detected += 1;
                         self.log_conflict(remote_event, &local_event).await?;
-                        let resolved_event = resolve_conflict(remote_event, &local_event, self.conflict_strategy);
+                        let resolved_event =
+                            resolve_conflict(remote_event, &local_event, self.conflict_strategy);
                         self.update_todo_from_event(&local_todo.id, &resolved_event)
                             .await?;
                     } else {
@@ -299,15 +298,15 @@ impl CalendarSyncAdapter {
                 }
                 events_pulled += 1;
             } else {
-                self.create_todo_from_event(remote_event)
-                    .await?;
+                self.create_todo_from_event(remote_event).await?;
                 events_pulled += 1;
             }
         }
 
         // Push local changes to this provider
         if self.auto_sync_due_dates {
-            let rows = self.todo_repo
+            let rows = self
+                .todo_repo
                 .list(&storage::TodoFilter::default())
                 .await
                 .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
@@ -377,10 +376,7 @@ impl CalendarSyncAdapter {
     }
 
     /// Find a todo by its calendar event UID via SQL.
-    async fn find_todo_by_calendar_uid(
-        &self,
-        uid: &str,
-    ) -> Option<Todo> {
+    async fn find_todo_by_calendar_uid(&self, uid: &str) -> Option<Todo> {
         let filter = storage::TodoFilter::default();
         if let Ok(rows) = self.todo_repo.list(&filter).await {
             rows.into_iter()
@@ -392,11 +388,7 @@ impl CalendarSyncAdapter {
     }
 
     /// Update a todo from a calendar event via SQL.
-    async fn update_todo_from_event(
-        &self,
-        todo_id: &str,
-        event: &CalendarEvent,
-    ) -> Result<()> {
+    async fn update_todo_from_event(&self, todo_id: &str, event: &CalendarEvent) -> Result<()> {
         let patch = storage::TodoPatch {
             id: todo_id.to_string(),
             title: Some(event.summary.clone()),
@@ -412,10 +404,7 @@ impl CalendarSyncAdapter {
     }
 
     /// Create a new todo from a calendar event via SQL.
-    async fn create_todo_from_event(
-        &self,
-        event: &CalendarEvent,
-    ) -> Result<()> {
+    async fn create_todo_from_event(&self, event: &CalendarEvent) -> Result<()> {
         let now = Utc::now();
         let todo = Todo {
             id: Todo::generate_id(),
@@ -664,11 +653,15 @@ impl CalendarHandler for CalendarSyncAdapter {
 
     /// Get sync status for all providers.
     async fn get_status(&self) -> Result<Value> {
-        let rows = self.todo_repo
+        let rows = self
+            .todo_repo
             .list(&storage::TodoFilter::default())
             .await
             .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
-        let synced_count = rows.iter().filter(|r| r.calendar_event_uid.is_some()).count();
+        let synced_count = rows
+            .iter()
+            .filter(|r| r.calendar_event_uid.is_some())
+            .count();
         let total_count = rows.len();
 
         let mut provider_statuses = Vec::new();
@@ -781,7 +774,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_calendar_sync_adapter_creation() {
-        let Some(todo_repo) = test_todo_repo().await else { return };
+        let Some(todo_repo) = test_todo_repo().await else {
+            return;
+        };
         let config = test_calendar_config();
 
         let adapter =
@@ -795,7 +790,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_todo_to_event_conversion() {
-        let Some(todo_repo) = test_todo_repo().await else { return };
+        let Some(todo_repo) = test_todo_repo().await else {
+            return;
+        };
         let config = test_calendar_config();
 
         let adapter = CalendarSyncAdapter::new(todo_repo, &config, "UTC".to_string(), None, false)
@@ -848,7 +845,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_todo_status_mapping() {
-        let Some(todo_repo) = test_todo_repo().await else { return };
+        let Some(todo_repo) = test_todo_repo().await else {
+            return;
+        };
         let config = test_calendar_config();
 
         let adapter = CalendarSyncAdapter::new(todo_repo, &config, "UTC".to_string(), None, false)
@@ -910,7 +909,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_todo_to_event_no_due_date() {
-        let Some(todo_repo) = test_todo_repo().await else { return };
+        let Some(todo_repo) = test_todo_repo().await else {
+            return;
+        };
         let config = test_calendar_config();
 
         let adapter = CalendarSyncAdapter::new(todo_repo, &config, "UTC".to_string(), None, false)
@@ -955,7 +956,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_multi_provider_adapter() {
-        let Some(todo_repo) = test_todo_repo().await else { return };
+        let Some(todo_repo) = test_todo_repo().await else {
+            return;
+        };
 
         let config = CalendarConfig {
             providers: vec![
@@ -988,7 +991,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_disabled_provider_skipped() {
-        let Some(todo_repo) = test_todo_repo().await else { return };
+        let Some(todo_repo) = test_todo_repo().await else {
+            return;
+        };
 
         let config = CalendarConfig {
             providers: vec![CalendarProviderConfig::Apple(AppleCalendarConfig {

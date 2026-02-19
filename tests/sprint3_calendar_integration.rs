@@ -87,7 +87,9 @@ fn create_test_event(
 
 #[tokio::test]
 async fn test_reconcile_event_time_changed_updates_todo() {
-    let Some(repo) = test_todo_repo().await else { return };
+    let Some(repo) = test_todo_repo().await else {
+        return;
+    };
 
     // Create todo with calendar event
     let original_due = Utc.with_ymd_and_hms(2026, 2, 20, 14, 0, 0).unwrap();
@@ -103,9 +105,7 @@ async fn test_reconcile_event_time_changed_updates_todo() {
     let events = vec![create_test_event("event-123", new_time, None)];
 
     // Action: Run reconciliation
-    let report = reconcile_calendar_events(&repo, events)
-        .await
-        .unwrap();
+    let report = reconcile_calendar_events(&repo, events).await.unwrap();
 
     // Assert
     assert_eq!(report.checked, 1);
@@ -125,7 +125,9 @@ async fn test_reconcile_event_time_changed_updates_todo() {
 
 #[tokio::test]
 async fn test_reconcile_event_completed_marks_todo_done() {
-    let Some(repo) = test_todo_repo().await else { return };
+    let Some(repo) = test_todo_repo().await else {
+        return;
+    };
 
     let mut todo = create_test_todo("Task");
     todo.status = TodoStatus::Todo;
@@ -141,9 +143,7 @@ async fn test_reconcile_event_completed_marks_todo_done() {
         Some("COMPLETED".to_string()),
     )];
 
-    let report = reconcile_calendar_events(&repo, events)
-        .await
-        .unwrap();
+    let report = reconcile_calendar_events(&repo, events).await.unwrap();
 
     assert_eq!(report.checked, 1);
     assert_eq!(report.todos_completed, 1);
@@ -161,7 +161,9 @@ async fn test_reconcile_event_completed_marks_todo_done() {
 
 #[tokio::test]
 async fn test_reconcile_event_cancelled_clears_uid() {
-    let Some(repo) = test_todo_repo().await else { return };
+    let Some(repo) = test_todo_repo().await else {
+        return;
+    };
 
     let mut todo = create_test_todo("Cancelled meeting");
     todo.calendar_event_uid = Some("event-789".to_string());
@@ -175,9 +177,7 @@ async fn test_reconcile_event_cancelled_clears_uid() {
         Some("CANCELLED".to_string()),
     )];
 
-    let report = reconcile_calendar_events(&repo, events)
-        .await
-        .unwrap();
+    let report = reconcile_calendar_events(&repo, events).await.unwrap();
 
     assert_eq!(report.checked, 1);
     assert_eq!(report.links_cleared, 1);
@@ -190,7 +190,9 @@ async fn test_reconcile_event_cancelled_clears_uid() {
 
 #[tokio::test]
 async fn test_reconcile_event_deleted_from_provider_clears_uid() {
-    let Some(repo) = test_todo_repo().await else { return };
+    let Some(repo) = test_todo_repo().await else {
+        return;
+    };
 
     let mut todo = create_test_todo("Deleted event");
     todo.calendar_event_uid = Some("event-999".to_string());
@@ -200,9 +202,7 @@ async fn test_reconcile_event_deleted_from_provider_clears_uid() {
 
     let events: Vec<CalendarEvent> = vec![];
 
-    let report = reconcile_calendar_events(&repo, events)
-        .await
-        .unwrap();
+    let report = reconcile_calendar_events(&repo, events).await.unwrap();
 
     assert_eq!(report.checked, 1);
     assert_eq!(report.links_cleared, 1);
@@ -214,7 +214,9 @@ async fn test_reconcile_event_deleted_from_provider_clears_uid() {
 
 #[tokio::test]
 async fn test_reconcile_multiple_changes_in_single_sync() {
-    let Some(repo) = test_todo_repo().await else { return };
+    let Some(repo) = test_todo_repo().await else {
+        return;
+    };
 
     let original_time = Utc.with_ymd_and_hms(2026, 2, 20, 14, 0, 0).unwrap();
     let new_time = Utc.with_ymd_and_hms(2026, 2, 20, 16, 0, 0).unwrap();
@@ -264,9 +266,7 @@ async fn test_reconcile_multiple_changes_in_single_sync() {
         // event-5 not in list (deleted)
     ];
 
-    let report = reconcile_calendar_events(&repo, events)
-        .await
-        .unwrap();
+    let report = reconcile_calendar_events(&repo, events).await.unwrap();
 
     assert_eq!(report.checked, 5);
     assert_eq!(report.due_dates_updated, 1); // todo1

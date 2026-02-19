@@ -8,4 +8,4 @@ pub use assembler::{AssembledContext, ContextEngine, ContextRequest, ExecutionSt
 pub use budget::{BudgetAllocator, BudgetConfig, BudgetReport, Priority};
 pub use history_compressor::{CompressedHistory, HistoryCompressor, HistorySummary};
 pub use memory_retriever::{MemoryEntry, MemoryRetriever};
-pub use token_counter::{CharTokenCounter, TokenCounter, default_token_counter};
+pub use token_counter::{default_token_counter, CharTokenCounter, TokenCounter};

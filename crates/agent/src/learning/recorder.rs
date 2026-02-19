@@ -50,7 +50,7 @@ impl OutcomeRecorder {
             created_at: Utc::now(),
         };
 
-        let mut store = self.store.write().await;
+        let store = self.store.write().await;
         if let Err(e) = store.record(record).await {
             warn!("Failed to record tool outcome: {}", e);
         }
@@ -95,7 +95,7 @@ impl tools::EnrichmentFeedbackHandler for OutcomeRecorder {
         &self,
         feedback: tools::EnrichmentFeedbackEntry,
     ) -> common::Result<()> {
-        let mut store = self.store.write().await;
+        let store = self.store.write().await;
         store.record_feedback(feedback).await
     }
 }

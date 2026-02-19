@@ -47,3 +47,24 @@ pub struct EnrichmentFeedbackRow {
     pub confidence: f64,
     pub timestamp: DateTime<Utc>,
 }
+
+/// Row struct for the `learning_state` key-value table.
+#[derive(Debug, Clone, FromRow)]
+pub struct LearningStateRow {
+    pub key: String,
+    pub value: serde_json::Value,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// Row struct for the `decision_log` table.
+#[derive(Debug, Clone, FromRow)]
+pub struct DecisionLogRow {
+    pub id: String,
+    pub session_key: String,
+    pub iteration: i32,
+    pub tool_names: serde_json::Value,
+    pub user_message_preview: String,
+    pub assessment: serde_json::Value,
+    pub outcome: Option<String>,
+    pub created_at: DateTime<Utc>,
+}

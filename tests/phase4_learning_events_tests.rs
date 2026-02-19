@@ -128,7 +128,10 @@ async fn ac_i2_4_threshold_change_applies_to_context_builder() {
 
     // Build a ContextBuilder and apply the event (as AgentLoop would)
     let workspace = std::path::PathBuf::from("/tmp/test-workspace-i2");
-    let mut ctx = ContextBuilder::new(workspace, "UTC".to_string(), None, None).await;
+    let pool = storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
+    let memory_note_repo = storage::MemoryNoteRepo::new(pool.inner().clone());
+    let mut ctx =
+        ContextBuilder::new(workspace, "UTC".to_string(), None, None, memory_note_repo).await;
 
     if let LearningEvent::ThresholdChanged { new_threshold, .. } = event {
         ctx.set_confidence_threshold(new_threshold);

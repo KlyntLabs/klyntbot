@@ -350,13 +350,15 @@ impl TodoPatch {
             priority: self.priority.map(|p| Some(p as i16)),
             due_date: self.due_date,
             tags: self.tags.clone(),
-            status: self.status.map(|s| match s {
-                TodoStatus::Todo => "todo",
-                TodoStatus::Doing => "doing",
-                TodoStatus::Done => "done",
-                TodoStatus::Archived => "archived",
-            }
-            .to_string()),
+            status: self.status.map(|s| {
+                match s {
+                    TodoStatus::Todo => "todo",
+                    TodoStatus::Doing => "doing",
+                    TodoStatus::Done => "done",
+                    TodoStatus::Archived => "archived",
+                }
+                .to_string()
+            }),
             calendar_event_uid: self.calendar_event_uid.clone(),
             // next_instance_date is intentionally omitted from domain TodoPatch —
             // it is an internal field managed exclusively by RecurringTaskSpawner
@@ -371,13 +373,15 @@ impl TodoPatch {
 impl TodoFilter {
     pub fn to_storage_filter(&self) -> storage::TodoFilter {
         storage::TodoFilter {
-            status: self.status.map(|s| match s {
-                TodoStatus::Todo => "todo",
-                TodoStatus::Doing => "doing",
-                TodoStatus::Done => "done",
-                TodoStatus::Archived => "archived",
-            }
-            .to_string()),
+            status: self.status.map(|s| {
+                match s {
+                    TodoStatus::Todo => "todo",
+                    TodoStatus::Doing => "doing",
+                    TodoStatus::Done => "done",
+                    TodoStatus::Archived => "archived",
+                }
+                .to_string()
+            }),
             tags: self.tag.as_ref().map(|t| vec![t.clone()]),
             project_id: self.project_id.clone(),
             priority_min: self.priority_min.map(|p| p as i16),

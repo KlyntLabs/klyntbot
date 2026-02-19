@@ -3,8 +3,11 @@
 pub mod calendar_sync;
 pub mod conv_embedding;
 pub mod cron;
+pub mod decision_log;
 pub mod embedding;
 pub mod goal;
+pub mod learning_state;
+pub mod memory_note;
 pub mod outcome;
 pub mod plan;
 pub mod project_repo;
@@ -19,8 +22,11 @@ pub mod tests;
 pub use calendar_sync::CalendarSyncRepo;
 pub use conv_embedding::ConvEmbeddingRepo;
 pub use cron::CronRepo;
+pub use decision_log::DecisionLogRepo;
 pub use embedding::EmbeddingRepo;
 pub use goal::GoalRepo;
+pub use learning_state::LearningStateRepo;
+pub use memory_note::MemoryNoteRepo;
 pub use outcome::OutcomeRepo;
 pub use plan::PlanRepo;
 pub use project_repo::{ProjectFilter, ProjectPatch, ProjectRepo, ProjectWithStats};
@@ -47,6 +53,9 @@ pub struct Repos {
     pub usage: UsageRepo,
     pub cron: CronRepo,
     pub calendar_sync: CalendarSyncRepo,
+    pub memory_notes: MemoryNoteRepo,
+    pub learning_state: LearningStateRepo,
+    pub decision_log: DecisionLogRepo,
 }
 
 impl Repos {
@@ -66,6 +75,9 @@ impl Repos {
             usage: UsageRepo::new(pg.clone()),
             cron: CronRepo::new(pg.clone()),
             calendar_sync: CalendarSyncRepo::new(pg.clone()),
+            memory_notes: MemoryNoteRepo::new(pg.clone()),
+            learning_state: LearningStateRepo::new(pg.clone()),
+            decision_log: DecisionLogRepo::new(pg.clone()),
             pool: pg,
         }
     }

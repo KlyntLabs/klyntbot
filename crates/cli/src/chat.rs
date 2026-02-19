@@ -40,8 +40,19 @@ pub async fn handle_chat(message: Option<String>, session: String) -> Result<()>
     let repos = storage::Repos::from_pool(&storage_pool);
 
     // Initialize agent loop (Arc for streaming support)
-    let agent_loop =
-        Arc::new(AgentLoop::new(bus, provider, config, repos.todos, Some(repos.embeddings)).await?);
+    let agent_loop = Arc::new(
+        AgentLoop::new(
+            bus,
+            provider,
+            config,
+            repos.todos,
+            Some(repos.embeddings),
+            repos.outcomes,
+            repos.learning_state,
+            repos.memory_notes,
+        )
+        .await?,
+    );
 
     // Session key for CLI
     let session_key = format!("cli:{}", session);

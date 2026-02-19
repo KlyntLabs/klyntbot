@@ -131,15 +131,15 @@ mod tests {
     #[test]
     fn test_priority_inference_from_keywords() {
         let cases = [
-            ("URGENT: fix production", 1),  // high-priority keyword (case-insensitive)
-            ("Fix broken auth flow", 2),     // medium-high keyword ("broken")
-            ("Add feature: dark mode", 3),   // medium keyword ("feature")
-            ("Correct typo in readme", 4),   // low keyword ("typo")
+            ("URGENT: fix production", 1), // high-priority keyword (case-insensitive)
+            ("Fix broken auth flow", 2),   // medium-high keyword ("broken")
+            ("Add feature: dark mode", 3), // medium keyword ("feature")
+            ("Correct typo in readme", 4), // low keyword ("typo")
             ("Implement user dashboard", 3), // no keywords → default medium
-            ("nice to have: polish UI", 4),  // multi-word low keyword
-            ("low priority: cleanup", 4),    // multi-word low keyword
-            ("", 3),                         // empty title → default medium
-            ("   \t\n  ", 3),               // whitespace-only → default medium
+            ("nice to have: polish UI", 4), // multi-word low keyword
+            ("low priority: cleanup", 4),  // multi-word low keyword
+            ("", 3),                       // empty title → default medium
+            ("   \t\n  ", 3),              // whitespace-only → default medium
         ];
         for (title, expected_priority) in cases {
             let mut task = Todo::default_instance();
@@ -155,13 +155,21 @@ mod tests {
         let mut task = Todo::default_instance();
         task.title = "Handle edge case".to_string();
         task.description = Some("This is a critical security issue".to_string());
-        assert_eq!(infer_priority(&task).unwrap().value, 1, "failed for: description keyword 'critical'");
+        assert_eq!(
+            infer_priority(&task).unwrap().value,
+            1,
+            "failed for: description keyword 'critical'"
+        );
 
         // Tag keywords: "bug" in tags → P2
         let mut task = Todo::default_instance();
         task.title = "Some task".to_string();
         task.tags = vec!["bug".to_string()];
-        assert_eq!(infer_priority(&task).unwrap().value, 2, "failed for: tag keyword 'bug'");
+        assert_eq!(
+            infer_priority(&task).unwrap().value,
+            2,
+            "failed for: tag keyword 'bug'"
+        );
 
         // Tags only (no title/description keywords): "urgent" in tags → P1
         let mut task = Todo::default_instance();
@@ -169,7 +177,10 @@ mod tests {
         task.tags = vec!["urgent".to_string(), "production".to_string()];
         let result = infer_priority(&task).unwrap();
         assert_eq!(result.value, 1, "failed for: tags-only keyword 'urgent'");
-        assert!(result.confidence >= 0.85, "tags-only urgent should have high confidence");
+        assert!(
+            result.confidence >= 0.85,
+            "tags-only urgent should have high confidence"
+        );
     }
 
     #[test]
@@ -179,7 +190,10 @@ mod tests {
         let mut task = Todo::default_instance();
         task.title = "Fix typo in header".to_string();
         let result = infer_priority(&task).unwrap();
-        assert_eq!(result.value, 4, "failed for: 'Fix typo' should pick typo (conf 0.87) over fix (conf 0.82)");
+        assert_eq!(
+            result.value, 4,
+            "failed for: 'Fix typo' should pick typo (conf 0.87) over fix (conf 0.82)"
+        );
         assert!(result.confidence >= 0.85);
 
         // "URGENT minor bug fix" has "urgent" (P1, 0.90), "minor" (P4, 0.87), "bug" (P2, 0.82)
@@ -187,6 +201,9 @@ mod tests {
         let mut task = Todo::default_instance();
         task.title = "URGENT minor bug fix".to_string();
         let result = infer_priority(&task).unwrap();
-        assert_eq!(result.value, 1, "failed for: 'URGENT minor bug fix' should pick urgent (conf 0.90)");
+        assert_eq!(
+            result.value, 1,
+            "failed for: 'URGENT minor bug fix' should pick urgent (conf 0.90)"
+        );
     }
 }

@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
@@ -12,11 +12,8 @@ use tracing::{debug, error, info, warn};
 use bus::{InboundMessage, MessageBus, OutboundMessage};
 use common::Result;
 use config::Config;
-use futures_util::future::join_all;
-use futures_util::StreamExt;
-use providers::{tool_calls_to_messages, ChatParams, DynProvider, Message};
+use providers::{DynProvider, Message};
 use session::SessionManager;
-use std::collections::HashMap;
 use tokio::sync::mpsc;
 use tools::{
     calendar_tool::{CalendarHandler, CalendarTool},
@@ -34,11 +31,8 @@ use tools::{
     EmbeddingHandler, RoutingContext,
 };
 
-use super::confidence::{self, ConfidenceEvaluator, DecisionAction, DecisionLogger};
+use super::confidence::ConfidenceEvaluator;
 use super::{AgentEvent, CalendarSyncAdapter, ContextBuilder, CronHandlerAdapter, SubagentManager};
-
-/// Maximum number of tool-calling iterations before returning final response
-const MAX_TOOL_ITERATIONS: usize = 20;
 
 /// A request to execute an approved plan via the execution queue.
 ///
@@ -53,27 +47,6 @@ pub struct PlanExecutionRequest {
 
 /// Default session history limit (number of messages)
 const DEFAULT_HISTORY_LIMIT: usize = 50;
-
-/// Send an event if the channel is available. No-op if `None`.
-macro_rules! emit {
-    ($tx:expr, $event:expr) => {
-        if let Some(tx) = &$tx {
-            let _ = tx.send($event).await;
-        }
-    };
-}
-
-/// Optional event channel for interactive streaming (CLI mode).
-struct StreamingChannels {
-    event_tx: Option<mpsc::Sender<AgentEvent>>,
-}
-
-impl StreamingChannels {
-    /// No streaming — all channels disabled.
-    fn none() -> Self {
-        Self { event_tx: None }
-    }
-}
 
 /// Handle for consuming streaming agent output.
 pub struct StreamingHandle {
@@ -92,15 +65,14 @@ type LastActiveChannel = Arc<RwLock<Option<(common::ChannelName, common::ChatId)
 
 /// Agent loop - the core processing engine
 pub struct AgentLoop {
-    bus: Arc<MessageBus>,
+    pub(crate) bus: Arc<MessageBus>,
     inbound_rx: Option<mpsc::Receiver<InboundMessage>>,
-    provider: DynProvider,
-    config: Config,
-    context_builder: Arc<RwLock<ContextBuilder>>,
-    session_manager: Arc<RwLock<SessionManager>>,
-    tool_registry: Arc<RwLock<ToolRegistry>>,
-    confidence_evaluator: Option<ConfidenceEvaluator>,
-    decision_logger: DecisionLogger,
+    pub(crate) provider: DynProvider,
+    pub(crate) config: Config,
+    pub(crate) context_builder: Arc<RwLock<ContextBuilder>>,
+    pub(crate) session_manager: Arc<RwLock<SessionManager>>,
+    pub(crate) tool_registry: Arc<RwLock<ToolRegistry>>,
+    pub(crate) confidence_evaluator: Option<ConfidenceEvaluator>,
     running: Arc<AtomicBool>,
     last_active_channel: Option<LastActiveChannel>,
     reminder_engine: Option<Arc<RwLock<super::ReminderEngine>>>,
@@ -110,29 +82,27 @@ pub struct AgentLoop {
     /// Calendar sync adapter (shared with ReminderEngine)
     _calendar_adapter: Option<Arc<CalendarSyncAdapter>>,
     /// Conversation embedding handler for semantic memory (Phase 4.1)
-    conversation_embedding_handler: Option<Arc<dyn tools::ConversationEmbeddingHandler>>,
-    /// Plan executor for structured multi-step execution (Phase 2)
-    plan_executor: Option<super::PlanExecutor>,
+    pub(crate) conversation_embedding_handler: Option<Arc<dyn tools::ConversationEmbeddingHandler>>,
+    /// Execution core for multi-cycle plan step execution
+    pub(crate) plan_execution_core: Option<Arc<crate::execution::ExecutionCore>>,
     /// Plan store for direct plan state management during execution
-    plan_store: Option<Arc<RwLock<plan::PlanStore>>>,
-    /// Tracks if a plan is currently executing (affects iteration limit)
-    plan_executing: Arc<std::sync::atomic::AtomicBool>,
+    pub(crate) plan_store: Option<Arc<RwLock<plan::PlanStore>>>,
+    /// Tracks if a plan is currently executing
+    pub(crate) plan_executing: Arc<std::sync::atomic::AtomicBool>,
     /// Outcome recorder for the learning system (None if learning disabled)
-    outcome_recorder: Option<Arc<crate::learning::OutcomeRecorder>>,
+    pub(crate) outcome_recorder: Option<Arc<crate::learning::OutcomeRecorder>>,
     /// Background learning service for adaptive threshold updates (None if learning disabled)
     learning_service: Option<Arc<RwLock<crate::learning::LearningService>>>,
     /// Handler called after plan execution finishes (updates linked goal metrics)
-    plan_completion_handler: Option<Arc<dyn PlanCompletionHandler>>,
-    /// Adaptive orchestrator pipeline (v2). When Some, `process_message_v2` routes
-    /// through classify → assemble → dispatch → validate → record instead of the
-    /// legacy `run_agent_loop` iteration loop.
-    pipeline: Option<Arc<crate::pipeline::AgentPipeline>>,
+    pub(crate) plan_completion_handler: Option<Arc<dyn PlanCompletionHandler>>,
+    /// Adaptive orchestrator pipeline: classify → assemble → dispatch → validate → record.
+    pub(crate) pipeline: Arc<crate::pipeline::AgentPipeline>,
 }
 
 impl AgentLoop {
     /// Create a new agent loop with optional cron service and shared instances
     #[allow(clippy::too_many_arguments)] // Architectural decision: follows existing goal_store pattern
-    #[allow(deprecated)] // goal_store_path / plan_store_path / learning_*_path pending G-17 SQL migration
+    #[allow(deprecated)] // goal_store_path / plan_store_path pending future SQL migration
     pub async fn new_with_cron(
         bus: Arc<MessageBus>,
         provider: DynProvider,
@@ -143,15 +113,19 @@ impl AgentLoop {
         goal_store: Option<Arc<RwLock<goal::GoalStore>>>,
         plan_store: Option<Arc<RwLock<plan::PlanStore>>>,
         notification_handle: Option<LastActiveChannel>,
+        outcome_repo: storage::OutcomeRepo,
+        learning_state_repo: storage::LearningStateRepo,
+        memory_note_repo: storage::MemoryNoteRepo,
     ) -> Result<Self> {
         let workspace = config.workspace_path();
 
-        // Create context builder
+        // Create context builder (SQL-backed memory)
         let mut context_builder = ContextBuilder::new(
             workspace.clone(),
             config.timezone.clone(),
             Some(todo_repo.clone()),
             goal_store.as_ref().map(Arc::clone),
+            memory_note_repo,
         )
         .await;
         context_builder.init().await.map_err(|e| {
@@ -289,9 +263,8 @@ impl AgentLoop {
         // Create outcome store + recorder early so TodoTool can report enrichment feedback.
         // The full LearningService is wired later using the same store.
         let outcome_store = if config.learning.enabled {
-            let store_path = config.learning_outcomes_path();
             Some(Arc::new(RwLock::new(crate::learning::OutcomeStore::new(
-                store_path,
+                outcome_repo,
             ))))
         } else {
             None
@@ -325,7 +298,9 @@ impl AgentLoop {
                 todo_embedding_repo = Some(emb_repo.clone());
 
                 todo_tool = todo_tool
-                    .with_embedding_handler(Arc::clone(&embedding_handler) as Arc<dyn EmbeddingHandler>)
+                    .with_embedding_handler(
+                        Arc::clone(&embedding_handler) as Arc<dyn EmbeddingHandler>
+                    )
                     .with_embedding_repo(emb_repo)
                     .with_search_config(
                         config.todo.search.semantic_threshold,
@@ -352,17 +327,16 @@ impl AgentLoop {
             tool_registry.register(GoalTool::new(Some(goal_handler as Arc<dyn GoalHandler>)));
         }
 
-        // Register plan tool and create plan executor (if plan_store is provided)
-        let (plan_executor, stored_plan_store) = if let Some(ps) = plan_store {
+        // Register plan tool and keep plan_store reference for run_plan_execution()
+        let stored_plan_store = if let Some(ps) = plan_store {
             let ps_clone = Arc::clone(&ps);
             let plan_handler = Arc::new(super::PlanHandlerImpl::new(ps));
             tool_registry.register(tools::plan_tool::PlanTool::new(Some(
                 plan_handler as Arc<dyn tools::plan_tool::PlanHandler>,
             )));
-            // Create PlanExecutor and keep plan_store reference for run_plan_execution()
-            (Some(super::PlanExecutor::new()), Some(ps_clone))
+            Some(ps_clone)
         } else {
-            (None, None)
+            None
         };
 
         // Wire plan completion handler (updates linked goal when plan finishes)
@@ -416,16 +390,23 @@ impl AgentLoop {
             }
         }
 
-        // Confidence evaluator
+        // Confidence evaluator (with per-tool overrides if configured)
         let confidence_evaluator = if config.confidence.enabled {
-            Some(ConfidenceEvaluator::new(config.confidence.threshold))
+            if config.confidence.tool_overrides.is_empty() {
+                Some(ConfidenceEvaluator::new(config.confidence.threshold))
+            } else {
+                let mut tool_map =
+                    crate::learning::ToolConfidenceMap::new(config.confidence.threshold);
+                for (tool_name, threshold) in &config.confidence.tool_overrides {
+                    tool_map.set_threshold(tool_name, *threshold);
+                }
+                Some(ConfidenceEvaluator::new_with_map(
+                    config.confidence.threshold,
+                    tool_map,
+                ))
+            }
         } else {
             None
-        };
-
-        let decision_logger = match &config.confidence.log_path {
-            Some(path) => DecisionLogger::new(path.clone()),
-            None => DecisionLogger::default_path(),
         };
 
         // Create ReminderEngine using the shared notification dispatcher and calendar handler
@@ -456,10 +437,9 @@ impl AgentLoop {
 
         // Initialize learning background service (reuses outcome_store + recorder created earlier)
         let learning_service = if let Some(ref store) = outcome_store {
-            let state_path = config.learning_state_path();
             let adaptive = Arc::new(RwLock::new(
-                crate::learning::adaptive::AdaptiveThresholds::load(
-                    state_path,
+                crate::learning::adaptive::AdaptiveThresholds::new(
+                    learning_state_repo.clone(),
                     config.confidence.threshold,
                     config.learning.min_threshold,
                     config.learning.max_threshold,
@@ -523,6 +503,12 @@ impl AgentLoop {
             provider.clone(),
             Arc::clone(&tool_registry),
         ));
+        // Share execution_core with plan execution (clone Arc before passing to dispatch)
+        let plan_execution_core = if stored_plan_store.is_some() {
+            Some(Arc::clone(&execution_core))
+        } else {
+            None
+        };
         let engine_dispatch = Arc::new(crate::execution::EngineDispatch::new(execution_core));
         let orchestrator = Arc::new(crate::orchestrator::Orchestrator::new(
             provider.clone(),
@@ -542,12 +528,12 @@ impl AgentLoop {
             provider_name: provider.name().to_string(),
         };
 
-        let pipeline = Some(Arc::new(crate::pipeline::AgentPipeline::new(
+        let pipeline = Arc::new(crate::pipeline::AgentPipeline::new(
             orchestrator,
             engine_dispatch,
             cost_tracker,
             pipeline_config,
-        )));
+        ));
 
         info!("Adaptive orchestrator pipeline initialized");
 
@@ -560,7 +546,6 @@ impl AgentLoop {
             session_manager: Arc::new(RwLock::new(session_manager)),
             tool_registry,
             confidence_evaluator,
-            decision_logger,
             running: Arc::new(AtomicBool::new(false)),
             last_active_channel: notification_handle,
             reminder_engine,
@@ -568,7 +553,7 @@ impl AgentLoop {
             _notification_dispatcher: notification_dispatcher,
             _calendar_adapter: calendar_adapter,
             conversation_embedding_handler,
-            plan_executor,
+            plan_execution_core,
             plan_store: stored_plan_store,
             plan_executing: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             outcome_recorder,
@@ -579,20 +564,35 @@ impl AgentLoop {
     }
 
     /// Create a new agent loop (without cron service)
-    #[allow(deprecated)] // goal_store_path / plan_store_path pending G-17 SQL migration
+    #[allow(clippy::too_many_arguments)] // Delegates to new_with_cron
+    #[allow(deprecated)] // goal_store_path / plan_store_path pending future SQL migration
     pub async fn new(
         bus: Arc<MessageBus>,
         provider: DynProvider,
         config: Config,
         todo_repo: storage::TodoRepo,
         embedding_repo: Option<storage::EmbeddingRepo>,
+        outcome_repo: storage::OutcomeRepo,
+        learning_state_repo: storage::LearningStateRepo,
+        memory_note_repo: storage::MemoryNoteRepo,
     ) -> Result<Self> {
         let goal_path = config.goal_store_path();
         let goal_store = Some(Arc::new(RwLock::new(goal::GoalStore::new(goal_path))));
         let plan_path = config.plan_store_path();
         let plan_store = Some(Arc::new(RwLock::new(plan::PlanStore::new(plan_path))));
         Self::new_with_cron(
-            bus, provider, config, None, todo_repo, embedding_repo, goal_store, plan_store, None,
+            bus,
+            provider,
+            config,
+            None,
+            todo_repo,
+            embedding_repo,
+            goal_store,
+            plan_store,
+            None,
+            outcome_repo,
+            learning_state_repo,
+            memory_note_repo,
         )
         .await
     }
@@ -679,425 +679,7 @@ impl AgentLoop {
         Ok(())
     }
 
-    /// Execute an approved plan sequentially, step by step.
-    ///
-    /// State machine: Approved → Executing → (Completed | Failed)
-    ///
-    /// For each step:
-    /// 1. Marks step as Executing
-    /// 2. Calls plan_executor.execute_step() to run the step
-    /// 3. Updates step status (Completed or Failed)
-    /// 4. Advances current_step_index
-    /// 5. Persists plan after each step
-    ///
-    /// On completion, sets plan.completed_at and transitions to Completed.
-    /// If any step fails beyond max_attempts, transitions to Failed.
-    pub async fn run_plan_execution(
-        &self,
-        plan_id: &uuid::Uuid,
-        routing_ctx: &RoutingContext,
-    ) -> Result<String> {
-        use chrono::Utc;
-        use plan::{PlanStatus, StepStatus};
-
-        let (executor, store_arc) = match (&self.plan_executor, &self.plan_store) {
-            (Some(e), Some(s)) => (e, Arc::clone(s)),
-            _ => {
-                return Err(common::KlyntbotError::Tool(
-                    common::ToolError::ExecutionFailed(
-                        "Plan execution not configured (missing plan_store or plan_executor)"
-                            .into(),
-                    ),
-                ))
-            }
-        };
-
-        // Load and validate, then transition to Executing in-place (zero-copy).
-        let (plan_title, initial_step_idx) = {
-            let mut store = store_arc.write().await;
-            let plan = store.get(plan_id).await?.ok_or_else(|| {
-                common::KlyntbotError::Plan(common::PlanError::NotFound(plan_id.to_string()))
-            })?;
-
-            // Validate: must be in Approved state
-            PlanStatus::validate_transition(&plan.status, &PlanStatus::Executing)?;
-
-            let title = plan.title.clone();
-            let step_idx = plan.current_step_index;
-
-            // Transition to Executing in-place — no Plan clone
-            {
-                let p = store.get_mut(plan_id).await?.ok_or_else(|| {
-                    common::KlyntbotError::Plan(common::PlanError::NotFound(plan_id.to_string()))
-                })?;
-                p.status = PlanStatus::Executing;
-                p.updated_at = Utc::now();
-            }
-            store.persist_latest(plan_id).await?;
-
-            (title, step_idx)
-        };
-
-        // Set executing flag (affects iteration limit in run_agent_loop)
-        self.plan_executing.store(true, Ordering::SeqCst);
-
-        // RAII guard: clears the flag on ALL exit paths — normal return, break, and ? propagation.
-        // Without this guard, any ? operator inside the loop leaks the flag as true permanently.
-        struct PlanExecutingGuard(Arc<std::sync::atomic::AtomicBool>);
-        impl Drop for PlanExecutingGuard {
-            fn drop(&mut self) {
-                self.0.store(false, std::sync::atomic::Ordering::SeqCst);
-            }
-        }
-        let _flag_guard = PlanExecutingGuard(Arc::clone(&self.plan_executing));
-
-        let mut step_idx = initial_step_idx;
-        // Tracks how many full plan regenerations have occurred (distinct from per-step retries)
-        let mut backtrack_count: usize = 0;
-        // step_count is re-read after regeneration
-        let mut step_count = {
-            let mut store = store_arc.write().await;
-            store
-                .get_mut(plan_id)
-                .await?
-                .map(|p| p.steps.len())
-                .unwrap_or(0)
-        };
-
-        info!(
-            "Starting plan execution: '{}' ({} steps)",
-            plan_title, step_count
-        );
-
-        let result: Result<(String, bool)> = loop {
-            if step_idx >= step_count {
-                break Ok((
-                    format!(
-                        "Plan '{}' completed: all {} steps executed.",
-                        plan_title, step_count
-                    ),
-                    true,
-                ));
-            }
-
-            // Under one lock: build step context, clone just the PlanStep (not whole Plan),
-            // mark step Executing in-place, then persist. Lock released before LLM call.
-            let (plan_context, step_snapshot, step_description) = {
-                let mut store = store_arc.write().await;
-                let p = store.get_mut(plan_id).await?.ok_or_else(|| {
-                    common::KlyntbotError::Plan(common::PlanError::NotFound(plan_id.to_string()))
-                })?;
-
-                let ctx = executor.build_step_context(p, step_idx);
-                let step_desc = p.steps[step_idx].description.clone();
-                // Clone just the step for execute_step — far cheaper than cloning Plan
-                let step_snap = p.steps[step_idx].clone();
-
-                // Mark Executing in-place
-                p.steps[step_idx].status = StepStatus::Executing;
-                p.steps[step_idx].started_at = Some(Utc::now());
-                p.steps[step_idx].attempt_count += 1;
-                p.updated_at = Utc::now();
-                // NLL releases the borrow of store through p here (last use of p)
-                store.persist_latest(plan_id).await?;
-
-                (ctx, step_snap, step_desc)
-            };
-
-            debug!(
-                "Executing step {}/{}: {}",
-                step_idx + 1,
-                step_count,
-                step_description
-            );
-
-            // Execute the step — no store lock held during the long-running LLM call
-            let step_start = Instant::now();
-            let step_result = executor
-                .execute_step(
-                    &step_snapshot,
-                    &plan_context,
-                    &self.provider,
-                    &self.tool_registry,
-                    routing_ctx,
-                    self.confidence_evaluator.as_ref(),
-                )
-                .await;
-            let step_duration_ms = step_start.elapsed().as_millis() as u64;
-
-            // Record plan step outcome for the learning system (best-effort)
-            if let Some(recorder) = &self.outcome_recorder {
-                let (success, error_cat, step_confidence, recorded_tool_name) = match &step_result {
-                    Ok(r) => (
-                        r.success,
-                        None,
-                        r.confidence.as_ref(),
-                        r.tool_name
-                            .clone()
-                            .unwrap_or_else(|| step_description.clone()),
-                    ),
-                    Err(_) => (
-                        false,
-                        Some("execution_error"),
-                        None,
-                        step_description.clone(),
-                    ),
-                };
-                let session_key = format!("{}:{}", routing_ctx.channel, routing_ctx.chat_id);
-                recorder
-                    .record_tool_outcome(
-                        &recorded_tool_name,
-                        success,
-                        error_cat,
-                        step_duration_ms,
-                        step_confidence,
-                        crate::learning::ExecutionMode::PlanStep {
-                            plan_id: plan_id.to_string(),
-                            step_index: step_idx,
-                        },
-                        &session_key,
-                    )
-                    .await;
-            }
-
-            match step_result {
-                Ok(result) if result.success => {
-                    info!(
-                        "Step {}/{} completed successfully",
-                        step_idx + 1,
-                        step_count
-                    );
-
-                    // Mark step Completed in-place — no Plan clone
-                    let mut store = store_arc.write().await;
-                    let p = store.get_mut(plan_id).await?.ok_or_else(|| {
-                        common::KlyntbotError::Plan(common::PlanError::NotFound(
-                            plan_id.to_string(),
-                        ))
-                    })?;
-                    p.steps[step_idx].status = StepStatus::Completed;
-                    p.steps[step_idx].result = Some(result.output);
-                    p.steps[step_idx].completed_at = Some(Utc::now());
-                    step_idx += 1;
-                    p.current_step_index = step_idx;
-                    p.updated_at = Utc::now();
-                    store.persist_latest(plan_id).await?;
-                }
-                Ok(result) => {
-                    // Step failed — read attempt info from store, then update in-place
-                    let (attempt, max_attempts) = {
-                        let mut store = store_arc.write().await;
-                        let p = store.get_mut(plan_id).await?.ok_or_else(|| {
-                            common::KlyntbotError::Plan(common::PlanError::NotFound(
-                                plan_id.to_string(),
-                            ))
-                        })?;
-                        (
-                            p.steps[step_idx].attempt_count,
-                            p.steps[step_idx].max_attempts,
-                        )
-                    };
-                    let failure_reason = result.failure_reason.unwrap_or(result.output);
-
-                    warn!(
-                        "Step {}/{} failed (attempt {}/{}): {}",
-                        step_idx + 1,
-                        step_count,
-                        attempt,
-                        max_attempts,
-                        failure_reason
-                    );
-
-                    // Record backtrack entry in-place
-                    {
-                        let mut store = store_arc.write().await;
-                        let p = store.get_mut(plan_id).await?.ok_or_else(|| {
-                            common::KlyntbotError::Plan(common::PlanError::NotFound(
-                                plan_id.to_string(),
-                            ))
-                        })?;
-                        p.backtrack_history.push(plan::BacktrackEntry {
-                            step_index: step_idx,
-                            attempt,
-                            failure_reason: failure_reason.clone(),
-                            timestamp: Utc::now(),
-                        });
-                        p.updated_at = Utc::now();
-                        store.persist_latest(plan_id).await?;
-                    }
-
-                    if attempt < max_attempts {
-                        // Exponential backoff before retry: 2^(attempt-1) seconds
-                        let backoff_secs = 2u64.pow((attempt as u32).saturating_sub(1));
-                        debug!(
-                            "Retrying step {} in {}s (attempt {}/{})",
-                            step_idx + 1,
-                            backoff_secs,
-                            attempt + 1,
-                            max_attempts
-                        );
-                        tokio::time::sleep(tokio::time::Duration::from_secs(backoff_secs)).await;
-                    } else {
-                        // Max per-step attempts exhausted — check backtrack limit
-                        backtrack_count += 1;
-                        if backtrack_count >= super::plan_executor::MAX_BACKTRACK_ATTEMPTS {
-                            // Backtrack limit reached — fail the plan in-place
-                            let mut store = store_arc.write().await;
-                            let p = store.get_mut(plan_id).await?.ok_or_else(|| {
-                                common::KlyntbotError::Plan(common::PlanError::NotFound(
-                                    plan_id.to_string(),
-                                ))
-                            })?;
-                            p.steps[step_idx].status = StepStatus::Failed;
-                            p.updated_at = Utc::now();
-                            store.persist_latest(plan_id).await?;
-                            break Err(common::KlyntbotError::Plan(
-                                common::PlanError::BacktrackLimitReached(
-                                    super::plan_executor::MAX_BACKTRACK_ATTEMPTS,
-                                ),
-                            ));
-                        }
-
-                        warn!(
-                            "Regenerating steps from index {} after {} attempts (backtrack {}/{})",
-                            step_idx,
-                            attempt,
-                            backtrack_count,
-                            super::plan_executor::MAX_BACKTRACK_ATTEMPTS
-                        );
-
-                        // Regeneration requires a Plan snapshot for the LLM call (one-time clone)
-                        let plan_snapshot = {
-                            let mut store = store_arc.write().await;
-                            let p = store.get_mut(plan_id).await?.ok_or_else(|| {
-                                common::KlyntbotError::Plan(common::PlanError::NotFound(
-                                    plan_id.to_string(),
-                                ))
-                            })?;
-                            p.steps[step_idx].status = StepStatus::Failed;
-                            p.clone() // One-time snapshot clone for the LLM regeneration call
-                        };
-
-                        let new_steps = executor
-                            .regenerate_from(
-                                &plan_snapshot,
-                                step_idx,
-                                &failure_reason,
-                                &self.provider,
-                            )
-                            .await?;
-
-                        // Replace steps from step_idx forward in-place
-                        let mut store = store_arc.write().await;
-                        let p = store.get_mut(plan_id).await?.ok_or_else(|| {
-                            common::KlyntbotError::Plan(common::PlanError::NotFound(
-                                plan_id.to_string(),
-                            ))
-                        })?;
-                        p.steps.truncate(step_idx);
-                        p.steps.extend(new_steps);
-                        step_count = p.steps.len();
-                        p.updated_at = Utc::now();
-                        store.persist_latest(plan_id).await?;
-
-                        // step_idx stays the same — now points to first regenerated step
-                        info!(
-                            "Regenerated {} steps from index {}",
-                            step_count - step_idx,
-                            step_idx
-                        );
-                    }
-                }
-                Err(e) => {
-                    // Hard error — mark step Failed in-place, let finalizer own plan status
-                    let mut store = store_arc.write().await;
-                    let p = store.get_mut(plan_id).await?.ok_or_else(|| {
-                        common::KlyntbotError::Plan(common::PlanError::NotFound(
-                            plan_id.to_string(),
-                        ))
-                    })?;
-                    p.steps[step_idx].status = StepStatus::Failed;
-                    p.updated_at = Utc::now();
-                    store.persist_latest(plan_id).await?;
-                    break Err(e);
-                }
-            }
-
-            // Guard against exceeding iteration limit.
-            // Compare backtrack_count (plan regenerations) — NOT backtrack_history.len()
-            // (which counts every per-step retry and inflates the check prematurely).
-            let iter_limit = {
-                let mut store = store_arc.write().await;
-                let p = store.get_mut(plan_id).await?.ok_or_else(|| {
-                    common::KlyntbotError::Plan(common::PlanError::NotFound(plan_id.to_string()))
-                })?;
-                p.iteration_limit
-            };
-            if backtrack_count >= iter_limit {
-                let mut store = store_arc.write().await;
-                let p = store.get_mut(plan_id).await?.ok_or_else(|| {
-                    common::KlyntbotError::Plan(common::PlanError::NotFound(plan_id.to_string()))
-                })?;
-                p.steps[step_idx].status = StepStatus::Failed;
-                p.updated_at = Utc::now();
-                store.persist_latest(plan_id).await?;
-                break Ok((
-                    format!(
-                        "Plan '{}' halted: iteration limit ({}) reached.",
-                        plan_title, iter_limit
-                    ),
-                    false,
-                ));
-            }
-        };
-
-        // _flag_guard (PlanExecutingGuard) clears plan_executing on drop.
-
-        // Finalize plan status in-place — no Plan clone
-        let (summary, plan_goal_id, plan_succeeded) = {
-            let mut store = store_arc.write().await;
-            let p = store.get_mut(plan_id).await?.ok_or_else(|| {
-                common::KlyntbotError::Plan(common::PlanError::NotFound(plan_id.to_string()))
-            })?;
-            let goal_id = p.goal_id;
-            let (msg, succeeded) = match &result {
-                Ok((msg, true)) => {
-                    p.status = PlanStatus::Completed;
-                    p.completed_at = Some(Utc::now());
-                    p.updated_at = Utc::now();
-                    ((*msg).clone(), true)
-                }
-                Ok((msg, _)) => {
-                    p.status = PlanStatus::Failed;
-                    p.updated_at = Utc::now();
-                    ((*msg).clone(), false)
-                }
-                Err(_) => {
-                    p.status = PlanStatus::Failed;
-                    p.updated_at = Utc::now();
-                    (
-                        format!("Plan '{}' failed with an error.", plan_title),
-                        false,
-                    )
-                }
-            };
-            store.persist_latest(plan_id).await?;
-            (msg, goal_id, succeeded)
-        };
-
-        // Notify the completion handler (best-effort; updates linked goal metrics)
-        if let Some(handler) = &self.plan_completion_handler {
-            if let Err(e) = handler
-                .on_plan_completed(plan_id, plan_goal_id, plan_succeeded, &summary)
-                .await
-            {
-                warn!("PlanCompletionHandler failed (non-fatal): {}", e);
-            }
-        }
-
-        info!("{}", summary);
-        result.map(|_| summary.clone())
-    }
+    // run_plan_execution() is in plan_runner.rs
 
     /// Process a single inbound message
     #[tracing::instrument(skip(self, msg), fields(channel = %msg.channel, sender = %msg.sender_id))]
@@ -1154,77 +736,11 @@ impl AgentLoop {
         // Drop the write lock
         drop(session_manager);
 
-        // Create routing context for tools
+        // Run through pipeline
         let routing_ctx = RoutingContext::new(msg.channel.clone(), msg.chat_id.clone());
-
-        let response_content = if let Some(pipeline) = &self.pipeline {
-            // Pipeline path: build system prompt separately, convert history, delegate
-            let mut context_builder = self.context_builder.write().await;
-            let system_prompt = context_builder
-                .build_system_prompt(msg.channel.as_str(), msg.chat_id.as_str())
-                .await;
-            drop(context_builder);
-
-            let history_messages: Vec<Message> = history
-                .iter()
-                .map(|m| match m.role.as_str() {
-                    "system" => Message::system(&m.content),
-                    "user" => Message::user(&m.content),
-                    "assistant" => Message::assistant(&m.content),
-                    _ => Message::user(&m.content),
-                })
-                .collect();
-
-            let tool_registry = self.tool_registry.read().await;
-            let tool_defs = tool_registry.get_definitions();
-            let tool_names: Vec<String> = tool_registry.tool_names();
-            drop(tool_registry);
-            let tool_name_refs: Vec<&str> = tool_names.iter().map(|s| s.as_str()).collect();
-
-            let result = pipeline
-                .process_message(
-                    &msg.content,
-                    history_messages,
-                    &tool_defs,
-                    &tool_name_refs,
-                    &routing_ctx,
-                    Some(&system_prompt),
-                )
-                .await?;
-
-            info!(
-                "Pipeline: strategy={}, escalations={}",
-                result.strategy_used, result.escalations
-            );
-            result.content
-        } else {
-            // Legacy path
-            let mut context_builder = self.context_builder.write().await;
-            let media = if msg.media.is_empty() {
-                None
-            } else {
-                Some(msg.media.clone())
-            };
-            let messages = context_builder
-                .build_messages(
-                    history,
-                    &msg.content,
-                    media,
-                    msg.channel.as_str(),
-                    msg.chat_id.as_str(),
-                )
-                .await;
-            drop(context_builder);
-
-            self.run_agent_loop(
-                messages,
-                false,
-                &routing_ctx,
-                StreamingChannels::none(),
-                CancellationToken::new(),
-            )
-            .await?
-        };
+        let response_content = self
+            .run_pipeline(&msg.content, history, &routing_ctx)
+            .await?;
 
         // Save assistant response to session
         self.save_to_session(session_key.as_str(), &response_content)
@@ -1274,9 +790,6 @@ impl AgentLoop {
         // Session key for the original conversation
         let session_key = format!("{}:{}", origin_channel, origin_chat_id);
 
-        // Create routing context for the origin channel (not "system")
-        let routing_ctx = RoutingContext::new(origin_channel.into(), origin_chat_id.into());
-
         // Get or create session and add system message as "user" role
         let mut session_manager = self.session_manager.write().await;
         let session = session_manager.get_or_create(&session_key).await?;
@@ -1288,31 +801,13 @@ impl AgentLoop {
         // Get session history
         let history = session.get_history(DEFAULT_HISTORY_LIMIT).to_vec();
 
-        // Drop the write lock before building messages
+        // Drop the write lock before processing
         drop(session_manager);
 
-        // Build messages for LLM
-        let mut context_builder = self.context_builder.write().await;
-        let messages = context_builder
-            .build_messages(
-                history,
-                &system_msg_content,
-                None,
-                origin_channel,
-                origin_chat_id,
-            )
-            .await;
-        drop(context_builder);
-
-        // Run agent loop
+        // Run through pipeline
+        let routing_ctx = RoutingContext::new(origin_channel.into(), origin_chat_id.into());
         let response_content = self
-            .run_agent_loop(
-                messages,
-                false,
-                &routing_ctx,
-                StreamingChannels::none(),
-                CancellationToken::new(),
-            )
+            .run_pipeline(&system_msg_content, history, &routing_ctx)
             .await?;
 
         // Save assistant response to session
@@ -1402,523 +897,9 @@ impl AgentLoop {
         }
     }
 
-    /// Run the agent iteration loop with the given messages.
-    /// Returns the final response content.
-    ///
-    /// `channels` carries optional event/user-response/prompt-pending channels
-    /// for interactive streaming mode. Pass `StreamingChannels::none()` when not
-    /// streaming interactively.
-    /// When `cancel_token` is cancelled, stops processing and returns partial content.
-    #[tracing::instrument(skip(self, messages, routing_ctx, channels, cancel_token), fields(message_count = messages.len()))]
-    async fn run_agent_loop(
-        &self,
-        messages: Vec<Message>,
-        use_streaming: bool,
-        routing_ctx: &RoutingContext,
-        channels: StreamingChannels,
-        cancel_token: CancellationToken,
-    ) -> Result<String> {
-        let mut current_messages = messages;
-        let mut final_content = None;
-
-        // Dynamic iteration limit: 50 for plan mode, 20 for chat mode
-        let max_iterations = if self.is_plan_executing() {
-            50
-        } else {
-            MAX_TOOL_ITERATIONS
-        };
-
-        for iteration in 0..max_iterations {
-            // Check for cancellation before each iteration
-            if cancel_token.is_cancelled() {
-                debug!("Agent loop cancelled at iteration {}", iteration);
-                break;
-            }
-
-            debug!("Agent iteration {}/{}", iteration + 1, max_iterations);
-            emit!(
-                channels.event_tx,
-                AgentEvent::IterationStart {
-                    iteration: iteration + 1,
-                    max: max_iterations,
-                }
-            );
-
-            let tool_registry = self.tool_registry.read().await;
-            let tools = tool_registry.get_definitions();
-            drop(tool_registry);
-
-            // Delegate to streaming or non-streaming path
-            let response = if use_streaming && self.provider.supports_streaming() {
-                self.run_streaming_iteration(
-                    &mut current_messages,
-                    &tools,
-                    routing_ctx,
-                    &channels.event_tx,
-                    &cancel_token,
-                )
-                .await
-            } else {
-                self.run_standard_iteration(
-                    &mut current_messages,
-                    &tools,
-                    routing_ctx,
-                    &channels.event_tx,
-                )
-                .await
-            };
-
-            // Emit Error event before propagating failures
-            let response = match response {
-                Ok(r) => r,
-                Err(e) => {
-                    emit!(channels.event_tx, AgentEvent::Error(e.to_string()));
-                    return Err(e);
-                }
-            };
-
-            match response {
-                IterationOutcome::ToolCallsProcessed => {
-                    continue;
-                }
-                IterationOutcome::FinalContent(content) => {
-                    final_content = Some(content);
-                    break;
-                }
-                IterationOutcome::Empty => {
-                    warn!("LLM returned no content and no tool calls");
-                    break;
-                }
-            }
-        }
-
-        let result = final_content.unwrap_or_else(|| {
-            "I've finished processing. Is there anything else I can help with?".to_string()
-        });
-
-        emit!(channels.event_tx, AgentEvent::Done(result.clone()));
-
-        Ok(result)
-    }
-
-    /// Evaluate confidence for a set of tool calls.
-    ///
-    /// Returns `Some(IterationOutcome)` if confidence handling short-circuits
-    /// (Clarify → nudge, Skip → final content). Returns `None` if we should
-    /// proceed with tool execution, along with the optional assessment.
-    async fn evaluate_confidence(
-        &self,
-        content: &str,
-        tool_names: &[String],
-        routing_ctx: &RoutingContext,
-        event_tx: &Option<mpsc::Sender<AgentEvent>>,
-        messages: &mut Vec<Message>,
-    ) -> (
-        Option<IterationOutcome>,
-        Option<crate::confidence::ConfidenceAssessment>,
-    ) {
-        let evaluator = match &self.confidence_evaluator {
-            Some(ev) => ev,
-            None => return (None, None),
-        };
-
-        let assessment = match evaluator.parse_assessment(content) {
-            Some(a) => a,
-            None => return (None, None),
-        };
-
-        let action_str = match &assessment.action {
-            DecisionAction::Proceed => "proceed",
-            DecisionAction::Clarify { .. } => "clarify",
-            DecisionAction::Skip { .. } => "skip",
-        };
-        emit!(
-            event_tx,
-            AgentEvent::ConfidenceAssessed {
-                score: assessment.score,
-                action: action_str.to_string(),
-            }
-        );
-
-        // Log the assessment
-        let entry = confidence::types::DecisionLogEntry {
-            id: uuid::Uuid::new_v4().to_string(),
-            session_key: routing_ctx.chat_id.to_string(),
-            iteration: 0,
-            tool_names: tool_names.to_vec(),
-            user_message_preview: String::new(),
-            assessment: assessment.clone(),
-            outcome: None,
-            created_at: chrono::Utc::now(),
-        };
-        self.decision_logger.log(&entry).await;
-
-        match &assessment.action {
-            DecisionAction::Clarify { .. } => {
-                debug!(
-                    score = assessment.score,
-                    "Low confidence — nudging LLM to call ask_user"
-                );
-                let nudge = format!(
-                    "Your confidence assessment was low (score: {:.2}). \
-                     Low dimensions: {}. Reasoning: \"{}\"\n\n\
-                     You MUST call the ask_user tool to clarify with the user \
-                     before proceeding. Ask contextually relevant questions \
-                     using appropriate types (single_select, yes_no, free_text). \
-                     Do NOT proceed with other tools until you have clarified.",
-                    assessment.score,
-                    low_dimensions_summary(
-                        &assessment,
-                        self.confidence_evaluator
-                            .as_ref()
-                            .map(|e| e.threshold())
-                            .expect("confidence_evaluator must exist in Clarify branch"),
-                    ),
-                    assessment.reasoning,
-                );
-                messages.push(Message::system(nudge));
-                (Some(IterationOutcome::ToolCallsProcessed), None)
-            }
-            DecisionAction::Skip { reason } => {
-                debug!(reason = %reason, "Skipping tool calls");
-                (Some(IterationOutcome::FinalContent(reason.clone())), None)
-            }
-            DecisionAction::Proceed => (None, Some(assessment)),
-        }
-    }
-
-    /// Execute tool calls in parallel and append results to the message history.
-    ///
-    /// Also records outcomes to the learning system and invalidates context
-    /// caches for mutating tools.
-    async fn execute_tool_calls(
-        &self,
-        tool_calls: &[providers::ToolCall],
-        messages: &mut Vec<Message>,
-        routing_ctx: &RoutingContext,
-        event_tx: &Option<mpsc::Sender<AgentEvent>>,
-        last_confidence: Option<&crate::confidence::ConfidenceAssessment>,
-    ) {
-        let tool_call_messages = tool_calls_to_messages(tool_calls);
-        messages.push(Message::assistant_with_tools(tool_call_messages));
-
-        let tool_futures: Vec<_> = tool_calls
-            .iter()
-            .map(|tc| {
-                let registry = self.tool_registry.clone();
-                let name = tc.name.clone();
-                let args = tc.arguments.clone();
-                let ctx = routing_ctx.clone();
-                let id = tc.id.clone();
-                let etx = event_tx.clone();
-                async move {
-                    debug!("Executing tool: {}", name);
-                    if let Some(tx) = &etx {
-                        let _ = tx
-                            .send(AgentEvent::ToolStart {
-                                name: name.clone(),
-                                args: args.clone(),
-                            })
-                            .await;
-                    }
-                    let start = Instant::now();
-                    let reg = registry.read().await;
-                    let result = reg.execute(&name, args, &ctx).await;
-                    let duration_ms = start.elapsed().as_millis() as u64;
-                    let success = result.is_ok();
-                    if let Some(tx) = &etx {
-                        let _ = tx
-                            .send(AgentEvent::ToolEnd {
-                                name: name.clone(),
-                                success,
-                                duration_ms,
-                            })
-                            .await;
-                    }
-                    (id, name, result, duration_ms)
-                }
-            })
-            .collect();
-
-        let results = join_all(tool_futures).await;
-
-        // Track which caches need invalidation
-        let mut invalidate_todo = false;
-        let mut invalidate_memory = false;
-        let mut invalidate_goals = false;
-
-        let outcome_session_key = format!("{}:{}", routing_ctx.channel, routing_ctx.chat_id);
-        for (id, name, result, duration_ms) in results {
-            // Record outcome for learning system (best-effort, privacy-by-omission)
-            if let Some(recorder) = &self.outcome_recorder {
-                let success = result.is_ok();
-                let error_cat = result
-                    .as_ref()
-                    .err()
-                    .map(|e| crate::learning::recorder::categorize_error(&e.to_string()));
-                recorder
-                    .record_tool_outcome(
-                        &name,
-                        success,
-                        error_cat,
-                        duration_ms,
-                        last_confidence,
-                        crate::learning::ExecutionMode::Chat,
-                        &outcome_session_key,
-                    )
-                    .await;
-            }
-
-            // Track cache invalidation needs based on tool names
-            if result.is_ok() {
-                match name.as_str() {
-                    "todo" => invalidate_todo = true,
-                    "memory_write" | "memory" => invalidate_memory = true,
-                    "goal" => invalidate_goals = true,
-                    _ => {}
-                }
-            }
-
-            let result_str = match result {
-                Ok(r) => r,
-                Err(e) => format!("Error: {}", e),
-            };
-            messages.push(Message::tool(id, name, result_str));
-        }
-
-        // Invalidate caches after mutating tool calls
-        if invalidate_todo || invalidate_memory || invalidate_goals {
-            let mut ctx_builder = self.context_builder.write().await;
-            if invalidate_todo {
-                ctx_builder.invalidate_todo_cache();
-            }
-            if invalidate_memory {
-                ctx_builder.invalidate_memory_cache();
-            }
-            if invalidate_goals {
-                ctx_builder.invalidate_goals_cache();
-            }
-        }
-    }
-
-    /// Run a single standard (non-streaming) iteration.
-    async fn run_standard_iteration(
-        &self,
-        messages: &mut Vec<Message>,
-        tools: &[serde_json::Value],
-        routing_ctx: &RoutingContext,
-        event_tx: &Option<mpsc::Sender<AgentEvent>>,
-    ) -> Result<IterationOutcome> {
-        let params = ChatParams::new(&self.config.agents.defaults.model);
-        let response = self.provider.chat(messages, Some(tools), &params).await?;
-
-        // Check for tool calls
-        if !response.tool_calls.is_empty() {
-            debug!("LLM requested {} tool calls", response.tool_calls.len());
-
-            let content = response.content.as_deref().unwrap_or("");
-            let tool_names: Vec<String> = response
-                .tool_calls
-                .iter()
-                .map(|tc| tc.name.clone())
-                .collect();
-
-            let (short_circuit, last_confidence) = self
-                .evaluate_confidence(content, &tool_names, routing_ctx, event_tx, messages)
-                .await;
-            if let Some(outcome) = short_circuit {
-                return Ok(outcome);
-            }
-
-            self.execute_tool_calls(
-                &response.tool_calls,
-                messages,
-                routing_ctx,
-                event_tx,
-                last_confidence.as_ref(),
-            )
-            .await;
-
-            return Ok(IterationOutcome::ToolCallsProcessed);
-        }
-
-        // No tool calls - check for final content
-        if let Some(content) = response.content {
-            let clean = confidence::evaluator::strip_confidence_blocks(&content);
-            // Emit ContentChunk so the CLI can display text even for non-streaming providers
-            emit!(event_tx, AgentEvent::ContentChunk(clean.clone()));
-            Ok(IterationOutcome::FinalContent(clean))
-        } else {
-            Ok(IterationOutcome::Empty)
-        }
-    }
-
-    /// Run a single streaming iteration.
-    ///
-    /// Content chunks are emitted via `event_tx` for real-time display.
-    /// Respects cancellation via `cancel_token`.
-    async fn run_streaming_iteration(
-        &self,
-        messages: &mut Vec<Message>,
-        tools: &[serde_json::Value],
-        routing_ctx: &RoutingContext,
-        event_tx: &Option<mpsc::Sender<AgentEvent>>,
-        cancel_token: &CancellationToken,
-    ) -> Result<IterationOutcome> {
-        let params = ChatParams::new(&self.config.agents.defaults.model);
-        let mut stream = self
-            .provider
-            .chat_stream(messages, Some(tools), &params)
-            .await?;
-
-        let mut accumulated_content = String::new();
-        let mut accumulated_tool_calls: HashMap<usize, ToolCallAccumulator> =
-            HashMap::with_capacity(4);
-
-        // Process stream chunks with cancellation support
-        loop {
-            tokio::select! {
-                chunk_opt = stream.next() => {
-                    let Some(chunk_result) = chunk_opt else { break };
-                    let chunk = chunk_result?;
-
-                    // Accumulate and emit content chunks
-                    if let Some(content) = chunk.content {
-                        accumulated_content.push_str(&content);
-                        emit!(event_tx, AgentEvent::ContentChunk(content));
-                    }
-
-                    // Accumulate tool calls
-                    if let Some(delta) = chunk.tool_call_delta {
-                        let accumulator = accumulated_tool_calls
-                            .entry(delta.index)
-                            .or_insert_with(ToolCallAccumulator::new);
-
-                        if let Some(id) = delta.id {
-                            accumulator.id = id;
-                        }
-                        if let Some(name) = delta.name {
-                            accumulator.name = name;
-                        }
-                        if let Some(args) = delta.arguments {
-                            accumulator.arguments.push_str(&args);
-                        }
-                    }
-
-                    if chunk.is_final {
-                        break;
-                    }
-                }
-                _ = cancel_token.cancelled() => {
-                    debug!("Streaming cancelled by user");
-                    // Return whatever we have so far
-                    if !accumulated_content.is_empty() {
-                        return Ok(IterationOutcome::FinalContent(accumulated_content));
-                    }
-                    return Ok(IterationOutcome::Empty);
-                }
-            }
-        }
-
-        // Build tool calls from accumulated data
-        let tool_calls: Vec<providers::ToolCall> = accumulated_tool_calls
-            .into_values()
-            .map(|acc| {
-                let arguments: serde_json::Value = serde_json::from_str(&acc.arguments)
-                    .unwrap_or_else(|_| serde_json::json!({"raw": acc.arguments}));
-
-                providers::ToolCall {
-                    id: acc.id,
-                    name: acc.name,
-                    arguments,
-                }
-            })
-            .collect();
-
-        // Handle tool calls or final content
-        if !tool_calls.is_empty() {
-            debug!("LLM requested {} tool calls", tool_calls.len());
-
-            let tool_names: Vec<String> = tool_calls.iter().map(|tc| tc.name.clone()).collect();
-
-            let (short_circuit, last_confidence) = self
-                .evaluate_confidence(
-                    &accumulated_content,
-                    &tool_names,
-                    routing_ctx,
-                    event_tx,
-                    messages,
-                )
-                .await;
-            if let Some(outcome) = short_circuit {
-                return Ok(outcome);
-            }
-
-            self.execute_tool_calls(
-                &tool_calls,
-                messages,
-                routing_ctx,
-                event_tx,
-                last_confidence.as_ref(),
-            )
-            .await;
-
-            return Ok(IterationOutcome::ToolCallsProcessed);
-        }
-
-        if !accumulated_content.is_empty() {
-            let clean = confidence::evaluator::strip_confidence_blocks(&accumulated_content);
-            Ok(IterationOutcome::FinalContent(clean))
-        } else {
-            Ok(IterationOutcome::Empty)
-        }
-    }
-
-    /// Set the adaptive orchestrator pipeline.
-    ///
-    /// When set, `process_message_v2()` becomes available, routing through the
-    /// new classify → assemble → dispatch → validate → record pipeline instead
-    /// of the legacy `run_agent_loop` iteration loop.
-    ///
-    /// The v2 path is accessible programmatically via `process_message_v2()`
-    /// or through CLI `chat` when pipeline is set. The `run()` bus loop
-    /// already routes through the pipeline when set (via `process_message`).
-    pub fn set_pipeline(&mut self, pipeline: Arc<crate::pipeline::AgentPipeline>) {
-        self.pipeline = Some(pipeline);
-    }
-
-    /// Process a message through the Adaptive Orchestrator pipeline (v2).
-    ///
-    /// Requires `set_pipeline()` to have been called first. Falls back to
-    /// the legacy `process_direct()` path if no pipeline is set.
-    ///
-    /// Pipeline flow: Orchestrator → ContextEngine → EngineDispatch →
-    /// ResponseValidator → CostTracker
-    pub async fn process_message_v2(&self, content: String, session_key: String) -> Result<String> {
-        let pipeline = match &self.pipeline {
-            Some(p) => Arc::clone(p),
-            None => {
-                debug!("No pipeline set, falling back to legacy process_direct");
-                return self.process_direct(content, session_key).await;
-            }
-        };
-
-        let preview = if content.len() > 80 {
-            format!("{}...", truncate_safe(&content, 80))
-        } else {
-            content.clone()
-        };
-        debug!("Processing message (v2 pipeline): {}", preview);
-
-        // Get or create session + add user message
-        let mut session_manager = self.session_manager.write().await;
-        let session = session_manager.get_or_create(&session_key).await?;
-        session.add_message("user", &content);
-        let history = session.get_history(DEFAULT_HISTORY_LIMIT).to_vec();
-        drop(session_manager);
-
-        // Convert session history to provider Messages
-        let history_messages: Vec<Message> = history
+    /// Convert session history to provider Messages.
+    fn convert_history(history: &[session::SessionMessage]) -> Vec<Message> {
+        history
             .iter()
             .map(|m| match m.role.as_str() {
                 "system" => Message::system(&m.content),
@@ -1926,38 +907,50 @@ impl AgentLoop {
                 "assistant" => Message::assistant(&m.content),
                 _ => Message::user(&m.content),
             })
-            .collect();
+            .collect()
+    }
 
-        // Get tool definitions and names
+    /// Get tool definitions and names from the registry.
+    async fn get_tool_info(&self) -> (Vec<serde_json::Value>, Vec<String>) {
         let tool_registry = self.tool_registry.read().await;
         let tool_defs = tool_registry.get_definitions();
-        let tool_names: Vec<String> = tool_registry.tool_names();
-        drop(tool_registry);
+        let tool_names = tool_registry.tool_names();
+        (tool_defs, tool_names)
+    }
 
+    /// Run a message through the pipeline with the given routing context.
+    async fn run_pipeline(
+        &self,
+        content: &str,
+        history: Vec<session::SessionMessage>,
+        routing_ctx: &RoutingContext,
+    ) -> Result<String> {
+        let mut context_builder = self.context_builder.write().await;
+        let system_prompt = context_builder
+            .build_system_prompt(routing_ctx.channel.as_str(), routing_ctx.chat_id.as_str())
+            .await;
+        drop(context_builder);
+
+        let history_messages = Self::convert_history(&history);
+        let (tool_defs, tool_names) = self.get_tool_info().await;
         let tool_name_refs: Vec<&str> = tool_names.iter().map(|s| s.as_str()).collect();
 
-        // Create routing context
-        let routing_ctx = RoutingContext::new("cli".into(), session_key.clone().into());
-
-        // Run through pipeline (v2 uses config default system prompt)
-        let result = pipeline
+        let result = self
+            .pipeline
             .process_message(
-                &content,
+                content,
                 history_messages,
                 &tool_defs,
                 &tool_name_refs,
-                &routing_ctx,
-                None,
+                routing_ctx,
+                Some(&system_prompt),
             )
             .await?;
 
         info!(
-            "Pipeline v2: strategy={}, escalations={}, valid={}",
-            result.strategy_used, result.escalations, result.validation.is_valid
+            "Pipeline: strategy={}, escalations={}",
+            result.strategy_used, result.escalations
         );
-
-        // Save to session
-        self.save_to_session(&session_key, &result.content).await;
 
         Ok(result.content)
     }
@@ -1992,26 +985,9 @@ impl AgentLoop {
         let history = session.get_history(DEFAULT_HISTORY_LIMIT).to_vec();
         drop(session_manager);
 
-        // Create routing context for CLI
+        // Run through pipeline
         let routing_ctx = RoutingContext::new("cli".into(), session_key.clone().into());
-
-        // Build messages for LLM
-        let mut context_builder = self.context_builder.write().await;
-        let messages = context_builder
-            .build_messages(history, &content, None, "cli", &session_key)
-            .await;
-        drop(context_builder);
-
-        // Run agent loop (with streaming enabled for CLI, no interactive prompts)
-        let response_content = self
-            .run_agent_loop(
-                messages,
-                true,
-                &routing_ctx,
-                StreamingChannels::none(),
-                CancellationToken::new(),
-            )
-            .await?;
+        let response_content = self.run_pipeline(&content, history, &routing_ctx).await?;
 
         // Save to session
         self.save_to_session(&session_key, &response_content).await;
@@ -2072,83 +1048,22 @@ impl AgentLoop {
 
         // Clone Arcs for the spawned task
         let agent = Arc::clone(self);
-        let cancel = cancel_token.clone();
         let sk = session_key.clone();
 
         let handle = tokio::spawn(async move {
-            let result = if let Some(pipeline) = &agent.pipeline {
-                // Pipeline path: non-streaming for now, but usage is tracked
-                let mut context_builder = agent.context_builder.write().await;
-                let system_prompt = context_builder.build_system_prompt("cli", &sk).await;
-                drop(context_builder);
-
-                let history_messages: Vec<Message> = history
-                    .iter()
-                    .map(|m| match m.role.as_str() {
-                        "system" => Message::system(&m.content),
-                        "user" => Message::user(&m.content),
-                        "assistant" => Message::assistant(&m.content),
-                        _ => Message::user(&m.content),
-                    })
-                    .collect();
-
-                let tool_registry = agent.tool_registry.read().await;
-                let tool_defs = tool_registry.get_definitions();
-                let tool_names: Vec<String> = tool_registry.tool_names();
-                drop(tool_registry);
-                let tool_name_refs: Vec<&str> = tool_names.iter().map(|s| s.as_str()).collect();
-
-                match pipeline
-                    .process_message(
-                        &content,
-                        history_messages,
-                        &tool_defs,
-                        &tool_name_refs,
-                        &routing_ctx,
-                        Some(&system_prompt),
-                    )
-                    .await
-                {
-                    Ok(pipeline_result) => {
-                        info!(
-                            "Pipeline (streaming): strategy={}, escalations={}",
-                            pipeline_result.strategy_used, pipeline_result.escalations
-                        );
-
-                        // Emit the full response for the CLI renderer
-                        let _ = event_tx
-                            .send(AgentEvent::ContentChunk(pipeline_result.content.clone()))
-                            .await;
-                        let _ = event_tx
-                            .send(AgentEvent::Done(pipeline_result.content.clone()))
-                            .await;
-
-                        Ok(pipeline_result.content)
-                    }
-                    Err(e) => {
-                        let _ = event_tx.send(AgentEvent::Error(e.to_string())).await;
-                        Err(e)
-                    }
+            let result = match agent.run_pipeline(&content, history, &routing_ctx).await {
+                Ok(response) => {
+                    // Emit the full response for the CLI renderer
+                    let _ = event_tx
+                        .send(AgentEvent::ContentChunk(response.clone()))
+                        .await;
+                    let _ = event_tx.send(AgentEvent::Done(response.clone())).await;
+                    Ok(response)
                 }
-            } else {
-                // Legacy streaming path
-                let mut context_builder = agent.context_builder.write().await;
-                let messages = context_builder
-                    .build_messages(history, &content, None, "cli", &sk)
-                    .await;
-                drop(context_builder);
-
-                agent
-                    .run_agent_loop(
-                        messages,
-                        true,
-                        &routing_ctx,
-                        StreamingChannels {
-                            event_tx: Some(event_tx),
-                        },
-                        cancel,
-                    )
-                    .await
+                Err(e) => {
+                    let _ = event_tx.send(AgentEvent::Error(e.to_string())).await;
+                    Err(e)
+                }
             };
 
             // Save to session regardless of success/failure
@@ -2173,37 +1088,6 @@ impl AgentLoop {
     }
 }
 
-/// Summarize which confidence dimensions scored below threshold.
-///
-/// Used in the system nudge message when confidence is low, so the LLM
-/// knows which aspects to clarify with the user.
-fn low_dimensions_summary(
-    assessment: &confidence::types::ConfidenceAssessment,
-    threshold: f32,
-) -> String {
-    let mut low = Vec::new();
-    if assessment.dimensions.intent_clarity < threshold {
-        low.push(format!(
-            "intent_clarity ({:.2})",
-            assessment.dimensions.intent_clarity
-        ));
-    }
-    if assessment.dimensions.tool_fit < threshold {
-        low.push(format!("tool_fit ({:.2})", assessment.dimensions.tool_fit));
-    }
-    if assessment.dimensions.info_sufficiency < threshold {
-        low.push(format!(
-            "info_sufficiency ({:.2})",
-            assessment.dimensions.info_sufficiency
-        ));
-    }
-    if low.is_empty() {
-        "overall score".to_string()
-    } else {
-        low.join(", ")
-    }
-}
-
 /// Safely truncate a string to approximately `max_bytes` without splitting
 /// multi-byte UTF-8 characters. Returns the original string if already short enough.
 fn truncate_safe(s: &str, max_bytes: usize) -> &str {
@@ -2219,60 +1103,10 @@ fn truncate_safe(s: &str, max_bytes: usize) -> &str {
     &s[..end]
 }
 
-/// Helper to accumulate tool call data across chunks
-struct ToolCallAccumulator {
-    id: String,
-    name: String,
-    arguments: String,
-}
-
-impl ToolCallAccumulator {
-    fn new() -> Self {
-        Self {
-            id: String::new(),
-            name: String::new(),
-            arguments: String::new(),
-        }
-    }
-}
-
-/// Result of running a single agent iteration
-enum IterationOutcome {
-    /// Tool calls were processed; continue to next iteration
-    ToolCallsProcessed,
-    /// Final content was received; iteration complete
-    FinalContent(String),
-    /// No content and no tool calls; end iteration
-    Empty,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use bus::{LearningEvent, LearningEventBus};
-    use chrono::Utc;
-    use confidence::types::{
-        AssessmentPhase, ConfidenceAssessment, ConfidenceDimensions, DecisionAction,
-    };
-
-    fn make_assessment(
-        intent_clarity: f32,
-        tool_fit: f32,
-        info_sufficiency: f32,
-    ) -> ConfidenceAssessment {
-        ConfidenceAssessment {
-            score: (intent_clarity + tool_fit + info_sufficiency) / 3.0,
-            phase: AssessmentPhase::PreTool,
-            reasoning: "test reasoning".to_string(),
-            dimensions: ConfidenceDimensions {
-                intent_clarity,
-                tool_fit,
-                info_sufficiency,
-            },
-            action: DecisionAction::default(),
-            assessed_at: Utc::now(),
-        }
-    }
 
     /// AC-I2.3/2.4: AgentLoop subscriber task updates ContextBuilder threshold
     /// when LearningService publishes a ThresholdChanged event.
@@ -2281,8 +1115,11 @@ mod tests {
         use crate::ContextBuilder;
 
         let workspace = std::path::PathBuf::from("/tmp/test-subscriber-i2-agent");
+        let pool =
+            storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
+        let memory_note_repo = storage::MemoryNoteRepo::new(pool.inner().clone());
         let ctx = Arc::new(RwLock::new(
-            ContextBuilder::new(workspace, "UTC".to_string(), None, None).await,
+            ContextBuilder::new(workspace, "UTC".to_string(), None, None, memory_note_repo).await,
         ));
 
         let event_bus = Arc::new(LearningEventBus::new(16));
@@ -2318,38 +1155,5 @@ mod tests {
         );
 
         handle.abort();
-    }
-
-    #[test]
-    fn test_low_dimensions_summary_all_low() {
-        let assessment = make_assessment(0.3, 0.4, 0.2);
-        let summary = low_dimensions_summary(&assessment, 0.7);
-        assert!(summary.contains("intent_clarity"));
-        assert!(summary.contains("tool_fit"));
-        assert!(summary.contains("info_sufficiency"));
-    }
-
-    #[test]
-    fn test_low_dimensions_summary_one_low() {
-        let assessment = make_assessment(0.9, 0.8, 0.3);
-        let summary = low_dimensions_summary(&assessment, 0.7);
-        assert!(!summary.contains("intent_clarity"));
-        assert!(!summary.contains("tool_fit"));
-        assert!(summary.contains("info_sufficiency (0.30)"));
-    }
-
-    #[test]
-    fn test_low_dimensions_summary_none_low() {
-        let assessment = make_assessment(0.9, 0.8, 0.75);
-        let summary = low_dimensions_summary(&assessment, 0.7);
-        assert_eq!(summary, "overall score");
-    }
-
-    #[test]
-    fn test_low_dimensions_summary_at_threshold() {
-        // Exactly at threshold should NOT be listed as low
-        let assessment = make_assessment(0.7, 0.7, 0.7);
-        let summary = low_dimensions_summary(&assessment, 0.7);
-        assert_eq!(summary, "overall score");
     }
 }

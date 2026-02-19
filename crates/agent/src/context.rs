@@ -52,15 +52,17 @@ pub struct ContextBuilder {
 }
 
 impl ContextBuilder {
-    /// Create a new context builder
+    /// Create a new context builder with a SQL-backed memory repo.
     pub async fn new(
         workspace: PathBuf,
         timezone: String,
         todo_repo: Option<storage::TodoRepo>,
         goal_store: Option<std::sync::Arc<tokio::sync::RwLock<GoalStore>>>,
+        memory_note_repo: storage::MemoryNoteRepo,
     ) -> Self {
+        let memory = MemoryStore::new(memory_note_repo);
         Self {
-            memory: MemoryStore::new(workspace.clone()).await,
+            memory,
             skills: SkillManager::new(),
             workspace,
             timezone,

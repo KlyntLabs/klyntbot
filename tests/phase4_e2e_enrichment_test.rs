@@ -151,10 +151,7 @@ async fn test_e2e_enriched_task_persists_in_todo_store() {
 
 #[tokio::test]
 async fn test_e2e_accepted_enrichment_recorded_as_feedback() {
-    let tmp = TempDir::new().unwrap();
-    let outcome_store = Arc::new(RwLock::new(OutcomeStore::new(
-        tmp.path().join("outcomes.jsonl"),
-    )));
+    let outcome_store = Arc::new(RwLock::new(OutcomeStore::new_in_memory()));
     let recorder = Arc::new(OutcomeRecorder::new(Arc::clone(&outcome_store)));
 
     let config = TodoEnrichmentConfig::default();
@@ -178,7 +175,7 @@ async fn test_e2e_accepted_enrichment_recorded_as_feedback() {
     recorder.record_feedback(feedback).await.unwrap();
 
     // Verify feedback is stored (keep guard alive while using borrowed slice)
-    let mut s = outcome_store.write().await;
+    let s = outcome_store.read().await;
     let all_feedback = s.get_all_feedback().await.unwrap();
 
     assert_eq!(all_feedback.len(), 1, "one feedback entry must be recorded");
@@ -195,10 +192,7 @@ async fn test_e2e_accepted_enrichment_recorded_as_feedback() {
 
 #[tokio::test]
 async fn test_e2e_rejected_enrichment_override_recorded() {
-    let tmp = TempDir::new().unwrap();
-    let outcome_store = Arc::new(RwLock::new(OutcomeStore::new(
-        tmp.path().join("outcomes.jsonl"),
-    )));
+    let outcome_store = Arc::new(RwLock::new(OutcomeStore::new_in_memory()));
     let recorder = Arc::new(OutcomeRecorder::new(Arc::clone(&outcome_store)));
 
     let config = TodoEnrichmentConfig::default();
@@ -220,7 +214,7 @@ async fn test_e2e_rejected_enrichment_override_recorded() {
     };
     recorder.record_feedback(feedback).await.unwrap();
 
-    let mut s = outcome_store.write().await;
+    let s = outcome_store.read().await;
     let all_feedback = s.get_all_feedback().await.unwrap();
 
     assert_eq!(all_feedback.len(), 1);
@@ -241,10 +235,7 @@ async fn test_e2e_rejected_enrichment_override_recorded() {
 
 #[tokio::test]
 async fn test_e2e_feedback_loop_reflected_in_analysis() {
-    let tmp = TempDir::new().unwrap();
-    let outcome_store = Arc::new(RwLock::new(OutcomeStore::new(
-        tmp.path().join("outcomes.jsonl"),
-    )));
+    let outcome_store = Arc::new(RwLock::new(OutcomeStore::new_in_memory()));
     let recorder = Arc::new(OutcomeRecorder::new(Arc::clone(&outcome_store)));
 
     // Record 10 feedback entries: 7 accepted, 3 overridden
@@ -267,12 +258,12 @@ async fn test_e2e_feedback_loop_reflected_in_analysis() {
     }
 
     // Read feedback and run analysis (keep guard alive for borrowed slice)
-    let mut s = outcome_store.write().await;
+    let s = outcome_store.read().await;
     let feedback_entries = s.get_all_feedback().await.unwrap();
 
     assert_eq!(feedback_entries.len(), 10);
 
-    let analysis = LearningAnalyzer::analyze(&[], feedback_entries);
+    let analysis = LearningAnalyzer::analyze(&[], &feedback_entries);
     let stats = &analysis.enrichment_stats;
 
     assert_eq!(stats.total_suggestions, 10);
@@ -342,9 +333,7 @@ async fn test_e2e_enrichment_skips_already_set_fields() {
 async fn test_e2e_full_enrichment_pipeline() {
     let tmp = TempDir::new().unwrap();
     let mut todo_store = TodoStore::new(tmp.path().join("todos.jsonl"));
-    let outcome_store = Arc::new(RwLock::new(OutcomeStore::new(
-        tmp.path().join("outcomes.jsonl"),
-    )));
+    let outcome_store = Arc::new(RwLock::new(OutcomeStore::new_in_memory()));
     let recorder = Arc::new(OutcomeRecorder::new(Arc::clone(&outcome_store)));
 
     let config = TodoEnrichmentConfig::default();
@@ -398,7 +387,7 @@ async fn test_e2e_full_enrichment_pipeline() {
     assert_eq!(all_todos.len(), 5, "all 5 todos must be stored");
 
     // Verify feedback was recorded (keep guard alive)
-    let mut s = outcome_store.write().await;
+    let s = outcome_store.read().await;
     let feedback_entries = s.get_all_feedback().await.unwrap();
     let feedback_len = feedback_entries.len();
     assert_eq!(
@@ -408,7 +397,7 @@ async fn test_e2e_full_enrichment_pipeline() {
     );
 
     // Run analysis
-    let analysis = LearningAnalyzer::analyze(&[], feedback_entries);
+    let analysis = LearningAnalyzer::analyze(&[], &feedback_entries);
     assert_eq!(analysis.enrichment_stats.total_suggestions, feedback_len);
     assert_eq!(analysis.enrichment_stats.accepted_count, accepted_count);
     assert_eq!(analysis.enrichment_stats.overridden_count, rejected_count);
@@ -420,10 +409,7 @@ async fn test_e2e_full_enrichment_pipeline() {
 
 #[tokio::test]
 async fn test_e2e_enrichment_tool_outcome_recorded() {
-    let tmp = TempDir::new().unwrap();
-    let outcome_store = Arc::new(RwLock::new(OutcomeStore::new(
-        tmp.path().join("outcomes.jsonl"),
-    )));
+    let outcome_store = Arc::new(RwLock::new(OutcomeStore::new_in_memory()));
     let recorder = OutcomeRecorder::new(Arc::clone(&outcome_store));
 
     // Simulate the agent recording a tool outcome for the "todo" tool
@@ -440,7 +426,7 @@ async fn test_e2e_enrichment_tool_outcome_recorded() {
         )
         .await;
 
-    let mut s = outcome_store.write().await;
+    let s = outcome_store.read().await;
     let outcomes = s.get_all_outcomes().await.unwrap();
 
     assert_eq!(outcomes.len(), 1);

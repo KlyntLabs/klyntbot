@@ -181,7 +181,6 @@ impl ReminderEngine {
         calendar_handler: Option<&Arc<dyn CalendarHandler>>,
         dispatcher: &Arc<NotificationDispatcher>,
     ) -> Result<()> {
-
         // Rule #4: Calendar event alerts (within 30 minutes)
         if let Some(handler) = calendar_handler {
             // Fetch upcoming events from calendar

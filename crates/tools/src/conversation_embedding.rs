@@ -171,9 +171,15 @@ impl ConversationEmbeddingStore {
             let vector = pgvector::Vector::from(record.embedding.clone());
             // Delete existing first (upsert semantics)
             let _ = repo.delete(id).await;
-            repo.insert(id, &record.session_key, &vector, &record.role, &record.content_preview)
-                .await
-                .map_err(|e| common::ToolError::ExecutionFailed(e.to_string()))?;
+            repo.insert(
+                id,
+                &record.session_key,
+                &vector,
+                &record.role,
+                &record.content_preview,
+            )
+            .await
+            .map_err(|e| common::ToolError::ExecutionFailed(e.to_string()))?;
             let mut index = self.index.write().await;
             index.insert(record.id.clone(), record);
             return Ok(());

@@ -1,28 +1,19 @@
-//! Memory system for agent persistence.
+//! Memory system for agent persistence (SQL-backed).
 
 use chrono::{Datelike, Utc};
-use std::path::PathBuf;
-use tokio::fs;
 use tracing::{debug, warn};
 
 use common::Result;
 
-/// Memory store for daily notes and long-term memory
+/// Memory store for daily notes and long-term memory, backed by PostgreSQL.
 pub struct MemoryStore {
-    memory_dir: PathBuf,
+    repo: storage::MemoryNoteRepo,
 }
 
 impl MemoryStore {
-    /// Create a new memory store
-    pub async fn new(workspace_path: PathBuf) -> Self {
-        let memory_dir = workspace_path.join("memory");
-
-        // Create memory directory if it doesn't exist
-        if let Err(e) = tokio::fs::create_dir_all(&memory_dir).await {
-            warn!("Failed to create memory directory: {}", e);
-        }
-
-        Self { memory_dir }
+    /// Create a SQL-backed memory store.
+    pub fn new(repo: storage::MemoryNoteRepo) -> Self {
+        Self { repo }
     }
 
     /// Get memory context for system prompt (long-term + today's notes)
@@ -52,124 +43,86 @@ impl MemoryStore {
     /// Read today's daily note
     pub async fn read_today(&self) -> Result<String> {
         let today = Utc::now();
-        let filename = format!(
-            "{:04}-{:02}-{:02}.md",
+        let key = format!(
+            "{:04}-{:02}-{:02}",
             today.year(),
             today.month(),
             today.day()
         );
-        let path = self.memory_dir.join(filename);
 
-        if path.exists() {
-            Ok(fs::read_to_string(&path).await?)
-        } else {
-            Ok(String::new())
+        match self.repo.get(&key).await {
+            Ok(Some(row)) => Ok(row.content),
+            Ok(None) => Ok(String::new()),
+            Err(e) => {
+                warn!("Failed to read today's note from SQL: {}", e);
+                Ok(String::new())
+            }
         }
     }
 
     /// Append to today's daily note
     pub async fn append_today(&self, content: &str) -> Result<()> {
         let today = Utc::now();
-        let filename = format!(
-            "{:04}-{:02}-{:02}.md",
+        let key = format!(
+            "{:04}-{:02}-{:02}",
             today.year(),
             today.month(),
             today.day()
         );
-        let path = self.memory_dir.join(filename);
 
-        let existing = if path.exists() {
-            fs::read_to_string(&path).await?
-        } else {
-            String::new()
-        };
-
-        let new_content = if existing.is_empty() {
-            content.to_string()
-        } else {
-            format!("{}\n\n{}", existing, content)
-        };
-
-        fs::write(&path, new_content).await?;
-        debug!("Appended to today's memory: {}", path.display());
-
+        self.repo
+            .append(&key, content)
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        debug!("Appended to today's memory note (SQL): {}", key);
         Ok(())
     }
 
     /// Read long-term memory
     pub async fn read_long_term(&self) -> Result<String> {
-        let path = self.memory_dir.join("MEMORY.md");
-
-        if path.exists() {
-            Ok(fs::read_to_string(&path).await?)
-        } else {
-            Ok(String::new())
+        match self
+            .repo
+            .get(storage::repos::memory_note::LONG_TERM_KEY)
+            .await
+        {
+            Ok(Some(row)) => Ok(row.content),
+            Ok(None) => Ok(String::new()),
+            Err(e) => {
+                warn!("Failed to read long-term memory from SQL: {}", e);
+                Ok(String::new())
+            }
         }
     }
 
     /// Write long-term memory
     pub async fn write_long_term(&self, content: &str) -> Result<()> {
-        let path = self.memory_dir.join("MEMORY.md");
-        fs::write(&path, content).await?;
-        debug!("Updated long-term memory: {}", path.display());
+        self.repo
+            .upsert(storage::repos::memory_note::LONG_TERM_KEY, content)
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        debug!("Updated long-term memory (SQL)");
         Ok(())
     }
 
-    /// Get recent memories from the last N days
-    pub async fn get_recent_memories(&self, days: usize) -> Result<Vec<(String, String)>> {
-        let mut memories = Vec::new();
-
-        // Get all .md files in memory directory
-        let mut entries = fs::read_dir(&self.memory_dir).await?;
-
-        while let Some(entry) = entries.next_entry().await? {
-            let path = entry.path();
-
-            if path.extension().and_then(|s| s.to_str()) == Some("md") {
-                if let Some(filename) = path.file_stem().and_then(|s| s.to_str()) {
-                    // Skip MEMORY.md
-                    if filename == "MEMORY" {
-                        continue;
-                    }
-
-                    // Check if it's a date file (YYYY-MM-DD format)
-                    if filename.len() == 10 && filename.chars().filter(|c| *c == '-').count() == 2 {
-                        if let Ok(content) = fs::read_to_string(&path).await {
-                            memories.push((filename.to_string(), content));
-                        }
-                    }
-                }
+    /// Get the N most recent memory entries (ordered newest-first, excludes LONG_TERM).
+    pub async fn get_recent_memories(&self, limit: usize) -> Result<Vec<(String, String)>> {
+        match self.repo.list_recent(limit as i64).await {
+            Ok(rows) => Ok(rows.into_iter().map(|r| (r.note_key, r.content)).collect()),
+            Err(e) => {
+                warn!("Failed to list recent memories from SQL: {}", e);
+                Ok(Vec::new())
             }
         }
-
-        // Sort by date (newest first)
-        memories.sort_by(|a, b| b.0.cmp(&a.0));
-
-        // Take only the last N days
-        memories.truncate(days);
-
-        Ok(memories)
     }
 
-    /// List all memory files
+    /// List all memory keys
     pub async fn list_memory_files(&self) -> Result<Vec<String>> {
-        let mut files = Vec::new();
-
-        let mut entries = fs::read_dir(&self.memory_dir).await?;
-
-        while let Some(entry) = entries.next_entry().await? {
-            let path = entry.path();
-
-            if path.extension().and_then(|s| s.to_str()) == Some("md") {
-                if let Some(filename) = path.file_name().and_then(|s| s.to_str()) {
-                    files.push(filename.to_string());
-                }
+        match self.repo.list_keys().await {
+            Ok(keys) => Ok(keys),
+            Err(e) => {
+                warn!("Failed to list memory keys from SQL: {}", e);
+                Ok(Vec::new())
             }
         }
-
-        files.sort();
-        files.reverse(); // Newest first
-
-        Ok(files)
     }
 }

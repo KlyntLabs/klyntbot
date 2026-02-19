@@ -374,7 +374,8 @@ impl CronService {
 
     /// Convert a CronJobRow from SQL back to a domain CronJob.
     fn row_to_job(row: CronJobRow) -> CronJob {
-        let schedule = serde_json::from_value(row.schedule).unwrap_or(CronSchedule::Every { every_ms: 0 });
+        let schedule =
+            serde_json::from_value(row.schedule).unwrap_or(CronSchedule::Every { every_ms: 0 });
         let payload = serde_json::from_value(row.payload).unwrap_or_default();
         CronJob {
             id: row.id,

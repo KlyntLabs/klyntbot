@@ -21,8 +21,7 @@ impl StoragePool {
     /// No migrations are run. Queries will fail at runtime if `database_url`
     /// is invalid or unreachable.
     pub fn connect_lazy(database_url: &str) -> Result<Self, StorageError> {
-        let pool = sqlx::postgres::PgPoolOptions::new()
-            .connect_lazy(database_url)?;
+        let pool = sqlx::postgres::PgPoolOptions::new().connect_lazy(database_url)?;
         Ok(Self(pool))
     }
 

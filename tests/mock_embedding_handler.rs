@@ -61,6 +61,7 @@ impl MockEmbeddingHandler {
     }
 
     /// Create a mock that reports as unavailable (simulates model download failure).
+    #[allow(dead_code)]
     pub fn unavailable() -> Self {
         Self {
             embeddings: Mutex::new(HashMap::new()),

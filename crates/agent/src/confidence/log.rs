@@ -1,74 +1,75 @@
-//! Decision logging — append-only JSONL for confidence tracking.
+//! Decision logging — SQL-backed persistence for confidence tracking.
 
-use std::path::PathBuf;
-
-use tokio::fs::{self, OpenOptions};
-use tokio::io::AsyncWriteExt;
 use tracing::warn;
 
 use super::types::DecisionLogEntry;
 
-/// Append-only JSONL logger for confidence decisions.
+/// SQL-backed logger for confidence decisions.
 pub struct DecisionLogger {
-    path: PathBuf,
+    repo: storage::DecisionLogRepo,
 }
 
 impl DecisionLogger {
-    /// Create a logger writing to the given path.
-    pub fn new(path: PathBuf) -> Self {
-        Self { path }
+    /// Create a logger backed by a SQL repository.
+    pub fn new(repo: storage::DecisionLogRepo) -> Self {
+        Self { repo }
     }
 
-    /// Create a logger using the default path (`~/.klyntbot/decision_log.jsonl`).
-    pub fn default_path() -> Self {
-        let path = dirs::home_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join(".klyntbot")
-            .join("decision_log.jsonl");
-        Self::new(path)
-    }
-
-    /// Append a log entry.
+    /// Append a log entry (best-effort, never propagates errors).
     pub async fn log(&self, entry: &DecisionLogEntry) {
-        if let Err(e) = self.write_entry(entry).await {
+        let row = match entry_to_row(entry) {
+            Ok(r) => r,
+            Err(e) => {
+                warn!("Failed to serialize decision log entry: {}", e);
+                return;
+            }
+        };
+        if let Err(e) = self.repo.create(&row).await {
             warn!("Failed to write decision log: {}", e);
         }
     }
 
-    async fn write_entry(&self, entry: &DecisionLogEntry) -> std::io::Result<()> {
-        // Ensure parent directory exists
-        if let Some(parent) = self.path.parent() {
-            fs::create_dir_all(parent).await?;
-        }
-
-        let mut line = serde_json::to_string(entry)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
-        line.push('\n');
-
-        let mut file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&self.path)
-            .await?;
-        file.write_all(line.as_bytes()).await?;
-
-        Ok(())
-    }
-
     /// Read the most recent entries (up to `limit`).
     pub async fn recent(&self, limit: usize) -> Vec<DecisionLogEntry> {
-        let content = match fs::read_to_string(&self.path).await {
-            Ok(c) => c,
-            Err(_) => return Vec::new(),
-        };
-
-        content
-            .lines()
-            .rev()
-            .take(limit)
-            .filter_map(|line| serde_json::from_str(line).ok())
-            .collect()
+        match self.repo.list_recent(limit as i64).await {
+            Ok(rows) => rows
+                .into_iter()
+                .filter_map(|r| row_to_entry(r).ok())
+                .collect(),
+            Err(e) => {
+                warn!("Failed to read decision log: {}", e);
+                Vec::new()
+            }
+        }
     }
+}
+
+/// Convert a domain entry to a SQL row.
+fn entry_to_row(entry: &DecisionLogEntry) -> Result<storage::DecisionLogRow, serde_json::Error> {
+    Ok(storage::DecisionLogRow {
+        id: entry.id.clone(),
+        session_key: entry.session_key.clone(),
+        iteration: entry.iteration as i32,
+        tool_names: serde_json::to_value(&entry.tool_names)?,
+        user_message_preview: entry.user_message_preview.clone(),
+        assessment: serde_json::to_value(&entry.assessment)?,
+        outcome: entry.outcome.clone(),
+        created_at: entry.created_at,
+    })
+}
+
+/// Convert a SQL row back to a domain entry.
+fn row_to_entry(row: storage::DecisionLogRow) -> Result<DecisionLogEntry, serde_json::Error> {
+    Ok(DecisionLogEntry {
+        id: row.id,
+        session_key: row.session_key,
+        iteration: row.iteration as usize,
+        tool_names: serde_json::from_value(row.tool_names)?,
+        user_message_preview: row.user_message_preview,
+        assessment: serde_json::from_value(row.assessment)?,
+        outcome: row.outcome,
+        created_at: row.created_at,
+    })
 }
 
 #[cfg(test)]
@@ -76,7 +77,6 @@ mod tests {
     use super::*;
     use crate::confidence::types::*;
     use chrono::Utc;
-    use tempfile::TempDir;
 
     fn make_entry() -> DecisionLogEntry {
         DecisionLogEntry {
@@ -102,28 +102,15 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_log_and_read() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path().join("test_log.jsonl");
-        let logger = DecisionLogger::new(path);
-
+    #[test]
+    fn test_entry_row_roundtrip() {
         let entry = make_entry();
-        logger.log(&entry).await;
-        logger.log(&entry).await;
-
-        let recent = logger.recent(10).await;
-        assert_eq!(recent.len(), 2);
-        assert_eq!(recent[0].id, "test-001");
-    }
-
-    #[tokio::test]
-    async fn test_recent_empty() {
-        let dir = TempDir::new().unwrap();
-        let path = dir.path().join("nonexistent.jsonl");
-        let logger = DecisionLogger::new(path);
-
-        let recent = logger.recent(5).await;
-        assert!(recent.is_empty());
+        let row = entry_to_row(&entry).unwrap();
+        let back = row_to_entry(row).unwrap();
+        assert_eq!(back.id, "test-001");
+        assert_eq!(back.session_key, "cli:default");
+        assert_eq!(back.iteration, 1);
+        assert_eq!(back.tool_names, vec!["read_file".to_string()]);
+        assert!((back.assessment.score - 0.85).abs() < f32::EPSILON);
     }
 }

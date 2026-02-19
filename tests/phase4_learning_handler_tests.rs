@@ -18,7 +18,6 @@ use klyntbot::agent::learning::{ExecutionMode, OutcomeRecord, OutcomeStore};
 use klyntbot::agent::learning_handler::LearningHandlerImpl;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tempfile::TempDir;
 use tokio::sync::RwLock;
 use tools::learning_tool::{LearningHandler, LearningStatus, LearningTool, ThresholdEntry};
 use tools::{RoutingContext, Tool};
@@ -183,13 +182,11 @@ fn test_learning_tool_to_schema() {
 // AC-I5.3: LearningHandlerImpl with real OutcomeStore
 // ─────────────────────────────────────────────────────────────
 
-async fn make_handler(tmp: &TempDir) -> (LearningHandlerImpl, Arc<RwLock<OutcomeStore>>) {
-    let store = Arc::new(RwLock::new(OutcomeStore::new(
-        tmp.path().join("outcomes.jsonl"),
+fn make_handler() -> (LearningHandlerImpl, Arc<RwLock<OutcomeStore>>) {
+    let store = Arc::new(RwLock::new(OutcomeStore::new_in_memory()));
+    let adaptive = Arc::new(RwLock::new(AdaptiveThresholds::new_in_memory(
+        0.7, 0.4, 0.9, 50,
     )));
-    let adaptive = Arc::new(RwLock::new(
-        AdaptiveThresholds::load(tmp.path().join("state.json"), 0.7, 0.4, 0.9, 50).await,
-    ));
     let handler = LearningHandlerImpl::new(Arc::clone(&store), adaptive);
     (handler, store)
 }
@@ -197,8 +194,7 @@ async fn make_handler(tmp: &TempDir) -> (LearningHandlerImpl, Arc<RwLock<Outcome
 /// AC-I5.3: get_status() returns None when OutcomeStore is empty.
 #[tokio::test]
 async fn test_learning_handler_impl_get_status_empty_store() {
-    let tmp = TempDir::new().unwrap();
-    let (handler, _store) = make_handler(&tmp).await;
+    let (handler, _store) = make_handler();
 
     let status = handler.get_status().await.unwrap();
     assert!(
@@ -210,12 +206,11 @@ async fn test_learning_handler_impl_get_status_empty_store() {
 /// AC-I5.3: get_status() returns Some(LearningStatus) when outcomes exist.
 #[tokio::test]
 async fn test_learning_handler_impl_get_status_with_outcomes() {
-    let tmp = TempDir::new().unwrap();
-    let (handler, store) = make_handler(&tmp).await;
+    let (handler, store) = make_handler();
 
     // Record an outcome
     {
-        let mut store_guard = store.write().await;
+        let store_guard = store.write().await;
         store_guard
             .record(OutcomeRecord {
                 id: "test-001".to_string(),
@@ -249,8 +244,7 @@ async fn test_learning_handler_impl_get_status_with_outcomes() {
 /// AC-I5.3: analyze_now() always returns a LearningStatus (even with empty store).
 #[tokio::test]
 async fn test_learning_handler_impl_analyze_now_empty() {
-    let tmp = TempDir::new().unwrap();
-    let (handler, _store) = make_handler(&tmp).await;
+    let (handler, _store) = make_handler();
 
     let status = handler.analyze_now().await.unwrap();
     assert_eq!(status.total_outcomes, 0);
@@ -265,12 +259,11 @@ async fn test_learning_handler_impl_analyze_now_empty() {
 /// AC-I5.3: analyze_now() reflects multiple outcomes with per-tool aggregation.
 #[tokio::test]
 async fn test_learning_handler_impl_analyze_now_with_outcomes() {
-    let tmp = TempDir::new().unwrap();
-    let (handler, store) = make_handler(&tmp).await;
+    let (handler, store) = make_handler();
 
     // Record two outcomes for "todo" and one for "shell"
     {
-        let mut sg = store.write().await;
+        let sg = store.write().await;
         for i in 0..2 {
             sg.record(OutcomeRecord {
                 id: format!("todo-{}", i),
@@ -489,8 +482,7 @@ async fn test_learning_handler_trait_threshold_history_respects_limit() {
 /// AC-I5.5: LearningHandlerImpl.get_threshold_history() returns empty Vec with no changes.
 #[tokio::test]
 async fn test_learning_handler_impl_threshold_history_empty() {
-    let tmp = TempDir::new().unwrap();
-    let (handler, _store) = make_handler(&tmp).await;
+    let (handler, _store) = make_handler();
 
     let history = handler.get_threshold_history(10).await.unwrap();
     assert!(
