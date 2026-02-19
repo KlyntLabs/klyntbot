@@ -9,10 +9,97 @@ use tokio::sync::RwLock;
 use common::Result;
 use providers::{tool_calls_to_messages, DynProvider, Message};
 use tools::{registry::ToolRegistry, RoutingContext};
+use tracing::debug;
 
 use providers::Usage;
 
 use crate::execution::types::{CycleOutcome, ExecutionParams, ToolExecutionResult};
+
+/// Detect if a text response is actually a fabricated tool response.
+///
+/// Some LLMs (DeepSeek, Kimi, etc.) skip tool calls and generate text that
+/// looks like a tool result. This function uses heuristics to detect that pattern.
+///
+/// Returns `true` if the text appears to be a fabricated tool execution.
+fn is_fabricated_tool_response(text: &str, tool_names: &[&str]) -> bool {
+    if tool_names.is_empty() {
+        return false;
+    }
+
+    let lower = text.to_lowercase();
+
+    // Pattern 1: Contains a fake ID pattern (hex ID like "9c4e5f3b" or "a1b2c3d4")
+    let has_fake_id = {
+        let mut found = false;
+        // Look for "ID:" or "(ID:" followed by hex-like string
+        for pattern in &["id:", "(id:"] {
+            if let Some(pos) = lower.find(pattern) {
+                let after = &lower[pos + pattern.len()..];
+                let trimmed = after.trim_start();
+                // Check if next chars are hex-like (at least 6 hex chars)
+                let hex_chars = trimmed
+                    .chars()
+                    .take(10)
+                    .take_while(|c| c.is_ascii_hexdigit())
+                    .count();
+                if hex_chars >= 6 {
+                    found = true;
+                    break;
+                }
+            }
+        }
+        found
+    };
+
+    // Pattern 2: Structured result patterns that indicate fabricated output
+    let structured_result_indicators = [
+        "task created",
+        "task added",
+        "i've created the task",
+        "i searched the web",
+        "search results:",
+        "here are the results",
+        "i found these results",
+        "event created",
+        "reminder set",
+        "calendar event added",
+    ];
+    let has_structured_result = structured_result_indicators
+        .iter()
+        .any(|p| lower.contains(p));
+
+    // Pattern 3: Has multiple field-like patterns (Priority:, Due Date:, Description:, Tags:)
+    let field_patterns = [
+        "priority:",
+        "due date:",
+        "description:",
+        "tags:",
+        "estimated time:",
+    ];
+    let field_count = field_patterns
+        .iter()
+        .filter(|p| lower.contains(**p))
+        .count();
+    let has_multiple_fields = field_count >= 2;
+
+    // Pattern 4: Numbered list after a search indicator (e.g. "1. Result\n2. Result")
+    let search_indicators = [
+        "i searched the web",
+        "search results:",
+        "here are the results",
+        "i found these results",
+    ];
+    let has_search_with_list = search_indicators.iter().any(|p| lower.contains(p))
+        && lower.contains("\n1.")
+        && lower.contains("\n2.");
+
+    // Decision: fabricated if (has fake ID AND structured result)
+    //   OR (structured result AND multiple fields)
+    //   OR search with numbered list
+    (has_fake_id && has_structured_result)
+        || (has_structured_result && has_multiple_fields)
+        || has_search_with_list
+}
 
 /// Drives a single LLM-tool execution cycle.
 ///
@@ -52,6 +139,10 @@ impl ExecutionCore {
         let usage = response.usage.clone();
 
         if !response.tool_calls.is_empty() {
+            debug!("ExecutionCore: LLM returned {} tool calls: {:?}",
+                response.tool_calls.len(),
+                response.tool_calls.iter().map(|tc| &tc.name).collect::<Vec<_>>()
+            );
             // Append assistant message with tool calls
             let tool_call_msgs = tool_calls_to_messages(&response.tool_calls);
             messages.push(Message::assistant_with_tools(tool_call_msgs));
@@ -116,6 +207,7 @@ impl ExecutionCore {
         }
 
         // No tool calls — check for text content
+        debug!("ExecutionCore: LLM returned text response (no tool calls)");
         if let Some(content) = response.content {
             if !content.trim().is_empty() {
                 return Ok((CycleOutcome::FinalResponse { content }, usage));
@@ -322,6 +414,50 @@ mod tests {
             }
             other => panic!("Expected ToolsExecuted with timeout, got {:?}", other),
         }
+    }
+
+    // ── Fabrication detection tests ─────────────────────────────
+
+    #[test]
+    fn test_detects_fabricated_todo_response() {
+        let tool_names = vec!["todo", "calendar", "web_search"];
+        let fabricated = "I've created the task for you:\n\n**Task Created:** Buy groceries (ID: 9c4e5f3b)\n- **Description:** Weekly shopping\n- **Priority:** P3 (Medium)\n- **Due Date:** Tomorrow";
+        assert!(is_fabricated_tool_response(fabricated, &tool_names));
+    }
+
+    #[test]
+    fn test_detects_fabricated_search_response() {
+        let tool_names = vec!["todo", "calendar", "web_search"];
+        let fabricated = "I searched the web for you and found these results:\n1. Rust programming language\n2. Rust game";
+        assert!(is_fabricated_tool_response(fabricated, &tool_names));
+    }
+
+    #[test]
+    fn test_does_not_flag_normal_response() {
+        let tool_names = vec!["todo", "calendar", "web_search"];
+        let normal = "Sure! I'd be happy to help you create a task. What would you like the task to be about?";
+        assert!(!is_fabricated_tool_response(normal, &tool_names));
+    }
+
+    #[test]
+    fn test_does_not_flag_explanation_about_tools() {
+        let tool_names = vec!["todo", "calendar", "web_search"];
+        let explanation = "I have access to a todo tool that can help you manage tasks. Would you like me to create one?";
+        assert!(!is_fabricated_tool_response(explanation, &tool_names));
+    }
+
+    #[test]
+    fn test_detects_fabricated_with_fake_id() {
+        let tool_names = vec!["todo"];
+        let fabricated = "Task added! ID: a1b2c3d4. Title: Buy milk. Priority: High.";
+        assert!(is_fabricated_tool_response(fabricated, &tool_names));
+    }
+
+    #[test]
+    fn test_no_tools_means_no_fabrication() {
+        let tool_names: Vec<&str> = vec![];
+        let text = "Task Created: Buy groceries (ID: 9c4e5f3b)";
+        assert!(!is_fabricated_tool_response(text, &tool_names));
     }
 
     #[tokio::test]
