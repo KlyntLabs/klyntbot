@@ -9,8 +9,8 @@ pub use loader::{
     config_dir, config_path, init, load, load_sync, load_with_env_overrides, save, save_sync,
 };
 pub use schema::{
-    AppleCalendarConfig, CalendarConfig, CalendarProviderConfig, Config, DiscordConfig,
-    EmailConfig, ExtendedThinkingConfig, GenericCalDavConfig, GoogleCalendarConfig, LearningConfig,
-    ProviderManagerConfig, QQConfig, Secret, SlackConfig, TelegramConfig, TodoEnrichmentConfig,
-    WhatsAppConfig,
+    AppleCalendarConfig, CalendarConfig, CalendarProviderConfig, Config, CreationMode,
+    DiscordConfig, EmailConfig, ExtendedThinkingConfig, GenericCalDavConfig,
+    GoogleCalendarConfig, LearningConfig, ProviderManagerConfig, QQConfig, Secret, SlackConfig,
+    TelegramConfig, TodoEnrichmentConfig, WhatsAppConfig,
 };
