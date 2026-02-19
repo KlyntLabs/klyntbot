@@ -208,346 +208,278 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    // ── required_str ─────────────────────────────────────────────────
-
     #[test]
-    fn required_str_present() {
-        let args = json!({"path": "/tmp/test.txt"});
+    fn test_required_extractors_present() {
+        let args = json!({
+            "path": "/tmp/test.txt",
+            "count": 42,
+            "seconds": 60,
+            "enabled": true,
+            "tags": ["a", "b"],
+            "config": {"key": "value"}
+        });
         let p = ParamExtractor::new(&args);
-        assert_eq!(p.required_str("path").unwrap(), "/tmp/test.txt");
+
+        assert_eq!(
+            p.required_str("path").unwrap(),
+            "/tmp/test.txt",
+            "expected valid str extraction"
+        );
+        assert_eq!(
+            p.required_i64("count").unwrap(),
+            42,
+            "expected valid i64 extraction"
+        );
+        assert_eq!(
+            p.required_u64("seconds").unwrap(),
+            60,
+            "expected valid u64 extraction"
+        );
+        assert!(
+            p.required_bool("enabled").unwrap(),
+            "expected valid bool extraction"
+        );
+        assert_eq!(
+            p.required_array("tags").unwrap().len(),
+            2,
+            "expected valid array extraction"
+        );
+        assert_eq!(
+            p.required_object("config")
+                .unwrap()
+                .get("key")
+                .unwrap()
+                .as_str()
+                .unwrap(),
+            "value",
+            "expected valid object extraction"
+        );
     }
 
     #[test]
-    fn required_str_missing() {
+    fn test_required_extractors_missing() {
         let args = json!({});
         let p = ParamExtractor::new(&args);
-        let err = p.required_str("path").unwrap_err();
-        assert!(err
-            .to_string()
-            .contains("missing required 'path' parameter"));
+
+        let labels = ["str", "i64", "u64", "bool", "array", "object"];
+        let results: Vec<Result<(), KlyntbotError>> = vec![
+            p.required_str("x").map(|_| ()),
+            p.required_i64("x").map(|_| ()),
+            p.required_u64("x").map(|_| ()),
+            p.required_bool("x").map(|_| ()),
+            p.required_array("x").map(|_| ()),
+            p.required_object("x").map(|_| ()),
+        ];
+
+        for (label, result) in labels.iter().zip(results) {
+            let err = result.unwrap_err();
+            assert!(
+                err.to_string().contains("missing required 'x'"),
+                "expected MissingRequired error for required_{label}"
+            );
+        }
     }
 
     #[test]
-    fn required_str_wrong_type() {
-        let args = json!({"path": 123});
-        let p = ParamExtractor::new(&args);
-        let err = p.required_str("path").unwrap_err();
-        assert!(err.to_string().contains("'path' must be a string"));
+    fn test_required_extractors_wrong_type() {
+        let cases: Vec<(&str, Value, &str)> = vec![
+            ("str", json!({"x": 123}), "'x' must be a string"),
+            ("i64", json!({"x": "five"}), "'x' must be an integer"),
+            (
+                "u64",
+                json!({"x": "sixty"}),
+                "'x' must be a positive integer",
+            ),
+            ("bool", json!({"x": "yes"}), "'x' must be a boolean"),
+            ("array", json!({"x": "not-array"}), "'x' must be an array"),
+            (
+                "object",
+                json!({"x": "not-object"}),
+                "'x' must be an object",
+            ),
+        ];
+
+        for (label, args, expected_msg) in &cases {
+            let p = ParamExtractor::new(args);
+            let result: Result<(), KlyntbotError> = match *label {
+                "str" => p.required_str("x").map(|_| ()),
+                "i64" => p.required_i64("x").map(|_| ()),
+                "u64" => p.required_u64("x").map(|_| ()),
+                "bool" => p.required_bool("x").map(|_| ()),
+                "array" => p.required_array("x").map(|_| ()),
+                "object" => p.required_object("x").map(|_| ()),
+                _ => unreachable!(),
+            };
+            let err = result.unwrap_err();
+            assert!(
+                err.to_string().contains(expected_msg),
+                "expected TypeMismatch for required_{label}: got {err}"
+            );
+        }
     }
 
     #[test]
-    fn required_str_null_treated_as_missing() {
+    fn test_required_edge_cases() {
+        // null treated as missing for required_str
         let args = json!({"path": null});
         let p = ParamExtractor::new(&args);
         let err = p.required_str("path").unwrap_err();
-        assert!(err.to_string().contains("missing required 'path'"));
-    }
+        assert!(
+            err.to_string().contains("missing required 'path'"),
+            "expected null to be treated as missing for required_str"
+        );
 
-    // ── required_i64 ─────────────────────────────────────────────────
-
-    #[test]
-    fn required_i64_present() {
-        let args = json!({"count": 42});
+        // negative value rejected by required_u64
+        let args = json!({"n": -1});
         let p = ParamExtractor::new(&args);
-        assert_eq!(p.required_i64("count").unwrap(), 42);
+        let err = p.required_u64("n").unwrap_err();
+        assert!(
+            err.to_string().contains("'n' must be a positive integer"),
+            "expected negative value to fail for required_u64"
+        );
     }
 
     #[test]
-    fn required_i64_missing() {
-        let args = json!({});
-        let p = ParamExtractor::new(&args);
-        let err = p.required_i64("count").unwrap_err();
-        assert!(err.to_string().contains("missing required 'count'"));
+    fn test_optional_extractors_present_and_absent() {
+        let present = json!({
+            "s": "hello",
+            "i": 5,
+            "u": 60,
+            "b": false,
+            "a": [1, 2, 3]
+        });
+        let p = ParamExtractor::new(&present);
+
+        assert_eq!(p.optional_str("s").unwrap(), Some("hello"), "optional_str present");
+        assert_eq!(p.optional_i64("i").unwrap(), Some(5), "optional_i64 present");
+        assert_eq!(p.optional_u64("u").unwrap(), Some(60), "optional_u64 present");
+        assert_eq!(p.optional_bool("b").unwrap(), Some(false), "optional_bool present");
+        assert_eq!(
+            p.optional_array("a").unwrap().unwrap().len(),
+            3,
+            "optional_array present"
+        );
+
+        // All absent → None
+        let absent = json!({});
+        let p = ParamExtractor::new(&absent);
+
+        assert_eq!(p.optional_str("s").unwrap(), None, "optional_str absent");
+        assert_eq!(p.optional_i64("i").unwrap(), None, "optional_i64 absent");
+        assert_eq!(p.optional_u64("u").unwrap(), None, "optional_u64 absent");
+        assert_eq!(p.optional_bool("b").unwrap(), None, "optional_bool absent");
+        assert_eq!(p.optional_array("a").unwrap(), None, "optional_array absent");
+
+        // null also returns None (test with optional_str)
+        let null_val = json!({"s": null});
+        let p = ParamExtractor::new(&null_val);
+        assert_eq!(p.optional_str("s").unwrap(), None, "optional_str null is None");
     }
 
     #[test]
-    fn required_i64_wrong_type() {
-        let args = json!({"count": "five"});
-        let p = ParamExtractor::new(&args);
-        let err = p.required_i64("count").unwrap_err();
-        assert!(err.to_string().contains("'count' must be an integer"));
-    }
+    fn test_optional_extractors_wrong_type() {
+        let cases: Vec<(&str, Value, &str)> = vec![
+            ("str", json!({"x": 123}), "'x' must be a string"),
+            ("i64", json!({"x": "five"}), "'x' must be an integer"),
+            (
+                "u64",
+                json!({"x": "sixty"}),
+                "'x' must be a positive integer",
+            ),
+            ("bool", json!({"x": "true"}), "'x' must be a boolean"),
+            ("array", json!({"x": "not-array"}), "'x' must be an array"),
+        ];
 
-    // ── required_u64 ─────────────────────────────────────────────────
-
-    #[test]
-    fn required_u64_present() {
-        let args = json!({"seconds": 60});
-        let p = ParamExtractor::new(&args);
-        assert_eq!(p.required_u64("seconds").unwrap(), 60);
-    }
-
-    #[test]
-    fn required_u64_missing() {
-        let args = json!({});
-        let p = ParamExtractor::new(&args);
-        assert!(p.required_u64("seconds").is_err());
-    }
-
-    #[test]
-    fn required_u64_negative() {
-        let args = json!({"seconds": -1});
-        let p = ParamExtractor::new(&args);
-        let err = p.required_u64("seconds").unwrap_err();
-        assert!(err
-            .to_string()
-            .contains("'seconds' must be a positive integer"));
-    }
-
-    // ── required_bool ────────────────────────────────────────────────
-
-    #[test]
-    fn required_bool_present() {
-        let args = json!({"enabled": true});
-        let p = ParamExtractor::new(&args);
-        assert!(p.required_bool("enabled").unwrap());
+        for (label, args, expected_msg) in &cases {
+            let p = ParamExtractor::new(args);
+            let result: Result<(), KlyntbotError> = match *label {
+                "str" => p.optional_str("x").map(|_| ()),
+                "i64" => p.optional_i64("x").map(|_| ()),
+                "u64" => p.optional_u64("x").map(|_| ()),
+                "bool" => p.optional_bool("x").map(|_| ()),
+                "array" => p.optional_array("x").map(|_| ()),
+                _ => unreachable!(),
+            };
+            let err = result.unwrap_err();
+            assert!(
+                err.to_string().contains(expected_msg),
+                "expected TypeMismatch for optional_{label}: got {err}"
+            );
+        }
     }
 
     #[test]
-    fn required_bool_wrong_type() {
-        let args = json!({"enabled": "yes"});
-        let p = ParamExtractor::new(&args);
-        let err = p.required_bool("enabled").unwrap_err();
-        assert!(err.to_string().contains("'enabled' must be a boolean"));
-    }
-
-    // ── required_array ───────────────────────────────────────────────
-
-    #[test]
-    fn required_array_present() {
-        let args = json!({"tags": ["a", "b"]});
-        let p = ParamExtractor::new(&args);
-        assert_eq!(p.required_array("tags").unwrap().len(), 2);
-    }
-
-    #[test]
-    fn required_array_wrong_type() {
-        let args = json!({"tags": "not-an-array"});
-        let p = ParamExtractor::new(&args);
-        let err = p.required_array("tags").unwrap_err();
-        assert!(err.to_string().contains("'tags' must be an array"));
-    }
-
-    // ── required_object ──────────────────────────────────────────────
-
-    #[test]
-    fn required_object_present() {
-        let args = json!({"config": {"key": "value"}});
-        let p = ParamExtractor::new(&args);
-        let obj = p.required_object("config").unwrap();
-        assert_eq!(obj.get("key").unwrap().as_str().unwrap(), "value");
-    }
-
-    #[test]
-    fn required_object_wrong_type() {
-        let args = json!({"config": "not-an-object"});
-        let p = ParamExtractor::new(&args);
-        let err = p.required_object("config").unwrap_err();
-        assert!(err.to_string().contains("'config' must be an object"));
-    }
-
-    // ── optional_str ─────────────────────────────────────────────────
-
-    #[test]
-    fn optional_str_present() {
-        let args = json!({"label": "test"});
-        let p = ParamExtractor::new(&args);
-        assert_eq!(p.optional_str("label").unwrap(), Some("test"));
-    }
-
-    #[test]
-    fn optional_str_absent() {
-        let args = json!({});
-        let p = ParamExtractor::new(&args);
-        assert_eq!(p.optional_str("label").unwrap(), None);
-    }
-
-    #[test]
-    fn optional_str_wrong_type() {
-        let args = json!({"label": 123});
-        let p = ParamExtractor::new(&args);
-        let err = p.optional_str("label").unwrap_err();
-        assert!(err.to_string().contains("'label' must be a string"));
-    }
-
-    #[test]
-    fn optional_str_null_is_none() {
-        let args = json!({"label": null});
-        let p = ParamExtractor::new(&args);
-        assert_eq!(p.optional_str("label").unwrap(), None);
-    }
-
-    // ── str_or ───────────────────────────────────────────────────────
-
-    #[test]
-    fn str_or_present() {
+    fn test_or_default_extractors() {
+        // str_or: present returns value, absent returns default, wrong type errors
         let args = json!({"name": "custom"});
         let p = ParamExtractor::new(&args);
-        assert_eq!(p.str_or("name", "default").unwrap(), "custom");
-    }
+        assert_eq!(p.str_or("name", "default").unwrap(), "custom", "str_or present");
 
-    #[test]
-    fn str_or_absent_returns_default() {
         let args = json!({});
         let p = ParamExtractor::new(&args);
-        assert_eq!(p.str_or("name", "default").unwrap(), "default");
-    }
+        assert_eq!(p.str_or("name", "default").unwrap(), "default", "str_or absent");
 
-    #[test]
-    fn str_or_wrong_type_errors() {
         let args = json!({"name": 42});
         let p = ParamExtractor::new(&args);
         let err = p.str_or("name", "default").unwrap_err();
-        assert!(err.to_string().contains("'name' must be a string"));
-    }
+        assert!(
+            err.to_string().contains("'name' must be a string"),
+            "str_or wrong type"
+        );
 
-    // ── optional_i64 / i64_or ────────────────────────────────────────
-
-    #[test]
-    fn optional_i64_present() {
-        let args = json!({"count": 5});
-        let p = ParamExtractor::new(&args);
-        assert_eq!(p.optional_i64("count").unwrap(), Some(5));
-    }
-
-    #[test]
-    fn optional_i64_absent() {
-        let args = json!({});
-        let p = ParamExtractor::new(&args);
-        assert_eq!(p.optional_i64("count").unwrap(), None);
-    }
-
-    #[test]
-    fn optional_i64_wrong_type() {
-        let args = json!({"count": "five"});
-        let p = ParamExtractor::new(&args);
-        assert!(p.optional_i64("count").is_err());
-    }
-
-    #[test]
-    fn i64_or_absent_returns_default() {
-        let args = json!({});
-        let p = ParamExtractor::new(&args);
-        assert_eq!(p.i64_or("count", 10).unwrap(), 10);
-    }
-
-    #[test]
-    fn i64_or_present() {
+        // i64_or: present returns value, absent returns default, wrong type errors
         let args = json!({"count": 42});
         let p = ParamExtractor::new(&args);
-        assert_eq!(p.i64_or("count", 10).unwrap(), 42);
-    }
+        assert_eq!(p.i64_or("count", 10).unwrap(), 42, "i64_or present");
 
-    #[test]
-    fn i64_or_wrong_type_errors() {
+        let args = json!({});
+        let p = ParamExtractor::new(&args);
+        assert_eq!(p.i64_or("count", 10).unwrap(), 10, "i64_or absent");
+
         let args = json!({"count": "nope"});
         let p = ParamExtractor::new(&args);
-        assert!(p.i64_or("count", 10).is_err());
-    }
-
-    // ── optional_u64 ─────────────────────────────────────────────────
-
-    #[test]
-    fn optional_u64_present() {
-        let args = json!({"seconds": 60});
-        let p = ParamExtractor::new(&args);
-        assert_eq!(p.optional_u64("seconds").unwrap(), Some(60));
+        let err = p.i64_or("count", 10).unwrap_err();
+        assert!(
+            err.to_string().contains("'count' must be an integer"),
+            "i64_or wrong type"
+        );
     }
 
     #[test]
-    fn optional_u64_absent() {
-        let args = json!({});
-        let p = ParamExtractor::new(&args);
-        assert_eq!(p.optional_u64("seconds").unwrap(), None);
-    }
-
-    #[test]
-    fn optional_u64_wrong_type() {
-        let args = json!({"seconds": "sixty"});
-        let p = ParamExtractor::new(&args);
-        assert!(p.optional_u64("seconds").is_err());
-    }
-
-    // ── optional_bool ────────────────────────────────────────────────
-
-    #[test]
-    fn optional_bool_absent() {
-        let args = json!({});
-        let p = ParamExtractor::new(&args);
-        assert_eq!(p.optional_bool("flag").unwrap(), None);
-    }
-
-    #[test]
-    fn optional_bool_present() {
-        let args = json!({"flag": false});
-        let p = ParamExtractor::new(&args);
-        assert_eq!(p.optional_bool("flag").unwrap(), Some(false));
-    }
-
-    #[test]
-    fn optional_bool_wrong_type() {
-        let args = json!({"flag": "true"});
-        let p = ParamExtractor::new(&args);
-        assert!(p.optional_bool("flag").is_err());
-    }
-
-    // ── optional_array ───────────────────────────────────────────────
-
-    #[test]
-    fn optional_array_present() {
-        let args = json!({"items": [1, 2, 3]});
-        let p = ParamExtractor::new(&args);
-        assert_eq!(p.optional_array("items").unwrap().unwrap().len(), 3);
-    }
-
-    #[test]
-    fn optional_array_absent() {
-        let args = json!({});
-        let p = ParamExtractor::new(&args);
-        assert_eq!(p.optional_array("items").unwrap(), None);
-    }
-
-    #[test]
-    fn optional_array_wrong_type() {
-        let args = json!({"items": "not-array"});
-        let p = ParamExtractor::new(&args);
-        assert!(p.optional_array("items").is_err());
-    }
-
-    // ── string_array_or_empty ────────────────────────────────────────
-
-    #[test]
-    fn string_array_or_empty_present() {
+    fn test_string_array_or_empty() {
+        // Present: returns string values
         let args = json!({"tags": ["rust", "async"]});
         let p = ParamExtractor::new(&args);
         assert_eq!(
             p.string_array_or_empty("tags").unwrap(),
-            vec!["rust", "async"]
+            vec!["rust", "async"],
+            "string_array_or_empty present"
         );
-    }
 
-    #[test]
-    fn string_array_or_empty_absent() {
+        // Absent: returns empty vec
         let args = json!({});
         let p = ParamExtractor::new(&args);
-        assert!(p.string_array_or_empty("tags").unwrap().is_empty());
-    }
+        assert!(
+            p.string_array_or_empty("tags").unwrap().is_empty(),
+            "string_array_or_empty absent"
+        );
 
-    #[test]
-    fn string_array_or_empty_filters_non_strings() {
+        // Filters non-strings
         let args = json!({"tags": ["valid", 123, "also_valid"]});
         let p = ParamExtractor::new(&args);
         assert_eq!(
             p.string_array_or_empty("tags").unwrap(),
-            vec!["valid", "also_valid"]
+            vec!["valid", "also_valid"],
+            "string_array_or_empty filters non-strings"
         );
-    }
 
-    #[test]
-    fn string_array_or_empty_wrong_type() {
+        // Wrong type: errors
         let args = json!({"tags": "not-an-array"});
         let p = ParamExtractor::new(&args);
         let err = p.string_array_or_empty("tags").unwrap_err();
-        assert!(err.to_string().contains("'tags' must be an array"));
+        assert!(
+            err.to_string().contains("'tags' must be an array"),
+            "string_array_or_empty wrong type"
+        );
     }
 }
