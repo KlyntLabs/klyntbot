@@ -681,9 +681,31 @@ impl FinanceTool {
     }
 
     async fn tx_recurring_add(&self, p: &ParamExtractor<'_>) -> Result<String> {
-        let account_id = p.required_str("account_id")?;
+        let account_id = match p.optional_str("account_id")? {
+            Some(id) => id.to_string(),
+            None => {
+                let accounts = self
+                    .accounts
+                    .list(false)
+                    .await
+                    .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+                accounts
+                    .first()
+                    .map(|a| a.id.clone())
+                    .ok_or_else(|| {
+                        ToolError::InvalidParams(
+                            "No active accounts found. Create an account first.".to_string(),
+                        )
+                    })?
+            }
+        };
+        let account_id = account_id.as_str();
 
-        let type_str = p.required_str("type")?;
+        // Accept either "type" or "tx_type" — LLMs sometimes use the wrong one.
+        let type_str = p
+            .optional_str("type")?
+            .or(p.optional_str("tx_type")?)
+            .ok_or_else(|| ToolError::InvalidParams("Missing required 'type' parameter".to_string()))?;
         let tx_type = TransactionType::from_str_loose(type_str).ok_or_else(|| {
             ToolError::InvalidParams(format!("Invalid transaction type: {}", type_str))
         })?;
