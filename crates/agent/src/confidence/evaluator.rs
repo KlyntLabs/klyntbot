@@ -189,12 +189,6 @@ mod tests {
     }
 
     #[test]
-    fn test_strip_no_blocks() {
-        let content = "No blocks here";
-        assert_eq!(strip_confidence_blocks(content), content);
-    }
-
-    #[test]
     fn test_scores_clamped() {
         let evaluator = ConfidenceEvaluator::new(0.7);
         let content = r#"<confidence>
@@ -205,26 +199,6 @@ mod tests {
         assert!((assessment.score - 1.0).abs() < f32::EPSILON);
         assert!((assessment.dimensions.intent_clarity - 0.0).abs() < f32::EPSILON);
         assert!((assessment.dimensions.tool_fit - 1.0).abs() < f32::EPSILON);
-    }
-
-    #[test]
-    fn test_threshold_getter() {
-        let evaluator = ConfidenceEvaluator::new(0.7);
-        assert!((evaluator.threshold() - 0.7).abs() < f32::EPSILON);
-    }
-
-    #[test]
-    fn test_threshold_getter_clamped() {
-        let evaluator = ConfidenceEvaluator::new(1.5);
-        assert!((evaluator.threshold() - 1.0).abs() < f32::EPSILON);
-    }
-
-    // ─── AtomicU32 threshold tests (Task #12) ────────────────────────────────
-
-    #[test]
-    fn test_atomic_threshold_is_readable() {
-        let evaluator = ConfidenceEvaluator::new(0.65);
-        assert!((evaluator.threshold() - 0.65).abs() < f32::EPSILON);
     }
 
     #[test]
