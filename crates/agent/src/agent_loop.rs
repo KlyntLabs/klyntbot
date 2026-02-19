@@ -751,7 +751,7 @@ impl AgentLoop {
         // Run through pipeline
         let routing_ctx = RoutingContext::new(msg.channel.clone(), msg.chat_id.clone());
         let response_content = self
-            .run_pipeline(&msg.content, history, &routing_ctx)
+            .run_pipeline(&msg.content, history, &routing_ctx, None)
             .await?;
 
         // Save assistant response to session
@@ -819,7 +819,7 @@ impl AgentLoop {
         // Run through pipeline
         let routing_ctx = RoutingContext::new(origin_channel.into(), origin_chat_id.into());
         let response_content = self
-            .run_pipeline(&system_msg_content, history, &routing_ctx)
+            .run_pipeline(&system_msg_content, history, &routing_ctx, None)
             .await?;
 
         // Save assistant response to session
@@ -936,6 +936,7 @@ impl AgentLoop {
         content: &str,
         history: Vec<session::SessionMessage>,
         routing_ctx: &RoutingContext,
+        event_tx: Option<tokio::sync::mpsc::Sender<AgentEvent>>,
     ) -> Result<String> {
         let mut context_builder = self.context_builder.write().await;
         let system_prompt = context_builder
@@ -956,7 +957,7 @@ impl AgentLoop {
                 &tool_name_refs,
                 routing_ctx,
                 Some(&system_prompt),
-                None, // event_tx — wired in Task 6
+                event_tx,
             )
             .await?;
 
@@ -1000,7 +1001,7 @@ impl AgentLoop {
 
         // Run through pipeline
         let routing_ctx = RoutingContext::new("cli".into(), session_key.clone().into());
-        let response_content = self.run_pipeline(&content, history, &routing_ctx).await?;
+        let response_content = self.run_pipeline(&content, history, &routing_ctx, None).await?;
 
         // Save to session
         self.save_to_session(&session_key, &response_content).await;
@@ -1064,7 +1065,11 @@ impl AgentLoop {
         let sk = session_key.clone();
 
         let handle = tokio::spawn(async move {
-            let result = match agent.run_pipeline(&content, history, &routing_ctx).await {
+            let pipeline_event_tx = event_tx.clone();
+            let result = match agent
+                .run_pipeline(&content, history, &routing_ctx, Some(pipeline_event_tx))
+                .await
+            {
                 Ok(response) => {
                     // Emit the full response for the CLI renderer
                     let _ = event_tx
