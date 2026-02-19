@@ -109,7 +109,7 @@ async fn create_test_tool() -> (TodoTool, TempDir) {
     let temp_dir = TempDir::new().unwrap();
     let pool = test_pool();
     let repo = TodoRepo::new(pool.inner().clone());
-    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string());
+    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string(), klyntbot::config::CreationMode::default());
     (tool, temp_dir)
 }
 
@@ -124,7 +124,7 @@ async fn create_test_tool_with_embeddings() -> (TodoTool, Arc<MockEmbeddingHandl
     let emb_store = Arc::new(RwLock::new(EmbeddingStore::new(emb_path)));
     let mock = Arc::new(MockEmbeddingHandler::with_store(emb_store.clone()));
 
-    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string())
+    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string(), klyntbot::config::CreationMode::default())
         .with_embedding_handler(mock.clone() as Arc<dyn EmbeddingHandler>)
         .with_embedding_repo(EmbeddingRepo::new(pool.inner().clone()))
         .with_search_config(0.0, 60); // Low threshold so mock embeddings match
@@ -251,7 +251,7 @@ async fn test_ac3_embeddings_stored_separately() {
     let emb_store = Arc::new(RwLock::new(EmbeddingStore::new(embeddings_path.clone())));
     let mock = Arc::new(MockEmbeddingHandler::with_store(emb_store.clone()));
 
-    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string())
+    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string(), klyntbot::config::CreationMode::default())
         .with_embedding_handler(mock as Arc<dyn EmbeddingHandler>)
         .with_embedding_repo(EmbeddingRepo::new(pool.inner().clone()))
         .with_search_config(0.5, 60);
@@ -363,7 +363,7 @@ async fn test_ac7_search_1000_todos_under_500ms() {
     let repo = TodoRepo::new(pool.inner().clone());
     let mock_handler = Arc::new(MockEmbeddingHandler::new());
 
-    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string())
+    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string(), klyntbot::config::CreationMode::default())
         .with_embedding_handler(mock_handler as Arc<dyn EmbeddingHandler>)
         .with_embedding_repo(EmbeddingRepo::new(pool.inner().clone()))
         .with_search_config(0.0, 60);
@@ -463,7 +463,7 @@ async fn test_ec3_no_embeddings_returns_message() {
 
     // Add task WITHOUT embedding handler so no auto-embed
     let repo = TodoRepo::new(pool.inner().clone());
-    let tool_no_emb = TodoTool::new(repo, 3, 18, "UTC".to_string());
+    let tool_no_emb = TodoTool::new(repo, 3, 18, "UTC".to_string(), klyntbot::config::CreationMode::default());
     tool_no_emb
         .execute(
             json!({"action": "add", "title": "A task with no embedding"}),
@@ -474,7 +474,7 @@ async fn test_ec3_no_embeddings_returns_message() {
 
     // Search WITH embedding handler
     let repo2 = TodoRepo::new(pool.inner().clone());
-    let tool_with_emb = TodoTool::new(repo2, 3, 18, "UTC".to_string())
+    let tool_with_emb = TodoTool::new(repo2, 3, 18, "UTC".to_string(), klyntbot::config::CreationMode::default())
         .with_embedding_handler(mock as Arc<dyn EmbeddingHandler>)
         .with_embedding_repo(EmbeddingRepo::new(pool.inner().clone()))
         .with_search_config(0.5, 60);
@@ -506,7 +506,7 @@ async fn test_ec4_partial_embeddings_noted_in_output() {
 
     // Add task WITHOUT embedding handler
     let repo = TodoRepo::new(pool.inner().clone());
-    let tool_no_emb = TodoTool::new(repo, 3, 18, "UTC".to_string());
+    let tool_no_emb = TodoTool::new(repo, 3, 18, "UTC".to_string(), klyntbot::config::CreationMode::default());
     tool_no_emb
         .execute(
             json!({"action": "add", "title": "Task without embedding"}),
@@ -517,7 +517,7 @@ async fn test_ec4_partial_embeddings_noted_in_output() {
 
     // Add task WITH embedding handler
     let repo2 = TodoRepo::new(pool.inner().clone());
-    let tool_with_emb = TodoTool::new(repo2, 3, 18, "UTC".to_string())
+    let tool_with_emb = TodoTool::new(repo2, 3, 18, "UTC".to_string(), klyntbot::config::CreationMode::default())
         .with_embedding_handler(mock.clone() as Arc<dyn EmbeddingHandler>)
         .with_embedding_repo(EmbeddingRepo::new(pool.inner().clone()))
         .with_search_config(0.0, 60);
@@ -617,7 +617,7 @@ async fn test_ec12_graceful_degradation_model_unavailable() {
     let repo = TodoRepo::new(pool.inner().clone());
     let mock = Arc::new(MockEmbeddingHandler::unavailable());
 
-    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string())
+    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string(), klyntbot::config::CreationMode::default())
         .with_embedding_handler(mock as Arc<dyn EmbeddingHandler>)
         .with_embedding_repo(EmbeddingRepo::new(pool.inner().clone()))
         .with_search_config(0.5, 60);
@@ -682,7 +682,7 @@ async fn test_ec16_hybrid_zero_semantic_results() {
     let repo = TodoRepo::new(pool.inner().clone());
     let mock = Arc::new(MockEmbeddingHandler::unavailable());
 
-    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string())
+    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string(), klyntbot::config::CreationMode::default())
         .with_embedding_handler(mock as Arc<dyn EmbeddingHandler>)
         .with_embedding_repo(EmbeddingRepo::new(pool.inner().clone()))
         .with_search_config(0.5, 60);
@@ -738,7 +738,7 @@ async fn test_br1_embedding_failure_does_not_block_add() {
     let repo = TodoRepo::new(pool.inner().clone());
     let mock = Arc::new(MockEmbeddingHandler::unavailable());
 
-    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string())
+    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string(), klyntbot::config::CreationMode::default())
         .with_embedding_handler(mock as Arc<dyn EmbeddingHandler>)
         .with_embedding_repo(EmbeddingRepo::new(pool.inner().clone()))
         .with_search_config(0.5, 60);

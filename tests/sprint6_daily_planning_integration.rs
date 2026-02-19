@@ -150,7 +150,7 @@ async fn test_scoring_overdue_p1_ranks_highest() {
     let (_store, _dir, _ids) = create_planning_test_data().await;
     let pool = storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
     let repo = storage::TodoRepo::new(pool.inner().clone());
-    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string());
+    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string(), klyntbot::config::CreationMode::default());
 
     let ctx = RoutingContext::new(ChannelName::new("cli"), ChatId::new("test"));
 
@@ -211,7 +211,7 @@ async fn test_scoring_no_priority_uses_default_weight() {
     let (_store, _dir, _ids) = create_planning_test_data().await;
     let pool = storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
     let repo = storage::TodoRepo::new(pool.inner().clone());
-    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string());
+    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string(), klyntbot::config::CreationMode::default());
 
     let ctx = RoutingContext::new(ChannelName::new("cli"), ChatId::new("test"));
 
@@ -261,7 +261,7 @@ async fn test_plan_suggests_top_3_tasks() {
     let (_store, _dir, _ids) = create_planning_test_data().await;
     let pool = storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
     let repo = storage::TodoRepo::new(pool.inner().clone());
-    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string());
+    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string(), klyntbot::config::CreationMode::default());
 
     let ctx = RoutingContext::new(ChannelName::new("cli"), ChatId::new("test"));
 
@@ -308,7 +308,7 @@ async fn test_plan_excludes_completed_tasks() {
     let (_store, _dir, _ids) = create_planning_test_data().await;
     let pool = storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
     let repo = storage::TodoRepo::new(pool.inner().clone());
-    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string());
+    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string(), klyntbot::config::CreationMode::default());
 
     let ctx = RoutingContext::new(ChannelName::new("cli"), ChatId::new("test"));
 
@@ -334,7 +334,7 @@ async fn test_plan_excludes_template_tasks() {
     let (_store, _dir, _ids) = create_planning_test_data().await;
     let pool = storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
     let repo = storage::TodoRepo::new(pool.inner().clone());
-    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string());
+    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string(), klyntbot::config::CreationMode::default());
 
     let ctx = RoutingContext::new(ChannelName::new("cli"), ChatId::new("test"));
 
@@ -740,7 +740,7 @@ async fn test_cli_todo_plan_command() {
     let (_store, _dir, _ids) = create_planning_test_data().await;
     let pool = storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
     let repo = storage::TodoRepo::new(pool.inner().clone());
-    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string());
+    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string(), klyntbot::config::CreationMode::default());
 
     let ctx = RoutingContext::new(ChannelName::new("cli"), ChatId::new("test"));
 

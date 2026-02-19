@@ -38,6 +38,8 @@ pub struct TodoTool {
     timezone: String,
     /// Learning feedback handler for reporting enrichment outcomes
     feedback_handler: Option<Arc<dyn crate::EnrichmentFeedbackHandler>>,
+    /// Task creation mode from config
+    creation_mode: config::CreationMode,
 }
 
 impl TodoTool {
@@ -47,6 +49,7 @@ impl TodoTool {
         max_focus_slots: usize,
         focus_deadline_hours: u64,
         timezone: String,
+        creation_mode: config::CreationMode,
     ) -> Self {
         Self {
             repo,
@@ -60,6 +63,7 @@ impl TodoTool {
             rrf_k: 60,
             timezone,
             feedback_handler: None,
+            creation_mode,
         }
     }
 
@@ -159,6 +163,39 @@ impl TodoTool {
                 })
                 .await;
         }
+    }
+
+    // ─── Creation Guard ───
+
+    /// Check if the creation guard should trigger.
+    ///
+    /// Returns `true` if the task looks like the LLM hallucinated details:
+    /// - Title is short (≤ 3 words)
+    /// - 2+ optional fields are filled (description, priority, due_date, tags)
+    /// - The LLM did NOT set `confirmed: true`
+    pub fn should_guard_creation(
+        title: &str,
+        has_description: bool,
+        has_priority: bool,
+        has_due_date: bool,
+        has_tags: bool,
+        confirmed: bool,
+    ) -> bool {
+        if confirmed {
+            return false;
+        }
+
+        let word_count = title.split_whitespace().count();
+        if word_count > 3 {
+            return false;
+        }
+
+        let optional_count = [has_description, has_priority, has_due_date, has_tags]
+            .iter()
+            .filter(|&&v| v)
+            .count();
+
+        optional_count >= 2
     }
 
     // ─── Daily Planning — Scoring Algorithm (Sprint 6, Task #9/#11) ───
@@ -377,6 +414,10 @@ impl Tool for TodoTool {
                 "count": {
                     "type": "integer",
                     "description": "Number of tasks to include in plan (for plan, default: 3)"
+                },
+                "confirmed": {
+                    "type": "boolean",
+                    "description": "Set to true ONLY after gathering task details via ask_user. Required when creation mode is ask-first and the title is short with multiple optional fields filled. Do NOT set to true if you haven't used ask_user to confirm details with the user."
                 }
             },
             "required": ["action"]
@@ -400,6 +441,27 @@ impl Tool for TodoTool {
                     .and_then(|s| parse_datetime(s, &self.timezone));
                 todo.tags = p.string_array_or_empty("tags")?;
                 todo.project_id = p.optional_str("project_id")?.map(String::from);
+
+                // Creation guard: reject vague tasks with hallucinated details in ask-first mode
+                if self.creation_mode == config::CreationMode::AskFirst {
+                    let confirmed = p.optional_bool("confirmed")?.unwrap_or(false);
+                    if Self::should_guard_creation(
+                        title,
+                        todo.description.is_some(),
+                        todo.priority.is_some(),
+                        todo.due_date.is_some(),
+                        !todo.tags.is_empty(),
+                        confirmed,
+                    ) {
+                        return Ok(
+                            "GUARD: This task has a short title with multiple auto-filled fields that weren't confirmed by the user. \
+                             Use ask_user FIRST to verify the task details (title, description, priority, due date, tags) with the user, \
+                             then call todo add again with confirmed=true. \
+                             Alternatively, call todo add with ONLY the title field and let the enrichment engine handle the rest."
+                            .to_string()
+                        );
+                    }
+                }
 
                 let row = storage::TodoRow::from(&todo);
                 let created_row = self.repo.add(&row).await?;
@@ -1812,6 +1874,41 @@ mod tests {
         let created_in_future = now + Duration::days(5);
         let age = TodoTool::calculate_age_days(created_in_future, now);
         assert_eq!(age, 0.0);
+    }
+
+    #[test]
+    fn test_guard_triggers_on_vague_unconfirmed_task() {
+        assert!(TodoTool::should_guard_creation(
+            "buy", true, true, false, false, false,
+        ));
+    }
+
+    #[test]
+    fn test_guard_skips_when_confirmed() {
+        assert!(!TodoTool::should_guard_creation(
+            "buy", true, true, false, false, true,
+        ));
+    }
+
+    #[test]
+    fn test_guard_skips_for_detailed_title() {
+        assert!(!TodoTool::should_guard_creation(
+            "buy milk from the store", true, true, true, true, false,
+        ));
+    }
+
+    #[test]
+    fn test_guard_skips_when_few_optional_fields() {
+        assert!(!TodoTool::should_guard_creation(
+            "buy", true, false, false, false, false,
+        ));
+    }
+
+    #[test]
+    fn test_guard_skips_for_title_only() {
+        assert!(!TodoTool::should_guard_creation(
+            "buy", false, false, false, false, false,
+        ));
     }
 
     // Integration tests requiring a PgPool are in tests/storage_integration_test.rs

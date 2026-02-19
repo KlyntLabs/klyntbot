@@ -78,7 +78,7 @@ async fn create_tool_and_store() -> (TodoTool, Arc<RwLock<TodoStore>>, TempDir, 
     let store = Arc::new(RwLock::new(TodoStore::new(file_path)));
     let pool = StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
     let repo = TodoRepo::new(pool.inner().clone());
-    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string());
+    let tool = TodoTool::new(repo, 3, 18, "UTC".to_string(), klyntbot::config::CreationMode::default());
     let ctx = RoutingContext::new(
         common::ChannelName::new("test"),
         common::ChatId::new("test-chat"),
