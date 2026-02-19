@@ -52,33 +52,6 @@ fn create_mock_notification_dispatcher() -> Arc<tokio::sync::RwLock<Vec<(String,
 }
 
 #[tokio::test]
-#[ignore] // Remove this once Phase 3 is complete
-async fn test_todo_tool_via_agent() {
-    // SCENARIO: User sends message asking to create a task
-    // EXPECTED: TodoTool is called, task is created, response mentions task ID
-    //
-    // Test flow:
-    // 1. Create agent with todo tool enabled
-    // 2. Send message: "add a task to fix the authentication bug"
-    // 3. Verify TodoTool was invoked (check tool registry call count)
-    // 4. Verify task was persisted to JSONL
-    // 5. Verify response contains task ID and confidence score
-
-    todo!("Implement after Phase 3 (TodoTool) completion");
-
-    // let (agent, _temp_dir) = create_test_agent_with_todo().await;
-    //
-    // // Send message requesting task creation
-    // let response = agent.process_message(...).await?;
-    //
-    // // Verify tool was called
-    // assert!(response.contains("task"));
-    //
-    // // Verify JSONL persistence
-    // // ...
-}
-
-#[tokio::test]
 async fn test_todo_context_injection() {
     // SCENARIO: User has focused tasks, starts new conversation
     // EXPECTED: System prompt contains "# Active Tasks" section with focused tasks
@@ -770,13 +743,6 @@ async fn test_todo_store_persistence() {
 }
 
 // test_confidence_scoring_accuracy removed — old field-completeness heuristic replaced by LLM-driven confidence
-
-#[tokio::test]
-#[ignore] // Legacy confidence test — replaced by LLM-driven confidence
-async fn test_confidence_scoring_accuracy_legacy() {
-    // This test validated the old calculate_confidence() heuristic which has been removed.
-    // The new confidence system is LLM-driven (see crates/agent/src/confidence/).
-}
 
 #[tokio::test]
 async fn test_focus_slot_limit() {

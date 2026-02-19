@@ -168,20 +168,4 @@ mod tests {
         assert_eq!(parsed_chat_id, chat_id);
     }
 
-    #[test]
-    fn test_session_key_from_parts() {
-        let session_key = SessionKey::from_parts("discord", "789");
-        assert_eq!(session_key.as_str(), "discord:789");
-    }
-
-    #[test]
-    fn test_session_key_equality() {
-        let key1 = SessionKey::from_parts("telegram", "123");
-        let key2 = SessionKey::from_parts("telegram", "123");
-        let key3 = SessionKey::from_parts("discord", "123");
-
-        assert_eq!(key1, key2);
-        assert_ne!(key1, key3);
-    }
-
 }

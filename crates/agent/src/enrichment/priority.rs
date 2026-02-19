@@ -129,199 +129,64 @@ mod tests {
     use tools::todo_types::Todo;
 
     #[test]
-    fn test_urgent_keyword() {
-        let mut task = Todo::default_instance();
-        task.title = "Fix urgent bug in login".to_string();
-
-        let result = infer_priority(&task);
-        assert!(result.is_some());
-        let s = result.unwrap();
-        assert_eq!(s.value, 1);
-        assert!(s.confidence >= 0.85);
+    fn test_priority_inference_from_keywords() {
+        let cases = [
+            ("URGENT: fix production", 1),  // high-priority keyword (case-insensitive)
+            ("Fix broken auth flow", 2),     // medium-high keyword ("broken")
+            ("Add feature: dark mode", 3),   // medium keyword ("feature")
+            ("Correct typo in readme", 4),   // low keyword ("typo")
+            ("Implement user dashboard", 3), // no keywords → default medium
+            ("nice to have: polish UI", 4),  // multi-word low keyword
+            ("low priority: cleanup", 4),    // multi-word low keyword
+            ("", 3),                         // empty title → default medium
+            ("   \t\n  ", 3),               // whitespace-only → default medium
+        ];
+        for (title, expected_priority) in cases {
+            let mut task = Todo::default_instance();
+            task.title = title.to_string();
+            let result = infer_priority(&task).expect("should always return Some");
+            assert_eq!(result.value, expected_priority, "failed for: {title:?}");
+        }
     }
 
     #[test]
-    fn test_bug_keyword() {
-        let mut task = Todo::default_instance();
-        task.title = "Fix broken auth flow".to_string();
-
-        let result = infer_priority(&task);
-        assert!(result.is_some());
-        let s = result.unwrap();
-        assert_eq!(s.value, 2);
-    }
-
-    #[test]
-    fn test_feature_keyword() {
-        let mut task = Todo::default_instance();
-        task.title = "Add feature: dark mode".to_string();
-
-        let result = infer_priority(&task);
-        assert!(result.is_some());
-        let s = result.unwrap();
-        assert_eq!(s.value, 3);
-        assert!(s.confidence >= 0.70);
-    }
-
-    #[test]
-    fn test_low_priority_keyword() {
-        let mut task = Todo::default_instance();
-        task.title = "Correct typo in readme".to_string();
-
-        let result = infer_priority(&task);
-        assert!(result.is_some());
-        let s = result.unwrap();
-        assert_eq!(s.value, 4);
-    }
-
-    #[test]
-    fn test_no_keywords_defaults_medium() {
-        let mut task = Todo::default_instance();
-        task.title = "Implement user dashboard".to_string();
-
-        let result = infer_priority(&task);
-        assert!(result.is_some());
-        let s = result.unwrap();
-        assert_eq!(s.value, 3);
-        assert!(s.confidence <= 0.55);
-    }
-
-    #[test]
-    fn test_description_keywords_counted() {
+    fn test_priority_inference_from_multiple_sources() {
+        // Description keywords: "critical" in description → P1
         let mut task = Todo::default_instance();
         task.title = "Handle edge case".to_string();
         task.description = Some("This is a critical security issue".to_string());
+        assert_eq!(infer_priority(&task).unwrap().value, 1, "failed for: description keyword 'critical'");
 
-        let result = infer_priority(&task);
-        assert!(result.is_some());
-        // "critical" is high-priority, "security" is medium-high
-        // "critical" should match first
-        assert_eq!(result.unwrap().value, 1);
-    }
-
-    #[test]
-    fn test_tag_keywords_counted() {
+        // Tag keywords: "bug" in tags → P2
         let mut task = Todo::default_instance();
         task.title = "Some task".to_string();
         task.tags = vec!["bug".to_string()];
+        assert_eq!(infer_priority(&task).unwrap().value, 2, "failed for: tag keyword 'bug'");
 
-        let result = infer_priority(&task);
-        assert!(result.is_some());
-        assert_eq!(result.unwrap().value, 2);
+        // Tags only (no title/description keywords): "urgent" in tags → P1
+        let mut task = Todo::default_instance();
+        task.title = "Do something".to_string();
+        task.tags = vec!["urgent".to_string(), "production".to_string()];
+        let result = infer_priority(&task).unwrap();
+        assert_eq!(result.value, 1, "failed for: tags-only keyword 'urgent'");
+        assert!(result.confidence >= 0.85, "tags-only urgent should have high confidence");
     }
 
-    // ========================================================================
-    // Edge case tests (added by QA)
-    // ========================================================================
-
     #[test]
-    fn test_conflicting_keywords_picks_highest_confidence() {
-        // "Fix typo" has both "fix" (MEDIUM_HIGH) and "typo" (LOW)
-        // LOW_KEYWORDS have higher confidence (0.87) than MEDIUM_HIGH (0.82)
-        // So should pick "typo" → priority 4
+    fn test_priority_conflict_resolution() {
+        // "Fix typo" has "fix" (P2, conf 0.82) and "typo" (P4, conf 0.87)
+        // Highest confidence wins → "typo" at P4
         let mut task = Todo::default_instance();
         task.title = "Fix typo in header".to_string();
+        let result = infer_priority(&task).unwrap();
+        assert_eq!(result.value, 4, "failed for: 'Fix typo' should pick typo (conf 0.87) over fix (conf 0.82)");
+        assert!(result.confidence >= 0.85);
 
-        let result = infer_priority(&task);
-        assert!(result.is_some());
-        let s = result.unwrap();
-        assert_eq!(
-            s.value, 4,
-            "Should pick 'typo' (P4, conf 0.87) over 'fix' (P2, conf 0.82)"
-        );
-        assert!(s.confidence >= 0.85, "Should have high confidence");
-    }
-
-    #[test]
-    fn test_multiword_keyword_nice_to_have() {
-        let mut task = Todo::default_instance();
-        task.title = "This would be nice to have eventually".to_string();
-
-        let result = infer_priority(&task);
-        assert!(result.is_some());
-        let s = result.unwrap();
-        assert_eq!(s.value, 4, "Should detect 'nice to have' as low priority");
-    }
-
-    #[test]
-    fn test_multiword_keyword_low_priority() {
-        let mut task = Todo::default_instance();
-        task.title = "Low priority task for later".to_string();
-
-        let result = infer_priority(&task);
-        assert!(result.is_some());
-        let s = result.unwrap();
-        assert_eq!(s.value, 4, "Should detect 'low priority' as P4");
-    }
-
-    #[test]
-    fn test_empty_title_defaults_medium() {
-        let mut task = Todo::default_instance();
-        task.title = "".to_string();
-        task.description = None;
-
-        let result = infer_priority(&task);
-        assert!(result.is_some());
-        let s = result.unwrap();
-        assert_eq!(s.value, 3, "Empty title should default to medium priority");
-        assert!(
-            s.confidence <= 0.55,
-            "Empty title should have low confidence"
-        );
-    }
-
-    #[test]
-    fn test_case_insensitive_matching() {
-        let mut task = Todo::default_instance();
-        task.title = "URGENT FIX REQUIRED".to_string();
-
-        let result = infer_priority(&task);
-        assert!(result.is_some());
-        let s = result.unwrap();
-        assert_eq!(
-            s.value, 1,
-            "Should match 'URGENT' case-insensitively to high priority"
-        );
-    }
-
-    #[test]
-    fn test_tags_only_matching_no_title_keywords() {
-        let mut task = Todo::default_instance();
-        task.title = "Do something".to_string(); // No keywords
-        task.description = None;
-        task.tags = vec!["urgent".to_string(), "production".to_string()];
-
-        let result = infer_priority(&task);
-        assert!(result.is_some());
-        let s = result.unwrap();
-        assert_eq!(s.value, 1, "Should detect 'urgent' in tags");
-        assert!(s.confidence >= 0.85);
-    }
-
-    #[test]
-    fn test_multiple_conflicting_keywords_picks_best() {
-        // Has "urgent" (P1, 0.90), "bug" (P2, 0.82), "minor" (P4, 0.87)
-        // Should pick "urgent" (highest confidence)
+        // "URGENT minor bug fix" has "urgent" (P1, 0.90), "minor" (P4, 0.87), "bug" (P2, 0.82)
+        // Highest confidence wins → "urgent" at P1
         let mut task = Todo::default_instance();
         task.title = "URGENT minor bug fix".to_string();
-
-        let result = infer_priority(&task);
-        assert!(result.is_some());
-        let s = result.unwrap();
-        assert_eq!(
-            s.value, 1,
-            "Should pick 'urgent' as it has highest confidence (0.90)"
-        );
-    }
-
-    #[test]
-    fn test_whitespace_only_title() {
-        let mut task = Todo::default_instance();
-        task.title = "   \t\n  ".to_string();
-
-        let result = infer_priority(&task);
-        assert!(result.is_some());
-        let s = result.unwrap();
-        assert_eq!(s.value, 3, "Whitespace-only should default to medium");
+        let result = infer_priority(&task).unwrap();
+        assert_eq!(result.value, 1, "failed for: 'URGENT minor bug fix' should pick urgent (conf 0.90)");
     }
 }

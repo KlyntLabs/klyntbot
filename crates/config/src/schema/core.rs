@@ -1143,27 +1143,9 @@ mod tests {
     }
 
     #[test]
-    fn test_calendar_config_serialization_new_format() {
-        let config = CalendarConfig {
-            providers: vec![CalendarProviderConfig::Apple(AppleCalendarConfig {
-                enabled: true,
-                username: "user@apple.com".to_string(),
-                password: Secret::new("pass".to_string()),
-                ..AppleCalendarConfig::default()
-            })],
-            conflict_resolution: "server_wins".to_string(),
-            ..CalendarConfig::default()
-        };
-
-        let json = serde_json::to_string(&config).unwrap();
-        assert!(json.contains("\"providers\""));
-        assert!(json.contains("\"type\":\"apple\""));
-        assert!(json.contains("\"user@apple.com\""));
-    }
-
-    #[test]
-    fn test_calendar_config_roundtrip() {
-        let original = CalendarConfig {
+    fn test_config_serde_roundtrips() {
+        // CalendarConfig serialization
+        let cal_config = CalendarConfig {
             providers: vec![
                 CalendarProviderConfig::Apple(AppleCalendarConfig {
                     enabled: true,
@@ -1184,31 +1166,20 @@ mod tests {
             ..CalendarConfig::default()
         };
 
-        let json = serde_json::to_string(&original).unwrap();
-        let deserialized: CalendarConfig = serde_json::from_str(&json).unwrap();
+        let json = serde_json::to_string(&cal_config).unwrap();
+        assert!(json.contains("\"providers\""));
+        assert!(json.contains("\"type\":\"apple\""));
+        assert!(json.contains("\"user@apple.com\""));
 
-        assert_eq!(original.providers.len(), deserialized.providers.len());
+        // CalendarConfig roundtrip
+        let deserialized: CalendarConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(cal_config.providers.len(), deserialized.providers.len());
         assert_eq!(
-            original.conflict_resolution,
+            cal_config.conflict_resolution,
             deserialized.conflict_resolution
         );
-    }
 
-    #[test]
-    fn test_secret_is_empty() {
-        let empty_secret: Secret<String> = Secret::default();
-        assert!(empty_secret.is_empty());
-
-        let non_empty_secret = Secret::new("value".to_string());
-        assert!(!non_empty_secret.is_empty());
-    }
-
-    // ========================================================================
-    // Config integration tests
-    // ========================================================================
-
-    #[test]
-    fn test_config_calendar_serialization() {
+        // Config-level calendar serialization
         let mut config = Config::default();
         config
             .calendar
@@ -1219,35 +1190,31 @@ mod tests {
                 password: Secret::new("password123".to_string()),
                 ..AppleCalendarConfig::default()
             }));
-
         let json = serde_json::to_string_pretty(&config).unwrap();
         assert!(json.contains("\"calendar\""));
         assert!(json.contains("\"providers\""));
         assert!(json.contains("\"test@example.com\""));
-    }
 
-    // ========================================================================
-    // DailyPlanningConfig tests
-    // ========================================================================
-
-    #[test]
-    fn test_daily_planning_config_serde_roundtrip() {
-        // Test with enabled: false to verify it doesn't just rely on defaults
-        let config = DailyPlanningConfig {
+        // DailyPlanningConfig roundtrip
+        let daily = DailyPlanningConfig {
             enabled: false,
             planning_time: "09:30".to_string(),
         };
-        let json = serde_json::to_string(&config).unwrap();
-
-        // Verify camelCase serialization
-        assert!(json.contains("\"enabled\""));
+        let json = serde_json::to_string(&daily).unwrap();
         assert!(json.contains("\"planningTime\""));
         assert!(json.contains("\"09:30\""));
-
-        // Verify roundtrip
         let loaded: DailyPlanningConfig = serde_json::from_str(&json).unwrap();
         assert!(!loaded.enabled);
         assert_eq!(loaded.planning_time, "09:30");
+    }
+
+    #[test]
+    fn test_secret_is_empty() {
+        let empty_secret: Secret<String> = Secret::default();
+        assert!(empty_secret.is_empty());
+
+        let non_empty_secret = Secret::new("value".to_string());
+        assert!(!non_empty_secret.is_empty());
     }
 
     // ========================================================================

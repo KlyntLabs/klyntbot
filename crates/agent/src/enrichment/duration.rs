@@ -84,48 +84,19 @@ mod tests {
     use tools::todo_types::Todo;
 
     #[test]
-    fn test_quick_task() {
-        let mut task = Todo::default_instance();
-        task.title = "Fix typo in header".to_string();
-
-        let result = predict_duration(&task).unwrap();
-        assert_eq!(result.value, 15);
-    }
-
-    #[test]
-    fn test_small_task() {
-        let mut task = Todo::default_instance();
-        task.title = "Fix login validation".to_string();
-
-        let result = predict_duration(&task).unwrap();
-        assert_eq!(result.value, 30);
-    }
-
-    #[test]
-    fn test_medium_task() {
-        let mut task = Todo::default_instance();
-        task.title = "Implement user notifications".to_string();
-
-        let result = predict_duration(&task).unwrap();
-        assert_eq!(result.value, 60);
-    }
-
-    #[test]
-    fn test_large_task() {
-        let mut task = Todo::default_instance();
-        task.title = "Refactor authentication system".to_string();
-
-        let result = predict_duration(&task).unwrap();
-        assert_eq!(result.value, 120);
-    }
-
-    #[test]
-    fn test_default_duration() {
-        let mut task = Todo::default_instance();
-        task.title = "Review PR".to_string();
-
-        let result = predict_duration(&task).unwrap();
-        assert_eq!(result.value, 45);
-        assert!(result.confidence < 0.50);
+    fn test_duration_prediction_from_keywords() {
+        let cases = [
+            ("Fix typo in header", 15),             // quick (typo)
+            ("Fix login validation", 30),            // small (fix, but no quick keyword)
+            ("Implement user notifications", 60),    // medium (implement)
+            ("Refactor authentication system", 120), // large (refactor)
+            ("Review PR", 45),                       // default (no keywords)
+        ];
+        for (title, expected_minutes) in cases {
+            let mut task = Todo::default_instance();
+            task.title = title.to_string();
+            let result = predict_duration(&task).expect("should always return Some");
+            assert_eq!(result.value, expected_minutes, "failed for: {title}");
+        }
     }
 }

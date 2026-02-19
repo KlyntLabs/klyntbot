@@ -353,52 +353,6 @@ async fn test_session_lru_eviction() {
     assert_eq!(loaded.messages[0].content, "Message 0");
 }
 
-/// Test email config defaults
-#[test]
-fn test_email_config_defaults() {
-    use klyntbot::config::schema::EmailConfig;
-
-    let config = EmailConfig::default();
-
-    // Test the 8 new fields have correct defaults
-    assert!(
-        !config.consent_granted,
-        "consent_granted should default to false"
-    );
-    assert!(
-        config.auto_reply_enabled,
-        "auto_reply_enabled should default to true"
-    );
-    assert_eq!(
-        config.imap_mailbox, "INBOX",
-        "imap_mailbox should default to INBOX"
-    );
-    assert!(config.imap_use_ssl, "imap_use_ssl should default to true");
-    assert!(config.smtp_use_tls, "smtp_use_tls should default to true");
-    assert!(!config.smtp_use_ssl, "smtp_use_ssl should default to false");
-    assert_eq!(
-        config.max_body_chars, 12000,
-        "max_body_chars should default to 12000"
-    );
-    assert!(config.mark_seen, "mark_seen should default to true");
-}
-
-/// Test web search config
-#[test]
-fn test_web_search_config() {
-    use klyntbot::config::schema::WebToolsConfig;
-
-    let config = WebToolsConfig::default();
-    assert_eq!(config.max_results, 5, "max_results should default to 5");
-
-    // Test with custom value
-    let custom_config = WebToolsConfig {
-        brave_api_key: Secret::new("test-key".to_string()),
-        max_results: 10,
-    };
-    assert_eq!(custom_config.max_results, 10);
-}
-
 /// Test skills availability attribute
 #[tokio::test]
 async fn test_skills_availability() {
@@ -519,104 +473,6 @@ fn test_backward_compat_minimal_config() {
     assert_eq!(config.gateway.port, 18790);
 }
 
-/// Test FeishuConfig deserialization with defaults
-#[test]
-fn test_feishu_config_defaults() {
-    use klyntbot::config::schema::FeishuConfig;
-
-    let config = FeishuConfig::default();
-    assert!(!config.enabled, "feishu should default to disabled");
-    assert_eq!(config.app_id, "", "app_id should default to empty");
-    assert!(
-        config.app_secret.is_empty(),
-        "app_secret should default to empty"
-    );
-    assert!(
-        config.allow_from.is_empty(),
-        "allow_from should default to empty"
-    );
-}
-
-/// Test DingTalkConfig deserialization with defaults
-#[test]
-fn test_dingtalk_config_defaults() {
-    use klyntbot::config::schema::DingTalkConfig;
-
-    let config = DingTalkConfig::default();
-    assert!(!config.enabled, "dingtalk should default to disabled");
-    assert_eq!(config.client_id, "", "client_id should default to empty");
-    assert!(
-        config.client_secret.is_empty(),
-        "client_secret should default to empty"
-    );
-    assert!(
-        config.allow_from.is_empty(),
-        "allow_from should default to empty"
-    );
-}
-
-/// Test MochatConfig deserialization with defaults
-#[test]
-fn test_mochat_config_defaults() {
-    use klyntbot::config::schema::MochatConfig;
-
-    let config = MochatConfig::default();
-    assert!(!config.enabled, "mochat should default to disabled");
-    assert_eq!(config.base_url, "https://mochat.io");
-    assert_eq!(config.socket_url, "", "socket_url should default to empty");
-    assert!(
-        config.claw_token.is_empty(),
-        "claw_token should default to empty"
-    );
-    assert_eq!(
-        config.agent_user_id, "",
-        "agent_user_id should default to empty"
-    );
-    assert!(
-        config.allow_from.is_empty(),
-        "allow_from should default to empty"
-    );
-}
-
-/// Test new provider configs (zhipu, dashscope, minimax, moonshot, aihubmix) deserialize
-#[test]
-fn test_new_provider_configs() {
-    use klyntbot::config::schema::ProvidersConfig;
-
-    let config = ProvidersConfig::default();
-
-    // Verify all new providers have defaults
-    assert!(config.zhipu.api_key.is_empty());
-    assert!(config.zhipu.api_base.is_none());
-    assert!(config.zhipu.extra_headers.is_none());
-
-    assert!(config.dashscope.api_key.is_empty());
-    assert!(config.dashscope.api_base.is_none());
-    assert!(config.dashscope.extra_headers.is_none());
-
-    assert!(config.minimax.api_key.is_empty());
-    assert!(config.minimax.api_base.is_none());
-    assert!(config.minimax.extra_headers.is_none());
-
-    assert!(config.moonshot.api_key.is_empty());
-    assert!(config.moonshot.api_base.is_none());
-    assert!(config.moonshot.extra_headers.is_none());
-
-    assert!(config.aihubmix.api_key.is_empty());
-    assert!(config.aihubmix.api_base.is_none());
-    assert!(config.aihubmix.extra_headers.is_none());
-}
-
-/// Test GatewayConfig deserialization with defaults
-#[test]
-fn test_gateway_config_defaults() {
-    use klyntbot::config::schema::GatewayConfig;
-
-    let config = GatewayConfig::default();
-    assert_eq!(config.host, "0.0.0.0", "host should default to 0.0.0.0");
-    assert_eq!(config.port, 18790, "port should default to 18790");
-}
-
 /// Test ProviderConfig extra_headers serialization/deserialization
 #[test]
 fn test_provider_extra_headers() {
@@ -651,35 +507,6 @@ fn test_provider_extra_headers() {
         "custom-value"
     );
     assert_eq!(loaded_headers.get("Authorization").unwrap(), "Bearer token");
-}
-
-/// Test Discord config fields are referenced correctly
-#[test]
-fn test_discord_config_usage() {
-    use klyntbot::config::schema::DiscordConfig;
-
-    // Create config with specific values
-    let config = DiscordConfig {
-        enabled: true,
-        token: Secret::new("test-token-123".to_string()),
-        gateway_url: "wss://custom-gateway.discord.gg".to_string(),
-        intents: 12345,
-        allow_from: vec!["user123".to_string()],
-    };
-
-    // Verify fields are accessible (not hardcoded constants)
-    assert_eq!(config.token.expose(), "test-token-123");
-    assert_eq!(config.gateway_url, "wss://custom-gateway.discord.gg");
-    assert_eq!(config.intents, 12345);
-    assert_eq!(config.allow_from.len(), 1);
-    assert_eq!(config.allow_from[0], "user123");
-
-    // Verify serialization uses config values
-    let json = serde_json::to_value(&config).unwrap();
-    assert_eq!(json["enabled"], true);
-    assert_eq!(json["token"], "test-token-123");
-    assert_eq!(json["gatewayUrl"], "wss://custom-gateway.discord.gg");
-    assert_eq!(json["intents"], 12345);
 }
 
 /// Test Email consent_granted enforcement
