@@ -38,7 +38,9 @@ impl FinanceTool {
                 ToolError::InvalidParams("Budget amount must be positive".to_string()).into(),
             );
         }
-        let currency = p.required_str("currency")?;
+        let currency = p
+            .optional_str("currency")?
+            .unwrap_or(&self.default_currency);
         let period_str = p.required_str("period")?;
         let period = BudgetPeriod::from_str_loose(period_str)
             .ok_or_else(|| ToolError::InvalidParams(format!("Invalid period: {period_str}")))?;
@@ -160,8 +162,12 @@ impl FinanceTool {
     }
 
     async fn budget_status(&self, p: &ParamExtractor<'_>) -> Result<String> {
-        let id = p.required_str("id")?;
-        let usage = self.budgets.budget_usage(id).await?;
+        // If no ID provided, show summary status for all active budgets.
+        let id = match p.optional_str("id")? {
+            Some(id) => id.to_string(),
+            None => return self.budget_status_all().await,
+        };
+        let usage = self.budgets.budget_usage(&id).await?;
 
         let remaining = usage.amount - usage.spent;
         let percentage = if usage.amount > 0 {
@@ -241,6 +247,43 @@ impl FinanceTool {
         Ok(serde_json::to_string_pretty(&resp).unwrap())
     }
 
+    /// Show a summary status for every active budget.
+    async fn budget_status_all(&self) -> Result<String> {
+        let usages = self
+            .budgets
+            .all_budget_usage()
+            .await
+            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+        if usages.is_empty() {
+            return Ok(r#"{"budgets":[],"message":"No active budgets found."}"#.to_string());
+        }
+
+        let items: Vec<_> = usages
+            .iter()
+            .map(|u| {
+                let remaining = u.amount - u.spent;
+                let percentage = if u.amount > 0 {
+                    (u.spent * 100) / u.amount
+                } else {
+                    0
+                };
+                json!({
+                    "id": u.id,
+                    "name": u.name,
+                    "category": u.category,
+                    "period": u.period,
+                    "amount": u.amount,
+                    "currency": u.currency,
+                    "spent": u.spent,
+                    "remaining": remaining,
+                    "percentage_used": percentage,
+                })
+            })
+            .collect();
+        let resp = json!({ "budgets": items });
+        Ok(serde_json::to_string_pretty(&resp).unwrap())
+    }
+
     async fn budget_update(&self, p: &ParamExtractor<'_>) -> Result<String> {
         let id = p.required_str("id")?;
         let name = p.optional_str("name")?;
@@ -299,14 +342,15 @@ mod tests {
         assert!(p.required_str("name").is_ok());
         assert!(p.required_i64("amount").is_err(), "amount must be required");
 
+        // currency is optional (defaults to self.default_currency)
         let args = json!({"name": "Food", "amount": 500000});
         let p = ParamExtractor::new(&args);
         assert!(
-            p.required_str("currency").is_err(),
-            "currency must be required"
+            p.optional_str("currency").unwrap().is_none(),
+            "currency should be optional"
         );
 
-        let args = json!({"name": "Food", "amount": 500000, "currency": "VND"});
+        let args = json!({"name": "Food", "amount": 500000});
         let p = ParamExtractor::new(&args);
         assert!(p.required_str("period").is_err(), "period must be required");
     }
