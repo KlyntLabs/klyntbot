@@ -232,7 +232,7 @@ impl FinanceTransactionRepo {
     ) -> Result<Vec<(String, i64)>, StorageError> {
         let rows: Vec<(String, i64)> = sqlx::query_as(
             r#"
-            SELECT COALESCE(category, 'uncategorized') AS cat, SUM(amount) AS total
+            SELECT COALESCE(category, 'uncategorized') AS cat, COALESCE(SUM(amount), 0)::BIGINT AS total
             FROM finance_transactions
             WHERE tx_type = $3
               AND tx_date >= $1
@@ -263,7 +263,7 @@ impl FinanceTransactionRepo {
             r#"
             SELECT
                 TO_CHAR(DATE_TRUNC('month', tx_date), 'YYYY-MM') AS period_label,
-                SUM(amount) AS total
+                COALESCE(SUM(amount), 0)::BIGINT AS total
             FROM finance_transactions
             WHERE tx_type = $1
               AND tx_date >= (DATE_TRUNC('month', CURRENT_DATE) - (($2::INT - 1) * INTERVAL '1 month'))::DATE

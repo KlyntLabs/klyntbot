@@ -311,8 +311,8 @@ impl FinanceInvestmentRepo {
             r#"
             SELECT
                 p.id                                       AS portfolio_id,
-                COALESCE(SUM(i.cost_basis), 0)            AS total_cost_basis,
-                COALESCE(SUM(i.current_value), 0)         AS total_current_value,
+                COALESCE(SUM(i.cost_basis), 0)::BIGINT     AS total_cost_basis,
+                COALESCE(SUM(i.current_value), 0)::BIGINT AS total_current_value,
                 COUNT(i.id)                                AS holding_count
             FROM finance_portfolios p
             LEFT JOIN finance_investments i ON i.portfolio_id = p.id
@@ -332,7 +332,7 @@ impl FinanceInvestmentRepo {
     pub async fn total_value_by_currency(&self) -> Result<Vec<(String, i64)>, StorageError> {
         let rows: Vec<(String, i64)> = sqlx::query_as(
             r#"
-            SELECT currency, SUM(current_value) AS total
+            SELECT currency, COALESCE(SUM(current_value), 0)::BIGINT AS total
             FROM finance_investments
             WHERE current_value IS NOT NULL
             GROUP BY currency

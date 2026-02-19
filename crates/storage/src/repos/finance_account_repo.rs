@@ -162,7 +162,7 @@ impl FinanceAccountRepo {
     pub async fn total_balance_by_currency(&self) -> Result<Vec<(String, i64)>, StorageError> {
         let rows: Vec<(String, i64)> = sqlx::query_as(
             r#"
-            SELECT currency, SUM(balance) AS total
+            SELECT currency, COALESCE(SUM(balance), 0)::BIGINT AS total
             FROM finance_accounts
             WHERE is_archived = FALSE
             GROUP BY currency

@@ -168,7 +168,7 @@ impl FinanceBudgetRepo {
                 b.alert_threshold,
                 b.created_at,
                 b.updated_at,
-                COALESCE(SUM(ft.amount), 0) AS spent
+                COALESCE(SUM(ft.amount), 0)::BIGINT AS spent
             FROM finance_budgets b
             LEFT JOIN finance_transactions ft ON
                 ft.tx_type = 'expense'
@@ -216,7 +216,7 @@ impl FinanceBudgetRepo {
                 b.alert_threshold,
                 b.created_at,
                 b.updated_at,
-                COALESCE(SUM(ft.amount), 0) AS spent
+                COALESCE(SUM(ft.amount), 0)::BIGINT AS spent
             FROM finance_budgets b
             LEFT JOIN finance_transactions ft ON
                 ft.tx_type = 'expense'

@@ -132,7 +132,7 @@ impl FinanceLiabilityRepo {
     pub async fn total_remaining_by_currency(&self) -> Result<Vec<(String, i64)>, StorageError> {
         let rows: Vec<(String, i64)> = sqlx::query_as(
             r#"
-            SELECT currency, SUM(remaining) AS total
+            SELECT currency, COALESCE(SUM(remaining), 0)::BIGINT AS total
             FROM finance_liabilities
             GROUP BY currency
             ORDER BY currency
