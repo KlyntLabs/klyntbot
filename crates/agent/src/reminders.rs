@@ -99,9 +99,7 @@ impl ReminderEngine {
         use tools::todo_types::Todo;
 
         // Get all active todos via SQL
-        let rows = repo
-            .list(&storage::TodoFilter::default())
-            .await?;
+        let rows = repo.list(&storage::TodoFilter::default()).await?;
 
         let todos: Vec<Todo> = rows.into_iter().map(Todo::from).collect();
 

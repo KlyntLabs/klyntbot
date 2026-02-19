@@ -138,12 +138,11 @@ impl SessionRepo {
 
     /// Count messages in a session.
     pub async fn count_messages(&self, session_key: &str) -> Result<i64, StorageError> {
-        let row: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM session_messages WHERE session_key = $1",
-        )
-        .bind(session_key)
-        .fetch_one(&self.pool)
-        .await?;
+        let row: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM session_messages WHERE session_key = $1")
+                .bind(session_key)
+                .fetch_one(&self.pool)
+                .await?;
         Ok(row.0)
     }
 

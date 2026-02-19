@@ -94,8 +94,7 @@ impl OutcomeStore {
         match &self.backend {
             Backend::Pg(repo) => {
                 let row = outcome_to_row(&outcome)?;
-                repo.create(&row)
-                    .await?;
+                repo.create(&row).await?;
             }
             Backend::InMemory { outcomes, .. } => {
                 outcomes.lock().unwrap().push(outcome);
@@ -129,9 +128,7 @@ impl OutcomeStore {
     pub async fn outcomes_since(&self, cutoff: DateTime<Utc>) -> Result<Vec<OutcomeRecord>> {
         match &self.backend {
             Backend::Pg(repo) => {
-                let rows = repo
-                    .list_by_date_range(cutoff, Utc::now())
-                    .await?;
+                let rows = repo.list_by_date_range(cutoff, Utc::now()).await?;
                 rows.into_iter()
                     .map(row_to_outcome)
                     .collect::<Result<Vec<_>>>()
@@ -159,9 +156,7 @@ impl OutcomeStore {
     pub async fn get_all_feedback(&self) -> Result<Vec<EnrichmentFeedbackEntry>> {
         match &self.backend {
             Backend::Pg(repo) => {
-                let rows = repo
-                    .list_enrichment_feedback()
-                    .await?;
+                let rows = repo.list_enrichment_feedback().await?;
                 Ok(rows
                     .into_iter()
                     .map(|r| EnrichmentFeedbackEntry {

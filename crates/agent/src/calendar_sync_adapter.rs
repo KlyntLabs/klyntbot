@@ -156,10 +156,7 @@ impl CalendarSyncAdapter {
 
         // Clear calendar_event_uid for todos that had events deleted from all providers
         if self.auto_sync_due_dates {
-            let rows = self
-                .todo_repo
-                .list(&storage::TodoFilter::default())
-                .await?;
+            let rows = self.todo_repo.list(&storage::TodoFilter::default()).await?;
             for row in rows {
                 if row.due_date.is_none() && row.calendar_event_uid.is_some() {
                     let patch = storage::TodoPatch {
@@ -311,10 +308,7 @@ impl CalendarSyncAdapter {
 
         // Push local changes to this provider
         if self.auto_sync_due_dates {
-            let rows = self
-                .todo_repo
-                .list(&storage::TodoFilter::default())
-                .await?;
+            let rows = self.todo_repo.list(&storage::TodoFilter::default()).await?;
             let todos: Vec<Todo> = rows.into_iter().map(Todo::from).collect();
 
             for todo in todos {
@@ -404,9 +398,7 @@ impl CalendarSyncAdapter {
             due_date: Some(Some(event.start)),
             ..Default::default()
         };
-        self.todo_repo
-            .update(&patch)
-            .await?;
+        self.todo_repo.update(&patch).await?;
         Ok(())
     }
 
@@ -444,9 +436,7 @@ impl CalendarSyncAdapter {
         };
 
         let row: storage::TodoRow = (&todo).into();
-        self.todo_repo
-            .add(&row)
-            .await?;
+        self.todo_repo.add(&row).await?;
         Ok(())
     }
 
@@ -719,10 +709,7 @@ impl CalendarHandler for CalendarSyncAdapter {
 
     /// Get sync status for all providers.
     async fn get_status(&self) -> Result<Value> {
-        let rows = self
-            .todo_repo
-            .list(&storage::TodoFilter::default())
-            .await?;
+        let rows = self.todo_repo.list(&storage::TodoFilter::default()).await?;
         let synced_count = rows
             .iter()
             .filter(|r| r.calendar_event_uid.is_some())
@@ -732,10 +719,9 @@ impl CalendarHandler for CalendarSyncAdapter {
         let mut provider_statuses = Vec::new();
 
         for (provider_id, provider) in &self.providers {
-            let sync_state =
-                load_provider_sync_state(&self.calendar_sync_repo, provider_id)
-                    .await
-                    .ok();
+            let sync_state = load_provider_sync_state(&self.calendar_sync_repo, provider_id)
+                .await
+                .ok();
 
             provider_statuses.push(json!({
                 "provider": provider.name(),
@@ -862,7 +848,13 @@ mod tests {
         let config = test_calendar_config();
 
         let adapter = CalendarSyncAdapter::new(
-            todo_repo, cal_repo, cache_repo, &config, "UTC".to_string(), None, false,
+            todo_repo,
+            cal_repo,
+            cache_repo,
+            &config,
+            "UTC".to_string(),
+            None,
+            false,
         )
         .await;
         assert!(adapter.is_ok());
@@ -880,7 +872,13 @@ mod tests {
         let config = test_calendar_config();
 
         let adapter = CalendarSyncAdapter::new(
-            todo_repo, cal_repo, cache_repo, &config, "UTC".to_string(), None, false,
+            todo_repo,
+            cal_repo,
+            cache_repo,
+            &config,
+            "UTC".to_string(),
+            None,
+            false,
         )
         .await
         .unwrap();
@@ -937,7 +935,13 @@ mod tests {
         let config = test_calendar_config();
 
         let adapter = CalendarSyncAdapter::new(
-            todo_repo, cal_repo, cache_repo, &config, "UTC".to_string(), None, false,
+            todo_repo,
+            cal_repo,
+            cache_repo,
+            &config,
+            "UTC".to_string(),
+            None,
+            false,
         )
         .await
         .unwrap();
@@ -1003,7 +1007,13 @@ mod tests {
         let config = test_calendar_config();
 
         let adapter = CalendarSyncAdapter::new(
-            todo_repo, cal_repo, cache_repo, &config, "UTC".to_string(), None, false,
+            todo_repo,
+            cal_repo,
+            cache_repo,
+            &config,
+            "UTC".to_string(),
+            None,
+            false,
         )
         .await
         .unwrap();
@@ -1072,7 +1082,13 @@ mod tests {
         };
 
         let adapter = CalendarSyncAdapter::new(
-            todo_repo, cal_repo, cache_repo, &config, "UTC".to_string(), None, false,
+            todo_repo,
+            cal_repo,
+            cache_repo,
+            &config,
+            "UTC".to_string(),
+            None,
+            false,
         )
         .await
         .unwrap();
@@ -1098,7 +1114,13 @@ mod tests {
         };
 
         let adapter = CalendarSyncAdapter::new(
-            todo_repo, cal_repo, cache_repo, &config, "UTC".to_string(), None, false,
+            todo_repo,
+            cal_repo,
+            cache_repo,
+            &config,
+            "UTC".to_string(),
+            None,
+            false,
         )
         .await
         .unwrap();

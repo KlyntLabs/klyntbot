@@ -68,9 +68,7 @@ fn parse_ical_datetime(s: &str) -> std::result::Result<DateTime<Utc>, String> {
 
 /// Parse a comma-separated list of u32 values.
 fn parse_u32_list(s: &str) -> Vec<u32> {
-    s.split(',')
-        .filter_map(|v| v.trim().parse().ok())
-        .collect()
+    s.split(',').filter_map(|v| v.trim().parse().ok()).collect()
 }
 
 impl RRule {
@@ -100,9 +98,9 @@ impl RRule {
             })
             .collect();
 
-        let freq_str = parts.get("FREQ").ok_or_else(|| {
-            common::ToolError::InvalidParams("FREQ is required".to_string())
-        })?;
+        let freq_str = parts
+            .get("FREQ")
+            .ok_or_else(|| common::ToolError::InvalidParams("FREQ is required".to_string()))?;
 
         let freq = Frequency::from_str(freq_str).ok_or_else(|| {
             common::ToolError::InvalidParams(format!("Invalid FREQ: {}", freq_str))
@@ -138,9 +136,8 @@ impl RRule {
         let until = parts
             .get("UNTIL")
             .map(|v| {
-                parse_ical_datetime(v).map_err(|e| {
-                    common::ToolError::InvalidParams(format!("Invalid UNTIL: {}", e))
-                })
+                parse_ical_datetime(v)
+                    .map_err(|e| common::ToolError::InvalidParams(format!("Invalid UNTIL: {}", e)))
             })
             .transpose()?;
 
@@ -478,8 +475,7 @@ mod tests {
 
     #[test]
     fn test_exdate_skips_excluded_dates() {
-        let r =
-            RRule::parse("FREQ=DAILY;EXDATE=20260220T000000Z,20260222T000000Z").unwrap();
+        let r = RRule::parse("FREQ=DAILY;EXDATE=20260220T000000Z,20260222T000000Z").unwrap();
         let from = Utc.with_ymd_and_hms(2026, 2, 18, 0, 0, 0).unwrap();
         let dates = r.next_occurrences(from, 5).unwrap();
         let excluded1 = Utc.with_ymd_and_hms(2026, 2, 20, 0, 0, 0).unwrap();

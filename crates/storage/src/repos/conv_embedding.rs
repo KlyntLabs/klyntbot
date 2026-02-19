@@ -128,10 +128,9 @@ impl ConvEmbeddingRepo {
 
     /// Count total conversation embeddings.
     pub async fn count(&self) -> Result<i64, StorageError> {
-        let (count,): (i64,) =
-            sqlx::query_as("SELECT COUNT(*) FROM conversation_embeddings")
-                .fetch_one(&self.pool)
-                .await?;
+        let (count,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM conversation_embeddings")
+            .fetch_one(&self.pool)
+            .await?;
         Ok(count)
     }
 
@@ -164,28 +163,20 @@ impl ConvEmbeddingRepo {
     }
 
     /// Delete all embeddings for a session key. Returns count deleted.
-    pub async fn purge_by_session_key(
-        &self,
-        session_key: &str,
-    ) -> Result<u64, StorageError> {
-        let result =
-            sqlx::query("DELETE FROM conversation_embeddings WHERE session_key = $1")
-                .bind(session_key)
-                .execute(&self.pool)
-                .await?;
+    pub async fn purge_by_session_key(&self, session_key: &str) -> Result<u64, StorageError> {
+        let result = sqlx::query("DELETE FROM conversation_embeddings WHERE session_key = $1")
+            .bind(session_key)
+            .execute(&self.pool)
+            .await?;
         Ok(result.rows_affected())
     }
 
     /// Delete all embeddings created before a cutoff date. Returns count deleted.
-    pub async fn purge_before(
-        &self,
-        cutoff: DateTime<Utc>,
-    ) -> Result<u64, StorageError> {
-        let result =
-            sqlx::query("DELETE FROM conversation_embeddings WHERE created_at < $1")
-                .bind(cutoff)
-                .execute(&self.pool)
-                .await?;
+    pub async fn purge_before(&self, cutoff: DateTime<Utc>) -> Result<u64, StorageError> {
+        let result = sqlx::query("DELETE FROM conversation_embeddings WHERE created_at < $1")
+            .bind(cutoff)
+            .execute(&self.pool)
+            .await?;
         Ok(result.rows_affected())
     }
 

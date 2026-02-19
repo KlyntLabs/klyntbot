@@ -542,7 +542,7 @@ mod tests {
     #[test]
     fn test_is_allowed_with_allowlist() {
         let channel = EmailChannel::new(make_config_with_allowlist(vec![
-            "trusted@example.com".to_string(),
+            "trusted@example.com".to_string()
         ]))
         .unwrap();
         assert!(channel.is_allowed("trusted@example.com"));

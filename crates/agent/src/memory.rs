@@ -70,9 +70,7 @@ impl MemoryStore {
             today.day()
         );
 
-        self.repo
-            .append(&key, content)
-            .await?;
+        self.repo.append(&key, content).await?;
         debug!("Appended to today's memory note (SQL): {}", key);
         Ok(())
     }

@@ -225,20 +225,18 @@ mod tests {
 
     #[test]
     fn test_is_allowed_with_allowlist() {
-        let channel = WhatsAppChannel::new(make_config_with_allowlist(vec![
-            "+1234567890".to_string(),
-        ]))
-        .unwrap();
+        let channel =
+            WhatsAppChannel::new(make_config_with_allowlist(vec!["+1234567890".to_string()]))
+                .unwrap();
         assert!(channel.is_allowed("+1234567890"));
         assert!(!channel.is_allowed("+9876543210"));
     }
 
     #[test]
     fn test_is_allowed_compound_id() {
-        let channel = WhatsAppChannel::new(make_config_with_allowlist(vec![
-            "+1234567890".to_string(),
-        ]))
-        .unwrap();
+        let channel =
+            WhatsAppChannel::new(make_config_with_allowlist(vec!["+1234567890".to_string()]))
+                .unwrap();
         assert!(channel.is_allowed("+1234567890|name"));
         assert!(!channel.is_allowed("+0000000000|name"));
     }

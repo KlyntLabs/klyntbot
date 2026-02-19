@@ -9,6 +9,7 @@ use common::FormResponse;
 use rustyline::error::ReadlineError;
 use std::io::{self, IsTerminal, Write};
 use std::sync::Arc;
+use std::time::Duration;
 use tools::InteractionBundle;
 
 use crate::interactive::SlashCommandHelper;
@@ -291,10 +292,14 @@ async fn run_with_streaming(
 
     let mut renderer = StreamRenderer::new();
 
-    // Start thinking renderer (replaces spinner)
+    // Start thinking renderer with initial spinner
     let is_tty = io::stdout().is_terminal();
     let mut thinking = ThinkingRenderer::new(verbose, is_tty);
+    thinking.set_spinner("Classifying...");
     let mut thinking_active = true;
+
+    // Ticker drives spinner animation (~80ms per frame)
+    let mut spinner_tick = tokio::time::interval(Duration::from_millis(80));
 
     // Spawn a task that cancels on Ctrl+C
     let cancel_for_signal = cancel_token.clone();
@@ -331,8 +336,8 @@ async fn run_with_streaming(
                     }
                     AgentEvent::ContentChunk(chunk) => {
                         if thinking_active {
-                            // Collapse thinking trace before showing content
-                            thinking.collapse(model, renderer.elapsed_secs());
+                            // Erase thinking trace before showing content
+                            thinking.collapse();
                             thinking_active = false;
                         }
                         renderer.on_content_chunk(&chunk);
@@ -358,13 +363,18 @@ async fn run_with_streaming(
                 }
             }
 
-            // Branch 2: Interactive user questions
+            // Branch 2: Spinner animation tick
+            _ = spinner_tick.tick(), if thinking_active => {
+                thinking.tick();
+            }
+
+            // Branch 3: Interactive user questions
             bundle = interaction_rx.recv() => {
                 let Some(InteractionBundle { request, response_tx }) = bundle else { break };
 
                 // Collapse thinking if still active
                 if thinking_active {
-                    thinking.collapse(model, renderer.elapsed_secs());
+                    thinking.collapse();
                     thinking_active = false;
                 }
 
@@ -392,9 +402,9 @@ async fn run_with_streaming(
         }
     }
 
-    // Collapse thinking trace if still active
+    // Erase thinking trace if still active
     if thinking_active && thinking.rendered_lines > 0 {
-        thinking.collapse(model, renderer.elapsed_secs());
+        thinking.collapse();
     }
 
     // Cancel the signal watcher (no longer needed)
@@ -426,11 +436,12 @@ async fn run_with_streaming(
         }
     }
 
-    // Show elapsed time with model info
+    // Show elapsed time with model, tool count, and iteration count
     let elapsed = renderer.elapsed_secs();
+    let label = thinking.separator_label(model, elapsed);
     println!(
         "{}\n",
-        StreamRenderer::draw_separator(Some(&format!("{} · {:.1}s", model, elapsed)))
+        StreamRenderer::draw_separator(Some(&label))
     );
 
     Ok(())

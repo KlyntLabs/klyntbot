@@ -176,8 +176,7 @@ mod tests {
             GoalStatus::validate_transition(&GoalStatus::Achieved, &GoalStatus::Achieved).is_ok()
         );
         assert!(
-            GoalStatus::validate_transition(&GoalStatus::Abandoned, &GoalStatus::Abandoned)
-                .is_ok()
+            GoalStatus::validate_transition(&GoalStatus::Abandoned, &GoalStatus::Abandoned).is_ok()
         );
     }
 
@@ -196,8 +195,7 @@ mod tests {
             GoalStatus::validate_transition(&GoalStatus::Achieved, &GoalStatus::Paused).is_err()
         );
         assert!(
-            GoalStatus::validate_transition(&GoalStatus::Achieved, &GoalStatus::Abandoned)
-                .is_err()
+            GoalStatus::validate_transition(&GoalStatus::Achieved, &GoalStatus::Abandoned).is_err()
         );
 
         // Abandoned → anything (final state)
@@ -208,8 +206,7 @@ mod tests {
             GoalStatus::validate_transition(&GoalStatus::Abandoned, &GoalStatus::Paused).is_err()
         );
         assert!(
-            GoalStatus::validate_transition(&GoalStatus::Abandoned, &GoalStatus::Achieved)
-                .is_err()
+            GoalStatus::validate_transition(&GoalStatus::Abandoned, &GoalStatus::Achieved).is_err()
         );
     }
 

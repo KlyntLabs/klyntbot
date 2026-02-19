@@ -104,27 +104,21 @@ impl CalendarEventCacheRepo {
 
     /// Delete all cached events for a provider.
     pub async fn delete_by_provider(&self, provider_id: &str) -> Result<u64, StorageError> {
-        let result =
-            sqlx::query("DELETE FROM calendar_event_cache WHERE provider_id = $1")
-                .bind(provider_id)
-                .execute(&self.pool)
-                .await?;
+        let result = sqlx::query("DELETE FROM calendar_event_cache WHERE provider_id = $1")
+            .bind(provider_id)
+            .execute(&self.pool)
+            .await?;
         Ok(result.rows_affected())
     }
 
     /// Delete a specific cached event.
-    pub async fn delete(
-        &self,
-        uid: &str,
-        provider_id: &str,
-    ) -> Result<bool, StorageError> {
-        let result = sqlx::query(
-            "DELETE FROM calendar_event_cache WHERE uid = $1 AND provider_id = $2",
-        )
-        .bind(uid)
-        .bind(provider_id)
-        .execute(&self.pool)
-        .await?;
+    pub async fn delete(&self, uid: &str, provider_id: &str) -> Result<bool, StorageError> {
+        let result =
+            sqlx::query("DELETE FROM calendar_event_cache WHERE uid = $1 AND provider_id = $2")
+                .bind(uid)
+                .bind(provider_id)
+                .execute(&self.pool)
+                .await?;
         Ok(result.rows_affected() > 0)
     }
 

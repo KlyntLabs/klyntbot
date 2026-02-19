@@ -74,9 +74,7 @@ pub async fn handle_serve(port: u16) -> Result<()> {
             rt.block_on(async move {
                 match job_name.as_str() {
                     "todo_focus_check" => {
-                        let focused = todo_repo
-                            .list_focused()
-                            .await?;
+                        let focused = todo_repo.list_focused().await?;
                         for task in &focused {
                             if let Some(deadline) = task.focus_deadline {
                                 let remaining = deadline - chrono::Utc::now();
@@ -112,12 +110,8 @@ pub async fn handle_serve(port: u16) -> Result<()> {
                         Ok(Some(format!("Checked {} focused tasks", focused.len())))
                     }
                     "todo_daily_digest" => {
-                        let summary = todo_repo
-                            .summary()
-                            .await?;
-                        let overdue = todo_repo
-                            .overdue()
-                            .await?;
+                        let summary = todo_repo.summary().await?;
+                        let overdue = todo_repo.overdue().await?;
                         let body = format!(
                             "Total: {} | Todo: {} | Doing: {} | Done: {} | Overdue: {}",
                             summary.total,
@@ -131,9 +125,7 @@ pub async fn handle_serve(port: u16) -> Result<()> {
                     }
                     "todo_overdue_check" => {
                         // Auto-unfocus tasks with expired focus deadlines
-                        let focused = todo_repo
-                            .list_focused()
-                            .await?;
+                        let focused = todo_repo.list_focused().await?;
                         let now = chrono::Utc::now();
                         let mut expired_count = 0u32;
                         for task in &focused {

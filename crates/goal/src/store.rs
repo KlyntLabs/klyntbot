@@ -225,12 +225,10 @@ impl GoalStore {
         if let Some(repo) = &self.sql_repo {
             goal.updated_at = Utc::now();
             let row = Self::goal_to_row(&goal);
-            repo.create(&row)
-                .await?;
+            repo.create(&row).await?;
             // Link projects
             for pid in &goal.linked_project_ids {
-                repo.link_project(goal.id, &pid.to_string())
-                    .await?;
+                repo.link_project(goal.id, &pid.to_string()).await?;
             }
             return Ok(goal);
         }
@@ -254,9 +252,7 @@ impl GoalStore {
         if let Some(repo) = &self.sql_repo {
             return match repo.get(*id).await {
                 Ok(row) => {
-                    let links = repo
-                        .get_project_links(*id)
-                        .await?;
+                    let links = repo.get_project_links(*id).await?;
                     let project_ids = links
                         .into_iter()
                         .filter_map(|l| Uuid::parse_str(&l.project_id).ok())
@@ -278,8 +274,7 @@ impl GoalStore {
             // Validate status transition
             match repo.get(goal.id).await {
                 Ok(existing) => {
-                    let old_status =
-                        GoalStatus::from_str(&existing.status).unwrap_or_default();
+                    let old_status = GoalStatus::from_str(&existing.status).unwrap_or_default();
                     GoalStatus::validate_transition(&old_status, &goal.status)?;
                 }
                 Err(storage::StorageError::NotFound(_)) => return Ok(None),
@@ -292,15 +287,12 @@ impl GoalStore {
             match repo.update(&row).await {
                 Ok(_) => {
                     // Sync project links: clear existing and re-link
-                    let existing = repo
-                        .get_project_links(updated.id)
-                        .await?;
+                    let existing = repo.get_project_links(updated.id).await?;
                     for link in &existing {
                         let _ = repo.unlink_project(updated.id, &link.project_id).await;
                     }
                     for pid in &updated.linked_project_ids {
-                        repo.link_project(updated.id, &pid.to_string())
-                            .await?;
+                        repo.link_project(updated.id, &pid.to_string()).await?;
                     }
                     Ok(Some(updated))
                 }
@@ -336,10 +328,7 @@ impl GoalStore {
     /// Delete a goal by ID.
     pub async fn delete(&mut self, id: &Uuid) -> Result<bool> {
         if let Some(repo) = &self.sql_repo {
-            return repo
-                .delete(*id)
-                .await
-                .map_err(common::KlyntbotError::from);
+            return repo.delete(*id).await.map_err(common::KlyntbotError::from);
         }
 
         self.ensure_loaded().await?;
@@ -360,14 +349,10 @@ impl GoalStore {
     pub async fn list(&mut self, status: Option<GoalStatus>) -> Result<Vec<Goal>> {
         if let Some(repo) = &self.sql_repo {
             let status_str = status.as_ref().map(|s| s.to_string());
-            let rows = repo
-                .list(status_str.as_deref())
-                .await?;
+            let rows = repo.list(status_str.as_deref()).await?;
             let mut goals = Vec::with_capacity(rows.len());
             for row in rows {
-                let links = repo
-                    .get_project_links(row.id)
-                    .await?;
+                let links = repo.get_project_links(row.id).await?;
                 let project_ids = links
                     .into_iter()
                     .filter_map(|l| Uuid::parse_str(&l.project_id).ok())

@@ -78,9 +78,7 @@ impl RecurringTaskSpawner {
 
     /// Check all templates and spawn instances that are due via SQL.
     async fn check_and_spawn(repo: &storage::TodoRepo, _timezone: &str) -> common::Result<()> {
-        let template_rows = repo
-            .list_templates()
-            .await?;
+        let template_rows = repo.list_templates().await?;
         let now = chrono::Utc::now();
 
         for tpl_row in &template_rows {
@@ -107,8 +105,7 @@ impl RecurringTaskSpawner {
 
             let instance_id = instance.id.clone();
             let instance_row: storage::TodoRow = (&instance).into();
-            repo.add(&instance_row)
-                .await?;
+            repo.add(&instance_row).await?;
 
             // Advance next_instance_date via update patch
             let next = rrule_utils::next_occurrence(&rule, now)?;

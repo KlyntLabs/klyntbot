@@ -846,4 +846,3 @@ pub struct TodoPatch {
     pub next_instance_date: Option<Option<DateTime<Utc>>>,
     pub last_reminded_at: Option<Option<DateTime<Utc>>>,
 }
-

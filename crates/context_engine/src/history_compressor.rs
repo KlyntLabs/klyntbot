@@ -236,7 +236,11 @@ fn first_snippet(text: &str, max_chars: usize) -> String {
         .rmatch_indices(['.', '!', '?'])
         .find(|&(pos, _)| {
             // Accept if it's the last char in window, or followed by whitespace
-            pos + 1 >= window.len() || window.as_bytes().get(pos + 1).is_some_and(|b| b.is_ascii_whitespace())
+            pos + 1 >= window.len()
+                || window
+                    .as_bytes()
+                    .get(pos + 1)
+                    .is_some_and(|b| b.is_ascii_whitespace())
         })
         .map(|(pos, _)| pos + 1); // include the punctuation
 
@@ -391,8 +395,7 @@ mod tests {
             snippet_length: 200,
             mode: CompressorMode::Abstractive,
         };
-        let compressor =
-            HistoryCompressor::with_config(4, default_token_counter(), config);
+        let compressor = HistoryCompressor::with_config(4, default_token_counter(), config);
         let history = make_history(10);
         let result = compressor.compress(&history, 50_000);
         // Should still produce results (falls back to extractive)
@@ -405,8 +408,7 @@ mod tests {
             snippet_length: 50,
             mode: CompressorMode::Extractive,
         };
-        let compressor =
-            HistoryCompressor::with_config(2, default_token_counter(), config);
+        let compressor = HistoryCompressor::with_config(2, default_token_counter(), config);
 
         // Use the compressor to verify it was created with the custom config
         let history = make_history(10);
@@ -454,7 +456,11 @@ mod tests {
             "Should not have trailing spaces: {}",
             snippet
         );
-        assert!(snippet.ends_with('…'), "Should end with ellipsis: {}", snippet);
+        assert!(
+            snippet.ends_with('…'),
+            "Should end with ellipsis: {}",
+            snippet
+        );
     }
 
     #[test]

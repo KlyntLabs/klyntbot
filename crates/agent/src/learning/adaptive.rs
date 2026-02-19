@@ -167,8 +167,7 @@ impl AdaptiveThresholds {
             None => return Ok(()), // in-memory: no-op
         };
         let value = serde_json::to_value(&self.state)?;
-        repo.set(ADAPTIVE_STATE_KEY, &value)
-            .await?;
+        repo.set(ADAPTIVE_STATE_KEY, &value).await?;
         Ok(())
     }
 }

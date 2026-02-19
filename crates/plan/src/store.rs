@@ -196,9 +196,7 @@ impl PlanStore {
     async fn sql_get(&self, repo: &storage::PlanRepo, id: Uuid) -> Result<Option<Plan>> {
         match repo.get(id).await {
             Ok(row) => {
-                let steps = repo
-                    .get_steps(id)
-                    .await?;
+                let steps = repo.get_steps(id).await?;
                 Ok(Some(Self::row_to_plan(row, steps)))
             }
             Err(storage::StorageError::NotFound(_)) => Ok(None),
@@ -375,9 +373,7 @@ impl PlanStore {
             if !self.index.contains_key(id) {
                 match repo.get(*id).await {
                     Ok(row) => {
-                        let steps = repo
-                            .get_steps(*id)
-                            .await?;
+                        let steps = repo.get_steps(*id).await?;
                         let plan = Self::row_to_plan(row, steps);
                         self.index.insert(*id, plan);
                     }
@@ -439,13 +435,9 @@ impl PlanStore {
             // Try each active status and combine
             let mut candidates = Vec::new();
             for status in &["draft", "approved", "executing"] {
-                let rows = repo
-                    .list(Some(status), Some(session_key), None)
-                    .await?;
+                let rows = repo.list(Some(status), Some(session_key), None).await?;
                 for row in rows {
-                    let steps = repo
-                        .get_steps(row.id)
-                        .await?;
+                    let steps = repo.get_steps(row.id).await?;
                     candidates.push(Self::row_to_plan(row, steps));
                 }
             }
@@ -475,14 +467,10 @@ impl PlanStore {
     /// List all plans in insertion order.
     pub async fn all(&mut self) -> Result<Vec<Plan>> {
         if let Some(repo) = &self.sql_repo {
-            let rows = repo
-                .list(None, None, None)
-                .await?;
+            let rows = repo.list(None, None, None).await?;
             let mut plans = Vec::with_capacity(rows.len());
             for row in rows {
-                let steps = repo
-                    .get_steps(row.id)
-                    .await?;
+                let steps = repo.get_steps(row.id).await?;
                 plans.push(Self::row_to_plan(row, steps));
             }
             return Ok(plans);
@@ -501,14 +489,10 @@ impl PlanStore {
     pub async fn list_by_status(&mut self, status: &PlanStatus) -> Result<Vec<Plan>> {
         if let Some(repo) = &self.sql_repo {
             let status_str = Self::plan_status_to_str(status);
-            let rows = repo
-                .list(Some(status_str), None, None)
-                .await?;
+            let rows = repo.list(Some(status_str), None, None).await?;
             let mut plans = Vec::with_capacity(rows.len());
             for row in rows {
-                let steps = repo
-                    .get_steps(row.id)
-                    .await?;
+                let steps = repo.get_steps(row.id).await?;
                 plans.push(Self::row_to_plan(row, steps));
             }
             return Ok(plans);
@@ -528,10 +512,7 @@ impl PlanStore {
     pub async fn delete(&mut self, id: &Uuid) -> Result<bool> {
         if let Some(repo) = &self.sql_repo {
             self.index.remove(id);
-            return repo
-                .delete(*id)
-                .await
-                .map_err(common::KlyntbotError::from);
+            return repo.delete(*id).await.map_err(common::KlyntbotError::from);
         }
 
         self.ensure_loaded().await?;

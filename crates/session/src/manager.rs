@@ -256,16 +256,13 @@ impl SessionManager {
                 // SQL path: try to load from DB
                 match repo.get_session(&key).await {
                     Ok(row) => {
-                        let msgs = repo
-                            .get_messages(&key)
-                            .await?;
+                        let msgs = repo.get_messages(&key).await?;
                         Self::row_to_session(row, msgs)
                     }
                     Err(storage::StorageError::NotFound(_)) => {
                         // Create in SQL
                         let metadata = serde_json::Value::Object(serde_json::Map::new());
-                        repo.create_session(&key, &metadata)
-                            .await?;
+                        repo.create_session(&key, &metadata).await?;
                         debug!("Creating new session in SQL: {}", key);
                         Session::new(key.clone())
                     }
@@ -363,8 +360,7 @@ impl SessionManager {
         if let Some(repo) = &self.sql_repo {
             // Upsert session metadata
             let metadata = serde_json::to_value(&session.metadata).unwrap_or_default();
-            repo.create_session(&session.key, &metadata)
-                .await?;
+            repo.create_session(&session.key, &metadata).await?;
 
             // Persist all messages (idempotent via ON CONFLICT or just try-insert)
             for msg in &session.messages {
@@ -429,10 +425,7 @@ impl SessionManager {
                             );
                         }
                         Err(e) => {
-                            warn!(
-                                "SQL compaction failed for {}: {}",
-                                session.key, e
-                            );
+                            warn!("SQL compaction failed for {}: {}", session.key, e);
                         }
                     }
                 }
@@ -540,9 +533,7 @@ impl SessionManager {
     /// List all sessions
     pub async fn list(&self) -> Result<Vec<SessionInfo>> {
         if let Some(repo) = &self.sql_repo {
-            let rows = repo
-                .list_sessions()
-                .await?;
+            let rows = repo.list_sessions().await?;
             // Already sorted by updated_at DESC in the query
             let sessions: Vec<SessionInfo> = rows
                 .into_iter()

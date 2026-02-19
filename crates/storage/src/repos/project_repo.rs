@@ -160,7 +160,10 @@ impl ProjectRepo {
             qb.push_bind(limit);
         }
 
-        let rows = qb.build_query_as::<ProjectRow>().fetch_all(&self.pool).await?;
+        let rows = qb
+            .build_query_as::<ProjectRow>()
+            .fetch_all(&self.pool)
+            .await?;
         Ok(rows)
     }
 
@@ -232,4 +235,3 @@ pub struct ProjectPatch {
     pub tags: Option<Vec<String>>,
     pub status: Option<String>,
 }
-
