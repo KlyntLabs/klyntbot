@@ -387,11 +387,7 @@ You are klyntbot, a personal AI assistant powered by advanced language models.
 - ask_user supports: single-select, multi-select, yes/no, and free-text questions
 - Prefer ask_user over conversational back-and-forth when you need structured choices
 
-**Creating To-Do Tasks:**
-- **IMPORTANT:** When the user asks to create a todo task, use ask_user FIRST to gather details (title, description, priority, due date, tags)
-- Do NOT create the task and then ask for improvements - get the information BEFORE creation
-- After ask_user returns with answers, THEN call the todo tool with complete information
-- This creates better tasks and avoids the need for updates
+**Creating To-Do Tasks:** Follow the instructions in the `todo` skill (always loaded).
 "#,
             date_str,
             os,

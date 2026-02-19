@@ -1,12 +1,85 @@
 ---
 name: todo
-description: Task management best practices and confidence scoring guidelines.
-metadata: '{"klyntbot":{"triggers":["todo","task","focus"]}}'
+description: Task creation workflow — ask-first by default, with confidence scoring and enrichment modes.
+metadata: '{"klyntbot":{"triggers":["todo","task","focus"],"always":true}}'
 ---
 
-# Todo Management
+# Todo Task Creation
 
-Use the `todo` tool to manage user tasks with AI-powered confidence scoring and enrichment.
+## CRITICAL RULE: Ask Before Creating
+
+When the user asks to create a task, you MUST follow this workflow:
+
+### Step 1: Assess — Is the request detailed enough?
+
+A request is "detailed enough" if it has:
+- A clear title (> 3 words describing a specific action)
+- OR the user explicitly provides priority, due date, or description
+
+**Detailed enough examples (create immediately):**
+- "add task: buy milk from the corner store, due tomorrow"
+- "create task: fix authentication bug in login flow, priority high"
+- "todo: review PR #42 for the payments refactor"
+
+**NOT detailed enough examples (must ask first):**
+- "add task: buy"
+- "create task: fix"
+- "todo: meeting"
+- "task: stuff"
+
+### Step 2: If NOT detailed enough — Use ask_user FIRST
+
+Call the `ask_user` tool to gather details BEFORE calling `todo add`:
+
+```json
+{
+  "title": "New Task Details",
+  "questions": [
+    {
+      "id": "title",
+      "title": "Title",
+      "text": "What specifically do you want to do? (e.g., 'buy groceries for dinner tonight')",
+      "type": "free_text",
+      "placeholder": "Describe the task..."
+    },
+    {
+      "id": "priority",
+      "title": "Priority",
+      "text": "How urgent is this?",
+      "type": "single_select",
+      "options": [
+        {"value": "1", "label": "Urgent", "description": "Do today"},
+        {"value": "2", "label": "High", "description": "Do this week"},
+        {"value": "3", "label": "Medium", "description": "Normal priority"},
+        {"value": "4", "label": "Low", "description": "When you get to it"}
+      ]
+    }
+  ]
+}
+```
+
+After ask_user returns, call `todo add` with the gathered details AND `confirmed: true`.
+
+### Step 3: If detailed enough — Create with confirmed=true
+
+Call `todo add` with all user-provided fields and `confirmed: true`:
+
+```json
+{
+  "action": "add",
+  "title": "Buy milk from the corner store",
+  "due_date": "tomorrow",
+  "confirmed": true
+}
+```
+
+### NEVER DO THIS
+
+- NEVER expand a vague title into a specific one without asking (e.g., "buy" → "Buy groceries")
+- NEVER invent a description the user didn't provide
+- NEVER guess priority, due date, or tags
+- NEVER call todo add with optional fields the user didn't explicitly state
+- If in doubt, call todo add with ONLY the title — the enrichment engine will suggest improvements
 
 ## Confidence Scoring
 
@@ -17,97 +90,10 @@ Tasks are scored 0.0-1.0 based on:
 - Due date (20%): concrete deadline
 - Tags (15%): at least one tag
 
-## When to Suggest Tasks
-
-Automatically create tasks when the user mentions:
-- "I need to..."
-- "Remind me to..."
-- "Don't forget..."
-- Action items from meetings or conversations
-
-Check existing tasks before creating to avoid duplicates.
-
-## Chat Enrichment Flow
-
-When a user asks to create a task in chat:
-
-1. **Assess completeness** — would this task have confidence >= 50%?
-2. **If high confidence** — create immediately with `todo.add`, show summary
-3. **If low confidence** — create the task first, then use the `ask_user` tool to gather missing fields:
-   - Use ask_user to present enrichment options interactively
-   - Group related questions (description, priority, due date) into one call
-   - Ask user how they want to proceed: Quick hint, Manual fill, Auto-enrich (YOLO), Brainstorm (Party), or Skip
-4. **After creation** — always show task summary with confidence
-5. **If confidence < 80%** — offer improvement suggestions
-
-### Using ask_user for Enrichment
-
-When a task has low confidence, use the `ask_user` tool to present enrichment options:
-
-```json
-{
-  "tool": "ask_user",
-  "args": {
-    "title": "Improve Task Details",
-    "questions": [
-      {
-        "id": "enrichment_mode",
-        "title": "How to enrich",
-        "text": "This task has low confidence. How would you like to improve it?",
-        "answer_type": {
-          "type": "single_select",
-          "options": [
-            {"value": "quick_hint", "label": "Quick hint", "description": "Give me context and I'll infer the rest"},
-            {"value": "manual", "label": "I'll fill it", "description": "Ask me for each field"},
-            {"value": "yolo", "label": "Auto-enrich", "description": "Infer from our conversation"},
-            {"value": "brainstorm", "label": "Let's brainstorm", "description": "Ask me targeted questions"},
-            {"value": "skip", "label": "Skip", "description": "Create as-is (low confidence)"}
-          ]
-        }
-      }
-    ]
-  }
-}
-```
-
-### Mode Activation
-
-- If user selects "quick_hint" → ask for one-liner context, then update task
-- If user selects "yolo" → activate todo-yolo skill behavior
-- If user selects "brainstorm" → activate todo-party skill behavior
-- If user selects "manual" → use ask_user to collect fields one-by-one
-- If user selects "skip" → leave task as-is
-
-### Enrichment Response Format
-
-After creating a low-confidence task, the todo tool will suggest using ask_user.
-When you see this suggestion, call ask_user with enrichment options:
-
-```
-Task created with low confidence. I'll now show you options to improve it.
-```
-
-Then use ask_user (see example above) to present the interactive options.
-The user will select their preference via the tabbed UI, and you'll receive
-a structured response like: `enrichment_mode: quick_hint`
-
-### Post-Creation Summary
-
-After creating a task, show the confidence score and offer improvement if < 80%.
-For formatting (tables, single-item display, status indicators), follow the rules in **RESPONSE.md**.
-
-### Important Rules
-
-- Never create a task silently without showing the summary
-- Always mention confidence score in the summary
-- One question per message in Party/Manual modes
-- Accept multi-field answers (don't ask what's already provided)
-- Use `todo.update` for post-creation improvements (not delete + recreate)
-- If user changes topic mid-enrichment, handle it, then optionally ask about the pending task
+After creating a task, show the confidence score. If < 80%, offer enrichment options via ask_user.
 
 ## Focus Mode
 
 - Max 3 tasks focused simultaneously
 - 18-hour deadline per focused task
 - Auto-unfocus when expired
-- Track focus_expired_count to detect postponing patterns
