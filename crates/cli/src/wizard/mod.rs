@@ -23,6 +23,7 @@
 pub mod ask_user_prompt;
 pub mod calendar;
 pub mod channels;
+pub mod core_setup;
 pub mod daemon;
 pub mod detect;
 pub mod framework;
