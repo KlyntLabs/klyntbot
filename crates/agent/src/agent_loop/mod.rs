@@ -104,7 +104,7 @@ impl AgentLoop {
         let mut inbound_rx = self
             .inbound_rx
             .take()
-            .expect("AgentLoop::run can only be called once");
+            .ok_or_else(|| common::KlyntbotError::Bus("AgentLoop::run can only be called once".into()))?;
 
         while self.running.load(Ordering::SeqCst) {
             // Wait for next message with timeout
@@ -210,13 +210,7 @@ impl AgentLoop {
         session.add_message("user", &msg.content);
 
         // Async conversation embedding hook for user message
-        {
-            let msg_id = session
-                .messages
-                .last()
-                .expect("Message should exist after add_message")
-                .id
-                .clone();
+        if let Some(msg_id) = session.messages.last().map(|m| m.id.clone()) {
             self.spawn_embed_message(session_key.as_str(), "user", &msg.content, &msg_id);
         }
 
@@ -368,19 +362,27 @@ impl AgentLoop {
     }
 
     async fn save_to_session(&self, session_key: &str, content: &str) {
-        let mut session_manager = self.session_manager.write().await;
-        if let Ok(session) = session_manager.get_or_create(session_key).await {
-            session.add_message("assistant", content);
+        // Split-phase locking: mutate under write lock, then persist outside it
+        let session_clone = {
+            let mut session_manager = self.session_manager.write().await;
+            match session_manager.get_or_create(session_key).await {
+                Ok(session) => {
+                    session.add_message("assistant", content);
 
-            let msg_id = session
-                .messages
-                .last()
-                .expect("Message should exist after add_message")
-                .id
-                .clone();
-            self.spawn_embed_message(session_key, "assistant", content, &msg_id);
+                    if let Some(msg_id) = session.messages.last().map(|m| m.id.clone()) {
+                        self.spawn_embed_message(session_key, "assistant", content, &msg_id);
+                    }
 
-            let session_clone = session.clone();
+                    Some(session.clone())
+                }
+                Err(_) => None,
+            }
+            // Write lock dropped here
+        };
+
+        // Persist outside the write lock — save() only needs &self on SessionManager
+        if let Some(session_clone) = session_clone {
+            let session_manager = self.session_manager.read().await;
             if let Err(e) = session_manager.save(&session_clone).await {
                 warn!("Failed to save session: {}", e);
             }
@@ -463,13 +465,7 @@ impl AgentLoop {
         session.add_message("user", &content);
 
         // Async conversation embedding hook for user message (CLI)
-        {
-            let msg_id = session
-                .messages
-                .last()
-                .expect("Message should exist after add_message")
-                .id
-                .clone();
+        if let Some(msg_id) = session.messages.last().map(|m| m.id.clone()) {
             self.spawn_embed_message(&session_key, "user", &content, &msg_id);
         }
 
@@ -513,13 +509,7 @@ impl AgentLoop {
         session.add_message("user", &content);
 
         // Async conversation embedding hook for user message (CLI streaming)
-        {
-            let msg_id = session
-                .messages
-                .last()
-                .expect("Message should exist after add_message")
-                .id
-                .clone();
+        if let Some(msg_id) = session.messages.last().map(|m| m.id.clone()) {
             self.spawn_embed_message(&session_key, "user", &content, &msg_id);
         }
 
