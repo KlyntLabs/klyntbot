@@ -24,10 +24,10 @@ mod core;
 mod finance;
 mod gateway;
 mod learning;
+mod packs;
 mod project;
 mod providers;
 mod todo;
-mod packs;
 mod tools;
 
 pub use self::agents::*;
@@ -39,10 +39,10 @@ pub use self::core::*;
 pub use self::finance::*;
 pub use self::gateway::*;
 pub use self::learning::*;
+pub use self::packs::*;
 pub use self::project::*;
 pub use self::providers::*;
 pub use self::todo::*;
-pub use self::packs::*;
 pub use self::tools::*;
 
 #[cfg(test)]

@@ -6,37 +6,19 @@
 //! - **Phase 2: Pack Selection** — presents feature packs grouped by tier,
 //!   lets user toggle with spacebar, applies config mutations.
 //!
-//! Legacy step modules are still compiled for potential pack-specific credential
-//! prompts but are no longer called from the main wizard flow.
-//!
 //! Supporting modules:
 //! - `framework`  – `WizardModule` trait, `WizardState`, `WizardRunner`
 //! - `prompts`    – Reusable prompt utilities
-//! - `templates`  – Workspace template file contents
-//! - `oauth`      – OAuth callback server for Discord/Slack
 //! - `ui`         – Shared terminal helpers (erase_lines, read_key)
 //! - `ask_user_prompt` – Tabbed multi-question UI for ask_user tool
 
 pub mod ask_user_prompt;
-pub mod calendar;
-pub mod channels;
 pub mod core_setup;
-pub mod daemon;
 pub mod detect;
 pub mod framework;
-pub mod learning;
-pub mod memory;
-pub mod oauth;
 pub mod pack_selection;
 pub mod packs;
 pub mod prompts;
-pub mod provider;
-pub mod search;
-pub mod steps;
-pub mod templates;
-pub mod tools;
-pub(crate) mod ui;
-pub mod workspace;
 
 use anyhow::Result;
 use common::utils::terminal::*;

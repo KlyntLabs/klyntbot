@@ -12,10 +12,10 @@ use super::conversation::ConversationConfig;
 use super::finance::FinanceConfig;
 use super::gateway::GatewayConfig;
 use super::learning::LearningConfig;
+use super::packs::PacksConfig;
 use super::project::ProjectConfig;
 use super::providers::{ProviderManagerConfig, ProvidersConfig};
 use super::todo::TodoConfig;
-use super::packs::PacksConfig;
 use super::tools::ToolsConfig;
 
 /// Expand a leading `~` in a path to the user's home directory.
