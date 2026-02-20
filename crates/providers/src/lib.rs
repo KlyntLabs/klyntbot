@@ -34,16 +34,32 @@ use config::Config;
 /// 2. Check if model name matches a known provider (e.g., "claude-*" → Anthropic)
 /// 3. Check for gateway providers (OpenRouter, AiHubMix) by api_key prefix or api_base
 /// 4. Fall back to first provider with a non-empty API key
-pub fn create_provider(config: &Config) -> Result<DynProvider> {
-    let model = &config.agents.defaults.model;
+pub fn create_provider(config: &Config) -> Result<(DynProvider, String)> {
+    let configured_model = &config.agents.defaults.model;
 
     // Priority 1: Explicit provider field
     if let Some(ref provider_name) = config.agents.defaults.provider {
         if !provider_name.is_empty() {
             if let Some(spec) = ProviderRegistry::find_by_name(provider_name) {
+                // When the user set a provider but the model doesn't match it,
+                // use the provider's own default model instead of the global default.
+                let model_belongs_to_provider = spec
+                    .keywords
+                    .iter()
+                    .any(|kw| configured_model.to_lowercase().contains(kw));
+                let model = if model_belongs_to_provider {
+                    configured_model.as_str()
+                } else {
+                    info!(
+                        "Model '{}' doesn't match provider '{}', using provider default: {}",
+                        configured_model, provider_name, spec.default_model
+                    );
+                    spec.default_model
+                };
+
                 if let Some(provider) = try_create_from_spec(spec, config, model) {
                     info!("Using explicitly configured provider: {}", provider_name);
-                    return Ok(provider);
+                    return Ok((provider, model.to_string()));
                 }
                 tracing::warn!(
                     "Provider '{}' configured but API key missing, trying auto-detection",
@@ -53,10 +69,12 @@ pub fn create_provider(config: &Config) -> Result<DynProvider> {
         }
     }
 
+    let model = configured_model.as_str();
+
     // Priority 2: Try to find provider by model name
     if let Some(spec) = ProviderRegistry::find_by_model(model) {
         if let Some(provider) = try_create_from_spec(spec, config, model) {
-            return Ok(provider);
+            return Ok((provider, model.to_string()));
         }
     }
 
@@ -90,7 +108,7 @@ pub fn create_provider(config: &Config) -> Result<DynProvider> {
             let api_base = pc.api_base.as_deref().unwrap_or(spec.default_api_base);
             let provider = OpenAiCompatProvider::new(api_base, pc.api_key.expose(), model)?;
             info!("Using {} provider with {}", spec.name, model);
-            return Ok(Arc::new(provider));
+            return Ok((Arc::new(provider), model.to_string()));
         }
     }
 
@@ -104,7 +122,7 @@ pub fn create_provider(config: &Config) -> Result<DynProvider> {
                     "Using {} provider with {} (model: {})",
                     spec.name, api_base, model
                 );
-                return Ok(Arc::new(provider));
+                return Ok((Arc::new(provider), model.to_string()));
             }
         }
     }
@@ -120,13 +138,13 @@ pub fn create_provider(config: &Config) -> Result<DynProvider> {
 /// in a [`ProviderManager`] with retry, failover, and circuit breaker logic.
 /// When no fallback is configured, returns a plain `DynProvider` (identical to
 /// [`create_provider`]).
-pub fn create_provider_with_failover(config: &Config) -> Result<DynProvider> {
-    let primary = create_provider(config)?;
+pub fn create_provider_with_failover(config: &Config) -> Result<(DynProvider, String)> {
+    let (primary, resolved_model) = create_provider(config)?;
 
     let pm_config = &config.provider_manager;
     let fallback_name = match &pm_config.fallback {
         Some(name) if !name.is_empty() => name,
-        _ => return Ok(primary),
+        _ => return Ok((primary, resolved_model)),
     };
 
     let fallback = create_fallback_provider(config, fallback_name)?;
@@ -140,11 +158,14 @@ pub fn create_provider_with_failover(config: &Config) -> Result<DynProvider> {
         "Created ProviderManager with fallback provider: {}",
         fallback_name
     );
-    Ok(Arc::new(ProviderManager::new(
-        primary,
-        Some(fallback),
-        classifier,
-    )))
+    Ok((
+        Arc::new(ProviderManager::new(
+            primary,
+            Some(fallback),
+            classifier,
+        )),
+        resolved_model,
+    ))
 }
 
 /// Create a fallback provider by name from config.

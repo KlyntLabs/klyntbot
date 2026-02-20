@@ -17,7 +17,7 @@ use tracing::{error, info};
 pub async fn handle_serve(port: u16) -> Result<()> {
     info!("Starting klyntbot gateway on port {}", port);
 
-    let config = config::load_with_env_overrides().await?;
+    let mut config = config::load_with_env_overrides().await?;
     info!("Configuration loaded from: {:?}", config::config_path());
 
     // Connect to database and create repos
@@ -33,8 +33,9 @@ pub async fn handle_serve(port: u16) -> Result<()> {
     let finance_repos = repos.clone();
     info!("Database connected and migrations applied");
 
-    // Initialize LLM provider
-    let provider = providers::create_provider(&config)?;
+    // Initialize LLM provider (resolves the effective model for this provider)
+    let (provider, resolved_model) = providers::create_provider(&config)?;
+    config.agents.defaults.model = resolved_model;
     info!("Provider ready: {}", provider.name());
 
     // Initialize message bus

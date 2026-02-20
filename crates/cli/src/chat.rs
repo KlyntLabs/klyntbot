@@ -18,14 +18,16 @@ use crate::wizard::ask_user_prompt;
 /// Handle chat command
 pub async fn handle_chat(message: Option<String>, session: String, verbose: bool) -> Result<()> {
     // Load config (with KLYNTBOT_* env var overrides)
-    let config = config::load_with_env_overrides().await?;
-    let model = config.agents.defaults.model.clone();
+    let mut config = config::load_with_env_overrides().await?;
+
+    // Initialize LLM provider (resolves the effective model for this provider)
+    let (provider, model) = providers::create_provider(&config)?;
+
+    // Update config with the resolved model so all downstream consumers use the correct one
+    config.agents.defaults.model = model.clone();
 
     // Startup banner
     print!("{}", draw_banner(&model));
-
-    // Initialize LLM provider
-    let provider = providers::create_provider(&config)?;
 
     // Create a minimal message bus (not used in CLI mode, but required for AgentLoop)
     let bus = Arc::new(MessageBus::new(10));

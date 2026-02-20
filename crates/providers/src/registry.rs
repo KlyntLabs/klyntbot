@@ -45,6 +45,9 @@ pub struct ProviderSpec {
     /// Default API base URL
     pub default_api_base: &'static str,
 
+    /// Default model name when provider is explicitly selected but no model is set
+    pub default_model: &'static str,
+
     /// Strip existing prefix before re-prefixing (for gateways)
     pub strip_model_prefix: bool,
 
@@ -81,6 +84,7 @@ pub static PROVIDERS: &[ProviderSpec] = &[
         detect_by_key_prefix: "sk-or-",
         detect_by_base_keyword: "openrouter",
         default_api_base: "https://openrouter.ai/api/v1",
+        default_model: "anthropic/claude-sonnet-4",
         strip_model_prefix: false,
         model_overrides: &[],
     },
@@ -98,6 +102,7 @@ pub static PROVIDERS: &[ProviderSpec] = &[
         detect_by_key_prefix: "",
         detect_by_base_keyword: "aihubmix",
         default_api_base: "https://aihubmix.com/v1",
+        default_model: "gpt-4o",
         strip_model_prefix: true, // Strip "anthropic/" then re-add "openai/"
         model_overrides: &[],
     },
@@ -117,6 +122,7 @@ pub static PROVIDERS: &[ProviderSpec] = &[
         detect_by_key_prefix: "",
         detect_by_base_keyword: "",
         default_api_base: "https://api.anthropic.com/v1",
+        default_model: "claude-sonnet-4-20250514",
         strip_model_prefix: false,
         model_overrides: &[],
     },
@@ -134,6 +140,7 @@ pub static PROVIDERS: &[ProviderSpec] = &[
         detect_by_key_prefix: "",
         detect_by_base_keyword: "",
         default_api_base: "https://api.openai.com/v1",
+        default_model: "gpt-4o",
         strip_model_prefix: false,
         model_overrides: &[],
     },
@@ -151,6 +158,7 @@ pub static PROVIDERS: &[ProviderSpec] = &[
         detect_by_key_prefix: "",
         detect_by_base_keyword: "",
         default_api_base: "https://api.deepseek.com/v1",
+        default_model: "deepseek-chat",
         strip_model_prefix: false,
         model_overrides: &[],
     },
@@ -168,6 +176,7 @@ pub static PROVIDERS: &[ProviderSpec] = &[
         detect_by_key_prefix: "",
         detect_by_base_keyword: "",
         default_api_base: "https://generativelanguage.googleapis.com/v1",
+        default_model: "gemini-2.0-flash",
         strip_model_prefix: false,
         model_overrides: &[],
     },
@@ -185,6 +194,7 @@ pub static PROVIDERS: &[ProviderSpec] = &[
         detect_by_key_prefix: "",
         detect_by_base_keyword: "",
         default_api_base: "https://open.bigmodel.cn/api/paas/v4",
+        default_model: "glm-4-flash",
         strip_model_prefix: false,
         model_overrides: &[],
     },
@@ -202,6 +212,7 @@ pub static PROVIDERS: &[ProviderSpec] = &[
         detect_by_key_prefix: "",
         detect_by_base_keyword: "",
         default_api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        default_model: "qwen-plus",
         strip_model_prefix: false,
         model_overrides: &[],
     },
@@ -219,6 +230,7 @@ pub static PROVIDERS: &[ProviderSpec] = &[
         detect_by_key_prefix: "",
         detect_by_base_keyword: "",
         default_api_base: "https://api.moonshot.ai/v1",
+        default_model: "moonshot-v1-8k",
         strip_model_prefix: false,
         model_overrides: &[
             ("kimi-k2.5", &[("temperature", "1.0")]), // Kimi K2.5 requires temp >= 1.0
@@ -238,6 +250,7 @@ pub static PROVIDERS: &[ProviderSpec] = &[
         detect_by_key_prefix: "",
         detect_by_base_keyword: "",
         default_api_base: "https://api.minimax.io/v1",
+        default_model: "abab6.5s-chat",
         strip_model_prefix: false,
         model_overrides: &[],
     },
@@ -257,6 +270,7 @@ pub static PROVIDERS: &[ProviderSpec] = &[
         detect_by_key_prefix: "",
         detect_by_base_keyword: "",
         default_api_base: "http://localhost:8000/v1",
+        default_model: "default",
         strip_model_prefix: false,
         model_overrides: &[],
     },
@@ -276,6 +290,7 @@ pub static PROVIDERS: &[ProviderSpec] = &[
         detect_by_key_prefix: "",
         detect_by_base_keyword: "",
         default_api_base: "https://api.groq.com/openai/v1",
+        default_model: "llama-3.3-70b-versatile",
         strip_model_prefix: false,
         model_overrides: &[],
     },

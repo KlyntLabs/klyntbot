@@ -27,9 +27,9 @@ pub async fn handle_brief_status() -> Result<()> {
         }
 
         // Active provider/model
-        let provider = detect_active_provider(&config);
+        let (provider, model) = resolve_provider_and_model(&config);
 
-        println!("Provider: {}/{}", provider, config.agents.defaults.model);
+        println!("Provider: {}/{}", provider, model);
         println!();
 
         // Top commands
@@ -68,11 +68,11 @@ pub async fn handle_status(verbose: bool) -> Result<()> {
         let workspace = config.workspace_path();
 
         // Determine active provider
-        let provider = detect_active_provider(&config);
+        let (provider, model) = resolve_provider_and_model(&config);
 
         // Provider section
         println!("Provider");
-        println!("  {}/{}", provider, config.agents.defaults.model);
+        println!("  {}/{}", provider, model);
         println!();
 
         // Workspace section
@@ -121,10 +121,33 @@ pub async fn handle_status(verbose: bool) -> Result<()> {
     Ok(())
 }
 
-/// Detect the active provider based on which API keys are configured.
-/// NOTE: This is a local helper function. Developer 4 will add this as a method on Config.
-fn detect_active_provider(config: &config::Config) -> &str {
-    if !config.providers.anthropic.api_key.is_empty() {
+/// Resolve the active provider name and effective model for display.
+///
+/// Priority: explicit `agents.defaults.provider` field, then API-key detection.
+/// When an explicit provider is set and the configured model doesn't match it,
+/// the provider's default model is shown instead.
+fn resolve_provider_and_model(config: &config::Config) -> (String, String) {
+    // If explicit provider is set, use it
+    if let Some(ref name) = config.agents.defaults.provider {
+        if !name.is_empty() {
+            if let Some(spec) = providers::ProviderRegistry::find_by_name(name) {
+                let model = &config.agents.defaults.model;
+                let model_belongs = spec
+                    .keywords
+                    .iter()
+                    .any(|kw| model.to_lowercase().contains(kw));
+                let resolved_model = if model_belongs {
+                    model.clone()
+                } else {
+                    spec.default_model.to_string()
+                };
+                return (name.clone(), resolved_model);
+            }
+        }
+    }
+
+    // Fall back to detecting by API key presence
+    let provider = if !config.providers.anthropic.api_key.is_empty() {
         "anthropic"
     } else if !config.providers.openai.api_key.is_empty() {
         "openai"
@@ -134,5 +157,6 @@ fn detect_active_provider(config: &config::Config) -> &str {
         "deepseek"
     } else {
         "none"
-    }
+    };
+    (provider.to_string(), config.agents.defaults.model.clone())
 }
