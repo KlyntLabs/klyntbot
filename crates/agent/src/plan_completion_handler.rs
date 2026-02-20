@@ -10,20 +10,18 @@
 use async_trait::async_trait;
 use chrono::Utc;
 use common::Result;
-use goal::GoalStore;
-use std::sync::Arc;
-use tokio::sync::RwLock;
+use goal::conversions;
 use tools::plan_tool::PlanCompletionHandler;
 use uuid::Uuid;
 
-/// Implements PlanCompletionHandler by updating goal metadata in GoalStore.
+/// Implements PlanCompletionHandler by updating goal metadata in GoalRepo.
 pub struct PlanCompletionHandlerImpl {
-    store: Arc<RwLock<GoalStore>>,
+    repo: storage::GoalRepo,
 }
 
 impl PlanCompletionHandlerImpl {
-    pub fn new(store: Arc<RwLock<GoalStore>>) -> Self {
-        Self { store }
+    pub fn new(repo: storage::GoalRepo) -> Self {
+        Self { repo }
     }
 }
 
@@ -41,14 +39,12 @@ impl PlanCompletionHandler for PlanCompletionHandlerImpl {
             return Ok(());
         };
 
-        let mut store = self.store.write().await;
-        let Some(goal) = store.get(&gid).await? else {
+        let Some(mut goal) = conversions::load_goal(&self.repo, &gid).await? else {
             // Goal was deleted — treat as no-op.
             return Ok(());
         };
 
-        let mut updated = goal;
-        let plans_completed: u64 = updated
+        let plans_completed: u64 = goal
             .metadata
             .get("plans_completed")
             .and_then(|v| v.parse().ok())
@@ -56,27 +52,23 @@ impl PlanCompletionHandler for PlanCompletionHandlerImpl {
 
         let outcome = if success { "completed" } else { "failed" };
 
-        updated
-            .metadata
+        goal.metadata
             .insert("last_completed_plan_id".into(), plan_id.to_string());
-        updated
-            .metadata
+        goal.metadata
             .insert("last_plan_outcome".into(), outcome.into());
-        updated
-            .metadata
+        goal.metadata
             .insert("last_plan_summary".into(), summary.to_string());
-        updated
-            .metadata
+        goal.metadata
             .insert("last_plan_at".into(), Utc::now().to_rfc3339());
 
         if success {
-            updated
-                .metadata
+            goal.metadata
                 .insert("plans_completed".into(), (plans_completed + 1).to_string());
         }
 
-        updated.updated_at = Utc::now();
-        store.update(updated).await?;
+        goal.updated_at = Utc::now();
+        let row = conversions::goal_to_row(&goal);
+        let _ = self.repo.update(&row).await;
         Ok(())
     }
 }

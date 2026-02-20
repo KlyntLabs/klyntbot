@@ -25,9 +25,6 @@ use common::{Result, ToolError};
 /// Tool for managing personal finance: accounts, transactions, budgets,
 /// investments, goals, liabilities, and financial reports.
 // Fields are `pub(crate)` so sub-module implementations can access them directly.
-// `dead_code` is suppressed for `timezone` which is plumbed through but not yet
-// consumed by any action handler (reserved for date-localisation in reports).
-#[allow(dead_code)]
 pub struct FinanceTool {
     pub(crate) accounts: storage::FinanceAccountRepo,
     pub(crate) transactions: storage::FinanceTransactionRepo,
@@ -38,7 +35,6 @@ pub struct FinanceTool {
     pub(crate) price_service: PriceService,
     pub(crate) finance_handler: Option<Arc<dyn FinanceHandler>>,
     pub(crate) default_currency: String,
-    pub(crate) timezone: String,
 }
 
 impl FinanceTool {
@@ -53,7 +49,6 @@ impl FinanceTool {
         liabilities: storage::FinanceLiabilityRepo,
         price_service: PriceService,
         default_currency: String,
-        timezone: String,
     ) -> Self {
         Self {
             accounts,
@@ -65,7 +60,6 @@ impl FinanceTool {
             price_service,
             finance_handler: None,
             default_currency,
-            timezone,
         }
     }
 

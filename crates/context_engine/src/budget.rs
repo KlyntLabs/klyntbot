@@ -47,6 +47,7 @@ pub struct BudgetAllocator {
 }
 
 /// Summary of budget usage.
+#[derive(Clone)]
 pub struct BudgetReport {
     pub total_window: usize,
     pub total_allocated: usize,

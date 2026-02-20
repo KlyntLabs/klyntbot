@@ -34,6 +34,10 @@ pub struct CompressorConfig {
     pub snippet_length: usize,
     /// Compression mode.
     pub mode: CompressorMode,
+    /// Number of messages per summary chunk when compressing older history.
+    pub chunk_size: usize,
+    /// Minimum number of recent messages to always keep verbatim.
+    pub min_recent_messages: usize,
 }
 
 impl Default for CompressorConfig {
@@ -41,6 +45,8 @@ impl Default for CompressorConfig {
         Self {
             snippet_length: DEFAULT_SNIPPET_LENGTH,
             mode: CompressorMode::Extractive,
+            chunk_size: 5,
+            min_recent_messages: 4,
         }
     }
 }
@@ -57,11 +63,10 @@ pub enum CompressorMode {
 /// Compresses conversation history to fit within a token budget.
 ///
 /// Strategy:
-/// - Always keep at least `min_recent_messages` verbatim (from the end)
+/// - Always keep at least `config.min_recent_messages` verbatim (from the end)
 /// - Expand recent window if budget allows
 /// - Summarize older messages using extractive summarization (no LLM call)
 pub struct HistoryCompressor {
-    min_recent_messages: usize,
     token_counter: Arc<dyn TokenCounter>,
     config: CompressorConfig,
 }
@@ -69,9 +74,11 @@ pub struct HistoryCompressor {
 impl HistoryCompressor {
     pub fn new(min_recent: usize, token_counter: Arc<dyn TokenCounter>) -> Self {
         Self {
-            min_recent_messages: min_recent,
             token_counter,
-            config: CompressorConfig::default(),
+            config: CompressorConfig {
+                min_recent_messages: min_recent,
+                ..CompressorConfig::default()
+            },
         }
     }
 
@@ -82,7 +89,17 @@ impl HistoryCompressor {
         config: CompressorConfig,
     ) -> Self {
         Self {
-            min_recent_messages: min_recent,
+            token_counter,
+            config: CompressorConfig {
+                min_recent_messages: min_recent,
+                ..config
+            },
+        }
+    }
+
+    /// Create from a `CompressorConfig` directly (uses config's `min_recent_messages`).
+    pub fn from_config(token_counter: Arc<dyn TokenCounter>, config: CompressorConfig) -> Self {
+        Self {
             token_counter,
             config,
         }
@@ -103,7 +120,7 @@ impl HistoryCompressor {
         }
 
         // Always keep at least min_recent messages (or all if fewer)
-        let min_keep = self.min_recent_messages.min(history.len());
+        let min_keep = self.config.min_recent_messages.min(history.len());
 
         // Count tokens for the minimum recent messages
         let mut recent_tokens: usize = history[history.len() - min_keep..]
@@ -137,7 +154,7 @@ impl HistoryCompressor {
         // Summarize older messages in chunks
         let mut summaries = Vec::new();
         if !to_summarize.is_empty() {
-            let chunk_size = 5;
+            let chunk_size = self.config.chunk_size;
             let snippet_len = self.config.snippet_length;
             for (chunk_idx, chunk) in to_summarize.chunks(chunk_size).enumerate() {
                 let content = Self::extractive_summary_with_length(chunk, snippet_len);
@@ -386,6 +403,8 @@ mod tests {
         let config = CompressorConfig::default();
         assert_eq!(config.snippet_length, 200);
         assert_eq!(config.mode, CompressorMode::Extractive);
+        assert_eq!(config.chunk_size, 5);
+        assert_eq!(config.min_recent_messages, 4);
     }
 
     #[test]
@@ -394,6 +413,7 @@ mod tests {
         let config = CompressorConfig {
             snippet_length: 200,
             mode: CompressorMode::Abstractive,
+            ..Default::default()
         };
         let compressor = HistoryCompressor::with_config(4, default_token_counter(), config);
         let history = make_history(10);
@@ -407,6 +427,7 @@ mod tests {
         let config = CompressorConfig {
             snippet_length: 50,
             mode: CompressorMode::Extractive,
+            ..Default::default()
         };
         let compressor = HistoryCompressor::with_config(2, default_token_counter(), config);
 

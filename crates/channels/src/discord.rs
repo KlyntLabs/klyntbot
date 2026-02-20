@@ -543,12 +543,30 @@ impl Channel for DiscordChannel {
     }
 
     async fn send(&self, msg: &OutboundMessage) -> Result<()> {
-        self.send_message_rest(msg.chat_id.as_str(), &msg.content, msg.reply_to.as_deref())
-            .await
+        let formatted = crate::formatter::formatter_for("discord").format(&msg.content);
+        let limit = crate::utils::max_length("discord");
+        let chunks = crate::utils::split_message(&formatted, limit);
+
+        for (i, chunk) in chunks.iter().enumerate() {
+            let reply_to = if i == 0 {
+                msg.reply_to.as_deref()
+            } else {
+                None
+            };
+            self.send_message_rest(msg.chat_id.as_str(), chunk, reply_to)
+                .await?;
+        }
+
+        Ok(())
     }
 
     fn is_allowed(&self, sender_id: &str) -> bool {
         check_allowlist(&self.config.allow_from, sender_id)
+    }
+
+    async fn send_typing(&self, chat_id: &str) -> Result<()> {
+        self.start_typing(chat_id.to_string()).await;
+        Ok(())
     }
 }
 

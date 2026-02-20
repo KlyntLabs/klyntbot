@@ -33,7 +33,7 @@ pub use common::{
 };
 pub use config::Config;
 pub use heartbeat::HeartbeatService;
-pub use plan::{Plan, PlanStatus, PlanStore};
+pub use plan::{Plan, PlanStatus};
 pub use providers::{
     create_provider, create_provider_with_failover, DynProvider, LlmProvider, LlmResponse, Message,
     ProviderRegistry,

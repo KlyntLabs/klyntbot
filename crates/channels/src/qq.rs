@@ -328,8 +328,15 @@ impl Channel for QQChannel {
     }
 
     async fn send(&self, msg: &OutboundMessage) -> Result<()> {
-        self.send_c2c_message(msg.chat_id.as_str(), &msg.content)
-            .await
+        let formatted = crate::formatter::formatter_for("qq").format(&msg.content);
+        let limit = crate::utils::max_length("qq");
+        let chunks = crate::utils::split_message(&formatted, limit);
+
+        for chunk in &chunks {
+            self.send_c2c_message(msg.chat_id.as_str(), chunk).await?;
+        }
+
+        Ok(())
     }
 
     fn is_allowed(&self, sender_id: &str) -> bool {

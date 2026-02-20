@@ -1,0 +1,70 @@
+//! Agent configuration: AgentsConfig, AgentDefaults.
+
+use serde::{Deserialize, Serialize};
+
+/// Agent configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[derive(Default)]
+pub struct AgentsConfig {
+    #[serde(default)]
+    pub defaults: AgentDefaults,
+}
+
+/// Default agent configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentDefaults {
+    #[serde(default = "default_workspace")]
+    pub workspace: String,
+
+    #[serde(default = "default_model")]
+    pub model: String,
+
+    /// Explicit active provider name (e.g., "anthropic", "deepseek").
+    /// When set, takes priority over model-name auto-detection.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
+
+    #[serde(default = "default_max_tokens")]
+    pub max_tokens: u32,
+
+    #[serde(default = "default_temperature")]
+    pub temperature: f32,
+
+    #[serde(default = "default_max_iterations")]
+    pub max_tool_iterations: u32,
+}
+
+impl Default for AgentDefaults {
+    fn default() -> Self {
+        Self {
+            workspace: default_workspace(),
+            model: default_model(),
+            provider: None,
+            max_tokens: default_max_tokens(),
+            temperature: default_temperature(),
+            max_tool_iterations: default_max_iterations(),
+        }
+    }
+}
+
+fn default_workspace() -> String {
+    "~/.klyntbot/workspace".to_string()
+}
+
+fn default_model() -> String {
+    "anthropic/claude-opus-4-5".to_string()
+}
+
+fn default_max_tokens() -> u32 {
+    8192
+}
+
+fn default_temperature() -> f32 {
+    0.7
+}
+
+fn default_max_iterations() -> u32 {
+    20
+}

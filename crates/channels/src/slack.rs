@@ -423,13 +423,17 @@ impl Channel for SlackChannel {
 
         // Only use thread for non-DM messages
         let use_thread = thread_ts.is_some() && channel_type != Some("im");
+        let ts = if use_thread { thread_ts } else { None };
 
-        self.send_message(
-            msg.chat_id.as_str(),
-            &msg.content,
-            if use_thread { thread_ts } else { None },
-        )
-        .await
+        let formatted = crate::formatter::formatter_for("slack").format(&msg.content);
+        let limit = crate::utils::max_length("slack");
+        let chunks = crate::utils::split_message(&formatted, limit);
+
+        for chunk in &chunks {
+            self.send_message(msg.chat_id.as_str(), chunk, ts).await?;
+        }
+
+        Ok(())
     }
 
     fn is_allowed(&self, sender_id: &str) -> bool {

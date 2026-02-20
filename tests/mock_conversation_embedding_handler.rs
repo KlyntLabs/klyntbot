@@ -16,7 +16,10 @@ use tools::conversation_embedding::{
     ConversationEmbeddingHandler, ConversationEmbeddingRecord, ConversationEmbeddingStatus,
     PurgeFilter,
 };
-use tools::EMBEDDING_DIM;
+
+#[path = "test_utils/embedding.rs"]
+mod embedding_utils;
+use embedding_utils::{cosine_similarity, deterministic_embedding};
 
 /// Record of an embed_message call for test assertions
 #[derive(Debug, Clone)]
@@ -68,23 +71,9 @@ impl MockConversationEmbeddingHandler {
     }
 
     /// Generate a deterministic 384-dim embedding from text.
-    /// Uses a simple hash-based approach so identical text produces identical vectors.
-    /// Follows the same pattern as MockEmbeddingHandler from Sprint 5.
+    /// Delegates to `test_utils::embedding::deterministic_embedding`.
     pub fn deterministic_embedding(text: &str) -> Vec<f32> {
-        let mut vec = vec![0.0f32; EMBEDDING_DIM];
-        // Simple deterministic fill: use byte values spread across dims
-        for (i, byte) in text.bytes().enumerate() {
-            let idx = i % EMBEDDING_DIM;
-            vec[idx] += (byte as f32) / 255.0;
-        }
-        // Normalize to unit vector
-        let norm: f32 = vec.iter().map(|x| x * x).sum::<f32>().sqrt();
-        if norm > 0.0 {
-            for v in &mut vec {
-                *v /= norm;
-            }
-        }
-        vec
+        deterministic_embedding(text)
     }
 
     /// Get the number of embed_message calls made.
@@ -104,19 +93,6 @@ impl MockConversationEmbeddingHandler {
     pub fn embed_message_calls(&self) -> Vec<EmbedCallRecord> {
         self.embed_message_calls.lock().unwrap().clone()
     }
-}
-
-/// Compute cosine similarity between two vectors.
-fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
-    let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
-    let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
-    let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
-
-    if norm_a == 0.0 || norm_b == 0.0 {
-        return 0.0;
-    }
-
-    (dot / (norm_a * norm_b)) as f64
 }
 
 #[async_trait]

@@ -50,6 +50,8 @@ pub async fn handle_chat(message: Option<String>, session: String, verbose: bool
             config,
             repos.todos,
             Some(repos.embeddings),
+            Some(repos.goals),
+            Some(repos.plans),
             repos.outcomes,
             repos.learning_state,
             repos.memory_notes,

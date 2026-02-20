@@ -51,10 +51,14 @@ impl EngineDispatch {
 
     /// Execute with the given strategy, escalating if an engine signals it
     /// cannot handle the request.
+    ///
+    /// Accepts `Arc<Vec<Message>>` to avoid deep-cloning the message history
+    /// at the dispatch boundary. Engines convert to a mutable `Vec` internally,
+    /// using `Arc::try_unwrap` to avoid a clone when the refcount is 1.
     pub async fn execute(
         &self,
         strategy: ExecutionStrategy,
-        messages: Vec<Message>,
+        messages: Arc<Vec<Message>>,
         tools: &[serde_json::Value],
         params: &ExecutionParams,
         ctx: &RoutingContext,
@@ -73,8 +77,10 @@ impl EngineDispatch {
             match &current_strategy {
                 ExecutionStrategy::DirectResponse => {
                     let engine = DirectEngine::new(self.core.clone());
+                    // Move the Arc — DirectEngine returns messages on escalation,
+                    // so we never need the original after this point.
                     let outcome = engine
-                        .execute(current_messages.clone(), params, ctx, event_tx.as_ref())
+                        .execute(current_messages, params, ctx, event_tx.as_ref())
                         .await?;
 
                     match outcome {
@@ -97,7 +103,7 @@ impl EngineDispatch {
                             }
                             debug!("DirectEngine escalated to ToolAssisted");
                             escalation_count += 1;
-                            current_messages = messages;
+                            current_messages = Arc::new(messages);
                             current_strategy =
                                 ExecutionStrategy::ToolAssisted { max_iterations: 5 };
                             continue;
@@ -110,6 +116,8 @@ impl EngineDispatch {
                         .with_max_iterations(*max_iterations)
                         .with_reflection_mode(ReflectionMode::OnFailure);
 
+                    // Clone the Arc (O(1)) — we may need current_messages again
+                    // if the engine escalates to AutonomousTask.
                     let outcome = engine
                         .execute(
                             current_messages.clone(),
@@ -171,14 +179,9 @@ impl EngineDispatch {
                         .with_max_iterations(*max_iterations)
                         .with_reflection_mode(ReflectionMode::EveryN(5));
 
+                    // Move the Arc — AutonomousTask always returns.
                     let outcome = engine
-                        .execute(
-                            current_messages.clone(),
-                            tools,
-                            params,
-                            ctx,
-                            event_tx.clone(),
-                        )
+                        .execute(current_messages, tools, params, ctx, event_tx.clone())
                         .await?;
 
                     let (content, usage) = match outcome {
@@ -324,7 +327,7 @@ mod tests {
         let result = dispatch
             .execute(
                 ExecutionStrategy::DirectResponse,
-                vec![Message::user("what is Rust?")],
+                Arc::new(vec![Message::user("what is Rust?")]),
                 &[],
                 &default_params(),
                 &routing_ctx(),
@@ -354,7 +357,7 @@ mod tests {
         let result = dispatch
             .execute(
                 ExecutionStrategy::DirectResponse,
-                vec![Message::user("search for Rust tutorials")],
+                Arc::new(vec![Message::user("search for Rust tutorials")]),
                 &[],
                 &default_params(),
                 &routing_ctx(),
@@ -380,7 +383,7 @@ mod tests {
         let result = dispatch
             .execute(
                 ExecutionStrategy::DirectResponse,
-                vec![Message::user("search")],
+                Arc::new(vec![Message::user("search")]),
                 &[],
                 &default_params(),
                 &routing_ctx(),
@@ -405,7 +408,7 @@ mod tests {
         let result = dispatch
             .execute(
                 ExecutionStrategy::AutonomousTask { max_iterations: 50 },
-                vec![Message::user("build the project")],
+                Arc::new(vec![Message::user("build the project")]),
                 &[],
                 &default_params(),
                 &routing_ctx(),
@@ -432,7 +435,7 @@ mod tests {
                 ExecutionStrategy::Clarification {
                     reason: "What programming language?".to_string(),
                 },
-                vec![Message::user("help me")],
+                Arc::new(vec![Message::user("help me")]),
                 &[],
                 &default_params(),
                 &routing_ctx(),

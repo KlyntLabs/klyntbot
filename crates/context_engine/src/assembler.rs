@@ -1,11 +1,16 @@
+use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::sync::Arc;
 
 use providers::Message;
+use tokio::sync::Mutex;
 
 use crate::memory_retriever::MemoryRetriever;
 use crate::token_counter::{default_token_counter, TokenCounter};
-use crate::{BudgetAllocator, BudgetConfig, BudgetReport, HistoryCompressor, Priority};
+use crate::{
+    BudgetAllocator, BudgetConfig, BudgetReport, CompressorConfig, HistoryCompressor, Priority,
+};
 
 /// Determines how the agent should process a request.
 #[derive(Debug, Clone)]
@@ -39,6 +44,7 @@ pub struct ContextRequest {
 }
 
 /// The assembled context ready to send to the LLM.
+#[derive(Clone)]
 pub struct AssembledContext {
     /// Ordered messages: system, memories, summaries, recent history.
     pub messages: Vec<Message>,
@@ -48,21 +54,87 @@ pub struct AssembledContext {
     pub budget_report: BudgetReport,
 }
 
+/// Default number of memory entries to retrieve.
+const DEFAULT_MEMORY_RETRIEVAL_LIMIT: usize = 5;
+
+/// Maximum number of entries in the context assembly cache.
+const DEFAULT_CACHE_CAPACITY: usize = 8;
+
+/// Bounded cache for assembled contexts, keyed by a hash of the request inputs.
+struct ContextCache {
+    entries: HashMap<u64, AssembledContext>,
+    /// Insertion order for eviction (oldest first).
+    order: Vec<u64>,
+    capacity: usize,
+    /// Generation counter — incremented on invalidation.
+    generation: u64,
+    /// Generation at which each entry was inserted.
+    entry_generations: HashMap<u64, u64>,
+}
+
+impl ContextCache {
+    fn new(capacity: usize) -> Self {
+        Self {
+            entries: HashMap::with_capacity(capacity),
+            order: Vec::with_capacity(capacity),
+            capacity,
+            generation: 0,
+            entry_generations: HashMap::with_capacity(capacity),
+        }
+    }
+
+    fn get(&self, key: u64) -> Option<&AssembledContext> {
+        // Only return if entry is from the current generation
+        let entry_gen = self.entry_generations.get(&key)?;
+        if *entry_gen < self.generation {
+            return None;
+        }
+        self.entries.get(&key)
+    }
+
+    fn insert(&mut self, key: u64, value: AssembledContext) {
+        if self.entries.len() >= self.capacity && !self.entries.contains_key(&key) {
+            // Evict oldest
+            if let Some(oldest_key) = self.order.first().copied() {
+                self.entries.remove(&oldest_key);
+                self.entry_generations.remove(&oldest_key);
+                self.order.remove(0);
+            }
+        }
+        self.entries.insert(key, value);
+        self.entry_generations.insert(key, self.generation);
+        if !self.order.contains(&key) {
+            self.order.push(key);
+        }
+    }
+
+    fn invalidate(&mut self) {
+        self.generation += 1;
+    }
+}
+
 /// Orchestrates budget allocation, history compression, and memory retrieval
 /// into a single assembled context that fits within the model's context window.
 pub struct ContextEngine {
     compressor: HistoryCompressor,
     token_counter: Arc<dyn TokenCounter>,
     memory_retriever: Option<Arc<dyn MemoryRetriever>>,
+    /// Maximum number of memory entries to retrieve per query.
+    memory_retrieval_limit: usize,
+    /// Cache for assembled contexts.
+    cache: Arc<Mutex<ContextCache>>,
 }
 
 impl Default for ContextEngine {
     fn default() -> Self {
         let counter = default_token_counter();
+        let config = CompressorConfig::default();
         Self {
-            compressor: HistoryCompressor::new(4, Arc::clone(&counter)),
+            compressor: HistoryCompressor::from_config(Arc::clone(&counter), config),
             token_counter: counter,
             memory_retriever: None,
+            memory_retrieval_limit: DEFAULT_MEMORY_RETRIEVAL_LIMIT,
+            cache: Arc::new(Mutex::new(ContextCache::new(DEFAULT_CACHE_CAPACITY))),
         }
     }
 }
@@ -75,10 +147,31 @@ impl ContextEngine {
     /// Override the token counter (e.g., with a provider-specific estimator).
     /// Returns `self` for chaining.
     pub fn with_token_counter(self, counter: Arc<dyn TokenCounter>) -> Self {
+        let config = CompressorConfig::default();
         Self {
-            compressor: HistoryCompressor::new(4, Arc::clone(&counter)),
+            compressor: HistoryCompressor::from_config(Arc::clone(&counter), config),
             token_counter: counter,
             memory_retriever: self.memory_retriever,
+            memory_retrieval_limit: self.memory_retrieval_limit,
+            cache: self.cache,
+        }
+    }
+
+    /// Override the compressor configuration.
+    /// Returns `self` for chaining.
+    pub fn with_compressor_config(self, config: CompressorConfig) -> Self {
+        Self {
+            compressor: HistoryCompressor::from_config(Arc::clone(&self.token_counter), config),
+            ..self
+        }
+    }
+
+    /// Set the maximum number of memory entries to retrieve per query.
+    /// Returns `self` for chaining.
+    pub fn with_memory_retrieval_limit(self, limit: usize) -> Self {
+        Self {
+            memory_retrieval_limit: limit,
+            ..self
         }
     }
 
@@ -91,7 +184,72 @@ impl ContextEngine {
         }
     }
 
+    /// Invalidate the assembled context cache.
+    ///
+    /// Call this after tool executions or config changes that affect
+    /// the context assembly output.
+    pub async fn invalidate_cache(&self) {
+        self.cache.lock().await.invalidate();
+    }
+
     pub async fn assemble(&self, request: ContextRequest) -> AssembledContext {
+        // Check cache first
+        let cache_key = Self::compute_cache_key(&request);
+        {
+            let cache = self.cache.lock().await;
+            if let Some(cached) = cache.get(cache_key) {
+                return cached.clone();
+            }
+        }
+
+        let result = self.assemble_uncached(&request).await;
+
+        // Store in cache
+        {
+            let mut cache = self.cache.lock().await;
+            cache.insert(cache_key, result.clone());
+        }
+
+        result
+    }
+
+    /// Assemble context without caching (useful for testing or one-off calls).
+    pub async fn assemble_no_cache(&self, request: ContextRequest) -> AssembledContext {
+        self.assemble_uncached(&request).await
+    }
+
+    /// Compute a cache key from the request inputs.
+    fn compute_cache_key(request: &ContextRequest) -> u64 {
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        // Hash system prompt
+        request.system_prompt.hash(&mut hasher);
+        // Hash history length + last message content (changes on each user message)
+        request.history.len().hash(&mut hasher);
+        if let Some(last) = request.history.last() {
+            // Hash the last message's debug repr as a proxy for content
+            format!("{:?}", last).hash(&mut hasher);
+        }
+        // Hash message text (used for memory retrieval)
+        request.message_text.hash(&mut hasher);
+        // Hash strategy discriminant
+        std::mem::discriminant(&request.strategy).hash(&mut hasher);
+        // Hash tool definition count + first tool name (lightweight proxy)
+        request.tool_definitions.len().hash(&mut hasher);
+        if let Some(first) = request.tool_definitions.first() {
+            if let Some(name) = first
+                .get("function")
+                .and_then(|f| f.get("name"))
+                .and_then(|n| n.as_str())
+            {
+                name.hash(&mut hasher);
+            }
+        }
+        // Hash context window
+        request.context_window.hash(&mut hasher);
+        hasher.finish()
+    }
+
+    async fn assemble_uncached(&self, request: &ContextRequest) -> AssembledContext {
         let mut allocator = BudgetAllocator::new(BudgetConfig::standard(request.context_window));
 
         // 1. System prompt always gets allocated first
@@ -108,7 +266,7 @@ impl ContextEngine {
         allocator.allocate(Priority::ToolDefinitions, tool_tokens);
 
         // 3. Retrieve memories and allocate budget (Priority::RetrievedMemory)
-        let memory_content = self.retrieve_memory(&request).await;
+        let memory_content = self.retrieve_memory(request).await;
         let memory_tokens = memory_content
             .as_deref()
             .map(|c| self.estimate_text(c))
@@ -169,7 +327,9 @@ impl ContextEngine {
     async fn retrieve_memory(&self, request: &ContextRequest) -> Option<String> {
         // Embedding-based retrieval takes precedence
         if let Some(retriever) = &self.memory_retriever {
-            let entries = retriever.retrieve(&request.message_text, 5).await;
+            let entries = retriever
+                .retrieve(&request.message_text, self.memory_retrieval_limit)
+                .await;
             if !entries.is_empty() {
                 let mut text = "[Relevant Context]\n".to_string();
                 for entry in entries {

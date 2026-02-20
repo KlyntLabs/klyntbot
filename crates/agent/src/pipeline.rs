@@ -187,7 +187,7 @@ impl AgentPipeline {
             .engine_dispatch
             .execute(
                 classification.strategy.clone(),
-                assembled.messages,
+                Arc::new(assembled.messages),
                 tool_definitions,
                 &params,
                 ctx,

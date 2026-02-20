@@ -10,7 +10,7 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use storage::{Repos, StoragePool};
 use tokio::signal;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::Mutex;
 use tracing::{error, info};
 
 /// Handle serve command
@@ -46,11 +46,9 @@ pub async fn handle_serve(port: u16) -> Result<()> {
     cron_service.start().await?;
     info!("Cron service started");
 
-    // Create SHARED GoalStore (SQL-backed via from_repo)
-    let goal_store = Arc::new(RwLock::new(goal::GoalStore::from_repo(repos.goals)));
-
-    // Create SHARED PlanStore (SQL-backed via from_repo)
-    let plan_store = Arc::new(RwLock::new(plan::PlanStore::from_repo(repos.plans)));
+    // Goal and plan repos (Clone+Send+Sync, no Arc<RwLock> needed)
+    let goal_repo = repos.goals.clone();
+    let plan_repo = repos.plans.clone();
 
     // Create SHARED NotificationDispatcher
     let notification_dispatcher = Arc::new(agent::NotificationDispatcher::new(
@@ -492,8 +490,8 @@ pub async fn handle_serve(port: u16) -> Result<()> {
             Some(cron_service.clone()),
             repos.todos,
             Some(repos.embeddings),
-            Some(goal_store.clone()),
-            Some(plan_store.clone()),
+            Some(goal_repo.clone()),
+            Some(plan_repo.clone()),
             Some(notification_dispatcher.last_active_handle()),
             repos.outcomes,
             repos.learning_state,

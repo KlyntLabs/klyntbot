@@ -1752,17 +1752,11 @@ dependencies = [
 name = "goal"
 version = "0.1.0"
 dependencies = [
- "async-trait",
  "chrono",
  "common",
- "config",
- "dirs",
  "serde",
  "serde_json",
  "storage",
- "tempfile",
- "tokio",
- "tracing",
  "uuid",
 ]
 
@@ -3275,8 +3269,6 @@ dependencies = [
  "serde",
  "serde_json",
  "storage",
- "tempfile",
- "tokio",
  "uuid",
 ]
 

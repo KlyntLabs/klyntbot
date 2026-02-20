@@ -5,38 +5,12 @@ use klyntbot::{AgentEvent, AgentLoop, MessageBus};
 use std::sync::Arc;
 use tempfile::TempDir;
 
-#[path = "mock_provider.rs"]
-mod mock_provider;
-use mock_provider::{ErrorProvider, MockProvider};
-
-/// Create repos backed by a lazy Postgres pool (no actual DB connection needed for unit tests).
-fn test_pool() -> klyntbot::storage::StoragePool {
-    klyntbot::storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap()
-}
-
-fn test_todo_repo() -> klyntbot::storage::TodoRepo {
-    klyntbot::storage::TodoRepo::new(test_pool().inner().clone())
-}
-
-fn test_outcome_repo() -> klyntbot::storage::OutcomeRepo {
-    klyntbot::storage::OutcomeRepo::new(test_pool().inner().clone())
-}
-
-fn test_learning_state_repo() -> klyntbot::storage::LearningStateRepo {
-    klyntbot::storage::LearningStateRepo::new(test_pool().inner().clone())
-}
-
-fn test_memory_note_repo() -> klyntbot::storage::MemoryNoteRepo {
-    klyntbot::storage::MemoryNoteRepo::new(test_pool().inner().clone())
-}
-
-fn test_calendar_sync_repo() -> klyntbot::storage::CalendarSyncRepo {
-    klyntbot::storage::CalendarSyncRepo::new(test_pool().inner().clone())
-}
-
-fn test_event_cache_repo() -> klyntbot::storage::CalendarEventCacheRepo {
-    klyntbot::storage::CalendarEventCacheRepo::new(test_pool().inner().clone())
-}
+mod common;
+use common::mock_provider::{ErrorProvider, MockProvider};
+use common::{
+    test_calendar_sync_repo, test_event_cache_repo, test_learning_state_repo,
+    test_memory_note_repo, test_outcome_repo, test_todo_repo,
+};
 
 /// Test basic message processing through agent loop
 #[tokio::test]
@@ -61,6 +35,8 @@ async fn test_agent_loop_basic_processing() {
         config,
         test_todo_repo(),
         None,
+        None, // goal_repo
+        None, // plan_repo
         test_outcome_repo(),
         test_learning_state_repo(),
         test_memory_note_repo(),
@@ -135,6 +111,8 @@ async fn test_agent_loop_with_tool_execution() {
         config,
         test_todo_repo(),
         None,
+        None, // goal_repo
+        None, // plan_repo
         test_outcome_repo(),
         test_learning_state_repo(),
         test_memory_note_repo(),
@@ -195,6 +173,8 @@ async fn test_agent_loop_max_iterations() {
         config,
         test_todo_repo(),
         None,
+        None, // goal_repo
+        None, // plan_repo
         test_outcome_repo(),
         test_learning_state_repo(),
         test_memory_note_repo(),
@@ -268,6 +248,8 @@ async fn test_agent_loop_tool_error_handling() {
         config,
         test_todo_repo(),
         None,
+        None, // goal_repo
+        None, // plan_repo
         test_outcome_repo(),
         test_learning_state_repo(),
         test_memory_note_repo(),
@@ -325,6 +307,8 @@ async fn test_agent_loop_session_persistence() {
             config.clone(),
             test_todo_repo(),
             None,
+            None, // goal_repo
+            None, // plan_repo
             test_outcome_repo(),
             test_learning_state_repo(),
             test_memory_note_repo(),
@@ -352,6 +336,8 @@ async fn test_agent_loop_session_persistence() {
         config,
         test_todo_repo(),
         None,
+        None, // goal_repo
+        None, // plan_repo
         test_outcome_repo(),
         test_learning_state_repo(),
         test_memory_note_repo(),
@@ -397,6 +383,8 @@ async fn test_streaming_emits_done() {
             config,
             test_todo_repo(),
             None,
+            None, // goal_repo
+            None, // plan_repo
             test_outcome_repo(),
             test_learning_state_repo(),
             test_memory_note_repo(),
@@ -466,6 +454,8 @@ async fn test_streaming_emits_error_on_failure() {
             config,
             test_todo_repo(),
             None,
+            None, // goal_repo
+            None, // plan_repo
             test_outcome_repo(),
             test_learning_state_repo(),
             test_memory_note_repo(),

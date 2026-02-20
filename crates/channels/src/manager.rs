@@ -13,6 +13,23 @@ use bus::{MessageBus, OutboundMessage};
 use common::{ChannelError, Result};
 use config::Config;
 
+/// Convert an error into a short, user-friendly description.
+fn user_facing_error(err: &common::KlyntbotError) -> String {
+    match err {
+        common::KlyntbotError::Channel(ChannelError::ConnectionFailed(_)) => {
+            "Connection issue — the channel may be temporarily unavailable.".to_string()
+        }
+        common::KlyntbotError::Channel(ChannelError::SendFailed(detail)) => {
+            if detail.contains("rate limit") || detail.contains("429") {
+                "Rate limited — please wait a moment and try again.".to_string()
+            } else {
+                "Message delivery failed — please try again.".to_string()
+            }
+        }
+        _ => "An unexpected error occurred.".to_string(),
+    }
+}
+
 /// Macro to reduce duplication in channel initialization.
 /// Handles the common pattern of checking enabled status, logging, creating the channel,
 /// and inserting it into the channels map.
@@ -158,6 +175,27 @@ impl ChannelManager {
                         if let Some(channel) = channels.get(msg.channel.as_str()) {
                             if let Err(e) = channel.send(&msg).await {
                                 error!("Failed to send message to {}: {}", msg.channel, e);
+
+                                // Send user-facing error feedback (avoid infinite loop
+                                // by not retrying if the error message itself fails)
+                                let error_text = format!(
+                                    "Sorry, I encountered an error sending that message. Please try again.\n({})",
+                                    user_facing_error(&e)
+                                );
+                                let error_msg = OutboundMessage {
+                                    channel: msg.channel.clone(),
+                                    chat_id: msg.chat_id.clone(),
+                                    content: error_text,
+                                    reply_to: None,
+                                    media: vec![],
+                                    metadata: Default::default(),
+                                };
+                                if let Err(e2) = channel.send(&error_msg).await {
+                                    error!(
+                                        "Failed to send error feedback to {}: {} (giving up)",
+                                        msg.channel, e2
+                                    );
+                                }
                             }
                         } else {
                             warn!("No channel found for: {}", msg.channel);

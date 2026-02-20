@@ -115,7 +115,6 @@ mod tests {
 
     #[test]
     fn test_plan_creation_defaults() {
-        // TODO: Test 1
         // Given: no plan exists
         // When: a new Plan is created with minimal fields
         // Then:
@@ -153,7 +152,6 @@ mod tests {
 
     #[test]
     fn test_plan_status_transitions_valid() {
-        // TODO: Test 2
         // Given: a Plan with status Draft
         // When: status transitions through: Draft → Approved → Executing → Completed
         // Then: all transitions succeed without error
@@ -174,7 +172,6 @@ mod tests {
 
     #[test]
     fn test_step_status_transitions() {
-        // TODO: Test 3
         // Given: a PlanStep with status Pending
         // When: status transitions: Pending → Executing → Completed
         // Then: each transition is valid
@@ -199,7 +196,6 @@ mod tests {
 
     #[test]
     fn test_plan_serde_roundtrip() {
-        // TODO: Test 5
         // Given: a Plan with all fields populated (steps, backtrack_history, linked goal)
         // When: the Plan is serialized to JSON and deserialized
         // Then: the deserialized Plan matches the original exactly

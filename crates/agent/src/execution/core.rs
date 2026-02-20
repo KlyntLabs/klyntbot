@@ -1,6 +1,7 @@
 //! Core execution engine that drives a single LLM→tool cycle.
 
 use std::collections::HashSet;
+use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -15,6 +16,46 @@ use tracing::debug;
 use providers::Usage;
 
 use crate::execution::types::{CycleOutcome, ExecutionParams, ToolExecutionResult};
+
+/// Hash a `serde_json::Value` without serializing to a string.
+///
+/// `Value` doesn't implement `Hash` (because of `f64`), so we walk the tree
+/// and feed each element into a `DefaultHasher`. This is cheaper than
+/// `serde_json::to_string()` which allocates a `String` for every tool call.
+fn hash_json_value(value: &serde_json::Value) -> u64 {
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    hash_value_into(value, &mut hasher);
+    hasher.finish()
+}
+
+fn hash_value_into(value: &serde_json::Value, hasher: &mut impl Hasher) {
+    std::mem::discriminant(value).hash(hasher);
+    match value {
+        serde_json::Value::Null => {}
+        serde_json::Value::Bool(b) => b.hash(hasher),
+        serde_json::Value::Number(n) => {
+            // Hash the canonical string representation of the number
+            // to avoid f64 hashing issues while staying allocation-free.
+            for byte in n.to_string().bytes() {
+                byte.hash(hasher);
+            }
+        }
+        serde_json::Value::String(s) => s.hash(hasher),
+        serde_json::Value::Array(arr) => {
+            arr.len().hash(hasher);
+            for item in arr {
+                hash_value_into(item, hasher);
+            }
+        }
+        serde_json::Value::Object(obj) => {
+            obj.len().hash(hasher);
+            for (k, v) in obj {
+                k.hash(hasher);
+                hash_value_into(v, hasher);
+            }
+        }
+    }
+}
 
 /// Detect if a text response is actually a fabricated tool response.
 ///
@@ -142,13 +183,15 @@ impl ExecutionCore {
             );
 
             // ── Duplicate tool call prevention ─────────────────────
-            // Build signature keys for each tool call: "name|canonical_args"
+            // Build signature keys for each tool call: "name|hash(args)"
+            // Uses hash-based comparison instead of serialization to avoid
+            // allocating a String per tool call.
             let current_keys: Vec<String> = response
                 .tool_calls
                 .iter()
                 .map(|tc| {
-                    let args_str = serde_json::to_string(&tc.arguments).unwrap_or_default();
-                    format!("{}|{}", tc.name, args_str)
+                    let args_hash = hash_json_value(&tc.arguments);
+                    format!("{}|{:x}", tc.name, args_hash)
                 })
                 .collect();
 
@@ -698,5 +741,35 @@ mod tests {
             .unwrap();
 
         assert!(matches!(outcome, CycleOutcome::FinalResponse { .. }));
+    }
+
+    // ── Hash-based dedup key tests ──────────────────────────────
+
+    #[test]
+    fn test_hash_json_value_same_values_same_hash() {
+        let v1 = serde_json::json!({"action": "search", "query": "rust"});
+        let v2 = serde_json::json!({"action": "search", "query": "rust"});
+        assert_eq!(hash_json_value(&v1), hash_json_value(&v2));
+    }
+
+    #[test]
+    fn test_hash_json_value_different_values_different_hash() {
+        let v1 = serde_json::json!({"action": "search"});
+        let v2 = serde_json::json!({"action": "add"});
+        assert_ne!(hash_json_value(&v1), hash_json_value(&v2));
+    }
+
+    #[test]
+    fn test_hash_json_value_handles_nested() {
+        let v1 = serde_json::json!({"a": {"b": [1, 2, 3]}, "c": true});
+        let v2 = serde_json::json!({"a": {"b": [1, 2, 3]}, "c": true});
+        assert_eq!(hash_json_value(&v1), hash_json_value(&v2));
+    }
+
+    #[test]
+    fn test_hash_json_value_null_vs_empty() {
+        let null = serde_json::json!(null);
+        let empty_obj = serde_json::json!({});
+        assert_ne!(hash_json_value(&null), hash_json_value(&empty_obj));
     }
 }

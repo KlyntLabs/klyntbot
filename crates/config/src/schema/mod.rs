@@ -1,17 +1,47 @@
 //! Configuration schema using serde.
 //!
-//! Split into submodules:
-//! - `core`: Secret, Config, agents, gateway, tools, todo, confidence
+//! Split into submodules by config section:
+//! - `core`: Secret, Config (root composition)
+//! - `agents`: AgentsConfig, AgentDefaults
+//! - `calendar`: CalendarConfig, provider configs
 //! - `channels`: All chat channel configuration structs
+//! - `confidence`: ConfidenceConfig
+//! - `conversation`: ConversationConfig, embedding/search
+//! - `finance`: FinanceConfig and sub-structs
+//! - `gateway`: GatewayConfig
+//! - `learning`: LearningConfig
+//! - `project`: ProjectConfig
 //! - `providers`: LLM provider configuration structs
+//! - `todo`: TodoConfig, enrichment, notifications, focus, search
+//! - `tools`: ToolsConfig, permissions, exec, web
 
+mod agents;
+mod calendar;
 mod channels;
+mod confidence;
+mod conversation;
 mod core;
+mod finance;
+mod gateway;
+mod learning;
+mod project;
 mod providers;
+mod todo;
+mod tools;
 
+pub use self::agents::*;
+pub use self::calendar::*;
 pub use self::channels::*;
+pub use self::confidence::*;
+pub use self::conversation::*;
 pub use self::core::*;
+pub use self::finance::*;
+pub use self::gateway::*;
+pub use self::learning::*;
+pub use self::project::*;
 pub use self::providers::*;
+pub use self::todo::*;
+pub use self::tools::*;
 
 #[cfg(test)]
 mod tests {
@@ -392,5 +422,71 @@ mod tests {
     fn test_tools_no_permissions_defaults_to_none() {
         let config = Config::default();
         assert!(config.tools.permissions.is_none());
+    }
+
+    #[test]
+    fn test_config_serde_roundtrips() {
+        // CalendarConfig serialization
+        let cal_config = CalendarConfig {
+            providers: vec![
+                CalendarProviderConfig::Apple(AppleCalendarConfig {
+                    enabled: true,
+                    username: "user@apple.com".to_string(),
+                    password: Secret::new("pass".to_string()),
+                    ..AppleCalendarConfig::default()
+                }),
+                CalendarProviderConfig::Google(GoogleCalendarConfig {
+                    enabled: true,
+                    client_id: "id123".to_string(),
+                    client_secret: Secret::new("secret".to_string()),
+                    access_token: Secret::new("tok".to_string()),
+                    refresh_token: Secret::new("ref".to_string()),
+                    ..GoogleCalendarConfig::default()
+                }),
+            ],
+            conflict_resolution: "server_wins".to_string(),
+            ..CalendarConfig::default()
+        };
+
+        let json = serde_json::to_string(&cal_config).unwrap();
+        assert!(json.contains("\"providers\""));
+        assert!(json.contains("\"type\":\"apple\""));
+        assert!(json.contains("\"user@apple.com\""));
+
+        // CalendarConfig roundtrip
+        let deserialized: CalendarConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(cal_config.providers.len(), deserialized.providers.len());
+        assert_eq!(
+            cal_config.conflict_resolution,
+            deserialized.conflict_resolution
+        );
+
+        // Config-level calendar serialization
+        let mut config = Config::default();
+        config
+            .calendar
+            .providers
+            .push(CalendarProviderConfig::Apple(AppleCalendarConfig {
+                enabled: true,
+                username: "test@example.com".to_string(),
+                password: Secret::new("password123".to_string()),
+                ..AppleCalendarConfig::default()
+            }));
+        let json = serde_json::to_string_pretty(&config).unwrap();
+        assert!(json.contains("\"calendar\""));
+        assert!(json.contains("\"providers\""));
+        assert!(json.contains("\"test@example.com\""));
+
+        // DailyPlanningConfig roundtrip
+        let daily = DailyPlanningConfig {
+            enabled: false,
+            planning_time: "09:30".to_string(),
+        };
+        let json = serde_json::to_string(&daily).unwrap();
+        assert!(json.contains("\"planningTime\""));
+        assert!(json.contains("\"09:30\""));
+        let loaded: DailyPlanningConfig = serde_json::from_str(&json).unwrap();
+        assert!(!loaded.enabled);
+        assert_eq!(loaded.planning_time, "09:30");
     }
 }

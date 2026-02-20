@@ -15,10 +15,12 @@ use common::Result;
 pub mod discord;
 #[cfg(feature = "email")]
 pub mod email;
+pub mod formatter;
 pub mod manager;
 pub mod qq;
 pub mod slack;
 pub mod telegram;
+pub mod utils;
 pub mod whatsapp;
 pub mod ws_manager;
 
@@ -48,6 +50,11 @@ pub trait Channel: Send + Sync {
 
     /// Check if sender is allowed
     fn is_allowed(&self, sender_id: &str) -> bool;
+
+    /// Send a typing indicator (default: no-op)
+    async fn send_typing(&self, _chat_id: &str) -> Result<()> {
+        Ok(())
+    }
 }
 
 /// Type alias for dynamic channel

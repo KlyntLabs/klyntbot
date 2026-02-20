@@ -163,19 +163,26 @@ impl Channel for WhatsAppChannel {
             .as_ref()
             .ok_or_else(|| ChannelError::SendFailed("WhatsApp bridge not connected".to_string()))?;
 
-        let payload = json!({
-            "type": "send",
-            "to": msg.chat_id,
-            "text": msg.content
-        });
+        let formatted = crate::formatter::formatter_for("whatsapp").format(&msg.content);
+        let limit = crate::utils::max_length("whatsapp");
+        let chunks = crate::utils::split_message(&formatted, limit);
 
-        let payload_str = serde_json::to_string(&payload)
-            .map_err(|e| ChannelError::SendFailed(format!("Failed to serialize message: {}", e)))?;
+        for chunk in &chunks {
+            let payload = json!({
+                "type": "send",
+                "to": msg.chat_id,
+                "text": chunk
+            });
 
-        let mut w = ws.lock().await;
-        w.send(WsMessage::Text(payload_str.into()))
-            .await
-            .map_err(|e| ChannelError::SendFailed(format!("Failed to send message: {}", e)))?;
+            let payload_str = serde_json::to_string(&payload).map_err(|e| {
+                ChannelError::SendFailed(format!("Failed to serialize message: {}", e))
+            })?;
+
+            let mut w = ws.lock().await;
+            w.send(WsMessage::Text(payload_str.into()))
+                .await
+                .map_err(|e| ChannelError::SendFailed(format!("Failed to send message: {}", e)))?;
+        }
 
         debug!("Sent WhatsApp message to {}: {}", msg.chat_id, msg.content);
 

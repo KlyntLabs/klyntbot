@@ -471,8 +471,14 @@ impl Channel for EmailChannel {
             last_ids.get(to).cloned()
         };
 
-        self.send_email(to, &msg.content, thread_msg_id.as_deref())
-            .await
+        let formatted = crate::formatter::formatter_for("email").format(&msg.content);
+        let limit = crate::utils::max_length("email");
+        let chunks = crate::utils::split_message(&formatted, limit);
+
+        for chunk in &chunks {
+            self.send_email(to, chunk, thread_msg_id.as_deref()).await?;
+        }
+        Ok(())
     }
 
     fn is_allowed(&self, sender_id: &str) -> bool {

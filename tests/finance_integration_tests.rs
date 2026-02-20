@@ -47,7 +47,6 @@ fn make_finance_tool() -> FinanceTool {
         storage::FinanceLiabilityRepo::new(p.clone()),
         PriceService::new(5),
         "VND".to_string(),
-        "Asia/Ho_Chi_Minh".to_string(),
     )
 }
 

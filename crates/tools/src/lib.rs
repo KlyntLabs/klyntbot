@@ -27,7 +27,6 @@ pub mod plan_tool;
 pub mod price_service;
 pub use params::ParamExtractor;
 pub mod permissions;
-pub mod project_store;
 pub mod project_tool;
 pub mod project_types;
 pub mod registry;
@@ -36,7 +35,6 @@ pub mod search_utils;
 pub mod shell;
 pub mod spawn;
 pub mod todo;
-pub mod todo_store;
 pub mod todo_types;
 pub mod web;
 

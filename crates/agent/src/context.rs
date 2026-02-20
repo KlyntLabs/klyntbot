@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use tokio::fs;
 use tracing::{debug, warn};
 
-use goal::{GoalStatus, GoalStore};
+use goal::GoalStatus;
 use plan;
 use providers::{ContentPart, ImageUrl, Message};
 use session::SessionMessage;
@@ -46,7 +46,7 @@ pub struct ContextBuilder {
     cached_todo: Option<CachedContext>,
     cached_goals: Option<CachedContext>,
     todo_repo: Option<storage::TodoRepo>,
-    goal_store: Option<std::sync::Arc<tokio::sync::RwLock<GoalStore>>>,
+    goal_repo: Option<storage::GoalRepo>,
     /// Current adaptive confidence threshold — updated by LearningService.
     confidence_threshold: f32,
 }
@@ -57,7 +57,7 @@ impl ContextBuilder {
         workspace: PathBuf,
         timezone: String,
         todo_repo: Option<storage::TodoRepo>,
-        goal_store: Option<std::sync::Arc<tokio::sync::RwLock<GoalStore>>>,
+        goal_repo: Option<storage::GoalRepo>,
         memory_note_repo: storage::MemoryNoteRepo,
     ) -> Self {
         let memory = MemoryStore::new(memory_note_repo);
@@ -71,7 +71,7 @@ impl ContextBuilder {
             cached_todo: None,
             cached_goals: None,
             todo_repo,
-            goal_store,
+            goal_repo,
             confidence_threshold: 0.7,
         }
     }
@@ -201,15 +201,15 @@ impl ContextBuilder {
             }
         }
 
-        let content = if let Some(store) = &self.goal_store {
-            let mut guard = store.write().await;
-            match guard.list(Some(GoalStatus::Active)).await {
-                Ok(goals) if !goals.is_empty() => {
+        let content = if let Some(repo) = &self.goal_repo {
+            let status_str = GoalStatus::Active.to_string();
+            match repo.list(Some(&status_str)).await {
+                Ok(rows) if !rows.is_empty() => {
                     let mut buf = String::from("# Goals\n\n");
-                    for g in &goals {
+                    for row in &rows {
                         buf.push_str(&format!(
                             "- [P{}] {}: {}\n",
-                            g.priority, g.title, g.description
+                            row.priority, row.title, row.description
                         ));
                     }
                     buf

@@ -15,7 +15,10 @@ use tokio::sync::RwLock;
 use tools::embedding_engine::EmbeddingHandler;
 use tools::embedding_store::{EmbeddingRecord, EmbeddingStore};
 use tools::todo_types::Todo;
-use tools::EMBEDDING_DIM;
+
+#[path = "test_utils/embedding.rs"]
+mod embedding_utils;
+use embedding_utils::deterministic_embedding;
 
 /// Mock embedding handler for testing semantic search without the real model.
 pub struct MockEmbeddingHandler {
@@ -85,23 +88,9 @@ impl MockEmbeddingHandler {
     }
 
     /// Generate a deterministic 384-dim embedding from text.
-    /// Uses a simple hash-based approach so semantically identical text
-    /// produces identical vectors.
+    /// Delegates to `test_utils::embedding::deterministic_embedding`.
     pub fn deterministic_embedding(text: &str) -> Vec<f32> {
-        let mut vec = vec![0.0f32; EMBEDDING_DIM];
-        // Simple deterministic fill: use byte values spread across dims
-        for (i, byte) in text.bytes().enumerate() {
-            let idx = i % EMBEDDING_DIM;
-            vec[idx] += (byte as f32) / 255.0;
-        }
-        // Normalize to unit vector
-        let norm: f32 = vec.iter().map(|x| x * x).sum::<f32>().sqrt();
-        if norm > 0.0 {
-            for v in &mut vec {
-                *v /= norm;
-            }
-        }
-        vec
+        deterministic_embedding(text)
     }
 
     /// Get the number of embed_todo calls made.

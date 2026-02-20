@@ -12,6 +12,12 @@ use tools::RoutingContext;
 
 use crate::execution::{CycleOutcome, ExecutionCore, ExecutionParams};
 
+/// Convert an `Arc<Vec<Message>>` into a `Vec<Message>`, avoiding a clone
+/// when this is the last Arc reference.
+fn arc_into_vec(arc: Arc<Vec<Message>>) -> Vec<Message> {
+    Arc::try_unwrap(arc).unwrap_or_else(|arc| (*arc).clone())
+}
+
 /// Outcome of a direct (no-tool) execution.
 #[derive(Debug)]
 pub enum DirectOutcome {
@@ -33,13 +39,17 @@ impl DirectEngine {
     }
 
     /// Execute a direct response cycle (no tools provided to LLM).
+    ///
+    /// Accepts `Arc<Vec<Message>>` to avoid cloning when the caller can
+    /// transfer sole ownership (refcount == 1).
     pub async fn execute(
         &self,
-        mut messages: Vec<Message>,
+        messages: Arc<Vec<Message>>,
         params: &ExecutionParams,
         ctx: &RoutingContext,
         event_tx: Option<&tokio::sync::mpsc::Sender<crate::events::AgentEvent>>,
     ) -> Result<DirectOutcome> {
+        let mut messages = arc_into_vec(messages);
         let (outcome, _usage) = self
             .core
             .run_cycle(&mut messages, &[], params, ctx, event_tx, None)
@@ -168,7 +178,7 @@ mod tests {
 
         let result = engine
             .execute(
-                vec![Message::user("hi")],
+                Arc::new(vec![Message::user("hi")]),
                 &ExecutionParams::new("mock"),
                 &routing_ctx(),
                 None,
@@ -190,7 +200,7 @@ mod tests {
 
         let result = engine
             .execute(
-                vec![Message::user("search for Rust docs")],
+                Arc::new(vec![Message::user("search for Rust docs")]),
                 &ExecutionParams::new("mock"),
                 &routing_ctx(),
                 None,
@@ -213,7 +223,7 @@ mod tests {
 
         let result = engine
             .execute(
-                vec![Message::user("...")],
+                Arc::new(vec![Message::user("...")]),
                 &ExecutionParams::new("mock"),
                 &routing_ctx(),
                 None,

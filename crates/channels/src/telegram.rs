@@ -3,49 +3,18 @@
 //! Lightweight implementation without teloxide - just reqwest HTTP calls.
 
 use async_trait::async_trait;
-use regex::Regex;
 use reqwest::Client;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
 use tokio::time::sleep;
 use tracing::{debug, error, info, warn};
 
-/// Cached compiled regexes for markdown-to-HTML conversion.
-struct MarkdownRegexes {
-    code_block: Regex,
-    inline_code: Regex,
-    header: Regex,
-    blockquote: Regex,
-    link: Regex,
-    bold_star: Regex,
-    bold_underscore: Regex,
-    italic: Regex,
-    strikethrough: Regex,
-    bullet: Regex,
-}
-
-fn markdown_regexes() -> &'static MarkdownRegexes {
-    static REGEXES: OnceLock<MarkdownRegexes> = OnceLock::new();
-    REGEXES.get_or_init(|| MarkdownRegexes {
-        code_block: Regex::new(r"```[\w]*\n?([\s\S]*?)```").unwrap(),
-        inline_code: Regex::new(r"`([^`]+)`").unwrap(),
-        header: Regex::new(r"(?m)^#{1,6}\s+(.+)$").unwrap(),
-        blockquote: Regex::new(r"(?m)^>\s*(.*)$").unwrap(),
-        link: Regex::new(r"\[([^\]]+)\]\(([^)]+)\)").unwrap(),
-        bold_star: Regex::new(r"\*\*(.+?)\*\*").unwrap(),
-        bold_underscore: Regex::new(r"__(.+?)__").unwrap(),
-        italic: Regex::new(r"(?:^|(?P<pre>[^a-zA-Z0-9]))_([^_]+)_(?:$|(?P<post>[^a-zA-Z0-9]))")
-            .unwrap(),
-        strikethrough: Regex::new(r"~~(.+?)~~").unwrap(),
-        bullet: Regex::new(r"(?m)^[-*]\s+").unwrap(),
-    })
-}
-
+use crate::formatter::ChannelFormatter;
 use crate::{check_allowlist, Channel};
 use bus::{InboundMessage, MessageBus, OutboundMessage};
 use common::{ChannelError, Result};
@@ -535,159 +504,6 @@ impl TelegramChannel {
         self.api_call("setMyCommands", params).await?;
         Ok(())
     }
-
-    /// Split message into chunks that fit Telegram's 4096 character limit
-    fn split_message(text: &str) -> Vec<String> {
-        const MAX_LENGTH: usize = 4096;
-
-        if text.len() <= MAX_LENGTH {
-            return vec![text.to_string()];
-        }
-
-        let mut chunks = Vec::with_capacity(text.len() / MAX_LENGTH + 1);
-        let mut current_chunk = String::new();
-
-        // Split by lines to avoid breaking in the middle of formatting
-        for line in text.lines() {
-            // If a single line is longer than MAX_LENGTH, split it by characters
-            if line.len() > MAX_LENGTH {
-                if !current_chunk.is_empty() {
-                    chunks.push(current_chunk.clone());
-                    current_chunk.clear();
-                }
-
-                // Split long line into chunks
-                let mut remaining = line;
-                while remaining.len() > MAX_LENGTH {
-                    let split_point = MAX_LENGTH;
-                    chunks.push(remaining[..split_point].to_string());
-                    remaining = &remaining[split_point..];
-                }
-                if !remaining.is_empty() {
-                    current_chunk = remaining.to_string();
-                }
-                continue;
-            }
-
-            // Check if adding this line would exceed the limit
-            let line_with_newline = if current_chunk.is_empty() {
-                line.to_string()
-            } else {
-                format!("\n{}", line)
-            };
-
-            if current_chunk.len() + line_with_newline.len() > MAX_LENGTH {
-                // Start a new chunk
-                chunks.push(current_chunk.clone());
-                current_chunk = line.to_string();
-            } else {
-                current_chunk.push_str(&line_with_newline);
-            }
-        }
-
-        if !current_chunk.is_empty() {
-            chunks.push(current_chunk);
-        }
-
-        chunks
-    }
-
-    /// Convert markdown to Telegram HTML
-    /// Based on the Python implementation for robust handling
-    fn markdown_to_html(text: &str) -> String {
-        if text.is_empty() {
-            return String::new();
-        }
-
-        let re = markdown_regexes();
-        let mut result = text.to_string();
-
-        // 1. Extract and protect code blocks first (preserve from other processing)
-        let mut code_blocks: Vec<String> = Vec::new();
-        result = re
-            .code_block
-            .replace_all(&result, |caps: &regex::Captures| {
-                code_blocks.push(caps.get(1).unwrap().as_str().to_string());
-                format!("\x00CB{}\x00", code_blocks.len() - 1)
-            })
-            .to_string();
-
-        // 2. Extract and protect inline code
-        let mut inline_codes: Vec<String> = Vec::new();
-        result = re
-            .inline_code
-            .replace_all(&result, |caps: &regex::Captures| {
-                inline_codes.push(caps.get(1).unwrap().as_str().to_string());
-                format!("\x00IC{}\x00", inline_codes.len() - 1)
-            })
-            .to_string();
-
-        // 3. Headers # Title -> just the title text
-        result = re.header.replace_all(&result, "$1").to_string();
-
-        // 4. Blockquotes > text -> just the text
-        result = re.blockquote.replace_all(&result, "$1").to_string();
-
-        // 5. Escape HTML special characters
-        result = result
-            .replace('&', "&amp;")
-            .replace('<', "&lt;")
-            .replace('>', "&gt;");
-
-        // 6. Links [text](url) - before bold/italic to handle nested cases
-        result = re
-            .link
-            .replace_all(&result, r#"<a href="$2">$1</a>"#)
-            .to_string();
-
-        // 7. Bold **text** or __text__
-        result = re.bold_star.replace_all(&result, "<b>$1</b>").to_string();
-        result = re
-            .bold_underscore
-            .replace_all(&result, "<b>$1</b>")
-            .to_string();
-
-        // 8. Italic _text_ (avoid matching inside words like some_var_name)
-        result = re
-            .italic
-            .replace_all(&result, "${pre}<i>$2</i>${post}")
-            .to_string();
-
-        // 9. Strikethrough ~~text~~
-        result = re
-            .strikethrough
-            .replace_all(&result, "<s>$1</s>")
-            .to_string();
-
-        // 10. Bullet lists - item -> • item
-        result = re.bullet.replace_all(&result, "• ").to_string();
-
-        // 11. Restore inline code with HTML tags
-        for (i, code) in inline_codes.iter().enumerate() {
-            let escaped = code
-                .replace('&', "&amp;")
-                .replace('<', "&lt;")
-                .replace('>', "&gt;");
-            result = result.replace(
-                &format!("\x00IC{}\x00", i),
-                &format!("<code>{}</code>", escaped),
-            );
-        }
-
-        // 12. Restore code blocks with HTML tags
-        for (i, code) in code_blocks.iter().enumerate() {
-            let escaped = code
-                .replace('&', "&amp;")
-                .replace('<', "&lt;")
-                .replace('>', "&gt;");
-            result = result.replace(
-                &format!("\x00CB{}\x00", i),
-                &format!("<pre><code>{}</code></pre>", escaped),
-            );
-        }
-
-        result
-    }
 }
 
 #[async_trait]
@@ -724,10 +540,9 @@ impl Channel for TelegramChannel {
             .parse()
             .map_err(|_| ChannelError::SendFailed("Invalid chat_id".to_string()))?;
 
-        let html_content = Self::markdown_to_html(&msg.content);
-
-        // Split message if it exceeds Telegram's 4096 character limit
-        let chunks = Self::split_message(&html_content);
+        let formatted = crate::formatter::formatter_for("telegram").format(&msg.content);
+        let limit = crate::utils::max_length("telegram");
+        let chunks = crate::utils::split_message(&formatted, limit);
 
         for (i, chunk) in chunks.iter().enumerate() {
             let params = json!({
@@ -739,18 +554,12 @@ impl Channel for TelegramChannel {
             match self.api_call("sendMessage", params).await {
                 Ok(_) => {}
                 Err(_) => {
-                    // Fallback to plain text for this chunk
+                    // Fallback: strip HTML tags from this chunk and send as plain text
                     warn!(
                         "HTML parsing failed for chunk {}, falling back to plain text",
                         i
                     );
-                    let plain_chunk = if chunks.len() > 1 {
-                        // For split messages, also split the original content
-                        let plain_chunks = Self::split_message(&msg.content);
-                        plain_chunks.get(i).unwrap_or(&msg.content).to_string()
-                    } else {
-                        msg.content.clone()
-                    };
+                    let plain_chunk = crate::formatter::PlainTextFormatter.format(chunk);
 
                     let params = json!({
                         "chat_id": chat_id,
@@ -772,6 +581,11 @@ impl Channel for TelegramChannel {
     fn is_allowed(&self, sender_id: &str) -> bool {
         check_allowlist(&self.config.allow_from, sender_id)
     }
+
+    async fn send_typing(&self, chat_id: &str) -> Result<()> {
+        self.start_typing(chat_id).await;
+        Ok(())
+    }
 }
 
 /// Telegram API response
@@ -784,13 +598,15 @@ struct TelegramResponse {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::formatter::{ChannelFormatter, TelegramFormatter};
+    use crate::utils;
 
     #[test]
     fn test_markdown_to_html_code_blocks() {
+        let f = TelegramFormatter;
         let input =
             "Here's some code:\n```rust\nfn main() {\n    let v: Vec<i32> = vec![];\n}\n```\nDone!";
-        let output = TelegramChannel::markdown_to_html(input);
+        let output = f.format(input);
         assert!(output.contains("<pre><code>"));
         assert!(output.contains("fn main()"));
         assert!(output.contains("&lt;i32&gt;")); // < and > should be escaped in code
@@ -798,77 +614,82 @@ mod tests {
 
     #[test]
     fn test_markdown_to_html_inline_code() {
+        let f = TelegramFormatter;
         let input = "Use `println!` to print.";
-        let output = TelegramChannel::markdown_to_html(input);
+        let output = f.format(input);
         assert!(output.contains("<code>println!</code>"));
     }
 
     #[test]
     fn test_markdown_to_html_bold_italic() {
+        let f = TelegramFormatter;
         let input = "This is **bold** and this is _italic_ and **_both_**.";
-        let output = TelegramChannel::markdown_to_html(input);
+        let output = f.format(input);
         assert!(output.contains("<b>bold</b>"));
         assert!(output.contains("<i>italic</i>"));
     }
 
     #[test]
     fn test_markdown_to_html_links() {
+        let f = TelegramFormatter;
         let input = "Check out [Rust](https://rust-lang.org).";
-        let output = TelegramChannel::markdown_to_html(input);
+        let output = f.format(input);
         assert!(output.contains(r#"<a href="https://rust-lang.org">Rust</a>"#));
     }
 
     #[test]
     fn test_markdown_to_html_strikethrough() {
+        let f = TelegramFormatter;
         let input = "This is ~~wrong~~ correct.";
-        let output = TelegramChannel::markdown_to_html(input);
+        let output = f.format(input);
         assert!(output.contains("<s>wrong</s>"));
     }
 
     #[test]
     fn test_markdown_to_html_bullets() {
+        let f = TelegramFormatter;
         let input = "List:\n- Item 1\n- Item 2";
-        let output = TelegramChannel::markdown_to_html(input);
+        let output = f.format(input);
         assert!(output.contains("• Item 1"));
         assert!(output.contains("• Item 2"));
     }
 
     #[test]
     fn test_message_split_short() {
+        let limit = utils::max_length("telegram");
         let input = "Short message";
-        let chunks = TelegramChannel::split_message(input);
+        let chunks = utils::split_message(input, limit);
         assert_eq!(chunks.len(), 1);
         assert_eq!(chunks[0], "Short message");
     }
 
     #[test]
     fn test_message_split_long() {
-        // Create a message longer than 4096 characters
+        let limit = utils::max_length("telegram");
         let long_line = "a".repeat(5000);
-        let chunks = TelegramChannel::split_message(&long_line);
+        let chunks = utils::split_message(&long_line, limit);
         assert!(chunks.len() > 1);
         for chunk in &chunks {
-            assert!(chunk.len() <= 4096);
+            assert!(chunk.len() <= limit);
         }
     }
 
     #[test]
     fn test_message_split_multiline() {
+        let limit = utils::max_length("telegram");
         let mut lines = Vec::new();
         for i in 0..200 {
             lines.push(format!("Line {} with some content", i));
         }
         let input = lines.join("\n");
-        let chunks = TelegramChannel::split_message(&input);
+        let chunks = utils::split_message(&input, limit);
 
-        // Should be split into multiple chunks
-        if input.len() > 4096 {
+        if input.len() > limit {
             assert!(chunks.len() > 1);
         }
 
-        // Each chunk should be under the limit
         for chunk in &chunks {
-            assert!(chunk.len() <= 4096);
+            assert!(chunk.len() <= limit);
         }
     }
 }

@@ -72,14 +72,18 @@ impl ReactPlusEngine {
     }
 
     /// Run the ReAct+ loop.
+    ///
+    /// Accepts `Arc<Vec<Message>>` to avoid cloning when the caller can
+    /// transfer sole ownership (refcount == 1).
     pub async fn execute(
         &self,
-        mut messages: Vec<Message>,
+        messages: Arc<Vec<Message>>,
         tools: &[serde_json::Value],
         params: &ExecutionParams,
         ctx: &RoutingContext,
         event_tx: Option<tokio::sync::mpsc::Sender<crate::events::AgentEvent>>,
     ) -> Result<ReactOutcome> {
+        let mut messages = Arc::try_unwrap(messages).unwrap_or_else(|arc| (*arc).clone());
         let mut scratchpad = Scratchpad::new();
         let escalation_threshold = (self.max_iterations as f32 * 0.8).ceil() as u32;
         let mut accumulated_usage = Usage::default();
@@ -451,7 +455,7 @@ mod tests {
         let core = Arc::new(ExecutionCore::new(provider, registry));
 
         let engine = ReactPlusEngine::new(core).with_max_iterations(10);
-        let messages = vec![Message::user("do something")];
+        let messages = Arc::new(vec![Message::user("do something")]);
 
         let outcome = engine
             .execute(messages, &[], &default_params(), &routing_ctx(), None)
@@ -510,7 +514,7 @@ mod tests {
             .with_max_iterations(3)
             .with_reflection_mode(ReflectionMode::Never);
 
-        let messages = vec![Message::user("do something")];
+        let messages = Arc::new(vec![Message::user("do something")]);
         let outcome = engine
             .execute(messages, &[], &default_params(), &routing_ctx(), None)
             .await
@@ -531,7 +535,7 @@ mod tests {
         let core = Arc::new(ExecutionCore::new(provider, registry));
 
         let engine = ReactPlusEngine::new(core).with_max_iterations(5);
-        let messages = vec![Message::user("complex task")];
+        let messages = Arc::new(vec![Message::user("complex task")]);
 
         let outcome = engine
             .execute(messages, &[], &default_params(), &routing_ctx(), None)
@@ -560,7 +564,7 @@ mod tests {
         let core = Arc::new(ExecutionCore::new(provider, registry));
 
         let engine = ReactPlusEngine::new(core).with_max_iterations(10);
-        let messages = vec![Message::user("multi-step task")];
+        let messages = Arc::new(vec![Message::user("multi-step task")]);
 
         let outcome = engine
             .execute(messages, &[], &default_params(), &routing_ctx(), None)
@@ -596,7 +600,7 @@ mod tests {
         let engine = ReactPlusEngine::new(core)
             .with_max_iterations(10)
             .with_reflection_mode(ReflectionMode::OnFailure);
-        let messages = vec![Message::user("try something")];
+        let messages = Arc::new(vec![Message::user("try something")]);
 
         let outcome = engine
             .execute(messages, &[], &default_params(), &routing_ctx(), None)
@@ -645,7 +649,7 @@ mod tests {
         let core = Arc::new(ExecutionCore::new(provider, registry));
 
         let engine = ReactPlusEngine::new(core).with_max_iterations(10);
-        let messages = vec![Message::user("create task: buy")];
+        let messages = Arc::new(vec![Message::user("create task: buy")]);
 
         // Need tool definitions so fabrication detection triggers
         let tools = vec![serde_json::json!({
@@ -706,7 +710,7 @@ mod tests {
         let core = Arc::new(ExecutionCore::new(provider, registry));
 
         let engine = ReactPlusEngine::new(core).with_max_iterations(10);
-        let messages = vec![Message::user("create task: buy")];
+        let messages = Arc::new(vec![Message::user("create task: buy")]);
         let tools = vec![serde_json::json!({
             "type": "function",
             "function": {
@@ -749,7 +753,7 @@ mod tests {
         let engine = ReactPlusEngine::new(core)
             .with_max_iterations(10)
             .with_reflection_mode(ReflectionMode::Never);
-        let messages = vec![Message::user("do something")];
+        let messages = Arc::new(vec![Message::user("do something")]);
 
         let outcome = engine
             .execute(messages, &[], &default_params(), &routing_ctx(), None)
@@ -806,7 +810,7 @@ mod tests {
         let engine = ReactPlusEngine::new(core)
             .with_max_iterations(10)
             .with_reflection_mode(ReflectionMode::Never);
-        let messages = vec![Message::user("do two things")];
+        let messages = Arc::new(vec![Message::user("do two things")]);
 
         let outcome = engine
             .execute(messages, &[], &default_params(), &routing_ctx(), None)

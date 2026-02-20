@@ -71,6 +71,8 @@ async fn create_agent_with_learning(provider: Arc<MockProvider>) -> (AgentLoop, 
         config,
         todo_repo,
         None,
+        None, // goal_repo
+        None, // plan_repo
         outcome_repo,
         learning_state_repo,
         memory_note_repo,
@@ -651,6 +653,8 @@ async fn test_ac_learning_disabled_no_recording() {
         config,
         todo_repo,
         None,
+        None, // goal_repo
+        None, // plan_repo
         outcome_repo,
         learning_state_repo,
         memory_note_repo,
