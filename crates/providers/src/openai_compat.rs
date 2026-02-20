@@ -309,7 +309,11 @@ impl LlmProvider for OpenAiCompatProvider {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
 
-            return Err(super::types::map_http_error(status.as_u16(), error_text));
+            return Err(super::types::map_http_error(
+                status.as_u16(),
+                error_text,
+                self.name(),
+            ));
         }
 
         // Parse response
@@ -395,7 +399,11 @@ impl LlmProvider for OpenAiCompatProvider {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
 
-            return Err(super::types::map_http_error(status.as_u16(), error_text));
+            return Err(super::types::map_http_error(
+                status.as_u16(),
+                error_text,
+                self.name(),
+            ));
         }
 
         // Create SSE stream

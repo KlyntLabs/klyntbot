@@ -13,15 +13,46 @@ use common::{KlyntbotError, MessageRole, ProviderError, Result};
 ///
 /// Centralizes the status → error mapping that was previously duplicated
 /// across openai_compat, anthropic_native, and transcription modules.
-pub(crate) fn map_http_error(status_code: u16, body: String) -> KlyntbotError {
+///
+/// `provider_name` is used in error messages to identify which provider failed.
+pub(crate) fn map_http_error(status_code: u16, body: String, provider_name: &str) -> KlyntbotError {
     match status_code {
-        429 => KlyntbotError::Provider(ProviderError::RateLimited),
-        401 | 403 => KlyntbotError::Provider(ProviderError::AuthFailed),
+        429 => {
+            // Try to extract Retry-After header value from the body (some providers include it)
+            let retry_after = extract_retry_after(&body);
+            KlyntbotError::Provider(ProviderError::RateLimited {
+                provider: provider_name.to_string(),
+                retry_after,
+            })
+        }
+        401 | 403 => KlyntbotError::Provider(ProviderError::AuthFailed {
+            provider: provider_name.to_string(),
+            config_key: format!("providers.{}.apiKey", provider_name),
+        }),
         _ => KlyntbotError::Provider(ProviderError::InvalidResponse(format!(
             "HTTP {}: {}",
             status_code, body
         ))),
     }
+}
+
+/// Try to extract a retry-after value from the error body (best-effort).
+fn extract_retry_after(body: &str) -> Option<u64> {
+    // Some providers include retry_after in JSON response
+    if let Ok(v) = serde_json::from_str::<serde_json::Value>(body) {
+        if let Some(secs) = v.get("retry_after").and_then(|v| v.as_u64()) {
+            return Some(secs);
+        }
+        // OpenAI-style: error.retry_after
+        if let Some(secs) = v
+            .get("error")
+            .and_then(|e| e.get("retry_after"))
+            .and_then(|v| v.as_u64())
+        {
+            return Some(secs);
+        }
+    }
+    None
 }
 
 /// Streaming chunk from LLM

@@ -27,16 +27,16 @@ pub enum KlyntbotError {
     Config(#[from] ConfigError),
 
     #[error("Cron error: {0}")]
-    Cron(#[from] CronError),
+    Cron(String),
 
     #[error("Calendar error: {0}")]
-    Calendar(#[from] CalendarError),
+    Calendar(String),
 
     #[error("Goal error: {0}")]
-    Goal(#[from] GoalError),
+    Goal(String),
 
     #[error("Plan error: {0}")]
-    Plan(#[from] PlanError),
+    Plan(String),
 
     #[error("Storage error: {0}")]
     Storage(String),
@@ -79,11 +79,17 @@ pub enum ProviderError {
     #[error("Invalid response: {0}")]
     InvalidResponse(String),
 
-    #[error("Rate limited")]
-    RateLimited,
+    #[error("Rate limited by {provider}{}", retry_after.map(|s| format!(" (retry after {}s)", s)).unwrap_or_default())]
+    RateLimited {
+        provider: String,
+        retry_after: Option<u64>,
+    },
 
-    #[error("Authentication failed")]
-    AuthFailed,
+    #[error("Authentication failed for {provider} (check config key: {config_key})")]
+    AuthFailed {
+        provider: String,
+        config_key: String,
+    },
 }
 
 /// Channel-specific errors
@@ -137,88 +143,6 @@ pub enum ConfigError {
     Json(#[from] serde_json::Error),
 }
 
-/// Cron-specific errors
-#[derive(Error, Debug)]
-pub enum CronError {
-    #[error("Invalid cron expression: {0}")]
-    InvalidExpression(String),
-
-    #[error("Job not found: {0}")]
-    JobNotFound(String),
-
-    #[error("Job execution failed: {0}")]
-    ExecutionFailed(String),
-
-    #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
-
-    #[error("JSON error: {0}")]
-    Json(#[from] serde_json::Error),
-}
-
-/// Calendar-specific errors (Phase 1 prep for Phase 3)
-#[derive(Error, Debug)]
-pub enum CalendarError {
-    #[error("Authentication failed: {0}")]
-    AuthFailed(String),
-
-    #[error("Connection failed: {0}")]
-    ConnectionFailed(String),
-
-    #[error("Sync failed: {0}")]
-    SyncFailed(String),
-
-    #[error("Calendar not found: {0}")]
-    NotFound(String),
-
-    #[error("CalDAV protocol error: {0}")]
-    ProtocolError(String),
-
-    #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
-
-    #[error("JSON error: {0}")]
-    Json(#[from] serde_json::Error),
-}
-
-/// Goal-specific errors
-#[derive(Error, Debug)]
-pub enum GoalError {
-    #[error("Goal not found: {0}")]
-    NotFound(String),
-
-    #[error("Invalid goal state: {0}")]
-    InvalidState(String),
-
-    #[error("Goal store error: {0}")]
-    StoreFailed(String),
-
-    #[error("Goal validation failed: {0}")]
-    ValidationFailed(String),
-}
-
-/// Plan-specific errors
-#[derive(Error, Debug)]
-pub enum PlanError {
-    #[error("Plan not found: {0}")]
-    NotFound(String),
-
-    #[error("Plan generation failed: {0}")]
-    GenerationFailed(String),
-
-    #[error("Invalid plan state: {0}")]
-    InvalidState(String),
-
-    #[error("Execution stalled at step {step_index}: {reason}")]
-    ExecutionStalled { step_index: usize, reason: String },
-
-    #[error("Backtrack limit reached at step {0}")]
-    BacktrackLimitReached(usize),
-
-    #[error("Plan store error: {0}")]
-    StoreFailed(String),
-}
-
 /// Type alias for Result with KlyntbotError
 pub type Result<T> = std::result::Result<T, KlyntbotError>;
 
@@ -251,10 +175,29 @@ mod tests {
             ProviderError::InvalidResponse("bad JSON".into()).to_string(),
             "Invalid response: bad JSON"
         );
-        assert_eq!(ProviderError::RateLimited.to_string(), "Rate limited");
         assert_eq!(
-            ProviderError::AuthFailed.to_string(),
-            "Authentication failed"
+            ProviderError::RateLimited {
+                provider: "openai".into(),
+                retry_after: Some(30)
+            }
+            .to_string(),
+            "Rate limited by openai (retry after 30s)"
+        );
+        assert_eq!(
+            ProviderError::RateLimited {
+                provider: "anthropic".into(),
+                retry_after: None
+            }
+            .to_string(),
+            "Rate limited by anthropic"
+        );
+        assert_eq!(
+            ProviderError::AuthFailed {
+                provider: "openai".into(),
+                config_key: "providers.openai.apiKey".into()
+            }
+            .to_string(),
+            "Authentication failed for openai (check config key: providers.openai.apiKey)"
         );
 
         // ChannelError
@@ -299,36 +242,22 @@ mod tests {
             "Missing required field: api_key"
         );
 
-        // CronError
+        // KlyntbotError String variants (domain errors moved to their crates)
         assert_eq!(
-            CronError::InvalidExpression("bad cron".into()).to_string(),
-            "Invalid cron expression: bad cron"
+            KlyntbotError::Cron("bad cron".into()).to_string(),
+            "Cron error: bad cron"
         );
         assert_eq!(
-            CronError::JobNotFound("job123".into()).to_string(),
-            "Job not found: job123"
+            KlyntbotError::Calendar("sync failed".into()).to_string(),
+            "Calendar error: sync failed"
         );
         assert_eq!(
-            CronError::ExecutionFailed("timeout".into()).to_string(),
-            "Job execution failed: timeout"
-        );
-
-        // GoalError
-        assert_eq!(
-            GoalError::NotFound("goal-123".into()).to_string(),
-            "Goal not found: goal-123"
+            KlyntbotError::Goal("not found".into()).to_string(),
+            "Goal error: not found"
         );
         assert_eq!(
-            GoalError::InvalidState("cannot transition from active to draft".into()).to_string(),
-            "Invalid goal state: cannot transition from active to draft"
-        );
-        assert_eq!(
-            GoalError::StoreFailed("disk full".into()).to_string(),
-            "Goal store error: disk full"
-        );
-        assert_eq!(
-            GoalError::ValidationFailed("title is required".into()).to_string(),
-            "Goal validation failed: title is required"
+            KlyntbotError::Plan("invalid state".into()).to_string(),
+            "Plan error: invalid state"
         );
 
         // KlyntbotError direct variants
@@ -350,7 +279,14 @@ mod tests {
     fn test_klyntbot_error_from_conversions() {
         let cases: Vec<(&str, KlyntbotError)> = vec![
             ("Tool error", ToolError::NotFound("test".into()).into()),
-            ("Provider error", ProviderError::AuthFailed.into()),
+            (
+                "Provider error",
+                ProviderError::AuthFailed {
+                    provider: "test".into(),
+                    config_key: "providers.test.apiKey".into(),
+                }
+                .into(),
+            ),
             (
                 "Channel error",
                 ChannelError::SendFailed("test".into()).into(),
@@ -360,11 +296,6 @@ mod tests {
                 SessionError::NotFound("test".into()).into(),
             ),
             ("Config error", ConfigError::Invalid("test".into()).into()),
-            (
-                "Cron error",
-                CronError::InvalidExpression("test".into()).into(),
-            ),
-            ("Goal error", GoalError::NotFound("test".into()).into()),
         ];
 
         for (expected_prefix, err) in cases {

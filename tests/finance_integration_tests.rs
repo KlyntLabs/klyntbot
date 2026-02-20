@@ -16,9 +16,8 @@
 //! Run with: cargo nextest run --run-ignored ignored -p klyntbot --test finance_integration_tests
 
 use common::{ChannelName, ChatId};
+use feature_finance::{FinanceTool, PriceService};
 use serde_json::json;
-use tools::finance_tool::FinanceTool;
-use tools::price_service::PriceService;
 use tools::{RoutingContext, Tool};
 
 #[path = "mock_provider.rs"]

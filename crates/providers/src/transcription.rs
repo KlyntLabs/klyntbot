@@ -96,7 +96,11 @@ impl TranscriptionProvider {
 
             warn!("Transcription failed: HTTP {}: {}", status, error_text);
 
-            return Err(super::types::map_http_error(status.as_u16(), error_text));
+            return Err(super::types::map_http_error(
+                status.as_u16(),
+                error_text,
+                "openai-transcription",
+            ));
         }
 
         // Parse response

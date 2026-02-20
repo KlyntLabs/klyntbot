@@ -118,8 +118,8 @@ impl ProviderManager {
                     self.reset_failures();
                     return Ok(response);
                 }
-                Err(KlyntbotError::Provider(ProviderError::RateLimited)) => {
-                    last_err = Some(KlyntbotError::Provider(ProviderError::RateLimited));
+                Err(e @ KlyntbotError::Provider(ProviderError::RateLimited { .. })) => {
+                    last_err = Some(e);
                     if attempt < delays.len() - 1 {
                         tokio::time::sleep(*delay).await;
                     }
@@ -157,8 +157,8 @@ impl ProviderManager {
                     self.reset_failures();
                     return Ok(stream);
                 }
-                Err(KlyntbotError::Provider(ProviderError::RateLimited)) => {
-                    last_err = Some(KlyntbotError::Provider(ProviderError::RateLimited));
+                Err(e @ KlyntbotError::Provider(ProviderError::RateLimited { .. })) => {
+                    last_err = Some(e);
                     if attempt < delays.len() - 1 {
                         tokio::time::sleep(*delay).await;
                     }
@@ -366,11 +366,17 @@ mod tests {
     }
 
     fn rate_limited_error() -> KlyntbotError {
-        KlyntbotError::Provider(ProviderError::RateLimited)
+        KlyntbotError::Provider(ProviderError::RateLimited {
+            provider: "test".into(),
+            retry_after: None,
+        })
     }
 
     fn auth_error() -> KlyntbotError {
-        KlyntbotError::Provider(ProviderError::AuthFailed)
+        KlyntbotError::Provider(ProviderError::AuthFailed {
+            provider: "test".into(),
+            config_key: "providers.test.apiKey".into(),
+        })
     }
 
     #[async_trait]
@@ -623,7 +629,10 @@ mod tests {
             ) -> Result<LlmResponse> {
                 let n = self.call_count.fetch_add(1, AtomicOrdering::SeqCst);
                 if n == 0 {
-                    Err(KlyntbotError::Provider(ProviderError::RateLimited))
+                    Err(KlyntbotError::Provider(ProviderError::RateLimited {
+                        provider: "first-fail".into(),
+                        retry_after: None,
+                    }))
                 } else {
                     Ok(dummy_response())
                 }
@@ -672,7 +681,10 @@ mod tests {
                 if n % 3 == 2 {
                     Ok(dummy_response())
                 } else {
-                    Err(KlyntbotError::Provider(ProviderError::AuthFailed))
+                    Err(KlyntbotError::Provider(ProviderError::AuthFailed {
+                        provider: "alternating".into(),
+                        config_key: "providers.alternating.apiKey".into(),
+                    }))
                 }
             }
             fn default_model(&self) -> &str {
@@ -879,7 +891,10 @@ mod tests {
             ) -> Result<LlmStream> {
                 let n = self.stream_count.fetch_add(1, AtomicOrdering::SeqCst);
                 if n == 0 {
-                    Err(KlyntbotError::Provider(ProviderError::RateLimited))
+                    Err(KlyntbotError::Provider(ProviderError::RateLimited {
+                        provider: "first-fail-stream".into(),
+                        retry_after: None,
+                    }))
                 } else {
                     Ok(dummy_stream())
                 }

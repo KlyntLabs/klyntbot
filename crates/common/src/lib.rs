@@ -10,8 +10,7 @@ pub mod utils;
 
 // Re-export commonly used types
 pub use error::{
-    CalendarError, ChannelError, ConfigError, CronError, GoalError, KlyntbotError, PlanError,
-    ProviderError, Result, SessionError, ToolError,
+    ChannelError, ConfigError, KlyntbotError, ProviderError, Result, SessionError, ToolError,
 };
 pub use prompts::{
     Answer, AnswerOption, AnswerType, AnswerValue, FormResponse, InteractionRequest, Question,

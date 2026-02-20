@@ -8,6 +8,9 @@ edition = "2021"
 common = { path = "../common" }
 storage = { path = "../storage" }
 
+# Error handling
+thiserror = "2.0"
+
 # Data structures
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.0", features = ["v4", "serde"] }

@@ -238,6 +238,9 @@ impl SessionManager {
 
     /// Save a session to SQL.
     /// Automatically compacts the session if it exceeds the compaction threshold.
+    ///
+    /// Uses batch INSERT to persist all messages in a single round-trip
+    /// (ON CONFLICT DO NOTHING for idempotency) instead of N individual inserts.
     pub async fn save(&self, session: &Session) -> Result<()> {
         // Upsert session metadata
         let metadata = serde_json::to_value(&session.metadata).unwrap_or_default();
@@ -245,31 +248,38 @@ impl SessionManager {
             .create_session(&session.key, &metadata)
             .await?;
 
-        // Persist all messages (idempotent via ON CONFLICT or just try-insert)
-        for msg in &session.messages {
-            let msg_id = Uuid::parse_str(&msg.id).unwrap_or_else(|_| Uuid::new_v4());
-            // Try to add; ignore duplicate key errors
-            match self
-                .sql_repo
-                .add_message(
-                    &session.key,
-                    msg_id,
-                    &msg.role,
-                    &msg.content,
-                    msg.request_id.as_deref(),
-                    msg.tool_calls.as_ref(),
-                    msg.metadata.as_ref(),
-                )
-                .await
-            {
-                Ok(_) => {}
-                Err(storage::StorageError::Sqlx(_)) => {
-                    // Likely duplicate — ignore
-                }
-                Err(e) => {
-                    return Err(e.into());
-                }
+        // Build batch arrays from session messages
+        if !session.messages.is_empty() {
+            let mut ids = Vec::with_capacity(session.messages.len());
+            let mut roles = Vec::with_capacity(session.messages.len());
+            let mut contents = Vec::with_capacity(session.messages.len());
+            let mut timestamps = Vec::with_capacity(session.messages.len());
+            let mut request_ids = Vec::with_capacity(session.messages.len());
+            let mut tool_calls_list = Vec::with_capacity(session.messages.len());
+            let mut metadata_list = Vec::with_capacity(session.messages.len());
+
+            for msg in &session.messages {
+                ids.push(Uuid::parse_str(&msg.id).unwrap_or_else(|_| Uuid::new_v4()));
+                roles.push(msg.role.clone());
+                contents.push(msg.content.clone());
+                timestamps.push(msg.timestamp);
+                request_ids.push(msg.request_id.clone());
+                tool_calls_list.push(msg.tool_calls.clone());
+                metadata_list.push(msg.metadata.clone());
             }
+
+            self.sql_repo
+                .batch_add_messages(
+                    &session.key,
+                    &ids,
+                    &roles,
+                    &contents,
+                    &timestamps,
+                    &request_ids,
+                    &tool_calls_list,
+                    &metadata_list,
+                )
+                .await?;
         }
 
         // SQL compaction: if message count exceeds threshold, compact

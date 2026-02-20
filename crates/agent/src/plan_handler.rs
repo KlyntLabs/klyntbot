@@ -6,7 +6,8 @@
 
 use async_trait::async_trait;
 use chrono::Utc;
-use common::{PlanError, Result};
+use common::Result;
+use plan::PlanError;
 use plan::{conversions, Plan, PlanStatus};
 use tools::plan_tool::PlanHandler;
 use uuid::Uuid;

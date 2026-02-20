@@ -16,7 +16,7 @@ chrono = { version = "0.4", features = ["serde"] }
 reqwest = { workspace = true }
 
 # XML parsing for CalDAV responses
-quick-xml = "0.36"
+quick-xml.workspace = true
 
 # Data structures
 uuid = { version = "1.0", features = ["v4", "serde"] }
@@ -31,6 +31,9 @@ chrono-tz = { workspace = true }
 
 # Async traits
 async-trait.workspace = true
+
+# Error handling
+thiserror = "2.0"
 
 # Logging
 tracing = "0.1"

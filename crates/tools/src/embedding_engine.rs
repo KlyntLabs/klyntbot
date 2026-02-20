@@ -6,6 +6,7 @@
 
 use async_trait::async_trait;
 use chrono::Utc;
+#[cfg(feature = "semantic-search")]
 use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
 use std::sync::{Arc, Mutex};
 use tracing::{debug, info};
@@ -20,10 +21,13 @@ pub const EMBEDDING_DIM: usize = 384;
 /// Core embedding engine wrapping fastembed with lazy model initialization.
 ///
 /// The model (~420MB) is downloaded on first use, not at construction time.
-/// `Mutex<Option<TextEmbedding>>` protects the one-time init; after init,
-/// `embed()` is essentially lock-free since `TextEmbedding::embed` takes `&self`.
+/// When compiled without the `semantic-search` feature, `embed()` always
+/// returns an error — the struct still exists for API compatibility.
 pub struct EmbeddingEngine {
+    #[cfg(feature = "semantic-search")]
     model: Mutex<Option<TextEmbedding>>,
+    #[cfg(not(feature = "semantic-search"))]
+    _phantom: (),
 }
 
 impl Default for EmbeddingEngine {
@@ -36,11 +40,15 @@ impl EmbeddingEngine {
     /// Create a new engine. The model is NOT loaded until the first embed call.
     pub fn new() -> Self {
         Self {
+            #[cfg(feature = "semantic-search")]
             model: Mutex::new(None),
+            #[cfg(not(feature = "semantic-search"))]
+            _phantom: (),
         }
     }
 
     /// Lazily initialize the model (downloads ~420MB on first call).
+    #[cfg(feature = "semantic-search")]
     fn ensure_model(&self) -> Result<()> {
         let mut guard = self.model.lock().map_err(|e| {
             common::ToolError::ExecutionFailed(format!("Embedding model lock poisoned: {}", e))
@@ -66,6 +74,7 @@ impl EmbeddingEngine {
     }
 
     /// Generate embedding for a single text. Returns `Vec<f32>` of `EMBEDDING_DIM` length.
+    #[cfg(feature = "semantic-search")]
     pub fn embed(&self, text: &str) -> Result<Vec<f32>> {
         self.ensure_model()?;
         let mut guard = self.model.lock().map_err(|e| {
@@ -81,7 +90,17 @@ impl EmbeddingEngine {
         })
     }
 
+    /// Stub when `semantic-search` feature is disabled.
+    #[cfg(not(feature = "semantic-search"))]
+    pub fn embed(&self, _text: &str) -> Result<Vec<f32>> {
+        Err(common::ToolError::ExecutionFailed(
+            "Semantic search is disabled. Rebuild with the `semantic-search` feature to enable embeddings.".to_string(),
+        )
+        .into())
+    }
+
     /// Batch embed multiple texts (more efficient than individual calls).
+    #[cfg(feature = "semantic-search")]
     pub fn embed_batch(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>> {
         if texts.is_empty() {
             return Ok(Vec::new());
@@ -97,10 +116,17 @@ impl EmbeddingEngine {
         Ok(results)
     }
 
+    /// Stub when `semantic-search` feature is disabled.
+    #[cfg(not(feature = "semantic-search"))]
+    pub fn embed_batch(&self, _texts: &[&str]) -> Result<Vec<Vec<f32>>> {
+        Err(common::ToolError::ExecutionFailed(
+            "Semantic search is disabled. Rebuild with the `semantic-search` feature to enable embeddings.".to_string(),
+        )
+        .into())
+    }
+
     /// Check if the embedding model is initialized and available.
-    ///
-    /// Returns `true` if the model has been loaded (either on first use or explicitly).
-    /// Returns `false` if the model hasn't been initialized yet.
+    #[cfg(feature = "semantic-search")]
     pub fn is_available(&self) -> bool {
         self.model
             .lock()
@@ -108,9 +134,13 @@ impl EmbeddingEngine {
             .unwrap_or(false)
     }
 
+    /// Always returns false when `semantic-search` is disabled.
+    #[cfg(not(feature = "semantic-search"))]
+    pub fn is_available(&self) -> bool {
+        false
+    }
+
     /// Get the name of the embedding model being used.
-    ///
-    /// Returns the model identifier for metadata and logging purposes.
     pub fn model_name(&self) -> &str {
         "paraphrase-multilingual-MiniLM-L12-v2"
     }

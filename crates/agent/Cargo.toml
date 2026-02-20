@@ -21,7 +21,7 @@ goal.workspace = true
 plan.workspace = true
 context_engine.workspace = true
 storage.workspace = true
-sqlx = { version = "0.8", features = ["runtime-tokio", "postgres"] }
+sqlx.workspace = true
 tokio = { workspace = true }
 tracing.workspace = true
 uuid = { workspace = true }

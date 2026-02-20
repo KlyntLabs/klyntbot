@@ -2,7 +2,8 @@
 
 use crate::caldav::parser::{generate_vevent, parse_vevent};
 use crate::types::CalendarEvent;
-use common::{CalendarError, KlyntbotError, Result};
+use crate::CalendarError;
+use common::Result;
 use reqwest::{header, Client, RequestBuilder, StatusCode};
 
 /// Authentication method for CalDAV connections.
@@ -184,10 +185,10 @@ impl CalDavClient {
             .send()
             .await
             .map_err(|e| {
-                KlyntbotError::Calendar(CalendarError::ConnectionFailed(format!(
+                CalendarError::ConnectionFailed(format!(
                     "Failed to connect to well-known endpoint: {}",
                     e
-                )))
+                ))
             })?;
 
         match response.status() {
@@ -195,19 +196,21 @@ impl CalDavClient {
             | StatusCode::OK
             | StatusCode::MOVED_PERMANENTLY
             | StatusCode::FOUND => {
-                let body = response.text().await.map_err(|e| {
-                    KlyntbotError::Calendar(CalendarError::ProtocolError(e.to_string()))
-                })?;
+                let body = response
+                    .text()
+                    .await
+                    .map_err(|e| CalendarError::ProtocolError(e.to_string()))?;
                 Self::extract_href_from_xml(&body, "current-user-principal")
             }
-            StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => {
-                Err(KlyntbotError::Calendar(CalendarError::AuthFailed(
-                    "Authentication failed during principal discovery".to_string(),
-                )))
-            }
-            status => Err(KlyntbotError::Calendar(CalendarError::ProtocolError(
-                format!("Principal discovery failed with status {}", status),
-            ))),
+            StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => Err(CalendarError::AuthFailed(
+                "Authentication failed during principal discovery".to_string(),
+            )
+            .into()),
+            status => Err(CalendarError::ProtocolError(format!(
+                "Principal discovery failed with status {}",
+                status
+            ))
+            .into()),
         }
     }
 
@@ -243,23 +246,25 @@ impl CalDavClient {
             .body(propfind_body)
             .send()
             .await
-            .map_err(|e| KlyntbotError::Calendar(CalendarError::ConnectionFailed(e.to_string())))?;
+            .map_err(|e| CalendarError::ConnectionFailed(e.to_string()))?;
 
         match response.status() {
             StatusCode::MULTI_STATUS | StatusCode::OK => {
-                let body = response.text().await.map_err(|e| {
-                    KlyntbotError::Calendar(CalendarError::ProtocolError(e.to_string()))
-                })?;
+                let body = response
+                    .text()
+                    .await
+                    .map_err(|e| CalendarError::ProtocolError(e.to_string()))?;
                 Self::extract_href_from_xml(&body, "calendar-home-set")
             }
-            StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => {
-                Err(KlyntbotError::Calendar(CalendarError::AuthFailed(
-                    "Authentication failed during calendar-home discovery".to_string(),
-                )))
-            }
-            status => Err(KlyntbotError::Calendar(CalendarError::ProtocolError(
-                format!("Calendar-home discovery failed with status {}", status),
-            ))),
+            StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => Err(CalendarError::AuthFailed(
+                "Authentication failed during calendar-home discovery".to_string(),
+            )
+            .into()),
+            status => Err(CalendarError::ProtocolError(format!(
+                "Calendar-home discovery failed with status {}",
+                status
+            ))
+            .into()),
         }
     }
 
@@ -297,23 +302,25 @@ impl CalDavClient {
             .body(propfind_body)
             .send()
             .await
-            .map_err(|e| KlyntbotError::Calendar(CalendarError::ConnectionFailed(e.to_string())))?;
+            .map_err(|e| CalendarError::ConnectionFailed(e.to_string()))?;
 
         match response.status() {
             StatusCode::MULTI_STATUS | StatusCode::OK => {
-                let body = response.text().await.map_err(|e| {
-                    KlyntbotError::Calendar(CalendarError::ProtocolError(e.to_string()))
-                })?;
+                let body = response
+                    .text()
+                    .await
+                    .map_err(|e| CalendarError::ProtocolError(e.to_string()))?;
                 Self::extract_calendar_from_list(&body, calendar_name)
             }
-            StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => {
-                Err(KlyntbotError::Calendar(CalendarError::AuthFailed(
-                    "Authentication failed during calendar listing".to_string(),
-                )))
-            }
-            status => Err(KlyntbotError::Calendar(CalendarError::ProtocolError(
-                format!("Calendar listing failed with status {}", status),
-            ))),
+            StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => Err(CalendarError::AuthFailed(
+                "Authentication failed during calendar listing".to_string(),
+            )
+            .into()),
+            status => Err(CalendarError::ProtocolError(format!(
+                "Calendar listing failed with status {}",
+                status
+            ))
+            .into()),
         }
     }
 
@@ -361,9 +368,11 @@ impl CalDavClient {
                 }
                 Ok(Event::Eof) => break,
                 Err(e) => {
-                    return Err(KlyntbotError::Calendar(CalendarError::ProtocolError(
-                        format!("XML parse error during {}: {}", element_name, e),
-                    )))
+                    return Err(CalendarError::ProtocolError(format!(
+                        "XML parse error during {}: {}",
+                        element_name, e
+                    ))
+                    .into())
                 }
                 _ => {}
             }
@@ -404,18 +413,20 @@ impl CalDavClient {
                 }
                 Ok(Event::Eof) => break,
                 Err(e) => {
-                    return Err(KlyntbotError::Calendar(CalendarError::ProtocolError(
-                        format!("XML parse error: {}", e),
-                    )))
+                    return Err(
+                        CalendarError::ProtocolError(format!("XML parse error: {}", e)).into(),
+                    )
                 }
                 _ => {}
             }
             buf.clear();
         }
 
-        Err(KlyntbotError::Calendar(CalendarError::ProtocolError(
-            format!("Could not find {} in XML response", element_name),
-        )))
+        Err(CalendarError::ProtocolError(format!(
+            "Could not find {} in XML response",
+            element_name
+        ))
+        .into())
     }
 
     /// Extract calendar URL from PROPFIND response listing calendars
@@ -496,9 +507,9 @@ impl CalDavClient {
                 }
                 Ok(Event::Eof) => break,
                 Err(e) => {
-                    return Err(KlyntbotError::Calendar(CalendarError::ProtocolError(
-                        format!("XML parse error: {}", e),
-                    )))
+                    return Err(
+                        CalendarError::ProtocolError(format!("XML parse error: {}", e)).into(),
+                    )
                 }
                 _ => {}
             }
@@ -525,9 +536,7 @@ impl CalDavClient {
             return Ok(href.clone());
         }
 
-        Err(KlyntbotError::Calendar(CalendarError::ProtocolError(
-            "No calendars found".to_string(),
-        )))
+        Err(CalendarError::ProtocolError("No calendars found".to_string()).into())
     }
 
     /// PUT an event to the CalDAV server, returns ETag
@@ -541,10 +550,11 @@ impl CalDavClient {
             .put(&event_url)
             .header(header::CONTENT_TYPE, "text/calendar; charset=utf-8")
             .body(ical_data);
-        let response =
-            self.apply_auth(request).send().await.map_err(|e| {
-                KlyntbotError::Calendar(CalendarError::ConnectionFailed(e.to_string()))
-            })?;
+        let response = self
+            .apply_auth(request)
+            .send()
+            .await
+            .map_err(|e| CalendarError::ConnectionFailed(e.to_string()))?;
 
         match response.status() {
             StatusCode::CREATED | StatusCode::NO_CONTENT | StatusCode::OK => {
@@ -557,12 +567,14 @@ impl CalDavClient {
                     .to_string();
                 Ok(etag)
             }
-            StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => Err(KlyntbotError::Calendar(
-                CalendarError::AuthFailed("Authentication failed".to_string()),
-            )),
-            status => Err(KlyntbotError::Calendar(CalendarError::ProtocolError(
-                format!("PUT failed with status {}", status),
-            ))),
+            StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => {
+                Err(CalendarError::AuthFailed("Authentication failed".to_string()).into())
+            }
+            status => Err(CalendarError::ProtocolError(format!(
+                "PUT failed with status {}",
+                status
+            ))
+            .into()),
         }
     }
 
@@ -572,19 +584,22 @@ impl CalDavClient {
         let event_url = format!("{}/{}.ics", base_url, event_uid);
 
         let request = self.http_client.delete(&event_url);
-        let response =
-            self.apply_auth(request).send().await.map_err(|e| {
-                KlyntbotError::Calendar(CalendarError::ConnectionFailed(e.to_string()))
-            })?;
+        let response = self
+            .apply_auth(request)
+            .send()
+            .await
+            .map_err(|e| CalendarError::ConnectionFailed(e.to_string()))?;
 
         match response.status() {
             StatusCode::NO_CONTENT | StatusCode::OK | StatusCode::NOT_FOUND => Ok(()),
-            StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => Err(KlyntbotError::Calendar(
-                CalendarError::AuthFailed("Authentication failed".to_string()),
-            )),
-            status => Err(KlyntbotError::Calendar(CalendarError::ProtocolError(
-                format!("DELETE failed with status {}", status),
-            ))),
+            StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => {
+                Err(CalendarError::AuthFailed("Authentication failed".to_string()).into())
+            }
+            status => Err(CalendarError::ProtocolError(format!(
+                "DELETE failed with status {}",
+                status
+            ))
+            .into()),
         }
     }
 
@@ -606,24 +621,28 @@ impl CalDavClient {
             .header(header::CONTENT_TYPE, "application/xml; charset=utf-8")
             .header("Depth", "1")
             .body(report_body);
-        let response =
-            self.apply_auth(request).send().await.map_err(|e| {
-                KlyntbotError::Calendar(CalendarError::ConnectionFailed(e.to_string()))
-            })?;
+        let response = self
+            .apply_auth(request)
+            .send()
+            .await
+            .map_err(|e| CalendarError::ConnectionFailed(e.to_string()))?;
 
         match response.status() {
             StatusCode::MULTI_STATUS | StatusCode::OK => {
-                let body = response.text().await.map_err(|e| {
-                    KlyntbotError::Calendar(CalendarError::ProtocolError(e.to_string()))
-                })?;
+                let body = response
+                    .text()
+                    .await
+                    .map_err(|e| CalendarError::ProtocolError(e.to_string()))?;
                 self.parse_report_response(&body)
             }
-            StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => Err(KlyntbotError::Calendar(
-                CalendarError::AuthFailed("Authentication failed".to_string()),
-            )),
-            status => Err(KlyntbotError::Calendar(CalendarError::ProtocolError(
-                format!("REPORT failed with status {}", status),
-            ))),
+            StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN => {
+                Err(CalendarError::AuthFailed("Authentication failed".to_string()).into())
+            }
+            status => Err(CalendarError::ProtocolError(format!(
+                "REPORT failed with status {}",
+                status
+            ))
+            .into()),
         }
     }
 
@@ -744,9 +763,9 @@ impl CalDavClient {
                 }
                 Ok(Event::Eof) => break,
                 Err(e) => {
-                    return Err(KlyntbotError::Calendar(CalendarError::ProtocolError(
-                        format!("XML parse error: {}", e),
-                    )))
+                    return Err(
+                        CalendarError::ProtocolError(format!("XML parse error: {}", e)).into(),
+                    )
                 }
                 _ => {}
             }

@@ -1,9 +1,12 @@
 pub mod caldav;
+pub mod error;
 pub mod provider;
 pub mod providers;
 pub mod state;
 pub mod sync_engine;
 pub mod types;
+
+pub use error::CalendarError;
 
 pub use caldav::{generate_vevent, parse_vevent, CalDavAuth, CalDavClient};
 pub use provider::CalendarProvider;

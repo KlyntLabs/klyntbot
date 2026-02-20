@@ -53,22 +53,22 @@ pub fn parse_vevent(ical_data: &str) -> Result<CalendarEvent> {
     }
 
     let uid = uid.ok_or_else(|| {
-        common::KlyntbotError::Calendar(common::CalendarError::ProtocolError(
+        common::KlyntbotError::from(crate::CalendarError::ProtocolError(
             "Missing UID".to_string(),
         ))
     })?;
     let summary = summary.ok_or_else(|| {
-        common::KlyntbotError::Calendar(common::CalendarError::ProtocolError(
+        common::KlyntbotError::from(crate::CalendarError::ProtocolError(
             "Missing SUMMARY".to_string(),
         ))
     })?;
     let start = dtstart.ok_or_else(|| {
-        common::KlyntbotError::Calendar(common::CalendarError::ProtocolError(
+        common::KlyntbotError::from(crate::CalendarError::ProtocolError(
             "Missing DTSTART".to_string(),
         ))
     })?;
     let end = dtend.ok_or_else(|| {
-        common::KlyntbotError::Calendar(common::CalendarError::ProtocolError(
+        common::KlyntbotError::from(crate::CalendarError::ProtocolError(
             "Missing DTEND".to_string(),
         ))
     })?;
@@ -159,12 +159,9 @@ fn parse_datetime_with_params(dt_str: &str, params: Option<&str>) -> Result<Date
 
 /// Parse a datetime string as a specific timezone, convert to UTC
 fn parse_datetime_in_tz(dt_str: &str, tzid: &str) -> Result<DateTime<Utc>> {
-    let tz: Tz = tzid.parse().map_err(|_| {
-        common::KlyntbotError::Calendar(common::CalendarError::ProtocolError(format!(
-            "Unknown timezone: {}",
-            tzid
-        )))
-    })?;
+    let tz: Tz = tzid
+        .parse()
+        .map_err(|_| crate::CalendarError::ProtocolError(format!("Unknown timezone: {}", tzid)))?;
 
     let naive = parse_naive_datetime(dt_str)?;
 
@@ -172,9 +169,8 @@ fn parse_datetime_in_tz(dt_str: &str, tzid: &str) -> Result<DateTime<Utc>> {
         .earliest()
         .map(|dt| dt.with_timezone(&Utc))
         .ok_or_else(|| {
-            common::KlyntbotError::Calendar(common::CalendarError::ProtocolError(
-                "Invalid or ambiguous local datetime".to_string(),
-            ))
+            crate::CalendarError::ProtocolError("Invalid or ambiguous local datetime".to_string())
+                .into()
         })
 }
 
@@ -183,58 +179,42 @@ fn parse_datetime_utc(dt_str: &str) -> Result<DateTime<Utc>> {
     let dt_str = dt_str.trim_end_matches('Z');
     let naive = parse_naive_datetime(dt_str)?;
 
-    Utc.from_local_datetime(&naive).single().ok_or_else(|| {
-        common::KlyntbotError::Calendar(common::CalendarError::ProtocolError(
-            "Invalid datetime".to_string(),
-        ))
-    })
+    Utc.from_local_datetime(&naive)
+        .single()
+        .ok_or_else(|| crate::CalendarError::ProtocolError("Invalid datetime".to_string()).into())
 }
 
 /// Parse YYYYMMDDTHHMMSS into NaiveDateTime
 fn parse_naive_datetime(dt_str: &str) -> Result<NaiveDateTime> {
     if dt_str.len() != 15 || dt_str.as_bytes().get(8) != Some(&b'T') {
-        return Err(common::KlyntbotError::Calendar(
-            common::CalendarError::ProtocolError("Invalid datetime format".to_string()),
-        ));
+        return Err(
+            crate::CalendarError::ProtocolError("Invalid datetime format".to_string()).into(),
+        );
     }
 
-    let year: i32 = dt_str[0..4].parse().map_err(|_| {
-        common::KlyntbotError::Calendar(common::CalendarError::ProtocolError(
-            "Invalid year".to_string(),
-        ))
-    })?;
-    let month: u32 = dt_str[4..6].parse().map_err(|_| {
-        common::KlyntbotError::Calendar(common::CalendarError::ProtocolError(
-            "Invalid month".to_string(),
-        ))
-    })?;
-    let day: u32 = dt_str[6..8].parse().map_err(|_| {
-        common::KlyntbotError::Calendar(common::CalendarError::ProtocolError(
-            "Invalid day".to_string(),
-        ))
-    })?;
-    let hour: u32 = dt_str[9..11].parse().map_err(|_| {
-        common::KlyntbotError::Calendar(common::CalendarError::ProtocolError(
-            "Invalid hour".to_string(),
-        ))
-    })?;
-    let minute: u32 = dt_str[11..13].parse().map_err(|_| {
-        common::KlyntbotError::Calendar(common::CalendarError::ProtocolError(
-            "Invalid minute".to_string(),
-        ))
-    })?;
-    let second: u32 = dt_str[13..15].parse().map_err(|_| {
-        common::KlyntbotError::Calendar(common::CalendarError::ProtocolError(
-            "Invalid second".to_string(),
-        ))
-    })?;
+    let year: i32 = dt_str[0..4]
+        .parse()
+        .map_err(|_| crate::CalendarError::ProtocolError("Invalid year".to_string()))?;
+    let month: u32 = dt_str[4..6]
+        .parse()
+        .map_err(|_| crate::CalendarError::ProtocolError("Invalid month".to_string()))?;
+    let day: u32 = dt_str[6..8]
+        .parse()
+        .map_err(|_| crate::CalendarError::ProtocolError("Invalid day".to_string()))?;
+    let hour: u32 = dt_str[9..11]
+        .parse()
+        .map_err(|_| crate::CalendarError::ProtocolError("Invalid hour".to_string()))?;
+    let minute: u32 = dt_str[11..13]
+        .parse()
+        .map_err(|_| crate::CalendarError::ProtocolError("Invalid minute".to_string()))?;
+    let second: u32 = dt_str[13..15]
+        .parse()
+        .map_err(|_| crate::CalendarError::ProtocolError("Invalid second".to_string()))?;
 
     NaiveDate::from_ymd_opt(year, month, day)
         .and_then(|d| d.and_hms_opt(hour, minute, second))
         .ok_or_else(|| {
-            common::KlyntbotError::Calendar(common::CalendarError::ProtocolError(
-                "Invalid datetime components".to_string(),
-            ))
+            crate::CalendarError::ProtocolError("Invalid datetime components".to_string()).into()
         })
 }
 

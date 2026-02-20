@@ -5,7 +5,8 @@
 //! - [`build_step_context`] — build a context window for the current step
 //! - [`regenerate_from`] — regenerate plan steps from a failure point
 
-use common::{error::PlanError, Result};
+use common::Result;
+use plan::PlanError;
 use plan::{Plan, PlanStep, StepStatus};
 use providers::{
     types::{ChatParams, Message},

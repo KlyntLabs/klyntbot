@@ -66,7 +66,7 @@ impl GoalStatus {
         if valid {
             Ok(())
         } else {
-            Err(common::GoalError::InvalidState(format!(
+            Err(crate::GoalError::InvalidState(format!(
                 "Invalid state transition: {} → {}",
                 from, to
             ))
@@ -95,7 +95,7 @@ impl FromStr for GoalStatus {
             "paused" => Ok(GoalStatus::Paused),
             "achieved" => Ok(GoalStatus::Achieved),
             "abandoned" => Ok(GoalStatus::Abandoned),
-            _ => Err(common::GoalError::ValidationFailed(format!(
+            _ => Err(crate::GoalError::ValidationFailed(format!(
                 "unknown status '{}'. Valid: active, paused, achieved, abandoned",
                 s
             ))
@@ -108,7 +108,7 @@ impl Goal {
     /// Validate that priority is within the allowed range (1-5).
     pub fn validate_priority(&self) -> common::Result<()> {
         if self.priority < 1 || self.priority > 5 {
-            return Err(common::GoalError::ValidationFailed(format!(
+            return Err(crate::GoalError::ValidationFailed(format!(
                 "priority must be 1-5, got {}",
                 self.priority
             ))

@@ -270,6 +270,73 @@ impl From<&Todo> for TodoRow {
     }
 }
 
+// Bridge conversion from storage::TodoRow (identical layout to feature_todo::TodoRow).
+// Needed because the agent crate reads through storage::TodoRepo but uses feature_todo::Todo.
+impl From<storage::TodoRow> for Todo {
+    fn from(row: storage::TodoRow) -> Self {
+        Self {
+            id: row.id,
+            title: row.title,
+            description: row.description,
+            priority: row.priority.map(|p| p as u8),
+            due_date: row.due_date,
+            tags: row.tags,
+            status: TodoStatus::from_str_loose(&row.status).unwrap_or(TodoStatus::Todo),
+            focused_at: row.focused_at,
+            focus_deadline: row.focus_deadline,
+            focus_expired_count: row.focus_expired_count as u32,
+            created_at: row.created_at,
+            updated_at: row.updated_at,
+            completed_at: row.completed_at,
+            parent_id: row.parent_id,
+            project_id: row.project_id,
+            attachments: Vec::new(),
+            time_entries: Vec::new(),
+            total_tracked_secs: row.total_tracked_secs as u64,
+            estimated_minutes: row.estimated_minutes.map(|m| m as u32),
+            calendar_event_uid: row.calendar_event_uid,
+            last_reminded_at: row.last_reminded_at,
+            recurrence_rule: row.recurrence_rule,
+            recurrence_parent_id: row.recurrence_parent_id,
+            is_template: row.is_template,
+            next_instance_date: row.next_instance_date,
+            blocked_by: Vec::new(),
+            blocks: Vec::new(),
+        }
+    }
+}
+
+impl Todo {
+    /// Convert to a `storage::TodoRow` for direct persistence via `storage::TodoRepo`.
+    pub fn to_storage_row(&self) -> storage::TodoRow {
+        storage::TodoRow {
+            id: self.id.clone(),
+            title: self.title.clone(),
+            description: self.description.clone(),
+            priority: self.priority.map(|p| p as i16),
+            due_date: self.due_date,
+            tags: self.tags.clone(),
+            status: self.status.as_str().to_string(),
+            focused_at: self.focused_at,
+            focus_deadline: self.focus_deadline,
+            focus_expired_count: self.focus_expired_count as i32,
+            created_at: self.created_at,
+            updated_at: self.updated_at,
+            completed_at: self.completed_at,
+            parent_id: self.parent_id.clone(),
+            project_id: self.project_id.clone(),
+            total_tracked_secs: self.total_tracked_secs as i64,
+            estimated_minutes: self.estimated_minutes.map(|m| m as i32),
+            calendar_event_uid: self.calendar_event_uid.clone(),
+            last_reminded_at: self.last_reminded_at,
+            recurrence_rule: self.recurrence_rule.clone(),
+            recurrence_parent_id: self.recurrence_parent_id.clone(),
+            is_template: self.is_template,
+            next_instance_date: self.next_instance_date,
+        }
+    }
+}
+
 impl From<TodoAttachmentRow> for Attachment {
     fn from(row: TodoAttachmentRow) -> Self {
         Self {

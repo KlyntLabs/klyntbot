@@ -6,7 +6,8 @@
 
 use async_trait::async_trait;
 use chrono::Utc;
-use common::{GoalError, Result};
+use common::Result;
+use goal::GoalError;
 use goal::{conversions, Goal, GoalProgress, GoalStatus};
 use tools::goal_tool::GoalHandler;
 use uuid::Uuid;

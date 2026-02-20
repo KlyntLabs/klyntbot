@@ -11,11 +11,11 @@ use common::Result;
 use config::{CalendarConfig, CalendarProviderConfig};
 use serde_json::{json, Value};
 use std::sync::Arc;
-use tracing::warn;
 use tools::{
     calendar_tool::CalendarHandler,
     todo_types::{Todo, TodoStatus},
 };
+use tracing::warn;
 
 /// CalendarSyncAdapter - implements two-way calendar synchronization
 /// with multiple CalDAV providers.
@@ -591,19 +591,13 @@ impl CalendarHandler for CalendarSyncAdapter {
 
         let start_dt = DateTime::parse_from_rfc3339(&start)
             .map_err(|e| {
-                common::KlyntbotError::Calendar(common::CalendarError::ProtocolError(format!(
-                    "Invalid start time: {}",
-                    e
-                )))
+                calendar::CalendarError::ProtocolError(format!("Invalid start time: {}", e))
             })?
             .with_timezone(&Utc);
 
         let end_dt = DateTime::parse_from_rfc3339(&end)
             .map_err(|e| {
-                common::KlyntbotError::Calendar(common::CalendarError::ProtocolError(format!(
-                    "Invalid end time: {}",
-                    e
-                )))
+                calendar::CalendarError::ProtocolError(format!("Invalid end time: {}", e))
             })?
             .with_timezone(&Utc);
 
@@ -622,11 +616,10 @@ impl CalendarHandler for CalendarSyncAdapter {
 
         // Push to all providers
         if self.providers.is_empty() {
-            return Err(common::KlyntbotError::Calendar(
-                common::CalendarError::ConnectionFailed(
-                    "No calendar providers configured".to_string(),
-                ),
-            ));
+            return Err(calendar::CalendarError::ConnectionFailed(
+                "No calendar providers configured".to_string(),
+            )
+            .into());
         }
 
         let mut push_results = Vec::new();

@@ -51,7 +51,7 @@ impl AgentLoop {
         let mut plan = conversions::load_plan(&repo, plan_id)
             .await?
             .ok_or_else(|| {
-                common::KlyntbotError::Plan(common::PlanError::NotFound(plan_id.to_string()))
+                common::KlyntbotError::from(plan::PlanError::NotFound(plan_id.to_string()))
             })?;
 
         // Validate: must be in Approved state
@@ -100,7 +100,7 @@ impl AgentLoop {
             plan = conversions::load_plan(&repo, plan_id)
                 .await?
                 .ok_or_else(|| {
-                    common::KlyntbotError::Plan(common::PlanError::NotFound(plan_id.to_string()))
+                    common::KlyntbotError::from(plan::PlanError::NotFound(plan_id.to_string()))
                 })?;
 
             let plan_context = super::plan_executor::build_step_context(&plan, step_idx);
@@ -174,7 +174,7 @@ impl AgentLoop {
             plan = conversions::load_plan(&repo, plan_id)
                 .await?
                 .ok_or_else(|| {
-                    common::KlyntbotError::Plan(common::PlanError::NotFound(plan_id.to_string()))
+                    common::KlyntbotError::from(plan::PlanError::NotFound(plan_id.to_string()))
                 })?;
 
             match step_result {
@@ -231,11 +231,10 @@ impl AgentLoop {
                             plan.steps[step_idx].status = StepStatus::Failed;
                             plan.updated_at = Utc::now();
                             conversions::save_plan(&repo, &plan).await?;
-                            break Err(common::KlyntbotError::Plan(
-                                common::PlanError::BacktrackLimitReached(
-                                    super::plan_executor::MAX_BACKTRACK_ATTEMPTS,
-                                ),
-                            ));
+                            break Err(plan::PlanError::BacktrackLimitReached(
+                                super::plan_executor::MAX_BACKTRACK_ATTEMPTS,
+                            )
+                            .into());
                         }
 
                         warn!(
@@ -263,7 +262,7 @@ impl AgentLoop {
                         plan = conversions::load_plan(&repo, plan_id)
                             .await?
                             .ok_or_else(|| {
-                                common::KlyntbotError::Plan(common::PlanError::NotFound(
+                                common::KlyntbotError::from(plan::PlanError::NotFound(
                                     plan_id.to_string(),
                                 ))
                             })?;
@@ -308,7 +307,7 @@ impl AgentLoop {
         plan = conversions::load_plan(&repo, plan_id)
             .await?
             .ok_or_else(|| {
-                common::KlyntbotError::Plan(common::PlanError::NotFound(plan_id.to_string()))
+                common::KlyntbotError::from(plan::PlanError::NotFound(plan_id.to_string()))
             })?;
 
         let plan_goal_id = plan.goal_id;

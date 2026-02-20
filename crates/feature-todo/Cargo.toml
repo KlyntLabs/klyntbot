@@ -18,7 +18,7 @@ chrono = { workspace = true }
 uuid = { workspace = true }
 rrule.workspace = true
 pgvector = { workspace = true }
-sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "chrono", "uuid"] }
+sqlx.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "test-util"] }

@@ -11,7 +11,9 @@
 //! - Step-by-step context windowing (current step + next 3)
 
 pub mod conversions;
+pub mod error;
 pub mod types;
 
 // Re-export commonly used types
+pub use error::PlanError;
 pub use types::{BacktrackEntry, Plan, PlanStatus, PlanStep, StepStatus};

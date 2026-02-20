@@ -52,10 +52,14 @@ impl SessionRepo {
     pub async fn list_sessions(&self) -> Result<Vec<SessionListRow>, StorageError> {
         let rows = sqlx::query_as::<_, SessionListRow>(
             "SELECT s.key, s.metadata, s.created_at, s.updated_at,
-                    (SELECT COUNT(*) FROM session_messages sm
-                     WHERE sm.session_key = s.key) AS message_count
+                    COALESCE(counts.cnt, 0) AS message_count
              FROM sessions s
-             ORDER BY updated_at DESC",
+             LEFT JOIN (
+                 SELECT session_key, COUNT(*) AS cnt
+                 FROM session_messages
+                 GROUP BY session_key
+             ) counts ON counts.session_key = s.key
+             ORDER BY s.updated_at DESC",
         )
         .fetch_all(&self.pool)
         .await?;
@@ -63,6 +67,9 @@ impl SessionRepo {
     }
 
     /// Add a message to a session.
+    ///
+    /// Uses a CTE to touch `sessions.updated_at` and insert the message
+    /// in a single round-trip instead of two separate queries.
     #[allow(clippy::too_many_arguments)]
     pub async fn add_message(
         &self,
@@ -75,15 +82,11 @@ impl SessionRepo {
         metadata: Option<&serde_json::Value>,
     ) -> Result<SessionMessageRow, StorageError> {
         let now = Utc::now();
-        // Touch session updated_at
-        sqlx::query("UPDATE sessions SET updated_at = $1 WHERE key = $2")
-            .bind(now)
-            .bind(session_key)
-            .execute(&self.pool)
-            .await?;
-
         let row = sqlx::query_as::<_, SessionMessageRow>(
-            "INSERT INTO session_messages
+            "WITH touch AS (
+                 UPDATE sessions SET updated_at = $5 WHERE key = $2
+             )
+             INSERT INTO session_messages
                  (id, session_key, role, content, timestamp, request_id, tool_calls, metadata)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
              RETURNING *",
@@ -99,6 +102,58 @@ impl SessionRepo {
         .fetch_one(&self.pool)
         .await?;
         Ok(row)
+    }
+
+    /// Batch-insert multiple messages in a single round-trip.
+    ///
+    /// Uses `UNNEST` arrays for bulk insert and a single `UPDATE sessions`
+    /// to touch `updated_at`. Messages that already exist (by id) are skipped
+    /// via `ON CONFLICT DO NOTHING`.
+    #[allow(clippy::too_many_arguments)]
+    pub async fn batch_add_messages(
+        &self,
+        session_key: &str,
+        ids: &[uuid::Uuid],
+        roles: &[String],
+        contents: &[String],
+        timestamps: &[chrono::DateTime<Utc>],
+        request_ids: &[Option<String>],
+        tool_calls_list: &[Option<serde_json::Value>],
+        metadata_list: &[Option<serde_json::Value>],
+    ) -> Result<u64, StorageError> {
+        if ids.is_empty() {
+            return Ok(0);
+        }
+        let now = Utc::now();
+
+        // Touch session updated_at once
+        sqlx::query("UPDATE sessions SET updated_at = $1 WHERE key = $2")
+            .bind(now)
+            .bind(session_key)
+            .execute(&self.pool)
+            .await?;
+
+        // Build session_key array (same value repeated)
+        let session_keys: Vec<&str> = vec![session_key; ids.len()];
+
+        let result = sqlx::query(
+            "INSERT INTO session_messages
+                 (id, session_key, role, content, timestamp, request_id, tool_calls, metadata)
+             SELECT * FROM UNNEST($1::uuid[], $2::text[], $3::text[], $4::text[], $5::timestamptz[], $6::text[], $7::jsonb[], $8::jsonb[])
+             ON CONFLICT (id) DO NOTHING",
+        )
+        .bind(ids)
+        .bind(&session_keys)
+        .bind(roles)
+        .bind(contents)
+        .bind(timestamps)
+        .bind(request_ids)
+        .bind(tool_calls_list)
+        .bind(metadata_list)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(result.rows_affected())
     }
 
     /// Get all messages for a session, ordered by timestamp ascending.

@@ -5,9 +5,10 @@
 // in the Cloud Console. The REST API works out of the box with the same
 // OAuth2 token and calendar scope.
 
+use crate::CalendarError;
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use common::{CalendarError, KlyntbotError, Result};
+use common::Result;
 use serde_json::Value;
 use tokio::sync::RwLock;
 
@@ -81,26 +82,21 @@ impl GoogleCalendarProvider {
             .send()
             .await
             .map_err(|e| {
-                KlyntbotError::Calendar(CalendarError::ConnectionFailed(format!(
-                    "Google token refresh failed: {}",
-                    e
-                )))
+                CalendarError::ConnectionFailed(format!("Google token refresh failed: {}", e))
             })?;
 
         if !resp.status().is_success() {
             let status = resp.status();
             let body = resp.text().await.unwrap_or_default();
-            return Err(KlyntbotError::Calendar(CalendarError::AuthFailed(format!(
+            return Err(CalendarError::AuthFailed(format!(
                 "Google token refresh failed ({}): {}",
                 status, body
-            ))));
+            ))
+            .into());
         }
 
         let json: Value = resp.json().await.map_err(|e| {
-            KlyntbotError::Calendar(CalendarError::ProtocolError(format!(
-                "Failed to parse token response: {}",
-                e
-            )))
+            CalendarError::ProtocolError(format!("Failed to parse token response: {}", e))
         })?;
 
         let new_token = json["access_token"]
@@ -109,9 +105,10 @@ impl GoogleCalendarProvider {
             .to_string();
 
         if new_token.is_empty() {
-            return Err(KlyntbotError::Calendar(CalendarError::AuthFailed(
+            return Err(CalendarError::AuthFailed(
                 "Google token refresh returned empty access_token".to_string(),
-            )));
+            )
+            .into());
         }
 
         let expires_in = json["expires_in"].as_u64().unwrap_or(3600);
@@ -230,7 +227,7 @@ impl GoogleCalendarProvider {
             .bearer_auth(&token)
             .send()
             .await
-            .map_err(|e| KlyntbotError::Calendar(CalendarError::ConnectionFailed(e.to_string())))?;
+            .map_err(|e| CalendarError::ConnectionFailed(e.to_string()))?;
 
         if !resp.status().is_success() {
             return Ok(None);
@@ -239,7 +236,7 @@ impl GoogleCalendarProvider {
         let json: Value = resp
             .json()
             .await
-            .map_err(|e| KlyntbotError::Calendar(CalendarError::ProtocolError(e.to_string())))?;
+            .map_err(|e| CalendarError::ProtocolError(e.to_string()))?;
 
         Ok(json["items"]
             .as_array()
@@ -288,18 +285,19 @@ impl CalendarProvider for GoogleCalendarProvider {
             .bearer_auth(&token)
             .send()
             .await
-            .map_err(|e| KlyntbotError::Calendar(CalendarError::ConnectionFailed(e.to_string())))?;
+            .map_err(|e| CalendarError::ConnectionFailed(e.to_string()))?;
 
         let status = resp.status().as_u16();
         match status {
             200 => {}
             401 | 403 => {
                 let body = resp.text().await.unwrap_or_default();
-                return Err(KlyntbotError::Calendar(CalendarError::AuthFailed(format!(
+                return Err(CalendarError::AuthFailed(format!(
                     "Google Calendar API error ({}): {}",
                     status,
                     Self::extract_api_error(&body)
-                ))));
+                ))
+                .into());
             }
             410 => {
                 // Gone — sync token expired, need full sync
@@ -308,16 +306,18 @@ impl CalendarProvider for GoogleCalendarProvider {
             }
             status => {
                 let body = resp.text().await.unwrap_or_default();
-                return Err(KlyntbotError::Calendar(CalendarError::ProtocolError(
-                    format!("Google Calendar API error ({}): {}", status, body),
-                )));
+                return Err(CalendarError::ProtocolError(format!(
+                    "Google Calendar API error ({}): {}",
+                    status, body
+                ))
+                .into());
             }
         }
 
         let json: Value = resp
             .json()
             .await
-            .map_err(|e| KlyntbotError::Calendar(CalendarError::ProtocolError(e.to_string())))?;
+            .map_err(|e| CalendarError::ProtocolError(e.to_string()))?;
 
         let events: Vec<CalendarEvent> = json["items"]
             .as_array()
@@ -345,16 +345,16 @@ impl CalendarProvider for GoogleCalendarProvider {
                 .json(&body)
                 .send()
                 .await
-                .map_err(|e| {
-                    KlyntbotError::Calendar(CalendarError::ConnectionFailed(e.to_string()))
-                })?;
+                .map_err(|e| CalendarError::ConnectionFailed(e.to_string()))?;
 
             if !resp.status().is_success() {
                 let status = resp.status();
                 let err_body = resp.text().await.unwrap_or_default();
-                return Err(KlyntbotError::Calendar(CalendarError::ProtocolError(
-                    format!("Google Calendar update failed ({}): {}", status, err_body),
-                )));
+                return Err(CalendarError::ProtocolError(format!(
+                    "Google Calendar update failed ({}): {}",
+                    status, err_body
+                ))
+                .into());
             }
 
             let result: Value = resp.json().await.unwrap_or_default();
@@ -369,16 +369,16 @@ impl CalendarProvider for GoogleCalendarProvider {
                 .json(&body)
                 .send()
                 .await
-                .map_err(|e| {
-                    KlyntbotError::Calendar(CalendarError::ConnectionFailed(e.to_string()))
-                })?;
+                .map_err(|e| CalendarError::ConnectionFailed(e.to_string()))?;
 
             if !resp.status().is_success() {
                 let status = resp.status();
                 let err_body = resp.text().await.unwrap_or_default();
-                return Err(KlyntbotError::Calendar(CalendarError::ProtocolError(
-                    format!("Google Calendar import failed ({}): {}", status, err_body),
-                )));
+                return Err(CalendarError::ProtocolError(format!(
+                    "Google Calendar import failed ({}): {}",
+                    status, err_body
+                ))
+                .into());
             }
 
             let result: Value = resp.json().await.unwrap_or_default();
@@ -403,18 +403,18 @@ impl CalendarProvider for GoogleCalendarProvider {
             .bearer_auth(&token)
             .send()
             .await
-            .map_err(|e| KlyntbotError::Calendar(CalendarError::ConnectionFailed(e.to_string())))?;
+            .map_err(|e| CalendarError::ConnectionFailed(e.to_string()))?;
 
         match resp.status().as_u16() {
             204 | 200 | 404 | 410 => Ok(()),
-            401 | 403 => Err(KlyntbotError::Calendar(CalendarError::AuthFailed(
-                "Authentication failed".to_string(),
-            ))),
+            401 | 403 => Err(CalendarError::AuthFailed("Authentication failed".to_string()).into()),
             status => {
                 let body = resp.text().await.unwrap_or_default();
-                Err(KlyntbotError::Calendar(CalendarError::ProtocolError(
-                    format!("Google Calendar delete failed ({}): {}", status, body),
-                )))
+                Err(CalendarError::ProtocolError(format!(
+                    "Google Calendar delete failed ({}): {}",
+                    status, body
+                ))
+                .into())
             }
         }
     }
@@ -430,17 +430,18 @@ impl CalendarProvider for GoogleCalendarProvider {
             .bearer_auth(&token)
             .send()
             .await
-            .map_err(|e| KlyntbotError::Calendar(CalendarError::ConnectionFailed(e.to_string())))?;
+            .map_err(|e| CalendarError::ConnectionFailed(e.to_string()))?;
 
         if resp.status().is_success() {
             Ok(())
         } else {
             let status = resp.status();
             let body = resp.text().await.unwrap_or_default();
-            Err(KlyntbotError::Calendar(CalendarError::AuthFailed(format!(
+            Err(CalendarError::AuthFailed(format!(
                 "Google Calendar connection test failed ({}): {}",
                 status, body
-            ))))
+            ))
+            .into())
         }
     }
 }

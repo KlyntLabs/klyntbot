@@ -1,7 +1,8 @@
 //! Plan types for structured multi-step execution.
 
+use crate::PlanError;
 use chrono::{DateTime, Utc};
-use common::{error::PlanError, Result};
+use common::Result;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 

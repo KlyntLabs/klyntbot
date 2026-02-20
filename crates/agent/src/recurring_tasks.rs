@@ -10,7 +10,7 @@ use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info};
 
-use tools::rrule_utils;
+use feature_todo::rrule_utils;
 use tools::todo_types::Todo;
 
 /// Background spawner for recurring task instances.
@@ -166,7 +166,7 @@ mod tests {
         let template = create_template("Daily standup", "FREQ=DAILY", past);
         let template_id = template.id.clone();
 
-        let tpl_row: storage::TodoRow = (&template).into();
+        let tpl_row = (&template).into();
         repo.add(&tpl_row).await.unwrap();
 
         RecurringTaskSpawner::check_and_spawn(&repo, "UTC")
@@ -206,7 +206,7 @@ mod tests {
         let template = create_template("Weekly review", "FREQ=WEEKLY", future);
         let template_id = template.id.clone();
 
-        let tpl_row: storage::TodoRow = (&template).into();
+        let tpl_row = (&template).into();
         repo.add(&tpl_row).await.unwrap();
 
         RecurringTaskSpawner::check_and_spawn(&repo, "UTC")

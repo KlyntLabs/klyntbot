@@ -427,7 +427,7 @@ impl CronService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use common::CronError;
+    use crate::CronError;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     #[tokio::test]

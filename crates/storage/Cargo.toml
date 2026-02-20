@@ -6,7 +6,7 @@ edition.workspace = true
 [dependencies]
 common.workspace = true
 tools-core.workspace = true
-sqlx = { version = "0.8", features = ["runtime-tokio", "tls-rustls", "postgres", "migrate", "uuid", "chrono", "json"] }
+sqlx.workspace = true
 pgvector.workspace = true
 uuid.workspace = true
 chrono.workspace = true

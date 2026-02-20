@@ -58,6 +58,9 @@ impl EmbeddingRepo {
     }
 
     /// Search for similar embeddings using cosine distance (`<=>`).
+    ///
+    /// Uses a CTE so the distance is computed once per row instead of
+    /// three times (SELECT, WHERE, ORDER BY).
     pub async fn search_similar(
         &self,
         query_embedding: &Vector,
@@ -69,11 +72,15 @@ impl EmbeddingRepo {
         let max_distance = 1.0 - threshold;
 
         let rows: Vec<EmbeddingWithDistance> = sqlx::query_as(
-            "SELECT todo_id, embedding, model, updated_at,
-                    (embedding <=> $1) AS distance
-             FROM todo_embeddings
-             WHERE (embedding <=> $1) <= $2
-             ORDER BY embedding <=> $1
+            "WITH q AS (
+                 SELECT todo_id, embedding, model, updated_at,
+                        (embedding <=> $1) AS distance
+                 FROM todo_embeddings
+             )
+             SELECT todo_id, embedding, model, updated_at, distance
+             FROM q
+             WHERE distance <= $2
+             ORDER BY distance
              LIMIT $3",
         )
         .bind(query_embedding)

@@ -12,6 +12,7 @@
 //! Run: `cargo nextest run --test phase4_e2e_feedback_loop_test`
 
 use chrono::Utc;
+use feature_todo::EnrichmentFeedbackEntry;
 use klyntbot::agent::learning::adaptive::AdaptiveThresholds;
 use klyntbot::agent::learning::analyzer::LearningAnalyzer;
 use klyntbot::agent::learning::types::{AnalysisResult, EnrichmentStats};
@@ -21,7 +22,6 @@ use klyntbot::agent::LearningService;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
-use tools::learning_feedback::EnrichmentFeedbackEntry;
 use tools::learning_tool::LearningHandler;
 
 // ─────────────────────────────────────────────────────────────

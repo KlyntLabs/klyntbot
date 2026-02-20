@@ -13,6 +13,7 @@
 //!
 //! Run: `cargo test --test learning_integration`
 
+use feature_todo::EnrichmentFeedbackHandler;
 use klyntbot::agent::confidence::prompt::confidence_prompt;
 use klyntbot::agent::confidence::ConfidenceEvaluator;
 use klyntbot::agent::learning::adaptive::AdaptiveThresholds;
@@ -27,7 +28,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
 use tokio::sync::RwLock;
-use feature_todo::EnrichmentFeedbackHandler;
 
 #[path = "mock_provider.rs"]
 mod mock_provider;
@@ -837,8 +837,8 @@ fn make_outcome(id: &str, tool: &str, success: bool) -> OutcomeRecord {
 fn make_feedback(
     task_id: &str,
     accepted: bool,
-) -> tools::learning_feedback::EnrichmentFeedbackEntry {
-    tools::learning_feedback::EnrichmentFeedbackEntry {
+) -> feature_todo::enrichment::EnrichmentFeedbackEntry {
+    feature_todo::enrichment::EnrichmentFeedbackEntry {
         task_id: task_id.to_string(),
         field: "priority".to_string(),
         suggested_value: "1".to_string(),

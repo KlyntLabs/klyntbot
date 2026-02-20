@@ -9,7 +9,8 @@ use tokio_util::sync::CancellationToken;
 use tracing::{debug, error};
 
 use common::Result;
-use tools::{calendar_tool::CalendarHandler, todo_types::Todo};
+use tools::calendar_tool::CalendarHandler;
+use tools::todo_types::Todo;
 
 use super::NotificationDispatcher;
 
