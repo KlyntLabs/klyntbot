@@ -6,6 +6,7 @@ use providers::Message;
 use tokio::sync::Mutex;
 
 use crate::memory_retriever::MemoryRetriever;
+use crate::source::{ContextSource, SourceContext};
 use crate::token_counter::{default_token_counter, TokenCounter};
 use crate::{
     BudgetAllocator, BudgetConfig, BudgetReport, CompressorConfig, HistoryCompressor, Priority,
@@ -110,8 +111,8 @@ impl ContextCache {
     }
 }
 
-/// Orchestrates budget allocation, history compression, and memory retrieval
-/// into a single assembled context that fits within the model's context window.
+/// Orchestrates budget allocation, history compression, memory retrieval,
+/// and system prompt assembly via pluggable context sources.
 pub struct ContextEngine {
     compressor: HistoryCompressor,
     token_counter: Arc<dyn TokenCounter>,
@@ -120,6 +121,8 @@ pub struct ContextEngine {
     memory_retrieval_limit: usize,
     /// Cache for assembled contexts.
     cache: Arc<Mutex<ContextCache>>,
+    /// Pluggable context sources for system prompt assembly, sorted by priority (descending).
+    sources: Vec<Box<dyn ContextSource>>,
 }
 
 impl Default for ContextEngine {
@@ -132,6 +135,7 @@ impl Default for ContextEngine {
             memory_retriever: None,
             memory_retrieval_limit: DEFAULT_MEMORY_RETRIEVAL_LIMIT,
             cache: Arc::new(Mutex::new(ContextCache::new(DEFAULT_CACHE_CAPACITY))),
+            sources: Vec::new(),
         }
     }
 }
@@ -151,6 +155,7 @@ impl ContextEngine {
             memory_retriever: self.memory_retriever,
             memory_retrieval_limit: self.memory_retrieval_limit,
             cache: self.cache,
+            sources: self.sources,
         }
     }
 
@@ -179,6 +184,46 @@ impl ContextEngine {
             memory_retriever: Some(retriever),
             ..self
         }
+    }
+
+    /// Register pluggable context sources for system prompt assembly.
+    ///
+    /// Sources are sorted by priority (descending) so higher-priority
+    /// sections appear first in the assembled system prompt.
+    /// Returns `self` for chaining.
+    pub fn with_sources(mut self, mut sources: Vec<Box<dyn ContextSource>>) -> Self {
+        sources.sort_by_key(|s| std::cmp::Reverse(s.priority()));
+        self.sources = sources;
+        self
+    }
+
+    /// Build the system prompt by iterating registered context sources.
+    ///
+    /// Each source is queried for its section; non-empty sections are
+    /// joined with `\n\n---\n\n` separators — matching the separator
+    /// format previously used by `ContextBuilder`.
+    ///
+    /// Returns an empty string if no sources are registered.
+    pub async fn build_system_prompt(&self, channel: &str, chat_id: &str) -> String {
+        if self.sources.is_empty() {
+            return String::new();
+        }
+
+        let ctx = SourceContext {
+            channel: channel.to_string(),
+            chat_id: chat_id.to_string(),
+        };
+
+        let mut sections = Vec::with_capacity(self.sources.len());
+        for source in &self.sources {
+            if let Some(section) = source.provide(&ctx).await {
+                if !section.trim().is_empty() {
+                    sections.push(section);
+                }
+            }
+        }
+
+        sections.join("\n\n---\n\n")
     }
 
     /// Invalidate the assembled context cache.

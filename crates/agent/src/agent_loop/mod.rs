@@ -19,7 +19,7 @@ use tokio::sync::mpsc;
 use tools::{plan_tool::PlanCompletionHandler, RoutingContext};
 
 use super::confidence::ConfidenceEvaluator;
-use super::{AgentEvent, CalendarSyncAdapter, ContextBuilder};
+use super::{AgentEvent, CalendarSyncAdapter};
 
 /// A request to execute an approved plan via the execution queue.
 ///
@@ -56,7 +56,7 @@ pub struct AgentLoop {
     pub(crate) inbound_rx: Option<mpsc::Receiver<InboundMessage>>,
     pub(crate) provider: DynProvider,
     pub(crate) config: Config,
-    pub(crate) context_builder: Arc<RwLock<ContextBuilder>>,
+    pub(crate) context_engine: Arc<context_engine::ContextEngine>,
     pub(crate) session_manager: Arc<RwLock<SessionManager>>,
     pub(crate) tool_registry: Arc<RwLock<tools::registry::ToolRegistry>>,
     pub(crate) confidence_evaluator: Option<ConfidenceEvaluator>,
@@ -416,11 +416,10 @@ impl AgentLoop {
         routing_ctx: &RoutingContext,
         event_tx: Option<tokio::sync::mpsc::Sender<AgentEvent>>,
     ) -> Result<String> {
-        let mut context_builder = self.context_builder.write().await;
-        let system_prompt = context_builder
+        let system_prompt = self
+            .context_engine
             .build_system_prompt(routing_ctx.channel.as_str(), routing_ctx.chat_id.as_str())
             .await;
-        drop(context_builder);
 
         let history_messages = Self::convert_history(&history);
         let (tool_defs, tool_names) = self.get_tool_info().await;
@@ -606,30 +605,25 @@ mod tests {
     use super::*;
     use bus::{LearningEvent, LearningEventBus};
 
-    /// AC-I2.3/2.4: AgentLoop subscriber task updates ContextBuilder threshold
+    /// AC-I2.3/2.4: Learning subscriber updates ConfidenceSource threshold
     /// when LearningService publishes a ThresholdChanged event.
     #[tokio::test]
-    async fn test_learning_subscriber_updates_context_threshold() {
-        use crate::ContextBuilder;
+    async fn test_learning_subscriber_updates_confidence_threshold() {
+        use crate::context_sources::ConfidenceSource;
+        use std::sync::atomic::Ordering;
 
-        let workspace = std::path::PathBuf::from("/tmp/test-subscriber-i2-agent");
-        let pool =
-            storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
-        let memory_note_repo = storage::MemoryNoteRepo::new(pool.inner().clone());
-        let ctx = Arc::new(RwLock::new(
-            ContextBuilder::new(workspace, "UTC".to_string(), None, None, memory_note_repo).await,
-        ));
+        let source = ConfidenceSource::new(0.70);
+        let threshold_handle = source.threshold_handle();
 
         let event_bus = Arc::new(LearningEventBus::new(16));
-        let ctx_clone = Arc::clone(&ctx);
+        let handle_for_subscriber = threshold_handle.clone();
         let mut rx = event_bus.subscribe();
 
         // Spawn subscriber (same pattern as AgentLoop::new_with_cron wires it)
         let handle = tokio::spawn(async move {
             while let Ok(event) = rx.recv().await {
                 if let LearningEvent::ThresholdChanged { new_threshold, .. } = event {
-                    let mut cb = ctx_clone.write().await;
-                    cb.set_confidence_threshold(new_threshold);
+                    handle_for_subscriber.store(new_threshold.to_bits(), Ordering::Relaxed);
                 }
             }
         });
@@ -645,11 +639,11 @@ mod tests {
 
         tokio::time::sleep(Duration::from_millis(50)).await;
 
-        let cb = ctx.read().await;
+        let actual = f32::from_bits(threshold_handle.load(Ordering::Relaxed));
         assert!(
-            (cb.confidence_threshold() - 0.82).abs() < f32::EPSILON,
+            (actual - 0.82).abs() < f32::EPSILON,
             "Expected threshold 0.82, got {}",
-            cb.confidence_threshold()
+            actual
         );
 
         handle.abort();

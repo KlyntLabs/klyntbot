@@ -2,7 +2,7 @@
 //!
 //! When a plan finishes (success or failure) and it has a `goal_id`,
 //! this handler writes structured metadata into the goal so the
-//! LLM and ContextBuilder can review what happened.
+//! LLM and ContextEngine can review what happened.
 //!
 //! Follows the same dependency-inversion pattern as GoalHandlerImpl:
 //! the trait lives in `tools` (Layer 3), the impl lives here (Layer 5).

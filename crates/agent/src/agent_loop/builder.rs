@@ -31,7 +31,9 @@ use super::super::context_sources::{
     BootstrapSource, ConfidenceSource, GoalSource, IdentitySource, MemorySource,
     SkillContentSource, SkillSummarySource, TodoSource,
 };
-use super::super::{CalendarSyncAdapter, CronHandlerAdapter, MemoryStore, SkillManager, SubagentManager};
+use super::super::{
+    CalendarSyncAdapter, CronHandlerAdapter, MemoryStore, SkillManager, SubagentManager,
+};
 use super::{AgentLoop, LastActiveChannel};
 
 /// Builder for constructing an [`AgentLoop`] with all its dependencies.
@@ -133,15 +135,12 @@ impl AgentLoopBuilder {
 
         // ── Skills (init + filter) ────────────────────────────────────────
         let mut skill_manager = SkillManager::new();
-        skill_manager
-            .load(workspace.clone())
-            .await
-            .map_err(|e| {
-                common::KlyntbotError::Config(common::ConfigError::Invalid(format!(
-                    "Failed to initialize skills: {}",
-                    e
-                )))
-            })?;
+        skill_manager.load(workspace.clone()).await.map_err(|e| {
+            common::KlyntbotError::Config(common::ConfigError::Invalid(format!(
+                "Failed to initialize skills: {}",
+                e
+            )))
+        })?;
 
         if !config.packs.enabled_skills.is_empty() {
             skill_manager.filter_by_skills(&config.packs.enabled_skills);
@@ -156,7 +155,10 @@ impl AgentLoopBuilder {
         let memory_store = MemoryStore::new(repos.memory_notes.clone());
 
         let mut sources: Vec<Box<dyn ContextSource>> = vec![
-            Box::new(IdentitySource::new(workspace.clone(), config.timezone.clone())),
+            Box::new(IdentitySource::new(
+                workspace.clone(),
+                config.timezone.clone(),
+            )),
             Box::new(BootstrapSource::new(workspace.clone())),
             Box::new(MemorySource::new(memory_store)),
             Box::new(TodoSource::new(repos.todos.clone())),
@@ -169,9 +171,7 @@ impl AgentLoopBuilder {
         // Sort by priority (descending) — ensures correct ordering in prompt
         sources.sort_by_key(|s| std::cmp::Reverse(s.priority()));
 
-        let context_engine = Arc::new(
-            context_engine::ContextEngine::new().with_sources(sources),
-        );
+        let context_engine = Arc::new(context_engine::ContextEngine::new().with_sources(sources));
 
         // ── Session manager (SQL-backed) ──────────────────────────────────
         let session_manager =
@@ -226,7 +226,7 @@ impl AgentLoopBuilder {
 
         // Spawn tool
         tool_registry.register(SpawnTool::with_handler(
-            Arc::clone(&subagent_manager) as Arc<dyn tools::spawn::SpawnHandler>,
+            Arc::clone(&subagent_manager) as Arc<dyn tools::spawn::SpawnHandler>
         ));
 
         // Cron tool (optional)
@@ -265,7 +265,7 @@ impl AgentLoopBuilder {
             );
 
             tool_registry.register(CalendarTool::new(
-                Arc::clone(&adapter) as Arc<dyn CalendarHandler>,
+                Arc::clone(&adapter) as Arc<dyn CalendarHandler>
             ));
             Some(adapter)
         } else {
@@ -305,9 +305,10 @@ impl AgentLoopBuilder {
             // Inject calendar handler
             if let Some(ref adapter) = calendar_adapter {
                 let todo_cal_sync = Arc::new(
-                    crate::todo_calendar_sync_adapter::TodoCalendarSyncAdapter::new(
-                        Arc::clone(adapter) as Arc<dyn CalendarHandler>,
-                    ),
+                    crate::todo_calendar_sync_adapter::TodoCalendarSyncAdapter::new(Arc::clone(
+                        adapter,
+                    )
+                        as Arc<dyn CalendarHandler>),
                 );
                 todo_tool = todo_tool.with_calendar_handler(
                     todo_cal_sync as Arc<dyn feature_todo::CalendarSyncHandler>,
@@ -316,21 +317,21 @@ impl AgentLoopBuilder {
 
             // Enrichment engine
             if config.todo.enrichment.enabled {
-                let enrichment_engine = Arc::new(
-                    super::super::enrichment::EnrichmentEngine::new(
-                        config.todo.enrichment.clone(),
-                    ),
-                );
-                todo_tool = todo_tool.with_enrichment_handler(
-                    Arc::clone(&enrichment_engine) as Arc<dyn feature_todo::EnrichmentHandler>,
-                );
+                let enrichment_engine = Arc::new(super::super::enrichment::EnrichmentEngine::new(
+                    config.todo.enrichment.clone(),
+                ));
+                todo_tool =
+                    todo_tool
+                        .with_enrichment_handler(Arc::clone(&enrichment_engine)
+                            as Arc<dyn feature_todo::EnrichmentHandler>);
             }
 
             // Enrichment feedback → learning
             if let Some(ref recorder) = outcome_recorder {
-                todo_tool = todo_tool.with_feedback_handler(
-                    Arc::clone(recorder) as Arc<dyn feature_todo::EnrichmentFeedbackHandler>,
-                );
+                todo_tool =
+                    todo_tool
+                        .with_feedback_handler(Arc::clone(recorder)
+                            as Arc<dyn feature_todo::EnrichmentFeedbackHandler>);
             }
 
             // Todo embedding (semantic search)
@@ -353,7 +354,7 @@ impl AgentLoopBuilder {
 
                 todo_tool = todo_tool
                     .with_embedding_handler(
-                        Arc::clone(&todo_embed_impl) as Arc<dyn feature_todo::EmbeddingHandler>,
+                        Arc::clone(&todo_embed_impl) as Arc<dyn feature_todo::EmbeddingHandler>
                     )
                     .with_embedding_repo(emb_repo)
                     .with_search_config(
@@ -378,9 +379,7 @@ impl AgentLoopBuilder {
         // ── Goal tool ─────────────────────────────────────────────────────
         {
             let goal_handler = Arc::new(super::super::GoalHandlerImpl::new(repos.goals.clone()));
-            tool_registry.register(GoalTool::new(Some(
-                goal_handler as Arc<dyn GoalHandler>,
-            )));
+            tool_registry.register(GoalTool::new(Some(goal_handler as Arc<dyn GoalHandler>)));
         }
 
         // ── Plan tool ─────────────────────────────────────────────────────
@@ -395,12 +394,12 @@ impl AgentLoopBuilder {
             super::super::plan_completion_handler::PlanCompletionHandlerImpl::new(
                 repos.goals.clone(),
             ),
-        ) as Arc<dyn PlanCompletionHandler>);
+        )
+            as Arc<dyn PlanCompletionHandler>);
 
         // ── Conversation embedding handler ────────────────────────────────
         let conversation_embedding_handler = if config.conversation.embedding.enabled {
-            let conv_store =
-                tools::ConversationEmbeddingStore::new(repos.conv_embeddings.clone());
+            let conv_store = tools::ConversationEmbeddingStore::new(repos.conv_embeddings.clone());
             let handler = Arc::new(
                 super::super::conversation_embedding_handler::ConversationEmbeddingHandlerImpl::new(
                     Arc::clone(&embedding_engine),
@@ -434,16 +433,14 @@ impl AgentLoopBuilder {
 
         // ── Finance tool (requires real pool) ─────────────────────────────
         if config.finance.enabled && self.pool.is_some() {
-            let price_service = feature_finance::PriceService::new(
-                config.finance.price_refresh.cache_ttl_minutes,
-            );
+            let price_service =
+                feature_finance::PriceService::new(config.finance.price_refresh.cache_ttl_minutes);
 
-            let finance_handler_impl =
-                Arc::new(crate::finance_adapter::FinanceHandlerImpl::new(
-                    repos.clone(),
-                    price_service.clone(),
-                    config.finance.clone(),
-                ));
+            let finance_handler_impl = Arc::new(crate::finance_adapter::FinanceHandlerImpl::new(
+                repos.clone(),
+                price_service.clone(),
+                config.finance.clone(),
+            ));
 
             let finance_tool = feature_finance::FinanceTool::new(
                 repos.finance_accounts.clone(),
@@ -456,7 +453,7 @@ impl AgentLoopBuilder {
                 config.finance.default_currency.clone(),
             )
             .with_finance_handler(
-                Arc::clone(&finance_handler_impl) as Arc<dyn feature_finance::FinanceHandler>,
+                Arc::clone(&finance_handler_impl) as Arc<dyn feature_finance::FinanceHandler>
             );
 
             tool_registry.register(finance_tool);
@@ -537,8 +534,7 @@ impl AgentLoopBuilder {
             tokio::spawn(async move {
                 while let Ok(event) = event_rx.recv().await {
                     if let bus::LearningEvent::ThresholdChanged { new_threshold, .. } = event {
-                        threshold_for_subscriber
-                            .store(new_threshold.to_bits(), Ordering::Relaxed);
+                        threshold_for_subscriber.store(new_threshold.to_bits(), Ordering::Relaxed);
                         info!(
                             "ConfidenceSource threshold updated by LearningService: {:.3}",
                             new_threshold
@@ -580,10 +576,8 @@ impl AgentLoopBuilder {
         };
 
         let engine_dispatch = Arc::new(crate::execution::EngineDispatch::new(execution_core));
-        let mut orchestrator = crate::orchestrator::Orchestrator::new(
-            provider.clone(),
-            &config.agents.defaults.model,
-        );
+        let mut orchestrator =
+            crate::orchestrator::Orchestrator::new(provider.clone(), &config.agents.defaults.model);
         orchestrator = orchestrator.with_strategy_repo(repos.strategies.clone());
         let orchestrator = Arc::new(orchestrator);
 

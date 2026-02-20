@@ -3,7 +3,7 @@
 //! AC-I2.1: LearningService publishes ThresholdChanged event when threshold changes
 //! AC-I2.2: LearningService publishes AnalysisCompleted event after analysis
 //! AC-I2.3: AgentLoop subscribes and receives LearningEvents from bus
-//! AC-I2.4: ContextBuilder.set_confidence_threshold called when ThresholdChanged received
+//! AC-I2.4: ConfidenceSource threshold updated when ThresholdChanged received
 //! AC-I2.5: Subscriber can receive both event types from LearningEventBus
 
 use std::sync::Arc;
@@ -107,10 +107,11 @@ async fn ac_i2_3_subscriber_receives_events_from_background_publisher() {
 
 // ─── AC-I2.4 ──────────────────────────────────────────────────────────────────
 /// When a ThresholdChanged event is received, the new threshold value
-/// can be extracted and applied to ContextBuilder.set_confidence_threshold.
+/// can be extracted and applied to ConfidenceSource via its atomic handle.
 #[tokio::test]
-async fn ac_i2_4_threshold_change_applies_to_context_builder() {
-    use agent::ContextBuilder;
+async fn ac_i2_4_threshold_change_applies_to_confidence_source() {
+    use agent::ConfidenceSource;
+    use std::sync::atomic::Ordering;
 
     let event_bus = Arc::new(LearningEventBus::new(16));
     let mut rx = event_bus.subscribe();
@@ -126,17 +127,18 @@ async fn ac_i2_4_threshold_change_applies_to_context_builder() {
 
     let event = rx.recv().await.expect("channel closed");
 
-    // Build a ContextBuilder and apply the event (as AgentLoop would)
-    let workspace = std::path::PathBuf::from("/tmp/test-workspace-i2");
-    let pool = storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
-    let memory_note_repo = storage::MemoryNoteRepo::new(pool.inner().clone());
-    let mut ctx =
-        ContextBuilder::new(workspace, "UTC".to_string(), None, None, memory_note_repo).await;
+    // Create a ConfidenceSource and apply the event (as AgentLoop subscriber would)
+    let source = ConfidenceSource::new(0.70);
+    let handle = source.threshold_handle();
 
     if let LearningEvent::ThresholdChanged { new_threshold, .. } = event {
-        ctx.set_confidence_threshold(new_threshold);
-        // Verify it can be retrieved
-        assert!((ctx.confidence_threshold() - 0.78).abs() < f32::EPSILON);
+        handle.store(new_threshold.to_bits(), Ordering::Relaxed);
+        // Verify via the source's read method
+        assert!(
+            (source.threshold() - 0.78).abs() < f32::EPSILON,
+            "Expected threshold 0.78, got {}",
+            source.threshold()
+        );
     } else {
         panic!("Expected ThresholdChanged event");
     }

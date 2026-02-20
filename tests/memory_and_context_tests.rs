@@ -1,7 +1,12 @@
-//! Integration tests for memory system and context builder
+//! Integration tests for memory system and context engine (sources)
 
-use klyntbot::agent::{ContextBuilder, MemoryStore};
-use klyntbot::session::SessionMessage;
+use klyntbot::agent::context_sources::{
+    BootstrapSource, ConfidenceSource, IdentitySource, MemorySource, SkillContentSource,
+    SkillSummarySource,
+};
+use klyntbot::agent::{MemoryStore, SkillManager};
+use klyntbot::context_engine::{ContextEngine, ContextSource, SourceContext};
+use std::sync::Arc;
 use tempfile::TempDir;
 
 /// Helper: create a lazy MemoryNoteRepo for tests (no actual DB connection).
@@ -11,65 +16,89 @@ fn test_memory_note_repo() -> klyntbot::storage::MemoryNoteRepo {
     klyntbot::storage::MemoryNoteRepo::new(pool.inner().clone())
 }
 
-/// Test context builder initialization
+/// Helper: build a ContextEngine with all sources for testing.
+async fn test_context_engine(workspace: std::path::PathBuf) -> ContextEngine {
+    let mut skill_manager = SkillManager::new();
+    let _ = skill_manager.load(workspace.clone()).await;
+    let skill_manager = Arc::new(skill_manager);
+
+    let memory_store = MemoryStore::new(test_memory_note_repo());
+
+    let sources: Vec<Box<dyn ContextSource>> = vec![
+        Box::new(IdentitySource::new(workspace.clone(), "UTC".to_string())),
+        Box::new(BootstrapSource::new(workspace)),
+        Box::new(MemorySource::new(memory_store)),
+        Box::new(ConfidenceSource::new(0.7)),
+        Box::new(SkillSummarySource::new(Arc::clone(&skill_manager))),
+        Box::new(SkillContentSource::new(skill_manager)),
+    ];
+
+    ContextEngine::new().with_sources(sources)
+}
+
+fn test_source_ctx() -> SourceContext {
+    SourceContext {
+        channel: "test".to_string(),
+        chat_id: "chat123".to_string(),
+    }
+}
+
+/// Test context engine initialization with sources
 #[tokio::test]
-async fn test_context_builder_init() {
+async fn test_context_engine_init() {
     let temp_dir = TempDir::new().unwrap();
     let workspace = temp_dir.path().join("workspace");
     std::fs::create_dir_all(&workspace).unwrap();
 
-    let mut context_builder = ContextBuilder::new(
-        workspace,
-        "UTC".to_string(),
-        None,
-        None,
-        test_memory_note_repo(),
-    )
-    .await;
-    let result = context_builder.init().await;
-    assert!(result.is_ok());
+    let engine = test_context_engine(workspace).await;
+    let prompt = engine.build_system_prompt("test", "chat123").await;
+
+    // Should contain identity section
+    assert!(prompt.contains("# Identity"));
+    assert!(prompt.contains("klyntbot"));
 }
 
 /// Test bootstrap file loading
 #[tokio::test]
-async fn test_context_builder_with_bootstrap_files() {
+async fn test_context_engine_with_bootstrap_files() {
     let temp_dir = TempDir::new().unwrap();
     let workspace = temp_dir.path().join("workspace");
     std::fs::create_dir_all(&workspace).unwrap();
 
     // Create bootstrap files
-    let agents_md = workspace.join("AGENTS.md");
-    std::fs::write(&agents_md, "# Agent Configuration\n\nYou are helpful.").unwrap();
-
-    let soul_md = workspace.join("SOUL.md");
-    std::fs::write(&soul_md, "# Agent Soul\n\nBe friendly and professional.").unwrap();
-
-    let identity_md = workspace.join("IDENTITY.md");
-    std::fs::write(&identity_md, "# Identity\n\nI am klyntbot.").unwrap();
-
-    let user_md = workspace.join("USER.md");
-    std::fs::write(&user_md, "# User\n\nUser prefers concise responses.").unwrap();
-
-    let tools_md = workspace.join("TOOLS.md");
-    std::fs::write(&tools_md, "# Tools\n\nUse tools when needed.").unwrap();
-
-    let mut context_builder = ContextBuilder::new(
-        workspace,
-        "UTC".to_string(),
-        None,
-        None,
-        test_memory_note_repo(),
+    std::fs::write(
+        workspace.join("AGENTS.md"),
+        "# Agent Configuration\n\nYou are helpful.",
     )
-    .await;
-    context_builder.init().await.unwrap();
+    .unwrap();
+    std::fs::write(
+        workspace.join("SOUL.md"),
+        "# Agent Soul\n\nBe friendly and professional.",
+    )
+    .unwrap();
+    std::fs::write(
+        workspace.join("IDENTITY.md"),
+        "# Identity\n\nI am klyntbot.",
+    )
+    .unwrap();
+    std::fs::write(
+        workspace.join("USER.md"),
+        "# User\n\nUser prefers concise responses.",
+    )
+    .unwrap();
+    std::fs::write(
+        workspace.join("TOOLS.md"),
+        "# Tools\n\nUse tools when needed.",
+    )
+    .unwrap();
 
-    // Build messages
-    let messages = context_builder
-        .build_messages(vec![], "Hello!", None, "test", "chat123")
-        .await;
+    let engine = test_context_engine(workspace).await;
+    let prompt = engine.build_system_prompt("test", "chat123").await;
 
-    // Should include system message and user message
-    assert!(messages.len() >= 2);
+    // Should include bootstrap file content
+    assert!(prompt.contains("Agent Configuration"));
+    assert!(prompt.contains("Agent Soul"));
+    assert!(prompt.contains("Use tools when needed"));
 }
 
 /// Test memory file creation and reading
@@ -80,162 +109,45 @@ async fn test_memory_store() {
     let memory_dir = workspace.join("memory");
     std::fs::create_dir_all(&memory_dir).unwrap();
 
-    // Create long-term memory file
     let memory_file = memory_dir.join("MEMORY.md");
     let memory_content = r#"# Long-term Memory
 
 ## User Preferences
 - Prefers Python over JavaScript
 - Likes detailed explanations
-
-## Ongoing Projects
-- Working on web scraper project
-- Learning Rust programming
 "#;
     std::fs::write(&memory_file, memory_content).unwrap();
 
     let _memory_store = MemoryStore::new(test_memory_note_repo());
 
-    // Memory store should be able to access the memory files
     assert!(memory_file.exists());
 }
 
-/// Test daily notes creation and retrieval
-#[tokio::test]
-async fn test_daily_notes_structure() {
-    let temp_dir = TempDir::new().unwrap();
-    let workspace = temp_dir.path().join("workspace");
-    let memory_dir = workspace.join("memory");
-    std::fs::create_dir_all(&memory_dir).unwrap();
-
-    // Create a daily note
-    let today = chrono::Local::now().format("%Y-%m-%d").to_string();
-    let daily_note = memory_dir.join(format!("{}.md", today));
-
-    let note_content = format!(
-        r#"# Daily Notes - {}
-
-## Conversations
-- Discussed Rust testing strategies
-- Helped debug a async/await issue
-
-## Tasks Completed
-- Reviewed PR #123
-- Fixed integration tests
-"#,
-        today
-    );
-    std::fs::write(&daily_note, note_content).unwrap();
-
-    // Verify file exists
-    assert!(daily_note.exists());
-
-    let mut context_builder = ContextBuilder::new(
-        workspace,
-        "UTC".to_string(),
-        None,
-        None,
-        test_memory_note_repo(),
-    )
-    .await;
-    context_builder.init().await.unwrap();
-
-    // Build messages
-    let messages = context_builder
-        .build_messages(vec![], "What did we do today?", None, "test", "chat123")
-        .await;
-
-    assert!(!messages.is_empty());
-}
-
-/// Test message building with conversation history
-#[tokio::test]
-async fn test_context_builder_with_history() {
-    let temp_dir = TempDir::new().unwrap();
-    let workspace = temp_dir.path().join("workspace");
-    std::fs::create_dir_all(&workspace).unwrap();
-
-    let mut context_builder = ContextBuilder::new(
-        workspace,
-        "UTC".to_string(),
-        None,
-        None,
-        test_memory_note_repo(),
-    )
-    .await;
-    context_builder.init().await.unwrap();
-
-    // Create conversation history
-    let history = vec![
-        SessionMessage {
-            id: "test-msg-1".to_string(),
-            role: "user".to_string(),
-            content: "What is Rust?".to_string(),
-            timestamp: chrono::Utc::now(),
-            request_id: None,
-            tool_calls: None,
-            metadata: None,
-        },
-        SessionMessage {
-            id: "test-msg-2".to_string(),
-            role: "assistant".to_string(),
-            content: "Rust is a systems programming language.".to_string(),
-            timestamp: chrono::Utc::now(),
-            request_id: None,
-            tool_calls: None,
-            metadata: None,
-        },
-    ];
-
-    // Build messages with history
-    let messages = context_builder
-        .build_messages(history, "Tell me more", None, "test", "chat123")
-        .await;
-
-    // Should include system message, history messages, and current message
-    assert!(messages.len() >= 4);
-}
-
-/// Test workspace path resolution
+/// Test workspace path structure
 #[test]
 fn test_workspace_path_structure() {
     let temp_dir = TempDir::new().unwrap();
     let workspace = temp_dir.path().join("workspace");
     std::fs::create_dir_all(&workspace).unwrap();
 
-    // Verify workspace structure can be created
     assert!(workspace.exists());
     assert!(workspace.is_dir());
 }
 
-/// Test bootstrap files optional loading
+/// Test bootstrap files are optional
 #[tokio::test]
 async fn test_bootstrap_files_optional() {
     let temp_dir = TempDir::new().unwrap();
     let workspace = temp_dir.path().join("workspace");
     std::fs::create_dir_all(&workspace).unwrap();
 
-    // Don't create any bootstrap files - should still work
+    // No bootstrap files — should still work
+    let engine = test_context_engine(workspace).await;
+    let prompt = engine.build_system_prompt("test", "chat123").await;
 
-    let mut context_builder = ContextBuilder::new(
-        workspace,
-        "UTC".to_string(),
-        None,
-        None,
-        test_memory_note_repo(),
-    )
-    .await;
-    let result = context_builder.init().await;
-
-    // Should initialize successfully even without bootstrap files
-    assert!(result.is_ok());
-
-    // Should be able to build messages
-    let messages = context_builder
-        .build_messages(vec![], "Hello", None, "test", "chat123")
-        .await;
-
-    assert!(!messages.is_empty());
+    // Should contain at minimum the identity section
+    assert!(prompt.contains("# Identity"));
+    assert!(!prompt.is_empty());
 }
 
 /// Test memory directory structure
@@ -244,17 +156,13 @@ fn test_memory_directory_structure() {
     let temp_dir = TempDir::new().unwrap();
     let workspace = temp_dir.path().join("workspace");
     let memory_dir = workspace.join("memory");
-
     std::fs::create_dir_all(&memory_dir).unwrap();
 
-    // Verify directory exists
     assert!(memory_dir.exists());
     assert!(memory_dir.is_dir());
 
-    // Create memory file
     let memory_file = memory_dir.join("MEMORY.md");
     std::fs::write(&memory_file, "# Memory\n\nTest content").unwrap();
-
     assert!(memory_file.exists());
     assert!(memory_file.is_file());
 }
@@ -267,85 +175,7 @@ async fn test_memory_store_initialization() {
     std::fs::create_dir_all(&workspace).unwrap();
 
     let _memory_store = MemoryStore::new(test_memory_note_repo());
-
-    // Memory store should initialize without error
     assert!(workspace.exists());
-}
-
-/// Test context builder with media files
-#[tokio::test]
-async fn test_context_builder_with_media() {
-    let temp_dir = TempDir::new().unwrap();
-    let workspace = temp_dir.path().join("workspace");
-    std::fs::create_dir_all(&workspace).unwrap();
-
-    let mut context_builder = ContextBuilder::new(
-        workspace,
-        "UTC".to_string(),
-        None,
-        None,
-        test_memory_note_repo(),
-    )
-    .await;
-    context_builder.init().await.unwrap();
-
-    // Create test media paths
-    let media_paths = vec!["/path/to/image1.png".to_string()];
-
-    // Build messages with media
-    let messages = context_builder
-        .build_messages(
-            vec![],
-            "What's in this image?",
-            Some(media_paths),
-            "test",
-            "chat123",
-        )
-        .await;
-
-    // Should include messages (exact structure depends on implementation)
-    assert!(!messages.is_empty());
-}
-
-/// Test multiple context builders with same workspace
-#[tokio::test]
-async fn test_multiple_context_builders() {
-    let temp_dir = TempDir::new().unwrap();
-    let workspace = temp_dir.path().join("workspace");
-    std::fs::create_dir_all(&workspace).unwrap();
-
-    // Create two context builders
-    let mut builder1 = ContextBuilder::new(
-        workspace.clone(),
-        "UTC".to_string(),
-        None,
-        None,
-        test_memory_note_repo(),
-    )
-    .await;
-    let mut builder2 = ContextBuilder::new(
-        workspace.clone(),
-        "UTC".to_string(),
-        None,
-        None,
-        test_memory_note_repo(),
-    )
-    .await;
-
-    // Both should initialize successfully
-    assert!(builder1.init().await.is_ok());
-    assert!(builder2.init().await.is_ok());
-
-    // Both should be able to build messages
-    let messages1 = builder1
-        .build_messages(vec![], "Hello from builder1", None, "test", "chat1")
-        .await;
-    let messages2 = builder2
-        .build_messages(vec![], "Hello from builder2", None, "test", "chat2")
-        .await;
-
-    assert!(!messages1.is_empty());
-    assert!(!messages2.is_empty());
 }
 
 /// Test context with channel and chat ID
@@ -355,101 +185,65 @@ async fn test_context_with_channel_info() {
     let workspace = temp_dir.path().join("workspace");
     std::fs::create_dir_all(&workspace).unwrap();
 
-    let mut context_builder = ContextBuilder::new(
-        workspace,
-        "UTC".to_string(),
-        None,
-        None,
-        test_memory_note_repo(),
-    )
-    .await;
-    context_builder.init().await.unwrap();
+    let engine = test_context_engine(workspace).await;
 
-    // Build messages with different channel/chat combinations
-    let telegram_messages = context_builder
-        .build_messages(vec![], "Message from Telegram", None, "telegram", "chat123")
-        .await;
+    // Build with different channels
+    let telegram_prompt = engine.build_system_prompt("telegram", "chat123").await;
+    let discord_prompt = engine.build_system_prompt("discord", "guild456").await;
 
-    let discord_messages = context_builder
-        .build_messages(vec![], "Message from Discord", None, "discord", "guild456")
-        .await;
-
-    // Both should build successfully
-    assert!(!telegram_messages.is_empty());
-    assert!(!discord_messages.is_empty());
+    // Both should contain their channel info
+    assert!(telegram_prompt.contains("telegram"));
+    assert!(discord_prompt.contains("discord"));
 }
 
-/// Test empty conversation history
+/// Test identity source contains expected sections
 #[tokio::test]
-async fn test_empty_conversation_history() {
+async fn test_identity_source_content() {
     let temp_dir = TempDir::new().unwrap();
     let workspace = temp_dir.path().join("workspace");
     std::fs::create_dir_all(&workspace).unwrap();
 
-    let mut context_builder = ContextBuilder::new(
-        workspace,
-        "UTC".to_string(),
-        None,
-        None,
-        test_memory_note_repo(),
-    )
-    .await;
-    context_builder.init().await.unwrap();
+    let source = IdentitySource::new(workspace, "UTC".to_string());
+    let ctx = test_source_ctx();
+    let content = source.provide(&ctx).await.unwrap();
 
-    // Build messages with empty history
-    let messages = context_builder
-        .build_messages(vec![], "First message", None, "test", "chat123")
-        .await;
-
-    // Should include at least system message and user message
-    assert!(messages.len() >= 2);
+    assert!(content.contains("# Identity"));
+    assert!(content.contains("Channel: test"));
+    assert!(content.contains("Chat ID: chat123"));
+    assert!(content.contains("message"));
+    assert!(content.contains("ask_user"));
 }
 
-/// Test long conversation history
+/// Test confidence source with threshold update
 #[tokio::test]
-async fn test_long_conversation_history() {
+async fn test_confidence_source_threshold() {
+    let source = ConfidenceSource::new(0.70);
+    let ctx = test_source_ctx();
+
+    let content = source.provide(&ctx).await.unwrap();
+    assert!(content.contains("0.70"));
+
+    // Update threshold
+    source.set_threshold(0.85);
+    let content = source.provide(&ctx).await.unwrap();
+    assert!(content.contains("0.85"));
+}
+
+/// Test that sources are ordered by priority
+#[tokio::test]
+async fn test_context_engine_source_ordering() {
     let temp_dir = TempDir::new().unwrap();
     let workspace = temp_dir.path().join("workspace");
     std::fs::create_dir_all(&workspace).unwrap();
 
-    let mut context_builder = ContextBuilder::new(
-        workspace,
-        "UTC".to_string(),
-        None,
-        None,
-        test_memory_note_repo(),
-    )
-    .await;
-    context_builder.init().await.unwrap();
+    let engine = test_context_engine(workspace).await;
+    let prompt = engine.build_system_prompt("test", "chat123").await;
 
-    // Create long history
-    let mut history = Vec::new();
-    for i in 0..50 {
-        history.push(SessionMessage {
-            id: format!("test-msg-{}-user", i),
-            role: "user".to_string(),
-            content: format!("Message {}", i),
-            timestamp: chrono::Utc::now(),
-            request_id: None,
-            tool_calls: None,
-            metadata: None,
-        });
-        history.push(SessionMessage {
-            id: format!("test-msg-{}-assistant", i),
-            role: "assistant".to_string(),
-            content: format!("Response {}", i),
-            timestamp: chrono::Utc::now(),
-            request_id: None,
-            tool_calls: None,
-            metadata: None,
-        });
-    }
-
-    // Build messages with long history
-    let messages = context_builder
-        .build_messages(history, "Latest message", None, "test", "chat123")
-        .await;
-
-    // Should handle long history without error
-    assert!(!messages.is_empty());
+    // Identity (priority 100) should appear before skills summary (priority 40)
+    let identity_pos = prompt.find("# Identity").unwrap();
+    let skills_pos = prompt.find("# Available Skills").unwrap();
+    assert!(
+        identity_pos < skills_pos,
+        "Identity should appear before skills"
+    );
 }

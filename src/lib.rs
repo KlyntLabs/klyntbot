@@ -10,6 +10,7 @@ pub use channels;
 // cli is used directly via `use cli::*` in main.rs; no re-export needed.
 pub use common;
 pub use config;
+pub use context_engine;
 pub use goal;
 pub use heartbeat;
 pub use plan;
@@ -21,7 +22,7 @@ pub use tools;
 
 // Re-export commonly used types for convenience
 pub use agent::{
-    AgentEvent, AgentLoop, ContextBuilder, FinanceHandlerImpl, MemoryStore,
+    AgentEvent, AgentLoop, ConfidenceSource, FinanceHandlerImpl, MemoryStore,
     PlanCompletionHandlerImpl, SkillManager, StreamingHandle, SubagentManager,
 };
 pub use bus::{InboundMessage, MessageBus, OutboundMessage};
