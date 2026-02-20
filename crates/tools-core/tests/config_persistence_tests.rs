@@ -1,26 +1,47 @@
 //! Tests for `ConfigPersistence` trait (AC 1.9).
-//!
-//! ConfigPersistence provides runtime config section read/write so feature
-//! crates can implement "settings" actions without depending on the config
-//! crate directly.
-//!
-//! Key properties:
-//! - Trait is object-safe (can be used as `Arc<dyn ConfigPersistence>`)
-//! - `load_section(key)` returns a JSON Value for the section
-//! - `save_section(key, value)` persists it
-//! - Trait requires Send + Sync
-//!
-//! Dev: implement these tests via TDD alongside the trait definition in
-//! `crates/tools-core/src/config_persistence.rs`.
 
-// NOTE: Adjust imports once tools-core/src/config_persistence.rs is finalized.
-//
-// Expected imports:
-//   use tools_core::ConfigPersistence;
-//   use async_trait::async_trait;
-//   use serde_json::{json, Value};
-//   use std::sync::Arc;
-//   use common::Result;
+use async_trait::async_trait;
+use common::Result;
+use serde_json::{json, Value};
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use tools_core::ConfigPersistence;
+
+// --- Mock implementation ---
+
+struct MockConfigPersistence {
+    sections: Mutex<HashMap<String, Value>>,
+}
+
+impl MockConfigPersistence {
+    fn new() -> Self {
+        Self {
+            sections: Mutex::new(HashMap::new()),
+        }
+    }
+
+    fn with_section(key: &str, value: Value) -> Self {
+        let mut map = HashMap::new();
+        map.insert(key.to_string(), value);
+        Self {
+            sections: Mutex::new(map),
+        }
+    }
+}
+
+#[async_trait]
+impl ConfigPersistence for MockConfigPersistence {
+    async fn load_section(&self, key: &str) -> Result<Value> {
+        let sections = self.sections.lock().unwrap();
+        Ok(sections.get(key).cloned().unwrap_or(Value::Null))
+    }
+
+    async fn save_section(&self, key: &str, value: Value) -> Result<()> {
+        let mut sections = self.sections.lock().unwrap();
+        sections.insert(key.to_string(), value);
+        Ok(())
+    }
+}
 
 // ============================================================
 // AC 1.9: Trait is object-safe (can be Arc<dyn ConfigPersistence>)
@@ -28,86 +49,49 @@
 
 #[test]
 fn test_config_persistence_is_object_safe() {
-    // Verifies: ConfigPersistence can be used as `Arc<dyn ConfigPersistence>`.
-    // This is primarily a compile-time test. If this test compiles and the
-    // mock impl below can be wrapped in Arc<dyn ConfigPersistence>, it passes.
-    //
-    // Setup:
-    //   struct MockConfigPersistence;
-    //   impl ConfigPersistence for MockConfigPersistence { ... }
-    //   let _: Arc<dyn ConfigPersistence> = Arc::new(MockConfigPersistence);
-    //
-    // AC 1.9
-    todo!()
+    let _: Arc<dyn ConfigPersistence> = Arc::new(MockConfigPersistence::new());
 }
 
 // ============================================================
 // AC 1.9: Mock implementation works — load_section
 // ============================================================
 
-// #[tokio::test]
-#[test]
-fn test_mock_load_section_returns_stored_value() {
-    // Verifies: A mock ConfigPersistence that stores sections in a HashMap
-    // returns the correct value when load_section is called.
-    //
-    // Setup:
-    //   1. Create MockConfigPersistence with pre-loaded section "todo" → {"enabled": true}
-    //   2. Call load_section("todo").await
-    //   3. Assert result == {"enabled": true}
-    //
-    // AC 1.9
-    todo!()
+#[tokio::test]
+async fn test_mock_load_section_returns_stored_value() {
+    let mock = MockConfigPersistence::with_section("todo", json!({"enabled": true}));
+    let result = mock.load_section("todo").await.unwrap();
+    assert_eq!(result, json!({"enabled": true}));
 }
 
-// #[tokio::test]
-#[test]
-fn test_mock_load_section_missing_key_returns_error_or_default() {
-    // Verifies: load_section with a key that doesn't exist returns an appropriate
-    // error or empty JSON value (behavior depends on impl contract).
-    //
-    // Setup:
-    //   1. Create MockConfigPersistence with no sections
-    //   2. Call load_section("nonexistent").await
-    //   3. Assert behavior (error or default)
-    //
-    // AC 1.9
-    todo!()
+#[tokio::test]
+async fn test_mock_load_section_missing_key_returns_error_or_default() {
+    let mock = MockConfigPersistence::new();
+    let result = mock.load_section("nonexistent").await.unwrap();
+    assert_eq!(result, Value::Null);
 }
 
 // ============================================================
 // AC 1.9: Mock implementation works — save_section
 // ============================================================
 
-// #[tokio::test]
-#[test]
-fn test_mock_save_section_persists_value() {
-    // Verifies: After save_section("todo", value), load_section("todo") returns
-    // the same value.
-    //
-    // Setup:
-    //   1. Create MockConfigPersistence (empty)
-    //   2. Call save_section("todo", {"enabled": false}).await
-    //   3. Call load_section("todo").await
-    //   4. Assert result == {"enabled": false}
-    //
-    // AC 1.9
-    todo!()
+#[tokio::test]
+async fn test_mock_save_section_persists_value() {
+    let mock = MockConfigPersistence::new();
+    mock.save_section("todo", json!({"enabled": false}))
+        .await
+        .unwrap();
+    let result = mock.load_section("todo").await.unwrap();
+    assert_eq!(result, json!({"enabled": false}));
 }
 
-// #[tokio::test]
-#[test]
-fn test_mock_save_section_overwrites_existing() {
-    // Verifies: save_section overwrites a previously stored section.
-    //
-    // Setup:
-    //   1. Create MockConfigPersistence with "todo" → {"enabled": true}
-    //   2. Call save_section("todo", {"enabled": false}).await
-    //   3. Call load_section("todo").await
-    //   4. Assert result == {"enabled": false} (overwritten)
-    //
-    // AC 1.9
-    todo!()
+#[tokio::test]
+async fn test_mock_save_section_overwrites_existing() {
+    let mock = MockConfigPersistence::with_section("todo", json!({"enabled": true}));
+    mock.save_section("todo", json!({"enabled": false}))
+        .await
+        .unwrap();
+    let result = mock.load_section("todo").await.unwrap();
+    assert_eq!(result, json!({"enabled": false}));
 }
 
 // ============================================================
@@ -116,32 +100,27 @@ fn test_mock_save_section_overwrites_existing() {
 
 #[test]
 fn test_config_persistence_is_send_sync() {
-    // Verifies: Arc<dyn ConfigPersistence> is Send + Sync, allowing it to be
-    // shared across async tasks and threads.
-    //
-    // This is a compile-time assertion:
-    //   fn assert_send_sync<T: Send + Sync>() {}
-    //   assert_send_sync::<Arc<dyn ConfigPersistence>>();
-    //
-    // AC 1.9
-    todo!()
+    fn assert_send_sync<T: Send + Sync>() {}
+    assert_send_sync::<Arc<dyn ConfigPersistence>>();
 }
 
 // ============================================================
 // AC 1.9: Multiple sections independent
 // ============================================================
 
-// #[tokio::test]
-#[test]
-fn test_mock_multiple_sections_independent() {
-    // Verifies: Saving to "todo" does not affect "finance" and vice versa.
-    //
-    // Setup:
-    //   1. save_section("todo", {"maxSlots": 5})
-    //   2. save_section("finance", {"currency": "USD"})
-    //   3. load_section("todo") == {"maxSlots": 5}
-    //   4. load_section("finance") == {"currency": "USD"}
-    //
-    // AC 1.9
-    todo!()
+#[tokio::test]
+async fn test_mock_multiple_sections_independent() {
+    let mock = MockConfigPersistence::new();
+    mock.save_section("todo", json!({"maxSlots": 5}))
+        .await
+        .unwrap();
+    mock.save_section("finance", json!({"currency": "USD"}))
+        .await
+        .unwrap();
+
+    let todo = mock.load_section("todo").await.unwrap();
+    let finance = mock.load_section("finance").await.unwrap();
+
+    assert_eq!(todo, json!({"maxSlots": 5}));
+    assert_eq!(finance, json!({"currency": "USD"}));
 }

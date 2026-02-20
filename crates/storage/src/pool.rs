@@ -29,6 +29,45 @@ impl StoragePool {
     pub fn inner(&self) -> &sqlx::PgPool {
         &self.0
     }
+
+    /// Run feature-owned migrations that haven't been applied yet.
+    ///
+    /// Each feature crate provides its own migrations via `FeaturePackage::migrations()`.
+    /// This method checks which have already been applied (tracked in `_feature_migrations`)
+    /// and runs any new ones.
+    pub async fn run_feature_migrations(
+        pool: &sqlx::PgPool,
+        migrations: &[tools_core::FeatureMigration],
+    ) -> Result<(), StorageError> {
+        for m in migrations {
+            let exists: bool = sqlx::query_scalar(
+                "SELECT EXISTS(SELECT 1 FROM _feature_migrations WHERE feature_name = $1 AND version = $2)",
+            )
+            .bind(&m.feature_name)
+            .bind(m.version)
+            .fetch_one(pool)
+            .await?;
+
+            if !exists {
+                tracing::info!(
+                    feature = %m.feature_name,
+                    version = m.version,
+                    description = %m.description,
+                    "Running feature migration"
+                );
+                sqlx::query(&m.sql).execute(pool).await?;
+                sqlx::query(
+                    "INSERT INTO _feature_migrations (feature_name, version, description) VALUES ($1, $2, $3)",
+                )
+                .bind(&m.feature_name)
+                .bind(m.version)
+                .bind(&m.description)
+                .execute(pool)
+                .await?;
+            }
+        }
+        Ok(())
+    }
 }
 
 impl std::fmt::Debug for StoragePool {

@@ -4681,6 +4681,7 @@ dependencies = [
  "sqlx",
  "thiserror 2.0.18",
  "tokio",
+ "tools-core",
  "tracing",
  "uuid",
 ]
@@ -5062,10 +5063,34 @@ dependencies = [
  "storage",
  "tempfile",
  "tokio",
+ "tools-core",
  "tracing",
  "url",
  "urlencoding",
  "uuid",
+]
+
+[[package]]
+name = "tools-core"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "common",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tools-core-macros",
+ "tracing",
+]
+
+[[package]]
+name = "tools-core-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "serde_json",
+ "syn",
 ]
 
 [[package]]

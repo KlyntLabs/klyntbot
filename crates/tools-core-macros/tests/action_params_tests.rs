@@ -1,13 +1,6 @@
 //! Tests for `#[derive(ActionParams)]` proc macro (AC 2.3).
-//!
-//! ActionParams generates:
-//! - `json_schema()` → JSON Schema with properties, required, types, constraints, descriptions
-//! - `from_value(&Value)` → Parse a serde_json::Value into the struct
-//!
-//! Dev: implement these tests via TDD alongside the macro in
-//! `crates/tools-core-macros/src/action_params.rs`.
 
-use serde_json::{json, Value};
+use serde_json::json;
 use tools_core_macros::ActionParams;
 
 // --- Test struct: mix of required, optional, constrained, and vec fields ---
@@ -52,16 +45,19 @@ pub struct ConstrainedStringParams {
 
 #[test]
 fn test_json_schema_has_required_fields() {
-    // Verifies: json_schema()["required"] contains "title" (and only "title").
-    // AC 2.3
-    todo!()
+    let schema = AddParams::json_schema();
+    let required = schema["required"].as_array().unwrap();
+    assert!(required.iter().any(|v| v == "title"));
 }
 
 #[test]
 fn test_json_schema_required_does_not_include_optional() {
-    // Verifies: json_schema()["required"] does NOT contain "priority", "tags", "description", "urgent".
-    // AC 2.3
-    todo!()
+    let schema = AddParams::json_schema();
+    let required = schema["required"].as_array().unwrap();
+    assert!(!required.iter().any(|v| v == "priority"));
+    assert!(!required.iter().any(|v| v == "tags"));
+    assert!(!required.iter().any(|v| v == "description"));
+    assert!(!required.iter().any(|v| v == "urgent"));
 }
 
 // ============================================================
@@ -70,38 +66,33 @@ fn test_json_schema_required_does_not_include_optional() {
 
 #[test]
 fn test_json_schema_string_type() {
-    // Verifies: schema["properties"]["title"]["type"] == "string".
-    // AC 2.3
-    todo!()
+    let schema = AddParams::json_schema();
+    assert_eq!(schema["properties"]["title"]["type"], "string");
 }
 
 #[test]
 fn test_json_schema_integer_type() {
-    // Verifies: schema["properties"]["priority"]["type"] == "integer".
-    // AC 2.3
-    todo!()
+    let schema = AddParams::json_schema();
+    assert_eq!(schema["properties"]["priority"]["type"], "integer");
 }
 
 #[test]
 fn test_json_schema_boolean_type() {
-    // Verifies: schema["properties"]["urgent"]["type"] == "boolean".
-    // AC 2.3
-    todo!()
+    let schema = AddParams::json_schema();
+    assert_eq!(schema["properties"]["urgent"]["type"], "boolean");
 }
 
 #[test]
 fn test_json_schema_array_type() {
-    // Verifies: schema["properties"]["tags"]["type"] == "array"
-    //           AND schema["properties"]["tags"]["items"]["type"] == "string".
-    // AC 2.3
-    todo!()
+    let schema = AddParams::json_schema();
+    assert_eq!(schema["properties"]["tags"]["type"], "array");
+    assert_eq!(schema["properties"]["tags"]["items"]["type"], "string");
 }
 
 #[test]
 fn test_json_schema_optional_string_type() {
-    // Verifies: schema["properties"]["description"]["type"] == "string".
-    // AC 2.3
-    todo!()
+    let schema = AddParams::json_schema();
+    assert_eq!(schema["properties"]["description"]["type"], "string");
 }
 
 // ============================================================
@@ -110,18 +101,16 @@ fn test_json_schema_optional_string_type() {
 
 #[test]
 fn test_json_schema_min_max_constraints() {
-    // Verifies: schema["properties"]["priority"]["minimum"] == 1
-    //           AND schema["properties"]["priority"]["maximum"] == 5.
-    // AC 2.3
-    todo!()
+    let schema = AddParams::json_schema();
+    assert_eq!(schema["properties"]["priority"]["minimum"], 1);
+    assert_eq!(schema["properties"]["priority"]["maximum"], 5);
 }
 
 #[test]
 fn test_json_schema_min_max_length_constraints() {
-    // Verifies: schema["properties"]["code"]["minLength"] == 2
-    //           AND schema["properties"]["code"]["maxLength"] == 10.
-    // AC 2.3
-    todo!()
+    let schema = ConstrainedStringParams::json_schema();
+    assert_eq!(schema["properties"]["code"]["minLength"], 2);
+    assert_eq!(schema["properties"]["code"]["maxLength"], 10);
 }
 
 // ============================================================
@@ -130,11 +119,19 @@ fn test_json_schema_min_max_length_constraints() {
 
 #[test]
 fn test_json_schema_descriptions_from_doc_comments() {
-    // Verifies: schema["properties"]["title"]["description"] == "Task title"
-    //           AND schema["properties"]["priority"]["description"] == "Task priority (1-5)"
-    //           AND schema["properties"]["tags"]["description"] == "Tags for categorization".
-    // AC 2.3
-    todo!()
+    let schema = AddParams::json_schema();
+    assert_eq!(
+        schema["properties"]["title"]["description"],
+        "Task title"
+    );
+    assert_eq!(
+        schema["properties"]["priority"]["description"],
+        "Task priority (1-5)"
+    );
+    assert_eq!(
+        schema["properties"]["tags"]["description"],
+        "Tags for categorization"
+    );
 }
 
 // ============================================================
@@ -143,12 +140,19 @@ fn test_json_schema_descriptions_from_doc_comments() {
 
 #[test]
 fn test_from_value_all_fields_present() {
-    // Verifies: from_value with all fields set returns correct values.
-    // Input: {"title": "Buy groceries", "priority": 2, "tags": ["shopping"], "description": "From the store", "urgent": true}
-    // Expected: title == "Buy groceries", priority == Some(2), tags == ["shopping"],
-    //           description == Some("From the store"), urgent == Some(true).
-    // AC 2.3
-    todo!()
+    let args = json!({
+        "title": "Buy groceries",
+        "priority": 2,
+        "tags": ["shopping"],
+        "description": "From the store",
+        "urgent": true
+    });
+    let params = AddParams::from_value(&args).unwrap();
+    assert_eq!(params.title, "Buy groceries");
+    assert_eq!(params.priority, Some(2));
+    assert_eq!(params.tags, vec!["shopping"]);
+    assert_eq!(params.description, Some("From the store".to_string()));
+    assert_eq!(params.urgent, Some(true));
 }
 
 // ============================================================
@@ -157,16 +161,16 @@ fn test_from_value_all_fields_present() {
 
 #[test]
 fn test_from_value_missing_required_field_errors() {
-    // Verifies: from_value({"priority": 2}) returns Err because "title" is required.
-    // AC 2.3
-    todo!()
+    let args = json!({ "priority": 2 });
+    let result = AddParams::from_value(&args);
+    assert!(result.is_err());
 }
 
 #[test]
 fn test_from_value_null_required_field_errors() {
-    // Verifies: from_value({"title": null}) returns Err.
-    // AC 2.3
-    todo!()
+    let args = json!({ "title": null });
+    let result = AddParams::from_value(&args);
+    assert!(result.is_err());
 }
 
 // ============================================================
@@ -175,16 +179,16 @@ fn test_from_value_null_required_field_errors() {
 
 #[test]
 fn test_from_value_missing_vec_defaults_to_empty() {
-    // Verifies: from_value({"title": "test"}) → tags == vec![] (empty Vec).
-    // AC 2.3
-    todo!()
+    let args = json!({ "title": "test" });
+    let params = AddParams::from_value(&args).unwrap();
+    assert!(params.tags.is_empty());
 }
 
 #[test]
 fn test_from_value_explicit_empty_array() {
-    // Verifies: from_value({"title": "test", "tags": []}) → tags == vec![].
-    // AC 2.3
-    todo!()
+    let args = json!({ "title": "test", "tags": [] });
+    let params = AddParams::from_value(&args).unwrap();
+    assert!(params.tags.is_empty());
 }
 
 // ============================================================
@@ -193,9 +197,11 @@ fn test_from_value_explicit_empty_array() {
 
 #[test]
 fn test_from_value_missing_optional_fields_are_none() {
-    // Verifies: from_value({"title": "test"}) → priority == None, description == None, urgent == None.
-    // AC 2.3
-    todo!()
+    let args = json!({ "title": "test" });
+    let params = AddParams::from_value(&args).unwrap();
+    assert_eq!(params.priority, None);
+    assert_eq!(params.description, None);
+    assert_eq!(params.urgent, None);
 }
 
 // ============================================================
@@ -204,14 +210,12 @@ fn test_from_value_missing_optional_fields_are_none() {
 
 #[test]
 fn test_empty_params_schema() {
-    // Verifies: EmptyParams::json_schema() has "type": "object" and empty/no properties.
-    // AC 2.3
-    todo!()
+    let schema = EmptyParams::json_schema();
+    assert_eq!(schema["type"], "object");
 }
 
 #[test]
 fn test_empty_params_from_value() {
-    // Verifies: EmptyParams::from_value(&json!({})) is Ok.
-    // AC 2.3
-    todo!()
+    let result = EmptyParams::from_value(&json!({}));
+    assert!(result.is_ok());
 }
