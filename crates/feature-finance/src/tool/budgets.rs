@@ -8,6 +8,7 @@ use uuid::Uuid;
 
 use crate::types::{BudgetMethod, BudgetPeriod, JarType};
 use common::{Result, ToolError};
+use storage::rows::finance::{FinanceBudgetPatch, FinanceBudgetRow, FinanceTransactionFilter};
 use tools_core::ParamExtractor;
 use tools_core::RoutingContext;
 
@@ -94,7 +95,7 @@ impl FinanceTool {
         let now = Utc::now();
         let id = Uuid::new_v4().to_string();
 
-        let row = storage::FinanceBudgetRow {
+        let row = FinanceBudgetRow {
             id,
             name: name.to_string(),
             amount,
@@ -177,7 +178,7 @@ impl FinanceTool {
         };
 
         // Fetch recent expense transactions for this budget's category
-        let filter = storage::FinanceTransactionFilter {
+        let filter = FinanceTransactionFilter {
             category: usage.category.clone(),
             tx_type: Some("expense".to_string()),
             limit: Some(20),
@@ -291,7 +292,7 @@ impl FinanceTool {
         let category = p.optional_str("category")?;
         let is_active = p.optional_bool("is_active")?;
 
-        let patch = storage::FinanceBudgetPatch {
+        let patch = FinanceBudgetPatch {
             id: id.to_string(),
             name: name.map(|s| s.to_string()),
             amount,

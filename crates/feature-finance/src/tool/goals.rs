@@ -8,9 +8,10 @@ use serde_json::json;
 
 use crate::types::{FinanceGoal, FinanceLiability, GoalStatus, GoalType, LiabilityType};
 use common::{Result, ToolError};
-use storage::{
-    FinanceGoalPatch, FinanceGoalRow, FinanceLiabilityPatch, FinanceLiabilityRow, StorageError,
+use storage::rows::finance::{
+    FinanceGoalPatch, FinanceGoalRow, FinanceLiabilityPatch, FinanceLiabilityRow,
 };
+use storage::StorageError;
 use tools_core::ParamExtractor;
 use tools_core::RoutingContext;
 

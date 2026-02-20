@@ -5,6 +5,11 @@
 
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
+use storage::rows::finance::{
+    FinanceAccountRow, FinanceBudgetRow, FinanceGoalRow, FinanceInvestmentFilter,
+    FinanceInvestmentRow, FinanceInvestmentTxRow, FinanceLiabilityRow, FinancePortfolioRow,
+    FinanceTransactionRow,
+};
 use tools_core::DomainEnum;
 
 // ============================================================
@@ -322,8 +327,8 @@ pub struct FinanceLiability {
 
 // ── FinanceAccount ──────────────────────────────────────────
 
-impl From<storage::FinanceAccountRow> for FinanceAccount {
-    fn from(row: storage::FinanceAccountRow) -> Self {
+impl From<FinanceAccountRow> for FinanceAccount {
+    fn from(row: FinanceAccountRow) -> Self {
         Self {
             id: row.id,
             name: row.name,
@@ -339,7 +344,7 @@ impl From<storage::FinanceAccountRow> for FinanceAccount {
     }
 }
 
-impl From<&FinanceAccount> for storage::FinanceAccountRow {
+impl From<&FinanceAccount> for FinanceAccountRow {
     fn from(account: &FinanceAccount) -> Self {
         Self {
             id: account.id.clone(),
@@ -358,8 +363,8 @@ impl From<&FinanceAccount> for storage::FinanceAccountRow {
 
 // ── FinanceTransaction ──────────────────────────────────────
 
-impl From<storage::FinanceTransactionRow> for FinanceTransaction {
-    fn from(row: storage::FinanceTransactionRow) -> Self {
+impl From<FinanceTransactionRow> for FinanceTransaction {
+    fn from(row: FinanceTransactionRow) -> Self {
         Self {
             id: row.id,
             account_id: row.account_id,
@@ -380,7 +385,7 @@ impl From<storage::FinanceTransactionRow> for FinanceTransaction {
     }
 }
 
-impl From<&FinanceTransaction> for storage::FinanceTransactionRow {
+impl From<&FinanceTransaction> for FinanceTransactionRow {
     fn from(tx: &FinanceTransaction) -> Self {
         Self {
             id: tx.id.clone(),
@@ -404,8 +409,8 @@ impl From<&FinanceTransaction> for storage::FinanceTransactionRow {
 
 // ── FinanceBudget ────────────────────────────────────────────
 
-impl From<storage::FinanceBudgetRow> for FinanceBudget {
-    fn from(row: storage::FinanceBudgetRow) -> Self {
+impl From<FinanceBudgetRow> for FinanceBudget {
+    fn from(row: FinanceBudgetRow) -> Self {
         Self {
             id: row.id,
             name: row.name,
@@ -425,7 +430,7 @@ impl From<storage::FinanceBudgetRow> for FinanceBudget {
     }
 }
 
-impl From<&FinanceBudget> for storage::FinanceBudgetRow {
+impl From<&FinanceBudget> for FinanceBudgetRow {
     fn from(budget: &FinanceBudget) -> Self {
         Self {
             id: budget.id.clone(),
@@ -448,8 +453,8 @@ impl From<&FinanceBudget> for storage::FinanceBudgetRow {
 
 // ── FinancePortfolio ─────────────────────────────────────────
 
-impl From<storage::FinancePortfolioRow> for FinancePortfolio {
-    fn from(row: storage::FinancePortfolioRow) -> Self {
+impl From<FinancePortfolioRow> for FinancePortfolio {
+    fn from(row: FinancePortfolioRow) -> Self {
         Self {
             id: row.id,
             name: row.name,
@@ -461,7 +466,7 @@ impl From<storage::FinancePortfolioRow> for FinancePortfolio {
     }
 }
 
-impl From<&FinancePortfolio> for storage::FinancePortfolioRow {
+impl From<&FinancePortfolio> for FinancePortfolioRow {
     fn from(portfolio: &FinancePortfolio) -> Self {
         Self {
             id: portfolio.id.clone(),
@@ -476,8 +481,8 @@ impl From<&FinancePortfolio> for storage::FinancePortfolioRow {
 
 // ── FinanceInvestment ─────────────────────────────────────────
 
-impl From<storage::FinanceInvestmentRow> for FinanceInvestment {
-    fn from(row: storage::FinanceInvestmentRow) -> Self {
+impl From<FinanceInvestmentRow> for FinanceInvestment {
+    fn from(row: FinanceInvestmentRow) -> Self {
         Self {
             id: row.id,
             portfolio_id: row.portfolio_id,
@@ -497,7 +502,7 @@ impl From<storage::FinanceInvestmentRow> for FinanceInvestment {
     }
 }
 
-impl From<&FinanceInvestment> for storage::FinanceInvestmentRow {
+impl From<&FinanceInvestment> for FinanceInvestmentRow {
     fn from(inv: &FinanceInvestment) -> Self {
         Self {
             id: inv.id.clone(),
@@ -520,8 +525,8 @@ impl From<&FinanceInvestment> for storage::FinanceInvestmentRow {
 
 // ── FinanceInvestmentTx ───────────────────────────────────────
 
-impl From<storage::FinanceInvestmentTxRow> for FinanceInvestmentTx {
-    fn from(row: storage::FinanceInvestmentTxRow) -> Self {
+impl From<FinanceInvestmentTxRow> for FinanceInvestmentTx {
+    fn from(row: FinanceInvestmentTxRow) -> Self {
         Self {
             id: row.id,
             investment_id: row.investment_id,
@@ -538,7 +543,7 @@ impl From<storage::FinanceInvestmentTxRow> for FinanceInvestmentTx {
     }
 }
 
-impl From<&FinanceInvestmentTx> for storage::FinanceInvestmentTxRow {
+impl From<&FinanceInvestmentTx> for FinanceInvestmentTxRow {
     fn from(tx: &FinanceInvestmentTx) -> Self {
         Self {
             id: tx.id.clone(),
@@ -558,8 +563,8 @@ impl From<&FinanceInvestmentTx> for storage::FinanceInvestmentTxRow {
 
 // ── FinanceGoal ───────────────────────────────────────────────
 
-impl From<storage::FinanceGoalRow> for FinanceGoal {
-    fn from(row: storage::FinanceGoalRow) -> Self {
+impl From<FinanceGoalRow> for FinanceGoal {
+    fn from(row: FinanceGoalRow) -> Self {
         Self {
             id: row.id,
             name: row.name,
@@ -579,7 +584,7 @@ impl From<storage::FinanceGoalRow> for FinanceGoal {
     }
 }
 
-impl From<&FinanceGoal> for storage::FinanceGoalRow {
+impl From<&FinanceGoal> for FinanceGoalRow {
     fn from(goal: &FinanceGoal) -> Self {
         Self {
             id: goal.id.clone(),
@@ -602,8 +607,8 @@ impl From<&FinanceGoal> for storage::FinanceGoalRow {
 
 // ── FinanceLiability ──────────────────────────────────────────
 
-impl From<storage::FinanceLiabilityRow> for FinanceLiability {
-    fn from(row: storage::FinanceLiabilityRow) -> Self {
+impl From<FinanceLiabilityRow> for FinanceLiability {
+    fn from(row: FinanceLiabilityRow) -> Self {
         Self {
             id: row.id,
             name: row.name,
@@ -621,7 +626,7 @@ impl From<storage::FinanceLiabilityRow> for FinanceLiability {
     }
 }
 
-impl From<&FinanceLiability> for storage::FinanceLiabilityRow {
+impl From<&FinanceLiability> for FinanceLiabilityRow {
     fn from(liability: &FinanceLiability) -> Self {
         Self {
             id: liability.id.clone(),
@@ -659,8 +664,8 @@ pub struct FinanceTransactionFilter {
 }
 
 impl FinanceTransactionFilter {
-    pub fn to_storage_filter(&self) -> storage::FinanceTransactionFilter {
-        storage::FinanceTransactionFilter {
+    pub fn to_storage_filter(&self) -> storage::rows::finance::FinanceTransactionFilter {
+        storage::rows::finance::FinanceTransactionFilter {
             account_id: self.account_id.clone(),
             tx_type: self.tx_type.map(|t| t.as_str().to_string()),
             category: self.category.clone(),
@@ -683,8 +688,8 @@ pub struct FinanceInvestmentDomainFilter {
 }
 
 impl FinanceInvestmentDomainFilter {
-    pub fn to_storage_filter(&self) -> storage::FinanceInvestmentFilter {
-        storage::FinanceInvestmentFilter {
+    pub fn to_storage_filter(&self) -> FinanceInvestmentFilter {
+        FinanceInvestmentFilter {
             portfolio_id: self.portfolio_id.clone(),
             asset_type: self.asset_type.map(|t| t.as_str().to_string()),
             has_symbol: self.has_symbol,

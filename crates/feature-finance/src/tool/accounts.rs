@@ -7,7 +7,8 @@ use serde_json::json;
 
 use crate::types::{AccountType, FinanceAccount};
 use common::{Result, ToolError};
-use storage::{FinanceAccountPatch, FinanceAccountRow, FinanceTransactionFilter, StorageError};
+use storage::rows::finance::{FinanceAccountPatch, FinanceAccountRow, FinanceTransactionFilter};
+use storage::StorageError;
 use tools_core::ParamExtractor;
 use tools_core::RoutingContext;
 

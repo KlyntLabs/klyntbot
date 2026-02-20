@@ -4,6 +4,7 @@ use chrono::{Duration, Local};
 use serde_json::json;
 
 use common::Result;
+use storage::rows::finance::FinanceInvestmentFilter;
 use tools_core::RoutingContext;
 
 use super::FinanceTool;
@@ -138,7 +139,7 @@ impl FinanceTool {
         let portfolios = self.investments.list_portfolios().await.unwrap_or_default();
         let mut empty_count = 0usize;
         for p in &portfolios {
-            let filter = storage::FinanceInvestmentFilter {
+            let filter = FinanceInvestmentFilter {
                 portfolio_id: Some(p.id.clone()),
                 ..Default::default()
             };

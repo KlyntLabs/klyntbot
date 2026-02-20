@@ -247,7 +247,7 @@ fn enum_from_str_unknown_returns_none() {
 #[test]
 fn finance_account_row_to_domain() {
     let now = Utc::now();
-    let row = storage::FinanceAccountRow {
+    let row = FinanceAccountRow {
         id: "acc001".to_string(),
         name: "VCB Savings".to_string(),
         account_type: "bank".to_string(),
@@ -281,7 +281,7 @@ fn finance_account_domain_to_row() {
         created_at: now,
         updated_at: now,
     };
-    let row = storage::FinanceAccountRow::from(&account);
+    let row = FinanceAccountRow::from(&account);
     assert_eq!(row.account_type, "ewallet");
     assert_eq!(row.id, account.id);
 }
@@ -289,7 +289,7 @@ fn finance_account_domain_to_row() {
 #[test]
 fn finance_account_roundtrip_preserves_data() {
     let now = Utc::now();
-    let row = storage::FinanceAccountRow {
+    let row = FinanceAccountRow {
         id: "acc003".to_string(),
         name: "Brokerage Account".to_string(),
         account_type: "brokerage".to_string(),
@@ -302,7 +302,7 @@ fn finance_account_roundtrip_preserves_data() {
         updated_at: now,
     };
     let domain = FinanceAccount::from(row.clone());
-    let back_row = storage::FinanceAccountRow::from(&domain);
+    let back_row = FinanceAccountRow::from(&domain);
     assert_eq!(back_row.id, row.id);
     assert_eq!(back_row.account_type, row.account_type);
     assert_eq!(back_row.balance, row.balance);
@@ -313,7 +313,7 @@ fn finance_account_roundtrip_preserves_data() {
 fn finance_transaction_row_to_domain() {
     let now = Utc::now();
     let date = NaiveDate::from_ymd_opt(2026, 2, 19).unwrap();
-    let row = storage::FinanceTransactionRow {
+    let row = FinanceTransactionRow {
         id: "tx001".to_string(),
         account_id: "acc001".to_string(),
         tx_type: "transfer".to_string(),
@@ -356,7 +356,7 @@ fn finance_transaction_domain_to_row() {
         created_at: now,
         updated_at: now,
     };
-    let row = storage::FinanceTransactionRow::from(&tx);
+    let row = FinanceTransactionRow::from(&tx);
     assert_eq!(row.tx_type, "income");
 }
 
@@ -364,7 +364,7 @@ fn finance_transaction_domain_to_row() {
 fn finance_budget_roundtrip() {
     let now = Utc::now();
     let start = NaiveDate::from_ymd_opt(2026, 2, 1).unwrap();
-    let row = storage::FinanceBudgetRow {
+    let row = FinanceBudgetRow {
         id: "bud001".to_string(),
         name: "Monthly Food".to_string(),
         amount: 5_000_000,
@@ -384,7 +384,7 @@ fn finance_budget_roundtrip() {
     assert_eq!(domain.method, BudgetMethod::SixJar);
     assert_eq!(domain.jar_type, Some(JarType::Essentials));
 
-    let back_row = storage::FinanceBudgetRow::from(&domain);
+    let back_row = FinanceBudgetRow::from(&domain);
     assert_eq!(back_row.jar_type, Some("essentials".to_string()));
     assert_eq!(back_row.method, "six_jar");
 }
@@ -392,7 +392,7 @@ fn finance_budget_roundtrip() {
 #[test]
 fn finance_investment_roundtrip() {
     let now = Utc::now();
-    let row = storage::FinanceInvestmentRow {
+    let row = FinanceInvestmentRow {
         id: "inv001".to_string(),
         portfolio_id: "pf001".to_string(),
         asset_type: "real_estate".to_string(),
@@ -413,7 +413,7 @@ fn finance_investment_roundtrip() {
     assert_eq!(domain.current_value, None);
     assert_eq!(domain.asset_type, AssetType::RealEstate);
 
-    let back_row = storage::FinanceInvestmentRow::from(&domain);
+    let back_row = FinanceInvestmentRow::from(&domain);
     assert_eq!(back_row.current_price, None);
     assert_eq!(back_row.asset_type, "real_estate");
 }
@@ -422,7 +422,7 @@ fn finance_investment_roundtrip() {
 fn finance_goal_roundtrip() {
     let now = Utc::now();
     let deadline = NaiveDate::from_ymd_opt(2026, 12, 31).unwrap();
-    let row = storage::FinanceGoalRow {
+    let row = FinanceGoalRow {
         id: "goal001".to_string(),
         name: "Emergency Fund".to_string(),
         goal_type: "savings".to_string(),
@@ -442,7 +442,7 @@ fn finance_goal_roundtrip() {
     assert_eq!(domain.status, GoalStatus::Achieved);
     assert_eq!(domain.deadline, Some(deadline));
 
-    let back_row = storage::FinanceGoalRow::from(&domain);
+    let back_row = FinanceGoalRow::from(&domain);
     assert_eq!(back_row.status, "achieved");
 }
 

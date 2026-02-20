@@ -9,6 +9,10 @@ use uuid::Uuid;
 
 use crate::types::{AssetType, InvestmentTxType};
 use common::{Result, ToolError};
+use storage::rows::finance::{
+    FinanceInvestmentFilter, FinanceInvestmentPatch, FinanceInvestmentRow, FinanceInvestmentTxRow,
+    FinancePortfolioRow,
+};
 use tools_core::ParamExtractor;
 use tools_core::RoutingContext;
 
@@ -53,7 +57,7 @@ impl FinanceTool {
         let now = Utc::now();
         let id = Uuid::new_v4().to_string();
 
-        let row = storage::FinancePortfolioRow {
+        let row = FinancePortfolioRow {
             id,
             name: name.to_string(),
             description: description.map(|s| s.to_string()),
@@ -160,7 +164,7 @@ impl FinanceTool {
         let now = Utc::now();
         let id = Uuid::new_v4().to_string();
 
-        let row = storage::FinanceInvestmentRow {
+        let row = FinanceInvestmentRow {
             id,
             portfolio_id: portfolio_id.to_string(),
             asset_type: asset_type.as_str().to_string(),
@@ -203,7 +207,7 @@ impl FinanceTool {
         let quantity = p.optional_f64("quantity")?;
         let notes = p.optional_str("notes")?;
 
-        let patch = storage::FinanceInvestmentPatch {
+        let patch = FinanceInvestmentPatch {
             id: id.to_string(),
             current_price: current_price.map(Some),
             current_value: current_value.map(Some),
@@ -294,7 +298,7 @@ impl FinanceTool {
             }
         }
 
-        let tx_row = storage::FinanceInvestmentTxRow {
+        let tx_row = FinanceInvestmentTxRow {
             id: tx_id,
             investment_id: investment_id.to_string(),
             tx_type: tx_type.as_str().to_string(),
@@ -345,15 +349,15 @@ impl FinanceTool {
     /// Build the `FinanceInvestmentPatch` that reflects a transaction's effect on the holding.
     fn compute_investment_patch(
         &self,
-        inv: &storage::FinanceInvestmentRow,
+        inv: &FinanceInvestmentRow,
         tx_type: InvestmentTxType,
         quantity: Option<f64>,
         total_amount: i64,
-    ) -> Result<storage::FinanceInvestmentPatch> {
+    ) -> Result<FinanceInvestmentPatch> {
         let patch = match tx_type {
             InvestmentTxType::Buy => {
                 let qty = quantity.unwrap_or(0.0);
-                storage::FinanceInvestmentPatch {
+                FinanceInvestmentPatch {
                     id: inv.id.clone(),
                     quantity: Some(inv.quantity + qty),
                     cost_basis: Some(inv.cost_basis + total_amount),
@@ -373,7 +377,7 @@ impl FinanceTool {
                 let cost_reduction = (cost_per_unit * sell_qty).round() as i64;
                 let new_quantity = (inv.quantity - sell_qty).max(0.0);
                 let new_cost_basis = (inv.cost_basis - cost_reduction).max(0);
-                storage::FinanceInvestmentPatch {
+                FinanceInvestmentPatch {
                     id: inv.id.clone(),
                     quantity: Some(new_quantity),
                     cost_basis: Some(new_cost_basis),
@@ -385,7 +389,7 @@ impl FinanceTool {
             InvestmentTxType::Split => {
                 // quantity param is the split ratio (e.g. 2.0 for a 2:1 split)
                 let ratio = quantity.unwrap_or(1.0);
-                storage::FinanceInvestmentPatch {
+                FinanceInvestmentPatch {
                     id: inv.id.clone(),
                     quantity: Some(inv.quantity * ratio),
                     cost_basis: None, // cost basis unchanged in a stock split
@@ -397,7 +401,7 @@ impl FinanceTool {
             // Dividend, rental income, interest: record income only — no quantity/basis change
             InvestmentTxType::Dividend
             | InvestmentTxType::RentalIncome
-            | InvestmentTxType::Interest => storage::FinanceInvestmentPatch {
+            | InvestmentTxType::Interest => FinanceInvestmentPatch {
                 id: inv.id.clone(),
                 quantity: None,
                 cost_basis: None,
@@ -424,7 +428,7 @@ impl FinanceTool {
             }
         }
 
-        let filter = storage::FinanceInvestmentFilter {
+        let filter = FinanceInvestmentFilter {
             portfolio_id: portfolio_id.map(|s| s.to_string()),
             ..Default::default()
         };

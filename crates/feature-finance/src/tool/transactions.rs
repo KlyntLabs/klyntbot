@@ -7,9 +7,10 @@ use serde_json::json;
 
 use crate::types::{FinanceTransaction, TransactionType};
 use common::{Result, ToolError};
-use storage::{
-    FinanceTransactionFilter, FinanceTransactionPatch, FinanceTransactionRow, StorageError,
+use storage::rows::finance::{
+    FinanceTransactionFilter, FinanceTransactionPatch, FinanceTransactionRow,
 };
+use storage::StorageError;
 use tools_core::ParamExtractor;
 use tools_core::RoutingContext;
 
