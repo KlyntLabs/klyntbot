@@ -91,7 +91,9 @@ The CLI has 4 commands. All task management, project management, and other opera
 klyntbot chat "message"          # One-shot chat (or omit message for REPL)
 klyntbot chat --session my-sess  # Resume a named session
 klyntbot serve --port 8080       # Start gateway daemon (channels, cron, heartbeat)
-klyntbot init                    # Interactive setup wizard (provider, channels, tools, workspace, calendar, semantic search, database, daemon, review)
+klyntbot init                    # 2-phase setup wizard (core setup + pack selection)
+klyntbot init --packs            # Jump directly to pack selection
+klyntbot init --reset            # Reset config to defaults before running wizard
 klyntbot status [--verbose]      # Show agent/config status
 ```
 
@@ -226,9 +228,37 @@ Semantic search uses local embeddings (fastembed, paraphrase-multilingual-MiniLM
 - **pgvector not installed?** Run `CREATE EXTENSION vector;` in your PostgreSQL instance.
 - **Semantic search unavailable?** Falls back with a clear error suggesting keyword search.
 
+## Feature Packs
+
+Feature packs bundle related config settings and skills into selectable groups. Users choose packs during `klyntbot init` (Phase 2: Pack Selection).
+
+**Pack tiers:**
+- **Core** (always enabled): task-management
+- **Recommended** (pre-checked): productivity, ai-intelligence, developer-tools
+- **Optional** (unchecked by default): finance, weather, skill-creator
+
+**Config schema** (`~/.klyntbot/config.json`):
+```json
+{
+  "packs": {
+    "enabled": ["task-management", "productivity", "ai-intelligence", "developer-tools"],
+    "enabledSkills": ["todo", "todo-party", "todo-yolo", "daily-planning", "cron", "summarize", "github", "tmux"]
+  }
+}
+```
+
+**How it works:**
+1. `PackRegistry` in `crates/cli/src/wizard/packs/registry.rs` defines 7 packs with tier, skills, and descriptions
+2. `pack_selection::apply_pack_config()` maps pack IDs to config section mutations (e.g., ai-intelligence enables `conversation.embedding`, `learning`)
+3. `config.packs.enabled_skills` is computed by the wizard and saved to config
+4. At agent startup, `SkillManager::filter_by_skills()` restricts built-in skills to those from enabled packs
+5. Workspace-loaded skills (from `~/.klyntbot/skills/`) are always kept regardless of pack selection
+
+**Adding a new pack:** Add a `Pack` entry to `PACKS` in `registry.rs`, then add config mutations to `apply_pack_config()` in `pack_selection.rs`.
+
 ## Skills
 
-Built-in skills live in `skills/` as `SKILL.md` files (summarize, skill-creator, github, tmux, weather, cron). The `SkillManager` in the agent crate discovers and loads them at runtime.
+Built-in skills live in `skills/` as `SKILL.md` files (summarize, skill-creator, github, tmux, weather, cron). The `SkillManager` in the agent crate discovers and loads them at runtime. Skills are filtered by enabled packs — only skills from selected packs are available.
 
 ## Gotchas & Common Pitfalls
 
