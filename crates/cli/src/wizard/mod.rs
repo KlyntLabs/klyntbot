@@ -29,6 +29,7 @@ pub mod framework;
 pub mod learning;
 pub mod memory;
 pub mod oauth;
+pub mod packs;
 pub mod prompts;
 pub mod provider;
 pub mod search;

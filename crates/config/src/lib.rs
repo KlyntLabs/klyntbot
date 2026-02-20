@@ -13,6 +13,6 @@ pub use schema::{
     DiscordConfig, EmailConfig, ExtendedThinkingConfig, FinanceBudgetingConfig,
     FinanceCategoryConfig, FinanceConfig, FinanceExpectedReturnsConfig, FinanceInflationConfig,
     FinancePriceRefreshConfig, FinanceSchedulingConfig, GenericCalDavConfig, GoogleCalendarConfig,
-    LearningConfig, PermissionsConfig, ProviderManagerConfig, QQConfig, Secret, SixJarRatios,
-    SlackConfig, TelegramConfig, TodoEnrichmentConfig, WhatsAppConfig,
+    LearningConfig, PackTier, PacksConfig, PermissionsConfig, ProviderManagerConfig, QQConfig,
+    Secret, SixJarRatios, SlackConfig, TelegramConfig, TodoEnrichmentConfig, WhatsAppConfig,
 };
