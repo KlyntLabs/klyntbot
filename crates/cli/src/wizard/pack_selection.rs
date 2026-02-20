@@ -149,8 +149,7 @@ pub fn run_pack_selection(state: &mut WizardState) -> Result<StepResult> {
         loop {
             if let Event::Key(key) = event::read()? {
                 // Ctrl+C cancels
-                if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c')
-                {
+                if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
                     return Ok(None);
                 }
 
@@ -390,10 +389,7 @@ mod tests {
     #[test]
     fn test_apply_pack_config_updates_packs_config() {
         let mut config = Config::default();
-        let selection = vec![
-            "task-management".to_string(),
-            "developer-tools".to_string(),
-        ];
+        let selection = vec!["task-management".to_string(), "developer-tools".to_string()];
 
         apply_pack_config(&mut config, &selection);
 
