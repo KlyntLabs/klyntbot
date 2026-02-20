@@ -10,9 +10,8 @@ use chrono::{Duration, Local, Utc};
 use common::Result;
 use config::{CalendarConfig, CalendarProviderConfig};
 use serde_json::{json, Value};
-use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::fs;
+use tracing::warn;
 use tools::{
     calendar_tool::CalendarHandler,
     todo_types::{Todo, TodoStatus},
@@ -22,11 +21,9 @@ use tools::{
 /// with multiple CalDAV providers.
 pub struct CalendarSyncAdapter {
     providers: Vec<(String, Box<dyn CalendarProvider>)>,
-    _provider_configs: Vec<CalendarProviderConfig>,
     todo_repo: storage::TodoRepo,
     calendar_sync_repo: storage::CalendarSyncRepo,
     event_cache_repo: storage::CalendarEventCacheRepo,
-    conflicts_path: PathBuf,
     auto_sync_due_dates: bool,
     dispatcher: Option<Arc<crate::NotificationDispatcher>>,
     bidirectional_sync: bool,
@@ -45,7 +42,6 @@ impl CalendarSyncAdapter {
         bidirectional_sync: bool,
     ) -> Result<Self> {
         let mut providers: Vec<(String, Box<dyn CalendarProvider>)> = Vec::new();
-        let mut provider_configs = Vec::new();
         let mut any_auto_sync = false;
 
         for provider_config in &config.providers {
@@ -85,13 +81,7 @@ impl CalendarSyncAdapter {
             };
 
             providers.push((provider_id, provider));
-            provider_configs.push(provider_config.clone());
         }
-
-        let conflicts_path = dirs::home_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join(".klyntbot")
-            .join("calendar_conflicts.jsonl");
 
         let conflict_strategy = config
             .conflict_resolution
@@ -100,11 +90,9 @@ impl CalendarSyncAdapter {
 
         Ok(Self {
             providers,
-            _provider_configs: provider_configs,
             todo_repo,
             calendar_sync_repo,
             event_cache_repo,
-            conflicts_path,
             auto_sync_due_dates: any_auto_sync,
             dispatcher,
             bidirectional_sync,
@@ -286,7 +274,7 @@ impl CalendarSyncAdapter {
                 if let Some(local_event) = self.todo_to_event(&local_todo) {
                     if detect_conflict(remote_event, &local_event) {
                         conflicts_detected += 1;
-                        self.log_conflict(remote_event, &local_event).await?;
+                        self.log_conflict(remote_event, &local_event);
                         let resolved_event =
                             resolve_conflict(remote_event, &local_event, self.conflict_strategy);
                         self.update_todo_from_event(&local_todo.id, &resolved_event)
@@ -509,47 +497,15 @@ impl CalendarSyncAdapter {
         }
     }
 
-    /// Log a conflict to the conflicts file.
-    async fn log_conflict(
-        &self,
-        server_event: &CalendarEvent,
-        local_event: &CalendarEvent,
-    ) -> Result<()> {
-        if let Some(parent) = self.conflicts_path.parent() {
-            fs::create_dir_all(parent).await?;
-        }
-
-        let conflict_entry = json!({
-            "timestamp": Utc::now().to_rfc3339(),
-            "uid": server_event.uid,
-            "server_version": {
-                "summary": server_event.summary,
-                "description": server_event.description,
-                "start": server_event.start.to_rfc3339(),
-                "end": server_event.end.to_rfc3339(),
-                "etag": server_event.etag
-            },
-            "local_version": {
-                "summary": local_event.summary,
-                "description": local_event.description,
-                "start": local_event.start.to_rfc3339(),
-                "end": local_event.end.to_rfc3339(),
-                "etag": local_event.etag
-            },
-            "resolution": "server_wins"
-        });
-
-        let mut line = serde_json::to_string(&conflict_entry)?;
-        line.push('\n');
-        use tokio::io::AsyncWriteExt;
-        let mut file = fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&self.conflicts_path)
-            .await?;
-        file.write_all(line.as_bytes()).await?;
-
-        Ok(())
+    /// Log a calendar conflict via tracing.
+    fn log_conflict(&self, server_event: &CalendarEvent, local_event: &CalendarEvent) {
+        warn!(
+            uid = %server_event.uid,
+            server_summary = %server_event.summary,
+            local_summary = %local_event.summary,
+            resolution = "server_wins",
+            "Calendar conflict detected"
+        );
     }
 }
 

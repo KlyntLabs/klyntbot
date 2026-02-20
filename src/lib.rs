@@ -7,7 +7,7 @@ pub use agent;
 pub use bus;
 pub use calendar;
 pub use channels;
-pub use cli;
+// cli is used directly via `use cli::*` in main.rs; no re-export needed.
 pub use common;
 pub use config;
 pub use goal;

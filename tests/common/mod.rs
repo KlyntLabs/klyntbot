@@ -47,14 +47,14 @@ pub fn test_workspace() -> (TempDir, std::path::PathBuf) {
     (temp_dir, workspace)
 }
 
-/// Create a SessionManager backed by a temporary directory.
+/// Create a SessionManager backed by a lazy PostgreSQL pool (no real DB needed for most tests).
 ///
-/// Returns the manager and a `TempDir` that must be kept alive.
+/// Returns the manager and a `TempDir` that must be kept alive (for other temp artifacts).
 pub async fn test_session_manager() -> (SessionManager, TempDir) {
     let temp_dir = TempDir::new().expect("failed to create temp dir");
-    let sessions_dir = temp_dir.path().join("sessions");
-    std::fs::create_dir_all(&sessions_dir).expect("failed to create sessions dir");
-    let manager = SessionManager::new(sessions_dir).await;
+    let pool = test_pool();
+    let repo = klyntbot::storage::SessionRepo::new(pool.inner().clone());
+    let manager = SessionManager::from_repo(repo).await;
     (manager, temp_dir)
 }
 

@@ -139,7 +139,6 @@ impl AgentPipeline {
             system_prompt: prompt.to_string(),
             strategy: classification.strategy.clone(),
             tool_definitions: tool_definitions.to_vec(),
-            memory_path: None,
             context_window: self.config.context_window,
         };
         let assemble_start = Instant::now();
@@ -317,9 +316,10 @@ mod tests {
         let orchestrator = Arc::new(Orchestrator::new(provider.clone(), "mock"));
         let dispatch = Arc::new(EngineDispatch::new(core));
 
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().to_path_buf();
-        let cost_tracker = Arc::new(CostTracker::new(path));
+        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/klyntbot_test")
+            .unwrap_or_else(|_| panic!("Failed to create lazy PgPool"));
+        let usage_repo = storage::UsageRepo::new(pool);
+        let cost_tracker = Arc::new(CostTracker::from_repo(usage_repo));
 
         AgentPipeline::new(
             orchestrator,

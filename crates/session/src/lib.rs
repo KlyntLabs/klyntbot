@@ -1,6 +1,6 @@
 //! Klyntbot Session - Conversation session persistence
 //!
-//! This crate provides session management and JSONL persistence.
+//! This crate provides session management backed by SQL (via `storage::SessionRepo`).
 
 pub mod manager;
 

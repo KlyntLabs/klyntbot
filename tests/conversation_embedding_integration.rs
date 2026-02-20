@@ -19,7 +19,6 @@
 //! | EC-12 | Model fails to initialize              | test_ec12_model_unavailable                   |
 
 use std::sync::Arc;
-use tempfile::TempDir;
 use tools::conversation_embedding::ConversationEmbeddingHandler;
 
 #[path = "mock_conversation_embedding_handler.rs"]
@@ -32,23 +31,15 @@ use mock_conversation_embedding_handler::MockConversationEmbeddingHandler;
 
 #[tokio::test]
 async fn test_tc1_user_assistant_messages_embedded_on_save() {
-    use session::SessionManager;
-
-    let temp_dir = TempDir::new().unwrap();
     let handler = Arc::new(MockConversationEmbeddingHandler::new());
 
-    // Create session manager
-    let session_dir = temp_dir.path().join("sessions");
-    let mut session_manager = SessionManager::new(session_dir).await;
+    // Use Session directly (no DB needed — embedding tests don't require persistence)
+    let mut session = session::Session::new("telegram:12345");
     let session_key = "telegram:12345";
 
     // Add user message to session
-    let user_msg_id = {
-        let session = session_manager.get_or_create(session_key).await.unwrap();
-        session.add_message("user", "Hello world");
-        session.messages.last().unwrap().id.clone()
-    };
-    session_manager.save_by_key(session_key).await.unwrap();
+    session.add_message("user", "Hello world");
+    let user_msg_id = session.messages.last().unwrap().id.clone();
 
     // Embed user message (simulating AgentLoop behavior)
     handler
@@ -57,12 +48,8 @@ async fn test_tc1_user_assistant_messages_embedded_on_save() {
         .unwrap();
 
     // Add assistant message to session
-    let assistant_msg_id = {
-        let session = session_manager.get_or_create(session_key).await.unwrap();
-        session.add_message("assistant", "Hi there!");
-        session.messages.last().unwrap().id.clone()
-    };
-    session_manager.save_by_key(session_key).await.unwrap();
+    session.add_message("assistant", "Hi there!");
+    let assistant_msg_id = session.messages.last().unwrap().id.clone();
 
     // Embed assistant message (simulating AgentLoop behavior)
     handler
@@ -109,32 +96,19 @@ async fn test_tc1_user_assistant_messages_embedded_on_save() {
 
 #[tokio::test]
 async fn test_tc2_system_tool_messages_not_embedded() {
-    use session::SessionManager;
-
-    let temp_dir = TempDir::new().unwrap();
     let handler = Arc::new(MockConversationEmbeddingHandler::new());
 
-    // Create session manager
-    let session_dir = temp_dir.path().join("sessions");
-    let mut session_manager = SessionManager::new(session_dir).await;
+    let mut session = session::Session::new("telegram:12345");
     let session_key = "telegram:12345";
 
     // Add system message to session (but DON'T call embed_message)
     // In production, AgentLoop's should_embed_conversation() would return false
-    {
-        let session = session_manager.get_or_create(session_key).await.unwrap();
-        session.add_message("system", "You are an AI assistant");
-    };
-    session_manager.save_by_key(session_key).await.unwrap();
+    session.add_message("system", "You are an AI assistant");
 
     // DON'T call embed_message for system role (simulating AgentLoop filtering)
 
     // Add tool message to session (but DON'T call embed_message)
-    {
-        let session = session_manager.get_or_create(session_key).await.unwrap();
-        session.add_message("tool", "Tool result here");
-    };
-    session_manager.save_by_key(session_key).await.unwrap();
+    session.add_message("tool", "Tool result here");
 
     // DON'T call embed_message for tool role (simulating AgentLoop filtering)
 
@@ -147,12 +121,8 @@ async fn test_tc2_system_tool_messages_not_embedded() {
     );
 
     // Sanity check: Add user message and verify it WOULD be embedded
-    let user_msg_id = {
-        let session = session_manager.get_or_create(session_key).await.unwrap();
-        session.add_message("user", "Test message");
-        session.messages.last().unwrap().id.clone()
-    };
-    session_manager.save_by_key(session_key).await.unwrap();
+    session.add_message("user", "Test message");
+    let user_msg_id = session.messages.last().unwrap().id.clone();
 
     // NOW call embed_message for user role (simulating AgentLoop allowing user messages)
     handler
@@ -172,14 +142,7 @@ async fn test_tc2_system_tool_messages_not_embedded() {
 
 #[tokio::test]
 async fn test_tc3_channel_exclusion_prevents_embedding() {
-    use session::SessionManager;
-
-    let temp_dir = TempDir::new().unwrap();
     let handler = Arc::new(MockConversationEmbeddingHandler::new());
-
-    // Create session manager
-    let session_dir = temp_dir.path().join("sessions");
-    let mut session_manager = SessionManager::new(session_dir).await;
 
     // Simulate config with excludeChannels: ["whatsapp"]
     // In production, AgentLoop checks config and skips embed_message for excluded channels
@@ -187,20 +150,14 @@ async fn test_tc3_channel_exclusion_prevents_embedding() {
     let telegram_key = "telegram:12345";
 
     // Add message from excluded WhatsApp channel (DON'T call embed_message)
-    {
-        let session = session_manager.get_or_create(whatsapp_key).await.unwrap();
-        session.add_message("user", "WhatsApp message");
-    };
-    session_manager.save_by_key(whatsapp_key).await.unwrap();
+    let mut whatsapp_session = session::Session::new(whatsapp_key);
+    whatsapp_session.add_message("user", "WhatsApp message");
     // DON'T call embed_message for WhatsApp (simulating AgentLoop filtering)
 
     // Add message from non-excluded Telegram channel (DO call embed_message)
-    let telegram_msg_id = {
-        let session = session_manager.get_or_create(telegram_key).await.unwrap();
-        session.add_message("user", "Telegram message");
-        session.messages.last().unwrap().id.clone()
-    };
-    session_manager.save_by_key(telegram_key).await.unwrap();
+    let mut telegram_session = session::Session::new(telegram_key);
+    telegram_session.add_message("user", "Telegram message");
+    let telegram_msg_id = telegram_session.messages.last().unwrap().id.clone();
 
     // Call embed_message for Telegram (simulating AgentLoop allowing Telegram)
     handler
@@ -224,33 +181,19 @@ async fn test_tc3_channel_exclusion_prevents_embedding() {
 
 #[tokio::test]
 async fn test_tc4_global_disable_prevents_embedding() {
-    use session::SessionManager;
-
-    let temp_dir = TempDir::new().unwrap();
     let handler = Arc::new(MockConversationEmbeddingHandler::new());
 
-    // Create session manager
-    let session_dir = temp_dir.path().join("sessions");
-    let mut session_manager = SessionManager::new(session_dir).await;
-    let session_key = "telegram:12345";
+    let mut session = session::Session::new("telegram:12345");
 
     // Simulate config with enabled: false
     // In production, AgentLoop checks config and skips ALL embed_message calls when disabled
 
     // Add user message (DON'T call embed_message due to global disable)
-    {
-        let session = session_manager.get_or_create(session_key).await.unwrap();
-        session.add_message("user", "User message");
-    };
-    session_manager.save_by_key(session_key).await.unwrap();
+    session.add_message("user", "User message");
     // DON'T call embed_message (simulating AgentLoop respecting enabled: false)
 
     // Add assistant message (DON'T call embed_message due to global disable)
-    {
-        let session = session_manager.get_or_create(session_key).await.unwrap();
-        session.add_message("assistant", "Assistant response");
-    };
-    session_manager.save_by_key(session_key).await.unwrap();
+    session.add_message("assistant", "Assistant response");
     // DON'T call embed_message (simulating AgentLoop respecting enabled: false)
 
     // Verify handler was NOT called for any messages
@@ -268,27 +211,15 @@ async fn test_tc4_global_disable_prevents_embedding() {
 
 #[tokio::test]
 async fn test_tc7_embedding_failure_non_blocking() {
-    use session::SessionManager;
-
-    let temp_dir = TempDir::new().unwrap();
-
     // Use unavailable() mode to simulate embedding failure
     let handler = Arc::new(MockConversationEmbeddingHandler::unavailable());
 
-    // Create session manager
-    let session_dir = temp_dir.path().join("sessions");
-    let mut session_manager = SessionManager::new(session_dir).await;
+    let mut session = session::Session::new("telegram:12345");
     let session_key = "telegram:12345";
 
     // Add user message
-    let user_msg_id = {
-        let session = session_manager.get_or_create(session_key).await.unwrap();
-        session.add_message("user", "Test message");
-        session.messages.last().unwrap().id.clone()
-    };
-
-    // Save session BEFORE embedding (normal flow)
-    session_manager.save_by_key(session_key).await.unwrap();
+    session.add_message("user", "Test message");
+    let user_msg_id = session.messages.last().unwrap().id.clone();
 
     // Call embed_message (will return Ok() despite failure - best-effort)
     let embed_result = handler
@@ -301,12 +232,11 @@ async fn test_tc7_embedding_failure_non_blocking() {
         "embed_message should return Ok() even on failure (best-effort)"
     );
 
-    // Verify session save succeeded (session JSONL was written)
-    let session = session_manager.get_or_create(session_key).await.unwrap();
+    // Verify session still has the message (in-memory)
     assert_eq!(
         session.messages.len(),
         1,
-        "Message should be persisted to session"
+        "Message should be present in session"
     );
     assert_eq!(session.messages[0].content, "Test message");
 

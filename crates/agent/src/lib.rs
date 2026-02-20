@@ -51,7 +51,7 @@ pub use memory::MemoryStore;
 pub use notifications::NotificationDispatcher;
 pub use pipeline::{AgentPipeline, PipelineConfig, PipelineResult};
 pub use plan_completion_handler::PlanCompletionHandlerImpl;
-pub use plan_executor::{build_step_context, regenerate_from, run_step, StepExecutionResult};
+pub use plan_executor::StepExecutionResult;
 pub use plan_handler::PlanHandlerImpl;
 pub use recurring_tasks::RecurringTaskSpawner;
 pub use reminders::{CalendarEvent, ReminderEngine};

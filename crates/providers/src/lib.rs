@@ -159,11 +159,7 @@ pub fn create_provider_with_failover(config: &Config) -> Result<(DynProvider, St
         fallback_name
     );
     Ok((
-        Arc::new(ProviderManager::new(
-            primary,
-            Some(fallback),
-            classifier,
-        )),
+        Arc::new(ProviderManager::new(primary, Some(fallback), classifier)),
         resolved_model,
     ))
 }

@@ -52,14 +52,21 @@ fn bench_session_add_message(c: &mut Criterion) {
 }
 
 fn bench_session_save_load(c: &mut Criterion) {
+    use klyntbot::storage::{SessionRepo, StoragePool};
+
     let rt = tokio::runtime::Runtime::new().unwrap();
     let mut group = c.benchmark_group("session_io");
+
+    let make_manager = |rt: &tokio::runtime::Runtime| -> SessionManager {
+        let pool = StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
+        let repo = SessionRepo::new(pool.inner().clone());
+        rt.block_on(SessionManager::from_repo(repo))
+    };
 
     group.bench_function("save_50_messages", |b| {
         b.iter_batched(
             || {
-                let temp_dir = tempfile::TempDir::new().unwrap();
-                let manager = rt.block_on(SessionManager::new(temp_dir.path()));
+                let manager = make_manager(&rt);
                 let mut session = Session::new("bench:chat");
                 for i in 0..50 {
                     session.add_message(
@@ -67,9 +74,9 @@ fn bench_session_save_load(c: &mut Criterion) {
                         format!("Message number {} with some realistic content length", i),
                     );
                 }
-                (manager, session, temp_dir)
+                (manager, session)
             },
-            |(manager, session, _temp_dir)| {
+            |(manager, session)| {
                 rt.block_on(async {
                     manager.save(&session).await.unwrap();
                 });
@@ -79,8 +86,7 @@ fn bench_session_save_load(c: &mut Criterion) {
     });
 
     group.bench_function("load_50_messages", |b| {
-        let temp_dir = tempfile::TempDir::new().unwrap();
-        let mut manager = rt.block_on(SessionManager::new(temp_dir.path()));
+        let mut manager = make_manager(&rt);
         rt.block_on(async {
             let session = manager.get_or_create("bench:chat").await.unwrap();
             for i in 0..50 {
@@ -94,7 +100,7 @@ fn bench_session_save_load(c: &mut Criterion) {
         });
 
         b.iter(|| {
-            let mut fresh_manager = rt.block_on(SessionManager::new(temp_dir.path()));
+            let mut fresh_manager = make_manager(&rt);
             rt.block_on(async {
                 black_box(fresh_manager.get_or_create("bench:chat").await.unwrap());
             });

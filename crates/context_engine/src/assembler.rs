@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
-use std::path::PathBuf;
 use std::sync::Arc;
 
 use providers::Message;
@@ -37,8 +36,6 @@ pub struct ContextRequest {
     pub strategy: ExecutionStrategy,
     /// Tool definitions as JSON schemas.
     pub tool_definitions: Vec<serde_json::Value>,
-    /// Path to MEMORY.md for retrieval (optional). Used when no `MemoryRetriever` is wired in.
-    pub memory_path: Option<PathBuf>,
     /// Model context window size (varies per model).
     pub context_window: usize,
 }
@@ -213,11 +210,6 @@ impl ContextEngine {
         result
     }
 
-    /// Assemble context without caching (useful for testing or one-off calls).
-    pub async fn assemble_no_cache(&self, request: ContextRequest) -> AssembledContext {
-        self.assemble_uncached(&request).await
-    }
-
     /// Compute a cache key from the request inputs.
     fn compute_cache_key(request: &ContextRequest) -> u64 {
         let mut hasher = std::collections::hash_map::DefaultHasher::new();
@@ -319,13 +311,8 @@ impl ContextEngine {
         }
     }
 
-    /// Retrieve relevant memories for the request.
-    ///
-    /// Preference order:
-    /// 1. `MemoryRetriever` (embedding-based, injected via `with_memory_retriever`)
-    /// 2. `memory_path` from `ContextRequest` (file-based MEMORY.md fallback)
+    /// Retrieve relevant memories for the request via embedding-based retrieval.
     async fn retrieve_memory(&self, request: &ContextRequest) -> Option<String> {
-        // Embedding-based retrieval takes precedence
         if let Some(retriever) = &self.memory_retriever {
             let entries = retriever
                 .retrieve(&request.message_text, self.memory_retrieval_limit)
@@ -339,14 +326,6 @@ impl ContextEngine {
                     ));
                 }
                 return Some(text);
-            }
-        }
-
-        // File-based fallback (MEMORY.md)
-        if let Some(path) = &request.memory_path {
-            match tokio::fs::read_to_string(path).await {
-                Ok(content) if !content.trim().is_empty() => return Some(content),
-                _ => {}
             }
         }
 
@@ -388,7 +367,6 @@ mod tests {
     use super::*;
     use crate::memory_retriever::{MemoryEntry, MemoryRetriever};
     use async_trait::async_trait;
-    use tempfile::NamedTempFile;
 
     fn make_request(
         strategy: ExecutionStrategy,
@@ -420,7 +398,7 @@ mod tests {
             system_prompt: "You are a helpful assistant.".to_string(),
             strategy,
             tool_definitions,
-            memory_path: None,
+
             context_window,
         }
     }
@@ -504,7 +482,7 @@ mod tests {
             system_prompt: "System prompt.".to_string(),
             strategy: ExecutionStrategy::DirectResponse,
             tool_definitions: vec![],
-            memory_path: None,
+
             context_window: 128_000,
         };
         let result = engine.assemble(request).await;
@@ -559,7 +537,7 @@ mod tests {
             system_prompt: "You are helpful.".to_string(),
             strategy: ExecutionStrategy::DirectResponse,
             tool_definitions: vec![],
-            memory_path: None,
+
             context_window: 128_000,
         };
         let result = engine.assemble(request).await;
@@ -588,7 +566,7 @@ mod tests {
             system_prompt: "System.".to_string(),
             strategy: ExecutionStrategy::DirectResponse,
             tool_definitions: vec![],
-            memory_path: None,
+
             context_window: 128_000,
         };
 
@@ -635,7 +613,7 @@ mod tests {
             system_prompt: "You are helpful.".into(),
             strategy: ExecutionStrategy::DirectResponse,
             tool_definitions: vec![],
-            memory_path: None,
+
             context_window: 128_000,
         };
 
@@ -675,7 +653,7 @@ mod tests {
             system_prompt: "You are helpful.".into(),
             strategy: ExecutionStrategy::DirectResponse,
             tool_definitions: vec![],
-            memory_path: None,
+
             context_window: 128_000,
         };
 
@@ -687,66 +665,5 @@ mod tests {
             .per_priority
             .iter()
             .all(|(p, _)| *p != Priority::RetrievedMemory));
-    }
-
-    #[tokio::test]
-    async fn test_memory_path_fallback() {
-        use std::io::Write;
-        let mut tmp = NamedTempFile::new().unwrap();
-        writeln!(tmp, "# Memory\n- I prefer dark mode").unwrap();
-
-        let engine = ContextEngine::new(); // no MemoryRetriever wired
-        let request = ContextRequest {
-            message_text: "preferences?".into(),
-            history: vec![],
-            system_prompt: "You are helpful.".into(),
-            strategy: ExecutionStrategy::DirectResponse,
-            tool_definitions: vec![],
-            memory_path: Some(tmp.path().to_path_buf()),
-            context_window: 128_000,
-        };
-
-        let result = engine.assemble(request).await;
-        // Memory file content injected as second system message
-        assert!(result.messages.len() >= 2);
-        if let Message::System { content } = &result.messages[1] {
-            assert!(content.contains("dark mode"));
-        } else {
-            panic!("Second message should be memory content");
-        }
-    }
-
-    #[tokio::test]
-    async fn test_memory_retriever_takes_precedence_over_path() {
-        use std::io::Write;
-        let mut tmp = NamedTempFile::new().unwrap();
-        writeln!(tmp, "# Memory\n- file content").unwrap();
-
-        let retriever = Arc::new(MockRetriever {
-            entries: vec![("embedding content".into(), 0.9)],
-        });
-        let engine = ContextEngine::new().with_memory_retriever(retriever);
-
-        let request = ContextRequest {
-            message_text: "query".into(),
-            history: vec![],
-            system_prompt: "You are helpful.".into(),
-            strategy: ExecutionStrategy::DirectResponse,
-            tool_definitions: vec![],
-            memory_path: Some(tmp.path().to_path_buf()),
-            context_window: 128_000,
-        };
-
-        let result = engine.assemble(request).await;
-        // Embedding retriever result should win
-        if let Message::System { content } = &result.messages[1] {
-            assert!(
-                content.contains("embedding content"),
-                "MemoryRetriever should take precedence over memory_path"
-            );
-            assert!(!content.contains("file content"));
-        } else {
-            panic!("Second message should be System");
-        }
     }
 }

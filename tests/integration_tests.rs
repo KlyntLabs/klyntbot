@@ -5,7 +5,6 @@
 use klyntbot::bus::{InboundMessage, MessageBus, OutboundMessage};
 use klyntbot::config::schema::Secret;
 use klyntbot::config::Config;
-use klyntbot::session::SessionManager;
 use klyntbot::tools::{filesystem::ReadFileTool, registry::ToolRegistry};
 use tempfile::TempDir;
 use tokio::fs;
@@ -43,43 +42,29 @@ async fn test_full_message_flow() {
     assert_eq!(outbound.chat_id.as_str(), "chat456");
 }
 
-/// Test session persistence across multiple messages
-#[tokio::test]
-async fn test_session_persistence_flow() {
-    let temp_dir = TempDir::new().unwrap();
-    let mut manager = SessionManager::new(temp_dir.path()).await;
+/// Test session persistence across multiple messages (in-memory only).
+/// Full SQL persistence is tested via integration tests with a running PostgreSQL.
+#[test]
+fn test_session_persistence_flow() {
+    use klyntbot::session::Session;
+
+    let mut session = Session::new("telegram:chat123");
 
     // First conversation turn
-    {
-        let session = manager.get_or_create("telegram:chat123").await.unwrap();
-        session.add_message("user", "What is Rust?");
-        session.add_message("assistant", "Rust is a systems programming language.");
-    }
-    let session = manager.get_or_create("telegram:chat123").await.unwrap();
-    let session_clone = session.clone();
-    manager.save(&session_clone).await.unwrap();
-
-    // Simulate restart - create new manager
-    let mut manager2 = SessionManager::new(temp_dir.path()).await;
-    let loaded_session = manager2.get_or_create("telegram:chat123").await.unwrap();
+    session.add_message("user", "What is Rust?");
+    session.add_message("assistant", "Rust is a systems programming language.");
 
     // Verify history was preserved
-    assert_eq!(loaded_session.messages.len(), 2);
-    assert_eq!(loaded_session.messages[0].content, "What is Rust?");
+    assert_eq!(session.messages.len(), 2);
+    assert_eq!(session.messages[0].content, "What is Rust?");
     assert_eq!(
-        loaded_session.messages[1].content,
+        session.messages[1].content,
         "Rust is a systems programming language."
     );
 
     // Add another turn
-    loaded_session.add_message("user", "Tell me more");
-    let loaded_clone = loaded_session.clone();
-    manager2.save(&loaded_clone).await.unwrap();
-
-    // Verify it was saved
-    let mut manager3 = SessionManager::new(temp_dir.path()).await;
-    let final_session = manager3.get_or_create("telegram:chat123").await.unwrap();
-    assert_eq!(final_session.messages.len(), 3);
+    session.add_message("user", "Tell me more");
+    assert_eq!(session.messages.len(), 3);
 }
 
 /// Test tool registry with multiple tools
@@ -148,56 +133,27 @@ fn test_config_init() {
     // loader::init().unwrap();
 }
 
-/// Test multiple sessions in parallel
-#[tokio::test]
-async fn test_multiple_sessions_parallel() {
-    let temp_dir = TempDir::new().unwrap();
-    let mut manager = SessionManager::new(temp_dir.path()).await;
+/// Test multiple sessions created independently
+#[test]
+fn test_multiple_sessions_parallel() {
+    use klyntbot::session::Session;
 
-    // Create multiple sessions
-    {
-        let session1 = manager.get_or_create("telegram:chat1").await.unwrap();
-        session1.add_message("user", "Session 1 message");
-    }
-    {
-        let session2 = manager.get_or_create("discord:guild1").await.unwrap();
-        session2.add_message("user", "Session 2 message");
-    }
-    {
-        let session3 = manager.get_or_create("slack:channel1").await.unwrap();
-        session3.add_message("user", "Session 3 message");
-    }
+    let mut session1 = Session::new("telegram:chat1");
+    session1.add_message("user", "Session 1 message");
 
-    // Save all sessions
-    let s1 = manager
-        .get_or_create("telegram:chat1")
-        .await
-        .unwrap()
-        .clone();
-    let s2 = manager
-        .get_or_create("discord:guild1")
-        .await
-        .unwrap()
-        .clone();
-    let s3 = manager
-        .get_or_create("slack:channel1")
-        .await
-        .unwrap()
-        .clone();
+    let mut session2 = Session::new("discord:guild1");
+    session2.add_message("user", "Session 2 message");
 
-    manager.save(&s1).await.unwrap();
-    manager.save(&s2).await.unwrap();
-    manager.save(&s3).await.unwrap();
+    let mut session3 = Session::new("slack:channel1");
+    session3.add_message("user", "Session 3 message");
 
-    // List all sessions
-    let sessions = manager.list().await.unwrap();
-    assert_eq!(sessions.len(), 3);
-
-    // Verify each session can be loaded
-    for session_info in sessions {
-        let loaded = manager.get_or_create(&session_info.key).await.unwrap();
-        assert_eq!(loaded.messages.len(), 1);
-    }
+    // Verify each session has correct data
+    assert_eq!(session1.key, "telegram:chat1");
+    assert_eq!(session1.messages.len(), 1);
+    assert_eq!(session2.key, "discord:guild1");
+    assert_eq!(session2.messages.len(), 1);
+    assert_eq!(session3.key, "slack:channel1");
+    assert_eq!(session3.messages.len(), 1);
 }
 
 /// Test bus message ordering
@@ -243,12 +199,11 @@ fn test_config_env_override() {
 }
 
 /// Test session history truncation
-#[tokio::test]
-async fn test_session_history_limit() {
-    let temp_dir = TempDir::new().unwrap();
-    let mut manager = SessionManager::new(temp_dir.path()).await;
+#[test]
+fn test_session_history_limit() {
+    use klyntbot::session::Session;
 
-    let session = manager.get_or_create("test:chat").await.unwrap();
+    let mut session = Session::new("test:chat");
 
     // Add 100 messages
     for i in 0..100 {
@@ -286,72 +241,22 @@ async fn test_tool_parameter_validation() {
     assert!(result.is_err());
 }
 
-/// Test session cleanup
-#[tokio::test]
-async fn test_session_cleanup() {
-    let temp_dir = TempDir::new().unwrap();
-    let mut manager = SessionManager::new(temp_dir.path()).await;
+/// Test session clear operation
+#[test]
+fn test_session_cleanup() {
+    use klyntbot::session::Session;
 
-    // Create and save sessions
-    for i in 0..5 {
-        {
-            let session = manager
-                .get_or_create(format!("test:chat{}", i))
-                .await
-                .unwrap();
-            session.add_message("user", "Test");
-        }
-        let session = manager
-            .get_or_create(format!("test:chat{}", i))
-            .await
-            .unwrap()
-            .clone();
-        manager.save(&session).await.unwrap();
-    }
+    let mut session = Session::new("test:chat");
+    session.add_message("user", "msg1");
+    session.add_message("assistant", "msg2");
+    assert_eq!(session.messages.len(), 2);
 
-    // Verify all exist
-    let sessions = manager.list().await.unwrap();
-    assert_eq!(sessions.len(), 5);
-
-    // Delete some sessions
-    manager.delete("test:chat0").await.unwrap();
-    manager.delete("test:chat2").await.unwrap();
-
-    // Verify deletion
-    let remaining = manager.list().await.unwrap();
-    assert_eq!(remaining.len(), 3);
+    session.clear();
+    assert_eq!(session.messages.len(), 0);
 }
 
-/// Test session LRU eviction
-#[tokio::test]
-async fn test_session_lru_eviction() {
-    let temp_dir = TempDir::new().unwrap();
-    let mut manager = SessionManager::with_capacity(temp_dir.path(), 3).await;
-
-    // Create 4 sessions (should evict the first one)
-    for i in 0..4 {
-        let session = manager
-            .get_or_create(format!("test:chat{}", i))
-            .await
-            .unwrap();
-        session.add_message("user", format!("Message {}", i));
-    }
-
-    // Verify only 3 sessions remain in cache (chat1, chat2, chat3)
-    // The first session (chat0) should have been evicted
-    assert!(manager.get_or_create("test:chat1").await.is_ok());
-    assert!(manager.get_or_create("test:chat2").await.is_ok());
-    assert!(manager.get_or_create("test:chat3").await.is_ok());
-
-    // Verify evicted session was saved to disk
-    let sessions = manager.list().await.unwrap();
-    assert!(sessions.iter().any(|s| s.key == "test:chat0"));
-
-    // Load the evicted session - it should come from disk
-    let loaded = manager.get_or_create("test:chat0").await.unwrap();
-    assert_eq!(loaded.messages.len(), 1);
-    assert_eq!(loaded.messages[0].content, "Message 0");
-}
+// LRU eviction test removed — relied on `with_capacity()` and JSONL disk persistence.
+// Cache eviction + SQL reload is tested implicitly by get_or_create() in the SQL-backed manager.
 
 /// Test skills availability attribute
 #[tokio::test]

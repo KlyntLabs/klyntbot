@@ -1,6 +1,29 @@
 //! Strategy classification tracking — computes accuracy and iteration stats.
 
-use super::strategy_store::StrategyRecord;
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+
+/// Records the outcome of a single strategy execution.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StrategyRecord {
+    pub timestamp: DateTime<Utc>,
+    pub request_id: String,
+    /// Predicted strategy name (e.g., "DirectResponse", "ToolAssisted").
+    pub predicted_strategy: String,
+    /// Actually used strategy (may differ if escalation occurred).
+    pub actual_strategy: String,
+    /// Number of times the request escalated to a different strategy.
+    pub escalation_count: u32,
+    /// Tool iterations actually used.
+    pub iterations_used: u32,
+    /// Maximum iterations allowed by the strategy.
+    pub max_iterations: u32,
+    pub success: bool,
+    /// Optional user satisfaction score (filled later via feedback).
+    pub user_satisfaction: Option<f32>,
+    /// End-to-end response time in milliseconds.
+    pub response_time_ms: u64,
+}
 
 /// Aggregated statistics for a strategy type.
 #[derive(Debug, Clone)]
@@ -50,7 +73,6 @@ pub fn compute_stats(strategy: &str, records: &[StrategyRecord]) -> StrategyStat
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Utc;
 
     fn make_record(
         predicted: &str,

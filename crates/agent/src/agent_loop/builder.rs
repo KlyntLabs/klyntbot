@@ -1,6 +1,5 @@
 //! Agent loop construction: tool registration, handler wiring, pipeline assembly.
 
-use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::Duration;
@@ -79,12 +78,16 @@ impl AgentLoop {
         // Wrap early so both the learning subscriber and Ok(Self{}) share the same Arc.
         let context_builder = Arc::new(RwLock::new(context_builder));
 
-        // Create session manager
-        let sessions_dir = dirs::home_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join(".klyntbot")
-            .join("sessions");
-        let session_manager = SessionManager::new(sessions_dir).await;
+        // Create session manager (SQL-backed)
+        let session_repo = if let Some(ref p) = pool {
+            storage::SessionRepo::new(p.clone())
+        } else {
+            // Fallback for test environments without a pool: use lazy connection
+            let fallback = sqlx::PgPool::connect_lazy("postgres://localhost/klyntbot")
+                .unwrap_or_else(|_| panic!("Failed to create lazy PgPool for SessionManager"));
+            storage::SessionRepo::new(fallback)
+        };
+        let session_manager = SessionManager::from_repo(session_repo).await;
 
         // Create subagent manager
         let brave_api_key = (!config.tools.web.brave_api_key.is_empty())
@@ -518,10 +521,14 @@ impl AgentLoop {
             orchestrator = orchestrator.with_strategy_repo(repo);
         }
         let orchestrator = Arc::new(orchestrator);
-        let data_dir = config::config_dir()
-            .unwrap_or_else(|_| config.workspace_path())
-            .join("data");
-        let cost_tracker = Arc::new(crate::output::CostTracker::new(data_dir));
+        let usage_repo = if let Some(ref p) = pool {
+            storage::UsageRepo::new(p.clone())
+        } else {
+            let fallback = sqlx::PgPool::connect_lazy("postgres://localhost/klyntbot")
+                .unwrap_or_else(|_| panic!("Failed to create lazy PgPool for CostTracker"));
+            storage::UsageRepo::new(fallback)
+        };
+        let cost_tracker = Arc::new(crate::output::CostTracker::from_repo(usage_repo));
 
         let pipeline_config = crate::pipeline::PipelineConfig {
             execution_model: config.agents.defaults.model.clone(),
