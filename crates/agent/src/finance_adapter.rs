@@ -7,9 +7,8 @@
 use async_trait::async_trait;
 use common::Result;
 use config::FinanceConfig;
-use tools::{
-    finance_types::AssetType, BudgetAlert, FinanceHandler, PriceService, PriceUpdateSummary,
-    ProactivityLevel,
+use feature_finance::{
+    AssetType, BudgetAlert, FinanceHandler, PriceService, PriceUpdateSummary, ProactivityLevel,
 };
 
 /// Concrete implementation of `FinanceHandler` used by `FinanceTool`.

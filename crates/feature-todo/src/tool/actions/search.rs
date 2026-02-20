@@ -24,7 +24,10 @@ impl TodoTool {
 
         let mut output = format!("{} task(s) matching '{}':\n", results.len(), query);
         for todo in results {
-            let priority_str = todo.priority.map(|p| format!("P{}", p)).unwrap_or_else(|| "P3".to_string());
+            let priority_str = todo
+                .priority
+                .map(|p| format!("P{}", p))
+                .unwrap_or_else(|| "P3".to_string());
             output.push_str(&format!(
                 "\n- [{}] {} ({}, {:?})",
                 todo.id, todo.title, priority_str, todo.status
@@ -41,7 +44,9 @@ impl TodoTool {
             .unwrap_or(self.semantic_threshold);
 
         if query.is_empty() {
-            return Err(ToolError::InvalidParams("Search query cannot be empty".to_string()).into());
+            return Err(
+                ToolError::InvalidParams("Search query cannot be empty".to_string()).into(),
+            );
         }
         if !(0.0..=1.0).contains(&threshold) {
             return Err(ToolError::InvalidParams(
@@ -65,7 +70,10 @@ impl TodoTool {
         let total_summary = self.repo.summary().await?;
         let total_tasks = total_summary.total as usize;
 
-        debug!(query = query, "Generating query embedding for semantic search");
+        debug!(
+            query = query,
+            "Generating query embedding for semantic search"
+        );
         let query_vec = emb.embed_query(query).await?;
 
         let scored = emb_repo
@@ -95,7 +103,10 @@ impl TodoTool {
         for (id, sim) in &scored {
             if let Ok(Some(row)) = self.repo.get(id).await {
                 let todo = Todo::from(row);
-                let priority_str = todo.priority.map(|p| format!("P{}", p)).unwrap_or_else(|| "P3".to_string());
+                let priority_str = todo
+                    .priority
+                    .map(|p| format!("P{}", p))
+                    .unwrap_or_else(|| "P3".to_string());
                 output.push_str(&format!(
                     "\n- [{}] {} ({}, {:?}, sim: {:.2})",
                     todo.id, todo.title, priority_str, todo.status, sim
@@ -124,7 +135,9 @@ impl TodoTool {
         let limit = p.optional_u64("limit")?.unwrap_or(10) as usize;
 
         if query.is_empty() {
-            return Err(ToolError::InvalidParams("Search query cannot be empty".to_string()).into());
+            return Err(
+                ToolError::InvalidParams("Search query cannot be empty".to_string()).into(),
+            );
         }
 
         let keyword_rows = self.repo.search_by_keyword(query, None).await?;
@@ -132,17 +145,16 @@ impl TodoTool {
         let keyword_count = keyword_results.len();
 
         // Run semantic search if available
-        let semantic_results: Vec<(String, f64)> = if let (Some(emb), Some(emb_repo)) =
-            (&self.embedding_handler, &self.embedding_repo)
-        {
-            let query_vec = emb.embed_query(query).await?;
-            emb_repo
-                .search_similar_vec(&query_vec, 100, self.semantic_threshold)
-                .await
-                .unwrap_or_default()
-        } else {
-            Vec::new()
-        };
+        let semantic_results: Vec<(String, f64)> =
+            if let (Some(emb), Some(emb_repo)) = (&self.embedding_handler, &self.embedding_repo) {
+                let query_vec = emb.embed_query(query).await?;
+                emb_repo
+                    .search_similar_vec(&query_vec, 100, self.semantic_threshold)
+                    .await
+                    .unwrap_or_default()
+            } else {
+                Vec::new()
+            };
 
         let merged = crate::search::hybrid_merge(&keyword_results, &semantic_results, self.rrf_k);
 
@@ -161,7 +173,10 @@ impl TodoTool {
         );
 
         for (todo, _rrf_score, source) in &results {
-            let priority_str = todo.priority.map(|p| format!("P{}", p)).unwrap_or_else(|| "P3".to_string());
+            let priority_str = todo
+                .priority
+                .map(|p| format!("P{}", p))
+                .unwrap_or_else(|| "P3".to_string());
             output.push_str(&format!(
                 "\n- [{}] {} ({}, {:?}, match: {})",
                 todo.id, todo.title, priority_str, todo.status, source

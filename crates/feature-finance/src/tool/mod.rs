@@ -16,8 +16,8 @@ use async_trait::async_trait;
 use serde_json::Value;
 use std::sync::Arc;
 
-use tools_core::{ConfigPersistence, ParamExtractor, RoutingContext, Tool};
 use common::{Result, ToolError};
+use tools_core::{ConfigPersistence, ParamExtractor, RoutingContext, Tool};
 
 use crate::handler::FinanceHandler;
 use crate::price_service::PriceService;
@@ -81,7 +81,10 @@ impl FinanceTool {
     ///
     /// Useful for tests (via `StoragePool::connect_lazy`) and for feature
     /// package bootstrap code that already holds a pool.
-    pub fn from_storage_pool(pool: &storage::StoragePool, default_currency: impl Into<String>) -> Self {
+    pub fn from_storage_pool(
+        pool: &storage::StoragePool,
+        default_currency: impl Into<String>,
+    ) -> Self {
         Self::new(
             storage::FinanceAccountRepo::new(pool.inner().clone()),
             storage::FinanceTransactionRepo::new(pool.inner().clone()),

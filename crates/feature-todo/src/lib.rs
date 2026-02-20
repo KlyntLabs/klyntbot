@@ -30,9 +30,7 @@ pub use enrichment::{
 pub use rrule_utils::{humanize_rrule, next_occurrence, should_spawn_instance, validate_rrule};
 pub use storage::{TodoFilter, TodoPatch, TodoRepo, TodoRow, TodoSummary};
 pub use tool::TodoTool;
-pub use types::{
-    Attachment, AttachmentType, TimeEntry, TimeEntrySource, Todo, TodoStatus,
-};
+pub use types::{Attachment, AttachmentType, TimeEntry, TimeEntrySource, Todo, TodoStatus};
 
 use async_trait::async_trait;
 use common::Result;
@@ -112,9 +110,11 @@ mod tests {
         let cfg = TodoConfig::default();
         let json = serde_json::to_value(&cfg).unwrap();
         assert!(json.is_object());
-        assert!(json.get("maxFocusSlots").is_some() || json.get("max_focus_slots").is_some() || {
-            // camelCase via serde rename_all
-            true
-        });
+        assert!(
+            json.get("maxFocusSlots").is_some() || json.get("max_focus_slots").is_some() || {
+                // camelCase via serde rename_all
+                true
+            }
+        );
     }
 }

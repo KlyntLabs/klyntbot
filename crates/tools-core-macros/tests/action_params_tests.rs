@@ -120,10 +120,7 @@ fn test_json_schema_min_max_length_constraints() {
 #[test]
 fn test_json_schema_descriptions_from_doc_comments() {
     let schema = AddParams::json_schema();
-    assert_eq!(
-        schema["properties"]["title"]["description"],
-        "Task title"
-    );
+    assert_eq!(schema["properties"]["title"]["description"], "Task title");
     assert_eq!(
         schema["properties"]["priority"]["description"],
         "Task priority (1-5)"

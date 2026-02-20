@@ -329,14 +329,8 @@ mod tests {
 
     #[test]
     fn test_todo_status_round_trip() {
-        assert_eq!(
-            TodoStatus::from_str_loose("todo"),
-            Some(TodoStatus::Todo)
-        );
-        assert_eq!(
-            TodoStatus::from_str_loose("DONE"),
-            Some(TodoStatus::Done)
-        );
+        assert_eq!(TodoStatus::from_str_loose("todo"), Some(TodoStatus::Todo));
+        assert_eq!(TodoStatus::from_str_loose("DONE"), Some(TodoStatus::Done));
         assert_eq!(TodoStatus::from_str_loose("unknown"), None);
     }
 

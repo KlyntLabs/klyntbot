@@ -1,6 +1,6 @@
 //! Unit tests for feature-todo domain types.
 
-use feature_todo::types::{Todo, TodoStatus, AttachmentType, TimeEntrySource};
+use feature_todo::types::{AttachmentType, TimeEntrySource, Todo, TodoStatus};
 
 #[test]
 fn test_todo_generate_id_unique() {
@@ -18,7 +18,10 @@ fn test_todo_generate_id_length() {
 #[test]
 fn test_default_instance_not_template() {
     let todo = Todo::default_instance();
-    assert!(!todo.is_template, "default_instance should not be a template");
+    assert!(
+        !todo.is_template,
+        "default_instance should not be a template"
+    );
     assert!(todo.blocked_by.is_empty());
     assert!(todo.blocks.is_empty());
     assert!(todo.attachments.is_empty());
@@ -30,7 +33,10 @@ fn test_todo_status_from_str_loose() {
     assert_eq!(TodoStatus::from_str_loose("TODO"), Some(TodoStatus::Todo));
     assert_eq!(TodoStatus::from_str_loose("doing"), Some(TodoStatus::Doing));
     assert_eq!(TodoStatus::from_str_loose("done"), Some(TodoStatus::Done));
-    assert_eq!(TodoStatus::from_str_loose("archived"), Some(TodoStatus::Archived));
+    assert_eq!(
+        TodoStatus::from_str_loose("archived"),
+        Some(TodoStatus::Archived)
+    );
     assert_eq!(TodoStatus::from_str_loose("unknown"), None);
 }
 

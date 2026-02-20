@@ -293,13 +293,16 @@ impl Tool for TodoTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     use chrono::{Duration, Utc};
 
     #[test]
     fn test_urgency_overdue() {
         let now = Utc::now();
-        assert_eq!(TodoTool::calculate_urgency(Some(now - Duration::days(2)), now), 10);
+        assert_eq!(
+            TodoTool::calculate_urgency(Some(now - Duration::days(2)), now),
+            10
+        );
     }
 
     #[test]
@@ -311,13 +314,19 @@ mod tests {
     #[test]
     fn test_urgency_tomorrow() {
         let now = Utc::now();
-        assert_eq!(TodoTool::calculate_urgency(Some(now + Duration::days(1)), now), 3);
+        assert_eq!(
+            TodoTool::calculate_urgency(Some(now + Duration::days(1)), now),
+            3
+        );
     }
 
     #[test]
     fn test_urgency_future() {
         let now = Utc::now();
-        assert_eq!(TodoTool::calculate_urgency(Some(now + Duration::days(7)), now), 1);
+        assert_eq!(
+            TodoTool::calculate_urgency(Some(now + Duration::days(7)), now),
+            1
+        );
     }
 
     #[test]
@@ -345,6 +354,10 @@ mod tests {
         task.created_at = now - Duration::days(5);
         let score = TodoTool::calculate_score(&task, now);
         // urgency=10, priority_wt=5, age=5 → 10*5 + 5*0.1 = 50.5
-        assert!((score - 50.5).abs() < 0.01, "Score should be ~50.5, got {}", score);
+        assert!(
+            (score - 50.5).abs() < 0.01,
+            "Score should be ~50.5, got {}",
+            score
+        );
     }
 }

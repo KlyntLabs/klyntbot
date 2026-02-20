@@ -89,10 +89,7 @@ fn test_from_str_loose_aliases() {
         TestStatus::from_str_loose("completed"),
         Some(TestStatus::Done)
     );
-    assert_eq!(
-        TestStatus::from_str_loose("closed"),
-        Some(TestStatus::Done)
-    );
+    assert_eq!(TestStatus::from_str_loose("closed"), Some(TestStatus::Done));
 }
 
 // ============================================================

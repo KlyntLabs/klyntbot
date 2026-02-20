@@ -45,6 +45,7 @@ async fn test_agent_loop_basic_processing() {
         test_event_cache_repo(),
         None, // conv_embedding_repo
         None, // finance_repos
+        None, // pool (no PgPool in test env)
     )
     .await
     .unwrap();
@@ -121,6 +122,7 @@ async fn test_agent_loop_with_tool_execution() {
         test_event_cache_repo(),
         None, // conv_embedding_repo
         None, // finance_repos
+        None, // pool (no PgPool in test env)
     )
     .await
     .unwrap();
@@ -183,6 +185,7 @@ async fn test_agent_loop_max_iterations() {
         test_event_cache_repo(),
         None, // conv_embedding_repo
         None, // finance_repos
+        None, // pool (no PgPool in test env)
     )
     .await
     .unwrap();
@@ -258,6 +261,7 @@ async fn test_agent_loop_tool_error_handling() {
         test_event_cache_repo(),
         None, // conv_embedding_repo
         None, // finance_repos
+        None, // pool (no PgPool in test env)
     )
     .await
     .unwrap();
@@ -317,6 +321,7 @@ async fn test_agent_loop_session_persistence() {
             test_event_cache_repo(),
             None, // conv_embedding_repo
             None, // finance_repos
+            None, // pool (no PgPool in test env)
         )
         .await
         .unwrap();
@@ -346,6 +351,7 @@ async fn test_agent_loop_session_persistence() {
         test_event_cache_repo(),
         None, // conv_embedding_repo
         None, // finance_repos
+        None, // pool (no PgPool in test env)
     )
     .await
     .unwrap();
@@ -393,6 +399,7 @@ async fn test_streaming_emits_done() {
             test_event_cache_repo(),
             None, // conv_embedding_repo
             None, // finance_repos
+            None, // pool (no PgPool in test env)
         )
         .await
         .unwrap(),
@@ -464,6 +471,7 @@ async fn test_streaming_emits_error_on_failure() {
             test_event_cache_repo(),
             None, // conv_embedding_repo
             None, // finance_repos
+            None, // pool (no PgPool in test env)
         )
         .await
         .unwrap(),

@@ -730,7 +730,11 @@ impl TodoRepo {
 
         let mut out = String::from("Active tasks:\n");
         for row in &rows {
-            let focus_marker = if row.focused_at.is_some() { " [FOCUSED]" } else { "" };
+            let focus_marker = if row.focused_at.is_some() {
+                " [FOCUSED]"
+            } else {
+                ""
+            };
             let priority_str = row.priority.map(|p| format!(" P{p}")).unwrap_or_default();
             out.push_str(&format!(
                 "- [{}]{}{} {}\n",

@@ -12,12 +12,16 @@ config.workspace = true
 providers.workspace = true
 session.workspace = true
 tools.workspace = true
+tools-core.workspace = true
+feature-todo.workspace = true
+feature-finance.workspace = true
 scheduling.workspace = true
 calendar.workspace = true
 goal.workspace = true
 plan.workspace = true
 context_engine.workspace = true
 storage.workspace = true
+sqlx = { version = "0.8", features = ["runtime-tokio", "postgres"] }
 tokio = { workspace = true }
 tracing.workspace = true
 uuid = { workspace = true }

@@ -26,7 +26,6 @@ pub fn hybrid_merge(
 mod tests {
     use super::*;
     use crate::types::Todo;
-    
 
     fn make_todo(id: &str, title: &str) -> Todo {
         let mut t = Todo::default_instance();

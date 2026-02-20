@@ -45,7 +45,7 @@ pub trait EnrichmentHandler: Send + Sync {
 }
 
 /// Feedback entry for recording enrichment outcomes.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnrichmentFeedbackEntry {
     pub task_id: String,
     pub field: String,

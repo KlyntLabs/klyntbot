@@ -60,6 +60,7 @@ pub async fn handle_chat(message: Option<String>, session: String, verbose: bool
             repos.calendar_event_cache,
             Some(repos.conv_embeddings),
             Some(finance_repos),
+            Some(storage_pool.inner().clone()),
         )
         .await?,
     );

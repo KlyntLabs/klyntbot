@@ -236,7 +236,10 @@ pub fn next_occurrence(rule: &str, after: DateTime<Utc>) -> Result<Option<DateTi
 }
 
 /// Check if a recurring task instance should be spawned.
-pub fn should_spawn_instance(next_instance_date: Option<DateTime<Utc>>, now: DateTime<Utc>) -> bool {
+pub fn should_spawn_instance(
+    next_instance_date: Option<DateTime<Utc>>,
+    now: DateTime<Utc>,
+) -> bool {
     next_instance_date.is_some_and(|next| next <= now)
 }
 

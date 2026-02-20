@@ -81,6 +81,7 @@ async fn create_agent_with_learning(provider: Arc<MockProvider>) -> (AgentLoop, 
         event_cache_repo,
         None, // conv_embedding_repo
         None, // finance_repos
+        None, // pool (no PgPool in test env)
     )
     .await
     .unwrap();
@@ -663,6 +664,7 @@ async fn test_ac_learning_disabled_no_recording() {
         event_cache_repo,
         None, // conv_embedding_repo
         None, // finance_repos
+        None, // pool (no PgPool in test env)
     )
     .await
     .unwrap();

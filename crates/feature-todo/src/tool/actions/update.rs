@@ -322,9 +322,7 @@ impl TodoTool {
         let value = p.required_str("value")?;
 
         let att_type = AttachmentType::parse(attachment_type_str).ok_or_else(|| {
-            ToolError::InvalidParams(
-                "attachment_type must be 'file', 'url', or 'note'".to_string(),
-            )
+            ToolError::InvalidParams("attachment_type must be 'file', 'url', or 'note'".to_string())
         })?;
 
         let title_opt = p.optional_str("attachment_title")?;
@@ -348,7 +346,10 @@ impl TodoTool {
         })?;
 
         if self.repo.remove_attachment(id, attachment_id).await? {
-            Ok(format!("Attachment {} removed from task: {}", attachment_id, id))
+            Ok(format!(
+                "Attachment {} removed from task: {}",
+                attachment_id, id
+            ))
         } else {
             Err(ToolError::ExecutionFailed("Task or attachment not found".to_string()).into())
         }

@@ -501,6 +501,7 @@ pub async fn handle_serve(port: u16) -> Result<()> {
             repos.calendar_event_cache,
             Some(repos.conv_embeddings),
             Some(finance_repos),
+            Some(storage_pool.inner().clone()),
         )
         .await?,
     ));

@@ -51,7 +51,10 @@ fn test_finance_feature_tools_name() {
 #[test]
 fn test_finance_feature_migrations_not_empty() {
     let migrations = FinanceFeature::migrations_static();
-    assert!(!migrations.is_empty(), "migrations_static() must return at least one migration");
+    assert!(
+        !migrations.is_empty(),
+        "migrations_static() must return at least one migration"
+    );
 }
 
 #[test]
@@ -86,7 +89,10 @@ fn test_finance_feature_migrations_have_sql() {
 #[test]
 fn test_finance_feature_default_config_is_object() {
     let config = FinanceFeature::default_config_static();
-    assert!(config.is_object(), "default_config_static() must return a JSON object");
+    assert!(
+        config.is_object(),
+        "default_config_static() must return a JSON object"
+    );
 }
 
 #[test]

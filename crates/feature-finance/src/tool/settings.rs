@@ -4,9 +4,9 @@
 
 use serde_json::json;
 
+use common::{Result, ToolError};
 use tools_core::ParamExtractor;
 use tools_core::RoutingContext;
-use common::{Result, ToolError};
 
 use super::FinanceTool;
 
@@ -70,9 +70,9 @@ impl FinanceTool {
                 .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?
         };
 
-        let obj = finance_json
-            .as_object_mut()
-            .ok_or_else(|| ToolError::ExecutionFailed("Finance config is not an object".to_string()))?;
+        let obj = finance_json.as_object_mut().ok_or_else(|| {
+            ToolError::ExecutionFailed("Finance config is not an object".to_string())
+        })?;
 
         let mut updated = serde_json::Map::new();
 
@@ -98,9 +98,7 @@ impl FinanceTool {
         }
 
         if let Some(rate) = inflation_rate {
-            let inflation = obj
-                .entry("inflation")
-                .or_insert_with(|| json!({}));
+            let inflation = obj.entry("inflation").or_insert_with(|| json!({}));
             if let Some(inf_obj) = inflation.as_object_mut() {
                 inf_obj.insert("rate".to_string(), json!(rate));
             }
@@ -109,9 +107,7 @@ impl FinanceTool {
 
         if let Some(threshold) = alert_threshold {
             let clamped = threshold.clamp(0, 100) as u8;
-            let budgeting = obj
-                .entry("budgeting")
-                .or_insert_with(|| json!({}));
+            let budgeting = obj.entry("budgeting").or_insert_with(|| json!({}));
             if let Some(bud_obj) = budgeting.as_object_mut() {
                 bud_obj.insert("alertThreshold".to_string(), json!(clamped));
             }
@@ -119,9 +115,7 @@ impl FinanceTool {
         }
 
         if let Some(auto_cat) = auto_categorize {
-            let categories = obj
-                .entry("categories")
-                .or_insert_with(|| json!({}));
+            let categories = obj.entry("categories").or_insert_with(|| json!({}));
             if let Some(cat_obj) = categories.as_object_mut() {
                 cat_obj.insert("autoCategorize".to_string(), json!(auto_cat));
             }
@@ -135,9 +129,7 @@ impl FinanceTool {
                 )
                 .into());
             }
-            let categories = obj
-                .entry("categories")
-                .or_insert_with(|| json!({}));
+            let categories = obj.entry("categories").or_insert_with(|| json!({}));
             if let Some(cat_obj) = categories.as_object_mut() {
                 cat_obj.insert("confidenceThreshold".to_string(), json!(conf));
             }

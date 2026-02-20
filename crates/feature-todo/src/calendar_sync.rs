@@ -26,8 +26,7 @@ mod tests {
     #[async_trait]
     impl CalendarSyncHandler for MockCalendarSync {
         async fn sync_calendar(&self) -> Result<()> {
-            self.called
-                .store(true, std::sync::atomic::Ordering::SeqCst);
+            self.called.store(true, std::sync::atomic::Ordering::SeqCst);
             Ok(())
         }
     }

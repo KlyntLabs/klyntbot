@@ -1,7 +1,6 @@
 //! Duration prediction from task title, tags, and complexity heuristics.
 
-use tools::enrichment::EnrichmentSuggestion;
-use tools::todo_types::Todo;
+use feature_todo::{EnrichmentSuggestion, Todo};
 
 /// Keyword-to-duration mappings (minutes).
 const QUICK_KEYWORDS: &[&str] = &["typo", "rename", "tweak", "bump", "toggle", "minor"];
@@ -81,7 +80,7 @@ fn contains_any(text: &str, keywords: &[&str]) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tools::todo_types::Todo;
+    use feature_todo::Todo;
 
     #[test]
     fn test_duration_prediction_from_keywords() {

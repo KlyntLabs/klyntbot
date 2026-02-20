@@ -79,9 +79,7 @@ fn test_generated_description_matches_attribute() {
 fn test_parameters_has_action_enum() {
     let tool = TestTool;
     let params = tool.parameters();
-    let action_enum = params["properties"]["action"]["enum"]
-        .as_array()
-        .unwrap();
+    let action_enum = params["properties"]["action"]["enum"].as_array().unwrap();
     assert!(action_enum.iter().any(|v| v == "greet"));
     assert!(action_enum.iter().any(|v| v == "farewell"));
 
@@ -118,10 +116,7 @@ async fn test_dispatch_to_greet_action() {
 async fn test_dispatch_to_farewell_action() {
     let tool = TestTool;
     let result = tool
-        .execute(
-            json!({"action": "farewell", "name": "World"}),
-            &ctx(),
-        )
+        .execute(json!({"action": "farewell", "name": "World"}), &ctx())
         .await
         .unwrap();
     assert_eq!(result, "Goodbye, World!");
@@ -134,9 +129,7 @@ async fn test_dispatch_to_farewell_action() {
 #[tokio::test]
 async fn test_unknown_action_returns_error() {
     let tool = TestTool;
-    let result = tool
-        .execute(json!({"action": "dance"}), &ctx())
-        .await;
+    let result = tool.execute(json!({"action": "dance"}), &ctx()).await;
     assert!(result.is_err());
 }
 
@@ -147,9 +140,7 @@ async fn test_unknown_action_returns_error() {
 #[tokio::test]
 async fn test_missing_action_field_returns_error() {
     let tool = TestTool;
-    let result = tool
-        .execute(json!({"name": "World"}), &ctx())
-        .await;
+    let result = tool.execute(json!({"name": "World"}), &ctx()).await;
     assert!(result.is_err());
 }
 
@@ -160,8 +151,6 @@ async fn test_missing_action_field_returns_error() {
 #[tokio::test]
 async fn test_null_action_field_returns_error() {
     let tool = TestTool;
-    let result = tool
-        .execute(json!({"action": null}), &ctx())
-        .await;
+    let result = tool.execute(json!({"action": null}), &ctx()).await;
     assert!(result.is_err());
 }

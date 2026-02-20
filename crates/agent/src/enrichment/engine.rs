@@ -3,8 +3,7 @@
 use async_trait::async_trait;
 use common::Result;
 use config::TodoEnrichmentConfig;
-use tools::enrichment::{EnrichmentHandler, EnrichmentResult};
-use tools::todo_types::Todo;
+use feature_todo::{EnrichmentHandler, EnrichmentResult, Todo};
 
 /// Central enrichment engine that coordinates priority, duration, and scheduling modules.
 pub struct EnrichmentEngine {
@@ -52,7 +51,7 @@ impl EnrichmentHandler for EnrichmentEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tools::todo_types::Todo;
+    use feature_todo::Todo;
 
     #[tokio::test]
     async fn test_enrichment_engine_disabled() {

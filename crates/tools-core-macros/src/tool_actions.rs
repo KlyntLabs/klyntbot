@@ -4,10 +4,9 @@ use syn::parse::Parser;
 use syn::{parse_macro_input, Expr, FnArg, ImplItem, ItemImpl, Lit, Meta, Type};
 
 pub fn expand(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let attr_args =
-        syn::punctuated::Punctuated::<Meta, syn::Token![,]>::parse_terminated
-            .parse(attr)
-            .expect("Failed to parse tool_actions attributes");
+    let attr_args = syn::punctuated::Punctuated::<Meta, syn::Token![,]>::parse_terminated
+        .parse(attr)
+        .expect("Failed to parse tool_actions attributes");
 
     let mut tool_name = String::new();
     let mut tool_description = String::new();
@@ -51,7 +50,8 @@ pub fn expand(attr: TokenStream, item: TokenStream) -> TokenStream {
                 if attr.path().is_ident("action") {
                     if let Meta::List(list) = &attr.meta {
                         let tokens = list.tokens.clone();
-                        let parser = syn::punctuated::Punctuated::<Meta, syn::Token![,]>::parse_terminated;
+                        let parser =
+                            syn::punctuated::Punctuated::<Meta, syn::Token![,]>::parse_terminated;
                         if let Ok(parsed) = parser.parse2(tokens) {
                             for meta in parsed {
                                 if let Meta::NameValue(nv) = &meta {

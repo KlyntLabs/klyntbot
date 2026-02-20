@@ -8,21 +8,19 @@ use tracing::{debug, info};
 
 use super::super::TodoTool;
 use crate::storage::TodoFilter;
-use crate::types::{Todo, TodoStatus, TimeEntrySource};
+use crate::types::{TimeEntrySource, Todo, TodoStatus};
 
 impl TodoTool {
     pub(crate) async fn handle_list(&self, p: &ParamExtractor<'_>) -> Result<String> {
         let filter = TodoFilter {
             status: p
                 .optional_str("status")?
-                .and_then(|s| {
-                    match s.to_lowercase().as_str() {
-                        "todo" => Some("todo".to_string()),
-                        "doing" => Some("doing".to_string()),
-                        "done" => Some("done".to_string()),
-                        "archived" => Some("archived".to_string()),
-                        _ => None,
-                    }
+                .and_then(|s| match s.to_lowercase().as_str() {
+                    "todo" => Some("todo".to_string()),
+                    "doing" => Some("doing".to_string()),
+                    "done" => Some("done".to_string()),
+                    "archived" => Some("archived".to_string()),
+                    _ => None,
                 }),
             priority_min: p.optional_u64("priority_min")?.map(|v| v as i16),
             tags: p.optional_str("tag")?.map(|t| vec![t.to_string()]),
@@ -40,7 +38,10 @@ impl TodoTool {
 
         let mut output = format!("{} task(s):\n", todos.len());
         for todo in todos {
-            let priority_str = todo.priority.map(|p| format!("P{}", p)).unwrap_or_else(|| "P3".to_string());
+            let priority_str = todo
+                .priority
+                .map(|p| format!("P{}", p))
+                .unwrap_or_else(|| "P3".to_string());
             output.push_str(&format!(
                 "\n- [{}] {} ({}, {:?}, {})",
                 todo.id,
@@ -61,7 +62,10 @@ impl TodoTool {
                 let mut output = format!("Task: {}\n", todo.title);
                 output.push_str(&format!("ID: {}\n", todo.id));
                 output.push_str(&format!("Status: {:?}\n", todo.status));
-                let priority_str = todo.priority.map(|p| format!("P{}", p)).unwrap_or_else(|| "P3".to_string());
+                let priority_str = todo
+                    .priority
+                    .map(|p| format!("P{}", p))
+                    .unwrap_or_else(|| "P3".to_string());
                 output.push_str(&format!("Priority: {}\n", priority_str));
                 if let Some(desc) = &todo.description {
                     output.push_str(&format!("Description: {}\n", desc));
@@ -126,15 +130,13 @@ impl TodoTool {
         fn render_tree(todo: &Todo, all_todos: &[Todo], prefix: &str, is_last: bool) -> String {
             let mut output = String::new();
             let connector = if is_last { "└─ " } else { "├─ " };
-            let priority_str = todo.priority.map(|p| format!("P{}", p)).unwrap_or_else(|| "P3".to_string());
+            let priority_str = todo
+                .priority
+                .map(|p| format!("P{}", p))
+                .unwrap_or_else(|| "P3".to_string());
             output.push_str(&format!(
                 "{}{}{} [{}] ({}, {:?})\n",
-                prefix,
-                connector,
-                todo.title,
-                todo.id,
-                priority_str,
-                todo.status
+                prefix, connector, todo.title, todo.id, priority_str, todo.status
             ));
 
             let detail_prefix = format!("{}{}  ", prefix, if is_last { " " } else { "│" });
@@ -158,7 +160,12 @@ impl TodoTool {
                 .collect();
             for (i, child) in children.iter().enumerate() {
                 let is_last_child = i == children.len() - 1;
-                output.push_str(&render_tree(child, all_todos, &detail_prefix, is_last_child));
+                output.push_str(&render_tree(
+                    child,
+                    all_todos,
+                    &detail_prefix,
+                    is_last_child,
+                ));
             }
             output
         }
@@ -248,7 +255,10 @@ impl TodoTool {
             output.push_str(&format!("### {}\n", project_key));
             output.push_str(&format!("  - Completed: {}\n", completed));
             output.push_str(&format!("  - Created: {}\n", created));
-            output.push_str(&format!("  - Time tracked: {:.1}h\n", time_tracked as f64 / 3600.0));
+            output.push_str(&format!(
+                "  - Time tracked: {:.1}h\n",
+                time_tracked as f64 / 3600.0
+            ));
             output.push('\n');
         }
 
@@ -271,9 +281,15 @@ impl TodoTool {
         output.push_str("## Summary:\n\n");
         output.push_str(&format!("  - Tasks created: {}\n", created_total));
         output.push_str(&format!("  - Tasks completed: {}\n", completed_total));
-        output.push_str(&format!("  - Total time tracked: {:.1}h\n", total_time_secs as f64 / 3600.0));
+        output.push_str(&format!(
+            "  - Total time tracked: {:.1}h\n",
+            total_time_secs as f64 / 3600.0
+        ));
         output.push_str(&format!("  - Focus sessions: {}\n", focus_sessions));
-        output.push_str(&format!("  - Focus time: {:.1}h\n", focus_secs as f64 / 3600.0));
+        output.push_str(&format!(
+            "  - Focus time: {:.1}h\n",
+            focus_secs as f64 / 3600.0
+        ));
         output.push_str(&format!("  - Overdue tasks: {}\n", overdue_count));
 
         Ok(output)

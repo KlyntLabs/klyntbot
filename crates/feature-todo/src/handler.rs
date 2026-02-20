@@ -67,10 +67,7 @@ impl TodoTool {
     }
 
     /// Add an enrichment feedback handler.
-    pub fn with_feedback_handler(
-        mut self,
-        handler: Arc<dyn EnrichmentFeedbackHandler>,
-    ) -> Self {
+    pub fn with_feedback_handler(mut self, handler: Arc<dyn EnrichmentFeedbackHandler>) -> Self {
         self.feedback_handler = Some(handler);
         self
     }

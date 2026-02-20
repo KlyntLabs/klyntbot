@@ -1,7 +1,6 @@
 //! Priority inference from task title, description, and tags.
 
-use tools::enrichment::EnrichmentSuggestion;
-use tools::todo_types::Todo;
+use feature_todo::{EnrichmentSuggestion, Todo};
 
 /// Keyword groups mapped to priority levels.
 /// Priority scale: 1 = highest, 4 = lowest.
@@ -126,7 +125,7 @@ fn find_keyword<'a>(text: &str, keywords: &[&'a str]) -> Option<&'a str> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tools::todo_types::Todo;
+    use feature_todo::Todo;
 
     #[test]
     fn test_priority_inference_from_keywords() {

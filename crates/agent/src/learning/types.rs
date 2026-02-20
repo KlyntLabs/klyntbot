@@ -89,8 +89,8 @@ pub struct FieldAcceptanceStats {
     pub acceptance_rate: f32,
 }
 
-// Re-export EnrichmentFeedbackEntry from the tools crate (canonical definition).
-pub use tools::learning_feedback::EnrichmentFeedbackEntry;
+// Re-export EnrichmentFeedbackEntry from feature-todo (canonical definition).
+pub use feature_todo::EnrichmentFeedbackEntry;
 
 /// Persistent state for adaptive threshold adjustment.
 #[derive(Debug, Clone, Serialize, Deserialize)]

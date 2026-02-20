@@ -121,7 +121,10 @@ fn test_rrf_merge_results_sorted_by_score_descending() {
     // "a" keyword only (rank 0) -> 1/61
     // "c" semantic only (rank 1) -> 1/62
     for i in 1..results.len() {
-        assert!(results[i - 1].1 >= results[i].1, "Results not sorted descending");
+        assert!(
+            results[i - 1].1 >= results[i].1,
+            "Results not sorted descending"
+        );
     }
 }
 

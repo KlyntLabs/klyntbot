@@ -8,6 +8,7 @@ license.workspace = true
 [dependencies]
 common.workspace = true
 tools-core.workspace = true
+feature-todo.workspace = true
 config.workspace = true
 storage.workspace = true
 bus.workspace = true

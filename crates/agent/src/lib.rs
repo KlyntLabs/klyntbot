@@ -30,6 +30,8 @@ pub mod recurring_tasks;
 pub mod reminders;
 pub mod skills;
 pub mod subagent;
+pub mod todo_calendar_sync_adapter;
+pub mod todo_embedding_handler;
 
 pub use agent_loop::{AgentLoop, StreamingHandle};
 pub use calendar_reconcile::{reconcile_calendar_events, ReconcileAction, ReconcileReport};

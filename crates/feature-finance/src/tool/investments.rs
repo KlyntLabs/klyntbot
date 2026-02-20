@@ -8,9 +8,9 @@ use serde_json::json;
 use uuid::Uuid;
 
 use crate::types::{AssetType, InvestmentTxType};
+use common::{Result, ToolError};
 use tools_core::ParamExtractor;
 use tools_core::RoutingContext;
-use common::{Result, ToolError};
 
 use super::FinanceTool;
 
@@ -630,8 +630,8 @@ impl FinanceTool {
 #[cfg(test)]
 mod tests {
     use crate::types::{AssetType, InvestmentTxType};
-    use tools_core::ParamExtractor;
     use serde_json::json;
+    use tools_core::ParamExtractor;
 
     #[test]
     fn portfolio_create_requires_name() {

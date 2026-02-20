@@ -92,7 +92,10 @@ fn test_rrule_validate_rejects_bysetpos() {
 #[test]
 fn test_rrule_humanize() {
     assert_eq!(feature_todo::humanize_rrule("FREQ=DAILY"), "Every day");
-    assert_eq!(feature_todo::humanize_rrule("FREQ=WEEKLY;INTERVAL=2"), "Every 2 weeks");
+    assert_eq!(
+        feature_todo::humanize_rrule("FREQ=WEEKLY;INTERVAL=2"),
+        "Every 2 weeks"
+    );
 }
 
 #[test]

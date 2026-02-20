@@ -15,7 +15,6 @@ use session::SessionManager;
 use tools::{
     calendar_tool::{CalendarHandler, CalendarTool},
     cron_tool::CronTool,
-    enrichment::EnrichmentHandler,
     filesystem::register_fs_tools,
     goal_tool::{GoalHandler, GoalTool},
     learning_tool::{LearningHandler, LearningTool},
@@ -25,7 +24,6 @@ use tools::{
     shell::ExecTool,
     spawn::SpawnTool,
     web::{WebFetchTool, WebSearchTool},
-    EmbeddingHandler, FinanceHandler,
 };
 
 use super::super::confidence::ConfidenceEvaluator;
@@ -53,6 +51,7 @@ impl AgentLoop {
         event_cache_repo: storage::CalendarEventCacheRepo,
         conv_embedding_repo: Option<storage::ConvEmbeddingRepo>,
         finance_repos: Option<storage::Repos>,
+        pool: Option<sqlx::PgPool>,
     ) -> Result<Self> {
         let workspace = config.workspace_path();
 
@@ -149,14 +148,6 @@ impl AgentLoop {
         let todo_repo_for_memory = todo_repo.clone();
         let todo_repo_shared = todo_repo.clone();
 
-        // Register todo tool (SQL repo)
-        let mut todo_tool = tools::todo::TodoTool::new(
-            todo_repo,
-            config.todo.focus.max_slots,
-            config.todo.focus.deadline_hours,
-            config.timezone.clone(),
-        );
-
         // Create NotificationDispatcher early so it can be shared with calendar adapter
         let notification_dispatcher = if !config.todo.notifications.targets.is_empty() {
             Some(Arc::new(super::super::NotificationDispatcher::new(
@@ -167,7 +158,9 @@ impl AgentLoop {
             None
         };
 
-        // Register calendar tool (if any provider is enabled)
+        // Register calendar tool (if any provider is enabled).
+        // The CalendarHandler is created here; injection into feature_todo::TodoTool
+        // happens inside the pool block below.
         let calendar_adapter = if config.calendar.is_any_enabled() {
             let adapter = Arc::new(
                 CalendarSyncAdapter::new(
@@ -182,10 +175,6 @@ impl AgentLoop {
                 .await?,
             );
 
-            // Inject calendar handler into TodoTool for immediate sync
-            todo_tool =
-                todo_tool.with_calendar_handler(Arc::clone(&adapter) as Arc<dyn CalendarHandler>);
-
             tool_registry.register(CalendarTool::new(
                 Arc::clone(&adapter) as Arc<dyn CalendarHandler>
             ));
@@ -193,17 +182,6 @@ impl AgentLoop {
         } else {
             None
         };
-
-        // Register enrichment engine (if enabled)
-        if config.todo.enrichment.enabled {
-            let enrichment_engine = Arc::new(super::super::enrichment::EnrichmentEngine::new(
-                config.todo.enrichment.clone(),
-            ));
-
-            todo_tool = todo_tool.with_enrichment_handler(
-                Arc::clone(&enrichment_engine) as Arc<dyn EnrichmentHandler>
-            );
-        }
 
         // Create outcome store + recorder early so TodoTool can report enrichment feedback.
         // The full LearningService is wired later using the same store.
@@ -218,53 +196,103 @@ impl AgentLoop {
             .as_ref()
             .map(|store| Arc::new(crate::learning::OutcomeRecorder::new(Arc::clone(store))));
 
-        // Wire enrichment feedback into learning system
-        if let Some(ref recorder) = outcome_recorder {
-            todo_tool = todo_tool.with_feedback_handler(
-                Arc::clone(recorder) as Arc<dyn tools::EnrichmentFeedbackHandler>
-            );
-        }
-
         // Create shared embedding engine (used by both todo and conversation embedding)
         let embedding_engine = Arc::new(tools::EmbeddingEngine::new());
 
-        // Register todo embedding (if enabled) and capture for MemoryTool
-        let todo_embedding_handler: Option<Arc<dyn EmbeddingHandler>>;
+        // Outputs for MemoryTool — populated inside the pool block if embedding is enabled
+        let todo_embedding_handler: Option<Arc<dyn tools::EmbeddingHandler>>;
         let todo_embedding_repo: Option<storage::EmbeddingRepo>;
 
-        if config.todo.search.enabled {
-            if let Some(emb_repo) = embedding_repo {
-                let embedding_handler = Arc::new(tools::EmbeddingEngineImpl::new(
-                    Arc::clone(&embedding_engine),
-                    emb_repo.clone(),
-                ));
+        // Register feature_todo::TodoTool when a PgPool is available.
+        // In test environments (pool = None) this section is skipped gracefully.
+        if let Some(ref pool) = pool {
+            let feature_todo_repo = feature_todo::TodoRepo::new(pool.clone());
+            let mut todo_tool = feature_todo::TodoTool::new(
+                feature_todo_repo,
+                config.todo.focus.max_slots,
+                config.todo.focus.deadline_hours,
+                config.timezone.clone(),
+            );
 
-                // Clone for MemoryTool before moving into TodoTool
-                todo_embedding_repo = Some(emb_repo.clone());
-
-                todo_tool = todo_tool
-                    .with_embedding_handler(
-                        Arc::clone(&embedding_handler) as Arc<dyn EmbeddingHandler>
+            // Inject calendar handler (CalendarHandler → CalendarSyncHandler bridge)
+            if let Some(ref adapter) = calendar_adapter {
+                let todo_cal_sync = Arc::new(
+                    crate::todo_calendar_sync_adapter::TodoCalendarSyncAdapter::new(Arc::clone(
+                        adapter,
                     )
-                    .with_embedding_repo(emb_repo)
-                    .with_search_config(
-                        config.todo.search.semantic_threshold,
-                        config.todo.search.rrf_k,
+                        as Arc<dyn CalendarHandler>),
+                );
+                todo_tool = todo_tool.with_calendar_handler(
+                    todo_cal_sync as Arc<dyn feature_todo::CalendarSyncHandler>,
+                );
+            }
+
+            // Register enrichment engine (if enabled)
+            if config.todo.enrichment.enabled {
+                let enrichment_engine = Arc::new(super::super::enrichment::EnrichmentEngine::new(
+                    config.todo.enrichment.clone(),
+                ));
+                todo_tool =
+                    todo_tool
+                        .with_enrichment_handler(Arc::clone(&enrichment_engine)
+                            as Arc<dyn feature_todo::EnrichmentHandler>);
+            }
+
+            // Wire enrichment feedback into learning system
+            if let Some(ref recorder) = outcome_recorder {
+                todo_tool =
+                    todo_tool
+                        .with_feedback_handler(Arc::clone(recorder)
+                            as Arc<dyn feature_todo::EnrichmentFeedbackHandler>);
+            }
+
+            // Register todo embedding (if enabled) and capture for MemoryTool
+            if config.todo.search.enabled {
+                if let Some(emb_repo) = embedding_repo {
+                    // feature_todo::TodoTool needs feature_todo::EmbeddingHandler
+                    let todo_embed_impl = Arc::new(
+                        crate::todo_embedding_handler::TodoEmbeddingHandlerImpl::new(
+                            Arc::clone(&embedding_engine),
+                            emb_repo.clone(),
+                        ),
                     );
 
-                // Capture for MemoryTool unified search
-                todo_embedding_handler =
-                    Some(Arc::clone(&embedding_handler) as Arc<dyn EmbeddingHandler>);
+                    // MemoryTool still needs tools::EmbeddingHandler
+                    let memory_embed_impl = Arc::new(tools::EmbeddingEngineImpl::new(
+                        Arc::clone(&embedding_engine),
+                        emb_repo.clone(),
+                    ));
+
+                    todo_embedding_repo = Some(emb_repo.clone());
+
+                    todo_tool = todo_tool
+                        .with_embedding_handler(
+                            Arc::clone(&todo_embed_impl) as Arc<dyn feature_todo::EmbeddingHandler>
+                        )
+                        .with_embedding_repo(emb_repo)
+                        .with_search_config(
+                            config.todo.search.semantic_threshold,
+                            config.todo.search.rrf_k,
+                        );
+
+                    // Capture tools::EmbeddingHandler for MemoryTool unified search
+                    todo_embedding_handler =
+                        Some(Arc::clone(&memory_embed_impl) as Arc<dyn tools::EmbeddingHandler>);
+                } else {
+                    todo_embedding_handler = None;
+                    todo_embedding_repo = None;
+                }
             } else {
                 todo_embedding_handler = None;
                 todo_embedding_repo = None;
             }
+
+            tool_registry.register(todo_tool);
         } else {
+            // No PgPool available (e.g., test environment) — skip feature_todo registration
             todo_embedding_handler = None;
             todo_embedding_repo = None;
         }
-
-        tool_registry.register(todo_tool);
 
         // Register goal tool (if goal_repo is provided)
         if let Some(ref gr) = goal_repo {
@@ -335,8 +363,9 @@ impl AgentLoop {
         // ── Finance Tool Registration ──────────────────────────────────────────
         if config.finance.enabled {
             if let Some(fin_repos) = finance_repos {
-                let price_service =
-                    tools::PriceService::new(config.finance.price_refresh.cache_ttl_minutes);
+                let price_service = feature_finance::PriceService::new(
+                    config.finance.price_refresh.cache_ttl_minutes,
+                );
 
                 let finance_handler_impl =
                     Arc::new(crate::finance_adapter::FinanceHandlerImpl::new(
@@ -345,7 +374,7 @@ impl AgentLoop {
                         config.finance.clone(),
                     ));
 
-                let finance_tool = tools::FinanceTool::new(
+                let finance_tool = feature_finance::FinanceTool::new(
                     fin_repos.finance_accounts,
                     fin_repos.finance_transactions,
                     fin_repos.finance_budgets,
@@ -355,7 +384,9 @@ impl AgentLoop {
                     price_service,
                     config.finance.default_currency.clone(),
                 )
-                .with_finance_handler(Arc::clone(&finance_handler_impl) as Arc<dyn FinanceHandler>);
+                .with_finance_handler(
+                    Arc::clone(&finance_handler_impl) as Arc<dyn feature_finance::FinanceHandler>
+                );
 
                 tool_registry.register(finance_tool);
             }
@@ -554,6 +585,7 @@ impl AgentLoop {
         event_cache_repo: storage::CalendarEventCacheRepo,
         conv_embedding_repo: Option<storage::ConvEmbeddingRepo>,
         finance_repos: Option<storage::Repos>,
+        pool: Option<sqlx::PgPool>,
     ) -> Result<Self> {
         Self::new_with_cron(
             bus,
@@ -573,6 +605,7 @@ impl AgentLoop {
             event_cache_repo,
             conv_embedding_repo,
             finance_repos,
+            pool,
         )
         .await
     }

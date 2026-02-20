@@ -1,8 +1,7 @@
 //! Due-date suggestion based on priority and task keywords.
 
 use chrono::{Duration, Utc};
-use tools::enrichment::EnrichmentSuggestion;
-use tools::todo_types::Todo;
+use feature_todo::{EnrichmentSuggestion, Todo};
 
 /// Suggest a due date based on task content and inferred urgency.
 pub fn suggest_due_date(
@@ -101,7 +100,7 @@ fn contains_urgency(text: &str) -> bool {
 mod tests {
     use super::*;
     use chrono::Utc;
-    use tools::todo_types::Todo;
+    use feature_todo::Todo;
 
     #[test]
     fn test_urgent_task_due_today() {

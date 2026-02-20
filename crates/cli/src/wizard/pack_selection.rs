@@ -155,9 +155,7 @@ pub fn run_pack_selection(state: &mut WizardState) -> Result<StepResult> {
 
                 match key.code {
                     KeyCode::Up | KeyCode::Char('k') => {
-                        if cursor > 0 {
-                            cursor -= 1;
-                        }
+                        cursor = cursor.saturating_sub(1);
                     }
                     KeyCode::Down | KeyCode::Char('j') => {
                         if cursor + 1 < options.len() {

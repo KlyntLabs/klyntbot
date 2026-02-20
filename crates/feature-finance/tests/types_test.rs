@@ -57,14 +57,8 @@ mod account_type {
 
     #[test]
     fn test_from_str_loose_case_insensitive() {
-        assert_eq!(
-            AccountType::from_str_loose("CASH"),
-            Some(AccountType::Cash)
-        );
-        assert_eq!(
-            AccountType::from_str_loose("Bank"),
-            Some(AccountType::Bank)
-        );
+        assert_eq!(AccountType::from_str_loose("CASH"), Some(AccountType::Cash));
+        assert_eq!(AccountType::from_str_loose("Bank"), Some(AccountType::Bank));
     }
 
     #[test]
@@ -241,10 +235,7 @@ mod jar_type {
 
     #[test]
     fn test_from_str_loose_saving_alias() {
-        assert_eq!(
-            JarType::from_str_loose("saving"),
-            Some(JarType::Savings)
-        );
+        assert_eq!(JarType::from_str_loose("saving"), Some(JarType::Savings));
     }
 
     #[test]
@@ -257,10 +248,7 @@ mod jar_type {
 
     #[test]
     fn test_from_str_loose_give_alias() {
-        assert_eq!(
-            JarType::from_str_loose("give"),
-            Some(JarType::Charity)
-        );
+        assert_eq!(JarType::from_str_loose("give"), Some(JarType::Charity));
     }
 
     #[test]
@@ -311,18 +299,12 @@ mod asset_type {
 
     #[test]
     fn test_from_str_loose_stocks_alias() {
-        assert_eq!(
-            AssetType::from_str_loose("stocks"),
-            Some(AssetType::Stock)
-        );
+        assert_eq!(AssetType::from_str_loose("stocks"), Some(AssetType::Stock));
     }
 
     #[test]
     fn test_from_str_loose_equity_alias() {
-        assert_eq!(
-            AssetType::from_str_loose("equity"),
-            Some(AssetType::Stock)
-        );
+        assert_eq!(AssetType::from_str_loose("equity"), Some(AssetType::Stock));
     }
 
     #[test]
@@ -355,10 +337,7 @@ mod asset_type {
 
     #[test]
     fn test_from_str_loose_bonds_alias() {
-        assert_eq!(
-            AssetType::from_str_loose("bonds"),
-            Some(AssetType::Bond)
-        );
+        assert_eq!(AssetType::from_str_loose("bonds"), Some(AssetType::Bond));
         assert_eq!(
             AssetType::from_str_loose("fixed_income"),
             Some(AssetType::Bond)
@@ -461,10 +440,7 @@ mod goal_type {
 
     #[test]
     fn test_from_str_loose_saving_alias() {
-        assert_eq!(
-            GoalType::from_str_loose("saving"),
-            Some(GoalType::Savings)
-        );
+        assert_eq!(GoalType::from_str_loose("saving"), Some(GoalType::Savings));
     }
 
     #[test]
@@ -477,18 +453,12 @@ mod goal_type {
 
     #[test]
     fn test_from_str_loose_buy_alias() {
-        assert_eq!(
-            GoalType::from_str_loose("buy"),
-            Some(GoalType::Purchase)
-        );
+        assert_eq!(GoalType::from_str_loose("buy"), Some(GoalType::Purchase));
     }
 
     #[test]
     fn test_from_str_loose_debt_aliases() {
-        assert_eq!(
-            GoalType::from_str_loose("debt"),
-            Some(GoalType::DebtPayoff)
-        );
+        assert_eq!(GoalType::from_str_loose("debt"), Some(GoalType::DebtPayoff));
         assert_eq!(
             GoalType::from_str_loose("payoff"),
             Some(GoalType::DebtPayoff)
@@ -647,16 +617,13 @@ mod liability_type {
 
 mod display_trait {
     use feature_finance::types::{
-        AccountType, AssetType, BudgetMethod, BudgetPeriod, GoalStatus, GoalType,
-        InvestmentTxType, JarType, LiabilityType, TransactionType,
+        AccountType, AssetType, BudgetMethod, BudgetPeriod, GoalStatus, GoalType, InvestmentTxType,
+        JarType, LiabilityType, TransactionType,
     };
 
     #[test]
     fn test_all_enums_display_matches_as_str() {
-        assert_eq!(
-            format!("{}", AccountType::Cash),
-            AccountType::Cash.as_str()
-        );
+        assert_eq!(format!("{}", AccountType::Cash), AccountType::Cash.as_str());
         assert_eq!(
             format!("{}", TransactionType::Income),
             TransactionType::Income.as_str()
@@ -673,18 +640,12 @@ mod display_trait {
             format!("{}", JarType::Essentials),
             JarType::Essentials.as_str()
         );
-        assert_eq!(
-            format!("{}", AssetType::Stock),
-            AssetType::Stock.as_str()
-        );
+        assert_eq!(format!("{}", AssetType::Stock), AssetType::Stock.as_str());
         assert_eq!(
             format!("{}", InvestmentTxType::Buy),
             InvestmentTxType::Buy.as_str()
         );
-        assert_eq!(
-            format!("{}", GoalType::Savings),
-            GoalType::Savings.as_str()
-        );
+        assert_eq!(format!("{}", GoalType::Savings), GoalType::Savings.as_str());
         assert_eq!(
             format!("{}", GoalStatus::Active),
             GoalStatus::Active.as_str()
@@ -702,8 +663,8 @@ mod display_trait {
 
 mod from_str_trait {
     use feature_finance::types::{
-        AccountType, AssetType, BudgetMethod, BudgetPeriod, GoalStatus, GoalType,
-        InvestmentTxType, JarType, LiabilityType, TransactionType,
+        AccountType, AssetType, BudgetMethod, BudgetPeriod, GoalStatus, GoalType, InvestmentTxType,
+        JarType, LiabilityType, TransactionType,
     };
     use std::str::FromStr;
 

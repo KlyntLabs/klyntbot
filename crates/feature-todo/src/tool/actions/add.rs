@@ -88,7 +88,10 @@ impl TodoTool {
         // Auto-embed (best-effort)
         if let Some(ref emb) = self.embedding_handler {
             if let Err(e) = emb.embed_todo(&created).await {
-                warn!("Failed to generate embedding for todo {}: {}", created.id, e);
+                warn!(
+                    "Failed to generate embedding for todo {}: {}",
+                    created.id, e
+                );
             }
         }
 
