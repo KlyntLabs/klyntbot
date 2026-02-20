@@ -67,6 +67,18 @@ impl WizardState {
         }
     }
 
+    /// Create a fresh wizard state with default config (ignoring any existing).
+    ///
+    /// Used when `--reset` flag is passed to discard previous configuration.
+    pub fn fresh() -> Self {
+        Self {
+            config: Config::default(),
+            total_steps: 0,
+            current_step: 0,
+            is_fresh_install: true,
+        }
+    }
+
     /// Format a step header like "Step 2 of 6: Provider Setup"
     pub fn step_header(&self, title: &str) -> String {
         format!(
@@ -416,5 +428,30 @@ mod tests {
     fn test_step_result_cancel() {
         let result = StepResult::Cancel;
         assert!(matches!(result, StepResult::Cancel));
+    }
+
+    // ========================================================================
+    // WizardState::fresh tests
+    // ========================================================================
+
+    #[test]
+    fn test_wizard_state_fresh_is_default_config() {
+        let state = WizardState::fresh();
+        assert!(state.is_fresh_install);
+        assert_eq!(state.total_steps, 0);
+        assert_eq!(state.current_step, 0);
+        // Fresh state always uses Config::default()
+        assert!(state.config.providers.anthropic.api_key.is_empty());
+    }
+
+    #[test]
+    fn test_wizard_state_fresh_vs_new() {
+        let fresh = WizardState::fresh();
+        let new = WizardState::new();
+        // Both start with zero steps
+        assert_eq!(fresh.total_steps, new.total_steps);
+        assert_eq!(fresh.current_step, new.current_step);
+        // Fresh is always marked as fresh install
+        assert!(fresh.is_fresh_install);
     }
 }

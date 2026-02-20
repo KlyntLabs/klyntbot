@@ -1,20 +1,6 @@
 use super::*;
 
 // ========================================================================
-// ToolsModule adapter tests
-// ========================================================================
-
-#[test]
-fn test_tools_module_metadata() {
-    let module = ToolsModule;
-    assert_eq!(module.name(), "Tool Permissions");
-    assert!(!module.is_required());
-
-    let state = WizardState::new();
-    assert!(module.is_applicable(&state));
-}
-
-// ========================================================================
 // Config set_provider_key integration tests
 // ========================================================================
 
@@ -166,7 +152,7 @@ fn test_active_provider_explicit_field() {
 fn test_active_provider_explicit_fallback() {
     let mut config = config::Config::default();
     config.set_provider_key("openai", "sk-openai-key".to_string());
-    // Explicit provider set but no key for it → falls back to auto-detection
+    // Explicit provider set but no key for it -> falls back to auto-detection
     config.agents.defaults.provider = Some("anthropic".to_string());
     assert_eq!(config.active_provider_name(), "openai");
 }
@@ -181,32 +167,22 @@ fn test_is_provider_configured() {
 }
 
 // ========================================================================
-// Step count tests
+// WizardState tests (new 2-phase flow)
 // ========================================================================
 
 #[test]
-fn test_wizard_step_count() {
-    // Verify the declared step count matches the number of step entries
-    // (this catches off-by-one errors if someone adds a step)
-    let state = WizardState::new();
-    let provider_mod = provider::ProviderModule;
-    let tools_mod = ToolsModule;
-    let daemon_mod = daemon::DaemonModule;
-    let workspace_mod = WorkspaceModule;
+fn test_wizard_state_fresh_has_defaults() {
+    let state = framework::WizardState::fresh();
+    assert!(state.is_fresh_install);
+    assert_eq!(state.total_steps, 0);
+    assert_eq!(state.current_step, 0);
+    // Config should be default (no loaded values)
+    assert!(state.config.providers.anthropic.api_key.is_empty());
+}
 
-    let applicables: Vec<bool> = vec![
-        provider_mod.is_applicable(&state),
-        true, // channels
-        tools_mod.is_applicable(&state),
-        workspace_mod.is_applicable(&state),
-        true, // calendar
-        daemon_mod.is_applicable(&state),
-        true, // review
-    ];
-
-    let count = applicables.iter().filter(|a| **a).count();
-    // On macOS/Linux daemon is applicable, so all 7 steps.
-    // On unknown platforms it would be 6.
-    assert!(count >= 6, "Should have at least 6 applicable steps");
-    assert!(count <= 7, "Should have at most 7 steps");
+#[test]
+fn test_wizard_state_new_loads_config() {
+    let state = framework::WizardState::new();
+    // Config should be initialized (from existing or default)
+    assert!(!state.config.agents.defaults.model.is_empty());
 }

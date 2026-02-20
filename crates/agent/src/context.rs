@@ -93,6 +93,15 @@ impl ContextBuilder {
         Ok(())
     }
 
+    /// Filter loaded skills to only those enabled by pack configuration.
+    ///
+    /// Call after [`init`] and before wrapping in `Arc<RwLock>`.
+    /// When `enabled_skills` is empty, all built-in skills are removed;
+    /// workspace-loaded skills are always kept regardless.
+    pub fn filter_skills(&mut self, enabled_skills: &[String]) {
+        self.skills.filter_by_skills(enabled_skills);
+    }
+
     /// Build messages array for LLM
     pub async fn build_messages(
         &mut self,

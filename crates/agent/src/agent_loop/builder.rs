@@ -71,6 +71,12 @@ impl AgentLoop {
                 e
             )))
         })?;
+
+        // Filter skills to those enabled by pack configuration
+        if !config.packs.enabled_skills.is_empty() {
+            context_builder.filter_skills(&config.packs.enabled_skills);
+        }
+
         // Wrap early so both the learning subscriber and Ok(Self{}) share the same Arc.
         let context_builder = Arc::new(RwLock::new(context_builder));
 

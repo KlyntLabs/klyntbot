@@ -1,16 +1,13 @@
 //! Interactive onboarding wizard for klyntbot initialization.
 //!
-//! Step modules (expand-in-place menus):
-//! - `provider`  – LLM provider selection, API key, model (includes config dashboard)
-//! - `channels`  – Chat platform configuration (async)
-//! - `tools`     – Security presets and tool permissions
-//! - `daemon`    – Background service installation
-//! - `workspace` – Workspace directories and template files
-//! - `calendar`  – Calendar sync configuration
+//! Two-phase flow:
+//! - **Phase 1: Core Setup** — auto-detects provider, database, and channel;
+//!   prompts for missing fields on a single screen.
+//! - **Phase 2: Pack Selection** — presents feature packs grouped by tier,
+//!   lets user toggle with spacebar, applies config mutations.
 //!
-//! Steps under `steps/`:
-//! - `welcome`   – Config status dashboard utilities
-//! - `todo_notifications` – Notification preferences
+//! Legacy step modules are still compiled for potential pack-specific credential
+//! prompts but are no longer called from the main wizard flow.
 //!
 //! Supporting modules:
 //! - `framework`  – `WizardModule` trait, `WizardState`, `WizardRunner`
@@ -44,221 +41,93 @@ pub mod workspace;
 use anyhow::Result;
 use common::utils::terminal::*;
 
-use framework::{print_step_header, StepResult, WizardModule, WizardState};
+use framework::{StepResult, WizardState};
 
-/// Adapter wrapping [`tools::configure_tools`] as a [`WizardModule`].
-struct ToolsModule;
-
-impl WizardModule for ToolsModule {
-    fn name(&self) -> &str {
-        "Tool Permissions"
-    }
-
-    fn description(&self) -> &str {
-        "Configure tool security and permissions"
-    }
-
-    fn is_required(&self) -> bool {
-        false
-    }
-
-    fn run(&self, state: &mut WizardState) -> Result<StepResult> {
-        let can_go_back = state.current_step > 1;
-        let outcome = tools::configure_tools(&mut state.config, can_go_back)?;
-        Ok(if outcome == ui::MenuOutcome::Back {
-            StepResult::Back
-        } else {
-            StepResult::Next
-        })
-    }
-}
-
-/// Adapter wrapping [`workspace::configure_workspace`] as a [`WizardModule`].
-struct WorkspaceModule;
-
-impl WizardModule for WorkspaceModule {
-    fn name(&self) -> &str {
-        "Workspace & Notifications"
-    }
-
-    fn description(&self) -> &str {
-        "Create workspace and configure notification preferences"
-    }
-
-    fn run(&self, state: &mut WizardState) -> Result<StepResult> {
-        let can_go_back = state.current_step > 1;
-        let outcome = workspace::configure_workspace(&mut state.config, can_go_back)?;
-        Ok(if outcome == ui::MenuOutcome::Back {
-            StepResult::Back
-        } else {
-            StepResult::Next
-        })
-    }
-}
+// ============================================================================
+// 2-phase wizard orchestrator
+// ============================================================================
 
 /// Run the interactive onboarding wizard.
 ///
-/// Orchestrates all wizard modules in sequence with forward/back navigation.
-/// The channels and calendar steps are handled inline because they require async I/O.
-pub async fn run_wizard(_packs_only: bool, _reset: bool) -> Result<()> {
-    // Print global branding header at the very top
+/// Two-phase flow:
+/// 1. **Core Setup** — auto-detect provider, database, channel; prompt for missing
+/// 2. **Pack Selection** — choose feature packs; apply config mutations
+///
+/// Flags:
+/// - `packs_only`: Skip Phase 1, jump directly to pack selection.
+/// - `reset`: Wipe config to defaults before starting.
+pub async fn run_wizard(packs_only: bool, reset: bool) -> Result<()> {
     print_wizard_header();
 
-    let mut state = WizardState::new();
+    let mut state = if reset {
+        WizardState::fresh()
+    } else {
+        WizardState::new()
+    };
 
-    // Step table: (name, required, applicable)
-    // Index order must match the dispatch arms below.
-    let all_steps: &[(&str, bool, bool)] = &[
-        ("LLM Provider", true, true),
-        ("Database", false, true),
-        ("Chat Channels", false, true),
-        ("Tool Permissions", false, true),
-        ("Workspace & Notifications", true, true),
-        ("Calendar Sync", false, true),
-        ("Semantic Search", false, true),
-        ("Conversation Memory", false, true),
-        ("Learning System", false, true),
-        (
-            "Background Service",
-            false,
-            daemon::DaemonModule.is_applicable(&state),
-        ),
-        ("Review & Confirm", true, true),
-    ];
-
-    // Filter to applicable steps
-    let applicable: Vec<usize> = all_steps
-        .iter()
-        .enumerate()
-        .filter(|(_, (_, _, app))| *app)
-        .map(|(i, _)| i)
-        .collect();
-
-    state.total_steps = applicable.len();
-
-    // Navigate through steps with forward/back support
-    let mut pos = 0;
-    while pos < applicable.len() {
-        let step_idx = applicable[pos];
-        let (name, required, _) = all_steps[step_idx];
-        state.current_step = pos + 1;
-
-        print_step_header(&state, name, required);
-
-        // Dispatch to the right module. Step indices correspond to `all_steps`:
-        // 0=provider, 1=database (async), 2=channels (async), 3=tools,
-        // 4=workspace+notifications, 5=calendar (async), 6=semantic_search,
-        // 7=conversation_memory, 8=learning, 9=daemon, 10=review.
-        // Ctrl+C in raw-mode prompts surfaces as an Err containing "Ctrl+C".
-        let result = match match step_idx {
-            0 => provider::ProviderModule.run(&mut state),
-            1 => steps::database::run_database_step(&mut state).await,
-            2 => run_channels_step(&mut state).await,
-            3 => ToolsModule.run(&mut state),
-            4 => WorkspaceModule.run(&mut state),
-            5 => run_calendar_step(&mut state).await,
-            6 => run_search_step(&mut state),
-            7 => run_memory_step(&mut state),
-            8 => run_learning_step(&mut state),
-            9 => daemon::DaemonModule.run(&mut state),
-            10 => steps::review::ReviewModule.run(&mut state),
-            _ => unreachable!(),
-        } {
-            Ok(r) => r,
+    if !packs_only {
+        // Phase 1: Smart Core Setup
+        print_phase_header(1, 2, "Core Setup");
+        match core_setup::run_core_setup(&mut state).await {
+            Ok(StepResult::Cancel) => {
+                println!("\n{} Setup cancelled.", status_warning());
+                return Ok(());
+            }
+            Ok(_) => {
+                config::save(&state.config).await?;
+            }
             Err(ref e) if e.to_string().contains("Ctrl+C") => {
-                println!("\n{} Setup cancelled. No changes saved.", status_warning());
+                println!("\n{} Setup cancelled.", status_warning());
                 return Ok(());
             }
             Err(e) => return Err(e),
-        };
-
-        match result {
-            StepResult::Next | StepResult::Skip => {
-                // Auto-save after each completed step so progress isn't lost
-                config::save(&state.config).await?;
-                pos += 1;
-            }
-            StepResult::Back if pos > 0 => pos -= 1,
-            StepResult::Back => {} // already at first step
-            StepResult::Cancel => {
-                println!("\n{} Setup cancelled. No changes saved.", status_warning());
-                return Ok(());
-            }
         }
     }
 
-    // Final safety save (redundant but ensures config is written)
-    config::save(&state.config).await?;
+    // Phase 2: Pack Selection
+    print_phase_header(
+        if packs_only { 1 } else { 2 },
+        if packs_only { 1 } else { 2 },
+        "Feature Packs",
+    );
+    match pack_selection::run_pack_selection(&mut state) {
+        Ok(StepResult::Cancel) => {
+            println!("\n{} Setup cancelled.", status_warning());
+            return Ok(());
+        }
+        Ok(StepResult::Back) if !packs_only => {
+            // Go back to Phase 1 — recurse without packs_only
+            return Box::pin(run_wizard(false, false)).await;
+        }
+        Ok(_) => {
+            config::save(&state.config).await?;
+        }
+        Err(ref e) if e.to_string().contains("Ctrl+C") => {
+            println!("\n{} Setup cancelled.", status_warning());
+            return Ok(());
+        }
+        Err(e) => return Err(e),
+    }
 
-    // Completion screen
     print_completion();
-
     Ok(())
 }
 
-/// Channels wizard step (async due to OAuth flows).
-///
-/// No y/n gate — always shows channel configuration with current state.
-async fn run_channels_step(state: &mut WizardState) -> Result<StepResult> {
-    let can_go_back = state.current_step > 1;
-    let outcome = channels::configure_channels(&mut state.config, can_go_back).await?;
-    Ok(if outcome == ui::MenuOutcome::Back {
-        StepResult::Back
-    } else {
-        StepResult::Next
-    })
-}
+// ============================================================================
+// UI helpers
+// ============================================================================
 
-/// Calendar wizard step (async due to connection testing).
-///
-/// No y/n gate — always shows calendar configuration with current state.
-async fn run_calendar_step(state: &mut WizardState) -> Result<StepResult> {
-    let can_go_back = state.current_step > 1;
-    let outcome = calendar::configure_calendars(&mut state.config, can_go_back).await?;
-    Ok(if outcome == ui::MenuOutcome::Back {
-        StepResult::Back
-    } else {
-        StepResult::Next
-    })
-}
-
-/// Semantic search wizard step (sync, but model download can take time).
-///
-/// Shows enable/disable menu with optional model download.
-fn run_search_step(state: &mut WizardState) -> Result<StepResult> {
-    let can_go_back = state.current_step > 1;
-    let outcome = search::configure_semantic_search(&mut state.config, can_go_back)?;
-    Ok(if outcome == ui::MenuOutcome::Back {
-        StepResult::Back
-    } else {
-        StepResult::Next
-    })
-}
-
-/// Conversation memory wizard step (sync, reuses semantic search model).
-///
-/// Shows enable/disable menu for conversation embedding and search.
-fn run_memory_step(state: &mut WizardState) -> Result<StepResult> {
-    let can_go_back = state.current_step > 1;
-    let outcome = memory::configure_conversation_memory(&mut state.config, can_go_back)?;
-    Ok(if outcome == ui::MenuOutcome::Back {
-        StepResult::Back
-    } else {
-        StepResult::Next
-    })
-}
-
-/// Learning system wizard step (sync).
-///
-/// Shows enable/disable menu for adaptive learning and outcome recording.
-fn run_learning_step(state: &mut WizardState) -> Result<StepResult> {
-    let can_go_back = state.current_step > 1;
-    let outcome = learning::configure_learning(&mut state.config, can_go_back)?;
-    Ok(if outcome == ui::MenuOutcome::Back {
-        StepResult::Back
-    } else {
-        StepResult::Next
-    })
+/// Print a phase header (e.g., "Phase 1 of 2 — Core Setup").
+fn print_phase_header(phase: usize, total: usize, name: &str) {
+    println!();
+    println!(
+        "  {} Phase {} of {} — {}",
+        colorize("●", BRAND),
+        phase,
+        total,
+        colorize(name, BOLD),
+    );
+    println!();
 }
 
 /// Print the global wizard header (shown once at the start).
@@ -286,7 +155,7 @@ fn print_wizard_header() {
     println!();
 }
 
-/// Print the completion screen after all steps finish.
+/// Print the completion screen after all phases finish.
 fn print_completion() {
     let config_path_str = config::config_path()
         .map(|p| p.display().to_string())
