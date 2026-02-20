@@ -101,10 +101,9 @@ impl AgentLoop {
         info!("Agent loop started");
 
         // Take ownership of the receiver
-        let mut inbound_rx = self
-            .inbound_rx
-            .take()
-            .ok_or_else(|| common::KlyntbotError::Bus("AgentLoop::run can only be called once".into()))?;
+        let mut inbound_rx = self.inbound_rx.take().ok_or_else(|| {
+            common::KlyntbotError::Bus("AgentLoop::run can only be called once".into())
+        })?;
 
         while self.running.load(Ordering::SeqCst) {
             // Wait for next message with timeout
