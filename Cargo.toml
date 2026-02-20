@@ -19,6 +19,8 @@ members = [
     "crates/storage",
     "crates/tools-core",
     "crates/tools-core-macros",
+    "crates/feature-finance",
+    "crates/feature-todo",
 ]
 
 [workspace.package]
@@ -47,6 +49,8 @@ context_engine = { path = "crates/context_engine" }
 storage = { path = "crates/storage" }
 tools-core = { path = "crates/tools-core" }
 tools-core-macros = { path = "crates/tools-core-macros" }
+feature-finance = { path = "crates/feature-finance" }
+feature-todo = { path = "crates/feature-todo" }
 
 # Proc-macro dependencies
 syn = { version = "2", features = ["full", "extra-traits"] }

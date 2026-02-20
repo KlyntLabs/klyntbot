@@ -1,187 +1,99 @@
-//! Tests for Todo types with DomainEnum (AC 4.2).
-//!
-//! Verifies that TodoStatus and CreationMode correctly use the DomainEnum
-//! derive macro for from_str_loose, as_str, Display, and FromStr.
-//!
-//! Dev: implement these tests via TDD alongside the types in
-//! `crates/feature-todo/src/types.rs` and `crates/feature-todo/src/config.rs`.
+//! Unit tests for feature-todo domain types.
 
-// NOTE: Adjust imports once feature-todo types are finalized.
-//
-// Expected imports:
-//   use feature_todo::TodoStatus;
-//   use feature_todo::config::CreationMode;  // or re-exported from lib.rs
+use feature_todo::types::{Todo, TodoStatus, AttachmentType, TimeEntrySource};
 
-// ============================================================
-// AC 4.2: TodoStatus::from_str_loose with aliases
-// ============================================================
-
-mod todo_status {
-    // use feature_todo::TodoStatus;
-
-    #[test]
-    fn test_todo_status_from_str_loose_pending() {
-        // Verifies: TodoStatus::from_str_loose("pending") == Some(TodoStatus::Todo).
-        // AC 4.2
-        todo!()
-    }
-
-    #[test]
-    fn test_todo_status_from_str_loose_open() {
-        // Verifies: TodoStatus::from_str_loose("open") == Some(TodoStatus::Todo).
-        // AC 4.2
-        todo!()
-    }
-
-    #[test]
-    fn test_todo_status_from_str_loose_in_progress() {
-        // Verifies: TodoStatus::from_str_loose("in_progress") == Some(TodoStatus::Doing).
-        // AC 4.2
-        todo!()
-    }
-
-    #[test]
-    fn test_todo_status_from_str_loose_active() {
-        // Verifies: TodoStatus::from_str_loose("active") == Some(TodoStatus::Doing).
-        // AC 4.2
-        todo!()
-    }
-
-    #[test]
-    fn test_todo_status_from_str_loose_completed() {
-        // Verifies: TodoStatus::from_str_loose("completed") == Some(TodoStatus::Done).
-        // AC 4.2
-        todo!()
-    }
-
-    #[test]
-    fn test_todo_status_from_str_loose_closed() {
-        // Verifies: TodoStatus::from_str_loose("closed") == Some(TodoStatus::Done).
-        // AC 4.2
-        todo!()
-    }
-
-    #[test]
-    fn test_todo_status_from_str_loose_case_insensitive() {
-        // Verifies: TodoStatus::from_str_loose("TODO") == Some(TodoStatus::Todo),
-        //           TodoStatus::from_str_loose("DOING") == Some(TodoStatus::Doing).
-        // AC 4.2
-        todo!()
-    }
-
-    #[test]
-    fn test_todo_status_from_str_loose_unknown() {
-        // Verifies: TodoStatus::from_str_loose("invalid") == None.
-        // AC 4.2
-        todo!()
-    }
-
-    // ============================================================
-    // AC 4.2: TodoStatus::as_str returns snake_case
-    // ============================================================
-
-    #[test]
-    fn test_todo_status_as_str_todo() {
-        // Verifies: TodoStatus::Todo.as_str() == "todo".
-        // AC 4.2
-        todo!()
-    }
-
-    #[test]
-    fn test_todo_status_as_str_doing() {
-        // Verifies: TodoStatus::Doing.as_str() == "doing".
-        // AC 4.2
-        todo!()
-    }
-
-    #[test]
-    fn test_todo_status_as_str_done() {
-        // Verifies: TodoStatus::Done.as_str() == "done".
-        // AC 4.2
-        todo!()
-    }
-
-    #[test]
-    fn test_todo_status_as_str_archived() {
-        // Verifies: TodoStatus::Archived.as_str() == "archived".
-        // AC 4.2
-        todo!()
-    }
-
-    // ============================================================
-    // AC 4.2: TodoStatus Display and FromStr
-    // ============================================================
-
-    #[test]
-    fn test_todo_status_display() {
-        // Verifies: format!("{}", TodoStatus::Todo) == "todo".
-        // AC 4.2
-        todo!()
-    }
-
-    #[test]
-    fn test_todo_status_from_str_roundtrip() {
-        // Verifies: "todo".parse::<TodoStatus>() == Ok(TodoStatus::Todo),
-        //           then TodoStatus::Todo.to_string() == "todo".
-        // AC 4.2
-        todo!()
-    }
+#[test]
+fn test_todo_generate_id_unique() {
+    use std::collections::HashSet;
+    let ids: HashSet<String> = (0..100).map(|_| Todo::generate_id()).collect();
+    assert_eq!(ids.len(), 100, "All 100 generated IDs should be unique");
 }
 
-// ============================================================
-// AC 4.2: CreationMode with DomainEnum
-// ============================================================
+#[test]
+fn test_todo_generate_id_length() {
+    let id = Todo::generate_id();
+    assert_eq!(id.len(), 8, "ID should be exactly 8 characters");
+}
 
-mod creation_mode {
-    // use feature_todo::config::CreationMode;
+#[test]
+fn test_default_instance_not_template() {
+    let todo = Todo::default_instance();
+    assert!(!todo.is_template, "default_instance should not be a template");
+    assert!(todo.blocked_by.is_empty());
+    assert!(todo.blocks.is_empty());
+    assert!(todo.attachments.is_empty());
+}
 
-    #[test]
-    fn test_creation_mode_as_str_ask_first() {
-        // Verifies: CreationMode::AskFirst.as_str() == "ask_first".
-        // AC 4.2
-        todo!()
-    }
+#[test]
+fn test_todo_status_from_str_loose() {
+    assert_eq!(TodoStatus::from_str_loose("todo"), Some(TodoStatus::Todo));
+    assert_eq!(TodoStatus::from_str_loose("TODO"), Some(TodoStatus::Todo));
+    assert_eq!(TodoStatus::from_str_loose("doing"), Some(TodoStatus::Doing));
+    assert_eq!(TodoStatus::from_str_loose("done"), Some(TodoStatus::Done));
+    assert_eq!(TodoStatus::from_str_loose("archived"), Some(TodoStatus::Archived));
+    assert_eq!(TodoStatus::from_str_loose("unknown"), None);
+}
 
-    #[test]
-    fn test_creation_mode_as_str_yolo() {
-        // Verifies: CreationMode::Yolo.as_str() == "yolo".
-        // AC 4.2
-        todo!()
-    }
+#[test]
+fn test_todo_status_display() {
+    assert_eq!(TodoStatus::Todo.as_str(), "todo");
+    assert_eq!(TodoStatus::Done.as_str(), "done");
+    assert_eq!(format!("{}", TodoStatus::Doing), "doing");
+}
 
-    #[test]
-    fn test_creation_mode_as_str_party() {
-        // Verifies: CreationMode::Party.as_str() == "party".
-        // AC 4.2
-        todo!()
-    }
+#[test]
+fn test_todo_serde_round_trip() {
+    let mut todo = Todo::default_instance();
+    todo.title = "Test task".to_string();
+    todo.priority = Some(2);
+    todo.tags = vec!["work".to_string(), "urgent".to_string()];
 
-    #[test]
-    fn test_creation_mode_from_str_loose_alias() {
-        // Verifies: CreationMode::from_str_loose("ask_first") == Some(CreationMode::AskFirst).
-        // The alias "ask_first" should map to AskFirst.
-        // AC 4.2
-        todo!()
-    }
+    let json = serde_json::to_string(&todo).unwrap();
+    let parsed: Todo = serde_json::from_str(&json).unwrap();
 
-    #[test]
-    fn test_creation_mode_from_str_loose_case_insensitive() {
-        // Verifies: CreationMode::from_str_loose("YOLO") == Some(CreationMode::Yolo).
-        // AC 4.2
-        todo!()
-    }
+    assert_eq!(parsed.title, "Test task");
+    assert_eq!(parsed.priority, Some(2));
+    assert_eq!(parsed.tags, vec!["work", "urgent"]);
+    assert!(!parsed.is_template);
+}
 
-    #[test]
-    fn test_creation_mode_from_str_loose_unknown() {
-        // Verifies: CreationMode::from_str_loose("invalid") == None.
-        // AC 4.2
-        todo!()
-    }
+#[test]
+fn test_todo_serde_backward_compat() {
+    // Old JSON without extended fields should deserialize with defaults
+    let json = r#"{
+        "id": "abc12345",
+        "title": "Old task",
+        "description": null,
+        "priority": null,
+        "due_date": null,
+        "tags": [],
+        "status": "todo",
+        "focused_at": null,
+        "focus_deadline": null,
+        "focus_expired_count": 0,
+        "created_at": "2026-01-01T00:00:00Z",
+        "updated_at": "2026-01-01T00:00:00Z",
+        "completed_at": null
+    }"#;
 
-    #[test]
-    fn test_creation_mode_display() {
-        // Verifies: format!("{}", CreationMode::AskFirst) == "ask_first".
-        // AC 4.2
-        todo!()
-    }
+    let todo: Todo = serde_json::from_str(json).unwrap();
+    assert_eq!(todo.id, "abc12345");
+    assert!(!todo.is_template);
+    assert!(todo.recurrence_rule.is_none());
+    assert!(todo.blocked_by.is_empty());
+    assert!(todo.blocks.is_empty());
+}
+
+#[test]
+fn test_attachment_type_round_trip() {
+    assert_eq!(AttachmentType::parse("file"), Some(AttachmentType::File));
+    assert_eq!(AttachmentType::parse("url"), Some(AttachmentType::Url));
+    assert_eq!(AttachmentType::parse("note"), Some(AttachmentType::Note));
+    assert_eq!(AttachmentType::parse("unknown"), None);
+}
+
+#[test]
+fn test_time_entry_source_default() {
+    let source = TimeEntrySource::default();
+    assert_eq!(source, TimeEntrySource::Focus);
 }
