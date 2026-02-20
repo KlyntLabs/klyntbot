@@ -300,6 +300,21 @@ impl SkillManager {
     pub fn all(&self) -> Vec<&Skill> {
         self.skills.values().collect()
     }
+
+    /// Filter loaded skills to only those in the allowed list.
+    ///
+    /// Used after `load()` to restrict skills to those from enabled packs.
+    /// Workspace-loaded skills (non-builtin) are always kept.
+    pub fn filter_by_skills(&mut self, allowed_skill_names: &[String]) {
+        self.skills.retain(|name, skill| {
+            // Keep workspace skills (not builtin) regardless
+            if !skill.path.to_string_lossy().starts_with("builtin::") {
+                return true;
+            }
+            // Keep if name is in the allowed list
+            allowed_skill_names.iter().any(|a| a == name)
+        });
+    }
 }
 
 impl Default for SkillManager {
@@ -360,4 +375,44 @@ fn check_requirements(bins: &[String], env_vars: &[String]) -> bool {
     }
 
     true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_filter_by_skills_includes_matching() {
+        let mut mgr = SkillManager::new();
+        mgr.load_builtin_skills().unwrap();
+
+        let enabled_skills = vec!["todo".to_string(), "github".to_string()];
+        mgr.filter_by_skills(&enabled_skills);
+
+        assert!(mgr.get("todo").is_some());
+        assert!(mgr.get("github").is_some());
+        assert!(mgr.get("weather").is_none());
+    }
+
+    #[test]
+    fn test_filter_by_skills_empty_keeps_nothing() {
+        let mut mgr = SkillManager::new();
+        mgr.load_builtin_skills().unwrap();
+
+        mgr.filter_by_skills(&[]);
+
+        assert_eq!(mgr.all().len(), 0);
+    }
+
+    #[test]
+    fn test_filter_by_skills_all_names_keeps_all() {
+        let mut mgr = SkillManager::new();
+        mgr.load_builtin_skills().unwrap();
+        let total = mgr.all().len();
+
+        let all_names: Vec<String> = mgr.all().iter().map(|s| s.name.clone()).collect();
+        mgr.filter_by_skills(&all_names);
+
+        assert_eq!(mgr.all().len(), total);
+    }
 }
