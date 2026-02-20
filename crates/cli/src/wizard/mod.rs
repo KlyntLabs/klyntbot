@@ -30,6 +30,7 @@ pub mod framework;
 pub mod learning;
 pub mod memory;
 pub mod oauth;
+pub mod pack_selection;
 pub mod packs;
 pub mod prompts;
 pub mod provider;
