@@ -31,7 +31,7 @@ async fn main() {
 
         Some(Commands::Serve { port, .. }) => cli_handlers::handle_serve(port).await,
 
-        Some(Commands::Init) => handle_init().await,
+        Some(Commands::Init { packs, reset }) => handle_init(packs, reset).await,
 
         Some(Commands::Status { verbose }) => cli_handlers::handle_status(verbose).await,
 
@@ -73,11 +73,11 @@ fn init_tracing(level: &str) {
 }
 
 /// Handle init command
-async fn handle_init() -> anyhow::Result<()> {
+async fn handle_init(packs: bool, reset: bool) -> anyhow::Result<()> {
     use cli::run_wizard;
 
     // Run the interactive wizard
-    run_wizard().await?;
+    run_wizard(packs, reset).await?;
 
     Ok(())
 }

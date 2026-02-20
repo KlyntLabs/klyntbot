@@ -24,6 +24,7 @@ pub mod ask_user_prompt;
 pub mod calendar;
 pub mod channels;
 pub mod daemon;
+pub mod detect;
 pub mod framework;
 pub mod learning;
 pub mod memory;
@@ -96,7 +97,7 @@ impl WizardModule for WorkspaceModule {
 ///
 /// Orchestrates all wizard modules in sequence with forward/back navigation.
 /// The channels and calendar steps are handled inline because they require async I/O.
-pub async fn run_wizard() -> Result<()> {
+pub async fn run_wizard(_packs_only: bool, _reset: bool) -> Result<()> {
     // Print global branding header at the very top
     print_wizard_header();
 
