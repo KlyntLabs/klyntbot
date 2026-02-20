@@ -15,6 +15,7 @@ use super::learning::LearningConfig;
 use super::project::ProjectConfig;
 use super::providers::{ProviderManagerConfig, ProvidersConfig};
 use super::todo::TodoConfig;
+use super::packs::PacksConfig;
 use super::tools::ToolsConfig;
 
 /// Expand a leading `~` in a path to the user's home directory.
@@ -122,6 +123,10 @@ pub struct Config {
     /// PostgreSQL connection URL (optional — DB features disabled when absent).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub database_url: Option<String>,
+
+    /// Feature packs (controls which skills and config sections are active).
+    #[serde(default)]
+    pub packs: PacksConfig,
 }
 
 impl Config {

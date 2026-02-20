@@ -27,6 +27,7 @@ mod learning;
 mod project;
 mod providers;
 mod todo;
+mod packs;
 mod tools;
 
 pub use self::agents::*;
@@ -41,6 +42,7 @@ pub use self::learning::*;
 pub use self::project::*;
 pub use self::providers::*;
 pub use self::todo::*;
+pub use self::packs::*;
 pub use self::tools::*;
 
 #[cfg(test)]
