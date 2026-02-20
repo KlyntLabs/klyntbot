@@ -25,6 +25,14 @@ impl StoragePool {
         Ok(Self(pool))
     }
 
+    /// Wrap an existing `sqlx::PgPool` without running migrations.
+    ///
+    /// Use this when you already have a connected pool (e.g., from a builder
+    /// that received the pool as a dependency).
+    pub fn from_existing(pool: sqlx::PgPool) -> Self {
+        Self(pool)
+    }
+
     /// Access the inner `sqlx::PgPool`.
     pub fn inner(&self) -> &sqlx::PgPool {
         &self.0

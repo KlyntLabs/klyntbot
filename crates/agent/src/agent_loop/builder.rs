@@ -1,6 +1,6 @@
 //! Agent loop construction: tool registration, handler wiring, pipeline assembly.
 
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
@@ -9,6 +9,7 @@ use tracing::info;
 use bus::MessageBus;
 use common::Result;
 use config::Config;
+use context_engine::ContextSource;
 use providers::DynProvider;
 use session::SessionManager;
 use tools::{
@@ -26,70 +27,158 @@ use tools::{
 };
 
 use super::super::confidence::ConfidenceEvaluator;
-use super::super::{CalendarSyncAdapter, ContextBuilder, CronHandlerAdapter, SubagentManager};
+use super::super::context_sources::{
+    BootstrapSource, ConfidenceSource, GoalSource, IdentitySource, MemorySource,
+    SkillContentSource, SkillSummarySource, TodoSource,
+};
+use super::super::{CalendarSyncAdapter, CronHandlerAdapter, MemoryStore, SkillManager, SubagentManager};
 use super::{AgentLoop, LastActiveChannel};
 
-impl AgentLoop {
-    /// Create a new agent loop with optional cron service and shared instances
-    #[allow(clippy::too_many_arguments)]
-    pub async fn new_with_cron(
-        bus: Arc<MessageBus>,
-        provider: DynProvider,
-        config: Config,
-        cron_service: Option<Arc<scheduling::CronService>>,
-        todo_repo: storage::TodoRepo,
-        embedding_repo: Option<storage::EmbeddingRepo>,
-        goal_repo: Option<storage::GoalRepo>,
-        plan_repo: Option<storage::PlanRepo>,
-        notification_handle: Option<LastActiveChannel>,
-        outcome_repo: storage::OutcomeRepo,
-        learning_state_repo: storage::LearningStateRepo,
-        memory_note_repo: storage::MemoryNoteRepo,
-        strategy_repo: Option<storage::StrategyRepo>,
-        calendar_sync_repo: storage::CalendarSyncRepo,
-        event_cache_repo: storage::CalendarEventCacheRepo,
-        conv_embedding_repo: Option<storage::ConvEmbeddingRepo>,
-        finance_repos: Option<storage::Repos>,
-        pool: Option<sqlx::PgPool>,
-    ) -> Result<Self> {
-        let workspace = config.workspace_path();
+/// Builder for constructing an [`AgentLoop`] with all its dependencies.
+///
+/// Required fields: `bus`, `provider`, `config`.
+/// Optional: `pool` (enables feature-todo, finance), `cron_service`, `notification_handle`.
+///
+/// # Example
+/// ```ignore
+/// let agent = AgentLoop::builder()
+///     .with_bus(bus)
+///     .with_provider(provider)
+///     .with_config(config)
+///     .with_pool(pool)
+///     .build()
+///     .await?;
+/// ```
+pub struct AgentLoopBuilder {
+    bus: Option<Arc<MessageBus>>,
+    provider: Option<DynProvider>,
+    config: Option<Config>,
+    pool: Option<sqlx::PgPool>,
+    cron_service: Option<Arc<scheduling::CronService>>,
+    notification_handle: Option<LastActiveChannel>,
+}
 
-        // Create context builder (SQL-backed memory)
-        let mut context_builder = ContextBuilder::new(
-            workspace.clone(),
-            config.timezone.clone(),
-            Some(todo_repo.clone()),
-            goal_repo.clone(),
-            memory_note_repo,
-        )
-        .await;
-        context_builder.init().await.map_err(|e| {
-            common::KlyntbotError::Config(common::ConfigError::Invalid(format!(
-                "Failed to initialize context: {}",
-                e
-            )))
+impl Default for AgentLoopBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl AgentLoopBuilder {
+    pub fn new() -> Self {
+        Self {
+            bus: None,
+            provider: None,
+            config: None,
+            pool: None,
+            cron_service: None,
+            notification_handle: None,
+        }
+    }
+
+    pub fn with_bus(mut self, bus: Arc<MessageBus>) -> Self {
+        self.bus = Some(bus);
+        self
+    }
+
+    pub fn with_provider(mut self, provider: DynProvider) -> Self {
+        self.provider = Some(provider);
+        self
+    }
+
+    pub fn with_config(mut self, config: Config) -> Self {
+        self.config = Some(config);
+        self
+    }
+
+    pub fn with_pool(mut self, pool: sqlx::PgPool) -> Self {
+        self.pool = Some(pool);
+        self
+    }
+
+    pub fn with_cron_service(mut self, service: Arc<scheduling::CronService>) -> Self {
+        self.cron_service = Some(service);
+        self
+    }
+
+    pub fn with_notification_handle(mut self, handle: LastActiveChannel) -> Self {
+        self.notification_handle = Some(handle);
+        self
+    }
+
+    /// Consume the builder and construct an [`AgentLoop`].
+    ///
+    /// Returns an error if any required field is missing or if initialization fails.
+    pub async fn build(self) -> Result<AgentLoop> {
+        // ── Validate required fields ──────────────────────────────────────
+        let bus = self.bus.ok_or_else(|| {
+            common::KlyntbotError::Config(common::ConfigError::MissingField("bus".into()))
+        })?;
+        let provider = self.provider.ok_or_else(|| {
+            common::KlyntbotError::Config(common::ConfigError::MissingField("provider".into()))
+        })?;
+        let config = self.config.ok_or_else(|| {
+            common::KlyntbotError::Config(common::ConfigError::MissingField("config".into()))
         })?;
 
-        // Filter skills to those enabled by pack configuration
+        let workspace = config.workspace_path();
+
+        // ── Create repos from pool (real or lazy fallback) ────────────────
+        let effective_pool = self.pool.clone().unwrap_or_else(|| {
+            sqlx::PgPool::connect_lazy("postgres://localhost/klyntbot")
+                .unwrap_or_else(|_| panic!("Failed to create lazy PgPool fallback"))
+        });
+        let storage_pool = storage::StoragePool::from_existing(effective_pool);
+        let repos = storage::Repos::from_pool(&storage_pool);
+
+        // ── Skills (init + filter) ────────────────────────────────────────
+        let mut skill_manager = SkillManager::new();
+        skill_manager
+            .load(workspace.clone())
+            .await
+            .map_err(|e| {
+                common::KlyntbotError::Config(common::ConfigError::Invalid(format!(
+                    "Failed to initialize skills: {}",
+                    e
+                )))
+            })?;
+
         if !config.packs.enabled_skills.is_empty() {
-            context_builder.filter_skills(&config.packs.enabled_skills);
+            skill_manager.filter_by_skills(&config.packs.enabled_skills);
         }
 
-        // Wrap early so both the learning subscriber and Ok(Self{}) share the same Arc.
-        let context_builder = Arc::new(RwLock::new(context_builder));
+        let skill_manager = Arc::new(skill_manager);
 
-        // Create session manager (SQL-backed)
-        let session_repo = if let Some(ref p) = pool {
-            storage::SessionRepo::new(p.clone())
-        } else {
-            // Fallback for test environments without a pool: use lazy connection
-            let fallback = sqlx::PgPool::connect_lazy("postgres://localhost/klyntbot")
-                .unwrap_or_else(|_| panic!("Failed to create lazy PgPool for SessionManager"));
-            storage::SessionRepo::new(fallback)
-        };
-        let session_manager = SessionManager::from_repo(session_repo).await;
+        // ── Context sources ───────────────────────────────────────────────
+        let confidence_source = ConfidenceSource::new(config.confidence.threshold);
+        let confidence_threshold_handle = confidence_source.threshold_handle();
 
-        // Create subagent manager
+        let memory_store = MemoryStore::new(repos.memory_notes.clone());
+
+        let mut sources: Vec<Box<dyn ContextSource>> = vec![
+            Box::new(IdentitySource::new(workspace.clone(), config.timezone.clone())),
+            Box::new(BootstrapSource::new(workspace.clone())),
+            Box::new(MemorySource::new(memory_store)),
+            Box::new(TodoSource::new(repos.todos.clone())),
+            Box::new(GoalSource::new(repos.goals.clone())),
+            Box::new(confidence_source),
+            Box::new(SkillSummarySource::new(Arc::clone(&skill_manager))),
+            Box::new(SkillContentSource::new(Arc::clone(&skill_manager))),
+        ];
+
+        // Sort by priority (descending) — ensures correct ordering in prompt
+        sources.sort_by_key(|s| std::cmp::Reverse(s.priority()));
+
+        let context_engine = Arc::new(
+            context_engine::ContextEngine::new().with_sources(sources),
+        );
+
+        // ── Session manager (SQL-backed) ──────────────────────────────────
+        let session_manager =
+            SessionManager::from_repo(storage::SessionRepo::new(storage_pool.inner().clone()))
+                .await;
+
+        // ── Subagent manager ──────────────────────────────────────────────
         let brave_api_key = (!config.tools.web.brave_api_key.is_empty())
             .then(|| config.tools.web.brave_api_key.expose().clone());
 
@@ -104,54 +193,53 @@ impl AgentLoop {
                 .build(),
         );
 
-        // Create tool registry
+        // ── Tool registry ─────────────────────────────────────────────────
         let mut tool_registry = ToolRegistry::new();
 
-        // Register filesystem tools
+        // Filesystem tools
         let allowed_dir = if config.tools.restrict_to_workspace {
             Some(workspace.clone())
         } else {
             None
         };
-
         register_fs_tools(&mut tool_registry, allowed_dir);
 
-        // Register shell tool
+        // Shell tool
         tool_registry.register(ExecTool::new(
             config.tools.exec.timeout,
             Some(workspace.clone()),
             config.tools.restrict_to_workspace,
         ));
 
-        // Register web tools (reuse brave_api_key from above)
+        // Web tools
         tool_registry.register(WebSearchTool::new(
             brave_api_key,
             config.tools.web.max_results,
         ));
         tool_registry.register(WebFetchTool::new());
 
-        // Register message tool
+        // Message tool
         tool_registry.register(MessageTool::new(bus.outbound_sender()));
 
-        // Register ask_user tool
+        // Ask-user tool
         tool_registry.register(tools::ask_user::AskUserTool);
 
-        // Register spawn tool with subagent manager as handler
+        // Spawn tool
         tool_registry.register(SpawnTool::with_handler(
-            Arc::clone(&subagent_manager) as Arc<dyn tools::spawn::SpawnHandler>
+            Arc::clone(&subagent_manager) as Arc<dyn tools::spawn::SpawnHandler>,
         ));
 
-        // Register cron tool (with service if provided)
-        if let Some(cron_svc) = cron_service {
+        // Cron tool (optional)
+        if let Some(cron_svc) = self.cron_service {
             let adapter = Arc::new(CronHandlerAdapter::new(cron_svc));
             tool_registry.register(CronTool::with_handler(adapter));
         }
 
-        // Clone todo_repo before moving into TodoTool (it's still needed by calendar, reminders, etc.)
-        let todo_repo_for_memory = todo_repo.clone();
-        let todo_repo_shared = todo_repo.clone();
+        // Clone repos for shared use
+        let todo_repo_for_memory = repos.todos.clone();
+        let todo_repo_shared = repos.todos.clone();
 
-        // Create NotificationDispatcher early so it can be shared with calendar adapter
+        // ── Notification dispatcher ───────────────────────────────────────
         let notification_dispatcher = if !config.todo.notifications.targets.is_empty() {
             Some(Arc::new(super::super::NotificationDispatcher::new(
                 bus.outbound_sender(),
@@ -161,15 +249,13 @@ impl AgentLoop {
             None
         };
 
-        // Register calendar tool (if any provider is enabled).
-        // The CalendarHandler is created here; injection into feature_todo::TodoTool
-        // happens inside the pool block below.
+        // ── Calendar tool ─────────────────────────────────────────────────
         let calendar_adapter = if config.calendar.is_any_enabled() {
             let adapter = Arc::new(
                 CalendarSyncAdapter::new(
                     todo_repo_shared.clone(),
-                    calendar_sync_repo,
-                    event_cache_repo,
+                    repos.calendar_sync.clone(),
+                    repos.calendar_event_cache.clone(),
                     &config.calendar,
                     config.timezone.clone(),
                     notification_dispatcher.clone(),
@@ -179,18 +265,17 @@ impl AgentLoop {
             );
 
             tool_registry.register(CalendarTool::new(
-                Arc::clone(&adapter) as Arc<dyn CalendarHandler>
+                Arc::clone(&adapter) as Arc<dyn CalendarHandler>,
             ));
             Some(adapter)
         } else {
             None
         };
 
-        // Create outcome store + recorder early so TodoTool can report enrichment feedback.
-        // The full LearningService is wired later using the same store.
+        // ── Learning: outcome store + recorder ────────────────────────────
         let outcome_store = if config.learning.enabled {
             Some(Arc::new(RwLock::new(crate::learning::OutcomeStore::new(
-                outcome_repo,
+                repos.outcomes.clone(),
             ))))
         } else {
             None
@@ -199,17 +284,17 @@ impl AgentLoop {
             .as_ref()
             .map(|store| Arc::new(crate::learning::OutcomeRecorder::new(Arc::clone(store))));
 
-        // Create shared embedding engine (used by both todo and conversation embedding)
+        // ── Shared embedding engine ───────────────────────────────────────
         let embedding_engine = Arc::new(tools::EmbeddingEngine::new());
 
         // Outputs for MemoryTool — populated inside the pool block if embedding is enabled
         let todo_embedding_handler: Option<Arc<dyn tools::EmbeddingHandler>>;
         let todo_embedding_repo: Option<storage::EmbeddingRepo>;
 
-        // Register feature_todo::TodoTool when a PgPool is available.
-        // In test environments (pool = None) this section is skipped gracefully.
-        if let Some(ref pool) = pool {
-            let feature_todo_repo = feature_todo::TodoRepo::new(pool.clone());
+        // ── Feature-todo tool (requires real pool) ────────────────────────
+        if self.pool.is_some() {
+            let pool_ref = storage_pool.inner();
+            let feature_todo_repo = feature_todo::TodoRepo::new(pool_ref.clone());
             let mut todo_tool = feature_todo::TodoTool::new(
                 feature_todo_repo,
                 config.todo.focus.max_slots,
@@ -217,74 +302,67 @@ impl AgentLoop {
                 config.timezone.clone(),
             );
 
-            // Inject calendar handler (CalendarHandler → CalendarSyncHandler bridge)
+            // Inject calendar handler
             if let Some(ref adapter) = calendar_adapter {
                 let todo_cal_sync = Arc::new(
-                    crate::todo_calendar_sync_adapter::TodoCalendarSyncAdapter::new(Arc::clone(
-                        adapter,
-                    )
-                        as Arc<dyn CalendarHandler>),
+                    crate::todo_calendar_sync_adapter::TodoCalendarSyncAdapter::new(
+                        Arc::clone(adapter) as Arc<dyn CalendarHandler>,
+                    ),
                 );
                 todo_tool = todo_tool.with_calendar_handler(
                     todo_cal_sync as Arc<dyn feature_todo::CalendarSyncHandler>,
                 );
             }
 
-            // Register enrichment engine (if enabled)
+            // Enrichment engine
             if config.todo.enrichment.enabled {
-                let enrichment_engine = Arc::new(super::super::enrichment::EnrichmentEngine::new(
-                    config.todo.enrichment.clone(),
-                ));
-                todo_tool =
-                    todo_tool
-                        .with_enrichment_handler(Arc::clone(&enrichment_engine)
-                            as Arc<dyn feature_todo::EnrichmentHandler>);
+                let enrichment_engine = Arc::new(
+                    super::super::enrichment::EnrichmentEngine::new(
+                        config.todo.enrichment.clone(),
+                    ),
+                );
+                todo_tool = todo_tool.with_enrichment_handler(
+                    Arc::clone(&enrichment_engine) as Arc<dyn feature_todo::EnrichmentHandler>,
+                );
             }
 
-            // Wire enrichment feedback into learning system
+            // Enrichment feedback → learning
             if let Some(ref recorder) = outcome_recorder {
-                todo_tool =
-                    todo_tool
-                        .with_feedback_handler(Arc::clone(recorder)
-                            as Arc<dyn feature_todo::EnrichmentFeedbackHandler>);
+                todo_tool = todo_tool.with_feedback_handler(
+                    Arc::clone(recorder) as Arc<dyn feature_todo::EnrichmentFeedbackHandler>,
+                );
             }
 
-            // Register todo embedding (if enabled) and capture for MemoryTool
+            // Todo embedding (semantic search)
             if config.todo.search.enabled {
-                if let Some(emb_repo) = embedding_repo {
-                    // feature_todo::TodoTool needs feature_todo::EmbeddingHandler
-                    let todo_embed_impl = Arc::new(
-                        crate::todo_embedding_handler::TodoEmbeddingHandlerImpl::new(
-                            Arc::clone(&embedding_engine),
-                            emb_repo.clone(),
-                        ),
-                    );
+                let emb_repo = repos.embeddings.clone();
 
-                    // MemoryTool still needs tools::EmbeddingHandler
-                    let memory_embed_impl = Arc::new(tools::EmbeddingEngineImpl::new(
+                let todo_embed_impl = Arc::new(
+                    crate::todo_embedding_handler::TodoEmbeddingHandlerImpl::new(
                         Arc::clone(&embedding_engine),
                         emb_repo.clone(),
-                    ));
+                    ),
+                );
 
-                    todo_embedding_repo = Some(emb_repo.clone());
+                let memory_embed_impl = Arc::new(tools::EmbeddingEngineImpl::new(
+                    Arc::clone(&embedding_engine),
+                    emb_repo.clone(),
+                ));
 
-                    todo_tool = todo_tool
-                        .with_embedding_handler(
-                            Arc::clone(&todo_embed_impl) as Arc<dyn feature_todo::EmbeddingHandler>
-                        )
-                        .with_embedding_repo(emb_repo)
-                        .with_search_config(
-                            config.todo.search.semantic_threshold,
-                            config.todo.search.rrf_k,
-                        );
+                todo_embedding_repo = Some(emb_repo.clone());
 
-                    // Capture tools::EmbeddingHandler for MemoryTool unified search
-                    todo_embedding_handler =
-                        Some(Arc::clone(&memory_embed_impl) as Arc<dyn tools::EmbeddingHandler>);
-                } else {
-                    todo_embedding_handler = None;
-                    todo_embedding_repo = None;
-                }
+                todo_tool = todo_tool
+                    .with_embedding_handler(
+                        Arc::clone(&todo_embed_impl) as Arc<dyn feature_todo::EmbeddingHandler>,
+                    )
+                    .with_embedding_repo(emb_repo)
+                    .with_search_config(
+                        config.todo.search.semantic_threshold,
+                        config.todo.search.rrf_k,
+                    );
+
+                todo_embedding_handler =
+                    Some(Arc::clone(&memory_embed_impl) as Arc<dyn tools::EmbeddingHandler>);
             } else {
                 todo_embedding_handler = None;
                 todo_embedding_repo = None;
@@ -292,57 +370,49 @@ impl AgentLoop {
 
             tool_registry.register(todo_tool);
         } else {
-            // No PgPool available (e.g., test environment) — skip feature_todo registration
+            // No PgPool available (e.g., test environment)
             todo_embedding_handler = None;
             todo_embedding_repo = None;
         }
 
-        // Register goal tool (if goal_repo is provided)
-        if let Some(ref gr) = goal_repo {
-            let goal_handler = Arc::new(super::super::GoalHandlerImpl::new(gr.clone()));
-            tool_registry.register(GoalTool::new(Some(goal_handler as Arc<dyn GoalHandler>)));
+        // ── Goal tool ─────────────────────────────────────────────────────
+        {
+            let goal_handler = Arc::new(super::super::GoalHandlerImpl::new(repos.goals.clone()));
+            tool_registry.register(GoalTool::new(Some(
+                goal_handler as Arc<dyn GoalHandler>,
+            )));
         }
 
-        // Register plan tool and keep plan_repo reference for run_plan_execution()
-        let stored_plan_repo = if let Some(ref pr) = plan_repo {
-            let plan_handler = Arc::new(super::super::PlanHandlerImpl::new(pr.clone()));
-            tool_registry.register(tools::plan_tool::PlanTool::new(Some(
-                plan_handler as Arc<dyn tools::plan_tool::PlanHandler>,
-            )));
-            Some(pr.clone())
-        } else {
-            None
-        };
+        // ── Plan tool ─────────────────────────────────────────────────────
+        let plan_handler = Arc::new(super::super::PlanHandlerImpl::new(repos.plans.clone()));
+        tool_registry.register(tools::plan_tool::PlanTool::new(Some(
+            plan_handler as Arc<dyn tools::plan_tool::PlanHandler>,
+        )));
+        let stored_plan_repo = Some(repos.plans.clone());
 
-        // Wire plan completion handler (updates linked goal when plan finishes)
-        let plan_completion_handler: Option<Arc<dyn PlanCompletionHandler>> =
-            goal_repo.as_ref().map(|gr| {
-                Arc::new(
-                    super::super::plan_completion_handler::PlanCompletionHandlerImpl::new(
-                        gr.clone(),
-                    ),
-                ) as Arc<dyn PlanCompletionHandler>
-            });
+        // Plan completion handler (updates linked goal)
+        let plan_completion_handler: Option<Arc<dyn PlanCompletionHandler>> = Some(Arc::new(
+            super::super::plan_completion_handler::PlanCompletionHandlerImpl::new(
+                repos.goals.clone(),
+            ),
+        ) as Arc<dyn PlanCompletionHandler>);
 
-        // Register conversation embedding handler (Phase 4.1)
+        // ── Conversation embedding handler ────────────────────────────────
         let conversation_embedding_handler = if config.conversation.embedding.enabled {
-            if let Some(repo) = conv_embedding_repo {
-                let conv_store = tools::ConversationEmbeddingStore::new(repo);
-                let handler = Arc::new(
-                    super::super::conversation_embedding_handler::ConversationEmbeddingHandlerImpl::new(
-                        Arc::clone(&embedding_engine),
-                        conv_store,
-                    ),
-                );
-                Some(handler as Arc<dyn tools::ConversationEmbeddingHandler>)
-            } else {
-                None
-            }
+            let conv_store =
+                tools::ConversationEmbeddingStore::new(repos.conv_embeddings.clone());
+            let handler = Arc::new(
+                super::super::conversation_embedding_handler::ConversationEmbeddingHandlerImpl::new(
+                    Arc::clone(&embedding_engine),
+                    conv_store,
+                ),
+            );
+            Some(handler as Arc<dyn tools::ConversationEmbeddingHandler>)
         } else {
             None
         };
 
-        // Register MemoryTool (Phase 4.1) - if conversation search is enabled
+        // ── Memory tool ───────────────────────────────────────────────────
         if config.conversation.search.enabled {
             if let Some(ref handler) = conversation_embedding_handler {
                 let mut memory_tool = tools::MemoryTool::new()
@@ -351,7 +421,6 @@ impl AgentLoop {
                     .with_threshold(config.conversation.search.semantic_threshold)
                     .with_rrf_k(config.todo.search.rrf_k);
 
-                // Inject todo embedding dependencies if available
                 if let Some(ref h) = todo_embedding_handler {
                     memory_tool = memory_tool.with_todo_embedding_handler(Arc::clone(h));
                 }
@@ -363,39 +432,37 @@ impl AgentLoop {
             }
         }
 
-        // ── Finance Tool Registration ──────────────────────────────────────────
-        if config.finance.enabled {
-            if let Some(fin_repos) = finance_repos {
-                let price_service = feature_finance::PriceService::new(
-                    config.finance.price_refresh.cache_ttl_minutes,
-                );
+        // ── Finance tool (requires real pool) ─────────────────────────────
+        if config.finance.enabled && self.pool.is_some() {
+            let price_service = feature_finance::PriceService::new(
+                config.finance.price_refresh.cache_ttl_minutes,
+            );
 
-                let finance_handler_impl =
-                    Arc::new(crate::finance_adapter::FinanceHandlerImpl::new(
-                        fin_repos.clone(),
-                        price_service.clone(),
-                        config.finance.clone(),
-                    ));
+            let finance_handler_impl =
+                Arc::new(crate::finance_adapter::FinanceHandlerImpl::new(
+                    repos.clone(),
+                    price_service.clone(),
+                    config.finance.clone(),
+                ));
 
-                let finance_tool = feature_finance::FinanceTool::new(
-                    fin_repos.finance_accounts,
-                    fin_repos.finance_transactions,
-                    fin_repos.finance_budgets,
-                    fin_repos.finance_investments,
-                    fin_repos.finance_goals,
-                    fin_repos.finance_liabilities,
-                    price_service,
-                    config.finance.default_currency.clone(),
-                )
-                .with_finance_handler(
-                    Arc::clone(&finance_handler_impl) as Arc<dyn feature_finance::FinanceHandler>
-                );
+            let finance_tool = feature_finance::FinanceTool::new(
+                repos.finance_accounts.clone(),
+                repos.finance_transactions.clone(),
+                repos.finance_budgets.clone(),
+                repos.finance_investments.clone(),
+                repos.finance_goals.clone(),
+                repos.finance_liabilities.clone(),
+                price_service,
+                config.finance.default_currency.clone(),
+            )
+            .with_finance_handler(
+                Arc::clone(&finance_handler_impl) as Arc<dyn feature_finance::FinanceHandler>,
+            );
 
-                tool_registry.register(finance_tool);
-            }
+            tool_registry.register(finance_tool);
         }
 
-        // Confidence evaluator (with per-tool overrides if configured)
+        // ── Confidence evaluator ──────────────────────────────────────────
         let confidence_evaluator = if config.confidence.enabled {
             if config.confidence.tool_overrides.is_empty() {
                 Some(ConfidenceEvaluator::new(config.confidence.threshold))
@@ -414,7 +481,7 @@ impl AgentLoop {
             None
         };
 
-        // Create ReminderEngine using the shared notification dispatcher and calendar handler
+        // ── Reminder engine ───────────────────────────────────────────────
         let reminder_engine = if let Some(ref dispatcher) = notification_dispatcher {
             let calendar_handler_opt = calendar_adapter
                 .as_ref()
@@ -423,7 +490,7 @@ impl AgentLoop {
                 todo_repo_shared.clone(),
                 calendar_handler_opt,
                 Arc::clone(dispatcher),
-                std::time::Duration::from_secs(300), // Check every 5 minutes
+                std::time::Duration::from_secs(300),
             );
             engine.start();
             Some(Arc::new(RwLock::new(engine)))
@@ -431,7 +498,7 @@ impl AgentLoop {
             None
         };
 
-        // Start RecurringTaskSpawner (checks every 60s for due recurring templates)
+        // ── Recurring task spawner ────────────────────────────────────────
         let mut recurring_spawner = super::super::RecurringTaskSpawner::new(
             todo_repo_shared.clone(),
             config.timezone.clone(),
@@ -440,11 +507,11 @@ impl AgentLoop {
         recurring_spawner.start();
         let recurring_task_spawner = Some(Arc::new(RwLock::new(recurring_spawner)));
 
-        // Initialize learning background service (reuses outcome_store + recorder created earlier)
+        // ── Learning service ──────────────────────────────────────────────
         let learning_service = if let Some(ref store) = outcome_store {
             let adaptive = Arc::new(RwLock::new(
                 crate::learning::adaptive::AdaptiveThresholds::new(
-                    learning_state_repo.clone(),
+                    repos.learning_state.clone(),
                     config.confidence.threshold,
                     config.learning.min_threshold,
                     config.learning.max_threshold,
@@ -453,7 +520,7 @@ impl AgentLoop {
                 .await,
             ));
 
-            // Register LearningTool so the LLM can query learning insights
+            // Register LearningTool
             let learning_handler = Arc::new(super::super::LearningHandlerImpl::new(
                 Arc::clone(store),
                 Arc::clone(&adaptive),
@@ -462,20 +529,18 @@ impl AgentLoop {
                 learning_handler as Arc<dyn LearningHandler>,
             )));
 
-            // Create event bus: LearningService publishes, AgentLoop subscribes.
+            // Event bus: subscriber updates ConfidenceSource threshold
             let event_bus = Arc::new(bus::LearningEventBus::new(16));
 
-            // Spawn subscriber task — updates ContextBuilder threshold on ThresholdChanged.
-            // Task self-terminates when the event bus sender drops (i.e., after LearningService stops).
-            let cb_for_subscriber = Arc::clone(&context_builder);
+            let threshold_for_subscriber = confidence_threshold_handle.clone();
             let mut event_rx = event_bus.subscribe();
             tokio::spawn(async move {
                 while let Ok(event) = event_rx.recv().await {
                     if let bus::LearningEvent::ThresholdChanged { new_threshold, .. } = event {
-                        let mut cb = cb_for_subscriber.write().await;
-                        cb.set_confidence_threshold(new_threshold);
+                        threshold_for_subscriber
+                            .store(new_threshold.to_bits(), Ordering::Relaxed);
                         info!(
-                            "ContextBuilder threshold updated by LearningService: {:.3}",
+                            "ConfidenceSource threshold updated by LearningService: {:.3}",
                             new_threshold
                         );
                     }
@@ -496,46 +561,42 @@ impl AgentLoop {
             None
         };
 
-        // Take ownership of the inbound receiver
+        // ── Bus receiver ──────────────────────────────────────────────────
         let inbound_rx = bus
             .take_inbound_rx()
             .expect("Inbound receiver already taken");
 
-        // Build the adaptive orchestrator pipeline.
-        // All dependencies (provider, tool_registry, config) are already available.
+        // ── Pipeline ──────────────────────────────────────────────────────
         let tool_registry = Arc::new(RwLock::new(tool_registry));
         let execution_core = Arc::new(crate::execution::ExecutionCore::new(
             provider.clone(),
             Arc::clone(&tool_registry),
         ));
-        // Share execution_core with plan execution (clone Arc before passing to dispatch)
+
         let plan_execution_core = if stored_plan_repo.is_some() {
             Some(Arc::clone(&execution_core))
         } else {
             None
         };
+
         let engine_dispatch = Arc::new(crate::execution::EngineDispatch::new(execution_core));
-        let mut orchestrator =
-            crate::orchestrator::Orchestrator::new(provider.clone(), &config.agents.defaults.model);
-        if let Some(repo) = strategy_repo {
-            orchestrator = orchestrator.with_strategy_repo(repo);
-        }
+        let mut orchestrator = crate::orchestrator::Orchestrator::new(
+            provider.clone(),
+            &config.agents.defaults.model,
+        );
+        orchestrator = orchestrator.with_strategy_repo(repos.strategies.clone());
         let orchestrator = Arc::new(orchestrator);
-        let usage_repo = if let Some(ref p) = pool {
-            storage::UsageRepo::new(p.clone())
-        } else {
-            let fallback = sqlx::PgPool::connect_lazy("postgres://localhost/klyntbot")
-                .unwrap_or_else(|_| panic!("Failed to create lazy PgPool for CostTracker"));
-            storage::UsageRepo::new(fallback)
-        };
-        let cost_tracker = Arc::new(crate::output::CostTracker::from_repo(usage_repo));
+
+        let cost_tracker = Arc::new(crate::output::CostTracker::from_repo(
+            storage::UsageRepo::new(storage_pool.inner().clone()),
+        ));
 
         let pipeline_config = crate::pipeline::PipelineConfig {
             execution_model: config.agents.defaults.model.clone(),
-            system_prompt: String::new(), // populated per-request from ContextBuilder
+            system_prompt: String::new(),
             context_window: provider.context_window(),
             max_response_tokens: config.agents.defaults.max_tokens as usize,
-            channel: "unknown".to_string(), // overridden per-request
+            channel: "unknown".to_string(),
             provider_name: provider.name().to_string(),
         };
 
@@ -548,17 +609,18 @@ impl AgentLoop {
 
         info!("Adaptive orchestrator pipeline initialized");
 
-        Ok(Self {
+        // ── Assemble AgentLoop ────────────────────────────────────────────
+        Ok(AgentLoop {
             bus,
             inbound_rx: Some(inbound_rx),
             provider,
             config,
-            context_builder,
+            context_engine,
             session_manager: Arc::new(RwLock::new(session_manager)),
             tool_registry,
             confidence_evaluator,
             running: Arc::new(AtomicBool::new(false)),
-            last_active_channel: notification_handle,
+            last_active_channel: self.notification_handle,
             reminder_engine,
             recurring_task_spawner,
             _notification_dispatcher: notification_dispatcher,
@@ -573,47 +635,11 @@ impl AgentLoop {
             pipeline,
         })
     }
+}
 
-    /// Create a new agent loop (without cron service)
-    #[allow(clippy::too_many_arguments)] // Delegates to new_with_cron
-    pub async fn new(
-        bus: Arc<MessageBus>,
-        provider: DynProvider,
-        config: Config,
-        todo_repo: storage::TodoRepo,
-        embedding_repo: Option<storage::EmbeddingRepo>,
-        goal_repo: Option<storage::GoalRepo>,
-        plan_repo: Option<storage::PlanRepo>,
-        outcome_repo: storage::OutcomeRepo,
-        learning_state_repo: storage::LearningStateRepo,
-        memory_note_repo: storage::MemoryNoteRepo,
-        strategy_repo: Option<storage::StrategyRepo>,
-        calendar_sync_repo: storage::CalendarSyncRepo,
-        event_cache_repo: storage::CalendarEventCacheRepo,
-        conv_embedding_repo: Option<storage::ConvEmbeddingRepo>,
-        finance_repos: Option<storage::Repos>,
-        pool: Option<sqlx::PgPool>,
-    ) -> Result<Self> {
-        Self::new_with_cron(
-            bus,
-            provider,
-            config,
-            None,
-            todo_repo,
-            embedding_repo,
-            goal_repo,
-            plan_repo,
-            None,
-            outcome_repo,
-            learning_state_repo,
-            memory_note_repo,
-            strategy_repo,
-            calendar_sync_repo,
-            event_cache_repo,
-            conv_embedding_repo,
-            finance_repos,
-            pool,
-        )
-        .await
+impl AgentLoop {
+    /// Create a builder for constructing an `AgentLoop`.
+    pub fn builder() -> AgentLoopBuilder {
+        AgentLoopBuilder::new()
     }
 }

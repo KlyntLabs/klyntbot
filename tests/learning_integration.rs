@@ -27,7 +27,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
 use tokio::sync::RwLock;
-use tools::EnrichmentFeedbackHandler;
+use feature_todo::EnrichmentFeedbackHandler;
 
 #[path = "mock_provider.rs"]
 mod mock_provider;
@@ -57,34 +57,13 @@ async fn create_agent_with_learning(provider: Arc<MockProvider>) -> (AgentLoop, 
     config.learning.min_outcomes_for_adaptation = 5; // low for unit tests
 
     let bus = Arc::new(MessageBus::new(10));
-    let pool =
-        klyntbot::storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
-    let todo_repo = klyntbot::storage::TodoRepo::new(pool.inner().clone());
-    let outcome_repo = klyntbot::storage::OutcomeRepo::new(pool.inner().clone());
-    let learning_state_repo = klyntbot::storage::LearningStateRepo::new(pool.inner().clone());
-    let memory_note_repo = klyntbot::storage::MemoryNoteRepo::new(pool.inner().clone());
-    let calendar_sync_repo = klyntbot::storage::CalendarSyncRepo::new(pool.inner().clone());
-    let event_cache_repo = klyntbot::storage::CalendarEventCacheRepo::new(pool.inner().clone());
-    let agent = AgentLoop::new(
-        bus,
-        provider,
-        config,
-        todo_repo,
-        None,
-        None, // goal_repo
-        None, // plan_repo
-        outcome_repo,
-        learning_state_repo,
-        memory_note_repo,
-        None, // strategy_repo
-        calendar_sync_repo,
-        event_cache_repo,
-        None, // conv_embedding_repo
-        None, // finance_repos
-        None, // pool (no PgPool in test env)
-    )
-    .await
-    .unwrap();
+    let agent = AgentLoop::builder()
+        .with_bus(bus)
+        .with_provider(provider)
+        .with_config(config)
+        .build()
+        .await
+        .unwrap();
     (agent, temp_dir)
 }
 
@@ -242,7 +221,7 @@ async fn test_ac_plan_step_outcomes_tagged_correctly() {
 /// it persists in the outcome store.
 #[tokio::test]
 async fn test_ac_enrichment_feedback_recorded_on_override() {
-    use tools::EnrichmentFeedbackEntry;
+    use feature_todo::EnrichmentFeedbackEntry;
 
     let store = Arc::new(RwLock::new(OutcomeStore::new_in_memory()));
     let recorder = Arc::new(OutcomeRecorder::new(Arc::clone(&store)));
@@ -273,7 +252,7 @@ async fn test_ac_enrichment_feedback_recorded_on_override() {
 /// When the user keeps the enrichment suggestion, accepted=true is recorded.
 #[tokio::test]
 async fn test_ac_enrichment_feedback_recorded_on_accept() {
-    use tools::EnrichmentFeedbackEntry;
+    use feature_todo::EnrichmentFeedbackEntry;
 
     let store = Arc::new(RwLock::new(OutcomeStore::new_in_memory()));
     let recorder = Arc::new(OutcomeRecorder::new(Arc::clone(&store)));
@@ -640,34 +619,13 @@ async fn test_ac_learning_disabled_no_recording() {
     config.learning.enabled = false;
 
     let bus = Arc::new(MessageBus::new(10));
-    let pool =
-        klyntbot::storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
-    let todo_repo = klyntbot::storage::TodoRepo::new(pool.inner().clone());
-    let outcome_repo = klyntbot::storage::OutcomeRepo::new(pool.inner().clone());
-    let learning_state_repo = klyntbot::storage::LearningStateRepo::new(pool.inner().clone());
-    let memory_note_repo = klyntbot::storage::MemoryNoteRepo::new(pool.inner().clone());
-    let calendar_sync_repo = klyntbot::storage::CalendarSyncRepo::new(pool.inner().clone());
-    let event_cache_repo = klyntbot::storage::CalendarEventCacheRepo::new(pool.inner().clone());
-    let agent = AgentLoop::new(
-        bus,
-        provider.clone(),
-        config,
-        todo_repo,
-        None,
-        None, // goal_repo
-        None, // plan_repo
-        outcome_repo,
-        learning_state_repo,
-        memory_note_repo,
-        None, // strategy_repo
-        calendar_sync_repo,
-        event_cache_repo,
-        None, // conv_embedding_repo
-        None, // finance_repos
-        None, // pool (no PgPool in test env)
-    )
-    .await
-    .unwrap();
+    let agent = AgentLoop::builder()
+        .with_bus(bus)
+        .with_provider(provider.clone())
+        .with_config(config)
+        .build()
+        .await
+        .unwrap();
 
     let response = agent
         .process_direct("Hi".to_string(), "test:sess".to_string())

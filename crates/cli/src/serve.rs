@@ -29,8 +29,6 @@ pub async fn handle_serve(port: u16) -> Result<()> {
     })?;
     let storage_pool = StoragePool::connect(database_url).await?;
     let repos = Repos::from_pool(&storage_pool);
-    // Clone repos for the finance handler before partially moving individual repos below.
-    let finance_repos = repos.clone();
     info!("Database connected and migrations applied");
 
     // Initialize LLM provider (resolves the effective model for this provider)
@@ -46,10 +44,6 @@ pub async fn handle_serve(port: u16) -> Result<()> {
     let mut cron_service = CronService::new(repos.cron);
     cron_service.start().await?;
     info!("Cron service started");
-
-    // Goal and plan repos (Clone+Send+Sync, no Arc<RwLock> needed)
-    let goal_repo = repos.goals.clone();
-    let plan_repo = repos.plans.clone();
 
     // Create SHARED NotificationDispatcher
     let notification_dispatcher = Arc::new(agent::NotificationDispatcher::new(
@@ -484,27 +478,15 @@ pub async fn handle_serve(port: u16) -> Result<()> {
 
     // Initialize agent loop WITH cron service and shared instances
     let agent_loop = Arc::new(Mutex::new(
-        AgentLoop::new_with_cron(
-            bus.clone(),
-            provider,
-            config.clone(),
-            Some(cron_service.clone()),
-            repos.todos,
-            Some(repos.embeddings),
-            Some(goal_repo.clone()),
-            Some(plan_repo.clone()),
-            Some(notification_dispatcher.last_active_handle()),
-            repos.outcomes,
-            repos.learning_state,
-            repos.memory_notes,
-            Some(repos.strategies),
-            repos.calendar_sync,
-            repos.calendar_event_cache,
-            Some(repos.conv_embeddings),
-            Some(finance_repos),
-            Some(storage_pool.inner().clone()),
-        )
-        .await?,
+        AgentLoop::builder()
+            .with_bus(bus.clone())
+            .with_provider(provider)
+            .with_config(config.clone())
+            .with_pool(storage_pool.inner().clone())
+            .with_cron_service(cron_service.clone())
+            .with_notification_handle(notification_dispatcher.last_active_handle())
+            .build()
+            .await?,
     ));
     info!("Agent loop initialized");
 
@@ -587,8 +569,14 @@ pub async fn handle_serve(port: u16) -> Result<()> {
     }
     println!("\nPress Ctrl+C to stop");
 
-    // Wait for shutdown signal
-    signal::ctrl_c().await?;
+    // Wait for shutdown signal (Ctrl+C or SIGTERM)
+    {
+        let mut sigterm = signal::unix::signal(signal::unix::SignalKind::terminate())?;
+        tokio::select! {
+            _ = signal::ctrl_c() => {},
+            _ = sigterm.recv() => {},
+        }
+    }
     println!("\nShutting down gracefully...");
     info!("Shutting down gracefully...");
 

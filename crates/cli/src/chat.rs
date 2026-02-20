@@ -40,31 +40,16 @@ pub async fn handle_chat(message: Option<String>, session: String, verbose: bool
         )
     })?;
     let storage_pool = storage::StoragePool::connect(database_url).await?;
-    let repos = storage::Repos::from_pool(&storage_pool);
-    // Clone repos for the finance handler before partially moving individual repos below.
-    let finance_repos = repos.clone();
 
     // Initialize agent loop (Arc for streaming support)
     let agent_loop = Arc::new(
-        AgentLoop::new(
-            bus,
-            provider,
-            config,
-            repos.todos,
-            Some(repos.embeddings),
-            Some(repos.goals),
-            Some(repos.plans),
-            repos.outcomes,
-            repos.learning_state,
-            repos.memory_notes,
-            Some(repos.strategies),
-            repos.calendar_sync,
-            repos.calendar_event_cache,
-            Some(repos.conv_embeddings),
-            Some(finance_repos),
-            Some(storage_pool.inner().clone()),
-        )
-        .await?,
+        AgentLoop::builder()
+            .with_bus(bus)
+            .with_provider(provider)
+            .with_config(config)
+            .with_pool(storage_pool.inner().clone())
+            .build()
+            .await?,
     );
 
     // Session key for CLI

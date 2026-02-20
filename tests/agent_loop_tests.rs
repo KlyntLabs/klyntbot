@@ -7,10 +7,21 @@ use tempfile::TempDir;
 
 mod common;
 use common::mock_provider::{ErrorProvider, MockProvider};
-use common::{
-    test_calendar_sync_repo, test_event_cache_repo, test_learning_state_repo,
-    test_memory_note_repo, test_outcome_repo, test_todo_repo,
-};
+
+/// Helper: build an AgentLoop with default test configuration.
+async fn build_test_agent(
+    bus: Arc<MessageBus>,
+    provider: Arc<dyn klyntbot::LlmProvider>,
+    config: Config,
+) -> AgentLoop {
+    AgentLoop::builder()
+        .with_bus(bus)
+        .with_provider(provider)
+        .with_config(config)
+        .build()
+        .await
+        .unwrap()
+}
 
 /// Test basic message processing through agent loop
 #[tokio::test]
@@ -29,26 +40,7 @@ async fn test_agent_loop_basic_processing() {
         .unwrap()
         .to_string();
 
-    let agent_loop = AgentLoop::new(
-        bus,
-        provider.clone(),
-        config,
-        test_todo_repo(),
-        None,
-        None, // goal_repo
-        None, // plan_repo
-        test_outcome_repo(),
-        test_learning_state_repo(),
-        test_memory_note_repo(),
-        None, // strategy_repo
-        test_calendar_sync_repo(),
-        test_event_cache_repo(),
-        None, // conv_embedding_repo
-        None, // finance_repos
-        None, // pool (no PgPool in test env)
-    )
-    .await
-    .unwrap();
+    let agent_loop = build_test_agent(bus, provider.clone(), config).await;
 
     // Process a direct message
     let response = agent_loop
@@ -106,26 +98,7 @@ async fn test_agent_loop_with_tool_execution() {
     let mut config = Config::default();
     config.agents.defaults.workspace = workspace.to_str().unwrap().to_string();
 
-    let agent_loop = AgentLoop::new(
-        bus,
-        provider.clone(),
-        config,
-        test_todo_repo(),
-        None,
-        None, // goal_repo
-        None, // plan_repo
-        test_outcome_repo(),
-        test_learning_state_repo(),
-        test_memory_note_repo(),
-        None, // strategy_repo
-        test_calendar_sync_repo(),
-        test_event_cache_repo(),
-        None, // conv_embedding_repo
-        None, // finance_repos
-        None, // pool (no PgPool in test env)
-    )
-    .await
-    .unwrap();
+    let agent_loop = build_test_agent(bus, provider.clone(), config).await;
 
     let response = agent_loop
         .process_direct("Read test.txt".to_string(), "test:session2".to_string())
@@ -169,26 +142,7 @@ async fn test_agent_loop_max_iterations() {
         .to_string();
     config.agents.defaults.max_tool_iterations = 3;
 
-    let agent_loop = AgentLoop::new(
-        bus,
-        provider.clone(),
-        config,
-        test_todo_repo(),
-        None,
-        None, // goal_repo
-        None, // plan_repo
-        test_outcome_repo(),
-        test_learning_state_repo(),
-        test_memory_note_repo(),
-        None, // strategy_repo
-        test_calendar_sync_repo(),
-        test_event_cache_repo(),
-        None, // conv_embedding_repo
-        None, // finance_repos
-        None, // pool (no PgPool in test env)
-    )
-    .await
-    .unwrap();
+    let agent_loop = build_test_agent(bus, provider.clone(), config).await;
 
     // This should hit max iterations and return an error or stop
     let result = agent_loop
@@ -245,26 +199,7 @@ async fn test_agent_loop_tool_error_handling() {
         .unwrap()
         .to_string();
 
-    let agent_loop = AgentLoop::new(
-        bus,
-        provider.clone(),
-        config,
-        test_todo_repo(),
-        None,
-        None, // goal_repo
-        None, // plan_repo
-        test_outcome_repo(),
-        test_learning_state_repo(),
-        test_memory_note_repo(),
-        None, // strategy_repo
-        test_calendar_sync_repo(),
-        test_event_cache_repo(),
-        None, // conv_embedding_repo
-        None, // finance_repos
-        None, // pool (no PgPool in test env)
-    )
-    .await
-    .unwrap();
+    let agent_loop = build_test_agent(bus, provider.clone(), config).await;
 
     let response = agent_loop
         .process_direct(
@@ -305,26 +240,7 @@ async fn test_agent_loop_session_persistence() {
     // First agent loop
     {
         let bus = Arc::new(MessageBus::new(10));
-        let agent_loop = AgentLoop::new(
-            bus,
-            provider.clone(),
-            config.clone(),
-            test_todo_repo(),
-            None,
-            None, // goal_repo
-            None, // plan_repo
-            test_outcome_repo(),
-            test_learning_state_repo(),
-            test_memory_note_repo(),
-            None, // strategy_repo
-            test_calendar_sync_repo(),
-            test_event_cache_repo(),
-            None, // conv_embedding_repo
-            None, // finance_repos
-            None, // pool (no PgPool in test env)
-        )
-        .await
-        .unwrap();
+        let agent_loop = build_test_agent(bus, provider.clone(), config.clone()).await;
 
         // First message
         let _ = agent_loop
@@ -335,26 +251,7 @@ async fn test_agent_loop_session_persistence() {
 
     // Create a new agent loop with a new bus (simulating restart)
     let bus2 = Arc::new(MessageBus::new(10));
-    let agent_loop2 = AgentLoop::new(
-        bus2,
-        provider.clone(),
-        config,
-        test_todo_repo(),
-        None,
-        None, // goal_repo
-        None, // plan_repo
-        test_outcome_repo(),
-        test_learning_state_repo(),
-        test_memory_note_repo(),
-        None, // strategy_repo
-        test_calendar_sync_repo(),
-        test_event_cache_repo(),
-        None, // conv_embedding_repo
-        None, // finance_repos
-        None, // pool (no PgPool in test env)
-    )
-    .await
-    .unwrap();
+    let agent_loop2 = build_test_agent(bus2, provider.clone(), config).await;
 
     // Second message - should have access to session history
     let response = agent_loop2
@@ -382,28 +279,7 @@ async fn test_streaming_emits_done() {
         .unwrap()
         .to_string();
 
-    let agent_loop = Arc::new(
-        AgentLoop::new(
-            bus,
-            provider,
-            config,
-            test_todo_repo(),
-            None,
-            None, // goal_repo
-            None, // plan_repo
-            test_outcome_repo(),
-            test_learning_state_repo(),
-            test_memory_note_repo(),
-            None, // strategy_repo
-            test_calendar_sync_repo(),
-            test_event_cache_repo(),
-            None, // conv_embedding_repo
-            None, // finance_repos
-            None, // pool (no PgPool in test env)
-        )
-        .await
-        .unwrap(),
-    );
+    let agent_loop = Arc::new(build_test_agent(bus, provider, config).await);
 
     let streaming_handle = agent_loop
         .process_direct_streaming("Hello".to_string(), "test:stream1".to_string())
@@ -454,28 +330,7 @@ async fn test_streaming_emits_error_on_failure() {
         .unwrap()
         .to_string();
 
-    let agent_loop = Arc::new(
-        AgentLoop::new(
-            bus,
-            provider,
-            config,
-            test_todo_repo(),
-            None,
-            None, // goal_repo
-            None, // plan_repo
-            test_outcome_repo(),
-            test_learning_state_repo(),
-            test_memory_note_repo(),
-            None, // strategy_repo
-            test_calendar_sync_repo(),
-            test_event_cache_repo(),
-            None, // conv_embedding_repo
-            None, // finance_repos
-            None, // pool (no PgPool in test env)
-        )
-        .await
-        .unwrap(),
-    );
+    let agent_loop = Arc::new(build_test_agent(bus, provider, config).await);
 
     let streaming_handle = agent_loop
         .process_direct_streaming("Hello".to_string(), "test:stream2".to_string())
