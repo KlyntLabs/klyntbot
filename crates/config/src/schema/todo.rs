@@ -61,6 +61,9 @@ pub struct TodoEnrichmentConfig {
     /// Confidence threshold for auto-applying suggestions without confirmation (default: 0.85)
     #[serde(default = "default_enrichment_confidence_threshold")]
     pub auto_apply_threshold: f64,
+    /// Use LLM for enrichment instead of keyword matching (opt-in, default: false)
+    #[serde(default)]
+    pub use_llm: bool,
 }
 
 impl Default for TodoEnrichmentConfig {
@@ -68,6 +71,7 @@ impl Default for TodoEnrichmentConfig {
         Self {
             enabled: true,
             auto_apply_threshold: default_enrichment_confidence_threshold(),
+            use_llm: false,
         }
     }
 }

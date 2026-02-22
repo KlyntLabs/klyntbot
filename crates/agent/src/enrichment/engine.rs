@@ -3,17 +3,178 @@
 use async_trait::async_trait;
 use common::Result;
 use config::TodoEnrichmentConfig;
-use feature_todo::{EnrichmentHandler, EnrichmentResult, Todo};
+use feature_todo::{EnrichmentHandler, EnrichmentResult, EnrichmentSuggestion, Todo};
+use providers::{ChatParams, DynProvider, Message};
+use serde::Deserialize;
+use tracing::warn;
+
+/// JSON structure returned by the LLM for task enrichment.
+#[derive(Deserialize)]
+struct LlmEnrichmentResponse {
+    priority: Option<u8>,
+    priority_confidence: Option<f64>,
+    priority_reasoning: Option<String>,
+    estimated_minutes: Option<u32>,
+    duration_confidence: Option<f64>,
+    duration_reasoning: Option<String>,
+    due_date: Option<String>,
+    due_date_confidence: Option<f64>,
+    due_date_reasoning: Option<String>,
+}
 
 /// Central enrichment engine that coordinates priority, duration, and scheduling modules.
 pub struct EnrichmentEngine {
     config: TodoEnrichmentConfig,
+    provider: Option<DynProvider>,
+    model: Option<String>,
 }
 
 impl EnrichmentEngine {
     pub fn new(config: TodoEnrichmentConfig) -> Self {
-        Self { config }
+        Self {
+            config,
+            provider: None,
+            model: None,
+        }
     }
+
+    /// Attach an LLM provider for use when `config.use_llm` is true.
+    pub fn with_provider(mut self, provider: DynProvider, model: String) -> Self {
+        self.provider = Some(provider);
+        self.model = Some(model);
+        self
+    }
+
+    /// Try to enrich a task using the LLM. Returns `None` on any error so callers
+    /// can fall back to keyword enrichment.
+    async fn enrich_with_llm(&self, task: &Todo) -> Option<EnrichmentResult> {
+        let provider = self.provider.as_ref()?;
+        let model = self.model.as_deref().unwrap_or("gpt-4o-mini");
+
+        // Build a compact task context for the prompt
+        let mut parts = vec![format!("Title: {}", task.title)];
+        if let Some(ref desc) = task.description {
+            parts.push(format!("Description: {}", desc));
+        }
+        if !task.tags.is_empty() {
+            parts.push(format!("Tags: {}", task.tags.join(", ")));
+        }
+        let task_context = parts.join("\n");
+
+        let system_prompt = r#"You are a task enrichment assistant. Analyze the given task and return enrichment suggestions as a JSON object.
+
+Return exactly this JSON structure (use null for uncertain fields):
+{
+  "priority": 1-4 or null,
+  "priority_confidence": 0.0-1.0,
+  "priority_reasoning": "brief explanation",
+  "estimated_minutes": integer or null,
+  "duration_confidence": 0.0-1.0,
+  "duration_reasoning": "brief explanation",
+  "due_date": "ISO 8601 datetime" or null,
+  "due_date_confidence": 0.0-1.0,
+  "due_date_reasoning": "brief explanation"
+}
+
+Priority scale: 1=urgent/critical, 2=important/bug, 3=feature/improvement, 4=nice-to-have/chore
+Duration guide: 15=typo/tweak, 30=small fix/patch, 60=feature/implement, 120=refactor/rewrite
+
+Return only valid JSON, no markdown fences."#;
+
+        let messages = [
+            Message::system(system_prompt),
+            Message::user(task_context),
+        ];
+
+        let params = ChatParams::new(model)
+            .with_temperature(0.0)
+            .with_max_tokens(512);
+
+        match provider.chat(&messages, None, &params).await {
+            Ok(response) => match response.content {
+                Some(content) => parse_llm_enrichment_response(&content, task),
+                None => {
+                    warn!("LLM enrichment returned empty content, falling back to keywords");
+                    None
+                }
+            },
+            Err(e) => {
+                warn!("LLM enrichment failed: {}, falling back to keywords", e);
+                None
+            }
+        }
+    }
+}
+
+/// Strip markdown code fences from LLM output (best-effort).
+fn extract_json(content: &str) -> String {
+    let trimmed = content.trim();
+    if let Some(stripped) = trimmed.strip_prefix("```json") {
+        stripped
+            .trim_start_matches('\n')
+            .trim_end_matches("```")
+            .trim()
+            .to_string()
+    } else if let Some(stripped) = trimmed.strip_prefix("```") {
+        stripped
+            .trim_start_matches('\n')
+            .trim_end_matches("```")
+            .trim()
+            .to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+/// Parse the LLM JSON response into an `EnrichmentResult`.
+/// Only fills fields that are not already set on the task.
+fn parse_llm_enrichment_response(content: &str, task: &Todo) -> Option<EnrichmentResult> {
+    let json_str = extract_json(content);
+    let parsed: LlmEnrichmentResponse = match serde_json::from_str(&json_str) {
+        Ok(r) => r,
+        Err(e) => {
+            warn!("Failed to parse LLM enrichment JSON: {}", e);
+            return None;
+        }
+    };
+
+    let mut result = EnrichmentResult::default();
+
+    if task.priority.is_none() {
+        if let Some(priority) = parsed.priority {
+            if (1..=4).contains(&priority) {
+                result.priority = Some(EnrichmentSuggestion {
+                    value: priority,
+                    confidence: parsed.priority_confidence.unwrap_or(0.7),
+                    reasoning: parsed.priority_reasoning.unwrap_or_default(),
+                });
+            }
+        }
+    }
+
+    if task.estimated_minutes.is_none() {
+        if let Some(minutes) = parsed.estimated_minutes {
+            result.estimated_minutes = Some(EnrichmentSuggestion {
+                value: minutes,
+                confidence: parsed.duration_confidence.unwrap_or(0.7),
+                reasoning: parsed.duration_reasoning.unwrap_or_default(),
+            });
+        }
+    }
+
+    if task.due_date.is_none() {
+        if let Some(ref date_str) = parsed.due_date {
+            if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(date_str) {
+                result.due_date = Some(EnrichmentSuggestion {
+                    value: dt.with_timezone(&chrono::Utc),
+                    confidence: parsed.due_date_confidence.unwrap_or(0.6),
+                    reasoning: parsed.due_date_reasoning.unwrap_or_default(),
+                });
+            }
+        }
+    }
+
+    Some(result)
 }
 
 #[async_trait]
@@ -21,6 +182,18 @@ impl EnrichmentHandler for EnrichmentEngine {
     async fn enrich_task(&self, task: &Todo) -> Result<Option<EnrichmentResult>> {
         if !self.config.enabled {
             return Ok(None);
+        }
+
+        // Try LLM enrichment first if opt-in flag is set
+        if self.config.use_llm {
+            if let Some(llm_result) = self.enrich_with_llm(task).await {
+                return Ok(if llm_result.is_empty() {
+                    None
+                } else {
+                    Some(llm_result)
+                });
+            }
+            // LLM unavailable or failed — fall through to keyword enrichment
         }
 
         let mut result = EnrichmentResult::default();
@@ -52,6 +225,66 @@ impl EnrichmentHandler for EnrichmentEngine {
 mod tests {
     use super::*;
     use feature_todo::Todo;
+    use serde_json::Value;
+    use std::sync::Arc;
+
+    // ── Minimal mock provider for unit tests ────────────────────────────────
+
+    struct MockProvider {
+        response: String,
+    }
+
+    #[async_trait]
+    impl providers::LlmProvider for MockProvider {
+        async fn chat(
+            &self,
+            _messages: &[Message],
+            _tools: Option<&[Value]>,
+            _params: &ChatParams,
+        ) -> Result<providers::LlmResponse> {
+            Ok(providers::LlmResponse {
+                content: Some(self.response.clone()),
+                tool_calls: vec![],
+                finish_reason: "stop".to_string(),
+                usage: providers::Usage::default(),
+                reasoning_content: None,
+            })
+        }
+
+        fn default_model(&self) -> &str {
+            "mock"
+        }
+
+        fn name(&self) -> &str {
+            "mock"
+        }
+    }
+
+    struct ErrorProvider;
+
+    #[async_trait]
+    impl providers::LlmProvider for ErrorProvider {
+        async fn chat(
+            &self,
+            _messages: &[Message],
+            _tools: Option<&[Value]>,
+            _params: &ChatParams,
+        ) -> Result<providers::LlmResponse> {
+            Err(common::KlyntbotError::Provider(
+                common::ProviderError::InvalidResponse("mock LLM error".to_string()),
+            ))
+        }
+
+        fn default_model(&self) -> &str {
+            "error"
+        }
+
+        fn name(&self) -> &str {
+            "error"
+        }
+    }
+
+    // ── Existing tests (unchanged) ──────────────────────────────────────────
 
     #[tokio::test]
     async fn test_enrichment_engine_disabled() {
@@ -248,5 +481,141 @@ mod tests {
             1,
             "Should infer high priority from tags"
         );
+    }
+
+    // ── LLM enrichment tests ────────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn test_enrichment_with_llm_provider() {
+        let json_response = r#"{"priority":1,"priority_confidence":0.95,"priority_reasoning":"urgent keyword","estimated_minutes":30,"duration_confidence":0.80,"duration_reasoning":"small fix","due_date":null,"due_date_confidence":0.0,"due_date_reasoning":"no deadline"}"#;
+
+        let config = TodoEnrichmentConfig {
+            use_llm: true,
+            ..Default::default()
+        };
+        let engine = EnrichmentEngine::new(config).with_provider(
+            Arc::new(MockProvider {
+                response: json_response.to_string(),
+            }),
+            "mock".to_string(),
+        );
+
+        let mut task = Todo::default_instance();
+        task.title = "Fix urgent auth bug".to_string();
+
+        let result = engine.enrich_task(&task).await.unwrap();
+        assert!(result.is_some(), "LLM enrichment should return a result");
+
+        let enrichment = result.unwrap();
+        assert!(enrichment.priority.is_some(), "Priority should be set");
+        assert_eq!(
+            enrichment.priority.as_ref().unwrap().value,
+            1,
+            "LLM-inferred priority should be 1"
+        );
+        assert!(
+            enrichment.estimated_minutes.is_some(),
+            "Duration should be set"
+        );
+        assert_eq!(
+            enrichment.estimated_minutes.as_ref().unwrap().value,
+            30,
+            "LLM-inferred duration should be 30 min"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_enrichment_falls_back_on_llm_error() {
+        let config = TodoEnrichmentConfig {
+            use_llm: true,
+            ..Default::default()
+        };
+        let engine = EnrichmentEngine::new(config)
+            .with_provider(Arc::new(ErrorProvider), "error".to_string());
+
+        let mut task = Todo::default_instance();
+        task.title = "Fix urgent auth bug".to_string();
+
+        // LLM errors → keyword enrichment should still produce results
+        let result = engine.enrich_task(&task).await.unwrap();
+        assert!(
+            result.is_some(),
+            "Should fall back to keyword enrichment on LLM error"
+        );
+
+        let enrichment = result.unwrap();
+        // Keyword enrichment detects "urgent" → priority 1
+        assert!(enrichment.priority.is_some());
+        assert_eq!(
+            enrichment.priority.unwrap().value,
+            1,
+            "Keyword fallback should detect 'urgent' → priority 1"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_enrichment_llm_skips_already_set_fields() {
+        // LLM returns priority=2 but task already has priority=1
+        // The engine must NOT overwrite it
+        let json_response = r#"{"priority":2,"priority_confidence":0.8,"priority_reasoning":"bug keyword","estimated_minutes":30,"duration_confidence":0.75,"duration_reasoning":"small task","due_date":null,"due_date_confidence":0.0,"due_date_reasoning":""}"#;
+
+        let config = TodoEnrichmentConfig {
+            use_llm: true,
+            ..Default::default()
+        };
+        let engine = EnrichmentEngine::new(config).with_provider(
+            Arc::new(MockProvider {
+                response: json_response.to_string(),
+            }),
+            "mock".to_string(),
+        );
+
+        let mut task = Todo::default_instance();
+        task.title = "Fix bug in auth".to_string();
+        task.priority = Some(1); // Already set
+
+        let result = engine.enrich_task(&task).await.unwrap();
+        // May be Some (with estimated_minutes set) or None — priority must be absent
+        if let Some(enrichment) = result {
+            assert!(
+                enrichment.priority.is_none(),
+                "Should not overwrite already-set priority"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_enrichment_llm_use_llm_false_skips_provider() {
+        // Even if a provider is attached, use_llm=false should use keywords only
+        let json_response = r#"{"priority":1,"priority_confidence":0.99,"priority_reasoning":"from LLM","estimated_minutes":15,"duration_confidence":0.9,"duration_reasoning":"quick","due_date":null,"due_date_confidence":0.0,"due_date_reasoning":""}"#;
+
+        let config = TodoEnrichmentConfig {
+            use_llm: false, // explicitly off
+            ..Default::default()
+        };
+        // Attach provider — but it should not be called
+        let engine = EnrichmentEngine::new(config).with_provider(
+            Arc::new(MockProvider {
+                response: json_response.to_string(),
+            }),
+            "mock".to_string(),
+        );
+
+        let mut task = Todo::default_instance();
+        task.title = "Rename variable".to_string(); // keyword → P3/quick
+
+        let result = engine.enrich_task(&task).await.unwrap();
+        assert!(result.is_some());
+        // Keyword engine sees no high-priority keywords → medium priority (3)
+        // and detects "rename" → quick (15 min) … but "rename" isn't in keyword list
+        // so it will be a medium-duration default. The key assertion is:
+        // If LLM had run it would return priority=1, keywords return priority=3.
+        let enrichment = result.unwrap();
+        if let Some(priority) = enrichment.priority {
+            assert_ne!(
+                priority.value, 1,
+                "use_llm=false should not produce LLM-only priority=1 for 'Rename variable'"
+            );
+        }
     }
 }
