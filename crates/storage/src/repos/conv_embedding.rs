@@ -27,10 +27,11 @@ impl ConvEmbeddingRepo {
         embedding: &Vector,
         role: &str,
         content_preview: &str,
+        content_full: &str,
     ) -> Result<ConvEmbeddingRow, StorageError> {
         let row = sqlx::query_as::<_, ConvEmbeddingRow>(
-            "INSERT INTO conversation_embeddings (id, session_key, embedding, role, content_preview, created_at)
-             VALUES ($1, $2, $3, $4, $5, $6)
+            "INSERT INTO conversation_embeddings (id, session_key, embedding, role, content_preview, content_full, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
              RETURNING *",
         )
         .bind(id)
@@ -38,6 +39,7 @@ impl ConvEmbeddingRepo {
         .bind(embedding)
         .bind(role)
         .bind(content_preview)
+        .bind(content_full)
         .bind(Utc::now())
         .fetch_one(&self.pool)
         .await?;
@@ -72,7 +74,7 @@ impl ConvEmbeddingRepo {
         let max_distance = 1.0 - threshold;
 
         let rows: Vec<ConvEmbeddingWithDistance> = sqlx::query_as(
-            "SELECT id, session_key, embedding, role, content_preview, created_at,
+            "SELECT id, session_key, embedding, role, content_preview, content_full, created_at,
                     (embedding <=> $1) AS distance
              FROM conversation_embeddings
              WHERE (embedding <=> $1) <= $2
@@ -95,6 +97,7 @@ impl ConvEmbeddingRepo {
                     embedding: r.embedding,
                     role: r.role,
                     content_preview: r.content_preview,
+                    content_full: r.content_full,
                     created_at: r.created_at,
                 };
                 (row, similarity)
@@ -197,6 +200,7 @@ struct ConvEmbeddingWithDistance {
     pub embedding: Vector,
     pub role: String,
     pub content_preview: String,
+    pub content_full: String,
     pub created_at: chrono::DateTime<chrono::Utc>,
     pub distance: f64,
 }

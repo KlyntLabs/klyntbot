@@ -72,7 +72,7 @@ impl MemoryRetriever for ConversationMemoryRetriever {
                 .into_iter()
                 .map(|(record, score)| MemoryEntry {
                     id: record.id,
-                    content: record.content_preview,
+                    content: record.content_full,
                     score,
                 })
                 .collect(),

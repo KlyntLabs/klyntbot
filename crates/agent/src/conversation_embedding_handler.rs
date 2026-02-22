@@ -80,6 +80,7 @@ impl ConversationEmbeddingHandler for ConversationEmbeddingHandlerImpl {
             session_key: session_key.to_string(),
             role: role.to_string(),
             content_preview: content.chars().take(100).collect(),
+            content_full: content.to_string(),
             embedding,
             model: self.engine.model_name().to_string(),
             embedded_at: Utc::now(),

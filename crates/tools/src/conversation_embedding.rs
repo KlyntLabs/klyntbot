@@ -19,6 +19,7 @@ pub struct ConversationEmbeddingRecord {
     pub session_key: String,     // "channel:chat_id"
     pub role: String,            // "user" | "assistant"
     pub content_preview: String, // First 100 chars
+    pub content_full: String,    // Full message content
     pub embedding: Vec<f32>,     // 384 dimensions
     pub model: String,
     pub embedded_at: DateTime<Utc>,
@@ -73,6 +74,7 @@ impl ConversationEmbeddingStore {
                 &vector,
                 &record.role,
                 &record.content_preview,
+                &record.content_full,
             )
             .await
             .map_err(|e| common::ToolError::ExecutionFailed(e.to_string()))?;
@@ -188,6 +190,7 @@ fn row_to_record(row: storage::ConvEmbeddingRow) -> ConversationEmbeddingRecord 
         session_key: row.session_key,
         role: row.role,
         content_preview: row.content_preview,
+        content_full: row.content_full,
         embedding: row.embedding.to_vec(),
         model: String::new(), // model info not stored in DB row
         embedded_at: row.created_at,
@@ -224,4 +227,24 @@ pub trait ConversationEmbeddingHandler: Send + Sync {
 
     /// Check if the handler is available (model loaded, etc.).
     fn is_available(&self) -> bool;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_record_has_content_full() {
+        let record = ConversationEmbeddingRecord {
+            id: "test".to_string(),
+            session_key: "cli:default".to_string(),
+            role: "user".to_string(),
+            content_preview: "Hello...".to_string(),
+            content_full: "Hello, how are you doing today?".to_string(),
+            embedding: vec![0.0; 384],
+            model: "test".to_string(),
+            embedded_at: chrono::Utc::now(),
+        };
+        assert_eq!(record.content_full, "Hello, how are you doing today?");
+    }
 }

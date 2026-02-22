@@ -553,6 +553,7 @@ mod tests {
                     session_key: "cli:test".to_string(),
                     role: "user".to_string(),
                     content_preview: "This is a test message".to_string(),
+                    content_full: "This is a test message".to_string(),
                     embedding: vec![0.1; 384],
                     model: "test-model".to_string(),
                     embedded_at: Utc::now(),

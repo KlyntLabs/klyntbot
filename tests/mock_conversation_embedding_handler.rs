@@ -162,6 +162,7 @@ impl ConversationEmbeddingHandler for MockConversationEmbeddingHandler {
                     session_key: "mock:session".to_string(),
                     role: "user".to_string(),
                     content_preview: "Mock content".to_string(),
+                    content_full: "Mock content".to_string(),
                     embedding: emb.clone(),
                     model: "mock-model".to_string(),
                     embedded_at: Utc::now(),

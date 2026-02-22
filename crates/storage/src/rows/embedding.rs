@@ -21,5 +21,6 @@ pub struct ConvEmbeddingRow {
     pub embedding: Vector,
     pub role: String,
     pub content_preview: String,
+    pub content_full: String,
     pub created_at: DateTime<Utc>,
 }
