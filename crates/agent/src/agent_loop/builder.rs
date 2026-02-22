@@ -171,7 +171,9 @@ impl AgentLoopBuilder {
         // Sort by priority (descending) — ensures correct ordering in prompt
         sources.sort_by_key(|s| std::cmp::Reverse(s.priority()));
 
-        let context_engine = context_engine::ContextEngine::new().with_sources(sources);
+        let context_engine = context_engine::ContextEngine::new()
+            .with_sources(sources)
+            .with_token_counter(context_engine::best_token_counter());
 
         // ── Session manager (SQL-backed) ──────────────────────────────────
         let session_manager =
