@@ -4,6 +4,27 @@ use serde::{Deserialize, Serialize};
 
 use super::core::{default_semantic_threshold, default_true};
 
+/// Session configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionConfig {
+    /// Maximum number of history messages to load (default: 50)
+    #[serde(default = "default_history_limit")]
+    pub history_limit: usize,
+}
+
+impl Default for SessionConfig {
+    fn default() -> Self {
+        Self {
+            history_limit: default_history_limit(),
+        }
+    }
+}
+
+fn default_history_limit() -> usize {
+    50
+}
+
 /// Conversation memory configuration
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -12,6 +33,8 @@ pub struct ConversationConfig {
     pub embedding: ConversationEmbeddingConfig,
     #[serde(default)]
     pub search: ConversationSearchConfig,
+    #[serde(default)]
+    pub session: SessionConfig,
 }
 
 /// Conversation embedding configuration
@@ -75,6 +98,22 @@ fn default_max_results() -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_session_history_limit_default() {
+        let json = serde_json::json!({});
+        let config: ConversationConfig = serde_json::from_value(json).unwrap();
+        assert_eq!(config.session.history_limit, 50);
+    }
+
+    #[test]
+    fn test_session_history_limit_custom() {
+        let json = serde_json::json!({
+            "session": { "historyLimit": 100 }
+        });
+        let config: ConversationConfig = serde_json::from_value(json).unwrap();
+        assert_eq!(config.session.history_limit, 100);
+    }
 
     #[test]
     fn test_conversation_config_defaults() {

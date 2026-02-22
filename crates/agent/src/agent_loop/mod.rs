@@ -32,8 +32,6 @@ pub struct PlanExecutionRequest {
     pub routing_ctx: tools::RoutingContext,
 }
 
-/// Default session history limit (number of messages)
-const DEFAULT_HISTORY_LIMIT: usize = 50;
 
 /// Handle for consuming streaming agent output.
 pub struct StreamingHandle {
@@ -84,6 +82,8 @@ pub struct AgentLoop {
     pub(crate) plan_completion_handler: Option<Arc<dyn PlanCompletionHandler>>,
     /// Adaptive orchestrator pipeline: classify → assemble → dispatch → validate → record.
     pub(crate) pipeline: Arc<crate::pipeline::AgentPipeline>,
+    /// Maximum number of history messages to load per request.
+    pub(crate) history_limit: usize,
 }
 
 impl AgentLoop {
@@ -214,7 +214,7 @@ impl AgentLoop {
         }
 
         // Get session history
-        let history = session.get_history(DEFAULT_HISTORY_LIMIT).to_vec();
+        let history = session.get_history(self.history_limit).to_vec();
 
         // Drop the write lock
         drop(session_manager);
@@ -282,7 +282,7 @@ impl AgentLoop {
         session.add_message("user", &system_msg_content);
 
         // Get session history
-        let history = session.get_history(DEFAULT_HISTORY_LIMIT).to_vec();
+        let history = session.get_history(self.history_limit).to_vec();
 
         // Drop the write lock before processing
         drop(session_manager);
@@ -468,7 +468,7 @@ impl AgentLoop {
             self.spawn_embed_message(&session_key, "user", &content, &msg_id);
         }
 
-        let history = session.get_history(DEFAULT_HISTORY_LIMIT).to_vec();
+        let history = session.get_history(self.history_limit).to_vec();
         drop(session_manager);
 
         // Run through pipeline
@@ -512,7 +512,7 @@ impl AgentLoop {
             self.spawn_embed_message(&session_key, "user", &content, &msg_id);
         }
 
-        let history = session.get_history(DEFAULT_HISTORY_LIMIT).to_vec();
+        let history = session.get_history(self.history_limit).to_vec();
         drop(session_manager);
 
         // Create event channel and interaction channel

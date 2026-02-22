@@ -621,6 +621,7 @@ impl AgentLoopBuilder {
         info!("Adaptive orchestrator pipeline initialized");
 
         // ── Assemble AgentLoop ────────────────────────────────────────────
+        let history_limit = config.conversation.session.history_limit;
         Ok(AgentLoop {
             bus,
             inbound_rx: Some(inbound_rx),
@@ -644,6 +645,7 @@ impl AgentLoopBuilder {
             learning_service,
             plan_completion_handler,
             pipeline,
+            history_limit,
         })
     }
 }
