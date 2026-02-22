@@ -38,6 +38,11 @@ mod tests {
         format!("{prefix}-{}", uuid::Uuid::new_v4().as_simple())
     }
 
+    /// Generate a unique category string to prevent parallel test contamination.
+    fn unique_cat(base: &str) -> String {
+        format!("{base}-{}", &uuid::Uuid::new_v4().to_string()[..8])
+    }
+
     fn sample_budget(
         id: &str,
         name: &str,
@@ -252,13 +257,14 @@ mod tests {
             return;
         };
         let budget_id = unique_id("b");
+        let cat = unique_cat("entertainment");
         repos
             .budgets
             .add(&sample_budget(
                 &budget_id,
                 "Entertainment",
                 2_000_000,
-                Some("entertainment"),
+                Some(&cat),
             ))
             .await
             .unwrap();
@@ -275,13 +281,14 @@ mod tests {
         let acct_id = unique_id("a");
         repos.accounts.add(&sample_account(&acct_id)).await.unwrap();
         let budget_id = unique_id("b");
+        let cat = unique_cat("food");
         repos
             .budgets
             .add(&sample_budget(
                 &budget_id,
                 "Food Budget",
                 5_000_000,
-                Some("food"),
+                Some(&cat),
             ))
             .await
             .unwrap();
@@ -298,7 +305,7 @@ mod tests {
             repos
                 .transactions
                 .add(&sample_tx_with_category(
-                    id, &acct_id, "expense", *amt, "food", feb15,
+                    id, &acct_id, "expense", *amt, &cat, feb15,
                 ))
                 .await
                 .unwrap();
@@ -320,13 +327,14 @@ mod tests {
         let acct_id = unique_id("a");
         repos.accounts.add(&sample_account(&acct_id)).await.unwrap();
         let budget_id = unique_id("b");
+        let cat = unique_cat("food");
         repos
             .budgets
             .add(&sample_budget(
                 &budget_id,
                 "Food Budget",
                 5_000_000,
-                Some("food"),
+                Some(&cat),
             ))
             .await
             .unwrap();
@@ -336,14 +344,14 @@ mod tests {
         repos
             .transactions
             .add(&sample_tx_with_category(
-                &exp_id, &acct_id, "expense", 200_000, "food", feb15,
+                &exp_id, &acct_id, "expense", 200_000, &cat, feb15,
             ))
             .await
             .unwrap();
         repos
             .transactions
             .add(&sample_tx_with_category(
-                &inc_id, &acct_id, "income", 500_000, "food", feb15,
+                &inc_id, &acct_id, "income", 500_000, &cat, feb15,
             ))
             .await
             .unwrap();
@@ -372,10 +380,14 @@ mod tests {
         let id1 = unique_id("t1");
         let id2 = unique_id("t2");
         let id3 = unique_id("t3");
+        // Use unique category names so these transactions don't match other tests' specific-category budgets.
+        let cat_food = unique_cat("food");
+        let cat_transport = unique_cat("transport");
+        let cat_entertainment = unique_cat("entertainment");
         repos
             .transactions
             .add(&sample_tx_with_category(
-                &id1, &acct_id, "expense", 100_000, "food", feb15,
+                &id1, &acct_id, "expense", 100_000, &cat_food, feb15,
             ))
             .await
             .unwrap();
@@ -386,7 +398,7 @@ mod tests {
                 &acct_id,
                 "expense",
                 50_000,
-                "transport",
+                &cat_transport,
                 feb15,
             ))
             .await
@@ -398,13 +410,19 @@ mod tests {
                 &acct_id,
                 "expense",
                 200_000,
-                "entertainment",
+                &cat_entertainment,
                 feb15,
             ))
             .await
             .unwrap();
         let usage = repos.budgets.budget_usage(&budget_id).await.unwrap();
-        assert_eq!(usage.spent, 350_000);
+        // NULL-category budget sums all expenses. In parallel tests other transactions may
+        // also be present, so assert >= the known amount from this test's transactions.
+        assert!(
+            usage.spent >= 350_000,
+            "expected spent >= 350_000 but got {}",
+            usage.spent
+        );
         for id in &[&id1, &id2, &id3] {
             let _ = repos.transactions.delete(id).await;
         }

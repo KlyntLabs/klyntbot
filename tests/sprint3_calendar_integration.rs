@@ -62,6 +62,11 @@ async fn test_todo_repo() -> Option<storage::TodoRepo> {
     }
 }
 
+/// Generate a unique event UID to prevent parallel test contamination.
+fn unique_event_uid(prefix: &str) -> String {
+    format!("{prefix}-{}", &uuid::Uuid::new_v4().to_string()[..8])
+}
+
 fn create_test_event(
     uid: &str,
     start: chrono::DateTime<Utc>,
@@ -91,27 +96,28 @@ async fn test_reconcile_event_time_changed_updates_todo() {
         return;
     };
 
-    // Create todo with calendar event
+    // Create todo with calendar event using a unique UID to avoid parallel test contamination
     let original_due = Utc.with_ymd_and_hms(2026, 2, 20, 14, 0, 0).unwrap();
+    let event_uid = unique_event_uid("ev-time");
     let mut todo = create_test_todo("Meeting");
     todo.due_date = Some(original_due);
-    todo.calendar_event_uid = Some("event-123".to_string());
+    todo.calendar_event_uid = Some(event_uid.clone());
     let todo_id = todo.id.clone();
     let row: storage::TodoRow = (&todo).into();
     repo.add(&row).await.unwrap();
 
     // Calendar returns event with new time
     let new_time = Utc.with_ymd_and_hms(2026, 2, 20, 16, 0, 0).unwrap();
-    let events = vec![create_test_event("event-123", new_time, None)];
+    let events = vec![create_test_event(&event_uid, new_time, None)];
 
     // Action: Run reconciliation
     let report = reconcile_calendar_events(&repo, events).await.unwrap();
 
-    // Assert
-    assert_eq!(report.checked, 1);
+    // checked/links_cleared use >= because parallel tests may add more calendar-linked todos.
+    // due_dates_updated and todos_completed are exact since unique UIDs prevent cross-contamination.
+    assert!(report.checked >= 1);
     assert_eq!(report.due_dates_updated, 1);
     assert_eq!(report.todos_completed, 0);
-    assert_eq!(report.links_cleared, 0);
 
     let updated_row = repo.get(&todo_id).await.unwrap().unwrap();
     let updated_todo = Todo::from(updated_row);
@@ -129,26 +135,27 @@ async fn test_reconcile_event_completed_marks_todo_done() {
         return;
     };
 
+    let event_uid = unique_event_uid("ev-done");
     let mut todo = create_test_todo("Task");
     todo.status = TodoStatus::Todo;
-    todo.calendar_event_uid = Some("event-456".to_string());
+    todo.calendar_event_uid = Some(event_uid.clone());
     todo.due_date = Some(Utc::now());
     let todo_id = todo.id.clone();
     let row: storage::TodoRow = (&todo).into();
     repo.add(&row).await.unwrap();
 
     let events = vec![create_test_event(
-        "event-456",
+        &event_uid,
         Utc::now(),
         Some("COMPLETED".to_string()),
     )];
 
     let report = reconcile_calendar_events(&repo, events).await.unwrap();
 
-    assert_eq!(report.checked, 1);
+    // Use >= for checked since parallel tests may add more calendar-linked todos.
+    assert!(report.checked >= 1);
     assert_eq!(report.todos_completed, 1);
     assert_eq!(report.due_dates_updated, 0);
-    assert_eq!(report.links_cleared, 0);
 
     let updated_row = repo.get(&todo_id).await.unwrap().unwrap();
     let updated = Todo::from(updated_row);
@@ -165,26 +172,34 @@ async fn test_reconcile_event_cancelled_clears_uid() {
         return;
     };
 
+    let event_uid = unique_event_uid("ev-cancel");
     let mut todo = create_test_todo("Cancelled meeting");
-    todo.calendar_event_uid = Some("event-789".to_string());
+    todo.calendar_event_uid = Some(event_uid.clone());
     let todo_id = todo.id.clone();
     let row: storage::TodoRow = (&todo).into();
     repo.add(&row).await.unwrap();
 
     let events = vec![create_test_event(
-        "event-789",
+        &event_uid,
         Utc::now(),
         Some("CANCELLED".to_string()),
     )];
 
     let report = reconcile_calendar_events(&repo, events).await.unwrap();
 
-    assert_eq!(report.checked, 1);
-    assert_eq!(report.links_cleared, 1);
+    // Use >= for checked/links_cleared since parallel tests may add more calendar-linked todos.
+    assert!(report.checked >= 1);
+    assert!(report.links_cleared >= 1);
     assert_eq!(report.todos_completed, 0);
     assert_eq!(report.due_dates_updated, 0);
 
-    // Note: ClearCalendarLink is best-effort (TodoPatch lacks calendar_event_uid field)
+    // Verify this specific todo's link was cleared
+    let updated = Todo::from(repo.get(&todo_id).await.unwrap().unwrap());
+    assert!(
+        updated.calendar_event_uid.is_none(),
+        "calendar_event_uid should be cleared after CANCELLED event"
+    );
+
     let _ = repo.delete(&todo_id).await;
 }
 
@@ -194,8 +209,9 @@ async fn test_reconcile_event_deleted_from_provider_clears_uid() {
         return;
     };
 
+    let event_uid = unique_event_uid("ev-del");
     let mut todo = create_test_todo("Deleted event");
-    todo.calendar_event_uid = Some("event-999".to_string());
+    todo.calendar_event_uid = Some(event_uid.clone());
     let todo_id = todo.id.clone();
     let row: storage::TodoRow = (&todo).into();
     repo.add(&row).await.unwrap();
@@ -204,8 +220,16 @@ async fn test_reconcile_event_deleted_from_provider_clears_uid() {
 
     let report = reconcile_calendar_events(&repo, events).await.unwrap();
 
-    assert_eq!(report.checked, 1);
-    assert_eq!(report.links_cleared, 1);
+    // Use >= since parallel tests may have more calendar-linked todos.
+    assert!(report.checked >= 1);
+    assert!(report.links_cleared >= 1);
+
+    // Verify this specific todo's link was cleared after event deletion
+    let updated = Todo::from(repo.get(&todo_id).await.unwrap().unwrap());
+    assert!(
+        updated.calendar_event_uid.is_none(),
+        "calendar_event_uid should be cleared when event is not found"
+    );
 
     let _ = repo.delete(&todo_id).await;
 }
@@ -224,16 +248,23 @@ async fn test_reconcile_multiple_changes_in_single_sync() {
 
     let mut ids = Vec::new();
 
+    // Use unique UIDs per run to prevent parallel test contamination
+    let uid1 = unique_event_uid("ev-multi1");
+    let uid2 = unique_event_uid("ev-multi2");
+    let uid3 = unique_event_uid("ev-multi3");
+    let uid4 = unique_event_uid("ev-multi4");
+    let uid5 = unique_event_uid("ev-multi5");
+
     // Todo 1: Time changed
     let mut todo1 = create_test_todo("Todo 1");
-    todo1.calendar_event_uid = Some("event-1".to_string());
+    todo1.calendar_event_uid = Some(uid1.clone());
     todo1.due_date = Some(original_time);
     ids.push(todo1.id.clone());
     repo.add(&storage::TodoRow::from(&todo1)).await.unwrap();
 
     // Todo 2: Completed
     let mut todo2 = create_test_todo("Todo 2");
-    todo2.calendar_event_uid = Some("event-2".to_string());
+    todo2.calendar_event_uid = Some(uid2.clone());
     todo2.status = TodoStatus::Todo;
     todo2.due_date = Some(unchanged_time);
     ids.push(todo2.id.clone());
@@ -241,37 +272,39 @@ async fn test_reconcile_multiple_changes_in_single_sync() {
 
     // Todo 3: Cancelled
     let mut todo3 = create_test_todo("Todo 3");
-    todo3.calendar_event_uid = Some("event-3".to_string());
+    todo3.calendar_event_uid = Some(uid3.clone());
     ids.push(todo3.id.clone());
     repo.add(&storage::TodoRow::from(&todo3)).await.unwrap();
 
     // Todo 4: Unchanged
     let mut todo4 = create_test_todo("Todo 4");
-    todo4.calendar_event_uid = Some("event-4".to_string());
+    todo4.calendar_event_uid = Some(uid4.clone());
     todo4.due_date = Some(unchanged_time);
     ids.push(todo4.id.clone());
     repo.add(&storage::TodoRow::from(&todo4)).await.unwrap();
 
     // Todo 5: Event deleted
     let mut todo5 = create_test_todo("Todo 5");
-    todo5.calendar_event_uid = Some("event-5".to_string());
+    todo5.calendar_event_uid = Some(uid5.clone());
     ids.push(todo5.id.clone());
     repo.add(&storage::TodoRow::from(&todo5)).await.unwrap();
 
     let events = vec![
-        create_test_event("event-1", new_time, None),
-        create_test_event("event-2", unchanged_time, Some("COMPLETED".to_string())),
-        create_test_event("event-3", unchanged_time, Some("CANCELLED".to_string())),
-        create_test_event("event-4", unchanged_time, None),
-        // event-5 not in list (deleted)
+        create_test_event(&uid1, new_time, None),
+        create_test_event(&uid2, unchanged_time, Some("COMPLETED".to_string())),
+        create_test_event(&uid3, unchanged_time, Some("CANCELLED".to_string())),
+        create_test_event(&uid4, unchanged_time, None),
+        // uid5 not in list (deleted)
     ];
 
     let report = reconcile_calendar_events(&repo, events).await.unwrap();
 
-    assert_eq!(report.checked, 5);
+    // checked/links_cleared use >= because parallel tests may add more calendar-linked todos.
+    // due_dates_updated and todos_completed are exact since unique UIDs prevent cross-contamination.
+    assert!(report.checked >= 5);
     assert_eq!(report.due_dates_updated, 1); // todo1
     assert_eq!(report.todos_completed, 1); // todo2
-    assert_eq!(report.links_cleared, 2); // todo3 + todo5
+    assert!(report.links_cleared >= 2); // todo3 + todo5 (plus any from parallel tests)
 
     // Cleanup
     for id in &ids {

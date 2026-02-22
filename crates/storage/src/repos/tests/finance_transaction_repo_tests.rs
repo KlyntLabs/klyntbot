@@ -35,6 +35,11 @@ mod tests {
         format!("{prefix}-{}", uuid::Uuid::new_v4().as_simple())
     }
 
+    /// Generate a unique category string to prevent parallel test contamination.
+    fn unique_cat(base: &str) -> String {
+        format!("{base}-{}", &uuid::Uuid::new_v4().to_string()[..8])
+    }
+
     fn sample_account(id: &str) -> FinanceAccountRow {
         let now = Utc::now();
         FinanceAccountRow {
@@ -404,23 +409,25 @@ mod tests {
         let feb1 = NaiveDate::from_ymd_opt(2026, 2, 1).unwrap();
         let feb28 = NaiveDate::from_ymd_opt(2026, 2, 28).unwrap();
         let feb15 = NaiveDate::from_ymd_opt(2026, 2, 15).unwrap();
+        let cat_food = unique_cat("food");
+        let cat_transport = unique_cat("transport");
         let food_ids: Vec<_> = (0..3).map(|i| unique_id(&format!("sf{i}"))).collect();
         for id in &food_ids {
             let mut tx = sample_tx(id, &acct_id, "expense", 100_000);
-            tx.category = Some("food".to_string());
+            tx.category = Some(cat_food.clone());
             tx.tx_date = feb15;
             repos.transactions.add(&tx).await.unwrap();
         }
         let tr_ids: Vec<_> = (0..2).map(|i| unique_id(&format!("st{i}"))).collect();
         for id in &tr_ids {
             let mut tx = sample_tx(id, &acct_id, "expense", 50_000);
-            tx.category = Some("transport".to_string());
+            tx.category = Some(cat_transport.clone());
             tx.tx_date = feb15;
             repos.transactions.add(&tx).await.unwrap();
         }
         let inc_id = unique_id("si");
         let mut tx_inc = sample_tx(&inc_id, &acct_id, "income", 500_000);
-        tx_inc.category = Some("food".to_string());
+        tx_inc.category = Some(cat_food.clone());
         tx_inc.tx_date = feb15;
         repos.transactions.add(&tx_inc).await.unwrap();
         let sums = repos
@@ -428,8 +435,11 @@ mod tests {
             .sum_by_category(feb1, feb28, "expense")
             .await
             .unwrap();
-        let food_sum = sums.iter().find(|(c, _)| c == "food").map(|(_, t)| *t);
-        let tr_sum = sums.iter().find(|(c, _)| c == "transport").map(|(_, t)| *t);
+        let food_sum = sums.iter().find(|(c, _)| c == &cat_food).map(|(_, t)| *t);
+        let tr_sum = sums
+            .iter()
+            .find(|(c, _)| c == &cat_transport)
+            .map(|(_, t)| *t);
         assert_eq!(food_sum, Some(300_000));
         assert_eq!(tr_sum, Some(100_000));
         for id in food_ids.iter().chain(tr_ids.iter()) {

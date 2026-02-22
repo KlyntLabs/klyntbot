@@ -54,8 +54,8 @@ mod tests {
         }
     }
 
-    fn unique_id(prefix: &str) -> String {
-        format!("{prefix}-{}", uuid::Uuid::new_v4().as_simple())
+    fn unique_id(_prefix: &str) -> String {
+        uuid::Uuid::new_v4().to_string()[..8].to_string()
     }
 
     // ----- CRUD -----
@@ -379,7 +379,8 @@ mod tests {
         let id = unique_id("fst");
         repo.add(&sample_todo(&id, "Focus me")).await.unwrap();
         let deadline = Utc::now() + chrono::Duration::hours(24);
-        assert!(repo.focus(&id, 3, Some(deadline)).await.unwrap());
+        // Use a large slot limit so parallel tests with their own focused todos don't interfere.
+        assert!(repo.focus(&id, 1000, Some(deadline)).await.unwrap());
         let row = repo.get(&id).await.unwrap().unwrap();
         assert!(row.focused_at.is_some());
         assert!(row.focus_deadline.is_some());
@@ -395,7 +396,7 @@ mod tests {
         };
         let id = unique_id("uft");
         repo.add(&sample_todo(&id, "Unfocus me")).await.unwrap();
-        repo.focus(&id, 3, None).await.unwrap();
+        repo.focus(&id, 1000, None).await.unwrap();
         assert!(repo.unfocus(&id).await.unwrap());
         let row = repo.get(&id).await.unwrap().unwrap();
         assert!(row.focused_at.is_none());
@@ -409,16 +410,21 @@ mod tests {
         let Some(repo) = test_todo_repo().await else {
             return;
         };
+        // Account for existing focused todos from parallel tests by basing the slot limit
+        // on the current count: limit = existing + 3, so filling 3 more saturates it.
+        let existing_focused = repo.list_focused().await.unwrap().len() as i64;
+        let slot_limit = existing_focused + 3;
+
         let ids: Vec<String> = (0..4).map(|i| unique_id(&format!("fsl{i}"))).collect();
         for id in &ids {
             repo.add(&sample_todo(id, "Slot task")).await.unwrap();
         }
-        // Fill 3 slots
+        // Fill 3 new slots on top of existing focused todos
         for id in &ids[..3] {
-            assert!(repo.focus(id, 3, None).await.unwrap());
+            assert!(repo.focus(id, slot_limit, None).await.unwrap());
         }
-        // 4th should fail
-        let focused = repo.focus(&ids[3], 3, None).await.unwrap();
+        // 4th should fail because slot_limit is now exactly reached
+        let focused = repo.focus(&ids[3], slot_limit, None).await.unwrap();
         assert!(!focused, "Should reject when slots are full");
 
         // Cleanup
