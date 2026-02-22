@@ -34,6 +34,9 @@ pub struct DispatchResult {
 pub struct EngineDispatch {
     core: Arc<ExecutionCore>,
     max_escalations: u32,
+    /// When present, `AutonomousTask` is handled by the plan-generate engine.
+    /// When absent, falls back to `ReactPlusEngine` (preserves test compatibility).
+    plan_generate_engine: Option<Arc<super::plan_generate::PlanGenerateEngine>>,
 }
 
 impl EngineDispatch {
@@ -41,11 +44,21 @@ impl EngineDispatch {
         Self {
             core,
             max_escalations: 2,
+            plan_generate_engine: None,
         }
     }
 
     pub fn with_max_escalations(mut self, max: u32) -> Self {
         self.max_escalations = max;
+        self
+    }
+
+    /// Attach a `PlanGenerateEngine` so that `AutonomousTask` uses plan-based execution.
+    pub fn with_plan_generate_engine(
+        mut self,
+        engine: Arc<super::plan_generate::PlanGenerateEngine>,
+    ) -> Self {
+        self.plan_generate_engine = Some(engine);
         self
     }
 
@@ -172,9 +185,17 @@ impl EngineDispatch {
                 }
 
                 ExecutionStrategy::AutonomousTask { max_iterations } => {
-                    // For autonomous tasks, we use ReactPlus with higher iteration limits.
-                    // Full PlanExecute integration requires plan steps from a planner —
-                    // that's wired up by the orchestrator layer above dispatch.
+                    // Prefer plan-based execution when a PlanGenerateEngine is wired in.
+                    if let Some(ref plan_engine) = self.plan_generate_engine {
+                        let mut result = plan_engine
+                            .execute(current_messages, params, ctx, event_tx.as_ref())
+                            .await?;
+                        // Override escalation count with the outer dispatch count.
+                        result.escalation_count = escalation_count;
+                        return Ok(result);
+                    }
+
+                    // Fallback: ReactPlus with higher iteration limits (no PlanRepo wired).
                     let engine = ReactPlusEngine::new(self.core.clone())
                         .with_max_iterations(*max_iterations)
                         .with_reflection_mode(ReflectionMode::EveryN(5));

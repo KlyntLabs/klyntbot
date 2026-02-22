@@ -614,7 +614,20 @@ impl AgentLoopBuilder {
             None
         };
 
-        let engine_dispatch = Arc::new(crate::execution::EngineDispatch::new(execution_core));
+        let mut engine_dispatch = crate::execution::EngineDispatch::new(execution_core);
+
+        // Inject PlanGenerateEngine when a PlanRepo is available.
+        if let (Some(ref plan_repo), Some(ref core)) = (&stored_plan_repo, &plan_execution_core) {
+            let plan_gen_engine = Arc::new(crate::execution::PlanGenerateEngine::new(
+                Arc::clone(core),
+                plan_repo.clone(),
+                provider.clone(),
+                config.agents.defaults.model.clone(),
+            ));
+            engine_dispatch = engine_dispatch.with_plan_generate_engine(plan_gen_engine);
+        }
+
+        let engine_dispatch = Arc::new(engine_dispatch);
         let mut orchestrator =
             crate::orchestrator::Orchestrator::new(provider.clone(), &config.agents.defaults.model);
         orchestrator = orchestrator.with_strategy_repo(repos.strategies.clone());
