@@ -1,6 +1,7 @@
 use std::collections::HashMap;
-use std::hash::{Hash, Hasher};
 use std::sync::Arc;
+
+use sha2::{Digest, Sha256};
 
 use providers::Message;
 use tokio::sync::Mutex;
@@ -60,14 +61,14 @@ const DEFAULT_CACHE_CAPACITY: usize = 8;
 
 /// Bounded cache for assembled contexts, keyed by a hash of the request inputs.
 struct ContextCache {
-    entries: HashMap<u64, AssembledContext>,
+    entries: HashMap<String, AssembledContext>,
     /// Insertion order for eviction (oldest first).
-    order: Vec<u64>,
+    order: Vec<String>,
     capacity: usize,
     /// Generation counter — incremented on invalidation.
     generation: u64,
     /// Generation at which each entry was inserted.
-    entry_generations: HashMap<u64, u64>,
+    entry_generations: HashMap<String, u64>,
 }
 
 impl ContextCache {
@@ -81,29 +82,29 @@ impl ContextCache {
         }
     }
 
-    fn get(&self, key: u64) -> Option<&AssembledContext> {
+    fn get(&self, key: &str) -> Option<&AssembledContext> {
         // Only return if entry is from the current generation
-        let entry_gen = self.entry_generations.get(&key)?;
+        let entry_gen = self.entry_generations.get(key)?;
         if *entry_gen < self.generation {
             return None;
         }
-        self.entries.get(&key)
+        self.entries.get(key)
     }
 
-    fn insert(&mut self, key: u64, value: AssembledContext) {
+    fn insert(&mut self, key: String, value: AssembledContext) {
         if self.entries.len() >= self.capacity && !self.entries.contains_key(&key) {
             // Evict oldest
-            if let Some(oldest_key) = self.order.first().copied() {
+            if let Some(oldest_key) = self.order.first().cloned() {
                 self.entries.remove(&oldest_key);
                 self.entry_generations.remove(&oldest_key);
                 self.order.remove(0);
             }
         }
-        self.entries.insert(key, value);
-        self.entry_generations.insert(key, self.generation);
         if !self.order.contains(&key) {
-            self.order.push(key);
+            self.order.push(key.clone());
         }
+        self.entries.insert(key.clone(), value);
+        self.entry_generations.insert(key, self.generation);
     }
 
     fn invalidate(&mut self) {
@@ -239,7 +240,7 @@ impl ContextEngine {
         let cache_key = Self::compute_cache_key(&request);
         {
             let cache = self.cache.lock().await;
-            if let Some(cached) = cache.get(cache_key) {
+            if let Some(cached) = cache.get(&cache_key) {
                 return cached.clone();
             }
         }
@@ -255,35 +256,43 @@ impl ContextEngine {
         result
     }
 
-    /// Compute a cache key from the request inputs.
-    fn compute_cache_key(request: &ContextRequest) -> u64 {
-        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    /// Compute a stable, deterministic cache key from the request inputs.
+    ///
+    /// Uses SHA-256 to produce a 64-char hex string that is stable across
+    /// process restarts (unlike `DefaultHasher` which is randomized).
+    fn compute_cache_key(request: &ContextRequest) -> String {
+        let mut hasher = Sha256::new();
         // Hash system prompt
-        request.system_prompt.hash(&mut hasher);
+        hasher.update(request.system_prompt.as_bytes());
         // Hash history length + last message content (changes on each user message)
-        request.history.len().hash(&mut hasher);
+        hasher.update(request.history.len().to_le_bytes());
         if let Some(last) = request.history.last() {
-            // Hash the last message's debug repr as a proxy for content
-            format!("{:?}", last).hash(&mut hasher);
+            hasher.update(format!("{:?}", last).as_bytes());
         }
         // Hash message text (used for memory retrieval)
-        request.message_text.hash(&mut hasher);
-        // Hash strategy discriminant
-        std::mem::discriminant(&request.strategy).hash(&mut hasher);
+        hasher.update(request.message_text.as_bytes());
+        // Hash strategy discriminant as a single byte for determinism
+        let strategy_byte: u8 = match &request.strategy {
+            ExecutionStrategy::DirectResponse => 0,
+            ExecutionStrategy::ToolAssisted { .. } => 1,
+            ExecutionStrategy::AutonomousTask { .. } => 2,
+            ExecutionStrategy::Clarification { .. } => 3,
+        };
+        hasher.update(&[strategy_byte]);
         // Hash tool definition count + first tool name (lightweight proxy)
-        request.tool_definitions.len().hash(&mut hasher);
+        hasher.update(request.tool_definitions.len().to_le_bytes());
         if let Some(first) = request.tool_definitions.first() {
             if let Some(name) = first
                 .get("function")
                 .and_then(|f| f.get("name"))
                 .and_then(|n| n.as_str())
             {
-                name.hash(&mut hasher);
+                hasher.update(name.as_bytes());
             }
         }
         // Hash context window
-        request.context_window.hash(&mut hasher);
-        hasher.finish()
+        hasher.update(request.context_window.to_le_bytes());
+        format!("{:x}", hasher.finalize())
     }
 
     async fn assemble_uncached(&self, request: &ContextRequest) -> AssembledContext {
@@ -685,6 +694,23 @@ mod tests {
             .find(|(p, _)| *p == Priority::RetrievedMemory);
         assert!(mem_alloc.is_some(), "RetrievedMemory should be allocated");
         assert!(mem_alloc.unwrap().1 > 0);
+    }
+
+    #[test]
+    fn test_cache_key_is_deterministic() {
+        let req = ContextRequest {
+            system_prompt: "You are helpful.".to_string(),
+            history: vec![Message::user("hello")],
+            message_text: "test".to_string(),
+            strategy: ExecutionStrategy::ToolAssisted { max_iterations: 5 },
+            tool_definitions: vec![],
+            context_window: 4096,
+        };
+        let key1 = ContextEngine::compute_cache_key(&req);
+        let key2 = ContextEngine::compute_cache_key(&req);
+        assert_eq!(key1, key2, "Cache key must be deterministic");
+        // SHA-256 produces a 64-char hex string
+        assert_eq!(key1.len(), 64, "Expected SHA-256 hex string (64 chars)");
     }
 
     #[tokio::test]

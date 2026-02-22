@@ -12,4 +12,6 @@ pub use history_compressor::{
 };
 pub use memory_retriever::{MemoryEntry, MemoryRetriever};
 pub use source::{ContextSource, SourceContext};
-pub use token_counter::{default_token_counter, CharTokenCounter, TokenCounter};
+pub use token_counter::{
+    best_token_counter, default_token_counter, CharTokenCounter, TiktokenCounter, TokenCounter,
+};
