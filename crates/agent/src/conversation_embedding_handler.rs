@@ -113,27 +113,8 @@ impl ConversationEmbeddingHandler for ConversationEmbeddingHandlerImpl {
                 })??
         };
 
-        // Search store for similar embeddings
-        let all_records = self.store.get_all().await?;
-
-        // Compute cosine similarity for each record
-        let mut results: Vec<(ConversationEmbeddingRecord, f64)> = all_records
-            .values()
-            .map(|record| {
-                let similarity =
-                    EmbeddingEngine::cosine_similarity(&query_embedding, &record.embedding);
-                (record.clone(), similarity)
-            })
-            .filter(|(_, score)| *score >= threshold)
-            .collect();
-
-        // Sort by similarity descending
-        results.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-
-        // Limit results
-        results.truncate(limit);
-
-        Ok(results)
+        // pgvector ANN search (cross-channel, O(log n))
+        self.store.search_similar(&query_embedding, limit, threshold).await
     }
 
     async fn purge(&self, filter: PurgeFilter) -> Result<usize> {

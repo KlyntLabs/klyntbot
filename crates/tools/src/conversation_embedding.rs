@@ -9,7 +9,6 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 use common::Result;
 
@@ -106,20 +105,22 @@ impl ConversationEmbeddingStore {
         Ok(rows.into_iter().map(row_to_record).collect())
     }
 
-    /// Get all embedding records (keyed by ID string).
-    pub async fn get_all(&self) -> Result<HashMap<String, ConversationEmbeddingRecord>> {
+    /// Search for similar embeddings using pgvector ANN (cosine distance).
+    ///
+    /// Cross-channel: searches ALL conversation embeddings regardless of session_key.
+    pub async fn search_similar(
+        &self,
+        query_embedding: &[f32],
+        limit: usize,
+        threshold: f64,
+    ) -> Result<Vec<(ConversationEmbeddingRecord, f64)>> {
+        let vector = pgvector::Vector::from(query_embedding.to_vec());
         let rows = self
             .repo
-            .get_all()
+            .search_similar(&vector, limit as i64, threshold)
             .await
             .map_err(|e| common::ToolError::ExecutionFailed(e.to_string()))?;
-        Ok(rows
-            .into_iter()
-            .map(|r| {
-                let id = r.id.to_string();
-                (id, row_to_record(r))
-            })
-            .collect())
+        Ok(rows.into_iter().map(|(row, sim)| (row_to_record(row), sim)).collect())
     }
 
     /// Get status information about the store.
