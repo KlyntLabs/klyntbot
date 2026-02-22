@@ -172,9 +172,14 @@ impl AgentLoopBuilder {
         // Sort by priority (descending) — ensures correct ordering in prompt
         sources.sort_by_key(|s| std::cmp::Reverse(s.priority()));
 
+        let summary_provider = Arc::new(crate::llm_summary_provider::LlmSummaryProvider::new(
+            provider.clone(),
+            config.agents.defaults.model.clone(),
+        ));
         let context_engine = context_engine::ContextEngine::new()
             .with_sources(sources)
-            .with_token_counter(context_engine::best_token_counter());
+            .with_token_counter(context_engine::best_token_counter())
+            .with_summary_provider(summary_provider);
 
         // ── Session manager (SQL-backed) ──────────────────────────────────
         let session_manager =
@@ -295,11 +300,15 @@ impl AgentLoopBuilder {
         let context_engine = if config.conversation.embedding.enabled {
             let conv_store_for_retriever =
                 tools::ConversationEmbeddingStore::new(repos.conv_embeddings.clone());
+            // Compute per-day decay factor from configured half-life: factor = 0.5^(1/half_life)
+            let decay_factor = 0.5_f64
+                .powf(1.0 / config.conversation.memory.decay_half_life_days as f64);
             let retriever = Arc::new(
                 super::super::conversation_memory_retriever::ConversationMemoryRetriever::new(
                     Arc::clone(&embedding_engine),
                     conv_store_for_retriever,
                     config.conversation.search.semantic_threshold,
+                    decay_factor,
                 ),
             );
             context_engine.with_memory_retriever(retriever)
@@ -338,9 +347,13 @@ impl AgentLoopBuilder {
 
             // Enrichment engine
             if config.todo.enrichment.enabled {
-                let enrichment_engine = Arc::new(super::super::enrichment::EnrichmentEngine::new(
-                    config.todo.enrichment.clone(),
-                ));
+                let mut enrichment_engine =
+                    super::super::enrichment::EnrichmentEngine::new(config.todo.enrichment.clone());
+                if config.todo.enrichment.use_llm {
+                    enrichment_engine = enrichment_engine
+                        .with_provider(provider.clone(), config.agents.defaults.model.clone());
+                }
+                let enrichment_engine = Arc::new(enrichment_engine);
                 todo_tool =
                     todo_tool
                         .with_enrichment_handler(Arc::clone(&enrichment_engine)
@@ -639,6 +652,22 @@ impl AgentLoopBuilder {
             None
         };
 
+        // ── Memory maintenance service ────────────────────────────────────
+        let memory_maintenance_token = if self.pool.is_some() {
+            let token = CancellationToken::new();
+            let maintenance_service =
+                crate::memory_maintenance_service::MemoryMaintenanceService::new(
+                    storage::ConvEmbeddingRepo::new(storage_pool.inner().clone()),
+                    config.conversation.memory.max_age_days,
+                    config.conversation.memory.maintenance_interval_hours,
+                    token.clone(),
+                );
+            maintenance_service.spawn();
+            Some(token)
+        } else {
+            None
+        };
+
         // ── Assemble AgentLoop ────────────────────────────────────────────
         let history_limit = config.conversation.session.history_limit;
         Ok(AgentLoop {
@@ -666,6 +695,7 @@ impl AgentLoopBuilder {
             pipeline,
             history_limit,
             _session_cleanup_token: session_cleanup_token,
+            _memory_maintenance_token: memory_maintenance_token,
         })
     }
 }

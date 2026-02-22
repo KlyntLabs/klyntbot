@@ -3,6 +3,7 @@ pub mod budget;
 pub mod history_compressor;
 pub mod memory_retriever;
 pub mod source;
+pub mod summary_provider;
 pub mod token_counter;
 
 pub use assembler::{AssembledContext, ContextEngine, ContextRequest, ExecutionStrategy};
@@ -12,6 +13,7 @@ pub use history_compressor::{
 };
 pub use memory_retriever::{MemoryEntry, MemoryRetriever};
 pub use source::{ContextSource, SourceContext};
+pub use summary_provider::SummaryProvider;
 pub use token_counter::{
     best_token_counter, default_token_counter, CharTokenCounter, TiktokenCounter, TokenCounter,
 };

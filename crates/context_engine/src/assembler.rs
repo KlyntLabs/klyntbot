@@ -8,6 +8,7 @@ use tokio::sync::Mutex;
 
 use crate::memory_retriever::MemoryRetriever;
 use crate::source::{ContextSource, SourceContext};
+use crate::summary_provider::SummaryProvider;
 use crate::token_counter::{default_token_counter, TokenCounter};
 use crate::{
     BudgetAllocator, BudgetConfig, BudgetReport, CompressorConfig, HistoryCompressor, Priority,
@@ -185,6 +186,13 @@ impl ContextEngine {
             memory_retriever: Some(retriever),
             ..self
         }
+    }
+
+    /// Set a `SummaryProvider` for abstractive history compression.
+    /// Returns `self` for chaining.
+    pub fn with_summary_provider(mut self, provider: Arc<dyn SummaryProvider>) -> Self {
+        self.compressor = self.compressor.with_summary_provider(provider);
+        self
     }
 
     /// Register pluggable context sources for system prompt assembly.

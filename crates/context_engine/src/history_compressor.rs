@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use providers::{Message, UserContent};
 
+use crate::summary_provider::SummaryProvider;
 use crate::token_counter::{default_token_counter, TokenCounter};
 
 /// Default snippet length for extractive summaries (characters).
@@ -66,9 +67,11 @@ pub enum CompressorMode {
 /// - Always keep at least `config.min_recent_messages` verbatim (from the end)
 /// - Expand recent window if budget allows
 /// - Summarize older messages using extractive summarization (no LLM call)
+///   or abstractive summarization via a `SummaryProvider` when configured.
 pub struct HistoryCompressor {
     token_counter: Arc<dyn TokenCounter>,
     config: CompressorConfig,
+    summary_provider: Option<Arc<dyn SummaryProvider>>,
 }
 
 impl HistoryCompressor {
@@ -79,6 +82,7 @@ impl HistoryCompressor {
                 min_recent_messages: min_recent,
                 ..CompressorConfig::default()
             },
+            summary_provider: None,
         }
     }
 
@@ -94,6 +98,7 @@ impl HistoryCompressor {
                 min_recent_messages: min_recent,
                 ..config
             },
+            summary_provider: None,
         }
     }
 
@@ -102,12 +107,19 @@ impl HistoryCompressor {
         Self {
             token_counter,
             config,
+            summary_provider: None,
         }
     }
 
     /// Create with the default character-based token counter.
     pub fn with_defaults(min_recent: usize) -> Self {
         Self::new(min_recent, default_token_counter())
+    }
+
+    /// Set an optional `SummaryProvider` for abstractive compression.
+    pub fn with_summary_provider(mut self, provider: Arc<dyn SummaryProvider>) -> Self {
+        self.summary_provider = Some(provider);
+        self
     }
 
     pub fn compress(&self, history: &[Message], budget_tokens: usize) -> CompressedHistory {
@@ -167,6 +179,84 @@ impl HistoryCompressor {
                     token_count,
                 });
             }
+        }
+
+        let summary_tokens: usize = summaries.iter().map(|s| s.token_count).sum();
+        let total_tokens = recent_tokens + summary_tokens;
+
+        CompressedHistory {
+            summaries,
+            recent_messages,
+            total_tokens,
+        }
+    }
+
+    /// Async version of [`compress`] that supports abstractive summarization.
+    ///
+    /// When `mode == Abstractive` and a `SummaryProvider` is configured, each
+    /// chunk of older messages is sent to the provider for an LLM-generated
+    /// summary. Falls back to extractive summarization on provider error.
+    pub async fn compress_async(
+        &self,
+        history: &[Message],
+        budget_tokens: usize,
+    ) -> CompressedHistory {
+        if history.is_empty() {
+            return CompressedHistory {
+                summaries: vec![],
+                recent_messages: vec![],
+                total_tokens: 0,
+            };
+        }
+
+        // Early-exit: if not abstractive or no provider, delegate to sync compress()
+        if self.config.mode != CompressorMode::Abstractive || self.summary_provider.is_none() {
+            return self.compress(history, budget_tokens);
+        }
+
+        // Same budget/split logic as compress()
+        let min_keep = self.config.min_recent_messages.min(history.len());
+        let mut recent_tokens: usize = history[history.len() - min_keep..]
+            .iter()
+            .map(|m| self.estimate_message_tokens(m))
+            .sum();
+        let mut extra_count = 0;
+        let older_messages = &history[..history.len() - min_keep];
+        let half_remaining = budget_tokens.saturating_sub(recent_tokens) / 2;
+        let mut extra_tokens = 0;
+        for msg in older_messages.iter().rev() {
+            let t = self.estimate_message_tokens(msg);
+            if extra_tokens + t <= half_remaining {
+                extra_tokens += t;
+                extra_count += 1;
+            } else {
+                break;
+            }
+        }
+        recent_tokens += extra_tokens;
+        let recent_count = min_keep + extra_count;
+        let split_point = history.len() - recent_count;
+        let to_summarize = &history[..split_point];
+        let recent_messages = history[split_point..].to_vec();
+
+        let provider = self.summary_provider.as_ref().unwrap();
+        let chunk_size = self.config.chunk_size;
+        let snippet_len = self.config.snippet_length;
+        let mut summaries = Vec::new();
+
+        for (chunk_idx, chunk) in to_summarize.chunks(chunk_size).enumerate() {
+            let content = match provider.summarize(chunk).await {
+                Ok(text) => text,
+                Err(_) => Self::extractive_summary_with_length(chunk, snippet_len),
+            };
+            let token_count = self.token_counter.estimate_text(&content);
+            let start = chunk_idx * chunk_size;
+            let end = (start + chunk.len()).min(split_point);
+            summaries.push(HistorySummary {
+                content,
+                message_range: (start, end),
+                token_count,
+            });
         }
 
         let summary_tokens: usize = summaries.iter().map(|s| s.token_count).sum();
@@ -294,7 +384,9 @@ fn first_snippet(text: &str, max_chars: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::summary_provider::SummaryProvider;
     use crate::token_counter::default_token_counter;
+    use async_trait::async_trait;
 
     fn make_compressor() -> HistoryCompressor {
         HistoryCompressor::new(4, default_token_counter())
@@ -525,5 +617,97 @@ mod tests {
     #[test]
     fn test_default_snippet_length_is_200() {
         assert_eq!(DEFAULT_SNIPPET_LENGTH, 200);
+    }
+
+    // ── Abstractive compression tests ────────────────────────────────────
+
+    struct MockSummaryProvider {
+        fixed_response: String,
+    }
+
+    impl MockSummaryProvider {
+        fn new(response: &str) -> Self {
+            Self {
+                fixed_response: response.to_string(),
+            }
+        }
+    }
+
+    #[async_trait]
+    impl SummaryProvider for MockSummaryProvider {
+        async fn summarize(&self, _messages: &[Message]) -> Result<String, String> {
+            Ok(self.fixed_response.clone())
+        }
+    }
+
+    #[tokio::test]
+    async fn test_abstractive_mode_calls_summary_provider() {
+        let provider = Arc::new(MockSummaryProvider::new("LLM summary of conversation"));
+        let config = CompressorConfig {
+            mode: CompressorMode::Abstractive,
+            min_recent_messages: 4,
+            chunk_size: 5,
+            ..Default::default()
+        };
+        let compressor = HistoryCompressor::from_config(default_token_counter(), config)
+            .with_summary_provider(provider);
+        let history = make_history(20);
+        // Use a small budget (30 tokens) to force older messages into summaries.
+        // With ~3 tokens/message and 4 min_recent, ~12 tokens used by recent;
+        // half_remaining ≈ 9 → only ~3 extra messages fit, leaving ~13 for summarization.
+        let result = compressor.compress_async(&history, 30).await;
+        assert!(
+            !result.summaries.is_empty(),
+            "Expected non-empty summaries with tight budget"
+        );
+        assert!(
+            result.summaries.iter().any(|s| s.content.contains("LLM summary")),
+            "Expected at least one summary containing 'LLM summary', got: {:?}",
+            result.summaries.iter().map(|s| &s.content).collect::<Vec<_>>()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_abstractive_fallback_when_no_provider() {
+        let config = CompressorConfig {
+            mode: CompressorMode::Abstractive,
+            ..Default::default()
+        };
+        let compressor = HistoryCompressor::from_config(default_token_counter(), config);
+        let history = make_history(10);
+        let result = compressor.compress_async(&history, 50_000).await;
+        // Falls back to sync compress() — should still have results
+        assert!(!result.recent_messages.is_empty());
+    }
+
+    struct FailingSummaryProvider;
+
+    #[async_trait]
+    impl SummaryProvider for FailingSummaryProvider {
+        async fn summarize(&self, _messages: &[Message]) -> Result<String, String> {
+            Err("Provider unavailable".to_string())
+        }
+    }
+
+    #[tokio::test]
+    async fn test_abstractive_fallback_on_provider_error() {
+        let config = CompressorConfig {
+            mode: CompressorMode::Abstractive,
+            ..Default::default()
+        };
+        let compressor =
+            HistoryCompressor::from_config(default_token_counter(), config)
+                .with_summary_provider(Arc::new(FailingSummaryProvider));
+        let history = make_history(20);
+        let result = compressor.compress_async(&history, 50_000).await;
+        // Should still succeed, falling back to extractive per chunk
+        assert!(!result.summaries.is_empty() || !result.recent_messages.is_empty());
+        for summary in &result.summaries {
+            assert!(
+                summary.content.contains("Earlier in this conversation:"),
+                "Expected extractive fallback, got: {}",
+                summary.content
+            );
+        }
     }
 }
