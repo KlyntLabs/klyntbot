@@ -27,6 +27,7 @@ pub mod plan_completion_handler;
 pub mod plan_executor;
 pub mod plan_handler;
 mod plan_runner;
+pub mod plan_step_generator;
 pub mod recurring_tasks;
 pub mod reminders;
 pub mod memory_maintenance_service;

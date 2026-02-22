@@ -417,7 +417,12 @@ impl AgentLoopBuilder {
         }
 
         // ── Plan tool ─────────────────────────────────────────────────────
-        let plan_handler = Arc::new(super::super::PlanHandlerImpl::new(repos.plans.clone()));
+        let plan_handler = Arc::new(
+            super::super::PlanHandlerImpl::new(repos.plans.clone()).with_provider(
+                provider.clone(),
+                config.agents.defaults.model.clone(),
+            ),
+        );
         tool_registry.register(tools::plan_tool::PlanTool::new(Some(
             plan_handler as Arc<dyn tools::plan_tool::PlanHandler>,
         )));

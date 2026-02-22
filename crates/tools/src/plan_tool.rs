@@ -49,6 +49,11 @@ pub trait PlanHandler: Send + Sync {
     async fn get_step_context(&self, id: &Uuid) -> Result<String>;
     /// Trigger execution of an approved plan. Returns the plan in Executing state.
     async fn execute_plan(&self, id: &Uuid) -> Result<Plan>;
+    /// Auto-generate steps for a newly created plan via LLM decomposition.
+    /// Saves the generated steps to the database.  Returns `Ok(())` whether or
+    /// not steps were generated — callers must not treat an empty result as an
+    /// error.
+    async fn generate_steps(&self, plan_id: &Uuid) -> Result<()>;
 }
 
 /// PlanTool — Tool interface for multi-step plan management.
@@ -143,6 +148,10 @@ impl Tool for PlanTool {
                 let plan = handler
                     .create_plan(title, description, session_key, goal_id)
                     .await?;
+
+                // Auto-generate steps from description (best-effort; ignore errors)
+                let _ = handler.generate_steps(&plan.id).await;
+
                 Ok(format!(
                     "Created plan '{}' (id: {}, status: {:?})",
                     plan.title, plan.id, plan.status

@@ -9,17 +9,34 @@ use chrono::Utc;
 use common::Result;
 use plan::PlanError;
 use plan::{conversions, Plan, PlanStatus};
+use providers::DynProvider;
 use tools::plan_tool::PlanHandler;
+use tracing::warn;
 use uuid::Uuid;
+
+use crate::plan_step_generator::{drafts_to_plan_steps, generate_plan_steps};
 
 /// Implements PlanHandler by delegating to PlanRepo.
 pub struct PlanHandlerImpl {
     repo: storage::PlanRepo,
+    provider: Option<DynProvider>,
+    model: Option<String>,
 }
 
 impl PlanHandlerImpl {
     pub fn new(repo: storage::PlanRepo) -> Self {
-        Self { repo }
+        Self {
+            repo,
+            provider: None,
+            model: None,
+        }
+    }
+
+    /// Attach an LLM provider so that `generate_steps` can call the LLM.
+    pub fn with_provider(mut self, provider: DynProvider, model: String) -> Self {
+        self.provider = Some(provider);
+        self.model = Some(model);
+        self
     }
 }
 
@@ -151,5 +168,50 @@ impl PlanHandler for PlanHandlerImpl {
 
         conversions::save_plan(&self.repo, &plan).await?;
         Ok(plan)
+    }
+
+    async fn generate_steps(&self, plan_id: &Uuid) -> Result<()> {
+        let provider = match &self.provider {
+            Some(p) => p,
+            None => {
+                // No provider configured — skip silently
+                return Ok(());
+            }
+        };
+        let model = self.model.as_deref().unwrap_or("gpt-4o-mini");
+
+        let plan = match conversions::load_plan(&self.repo, plan_id).await? {
+            Some(p) => p,
+            None => {
+                warn!("generate_steps: plan {} not found", plan_id);
+                return Ok(());
+            }
+        };
+
+        // Only generate steps if the plan has none yet
+        if !plan.steps.is_empty() {
+            return Ok(());
+        }
+
+        let drafts = match generate_plan_steps(provider, model, &plan.description, &[], &[]).await
+        {
+            Ok(d) => d,
+            Err(e) => {
+                warn!("generate_steps: LLM call failed for plan {}: {}", plan_id, e);
+                return Ok(());
+            }
+        };
+
+        if drafts.is_empty() {
+            return Ok(());
+        }
+
+        let steps = drafts_to_plan_steps(&drafts, 0);
+        let mut plan = plan;
+        plan.steps = steps;
+        plan.updated_at = Utc::now();
+
+        conversions::save_plan(&self.repo, &plan).await?;
+        Ok(())
     }
 }
