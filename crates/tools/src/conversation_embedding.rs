@@ -120,7 +120,10 @@ impl ConversationEmbeddingStore {
             .search_similar(&vector, limit as i64, threshold)
             .await
             .map_err(|e| common::ToolError::ExecutionFailed(e.to_string()))?;
-        Ok(rows.into_iter().map(|(row, sim)| (row_to_record(row), sim)).collect())
+        Ok(rows
+            .into_iter()
+            .map(|(row, sim)| (row_to_record(row), sim))
+            .collect())
     }
 
     /// Get status information about the store.

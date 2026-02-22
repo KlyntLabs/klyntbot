@@ -114,7 +114,9 @@ impl ConversationEmbeddingHandler for ConversationEmbeddingHandlerImpl {
         };
 
         // pgvector ANN search (cross-channel, O(log n))
-        self.store.search_similar(&query_embedding, limit, threshold).await
+        self.store
+            .search_similar(&query_embedding, limit, threshold)
+            .await
     }
 
     async fn purge(&self, filter: PurgeFilter) -> Result<usize> {

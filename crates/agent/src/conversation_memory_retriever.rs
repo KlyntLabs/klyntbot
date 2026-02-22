@@ -34,7 +34,11 @@ impl ConversationMemoryRetriever {
         store: ConversationEmbeddingStore,
         threshold: f64,
     ) -> Self {
-        Self { engine, store, threshold }
+        Self {
+            engine,
+            store,
+            threshold,
+        }
     }
 }
 
@@ -59,7 +63,11 @@ impl MemoryRetriever for ConversationMemoryRetriever {
         };
 
         // 2. pgvector ANN search (cross-channel)
-        match self.store.search_similar(&embedding, limit, self.threshold).await {
+        match self
+            .store
+            .search_similar(&embedding, limit, self.threshold)
+            .await
+        {
             Ok(results) => results
                 .into_iter()
                 .map(|(record, score)| MemoryEntry {
@@ -93,14 +101,20 @@ mod tests {
     async fn test_retrieve_returns_empty_when_engine_unavailable() {
         let retriever = make_retriever();
         let results = retriever.retrieve("test query", 5).await;
-        assert!(results.is_empty(), "Should return empty when model unavailable");
+        assert!(
+            results.is_empty(),
+            "Should return empty when model unavailable"
+        );
     }
 
     #[tokio::test]
     async fn test_retrieve_empty_query() {
         let retriever = make_retriever();
         let results = retriever.retrieve("", 5).await;
-        assert!(results.is_empty(), "Empty query should return empty results");
+        assert!(
+            results.is_empty(),
+            "Empty query should return empty results"
+        );
     }
 
     #[tokio::test]

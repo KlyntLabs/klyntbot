@@ -171,7 +171,7 @@ impl AgentLoopBuilder {
         // Sort by priority (descending) — ensures correct ordering in prompt
         sources.sort_by_key(|s| std::cmp::Reverse(s.priority()));
 
-        let context_engine = Arc::new(context_engine::ContextEngine::new().with_sources(sources));
+        let context_engine = context_engine::ContextEngine::new().with_sources(sources);
 
         // ── Session manager (SQL-backed) ──────────────────────────────────
         let session_manager =
@@ -286,6 +286,23 @@ impl AgentLoopBuilder {
 
         // ── Shared embedding engine ───────────────────────────────────────
         let embedding_engine = Arc::new(tools::EmbeddingEngine::new());
+
+        // ── Wire automatic memory retrieval (cross-channel pgvector ANN) ─
+        let context_engine = if config.conversation.embedding.enabled {
+            let conv_store_for_retriever =
+                tools::ConversationEmbeddingStore::new(repos.conv_embeddings.clone());
+            let retriever = Arc::new(
+                super::super::conversation_memory_retriever::ConversationMemoryRetriever::new(
+                    Arc::clone(&embedding_engine),
+                    conv_store_for_retriever,
+                    config.conversation.search.semantic_threshold,
+                ),
+            );
+            context_engine.with_memory_retriever(retriever)
+        } else {
+            context_engine
+        };
+        let context_engine = Arc::new(context_engine);
 
         // Outputs for MemoryTool — populated inside the pool block if embedding is enabled
         let todo_embedding_handler: Option<Arc<dyn tools::EmbeddingHandler>>;
