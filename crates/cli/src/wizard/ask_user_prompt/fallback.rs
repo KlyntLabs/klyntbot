@@ -35,18 +35,19 @@ pub(super) fn prompt_non_interactive(request: &InteractionRequest) -> Result<For
                 let mut input = String::new();
                 io::stdin().read_line(&mut input)?;
                 let choice = input.trim();
-                let selected_idx = if choice.is_empty() {
-                    0
-                } else {
-                    choice.parse::<usize>().unwrap_or(1).saturating_sub(1)
-                };
 
-                if selected_idx < options.len() {
-                    AnswerValue::Selected {
-                        value: options[selected_idx].value.clone(),
-                    }
-                } else {
+                // On empty/EOF input, skip so enrichment can infer the value
+                if choice.is_empty() {
                     AnswerValue::Skipped
+                } else {
+                    let selected_idx = choice.parse::<usize>().unwrap_or(1).saturating_sub(1);
+                    if selected_idx < options.len() {
+                        AnswerValue::Selected {
+                            value: options[selected_idx].value.clone(),
+                        }
+                    } else {
+                        AnswerValue::Skipped
+                    }
                 }
             }
 

@@ -126,6 +126,17 @@ impl AgentLoopBuilder {
 
         let workspace = config.workspace_path();
 
+        // Ensure workspace directory exists so exec and fs tools work correctly
+        if !workspace.exists() {
+            tokio::fs::create_dir_all(&workspace).await.map_err(|e| {
+                common::KlyntbotError::Config(common::ConfigError::Invalid(format!(
+                    "Failed to create workspace directory {}: {}",
+                    workspace.display(),
+                    e
+                )))
+            })?;
+        }
+
         // ── Create repos from pool (real or lazy fallback) ────────────────
         let effective_pool = self.pool.clone().unwrap_or_else(|| {
             sqlx::PgPool::connect_lazy("postgres://localhost/klyntbot")
