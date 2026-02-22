@@ -28,6 +28,7 @@ pub mod plan_handler;
 mod plan_runner;
 pub mod recurring_tasks;
 pub mod reminders;
+pub mod session_cleanup_service;
 pub mod skills;
 pub mod subagent;
 pub mod todo_calendar_sync_adapter;

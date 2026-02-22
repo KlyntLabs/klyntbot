@@ -233,4 +233,17 @@ impl SessionRepo {
             .await?;
         Ok(result.rows_affected() > 0)
     }
+
+    /// Delete all sessions that have not been updated within the given TTL.
+    ///
+    /// Returns the number of sessions deleted (messages are cascade-deleted by the DB).
+    pub async fn delete_stale_sessions(&self, ttl_days: u32) -> Result<u64, StorageError> {
+        let result = sqlx::query(
+            "DELETE FROM sessions WHERE updated_at < now() - make_interval(days => $1::int)",
+        )
+        .bind(ttl_days as i32)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected())
+    }
 }

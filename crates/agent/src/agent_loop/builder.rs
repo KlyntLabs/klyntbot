@@ -4,6 +4,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
+use tokio_util::sync::CancellationToken;
 use tracing::info;
 
 use bus::MessageBus;
@@ -623,6 +624,21 @@ impl AgentLoopBuilder {
 
         info!("Adaptive orchestrator pipeline initialized");
 
+        // ── Session cleanup service ───────────────────────────────────────
+        let session_cleanup_token = if self.pool.is_some() {
+            let token = CancellationToken::new();
+            let cleanup_service = crate::session_cleanup_service::SessionCleanupService::new(
+                storage::SessionRepo::new(storage_pool.inner().clone()),
+                config.conversation.session.ttl_days,
+                config.conversation.session.cleanup_interval_hours,
+                token.clone(),
+            );
+            cleanup_service.spawn();
+            Some(token)
+        } else {
+            None
+        };
+
         // ── Assemble AgentLoop ────────────────────────────────────────────
         let history_limit = config.conversation.session.history_limit;
         Ok(AgentLoop {
@@ -649,6 +665,7 @@ impl AgentLoopBuilder {
             plan_completion_handler,
             pipeline,
             history_limit,
+            _session_cleanup_token: session_cleanup_token,
         })
     }
 }

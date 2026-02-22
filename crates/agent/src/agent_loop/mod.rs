@@ -84,6 +84,8 @@ pub struct AgentLoop {
     pub(crate) pipeline: Arc<crate::pipeline::AgentPipeline>,
     /// Maximum number of history messages to load per request.
     pub(crate) history_limit: usize,
+    /// Cancellation token for the session cleanup background service.
+    pub(crate) _session_cleanup_token: Option<CancellationToken>,
 }
 
 impl AgentLoop {
@@ -163,6 +165,11 @@ impl AgentLoop {
         if let Some(service) = &self.learning_service {
             let mut service_guard = service.write().await;
             service_guard.stop().await;
+        }
+
+        // Stop the session cleanup service
+        if let Some(token) = &self._session_cleanup_token {
+            token.cancel();
         }
 
         Ok(())

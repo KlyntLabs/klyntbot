@@ -11,18 +11,34 @@ pub struct SessionConfig {
     /// Maximum number of history messages to load (default: 50)
     #[serde(default = "default_history_limit")]
     pub history_limit: usize,
+    /// Number of days before an inactive session is considered stale and deleted (default: 30)
+    #[serde(default = "default_ttl_days")]
+    pub ttl_days: u32,
+    /// How often the cleanup service runs, in hours (default: 1)
+    #[serde(default = "default_cleanup_interval_hours")]
+    pub cleanup_interval_hours: u32,
 }
 
 impl Default for SessionConfig {
     fn default() -> Self {
         Self {
             history_limit: default_history_limit(),
+            ttl_days: default_ttl_days(),
+            cleanup_interval_hours: default_cleanup_interval_hours(),
         }
     }
 }
 
 fn default_history_limit() -> usize {
     50
+}
+
+fn default_ttl_days() -> u32 {
+    30
+}
+
+fn default_cleanup_interval_hours() -> u32 {
+    1
 }
 
 /// Conversation memory configuration
@@ -113,6 +129,28 @@ mod tests {
         });
         let config: ConversationConfig = serde_json::from_value(json).unwrap();
         assert_eq!(config.session.history_limit, 100);
+    }
+
+    #[test]
+    fn test_session_ttl_days_default() {
+        let config = SessionConfig::default();
+        assert_eq!(config.ttl_days, 30);
+    }
+
+    #[test]
+    fn test_session_cleanup_interval_hours_default() {
+        let config = SessionConfig::default();
+        assert_eq!(config.cleanup_interval_hours, 1);
+    }
+
+    #[test]
+    fn test_session_ttl_custom() {
+        let json = serde_json::json!({
+            "session": { "ttlDays": 7, "cleanupIntervalHours": 6 }
+        });
+        let config: ConversationConfig = serde_json::from_value(json).unwrap();
+        assert_eq!(config.session.ttl_days, 7);
+        assert_eq!(config.session.cleanup_interval_hours, 6);
     }
 
     #[test]
