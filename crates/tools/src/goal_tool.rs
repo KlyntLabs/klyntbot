@@ -23,6 +23,13 @@ pub trait GoalHandler: Send + Sync {
     async fn update_goal(&self, goal: Goal) -> Result<()>;
     async fn delete_goal(&self, id: &Uuid) -> Result<()>;
     async fn calculate_progress(&self, id: &Uuid) -> Result<GoalProgress>;
+    /// Decompose a goal into an execution plan via LLM. Creates a Draft plan linked to
+    /// this goal and returns a summary string. Returns a graceful message (not an error)
+    /// when a provider or plan repository is not configured.
+    async fn decompose_goal(&self, goal_id: &Uuid) -> Result<String>;
+    /// Show progress of all plans linked to this goal — plan statuses and step completion.
+    /// Returns a graceful message when no plan repository is configured.
+    async fn goal_progress(&self, goal_id: &Uuid) -> Result<String>;
 }
 
 /// GoalTool — Tool interface for strategic goal management.
@@ -53,7 +60,7 @@ impl Tool for GoalTool {
     }
 
     fn description(&self) -> &str {
-        "Manage strategic goals that span multiple projects. Actions: create, list, show, update, delete, progress."
+        "Manage strategic goals that span multiple projects. Actions: create, list, show, update, delete, progress, decompose, status."
     }
 
     fn parameters(&self) -> Value {
@@ -62,7 +69,7 @@ impl Tool for GoalTool {
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": ["create", "list", "show", "update", "delete", "progress"],
+                    "enum": ["create", "list", "show", "update", "delete", "progress", "decompose", "status"],
                     "description": "The goal action to perform"
                 },
                 "title": {
@@ -249,6 +256,18 @@ impl Tool for GoalTool {
                 Ok(lines.join("\n"))
             }
 
+            "decompose" => {
+                let id = parse_goal_id(&args)?;
+                let result = handler.decompose_goal(&id).await?;
+                Ok(result)
+            }
+
+            "status" => {
+                let id = parse_goal_id(&args)?;
+                let result = handler.goal_progress(&id).await?;
+                Ok(result)
+            }
+
             other => Err(ToolError::InvalidParams(format!("Unknown action: {}", other)).into()),
         }
     }
@@ -319,6 +338,14 @@ mod tests {
                 metrics: vec![],
                 summary: "Half done".to_string(),
             })
+        }
+
+        async fn decompose_goal(&self, _goal_id: &Uuid) -> Result<String> {
+            Ok("Decomposed goal into 3 steps (mock)".to_string())
+        }
+
+        async fn goal_progress(&self, _goal_id: &Uuid) -> Result<String> {
+            Ok("No plans linked to this goal.".to_string())
         }
     }
 
@@ -584,5 +611,59 @@ mod tests {
     #[test]
     fn test_parse_goal_id_invalid() {
         assert!(parse_goal_id(&serde_json::json!({"goal_id": "not-a-uuid"})).is_err());
+    }
+
+    #[tokio::test]
+    async fn test_decompose_action() {
+        use crate::Tool;
+        let (tool, handler) = make_tool();
+        tool.execute(
+            serde_json::json!({"action": "create", "title": "Big Goal"}),
+            &ctx(),
+        )
+        .await
+        .unwrap();
+
+        let id = handler.goals.lock().unwrap()[0].id.to_string();
+        let result = tool
+            .execute(
+                serde_json::json!({"action": "decompose", "goal_id": id}),
+                &ctx(),
+            )
+            .await
+            .unwrap();
+        assert!(result.contains("Decomposed"));
+    }
+
+    #[tokio::test]
+    async fn test_status_action() {
+        use crate::Tool;
+        let (tool, handler) = make_tool();
+        tool.execute(
+            serde_json::json!({"action": "create", "title": "Track Goal"}),
+            &ctx(),
+        )
+        .await
+        .unwrap();
+
+        let id = handler.goals.lock().unwrap()[0].id.to_string();
+        let result = tool
+            .execute(
+                serde_json::json!({"action": "status", "goal_id": id}),
+                &ctx(),
+            )
+            .await
+            .unwrap();
+        assert!(result.contains("No plans linked"));
+    }
+
+    #[test]
+    fn test_goal_tool_parameters_schema_includes_new_actions() {
+        use crate::Tool;
+        let tool = GoalTool::new(None);
+        let params = tool.parameters();
+        let action_enum = params["properties"]["action"]["enum"].as_array().unwrap();
+        assert!(action_enum.contains(&serde_json::json!("decompose")));
+        assert!(action_enum.contains(&serde_json::json!("status")));
     }
 }

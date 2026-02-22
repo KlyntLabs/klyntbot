@@ -412,7 +412,11 @@ impl AgentLoopBuilder {
 
         // ── Goal tool ─────────────────────────────────────────────────────
         {
-            let goal_handler = Arc::new(super::super::GoalHandlerImpl::new(repos.goals.clone()));
+            let goal_handler = Arc::new(
+                super::super::GoalHandlerImpl::new(repos.goals.clone())
+                    .with_plan_repo(repos.plans.clone())
+                    .with_provider(provider.clone(), config.agents.defaults.model.clone()),
+            );
             tool_registry.register(GoalTool::new(Some(goal_handler as Arc<dyn GoalHandler>)));
         }
 
