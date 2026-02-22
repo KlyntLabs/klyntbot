@@ -174,19 +174,6 @@ impl TodoTool {
         let keyword_rows = self.repo.search_by_keyword(query_trimmed, None).await?;
         let keyword_results: Vec<Todo> = keyword_rows.into_iter().map(Todo::from).collect();
 
-        // Build ID-to-Todo map for RRF lookups
-        let all_rows = self.repo.list(&storage::TodoFilter::default()).await?;
-        let all_todos: Vec<Todo> = all_rows.into_iter().map(Todo::from).collect();
-        let todos_by_id: HashMap<String, crate::search_utils::SearchResult> = all_todos
-            .into_iter()
-            .map(|t| {
-                (
-                    t.id.clone(),
-                    crate::search_utils::SearchResult::Todo(Box::new(t)),
-                )
-            })
-            .collect();
-
         // 2. Run semantic search via pgvector (if available)
         let semantic_results: Vec<(String, f64)> =
             if let (Some(emb), Some(emb_repo)) = (&self.embedding_handler, &self.embedding_repo) {
@@ -198,6 +185,28 @@ impl TodoTool {
             } else {
                 Vec::new()
             };
+
+        // Build ID-to-Todo map for RRF lookups — fetch only the IDs we need.
+        let keyword_ids: Vec<String> = keyword_results.iter().map(|t| t.id.clone()).collect();
+        let semantic_ids: Vec<String> = semantic_results.iter().map(|(id, _)| id.clone()).collect();
+        let mut all_ids: Vec<String> = keyword_ids
+            .into_iter()
+            .chain(semantic_ids.into_iter())
+            .collect();
+        all_ids.sort_unstable();
+        all_ids.dedup();
+
+        let needed_rows = self.repo.get_by_ids(&all_ids).await?;
+        let todos_by_id: HashMap<String, crate::search_utils::SearchResult> = needed_rows
+            .into_iter()
+            .map(|row| {
+                let todo = Todo::from(row);
+                (
+                    todo.id.clone(),
+                    crate::search_utils::SearchResult::Todo(Box::new(todo)),
+                )
+            })
+            .collect();
 
         // 3. Merge via Reciprocal Rank Fusion
         let keyword_count = keyword_results.len();

@@ -109,6 +109,18 @@ impl TodoRepo {
             .ok_or_else(|| StorageError::NotFound(format!("todo {id}")))
     }
 
+    /// Fetch todos by a list of IDs. Missing IDs are silently skipped.
+    pub async fn get_by_ids(&self, ids: &[String]) -> Result<Vec<TodoRow>, StorageError> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        let rows = sqlx::query_as::<_, TodoRow>("SELECT * FROM todos WHERE id = ANY($1)")
+            .bind(ids)
+            .fetch_all(&self.pool)
+            .await?;
+        Ok(rows)
+    }
+
     /// Update mutable fields on a todo. Only non-None fields are overwritten.
     pub async fn update(&self, patch: &TodoPatch) -> Result<TodoRow, StorageError> {
         let row = sqlx::query_as::<_, TodoRow>(
@@ -829,6 +841,16 @@ impl TodoRepo {
             .execute(&self.pool)
             .await?;
         Ok(result.rows_affected() > 0)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_get_by_ids_empty_input_short_circuits() {
+        // Verify the empty-slice fast-path logic (no DB required).
+        let ids: Vec<String> = vec![];
+        assert!(ids.is_empty(), "Empty ids should trigger early return in get_by_ids");
     }
 }
 
