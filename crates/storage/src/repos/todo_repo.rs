@@ -850,7 +850,10 @@ mod tests {
     fn test_get_by_ids_empty_input_short_circuits() {
         // Verify the empty-slice fast-path logic (no DB required).
         let ids: Vec<String> = vec![];
-        assert!(ids.is_empty(), "Empty ids should trigger early return in get_by_ids");
+        assert!(
+            ids.is_empty(),
+            "Empty ids should trigger early return in get_by_ids"
+        );
     }
 }
 

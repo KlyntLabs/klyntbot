@@ -101,7 +101,11 @@ mod tests {
     #[test]
     fn test_tiktoken_counter_empty() {
         let counter = TiktokenCounter::new().expect("tiktoken init should succeed");
-        assert_eq!(counter.estimate_text(""), 0, "Empty string should be 0 tokens");
+        assert_eq!(
+            counter.estimate_text(""),
+            0,
+            "Empty string should be 0 tokens"
+        );
     }
 
     #[test]

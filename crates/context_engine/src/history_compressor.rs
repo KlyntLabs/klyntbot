@@ -661,9 +661,16 @@ mod tests {
             "Expected non-empty summaries with tight budget"
         );
         assert!(
-            result.summaries.iter().any(|s| s.content.contains("LLM summary")),
+            result
+                .summaries
+                .iter()
+                .any(|s| s.content.contains("LLM summary")),
             "Expected at least one summary containing 'LLM summary', got: {:?}",
-            result.summaries.iter().map(|s| &s.content).collect::<Vec<_>>()
+            result
+                .summaries
+                .iter()
+                .map(|s| &s.content)
+                .collect::<Vec<_>>()
         );
     }
 
@@ -695,9 +702,8 @@ mod tests {
             mode: CompressorMode::Abstractive,
             ..Default::default()
         };
-        let compressor =
-            HistoryCompressor::from_config(default_token_counter(), config)
-                .with_summary_provider(Arc::new(FailingSummaryProvider));
+        let compressor = HistoryCompressor::from_config(default_token_counter(), config)
+            .with_summary_provider(Arc::new(FailingSummaryProvider));
         let history = make_history(20);
         let result = compressor.compress_async(&history, 50_000).await;
         // Should still succeed, falling back to extractive per chunk

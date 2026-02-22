@@ -53,7 +53,9 @@ impl SummaryProvider for LlmSummaryProvider {
         let params = ChatParams::new(&self.model).with_max_tokens(256);
 
         match self.provider.chat(&request_messages, None, &params).await {
-            Ok(response) => response.content.ok_or_else(|| "Empty LLM response".to_string()),
+            Ok(response) => response
+                .content
+                .ok_or_else(|| "Empty LLM response".to_string()),
             Err(e) => {
                 warn!("LlmSummaryProvider failed: {}", e);
                 Err(e.to_string())

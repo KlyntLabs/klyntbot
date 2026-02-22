@@ -238,6 +238,9 @@ mod tests {
         // decay_factor=1.0 means no decay (score == similarity)
         let decay_factor = 1.0_f64;
         let weight = decay_factor.powf(365.0);
-        assert_eq!(weight, 1.0, "decay_factor=1.0 should give weight 1.0 at any age");
+        assert_eq!(
+            weight, 1.0,
+            "decay_factor=1.0 should give weight 1.0 at any age"
+        );
     }
 }

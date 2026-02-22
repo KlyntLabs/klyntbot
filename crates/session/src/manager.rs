@@ -202,10 +202,7 @@ impl SessionManager {
     ///
     /// Returns an `Arc<TokioMutex<Session>>` — the caller locks it per-session.
     /// Concurrent calls for *different* keys proceed without blocking each other.
-    pub async fn get_or_create(
-        &self,
-        key: impl Into<String>,
-    ) -> Result<Arc<TokioMutex<Session>>> {
+    pub async fn get_or_create(&self, key: impl Into<String>) -> Result<Arc<TokioMutex<Session>>> {
         let key = key.into();
 
         // Update LRU order and collect keys to evict (sync, brief hold)
@@ -571,11 +568,7 @@ mod tests {
             key.to_string(),
             Arc::new(TokioMutex::new(Session::new(key))),
         );
-        manager
-            .lru_order
-            .lock()
-            .unwrap()
-            .push_back(key.to_string());
+        manager.lru_order.lock().unwrap().push_back(key.to_string());
 
         assert!(
             manager.has_session(key),

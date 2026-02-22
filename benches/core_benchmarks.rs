@@ -86,9 +86,10 @@ fn bench_session_save_load(c: &mut Criterion) {
     });
 
     group.bench_function("load_50_messages", |b| {
-        let mut manager = make_manager(&rt);
+        let manager = make_manager(&rt);
         rt.block_on(async {
-            let session = manager.get_or_create("bench:chat").await.unwrap();
+            let session_arc = manager.get_or_create("bench:chat").await.unwrap();
+            let mut session = session_arc.lock().await;
             for i in 0..50 {
                 session.add_message(
                     if i % 2 == 0 { "user" } else { "assistant" },
@@ -96,11 +97,12 @@ fn bench_session_save_load(c: &mut Criterion) {
                 );
             }
             let session_clone = session.clone();
+            drop(session);
             manager.save(&session_clone).await.unwrap();
         });
 
         b.iter(|| {
-            let mut fresh_manager = make_manager(&rt);
+            let fresh_manager = make_manager(&rt);
             rt.block_on(async {
                 black_box(fresh_manager.get_or_create("bench:chat").await.unwrap());
             });

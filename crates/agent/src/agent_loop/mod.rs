@@ -32,7 +32,6 @@ pub struct PlanExecutionRequest {
     pub routing_ctx: tools::RoutingContext,
 }
 
-
 /// Handle for consuming streaming agent output.
 pub struct StreamingHandle {
     /// Agent events (content chunks, tool status).
@@ -216,7 +215,10 @@ impl AgentLoop {
 
         // Get or create session — returns per-session Arc<Mutex<Session>>
         let session_key = msg.session_key();
-        let session_arc = self.session_manager.get_or_create(session_key.as_str()).await?;
+        let session_arc = self
+            .session_manager
+            .get_or_create(session_key.as_str())
+            .await?;
 
         // Mutate session and collect data under the per-session lock
         let (history, embed_msg_id) = {
@@ -362,26 +364,23 @@ impl AgentLoop {
     }
 
     async fn save_to_session(&self, session_key: &str, content: &str) {
-        match self.session_manager.get_or_create(session_key).await {
-            Ok(session_arc) => {
-                // Mutate under per-session lock, clone for async save
-                let session_clone = {
-                    let mut session = session_arc.lock().await;
-                    session.add_message("assistant", content);
+        if let Ok(session_arc) = self.session_manager.get_or_create(session_key).await {
+            // Mutate under per-session lock, clone for async save
+            let session_clone = {
+                let mut session = session_arc.lock().await;
+                session.add_message("assistant", content);
 
-                    if let Some(msg_id) = session.messages.last().map(|m| m.id.clone()) {
-                        self.spawn_embed_message(session_key, "assistant", content, &msg_id);
-                    }
-
-                    session.clone()
-                    // per-session lock released here
-                };
-
-                if let Err(e) = self.session_manager.save(&session_clone).await {
-                    warn!("Failed to save session: {}", e);
+                if let Some(msg_id) = session.messages.last().map(|m| m.id.clone()) {
+                    self.spawn_embed_message(session_key, "assistant", content, &msg_id);
                 }
+
+                session.clone()
+                // per-session lock released here
+            };
+
+            if let Err(e) = self.session_manager.save(&session_clone).await {
+                warn!("Failed to save session: {}", e);
             }
-            Err(_) => {}
         }
     }
 

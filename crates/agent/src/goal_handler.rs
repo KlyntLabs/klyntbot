@@ -116,7 +116,11 @@ impl GoalHandler for GoalHandlerImpl {
     async fn decompose_goal(&self, goal_id: &Uuid) -> Result<String> {
         let (provider, plan_repo) = match (&self.provider, &self.plan_repo) {
             (Some(p), Some(r)) => (p, r),
-            _ => return Ok("Goal decomposition requires an LLM provider and plan repository.".to_string()),
+            _ => {
+                return Ok(
+                    "Goal decomposition requires an LLM provider and plan repository.".to_string(),
+                )
+            }
         };
         let model = self.model.as_deref().unwrap_or("gpt-4o-mini");
 
@@ -127,13 +131,22 @@ impl GoalHandler for GoalHandlerImpl {
         let drafts = match generate_plan_steps(provider, model, &goal.description, &[], &[]).await {
             Ok(d) => d,
             Err(e) => {
-                warn!("decompose_goal: LLM call failed for goal {}: {}", goal_id, e);
-                return Ok(format!("Could not generate steps for goal '{}': {}", goal.title, e));
+                warn!(
+                    "decompose_goal: LLM call failed for goal {}: {}",
+                    goal_id, e
+                );
+                return Ok(format!(
+                    "Could not generate steps for goal '{}': {}",
+                    goal.title, e
+                ));
             }
         };
 
         if drafts.is_empty() {
-            return Ok(format!("Could not decompose goal '{}': no steps generated.", goal.title));
+            return Ok(format!(
+                "Could not decompose goal '{}': no steps generated.",
+                goal.title
+            ));
         }
 
         let now = Utc::now();
@@ -159,7 +172,10 @@ impl GoalHandler for GoalHandlerImpl {
 
         if let Err(e) = plan::conversions::save_plan(plan_repo, &plan).await {
             warn!("decompose_goal: failed to save plan: {}", e);
-            return Ok(format!("Generated {} steps but could not persist plan: {}", step_count, e));
+            return Ok(format!(
+                "Generated {} steps but could not persist plan: {}",
+                step_count, e
+            ));
         }
 
         Ok(format!(
@@ -188,10 +204,7 @@ impl GoalHandler for GoalHandlerImpl {
         for row in &plan_rows {
             let step_rows = plan_repo.get_steps(row.id).await.unwrap_or_default();
             let total = step_rows.len();
-            let done = step_rows
-                .iter()
-                .filter(|s| s.status == "Completed")
-                .count();
+            let done = step_rows.iter().filter(|s| s.status == "Completed").count();
             let pct = if total > 0 {
                 (done as f64 / total as f64) * 100.0
             } else {

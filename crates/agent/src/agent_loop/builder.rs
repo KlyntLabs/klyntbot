@@ -301,8 +301,8 @@ impl AgentLoopBuilder {
             let conv_store_for_retriever =
                 tools::ConversationEmbeddingStore::new(repos.conv_embeddings.clone());
             // Compute per-day decay factor from configured half-life: factor = 0.5^(1/half_life)
-            let decay_factor = 0.5_f64
-                .powf(1.0 / config.conversation.memory.decay_half_life_days as f64);
+            let decay_factor =
+                0.5_f64.powf(1.0 / config.conversation.memory.decay_half_life_days as f64);
             let retriever = Arc::new(
                 super::super::conversation_memory_retriever::ConversationMemoryRetriever::new(
                     Arc::clone(&embedding_engine),
@@ -422,10 +422,8 @@ impl AgentLoopBuilder {
 
         // ── Plan tool ─────────────────────────────────────────────────────
         let plan_handler = Arc::new(
-            super::super::PlanHandlerImpl::new(repos.plans.clone()).with_provider(
-                provider.clone(),
-                config.agents.defaults.model.clone(),
-            ),
+            super::super::PlanHandlerImpl::new(repos.plans.clone())
+                .with_provider(provider.clone(), config.agents.defaults.model.clone()),
         );
         tool_registry.register(tools::plan_tool::PlanTool::new(Some(
             plan_handler as Arc<dyn tools::plan_tool::PlanHandler>,

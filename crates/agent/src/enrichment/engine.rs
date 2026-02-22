@@ -81,10 +81,7 @@ Duration guide: 15=typo/tweak, 30=small fix/patch, 60=feature/implement, 120=ref
 
 Return only valid JSON, no markdown fences."#;
 
-        let messages = [
-            Message::system(system_prompt),
-            Message::user(task_context),
-        ];
+        let messages = [Message::system(system_prompt), Message::user(task_context)];
 
         let params = ChatParams::new(model)
             .with_temperature(0.0)

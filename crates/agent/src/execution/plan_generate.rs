@@ -212,9 +212,10 @@ impl PlanGenerateEngine {
 
         let (content, usage) = match outcome {
             ReactOutcome::Response { content, usage, .. } => (content, usage),
-            ReactOutcome::EscalateToAutonomous { reason, usage } => {
-                (format!("Task complexity exceeded capacity: {}", reason), usage)
-            }
+            ReactOutcome::EscalateToAutonomous { reason, usage } => (
+                format!("Task complexity exceeded capacity: {}", reason),
+                usage,
+            ),
             ReactOutcome::MaxIterationsReached {
                 partial_content,
                 usage,
@@ -281,10 +282,7 @@ mod tests {
 
     #[test]
     fn test_extract_last_user_message_empty_history() {
-        assert_eq!(
-            extract_last_user_message(&[]),
-            "Complete the task"
-        );
+        assert_eq!(extract_last_user_message(&[]), "Complete the task");
     }
 
     #[test]

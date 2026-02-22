@@ -193,11 +193,13 @@ impl PlanHandler for PlanHandlerImpl {
             return Ok(());
         }
 
-        let drafts = match generate_plan_steps(provider, model, &plan.description, &[], &[]).await
-        {
+        let drafts = match generate_plan_steps(provider, model, &plan.description, &[], &[]).await {
             Ok(d) => d,
             Err(e) => {
-                warn!("generate_steps: LLM call failed for plan {}: {}", plan_id, e);
+                warn!(
+                    "generate_steps: LLM call failed for plan {}: {}",
+                    plan_id, e
+                );
                 return Ok(());
             }
         };
