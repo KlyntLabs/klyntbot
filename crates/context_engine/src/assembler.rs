@@ -278,7 +278,7 @@ impl ContextEngine {
             ExecutionStrategy::AutonomousTask { .. } => 2,
             ExecutionStrategy::Clarification { .. } => 3,
         };
-        hasher.update(&[strategy_byte]);
+        hasher.update([strategy_byte]);
         // Hash tool definition count + first tool name (lightweight proxy)
         hasher.update(request.tool_definitions.len().to_le_bytes());
         if let Some(first) = request.tool_definitions.first() {
