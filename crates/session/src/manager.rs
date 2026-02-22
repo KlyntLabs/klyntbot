@@ -1,8 +1,11 @@
 //! Session management for conversation history.
 
 use chrono::{DateTime, Utc};
+use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
+use std::sync::{Arc, Mutex as StdMutex};
+use tokio::sync::Mutex as TokioMutex;
 use tracing::{debug, warn};
 use uuid::Uuid;
 
@@ -140,10 +143,17 @@ const COMPACTION_THRESHOLD: usize = 1000;
 const COMPACTION_KEEP: usize = 500;
 
 /// Session manager backed by a SQL repository.
-/// Uses an in-memory LRU cache for performance.
+///
+/// Uses a DashMap for concurrent per-session access — each session has its own
+/// `tokio::sync::Mutex`, eliminating the global write lock bottleneck.
+/// LRU eviction order is tracked via a `std::sync::Mutex<VecDeque>` (fast, non-async).
+///
+/// `SessionManager` is `Clone`: all clones share the same underlying map and repo,
+/// so it can be stored directly (no `Arc<RwLock<SessionManager>>` needed).
+#[derive(Clone)]
 pub struct SessionManager {
-    cache: HashMap<String, Session>,
-    lru_order: VecDeque<String>,
+    sessions: Arc<DashMap<String, Arc<TokioMutex<Session>>>>,
+    lru_order: Arc<StdMutex<VecDeque<String>>>,
     max_cache_size: usize,
     sql_repo: storage::SessionRepo,
 }
@@ -152,8 +162,8 @@ impl SessionManager {
     /// Create a session manager backed by a SQL repository.
     pub async fn from_repo(repo: storage::SessionRepo) -> Self {
         Self {
-            cache: HashMap::new(),
-            lru_order: VecDeque::new(),
+            sessions: Arc::new(DashMap::new()),
+            lru_order: Arc::new(StdMutex::new(VecDeque::new())),
             max_cache_size: 1000,
             sql_repo: repo,
         }
@@ -188,52 +198,69 @@ impl SessionManager {
         }
     }
 
-    /// Get an existing session or create a new one
-    pub async fn get_or_create(&mut self, key: impl Into<String>) -> Result<&mut Session> {
+    /// Get an existing session or create a new one.
+    ///
+    /// Returns an `Arc<TokioMutex<Session>>` — the caller locks it per-session.
+    /// Concurrent calls for *different* keys proceed without blocking each other.
+    pub async fn get_or_create(
+        &self,
+        key: impl Into<String>,
+    ) -> Result<Arc<TokioMutex<Session>>> {
         let key = key.into();
 
-        // Update LRU order
-        self.lru_order.retain(|k| k != &key);
-        self.lru_order.push_back(key.clone());
+        // Update LRU order and collect keys to evict (sync, brief hold)
+        let evict_keys = {
+            let mut lru = self.lru_order.lock().unwrap();
+            lru.retain(|k| k != &key);
+            lru.push_back(key.clone());
 
-        // Evict if over capacity
-        while self.lru_order.len() > self.max_cache_size {
-            if let Some(old_key) = self.lru_order.pop_front() {
-                if let Some(session) = self.cache.remove(&old_key) {
-                    if let Err(e) = self.save(&session).await {
-                        warn!(
-                            "Failed to save evicted session {}: {}. Data may be lost.",
-                            old_key, e
-                        );
-                    }
-                    debug!("Evicted session from cache: {}", old_key);
+            let mut to_evict = Vec::new();
+            while lru.len() > self.max_cache_size {
+                if let Some(old_key) = lru.pop_front() {
+                    to_evict.push(old_key);
                 }
+            }
+            to_evict
+        };
+
+        // Handle evictions (async, LRU lock already released)
+        for old_key in evict_keys {
+            if let Some((_, session_arc)) = self.sessions.remove(&old_key) {
+                let session = session_arc.lock().await;
+                if let Err(e) = self.save(&session).await {
+                    warn!(
+                        "Failed to save evicted session {}: {}. Data may be lost.",
+                        old_key, e
+                    );
+                }
+                debug!("Evicted session from cache: {}", old_key);
             }
         }
 
-        // On cache miss: load or create, then move key into cache
-        if !self.cache.contains_key(&key) {
-            let session = match self.sql_repo.get_session(&key).await {
-                Ok(row) => {
-                    let msgs = self.sql_repo.get_messages(&key).await?;
-                    Self::row_to_session(row, msgs)
-                }
-                Err(storage::StorageError::NotFound(_)) => {
-                    // Create in SQL
-                    let metadata = serde_json::Value::Object(serde_json::Map::new());
-                    self.sql_repo.create_session(&key, &metadata).await?;
-                    debug!("Creating new session in SQL: {}", key);
-                    Session::new(key.clone())
-                }
-                Err(e) => return Err(e.into()),
-            };
-            self.cache.insert(key, session);
-            // Retrieve via LRU back-reference (key was moved into cache)
-            let lru_key = self.lru_order.back().unwrap();
-            return Ok(self.cache.get_mut(lru_key.as_str()).unwrap());
+        // Fast path: session already cached
+        if let Some(session_arc) = self.sessions.get(&key) {
+            return Ok(session_arc.clone());
         }
 
-        Ok(self.cache.get_mut(&key).unwrap())
+        // Slow path: load or create from DB
+        let session = match self.sql_repo.get_session(&key).await {
+            Ok(row) => {
+                let msgs = self.sql_repo.get_messages(&key).await?;
+                Self::row_to_session(row, msgs)
+            }
+            Err(storage::StorageError::NotFound(_)) => {
+                let metadata = serde_json::Value::Object(serde_json::Map::new());
+                self.sql_repo.create_session(&key, &metadata).await?;
+                debug!("Creating new session in SQL: {}", key);
+                Session::new(key.clone())
+            }
+            Err(e) => return Err(e.into()),
+        };
+
+        let session_arc = Arc::new(TokioMutex::new(session));
+        // Atomically insert if not already present (handles concurrent inserts for same key)
+        let entry = self.sessions.entry(key).or_insert(session_arc);
+        Ok(entry.value().clone())
     }
 
     /// Save a session to SQL.
@@ -335,10 +362,11 @@ impl SessionManager {
     }
 
     /// Save a session by key without requiring a clone.
-    /// This method saves the session directly from the internal cache if it exists.
-    pub async fn save_by_key(&mut self, key: &str) -> Result<()> {
-        if let Some(session) = self.cache.get(key) {
-            self.save(session).await?;
+    /// Locks the session, clones it, then persists.
+    pub async fn save_by_key(&self, key: &str) -> Result<()> {
+        if let Some(session_arc) = self.sessions.get(key) {
+            let session = session_arc.lock().await;
+            self.save(&session).await?;
         }
         Ok(())
     }
@@ -346,10 +374,13 @@ impl SessionManager {
     /// Reset (delete) a session — removes from in-memory cache and deletes from the database.
     ///
     /// Cache removal is unconditional; the database deletion error is propagated.
-    pub async fn reset_session(&mut self, key: &str) -> Result<()> {
+    pub async fn reset_session(&self, key: &str) -> Result<()> {
         // Remove from in-memory cache unconditionally
-        self.cache.remove(key);
-        self.lru_order.retain(|k| k != key);
+        self.sessions.remove(key);
+        {
+            let mut lru = self.lru_order.lock().unwrap();
+            lru.retain(|k| k != key);
+        }
 
         // Delete from database (cascades to messages)
         self.sql_repo
@@ -364,13 +395,13 @@ impl SessionManager {
 
     /// Check whether a session exists in the in-memory cache.
     pub fn has_session(&self, key: &str) -> bool {
-        self.cache.contains_key(key)
+        self.sessions.contains_key(key)
     }
 
     /// Delete a session
-    pub async fn delete(&mut self, key: &str) -> Result<bool> {
+    pub async fn delete(&self, key: &str) -> Result<bool> {
         // Remove from cache
-        self.cache.remove(key);
+        self.sessions.remove(key);
 
         self.sql_repo
             .delete_session(key)
@@ -525,22 +556,31 @@ mod tests {
 
     /// Verify that `has_session` correctly reflects in-memory cache state.
     ///
-    /// This test does not require a live database: it uses a lazy pool (no
-    /// connection is established) and directly manipulates the cache fields
-    /// (accessible within the same module).
+    /// Uses a lazy pool (no connection is established) and directly manipulates
+    /// the sessions DashMap (accessible within the same module).
     #[tokio::test]
     async fn test_reset_session_removes_from_cache() {
         let pool = sqlx::PgPool::connect_lazy("postgres://localhost/test_unused").unwrap();
         let repo = storage::SessionRepo::new(pool);
-        let mut manager = SessionManager::from_repo(repo).await;
+        let manager = SessionManager::from_repo(repo).await;
 
         let key = "test:reset";
 
         // Insert directly into cache — no DB required
-        manager.cache.insert(key.to_string(), Session::new(key));
-        manager.lru_order.push_back(key.to_string());
+        manager.sessions.insert(
+            key.to_string(),
+            Arc::new(TokioMutex::new(Session::new(key))),
+        );
+        manager
+            .lru_order
+            .lock()
+            .unwrap()
+            .push_back(key.to_string());
 
-        assert!(manager.has_session(key), "session should be in cache after insertion");
+        assert!(
+            manager.has_session(key),
+            "session should be in cache after insertion"
+        );
 
         // reset_session removes from cache unconditionally; DB call may fail — ignore
         let _ = manager.reset_session(key).await;
@@ -550,20 +590,16 @@ mod tests {
             "session should no longer be in cache after reset"
         );
         assert!(
-            !manager.lru_order.contains(&key.to_string()),
+            !manager.lru_order.lock().unwrap().contains(&key.to_string()),
             "session key should be removed from LRU order"
         );
     }
 
     #[test]
     fn test_has_session_false_when_not_cached() {
-        // has_session is sync — no async or DB needed
-        // We can't construct SessionManager without async, so we only verify the
-        // logic once a manager exists via a trivial inline check.
         let key = "any:key";
-        // Build a bare HashMap to mimic the cache field logic
-        let cache: HashMap<String, Session> = HashMap::new();
-        assert!(!cache.contains_key(key));
+        let sessions: DashMap<String, Arc<TokioMutex<Session>>> = DashMap::new();
+        assert!(!sessions.contains_key(key));
     }
 
     #[test]
@@ -577,5 +613,68 @@ mod tests {
         assert!(session.messages[0].metadata.is_none());
         assert!(session.messages[1].tool_calls.is_none());
         assert!(session.messages[1].metadata.is_none());
+    }
+
+    /// Verify SessionManager is Clone (compile-time check).
+    #[test]
+    fn test_session_manager_is_clone() {
+        fn assert_clone<T: Clone>() {}
+        assert_clone::<SessionManager>();
+    }
+
+    /// Verify SessionManager is Send + Sync (compile-time check).
+    #[test]
+    fn test_session_manager_is_send_sync() {
+        fn assert_send_sync<T: Send + Sync>() {}
+        assert_send_sync::<SessionManager>();
+    }
+
+    /// Verify concurrent access to *different* sessions doesn't deadlock.
+    #[tokio::test]
+    async fn test_concurrent_different_sessions_no_deadlock() {
+        use std::time::Duration;
+
+        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/test_unused").unwrap();
+        let repo = storage::SessionRepo::new(pool);
+        let manager = SessionManager::from_repo(repo).await;
+
+        let key_a = "test:session_a";
+        let key_b = "test:session_b";
+
+        // Insert sessions directly — no DB required
+        manager.sessions.insert(
+            key_a.to_string(),
+            Arc::new(TokioMutex::new(Session::new(key_a))),
+        );
+        manager.sessions.insert(
+            key_b.to_string(),
+            Arc::new(TokioMutex::new(Session::new(key_b))),
+        );
+
+        let arc_a = manager.sessions.get(key_a).unwrap().clone();
+        let arc_b = manager.sessions.get(key_b).unwrap().clone();
+
+        // Task 1: mutates session A
+        let task1 = tokio::spawn(async move {
+            let mut s = arc_a.lock().await;
+            tokio::time::sleep(Duration::from_millis(10)).await;
+            s.add_message("user", "task1 writes to A");
+        });
+
+        // Task 2: mutates session B concurrently
+        let task2 = tokio::spawn(async move {
+            let mut s = arc_b.lock().await;
+            tokio::time::sleep(Duration::from_millis(10)).await;
+            s.add_message("user", "task2 writes to B");
+        });
+
+        // Both should complete well within 5 seconds (no deadlock)
+        let result = tokio::time::timeout(Duration::from_secs(5), async {
+            let _ = task1.await;
+            let _ = task2.await;
+        })
+        .await;
+
+        assert!(result.is_ok(), "tasks deadlocked or timed out");
     }
 }

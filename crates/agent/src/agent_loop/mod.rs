@@ -55,7 +55,7 @@ pub struct AgentLoop {
     pub(crate) provider: DynProvider,
     pub(crate) config: Config,
     pub(crate) context_engine: Arc<context_engine::ContextEngine>,
-    pub(crate) session_manager: Arc<RwLock<SessionManager>>,
+    pub(crate) session_manager: SessionManager,
     pub(crate) tool_registry: Arc<RwLock<tools::registry::ToolRegistry>>,
     pub(crate) confidence_evaluator: Option<ConfidenceEvaluator>,
     pub(crate) running: Arc<AtomicBool>,
@@ -207,24 +207,24 @@ impl AgentLoop {
             msg.channel, msg.sender_id, preview
         );
 
-        // Get or create session
+        // Get or create session — returns per-session Arc<Mutex<Session>>
         let session_key = msg.session_key();
-        let mut session_manager = self.session_manager.write().await;
-        let session = session_manager.get_or_create(session_key.as_str()).await?;
+        let session_arc = self.session_manager.get_or_create(session_key.as_str()).await?;
 
-        // Add user message to session
-        session.add_message("user", &msg.content);
+        // Mutate session and collect data under the per-session lock
+        let (history, embed_msg_id) = {
+            let mut session = session_arc.lock().await;
+            session.add_message("user", &msg.content);
+            let msg_id = session.messages.last().map(|m| m.id.clone());
+            let history = session.get_history(self.history_limit).to_vec();
+            (history, msg_id)
+            // per-session lock released here
+        };
 
         // Async conversation embedding hook for user message
-        if let Some(msg_id) = session.messages.last().map(|m| m.id.clone()) {
+        if let Some(msg_id) = embed_msg_id {
             self.spawn_embed_message(session_key.as_str(), "user", &msg.content, &msg_id);
         }
-
-        // Get session history
-        let history = session.get_history(self.history_limit).to_vec();
-
-        // Drop the write lock
-        drop(session_manager);
 
         // Run through pipeline
         let routing_ctx = RoutingContext::new(msg.channel.clone(), msg.chat_id.clone());
@@ -250,8 +250,7 @@ impl AgentLoop {
         // Handle session reset messages
         if msg.sender_id == "telegram_reset" {
             let key = msg.chat_id.as_str();
-            let mut session_manager = self.session_manager.write().await;
-            if let Err(e) = session_manager.reset_session(key).await {
+            if let Err(e) = self.session_manager.reset_session(key).await {
                 warn!("Failed to reset session {}: {}", key, e);
             }
             return Ok(());
@@ -270,19 +269,17 @@ impl AgentLoop {
         // Session key for the original conversation
         let session_key = format!("{}:{}", origin_channel, origin_chat_id);
 
-        // Get or create session and add system message as "user" role
-        let mut session_manager = self.session_manager.write().await;
-        let session = session_manager.get_or_create(&session_key).await?;
-
         // Format system message with sender_id prefix
         let system_msg_content = format!("[System: {}] {}", msg.sender_id, msg.content);
-        session.add_message("user", &system_msg_content);
 
-        // Get session history
-        let history = session.get_history(self.history_limit).to_vec();
-
-        // Drop the write lock before processing
-        drop(session_manager);
+        // Get or create session and mutate under the per-session lock
+        let session_arc = self.session_manager.get_or_create(&session_key).await?;
+        let history = {
+            let mut session = session_arc.lock().await;
+            session.add_message("user", &system_msg_content);
+            session.get_history(self.history_limit).to_vec()
+            // per-session lock released here
+        };
 
         // Run through pipeline
         let routing_ctx = RoutingContext::new(origin_channel.into(), origin_chat_id.into());
@@ -358,30 +355,26 @@ impl AgentLoop {
     }
 
     async fn save_to_session(&self, session_key: &str, content: &str) {
-        // Split-phase locking: mutate under write lock, then persist outside it
-        let session_clone = {
-            let mut session_manager = self.session_manager.write().await;
-            match session_manager.get_or_create(session_key).await {
-                Ok(session) => {
+        match self.session_manager.get_or_create(session_key).await {
+            Ok(session_arc) => {
+                // Mutate under per-session lock, clone for async save
+                let session_clone = {
+                    let mut session = session_arc.lock().await;
                     session.add_message("assistant", content);
 
                     if let Some(msg_id) = session.messages.last().map(|m| m.id.clone()) {
                         self.spawn_embed_message(session_key, "assistant", content, &msg_id);
                     }
 
-                    Some(session.clone())
-                }
-                Err(_) => None,
-            }
-            // Write lock dropped here
-        };
+                    session.clone()
+                    // per-session lock released here
+                };
 
-        // Persist outside the write lock — save() only needs &self on SessionManager
-        if let Some(session_clone) = session_clone {
-            let session_manager = self.session_manager.read().await;
-            if let Err(e) = session_manager.save(&session_clone).await {
-                warn!("Failed to save session: {}", e);
+                if let Err(e) = self.session_manager.save(&session_clone).await {
+                    warn!("Failed to save session: {}", e);
+                }
             }
+            Err(_) => {}
         }
     }
 
@@ -455,18 +448,21 @@ impl AgentLoop {
         };
         debug!("Processing direct message: {}", preview);
 
-        // Get or create session
-        let mut session_manager = self.session_manager.write().await;
-        let session = session_manager.get_or_create(&session_key).await?;
-        session.add_message("user", &content);
+        // Get or create session and collect data under per-session lock
+        let session_arc = self.session_manager.get_or_create(&session_key).await?;
+        let (history, embed_msg_id) = {
+            let mut session = session_arc.lock().await;
+            session.add_message("user", &content);
+            let msg_id = session.messages.last().map(|m| m.id.clone());
+            let history = session.get_history(self.history_limit).to_vec();
+            (history, msg_id)
+            // per-session lock released here
+        };
 
         // Async conversation embedding hook for user message (CLI)
-        if let Some(msg_id) = session.messages.last().map(|m| m.id.clone()) {
+        if let Some(msg_id) = embed_msg_id {
             self.spawn_embed_message(&session_key, "user", &content, &msg_id);
         }
-
-        let history = session.get_history(self.history_limit).to_vec();
-        drop(session_manager);
 
         // Run through pipeline
         let routing_ctx = RoutingContext::new("cli".into(), session_key.clone().into());
@@ -500,17 +496,20 @@ impl AgentLoop {
         debug!("Processing streaming direct message: {}", preview);
 
         // Get or create session and build messages before spawning
-        let mut session_manager = self.session_manager.write().await;
-        let session = session_manager.get_or_create(&session_key).await?;
-        session.add_message("user", &content);
+        let session_arc = self.session_manager.get_or_create(&session_key).await?;
+        let (history, embed_msg_id) = {
+            let mut session = session_arc.lock().await;
+            session.add_message("user", &content);
+            let msg_id = session.messages.last().map(|m| m.id.clone());
+            let history = session.get_history(self.history_limit).to_vec();
+            (history, msg_id)
+            // per-session lock released here
+        };
 
         // Async conversation embedding hook for user message (CLI streaming)
-        if let Some(msg_id) = session.messages.last().map(|m| m.id.clone()) {
+        if let Some(msg_id) = embed_msg_id {
             self.spawn_embed_message(&session_key, "user", &content, &msg_id);
         }
-
-        let history = session.get_history(self.history_limit).to_vec();
-        drop(session_manager);
 
         // Create event channel and interaction channel
         let (event_tx, event_rx) = mpsc::channel(64);

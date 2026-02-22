@@ -647,7 +647,7 @@ impl AgentLoopBuilder {
             provider,
             config,
             context_engine,
-            session_manager: Arc::new(RwLock::new(session_manager)),
+            session_manager,
             tool_registry,
             confidence_evaluator,
             running: Arc::new(AtomicBool::new(false)),
