@@ -64,33 +64,36 @@ impl ConvEmbeddingRepo {
         Ok(result.rows_affected() > 0)
     }
 
-    /// Search for similar conversation embeddings using cosine distance.
+    /// Search for similar conversation embeddings using cosine distance with time-decay scoring.
+    ///
+    /// The final score is `cosine_similarity * decay_factor^days_old`, giving recent
+    /// embeddings higher weight. Use `decay_factor = 1.0` to disable decay.
+    /// A typical value is `0.995` (half-life ≈ 138 days: `0.995^138 ≈ 0.5`).
     pub async fn search_similar(
         &self,
         query_embedding: &Vector,
         limit: i64,
         threshold: f64,
+        decay_factor: f64,
     ) -> Result<Vec<(ConvEmbeddingRow, f64)>, StorageError> {
-        let max_distance = 1.0 - threshold;
-
-        let rows: Vec<ConvEmbeddingWithDistance> = sqlx::query_as(
+        let rows: Vec<ConvEmbeddingWithScore> = sqlx::query_as(
             "SELECT id, session_key, embedding, role, content_preview, content_full, created_at,
-                    (embedding <=> $1) AS distance
+                    (1.0 - (embedding <=> $1)) * power($4, EXTRACT(EPOCH FROM now() - created_at) / 86400.0) AS score
              FROM conversation_embeddings
-             WHERE (embedding <=> $1) <= $2
-             ORDER BY embedding <=> $1
-             LIMIT $3",
+             WHERE (1.0 - (embedding <=> $1)) >= $3
+             ORDER BY score DESC
+             LIMIT $2",
         )
         .bind(query_embedding)
-        .bind(max_distance)
         .bind(limit)
+        .bind(threshold)
+        .bind(decay_factor)
         .fetch_all(&self.pool)
         .await?;
 
         Ok(rows
             .into_iter()
             .map(|r| {
-                let similarity = 1.0 - r.distance;
                 let row = ConvEmbeddingRow {
                     id: r.id,
                     session_key: r.session_key,
@@ -100,9 +103,20 @@ impl ConvEmbeddingRepo {
                     content_full: r.content_full,
                     created_at: r.created_at,
                 };
-                (row, similarity)
+                (row, r.score)
             })
             .collect())
+    }
+
+    /// Delete embeddings older than `max_age_days`. Returns count deleted.
+    pub async fn delete_old_embeddings(&self, max_age_days: u32) -> Result<u64, StorageError> {
+        let result = sqlx::query(
+            "DELETE FROM conversation_embeddings WHERE created_at < now() - ($1 || ' days')::interval",
+        )
+        .bind(max_age_days as i64)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected())
     }
 
     /// Get all conversation embeddings.
@@ -192,9 +206,9 @@ impl ConvEmbeddingRepo {
     }
 }
 
-/// Internal helper row with distance column for ANN queries.
+/// Internal helper row with time-decayed score column for ANN queries.
 #[derive(sqlx::FromRow)]
-struct ConvEmbeddingWithDistance {
+struct ConvEmbeddingWithScore {
     pub id: Uuid,
     pub session_key: String,
     pub embedding: Vector,
@@ -202,5 +216,28 @@ struct ConvEmbeddingWithDistance {
     pub content_preview: String,
     pub content_full: String,
     pub created_at: chrono::DateTime<chrono::Utc>,
-    pub distance: f64,
+    pub score: f64,
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_decay_factor_calculation() {
+        let decay_factor = 0.995_f64;
+        let days = 138.0;
+        let weight = decay_factor.powf(days);
+        assert!(
+            (weight - 0.5).abs() < 0.01,
+            "Expected ~0.5 at 138 days with decay_factor=0.995, got {}",
+            weight
+        );
+    }
+
+    #[test]
+    fn test_decay_factor_no_decay() {
+        // decay_factor=1.0 means no decay (score == similarity)
+        let decay_factor = 1.0_f64;
+        let weight = decay_factor.powf(365.0);
+        assert_eq!(weight, 1.0, "decay_factor=1.0 should give weight 1.0 at any age");
+    }
 }

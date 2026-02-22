@@ -86,6 +86,8 @@ pub struct AgentLoop {
     pub(crate) history_limit: usize,
     /// Cancellation token for the session cleanup background service.
     pub(crate) _session_cleanup_token: Option<CancellationToken>,
+    /// Cancellation token for the memory maintenance background service.
+    pub(crate) _memory_maintenance_token: Option<CancellationToken>,
 }
 
 impl AgentLoop {
@@ -169,6 +171,11 @@ impl AgentLoop {
 
         // Stop the session cleanup service
         if let Some(token) = &self._session_cleanup_token {
+            token.cancel();
+        }
+
+        // Stop the memory maintenance service
+        if let Some(token) = &self._memory_maintenance_token {
             token.cancel();
         }
 

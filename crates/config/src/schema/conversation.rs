@@ -41,6 +41,47 @@ fn default_cleanup_interval_hours() -> u32 {
     1
 }
 
+/// Memory decay and consolidation configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MemoryConfig {
+    /// Half-life in days for time-decay scoring (default: 138, i.e. 0.995^138 ≈ 0.5)
+    #[serde(default = "default_decay_half_life_days")]
+    pub decay_half_life_days: u32,
+    /// Maximum age in days before an embedding is pruned by maintenance (default: 90)
+    #[serde(default = "default_max_age_days")]
+    pub max_age_days: u32,
+    /// Enable background consolidation of old embeddings (default: false)
+    #[serde(default)]
+    pub consolidation_enabled: bool,
+    /// How often the memory maintenance service runs, in hours (default: 24)
+    #[serde(default = "default_maintenance_interval_hours")]
+    pub maintenance_interval_hours: u32,
+}
+
+impl Default for MemoryConfig {
+    fn default() -> Self {
+        Self {
+            decay_half_life_days: default_decay_half_life_days(),
+            max_age_days: default_max_age_days(),
+            consolidation_enabled: false,
+            maintenance_interval_hours: default_maintenance_interval_hours(),
+        }
+    }
+}
+
+fn default_decay_half_life_days() -> u32 {
+    138
+}
+
+fn default_max_age_days() -> u32 {
+    90
+}
+
+fn default_maintenance_interval_hours() -> u32 {
+    24
+}
+
 /// Conversation memory configuration
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -51,6 +92,8 @@ pub struct ConversationConfig {
     pub search: ConversationSearchConfig,
     #[serde(default)]
     pub session: SessionConfig,
+    #[serde(default)]
+    pub memory: MemoryConfig,
 }
 
 /// Conversation embedding configuration
@@ -151,6 +194,45 @@ mod tests {
         let config: ConversationConfig = serde_json::from_value(json).unwrap();
         assert_eq!(config.session.ttl_days, 7);
         assert_eq!(config.session.cleanup_interval_hours, 6);
+    }
+
+    #[test]
+    fn test_memory_config_defaults() {
+        let config = MemoryConfig::default();
+        assert_eq!(config.decay_half_life_days, 138);
+        assert_eq!(config.max_age_days, 90);
+        assert!(!config.consolidation_enabled);
+        assert_eq!(config.maintenance_interval_hours, 24);
+    }
+
+    #[test]
+    fn test_memory_config_decay_half_life_math() {
+        // 0.995^138 ≈ 0.5 (half-life property)
+        let decay_factor = 0.995_f64;
+        let days = MemoryConfig::default().decay_half_life_days as f64;
+        let weight = decay_factor.powf(days);
+        assert!(
+            (weight - 0.5).abs() < 0.01,
+            "Expected ~0.5 at half-life, got {}",
+            weight
+        );
+    }
+
+    #[test]
+    fn test_memory_config_deserialize() {
+        let json = serde_json::json!({
+            "memory": {
+                "decayHalfLifeDays": 60,
+                "maxAgeDays": 30,
+                "consolidationEnabled": true,
+                "maintenanceIntervalHours": 12
+            }
+        });
+        let config: ConversationConfig = serde_json::from_value(json).unwrap();
+        assert_eq!(config.memory.decay_half_life_days, 60);
+        assert_eq!(config.memory.max_age_days, 30);
+        assert!(config.memory.consolidation_enabled);
+        assert_eq!(config.memory.maintenance_interval_hours, 12);
     }
 
     #[test]

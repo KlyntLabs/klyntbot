@@ -107,24 +107,28 @@ impl ConversationEmbeddingStore {
         Ok(rows.into_iter().map(row_to_record).collect())
     }
 
-    /// Search for similar embeddings using pgvector ANN (cosine distance).
+    /// Search for similar embeddings using pgvector ANN with time-decay scoring.
     ///
     /// Cross-channel: searches ALL conversation embeddings regardless of session_key.
+    ///
+    /// `decay_factor` controls recency weighting: `score = similarity * decay_factor^days_old`.
+    /// Use `1.0` for no decay, or `0.995` for a ~138-day half-life.
     pub async fn search_similar(
         &self,
         query_embedding: &[f32],
         limit: usize,
         threshold: f64,
+        decay_factor: f64,
     ) -> Result<Vec<(ConversationEmbeddingRecord, f64)>> {
         let vector = pgvector::Vector::from(query_embedding.to_vec());
         let rows = self
             .repo
-            .search_similar(&vector, limit as i64, threshold)
+            .search_similar(&vector, limit as i64, threshold, decay_factor)
             .await
             .map_err(|e| common::ToolError::ExecutionFailed(e.to_string()))?;
         Ok(rows
             .into_iter()
-            .map(|(row, sim)| (row_to_record(row), sim))
+            .map(|(row, score)| (row_to_record(row), score))
             .collect())
     }
 
