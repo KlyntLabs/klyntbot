@@ -192,6 +192,7 @@ impl AgentLoopBuilder {
                 .web_max_results(config.tools.web.max_results)
                 .exec_timeout(config.tools.exec.timeout)
                 .restrict_to_workspace(config.tools.restrict_to_workspace)
+                .max_concurrent_subagents(config.agents.defaults.max_concurrent_subagents)
                 .build(),
         );
 

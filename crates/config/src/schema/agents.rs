@@ -34,6 +34,9 @@ pub struct AgentDefaults {
 
     #[serde(default = "default_max_iterations")]
     pub max_tool_iterations: u32,
+
+    #[serde(default = "default_max_concurrent_subagents")]
+    pub max_concurrent_subagents: usize,
 }
 
 impl Default for AgentDefaults {
@@ -45,6 +48,7 @@ impl Default for AgentDefaults {
             max_tokens: default_max_tokens(),
             temperature: default_temperature(),
             max_tool_iterations: default_max_iterations(),
+            max_concurrent_subagents: default_max_concurrent_subagents(),
         }
     }
 }
@@ -67,4 +71,8 @@ fn default_temperature() -> f32 {
 
 fn default_max_iterations() -> u32 {
     20
+}
+
+fn default_max_concurrent_subagents() -> usize {
+    3
 }

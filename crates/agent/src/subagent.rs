@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, Semaphore};
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
@@ -36,6 +36,7 @@ pub struct SubagentManager {
     web_max_results: u8,
     exec_timeout: u64,
     restrict_to_workspace: bool,
+    semaphore: Arc<Semaphore>,
 }
 
 /// Builder for SubagentManager
@@ -48,6 +49,7 @@ pub struct SubagentManagerBuilder {
     web_max_results: u8,
     exec_timeout: u64,
     restrict_to_workspace: bool,
+    max_concurrent_subagents: usize,
 }
 
 impl SubagentManagerBuilder {
@@ -62,6 +64,7 @@ impl SubagentManagerBuilder {
             web_max_results: 5,
             exec_timeout: 60,
             restrict_to_workspace: true,
+            max_concurrent_subagents: 3,
         }
     }
 
@@ -95,6 +98,11 @@ impl SubagentManagerBuilder {
         self
     }
 
+    pub fn max_concurrent_subagents(mut self, n: usize) -> Self {
+        self.max_concurrent_subagents = n;
+        self
+    }
+
     pub fn build(self) -> SubagentManager {
         SubagentManager {
             provider: self.provider,
@@ -105,6 +113,7 @@ impl SubagentManagerBuilder {
             web_max_results: self.web_max_results,
             exec_timeout: self.exec_timeout,
             restrict_to_workspace: self.restrict_to_workspace,
+            semaphore: Arc::new(Semaphore::new(self.max_concurrent_subagents)),
         }
     }
 }
@@ -113,6 +122,11 @@ impl SubagentManager {
     /// Create a new subagent manager builder
     pub fn builder(provider: DynProvider, workspace: PathBuf) -> SubagentManagerBuilder {
         SubagentManagerBuilder::new(provider, workspace)
+    }
+
+    /// Returns the total semaphore permit count (max concurrent subagents).
+    pub fn semaphore_permits(&self) -> usize {
+        self.semaphore.available_permits()
     }
 
     /// Create a new subagent manager (deprecated - use builder)
@@ -137,6 +151,7 @@ impl SubagentManager {
             web_max_results,
             exec_timeout,
             restrict_to_workspace,
+            semaphore: Arc::new(Semaphore::new(3)),
         }
     }
 
@@ -172,7 +187,16 @@ impl SubagentManager {
             restrict_to_workspace: self.restrict_to_workspace,
         };
 
+        let semaphore = Arc::clone(&self.semaphore);
+
         tokio::spawn(async move {
+            // Acquire permit before running — limits concurrent subagents.
+            // _permit is held for the duration of the task, then dropped automatically.
+            let _permit = semaphore
+                .acquire_owned()
+                .await
+                .expect("Semaphore closed unexpectedly");
+
             info!("Subagent {} started: {}", subagent_id_clone, label_clone);
 
             let result = run_subagent_task(&provider, &workspace, &model, &task, config).await;
@@ -421,4 +445,82 @@ Summarize this naturally for the user. Keep it brief (1-2 sentences). Do not men
     }
 
     debug!("Subagent [{}] announced result to {}", task_id, origin_key);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use async_trait::async_trait;
+    use common::Result;
+    use providers::{ChatParams, LlmProvider, LlmResponse, Message, Usage};
+    use tokio::sync::mpsc;
+
+    /// Minimal no-op provider for unit tests — never actually called.
+    struct NoOpProvider;
+
+    #[async_trait]
+    impl LlmProvider for NoOpProvider {
+        async fn chat(
+            &self,
+            _messages: &[Message],
+            _tools: Option<&[serde_json::Value]>,
+            _params: &ChatParams,
+        ) -> Result<LlmResponse> {
+            Ok(LlmResponse {
+                content: Some("ok".to_string()),
+                tool_calls: vec![],
+                finish_reason: "stop".to_string(),
+                usage: Usage::default(),
+                reasoning_content: None,
+            })
+        }
+
+        fn default_model(&self) -> &str {
+            "no-op"
+        }
+
+        fn name(&self) -> &str {
+            "no-op"
+        }
+    }
+
+    fn make_manager(permits: usize) -> SubagentManager {
+        let (tx, _rx) = mpsc::channel(8);
+        let provider: DynProvider = Arc::new(NoOpProvider);
+        SubagentManager::builder(provider, std::path::PathBuf::from("/tmp"))
+            .inbound_sender(tx)
+            .max_concurrent_subagents(permits)
+            .build()
+    }
+
+    #[test]
+    fn test_subagent_manager_has_semaphore() {
+        let mgr = make_manager(5);
+        assert_eq!(mgr.semaphore_permits(), 5);
+    }
+
+    #[test]
+    fn test_default_semaphore_permits_match_config_default() {
+        let mgr = make_manager(3);
+        assert_eq!(mgr.semaphore_permits(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_semaphore_limits_concurrency() {
+        // Verify that the semaphore correctly limits concurrent acquisitions.
+        let sem = Arc::new(Semaphore::new(2));
+
+        let p1 = Arc::clone(&sem).acquire_owned().await.unwrap();
+        let p2 = Arc::clone(&sem).acquire_owned().await.unwrap();
+
+        // All permits are held — further tries should fail immediately.
+        assert!(sem.try_acquire().is_err());
+
+        // Release one permit; now one slot is free.
+        drop(p1);
+        let p3 = sem.try_acquire();
+        assert!(p3.is_ok());
+
+        drop(p2);
+    }
 }
