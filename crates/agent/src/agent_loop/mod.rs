@@ -241,21 +241,11 @@ impl AgentLoop {
         info!("Processing system message from {}", msg.sender_id);
 
         // Handle session reset messages
-        if msg.sender_id == "telegram_reset" && msg.content == "__RESET_SESSION__" {
+        if msg.sender_id == "telegram_reset" {
+            let key = msg.chat_id.as_str();
             let mut session_manager = self.session_manager.write().await;
-            let session_to_save = {
-                if let Ok(session) = session_manager.get_or_create(msg.chat_id.as_str()).await {
-                    session.clear();
-                    Some(session.clone())
-                } else {
-                    None
-                }
-            };
-
-            if let Some(session) = session_to_save {
-                if let Err(e) = session_manager.save(&session).await {
-                    warn!("Failed to save cleared session: {}", e);
-                }
+            if let Err(e) = session_manager.reset_session(key).await {
+                warn!("Failed to reset session {}: {}", key, e);
             }
             return Ok(());
         }
