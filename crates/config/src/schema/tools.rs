@@ -17,6 +17,9 @@ pub struct ToolsConfig {
     pub exec: ExecToolConfig,
 
     #[serde(default)]
+    pub browser: BrowserConfig,
+
+    #[serde(default)]
     pub restrict_to_workspace: bool,
 
     /// Optional per-channel permission levels for tool access control.
@@ -90,4 +93,64 @@ fn default_timeout() -> u64 {
 
 fn default_web_max_results() -> u8 {
     5
+}
+
+/// Browser automation tool configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BrowserConfig {
+    #[serde(default)]
+    pub enabled: bool,
+
+    #[serde(default = "default_trust_level")]
+    pub trust_level: String,
+
+    #[serde(default = "default_session_timeout_secs")]
+    pub session_timeout_secs: u64,
+}
+
+impl Default for BrowserConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            trust_level: default_trust_level(),
+            session_timeout_secs: default_session_timeout_secs(),
+        }
+    }
+}
+
+fn default_trust_level() -> String {
+    "autonomous".to_string()
+}
+
+fn default_session_timeout_secs() -> u64 {
+    300
+}
+
+#[cfg(test)]
+mod browser_config_tests {
+    use super::*;
+
+    #[test]
+    fn test_browser_config_defaults() {
+        let cfg = BrowserConfig::default();
+        assert!(!cfg.enabled);
+        assert_eq!(cfg.trust_level, "autonomous");
+        assert_eq!(cfg.session_timeout_secs, 300);
+    }
+
+    #[test]
+    fn test_browser_config_serde_roundtrip() {
+        let json = r#"{"enabled": true, "trustLevel": "strict", "sessionTimeoutSecs": 60}"#;
+        let cfg: BrowserConfig = serde_json::from_str(json).unwrap();
+        assert!(cfg.enabled);
+        assert_eq!(cfg.trust_level, "strict");
+        assert_eq!(cfg.session_timeout_secs, 60);
+    }
+
+    #[test]
+    fn test_tools_config_has_browser_field() {
+        let cfg = ToolsConfig::default();
+        assert!(!cfg.browser.enabled);
+    }
 }
