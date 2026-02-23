@@ -18,10 +18,10 @@ pub use tools_core::{
 
 // ── Core tool implementations ────────────────────────────────────────────────
 pub mod ask_user;
+pub mod browser;
 pub mod cron_tool;
 pub mod filesystem;
 pub mod message;
-pub mod browser;
 pub mod shell;
 pub mod spawn;
 pub mod web;
@@ -85,3 +85,6 @@ pub use permissions::{PermissionLevel, ToolPermissions};
 
 // Search utilities
 pub use search_utils::{rrf_merge, SearchResult};
+
+// Browser
+pub use config::TrustLevel;
