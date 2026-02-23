@@ -121,6 +121,15 @@ impl BrowserTool {
             .collect()
     }
 
+    /// Find the first element whose label contains `query` (case-insensitive).
+    pub fn find_element_by_label<'a>(
+        elements: &'a [SnapshotElement],
+        query: &str,
+    ) -> Option<&'a SnapshotElement> {
+        let q = query.to_lowercase();
+        elements.iter().find(|e| e.label.to_lowercase().contains(&q))
+    }
+
     /// Format the message returned to the LLM when a write action is guarded.
     pub fn guard_message(action: &str, label: &str) -> String {
         format!(
@@ -380,16 +389,96 @@ impl BrowserTool {
         self.run(&args).await
     }
 
-    // ── Composite stubs (implemented in Task 5) ───────────────────────────────
+    // ── Composite action implementations ─────────────────────────────────────
 
-    async fn act_fill_form(&self, _p: &ParamExtractor<'_>) -> Result<String> {
-        Err(ToolError::ExecutionFailed("not yet implemented".into()).into())
+    /// fill_form: snapshot → match labels → fill each field.
+    async fn act_fill_form(&self, p: &ParamExtractor<'_>) -> Result<String> {
+        let fields = p.required_object("fields")?.clone();
+
+        let snapshot_raw = self.act_snapshot().await?;
+        let elements = Self::parse_snapshot(&snapshot_raw);
+
+        let mut filled = Vec::new();
+        let mut not_found = Vec::new();
+
+        for (label, value) in &fields {
+            let val = value.as_str().unwrap_or_default();
+            if self.should_guard("fill", label) {
+                return Ok(Self::guard_message("fill", label));
+            }
+            match Self::find_element_by_label(&elements, label) {
+                Some(elem) => {
+                    let args = Self::build_args("fill", &[&elem.ref_id, val]);
+                    self.run(&args).await?;
+                    filled.push(label.as_str());
+                }
+                None => not_found.push(label.as_str()),
+            }
+        }
+
+        let mut result = format!("Filled: {}", filled.join(", "));
+        if !not_found.is_empty() {
+            result.push_str(&format!(". Not found: {}", not_found.join(", ")));
+        }
+        Ok(result)
     }
-    async fn act_login_flow(&self, _p: &ParamExtractor<'_>) -> Result<String> {
-        Err(ToolError::ExecutionFailed("not yet implemented".into()).into())
+
+    /// login_flow: navigate → snapshot → fill credentials → Enter → wait.
+    async fn act_login_flow(&self, p: &ParamExtractor<'_>) -> Result<String> {
+        let url      = p.required_str("url")?;
+        let username = p.required_str("username")?;
+        let password = p.required_str("password")?;
+
+        // 1. Navigate
+        self.run(&Self::build_args("navigate", &[url])).await?;
+
+        // 2. Snapshot
+        let snapshot_raw = self.act_snapshot().await?;
+        let elements = Self::parse_snapshot(&snapshot_raw);
+
+        // 3. Fill username
+        let username_labels = ["email", "username", "user", "login"];
+        let user_elem = elements.iter()
+            .find(|e| {
+                let l = e.label.to_lowercase();
+                username_labels.iter().any(|k| l.contains(k))
+            })
+            .ok_or_else(|| ToolError::ExecutionFailed(
+                "Could not find username/email field on page".into()
+            ))?;
+
+        self.run(&Self::build_args("fill", &[&user_elem.ref_id, username])).await?;
+
+        // 4. Fill password
+        let pass_elem = elements.iter()
+            .find(|e| e.label.to_lowercase().contains("password"))
+            .ok_or_else(|| ToolError::ExecutionFailed(
+                "Could not find password field on page".into()
+            ))?;
+
+        self.run(&Self::build_args("fill", &[&pass_elem.ref_id, password])).await?;
+
+        // 5. Press Enter to submit
+        self.run(&["press".to_string(), "Enter".to_string()]).await?;
+
+        // 6. Wait for navigation
+        self.run(&["wait".to_string(), "load".to_string()]).await?;
+
+        Ok(format!("Login flow completed for {}", url))
     }
-    async fn act_submit_and_confirm(&self, _p: &ParamExtractor<'_>) -> Result<String> {
-        Err(ToolError::ExecutionFailed("not yet implemented".into()).into())
+
+    /// submit_and_confirm: always routes through write guard, then clicks element.
+    async fn act_submit_and_confirm(&self, p: &ParamExtractor<'_>) -> Result<String> {
+        let element = p.required_str("element")?;
+
+        // submit_and_confirm always guarded except TrustLevel::Full
+        if self.should_guard("submit_and_confirm", element) {
+            return Ok(Self::guard_message("submit_and_confirm", element));
+        }
+
+        // TrustLevel::Full reaches here
+        let args = Self::build_args("click", &[element]);
+        self.run(&args).await
     }
 }
 
@@ -531,5 +620,56 @@ mod tests {
         assert!(msg.contains("[CONFIRMATION_REQUIRED]"));
         assert!(msg.contains("Place Order"));
         assert!(msg.contains("ask_user"));
+    }
+
+    #[test]
+    fn test_find_element_by_label_exact() {
+        let elements = vec![
+            SnapshotElement { ref_id: "@e1".into(), kind: "input".into(), label: "Email".into() },
+            SnapshotElement { ref_id: "@e2".into(), kind: "input".into(), label: "Password".into() },
+            SnapshotElement { ref_id: "@e3".into(), kind: "button".into(), label: "Sign In".into() },
+        ];
+        let found = BrowserTool::find_element_by_label(&elements, "Email");
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().ref_id, "@e1");
+    }
+
+    #[test]
+    fn test_find_element_by_label_case_insensitive() {
+        let elements = vec![
+            SnapshotElement { ref_id: "@e1".into(), kind: "input".into(), label: "Email Address".into() },
+        ];
+        let found = BrowserTool::find_element_by_label(&elements, "email address");
+        assert!(found.is_some());
+    }
+
+    #[test]
+    fn test_find_element_by_label_partial_match() {
+        let elements = vec![
+            SnapshotElement { ref_id: "@e1".into(), kind: "input".into(), label: "Card Number".into() },
+        ];
+        let found = BrowserTool::find_element_by_label(&elements, "card");
+        assert!(found.is_some());
+    }
+
+    #[test]
+    fn test_find_element_by_label_not_found() {
+        let elements = vec![
+            SnapshotElement { ref_id: "@e1".into(), kind: "input".into(), label: "Email".into() },
+        ];
+        let found = BrowserTool::find_element_by_label(&elements, "nonexistent");
+        assert!(found.is_none());
+    }
+
+    #[test]
+    fn test_submit_and_confirm_full_trust_not_guarded() {
+        let tool = BrowserTool::new_unchecked(TrustLevel::Full);
+        assert!(!tool.should_guard("submit_and_confirm", ""));
+    }
+
+    #[test]
+    fn test_submit_and_confirm_autonomous_always_guarded() {
+        let tool = BrowserTool::new_unchecked(TrustLevel::Autonomous);
+        assert!(tool.should_guard("submit_and_confirm", ""));
     }
 }
