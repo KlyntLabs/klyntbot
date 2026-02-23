@@ -54,7 +54,7 @@ pub struct AgentLoopBuilder {
     bus: Option<Arc<MessageBus>>,
     provider: Option<DynProvider>,
     config: Option<Config>,
-    pool: Option<sqlx::PgPool>,
+    pool: Option<sqlx::SqlitePool>,
     cron_service: Option<Arc<scheduling::CronService>>,
     notification_handle: Option<LastActiveChannel>,
 }
@@ -92,7 +92,7 @@ impl AgentLoopBuilder {
         self
     }
 
-    pub fn with_pool(mut self, pool: sqlx::PgPool) -> Self {
+    pub fn with_pool(mut self, pool: sqlx::SqlitePool) -> Self {
         self.pool = Some(pool);
         self
     }
@@ -135,11 +135,16 @@ impl AgentLoopBuilder {
             })?;
         }
 
-        // ── Create repos from pool (real or lazy fallback) ────────────────
-        let effective_pool = self.pool.clone().unwrap_or_else(|| {
-            sqlx::PgPool::connect_lazy("postgres://localhost/klyntbot")
-                .unwrap_or_else(|_| panic!("Failed to create lazy PgPool fallback"))
-        });
+        // ── Create repos from pool (real or in-memory fallback) ──────────
+        // Storage-dependent features (todo, finance, sessions) are disabled via
+        // the `if self.pool.is_some()` guards below when no real pool is provided.
+        let effective_pool = if let Some(pool) = self.pool.clone() {
+            pool
+        } else {
+            sqlx::SqlitePool::connect(":memory:")
+                .await
+                .unwrap_or_else(|e| panic!("Failed to create in-memory SQLite fallback: {e}"))
+        };
         let storage_pool = storage::StoragePool::from_existing(effective_pool);
         let repos = storage::Repos::from_pool(&storage_pool);
 
