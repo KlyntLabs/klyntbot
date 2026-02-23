@@ -92,6 +92,13 @@ static PACKS: &[Pack] = &[
         skills: &["github", "tmux"],
     },
     Pack {
+        id: "browser",
+        name: "Browser Automation",
+        description: "Real-world task execution: booking, shopping, account management",
+        tier: PackTier::Optional,
+        skills: &["browser"],
+    },
+    Pack {
         id: "finance",
         name: "Finance",
         description: "Budget tracking, expenses, investment projection",
@@ -119,9 +126,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_all_packs_returns_7() {
+    fn test_all_packs_returns_8() {
         let packs = PackRegistry::all();
-        assert_eq!(packs.len(), 7);
+        assert_eq!(packs.len(), 8);
     }
 
     #[test]
@@ -140,7 +147,7 @@ mod tests {
     #[test]
     fn test_optional_packs() {
         let opt = PackRegistry::by_tier(PackTier::Optional);
-        assert_eq!(opt.len(), 3);
+        assert_eq!(opt.len(), 4);
     }
 
     #[test]

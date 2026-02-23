@@ -95,6 +95,9 @@ pub fn apply_pack_config(config: &mut Config, enabled_packs: &[String]) {
     // --- finance ---
     config.finance.enabled = has("finance");
 
+    // --- browser ---
+    config.tools.browser.enabled = has("browser");
+
     // --- weather & skill-creator: skill-only, no config mutations ---
 
     // Update the packs config itself
@@ -102,6 +105,72 @@ pub fn apply_pack_config(config: &mut Config, enabled_packs: &[String]) {
         enabled: enabled_packs.to_vec(),
         enabled_skills: PackRegistry::skills_for_packs(enabled_packs),
     };
+}
+
+// ============================================================================
+// Agent-browser install helper
+// ============================================================================
+
+/// Check for agent-browser binary and offer to install it if missing.
+fn offer_agent_browser_install() -> anyhow::Result<()> {
+    use common::utils::terminal::*;
+
+    let which_cmd = if cfg!(target_os = "windows") { "where" } else { "which" };
+    let found = std::process::Command::new(which_cmd)
+        .arg("agent-browser")
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false);
+
+    if found {
+        println!("  {} agent-browser already installed.", colorize("✓", SUCCESS));
+        return Ok(());
+    }
+
+    println!("  {} agent-browser not found.", colorize("!", DIM));
+    println!("  Install it to enable browser automation.\n");
+
+    let choices = if cfg!(target_os = "macos") {
+        vec!["npm install -g agent-browser", "brew install agent-browser", "Skip (install later)"]
+    } else {
+        vec!["npm install -g agent-browser", "Skip (install later)"]
+    };
+
+    println!("  Choose install method:");
+    for (i, choice) in choices.iter().enumerate() {
+        println!("    {}. {}", i + 1, choice);
+    }
+
+    use std::io::{BufRead, Write};
+    print!("  Choice [1]: ");
+    std::io::stdout().flush()?;
+
+    let mut line = String::new();
+    std::io::stdin().lock().read_line(&mut line)?;
+    let choice = line.trim().parse::<usize>().unwrap_or(1);
+
+    if choice == choices.len()
+        || choices.get(choice - 1).map(|c| c.contains("Skip")).unwrap_or(true)
+    {
+        println!("  Skipped. Run manually: npm install -g agent-browser\n");
+        return Ok(());
+    }
+
+    let cmd = choices.get(choice - 1).unwrap_or(&choices[0]);
+    println!("  Running: {}", colorize(cmd, BOLD));
+
+    let parts: Vec<&str> = cmd.split_whitespace().collect();
+    let status = std::process::Command::new(parts[0])
+        .args(&parts[1..])
+        .status()?;
+
+    if status.success() {
+        println!("  {} agent-browser installed successfully.\n", colorize("✓", SUCCESS));
+    } else {
+        println!("  {} Install failed. Run manually: {}\n", colorize(cmd, BOLD), cmd);
+    }
+
+    Ok(())
 }
 
 // ============================================================================
@@ -198,6 +267,11 @@ pub fn run_pack_selection(state: &mut WizardState) -> Result<StepResult> {
     match result? {
         Some(selected) => {
             apply_pack_config(&mut state.config, &selected);
+
+            // If browser pack was just enabled, check for agent-browser binary
+            if selected.iter().any(|id| id == "browser") {
+                offer_agent_browser_install()?;
+            }
 
             // Print summary
             println!("  {} Enabled packs:", colorize("✓", SUCCESS));
@@ -305,7 +379,7 @@ mod tests {
     #[test]
     fn test_build_pack_options_returns_all_packs() {
         let options = build_pack_options(&[]);
-        assert_eq!(options.len(), 7);
+        assert_eq!(options.len(), 8);
     }
 
     #[test]
@@ -415,5 +489,27 @@ mod tests {
         let options = build_pack_options(&PacksConfig::default().enabled);
         // Should have 3 tier headers: Core, Recommended, Optional
         assert_eq!(tier_header_count(&options), 3);
+    }
+
+    #[test]
+    fn test_apply_pack_config_enables_browser() {
+        let mut config = Config::default();
+        assert!(!config.tools.browser.enabled);
+
+        let selection = vec!["task-management".to_string(), "browser".to_string()];
+        apply_pack_config(&mut config, &selection);
+
+        assert!(config.tools.browser.enabled);
+    }
+
+    #[test]
+    fn test_apply_pack_config_disables_browser_when_not_selected() {
+        let mut config = Config::default();
+        config.tools.browser.enabled = true; // pre-enabled
+
+        let selection = vec!["task-management".to_string()];
+        apply_pack_config(&mut config, &selection);
+
+        assert!(!config.tools.browser.enabled);
     }
 }
