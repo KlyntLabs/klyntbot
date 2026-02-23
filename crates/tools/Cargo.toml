@@ -8,6 +8,7 @@ license.workspace = true
 [features]
 default = ["semantic-search"]
 semantic-search = ["dep:fastembed"]
+browser-integration = []
 
 [dependencies]
 common.workspace = true

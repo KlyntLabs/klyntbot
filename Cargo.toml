@@ -120,6 +120,7 @@ license.workspace = true
 [features]
 default = ["email"]
 email = ["channels/email"]
+browser-integration = ["tools/browser-integration"]
 
 [dependencies]
 # Re-export all workspace crates
