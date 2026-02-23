@@ -253,9 +253,9 @@ pub async fn load_with_env_overrides() -> Result<Config> {
         config.providers.aihubmix.api_key
     );
 
-    // Database URL
-    if let Ok(val) = std::env::var("KLYNTBOT_DATABASE_URL") {
-        config.database_url = Some(val);
+    // Data directory
+    if let Ok(val) = std::env::var("KLYNTBOT_DATA_DIR") {
+        config.data_dir = Some(val);
     }
 
     // Channel tokens

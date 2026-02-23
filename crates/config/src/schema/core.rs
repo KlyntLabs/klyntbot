@@ -120,9 +120,9 @@ pub struct Config {
     #[serde(default = "default_timezone")]
     pub timezone: String,
 
-    /// PostgreSQL connection URL (optional — DB features disabled when absent).
+    /// Data directory for SQLite + LanceDB storage files (default: ~/.klyntbot).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub database_url: Option<String>,
+    pub data_dir: Option<String>,
 
     /// Feature packs (controls which skills and config sections are active).
     #[serde(default)]
@@ -133,6 +133,14 @@ impl Config {
     /// Get the workspace path (expanded)
     pub fn workspace_path(&self) -> PathBuf {
         expand_tilde(&self.agents.defaults.workspace)
+    }
+
+    /// Resolve the data directory path, expanding `~` and defaulting to `~/.klyntbot`.
+    pub fn data_dir_path(&self) -> PathBuf {
+        match &self.data_dir {
+            Some(dir) => expand_tilde(dir),
+            None => expand_tilde("~/.klyntbot"),
+        }
     }
 
     /// Return all provider configs keyed by name (detection priority order).
