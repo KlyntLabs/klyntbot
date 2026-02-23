@@ -1,7 +1,7 @@
 //! Calendar event cache repository — calendar_event_cache table.
 
 use chrono::{DateTime, Utc};
-use sqlx::PgPool;
+use sqlx::SqlitePool;
 
 use crate::error::StorageError;
 use crate::rows::calendar::CalendarEventCacheRow;
@@ -9,18 +9,18 @@ use crate::rows::calendar::CalendarEventCacheRow;
 /// Repository for cached calendar events.
 #[derive(Debug, Clone)]
 pub struct CalendarEventCacheRepo {
-    pool: PgPool,
+    pool: SqlitePool,
 }
 
 impl CalendarEventCacheRepo {
-    pub fn new(pool: PgPool) -> Self {
+    pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
     }
 
     /// Get a cached event by UID (across all providers).
     pub async fn get_by_uid(&self, uid: &str) -> Result<CalendarEventCacheRow, StorageError> {
         sqlx::query_as::<_, CalendarEventCacheRow>(
-            "SELECT * FROM calendar_event_cache WHERE uid = $1 LIMIT 1",
+            "SELECT * FROM calendar_event_cache WHERE uid = ?1 LIMIT 1",
         )
         .bind(uid)
         .fetch_optional(&self.pool)
@@ -34,7 +34,7 @@ impl CalendarEventCacheRepo {
         provider_id: &str,
     ) -> Result<Vec<CalendarEventCacheRow>, StorageError> {
         let rows = sqlx::query_as::<_, CalendarEventCacheRow>(
-            "SELECT * FROM calendar_event_cache WHERE provider_id = $1 ORDER BY start_at",
+            "SELECT * FROM calendar_event_cache WHERE provider_id = ?1 ORDER BY start_at",
         )
         .bind(provider_id)
         .fetch_all(&self.pool)
@@ -49,9 +49,9 @@ impl CalendarEventCacheRepo {
     ) -> Result<Vec<CalendarEventCacheRow>, StorageError> {
         let rows = sqlx::query_as::<_, CalendarEventCacheRow>(
             "SELECT * FROM calendar_event_cache \
-             WHERE start_at >= now() \
+             WHERE start_at >= datetime('now') \
              ORDER BY start_at \
-             LIMIT $1",
+             LIMIT ?1",
         )
         .bind(limit)
         .fetch_all(&self.pool)
@@ -76,7 +76,7 @@ impl CalendarEventCacheRepo {
         let row = sqlx::query_as::<_, CalendarEventCacheRow>(
             "INSERT INTO calendar_event_cache \
                 (uid, provider_id, summary, description, start_at, end_at, source, etag, status, cached_at) \
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now()) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, datetime('now')) \
              ON CONFLICT (uid, provider_id) DO UPDATE SET \
                  summary = EXCLUDED.summary, \
                  description = EXCLUDED.description, \
@@ -104,7 +104,7 @@ impl CalendarEventCacheRepo {
 
     /// Delete all cached events for a provider.
     pub async fn delete_by_provider(&self, provider_id: &str) -> Result<u64, StorageError> {
-        let result = sqlx::query("DELETE FROM calendar_event_cache WHERE provider_id = $1")
+        let result = sqlx::query("DELETE FROM calendar_event_cache WHERE provider_id = ?1")
             .bind(provider_id)
             .execute(&self.pool)
             .await?;
@@ -114,7 +114,7 @@ impl CalendarEventCacheRepo {
     /// Delete a specific cached event.
     pub async fn delete(&self, uid: &str, provider_id: &str) -> Result<bool, StorageError> {
         let result =
-            sqlx::query("DELETE FROM calendar_event_cache WHERE uid = $1 AND provider_id = $2")
+            sqlx::query("DELETE FROM calendar_event_cache WHERE uid = ?1 AND provider_id = ?2")
                 .bind(uid)
                 .bind(provider_id)
                 .execute(&self.pool)
@@ -128,7 +128,7 @@ impl CalendarEventCacheRepo {
         provider_id: &str,
     ) -> Result<Option<DateTime<Utc>>, StorageError> {
         let row: (Option<DateTime<Utc>>,) = sqlx::query_as(
-            "SELECT MAX(cached_at) FROM calendar_event_cache WHERE provider_id = $1",
+            "SELECT MAX(cached_at) FROM calendar_event_cache WHERE provider_id = ?1",
         )
         .bind(provider_id)
         .fetch_one(&self.pool)

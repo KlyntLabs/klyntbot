@@ -1,7 +1,7 @@
 //! Strategy repository — strategy_records table.
 
 use chrono::{DateTime, Utc};
-use sqlx::PgPool;
+use sqlx::SqlitePool;
 use uuid::Uuid;
 
 use crate::error::StorageError;
@@ -10,11 +10,11 @@ use crate::rows::learning::{StrategyRecordRow, StrategySummaryRow};
 /// Repository for strategy execution record persistence.
 #[derive(Debug, Clone)]
 pub struct StrategyRepo {
-    pool: PgPool,
+    pool: SqlitePool,
 }
 
 impl StrategyRepo {
-    pub fn new(pool: PgPool) -> Self {
+    pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
     }
 
@@ -24,7 +24,7 @@ impl StrategyRepo {
             "INSERT INTO strategy_records (id, timestamp, request_id, predicted_strategy,
                                            actual_strategy, escalation_count, iterations_used,
                                            max_iterations, success, user_satisfaction, response_time_ms)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
              RETURNING *",
         )
         .bind(row.id)
@@ -45,7 +45,7 @@ impl StrategyRepo {
 
     /// Get a strategy record by ID.
     pub async fn get(&self, id: Uuid) -> Result<StrategyRecordRow, StorageError> {
-        sqlx::query_as::<_, StrategyRecordRow>("SELECT * FROM strategy_records WHERE id = $1")
+        sqlx::query_as::<_, StrategyRecordRow>("SELECT * FROM strategy_records WHERE id = ?1")
             .bind(id)
             .fetch_optional(&self.pool)
             .await?
@@ -60,7 +60,7 @@ impl StrategyRepo {
     ) -> Result<Vec<StrategyRecordRow>, StorageError> {
         let rows = sqlx::query_as::<_, StrategyRecordRow>(
             "SELECT * FROM strategy_records
-             WHERE predicted_strategy = $1 AND timestamp >= $2
+             WHERE predicted_strategy = ?1 AND timestamp >= ?2
              ORDER BY timestamp DESC",
         )
         .bind(strategy)
@@ -78,9 +78,9 @@ impl StrategyRepo {
     ) -> Result<Option<f32>, StorageError> {
         let row: (i64, i64) = sqlx::query_as(
             "SELECT COUNT(*),
-                    COUNT(*) FILTER (WHERE predicted_strategy = actual_strategy)
+                    COALESCE(SUM(CASE WHEN predicted_strategy = actual_strategy THEN 1 ELSE 0 END), 0)
              FROM strategy_records
-             WHERE predicted_strategy = $1 AND timestamp >= $2",
+             WHERE predicted_strategy = ?1 AND timestamp >= ?2",
         )
         .bind(strategy)
         .bind(since)
@@ -103,12 +103,12 @@ impl StrategyRepo {
     ) -> Result<Vec<StrategySummaryRow>, StorageError> {
         let rows = sqlx::query_as::<_, StrategySummaryRow>(
             "SELECT predicted_strategy,
-                    COUNT(*)::BIGINT AS sample_count,
-                    COUNT(*) FILTER (WHERE predicted_strategy = actual_strategy)::BIGINT
+                    COUNT(*) AS sample_count,
+                    COALESCE(SUM(CASE WHEN predicted_strategy = actual_strategy THEN 1 ELSE 0 END), 0)
                         AS correct_count,
-                    AVG(escalation_count)::REAL AS avg_escalations
+                    AVG(CAST(escalation_count AS REAL)) AS avg_escalations
              FROM strategy_records
-             WHERE timestamp >= $1
+             WHERE timestamp >= ?1
              GROUP BY predicted_strategy
              ORDER BY sample_count DESC",
         )
@@ -126,7 +126,7 @@ impl StrategyRepo {
     ) -> Result<Vec<StrategyRecordRow>, StorageError> {
         let rows = sqlx::query_as::<_, StrategyRecordRow>(
             "SELECT * FROM strategy_records
-             WHERE timestamp >= $1 AND timestamp <= $2
+             WHERE timestamp >= ?1 AND timestamp <= ?2
              ORDER BY timestamp DESC",
         )
         .bind(from)

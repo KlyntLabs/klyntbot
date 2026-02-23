@@ -1,7 +1,7 @@
 //! Outcome repository — learning_outcomes + enrichment_feedback tables.
 
 use chrono::{DateTime, Utc};
-use sqlx::PgPool;
+use sqlx::SqlitePool;
 
 use crate::error::StorageError;
 use crate::rows::learning::{EnrichmentFeedbackRow, OutcomeRow};
@@ -9,11 +9,11 @@ use crate::rows::learning::{EnrichmentFeedbackRow, OutcomeRow};
 /// Repository for learning outcome and enrichment feedback persistence.
 #[derive(Debug, Clone)]
 pub struct OutcomeRepo {
-    pool: PgPool,
+    pool: SqlitePool,
 }
 
 impl OutcomeRepo {
-    pub fn new(pool: PgPool) -> Self {
+    pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
     }
 
@@ -23,7 +23,7 @@ impl OutcomeRepo {
             "INSERT INTO learning_outcomes (id, session_key, tool_name, success, error_category,
                                             duration_ms, confidence_score, confidence_dimensions,
                                             execution_mode, created_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
              RETURNING *",
         )
         .bind(&row.id)
@@ -49,7 +49,7 @@ impl OutcomeRepo {
     ) -> Result<Vec<OutcomeRow>, StorageError> {
         let rows = sqlx::query_as::<_, OutcomeRow>(
             "SELECT * FROM learning_outcomes
-             WHERE created_at >= $1 AND created_at <= $2
+             WHERE created_at >= ?1 AND created_at <= ?2
              ORDER BY created_at DESC",
         )
         .bind(from)
@@ -62,7 +62,7 @@ impl OutcomeRepo {
     /// List outcomes for a specific tool.
     pub async fn list_by_tool(&self, tool_name: &str) -> Result<Vec<OutcomeRow>, StorageError> {
         let rows = sqlx::query_as::<_, OutcomeRow>(
-            "SELECT * FROM learning_outcomes WHERE tool_name = $1 ORDER BY created_at DESC",
+            "SELECT * FROM learning_outcomes WHERE tool_name = ?1 ORDER BY created_at DESC",
         )
         .bind(tool_name)
         .fetch_all(&self.pool)
@@ -73,8 +73,9 @@ impl OutcomeRepo {
     /// Count outcomes (total, success) for aggregate stats.
     pub async fn count_stats(&self, since: DateTime<Utc>) -> Result<(i64, i64), StorageError> {
         let row: (i64, i64) = sqlx::query_as(
-            "SELECT COUNT(*), COUNT(*) FILTER (WHERE success = true)
-             FROM learning_outcomes WHERE created_at >= $1",
+            "SELECT COUNT(*),
+                    COALESCE(SUM(CASE WHEN success THEN 1 ELSE 0 END), 0)
+             FROM learning_outcomes WHERE created_at >= ?1",
         )
         .bind(since)
         .fetch_one(&self.pool)
@@ -84,7 +85,7 @@ impl OutcomeRepo {
 
     // ── Enrichment Feedback ──────────────────────────────────────
 
-    /// Insert enrichment feedback (SERIAL id auto-generated).
+    /// Insert enrichment feedback (autoincrement id).
     pub async fn create_enrichment_feedback(
         &self,
         task_id: &str,
@@ -97,7 +98,7 @@ impl OutcomeRepo {
         let row = sqlx::query_as::<_, EnrichmentFeedbackRow>(
             "INSERT INTO enrichment_feedback (task_id, field, suggested_value, actual_value,
                                               accepted, confidence, timestamp)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
              RETURNING *",
         )
         .bind(task_id)

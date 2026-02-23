@@ -1,6 +1,6 @@
 //! Cron job repository — cron_jobs table.
 
-use sqlx::PgPool;
+use sqlx::SqlitePool;
 
 use crate::error::StorageError;
 use crate::rows::cron::CronJobRow;
@@ -8,11 +8,11 @@ use crate::rows::cron::CronJobRow;
 /// Repository for cron job persistence.
 #[derive(Debug, Clone)]
 pub struct CronRepo {
-    pool: PgPool,
+    pool: SqlitePool,
 }
 
 impl CronRepo {
-    pub fn new(pool: PgPool) -> Self {
+    pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
     }
 
@@ -22,7 +22,7 @@ impl CronRepo {
             "INSERT INTO cron_jobs (id, name, enabled, schedule, payload, next_run_at_ms,
                                     last_run_at_ms, last_status, last_error,
                                     created_at_ms, updated_at_ms, delete_after_run)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
              ON CONFLICT (id) DO UPDATE SET
                  name = EXCLUDED.name,
                  enabled = EXCLUDED.enabled,
@@ -55,7 +55,7 @@ impl CronRepo {
 
     /// Get a cron job by ID.
     pub async fn get(&self, id: &str) -> Result<CronJobRow, StorageError> {
-        sqlx::query_as::<_, CronJobRow>("SELECT * FROM cron_jobs WHERE id = $1")
+        sqlx::query_as::<_, CronJobRow>("SELECT * FROM cron_jobs WHERE id = ?1")
             .bind(id)
             .fetch_optional(&self.pool)
             .await?
@@ -74,7 +74,7 @@ impl CronRepo {
     /// List only enabled cron jobs.
     pub async fn list_active(&self) -> Result<Vec<CronJobRow>, StorageError> {
         let rows = sqlx::query_as::<_, CronJobRow>(
-            "SELECT * FROM cron_jobs WHERE enabled = true ORDER BY next_run_at_ms ASC NULLS LAST",
+            "SELECT * FROM cron_jobs WHERE enabled = TRUE ORDER BY next_run_at_ms ASC NULLS LAST",
         )
         .fetch_all(&self.pool)
         .await?;
@@ -83,7 +83,7 @@ impl CronRepo {
 
     /// Enable or disable a cron job.
     pub async fn set_enabled(&self, id: &str, enabled: bool) -> Result<(), StorageError> {
-        let result = sqlx::query("UPDATE cron_jobs SET enabled = $1 WHERE id = $2")
+        let result = sqlx::query("UPDATE cron_jobs SET enabled = ?1 WHERE id = ?2")
             .bind(enabled)
             .bind(id)
             .execute(&self.pool)
@@ -105,9 +105,9 @@ impl CronRepo {
         updated_at_ms: i64,
     ) -> Result<(), StorageError> {
         let result = sqlx::query(
-            "UPDATE cron_jobs SET last_run_at_ms = $1, next_run_at_ms = $2,
-                                  last_status = $3, last_error = $4, updated_at_ms = $5
-             WHERE id = $6",
+            "UPDATE cron_jobs SET last_run_at_ms = ?1, next_run_at_ms = ?2,
+                                  last_status = ?3, last_error = ?4, updated_at_ms = ?5
+             WHERE id = ?6",
         )
         .bind(last_run_at_ms)
         .bind(next_run_at_ms)
@@ -125,7 +125,7 @@ impl CronRepo {
 
     /// Delete a cron job by ID.
     pub async fn delete(&self, id: &str) -> Result<bool, StorageError> {
-        let result = sqlx::query("DELETE FROM cron_jobs WHERE id = $1")
+        let result = sqlx::query("DELETE FROM cron_jobs WHERE id = ?1")
             .bind(id)
             .execute(&self.pool)
             .await?;

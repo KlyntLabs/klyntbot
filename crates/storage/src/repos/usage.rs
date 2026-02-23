@@ -1,7 +1,7 @@
 //! Usage repository — usage_records table.
 
 use chrono::{DateTime, Utc};
-use sqlx::PgPool;
+use sqlx::SqlitePool;
 
 use crate::error::StorageError;
 use crate::rows::usage::UsageRecordRow;
@@ -9,11 +9,11 @@ use crate::rows::usage::UsageRecordRow;
 /// Repository for LLM usage record persistence and reporting.
 #[derive(Debug, Clone)]
 pub struct UsageRepo {
-    pool: PgPool,
+    pool: SqlitePool,
 }
 
 impl UsageRepo {
-    pub fn new(pool: PgPool) -> Self {
+    pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
     }
 
@@ -23,7 +23,7 @@ impl UsageRepo {
             "INSERT INTO usage_records (id, timestamp, request_id, model, provider,
                                         prompt_tokens, completion_tokens, cache_read_tokens,
                                         cache_write_tokens, estimated_cost_usd, channel, strategy)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
              RETURNING *",
         )
         .bind(row.id)
@@ -51,10 +51,10 @@ impl UsageRepo {
     ) -> Result<Vec<(String, i64, f64)>, StorageError> {
         let rows: Vec<ModelAggregate> = sqlx::query_as(
             "SELECT model,
-                    SUM(prompt_tokens + completion_tokens)::BIGINT AS total_tokens,
+                    SUM(prompt_tokens + completion_tokens) AS total_tokens,
                     SUM(estimated_cost_usd) AS total_cost
              FROM usage_records
-             WHERE timestamp >= $1
+             WHERE timestamp >= ?1
              GROUP BY model
              ORDER BY total_cost DESC",
         )
@@ -80,10 +80,10 @@ impl UsageRepo {
         since: DateTime<Utc>,
     ) -> Result<Vec<(String, f64)>, StorageError> {
         let rows: Vec<DayAggregate> = sqlx::query_as(
-            "SELECT to_char(timestamp, 'YYYY-MM-DD') AS day,
+            "SELECT strftime('%Y-%m-%d', timestamp) AS day,
                     SUM(estimated_cost_usd) AS total_cost
              FROM usage_records
-             WHERE timestamp >= $1
+             WHERE timestamp >= ?1
              GROUP BY day
              ORDER BY day ASC",
         )
@@ -99,9 +99,9 @@ impl UsageRepo {
     /// Get total request count and cost since a timestamp.
     pub async fn totals_since(&self, since: DateTime<Utc>) -> Result<(i64, f64), StorageError> {
         let row: TotalAggregate = sqlx::query_as(
-            "SELECT COUNT(*)::BIGINT AS total_requests,
+            "SELECT COUNT(*) AS total_requests,
                     COALESCE(SUM(estimated_cost_usd), 0) AS total_cost
-             FROM usage_records WHERE timestamp >= $1",
+             FROM usage_records WHERE timestamp >= ?1",
         )
         .bind(since)
         .fetch_one(&self.pool)

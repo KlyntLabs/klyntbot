@@ -1,6 +1,6 @@
 //! Repository for the `learning_state` key-value table.
 
-use sqlx::PgPool;
+use sqlx::SqlitePool;
 
 use crate::error::StorageError;
 use crate::rows::learning::LearningStateRow;
@@ -8,28 +8,28 @@ use crate::rows::learning::LearningStateRow;
 /// Repository for learning state persistence (adaptive thresholds, etc.).
 #[derive(Debug, Clone)]
 pub struct LearningStateRepo {
-    pool: PgPool,
+    pool: SqlitePool,
 }
 
 impl LearningStateRepo {
-    pub fn new(pool: PgPool) -> Self {
+    pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
     }
 
     /// Get a learning state value by key.
     pub async fn get(&self, key: &str) -> Result<Option<LearningStateRow>, StorageError> {
         let row =
-            sqlx::query_as::<_, LearningStateRow>("SELECT * FROM learning_state WHERE key = $1")
+            sqlx::query_as::<_, LearningStateRow>("SELECT * FROM learning_state WHERE key = ?1")
                 .bind(key)
                 .fetch_optional(&self.pool)
                 .await?;
         Ok(row)
     }
 
-    /// Get the JSONB value for a key, or None if not found.
+    /// Get the JSON value for a key, or None if not found.
     pub async fn get_value(&self, key: &str) -> Result<Option<serde_json::Value>, StorageError> {
         let row: Option<(serde_json::Value,)> =
-            sqlx::query_as("SELECT value FROM learning_state WHERE key = $1")
+            sqlx::query_as("SELECT value FROM learning_state WHERE key = ?1")
                 .bind(key)
                 .fetch_optional(&self.pool)
                 .await?;
@@ -43,13 +43,11 @@ impl LearningStateRepo {
         value: &serde_json::Value,
     ) -> Result<LearningStateRow, StorageError> {
         let row = sqlx::query_as::<_, LearningStateRow>(
-            r#"
-            INSERT INTO learning_state (key, value)
-            VALUES ($1, $2)
-            ON CONFLICT (key)
-            DO UPDATE SET value = $2, updated_at = now()
-            RETURNING *
-            "#,
+            "INSERT INTO learning_state (key, value)
+             VALUES (?1, ?2)
+             ON CONFLICT (key)
+             DO UPDATE SET value = ?2, updated_at = datetime('now')
+             RETURNING *",
         )
         .bind(key)
         .bind(value)
@@ -69,7 +67,7 @@ impl LearningStateRepo {
 
     /// Delete a learning state entry by key.
     pub async fn delete(&self, key: &str) -> Result<bool, StorageError> {
-        let result = sqlx::query("DELETE FROM learning_state WHERE key = $1")
+        let result = sqlx::query("DELETE FROM learning_state WHERE key = ?1")
             .bind(key)
             .execute(&self.pool)
             .await?;
