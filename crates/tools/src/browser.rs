@@ -3,7 +3,7 @@
 use async_trait::async_trait;
 use config::TrustLevel;
 use serde_json::Value;
-use tracing::debug;
+use tracing::{debug, warn};
 
 use super::{PermissionLevel, RoutingContext, Tool};
 use crate::params::ParamExtractor;
@@ -43,13 +43,21 @@ pub fn is_write_action(action: &str, element_label: &str) -> bool {
     false
 }
 
+// ── SnapshotElement ───────────────────────────────────────────────────────────
+
+/// A single element reference parsed from a snapshot.
+pub struct SnapshotElement {
+    pub ref_id: String,
+    pub kind:   String,
+    pub label:  String,
+}
+
 // ── BrowserTool ───────────────────────────────────────────────────────────────
 
 /// Tool for browser automation via the agent-browser CLI.
 pub struct BrowserTool {
     trust_level: TrustLevel,
-    /// Path to the agent-browser binary; used by action implementations in Task 4 & 5.
-    #[allow(dead_code)]
+    /// Path to the agent-browser binary.
     binary_path: String,
 }
 
@@ -80,6 +88,73 @@ impl BrowserTool {
                 matches!(action, "click" | "fill" | "type" | "submit_and_confirm")
             }
         }
+    }
+
+    /// Map action name to agent-browser CLI arguments.
+    pub fn build_args(action: &str, extra: &[&str]) -> Vec<String> {
+        let cmd = match action {
+            "navigate" => "open",
+            other      => other,
+        };
+        let mut args = vec![cmd.to_string()];
+        args.extend(extra.iter().map(|s| s.to_string()));
+        args
+    }
+
+    /// Parse agent-browser snapshot output into structured element refs.
+    /// Expected line format: `@e1 button "Search"`
+    pub fn parse_snapshot(raw: &str) -> Vec<SnapshotElement> {
+        raw.lines()
+            .filter_map(|line| {
+                let line = line.trim();
+                if !line.starts_with('@') { return None; }
+                let mut parts = line.splitn(3, ' ');
+                let ref_id = parts.next()?.to_string();
+                let kind   = parts.next().unwrap_or("").to_string();
+                let label  = parts.next()
+                    .unwrap_or("")
+                    .trim_matches('"')
+                    .to_string();
+                Some(SnapshotElement { ref_id, kind, label })
+            })
+            .collect()
+    }
+
+    /// Format the message returned to the LLM when a write action is guarded.
+    pub fn guard_message(action: &str, label: &str) -> String {
+        format!(
+            "[CONFIRMATION_REQUIRED] About to {} '{}'. \
+             Use the ask_user tool to confirm with the user, \
+             then call browser with the same action once confirmed.",
+            action, label
+        )
+    }
+
+    /// Execute an agent-browser subprocess command with a 30-second timeout.
+    async fn run(&self, args: &[String]) -> Result<String> {
+        debug!("agent-browser {:?}", args);
+
+        let output = tokio::time::timeout(
+            tokio::time::Duration::from_secs(30),
+            tokio::process::Command::new(&self.binary_path).args(args).output(),
+        )
+        .await
+        .map_err(|_| ToolError::ExecutionFailed(
+            "Browser action timed out after 30s".to_string()
+        ))?
+        .map_err(|e| {
+            warn!("agent-browser connection error: {}", e);
+            ToolError::ExecutionFailed(
+                "Browser session unavailable. Try navigating again.".to_string()
+            )
+        })?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+            return Err(ToolError::ExecutionFailed(stderr).into());
+        }
+
+        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
     }
 }
 
@@ -216,42 +291,91 @@ impl Tool for BrowserTool {
     }
 }
 
-// ── Action stubs (implemented in Task 4 & 5) ─────────────────────────────────
+// ── Primitive action implementations ─────────────────────────────────────────
 
 impl BrowserTool {
-    async fn act_navigate(&self, _p: &ParamExtractor<'_>) -> Result<String> {
-        Err(ToolError::ExecutionFailed("not yet implemented".into()).into())
+    async fn act_navigate(&self, p: &ParamExtractor<'_>) -> Result<String> {
+        let url = p.required_str("url")?;
+        let args = Self::build_args("navigate", &[url]);
+        self.run(&args).await
     }
+
     async fn act_snapshot(&self) -> Result<String> {
-        Err(ToolError::ExecutionFailed("not yet implemented".into()).into())
+        self.run(&["snapshot".to_string()]).await
     }
-    async fn act_click(&self, _p: &ParamExtractor<'_>) -> Result<String> {
-        Err(ToolError::ExecutionFailed("not yet implemented".into()).into())
+
+    async fn act_click(&self, p: &ParamExtractor<'_>) -> Result<String> {
+        let element = p.required_str("element")?;
+        if self.should_guard("click", element) {
+            return Ok(Self::guard_message("click", element));
+        }
+        let args = Self::build_args("click", &[element]);
+        self.run(&args).await
     }
-    async fn act_type(&self, _p: &ParamExtractor<'_>) -> Result<String> {
-        Err(ToolError::ExecutionFailed("not yet implemented".into()).into())
+
+    async fn act_type(&self, p: &ParamExtractor<'_>) -> Result<String> {
+        let element = p.required_str("element")?;
+        let text    = p.required_str("text")?;
+        if self.should_guard("type", element) {
+            return Ok(Self::guard_message("type", element));
+        }
+        let args = Self::build_args("type", &[element, text]);
+        self.run(&args).await
     }
-    async fn act_fill(&self, _p: &ParamExtractor<'_>) -> Result<String> {
-        Err(ToolError::ExecutionFailed("not yet implemented".into()).into())
+
+    async fn act_fill(&self, p: &ParamExtractor<'_>) -> Result<String> {
+        let element = p.required_str("element")?;
+        let value   = p.required_str("value")?;
+        if self.should_guard("fill", element) {
+            return Ok(Self::guard_message("fill", element));
+        }
+        let args = Self::build_args("fill", &[element, value]);
+        self.run(&args).await
     }
-    async fn act_press(&self, _p: &ParamExtractor<'_>) -> Result<String> {
-        Err(ToolError::ExecutionFailed("not yet implemented".into()).into())
+
+    async fn act_press(&self, p: &ParamExtractor<'_>) -> Result<String> {
+        let key  = p.required_str("key")?;
+        let args = Self::build_args("press", &[key]);
+        self.run(&args).await
     }
-    async fn act_scroll(&self, _p: &ParamExtractor<'_>) -> Result<String> {
-        Err(ToolError::ExecutionFailed("not yet implemented".into()).into())
+
+    async fn act_scroll(&self, p: &ParamExtractor<'_>) -> Result<String> {
+        let direction = p.required_str("direction")?;
+        let amount = p.i64_or("amount", 0)?;
+        let args = if amount > 0 {
+            let amount_str = amount.to_string();
+            Self::build_args("scroll", &[direction, &amount_str])
+        } else {
+            Self::build_args("scroll", &[direction])
+        };
+        self.run(&args).await
     }
-    async fn act_wait(&self, _p: &ParamExtractor<'_>) -> Result<String> {
-        Err(ToolError::ExecutionFailed("not yet implemented".into()).into())
+
+    async fn act_wait(&self, p: &ParamExtractor<'_>) -> Result<String> {
+        let condition = p.required_str("condition")?;
+        let args = Self::build_args("wait", &[condition]);
+        self.run(&args).await
     }
-    async fn act_get_text(&self, _p: &ParamExtractor<'_>) -> Result<String> {
-        Err(ToolError::ExecutionFailed("not yet implemented".into()).into())
+
+    async fn act_get_text(&self, p: &ParamExtractor<'_>) -> Result<String> {
+        let element = p.required_str("element")?;
+        // agent-browser: `get text @e1`
+        let args = vec!["get".to_string(), "text".to_string(), element.to_string()];
+        self.run(&args).await
     }
+
     async fn act_screenshot(&self) -> Result<String> {
-        Err(ToolError::ExecutionFailed("not yet implemented".into()).into())
+        self.run(&["screenshot".to_string()]).await
     }
-    async fn act_eval(&self, _p: &ParamExtractor<'_>) -> Result<String> {
-        Err(ToolError::ExecutionFailed("not yet implemented".into()).into())
+
+    async fn act_eval(&self, p: &ParamExtractor<'_>) -> Result<String> {
+        let script = p.required_str("script")?;
+        let args = Self::build_args("eval", &[script]);
+        self.run(&args).await
     }
+
+    // ── Composite stubs (implemented in Task 5) ───────────────────────────────
+
     async fn act_fill_form(&self, _p: &ParamExtractor<'_>) -> Result<String> {
         Err(ToolError::ExecutionFailed("not yet implemented".into()).into())
     }
@@ -356,5 +480,50 @@ mod tests {
         assert!(!tool.should_guard("navigate", ""));
         assert!(!tool.should_guard("snapshot", ""));
         assert!(!tool.should_guard("screenshot", ""));
+    }
+
+    // ── Pure helper tests ─────────────────────────────────────────────────────
+
+    #[test]
+    fn test_build_args_navigate() {
+        let args = BrowserTool::build_args("navigate", &["https://example.com"]);
+        assert_eq!(args, vec!["open", "https://example.com"]);
+    }
+
+    #[test]
+    fn test_build_args_click() {
+        let args = BrowserTool::build_args("click", &["@e3"]);
+        assert_eq!(args, vec!["click", "@e3"]);
+    }
+
+    #[test]
+    fn test_build_args_type() {
+        let args = BrowserTool::build_args("type", &["@e2", "hello world"]);
+        assert_eq!(args, vec!["type", "@e2", "hello world"]);
+    }
+
+    #[test]
+    fn test_parse_snapshot_finds_elements() {
+        let raw = "@e1 button \"Search\"\n@e2 input \"Email\"\n@e3 button \"Submit\"";
+        let elems = BrowserTool::parse_snapshot(raw);
+        assert_eq!(elems.len(), 3);
+        assert_eq!(elems[0].ref_id, "@e1");
+        assert_eq!(elems[0].label, "Search");
+        assert_eq!(elems[1].ref_id, "@e2");
+        assert_eq!(elems[1].label, "Email");
+    }
+
+    #[test]
+    fn test_parse_snapshot_empty() {
+        let elems = BrowserTool::parse_snapshot("");
+        assert!(elems.is_empty());
+    }
+
+    #[test]
+    fn test_guard_message_format() {
+        let msg = BrowserTool::guard_message("click", "Place Order");
+        assert!(msg.contains("[CONFIRMATION_REQUIRED]"));
+        assert!(msg.contains("Place Order"));
+        assert!(msg.contains("ask_user"));
     }
 }
