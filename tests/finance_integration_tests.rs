@@ -16,7 +16,7 @@
 //! Run with: cargo nextest run --run-ignored ignored -p klyntbot --test finance_integration_tests
 
 use common::{ChannelName, ChatId};
-use feature_finance::{FinanceTool, PriceService};
+use feature_finance::FinanceTool;
 use serde_json::json;
 use tools::{RoutingContext, Tool};
 
@@ -27,26 +27,14 @@ mod mock_provider;
 // Test helpers
 // ---------------------------------------------------------------------------
 
-/// Connect to the test database. Returns the URL.
-fn test_db_url() -> String {
-    std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://localhost/klyntbot_test".to_string())
-}
-
-/// Create a FinanceTool backed by real PostgreSQL repos.
-fn make_finance_tool() -> FinanceTool {
-    let pool = storage::StoragePool::connect_lazy(&test_db_url()).unwrap();
-    let p = pool.inner().clone();
-    FinanceTool::new(
-        storage::FinanceAccountRepo::new(p.clone()),
-        storage::FinanceTransactionRepo::new(p.clone()),
-        storage::FinanceBudgetRepo::new(p.clone()),
-        storage::FinanceInvestmentRepo::new(p.clone()),
-        storage::FinanceGoalRepo::new(p.clone()),
-        storage::FinanceLiabilityRepo::new(p.clone()),
-        PriceService::new(5),
-        "VND".to_string(),
-    )
+/// Create a FinanceTool backed by an ephemeral SQLite pool.
+async fn make_finance_tool() -> FinanceTool {
+    let dir = tempfile::TempDir::new().expect("temp dir");
+    let pool = storage::StoragePool::connect(dir.path())
+        .await
+        .expect("SQLite test pool");
+    std::mem::forget(dir); // keep dir alive for pool lifetime
+    FinanceTool::from_storage_pool(&pool, "VND")
 }
 
 fn test_ctx() -> RoutingContext {
@@ -79,7 +67,7 @@ fn extract_nested_field(response: &str, outer: &str, inner: &str) -> Option<Stri
 #[tokio::test]
 #[ignore]
 async fn finance_tool_dispatch_via_registry() {
-    let tool = make_finance_tool();
+    let tool = make_finance_tool().await;
     let ctx = test_ctx();
 
     // Create an account
@@ -120,7 +108,7 @@ async fn finance_tool_dispatch_via_registry() {
 #[tokio::test]
 #[ignore]
 async fn account_add_then_list() {
-    let tool = make_finance_tool();
+    let tool = make_finance_tool().await;
     let ctx = test_ctx();
 
     // Create account
@@ -161,7 +149,7 @@ async fn account_add_then_list() {
 #[tokio::test]
 #[ignore]
 async fn tx_add_updates_account_balance() {
-    let tool = make_finance_tool();
+    let tool = make_finance_tool().await;
     let ctx = test_ctx();
 
     // Create account with balance 1,000,000
@@ -213,7 +201,7 @@ async fn tx_add_updates_account_balance() {
 #[tokio::test]
 #[ignore]
 async fn tx_add_with_budget_shows_impact() {
-    let tool = make_finance_tool();
+    let tool = make_finance_tool().await;
     let ctx = test_ctx();
 
     // Create account
@@ -291,7 +279,7 @@ async fn tx_add_with_budget_shows_impact() {
 #[tokio::test]
 #[ignore]
 async fn transfer_creates_paired_rows() {
-    let tool = make_finance_tool();
+    let tool = make_finance_tool().await;
     let ctx = test_ctx();
 
     // Create account A (1,000,000 VND)
@@ -378,7 +366,7 @@ async fn transfer_creates_paired_rows() {
 #[tokio::test]
 #[ignore]
 async fn investment_buy_sell_cost_basis() {
-    let tool = make_finance_tool();
+    let tool = make_finance_tool().await;
     let ctx = test_ctx();
 
     // Create portfolio
@@ -479,7 +467,7 @@ async fn investment_buy_sell_cost_basis() {
 #[tokio::test]
 #[ignore]
 async fn net_worth_calculation() {
-    let tool = make_finance_tool();
+    let tool = make_finance_tool().await;
     let ctx = test_ctx();
 
     // Create account (100,000 VND)
@@ -552,7 +540,7 @@ async fn net_worth_calculation() {
 #[tokio::test]
 #[ignore]
 async fn budget_list_shows_current_usage() {
-    let tool = make_finance_tool();
+    let tool = make_finance_tool().await;
     let ctx = test_ctx();
 
     // Create account
@@ -643,7 +631,7 @@ async fn budget_list_shows_current_usage() {
 #[tokio::test]
 #[ignore]
 async fn goal_fire_with_explicit_expenses() {
-    let tool = make_finance_tool();
+    let tool = make_finance_tool().await;
     let ctx = test_ctx();
 
     // Create account with large balance so net_worth > 0
@@ -705,7 +693,7 @@ async fn goal_fire_with_explicit_expenses() {
 #[tokio::test]
 #[ignore]
 async fn settings_get_returns_config() {
-    let tool = make_finance_tool();
+    let tool = make_finance_tool().await;
     let ctx = test_ctx();
 
     let result = tool
@@ -731,7 +719,7 @@ async fn settings_get_returns_config() {
 #[tokio::test]
 #[ignore]
 async fn report_spending_shows_category_breakdown() {
-    let tool = make_finance_tool();
+    let tool = make_finance_tool().await;
     let ctx = test_ctx();
 
     // Create account
@@ -821,7 +809,7 @@ async fn report_spending_shows_category_breakdown() {
 #[tokio::test]
 #[ignore]
 async fn unknown_action_returns_error() {
-    let tool = make_finance_tool();
+    let tool = make_finance_tool().await;
     let ctx = test_ctx();
 
     let result = tool.execute(json!({"action": "explode"}), &ctx).await;
@@ -843,7 +831,7 @@ async fn unknown_action_returns_error() {
 #[tokio::test]
 #[ignore]
 async fn finance_tool_has_correct_name() {
-    let tool = make_finance_tool();
+    let tool = make_finance_tool().await;
     assert_eq!(tool.name(), "finance");
 }
 
@@ -851,7 +839,7 @@ async fn finance_tool_has_correct_name() {
 #[tokio::test]
 #[ignore]
 async fn finance_tool_parameters_has_action() {
-    let tool = make_finance_tool();
+    let tool = make_finance_tool().await;
     let params = tool.parameters();
     let required = params["required"].as_array().expect("should have required");
     assert!(

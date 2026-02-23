@@ -47,12 +47,12 @@ pub fn test_workspace() -> (TempDir, std::path::PathBuf) {
     (temp_dir, workspace)
 }
 
-/// Create a SessionManager backed by a lazy PostgreSQL pool (no real DB needed for most tests).
+/// Create a SessionManager backed by a SQLite test pool.
 ///
 /// Returns the manager and a `TempDir` that must be kept alive (for other temp artifacts).
 pub async fn test_session_manager() -> (SessionManager, TempDir) {
     let temp_dir = TempDir::new().expect("failed to create temp dir");
-    let pool = test_pool();
+    let pool = test_pool().await;
     let repo = klyntbot::storage::SessionRepo::new(pool.inner().clone());
     let manager = SessionManager::from_repo(repo).await;
     (manager, temp_dir)
@@ -102,33 +102,41 @@ pub mod mock_embedding_handler;
 #[allow(unused_imports)]
 pub use mock_embedding_handler::MockEmbeddingHandler;
 
-// ─── Storage repo helpers (lazy pool, no real DB connection) ──
+// ─── Storage repo helpers (SQLite temp-file pool) ─────────────
 
-/// Create a lazy StoragePool for tests that don't need a real database.
-pub fn test_pool() -> klyntbot::storage::StoragePool {
-    klyntbot::storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap()
+/// Create a SQLite StoragePool backed by a temporary directory.
+///
+/// The temp directory is leaked intentionally — the OS cleans it up on
+/// process exit, which is acceptable for ephemeral test processes.
+pub async fn test_pool() -> klyntbot::storage::StoragePool {
+    let dir = tempfile::TempDir::new().expect("temp dir");
+    let pool = klyntbot::storage::StoragePool::connect(dir.path())
+        .await
+        .expect("SQLite test pool");
+    std::mem::forget(dir);
+    pool
 }
 
-pub fn test_todo_repo() -> klyntbot::storage::TodoRepo {
-    klyntbot::storage::TodoRepo::new(test_pool().inner().clone())
+pub async fn test_todo_repo() -> klyntbot::storage::TodoRepo {
+    klyntbot::storage::TodoRepo::new(test_pool().await.inner().clone())
 }
 
-pub fn test_outcome_repo() -> klyntbot::storage::OutcomeRepo {
-    klyntbot::storage::OutcomeRepo::new(test_pool().inner().clone())
+pub async fn test_outcome_repo() -> klyntbot::storage::OutcomeRepo {
+    klyntbot::storage::OutcomeRepo::new(test_pool().await.inner().clone())
 }
 
-pub fn test_learning_state_repo() -> klyntbot::storage::LearningStateRepo {
-    klyntbot::storage::LearningStateRepo::new(test_pool().inner().clone())
+pub async fn test_learning_state_repo() -> klyntbot::storage::LearningStateRepo {
+    klyntbot::storage::LearningStateRepo::new(test_pool().await.inner().clone())
 }
 
-pub fn test_memory_note_repo() -> klyntbot::storage::MemoryNoteRepo {
-    klyntbot::storage::MemoryNoteRepo::new(test_pool().inner().clone())
+pub async fn test_memory_note_repo() -> klyntbot::storage::MemoryNoteRepo {
+    klyntbot::storage::MemoryNoteRepo::new(test_pool().await.inner().clone())
 }
 
-pub fn test_calendar_sync_repo() -> klyntbot::storage::CalendarSyncRepo {
-    klyntbot::storage::CalendarSyncRepo::new(test_pool().inner().clone())
+pub async fn test_calendar_sync_repo() -> klyntbot::storage::CalendarSyncRepo {
+    klyntbot::storage::CalendarSyncRepo::new(test_pool().await.inner().clone())
 }
 
-pub fn test_event_cache_repo() -> klyntbot::storage::CalendarEventCacheRepo {
-    klyntbot::storage::CalendarEventCacheRepo::new(test_pool().inner().clone())
+pub async fn test_event_cache_repo() -> klyntbot::storage::CalendarEventCacheRepo {
+    klyntbot::storage::CalendarEventCacheRepo::new(test_pool().await.inner().clone())
 }

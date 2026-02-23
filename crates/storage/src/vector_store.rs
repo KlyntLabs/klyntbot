@@ -26,16 +26,21 @@ pub struct VectorStore {
     db: Arc<Connection>,
 }
 
+impl std::fmt::Debug for VectorStore {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("VectorStore").finish_non_exhaustive()
+    }
+}
+
 impl VectorStore {
     /// Open (or create) the LanceDB store at `{data_dir}/lance/`.
     pub async fn connect(data_dir: &Path) -> Result<Self, StorageError> {
         let lance_dir = data_dir.join("lance");
-        std::fs::create_dir_all(&lance_dir).map_err(|e| {
-            StorageError::Vector(format!("Failed to create lance dir: {e}"))
-        })?;
-        let path_str = lance_dir.to_str().ok_or_else(|| {
-            StorageError::Vector("lance dir path is not valid UTF-8".to_string())
-        })?;
+        std::fs::create_dir_all(&lance_dir)
+            .map_err(|e| StorageError::Vector(format!("Failed to create lance dir: {e}")))?;
+        let path_str = lance_dir
+            .to_str()
+            .ok_or_else(|| StorageError::Vector("lance dir path is not valid UTF-8".to_string()))?;
         let db = lancedb::connect(path_str)
             .execute()
             .await
@@ -67,9 +72,7 @@ impl VectorStore {
                 .create_table(name, Box::new(reader))
                 .execute()
                 .await
-                .map_err(|e| {
-                    StorageError::Vector(format!("LanceDB create table {name}: {e}"))
-                })?;
+                .map_err(|e| StorageError::Vector(format!("LanceDB create table {name}: {e}")))?;
         }
         Ok(())
     }
@@ -214,10 +217,104 @@ impl VectorStore {
         let safe_id = id.replace('\'', "''");
         tbl.delete(&format!("id = '{safe_id}'"))
             .await
-            .map_err(|e| {
-                StorageError::Vector(format!("LanceDB delete from {table}: {e}"))
-            })?;
+            .map_err(|e| StorageError::Vector(format!("LanceDB delete from {table}: {e}")))?;
         Ok(())
+    }
+
+    /// Delete all rows matching a SQL predicate.
+    ///
+    /// The caller is responsible for escaping string values in the predicate
+    /// (replace `'` with `''`). Example predicates:
+    /// - `"session_key = 'my-session'"`
+    /// - `"created_at < '2024-01-01T00:00:00Z'"`
+    /// - `"id IS NOT NULL"` (delete all)
+    pub async fn delete_where(&self, table: &str, predicate: &str) -> Result<(), StorageError> {
+        let tbl = match self.db.open_table(table).execute().await {
+            Ok(t) => t,
+            Err(_) => return Ok(()), // table may not exist yet
+        };
+        tbl.delete(predicate)
+            .await
+            .map_err(|e| StorageError::Vector(format!("delete_where in {table}: {e}")))?;
+        Ok(())
+    }
+
+    /// Search `conv_embeddings` by nearest-neighbor and return full row data.
+    ///
+    /// Returns `(id, session_key, role, content_preview, full_content, score)` tuples
+    /// where `score = 1.0 - distance` and `score >= threshold`.
+    pub async fn search_conv_embeddings(
+        &self,
+        query: &[f32],
+        limit: usize,
+        threshold: f64,
+    ) -> Result<Vec<(String, String, String, String, String, f64)>, StorageError> {
+        let tbl = self
+            .db
+            .open_table("conv_embeddings")
+            .execute()
+            .await
+            .map_err(|e| StorageError::Vector(format!("open table conv_embeddings: {e}")))?;
+
+        let results = tbl
+            .query()
+            .nearest_to(query)
+            .map_err(|e| StorageError::Vector(format!("nearest_to: {e}")))?
+            .limit(limit)
+            .execute()
+            .await
+            .map_err(|e| StorageError::Vector(format!("LanceDB query conv_embeddings: {e}")))?;
+
+        let batches: Vec<RecordBatch> = results
+            .try_collect()
+            .await
+            .map_err(|e| StorageError::Vector(format!("collect conv results: {e}")))?;
+
+        let mut out = Vec::new();
+        for batch in &batches {
+            let id_col = batch
+                .column_by_name("id")
+                .and_then(|c| c.as_any().downcast_ref::<StringArray>());
+            let sk_col = batch
+                .column_by_name("session_key")
+                .and_then(|c| c.as_any().downcast_ref::<StringArray>());
+            let role_col = batch
+                .column_by_name("role")
+                .and_then(|c| c.as_any().downcast_ref::<StringArray>());
+            let preview_col = batch
+                .column_by_name("content_preview")
+                .and_then(|c| c.as_any().downcast_ref::<StringArray>());
+            let full_col = batch
+                .column_by_name("full_content")
+                .and_then(|c| c.as_any().downcast_ref::<StringArray>());
+            let dist_col = batch
+                .column_by_name("_distance")
+                .and_then(|c| c.as_any().downcast_ref::<Float32Array>());
+
+            let (Some(id_col), Some(sk_col), Some(role_col), Some(preview_col), Some(full_col)) =
+                (id_col, sk_col, role_col, preview_col, full_col)
+            else {
+                continue; // skip malformed batch
+            };
+
+            for i in 0..batch.num_rows() {
+                let score = match dist_col {
+                    Some(d) => 1.0 - d.value(i) as f64,
+                    None => 1.0,
+                };
+                if score >= threshold {
+                    out.push((
+                        id_col.value(i).to_string(),
+                        sk_col.value(i).to_string(),
+                        role_col.value(i).to_string(),
+                        preview_col.value(i).to_string(),
+                        full_col.value(i).to_string(),
+                        score,
+                    ));
+                }
+            }
+        }
+        Ok(out)
     }
 
     /// Count the number of rows in a table.
@@ -306,7 +403,12 @@ mod tests {
         let (store, _dir) = test_store().await;
         let vec1 = vec![1.0f32; 384];
         store
-            .upsert_embedding("todo_embeddings", "test-1", &vec1, &[("model", "test-model")])
+            .upsert_embedding(
+                "todo_embeddings",
+                "test-1",
+                &vec1,
+                &[("model", "test-model")],
+            )
             .await
             .unwrap();
 

@@ -9,11 +9,14 @@ use klyntbot::context_engine::{ContextEngine, ContextSource, SourceContext};
 use std::sync::Arc;
 use tempfile::TempDir;
 
-/// Helper: create a lazy MemoryNoteRepo for tests (no actual DB connection).
-fn test_memory_note_repo() -> klyntbot::storage::MemoryNoteRepo {
-    let pool =
-        klyntbot::storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
-    klyntbot::storage::MemoryNoteRepo::new(pool.inner().clone())
+/// Helper: create a MemoryNoteRepo backed by an in-memory SQLite pool.
+///
+/// Uses in-memory SQLite (no filesystem I/O) since these tests never query the DB.
+async fn test_memory_note_repo() -> klyntbot::storage::MemoryNoteRepo {
+    let pool = sqlx::SqlitePool::connect(":memory:")
+        .await
+        .expect("in-memory SQLite");
+    klyntbot::storage::MemoryNoteRepo::new(pool)
 }
 
 /// Helper: build a ContextEngine with all sources for testing.
@@ -22,7 +25,7 @@ async fn test_context_engine(workspace: std::path::PathBuf) -> ContextEngine {
     let _ = skill_manager.load(workspace.clone()).await;
     let skill_manager = Arc::new(skill_manager);
 
-    let memory_store = MemoryStore::new(test_memory_note_repo());
+    let memory_store = MemoryStore::new(test_memory_note_repo().await);
 
     let sources: Vec<Box<dyn ContextSource>> = vec![
         Box::new(IdentitySource::new(workspace.clone(), "UTC".to_string())),
@@ -119,7 +122,7 @@ async fn test_memory_store() {
 "#;
     std::fs::write(&memory_file, memory_content).unwrap();
 
-    let _memory_store = MemoryStore::new(test_memory_note_repo());
+    let _memory_store = MemoryStore::new(test_memory_note_repo().await);
 
     assert!(memory_file.exists());
 }
@@ -175,7 +178,7 @@ async fn test_memory_store_initialization() {
     let workspace = temp_dir.path().join("workspace");
     std::fs::create_dir_all(&workspace).unwrap();
 
-    let _memory_store = MemoryStore::new(test_memory_note_repo());
+    let _memory_store = MemoryStore::new(test_memory_note_repo().await);
     assert!(workspace.exists());
 }
 

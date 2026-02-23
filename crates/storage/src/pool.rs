@@ -1,7 +1,7 @@
 //! Connection pool with automatic migration.
 
-use std::path::Path;
 use crate::error::StorageError;
+use std::path::Path;
 
 /// Newtype wrapper around `sqlx::SqlitePool` with auto-migration on connect.
 #[derive(Clone)]
@@ -19,8 +19,12 @@ impl StoragePool {
         }
         let url = format!("sqlite:{}?mode=rwc", db_path.display());
         let pool = sqlx::SqlitePool::connect(&url).await?;
-        sqlx::query("PRAGMA journal_mode=WAL;").execute(&pool).await?;
-        sqlx::query("PRAGMA foreign_keys=ON;").execute(&pool).await?;
+        sqlx::query("PRAGMA journal_mode=WAL;")
+            .execute(&pool)
+            .await?;
+        sqlx::query("PRAGMA foreign_keys=ON;")
+            .execute(&pool)
+            .await?;
         sqlx::migrate!("./migrations").run(&pool).await?;
         Ok(Self(pool))
     }
@@ -28,6 +32,18 @@ impl StoragePool {
     /// Wrap an existing `sqlx::SqlitePool` without running migrations.
     pub fn from_existing(pool: sqlx::SqlitePool) -> Self {
         Self(pool)
+    }
+
+    /// Create an in-memory SQLite pool with all migrations applied.
+    ///
+    /// Useful for tests and as a fallback when no `data_dir` is configured.
+    pub async fn connect_in_memory() -> Result<Self, StorageError> {
+        let pool = sqlx::SqlitePool::connect("sqlite::memory:").await?;
+        sqlx::query("PRAGMA foreign_keys=ON;")
+            .execute(&pool)
+            .await?;
+        sqlx::migrate!("./migrations").run(&pool).await?;
+        Ok(Self(pool))
     }
 
     /// Access the inner `sqlx::SqlitePool`.

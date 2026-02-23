@@ -198,9 +198,8 @@ impl FinanceInvestmentRepo {
         &self,
         filter: &FinanceInvestmentFilter,
     ) -> Result<Vec<FinanceInvestmentRow>, StorageError> {
-        let mut qb = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
-            "SELECT * FROM finance_investments WHERE TRUE",
-        );
+        let mut qb =
+            sqlx::QueryBuilder::<sqlx::Sqlite>::new("SELECT * FROM finance_investments WHERE TRUE");
 
         if let Some(ref portfolio_id) = filter.portfolio_id {
             qb.push(" AND portfolio_id = ");

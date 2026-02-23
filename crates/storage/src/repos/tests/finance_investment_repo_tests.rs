@@ -9,12 +9,10 @@ mod tests {
     use crate::StoragePool;
 
     async fn test_repo() -> Option<FinanceInvestmentRepo> {
-        let url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgres://localhost/klyntbot_test".to_string());
-        match StoragePool::connect(&url).await {
-            Ok(pool) => Some(FinanceInvestmentRepo::new(pool.inner().clone())),
-            Err(_) => None,
-        }
+        let dir = tempfile::tempdir().ok()?;
+        let pool = StoragePool::connect(dir.path()).await.ok()?;
+        let _ = dir.keep(); // prevent cleanup; acceptable in test context
+        Some(FinanceInvestmentRepo::new(pool.inner().clone()))
     }
 
     fn unique_id(prefix: &str) -> String {

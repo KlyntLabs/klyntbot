@@ -102,7 +102,7 @@ impl ProjectRepo {
                 .unwrap_or_default(),
         )
         .bind(&patch.color)
-        .bind(patch.tags.as_ref().map(|t| sqlx::types::Json(t)))
+        .bind(patch.tags.as_ref().map(sqlx::types::Json))
         .bind(&patch.status)
         .fetch_optional(&self.pool)
         .await?

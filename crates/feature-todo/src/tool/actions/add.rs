@@ -6,8 +6,8 @@ use tools_core::ParamExtractor;
 use tracing::warn;
 
 use super::super::TodoTool;
-use crate::storage::TodoPatch;
 use crate::types::Todo;
+use storage::TodoPatch;
 
 impl TodoTool {
     pub(crate) async fn handle_add(&self, p: &ParamExtractor<'_>) -> Result<String> {
@@ -23,7 +23,7 @@ impl TodoTool {
         todo.tags = p.string_array_or_empty("tags")?;
         todo.project_id = p.optional_str("project_id")?.map(String::from);
 
-        let row = crate::storage::TodoRow::from(&todo);
+        let row = storage::TodoRow::from(&todo);
         let created_row = self.repo.add(&row).await?;
         let created = Todo::from(created_row);
 
@@ -125,7 +125,7 @@ impl TodoTool {
         todo.parent_id = Some(parent_id.to_string());
         todo.project_id = p.optional_str("project_id")?.map(String::from);
 
-        let row = crate::storage::TodoRow::from(&todo);
+        let row = storage::TodoRow::from(&todo);
         let created_row = self.repo.add(&row).await?;
         let created = Todo::from(created_row);
 
@@ -156,7 +156,7 @@ impl TodoTool {
         template.is_template = true;
         template.next_instance_date = next_instance_date;
 
-        let row = crate::storage::TodoRow::from(&template);
+        let row = storage::TodoRow::from(&template);
         let created_row = self.repo.add_template(&row).await?;
         let created = Todo::from(created_row);
 

@@ -6,8 +6,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::storage::rows::{TodoAttachmentRow, TodoTimeEntryRow};
-use crate::storage::TodoRow;
+use storage::{TodoAttachmentRow, TodoRow, TodoTimeEntryRow};
 
 /// A task/todo item with focus tracking.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -266,42 +265,6 @@ impl From<&Todo> for TodoRow {
             recurrence_parent_id: todo.recurrence_parent_id.clone(),
             is_template: todo.is_template,
             next_instance_date: todo.next_instance_date,
-        }
-    }
-}
-
-// Bridge conversion from storage::TodoRow (identical layout to feature_todo::TodoRow).
-// Needed because the agent crate reads through storage::TodoRepo but uses feature_todo::Todo.
-impl From<storage::TodoRow> for Todo {
-    fn from(row: storage::TodoRow) -> Self {
-        Self {
-            id: row.id,
-            title: row.title,
-            description: row.description,
-            priority: row.priority.map(|p| p as u8),
-            due_date: row.due_date,
-            tags: row.tags,
-            status: TodoStatus::from_str_loose(&row.status).unwrap_or(TodoStatus::Todo),
-            focused_at: row.focused_at,
-            focus_deadline: row.focus_deadline,
-            focus_expired_count: row.focus_expired_count as u32,
-            created_at: row.created_at,
-            updated_at: row.updated_at,
-            completed_at: row.completed_at,
-            parent_id: row.parent_id,
-            project_id: row.project_id,
-            attachments: Vec::new(),
-            time_entries: Vec::new(),
-            total_tracked_secs: row.total_tracked_secs as u64,
-            estimated_minutes: row.estimated_minutes.map(|m| m as u32),
-            calendar_event_uid: row.calendar_event_uid,
-            last_reminded_at: row.last_reminded_at,
-            recurrence_rule: row.recurrence_rule,
-            recurrence_parent_id: row.recurrence_parent_id,
-            is_template: row.is_template,
-            next_instance_date: row.next_instance_date,
-            blocked_by: Vec::new(),
-            blocks: Vec::new(),
         }
     }
 }

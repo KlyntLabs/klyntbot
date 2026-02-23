@@ -310,14 +310,15 @@ mod tests {
         RoutingContext::new("test".into(), "test".into())
     }
 
-    fn make_pipeline(provider: Arc<dyn LlmProvider>) -> AgentPipeline {
+    async fn make_pipeline(provider: Arc<dyn LlmProvider>) -> AgentPipeline {
         let registry = Arc::new(RwLock::new(ToolRegistry::new()));
         let core = Arc::new(ExecutionCore::new(provider.clone(), registry));
         let orchestrator = Arc::new(Orchestrator::new(provider.clone(), "mock"));
         let dispatch = Arc::new(EngineDispatch::new(core));
 
-        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/klyntbot_test")
-            .unwrap_or_else(|_| panic!("Failed to create lazy PgPool"));
+        let pool = sqlx::SqlitePool::connect(":memory:")
+            .await
+            .expect("in-memory SQLite for tests");
         let usage_repo = storage::UsageRepo::new(pool);
         let cost_tracker = Arc::new(CostTracker::from_repo(usage_repo));
 
@@ -335,7 +336,7 @@ mod tests {
     async fn test_direct_response_pipeline() {
         // "hello" → heuristic classifies as DirectResponse → single LLM call
         let provider = MockPipelineProvider::new(vec![text_response("Hi there!")]);
-        let pipeline = make_pipeline(provider);
+        let pipeline = make_pipeline(provider).await;
 
         let result = pipeline
             .process_message("hello", vec![], &[], &[], &routing_ctx(), None, None)
@@ -353,7 +354,7 @@ mod tests {
         // "show my tasks" → heuristic classifies as ToolAssisted
         // Provider returns a text response (no actual tool calls)
         let provider = MockPipelineProvider::new(vec![text_response("Here are your tasks: ...")]);
-        let pipeline = make_pipeline(provider);
+        let pipeline = make_pipeline(provider).await;
 
         let result = pipeline
             .process_message(
@@ -383,7 +384,7 @@ mod tests {
             usage: Usage::default(),
             reasoning_content: None,
         }]);
-        let pipeline = make_pipeline(provider);
+        let pipeline = make_pipeline(provider).await;
 
         let result = pipeline
             .process_message("hi", vec![], &[], &[], &routing_ctx(), None, None)
@@ -413,7 +414,7 @@ mod tests {
             // Second call: final text response after escalation
             text_response("I found the answer after escalation"),
         ]);
-        let pipeline = make_pipeline(provider);
+        let pipeline = make_pipeline(provider).await;
 
         let result = pipeline
             .process_message("hello", vec![], &[], &[], &routing_ctx(), None, None)
@@ -431,7 +432,7 @@ mod tests {
         let provider = MockPipelineProvider::new(vec![text_response(
             "Here is the deployment script:\n```bash\necho deploy\n```",
         )]);
-        let pipeline = make_pipeline(provider);
+        let pipeline = make_pipeline(provider).await;
 
         let result = pipeline
             .process_message(
@@ -457,7 +458,7 @@ mod tests {
         let provider = MockPipelineProvider::new(vec![text_response(
             "Based on our earlier discussion, here's my answer.",
         )]);
-        let pipeline = make_pipeline(provider);
+        let pipeline = make_pipeline(provider).await;
 
         let history = vec![
             Message::user("Tell me about Rust"),
@@ -485,7 +486,7 @@ mod tests {
     async fn test_e2e_classification_confidence_tracking() {
         // Verify classification metadata is preserved
         let provider = MockPipelineProvider::new(vec![text_response("Done")]);
-        let pipeline = make_pipeline(provider);
+        let pipeline = make_pipeline(provider).await;
 
         let result = pipeline
             .process_message("hello", vec![], &[], &[], &routing_ctx(), None, None)
@@ -506,7 +507,7 @@ mod tests {
         use tokio::sync::mpsc;
 
         let provider = MockPipelineProvider::new(vec![text_response("Hi!")]);
-        let pipeline = make_pipeline(provider);
+        let pipeline = make_pipeline(provider).await;
         let (event_tx, mut event_rx) = mpsc::channel(64);
 
         let _result = pipeline

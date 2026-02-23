@@ -26,8 +26,8 @@ pub struct MemoryTool {
     todo_repo: Option<storage::TodoRepo>,
     /// Embedding handler for todo semantic search
     todo_embedding_handler: Option<Arc<dyn EmbeddingHandler>>,
-    /// Embedding repo for todo semantic search (SQL-backed pgvector)
-    embedding_repo: Option<storage::EmbeddingRepo>,
+    /// LanceDB vector store for todo semantic search
+    embedding_store: Option<storage::VectorStore>,
 }
 
 impl MemoryTool {
@@ -39,7 +39,7 @@ impl MemoryTool {
             rrf_k: 60,
             todo_repo: None,
             todo_embedding_handler: None,
-            embedding_repo: None,
+            embedding_store: None,
         }
     }
 
@@ -76,9 +76,9 @@ impl MemoryTool {
         self
     }
 
-    /// Inject embedding repo for todo semantic search.
-    pub fn with_embedding_repo(mut self, repo: storage::EmbeddingRepo) -> Self {
-        self.embedding_repo = Some(repo);
+    /// Inject vector store for todo semantic search.
+    pub fn with_embedding_store(mut self, store: storage::VectorStore) -> Self {
+        self.embedding_store = Some(store);
         self
     }
 }
@@ -245,13 +245,12 @@ impl MemoryTool {
             let keyword_rows = todo_repo.search_by_keyword(query, None).await?;
             let keyword_todos: Vec<Todo> = keyword_rows.into_iter().map(Todo::from).collect();
 
-            // Semantic search via pgvector (if available)
-            let semantic_todos: Vec<(String, f64)> = if let (Some(emb), Some(emb_repo)) =
-                (&self.todo_embedding_handler, &self.embedding_repo)
+            // Semantic search via LanceDB (if available)
+            let semantic_todos: Vec<(String, f64)> = if let (Some(emb), Some(vs)) =
+                (&self.todo_embedding_handler, &self.embedding_store)
             {
                 let query_vec = emb.embed_query(query).await?;
-                emb_repo
-                    .search_similar_vec(&query_vec, 100, threshold)
+                vs.search_similar("todo_embeddings", &query_vec, 100, threshold)
                     .await
                     .unwrap_or_default()
             } else {

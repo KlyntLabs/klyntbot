@@ -157,7 +157,7 @@ impl TodoRepo {
         .bind(patch.priority.unwrap_or_default())
         .bind(patch.due_date.is_some())
         .bind(patch.due_date.unwrap_or_default())
-        .bind(patch.tags.as_ref().map(|t| sqlx::types::Json(t)))
+        .bind(patch.tags.as_ref().map(sqlx::types::Json))
         .bind(&patch.status)
         .bind(patch.calendar_event_uid.is_some())
         .bind(patch.calendar_event_uid.as_ref().and_then(|v| v.as_deref()))
@@ -491,13 +491,15 @@ impl TodoRepo {
         title: Option<&str>,
         tags: &[String],
     ) -> Result<TodoAttachmentRow, StorageError> {
+        let id = uuid::Uuid::new_v4();
         let row = sqlx::query_as::<_, TodoAttachmentRow>(
             r#"
-            INSERT INTO todo_attachments (todo_id, attachment_type, value, title, tags)
-            VALUES (?1, ?2, ?3, ?4, ?5)
+            INSERT INTO todo_attachments (id, todo_id, attachment_type, value, title, tags)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6)
             RETURNING *
             "#,
         )
+        .bind(id)
         .bind(todo_id)
         .bind(attachment_type)
         .bind(value)
@@ -550,13 +552,15 @@ impl TodoRepo {
         note: Option<&str>,
     ) -> Result<TodoTimeEntryRow, StorageError> {
         let ended_at = duration_secs.map(|d| started_at + chrono::Duration::seconds(d));
+        let id = uuid::Uuid::new_v4();
         let row = sqlx::query_as::<_, TodoTimeEntryRow>(
             r#"
-            INSERT INTO todo_time_entries (todo_id, source, started_at, ended_at, duration_secs, note)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+            INSERT INTO todo_time_entries (id, todo_id, source, started_at, ended_at, duration_secs, note)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
             RETURNING *
             "#,
         )
+        .bind(id)
         .bind(todo_id)
         .bind(source)
         .bind(started_at)

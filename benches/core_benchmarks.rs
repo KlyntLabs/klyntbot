@@ -58,9 +58,13 @@ fn bench_session_save_load(c: &mut Criterion) {
     let mut group = c.benchmark_group("session_io");
 
     let make_manager = |rt: &tokio::runtime::Runtime| -> SessionManager {
-        let pool = StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
-        let repo = SessionRepo::new(pool.inner().clone());
-        rt.block_on(SessionManager::from_repo(repo))
+        rt.block_on(async {
+            let dir = tempfile::TempDir::new().expect("bench temp dir");
+            let pool = StoragePool::connect(dir.path()).await.expect("bench pool");
+            std::mem::forget(dir);
+            let repo = SessionRepo::new(pool.inner().clone());
+            SessionManager::from_repo(repo).await
+        })
     };
 
     group.bench_function("save_50_messages", |b| {

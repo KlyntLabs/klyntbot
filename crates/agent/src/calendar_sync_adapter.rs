@@ -1055,22 +1055,17 @@ mod tests {
     use super::*;
     use config::{AppleCalendarConfig, Secret};
 
-    /// Try to connect to a test database. Returns None if no DB is available,
-    /// allowing tests to gracefully skip.
+    /// Connect to an ephemeral SQLite database for testing.
     async fn test_repos() -> Option<(
         storage::TodoRepo,
         storage::CalendarSyncRepo,
         storage::CalendarEventCacheRepo,
     )> {
-        let url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgres://localhost/klyntbot_test".to_string());
-        match storage::StoragePool::connect(&url).await {
-            Ok(pool) => {
-                let repos = storage::Repos::from_pool(&pool);
-                Some((repos.todos, repos.calendar_sync, repos.calendar_event_cache))
-            }
-            Err(_) => None,
-        }
+        let dir = tempfile::tempdir().ok()?;
+        let pool = storage::StoragePool::connect(dir.path()).await.ok()?;
+        let _ = dir.keep(); // prevent cleanup; acceptable in test context
+        let repos = storage::Repos::from_pool(&pool);
+        Some((repos.todos, repos.calendar_sync, repos.calendar_event_cache))
     }
 
     fn test_calendar_config() -> CalendarConfig {

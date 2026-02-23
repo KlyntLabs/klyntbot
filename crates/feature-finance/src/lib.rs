@@ -77,21 +77,24 @@ impl FinanceFeature {
         serde_json::to_value(FinanceConfig::default()).unwrap_or(Value::Null)
     }
 
-    /// Construct a `FinanceFeature` using a lazy (non-connecting) pool.
+    /// Construct a `FinanceFeature` backed by a temporary in-directory SQLite database.
     ///
-    /// The pool defers connection until the first query, so this is safe for
-    /// tests that only exercise metadata (name, config, migrations) rather than
-    /// hitting the database.
-    ///
-    /// A single-threaded Tokio runtime is created internally because
-    /// `sqlx::PgPool` requires a Tokio context even for lazy initialization.
+    /// A single-threaded Tokio runtime is created internally to run the async
+    /// `StoragePool::connect` call. Suitable for unit tests that exercise
+    /// metadata (name, config, migrations) and do not need a persistent store.
     pub fn for_tests() -> Self {
         let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
             .build()
             .expect("failed to build single-threaded tokio runtime for test pool");
         let pool = rt.block_on(async {
-            storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test")
-                .expect("lazy pool URL must be syntactically valid")
+            let dir = tempfile::tempdir().expect("temp dir for test pool");
+            let p = storage::StoragePool::connect(dir.path())
+                .await
+                .expect("SQLite test pool");
+            // Keep dir alive by leaking — acceptable in test context.
+            let _path = dir.keep();
+            p
         });
         Self::new(FinanceTool::from_storage_pool(&pool, "USD"))
     }

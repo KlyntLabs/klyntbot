@@ -5,13 +5,13 @@ use std::time::Duration;
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 
-use storage::ConvEmbeddingRepo;
+use storage::VectorStore;
 
 /// Spawns a background task that deletes conversation embeddings older than
 /// `max_age_days` every `interval_hours` hours. Shuts down gracefully when
 /// the `CancellationToken` is cancelled.
 pub struct MemoryMaintenanceService {
-    repo: ConvEmbeddingRepo,
+    store: VectorStore,
     max_age_days: u32,
     interval: Duration,
     token: CancellationToken,
@@ -19,13 +19,13 @@ pub struct MemoryMaintenanceService {
 
 impl MemoryMaintenanceService {
     pub fn new(
-        repo: ConvEmbeddingRepo,
+        store: VectorStore,
         max_age_days: u32,
         maintenance_interval_hours: u32,
         token: CancellationToken,
     ) -> Self {
         Self {
-            repo,
+            store,
             max_age_days,
             interval: Duration::from_secs(maintenance_interval_hours as u64 * 3600),
             token,
@@ -45,17 +45,41 @@ impl MemoryMaintenanceService {
         loop {
             tokio::select! {
                 _ = interval.tick() => {
-                    match self.repo.delete_old_embeddings(self.max_age_days).await {
-                        Ok(0) => {}
-                        Ok(n) => info!(
-                            deleted = n,
-                            max_age_days = self.max_age_days,
-                            "MemoryMaintenanceService: pruned old conversation embeddings"
-                        ),
-                        Err(e) => warn!(
+                    let cutoff = chrono::Utc::now()
+                        - chrono::Duration::days(self.max_age_days as i64);
+                    let cutoff_str = cutoff.to_rfc3339();
+                    let predicate = format!("created_at < '{cutoff_str}'");
+
+                    let before = match self.store.count("conv_embeddings").await {
+                        Ok(n) => n,
+                        Err(e) => {
+                            warn!(
+                                error = %e,
+                                "MemoryMaintenanceService: failed to count embeddings"
+                            );
+                            continue;
+                        }
+                    };
+
+                    if let Err(e) = self.store
+                        .delete_where("conv_embeddings", &predicate)
+                        .await
+                    {
+                        warn!(
                             error = %e,
                             "MemoryMaintenanceService: failed to prune old embeddings"
-                        ),
+                        );
+                        continue;
+                    }
+
+                    let after = self.store.count("conv_embeddings").await.unwrap_or(before);
+                    let deleted = before.saturating_sub(after);
+                    if deleted > 0 {
+                        info!(
+                            deleted,
+                            max_age_days = self.max_age_days,
+                            "MemoryMaintenanceService: pruned old conversation embeddings"
+                        );
                     }
                 }
                 _ = self.token.cancelled() => {

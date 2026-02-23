@@ -94,18 +94,22 @@ impl MemoryRetriever for ConversationMemoryRetriever {
 mod tests {
     use super::*;
 
-    fn make_retriever() -> ConversationMemoryRetriever {
+    async fn make_retriever() -> (ConversationMemoryRetriever, tempfile::TempDir) {
         let engine = Arc::new(EmbeddingEngine::new());
-        let pool = storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test")
-            .expect("test pool");
-        let repo = storage::ConvEmbeddingRepo::new(pool.inner().clone());
-        let store = ConversationEmbeddingStore::new(repo);
-        ConversationMemoryRetriever::new(engine, store, 0.5, 0.995)
+        let dir = tempfile::TempDir::new().expect("temp dir");
+        let vs = storage::VectorStore::connect(dir.path())
+            .await
+            .expect("vector store");
+        let store = ConversationEmbeddingStore::new(vs);
+        (
+            ConversationMemoryRetriever::new(engine, store, 0.5, 0.995),
+            dir,
+        )
     }
 
     #[tokio::test]
     async fn test_retrieve_returns_empty_when_engine_unavailable() {
-        let retriever = make_retriever();
+        let (retriever, _dir) = make_retriever().await;
         let results = retriever.retrieve("test query", 5).await;
         assert!(
             results.is_empty(),
@@ -115,7 +119,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_retrieve_empty_query() {
-        let retriever = make_retriever();
+        let (retriever, _dir) = make_retriever().await;
         let results = retriever.retrieve("", 5).await;
         assert!(
             results.is_empty(),
@@ -125,7 +129,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_retrieve_zero_limit() {
-        let retriever = make_retriever();
+        let (retriever, _dir) = make_retriever().await;
         let results = retriever.retrieve("test", 0).await;
         assert!(results.is_empty(), "Zero limit should return empty results");
     }

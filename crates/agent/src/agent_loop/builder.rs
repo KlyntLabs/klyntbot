@@ -55,6 +55,7 @@ pub struct AgentLoopBuilder {
     provider: Option<DynProvider>,
     config: Option<Config>,
     pool: Option<sqlx::SqlitePool>,
+    vector_store: Option<storage::VectorStore>,
     cron_service: Option<Arc<scheduling::CronService>>,
     notification_handle: Option<LastActiveChannel>,
 }
@@ -72,6 +73,7 @@ impl AgentLoopBuilder {
             provider: None,
             config: None,
             pool: None,
+            vector_store: None,
             cron_service: None,
             notification_handle: None,
         }
@@ -94,6 +96,11 @@ impl AgentLoopBuilder {
 
     pub fn with_pool(mut self, pool: sqlx::SqlitePool) -> Self {
         self.pool = Some(pool);
+        self
+    }
+
+    pub fn with_vector_store(mut self, store: storage::VectorStore) -> Self {
+        self.vector_store = Some(store);
         self
     }
 
@@ -138,14 +145,13 @@ impl AgentLoopBuilder {
         // ── Create repos from pool (real or in-memory fallback) ──────────
         // Storage-dependent features (todo, finance, sessions) are disabled via
         // the `if self.pool.is_some()` guards below when no real pool is provided.
-        let effective_pool = if let Some(pool) = self.pool.clone() {
-            pool
+        let storage_pool = if let Some(pool) = self.pool.clone() {
+            storage::StoragePool::from_existing(pool)
         } else {
-            sqlx::SqlitePool::connect(":memory:")
+            storage::StoragePool::connect_in_memory()
                 .await
                 .unwrap_or_else(|e| panic!("Failed to create in-memory SQLite fallback: {e}"))
         };
-        let storage_pool = storage::StoragePool::from_existing(effective_pool);
         let repos = storage::Repos::from_pool(&storage_pool);
 
         // ── Skills (init + filter) ────────────────────────────────────────
@@ -171,10 +177,10 @@ impl AgentLoopBuilder {
         let embedding_engine = Arc::new(tools::EmbeddingEngine::new());
 
         // ── Memory store (with optional embedding-based relevance filtering) ──
-        let memory_store = if config.conversation.embedding.enabled {
+        let memory_store = if config.conversation.embedding.enabled && self.vector_store.is_some() {
             crate::memory::MemoryStore::with_embeddings(
                 repos.memory_notes.clone(),
-                repos.memory_note_embeddings.clone(),
+                self.vector_store.clone().unwrap(),
                 Arc::clone(&embedding_engine),
                 config.conversation.search.semantic_threshold,
             )
@@ -320,10 +326,11 @@ impl AgentLoopBuilder {
             .as_ref()
             .map(|store| Arc::new(crate::learning::OutcomeRecorder::new(Arc::clone(store))));
 
-        // ── Wire automatic memory retrieval (cross-channel pgvector ANN) ─
-        let context_engine = if config.conversation.embedding.enabled {
+        // ── Wire automatic memory retrieval (cross-channel LanceDB ANN) ─
+        let context_engine = if config.conversation.embedding.enabled && self.vector_store.is_some()
+        {
             let conv_store_for_retriever =
-                tools::ConversationEmbeddingStore::new(repos.conv_embeddings.clone());
+                tools::ConversationEmbeddingStore::new(self.vector_store.clone().unwrap());
             // Compute per-day decay factor from configured half-life: factor = 0.5^(1/half_life)
             let decay_factor =
                 0.5_f64.powf(1.0 / config.conversation.memory.decay_half_life_days as f64);
@@ -343,7 +350,6 @@ impl AgentLoopBuilder {
 
         // Outputs for MemoryTool — populated inside the pool block if embedding is enabled
         let todo_embedding_handler: Option<Arc<dyn tools::EmbeddingHandler>>;
-        let todo_embedding_repo: Option<storage::EmbeddingRepo>;
 
         // ── Feature-todo tool (requires real pool) ────────────────────────
         if self.pool.is_some() {
@@ -393,28 +399,25 @@ impl AgentLoopBuilder {
             }
 
             // Todo embedding (semantic search)
-            if config.todo.search.enabled {
-                let emb_repo = repos.embeddings.clone();
+            if config.todo.search.enabled && self.vector_store.is_some() {
+                let vs = self.vector_store.clone().unwrap();
 
                 let todo_embed_impl = Arc::new(
                     crate::todo_embedding_handler::TodoEmbeddingHandlerImpl::new(
                         Arc::clone(&embedding_engine),
-                        emb_repo.clone(),
+                        vs.clone(),
                     ),
                 );
 
                 let memory_embed_impl = Arc::new(tools::EmbeddingEngineImpl::new(
                     Arc::clone(&embedding_engine),
-                    emb_repo.clone(),
+                    vs,
                 ));
-
-                todo_embedding_repo = Some(emb_repo.clone());
 
                 todo_tool = todo_tool
                     .with_embedding_handler(
                         Arc::clone(&todo_embed_impl) as Arc<dyn feature_todo::EmbeddingHandler>
                     )
-                    .with_embedding_repo(emb_repo)
                     .with_search_config(
                         config.todo.search.semantic_threshold,
                         config.todo.search.rrf_k,
@@ -424,14 +427,12 @@ impl AgentLoopBuilder {
                     Some(Arc::clone(&memory_embed_impl) as Arc<dyn tools::EmbeddingHandler>);
             } else {
                 todo_embedding_handler = None;
-                todo_embedding_repo = None;
             }
 
             tool_registry.register(todo_tool);
         } else {
-            // No PgPool available (e.g., test environment)
+            // No pool available (e.g., test environment)
             todo_embedding_handler = None;
-            todo_embedding_repo = None;
         }
 
         // ── Goal tool ─────────────────────────────────────────────────────
@@ -463,18 +464,20 @@ impl AgentLoopBuilder {
             as Arc<dyn PlanCompletionHandler>);
 
         // ── Conversation embedding handler ────────────────────────────────
-        let conversation_embedding_handler = if config.conversation.embedding.enabled {
-            let conv_store = tools::ConversationEmbeddingStore::new(repos.conv_embeddings.clone());
-            let handler = Arc::new(
+        let conversation_embedding_handler =
+            if config.conversation.embedding.enabled && self.vector_store.is_some() {
+                let conv_store =
+                    tools::ConversationEmbeddingStore::new(self.vector_store.clone().unwrap());
+                let handler = Arc::new(
                 super::super::conversation_embedding_handler::ConversationEmbeddingHandlerImpl::new(
                     Arc::clone(&embedding_engine),
                     conv_store,
                 ),
             );
-            Some(handler as Arc<dyn tools::ConversationEmbeddingHandler>)
-        } else {
-            None
-        };
+                Some(handler as Arc<dyn tools::ConversationEmbeddingHandler>)
+            } else {
+                None
+            };
 
         // ── Memory tool ───────────────────────────────────────────────────
         if config.conversation.search.enabled {
@@ -487,9 +490,6 @@ impl AgentLoopBuilder {
 
                 if let Some(ref h) = todo_embedding_handler {
                     memory_tool = memory_tool.with_todo_embedding_handler(Arc::clone(h));
-                }
-                if let Some(repo) = todo_embedding_repo {
-                    memory_tool = memory_tool.with_embedding_repo(repo);
                 }
 
                 tool_registry.register(memory_tool);
@@ -697,11 +697,11 @@ impl AgentLoopBuilder {
         };
 
         // ── Memory maintenance service ────────────────────────────────────
-        let memory_maintenance_token = if self.pool.is_some() {
+        let memory_maintenance_token = if self.pool.is_some() && self.vector_store.is_some() {
             let token = CancellationToken::new();
             let maintenance_service =
                 crate::memory_maintenance_service::MemoryMaintenanceService::new(
-                    storage::ConvEmbeddingRepo::new(storage_pool.inner().clone()),
+                    self.vector_store.clone().unwrap(),
                     config.conversation.memory.max_age_days,
                     config.conversation.memory.maintenance_interval_hours,
                     token.clone(),

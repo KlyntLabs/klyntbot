@@ -52,14 +52,12 @@ fn create_test_todo(title: &str) -> Todo {
     }
 }
 
-/// Try to connect to a test database. Returns None if no DB is available.
+/// Connect to an ephemeral SQLite database for testing.
 async fn test_todo_repo() -> Option<storage::TodoRepo> {
-    let url = std::env::var("DATABASE_URL")
-        .unwrap_or_else(|_| "postgres://localhost/klyntbot_test".to_string());
-    match storage::StoragePool::connect(&url).await {
-        Ok(pool) => Some(storage::Repos::from_pool(&pool).todos),
-        Err(_) => None,
-    }
+    let dir = tempfile::tempdir().ok()?;
+    let pool = storage::StoragePool::connect(dir.path()).await.ok()?;
+    let _ = dir.keep(); // prevent cleanup; acceptable in test context
+    Some(storage::Repos::from_pool(&pool).todos)
 }
 
 /// Generate a unique event UID to prevent parallel test contamination.

@@ -9,9 +9,9 @@ use std::sync::Arc;
 use crate::calendar_sync::CalendarSyncHandler;
 use crate::embedding::EmbeddingHandler;
 use crate::enrichment::{EnrichmentFeedbackHandler, EnrichmentHandler};
-use crate::storage::TodoRepo;
 use crate::types::{Attachment, TimeEntry, Todo};
 use common::{Result, ToolError};
+use storage::TodoRepo;
 use tools_core::{ParamExtractor, RoutingContext, Tool};
 
 /// TodoTool: full todo management with optional enrichment, embedding, and calendar sync.
@@ -23,8 +23,8 @@ pub struct TodoTool {
     pub(crate) calendar_handler: Option<Arc<dyn CalendarSyncHandler>>,
     pub(crate) enrichment_handler: Option<Arc<dyn EnrichmentHandler>>,
     pub(crate) embedding_handler: Option<Arc<dyn EmbeddingHandler>>,
-    /// EmbeddingRepo from the storage crate for semantic search.
-    pub(crate) embedding_repo: Option<storage::EmbeddingRepo>,
+    /// LanceDB vector store for semantic search.
+    pub(crate) embedding_store: Option<storage::VectorStore>,
     pub(crate) semantic_threshold: f64,
     pub(crate) rrf_k: u32,
     pub(crate) feedback_handler: Option<Arc<dyn EnrichmentFeedbackHandler>>,
@@ -46,7 +46,7 @@ impl TodoTool {
             calendar_handler: None,
             enrichment_handler: None,
             embedding_handler: None,
-            embedding_repo: None,
+            embedding_store: None,
             semantic_threshold: 0.5,
             rrf_k: 60,
             feedback_handler: None,
@@ -71,9 +71,9 @@ impl TodoTool {
         self
     }
 
-    /// Attach an embedding repo for SQL semantic search.
-    pub fn with_embedding_repo(mut self, repo: storage::EmbeddingRepo) -> Self {
-        self.embedding_repo = Some(repo);
+    /// Attach a vector store for LanceDB semantic search.
+    pub fn with_embedding_store(mut self, store: storage::VectorStore) -> Self {
+        self.embedding_store = Some(store);
         self
     }
 
@@ -137,7 +137,7 @@ impl TodoTool {
 
     // ─── Full todo loading ─────────────────────────────────────────
 
-    pub(crate) async fn load_full_todo(&self, row: crate::storage::TodoRow) -> Result<Todo> {
+    pub(crate) async fn load_full_todo(&self, row: storage::TodoRow) -> Result<Todo> {
         let id = row.id.clone();
         let mut todo = Todo::from(row);
 

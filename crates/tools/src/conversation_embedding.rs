@@ -1,7 +1,7 @@
 //! Conversation embedding storage and handler for semantic memory search.
 //!
-//! SQL-only wrapper around `ConvEmbeddingRepo` (pgvector).
-//! All persistence is handled by PostgreSQL — no JSONL journals or in-memory indexes.
+//! LanceDB-backed wrapper around `storage::VectorStore`.
+//! All persistence is handled by LanceDB — no pgvector, no JSONL journals.
 //!
 //! The `ConversationEmbeddingHandler` trait provides dependency inversion for
 //! the embedding pipeline (defined in tools crate L3, implemented in agent crate L5).
@@ -46,158 +46,125 @@ pub struct ConversationEmbeddingStatus {
     pub is_available: bool,
 }
 
-/// SQL-only conversation embedding store backed by `ConvEmbeddingRepo` (pgvector).
+/// LanceDB-backed conversation embedding store.
 ///
-/// All methods delegate directly to the repository. No in-memory caching,
+/// All methods delegate to the underlying `VectorStore`. No in-memory caching,
 /// no JSONL journals, no locks.
 #[derive(Debug, Clone)]
 pub struct ConversationEmbeddingStore {
-    repo: storage::ConvEmbeddingRepo,
+    store: storage::VectorStore,
 }
 
 impl ConversationEmbeddingStore {
-    /// Create a new SQL-only store from a `ConvEmbeddingRepo`.
-    pub fn new(repo: storage::ConvEmbeddingRepo) -> Self {
-        Self { repo }
+    /// Create a new store from a `VectorStore`.
+    pub fn new(store: storage::VectorStore) -> Self {
+        Self { store }
     }
 
-    /// Upsert an embedding record. Deletes existing record with the same ID first.
+    /// Upsert an embedding record (delete-then-insert semantics).
     pub async fn upsert(&self, record: ConversationEmbeddingRecord) -> Result<()> {
-        let id = uuid::Uuid::parse_str(&record.id).unwrap_or_else(|_| uuid::Uuid::new_v4());
-        let vector = pgvector::Vector::from(record.embedding);
-        // Delete existing first (upsert semantics)
-        let _ = self.repo.delete(id).await;
-        self.repo
-            .insert(
-                id,
-                &record.session_key,
-                &vector,
-                &record.role,
-                &record.content_preview,
-                &record.content_full,
+        self.store
+            .upsert_embedding(
+                "conv_embeddings",
+                &record.id,
+                &record.embedding,
+                &[
+                    ("session_key", &record.session_key),
+                    ("role", &record.role),
+                    ("content_preview", &record.content_preview),
+                    ("full_content", &record.content_full),
+                ],
             )
             .await
             .map_err(|e| common::ToolError::ExecutionFailed(e.to_string()))?;
         Ok(())
     }
 
-    /// Get a single embedding record by message ID.
-    pub async fn get(&self, id: &str) -> Result<Option<ConversationEmbeddingRecord>> {
-        let uuid = match uuid::Uuid::parse_str(id) {
-            Ok(u) => u,
-            Err(_) => return Ok(None),
-        };
-        match self.repo.get(uuid).await {
-            Ok(row) => Ok(Some(row_to_record(row))),
-            Err(storage::StorageError::NotFound(_)) => Ok(None),
-            Err(e) => Err(common::ToolError::ExecutionFailed(e.to_string()).into()),
-        }
-    }
-
-    /// Get all embedding records matching a session key.
-    pub async fn get_by_session_key(
-        &self,
-        session_key: &str,
-    ) -> Result<Vec<ConversationEmbeddingRecord>> {
-        let rows = self
-            .repo
-            .get_by_session_key(session_key)
-            .await
-            .map_err(|e| common::ToolError::ExecutionFailed(e.to_string()))?;
-        Ok(rows.into_iter().map(row_to_record).collect())
-    }
-
-    /// Search for similar embeddings using pgvector ANN with time-decay scoring.
+    /// Search for similar embeddings. Returns `(record, score)` pairs.
     ///
-    /// Cross-channel: searches ALL conversation embeddings regardless of session_key.
-    ///
-    /// `decay_factor` controls recency weighting: `score = similarity * decay_factor^days_old`.
-    /// Use `1.0` for no decay, or `0.995` for a ~138-day half-life.
+    /// `decay_factor` is accepted for API compatibility but is not applied —
+    /// LanceDB returns raw cosine similarity scores.
     pub async fn search_similar(
         &self,
         query_embedding: &[f32],
         limit: usize,
         threshold: f64,
-        decay_factor: f64,
+        _decay_factor: f64,
     ) -> Result<Vec<(ConversationEmbeddingRecord, f64)>> {
-        let vector = pgvector::Vector::from(query_embedding.to_vec());
-        let rows = self
-            .repo
-            .search_similar(&vector, limit as i64, threshold, decay_factor)
+        let hits = self
+            .store
+            .search_conv_embeddings(query_embedding, limit, threshold)
             .await
             .map_err(|e| common::ToolError::ExecutionFailed(e.to_string()))?;
-        Ok(rows
+
+        let records = hits
             .into_iter()
-            .map(|(row, score)| (row_to_record(row), score))
-            .collect())
+            .map(
+                |(id, session_key, role, content_preview, full_content, score)| {
+                    let record = ConversationEmbeddingRecord {
+                        id,
+                        session_key,
+                        role,
+                        content_preview,
+                        content_full: full_content,
+                        embedding: Vec::new(), // not re-hydrated from search results
+                        model: String::new(),
+                        embedded_at: Utc::now(), // approximate — not stored in search path
+                    };
+                    (record, score)
+                },
+            )
+            .collect();
+        Ok(records)
     }
 
     /// Get status information about the store.
     pub async fn status(&self) -> Result<ConversationEmbeddingStatus> {
         let total = self
-            .repo
-            .count()
-            .await
-            .map_err(|e| common::ToolError::ExecutionFailed(e.to_string()))?;
-        let indexed_channels = self
-            .repo
-            .list_session_keys()
-            .await
-            .map_err(|e| common::ToolError::ExecutionFailed(e.to_string()))?;
-        let oldest_embedding = self
-            .repo
-            .oldest_created_at()
-            .await
-            .map_err(|e| common::ToolError::ExecutionFailed(e.to_string()))?;
-        let newest_embedding = self
-            .repo
-            .newest_created_at()
+            .store
+            .count("conv_embeddings")
             .await
             .map_err(|e| common::ToolError::ExecutionFailed(e.to_string()))?;
 
         Ok(ConversationEmbeddingStatus {
-            total_embeddings: total as usize,
-            indexed_channels,
-            oldest_embedding,
-            newest_embedding,
+            total_embeddings: total,
+            // Distinct session_key listing requires a full table scan not
+            // supported by the current VectorStore API; omitted for now.
+            indexed_channels: Vec::new(),
+            oldest_embedding: None,
+            newest_embedding: None,
             is_available: true,
         })
     }
 
     /// Purge embeddings matching the filter. Returns count of deleted records.
     pub async fn purge(&self, filter: PurgeFilter) -> Result<usize> {
-        let count = match filter {
-            PurgeFilter::BySessionKey(session_key) => self
-                .repo
-                .purge_by_session_key(&session_key)
-                .await
-                .map_err(|e| common::ToolError::ExecutionFailed(e.to_string()))?,
-            PurgeFilter::Before(cutoff) => self
-                .repo
-                .purge_before(cutoff)
-                .await
-                .map_err(|e| common::ToolError::ExecutionFailed(e.to_string()))?,
-            PurgeFilter::All => self
-                .repo
-                .purge_all()
-                .await
-                .map_err(|e| common::ToolError::ExecutionFailed(e.to_string()))?,
-        };
-        Ok(count as usize)
-    }
-}
+        let before = self
+            .store
+            .count("conv_embeddings")
+            .await
+            .map_err(|e| common::ToolError::ExecutionFailed(e.to_string()))?;
 
-/// Convert a `ConvEmbeddingRow` to a `ConversationEmbeddingRecord`.
-fn row_to_record(row: storage::ConvEmbeddingRow) -> ConversationEmbeddingRecord {
-    ConversationEmbeddingRecord {
-        id: row.id.to_string(),
-        session_key: row.session_key,
-        role: row.role,
-        content_preview: row.content_preview,
-        content_full: row.content_full,
-        embedding: row.embedding.to_vec(),
-        model: String::new(), // model info not stored in DB row
-        embedded_at: row.created_at,
+        let predicate = match &filter {
+            PurgeFilter::BySessionKey(sk) => {
+                let safe = sk.replace('\'', "''");
+                format!("session_key = '{safe}'")
+            }
+            PurgeFilter::Before(cutoff) => {
+                let ts = cutoff.to_rfc3339();
+                format!("created_at < '{ts}'")
+            }
+            PurgeFilter::All => "id IS NOT NULL".to_string(),
+        };
+
+        self.store
+            .delete_where("conv_embeddings", &predicate)
+            .await
+            .map_err(|e| common::ToolError::ExecutionFailed(e.to_string()))?;
+
+        let after = self.store.count("conv_embeddings").await.unwrap_or(before);
+
+        Ok(before.saturating_sub(after))
     }
 }
 

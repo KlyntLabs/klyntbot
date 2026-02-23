@@ -17,18 +17,14 @@ mod tests {
     }
 
     async fn test_repos() -> Option<TestRepos> {
-        let url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgres://localhost/klyntbot_test".to_string());
-        match StoragePool::connect(&url).await {
-            Ok(pool) => {
-                let pg = pool.inner().clone();
-                Some(TestRepos {
-                    accounts: FinanceAccountRepo::new(pg.clone()),
-                    transactions: FinanceTransactionRepo::new(pg),
-                })
-            }
-            Err(_) => None,
-        }
+        let dir = tempfile::tempdir().ok()?;
+        let pool = StoragePool::connect(dir.path()).await.ok()?;
+        let _ = dir.keep(); // prevent cleanup; acceptable in test context
+        let pg = pool.inner().clone();
+        Some(TestRepos {
+            accounts: FinanceAccountRepo::new(pg.clone()),
+            transactions: FinanceTransactionRepo::new(pg),
+        })
     }
 
     fn unique_id(prefix: &str) -> String {

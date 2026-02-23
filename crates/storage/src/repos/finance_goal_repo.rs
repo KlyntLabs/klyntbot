@@ -60,11 +60,10 @@ impl FinanceGoalRepo {
 
     /// Get a single goal by id. Returns `None` if not found.
     pub async fn get(&self, id: &str) -> Result<Option<FinanceGoalRow>, StorageError> {
-        let row =
-            sqlx::query_as::<_, FinanceGoalRow>("SELECT * FROM finance_goals WHERE id = ?")
-                .bind(id)
-                .fetch_optional(&self.pool)
-                .await?;
+        let row = sqlx::query_as::<_, FinanceGoalRow>("SELECT * FROM finance_goals WHERE id = ?")
+            .bind(id)
+            .fetch_optional(&self.pool)
+            .await?;
         Ok(row)
     }
 

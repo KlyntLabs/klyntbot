@@ -11,12 +11,10 @@ mod tests {
     use chrono::Utc;
 
     async fn test_account_repo() -> Option<FinanceAccountRepo> {
-        let url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgres://localhost/klyntbot_test".to_string());
-        match StoragePool::connect(&url).await {
-            Ok(pool) => Some(FinanceAccountRepo::new(pool.inner().clone())),
-            Err(_) => None,
-        }
+        let dir = tempfile::tempdir().ok()?;
+        let pool = StoragePool::connect(dir.path()).await.ok()?;
+        let _ = dir.keep(); // prevent cleanup; acceptable in test context
+        Some(FinanceAccountRepo::new(pool.inner().clone()))
     }
 
     fn sample_account(id: &str, name: &str, account_type: &str) -> FinanceAccountRow {

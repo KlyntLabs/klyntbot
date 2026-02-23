@@ -189,16 +189,16 @@ pub trait EmbeddingHandler: Send + Sync {
 
 /// Production implementation of `EmbeddingHandler`.
 ///
-/// Wraps `EmbeddingEngine` (for vector generation) and `EmbeddingRepo`
-/// (for SQL persistence). Constructed in the agent crate and injected into `TodoTool`.
+/// Wraps `EmbeddingEngine` (for vector generation) and `VectorStore`
+/// (for LanceDB persistence). Constructed in the agent crate and injected into `TodoTool`.
 pub struct EmbeddingEngineImpl {
     engine: Arc<EmbeddingEngine>,
-    repo: storage::EmbeddingRepo,
+    store: storage::VectorStore,
 }
 
 impl EmbeddingEngineImpl {
-    pub fn new(engine: Arc<EmbeddingEngine>, repo: storage::EmbeddingRepo) -> Self {
-        Self { engine, repo }
+    pub fn new(engine: Arc<EmbeddingEngine>, store: storage::VectorStore) -> Self {
+        Self { engine, store }
     }
 
     /// Compose the searchable text for a todo: "{title} {description} {tags}".
@@ -237,10 +237,16 @@ impl EmbeddingHandler for EmbeddingEngineImpl {
 
         let model_name = "paraphrase-multilingual-MiniLM-L12-v2";
 
-        // Persist to SQL via repo
-        self.repo
-            .upsert_vec(&todo_id, &embedding, model_name)
-            .await?;
+        // Persist to LanceDB via VectorStore
+        self.store
+            .upsert_embedding(
+                "todo_embeddings",
+                &todo_id,
+                &embedding,
+                &[("model", model_name)],
+            )
+            .await
+            .map_err(|e| common::ToolError::ExecutionFailed(e.to_string()))?;
 
         let record = EmbeddingRecord {
             id: todo_id,

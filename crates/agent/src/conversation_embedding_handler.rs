@@ -138,17 +138,18 @@ impl ConversationEmbeddingHandler for ConversationEmbeddingHandlerImpl {
 mod tests {
     use super::*;
 
-    async fn create_test_handler() -> ConversationEmbeddingHandlerImpl {
+    async fn create_test_handler() -> (ConversationEmbeddingHandlerImpl, tempfile::TempDir) {
         // Create embedding engine (model won't be loaded in tests)
         let engine = Arc::new(EmbeddingEngine::new());
 
-        // Use a test database pool for the repo
-        let pool = storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test")
-            .expect("test pool");
-        let repo = storage::ConvEmbeddingRepo::new(pool.inner().clone());
-        let store = ConversationEmbeddingStore::new(repo);
+        // Use a temporary LanceDB directory for the vector store
+        let dir = tempfile::TempDir::new().expect("temp dir");
+        let vs = storage::VectorStore::connect(dir.path())
+            .await
+            .expect("vector store");
+        let store = ConversationEmbeddingStore::new(vs);
 
-        ConversationEmbeddingHandlerImpl::new(engine, store)
+        (ConversationEmbeddingHandlerImpl::new(engine, store), dir)
     }
 
     // ──────────────────────────────────────────────────────────────────────
@@ -157,7 +158,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_embed_message_adds_role_prefix() {
-        let handler = create_test_handler().await;
+        let (handler, _dir) = create_test_handler().await;
 
         // This will fail if model unavailable, but we test the role prefix logic
         let result = handler
@@ -173,7 +174,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_embed_message_best_effort_on_error() {
-        let handler = create_test_handler().await;
+        let (handler, _dir) = create_test_handler().await;
 
         // This will fail (no model loaded yet), but should succeed with best-effort
         let result = handler
@@ -188,7 +189,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_is_available_reflects_engine() {
-        let handler = create_test_handler().await;
+        let (handler, _dir) = create_test_handler().await;
 
         // Engine uses lazy init, model not loaded yet
         assert!(

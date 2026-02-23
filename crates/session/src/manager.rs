@@ -557,7 +557,7 @@ mod tests {
     /// the sessions DashMap (accessible within the same module).
     #[tokio::test]
     async fn test_reset_session_removes_from_cache() {
-        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/test_unused").unwrap();
+        let pool = sqlx::SqlitePool::connect(":memory:").await.unwrap();
         let repo = storage::SessionRepo::new(pool);
         let manager = SessionManager::from_repo(repo).await;
 
@@ -627,7 +627,7 @@ mod tests {
     async fn test_concurrent_different_sessions_no_deadlock() {
         use std::time::Duration;
 
-        let pool = sqlx::PgPool::connect_lazy("postgres://localhost/test_unused").unwrap();
+        let pool = sqlx::SqlitePool::connect(":memory:").await.unwrap();
         let repo = storage::SessionRepo::new(pool);
         let manager = SessionManager::from_repo(repo).await;
 

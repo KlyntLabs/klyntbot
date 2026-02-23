@@ -138,14 +138,12 @@ mod tests {
     use chrono::{Duration, Utc};
     use tools::todo_types::TodoStatus;
 
-    /// Try to connect to a test database. Returns None if no DB is available.
+    /// Connect to an ephemeral SQLite database for testing.
     async fn test_todo_repo() -> Option<storage::TodoRepo> {
-        let url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgres://localhost/klyntbot_test".to_string());
-        match storage::StoragePool::connect(&url).await {
-            Ok(pool) => Some(storage::Repos::from_pool(&pool).todos),
-            Err(_) => None,
-        }
+        let dir = tempfile::tempdir().ok()?;
+        let pool = storage::StoragePool::connect(dir.path()).await.ok()?;
+        let _ = dir.keep(); // prevent cleanup; acceptable in test context
+        Some(storage::Repos::from_pool(&pool).todos)
     }
 
     fn create_template(title: &str, rule: &str, next: chrono::DateTime<Utc>) -> Todo {

@@ -82,7 +82,11 @@ pub async fn handle_status(verbose: bool) -> Result<()> {
         if db_path.exists() {
             println!("  SQLite at {}", db_path.display());
         } else {
-            println!("  {} not initialized — run {} to set up", status_warning(), colorize("klyntbot init", HIGHLIGHT));
+            println!(
+                "  {} not initialized — run {} to set up",
+                status_warning(),
+                colorize("klyntbot init", HIGHLIGHT)
+            );
         }
         println!();
 

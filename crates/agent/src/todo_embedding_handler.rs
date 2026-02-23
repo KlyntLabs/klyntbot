@@ -1,6 +1,6 @@
 //! TodoEmbeddingHandlerImpl — implements feature_todo::EmbeddingHandler.
 //!
-//! Wraps the shared EmbeddingEngine (fastembed) and a storage::EmbeddingRepo.
+//! Wraps the shared EmbeddingEngine (fastembed) and a storage::VectorStore.
 //! Satisfies feature-todo's dependency inversion contract for embedding operations.
 
 use async_trait::async_trait;
@@ -13,15 +13,15 @@ use tracing::debug;
 /// Production implementation of feature_todo::EmbeddingHandler.
 ///
 /// Uses the shared `EmbeddingEngine` for vector generation and
-/// `storage::EmbeddingRepo` for SQL persistence via pgvector.
+/// `storage::VectorStore` for LanceDB persistence.
 pub struct TodoEmbeddingHandlerImpl {
     engine: Arc<EmbeddingEngine>,
-    repo: storage::EmbeddingRepo,
+    store: storage::VectorStore,
 }
 
 impl TodoEmbeddingHandlerImpl {
-    pub fn new(engine: Arc<EmbeddingEngine>, repo: storage::EmbeddingRepo) -> Self {
-        Self { engine, repo }
+    pub fn new(engine: Arc<EmbeddingEngine>, store: storage::VectorStore) -> Self {
+        Self { engine, store }
     }
 
     /// Compose searchable text for a todo: "{title} {description} {tags}".
@@ -52,9 +52,15 @@ impl EmbeddingHandler for TodoEmbeddingHandlerImpl {
             })??;
 
         let model_name = "paraphrase-multilingual-MiniLM-L12-v2";
-        self.repo
-            .upsert_vec(&todo_id, &embedding, model_name)
-            .await?;
+        self.store
+            .upsert_embedding(
+                "todo_embeddings",
+                &todo_id,
+                &embedding,
+                &[("model", model_name)],
+            )
+            .await
+            .map_err(|e| common::ToolError::ExecutionFailed(e.to_string()))?;
 
         Ok(())
     }

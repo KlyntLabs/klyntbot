@@ -27,9 +27,8 @@ fn make_pipeline(provider: Arc<dyn LlmProvider>) -> AgentPipeline {
     let orchestrator = Arc::new(Orchestrator::new(provider.clone(), "mock"));
     let dispatch = Arc::new(EngineDispatch::new(core));
 
-    let pool =
-        klyntbot::storage::StoragePool::connect_lazy("postgres://localhost/klyntbot_test").unwrap();
-    let usage_repo = klyntbot::storage::UsageRepo::new(pool.inner().clone());
+    let pool = sqlx::SqlitePool::connect_lazy("sqlite::memory:").expect("in-memory SQLite pool");
+    let usage_repo = klyntbot::storage::UsageRepo::new(pool);
     let cost_tracker = Arc::new(CostTracker::from_repo(usage_repo));
 
     AgentPipeline::new(

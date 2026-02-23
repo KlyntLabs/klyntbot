@@ -72,6 +72,7 @@ impl FinanceAccountRepo {
         &self,
         patch: &FinanceAccountPatch,
     ) -> Result<FinanceAccountRow, StorageError> {
+        let now = chrono::Utc::now();
         let row = sqlx::query_as::<_, FinanceAccountRow>(
             r#"
             UPDATE finance_accounts SET
@@ -80,7 +81,7 @@ impl FinanceAccountRepo {
                 institution = CASE WHEN ? THEN ? ELSE institution END,
                 notes       = CASE WHEN ? THEN ? ELSE notes END,
                 is_archived = COALESCE(?, is_archived),
-                updated_at  = datetime('now')
+                updated_at  = ?
             WHERE id = ?
             RETURNING *
             "#,
@@ -92,6 +93,7 @@ impl FinanceAccountRepo {
         .bind(patch.notes.is_some())
         .bind(patch.notes.as_ref().and_then(|v| v.as_deref()))
         .bind(patch.is_archived)
+        .bind(now)
         .bind(&patch.id)
         .fetch_optional(&self.pool)
         .await?
@@ -184,15 +186,17 @@ impl FinanceAccountRepo {
         id: &str,
         delta: i64,
     ) -> Result<FinanceAccountRow, StorageError> {
+        let now = chrono::Utc::now();
         let row = sqlx::query_as::<_, FinanceAccountRow>(
             r#"
             UPDATE finance_accounts
-            SET balance = balance + ?, updated_at = datetime('now')
+            SET balance = balance + ?, updated_at = ?
             WHERE id = ?
             RETURNING *
             "#,
         )
         .bind(delta)
+        .bind(now)
         .bind(id)
         .fetch_optional(&self.pool)
         .await?

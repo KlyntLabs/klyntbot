@@ -7,8 +7,8 @@ use tools_core::ParamExtractor;
 use tracing::{debug, info};
 
 use super::super::TodoTool;
-use crate::storage::TodoFilter;
 use crate::types::{TimeEntrySource, Todo, TodoStatus};
+use storage::TodoFilter;
 
 impl TodoTool {
     pub(crate) async fn handle_list(&self, p: &ParamExtractor<'_>) -> Result<String> {

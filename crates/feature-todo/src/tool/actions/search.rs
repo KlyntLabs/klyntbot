@@ -61,9 +61,9 @@ impl TodoTool {
             )
         })?;
 
-        let emb_repo = self.embedding_repo.as_ref().ok_or_else(|| {
+        let vs = self.embedding_store.as_ref().ok_or_else(|| {
             ToolError::ExecutionFailed(
-                "Semantic search unavailable: embedding repo not configured".to_string(),
+                "Semantic search unavailable: embedding store not configured".to_string(),
             )
         })?;
 
@@ -76,11 +76,12 @@ impl TodoTool {
         );
         let query_vec = emb.embed_query(query).await?;
 
-        let scored = emb_repo
-            .search_similar_vec(&query_vec, limit as i64, threshold)
-            .await?;
+        let scored = vs
+            .search_similar("todo_embeddings", &query_vec, limit, threshold)
+            .await
+            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
 
-        let embedding_count = emb_repo.count().await.unwrap_or(0) as usize;
+        let embedding_count = vs.count("todo_embeddings").await.unwrap_or(0);
 
         if scored.is_empty() {
             let mut msg = format!(
@@ -146,10 +147,9 @@ impl TodoTool {
 
         // Run semantic search if available
         let semantic_results: Vec<(String, f64)> =
-            if let (Some(emb), Some(emb_repo)) = (&self.embedding_handler, &self.embedding_repo) {
+            if let (Some(emb), Some(vs)) = (&self.embedding_handler, &self.embedding_store) {
                 let query_vec = emb.embed_query(query).await?;
-                emb_repo
-                    .search_similar_vec(&query_vec, 100, self.semantic_threshold)
+                vs.search_similar("todo_embeddings", &query_vec, 100, self.semantic_threshold)
                     .await
                     .unwrap_or_default()
             } else {

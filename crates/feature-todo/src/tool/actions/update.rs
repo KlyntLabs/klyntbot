@@ -6,8 +6,8 @@ use tools_core::ParamExtractor;
 use tracing::warn;
 
 use super::super::TodoTool;
-use crate::storage::TodoPatch;
 use crate::types::{AttachmentType, Todo};
+use storage::TodoPatch;
 
 impl TodoTool {
     pub(crate) async fn handle_update(&self, p: &ParamExtractor<'_>) -> Result<String> {

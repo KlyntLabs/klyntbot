@@ -14,14 +14,12 @@ mod tests {
     use crate::rows::todo::TodoRow;
     use crate::StoragePool;
 
-    /// Try to connect to a test database. Returns None if no DB is available.
+    /// Connect to an ephemeral SQLite database for testing.
     async fn test_todo_repo() -> Option<TodoRepo> {
-        let url = std::env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgres://localhost/klyntbot_test".to_string());
-        match StoragePool::connect(&url).await {
-            Ok(pool) => Some(crate::Repos::from_pool(&pool).todos),
-            Err(_) => None,
-        }
+        let dir = tempfile::tempdir().ok()?;
+        let pool = StoragePool::connect(dir.path()).await.ok()?;
+        let _ = dir.keep(); // prevent cleanup; acceptable in test context
+        Some(crate::Repos::from_pool(&pool).todos)
     }
 
     /// Helper: create a minimal TodoRow for testing.

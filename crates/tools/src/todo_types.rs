@@ -364,6 +364,7 @@ impl TodoPatch {
             // it is an internal field managed exclusively by RecurringTaskSpawner
             // via storage::TodoPatch directly. Tool-layer callers cannot set it.
             next_instance_date: None,
+            estimated_minutes: self.estimated_minutes.map(|opt| opt.map(|m| m as i32)),
             last_reminded_at: self.last_reminded_at,
         }
     }
