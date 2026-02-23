@@ -9,13 +9,19 @@ pub enum StorageError {
     Sqlx(#[from] sqlx::Error),
 
     #[error("Migration error: {0}")]
-    Migration(#[from] sqlx::migrate::MigrateError),
+    Migration(String),
 
     #[error("Not found: {0}")]
     NotFound(String),
 
     #[error("Conflict: {0}")]
     Conflict(String),
+}
+
+impl From<sqlx::migrate::MigrateError> for StorageError {
+    fn from(e: sqlx::migrate::MigrateError) -> Self {
+        StorageError::Migration(e.to_string())
+    }
 }
 
 impl From<StorageError> for common::KlyntbotError {
