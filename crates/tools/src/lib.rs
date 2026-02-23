@@ -87,4 +87,5 @@ pub use permissions::{PermissionLevel, ToolPermissions};
 pub use search_utils::{rrf_merge, SearchResult};
 
 // Browser
+pub use browser::BrowserTool;
 pub use config::TrustLevel;
