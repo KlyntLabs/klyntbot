@@ -34,7 +34,6 @@ chrono = { workspace = true }
 uuid = { workspace = true }
 serde = { workspace = true }
 fastembed = { workspace = true, optional = true }
-pgvector.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

@@ -59,7 +59,7 @@ proc-macro2 = "1"
 
 # Shared external dependencies (version pinned at workspace level)
 tokio = { version = "1.49.0", features = ["rt-multi-thread", "macros", "time", "sync", "io-util", "net", "signal", "fs", "process"] }
-sqlx = { version = "0.8", features = ["runtime-tokio", "tls-rustls", "postgres", "migrate", "uuid", "chrono", "json"] }
+sqlx = { version = "0.8", features = ["runtime-tokio", "tls-rustls", "sqlite", "migrate", "uuid", "chrono", "json"] }
 quick-xml = "0.36"
 async-trait = "0.1.89"
 serde = { version = "1.0.228", features = ["derive"] }
@@ -96,7 +96,10 @@ chrono-tz = "0.10"
 iana-time-zone = "0.1"
 rrule = "0.14"
 fastembed = "5"
-pgvector = { version = "0.4", features = ["sqlx"] }
+lancedb = "0.26"
+arrow = { version = "57", features = ["prettyprint"] }
+arrow-array = "57"
+arrow-schema = "57"
 dashmap = "6"
 
 # Optional email dependencies
