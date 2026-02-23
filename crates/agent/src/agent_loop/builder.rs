@@ -29,12 +29,10 @@ use tools::{
 
 use super::super::confidence::ConfidenceEvaluator;
 use super::super::context_sources::{
-    BootstrapSource, ConfidenceSource, GoalSource, IdentitySource, MemorySource,
-    SkillContentSource, SkillSummarySource, TodoSource,
+    BootstrapSource, ConfidenceSource, GoalSource, IdentitySource, SkillContentSource,
+    SkillSummarySource, TodoSource,
 };
-use super::super::{
-    CalendarSyncAdapter, CronHandlerAdapter, MemoryStore, SkillManager, SubagentManager,
-};
+use super::super::{CalendarSyncAdapter, CronHandlerAdapter, SkillManager, SubagentManager};
 use super::{AgentLoop, LastActiveChannel};
 
 /// Builder for constructing an [`AgentLoop`] with all its dependencies.
@@ -164,7 +162,8 @@ impl AgentLoopBuilder {
         let confidence_source = ConfidenceSource::new(config.confidence.threshold);
         let confidence_threshold_handle = confidence_source.threshold_handle();
 
-        let memory_store = MemoryStore::new(repos.memory_notes.clone());
+        // MemoryStore is built later (after embedding engine) to enable relevance filtering.
+        // Use a placeholder here; the actual MemorySource is added below.
 
         let mut sources: Vec<Box<dyn ContextSource>> = vec![
             Box::new(IdentitySource::new(
@@ -172,7 +171,6 @@ impl AgentLoopBuilder {
                 config.timezone.clone(),
             )),
             Box::new(BootstrapSource::new(workspace.clone())),
-            Box::new(MemorySource::new(memory_store)),
             Box::new(TodoSource::new(repos.todos.clone())),
             Box::new(GoalSource::new(repos.goals.clone())),
             Box::new(confidence_source),

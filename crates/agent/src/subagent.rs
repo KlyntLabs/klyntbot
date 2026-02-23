@@ -3,12 +3,12 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::{mpsc, Semaphore};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 use async_trait::async_trait;
 use bus::InboundMessage;
-use providers::{tool_calls_to_messages, ChatParams, DynProvider, Message};
+use providers::{DynProvider, Message};
 use tools::{
     filesystem::register_fs_tools,
     registry::ToolRegistry,
@@ -266,6 +266,11 @@ async fn run_subagent_task(
     task: &str,
     config: SubagentConfig,
 ) -> std::result::Result<(String, String), Box<dyn std::error::Error + Send + Sync>> {
+    use crate::execution::core::ExecutionCore;
+    use crate::execution::react_plus::{ReactOutcome, ReactPlusEngine, ReflectionMode};
+    use crate::execution::types::ExecutionParams;
+    use tokio::sync::RwLock;
+
     // Build subagent tool registry with limited tools
     let mut tools = ToolRegistry::new();
 
@@ -292,86 +297,47 @@ async fn run_subagent_task(
     ));
     tools.register(WebFetchTool::new());
 
-    // Build system prompt
-    let system_prompt = build_subagent_prompt(workspace, task);
+    let tool_defs = tools.get_definitions();
 
-    // Initialize messages
-    let mut messages = vec![
+    // Build execution engine
+    let core = Arc::new(ExecutionCore::new(
+        Arc::clone(provider),
+        Arc::new(RwLock::new(tools)),
+    ));
+    let engine = ReactPlusEngine::new(core)
+        .with_max_iterations(15)
+        .with_reflection_mode(ReflectionMode::OnFailure);
+
+    // Build system prompt and messages
+    let system_prompt = build_subagent_prompt(workspace, task);
+    let messages = vec![
         Message::system(system_prompt),
         Message::user(task.to_string()),
     ];
 
-    // Run agent loop with 15-iteration cap
-    let max_iterations = 15;
-    let mut iteration = 0;
-    let mut final_result: Option<String> = None;
-
-    // Subagents don't have meaningful routing context, use placeholder
+    let params =
+        ExecutionParams::new(model).with_timeout(std::time::Duration::from_secs(config.exec_timeout));
     let routing_ctx = RoutingContext::new("subagent".into(), "background".into());
 
-    while iteration < max_iterations {
-        iteration += 1;
+    // Execute via ReactPlusEngine
+    let outcome = engine
+        .execute(Arc::new(messages), &tool_defs, &params, &routing_ctx, None)
+        .await
+        .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
 
-        debug!("Subagent iteration {}/{}", iteration, max_iterations);
-
-        // Call LLM with tools
-        let tool_defs = tools.get_definitions();
-        let params = ChatParams::new(model);
-        let response = provider
-            .chat(&messages, Some(&tool_defs), &params)
-            .await
-            .map_err(|e| {
-                error!("Subagent LLM call failed: {}", e);
-                Box::new(e) as Box<dyn std::error::Error + Send + Sync>
-            })?;
-
-        // Check if there are tool calls
-        if !response.tool_calls.is_empty() {
-            // Convert ToolCall to ToolCallMessage
-            let tool_call_messages = tool_calls_to_messages(&response.tool_calls);
-
-            // Add assistant message with tool calls (can have both content and tool_calls)
-            messages.push(Message::Assistant {
-                content: response.content.clone(),
-                tool_calls: Some(tool_call_messages),
-                reasoning_content: None,
+    match outcome {
+        ReactOutcome::Response { content, .. } => Ok(("ok".to_string(), content)),
+        ReactOutcome::EscalateToAutonomous { reason, .. } => Ok((
+            "ok".to_string(),
+            format!("Task requires more complex handling: {}", reason),
+        )),
+        ReactOutcome::MaxIterationsReached { partial_content, .. } => {
+            let text = partial_content.unwrap_or_else(|| {
+                "Task completed but no final response was generated.".to_string()
             });
-
-            // Execute each tool call
-            for tool_call in &response.tool_calls {
-                let tool_name = &tool_call.name;
-                let args = &tool_call.arguments;
-
-                debug!("Subagent executing tool: {} with args: {}", tool_name, args);
-
-                let result = tools
-                    .execute(tool_name, args.clone(), &routing_ctx)
-                    .await
-                    .unwrap_or_else(|e| format!("Tool error: {}", e));
-
-                // Add tool result message
-                messages.push(Message::tool(
-                    tool_call.id.clone(),
-                    tool_name.clone(),
-                    result,
-                ));
-            }
-
-            continue;
+            Ok(("ok".to_string(), text))
         }
-
-        // No tool calls - this is the final response
-        final_result = response.content;
-        break;
     }
-
-    if final_result.is_none() {
-        final_result = Some("Task completed but no final response was generated.".to_string());
-    }
-
-    let status = "ok"; // Successful completion regardless of iteration count
-
-    Ok((status.to_string(), final_result.unwrap()))
 }
 
 /// Build a focused system prompt for subagents
@@ -503,6 +469,29 @@ mod tests {
     fn test_default_semaphore_permits_match_config_default() {
         let mgr = make_manager(3);
         assert_eq!(mgr.semaphore_permits(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_run_subagent_task_returns_text_response() {
+        let provider: DynProvider = Arc::new(NoOpProvider);
+        let config = SubagentConfig {
+            brave_api_key: None,
+            web_max_results: 5,
+            exec_timeout: 60,
+            restrict_to_workspace: false,
+        };
+        let result = run_subagent_task(
+            &provider,
+            std::path::Path::new("/tmp"),
+            "no-op",
+            "Say hello",
+            config,
+        )
+        .await;
+        assert!(result.is_ok());
+        let (status, text) = result.unwrap();
+        assert_eq!(status, "ok");
+        assert_eq!(text, "ok"); // NoOpProvider returns "ok"
     }
 
     #[tokio::test]
