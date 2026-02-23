@@ -39,6 +39,18 @@ pub trait CalendarHandler: Send + Sync {
     /// Get all calendar events from all enabled providers for reconciliation
     /// Returns combined list of events (deduplicated by UID)
     async fn get_events_for_reconciliation(&self) -> Result<Vec<CalendarEvent>>;
+
+    /// Push a single task to calendar by task ID.
+    async fn push_single_task(&self, task_id: &str) -> Result<Value>;
+
+    /// Remove a single calendar event by UID.
+    async fn remove_single_event(&self, calendar_event_uid: &str) -> Result<Value>;
+
+    /// Pull all events from calendar providers (no pushing).
+    async fn pull_all_events(&self) -> Result<Value>;
+
+    /// Push all tasks with due dates to calendar (no pulling).
+    async fn push_all_tasks(&self) -> Result<Value>;
 }
 
 /// CalendarTool - Tool interface for calendar operations
@@ -59,7 +71,7 @@ impl Tool for CalendarTool {
     }
 
     fn description(&self) -> &str {
-        "Manage calendar events and sync with CalDAV. Actions: sync, list_events, create_event, status."
+        "Manage calendar events and sync with CalDAV. Actions: sync, list_events, create_event, status, push_all, pull_all."
     }
 
     fn parameters(&self) -> Value {
@@ -68,8 +80,8 @@ impl Tool for CalendarTool {
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": ["sync", "list_events", "create_event", "status"],
-                    "description": "Action to perform"
+                    "enum": ["sync", "list_events", "create_event", "status", "push_all", "pull_all"],
+                    "description": "Action to perform. push_all pushes all tasks to calendar. pull_all pulls all events from calendar."
                 },
                 "limit": {
                     "type": "integer",
@@ -129,6 +141,16 @@ impl Tool for CalendarTool {
                 let result = self.handler.get_status().await?;
                 Ok(serde_json::to_string_pretty(&result)
                     .unwrap_or_else(|_| "Calendar status retrieved".to_string()))
+            }
+            "push_all" => {
+                let result = self.handler.push_all_tasks().await?;
+                Ok(serde_json::to_string_pretty(&result)
+                    .unwrap_or_else(|_| "All tasks pushed to calendar".to_string()))
+            }
+            "pull_all" => {
+                let result = self.handler.pull_all_events().await?;
+                Ok(serde_json::to_string_pretty(&result)
+                    .unwrap_or_else(|_| "All events pulled from calendar".to_string()))
             }
             _ => {
                 Err(ToolError::InvalidParams(format!("Unknown calendar action: {}", action)).into())
@@ -190,6 +212,22 @@ mod tests {
 
         async fn get_events_for_reconciliation(&self) -> Result<Vec<CalendarEvent>> {
             Ok(vec![])
+        }
+
+        async fn push_single_task(&self, _task_id: &str) -> Result<Value> {
+            Ok(json!({"status": "pushed", "task_id": _task_id}))
+        }
+
+        async fn remove_single_event(&self, _calendar_event_uid: &str) -> Result<Value> {
+            Ok(json!({"status": "removed", "uid": _calendar_event_uid}))
+        }
+
+        async fn pull_all_events(&self) -> Result<Value> {
+            Ok(json!({"status": "success", "events_pulled": 0}))
+        }
+
+        async fn push_all_tasks(&self) -> Result<Value> {
+            Ok(json!({"status": "success", "tasks_pushed": 0}))
         }
     }
 

@@ -49,7 +49,7 @@ impl TodoTool {
                     }
                 }
 
-                self.trigger_sync_async().await;
+                self.push_task_to_calendar(id).await;
                 Ok(format!("Updated task: {}", todo.title))
             }
             Err(storage::StorageError::NotFound(msg)) => {
@@ -141,7 +141,7 @@ impl TodoTool {
         };
 
         if result.is_ok() {
-            self.trigger_sync_async().await;
+            self.push_task_to_calendar(id).await;
         }
 
         result
@@ -220,7 +220,7 @@ impl TodoTool {
                 self.record_enrichment_feedback(id, &result, Some(true))
                     .await;
 
-                self.trigger_sync_async().await;
+                self.push_task_to_calendar(id).await;
 
                 Ok(format!(
                     "Enriched task {} with: {}\n\nSuggestions:\n{}",
@@ -314,7 +314,7 @@ impl TodoTool {
         };
 
         if result.is_ok() {
-            self.trigger_sync_async().await;
+            self.push_task_to_calendar(id).await;
         }
 
         result

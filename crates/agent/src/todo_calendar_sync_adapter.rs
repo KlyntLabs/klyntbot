@@ -27,4 +27,15 @@ impl CalendarSyncHandler for TodoCalendarSyncAdapter {
         // CalendarHandler::sync_calendar returns Result<Value>; we discard the value.
         self.inner.sync_calendar().await.map(|_| ())
     }
+
+    async fn push_task(&self, task_id: &str) -> Result<()> {
+        self.inner.push_single_task(task_id).await.map(|_| ())
+    }
+
+    async fn remove_event(&self, calendar_event_uid: &str) -> Result<()> {
+        self.inner
+            .remove_single_event(calendar_event_uid)
+            .await
+            .map(|_| ())
+    }
 }

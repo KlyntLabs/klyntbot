@@ -12,6 +12,12 @@ use common::Result;
 pub trait CalendarSyncHandler: Send + Sync {
     /// Trigger an immediate calendar sync (best-effort).
     async fn sync_calendar(&self) -> Result<()>;
+
+    /// Push a single task to calendar by task ID.
+    async fn push_task(&self, task_id: &str) -> Result<()>;
+
+    /// Remove a calendar event by its UID.
+    async fn remove_event(&self, calendar_event_uid: &str) -> Result<()>;
 }
 
 #[cfg(test)]
@@ -26,6 +32,16 @@ mod tests {
     #[async_trait]
     impl CalendarSyncHandler for MockCalendarSync {
         async fn sync_calendar(&self) -> Result<()> {
+            self.called.store(true, std::sync::atomic::Ordering::SeqCst);
+            Ok(())
+        }
+
+        async fn push_task(&self, _task_id: &str) -> Result<()> {
+            self.called.store(true, std::sync::atomic::Ordering::SeqCst);
+            Ok(())
+        }
+
+        async fn remove_event(&self, _calendar_event_uid: &str) -> Result<()> {
             self.called.store(true, std::sync::atomic::Ordering::SeqCst);
             Ok(())
         }

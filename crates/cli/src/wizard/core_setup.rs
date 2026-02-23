@@ -104,6 +104,27 @@ pub static CHANNEL_INFO: &[ChannelInfo] = &[
     },
 ];
 
+/// Calendar provider display metadata for the core setup screen.
+pub struct CalendarProviderInfo {
+    pub key: &'static str,
+    pub name: &'static str,
+}
+
+pub static CALENDAR_PROVIDER_INFO: &[CalendarProviderInfo] = &[
+    CalendarProviderInfo {
+        key: "apple",
+        name: "Apple Calendar (iCloud)",
+    },
+    CalendarProviderInfo {
+        key: "google",
+        name: "Google Calendar",
+    },
+    CalendarProviderInfo {
+        key: "caldav",
+        name: "Generic CalDAV (Nextcloud, Fastmail, etc.)",
+    },
+];
+
 // ============================================================================
 // Core setup orchestrator
 // ============================================================================
@@ -112,7 +133,7 @@ pub static CHANNEL_INFO: &[ChannelInfo] = &[
 ///
 /// 1. Build `DetectedState` from config, env vars, and system probes
 /// 2. Render summary of auto-detected values
-/// 3. Prompt for missing/editable fields (provider, API key, database, channel)
+/// 3. Prompt for missing/editable fields (provider, API key, database, channel, calendar)
 /// 4. Save results to `state.config`
 pub async fn run_core_setup(state: &mut WizardState) -> Result<StepResult> {
     // Build detected state
@@ -131,6 +152,9 @@ pub async fn run_core_setup(state: &mut WizardState) -> Result<StepResult> {
 
     // Channel setup (optional)
     prompt_channel(state, &detected)?;
+
+    // Calendar setup (optional)
+    prompt_calendar(state, &detected)?;
 
     Ok(StepResult::Next)
 }
@@ -186,6 +210,21 @@ fn render_summary(detected: &DetectedState) {
             "  {} Channel:  {}",
             colorize("·", DIM),
             colorize("none — CLI only", DIM)
+        );
+    }
+
+    if let Some((ref name, ref source)) = detected.calendar {
+        println!(
+            "  {} Calendar: {} ({})",
+            colorize("✓", SUCCESS),
+            colorize(name, HIGHLIGHT),
+            source
+        );
+    } else {
+        println!(
+            "  {} Calendar: {}",
+            colorize("·", DIM),
+            colorize("not configured", DIM)
         );
     }
     println!();
@@ -340,6 +379,104 @@ fn prompt_channel(state: &mut WizardState, detected: &DetectedState) -> Result<(
     Ok(())
 }
 
+/// Prompt for optional calendar provider configuration.
+fn prompt_calendar(state: &mut WizardState, detected: &DetectedState) -> Result<()> {
+    // Build options: "None" + all calendar providers
+    let mut options: Vec<SelectOption<'_>> = vec![SelectOption {
+        label: "None",
+        description: "no calendar sync",
+    }];
+
+    for cp in CALENDAR_PROVIDER_INFO {
+        options.push(SelectOption {
+            label: cp.name,
+            description: cp.key,
+        });
+    }
+
+    // Default to detected calendar or "None"
+    let default_idx = detected
+        .calendar
+        .as_ref()
+        .and_then(|(key, _)| CALENDAR_PROVIDER_INFO.iter().position(|c| c.key == key))
+        .map(|i| i + 1) // +1 because "None" is index 0
+        .unwrap_or(0);
+
+    let selected = prompt_select("Calendar Sync (optional)", &options, default_idx)?;
+
+    if selected == 0 {
+        return Ok(());
+    }
+
+    let calendar = &CALENDAR_PROVIDER_INFO[selected - 1];
+
+    match calendar.key {
+        "apple" => {
+            let apple = state.config.calendar.ensure_apple_mut();
+            apple.enabled = true;
+
+            let username = prompt_text("Apple ID (email)", None, true)?;
+            apple.username = username;
+
+            let password = prompt_secret("App-Specific Password", 1)?;
+            apple.password = config::Secret::new(password);
+
+            let caldav_url =
+                prompt_text("CalDAV URL", Some("https://caldav.icloud.com"), false)?;
+            apple.caldav_url = caldav_url;
+
+            let cal_name = prompt_text("Calendar Name", Some("Klyntbot Tasks"), false)?;
+            apple.calendar_name = cal_name;
+        }
+        "google" => {
+            let google = state.config.calendar.ensure_google_mut();
+            google.enabled = true;
+
+            let client_id = prompt_text("Client ID", None, true)?;
+            google.client_id = client_id;
+
+            let client_secret = prompt_secret("Client Secret", 1)?;
+            google.client_secret = config::Secret::new(client_secret);
+
+            let access_token = prompt_secret("Access Token", 1)?;
+            google.access_token = config::Secret::new(access_token);
+
+            let refresh_token = prompt_secret("Refresh Token", 1)?;
+            google.refresh_token = config::Secret::new(refresh_token);
+
+            let cal_id = prompt_text("Calendar ID", Some("primary"), false)?;
+            google.calendar_id = cal_id;
+        }
+        "caldav" => {
+            let name = prompt_text("Provider Name (e.g. Nextcloud)", None, true)?;
+            let caldav_url = prompt_text("CalDAV URL", None, true)?;
+            let username = prompt_text("Username", None, true)?;
+            let password = prompt_secret("Password", 1)?;
+            let cal_name = prompt_text("Calendar Name", Some("Klyntbot Tasks"), false)?;
+
+            state
+                .config
+                .calendar
+                .providers
+                .push(config::CalendarProviderConfig::GenericCalDav(
+                    config::GenericCalDavConfig {
+                        enabled: true,
+                        name,
+                        caldav_url,
+                        username,
+                        password: config::Secret::new(password),
+                        calendar_name: cal_name,
+                        sync_interval_secs: 300,
+                        auto_sync_due_dates: true,
+                    },
+                ));
+        }
+        _ => {}
+    }
+
+    Ok(())
+}
+
 /// Mask an API key for display (show prefix + last 4 chars).
 fn mask_key(key: &str) -> String {
     if key.len() <= 8 {
@@ -420,5 +557,41 @@ mod tests {
     #[test]
     fn test_channel_info_has_telegram() {
         assert!(CHANNEL_INFO.iter().any(|c| c.key == "telegram"));
+    }
+
+    #[test]
+    fn test_calendar_provider_info_count() {
+        assert_eq!(CALENDAR_PROVIDER_INFO.len(), 3);
+    }
+
+    #[test]
+    fn test_calendar_provider_keys_unique() {
+        let mut keys: Vec<&str> = CALENDAR_PROVIDER_INFO.iter().map(|c| c.key).collect();
+        keys.sort();
+        keys.dedup();
+        assert_eq!(keys.len(), CALENDAR_PROVIDER_INFO.len());
+    }
+
+    #[test]
+    fn test_calendar_provider_info_has_apple() {
+        assert!(CALENDAR_PROVIDER_INFO.iter().any(|c| c.key == "apple"));
+    }
+
+    #[test]
+    fn test_calendar_provider_info_has_google() {
+        assert!(CALENDAR_PROVIDER_INFO.iter().any(|c| c.key == "google"));
+    }
+
+    #[test]
+    fn test_calendar_provider_info_has_caldav() {
+        assert!(CALENDAR_PROVIDER_INFO.iter().any(|c| c.key == "caldav"));
+    }
+
+    #[test]
+    fn test_calendar_provider_info_valid() {
+        for info in CALENDAR_PROVIDER_INFO {
+            assert!(!info.key.is_empty());
+            assert!(!info.name.is_empty());
+        }
     }
 }

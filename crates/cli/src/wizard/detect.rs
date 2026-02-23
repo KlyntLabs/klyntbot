@@ -40,6 +40,8 @@ pub struct DetectedState {
     pub channel: Option<(String, DetectSource)>,
     /// (token, source)
     pub channel_token: Option<(String, DetectSource)>,
+    /// (calendar_provider_key, source) — e.g., "apple"
+    pub calendar: Option<(String, DetectSource)>,
 }
 
 impl DetectedState {
@@ -107,6 +109,18 @@ impl DetectedState {
                 state.channel = Some((name.to_string(), DetectSource::Config));
                 state.channel_token = Some((token.to_string(), DetectSource::Config));
                 break;
+            }
+        }
+
+        // Detect first enabled calendar provider
+        if config.calendar.is_any_enabled() {
+            if let Some(provider) = config.calendar.enabled_providers().first() {
+                let key = match provider {
+                    config::CalendarProviderConfig::Apple(_) => "apple",
+                    config::CalendarProviderConfig::Google(_) => "google",
+                    config::CalendarProviderConfig::GenericCalDav(_) => "caldav",
+                };
+                state.calendar = Some((key.to_string(), DetectSource::Config));
             }
         }
 
@@ -395,5 +409,85 @@ mod tests {
     fn test_default_pg_running_is_false() {
         let state = DetectedState::default();
         assert!(!state.pg_running);
+    }
+
+    #[test]
+    fn test_detect_from_config_no_calendar() {
+        let config = config::Config::default();
+        let state = DetectedState::from_config(&config);
+        assert!(state.calendar.is_none());
+    }
+
+    #[test]
+    fn test_detect_from_config_apple_calendar() {
+        let mut config = config::Config::default();
+        config.calendar.providers.push(
+            config::CalendarProviderConfig::Apple(config::AppleCalendarConfig {
+                enabled: true,
+                username: "user@icloud.com".to_string(),
+                password: config::Secret::new("pass".to_string()),
+                ..config::AppleCalendarConfig::default()
+            }),
+        );
+
+        let state = DetectedState::from_config(&config);
+        assert_eq!(
+            state.calendar,
+            Some(("apple".to_string(), DetectSource::Config))
+        );
+    }
+
+    #[test]
+    fn test_detect_from_config_google_calendar() {
+        let mut config = config::Config::default();
+        config.calendar.providers.push(
+            config::CalendarProviderConfig::Google(config::GoogleCalendarConfig {
+                enabled: true,
+                ..config::GoogleCalendarConfig::default()
+            }),
+        );
+
+        let state = DetectedState::from_config(&config);
+        assert_eq!(
+            state.calendar,
+            Some(("google".to_string(), DetectSource::Config))
+        );
+    }
+
+    #[test]
+    fn test_detect_from_config_disabled_calendar_ignored() {
+        let mut config = config::Config::default();
+        config.calendar.providers.push(
+            config::CalendarProviderConfig::Apple(config::AppleCalendarConfig {
+                enabled: false,
+                ..config::AppleCalendarConfig::default()
+            }),
+        );
+
+        let state = DetectedState::from_config(&config);
+        assert!(state.calendar.is_none());
+    }
+
+    #[test]
+    fn test_detect_from_config_generic_caldav() {
+        let mut config = config::Config::default();
+        config.calendar.providers.push(
+            config::CalendarProviderConfig::GenericCalDav(config::GenericCalDavConfig {
+                enabled: true,
+                name: "Nextcloud".to_string(),
+                caldav_url: "https://nc.example.com/dav".to_string(),
+                username: "user".to_string(),
+                password: config::Secret::new("pass".to_string()),
+                calendar_name: "Tasks".to_string(),
+                sync_interval_secs: 300,
+                auto_sync_due_dates: true,
+            }),
+        );
+
+        let state = DetectedState::from_config(&config);
+        assert_eq!(
+            state.calendar,
+            Some(("caldav".to_string(), DetectSource::Config))
+        );
     }
 }

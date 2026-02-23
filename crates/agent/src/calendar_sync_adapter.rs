@@ -497,6 +497,298 @@ impl CalendarSyncAdapter {
         }
     }
 
+    /// Push a single task to all calendar providers.
+    /// If the task has a due_date, PUT to all providers and update calendar_event_uid.
+    /// If the task has no due_date but has a calendar_event_uid, DELETE from all providers.
+    async fn push_single_task_internal(&self, task_id: &str) -> Result<Value> {
+        let row = self
+            .todo_repo
+            .get(task_id)
+            .await?
+            .ok_or_else(|| common::ToolError::ExecutionFailed(format!("Task not found: {}", task_id)))?;
+        let todo = Todo::from(row);
+
+        if todo.due_date.is_some() {
+            if let Some(event) = self.todo_to_event(&todo) {
+                let mut pushed = 0u64;
+                for (provider_id, provider) in &self.providers {
+                    match provider.put_event(&event).await {
+                        Ok(_etag) => {
+                            pushed += 1;
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                "Failed to push task {} to {}: {}",
+                                task_id,
+                                provider_id,
+                                e
+                            );
+                        }
+                    }
+                }
+                // Set calendar_event_uid if not already set
+                if todo.calendar_event_uid.is_none() {
+                    let patch = storage::TodoPatch {
+                        id: task_id.to_string(),
+                        calendar_event_uid: Some(Some(event.uid.clone())),
+                        ..Default::default()
+                    };
+                    if let Err(e) = self.todo_repo.update(&patch).await {
+                        tracing::warn!("Failed to set calendar_event_uid for {}: {}", task_id, e);
+                    }
+                }
+                Ok(json!({"status": "pushed", "task_id": task_id, "providers_pushed": pushed}))
+            } else {
+                Ok(json!({"status": "skipped", "task_id": task_id, "reason": "could not convert to event"}))
+            }
+        } else if let Some(uid) = &todo.calendar_event_uid {
+            // No due_date but has calendar UID — remove from providers
+            self.remove_single_event_internal(uid).await?;
+            // Clear the UID on the todo
+            let patch = storage::TodoPatch {
+                id: task_id.to_string(),
+                calendar_event_uid: Some(None),
+                ..Default::default()
+            };
+            if let Err(e) = self.todo_repo.update(&patch).await {
+                tracing::warn!("Failed to clear calendar_event_uid for {}: {}", task_id, e);
+            }
+            Ok(json!({"status": "removed", "task_id": task_id, "reason": "no due_date"}))
+        } else {
+            Ok(json!({"status": "skipped", "task_id": task_id, "reason": "no due_date and no calendar_event_uid"}))
+        }
+    }
+
+    /// Remove a single calendar event from all providers by UID.
+    async fn remove_single_event_internal(&self, calendar_event_uid: &str) -> Result<Value> {
+        let mut removed = 0u64;
+        for (provider_id, provider) in &self.providers {
+            match provider.delete_event(calendar_event_uid).await {
+                Ok(()) => removed += 1,
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to delete event {} from {}: {}",
+                        calendar_event_uid,
+                        provider_id,
+                        e
+                    );
+                }
+            }
+        }
+        Ok(json!({"status": "removed", "uid": calendar_event_uid, "providers_removed": removed}))
+    }
+
+    /// Pull all events from all providers (no pushing).
+    async fn pull_all_events_internal(&self) -> Result<Value> {
+        let mut total_pulled = 0u64;
+        let mut total_conflicts = 0u64;
+        let mut provider_results = Vec::new();
+
+        for (provider_id, provider) in &self.providers {
+            let sync_state =
+                load_provider_sync_state(&self.calendar_sync_repo, provider_id).await?;
+
+            match provider.get_events(sync_state.sync_token.as_deref()).await {
+                Ok((remote_events, new_sync_token)) => {
+                    let mut events_pulled = 0u64;
+                    let mut conflicts = 0u64;
+
+                    for remote_event in &remote_events {
+                        if let Some(local_todo) =
+                            self.find_todo_by_calendar_uid(&remote_event.uid).await
+                        {
+                            if let Some(local_event) = self.todo_to_event(&local_todo) {
+                                if detect_conflict(remote_event, &local_event) {
+                                    conflicts += 1;
+                                    self.log_conflict(remote_event, &local_event);
+                                    let resolved = resolve_conflict(
+                                        remote_event,
+                                        &local_event,
+                                        self.conflict_strategy,
+                                    );
+                                    self.update_todo_from_event(&local_todo.id, &resolved)
+                                        .await?;
+                                } else {
+                                    self.update_todo_from_event(&local_todo.id, remote_event)
+                                        .await?;
+                                }
+                            } else {
+                                self.update_todo_from_event(&local_todo.id, remote_event)
+                                    .await?;
+                            }
+                            events_pulled += 1;
+                        } else {
+                            self.create_todo_from_event(remote_event).await?;
+                            events_pulled += 1;
+                        }
+                    }
+
+                    // Save sync token
+                    let mut updated_state = sync_state;
+                    updated_state.sync_token = new_sync_token;
+                    updated_state.last_sync = Some(Utc::now());
+                    save_provider_sync_state(
+                        &self.calendar_sync_repo,
+                        provider_id,
+                        &updated_state,
+                    )
+                    .await?;
+
+                    self.cache_events(provider_id, &remote_events).await;
+
+                    total_pulled += events_pulled;
+                    total_conflicts += conflicts;
+                    provider_results.push(json!({
+                        "provider": provider.name(),
+                        "provider_id": provider_id,
+                        "status": "success",
+                        "events_pulled": events_pulled,
+                        "conflicts_detected": conflicts,
+                    }));
+                }
+                Err(e) => {
+                    tracing::error!("Pull failed for {}: {:?}", provider.name(), e);
+                    provider_results.push(json!({
+                        "provider": provider.name(),
+                        "provider_id": provider_id,
+                        "status": "error",
+                        "error": e.to_string(),
+                    }));
+                }
+            }
+        }
+
+        // Run reconciliation if bidirectional sync is enabled
+        if self.bidirectional_sync {
+            if let Ok(events) = self.get_events_for_reconciliation().await {
+                if let Ok(report) =
+                    crate::reconcile_calendar_events(&self.todo_repo, events).await
+                {
+                    let changes = report.due_dates_updated
+                        + report.todos_completed
+                        + report.links_cleared;
+                    if changes > 0 {
+                        if let Some(ref dispatcher) = self.dispatcher {
+                            let summary = format!(
+                                "Updated: {} | Completed: {} | Unlinked: {}",
+                                report.due_dates_updated,
+                                report.todos_completed,
+                                report.links_cleared
+                            );
+                            dispatcher
+                                .notify("📅 Calendar Pull: Changes Detected", &summary)
+                                .await
+                                .ok();
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(json!({
+            "status": "success",
+            "events_pulled": total_pulled,
+            "conflicts_detected": total_conflicts,
+            "providers": provider_results,
+        }))
+    }
+
+    /// Push all tasks with due dates to all providers (no pulling).
+    async fn push_all_tasks_internal(&self) -> Result<Value> {
+        let rows = self.todo_repo.list(&storage::TodoFilter::default()).await?;
+        let todos: Vec<Todo> = rows.into_iter().map(Todo::from).collect();
+
+        let mut total_pushed = 0u64;
+        let mut total_deleted = 0u64;
+        let mut provider_results = Vec::new();
+
+        for (provider_id, provider) in &self.providers {
+            let mut pushed = 0u64;
+            let mut deleted = 0u64;
+
+            for todo in &todos {
+                if todo.due_date.is_some() {
+                    if let Some(event) = self.todo_to_event(todo) {
+                        match provider.put_event(&event).await {
+                            Ok(_etag) => {
+                                if todo.calendar_event_uid.is_none() {
+                                    let patch = storage::TodoPatch {
+                                        id: todo.id.clone(),
+                                        calendar_event_uid: Some(Some(event.uid.clone())),
+                                        ..Default::default()
+                                    };
+                                    if let Err(e) = self.todo_repo.update(&patch).await {
+                                        tracing::warn!(
+                                            "Failed to set calendar_event_uid for {}: {}",
+                                            todo.id,
+                                            e
+                                        );
+                                    }
+                                }
+                                pushed += 1;
+                            }
+                            Err(e) => {
+                                tracing::warn!(
+                                    "Failed to push {} to {}: {}",
+                                    todo.id,
+                                    provider_id,
+                                    e
+                                );
+                            }
+                        }
+                    }
+                } else if let Some(uid) = &todo.calendar_event_uid {
+                    // No due_date but has calendar UID — delete the event
+                    match provider.delete_event(uid).await {
+                        Ok(()) => deleted += 1,
+                        Err(e) => {
+                            tracing::warn!(
+                                "Failed to delete event {} from {}: {}",
+                                uid,
+                                provider_id,
+                                e
+                            );
+                        }
+                    }
+                }
+            }
+
+            total_pushed += pushed;
+            total_deleted += deleted;
+            provider_results.push(json!({
+                "provider": provider.name(),
+                "provider_id": provider_id,
+                "events_pushed": pushed,
+                "events_deleted": deleted,
+            }));
+        }
+
+        // Clear calendar_event_uid for todos that lost their due_date
+        for todo in &todos {
+            if todo.due_date.is_none() && todo.calendar_event_uid.is_some() {
+                let patch = storage::TodoPatch {
+                    id: todo.id.clone(),
+                    calendar_event_uid: Some(None),
+                    ..Default::default()
+                };
+                if let Err(e) = self.todo_repo.update(&patch).await {
+                    tracing::warn!(
+                        "Failed to clear calendar_event_uid for {}: {}",
+                        todo.id,
+                        e
+                    );
+                }
+            }
+        }
+
+        Ok(json!({
+            "status": "success",
+            "tasks_pushed": total_pushed,
+            "events_deleted": total_deleted,
+            "providers": provider_results,
+        }))
+    }
+
     /// Log a calendar conflict via tracing.
     fn log_conflict(&self, server_event: &CalendarEvent, local_event: &CalendarEvent) {
         warn!(
@@ -719,6 +1011,22 @@ impl CalendarHandler for CalendarSyncAdapter {
         }
 
         Ok(None)
+    }
+
+    async fn push_single_task(&self, task_id: &str) -> Result<Value> {
+        self.push_single_task_internal(task_id).await
+    }
+
+    async fn remove_single_event(&self, calendar_event_uid: &str) -> Result<Value> {
+        self.remove_single_event_internal(calendar_event_uid).await
+    }
+
+    async fn pull_all_events(&self) -> Result<Value> {
+        self.pull_all_events_internal().await
+    }
+
+    async fn push_all_tasks(&self) -> Result<Value> {
+        self.push_all_tasks_internal().await
     }
 
     /// Get all calendar events from all enabled providers for reconciliation.

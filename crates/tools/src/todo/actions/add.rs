@@ -82,7 +82,7 @@ impl TodoTool {
             }
         }
 
-        self.trigger_sync_async().await;
+        self.push_task_to_calendar(&created.id).await;
 
         Ok(format!(
             "Task created: {} (ID: {}){}",
@@ -120,7 +120,7 @@ impl TodoTool {
             created.title, created.id, parent_id
         );
 
-        self.trigger_sync_async().await;
+        self.push_task_to_calendar(&created.id).await;
 
         Ok(result)
     }

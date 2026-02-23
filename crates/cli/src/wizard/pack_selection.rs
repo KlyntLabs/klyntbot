@@ -232,11 +232,15 @@ fn tier_header_count(options: &[PackOption]) -> usize {
 }
 
 /// Render the checklist to stdout.
+///
+/// Uses explicit `\r\n` because this runs inside crossterm raw mode where
+/// `\n` alone only moves the cursor down without returning to column 0.
 fn render_checklist(options: &[PackOption], cursor: usize) {
     use common::utils::terminal::*;
+    use std::io::Write;
 
+    let mut stdout = std::io::stdout();
     let mut last_tier: Option<PackTier> = None;
-    let mut line_idx = 0;
 
     for (i, opt) in options.iter().enumerate() {
         // Print tier header when tier changes
@@ -246,9 +250,8 @@ fn render_checklist(options: &[PackOption], cursor: usize) {
                 PackTier::Recommended => "Recommended",
                 PackTier::Optional => "Optional",
             };
-            println!("  {}", colorize(label, BOLD));
+            let _ = write!(stdout, "  {}\r\n", colorize(label, BOLD));
             last_tier = Some(opt.tier);
-            line_idx += 1;
         }
 
         let marker = if opt.locked {
@@ -271,18 +274,17 @@ fn render_checklist(options: &[PackOption], cursor: usize) {
             colorize(&opt.name, BOLD)
         };
 
-        println!(
-            "    {}{} {} {}",
+        let _ = write!(
+            stdout,
+            "    {}{} {} {}\r\n",
             pointer,
             marker,
             name_style,
             colorize(&format!("— {}", opt.description), DIM)
         );
-
-        line_idx += 1;
     }
 
-    let _ = line_idx; // suppress unused
+    let _ = stdout.flush();
 }
 
 /// Erase N lines above the cursor (for re-rendering).
