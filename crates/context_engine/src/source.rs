@@ -14,6 +14,8 @@ pub struct SourceContext {
     pub channel: String,
     /// Chat/conversation ID.
     pub chat_id: String,
+    /// Current user message (for relevance-filtered sources).
+    pub message: Option<String>,
 }
 
 /// A pluggable provider of context sections for the system prompt.

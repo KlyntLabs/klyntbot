@@ -1,19 +1,85 @@
 //! Memory system for agent persistence (SQL-backed).
 
+use std::sync::Arc;
+
 use chrono::{Datelike, Utc};
 use tracing::{debug, warn};
 
 use common::Result;
+use storage::MemoryNoteEmbeddingRepo;
+use tools::embedding_engine::EmbeddingEngine;
 
 /// Memory store for daily notes and long-term memory, backed by PostgreSQL.
 pub struct MemoryStore {
     repo: storage::MemoryNoteRepo,
+    embedding_repo: Option<MemoryNoteEmbeddingRepo>,
+    embedding_engine: Option<Arc<EmbeddingEngine>>,
+    similarity_threshold: f64,
 }
 
 impl MemoryStore {
-    /// Create a SQL-backed memory store.
+    /// Create a SQL-backed memory store (no embedding support).
     pub fn new(repo: storage::MemoryNoteRepo) -> Self {
-        Self { repo }
+        Self {
+            repo,
+            embedding_repo: None,
+            embedding_engine: None,
+            similarity_threshold: 0.5,
+        }
+    }
+
+    /// Create a SQL-backed memory store with embedding-based relevance filtering.
+    pub fn with_embeddings(
+        repo: storage::MemoryNoteRepo,
+        embedding_repo: MemoryNoteEmbeddingRepo,
+        embedding_engine: Arc<EmbeddingEngine>,
+        similarity_threshold: f64,
+    ) -> Self {
+        Self {
+            repo,
+            embedding_repo: Some(embedding_repo),
+            embedding_engine: Some(embedding_engine),
+            similarity_threshold,
+        }
+    }
+
+    /// Get memory context filtered by relevance to the query.
+    /// Falls back to `get_memory_context()` if embeddings are unavailable.
+    pub async fn get_relevant_memory(&self, query: &str, limit: usize) -> String {
+        if let (Some(engine), Some(repo)) = (&self.embedding_engine, &self.embedding_repo) {
+            // Embed query (CPU-bound, run in blocking thread)
+            let engine = Arc::clone(engine);
+            let query_text = query.to_string();
+            let embed_result = tokio::task::spawn_blocking(move || engine.embed(&query_text)).await;
+
+            if let Ok(Ok(query_vec)) = embed_result {
+                match repo
+                    .search_similar(&query_vec, limit as i64, self.similarity_threshold)
+                    .await
+                {
+                    Ok(matches) if !matches.is_empty() => {
+                        let mut context = String::new();
+                        context.push_str("# Relevant Memory\n\n");
+                        for m in &matches {
+                            context.push_str(&format!(
+                                "## {} (relevance: {:.0}%)\n{}\n\n",
+                                m.note_key,
+                                m.similarity * 100.0,
+                                m.content
+                            ));
+                        }
+                        return context;
+                    }
+                    Ok(_) => {} // No matches above threshold — fall through
+                    Err(e) => {
+                        warn!("Memory embedding search failed: {}", e);
+                    }
+                }
+            }
+        }
+
+        // Fallback to dump-everything
+        self.get_memory_context().await
     }
 
     /// Get memory context for system prompt (long-term + today's notes)
@@ -72,6 +138,10 @@ impl MemoryStore {
 
         self.repo.append(&key, content).await?;
         debug!("Appended to today's memory note (SQL): {}", key);
+
+        // Best-effort: embed the note for future relevance search
+        self.embed_note(&key, content);
+
         Ok(())
     }
 
@@ -97,6 +167,10 @@ impl MemoryStore {
             .upsert(storage::repos::memory_note::LONG_TERM_KEY, content)
             .await?;
         debug!("Updated long-term memory (SQL)");
+
+        // Best-effort: embed for future relevance search
+        self.embed_note(storage::repos::memory_note::LONG_TERM_KEY, content);
+
         Ok(())
     }
 
@@ -119,6 +193,33 @@ impl MemoryStore {
                 warn!("Failed to list memory keys from SQL: {}", e);
                 Ok(Vec::new())
             }
+        }
+    }
+
+    /// Fire-and-forget embed a memory note for semantic retrieval.
+    fn embed_note(&self, key: &str, content: &str) {
+        if let (Some(engine), Some(repo)) = (&self.embedding_engine, &self.embedding_repo) {
+            let engine = Arc::clone(engine);
+            let repo = repo.clone();
+            let key = key.to_string();
+            let content = content.to_string();
+            tokio::spawn(async move {
+                let embed_result =
+                    tokio::task::spawn_blocking(move || engine.embed(&content)).await;
+                match embed_result {
+                    Ok(Ok(vec)) => {
+                        if let Err(e) = repo.upsert(&key, &vec).await {
+                            warn!("Failed to upsert memory note embedding: {}", e);
+                        }
+                    }
+                    Ok(Err(e)) => {
+                        warn!("Failed to embed memory note: {}", e);
+                    }
+                    Err(e) => {
+                        warn!("Embedding task panicked: {}", e);
+                    }
+                }
+            });
         }
     }
 }

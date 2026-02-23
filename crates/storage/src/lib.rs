@@ -30,6 +30,7 @@ pub use repos::PlanRepo;
 pub use repos::SessionRepo;
 pub use repos::StrategyRepo;
 pub use repos::UsageRepo;
+pub use repos::{MemoryNoteEmbeddingRepo, MemoryNoteMatch};
 
 // Re-export finance repo types.
 pub use repos::FinanceAccountRepo;

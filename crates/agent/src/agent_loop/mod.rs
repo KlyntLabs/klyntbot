@@ -415,7 +415,11 @@ impl AgentLoop {
     ) -> Result<String> {
         let system_prompt = self
             .context_engine
-            .build_system_prompt(routing_ctx.channel.as_str(), routing_ctx.chat_id.as_str())
+            .build_system_prompt(
+                routing_ctx.channel.as_str(),
+                routing_ctx.chat_id.as_str(),
+                Some(content),
+            )
             .await;
 
         let history_messages = Self::convert_history(&history);

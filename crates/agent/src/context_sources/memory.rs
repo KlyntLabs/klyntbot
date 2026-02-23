@@ -19,6 +19,8 @@ pub struct MemorySource {
 struct CachedValue {
     content: String,
     expires_at: DateTime<Utc>,
+    /// Query used to generate this cached value (None = unfiltered).
+    query: Option<String>,
 }
 
 impl MemorySource {
@@ -40,12 +42,12 @@ impl ContextSource for MemorySource {
         80
     }
 
-    async fn provide(&self, _ctx: &SourceContext) -> Option<String> {
-        // Check TTL cache
+    async fn provide(&self, ctx: &SourceContext) -> Option<String> {
+        // Check TTL cache — cache hit only if query matches
         {
             let cache = self.cache.lock().await;
             if let Some(ref cached) = *cache {
-                if Utc::now() < cached.expires_at {
+                if Utc::now() < cached.expires_at && cached.query == ctx.message {
                     return if cached.content.trim().is_empty() {
                         None
                     } else {
@@ -55,8 +57,13 @@ impl ContextSource for MemorySource {
             }
         }
 
-        // Cache miss — fetch fresh
-        let content = self.memory.get_memory_context().await;
+        // Cache miss — fetch fresh, using relevance filtering if message available
+        let content = if let Some(ref query) = ctx.message {
+            self.memory.get_relevant_memory(query, 5).await
+        } else {
+            self.memory.get_memory_context().await
+        };
+
         let result = if content.trim().is_empty() {
             None
         } else {
@@ -69,6 +76,7 @@ impl ContextSource for MemorySource {
             *cache = Some(CachedValue {
                 content,
                 expires_at: Utc::now() + Duration::seconds(MEMORY_CACHE_TTL_SECS),
+                query: ctx.message.clone(),
             });
         }
 
