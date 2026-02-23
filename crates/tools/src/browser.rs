@@ -395,6 +395,13 @@ impl BrowserTool {
     async fn act_fill_form(&self, p: &ParamExtractor<'_>) -> Result<String> {
         let fields = p.required_object("fields")?.clone();
 
+        // Pre-scan: guard fires before any browser state is modified.
+        for label in fields.keys() {
+            if self.should_guard("fill", label) {
+                return Ok(Self::guard_message("fill", label));
+            }
+        }
+
         let snapshot_raw = self.act_snapshot().await?;
         let elements = Self::parse_snapshot(&snapshot_raw);
 
@@ -403,9 +410,6 @@ impl BrowserTool {
 
         for (label, value) in &fields {
             let val = value.as_str().unwrap_or_default();
-            if self.should_guard("fill", label) {
-                return Ok(Self::guard_message("fill", label));
-            }
             match Self::find_element_by_label(&elements, label) {
                 Some(elem) => {
                     let args = Self::build_args("fill", &[&elem.ref_id, val]);
@@ -414,6 +418,12 @@ impl BrowserTool {
                 }
                 None => not_found.push(label.as_str()),
             }
+        }
+
+        if filled.is_empty() {
+            return Err(ToolError::ExecutionFailed(
+                format!("No fields filled. Not found: {}", not_found.join(", "))
+            ).into());
         }
 
         let mut result = format!("Filled: {}", filled.join(", "));
