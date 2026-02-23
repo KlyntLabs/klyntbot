@@ -46,6 +46,7 @@ pub fn is_write_action(action: &str, element_label: &str) -> bool {
 // ── SnapshotElement ───────────────────────────────────────────────────────────
 
 /// A single element reference parsed from a snapshot.
+#[derive(Debug)]
 pub struct SnapshotElement {
     pub ref_id: String,
     pub kind:   String,
@@ -151,7 +152,12 @@ impl BrowserTool {
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-            return Err(ToolError::ExecutionFailed(stderr).into());
+            let msg = if stderr.is_empty() {
+                format!("agent-browser exited with status {}", output.status)
+            } else {
+                stderr
+            };
+            return Err(ToolError::ExecutionFailed(msg).into());
         }
 
         Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
