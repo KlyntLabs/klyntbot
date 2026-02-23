@@ -337,7 +337,10 @@ impl ContextEngine {
 
         // 4. Compress history to fit remaining budget (token-aware)
         let history_budget = allocator.remaining();
-        let compressed = self.compressor.compress(&request.history, history_budget);
+        let compressed = self
+            .compressor
+            .compress_async(&request.history, history_budget)
+            .await;
 
         // Post-compression budget enforcement: if recent messages alone
         // exceed the budget (e.g., very long tool results), truncate from oldest.
