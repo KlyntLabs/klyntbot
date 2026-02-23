@@ -2,7 +2,6 @@
 
 pub mod calendar;
 pub mod cron;
-pub mod embedding;
 pub mod finance;
 pub mod goal;
 pub mod learning;
