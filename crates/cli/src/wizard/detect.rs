@@ -421,14 +421,17 @@ mod tests {
     #[test]
     fn test_detect_from_config_apple_calendar() {
         let mut config = config::Config::default();
-        config.calendar.providers.push(
-            config::CalendarProviderConfig::Apple(config::AppleCalendarConfig {
-                enabled: true,
-                username: "user@icloud.com".to_string(),
-                password: config::Secret::new("pass".to_string()),
-                ..config::AppleCalendarConfig::default()
-            }),
-        );
+        config
+            .calendar
+            .providers
+            .push(config::CalendarProviderConfig::Apple(
+                config::AppleCalendarConfig {
+                    enabled: true,
+                    username: "user@icloud.com".to_string(),
+                    password: config::Secret::new("pass".to_string()),
+                    ..config::AppleCalendarConfig::default()
+                },
+            ));
 
         let state = DetectedState::from_config(&config);
         assert_eq!(
@@ -440,12 +443,15 @@ mod tests {
     #[test]
     fn test_detect_from_config_google_calendar() {
         let mut config = config::Config::default();
-        config.calendar.providers.push(
-            config::CalendarProviderConfig::Google(config::GoogleCalendarConfig {
-                enabled: true,
-                ..config::GoogleCalendarConfig::default()
-            }),
-        );
+        config
+            .calendar
+            .providers
+            .push(config::CalendarProviderConfig::Google(
+                config::GoogleCalendarConfig {
+                    enabled: true,
+                    ..config::GoogleCalendarConfig::default()
+                },
+            ));
 
         let state = DetectedState::from_config(&config);
         assert_eq!(
@@ -457,12 +463,15 @@ mod tests {
     #[test]
     fn test_detect_from_config_disabled_calendar_ignored() {
         let mut config = config::Config::default();
-        config.calendar.providers.push(
-            config::CalendarProviderConfig::Apple(config::AppleCalendarConfig {
-                enabled: false,
-                ..config::AppleCalendarConfig::default()
-            }),
-        );
+        config
+            .calendar
+            .providers
+            .push(config::CalendarProviderConfig::Apple(
+                config::AppleCalendarConfig {
+                    enabled: false,
+                    ..config::AppleCalendarConfig::default()
+                },
+            ));
 
         let state = DetectedState::from_config(&config);
         assert!(state.calendar.is_none());
@@ -471,18 +480,21 @@ mod tests {
     #[test]
     fn test_detect_from_config_generic_caldav() {
         let mut config = config::Config::default();
-        config.calendar.providers.push(
-            config::CalendarProviderConfig::GenericCalDav(config::GenericCalDavConfig {
-                enabled: true,
-                name: "Nextcloud".to_string(),
-                caldav_url: "https://nc.example.com/dav".to_string(),
-                username: "user".to_string(),
-                password: config::Secret::new("pass".to_string()),
-                calendar_name: "Tasks".to_string(),
-                sync_interval_secs: 300,
-                auto_sync_due_dates: true,
-            }),
-        );
+        config
+            .calendar
+            .providers
+            .push(config::CalendarProviderConfig::GenericCalDav(
+                config::GenericCalDavConfig {
+                    enabled: true,
+                    name: "Nextcloud".to_string(),
+                    caldav_url: "https://nc.example.com/dav".to_string(),
+                    username: "user".to_string(),
+                    password: config::Secret::new("pass".to_string()),
+                    calendar_name: "Tasks".to_string(),
+                    sync_interval_secs: 300,
+                    auto_sync_due_dates: true,
+                },
+            ));
 
         let state = DetectedState::from_config(&config);
         assert_eq!(

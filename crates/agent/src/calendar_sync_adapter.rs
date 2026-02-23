@@ -501,11 +501,9 @@ impl CalendarSyncAdapter {
     /// If the task has a due_date, PUT to all providers and update calendar_event_uid.
     /// If the task has no due_date but has a calendar_event_uid, DELETE from all providers.
     async fn push_single_task_internal(&self, task_id: &str) -> Result<Value> {
-        let row = self
-            .todo_repo
-            .get(task_id)
-            .await?
-            .ok_or_else(|| common::ToolError::ExecutionFailed(format!("Task not found: {}", task_id)))?;
+        let row = self.todo_repo.get(task_id).await?.ok_or_else(|| {
+            common::ToolError::ExecutionFailed(format!("Task not found: {}", task_id))
+        })?;
         let todo = Todo::from(row);
 
         if todo.due_date.is_some() {
@@ -539,7 +537,9 @@ impl CalendarSyncAdapter {
                 }
                 Ok(json!({"status": "pushed", "task_id": task_id, "providers_pushed": pushed}))
             } else {
-                Ok(json!({"status": "skipped", "task_id": task_id, "reason": "could not convert to event"}))
+                Ok(
+                    json!({"status": "skipped", "task_id": task_id, "reason": "could not convert to event"}),
+                )
             }
         } else if let Some(uid) = &todo.calendar_event_uid {
             // No due_date but has calendar UID — remove from providers
@@ -555,7 +555,9 @@ impl CalendarSyncAdapter {
             }
             Ok(json!({"status": "removed", "task_id": task_id, "reason": "no due_date"}))
         } else {
-            Ok(json!({"status": "skipped", "task_id": task_id, "reason": "no due_date and no calendar_event_uid"}))
+            Ok(
+                json!({"status": "skipped", "task_id": task_id, "reason": "no due_date and no calendar_event_uid"}),
+            )
         }
     }
 
@@ -627,12 +629,8 @@ impl CalendarSyncAdapter {
                     let mut updated_state = sync_state;
                     updated_state.sync_token = new_sync_token;
                     updated_state.last_sync = Some(Utc::now());
-                    save_provider_sync_state(
-                        &self.calendar_sync_repo,
-                        provider_id,
-                        &updated_state,
-                    )
-                    .await?;
+                    save_provider_sync_state(&self.calendar_sync_repo, provider_id, &updated_state)
+                        .await?;
 
                     self.cache_events(provider_id, &remote_events).await;
 
@@ -661,12 +659,10 @@ impl CalendarSyncAdapter {
         // Run reconciliation if bidirectional sync is enabled
         if self.bidirectional_sync {
             if let Ok(events) = self.get_events_for_reconciliation().await {
-                if let Ok(report) =
-                    crate::reconcile_calendar_events(&self.todo_repo, events).await
+                if let Ok(report) = crate::reconcile_calendar_events(&self.todo_repo, events).await
                 {
-                    let changes = report.due_dates_updated
-                        + report.todos_completed
-                        + report.links_cleared;
+                    let changes =
+                        report.due_dates_updated + report.todos_completed + report.links_cleared;
                     if changes > 0 {
                         if let Some(ref dispatcher) = self.dispatcher {
                             let summary = format!(
@@ -772,11 +768,7 @@ impl CalendarSyncAdapter {
                     ..Default::default()
                 };
                 if let Err(e) = self.todo_repo.update(&patch).await {
-                    tracing::warn!(
-                        "Failed to clear calendar_event_uid for {}: {}",
-                        todo.id,
-                        e
-                    );
+                    tracing::warn!("Failed to clear calendar_event_uid for {}: {}", todo.id, e);
                 }
             }
         }

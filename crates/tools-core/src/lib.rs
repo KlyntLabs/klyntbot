@@ -301,7 +301,9 @@ fn validate_value(val: &Value, schema: &Value, path: &str) -> Vec<String> {
 
     // anyOf: must match at least one subschema
     if let Some(schemas) = schema.get("anyOf").and_then(|s| s.as_array()) {
-        let matches_any = schemas.iter().any(|s| validate_value(val, s, path).is_empty());
+        let matches_any = schemas
+            .iter()
+            .any(|s| validate_value(val, s, path).is_empty());
         if !matches_any {
             errors.push(format!(
                 "{} must match at least one of anyOf schemas",
@@ -383,7 +385,8 @@ mod tests {
         assert!(!validate_value(&json!([1]), &schema, "").is_empty()); // too few
         assert!(validate_value(&json!([1, 2]), &schema, "").is_empty()); // ok
         assert!(validate_value(&json!([1, 2, 3, 4]), &schema, "").is_empty()); // ok
-        assert!(!validate_value(&json!([1, 2, 3, 4, 5]), &schema, "").is_empty()); // too many
+        assert!(!validate_value(&json!([1, 2, 3, 4, 5]), &schema, "").is_empty());
+        // too many
     }
 
     #[test]

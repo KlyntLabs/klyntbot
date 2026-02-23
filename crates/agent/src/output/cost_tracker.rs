@@ -399,7 +399,11 @@ mod tests {
         // Cache read: 0.05M * $0.30 = $0.015
         // Cache write: 0.02M * $3.75 = $0.075
         // Total: $0.54
-        assert!(cost > 0.45, "Cost should include cache tokens, got {}", cost);
+        assert!(
+            cost > 0.45,
+            "Cost should include cache tokens, got {}",
+            cost
+        );
     }
 
     #[test]
@@ -411,10 +415,7 @@ mod tests {
     #[test]
     fn test_deepseek_pricing_exists() {
         let pricing = model_pricing("deepseek-chat");
-        assert!(
-            pricing.input > 0.0,
-            "DeepSeek should have non-zero pricing"
-        );
+        assert!(pricing.input > 0.0, "DeepSeek should have non-zero pricing");
     }
 
     #[test]

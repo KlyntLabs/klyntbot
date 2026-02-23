@@ -323,7 +323,7 @@ fn default_caldav_url() -> String {
 }
 
 fn default_calendar_name() -> String {
-    "Klyntbot Tasks".to_string()
+    "Personal".to_string()
 }
 
 fn default_sync_interval_secs() -> u64 {

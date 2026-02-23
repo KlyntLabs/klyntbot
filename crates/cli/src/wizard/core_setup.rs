@@ -421,11 +421,10 @@ fn prompt_calendar(state: &mut WizardState, detected: &DetectedState) -> Result<
             let password = prompt_secret("App-Specific Password", 1)?;
             apple.password = config::Secret::new(password);
 
-            let caldav_url =
-                prompt_text("CalDAV URL", Some("https://caldav.icloud.com"), false)?;
+            let caldav_url = prompt_text("CalDAV URL", Some("https://caldav.icloud.com"), false)?;
             apple.caldav_url = caldav_url;
 
-            let cal_name = prompt_text("Calendar Name", Some("Klyntbot Tasks"), false)?;
+            let cal_name = prompt_text("Calendar Name", Some("Personal"), false)?;
             apple.calendar_name = cal_name;
         }
         "google" => {
@@ -452,7 +451,7 @@ fn prompt_calendar(state: &mut WizardState, detected: &DetectedState) -> Result<
             let caldav_url = prompt_text("CalDAV URL", None, true)?;
             let username = prompt_text("Username", None, true)?;
             let password = prompt_secret("Password", 1)?;
-            let cal_name = prompt_text("Calendar Name", Some("Klyntbot Tasks"), false)?;
+            let cal_name = prompt_text("Calendar Name", Some("Personal"), false)?;
 
             state
                 .config

@@ -315,8 +315,8 @@ async fn run_subagent_task(
         Message::user(task.to_string()),
     ];
 
-    let params =
-        ExecutionParams::new(model).with_timeout(std::time::Duration::from_secs(config.exec_timeout));
+    let params = ExecutionParams::new(model)
+        .with_timeout(std::time::Duration::from_secs(config.exec_timeout));
     let routing_ctx = RoutingContext::new("subagent".into(), "background".into());
 
     // Execute via ReactPlusEngine
@@ -331,7 +331,9 @@ async fn run_subagent_task(
             "ok".to_string(),
             format!("Task requires more complex handling: {}", reason),
         )),
-        ReactOutcome::MaxIterationsReached { partial_content, .. } => {
+        ReactOutcome::MaxIterationsReached {
+            partial_content, ..
+        } => {
             let text = partial_content.unwrap_or_else(|| {
                 "Task completed but no final response was generated.".to_string()
             });

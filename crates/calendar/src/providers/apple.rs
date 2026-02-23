@@ -147,7 +147,7 @@ mod tests {
             "https://caldav.icloud.com".to_string(),
             "user@icloud.com".to_string(),
             "app-password".to_string(),
-            "Klyntbot Tasks".to_string(),
+            "Personal".to_string(),
             "UTC".to_string(),
         );
 
@@ -162,7 +162,7 @@ mod tests {
             "https://p123-caldav.icloud.com:443/12345/calendars/klyntbot/".to_string(),
             "user@icloud.com".to_string(),
             "app-password".to_string(),
-            "Klyntbot Tasks".to_string(),
+            "Personal".to_string(),
             "Asia/Bangkok".to_string(),
         );
 
