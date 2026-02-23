@@ -50,7 +50,7 @@ pub async fn run_wizard(packs_only: bool, reset: bool) -> Result<()> {
     if !packs_only {
         // Phase 1: Smart Core Setup
         print_phase_header(1, 2, "Core Setup");
-        match core_setup::run_core_setup(&mut state).await {
+        match core_setup::run_core_setup(&mut state) {
             Ok(StepResult::Cancel) => {
                 println!("\n{} Setup cancelled.", status_warning());
                 return Ok(());

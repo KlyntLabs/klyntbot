@@ -20,16 +20,11 @@ pub async fn handle_serve(port: u16) -> Result<()> {
     let mut config = config::load_with_env_overrides().await?;
     info!("Configuration loaded from: {:?}", config::config_path());
 
-    // Connect to database and create repos
-    let database_url = config.database_url.as_deref().ok_or_else(|| {
-        anyhow::anyhow!(
-            "Database not configured. Run `klyntbot init` to set up PostgreSQL.\n\
-             Or set KLYNTBOT_DATABASE_URL in your environment."
-        )
-    })?;
-    let storage_pool = StoragePool::connect(database_url).await?;
+    // Connect to SQLite storage and create repos
+    let data_dir = config.data_dir_path();
+    let storage_pool = StoragePool::connect(&data_dir).await?;
     let repos = Repos::from_pool(&storage_pool);
-    info!("Database connected and migrations applied");
+    info!("Storage connected and migrations applied");
 
     // Initialize LLM provider (resolves the effective model for this provider)
     let (provider, resolved_model) = providers::create_provider(&config)?;

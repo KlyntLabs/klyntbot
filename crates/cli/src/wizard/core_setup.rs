@@ -135,20 +135,17 @@ pub static CALENDAR_PROVIDER_INFO: &[CalendarProviderInfo] = &[
 /// 2. Render summary of auto-detected values
 /// 3. Prompt for missing/editable fields (provider, API key, database, channel, calendar)
 /// 4. Save results to `state.config`
-pub async fn run_core_setup(state: &mut WizardState) -> Result<StepResult> {
+pub fn run_core_setup(state: &mut WizardState) -> Result<StepResult> {
     // Build detected state
     let mut detected = DetectedState::from_config(&state.config);
     detected.overlay_env_vars();
-    detected.probe_postgres();
+    detected.check_data_dir();
 
     // Show auto-detected summary
     render_summary(&detected);
 
     // Provider setup
     prompt_provider(state, &detected)?;
-
-    // Database setup
-    prompt_database(state, &detected).await?;
 
     // Channel setup (optional)
     prompt_channel(state, &detected)?;
@@ -183,18 +180,19 @@ fn render_summary(detected: &DetectedState) {
         );
     }
 
-    if let Some((ref url, ref source)) = detected.database_url {
+    if detected.data_dir_writable {
         println!(
-            "  {} Database: {} ({})",
+            "  {} Data dir: {} {}",
             colorize("✓", SUCCESS),
-            colorize(url, HIGHLIGHT),
-            source
+            colorize(&detected.data_dir, HIGHLIGHT),
+            colorize("(writable)", DIM)
         );
     } else {
         println!(
-            "  {} Database: {}",
+            "  {} Data dir: {} {}",
             colorize("·", DIM),
-            colorize("not configured", DIM)
+            colorize(&detected.data_dir, HIGHLIGHT),
+            colorize("(will be created on first run)", DIM)
         );
     }
 
@@ -272,20 +270,6 @@ fn prompt_provider(state: &mut WizardState, detected: &DetectedState) -> Result<
             state.config.set_provider_key(provider.key, key);
         }
     }
-
-    Ok(())
-}
-
-/// Prompt for database URL configuration.
-async fn prompt_database(state: &mut WizardState, detected: &DetectedState) -> Result<()> {
-    let default_url = detected
-        .database_url
-        .as_ref()
-        .map(|(url, _)| url.as_str())
-        .unwrap_or("postgresql://localhost/klyntbot");
-
-    let url = prompt_text("Database URL", Some(default_url), true)?;
-    state.config.database_url = Some(url);
 
     Ok(())
 }

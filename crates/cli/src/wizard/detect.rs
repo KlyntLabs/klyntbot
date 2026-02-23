@@ -9,7 +9,7 @@ pub enum DetectSource {
     Config,
     /// From KLYNTBOT_* environment variable
     EnvVar,
-    /// From system probe (e.g., pg_isready)
+    /// From system probe (e.g., directory writability check)
     Detected,
 }
 
@@ -32,10 +32,10 @@ pub struct DetectedState {
     pub api_key: Option<(String, DetectSource)>,
     /// (model, source)
     pub model: Option<(String, DetectSource)>,
-    /// (database_url, source)
-    pub database_url: Option<(String, DetectSource)>,
-    /// Whether postgres is running (from pg_isready probe)
-    pub pg_running: bool,
+    /// Effective data directory path (expanded ~)
+    pub data_dir: String,
+    /// Whether the data directory exists and is writable (or can be created)
+    pub data_dir_writable: bool,
     /// (channel_key, source) — e.g., "telegram"
     pub channel: Option<(String, DetectSource)>,
     /// (token, source)
@@ -81,10 +81,8 @@ impl DetectedState {
             state.model = Some((config.agents.defaults.model.clone(), DetectSource::Config));
         }
 
-        // Detect database URL
-        if let Some(ref url) = config.database_url {
-            state.database_url = Some((url.clone(), DetectSource::Config));
-        }
+        // Populate effective data directory path
+        state.data_dir = config.data_dir_path().display().to_string();
 
         // Detect first enabled channel
         let channels: &[(&str, bool, &str)] = &[
@@ -148,13 +146,6 @@ impl DetectedState {
             }
         }
 
-        // Database URL from env
-        if let Ok(url) = std::env::var("KLYNTBOT_DATABASE_URL") {
-            if !url.is_empty() {
-                self.database_url = Some((url, DetectSource::EnvVar));
-            }
-        }
-
         // Channel tokens from env
         let env_channels = [
             ("KLYNTBOT_CHANNELS__TELEGRAM__TOKEN", "telegram"),
@@ -172,27 +163,20 @@ impl DetectedState {
         }
     }
 
-    /// Probe system for running PostgreSQL (fills pg_running and default DB URL).
-    pub fn probe_postgres(&mut self) {
-        if self.database_url.is_some() {
-            return; // Already have a URL, skip probe
-        }
-
-        // Check if pg_isready succeeds
-        let pg_running = std::process::Command::new("pg_isready")
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .status()
-            .map(|s| s.success())
-            .unwrap_or(false);
-
-        self.pg_running = pg_running;
-        if pg_running {
-            self.database_url = Some((
-                "postgresql://localhost/klyntbot".to_string(),
-                DetectSource::Detected,
-            ));
-        }
+    /// Check whether the data directory is writable (or can be created).
+    pub fn check_data_dir(&mut self) {
+        let path = std::path::Path::new(&self.data_dir);
+        // Try to create the directory (no-op if it already exists), then
+        // probe writability by writing and immediately removing a marker file.
+        let writable = if std::fs::create_dir_all(path).is_ok() {
+            let probe = path.join(".write_probe");
+            let ok = std::fs::write(&probe, b"").is_ok();
+            let _ = std::fs::remove_file(&probe);
+            ok
+        } else {
+            false
+        };
+        self.data_dir_writable = writable;
     }
 }
 
@@ -205,7 +189,6 @@ mod tests {
         let state = DetectedState::default();
         assert!(state.provider.is_none());
         assert!(state.api_key.is_none());
-        assert!(state.database_url.is_none());
         assert!(state.channel.is_none());
     }
 
@@ -244,17 +227,22 @@ mod tests {
     }
 
     #[test]
-    fn test_detect_from_config_with_database() {
+    fn test_detect_from_config_data_dir_populated() {
+        let config = config::Config::default();
+        let state = DetectedState::from_config(&config);
+        // data_dir should be set to the effective path (default: ~/.klyntbot)
+        assert!(!state.data_dir.is_empty());
+        assert!(state.data_dir.contains("klyntbot"));
+    }
+
+    #[test]
+    fn test_detect_from_config_custom_data_dir() {
         let config = config::Config {
-            database_url: Some("postgres://custom/db".to_string()),
+            data_dir: Some("/tmp/custom-klyntbot".to_string()),
             ..Default::default()
         };
-
         let state = DetectedState::from_config(&config);
-        assert_eq!(
-            state.database_url,
-            Some(("postgres://custom/db".to_string(), DetectSource::Config))
-        );
+        assert_eq!(state.data_dir, "/tmp/custom-klyntbot");
     }
 
     #[test]
@@ -386,29 +374,6 @@ mod tests {
             state.channel,
             Some(("telegram".to_string(), DetectSource::Config))
         );
-    }
-
-    #[test]
-    fn test_probe_postgres_skips_when_url_set() {
-        let mut state = DetectedState {
-            database_url: Some(("postgres://custom/db".to_string(), DetectSource::Config)),
-            ..Default::default()
-        };
-
-        state.probe_postgres();
-        // URL should remain unchanged
-        assert_eq!(
-            state.database_url,
-            Some(("postgres://custom/db".to_string(), DetectSource::Config))
-        );
-        // pg_running stays at default false since probe was skipped
-        assert!(!state.pg_running);
-    }
-
-    #[test]
-    fn test_default_pg_running_is_false() {
-        let state = DetectedState::default();
-        assert!(!state.pg_running);
     }
 
     #[test]

@@ -32,14 +32,9 @@ pub async fn handle_chat(message: Option<String>, session: String, verbose: bool
     // Create a minimal message bus (not used in CLI mode, but required for AgentLoop)
     let bus = Arc::new(MessageBus::new(10));
 
-    // Connect to database for SQL repos
-    let database_url = config.database_url.as_deref().ok_or_else(|| {
-        anyhow::anyhow!(
-            "Database not configured. Run `klyntbot init` to set up PostgreSQL.\n\
-             Or set KLYNTBOT_DATABASE_URL in your environment."
-        )
-    })?;
-    let storage_pool = storage::StoragePool::connect(database_url).await?;
+    // Connect to SQLite storage
+    let data_dir = config.data_dir_path();
+    let storage_pool = storage::StoragePool::connect(&data_dir).await?;
 
     // Initialize agent loop (Arc for streaming support)
     let agent_loop = Arc::new(
