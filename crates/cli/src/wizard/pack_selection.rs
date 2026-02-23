@@ -167,7 +167,7 @@ fn offer_agent_browser_install() -> anyhow::Result<()> {
     if status.success() {
         println!("  {} agent-browser installed successfully.\n", colorize("✓", SUCCESS));
     } else {
-        println!("  {} Install failed. Run manually: {}\n", colorize(cmd, BOLD), cmd);
+        println!("  {} Install failed. Run manually: {}\n", colorize("✗", ERROR), cmd);
     }
 
     Ok(())

@@ -106,18 +106,18 @@ static PACKS: &[Pack] = &[
         skills: &["finance"],
     },
     Pack {
-        id: "weather",
-        name: "Weather",
-        description: "Weather queries and forecasts",
-        tier: PackTier::Optional,
-        skills: &["weather"],
-    },
-    Pack {
         id: "skill-creator",
         name: "Skill Creator",
         description: "Create custom skills",
         tier: PackTier::Optional,
         skills: &["skill-creator"],
+    },
+    Pack {
+        id: "weather",
+        name: "Weather",
+        description: "Weather queries and forecasts",
+        tier: PackTier::Optional,
+        skills: &["weather"],
     },
 ];
 
