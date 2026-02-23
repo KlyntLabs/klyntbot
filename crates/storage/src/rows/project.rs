@@ -10,6 +10,7 @@ pub struct ProjectRow {
     pub name: String,
     pub description: Option<String>,
     pub color: String,
+    #[sqlx(json)]
     pub tags: Vec<String>,
     pub status: String,
     pub created_at: DateTime<Utc>,

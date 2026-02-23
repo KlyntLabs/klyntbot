@@ -2,7 +2,7 @@
 //! (`todo_attachments`, `todo_time_entries`, `todo_dependencies`).
 
 use chrono::{DateTime, Utc};
-use sqlx::PgPool;
+use sqlx::SqlitePool;
 
 use crate::error::StorageError;
 use crate::rows::todo::{TodoAttachmentRow, TodoDependencyRow, TodoRow, TodoTimeEntryRow};
@@ -30,11 +30,11 @@ pub struct TodoSummary {
 /// Repository for todo CRUD, hierarchy, focus, dependencies, attachments, and time tracking.
 #[derive(Debug, Clone)]
 pub struct TodoRepo {
-    pool: PgPool,
+    pool: SqlitePool,
 }
 
 impl TodoRepo {
-    pub fn new(pool: PgPool) -> Self {
+    pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
     }
 
@@ -54,12 +54,12 @@ impl TodoRepo {
                 calendar_event_uid, last_reminded_at,
                 recurrence_rule, recurrence_parent_id, is_template, next_instance_date
             ) VALUES (
-                $1, $2, $3, $4, $5, $6, $7,
-                $8, $9, $10,
-                $11, $12, $13,
-                $14, $15, $16, $17,
-                $18, $19,
-                $20, $21, $22, $23
+                ?1, ?2, ?3, ?4, ?5, ?6, ?7,
+                ?8, ?9, ?10,
+                ?11, ?12, ?13,
+                ?14, ?15, ?16, ?17,
+                ?18, ?19,
+                ?20, ?21, ?22, ?23
             )
             RETURNING *
             "#,
@@ -69,7 +69,7 @@ impl TodoRepo {
         .bind(&row.description)
         .bind(row.priority)
         .bind(row.due_date)
-        .bind(&row.tags)
+        .bind(sqlx::types::Json(&row.tags))
         .bind(&row.status)
         .bind(row.focused_at)
         .bind(row.focus_deadline)
@@ -95,7 +95,7 @@ impl TodoRepo {
 
     /// Get a single todo by id. Returns `None` if not found.
     pub async fn get(&self, id: &str) -> Result<Option<TodoRow>, StorageError> {
-        let row = sqlx::query_as::<_, TodoRow>("SELECT * FROM todos WHERE id = $1")
+        let row = sqlx::query_as::<_, TodoRow>("SELECT * FROM todos WHERE id = ?1")
             .bind(id)
             .fetch_optional(&self.pool)
             .await?;
@@ -114,10 +114,13 @@ impl TodoRepo {
         if ids.is_empty() {
             return Ok(Vec::new());
         }
-        let rows = sqlx::query_as::<_, TodoRow>("SELECT * FROM todos WHERE id = ANY($1)")
-            .bind(ids)
-            .fetch_all(&self.pool)
-            .await?;
+        let mut qb = sqlx::QueryBuilder::<sqlx::Sqlite>::new("SELECT * FROM todos WHERE id IN (");
+        let mut sep = qb.separated(", ");
+        for id in ids {
+            sep.push_bind(id);
+        }
+        qb.push(")");
+        let rows = qb.build_query_as::<TodoRow>().fetch_all(&self.pool).await?;
         Ok(rows)
     }
 
@@ -126,22 +129,23 @@ impl TodoRepo {
         let row = sqlx::query_as::<_, TodoRow>(
             r#"
             UPDATE todos SET
-                title              = COALESCE($2, title),
-                description        = CASE WHEN $3 THEN $4 ELSE description END,
-                priority           = CASE WHEN $5 THEN $6 ELSE priority END,
-                due_date           = CASE WHEN $7 THEN $8 ELSE due_date END,
-                tags               = COALESCE($9, tags),
-                status             = COALESCE($10, status),
+                title              = COALESCE(?2, title),
+                description        = CASE WHEN ?3 THEN ?4 ELSE description END,
+                priority           = CASE WHEN ?5 THEN ?6 ELSE priority END,
+                due_date           = CASE WHEN ?7 THEN ?8 ELSE due_date END,
+                tags               = COALESCE(?9, tags),
+                status             = COALESCE(?10, status),
                 completed_at       = CASE
-                    WHEN $10 = 'done' AND completed_at IS NULL THEN now()
-                    WHEN $10 IS NOT NULL AND $10 != 'done' THEN NULL
+                    WHEN ?10 = 'done' AND completed_at IS NULL THEN datetime('now')
+                    WHEN ?10 IS NOT NULL AND ?10 != 'done' THEN NULL
                     ELSE completed_at
                 END,
-                calendar_event_uid = CASE WHEN $11 THEN $12 ELSE calendar_event_uid END,
-                next_instance_date = CASE WHEN $13 THEN $14 ELSE next_instance_date END,
-                last_reminded_at   = CASE WHEN $15 THEN $16 ELSE last_reminded_at END,
-                updated_at         = now()
-            WHERE id = $1
+                calendar_event_uid = CASE WHEN ?11 THEN ?12 ELSE calendar_event_uid END,
+                next_instance_date = CASE WHEN ?13 THEN ?14 ELSE next_instance_date END,
+                last_reminded_at   = CASE WHEN ?15 THEN ?16 ELSE last_reminded_at END,
+                estimated_minutes  = CASE WHEN ?17 THEN ?18 ELSE estimated_minutes END,
+                updated_at         = datetime('now')
+            WHERE id = ?1
             RETURNING *
             "#,
         )
@@ -153,7 +157,7 @@ impl TodoRepo {
         .bind(patch.priority.unwrap_or_default())
         .bind(patch.due_date.is_some())
         .bind(patch.due_date.unwrap_or_default())
-        .bind(&patch.tags)
+        .bind(patch.tags.as_ref().map(|t| sqlx::types::Json(t)))
         .bind(&patch.status)
         .bind(patch.calendar_event_uid.is_some())
         .bind(patch.calendar_event_uid.as_ref().and_then(|v| v.as_deref()))
@@ -161,6 +165,8 @@ impl TodoRepo {
         .bind(patch.next_instance_date.unwrap_or_default())
         .bind(patch.last_reminded_at.is_some())
         .bind(patch.last_reminded_at.unwrap_or_default())
+        .bind(patch.estimated_minutes.is_some())
+        .bind(patch.estimated_minutes.unwrap_or_default())
         .fetch_optional(&self.pool)
         .await?
         .ok_or_else(|| StorageError::NotFound(format!("todo {}", patch.id)))?;
@@ -170,7 +176,7 @@ impl TodoRepo {
 
     /// Delete a todo and all its cascade dependents (attachments, time entries, deps).
     pub async fn delete(&self, id: &str) -> Result<bool, StorageError> {
-        let result = sqlx::query("DELETE FROM todos WHERE id = $1")
+        let result = sqlx::query("DELETE FROM todos WHERE id = ?1")
             .bind(id)
             .execute(&self.pool)
             .await?;
@@ -183,7 +189,7 @@ impl TodoRepo {
 
     /// List todos matching the given filter criteria.
     pub async fn list(&self, filter: &TodoFilter) -> Result<Vec<TodoRow>, StorageError> {
-        let mut qb = sqlx::QueryBuilder::<sqlx::Postgres>::new("SELECT * FROM todos WHERE ");
+        let mut qb = sqlx::QueryBuilder::<sqlx::Sqlite>::new("SELECT * FROM todos WHERE ");
 
         if filter.templates_only {
             qb.push("is_template = TRUE");
@@ -197,8 +203,11 @@ impl TodoRepo {
         }
 
         if let Some(ref tags) = filter.tags {
-            qb.push(" AND tags @> ");
-            qb.push_bind(tags);
+            for tag in tags {
+                qb.push(" AND EXISTS (SELECT 1 FROM json_each(tags) WHERE value = ");
+                qb.push_bind(tag);
+                qb.push(")");
+            }
         }
 
         if let Some(ref project_id) = filter.project_id {
@@ -233,14 +242,14 @@ impl TodoRepo {
 
     /// Search todos by keyword in title or description (case-insensitive).
     ///
-    /// ILIKE special characters (`%`, `_`, `\`) are escaped so the query is
+    /// LIKE special characters (`%`, `_`, `\`) are escaped so the query is
     /// treated as a literal substring match.
     pub async fn search_by_keyword(
         &self,
         query: &str,
         limit: Option<i64>,
     ) -> Result<Vec<TodoRow>, StorageError> {
-        // Escape ILIKE special characters so the query is a literal substring
+        // Escape LIKE special characters so the query is a literal substring
         let escaped = query
             .replace('\\', "\\\\")
             .replace('%', "\\%")
@@ -252,9 +261,9 @@ impl TodoRepo {
                 r#"
                 SELECT * FROM todos
                 WHERE is_template = FALSE
-                  AND (title ILIKE $1 OR description ILIKE $1)
+                  AND (title LIKE ?1 ESCAPE '\' OR description LIKE ?1 ESCAPE '\')
                 ORDER BY created_at DESC
-                LIMIT $2
+                LIMIT ?2
                 "#,
             )
             .bind(&pattern)
@@ -266,7 +275,7 @@ impl TodoRepo {
                 r#"
                 SELECT * FROM todos
                 WHERE is_template = FALSE
-                  AND (title ILIKE $1 OR description ILIKE $1)
+                  AND (title LIKE ?1 ESCAPE '\' OR description LIKE ?1 ESCAPE '\')
                 ORDER BY created_at DESC
                 "#,
             )
@@ -292,10 +301,10 @@ impl TodoRepo {
         let result = sqlx::query(
             r#"
             UPDATE todos
-            SET focused_at = now(), focus_deadline = $3, updated_at = now()
-            WHERE id = $1
+            SET focused_at = datetime('now'), focus_deadline = ?3, updated_at = datetime('now')
+            WHERE id = ?1
               AND focused_at IS NULL
-              AND (SELECT COUNT(*) FROM todos WHERE focused_at IS NOT NULL) < $2
+              AND (SELECT COUNT(*) FROM todos WHERE focused_at IS NOT NULL) < ?2
             "#,
         )
         .bind(id)
@@ -310,7 +319,7 @@ impl TodoRepo {
     /// Unfocus a todo.
     pub async fn unfocus(&self, id: &str) -> Result<bool, StorageError> {
         let result = sqlx::query(
-            "UPDATE todos SET focused_at = NULL, focus_deadline = NULL, updated_at = now() WHERE id = $1",
+            "UPDATE todos SET focused_at = NULL, focus_deadline = NULL, updated_at = datetime('now') WHERE id = ?1",
         )
         .bind(id)
         .execute(&self.pool)
@@ -347,7 +356,7 @@ impl TodoRepo {
             )));
         }
 
-        sqlx::query("INSERT INTO todo_dependencies (task_id, blocker_id) VALUES ($1, $2)")
+        sqlx::query("INSERT INTO todo_dependencies (task_id, blocker_id) VALUES (?1, ?2)")
             .bind(task_id)
             .bind(blocker_id)
             .execute(&self.pool)
@@ -374,7 +383,7 @@ impl TodoRepo {
         blocker_id: &str,
     ) -> Result<bool, StorageError> {
         let result =
-            sqlx::query("DELETE FROM todo_dependencies WHERE task_id = $1 AND blocker_id = $2")
+            sqlx::query("DELETE FROM todo_dependencies WHERE task_id = ?1 AND blocker_id = ?2")
                 .bind(task_id)
                 .bind(blocker_id)
                 .execute(&self.pool)
@@ -388,7 +397,7 @@ impl TodoRepo {
             r#"
             SELECT t.* FROM todos t
             INNER JOIN todo_dependencies d ON d.blocker_id = t.id
-            WHERE d.task_id = $1
+            WHERE d.task_id = ?1
             "#,
         )
         .bind(task_id)
@@ -403,7 +412,7 @@ impl TodoRepo {
             r#"
             SELECT t.* FROM todos t
             INNER JOIN todo_dependencies d ON d.blocker_id = t.id
-            WHERE d.task_id = $1 AND t.status != 'done'
+            WHERE d.task_id = ?1 AND t.status != 'done'
             "#,
         )
         .bind(task_id)
@@ -418,7 +427,7 @@ impl TodoRepo {
             r#"
             SELECT t.* FROM todos t
             INNER JOIN todo_dependencies d ON d.task_id = t.id
-            WHERE d.blocker_id = $1
+            WHERE d.blocker_id = ?1
             "#,
         )
         .bind(blocker_id)
@@ -439,12 +448,12 @@ impl TodoRepo {
         let row: Option<(bool,)> = sqlx::query_as(
             r#"
             WITH RECURSIVE reachable AS (
-                SELECT blocker_id AS node FROM todo_dependencies WHERE task_id = $2
+                SELECT blocker_id AS node FROM todo_dependencies WHERE task_id = ?2
                 UNION
                 SELECT d.blocker_id FROM todo_dependencies d
                 INNER JOIN reachable r ON d.task_id = r.node
             )
-            SELECT EXISTS(SELECT 1 FROM reachable WHERE node = $1)
+            SELECT EXISTS(SELECT 1 FROM reachable WHERE node = ?1)
             "#,
         )
         .bind(task_id)
@@ -461,7 +470,7 @@ impl TodoRepo {
         task_id: &str,
     ) -> Result<Vec<TodoDependencyRow>, StorageError> {
         let rows = sqlx::query_as::<_, TodoDependencyRow>(
-            "SELECT * FROM todo_dependencies WHERE task_id = $1",
+            "SELECT * FROM todo_dependencies WHERE task_id = ?1",
         )
         .bind(task_id)
         .fetch_all(&self.pool)
@@ -485,7 +494,7 @@ impl TodoRepo {
         let row = sqlx::query_as::<_, TodoAttachmentRow>(
             r#"
             INSERT INTO todo_attachments (todo_id, attachment_type, value, title, tags)
-            VALUES ($1, $2, $3, $4, $5)
+            VALUES (?1, ?2, ?3, ?4, ?5)
             RETURNING *
             "#,
         )
@@ -493,7 +502,7 @@ impl TodoRepo {
         .bind(attachment_type)
         .bind(value)
         .bind(title)
-        .bind(tags)
+        .bind(sqlx::types::Json(tags))
         .fetch_one(&self.pool)
         .await?;
         Ok(row)
@@ -505,7 +514,7 @@ impl TodoRepo {
         todo_id: &str,
         attachment_id: uuid::Uuid,
     ) -> Result<bool, StorageError> {
-        let result = sqlx::query("DELETE FROM todo_attachments WHERE id = $1 AND todo_id = $2")
+        let result = sqlx::query("DELETE FROM todo_attachments WHERE id = ?1 AND todo_id = ?2")
             .bind(attachment_id)
             .bind(todo_id)
             .execute(&self.pool)
@@ -519,7 +528,7 @@ impl TodoRepo {
         todo_id: &str,
     ) -> Result<Vec<TodoAttachmentRow>, StorageError> {
         let rows = sqlx::query_as::<_, TodoAttachmentRow>(
-            "SELECT * FROM todo_attachments WHERE todo_id = $1 ORDER BY created_at",
+            "SELECT * FROM todo_attachments WHERE todo_id = ?1 ORDER BY created_at",
         )
         .bind(todo_id)
         .fetch_all(&self.pool)
@@ -544,7 +553,7 @@ impl TodoRepo {
         let row = sqlx::query_as::<_, TodoTimeEntryRow>(
             r#"
             INSERT INTO todo_time_entries (todo_id, source, started_at, ended_at, duration_secs, note)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6)
             RETURNING *
             "#,
         )
@@ -560,7 +569,7 @@ impl TodoRepo {
         // Update total_tracked_secs on the todo.
         if let Some(secs) = duration_secs {
             sqlx::query(
-                "UPDATE todos SET total_tracked_secs = total_tracked_secs + $2, updated_at = now() WHERE id = $1",
+                "UPDATE todos SET total_tracked_secs = total_tracked_secs + ?2, updated_at = datetime('now') WHERE id = ?1",
             )
             .bind(todo_id)
             .bind(secs)
@@ -580,9 +589,9 @@ impl TodoRepo {
         let row = sqlx::query_as::<_, TodoTimeEntryRow>(
             r#"
             UPDATE todo_time_entries
-            SET ended_at = now(),
-                duration_secs = EXTRACT(EPOCH FROM (now() - started_at))::BIGINT
-            WHERE id = $1 AND todo_id = $2 AND ended_at IS NULL
+            SET ended_at = datetime('now'),
+                duration_secs = (unixepoch('now') - unixepoch(started_at))
+            WHERE id = ?1 AND todo_id = ?2 AND ended_at IS NULL
             RETURNING *
             "#,
         )
@@ -597,7 +606,7 @@ impl TodoRepo {
         // Update total_tracked_secs.
         if let Some(secs) = row.duration_secs {
             sqlx::query(
-                "UPDATE todos SET total_tracked_secs = total_tracked_secs + $2, updated_at = now() WHERE id = $1",
+                "UPDATE todos SET total_tracked_secs = total_tracked_secs + ?2, updated_at = datetime('now') WHERE id = ?1",
             )
             .bind(todo_id)
             .bind(secs)
@@ -614,7 +623,7 @@ impl TodoRepo {
         todo_id: &str,
     ) -> Result<Vec<TodoTimeEntryRow>, StorageError> {
         let rows = sqlx::query_as::<_, TodoTimeEntryRow>(
-            "SELECT * FROM todo_time_entries WHERE todo_id = $1 ORDER BY started_at",
+            "SELECT * FROM todo_time_entries WHERE todo_id = ?1 ORDER BY started_at",
         )
         .bind(todo_id)
         .fetch_all(&self.pool)
@@ -629,7 +638,7 @@ impl TodoRepo {
     /// Get immediate children of a todo.
     pub async fn get_children(&self, parent_id: &str) -> Result<Vec<TodoRow>, StorageError> {
         let rows = sqlx::query_as::<_, TodoRow>(
-            "SELECT * FROM todos WHERE parent_id = $1 ORDER BY created_at",
+            "SELECT * FROM todos WHERE parent_id = ?1 ORDER BY created_at",
         )
         .bind(parent_id)
         .fetch_all(&self.pool)
@@ -642,7 +651,7 @@ impl TodoRepo {
         let rows = sqlx::query_as::<_, TodoRow>(
             r#"
             WITH RECURSIVE subtree AS (
-                SELECT * FROM todos WHERE id = $1
+                SELECT * FROM todos WHERE id = ?1
                 UNION ALL
                 SELECT t.* FROM todos t
                 INNER JOIN subtree s ON t.parent_id = s.id
@@ -675,8 +684,8 @@ impl TodoRepo {
         let row = sqlx::query_as::<_, TodoRow>(
             r#"
             UPDATE todos
-            SET parent_id = $2, project_id = $3, updated_at = now()
-            WHERE id = $1
+            SET parent_id = ?2, project_id = ?3, updated_at = datetime('now')
+            WHERE id = ?1
             RETURNING *
             "#,
         )
@@ -700,13 +709,13 @@ impl TodoRepo {
         let row: Option<(bool,)> = sqlx::query_as(
             r#"
             WITH RECURSIVE ancestors AS (
-                SELECT parent_id FROM todos WHERE id = $2
+                SELECT parent_id FROM todos WHERE id = ?2
                 UNION ALL
                 SELECT t.parent_id FROM todos t
                 INNER JOIN ancestors a ON t.id = a.parent_id
                 WHERE a.parent_id IS NOT NULL
             )
-            SELECT EXISTS(SELECT 1 FROM ancestors WHERE parent_id = $1)
+            SELECT EXISTS(SELECT 1 FROM ancestors WHERE parent_id = ?1)
             "#,
         )
         .bind(child_id)
@@ -727,12 +736,12 @@ impl TodoRepo {
         let result = sqlx::query(
             r#"
             WITH RECURSIVE subtree AS (
-                SELECT id FROM todos WHERE id = $1
+                SELECT id FROM todos WHERE id = ?1
                 UNION ALL
                 SELECT t.id FROM todos t
                 INNER JOIN subtree s ON t.parent_id = s.id
             )
-            UPDATE todos SET status = 'done', completed_at = now(), updated_at = now()
+            UPDATE todos SET status = 'done', completed_at = datetime('now'), updated_at = datetime('now')
             WHERE id IN (SELECT id FROM subtree) AND status != 'done'
             "#,
         )
@@ -777,7 +786,7 @@ impl TodoRepo {
         let rows = sqlx::query_as::<_, TodoRow>(
             r#"
             SELECT * FROM todos
-            WHERE due_date < now()
+            WHERE due_date < datetime('now')
               AND status != 'done'
               AND is_template = FALSE
             ORDER BY due_date
@@ -836,7 +845,7 @@ impl TodoRepo {
 
     /// Delete a recurring template.
     pub async fn delete_template(&self, id: &str) -> Result<bool, StorageError> {
-        let result = sqlx::query("DELETE FROM todos WHERE id = $1 AND is_template = TRUE")
+        let result = sqlx::query("DELETE FROM todos WHERE id = ?1 AND is_template = TRUE")
             .bind(id)
             .execute(&self.pool)
             .await?;
@@ -870,4 +879,5 @@ pub struct TodoPatch {
     pub calendar_event_uid: Option<Option<String>>,
     pub next_instance_date: Option<Option<DateTime<Utc>>>,
     pub last_reminded_at: Option<Option<DateTime<Utc>>>,
+    pub estimated_minutes: Option<Option<i32>>,
 }

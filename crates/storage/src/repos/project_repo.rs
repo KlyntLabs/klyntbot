@@ -1,6 +1,6 @@
 //! Repository for the `projects` table.
 
-use sqlx::PgPool;
+use sqlx::SqlitePool;
 
 use crate::error::StorageError;
 use crate::rows::project::ProjectRow;
@@ -26,11 +26,11 @@ pub struct ProjectWithStats {
 /// Repository for project CRUD and aggregation.
 #[derive(Debug, Clone)]
 pub struct ProjectRepo {
-    pool: PgPool,
+    pool: SqlitePool,
 }
 
 impl ProjectRepo {
-    pub fn new(pool: PgPool) -> Self {
+    pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
     }
 
@@ -43,7 +43,7 @@ impl ProjectRepo {
         let inserted = sqlx::query_as::<_, ProjectRow>(
             r#"
             INSERT INTO projects (id, name, description, color, tags, status, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
             RETURNING *
             "#,
         )
@@ -51,7 +51,7 @@ impl ProjectRepo {
         .bind(&row.name)
         .bind(&row.description)
         .bind(&row.color)
-        .bind(&row.tags)
+        .bind(sqlx::types::Json(&row.tags))
         .bind(&row.status)
         .bind(row.created_at)
         .bind(row.updated_at)
@@ -62,7 +62,7 @@ impl ProjectRepo {
 
     /// Get a project by id. Returns `None` if not found.
     pub async fn get(&self, id: &str) -> Result<Option<ProjectRow>, StorageError> {
-        let row = sqlx::query_as::<_, ProjectRow>("SELECT * FROM projects WHERE id = $1")
+        let row = sqlx::query_as::<_, ProjectRow>("SELECT * FROM projects WHERE id = ?1")
             .bind(id)
             .fetch_optional(&self.pool)
             .await?;
@@ -81,13 +81,13 @@ impl ProjectRepo {
         let row = sqlx::query_as::<_, ProjectRow>(
             r#"
             UPDATE projects SET
-                name        = COALESCE($2, name),
-                description = CASE WHEN $3 THEN $4 ELSE description END,
-                color       = COALESCE($5, color),
-                tags        = COALESCE($6, tags),
-                status      = COALESCE($7, status),
-                updated_at  = now()
-            WHERE id = $1
+                name        = COALESCE(?2, name),
+                description = CASE WHEN ?3 THEN ?4 ELSE description END,
+                color       = COALESCE(?5, color),
+                tags        = COALESCE(?6, tags),
+                status      = COALESCE(?7, status),
+                updated_at  = datetime('now')
+            WHERE id = ?1
             RETURNING *
             "#,
         )
@@ -102,7 +102,7 @@ impl ProjectRepo {
                 .unwrap_or_default(),
         )
         .bind(&patch.color)
-        .bind(&patch.tags)
+        .bind(patch.tags.as_ref().map(|t| sqlx::types::Json(t)))
         .bind(&patch.status)
         .fetch_optional(&self.pool)
         .await?
@@ -113,7 +113,7 @@ impl ProjectRepo {
 
     /// Delete a project. Todos with this project_id will have it set to NULL (FK ON DELETE SET NULL).
     pub async fn delete(&self, id: &str) -> Result<bool, StorageError> {
-        let result = sqlx::query("DELETE FROM projects WHERE id = $1")
+        let result = sqlx::query("DELETE FROM projects WHERE id = ?1")
             .bind(id)
             .execute(&self.pool)
             .await?;
@@ -136,7 +136,7 @@ impl ProjectRepo {
 
     /// List projects matching the given filter criteria.
     pub async fn list(&self, filter: &ProjectFilter) -> Result<Vec<ProjectRow>, StorageError> {
-        let mut qb = sqlx::QueryBuilder::<sqlx::Postgres>::new("SELECT * FROM projects");
+        let mut qb = sqlx::QueryBuilder::<sqlx::Sqlite>::new("SELECT * FROM projects");
         let mut has_where = false;
 
         if let Some(ref status) = filter.status {
@@ -146,10 +146,13 @@ impl ProjectRepo {
         }
 
         if let Some(ref tags) = filter.tags {
-            qb.push(if has_where { " AND " } else { " WHERE " });
-            qb.push("tags @> ");
-            qb.push_bind(tags);
-            has_where = true;
+            for tag in tags {
+                qb.push(if has_where { " AND " } else { " WHERE " });
+                has_where = true;
+                qb.push("EXISTS (SELECT 1 FROM json_each(tags) WHERE value = ");
+                qb.push_bind(tag);
+                qb.push(")");
+            }
         }
 
         let _ = has_where;
@@ -185,7 +188,7 @@ impl ProjectRepo {
             r#"
             SELECT status, COUNT(*) as count
             FROM todos
-            WHERE project_id = $1 AND is_template = FALSE
+            WHERE project_id = ?1 AND is_template = FALSE
             GROUP BY status
             "#,
         )

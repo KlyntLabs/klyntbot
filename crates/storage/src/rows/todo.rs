@@ -12,6 +12,7 @@ pub struct TodoRow {
     pub description: Option<String>,
     pub priority: Option<i16>,
     pub due_date: Option<DateTime<Utc>>,
+    #[sqlx(json)]
     pub tags: Vec<String>,
     pub status: String,
     pub focused_at: Option<DateTime<Utc>>,
@@ -40,6 +41,7 @@ pub struct TodoAttachmentRow {
     pub attachment_type: String,
     pub value: String,
     pub title: Option<String>,
+    #[sqlx(json)]
     pub tags: Vec<String>,
     pub created_at: DateTime<Utc>,
 }
