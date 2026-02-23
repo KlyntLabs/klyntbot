@@ -8,10 +8,12 @@ pub mod error;
 pub mod pool;
 pub mod repos;
 pub mod rows;
+pub mod vector_store;
 
 pub use error::StorageError;
 pub use pool::StoragePool;
 pub use repos::Repos;
+pub use vector_store::VectorStore;
 
 // Re-export repo types for consumer convenience.
 pub use repos::project_repo::{ProjectFilter, ProjectPatch, ProjectRepo, ProjectWithStats};

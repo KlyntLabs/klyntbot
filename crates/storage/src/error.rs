@@ -16,6 +16,9 @@ pub enum StorageError {
 
     #[error("Conflict: {0}")]
     Conflict(String),
+
+    #[error("Vector store error: {0}")]
+    Vector(String),
 }
 
 impl From<sqlx::migrate::MigrateError> for StorageError {
