@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
-use tracing::info;
+use tracing::{info, warn};
 
 use bus::MessageBus;
 use common::Result;
@@ -25,6 +25,7 @@ use tools::{
     shell::ExecTool,
     spawn::SpawnTool,
     web::{WebFetchTool, WebSearchTool},
+    BrowserTool,
 };
 
 use super::super::confidence::ConfidenceEvaluator;
@@ -259,6 +260,18 @@ impl AgentLoopBuilder {
             config.tools.web.max_results,
         ));
         tool_registry.register(WebFetchTool::new());
+
+        if config.tools.browser.enabled {
+            match BrowserTool::new(config.tools.browser.trust_level.clone()) {
+                Ok(tool) => {
+                    tool_registry.register(tool);
+                    info!("Browser tool registered");
+                }
+                Err(e) => {
+                    warn!("Browser tool unavailable: {}", e);
+                }
+            }
+        }
 
         // Message tool
         tool_registry.register(MessageTool::new(bus.outbound_sender()));
