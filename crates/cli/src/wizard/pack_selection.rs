@@ -124,6 +124,8 @@ fn offer_agent_browser_install() -> anyhow::Result<()> {
 
     if found {
         println!("  {} agent-browser already installed.", colorize("✓", SUCCESS));
+        // Also check that Chromium browser binary is installed
+        offer_chromium_install()?;
         return Ok(());
     }
 
@@ -165,9 +167,73 @@ fn offer_agent_browser_install() -> anyhow::Result<()> {
         .status()?;
 
     if status.success() {
-        println!("  {} agent-browser installed successfully.\n", colorize("✓", SUCCESS));
+        println!("  {} agent-browser installed successfully.", colorize("✓", SUCCESS));
+        offer_chromium_install()?;
     } else {
         println!("  {} Install failed. Run manually: {}\n", colorize("✗", ERROR), cmd);
+    }
+
+    Ok(())
+}
+
+/// Check for Chromium browser binary and offer to install it via `agent-browser install`.
+fn offer_chromium_install() -> anyhow::Result<()> {
+    use common::utils::terminal::*;
+
+    // Check for Playwright's Chromium cache directory on disk — no daemon interaction.
+    // Playwright stores browser binaries under {cache_dir}/ms-playwright/chromium-*.
+    // We deliberately avoid running any `agent-browser open` command here because that
+    // starts a persistent daemon session which would carry navigation state into the
+    // user's first real chat session.
+    let chromium_ok = playwright_cache_dir()
+        .and_then(|dir| {
+            std::fs::read_dir(dir).ok()?.find(|e| {
+                e.as_ref()
+                    .ok()
+                    .and_then(|e| e.file_name().into_string().ok())
+                    .map(|n| n.starts_with("chromium"))
+                    .unwrap_or(false)
+            })
+        })
+        .is_some();
+
+    /// Return the platform-specific Playwright browser cache directory if it exists.
+    fn playwright_cache_dir() -> Option<std::path::PathBuf> {
+        // macOS: ~/Library/Caches/ms-playwright
+        #[cfg(target_os = "macos")]
+        {
+            dirs::cache_dir().map(|d| d.join("ms-playwright"))
+        }
+        // Linux / Windows: ~/.cache/ms-playwright
+        #[cfg(not(target_os = "macos"))]
+        {
+            dirs::cache_dir().map(|d| d.join("ms-playwright"))
+        }
+    }
+
+    if chromium_ok {
+        println!("  {} Chromium browser already installed.\n", colorize("✓", SUCCESS));
+        return Ok(());
+    }
+
+    println!("  {} Chromium browser not found.", colorize("!", DIM));
+    println!("  Running: {}\n", colorize("agent-browser install", BOLD));
+
+    let status = std::process::Command::new("agent-browser")
+        .arg("install")
+        .status();
+
+    match status {
+        Ok(s) if s.success() => {
+            println!("  {} Chromium installed successfully.\n", colorize("✓", SUCCESS));
+        }
+        _ => {
+            println!(
+                "  {} Chromium install failed. Run manually: {}\n",
+                colorize("✗", ERROR),
+                colorize("agent-browser install", BOLD)
+            );
+        }
     }
 
     Ok(())
