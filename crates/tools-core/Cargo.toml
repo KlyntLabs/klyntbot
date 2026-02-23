@@ -9,6 +9,7 @@ license.workspace = true
 common.workspace = true
 tools-core-macros.workspace = true
 async-trait.workspace = true
+regex.workspace = true
 serde_json.workspace = true
 serde.workspace = true
 tokio.workspace = true
