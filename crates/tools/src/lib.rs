@@ -21,6 +21,7 @@ pub mod ask_user;
 pub mod cron_tool;
 pub mod filesystem;
 pub mod message;
+pub mod browser;
 pub mod shell;
 pub mod spawn;
 pub mod web;
