@@ -213,7 +213,12 @@ impl ContextEngine {
     /// format previously used by `ContextBuilder`.
     ///
     /// Returns an empty string if no sources are registered.
-    pub async fn build_system_prompt(&self, channel: &str, chat_id: &str) -> String {
+    pub async fn build_system_prompt(
+        &self,
+        channel: &str,
+        chat_id: &str,
+        message: Option<&str>,
+    ) -> String {
         if self.sources.is_empty() {
             return String::new();
         }
@@ -221,6 +226,7 @@ impl ContextEngine {
         let ctx = SourceContext {
             channel: channel.to_string(),
             chat_id: chat_id.to_string(),
+            message: message.map(|s| s.to_string()),
         };
 
         let mut sections = Vec::with_capacity(self.sources.len());
@@ -329,19 +335,40 @@ impl ContextEngine {
             allocator.allocate(Priority::RetrievedMemory, memory_tokens);
         }
 
-        // 4. Compress history to fit remaining budget
+        // 4. Compress history to fit remaining budget (token-aware)
         let history_budget = allocator.remaining();
         let compressed = self.compressor.compress(&request.history, history_budget);
 
-        // Track actual allocations
-        let recent_tokens: usize = compressed
-            .recent_messages
+        // Post-compression budget enforcement: if recent messages alone
+        // exceed the budget (e.g., very long tool results), truncate from oldest.
+        let mut recent_messages = compressed.recent_messages;
+        let mut recent_tokens: usize = recent_messages
             .iter()
             .map(|m| self.estimate_message_tokens(m))
             .sum();
+        while recent_tokens > history_budget && recent_messages.len() > 1 {
+            let removed_tokens = self.estimate_message_tokens(&recent_messages[0]);
+            recent_messages.remove(0);
+            recent_tokens = recent_tokens.saturating_sub(removed_tokens);
+        }
+
+        // Track actual allocations
         allocator.allocate(Priority::RecentHistory, recent_tokens);
 
-        let summary_tokens: usize = compressed.summaries.iter().map(|s| s.token_count).sum();
+        let remaining_after_recent = history_budget.saturating_sub(recent_tokens);
+        let summaries: Vec<_> = compressed
+            .summaries
+            .into_iter()
+            .scan(0usize, |acc, s| {
+                *acc += s.token_count;
+                if *acc <= remaining_after_recent {
+                    Some(s)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        let summary_tokens: usize = summaries.iter().map(|s| s.token_count).sum();
         allocator.allocate(Priority::CompressedHistory, summary_tokens);
 
         // 5. Build the final message list
@@ -356,12 +383,12 @@ impl ContextEngine {
         }
 
         // Summaries as system-level context (if any)
-        for summary in &compressed.summaries {
+        for summary in &summaries {
             messages.push(Message::system(&summary.content));
         }
 
         // Recent messages verbatim
-        messages.extend(compressed.recent_messages);
+        messages.extend(recent_messages);
 
         let token_count = allocator.total_allocated();
         let budget_report = allocator.report();
@@ -744,5 +771,107 @@ mod tests {
             .per_priority
             .iter()
             .all(|(p, _)| *p != Priority::RetrievedMemory));
+    }
+
+    #[tokio::test]
+    async fn test_token_budget_truncates_long_messages() {
+        let engine = ContextEngine::new();
+        // Create history with very long messages that would blow a small budget
+        let mut history = Vec::new();
+        for i in 0..10 {
+            // Each message is ~250 tokens (1000 chars / 4 chars per token)
+            let long_text = format!("Message {} {}", i, "x".repeat(1000));
+            if i % 2 == 0 {
+                history.push(Message::user(long_text));
+            } else {
+                history.push(Message::assistant(long_text));
+            }
+        }
+
+        let request = ContextRequest {
+            message_text: "test".to_string(),
+            history,
+            system_prompt: "System.".to_string(),
+            strategy: ExecutionStrategy::DirectResponse,
+            tool_definitions: vec![],
+            context_window: 1000, // very small window — ~850 input budget
+        };
+        let result = engine.assemble(request).await;
+
+        // Token count must stay within 85% of context_window
+        assert!(
+            result.token_count <= 850,
+            "Token count {} should not exceed input budget 850",
+            result.token_count
+        );
+        // Should still have at least the system message
+        assert!(!result.messages.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_abstractive_compression_used_when_provider_wired() {
+        use crate::history_compressor::CompressorMode;
+        use crate::summary_provider::SummaryProvider;
+        use crate::CompressorConfig;
+
+        struct TrackingProvider {
+            called: std::sync::Arc<std::sync::atomic::AtomicBool>,
+        }
+
+        #[async_trait]
+        impl SummaryProvider for TrackingProvider {
+            async fn summarize(
+                &self,
+                _messages: &[Message],
+            ) -> std::result::Result<String, String> {
+                self.called.store(true, std::sync::atomic::Ordering::SeqCst);
+                Ok("LLM summary".to_string())
+            }
+        }
+
+        let called = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let provider = Arc::new(TrackingProvider {
+            called: called.clone(),
+        });
+
+        let config = CompressorConfig {
+            mode: CompressorMode::Abstractive,
+            min_recent_messages: 2,
+            chunk_size: 3,
+            ..Default::default()
+        };
+
+        let engine = ContextEngine::new()
+            .with_compressor_config(config)
+            .with_summary_provider(provider);
+
+        // 20 messages to ensure some get compressed
+        let mut history = Vec::new();
+        for i in 0..20 {
+            if i % 2 == 0 {
+                history.push(Message::user(format!("User message {}", i)));
+            } else {
+                history.push(Message::assistant(format!("Response {}", i)));
+            }
+        }
+
+        let request = ContextRequest {
+            message_text: "test".to_string(),
+            history,
+            system_prompt: "System.".to_string(),
+            strategy: ExecutionStrategy::DirectResponse,
+            tool_definitions: vec![],
+            // Small enough to force compression: available_input ≈ 43,
+            // system ≈ 2 tokens, history_budget ≈ 41, which is less than
+            // all 20 messages (~70 tokens total).
+            context_window: 50,
+        };
+
+        engine.assemble(request).await;
+
+        assert!(
+            called.load(std::sync::atomic::Ordering::SeqCst),
+            "SummaryProvider should have been called via compress_async"
+        );
     }
 }
