@@ -3,8 +3,7 @@
 //! Covers CRUD, join tables (attachments, time_entries, dependencies),
 //! focus slot management, cycle detection, cascade operations, and filtering.
 //!
-//! Tests that require a live database use `test_todo_repo()` which gracefully
-//! returns None (and skips the test) when no PostgreSQL is available.
+//! Tests use an ephemeral SQLite pool via `test_todo_repo()` (StoragePool::connect on a TempDir).
 
 #[cfg(test)]
 mod tests {

@@ -1,6 +1,6 @@
 //! ConversationMemoryRetriever — implements MemoryRetriever for automatic contextual recall.
 //!
-//! Uses EmbeddingEngine (fastembed) + ConversationEmbeddingStore (pgvector ANN)
+//! Uses EmbeddingEngine (fastembed) + ConversationEmbeddingStore (LanceDB ANN)
 //! to retrieve relevant past conversation snippets during context assembly.
 //! Cross-channel: searches all sessions, not scoped to current.
 
@@ -13,7 +13,7 @@ use context_engine::memory_retriever::{MemoryEntry, MemoryRetriever};
 use tools::conversation_embedding::ConversationEmbeddingStore;
 use tools::embedding_engine::EmbeddingEngine;
 
-/// Retrieves relevant conversation memories using pgvector ANN search with time-decay scoring.
+/// Retrieves relevant conversation memories using LanceDB ANN search with time-decay scoring.
 ///
 /// Injected into `ContextEngine` via `.with_memory_retriever()` at startup.
 /// Called automatically on every message during context assembly.
@@ -30,7 +30,7 @@ impl ConversationMemoryRetriever {
     /// Create a new retriever.
     ///
     /// - `engine`: shared embedding engine (fastembed, lazy-loaded)
-    /// - `store`: pgvector-backed conversation embedding store
+    /// - `store`: LanceDB-backed conversation embedding store
     /// - `threshold`: minimum cosine similarity for retrieval (0.0-1.0)
     /// - `decay_factor`: per-day score multiplier for time decay (e.g. `0.995`)
     pub fn new(
@@ -68,7 +68,7 @@ impl MemoryRetriever for ConversationMemoryRetriever {
             }
         };
 
-        // 2. pgvector ANN search (cross-channel) with time-decay scoring
+        // 2. LanceDB ANN search (cross-channel) with time-decay scoring
         match self
             .store
             .search_similar(&embedding, limit, self.threshold, self.decay_factor)

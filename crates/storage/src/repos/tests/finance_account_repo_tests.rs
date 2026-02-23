@@ -1,7 +1,6 @@
 //! Tests for FinanceAccountRepo.
 //!
-//! Tests that require a live database use `test_account_repo()` which gracefully
-//! returns `None` (and skips the test) when no PostgreSQL is available.
+//! Tests use an ephemeral SQLite pool via `test_account_repo()` (StoragePool::connect on a TempDir).
 
 #[cfg(test)]
 mod tests {

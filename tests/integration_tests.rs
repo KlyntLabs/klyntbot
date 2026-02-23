@@ -43,7 +43,7 @@ async fn test_full_message_flow() {
 }
 
 /// Test session persistence across multiple messages (in-memory only).
-/// Full SQL persistence is tested via integration tests with a running PostgreSQL.
+/// Full SQL persistence is tested via the SQL-backed manager integration tests.
 #[test]
 fn test_session_persistence_flow() {
     use klyntbot::session::Session;
@@ -255,7 +255,7 @@ fn test_session_cleanup() {
     assert_eq!(session.messages.len(), 0);
 }
 
-// LRU eviction test removed — relied on `with_capacity()` and JSONL disk persistence.
+// LRU eviction test removed — relied on `with_capacity()` and disk persistence.
 // Cache eviction + SQL reload is tested implicitly by get_or_create() in the SQL-backed manager.
 
 /// Test skills availability attribute
@@ -472,5 +472,4 @@ fn test_email_consent_granted_enforcement() {
     );
 }
 
-// Plan integration tests removed — JSONL PlanStore superseded by PostgreSQL.
-// Plan functionality is tested via PlanHandlerImpl + PlanRepo in the agent crate.
+// Plan integration tests removed — plan functionality is tested via PlanHandlerImpl + PlanRepo in the agent crate.

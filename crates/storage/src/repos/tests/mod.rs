@@ -1,11 +1,10 @@
 //! Unit tests for all storage repository implementations.
 //!
-//! Each repo module below tests its repository in isolation against
-//! an ephemeral Postgres container (testcontainers-rs).
+//! Each repo module tests its repository in isolation against
+//! an ephemeral SQLite pool (via `StoragePool::connect(tempdir)`).
 //!
 //! Test naming convention: `{repo}_{operation}_{scenario}`
 
-pub mod fixtures;
 pub mod todo_repo_tests;
 
 // Finance module repo tests — TDD skeletons, fail until implementation is added.

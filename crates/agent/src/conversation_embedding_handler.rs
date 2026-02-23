@@ -114,7 +114,7 @@ impl ConversationEmbeddingHandler for ConversationEmbeddingHandlerImpl {
                 })??
         };
 
-        // pgvector ANN search (cross-channel, O(log n)).
+        // LanceDB ANN search (cross-channel).
         // Explicit user searches use decay_factor=1.0 (no time decay) for unbiased results.
         self.store
             .search_similar(&query_embedding, limit, threshold, 1.0)

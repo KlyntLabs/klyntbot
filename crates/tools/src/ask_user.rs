@@ -243,24 +243,14 @@ fn parse_interaction_request(args: &Value) -> Result<InteractionRequest> {
 
 /// Parse the answer type from a flat question object.
 ///
-/// Looks for `"type"` field at the question level (not nested in `answer_type`).
-/// Also supports the old nested `"answer_type": {"type": "..."}` format for
-/// backward compatibility.
+/// Expects `"type"` field at the question level.
 fn parse_flat_answer_type(
     q_obj: &serde_json::Map<String, Value>,
     question_idx: usize,
 ) -> Result<AnswerType> {
-    // Try flat format first: question.type
     let type_str = q_obj
         .get("type")
         .and_then(|v| v.as_str())
-        // Fallback: nested answer_type.type (backward compat)
-        .or_else(|| {
-            q_obj
-                .get("answer_type")
-                .and_then(|at| at.get("type"))
-                .and_then(|v| v.as_str())
-        })
         .ok_or_else(|| {
             ToolError::InvalidParams(format!(
                 "question {} missing 'type' field (expected: single_select, multi_select, yes_no, free_text)",
@@ -268,10 +258,7 @@ fn parse_flat_answer_type(
             ))
         })?;
 
-    // Get options from flat format or nested answer_type format
-    let options_val = q_obj
-        .get("options")
-        .or_else(|| q_obj.get("answer_type").and_then(|at| at.get("options")));
+    let options_val = q_obj.get("options");
 
     match type_str {
         "single_select" => {
@@ -625,34 +612,6 @@ mod tests {
                 assert_eq!(options[0].value, "oauth2");
                 assert_eq!(options[0].label, "OAuth 2.0");
                 assert_eq!(options[0].description, Some("Industry standard".into()));
-            }
-            _ => panic!("Expected SingleSelect"),
-        }
-    }
-
-    #[test]
-    fn test_parse_nested_answer_type_compat() {
-        // Old nested format should still work
-        let args = json!({
-            "title": "Choose auth",
-            "questions": [{
-                "id": "auth",
-                "title": "Auth",
-                "text": "Which auth?",
-                "answer_type": {
-                    "type": "single_select",
-                    "options": [
-                        {"value": "a", "label": "Option A"},
-                        {"value": "b", "label": "Option B"}
-                    ]
-                }
-            }]
-        });
-
-        let request = parse_interaction_request(&args).unwrap();
-        match &request.questions[0].answer_type {
-            AnswerType::SingleSelect { options } => {
-                assert_eq!(options.len(), 2);
             }
             _ => panic!("Expected SingleSelect"),
         }

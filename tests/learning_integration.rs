@@ -38,8 +38,7 @@ use mock_provider::MockProvider;
 // ─────────────────────────────────────────────────────────────
 
 /// Create an agent loop with learning enabled, isolated to a temp directory.
-/// Uses a lazy (non-connected) pool — tests that trigger DB queries will fail unless
-/// DATABASE_URL is set and points to a valid Postgres instance.
+/// Uses an in-memory SQLite pool (via StoragePool::connect_in_memory()).
 #[allow(dead_code)]
 async fn create_agent_with_learning(provider: Arc<MockProvider>) -> (AgentLoop, TempDir) {
     let temp_dir = TempDir::new().unwrap();
@@ -632,16 +631,6 @@ async fn test_ac_learning_disabled_no_recording() {
         .await
         .unwrap();
     assert_eq!(response, "Hello!");
-
-    let outcomes_path = temp_dir
-        .path()
-        .join(".klyntbot")
-        .join("data")
-        .join("outcomes.jsonl");
-    assert!(
-        !outcomes_path.exists(),
-        "outcomes.jsonl must not be created when learning is disabled"
-    );
 }
 
 // ─────────────────────────────────────────────────────────────

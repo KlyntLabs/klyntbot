@@ -43,13 +43,11 @@ async fn test_ask_user_single_select_question() {
             "id": "auth_method",
             "title": "Auth",
             "text": "Which authentication method?",
-            "answer_type": {
-                "type": "single_select",
-                "options": [
-                    {"value": "oauth2", "label": "OAuth 2.0"},
-                    {"value": "jwt", "label": "JWT"}
-                ]
-            }
+            "type": "single_select",
+            "options": [
+                {"value": "oauth2", "label": "OAuth 2.0"},
+                {"value": "jwt", "label": "JWT"}
+            ]
         }]
     });
 
@@ -99,34 +97,28 @@ async fn test_ask_user_multi_question_form() {
                 "id": "priority",
                 "title": "Priority",
                 "text": "What priority level?",
-                "answer_type": {
-                    "type": "single_select",
-                    "options": [
-                        {"value": "high", "label": "High", "description": "Critical tasks"},
-                        {"value": "low", "label": "Low"}
-                    ]
-                }
+                "type": "single_select",
+                "options": [
+                    {"value": "high", "label": "High", "description": "Critical tasks"},
+                    {"value": "low", "label": "Low"}
+                ]
             },
             {
                 "id": "features",
                 "title": "Features",
                 "text": "Which features?",
-                "answer_type": {
-                    "type": "multi_select",
-                    "options": [
-                        {"value": "auth", "label": "Authentication"},
-                        {"value": "logging", "label": "Logging"}
-                    ]
-                }
+                "type": "multi_select",
+                "options": [
+                    {"value": "auth", "label": "Authentication"},
+                    {"value": "logging", "label": "Logging"}
+                ]
             },
             {
                 "id": "confirm",
                 "title": "Confirm",
                 "text": "Proceed?",
-                "answer_type": {
-                    "type": "yes_no",
-                    "default": true
-                }
+                "type": "yes_no",
+                "default": true
             }
         ]
     });
@@ -185,7 +177,7 @@ async fn test_ask_user_cancellation() {
             "id": "test",
             "title": "Test",
             "text": "A test question",
-            "answer_type": {"type": "yes_no"}
+            "type": "yes_no"
         }]
     });
 
@@ -216,13 +208,11 @@ async fn test_ask_user_non_tty_fallback() {
             "id": "auth_method",
             "title": "Auth",
             "text": "Which authentication method?",
-            "answer_type": {
-                "type": "single_select",
-                "options": [
-                    {"value": "oauth2", "label": "OAuth 2.0", "description": "Industry standard"},
-                    {"value": "jwt", "label": "JWT"}
-                ]
-            }
+            "type": "single_select",
+            "options": [
+                {"value": "oauth2", "label": "OAuth 2.0", "description": "Industry standard"},
+                {"value": "jwt", "label": "JWT"}
+            ]
         }]
     });
 
@@ -248,10 +238,8 @@ async fn test_ask_user_free_text_question() {
             "id": "description",
             "title": "Description",
             "text": "Describe the issue",
-            "answer_type": {
-                "type": "free_text",
-                "placeholder": "Enter details..."
-            }
+            "type": "free_text",
+            "placeholder": "Enter details..."
         }]
     });
 
@@ -287,7 +275,7 @@ async fn test_ask_user_skipped_answers() {
             "id": "optional",
             "title": "Optional",
             "text": "Optional question",
-            "answer_type": {"type": "yes_no"}
+            "type": "yes_no"
         }]
     });
 
@@ -320,13 +308,11 @@ async fn test_ask_user_empty_multi_select() {
             "id": "features",
             "title": "Features",
             "text": "Which features?",
-            "answer_type": {
-                "type": "multi_select",
-                "options": [
-                    {"value": "a", "label": "Feature A"},
-                    {"value": "b", "label": "Feature B"}
-                ]
-            }
+            "type": "multi_select",
+            "options": [
+                {"value": "a", "label": "Feature A"},
+                {"value": "b", "label": "Feature B"}
+            ]
         }]
     });
 
@@ -360,7 +346,7 @@ async fn test_ask_user_parameter_validation_missing_title() {
             "id": "q1",
             "title": "Q1",
             "text": "Question",
-            "answer_type": {"type": "yes_no"}
+            "type": "yes_no"
         }]
     });
 
@@ -395,11 +381,11 @@ async fn test_ask_user_parameter_validation_too_many_questions() {
     let args = json!({
         "title": "Test",
         "questions": [
-            {"id": "q1", "title": "Q1", "text": "Q", "answer_type": {"type": "yes_no"}},
-            {"id": "q2", "title": "Q2", "text": "Q", "answer_type": {"type": "yes_no"}},
-            {"id": "q3", "title": "Q3", "text": "Q", "answer_type": {"type": "yes_no"}},
-            {"id": "q4", "title": "Q4", "text": "Q", "answer_type": {"type": "yes_no"}},
-            {"id": "q5", "title": "Q5", "text": "Q", "answer_type": {"type": "yes_no"}}
+            {"id": "q1", "title": "Q1", "text": "Q", "type": "yes_no"},
+            {"id": "q2", "title": "Q2", "text": "Q", "type": "yes_no"},
+            {"id": "q3", "title": "Q3", "text": "Q", "type": "yes_no"},
+            {"id": "q4", "title": "Q4", "text": "Q", "type": "yes_no"},
+            {"id": "q5", "title": "Q5", "text": "Q", "type": "yes_no"}
         ]
     });
 
@@ -423,7 +409,7 @@ async fn test_ask_user_parameter_validation_title_too_long() {
             "id": "q1",
             "title": "This title is too long for tab",
             "text": "Question",
-            "answer_type": {"type": "yes_no"}
+            "type": "yes_no"
         }]
     });
 
@@ -444,10 +430,8 @@ async fn test_ask_user_parameter_validation_options_min_count() {
             "id": "q1",
             "title": "Q1",
             "text": "Question",
-            "answer_type": {
-                "type": "single_select",
-                "options": [{"value": "only_one", "label": "Only one"}]
-            }
+            "type": "single_select",
+            "options": [{"value": "only_one", "label": "Only one"}]
         }]
     });
 
@@ -470,7 +454,7 @@ async fn test_ask_user_response_channel_closed() {
             "id": "test",
             "title": "Test",
             "text": "Test question",
-            "answer_type": {"type": "yes_no"}
+            "type": "yes_no"
         }]
     });
 
@@ -505,7 +489,7 @@ async fn test_ask_user_interaction_channel_closed() {
             "id": "test",
             "title": "Test",
             "text": "Test question",
-            "answer_type": {"type": "yes_no"}
+            "type": "yes_no"
         }]
     });
 

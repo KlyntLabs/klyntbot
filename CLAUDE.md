@@ -9,7 +9,7 @@ cargo build --workspace              # Build all crates
 cargo build --release                # Optimized release build (LTO, stripped)
 cargo nextest run --workspace        # Run all tests (parallel, faster than cargo test)
 cargo nextest run -p agent           # Test a single crate
-cargo nextest run -p storage         # Test storage crate (requires PostgreSQL)
+cargo nextest run -p storage         # Test storage crate (uses ephemeral SQLite)
 cargo nextest run --test integration_tests  # Run a specific test file
 cargo nextest run -E 'test(session_persistence)'  # Run tests matching pattern
 cargo nextest run --nocapture        # Show test stdout (nextest captures by default)
@@ -22,18 +22,18 @@ cargo build --no-default-features    # Build without email channel
 
 **Why nextest?** Parallel test execution (faster), better output formatting, test retries, partition support for CI. Falls back to `cargo test --doc` for doctests only.
 
-**Database requirement**: Integration tests require a running PostgreSQL instance with pgvector. Set `DATABASE_URL` or tests will use `postgres://localhost/klyntbot_test`.
+**No external database required**: All tests use ephemeral SQLite pools (`StoragePool::connect(tempdir)` or `StoragePool::connect_in_memory()`).
 
 ## Architecture
 
-Klyntbot is a Rust AI agent framework — a single binary that connects to 6+ chat platforms, calls LLMs, executes tools, manages tasks/projects, syncs with Apple Calendar, and manages persistent memory. All persistent state is stored in PostgreSQL (with pgvector for embeddings).
+Klyntbot is a Rust AI agent framework — a single binary that connects to 6+ chat platforms, calls LLMs, executes tools, manages tasks/projects, syncs with Apple Calendar, and manages persistent memory. All persistent state is stored in SQLite (relational data) + LanceDB (vector embeddings).
 
 ### Workspace layout (15 crates in 9 dependency layers)
 
 ```
 Layer 0: common          — Error types (KlyntbotError with 12 variants including CalendarError, Storage), MessageRole, ChannelName, ChatId, SessionKey
 Layer 1: config, bus     — Config schema (camelCase JSON serde + CalendarConfig, ProjectConfig), async message bus (tokio::mpsc)
-Layer 1.5: storage       — PostgreSQL connection pool (sqlx), auto-migrations, row structs, repository pattern (TodoRepo, ProjectRepo, EmbeddingRepo, etc.)
+Layer 1.5: storage       — SQLite connection pool (sqlx + SqlitePool), auto-migrations, row structs, repository pattern (TodoRepo, ProjectRepo, VectorStore, etc.)
 Layer 2: providers, session, scheduling, calendar, context_engine — LLM HTTP client, session persistence, cron service, CalDAV client + sync engine, token budget allocator + context assembler
 Layer 3: tools           — Tool trait + 12 implementations (file I/O ×4, shell, web ×2, message, spawn, cron, todo, project, calendar)
 Layer 4: channels, heartbeat — Chat platform integrations (Telegram, Discord, WhatsApp, Slack, Email, QQ)
@@ -44,18 +44,18 @@ Layer 7: klyntbot        — Re-export facade (src/lib.rs) + binary entry point 
 
 Dependencies flow strictly upward. No circular dependencies — enforced by Cargo.
 
-**New in v0.4.0 (PostgreSQL Storage Migration):**
-- `storage` crate at Layer 1.5: connection pooling (`PgPool`), auto-running migrations, row structs (`*Row`), repository pattern (`*Repo`)
-- All persistent data migrated from JSONL flat files to PostgreSQL: todos, projects, embeddings, sessions, goals, plans, cron jobs, usage, strategies, outcomes
-- pgvector for embedding similarity search (ANN) — replaces brute-force in-memory cosine similarity
-- `Repos` aggregate struct for convenient access to all repositories
-- `StoragePool::connect()` with automatic migration execution
-- CLI slimmed from 40+ subcommands to 4 (chat, serve, init, status) — all task/project management now via chat
-- `StorageError` variant added to `KlyntbotError` with automatic conversion
+**Storage stack (SQLite + LanceDB):**
+- `storage` crate at Layer 1.5: `StoragePool` wraps `SqlitePool`, auto-runs migrations, exposes repository pattern (`*Repo` structs)
+- All relational data in SQLite (`{data_dir}/data.db`): todos, projects, sessions, goals, plans, cron jobs, usage, strategies, outcomes
+- Vector embeddings in LanceDB (`{data_dir}/lancedb/`): todo embeddings, conversation embeddings — replaces pgvector
+- `Repos` aggregate struct for convenient access: `Repos::from_pool(&pool)`
+- `StoragePool::connect(data_dir)` creates/opens `data.db`, enables WAL + foreign keys, runs migrations
+- `StoragePool::connect_in_memory()` for tests — runs migrations on an in-memory SQLite pool
+- Data directory defaults to `~/.klyntbot`, configurable via `data_dir` in config
 
 ### Key patterns
 
-- **Repository pattern**: All persistent state goes through `*Repo` structs in the `storage` crate. Repos hold a `PgPool` (which is `Clone + Send + Sync` internally via `Arc`), eliminating the need for `Arc<RwLock<Store>>` wrappers. The `Repos` aggregate provides convenient access: `Repos::from_pool(&pool)`.
+- **Repository pattern**: All persistent state goes through `*Repo` structs in the `storage` crate. Repos hold a `SqlitePool` (which is `Clone + Send + Sync` internally via `Arc`), eliminating the need for `Arc<RwLock<Store>>` wrappers. The `Repos` aggregate provides convenient access: `Repos::from_pool(&pool)`.
 - **Dependency inversion**: `SpawnHandler` and `CronHandler` traits are defined in `tools` (Layer 3) but implemented in `agent` (Layer 5). Injected as `Arc<dyn Trait>` at construction. This breaks what would otherwise be circular deps between tools and agent.
 - **Re-export facade**: `src/lib.rs` re-exports all public types from workspace crates including `storage`. Integration tests and external consumers use `klyntbot::AgentLoop`, `klyntbot::Config`, `klyntbot::StoragePool`, etc.
 - **Provider auto-detection**: The provider registry matches model name keywords to route to the correct LLM provider. No external routing library.
@@ -104,13 +104,12 @@ Task management, project management, calendar sync, cron jobs, skills, and all o
 Config can be overridden via `KLYNTBOT_` prefix with `__` as nesting separator:
 
 ```bash
-KLYNTBOT_DATABASE_URL=postgres://user:pass@localhost/klyntbot
 KLYNTBOT_AGENTS__DEFAULTS__MODEL=gpt-4o
 KLYNTBOT_PROVIDERS__ANTHROPIC__API_KEY=sk-...
 KLYNTBOT_TOOLS__RESTRICT_TO_WORKSPACE=true
 ```
 
-PostgreSQL with pgvector is required. The database URL defaults to `postgres://localhost/klyntbot` if not set.
+No external database required. Data is stored in `~/.klyntbot/data.db` (SQLite) and `~/.klyntbot/lancedb/` (vectors) by default. Override with `data_dir` in config.
 
 ## Enrichment Configuration
 
@@ -213,19 +212,18 @@ Semantic search uses local embeddings (fastembed, paraphrase-multilingual-MiniLM
 
 **Search modes** (available via TodoTool in chat):
 - `search` — keyword matching (title + description substring via SQL)
-- `search-semantic` — pgvector ANN cosine similarity on embeddings
+- `search-semantic` — LanceDB ANN cosine similarity on embeddings
 - `search-hybrid` — merges keyword + semantic via Reciprocal Rank Fusion (RRF)
 
 **How it works:**
 1. Embeddings auto-generate when tasks are created or updated (best-effort, non-blocking)
-2. Embeddings persist in PostgreSQL `todo_embeddings` table (pgvector `vector(384)` column)
-3. Semantic search uses pgvector approximate nearest neighbor (ANN) for fast cosine similarity
+2. Embeddings persist in LanceDB (`~/.klyntbot/lancedb/`)
+3. Semantic search uses LanceDB approximate nearest neighbor (ANN) for fast cosine similarity
 4. Hybrid search runs both keyword and semantic, merges via RRF
 
 **Troubleshooting:**
 - **First search is slow?** Model downloads ~420MB on first use. Subsequent searches are fast.
 - **No results?** Lower the threshold (e.g., 0.3) or use hybrid search for broader matching.
-- **pgvector not installed?** Run `CREATE EXTENSION vector;` in your PostgreSQL instance.
 - **Semantic search unavailable?** Falls back with a clear error suggesting keyword search.
 
 ## Feature Packs
@@ -262,12 +260,13 @@ Built-in skills live in `skills/` as `SKILL.md` files (summarize, skill-creator,
 
 ## Gotchas & Common Pitfalls
 
-- **PostgreSQL required**: A running PostgreSQL instance with the `pgvector` extension is required. Migrations run automatically on first connect via `StoragePool::connect()`.
-- **Database URL**: Defaults to `postgres://localhost/klyntbot`. Set `database_url` in config or `KLYNTBOT_DATABASE_URL` env var.
+- **No external DB required**: SQLite file is created automatically at `{data_dir}/data.db` on first run. LanceDB directory is created at `{data_dir}/lancedb/` when semantic search is first used.
+- **Data directory**: Defaults to `~/.klyntbot`. Override with `data_dir` in `~/.klyntbot/config.json`.
+- **`StoragePool::from_existing()` skips migrations**: Only use for pools already migrated by `StoragePool::connect()`. For in-memory test pools, always use `StoragePool::connect_in_memory()`.
 - **CalDAV sync is async**: Calendar sync runs in background. Use `CalendarTool::sync_now()` for immediate sync, or wait for next scheduled interval.
 - **Config changes require restart**: Modifying `~/.klyntbot/config.json` requires restarting `klyntbot serve` for changes to take effect.
 - **Dependency inversion gotcha**: When adding new tools that need agent context (spawn/cron handlers), inject via `Arc<dyn Trait>` at construction to avoid circular deps.
-- **PgPool is Clone+Send+Sync**: Unlike the old `Arc<RwLock<Store>>` pattern, `PgPool` (and therefore all `*Repo` structs) can be freely cloned and shared across tasks without locking. Connection pooling is handled internally by sqlx.
+- **SqlitePool is Clone+Send+Sync**: Unlike the old `Arc<RwLock<Store>>` pattern, `SqlitePool` (and therefore all `*Repo` structs) can be freely cloned and shared across tasks without locking. Connection pooling is handled internally by sqlx.
 
 ## Planning Engine (Phase 4 — v0.3.0)
 

@@ -129,32 +129,6 @@ impl SubagentManager {
         self.semaphore.available_permits()
     }
 
-    /// Create a new subagent manager (deprecated - use builder)
-    #[deprecated(note = "Use SubagentManager::builder() instead")]
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        provider: DynProvider,
-        workspace: PathBuf,
-        inbound_tx: mpsc::Sender<InboundMessage>,
-        model: String,
-        brave_api_key: Option<String>,
-        web_max_results: u8,
-        exec_timeout: u64,
-        restrict_to_workspace: bool,
-    ) -> Self {
-        Self {
-            provider,
-            workspace,
-            inbound_tx,
-            model,
-            brave_api_key,
-            web_max_results,
-            exec_timeout,
-            restrict_to_workspace,
-            semaphore: Arc::new(Semaphore::new(3)),
-        }
-    }
-
     /// Spawn a subagent for a background task.
     ///
     /// The subagent runs a simplified agent loop: it sends the task as a user message

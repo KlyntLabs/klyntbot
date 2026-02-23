@@ -411,13 +411,14 @@ impl AgentLoopBuilder {
 
                 let memory_embed_impl = Arc::new(tools::EmbeddingEngineImpl::new(
                     Arc::clone(&embedding_engine),
-                    vs,
+                    vs.clone(),
                 ));
 
                 todo_tool = todo_tool
                     .with_embedding_handler(
                         Arc::clone(&todo_embed_impl) as Arc<dyn feature_todo::EmbeddingHandler>
                     )
+                    .with_embedding_store(vs)
                     .with_search_config(
                         config.todo.search.semantic_threshold,
                         config.todo.search.rrf_k,

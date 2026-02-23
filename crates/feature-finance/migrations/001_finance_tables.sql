@@ -1,130 +1,142 @@
--- Finance feature migration: create all finance tables
--- All statements use IF NOT EXISTS for idempotency.
-
+-- Feature migration: finance tables (IF NOT EXISTS — core migration owns these)
 CREATE TABLE IF NOT EXISTS finance_accounts (
-    id VARCHAR(36) PRIMARY KEY,
-    name TEXT NOT NULL,
-    account_type VARCHAR(50) NOT NULL,
-    currency VARCHAR(10) NOT NULL,
-    balance BIGINT NOT NULL DEFAULT 0,
-    institution TEXT,
-    notes TEXT,
-    is_archived BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at TIMESTAMPTZ NOT NULL,
-    updated_at TIMESTAMPTZ NOT NULL
+    id           TEXT PRIMARY KEY,
+    name         TEXT NOT NULL,
+    account_type TEXT NOT NULL,
+    currency     TEXT NOT NULL,
+    balance      INTEGER NOT NULL DEFAULT 0,
+    institution  TEXT,
+    notes        TEXT,
+    is_archived  INTEGER NOT NULL DEFAULT 0,
+    created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
+
+CREATE INDEX IF NOT EXISTS idx_finance_accounts_currency ON finance_accounts(currency);
+CREATE INDEX IF NOT EXISTS idx_finance_accounts_is_archived ON finance_accounts(is_archived) WHERE is_archived = 0;
 
 CREATE TABLE IF NOT EXISTS finance_transactions (
-    id VARCHAR(36) PRIMARY KEY,
-    account_id VARCHAR(36) NOT NULL REFERENCES finance_accounts(id) ON DELETE CASCADE,
-    tx_type VARCHAR(50) NOT NULL,
-    amount BIGINT NOT NULL,
-    currency VARCHAR(10) NOT NULL,
-    category TEXT,
-    subcategory TEXT,
-    counterparty TEXT,
-    notes TEXT,
-    tx_date DATE NOT NULL,
-    transfer_id VARCHAR(36),
-    is_recurring BOOLEAN NOT NULL DEFAULT FALSE,
+    id             TEXT PRIMARY KEY,
+    account_id     TEXT NOT NULL REFERENCES finance_accounts(id) ON DELETE CASCADE,
+    tx_type        TEXT NOT NULL,
+    amount         INTEGER NOT NULL,
+    currency       TEXT NOT NULL,
+    category       TEXT,
+    subcategory    TEXT,
+    counterparty   TEXT,
+    notes          TEXT,
+    tx_date        TEXT NOT NULL DEFAULT (date('now')),
+    transfer_id    TEXT,
+    is_recurring   INTEGER NOT NULL DEFAULT 0,
     recurring_rule TEXT,
-    created_at TIMESTAMPTZ NOT NULL,
-    updated_at TIMESTAMPTZ NOT NULL
+    created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    updated_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
 
-CREATE INDEX IF NOT EXISTS idx_finance_transactions_account_id
-    ON finance_transactions (account_id);
-CREATE INDEX IF NOT EXISTS idx_finance_transactions_tx_date
-    ON finance_transactions (tx_date);
+CREATE INDEX IF NOT EXISTS idx_finance_tx_account_id ON finance_transactions(account_id);
+CREATE INDEX IF NOT EXISTS idx_finance_tx_tx_date ON finance_transactions(tx_date);
+CREATE INDEX IF NOT EXISTS idx_finance_tx_tx_type ON finance_transactions(tx_type);
+CREATE INDEX IF NOT EXISTS idx_finance_tx_category ON finance_transactions(category);
+CREATE INDEX IF NOT EXISTS idx_finance_tx_transfer ON finance_transactions(transfer_id) WHERE transfer_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS finance_budgets (
-    id VARCHAR(36) PRIMARY KEY,
-    name TEXT NOT NULL,
-    amount BIGINT NOT NULL,
-    currency VARCHAR(10) NOT NULL,
-    period VARCHAR(50) NOT NULL,
-    category TEXT,
-    method VARCHAR(50) NOT NULL DEFAULT 'standard',
-    jar_type VARCHAR(50),
-    start_date DATE NOT NULL,
-    end_date DATE,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    id              TEXT PRIMARY KEY,
+    name            TEXT NOT NULL,
+    amount          INTEGER NOT NULL,
+    currency        TEXT NOT NULL,
+    period          TEXT NOT NULL,
+    category        TEXT,
+    method          TEXT NOT NULL DEFAULT 'standard',
+    jar_type        TEXT,
+    start_date      TEXT NOT NULL DEFAULT (date('now')),
+    end_date        TEXT,
+    is_active       INTEGER NOT NULL DEFAULT 1,
     alert_threshold INTEGER NOT NULL DEFAULT 80,
-    created_at TIMESTAMPTZ NOT NULL,
-    updated_at TIMESTAMPTZ NOT NULL
+    created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
 
+CREATE INDEX IF NOT EXISTS idx_finance_budgets_is_active ON finance_budgets(is_active) WHERE is_active = 1;
+CREATE INDEX IF NOT EXISTS idx_finance_budgets_category ON finance_budgets(category);
+
 CREATE TABLE IF NOT EXISTS finance_portfolios (
-    id VARCHAR(36) PRIMARY KEY,
-    name TEXT NOT NULL,
+    id          TEXT PRIMARY KEY,
+    name        TEXT NOT NULL,
     description TEXT,
-    currency VARCHAR(10) NOT NULL,
-    created_at TIMESTAMPTZ NOT NULL,
-    updated_at TIMESTAMPTZ NOT NULL
+    currency    TEXT NOT NULL,
+    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
 
 CREATE TABLE IF NOT EXISTS finance_investments (
-    id VARCHAR(36) PRIMARY KEY,
-    portfolio_id VARCHAR(36) NOT NULL REFERENCES finance_portfolios(id) ON DELETE CASCADE,
-    asset_type VARCHAR(50) NOT NULL,
-    symbol TEXT,
-    name TEXT NOT NULL,
-    quantity DOUBLE PRECISION NOT NULL,
-    cost_basis BIGINT NOT NULL,
-    currency VARCHAR(10) NOT NULL,
-    current_price BIGINT,
-    current_value BIGINT,
-    purchase_date DATE,
-    notes TEXT,
-    created_at TIMESTAMPTZ NOT NULL,
-    updated_at TIMESTAMPTZ NOT NULL
+    id            TEXT PRIMARY KEY,
+    portfolio_id  TEXT NOT NULL REFERENCES finance_portfolios(id) ON DELETE CASCADE,
+    asset_type    TEXT NOT NULL,
+    symbol        TEXT,
+    name          TEXT NOT NULL,
+    quantity      REAL NOT NULL,
+    cost_basis    INTEGER NOT NULL,
+    currency      TEXT NOT NULL,
+    current_price INTEGER,
+    current_value INTEGER,
+    purchase_date TEXT,
+    notes         TEXT,
+    created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
 
-CREATE INDEX IF NOT EXISTS idx_finance_investments_portfolio_id
-    ON finance_investments (portfolio_id);
+CREATE INDEX IF NOT EXISTS idx_finance_investments_portfolio_id ON finance_investments(portfolio_id);
+CREATE INDEX IF NOT EXISTS idx_finance_investments_symbol ON finance_investments(symbol) WHERE symbol IS NOT NULL;
 
-CREATE TABLE IF NOT EXISTS finance_investment_txs (
-    id VARCHAR(36) PRIMARY KEY,
-    investment_id VARCHAR(36) NOT NULL REFERENCES finance_investments(id) ON DELETE CASCADE,
-    tx_type VARCHAR(50) NOT NULL,
-    quantity DOUBLE PRECISION,
-    price_per_unit BIGINT,
-    total_amount BIGINT NOT NULL,
-    currency VARCHAR(10) NOT NULL,
-    fees BIGINT NOT NULL DEFAULT 0,
-    tx_date DATE NOT NULL,
-    notes TEXT,
-    created_at TIMESTAMPTZ NOT NULL
+CREATE TABLE IF NOT EXISTS finance_investment_transactions (
+    id             TEXT PRIMARY KEY,
+    investment_id  TEXT NOT NULL REFERENCES finance_investments(id) ON DELETE CASCADE,
+    tx_type        TEXT NOT NULL,
+    quantity       REAL,
+    price_per_unit INTEGER,
+    total_amount   INTEGER NOT NULL,
+    currency       TEXT NOT NULL,
+    fees           INTEGER NOT NULL DEFAULT 0,
+    tx_date        TEXT NOT NULL DEFAULT (date('now')),
+    notes          TEXT,
+    created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
+
+CREATE INDEX IF NOT EXISTS idx_finance_inv_txs_investment_id ON finance_investment_transactions(investment_id);
+CREATE INDEX IF NOT EXISTS idx_finance_inv_txs_tx_date ON finance_investment_transactions(tx_date);
 
 CREATE TABLE IF NOT EXISTS finance_goals (
-    id VARCHAR(36) PRIMARY KEY,
-    name TEXT NOT NULL,
-    goal_type VARCHAR(50) NOT NULL,
-    target_amount BIGINT NOT NULL,
-    current_amount BIGINT NOT NULL DEFAULT 0,
-    currency VARCHAR(10) NOT NULL,
-    status VARCHAR(50) NOT NULL DEFAULT 'active',
-    deadline DATE,
-    monthly_contribution BIGINT,
-    expected_return_rate DOUBLE PRECISION,
-    inflation_rate DOUBLE PRECISION,
-    notes TEXT,
-    created_at TIMESTAMPTZ NOT NULL,
-    updated_at TIMESTAMPTZ NOT NULL
+    id                   TEXT PRIMARY KEY,
+    name                 TEXT NOT NULL,
+    goal_type            TEXT NOT NULL,
+    target_amount        INTEGER NOT NULL,
+    current_amount       INTEGER NOT NULL DEFAULT 0,
+    currency             TEXT NOT NULL,
+    status               TEXT NOT NULL DEFAULT 'active',
+    deadline             TEXT,
+    monthly_contribution INTEGER,
+    expected_return_rate REAL,
+    inflation_rate       REAL,
+    notes                TEXT,
+    created_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    updated_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
 
+CREATE INDEX IF NOT EXISTS idx_finance_goals_status ON finance_goals(status);
+
 CREATE TABLE IF NOT EXISTS finance_liabilities (
-    id VARCHAR(36) PRIMARY KEY,
-    name TEXT NOT NULL,
-    liability_type VARCHAR(50) NOT NULL,
-    principal BIGINT NOT NULL,
-    remaining BIGINT NOT NULL,
-    currency VARCHAR(10) NOT NULL,
-    interest_rate DOUBLE PRECISION,
-    monthly_payment BIGINT,
-    due_date DATE,
-    notes TEXT,
-    created_at TIMESTAMPTZ NOT NULL,
-    updated_at TIMESTAMPTZ NOT NULL
+    id              TEXT PRIMARY KEY,
+    name            TEXT NOT NULL,
+    liability_type  TEXT NOT NULL,
+    principal       INTEGER NOT NULL,
+    remaining       INTEGER NOT NULL,
+    currency        TEXT NOT NULL,
+    interest_rate   REAL,
+    monthly_payment INTEGER,
+    due_date        TEXT,
+    notes           TEXT,
+    created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
+
+CREATE INDEX IF NOT EXISTS idx_finance_liabilities_currency ON finance_liabilities(currency);

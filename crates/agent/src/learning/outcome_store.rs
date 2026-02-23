@@ -1,8 +1,8 @@
 //! Outcome storage for the learning system.
 //!
 //! Supports two backends:
-//! - **Pg**: SQL-backed via `OutcomeRepo` (production)
-//! - **InMemory**: vector-backed (unit/integration tests without PostgreSQL)
+//! - **Sqlite**: SQL-backed via `OutcomeRepo` (production)
+//! - **InMemory**: vector-backed (unit/integration tests)
 
 use chrono::{DateTime, Utc};
 
@@ -57,9 +57,9 @@ fn row_to_outcome(row: storage::OutcomeRow) -> Result<OutcomeRecord> {
     })
 }
 
-/// Backend for outcome storage — Pg for production, InMemory for tests.
+/// Backend for outcome storage — Sqlite for production, InMemory for tests.
 enum Backend {
-    Pg(storage::OutcomeRepo),
+    Sqlite(storage::OutcomeRepo),
     InMemory {
         outcomes: std::sync::Mutex<Vec<OutcomeRecord>>,
         feedback: std::sync::Mutex<Vec<EnrichmentFeedbackEntry>>,
@@ -75,7 +75,7 @@ impl OutcomeStore {
     /// Create a store backed by a SQL repository (production path).
     pub fn new(repo: storage::OutcomeRepo) -> Self {
         Self {
-            backend: Backend::Pg(repo),
+            backend: Backend::Sqlite(repo),
         }
     }
 
@@ -92,7 +92,7 @@ impl OutcomeStore {
     /// Record a tool execution outcome.
     pub async fn record(&self, outcome: OutcomeRecord) -> Result<()> {
         match &self.backend {
-            Backend::Pg(repo) => {
+            Backend::Sqlite(repo) => {
                 let row = outcome_to_row(&outcome)?;
                 repo.create(&row).await?;
             }
@@ -106,7 +106,7 @@ impl OutcomeStore {
     /// Record enrichment feedback.
     pub async fn record_feedback(&self, feedback: EnrichmentFeedbackEntry) -> Result<()> {
         match &self.backend {
-            Backend::Pg(repo) => {
+            Backend::Sqlite(repo) => {
                 repo.create_enrichment_feedback(
                     &feedback.task_id,
                     &feedback.field,
@@ -127,7 +127,7 @@ impl OutcomeStore {
     /// Get outcomes recorded after a given timestamp.
     pub async fn outcomes_since(&self, cutoff: DateTime<Utc>) -> Result<Vec<OutcomeRecord>> {
         match &self.backend {
-            Backend::Pg(repo) => {
+            Backend::Sqlite(repo) => {
                 let rows = repo.list_by_date_range(cutoff, Utc::now()).await?;
                 rows.into_iter()
                     .map(row_to_outcome)
@@ -147,7 +147,7 @@ impl OutcomeStore {
     /// Get all outcome records (fetches from epoch to now).
     pub async fn get_all_outcomes(&self) -> Result<Vec<OutcomeRecord>> {
         match &self.backend {
-            Backend::Pg(_) => self.outcomes_since(DateTime::<Utc>::MIN_UTC).await,
+            Backend::Sqlite(_) => self.outcomes_since(DateTime::<Utc>::MIN_UTC).await,
             Backend::InMemory { outcomes, .. } => Ok(outcomes.lock().unwrap().clone()),
         }
     }
@@ -155,7 +155,7 @@ impl OutcomeStore {
     /// Get all enrichment feedback entries.
     pub async fn get_all_feedback(&self) -> Result<Vec<EnrichmentFeedbackEntry>> {
         match &self.backend {
-            Backend::Pg(repo) => {
+            Backend::Sqlite(repo) => {
                 let rows = repo.list_enrichment_feedback().await?;
                 Ok(rows
                     .into_iter()

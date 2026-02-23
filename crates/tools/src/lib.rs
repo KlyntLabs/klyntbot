@@ -3,14 +3,14 @@
 //! This crate provides:
 //! - Core tool implementations: filesystem (x4), shell, web (x2), message, spawn, cron
 //! - Domain tool interfaces: calendar, goal, plan, learning, memory, project
-//! - Embedding infrastructure: engine (fastembed), store (pgvector)
+//! - Embedding infrastructure: engine (fastembed), store (LanceDB)
 //! - Tool registry and permissions
 //!
 //! Feature-specific tools (todo, finance) live in their own crates
 //! (`feature-todo`, `feature-finance`) and depend on `tools-core` directly.
 
-// Re-export from tools-core for backward compatibility.
-// Consumers should gradually migrate to importing from tools-core directly.
+// Re-export from tools-core for convenience.
+// Consumers can import from tools-core directly.
 pub use tools_core::{
     tool_actions, ActionParams, ConfigPersistence, DomainEnum, DynTool, FeatureMigration,
     FeaturePackage, HealthStatus, InteractionBundle, Page, RoutingContext, Searchable, Tool,

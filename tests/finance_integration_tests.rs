@@ -12,8 +12,7 @@
 //! - Settings persistence to disk
 //! - Report generation
 //!
-//! All tests are #[ignore] because they require a running PostgreSQL instance.
-//! Run with: cargo nextest run --run-ignored ignored -p klyntbot --test finance_integration_tests
+//! Tests use an ephemeral SQLite pool (via `StoragePool::connect(tempdir)`) — no external database required.
 
 use common::{ChannelName, ChatId};
 use feature_finance::FinanceTool;
@@ -65,7 +64,6 @@ fn extract_nested_field(response: &str, outer: &str, inner: &str) -> Option<Stri
 
 /// Finance tool dispatches correctly and creates an account end-to-end.
 #[tokio::test]
-#[ignore]
 async fn finance_tool_dispatch_via_registry() {
     let tool = make_finance_tool().await;
     let ctx = test_ctx();
@@ -106,7 +104,6 @@ async fn finance_tool_dispatch_via_registry() {
 
 /// E2E: add account, then list -- account appears in response.
 #[tokio::test]
-#[ignore]
 async fn account_add_then_list() {
     let tool = make_finance_tool().await;
     let ctx = test_ctx();
@@ -147,7 +144,6 @@ async fn account_add_then_list() {
 
 /// E2E: add account, add expense transaction -- balance is decremented.
 #[tokio::test]
-#[ignore]
 async fn tx_add_updates_account_balance() {
     let tool = make_finance_tool().await;
     let ctx = test_ctx();
@@ -199,7 +195,6 @@ async fn tx_add_updates_account_balance() {
 
 /// E2E: budget shows correct usage percentage after expense in that category.
 #[tokio::test]
-#[ignore]
 async fn tx_add_with_budget_shows_impact() {
     let tool = make_finance_tool().await;
     let ctx = test_ctx();
@@ -277,7 +272,6 @@ async fn tx_add_with_budget_shows_impact() {
 
 /// E2E: transfer creates two paired rows and adjusts both account balances.
 #[tokio::test]
-#[ignore]
 async fn transfer_creates_paired_rows() {
     let tool = make_finance_tool().await;
     let ctx = test_ctx();
@@ -364,7 +358,6 @@ async fn transfer_creates_paired_rows() {
 
 /// E2E: buy then sell -- cost basis reduced proportionally (average cost method).
 #[tokio::test]
-#[ignore]
 async fn investment_buy_sell_cost_basis() {
     let tool = make_finance_tool().await;
     let ctx = test_ctx();
@@ -465,7 +458,6 @@ async fn investment_buy_sell_cost_basis() {
 
 /// E2E: net worth correctly computes assets - liabilities.
 #[tokio::test]
-#[ignore]
 async fn net_worth_calculation() {
     let tool = make_finance_tool().await;
     let ctx = test_ctx();
@@ -538,7 +530,6 @@ async fn net_worth_calculation() {
 
 /// E2E: budget_list shows correct usage percentage from real transactions.
 #[tokio::test]
-#[ignore]
 async fn budget_list_shows_current_usage() {
     let tool = make_finance_tool().await;
     let ctx = test_ctx();
@@ -629,7 +620,6 @@ async fn budget_list_shows_current_usage() {
 
 /// E2E: FIRE calculation with explicit annual_expenses.
 #[tokio::test]
-#[ignore]
 async fn goal_fire_with_explicit_expenses() {
     let tool = make_finance_tool().await;
     let ctx = test_ctx();
@@ -691,7 +681,6 @@ async fn goal_fire_with_explicit_expenses() {
 
 /// E2E: settings_get returns formatted config.
 #[tokio::test]
-#[ignore]
 async fn settings_get_returns_config() {
     let tool = make_finance_tool().await;
     let ctx = test_ctx();
@@ -717,7 +706,6 @@ async fn settings_get_returns_config() {
 
 /// E2E: report_spending shows per-category breakdown with amounts.
 #[tokio::test]
-#[ignore]
 async fn report_spending_shows_category_breakdown() {
     let tool = make_finance_tool().await;
     let ctx = test_ctx();
@@ -807,7 +795,6 @@ async fn report_spending_shows_category_breakdown() {
 
 /// Unknown action returns error.
 #[tokio::test]
-#[ignore]
 async fn unknown_action_returns_error() {
     let tool = make_finance_tool().await;
     let ctx = test_ctx();
@@ -829,7 +816,6 @@ async fn unknown_action_returns_error() {
 
 /// Finance tool has the correct name.
 #[tokio::test]
-#[ignore]
 async fn finance_tool_has_correct_name() {
     let tool = make_finance_tool().await;
     assert_eq!(tool.name(), "finance");
@@ -837,7 +823,6 @@ async fn finance_tool_has_correct_name() {
 
 /// Finance tool parameters schema has required "action" field.
 #[tokio::test]
-#[ignore]
 async fn finance_tool_parameters_has_action() {
     let tool = make_finance_tool().await;
     let params = tool.parameters();

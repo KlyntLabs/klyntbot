@@ -237,7 +237,7 @@ pub struct FinanceTransactionFilter {
     pub date_to: Option<NaiveDate>,
     pub amount_min: Option<i64>,
     pub amount_max: Option<i64>,
-    /// ILIKE search across notes, counterparty, and category.
+    /// LIKE search across notes, counterparty, and category.
     pub query: Option<String>,
     /// Defaults to 20, max 100 (enforced in repo).
     pub limit: Option<i64>,
