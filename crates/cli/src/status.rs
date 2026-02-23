@@ -75,6 +75,17 @@ pub async fn handle_status(verbose: bool) -> Result<()> {
         println!("  {}/{}", provider, model);
         println!();
 
+        // Storage section
+        let data_dir = config.data_dir_path();
+        let db_path = data_dir.join("data.db");
+        println!("Storage");
+        if db_path.exists() {
+            println!("  SQLite at {}", db_path.display());
+        } else {
+            println!("  {} not initialized — run {} to set up", status_warning(), colorize("klyntbot init", HIGHLIGHT));
+        }
+        println!();
+
         // Workspace section
         println!("Workspace");
         println!("  {}", workspace.display());

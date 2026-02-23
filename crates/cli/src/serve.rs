@@ -8,7 +8,7 @@ use heartbeat::HeartbeatService;
 use scheduling::CronService;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use storage::{Repos, StoragePool};
+use storage::{Repos, StoragePool, VectorStore};
 use tokio::signal;
 use tokio::sync::Mutex;
 use tracing::{error, info};
@@ -24,6 +24,10 @@ pub async fn handle_serve(port: u16) -> Result<()> {
     let data_dir = config.data_dir_path();
     let storage_pool = StoragePool::connect(&data_dir).await?;
     let repos = Repos::from_pool(&storage_pool);
+    let vector_store = VectorStore::connect(&data_dir).await
+        .map_err(|e| anyhow::anyhow!("{}", e))?;
+    // TODO: pass vector_store to builder once Task #12 (embedding pipeline) adds with_vector_store()
+    let _ = vector_store;
     info!("Storage connected and migrations applied");
 
     // Initialize LLM provider (resolves the effective model for this provider)

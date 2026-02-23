@@ -35,6 +35,10 @@ pub async fn handle_chat(message: Option<String>, session: String, verbose: bool
     // Connect to SQLite storage
     let data_dir = config.data_dir_path();
     let storage_pool = storage::StoragePool::connect(&data_dir).await?;
+    let vector_store = storage::VectorStore::connect(&data_dir).await
+        .map_err(|e| anyhow::anyhow!("{}", e))?;
+    // TODO: pass vector_store to builder once Task #12 (embedding pipeline) adds with_vector_store()
+    let _ = vector_store;
 
     // Initialize agent loop (Arc for streaming support)
     let agent_loop = Arc::new(
