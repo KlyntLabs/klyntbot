@@ -1,6 +1,6 @@
 //! Repository for the `finance_budgets` table, including the budget-usage join query.
 
-use sqlx::PgPool;
+use sqlx::SqlitePool;
 
 use crate::error::StorageError;
 use crate::rows::finance::{BudgetUsageRow, FinanceBudgetPatch, FinanceBudgetRow};
@@ -8,11 +8,11 @@ use crate::rows::finance::{BudgetUsageRow, FinanceBudgetPatch, FinanceBudgetRow}
 /// Repository for budget CRUD, active-budget listing, and usage aggregation.
 #[derive(Debug, Clone)]
 pub struct FinanceBudgetRepo {
-    pool: PgPool,
+    pool: SqlitePool,
 }
 
 impl FinanceBudgetRepo {
-    pub fn new(pool: PgPool) -> Self {
+    pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
     }
 
@@ -29,9 +29,9 @@ impl FinanceBudgetRepo {
                 method, jar_type, start_date, end_date, is_active,
                 alert_threshold, created_at, updated_at
             ) VALUES (
-                $1, $2, $3, $4, $5, $6,
-                $7, $8, $9, $10, $11,
-                $12, $13, $14
+                ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?,
+                ?, ?, ?
             )
             RETURNING *
             "#,
@@ -59,7 +59,7 @@ impl FinanceBudgetRepo {
     /// Get a single budget by id. Returns `None` if not found.
     pub async fn get(&self, id: &str) -> Result<Option<FinanceBudgetRow>, StorageError> {
         let row =
-            sqlx::query_as::<_, FinanceBudgetRow>("SELECT * FROM finance_budgets WHERE id = $1")
+            sqlx::query_as::<_, FinanceBudgetRow>("SELECT * FROM finance_budgets WHERE id = ?")
                 .bind(id)
                 .fetch_optional(&self.pool)
                 .await?;
@@ -74,21 +74,21 @@ impl FinanceBudgetRepo {
         let row = sqlx::query_as::<_, FinanceBudgetRow>(
             r#"
             UPDATE finance_budgets SET
-                name      = COALESCE($2, name),
-                amount    = COALESCE($3, amount),
-                category  = CASE WHEN $4 THEN $5 ELSE category END,
-                is_active = COALESCE($6, is_active),
-                updated_at = now()
-            WHERE id = $1
+                name      = COALESCE(?, name),
+                amount    = COALESCE(?, amount),
+                category  = CASE WHEN ? THEN ? ELSE category END,
+                is_active = COALESCE(?, is_active),
+                updated_at = datetime('now')
+            WHERE id = ?
             RETURNING *
             "#,
         )
-        .bind(&patch.id)
         .bind(&patch.name)
         .bind(patch.amount)
         .bind(patch.category.is_some())
         .bind(patch.category.as_ref().and_then(|v| v.as_deref()))
         .bind(patch.is_active)
+        .bind(&patch.id)
         .fetch_optional(&self.pool)
         .await?
         .ok_or_else(|| StorageError::NotFound(format!("finance_budget {}", patch.id)))?;
@@ -98,7 +98,7 @@ impl FinanceBudgetRepo {
 
     /// Delete a budget. Returns `true` if the row existed and was deleted.
     pub async fn delete(&self, id: &str) -> Result<bool, StorageError> {
-        let result = sqlx::query("DELETE FROM finance_budgets WHERE id = $1")
+        let result = sqlx::query("DELETE FROM finance_budgets WHERE id = ?")
             .bind(id)
             .execute(&self.pool)
             .await?;
@@ -125,7 +125,7 @@ impl FinanceBudgetRepo {
         category: &str,
     ) -> Result<Option<FinanceBudgetRow>, StorageError> {
         let row = sqlx::query_as::<_, FinanceBudgetRow>(
-            "SELECT * FROM finance_budgets WHERE category = $1 AND is_active = TRUE LIMIT 1",
+            "SELECT * FROM finance_budgets WHERE category = ? AND is_active = TRUE LIMIT 1",
         )
         .bind(category)
         .fetch_optional(&self.pool)
@@ -140,7 +140,7 @@ impl FinanceBudgetRepo {
     /// Return the budget row for `budget_id` with the `spent` amount calculated
     /// by summing matching expense transactions in the budget's current period.
     ///
-    /// Period boundaries are derived from `b.period` + `CURRENT_DATE`:
+    /// Period boundaries are derived from `b.period` + `date('now')`:
     /// - `monthly` → first to last day of the current calendar month
     /// - `weekly`  → Monday to Sunday of the current ISO week
     /// - `yearly`  → first to last day of the current calendar year
@@ -168,24 +168,24 @@ impl FinanceBudgetRepo {
                 b.alert_threshold,
                 b.created_at,
                 b.updated_at,
-                COALESCE(SUM(ft.amount), 0)::BIGINT AS spent
+                COALESCE(SUM(ft.amount), 0) AS spent
             FROM finance_budgets b
             LEFT JOIN finance_transactions ft ON
                 ft.tx_type = 'expense'
                 AND (b.category IS NULL OR ft.category = b.category)
                 AND ft.tx_date >= CASE
-                    WHEN b.period = 'monthly' THEN DATE_TRUNC('month', CURRENT_DATE)::DATE
-                    WHEN b.period = 'weekly'  THEN DATE_TRUNC('week', CURRENT_DATE)::DATE
-                    WHEN b.period = 'yearly'  THEN DATE_TRUNC('year', CURRENT_DATE)::DATE
+                    WHEN b.period = 'monthly' THEN date('now', 'start of month')
+                    WHEN b.period = 'weekly'  THEN date('now', '-' || ((strftime('%w', 'now') + 6) % 7) || ' days')
+                    WHEN b.period = 'yearly'  THEN date('now', 'start of year')
                     ELSE b.start_date
                 END
                 AND ft.tx_date <= CASE
-                    WHEN b.period = 'monthly' THEN (DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month' - INTERVAL '1 day')::DATE
-                    WHEN b.period = 'weekly'  THEN (DATE_TRUNC('week', CURRENT_DATE) + INTERVAL '6 days')::DATE
-                    WHEN b.period = 'yearly'  THEN (DATE_TRUNC('year', CURRENT_DATE) + INTERVAL '1 year' - INTERVAL '1 day')::DATE
-                    ELSE COALESCE(b.end_date, CURRENT_DATE)
+                    WHEN b.period = 'monthly' THEN date('now', 'start of month', '+1 month', '-1 day')
+                    WHEN b.period = 'weekly'  THEN date('now', '-' || ((strftime('%w', 'now') + 6) % 7) || ' days', '+6 days')
+                    WHEN b.period = 'yearly'  THEN date('now', 'start of year', '+1 year', '-1 day')
+                    ELSE COALESCE(b.end_date, date('now'))
                 END
-            WHERE b.id = $1
+            WHERE b.id = ?
             GROUP BY b.id
             "#,
         )
@@ -216,22 +216,22 @@ impl FinanceBudgetRepo {
                 b.alert_threshold,
                 b.created_at,
                 b.updated_at,
-                COALESCE(SUM(ft.amount), 0)::BIGINT AS spent
+                COALESCE(SUM(ft.amount), 0) AS spent
             FROM finance_budgets b
             LEFT JOIN finance_transactions ft ON
                 ft.tx_type = 'expense'
                 AND (b.category IS NULL OR ft.category = b.category)
                 AND ft.tx_date >= CASE
-                    WHEN b.period = 'monthly' THEN DATE_TRUNC('month', CURRENT_DATE)::DATE
-                    WHEN b.period = 'weekly'  THEN DATE_TRUNC('week', CURRENT_DATE)::DATE
-                    WHEN b.period = 'yearly'  THEN DATE_TRUNC('year', CURRENT_DATE)::DATE
+                    WHEN b.period = 'monthly' THEN date('now', 'start of month')
+                    WHEN b.period = 'weekly'  THEN date('now', '-' || ((strftime('%w', 'now') + 6) % 7) || ' days')
+                    WHEN b.period = 'yearly'  THEN date('now', 'start of year')
                     ELSE b.start_date
                 END
                 AND ft.tx_date <= CASE
-                    WHEN b.period = 'monthly' THEN (DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month' - INTERVAL '1 day')::DATE
-                    WHEN b.period = 'weekly'  THEN (DATE_TRUNC('week', CURRENT_DATE) + INTERVAL '6 days')::DATE
-                    WHEN b.period = 'yearly'  THEN (DATE_TRUNC('year', CURRENT_DATE) + INTERVAL '1 year' - INTERVAL '1 day')::DATE
-                    ELSE COALESCE(b.end_date, CURRENT_DATE)
+                    WHEN b.period = 'monthly' THEN date('now', 'start of month', '+1 month', '-1 day')
+                    WHEN b.period = 'weekly'  THEN date('now', '-' || ((strftime('%w', 'now') + 6) % 7) || ' days', '+6 days')
+                    WHEN b.period = 'yearly'  THEN date('now', 'start of year', '+1 year', '-1 day')
+                    ELSE COALESCE(b.end_date, date('now'))
                 END
             WHERE b.is_active = TRUE
             GROUP BY b.id

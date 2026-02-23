@@ -1,6 +1,6 @@
 //! Repository for the `finance_goals` table.
 
-use sqlx::PgPool;
+use sqlx::SqlitePool;
 
 use crate::error::StorageError;
 use crate::rows::finance::{FinanceGoalPatch, FinanceGoalRow};
@@ -8,11 +8,11 @@ use crate::rows::finance::{FinanceGoalPatch, FinanceGoalRow};
 /// Repository for financial goal CRUD, status filtering, and progress updates.
 #[derive(Debug, Clone)]
 pub struct FinanceGoalRepo {
-    pool: PgPool,
+    pool: SqlitePool,
 }
 
 impl FinanceGoalRepo {
-    pub fn new(pool: PgPool) -> Self {
+    pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
     }
 
@@ -30,10 +30,10 @@ impl FinanceGoalRepo {
                 expected_return_rate, inflation_rate, notes,
                 created_at, updated_at
             ) VALUES (
-                $1, $2, $3, $4, $5,
-                $6, $7, $8, $9,
-                $10, $11, $12,
-                $13, $14
+                ?, ?, ?, ?, ?,
+                ?, ?, ?, ?,
+                ?, ?, ?,
+                ?, ?
             )
             RETURNING *
             "#,
@@ -60,10 +60,11 @@ impl FinanceGoalRepo {
 
     /// Get a single goal by id. Returns `None` if not found.
     pub async fn get(&self, id: &str) -> Result<Option<FinanceGoalRow>, StorageError> {
-        let row = sqlx::query_as::<_, FinanceGoalRow>("SELECT * FROM finance_goals WHERE id = $1")
-            .bind(id)
-            .fetch_optional(&self.pool)
-            .await?;
+        let row =
+            sqlx::query_as::<_, FinanceGoalRow>("SELECT * FROM finance_goals WHERE id = ?")
+                .bind(id)
+                .fetch_optional(&self.pool)
+                .await?;
         Ok(row)
     }
 
@@ -72,20 +73,19 @@ impl FinanceGoalRepo {
         let row = sqlx::query_as::<_, FinanceGoalRow>(
             r#"
             UPDATE finance_goals SET
-                name                 = COALESCE($2, name),
-                current_amount       = COALESCE($3, current_amount),
-                target_amount        = COALESCE($4, target_amount),
-                monthly_contribution = CASE WHEN $5 THEN $6 ELSE monthly_contribution END,
-                expected_return_rate = CASE WHEN $7 THEN $8 ELSE expected_return_rate END,
-                inflation_rate       = CASE WHEN $9 THEN $10 ELSE inflation_rate END,
-                deadline             = CASE WHEN $11 THEN $12 ELSE deadline END,
-                status               = COALESCE($13, status),
-                updated_at           = now()
-            WHERE id = $1
+                name                 = COALESCE(?, name),
+                current_amount       = COALESCE(?, current_amount),
+                target_amount        = COALESCE(?, target_amount),
+                monthly_contribution = CASE WHEN ? THEN ? ELSE monthly_contribution END,
+                expected_return_rate = CASE WHEN ? THEN ? ELSE expected_return_rate END,
+                inflation_rate       = CASE WHEN ? THEN ? ELSE inflation_rate END,
+                deadline             = CASE WHEN ? THEN ? ELSE deadline END,
+                status               = COALESCE(?, status),
+                updated_at           = datetime('now')
+            WHERE id = ?
             RETURNING *
             "#,
         )
-        .bind(&patch.id)
         .bind(&patch.name)
         .bind(patch.current_amount)
         .bind(patch.target_amount)
@@ -98,6 +98,7 @@ impl FinanceGoalRepo {
         .bind(patch.deadline.is_some())
         .bind(patch.deadline.as_ref().and_then(|v| *v))
         .bind(&patch.status)
+        .bind(&patch.id)
         .fetch_optional(&self.pool)
         .await?
         .ok_or_else(|| StorageError::NotFound(format!("finance_goal {}", patch.id)))?;
@@ -107,7 +108,7 @@ impl FinanceGoalRepo {
 
     /// Delete a goal. Returns `true` if the row existed and was deleted.
     pub async fn delete(&self, id: &str) -> Result<bool, StorageError> {
-        let result = sqlx::query("DELETE FROM finance_goals WHERE id = $1")
+        let result = sqlx::query("DELETE FROM finance_goals WHERE id = ?")
             .bind(id)
             .execute(&self.pool)
             .await?;
@@ -141,13 +142,13 @@ impl FinanceGoalRepo {
         let row = sqlx::query_as::<_, FinanceGoalRow>(
             r#"
             UPDATE finance_goals
-            SET current_amount = $2, updated_at = now()
-            WHERE id = $1
+            SET current_amount = ?, updated_at = datetime('now')
+            WHERE id = ?
             RETURNING *
             "#,
         )
-        .bind(id)
         .bind(current_amount)
+        .bind(id)
         .fetch_optional(&self.pool)
         .await?
         .ok_or_else(|| StorageError::NotFound(format!("finance_goal {id}")))?;

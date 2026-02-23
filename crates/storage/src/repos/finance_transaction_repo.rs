@@ -1,7 +1,7 @@
 //! Repository for the `finance_transactions` table.
 
 use chrono::NaiveDate;
-use sqlx::PgPool;
+use sqlx::SqlitePool;
 
 use crate::error::StorageError;
 use crate::rows::finance::{
@@ -11,11 +11,11 @@ use crate::rows::finance::{
 /// Repository for transaction CRUD, QueryBuilder filtering, transfer lookups, and aggregation.
 #[derive(Debug, Clone)]
 pub struct FinanceTransactionRepo {
-    pool: PgPool,
+    pool: SqlitePool,
 }
 
 impl FinanceTransactionRepo {
-    pub fn new(pool: PgPool) -> Self {
+    pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
     }
 
@@ -36,10 +36,10 @@ impl FinanceTransactionRepo {
                 tx_date, transfer_id, is_recurring, recurring_rule,
                 created_at, updated_at
             ) VALUES (
-                $1, $2, $3, $4, $5,
-                $6, $7, $8, $9,
-                $10, $11, $12, $13,
-                $14, $15
+                ?, ?, ?, ?, ?,
+                ?, ?, ?, ?,
+                ?, ?, ?, ?,
+                ?, ?
             )
             RETURNING *
             "#,
@@ -68,7 +68,7 @@ impl FinanceTransactionRepo {
     /// Get a single transaction by id. Returns `None` if not found.
     pub async fn get(&self, id: &str) -> Result<Option<FinanceTransactionRow>, StorageError> {
         let row = sqlx::query_as::<_, FinanceTransactionRow>(
-            "SELECT * FROM finance_transactions WHERE id = $1",
+            "SELECT * FROM finance_transactions WHERE id = ?",
         )
         .bind(id)
         .fetch_optional(&self.pool)
@@ -85,18 +85,17 @@ impl FinanceTransactionRepo {
         let row = sqlx::query_as::<_, FinanceTransactionRow>(
             r#"
             UPDATE finance_transactions SET
-                amount       = COALESCE($2, amount),
-                category     = CASE WHEN $3 THEN $4 ELSE category END,
-                subcategory  = CASE WHEN $5 THEN $6 ELSE subcategory END,
-                counterparty = CASE WHEN $7 THEN $8 ELSE counterparty END,
-                notes        = CASE WHEN $9 THEN $10 ELSE notes END,
-                tx_date      = COALESCE($11, tx_date),
-                updated_at   = now()
-            WHERE id = $1
+                amount       = COALESCE(?, amount),
+                category     = CASE WHEN ? THEN ? ELSE category END,
+                subcategory  = CASE WHEN ? THEN ? ELSE subcategory END,
+                counterparty = CASE WHEN ? THEN ? ELSE counterparty END,
+                notes        = CASE WHEN ? THEN ? ELSE notes END,
+                tx_date      = COALESCE(?, tx_date),
+                updated_at   = datetime('now')
+            WHERE id = ?
             RETURNING *
             "#,
         )
-        .bind(&patch.id)
         .bind(patch.amount)
         .bind(patch.category.is_some())
         .bind(patch.category.as_ref().and_then(|v| v.as_deref()))
@@ -107,6 +106,7 @@ impl FinanceTransactionRepo {
         .bind(patch.notes.is_some())
         .bind(patch.notes.as_ref().and_then(|v| v.as_deref()))
         .bind(patch.tx_date)
+        .bind(&patch.id)
         .fetch_optional(&self.pool)
         .await?
         .ok_or_else(|| StorageError::NotFound(format!("finance_transaction {}", patch.id)))?;
@@ -117,7 +117,7 @@ impl FinanceTransactionRepo {
     /// Delete a transaction. Returns the deleted row (for balance reversal), or `None` if not found.
     pub async fn delete(&self, id: &str) -> Result<Option<FinanceTransactionRow>, StorageError> {
         let row = sqlx::query_as::<_, FinanceTransactionRow>(
-            "DELETE FROM finance_transactions WHERE id = $1 RETURNING *",
+            "DELETE FROM finance_transactions WHERE id = ? RETURNING *",
         )
         .bind(id)
         .fetch_optional(&self.pool)
@@ -136,7 +136,7 @@ impl FinanceTransactionRepo {
     ) -> Result<Vec<FinanceTransactionRow>, StorageError> {
         let limit = filter.limit.unwrap_or(20).min(100);
 
-        let mut qb = sqlx::QueryBuilder::<sqlx::Postgres>::new(
+        let mut qb = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
             "SELECT * FROM finance_transactions WHERE TRUE",
         );
 
@@ -176,18 +176,19 @@ impl FinanceTransactionRepo {
         }
 
         if let Some(ref query) = filter.query {
+            // Escape SQLite LIKE wildcards so user input is treated literally.
             let escaped = query
                 .replace('\\', "\\\\")
                 .replace('%', "\\%")
                 .replace('_', "\\_");
             let pattern = format!("%{escaped}%");
-            qb.push(" AND (notes ILIKE ");
+            qb.push(" AND (notes LIKE ");
             qb.push_bind(pattern.clone());
-            qb.push(" OR counterparty ILIKE ");
+            qb.push(" ESCAPE '\\' OR counterparty LIKE ");
             qb.push_bind(pattern.clone());
-            qb.push(" OR category ILIKE ");
+            qb.push(" ESCAPE '\\' OR category LIKE ");
             qb.push_bind(pattern);
-            qb.push(")");
+            qb.push(" ESCAPE '\\')");
         }
 
         qb.push(" ORDER BY tx_date DESC, created_at DESC LIMIT ");
@@ -210,7 +211,7 @@ impl FinanceTransactionRepo {
         transfer_id: &str,
     ) -> Result<Vec<FinanceTransactionRow>, StorageError> {
         let rows = sqlx::query_as::<_, FinanceTransactionRow>(
-            "SELECT * FROM finance_transactions WHERE transfer_id = $1 ORDER BY tx_type",
+            "SELECT * FROM finance_transactions WHERE transfer_id = ? ORDER BY tx_type",
         )
         .bind(transfer_id)
         .fetch_all(&self.pool)
@@ -232,11 +233,11 @@ impl FinanceTransactionRepo {
     ) -> Result<Vec<(String, i64)>, StorageError> {
         let rows: Vec<(String, i64)> = sqlx::query_as(
             r#"
-            SELECT COALESCE(category, 'uncategorized') AS cat, COALESCE(SUM(amount), 0)::BIGINT AS total
+            SELECT COALESCE(category, 'uncategorized') AS cat, COALESCE(SUM(amount), 0) AS total
             FROM finance_transactions
-            WHERE tx_type = $3
-              AND tx_date >= $1
-              AND tx_date <= $2
+            WHERE tx_date >= ?
+              AND tx_date <= ?
+              AND tx_type = ?
             GROUP BY cat
             ORDER BY total DESC
             "#,
@@ -258,15 +259,15 @@ impl FinanceTransactionRepo {
         n_periods: i32,
         _period_type: &str,
     ) -> Result<Vec<(String, i64)>, StorageError> {
-        // Calculate cutoff: start of (n_periods - 1) months ago.
+        // Cutoff = start of current month minus (n_periods - 1) months.
         let rows: Vec<(String, i64)> = sqlx::query_as(
             r#"
             SELECT
-                TO_CHAR(DATE_TRUNC('month', tx_date), 'YYYY-MM') AS period_label,
-                COALESCE(SUM(amount), 0)::BIGINT AS total
+                strftime('%Y-%m', tx_date) AS period_label,
+                COALESCE(SUM(amount), 0)   AS total
             FROM finance_transactions
-            WHERE tx_type = $1
-              AND tx_date >= (DATE_TRUNC('month', CURRENT_DATE) - (($2::INT - 1) * INTERVAL '1 month'))::DATE
+            WHERE tx_type = ?
+              AND tx_date >= date('now', 'start of month', '-' || (? - 1) || ' months')
             GROUP BY period_label
             ORDER BY period_label DESC
             "#,
@@ -291,7 +292,7 @@ impl FinanceTransactionRepo {
             WHERE counterparty IS NOT NULL AND category IS NOT NULL
             GROUP BY counterparty, category
             ORDER BY cnt DESC
-            LIMIT $1
+            LIMIT ?
             "#,
         )
         .bind(limit)

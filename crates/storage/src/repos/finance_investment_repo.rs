@@ -1,7 +1,7 @@
 //! Repository for `finance_portfolios`, `finance_investments`, and
 //! `finance_investment_transactions` — three related tables managed together.
 
-use sqlx::PgPool;
+use sqlx::SqlitePool;
 
 use crate::error::StorageError;
 use crate::rows::finance::{
@@ -12,11 +12,11 @@ use crate::rows::finance::{
 /// Repository covering portfolios, investments, and investment transactions.
 #[derive(Debug, Clone)]
 pub struct FinanceInvestmentRepo {
-    pool: PgPool,
+    pool: SqlitePool,
 }
 
 impl FinanceInvestmentRepo {
-    pub fn new(pool: PgPool) -> Self {
+    pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
     }
 
@@ -32,7 +32,7 @@ impl FinanceInvestmentRepo {
         let inserted = sqlx::query_as::<_, FinancePortfolioRow>(
             r#"
             INSERT INTO finance_portfolios (id, name, description, currency, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            VALUES (?, ?, ?, ?, ?, ?)
             RETURNING *
             "#,
         )
@@ -53,7 +53,7 @@ impl FinanceInvestmentRepo {
         id: &str,
     ) -> Result<Option<FinancePortfolioRow>, StorageError> {
         let row = sqlx::query_as::<_, FinancePortfolioRow>(
-            "SELECT * FROM finance_portfolios WHERE id = $1",
+            "SELECT * FROM finance_portfolios WHERE id = ?",
         )
         .bind(id)
         .fetch_optional(&self.pool)
@@ -73,7 +73,7 @@ impl FinanceInvestmentRepo {
 
     /// Delete a portfolio and cascade-delete all its investments and their transactions.
     pub async fn delete_portfolio(&self, id: &str) -> Result<bool, StorageError> {
-        let result = sqlx::query("DELETE FROM finance_portfolios WHERE id = $1")
+        let result = sqlx::query("DELETE FROM finance_portfolios WHERE id = ?")
             .bind(id)
             .execute(&self.pool)
             .await?;
@@ -96,9 +96,9 @@ impl FinanceInvestmentRepo {
                 cost_basis, currency, current_price, current_value,
                 purchase_date, notes, created_at, updated_at
             ) VALUES (
-                $1, $2, $3, $4, $5, $6,
-                $7, $8, $9, $10,
-                $11, $12, $13, $14
+                ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?,
+                ?, ?, ?, ?
             )
             RETURNING *
             "#,
@@ -128,7 +128,7 @@ impl FinanceInvestmentRepo {
         id: &str,
     ) -> Result<Option<FinanceInvestmentRow>, StorageError> {
         let row = sqlx::query_as::<_, FinanceInvestmentRow>(
-            "SELECT * FROM finance_investments WHERE id = $1",
+            "SELECT * FROM finance_investments WHERE id = ?",
         )
         .bind(id)
         .fetch_optional(&self.pool)
@@ -144,17 +144,16 @@ impl FinanceInvestmentRepo {
         let row = sqlx::query_as::<_, FinanceInvestmentRow>(
             r#"
             UPDATE finance_investments SET
-                current_price = CASE WHEN $2 THEN $3 ELSE current_price END,
-                current_value = CASE WHEN $4 THEN $5 ELSE current_value END,
-                quantity      = COALESCE($6, quantity),
-                cost_basis    = COALESCE($7, cost_basis),
-                notes         = CASE WHEN $8 THEN $9 ELSE notes END,
-                updated_at    = now()
-            WHERE id = $1
+                current_price = CASE WHEN ? THEN ? ELSE current_price END,
+                current_value = CASE WHEN ? THEN ? ELSE current_value END,
+                quantity      = COALESCE(?, quantity),
+                cost_basis    = COALESCE(?, cost_basis),
+                notes         = CASE WHEN ? THEN ? ELSE notes END,
+                updated_at    = datetime('now')
+            WHERE id = ?
             RETURNING *
             "#,
         )
-        .bind(&patch.id)
         .bind(patch.current_price.is_some())
         .bind(patch.current_price.as_ref().and_then(|v| *v))
         .bind(patch.current_value.is_some())
@@ -163,6 +162,7 @@ impl FinanceInvestmentRepo {
         .bind(patch.cost_basis)
         .bind(patch.notes.is_some())
         .bind(patch.notes.as_ref().and_then(|v| v.as_deref()))
+        .bind(&patch.id)
         .fetch_optional(&self.pool)
         .await?
         .ok_or_else(|| StorageError::NotFound(format!("finance_investment {}", patch.id)))?;
@@ -179,14 +179,14 @@ impl FinanceInvestmentRepo {
         let row = sqlx::query_as::<_, FinanceInvestmentRow>(
             r#"
             UPDATE finance_investments
-            SET current_price = $2, current_value = $3, updated_at = now()
-            WHERE id = $1
+            SET current_price = ?, current_value = ?, updated_at = datetime('now')
+            WHERE id = ?
             RETURNING *
             "#,
         )
-        .bind(id)
         .bind(current_price)
         .bind(current_value)
+        .bind(id)
         .fetch_optional(&self.pool)
         .await?
         .ok_or_else(|| StorageError::NotFound(format!("finance_investment {id}")))?;
@@ -198,7 +198,7 @@ impl FinanceInvestmentRepo {
         &self,
         filter: &FinanceInvestmentFilter,
     ) -> Result<Vec<FinanceInvestmentRow>, StorageError> {
-        let mut qb = sqlx::QueryBuilder::<sqlx::Postgres>::new(
+        let mut qb = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
             "SELECT * FROM finance_investments WHERE TRUE",
         );
 
@@ -240,7 +240,7 @@ impl FinanceInvestmentRepo {
 
     /// Delete an investment and cascade-delete all its transactions.
     pub async fn delete_investment(&self, id: &str) -> Result<bool, StorageError> {
-        let result = sqlx::query("DELETE FROM finance_investments WHERE id = $1")
+        let result = sqlx::query("DELETE FROM finance_investments WHERE id = ?")
             .bind(id)
             .execute(&self.pool)
             .await?;
@@ -262,8 +262,8 @@ impl FinanceInvestmentRepo {
                 id, investment_id, tx_type, quantity, price_per_unit,
                 total_amount, currency, fees, tx_date, notes, created_at
             ) VALUES (
-                $1, $2, $3, $4, $5,
-                $6, $7, $8, $9, $10, $11
+                ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?
             )
             RETURNING *
             "#,
@@ -290,7 +290,7 @@ impl FinanceInvestmentRepo {
         investment_id: &str,
     ) -> Result<Vec<FinanceInvestmentTxRow>, StorageError> {
         let rows = sqlx::query_as::<_, FinanceInvestmentTxRow>(
-            "SELECT * FROM finance_investment_transactions WHERE investment_id = $1 ORDER BY tx_date, created_at",
+            "SELECT * FROM finance_investment_transactions WHERE investment_id = ? ORDER BY tx_date, created_at",
         )
         .bind(investment_id)
         .fetch_all(&self.pool)
@@ -310,13 +310,13 @@ impl FinanceInvestmentRepo {
         let row = sqlx::query_as::<_, PortfolioSummaryRow>(
             r#"
             SELECT
-                p.id                                       AS portfolio_id,
-                COALESCE(SUM(i.cost_basis), 0)::BIGINT     AS total_cost_basis,
-                COALESCE(SUM(i.current_value), 0)::BIGINT AS total_current_value,
-                COUNT(i.id)                                AS holding_count
+                p.id                                              AS portfolio_id,
+                COALESCE(SUM(i.cost_basis), 0)                    AS total_cost_basis,
+                COALESCE(SUM(i.current_value), 0)                 AS total_current_value,
+                COUNT(i.id)                                       AS holding_count
             FROM finance_portfolios p
             LEFT JOIN finance_investments i ON i.portfolio_id = p.id
-            WHERE p.id = $1
+            WHERE p.id = ?
             GROUP BY p.id
             "#,
         )
@@ -332,7 +332,7 @@ impl FinanceInvestmentRepo {
     pub async fn total_value_by_currency(&self) -> Result<Vec<(String, i64)>, StorageError> {
         let rows: Vec<(String, i64)> = sqlx::query_as(
             r#"
-            SELECT currency, COALESCE(SUM(current_value), 0)::BIGINT AS total
+            SELECT currency, COALESCE(SUM(current_value), 0) AS total
             FROM finance_investments
             WHERE current_value IS NOT NULL
             GROUP BY currency

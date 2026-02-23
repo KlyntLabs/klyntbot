@@ -1,6 +1,6 @@
 //! Repository for the `finance_accounts` table.
 
-use sqlx::PgPool;
+use sqlx::SqlitePool;
 
 use crate::error::StorageError;
 use crate::rows::finance::{FinanceAccountPatch, FinanceAccountRow};
@@ -8,11 +8,11 @@ use crate::rows::finance::{FinanceAccountPatch, FinanceAccountRow};
 /// Repository for finance account CRUD, listing, and balance operations.
 #[derive(Debug, Clone)]
 pub struct FinanceAccountRepo {
-    pool: PgPool,
+    pool: SqlitePool,
 }
 
 impl FinanceAccountRepo {
-    pub fn new(pool: PgPool) -> Self {
+    pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
     }
 
@@ -28,8 +28,8 @@ impl FinanceAccountRepo {
                 id, name, account_type, currency, balance,
                 institution, notes, is_archived, created_at, updated_at
             ) VALUES (
-                $1, $2, $3, $4, $5,
-                $6, $7, $8, $9, $10
+                ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?
             )
             RETURNING *
             "#,
@@ -53,7 +53,7 @@ impl FinanceAccountRepo {
     /// Get a single account by id. Returns `None` if not found.
     pub async fn get(&self, id: &str) -> Result<Option<FinanceAccountRow>, StorageError> {
         let row =
-            sqlx::query_as::<_, FinanceAccountRow>("SELECT * FROM finance_accounts WHERE id = $1")
+            sqlx::query_as::<_, FinanceAccountRow>("SELECT * FROM finance_accounts WHERE id = ?")
                 .bind(id)
                 .fetch_optional(&self.pool)
                 .await?;
@@ -75,17 +75,16 @@ impl FinanceAccountRepo {
         let row = sqlx::query_as::<_, FinanceAccountRow>(
             r#"
             UPDATE finance_accounts SET
-                name        = COALESCE($2, name),
-                balance     = COALESCE($3, balance),
-                institution = CASE WHEN $4 THEN $5 ELSE institution END,
-                notes       = CASE WHEN $6 THEN $7 ELSE notes END,
-                is_archived = COALESCE($8, is_archived),
-                updated_at  = now()
-            WHERE id = $1
+                name        = COALESCE(?, name),
+                balance     = COALESCE(?, balance),
+                institution = CASE WHEN ? THEN ? ELSE institution END,
+                notes       = CASE WHEN ? THEN ? ELSE notes END,
+                is_archived = COALESCE(?, is_archived),
+                updated_at  = datetime('now')
+            WHERE id = ?
             RETURNING *
             "#,
         )
-        .bind(&patch.id)
         .bind(&patch.name)
         .bind(patch.balance)
         .bind(patch.institution.is_some())
@@ -93,6 +92,7 @@ impl FinanceAccountRepo {
         .bind(patch.notes.is_some())
         .bind(patch.notes.as_ref().and_then(|v| v.as_deref()))
         .bind(patch.is_archived)
+        .bind(&patch.id)
         .fetch_optional(&self.pool)
         .await?
         .ok_or_else(|| StorageError::NotFound(format!("finance_account {}", patch.id)))?;
@@ -103,7 +103,7 @@ impl FinanceAccountRepo {
     /// Delete an account. Returns `true` if the row existed and was deleted.
     /// Cascade deletes all transactions for this account.
     pub async fn delete(&self, id: &str) -> Result<bool, StorageError> {
-        let result = sqlx::query("DELETE FROM finance_accounts WHERE id = $1")
+        let result = sqlx::query("DELETE FROM finance_accounts WHERE id = ?")
             .bind(id)
             .execute(&self.pool)
             .await?;
@@ -143,7 +143,7 @@ impl FinanceAccountRepo {
         let rows = sqlx::query_as::<_, FinanceAccountRow>(
             r#"
             SELECT * FROM finance_accounts
-            WHERE currency = $1 AND is_archived = FALSE
+            WHERE currency = ? AND is_archived = FALSE
             ORDER BY created_at
             "#,
         )
@@ -162,7 +162,7 @@ impl FinanceAccountRepo {
     pub async fn total_balance_by_currency(&self) -> Result<Vec<(String, i64)>, StorageError> {
         let rows: Vec<(String, i64)> = sqlx::query_as(
             r#"
-            SELECT currency, COALESCE(SUM(balance), 0)::BIGINT AS total
+            SELECT currency, COALESCE(SUM(balance), 0) AS total
             FROM finance_accounts
             WHERE is_archived = FALSE
             GROUP BY currency
@@ -187,13 +187,13 @@ impl FinanceAccountRepo {
         let row = sqlx::query_as::<_, FinanceAccountRow>(
             r#"
             UPDATE finance_accounts
-            SET balance = balance + $2, updated_at = now()
-            WHERE id = $1
+            SET balance = balance + ?, updated_at = datetime('now')
+            WHERE id = ?
             RETURNING *
             "#,
         )
-        .bind(id)
         .bind(delta)
+        .bind(id)
         .fetch_optional(&self.pool)
         .await?
         .ok_or_else(|| StorageError::NotFound(format!("finance_account {id}")))?;
