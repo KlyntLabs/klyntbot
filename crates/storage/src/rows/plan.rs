@@ -28,6 +28,7 @@ pub struct PlanStepRow {
     pub step_index: i32,
     pub description: String,
     pub reasoning: String,
+    #[sqlx(json)]
     pub expected_tools: Vec<String>,
     pub status: String,
     pub attempt_count: i16,

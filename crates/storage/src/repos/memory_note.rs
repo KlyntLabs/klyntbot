@@ -1,6 +1,6 @@
 //! Repository for the `memory_notes` table.
 
-use sqlx::PgPool;
+use sqlx::SqlitePool;
 
 use crate::error::StorageError;
 use crate::rows::memory::MemoryNoteRow;
@@ -8,21 +8,21 @@ use crate::rows::memory::MemoryNoteRow;
 /// Repository for memory note persistence (daily notes + long-term memory).
 #[derive(Debug, Clone)]
 pub struct MemoryNoteRepo {
-    pool: PgPool,
+    pool: SqlitePool,
 }
 
 /// Well-known key for long-term memory (replaces MEMORY.md).
 pub const LONG_TERM_KEY: &str = "LONG_TERM";
 
 impl MemoryNoteRepo {
-    pub fn new(pool: PgPool) -> Self {
+    pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
     }
 
     /// Get a memory note by key (date string or `LONG_TERM`).
     pub async fn get(&self, note_key: &str) -> Result<Option<MemoryNoteRow>, StorageError> {
         let row =
-            sqlx::query_as::<_, MemoryNoteRow>("SELECT * FROM memory_notes WHERE note_key = $1")
+            sqlx::query_as::<_, MemoryNoteRow>("SELECT * FROM memory_notes WHERE note_key = ?1")
                 .bind(note_key)
                 .fetch_optional(&self.pool)
                 .await?;
@@ -38,9 +38,9 @@ impl MemoryNoteRepo {
         let row = sqlx::query_as::<_, MemoryNoteRow>(
             r#"
             INSERT INTO memory_notes (note_key, content)
-            VALUES ($1, $2)
+            VALUES (?1, ?2)
             ON CONFLICT (note_key)
-            DO UPDATE SET content = $2, updated_at = now()
+            DO UPDATE SET content = ?2, updated_at = datetime('now')
             RETURNING *
             "#,
         )
@@ -60,14 +60,14 @@ impl MemoryNoteRepo {
         let row = sqlx::query_as::<_, MemoryNoteRow>(
             r#"
             INSERT INTO memory_notes (note_key, content)
-            VALUES ($1, $2)
+            VALUES (?1, ?2)
             ON CONFLICT (note_key)
             DO UPDATE SET
                 content = CASE
-                    WHEN memory_notes.content = '' THEN $2
-                    ELSE memory_notes.content || E'\n\n' || $2
+                    WHEN memory_notes.content = '' THEN ?2
+                    ELSE memory_notes.content || char(10) || char(10) || ?2
                 END,
-                updated_at = now()
+                updated_at = datetime('now')
             RETURNING *
             "#,
         )
@@ -83,9 +83,9 @@ impl MemoryNoteRepo {
         let rows = sqlx::query_as::<_, MemoryNoteRow>(
             r#"
             SELECT * FROM memory_notes
-            WHERE note_key != $2
+            WHERE note_key != ?2
             ORDER BY note_key DESC
-            LIMIT $1
+            LIMIT ?1
             "#,
         )
         .bind(limit)
@@ -114,7 +114,7 @@ impl MemoryNoteRepo {
         let rows = sqlx::query_as::<_, MemoryNoteRow>(
             r#"
             SELECT * FROM memory_notes
-            WHERE content ILIKE $1
+            WHERE content LIKE ?1
             ORDER BY note_key DESC
             "#,
         )
@@ -126,7 +126,7 @@ impl MemoryNoteRepo {
 
     /// Delete a memory note by key.
     pub async fn delete(&self, note_key: &str) -> Result<bool, StorageError> {
-        let result = sqlx::query("DELETE FROM memory_notes WHERE note_key = $1")
+        let result = sqlx::query("DELETE FROM memory_notes WHERE note_key = ?1")
             .bind(note_key)
             .execute(&self.pool)
             .await?;

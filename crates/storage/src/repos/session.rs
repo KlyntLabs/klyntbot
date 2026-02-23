@@ -1,7 +1,7 @@
 //! Session repository — sessions + session_messages tables.
 
 use chrono::Utc;
-use sqlx::PgPool;
+use sqlx::SqlitePool;
 
 use crate::error::StorageError;
 use crate::rows::session::{SessionListRow, SessionMessageRow, SessionRow};
@@ -9,11 +9,11 @@ use crate::rows::session::{SessionListRow, SessionMessageRow, SessionRow};
 /// Repository for session and message persistence.
 #[derive(Debug, Clone)]
 pub struct SessionRepo {
-    pool: PgPool,
+    pool: SqlitePool,
 }
 
 impl SessionRepo {
-    pub fn new(pool: PgPool) -> Self {
+    pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
     }
 
@@ -26,8 +26,8 @@ impl SessionRepo {
         let now = Utc::now();
         let row = sqlx::query_as::<_, SessionRow>(
             "INSERT INTO sessions (key, metadata, created_at, updated_at)
-             VALUES ($1, $2, $3, $4)
-             ON CONFLICT (key) DO UPDATE SET updated_at = $4
+             VALUES (?1, ?2, ?3, ?4)
+             ON CONFLICT (key) DO UPDATE SET updated_at = ?4
              RETURNING *",
         )
         .bind(key)
@@ -41,7 +41,7 @@ impl SessionRepo {
 
     /// Get a session by key.
     pub async fn get_session(&self, key: &str) -> Result<SessionRow, StorageError> {
-        sqlx::query_as::<_, SessionRow>("SELECT * FROM sessions WHERE key = $1")
+        sqlx::query_as::<_, SessionRow>("SELECT * FROM sessions WHERE key = ?1")
             .bind(key)
             .fetch_optional(&self.pool)
             .await?
@@ -84,11 +84,11 @@ impl SessionRepo {
         let now = Utc::now();
         let row = sqlx::query_as::<_, SessionMessageRow>(
             "WITH touch AS (
-                 UPDATE sessions SET updated_at = $5 WHERE key = $2
+                 UPDATE sessions SET updated_at = ?5 WHERE key = ?2
              )
              INSERT INTO session_messages
                  (id, session_key, role, content, timestamp, request_id, tool_calls, metadata)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
              RETURNING *",
         )
         .bind(id)
@@ -104,11 +104,10 @@ impl SessionRepo {
         Ok(row)
     }
 
-    /// Batch-insert multiple messages in a single round-trip.
+    /// Batch-insert multiple messages.
     ///
-    /// Uses `UNNEST` arrays for bulk insert and a single `UPDATE sessions`
-    /// to touch `updated_at`. Messages that already exist (by id) are skipped
-    /// via `ON CONFLICT DO NOTHING`.
+    /// Inserts each message individually using `INSERT OR IGNORE` to skip
+    /// duplicates, and touches `sessions.updated_at` once before inserting.
     #[allow(clippy::too_many_arguments)]
     pub async fn batch_add_messages(
         &self,
@@ -127,33 +126,33 @@ impl SessionRepo {
         let now = Utc::now();
 
         // Touch session updated_at once
-        sqlx::query("UPDATE sessions SET updated_at = $1 WHERE key = $2")
+        sqlx::query("UPDATE sessions SET updated_at = ?1 WHERE key = ?2")
             .bind(now)
             .bind(session_key)
             .execute(&self.pool)
             .await?;
 
-        // Build session_key array (same value repeated)
-        let session_keys: Vec<&str> = vec![session_key; ids.len()];
+        let mut inserted = 0u64;
+        for i in 0..ids.len() {
+            let result = sqlx::query(
+                "INSERT OR IGNORE INTO session_messages
+                     (id, session_key, role, content, timestamp, request_id, tool_calls, metadata)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            )
+            .bind(ids[i])
+            .bind(session_key)
+            .bind(&roles[i])
+            .bind(&contents[i])
+            .bind(timestamps[i])
+            .bind(request_ids[i].as_deref())
+            .bind(&tool_calls_list[i])
+            .bind(&metadata_list[i])
+            .execute(&self.pool)
+            .await?;
+            inserted += result.rows_affected();
+        }
 
-        let result = sqlx::query(
-            "INSERT INTO session_messages
-                 (id, session_key, role, content, timestamp, request_id, tool_calls, metadata)
-             SELECT * FROM UNNEST($1::uuid[], $2::text[], $3::text[], $4::text[], $5::timestamptz[], $6::text[], $7::jsonb[], $8::jsonb[])
-             ON CONFLICT (id) DO NOTHING",
-        )
-        .bind(ids)
-        .bind(&session_keys)
-        .bind(roles)
-        .bind(contents)
-        .bind(timestamps)
-        .bind(request_ids)
-        .bind(tool_calls_list)
-        .bind(metadata_list)
-        .execute(&self.pool)
-        .await?;
-
-        Ok(result.rows_affected())
+        Ok(inserted)
     }
 
     /// Get all messages for a session, ordered by timestamp ascending.
@@ -162,7 +161,7 @@ impl SessionRepo {
         session_key: &str,
     ) -> Result<Vec<SessionMessageRow>, StorageError> {
         let rows = sqlx::query_as::<_, SessionMessageRow>(
-            "SELECT * FROM session_messages WHERE session_key = $1 ORDER BY timestamp ASC",
+            "SELECT * FROM session_messages WHERE session_key = ?1 ORDER BY timestamp ASC",
         )
         .bind(session_key)
         .fetch_all(&self.pool)
@@ -179,9 +178,9 @@ impl SessionRepo {
         let rows = sqlx::query_as::<_, SessionMessageRow>(
             "SELECT * FROM (
                 SELECT * FROM session_messages
-                WHERE session_key = $1
+                WHERE session_key = ?1
                 ORDER BY timestamp DESC
-                LIMIT $2
+                LIMIT ?2
              ) sub ORDER BY timestamp ASC",
         )
         .bind(session_key)
@@ -194,7 +193,7 @@ impl SessionRepo {
     /// Count messages in a session.
     pub async fn count_messages(&self, session_key: &str) -> Result<i64, StorageError> {
         let row: (i64,) =
-            sqlx::query_as("SELECT COUNT(*) FROM session_messages WHERE session_key = $1")
+            sqlx::query_as("SELECT COUNT(*) FROM session_messages WHERE session_key = ?1")
                 .bind(session_key)
                 .fetch_one(&self.pool)
                 .await?;
@@ -210,12 +209,12 @@ impl SessionRepo {
     ) -> Result<u64, StorageError> {
         let result = sqlx::query(
             "DELETE FROM session_messages
-             WHERE session_key = $1
+             WHERE session_key = ?1
                AND id NOT IN (
                    SELECT id FROM session_messages
-                   WHERE session_key = $1
+                   WHERE session_key = ?1
                    ORDER BY timestamp DESC
-                   LIMIT $2
+                   LIMIT ?2
                )",
         )
         .bind(session_key)
@@ -227,7 +226,7 @@ impl SessionRepo {
 
     /// Delete a session and all its messages (CASCADE).
     pub async fn delete_session(&self, key: &str) -> Result<bool, StorageError> {
-        let result = sqlx::query("DELETE FROM sessions WHERE key = $1")
+        let result = sqlx::query("DELETE FROM sessions WHERE key = ?1")
             .bind(key)
             .execute(&self.pool)
             .await?;
@@ -238,12 +237,11 @@ impl SessionRepo {
     ///
     /// Returns the number of sessions deleted (messages are cascade-deleted by the DB).
     pub async fn delete_stale_sessions(&self, ttl_days: u32) -> Result<u64, StorageError> {
-        let result = sqlx::query(
-            "DELETE FROM sessions WHERE updated_at < now() - make_interval(days => $1::int)",
-        )
-        .bind(ttl_days as i32)
-        .execute(&self.pool)
-        .await?;
+        let cutoff = Utc::now() - chrono::Duration::days(ttl_days as i64);
+        let result = sqlx::query("DELETE FROM sessions WHERE updated_at < ?1")
+            .bind(cutoff)
+            .execute(&self.pool)
+            .await?;
         Ok(result.rows_affected())
     }
 }

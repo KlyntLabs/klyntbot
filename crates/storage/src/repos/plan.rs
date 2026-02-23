@@ -1,7 +1,7 @@
 //! Plan repository — plans + plan_steps tables.
 
 use chrono::Utc;
-use sqlx::PgPool;
+use sqlx::SqlitePool;
 use uuid::Uuid;
 
 use crate::error::StorageError;
@@ -10,11 +10,11 @@ use crate::rows::plan::{PlanRow, PlanStepRow};
 /// Repository for plan persistence.
 #[derive(Debug, Clone)]
 pub struct PlanRepo {
-    pool: PgPool,
+    pool: SqlitePool,
 }
 
 impl PlanRepo {
-    pub fn new(pool: PgPool) -> Self {
+    pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
     }
 
@@ -24,7 +24,7 @@ impl PlanRepo {
             "INSERT INTO plans (id, session_key, goal_id, title, description, status,
                                 current_step_index, iteration_limit, backtrack_history,
                                 created_at, updated_at, completed_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
              RETURNING *",
         )
         .bind(row.id)
@@ -50,7 +50,7 @@ impl PlanRepo {
             "INSERT INTO plans (id, session_key, goal_id, title, description, status,
                                 current_step_index, iteration_limit, backtrack_history,
                                 created_at, updated_at, completed_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
              ON CONFLICT(id) DO UPDATE SET
                 status = EXCLUDED.status,
                 current_step_index = EXCLUDED.current_step_index,
@@ -79,7 +79,7 @@ impl PlanRepo {
 
     /// Get a plan by ID.
     pub async fn get(&self, id: Uuid) -> Result<PlanRow, StorageError> {
-        sqlx::query_as::<_, PlanRow>("SELECT * FROM plans WHERE id = $1")
+        sqlx::query_as::<_, PlanRow>("SELECT * FROM plans WHERE id = ?1")
             .bind(id)
             .fetch_optional(&self.pool)
             .await?
@@ -93,7 +93,7 @@ impl PlanRepo {
         session_key: Option<&str>,
         goal_id: Option<Uuid>,
     ) -> Result<Vec<PlanRow>, StorageError> {
-        let mut qb = sqlx::QueryBuilder::<sqlx::Postgres>::new("SELECT * FROM plans WHERE 1=1");
+        let mut qb = sqlx::QueryBuilder::<sqlx::Sqlite>::new("SELECT * FROM plans WHERE 1=1");
 
         if let Some(s) = status {
             qb.push(" AND status = ");
@@ -118,9 +118,9 @@ impl PlanRepo {
     pub async fn update(&self, row: &PlanRow) -> Result<PlanRow, StorageError> {
         let now = Utc::now();
         let result = sqlx::query_as::<_, PlanRow>(
-            "UPDATE plans SET status = $1, current_step_index = $2, iteration_limit = $3,
-                              backtrack_history = $4, updated_at = $5, completed_at = $6
-             WHERE id = $7
+            "UPDATE plans SET status = ?1, current_step_index = ?2, iteration_limit = ?3,
+                              backtrack_history = ?4, updated_at = ?5, completed_at = ?6
+             WHERE id = ?7
              RETURNING *",
         )
         .bind(&row.status)
@@ -138,7 +138,7 @@ impl PlanRepo {
 
     /// Delete a plan by ID (cascades to plan_steps).
     pub async fn delete(&self, id: Uuid) -> Result<bool, StorageError> {
-        let result = sqlx::query("DELETE FROM plans WHERE id = $1")
+        let result = sqlx::query("DELETE FROM plans WHERE id = ?1")
             .bind(id)
             .execute(&self.pool)
             .await?;
@@ -153,8 +153,8 @@ impl PlanRepo {
             _ => None,
         };
         let result = sqlx::query(
-            "UPDATE plans SET status = $1, updated_at = $2, completed_at = COALESCE($3, completed_at)
-             WHERE id = $4",
+            "UPDATE plans SET status = ?1, updated_at = ?2, completed_at = COALESCE(?3, completed_at)
+             WHERE id = ?4",
         )
         .bind(status)
         .bind(now)
@@ -176,7 +176,7 @@ impl PlanRepo {
             "INSERT INTO plan_steps (id, plan_id, step_index, description, reasoning,
                                      expected_tools, status, attempt_count, max_attempts,
                                      result, started_at, completed_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
              RETURNING *",
         )
         .bind(step.id)
@@ -184,7 +184,7 @@ impl PlanRepo {
         .bind(step.step_index)
         .bind(&step.description)
         .bind(&step.reasoning)
-        .bind(&step.expected_tools)
+        .bind(sqlx::types::Json(&step.expected_tools))
         .bind(&step.status)
         .bind(step.attempt_count)
         .bind(step.max_attempts)
@@ -199,9 +199,9 @@ impl PlanRepo {
     /// Update a plan step.
     pub async fn update_step(&self, step: &PlanStepRow) -> Result<PlanStepRow, StorageError> {
         let result = sqlx::query_as::<_, PlanStepRow>(
-            "UPDATE plan_steps SET status = $1, attempt_count = $2, result = $3,
-                                   started_at = $4, completed_at = $5
-             WHERE id = $6
+            "UPDATE plan_steps SET status = ?1, attempt_count = ?2, result = ?3,
+                                   started_at = ?4, completed_at = ?5
+             WHERE id = ?6
              RETURNING *",
         )
         .bind(&step.status)
@@ -222,7 +222,7 @@ impl PlanRepo {
             "INSERT INTO plan_steps (id, plan_id, step_index, description, reasoning,
                                      expected_tools, status, attempt_count, max_attempts,
                                      result, started_at, completed_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
              ON CONFLICT(id) DO UPDATE SET
                 status = EXCLUDED.status,
                 attempt_count = EXCLUDED.attempt_count,
@@ -236,7 +236,7 @@ impl PlanRepo {
         .bind(step.step_index)
         .bind(&step.description)
         .bind(&step.reasoning)
-        .bind(&step.expected_tools)
+        .bind(sqlx::types::Json(&step.expected_tools))
         .bind(&step.status)
         .bind(step.attempt_count)
         .bind(step.max_attempts)
@@ -251,7 +251,7 @@ impl PlanRepo {
     /// Get all steps for a plan, ordered by step_index.
     pub async fn get_steps(&self, plan_id: Uuid) -> Result<Vec<PlanStepRow>, StorageError> {
         let rows = sqlx::query_as::<_, PlanStepRow>(
-            "SELECT * FROM plan_steps WHERE plan_id = $1 ORDER BY step_index ASC",
+            "SELECT * FROM plan_steps WHERE plan_id = ?1 ORDER BY step_index ASC",
         )
         .bind(plan_id)
         .fetch_all(&self.pool)
