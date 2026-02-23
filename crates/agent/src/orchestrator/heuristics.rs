@@ -46,7 +46,27 @@ pub fn classify_heuristic(message: &str) -> Option<ExecutionStrategy> {
         }
     }
 
-    // 3. Plan keywords → AutonomousTask with high iteration budget (50)
+    // 3. Task management patterns → ToolAssisted with low budget (5)
+    //    "create a task: fix the memory bug" means "add a todo item", NOT "fix the bug".
+    //    Must be checked BEFORE plan/code keywords because these messages often contain
+    //    code-like words (fix, build, implement) that are just the task *description*.
+    //    Low iteration budget (5) keeps the LLM focused on calling `todo add` and prevents
+    //    escalation to AutonomousTask (escalation threshold = ceil(5 * 0.8) = 4).
+    const TASK_MGMT_KEYWORDS: &[&str] = &[
+        "create a task",
+        "add a task",
+        "add a todo",
+        "create a todo",
+        "new task",
+        "new todo",
+        "add task",
+        "create todo",
+    ];
+    if TASK_MGMT_KEYWORDS.iter().any(|k| msg.contains(k)) {
+        return Some(ExecutionStrategy::ToolAssisted { max_iterations: 5 });
+    }
+
+    // 4. Plan keywords → AutonomousTask with high iteration budget (50)
     //    These are explicit planning requests, higher confidence than general autonomous keywords (15).
     const PLAN_KEYWORDS: &[&str] = &[
         "create a plan",
@@ -60,7 +80,7 @@ pub fn classify_heuristic(message: &str) -> Option<ExecutionStrategy> {
         return Some(ExecutionStrategy::AutonomousTask { max_iterations: 50 });
     }
 
-    // 4. Keyword-based classification with conflict detection
+    // 5. Keyword-based classification with conflict detection
     classify_by_keywords(&msg)
 }
 
@@ -253,6 +273,71 @@ mod tests {
             classify_heuristic("fix the login bug")
         {
             assert_eq!(max_iterations, 10);
+        } else {
+            panic!("Expected ToolAssisted");
+        }
+    }
+
+    // --- Task management heuristic tests ---
+
+    #[test]
+    fn test_create_task_routes_to_tool_assisted() {
+        // "create a task: fix the memory bug" should be ToolAssisted(5),
+        // NOT ToolAssisted(10) from CODE_KEYWORDS or AutonomousTask from escalation.
+        assert!(matches!(
+            classify_heuristic("create a task: fix the memory bug into fully work - that should be completed before 10pm today"),
+            Some(ExecutionStrategy::ToolAssisted { max_iterations: 5 })
+        ));
+    }
+
+    #[test]
+    fn test_task_mgmt_variants() {
+        for msg in &[
+            "create a task: buy groceries",
+            "add a task to review the PR",
+            "add a todo: call the dentist",
+            "create a todo for tomorrow",
+            "new task: refactor the auth module",
+            "new todo: deploy to staging",
+            "add task fix the build",
+            "create todo write the tests",
+        ] {
+            assert!(
+                matches!(
+                    classify_heuristic(msg),
+                    Some(ExecutionStrategy::ToolAssisted { max_iterations: 5 })
+                ),
+                "Expected ToolAssisted(5) for '{}', got {:?}",
+                msg,
+                classify_heuristic(msg)
+            );
+        }
+    }
+
+    #[test]
+    fn test_task_mgmt_overrides_code_keywords() {
+        // Even though "fix" and "implement" are CODE_KEYWORDS, the task management
+        // pattern should take priority since the user wants to *track* the work,
+        // not *do* the work.
+        assert!(matches!(
+            classify_heuristic("create a task: implement the new auth system"),
+            Some(ExecutionStrategy::ToolAssisted { max_iterations: 5 })
+        ));
+        assert!(matches!(
+            classify_heuristic("add a task to fix the critical production bug"),
+            Some(ExecutionStrategy::ToolAssisted { max_iterations: 5 })
+        ));
+    }
+
+    #[test]
+    fn test_task_mgmt_max_iterations() {
+        if let Some(ExecutionStrategy::ToolAssisted { max_iterations }) =
+            classify_heuristic("create a task: something")
+        {
+            assert_eq!(
+                max_iterations, 5,
+                "Task management should have max_iterations=5"
+            );
         } else {
             panic!("Expected ToolAssisted");
         }
