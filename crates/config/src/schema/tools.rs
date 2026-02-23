@@ -95,6 +95,19 @@ fn default_web_max_results() -> u8 {
     5
 }
 
+/// Controls how the browser tool guards write actions.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum TrustLevel {
+    /// Ask the user before every write action.
+    Strict,
+    /// (Default) Ask the user only for detected dangerous actions.
+    #[default]
+    Autonomous,
+    /// Execute all actions immediately without any confirmation gate.
+    Full,
+}
+
 /// Browser automation tool configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -102,8 +115,8 @@ pub struct BrowserConfig {
     #[serde(default)]
     pub enabled: bool,
 
-    #[serde(default = "default_trust_level")]
-    pub trust_level: String,
+    #[serde(default)]
+    pub trust_level: TrustLevel,
 
     #[serde(default = "default_session_timeout_secs")]
     pub session_timeout_secs: u64,
@@ -113,14 +126,10 @@ impl Default for BrowserConfig {
     fn default() -> Self {
         Self {
             enabled: false,
-            trust_level: default_trust_level(),
+            trust_level: TrustLevel::default(),
             session_timeout_secs: default_session_timeout_secs(),
         }
     }
-}
-
-fn default_trust_level() -> String {
-    "autonomous".to_string()
 }
 
 fn default_session_timeout_secs() -> u64 {
@@ -135,7 +144,7 @@ mod browser_config_tests {
     fn test_browser_config_defaults() {
         let cfg = BrowserConfig::default();
         assert!(!cfg.enabled);
-        assert_eq!(cfg.trust_level, "autonomous");
+        assert_eq!(cfg.trust_level, TrustLevel::Autonomous);
         assert_eq!(cfg.session_timeout_secs, 300);
     }
 
@@ -144,13 +153,33 @@ mod browser_config_tests {
         let json = r#"{"enabled": true, "trustLevel": "strict", "sessionTimeoutSecs": 60}"#;
         let cfg: BrowserConfig = serde_json::from_str(json).unwrap();
         assert!(cfg.enabled);
-        assert_eq!(cfg.trust_level, "strict");
+        assert_eq!(cfg.trust_level, TrustLevel::Strict);
         assert_eq!(cfg.session_timeout_secs, 60);
+        // Also verify serialization produces camelCase
+        let serialized = serde_json::to_string(&cfg).unwrap();
+        assert!(serialized.contains("sessionTimeoutSecs"));
     }
 
     #[test]
-    fn test_tools_config_has_browser_field() {
+    fn test_trust_level_serde() {
+        assert_eq!(
+            serde_json::from_str::<TrustLevel>(r#""autonomous""#).unwrap(),
+            TrustLevel::Autonomous
+        );
+        assert_eq!(
+            serde_json::from_str::<TrustLevel>(r#""strict""#).unwrap(),
+            TrustLevel::Strict
+        );
+        assert_eq!(
+            serde_json::from_str::<TrustLevel>(r#""full""#).unwrap(),
+            TrustLevel::Full
+        );
+    }
+
+    #[test]
+    fn test_tools_config_browser_default_trust() {
         let cfg = ToolsConfig::default();
         assert!(!cfg.browser.enabled);
+        assert_eq!(cfg.browser.trust_level, TrustLevel::Autonomous);
     }
 }
