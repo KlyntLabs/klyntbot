@@ -14,6 +14,7 @@ use context_engine::ContextSource;
 use providers::DynProvider;
 use session::SessionManager;
 use tools::{
+    browser::BrowserTool,
     calendar_tool::{CalendarHandler, CalendarTool},
     cron_tool::CronTool,
     filesystem::register_fs_tools,
@@ -25,7 +26,6 @@ use tools::{
     shell::ExecTool,
     spawn::SpawnTool,
     web::{WebFetchTool, WebSearchTool},
-    BrowserTool,
 };
 
 use super::super::confidence::ConfidenceEvaluator;
