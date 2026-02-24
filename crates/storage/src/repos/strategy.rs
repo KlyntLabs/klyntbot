@@ -13,6 +13,24 @@ pub struct StrategyRepo {
     pool: SqlitePool,
 }
 
+/// Overall stats returned by get_overall_stats().
+#[derive(Debug, Clone)]
+pub struct OverallStats {
+    pub total_records: i64,
+    pub accuracy: f64,
+    pub avg_response_time_ms: i64,
+    pub avg_satisfaction: Option<f64>,
+}
+
+/// Per-tool stats returned by get_tool_stats().
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct ToolStatsRow {
+    pub tool_name: String,
+    pub total_calls: i64,
+    pub success_count: i64,
+    pub avg_duration_ms: i64,
+}
+
 impl StrategyRepo {
     pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
@@ -167,6 +185,58 @@ impl StrategyRepo {
         .await?;
 
         Ok(result.rows_affected() > 0)
+    }
+
+    /// Count total strategy records.
+    pub async fn count_all(&self) -> Result<i64, StorageError> {
+        let (count,): (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM strategy_records")
+                .fetch_one(&self.pool)
+                .await?;
+        Ok(count)
+    }
+
+    /// Get overall stats: total records, accuracy, avg response time, avg satisfaction.
+    pub async fn get_overall_stats(&self) -> Result<OverallStats, StorageError> {
+        let row: (i64, i64, i64, Option<f64>) = sqlx::query_as(
+            "SELECT COUNT(*),
+                    COALESCE(SUM(CASE WHEN predicted_strategy = actual_strategy THEN 1 ELSE 0 END), 0),
+                    CAST(COALESCE(AVG(response_time_ms), 0) AS INTEGER),
+                    AVG(user_satisfaction)
+             FROM strategy_records",
+        )
+        .fetch_one(&self.pool)
+        .await?;
+
+        let accuracy = if row.0 > 0 {
+            row.1 as f64 / row.0 as f64
+        } else {
+            0.0
+        };
+
+        Ok(OverallStats {
+            total_records: row.0,
+            accuracy,
+            avg_response_time_ms: row.2,
+            avg_satisfaction: row.3,
+        })
+    }
+
+    /// Get per-tool stats (only for records where tool_name is non-null).
+    pub async fn get_tool_stats(&self) -> Result<Vec<ToolStatsRow>, StorageError> {
+        let rows = sqlx::query_as::<_, ToolStatsRow>(
+            "SELECT tool_name,
+                    COUNT(*) AS total_calls,
+                    COALESCE(SUM(CASE WHEN tool_success = 1 THEN 1 ELSE 0 END), 0) AS success_count,
+                    CAST(COALESCE(AVG(tool_duration_ms), 0) AS INTEGER) AS avg_duration_ms
+             FROM strategy_records
+             WHERE tool_name IS NOT NULL
+             GROUP BY tool_name
+             ORDER BY total_calls DESC",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
     }
 }
 
@@ -344,5 +414,106 @@ mod tests {
 
         let older_fetched = repo.get(older.id).await.unwrap();
         assert_eq!(older_fetched.user_satisfaction, None);
+    }
+
+    #[tokio::test]
+    async fn test_count_all() {
+        let pool = crate::StoragePool::connect_in_memory().await.unwrap();
+        let repo = StrategyRepo::new(pool.inner().clone());
+        assert_eq!(repo.count_all().await.unwrap(), 0);
+
+        let row = StrategyRecordRow {
+            id: uuid::Uuid::new_v4(),
+            timestamp: chrono::Utc::now(),
+            request_id: "req-cnt".to_string(),
+            predicted_strategy: "DirectResponse".to_string(),
+            actual_strategy: "DirectResponse".to_string(),
+            escalation_count: 0,
+            iterations_used: 1,
+            max_iterations: 1,
+            success: true,
+            user_satisfaction: None,
+            response_time_ms: 100,
+            chat_id: None,
+            tool_name: None,
+            tool_success: None,
+            tool_duration_ms: None,
+        };
+        repo.create(&row).await.unwrap();
+        assert_eq!(repo.count_all().await.unwrap(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_get_overall_stats() {
+        let pool = crate::StoragePool::connect_in_memory().await.unwrap();
+        let repo = StrategyRepo::new(pool.inner().clone());
+
+        let now = chrono::Utc::now();
+        for (i, (pred, actual, sat)) in [
+            ("DirectResponse", "DirectResponse", Some(1.0f32)),
+            ("ToolAssisted", "ToolAssisted", None),
+            ("DirectResponse", "ToolAssisted", Some(0.0f32)),
+        ]
+        .iter()
+        .enumerate()
+        {
+            let row = StrategyRecordRow {
+                id: uuid::Uuid::new_v4(),
+                timestamp: now + chrono::Duration::seconds(i as i64),
+                request_id: format!("req-{}", i),
+                predicted_strategy: pred.to_string(),
+                actual_strategy: actual.to_string(),
+                escalation_count: 0,
+                iterations_used: 1,
+                max_iterations: 1,
+                success: true,
+                user_satisfaction: *sat,
+                response_time_ms: 100 * (i as i64 + 1),
+                chat_id: None,
+                tool_name: None,
+                tool_success: None,
+                tool_duration_ms: None,
+            };
+            repo.create(&row).await.unwrap();
+        }
+
+        let stats = repo.get_overall_stats().await.unwrap();
+        assert_eq!(stats.total_records, 3);
+        assert!((stats.accuracy - 2.0 / 3.0).abs() < 0.01);
+        assert_eq!(stats.avg_response_time_ms, 200);
+        assert!((stats.avg_satisfaction.unwrap() - 0.5).abs() < 0.01);
+    }
+
+    #[tokio::test]
+    async fn test_get_tool_stats() {
+        let pool = crate::StoragePool::connect_in_memory().await.unwrap();
+        let repo = StrategyRepo::new(pool.inner().clone());
+
+        for (tool, success) in [("todo", true), ("todo", true), ("todo", false), ("shell", true)] {
+            let row = StrategyRecordRow {
+                id: uuid::Uuid::new_v4(),
+                timestamp: chrono::Utc::now(),
+                request_id: uuid::Uuid::new_v4().to_string(),
+                predicted_strategy: "ToolAssisted".to_string(),
+                actual_strategy: "ToolAssisted".to_string(),
+                escalation_count: 0,
+                iterations_used: 1,
+                max_iterations: 5,
+                success: true,
+                user_satisfaction: None,
+                response_time_ms: 100,
+                chat_id: None,
+                tool_name: Some(tool.to_string()),
+                tool_success: Some(success),
+                tool_duration_ms: Some(50),
+            };
+            repo.create(&row).await.unwrap();
+        }
+
+        let stats = repo.get_tool_stats().await.unwrap();
+        assert_eq!(stats.len(), 2);
+        let todo = stats.iter().find(|s| s.tool_name == "todo").unwrap();
+        assert_eq!(todo.total_calls, 3);
+        assert_eq!(todo.success_count, 2);
     }
 }

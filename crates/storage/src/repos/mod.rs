@@ -41,7 +41,7 @@ pub use outcome::OutcomeRepo;
 pub use plan::PlanRepo;
 pub use project_repo::{ProjectFilter, ProjectPatch, ProjectRepo, ProjectWithStats};
 pub use session::SessionRepo;
-pub use strategy::StrategyRepo;
+pub use strategy::{OverallStats, StrategyRepo, ToolStatsRow};
 pub use todo_repo::{TodoFilter, TodoPatch, TodoRepo, TodoSummary};
 pub use usage::UsageRepo;
 
