@@ -11,7 +11,7 @@ use async_trait::async_trait;
 use bus::InboundMessage;
 use providers::{DynProvider, Message};
 use tools::{
-    filesystem::register_fs_tools,
+    filesystem::{register_fs_read_tools, register_fs_tools},
     registry::ToolRegistry,
     shell::ExecTool,
     spawn::SpawnHandler,
@@ -204,8 +204,6 @@ impl SubagentManager {
         let origin_key = format!("{}:{}", origin_channel, origin_chat_id);
         let subagent_id_clone = subagent_id.clone();
         let label_clone = label_text.clone();
-        let _profile = profile; // Captured for future use (Task 7 will wire into run_subagent_task)
-
         let config = SubagentConfig {
             brave_api_key: self.brave_api_key.clone(),
             web_max_results: self.web_max_results,
@@ -225,7 +223,8 @@ impl SubagentManager {
 
             info!("Subagent {} started: {}", subagent_id_clone, label_clone);
 
-            let result = run_subagent_task(&provider, &workspace, &model, &task, config).await;
+            let result =
+                run_subagent_task(&provider, &workspace, &model, &task, config, profile).await;
 
             match result {
                 Ok((status, result_text)) => {
@@ -283,23 +282,27 @@ impl SpawnHandler for SubagentManager {
     }
 }
 
-/// Run an agent loop for a subagent task with limited tools.
+/// Run an agent loop for a subagent task with profile-based tools.
 ///
-/// Subagents have access to filesystem, shell, and web tools, but NOT message, spawn, or cron tools.
-/// They run for a maximum of 15 iterations (vs 20 for main agent).
+/// Tool access is determined by `SubagentProfile`:
+/// - General: filesystem + shell + web (full access)
+/// - Research: read-only filesystem + web (no shell, no writes)
+/// - Code: filesystem + shell (no web)
+/// - Analyst: read-only filesystem only (pure reasoning)
 async fn run_subagent_task(
     provider: &DynProvider,
     workspace: &std::path::Path,
     model: &str,
     task: &str,
     config: SubagentConfig,
+    profile: SubagentProfile,
 ) -> std::result::Result<(String, String), Box<dyn std::error::Error + Send + Sync>> {
     use crate::execution::core::ExecutionCore;
     use crate::execution::react_plus::{ReactOutcome, ReactPlusEngine, ReflectionMode};
     use crate::execution::types::ExecutionParams;
     use tokio::sync::RwLock;
 
-    // Build subagent tool registry with limited tools
+    // Build subagent tool registry based on profile
     let mut tools = ToolRegistry::new();
 
     let allowed_dir = if config.restrict_to_workspace {
@@ -308,22 +311,40 @@ async fn run_subagent_task(
         None
     };
 
-    // Filesystem tools
-    register_fs_tools(&mut tools, allowed_dir);
-
-    // Shell tool
-    tools.register(ExecTool::new(
-        config.exec_timeout,
-        Some(workspace.to_path_buf()),
-        config.restrict_to_workspace,
-    ));
-
-    // Web tools
-    tools.register(WebSearchTool::new(
-        config.brave_api_key,
-        config.web_max_results,
-    ));
-    tools.register(WebFetchTool::new());
+    match profile {
+        SubagentProfile::General => {
+            register_fs_tools(&mut tools, allowed_dir);
+            tools.register(ExecTool::new(
+                config.exec_timeout,
+                Some(workspace.to_path_buf()),
+                config.restrict_to_workspace,
+            ));
+            tools.register(WebSearchTool::new(
+                config.brave_api_key,
+                config.web_max_results,
+            ));
+            tools.register(WebFetchTool::new());
+        }
+        SubagentProfile::Research => {
+            register_fs_read_tools(&mut tools, allowed_dir);
+            tools.register(WebSearchTool::new(
+                config.brave_api_key,
+                config.web_max_results,
+            ));
+            tools.register(WebFetchTool::new());
+        }
+        SubagentProfile::Code => {
+            register_fs_tools(&mut tools, allowed_dir);
+            tools.register(ExecTool::new(
+                config.exec_timeout,
+                Some(workspace.to_path_buf()),
+                config.restrict_to_workspace,
+            ));
+        }
+        SubagentProfile::Analyst => {
+            register_fs_read_tools(&mut tools, allowed_dir);
+        }
+    }
 
     let tool_defs = tools.get_definitions();
 
@@ -333,11 +354,11 @@ async fn run_subagent_task(
         Arc::new(RwLock::new(tools)),
     ));
     let engine = ReactPlusEngine::new(core)
-        .with_max_iterations(15)
+        .with_max_iterations(profile.max_iterations())
         .with_reflection_mode(ReflectionMode::OnFailure);
 
     // Build system prompt and messages
-    let system_prompt = build_subagent_prompt(workspace, task);
+    let system_prompt = build_subagent_prompt(workspace, task, profile);
     let messages = vec![
         Message::system(system_prompt),
         Message::user(task.to_string()),
@@ -370,12 +391,23 @@ async fn run_subagent_task(
     }
 }
 
-/// Build a focused system prompt for subagents
-fn build_subagent_prompt(workspace: &std::path::Path, task: &str) -> String {
+/// Build a focused system prompt for subagents, tailored to the profile.
+fn build_subagent_prompt(
+    workspace: &std::path::Path,
+    task: &str,
+    profile: SubagentProfile,
+) -> String {
+    let tool_description = match profile {
+        SubagentProfile::General => "- Read and write files in the workspace\n- Execute shell commands\n- Search the web and fetch web pages",
+        SubagentProfile::Research => "- Read files in the workspace (read-only)\n- Search the web and fetch web pages",
+        SubagentProfile::Code => "- Read and write files in the workspace\n- Execute shell commands",
+        SubagentProfile::Analyst => "- Read files in the workspace (read-only)",
+    };
+
     format!(
         r#"# Subagent
 
-You are a subagent spawned by the main agent to complete a specific task.
+{}
 
 ## Your Task
 {}
@@ -387,10 +419,7 @@ You are a subagent spawned by the main agent to complete a specific task.
 4. Be concise but informative in your findings
 
 ## What You Can Do
-- Read and write files in the workspace
-- Execute shell commands
-- Search the web and fetch web pages
-- Complete the task thoroughly
+{}
 
 ## What You Cannot Do
 - Send messages directly to users (no message tool available)
@@ -401,7 +430,9 @@ You are a subagent spawned by the main agent to complete a specific task.
 Your workspace is at: {}
 
 When you have completed the task, provide a clear summary of your findings or actions."#,
+        profile.role_prompt(),
         task,
+        tool_description,
         workspace.display()
     )
 }
@@ -516,6 +547,7 @@ mod tests {
             "no-op",
             "Say hello",
             config,
+            SubagentProfile::General,
         )
         .await;
         assert!(result.is_ok());
@@ -579,5 +611,54 @@ mod tests {
         assert_eq!(SubagentProfile::Research.max_iterations(), 10);
         assert_eq!(SubagentProfile::Code.max_iterations(), 15);
         assert_eq!(SubagentProfile::Analyst.max_iterations(), 5);
+    }
+
+    #[test]
+    fn test_build_subagent_prompt_includes_profile_role() {
+        let prompt = build_subagent_prompt(
+            std::path::Path::new("/tmp"),
+            "Research Rust patterns",
+            SubagentProfile::Research,
+        );
+        assert!(prompt.contains("research specialist"));
+        assert!(prompt.contains("Research Rust patterns"));
+        assert!(prompt.contains("read-only"));
+    }
+
+    #[test]
+    fn test_build_subagent_prompt_general_profile() {
+        let prompt = build_subagent_prompt(
+            std::path::Path::new("/tmp"),
+            "Do something",
+            SubagentProfile::General,
+        );
+        assert!(prompt.contains("general-purpose subagent"));
+        assert!(prompt.contains("Execute shell commands"));
+    }
+
+    #[test]
+    fn test_build_subagent_prompt_code_profile() {
+        let prompt = build_subagent_prompt(
+            std::path::Path::new("/tmp"),
+            "Fix the bug",
+            SubagentProfile::Code,
+        );
+        assert!(prompt.contains("code specialist"));
+        // "What You Can Do" section should NOT list web capabilities
+        assert!(!prompt.contains("Search the web"));
+        assert!(!prompt.contains("fetch web pages"));
+    }
+
+    #[test]
+    fn test_build_subagent_prompt_analyst_profile() {
+        let prompt = build_subagent_prompt(
+            std::path::Path::new("/tmp"),
+            "Analyze data",
+            SubagentProfile::Analyst,
+        );
+        assert!(prompt.contains("analyst"));
+        assert!(prompt.contains("read-only"));
+        // "What You Can Do" section should NOT list shell capabilities
+        assert!(!prompt.contains("Execute shell commands"));
     }
 }
