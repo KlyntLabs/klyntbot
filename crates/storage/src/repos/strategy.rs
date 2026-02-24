@@ -137,6 +137,33 @@ impl StrategyRepo {
         .await?;
         Ok(rows)
     }
+
+    /// Update user_satisfaction on the most recent strategy record for a chat.
+    /// Returns true if a record was updated, false if no matching record found.
+    pub async fn set_satisfaction_for_chat(
+        &self,
+        chat_id: &str,
+        since: DateTime<Utc>,
+        satisfaction: f32,
+    ) -> Result<bool, StorageError> {
+        // SQLite doesn't support UPDATE...ORDER BY...LIMIT in standard syntax.
+        // Use a subquery to find the most recent record's ID.
+        let result = sqlx::query(
+            "UPDATE strategy_records SET user_satisfaction = ?1 \
+             WHERE id = ( \
+               SELECT id FROM strategy_records \
+               WHERE chat_id = ?2 AND timestamp >= ?3 \
+               ORDER BY timestamp DESC LIMIT 1 \
+             )",
+        )
+        .bind(satisfaction)
+        .bind(chat_id)
+        .bind(since.to_rfc3339())
+        .execute(&self.pool)
+        .await?;
+
+        Ok(result.rows_affected() > 0)
+    }
 }
 
 #[cfg(test)]
@@ -192,5 +219,111 @@ mod tests {
 
         let created = repo.create(&row).await.unwrap();
         assert_eq!(created.chat_id, None);
+    }
+
+    #[tokio::test]
+    async fn test_set_satisfaction_for_chat() {
+        let pool = crate::StoragePool::connect_in_memory().await.unwrap();
+        let repo = StrategyRepo::new(pool.inner().clone());
+
+        let now = chrono::Utc::now();
+
+        // Create a record with chat_id
+        let row = StrategyRecordRow {
+            id: uuid::Uuid::new_v4(),
+            timestamp: now,
+            request_id: "req-sat".to_string(),
+            predicted_strategy: "DirectResponse".to_string(),
+            actual_strategy: "DirectResponse".to_string(),
+            escalation_count: 0,
+            iterations_used: 1,
+            max_iterations: 1,
+            success: true,
+            user_satisfaction: None,
+            response_time_ms: 500,
+            chat_id: Some("tg:123".to_string()),
+        };
+        repo.create(&row).await.unwrap();
+
+        // Set satisfaction
+        let since = now - chrono::Duration::minutes(5);
+        let updated = repo
+            .set_satisfaction_for_chat("tg:123", since, 1.0)
+            .await
+            .unwrap();
+        assert!(updated);
+
+        // Verify
+        let fetched = repo.get(row.id).await.unwrap();
+        assert_eq!(fetched.user_satisfaction, Some(1.0));
+    }
+
+    #[tokio::test]
+    async fn test_set_satisfaction_no_match_wrong_chat() {
+        let pool = crate::StoragePool::connect_in_memory().await.unwrap();
+        let repo = StrategyRepo::new(pool.inner().clone());
+
+        let since = chrono::Utc::now() - chrono::Duration::minutes(5);
+        let updated = repo
+            .set_satisfaction_for_chat("nonexistent", since, 1.0)
+            .await
+            .unwrap();
+        assert!(!updated);
+    }
+
+    #[tokio::test]
+    async fn test_set_satisfaction_updates_most_recent_only() {
+        let pool = crate::StoragePool::connect_in_memory().await.unwrap();
+        let repo = StrategyRepo::new(pool.inner().clone());
+
+        let now = chrono::Utc::now();
+
+        // Create two records for the same chat — older and newer
+        let older = StrategyRecordRow {
+            id: uuid::Uuid::new_v4(),
+            timestamp: now - chrono::Duration::seconds(30),
+            request_id: "req-old".to_string(),
+            predicted_strategy: "DirectResponse".to_string(),
+            actual_strategy: "DirectResponse".to_string(),
+            escalation_count: 0,
+            iterations_used: 1,
+            max_iterations: 1,
+            success: true,
+            user_satisfaction: None,
+            response_time_ms: 200,
+            chat_id: Some("tg:456".to_string()),
+        };
+        let newer = StrategyRecordRow {
+            id: uuid::Uuid::new_v4(),
+            timestamp: now,
+            request_id: "req-new".to_string(),
+            predicted_strategy: "ToolAssisted".to_string(),
+            actual_strategy: "ToolAssisted".to_string(),
+            escalation_count: 0,
+            iterations_used: 3,
+            max_iterations: 5,
+            success: true,
+            user_satisfaction: None,
+            response_time_ms: 1500,
+            chat_id: Some("tg:456".to_string()),
+        };
+
+        repo.create(&older).await.unwrap();
+        repo.create(&newer).await.unwrap();
+
+        // Set satisfaction — should only update the newer record
+        let since = now - chrono::Duration::minutes(5);
+        let updated = repo
+            .set_satisfaction_for_chat("tg:456", since, 0.0)
+            .await
+            .unwrap();
+        assert!(updated);
+
+        // Verify: newer has satisfaction, older does not
+        let newer_fetched = repo.get(newer.id).await.unwrap();
+        assert_eq!(newer_fetched.user_satisfaction, Some(0.0));
+
+        let older_fetched = repo.get(older.id).await.unwrap();
+        assert_eq!(older_fetched.user_satisfaction, None);
     }
 }
