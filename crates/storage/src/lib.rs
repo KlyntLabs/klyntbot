@@ -28,8 +28,8 @@ pub use repos::MemoryNoteRepo;
 pub use repos::OutcomeRepo;
 pub use repos::PlanRepo;
 pub use repos::SessionRepo;
-pub use repos::{OverallStats, StrategyRepo, ToolStatsRow};
 pub use repos::UsageRepo;
+pub use repos::{OverallStats, StrategyRepo, ToolStatsRow};
 
 // Re-export finance repo types.
 pub use repos::FinanceAccountRepo;

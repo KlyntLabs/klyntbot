@@ -189,10 +189,9 @@ impl StrategyRepo {
 
     /// Count total strategy records.
     pub async fn count_all(&self) -> Result<i64, StorageError> {
-        let (count,): (i64,) =
-            sqlx::query_as("SELECT COUNT(*) FROM strategy_records")
-                .fetch_one(&self.pool)
-                .await?;
+        let (count,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM strategy_records")
+            .fetch_one(&self.pool)
+            .await?;
         Ok(count)
     }
 
@@ -489,7 +488,12 @@ mod tests {
         let pool = crate::StoragePool::connect_in_memory().await.unwrap();
         let repo = StrategyRepo::new(pool.inner().clone());
 
-        for (tool, success) in [("todo", true), ("todo", true), ("todo", false), ("shell", true)] {
+        for (tool, success) in [
+            ("todo", true),
+            ("todo", true),
+            ("todo", false),
+            ("shell", true),
+        ] {
             let row = StrategyRecordRow {
                 id: uuid::Uuid::new_v4(),
                 timestamp: chrono::Utc::now(),
