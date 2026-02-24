@@ -27,6 +27,7 @@ use tools::{
     spawn::SpawnTool,
     web::{WebFetchTool, WebSearchTool},
 };
+use tools_core::FeaturePackage;
 
 use super::super::confidence::ConfidenceEvaluator;
 use super::super::context_sources::{
@@ -285,10 +286,15 @@ impl AgentLoopBuilder {
         ));
 
         // Cron tool (optional)
-        if let Some(cron_svc) = self.cron_service {
-            let adapter = Arc::new(CronHandlerAdapter::new(cron_svc));
-            tool_registry.register(CronTool::with_handler(adapter));
-        }
+        let cron_handler: Option<Arc<dyn tools::cron_tool::CronHandler>> =
+            if let Some(cron_svc) = self.cron_service {
+                let adapter: Arc<dyn tools::cron_tool::CronHandler> =
+                    Arc::new(CronHandlerAdapter::new(cron_svc));
+                tool_registry.register(CronTool::with_handler(Arc::clone(&adapter)));
+                Some(adapter)
+            } else {
+                None
+            };
 
         // Clone repos for shared use
         let todo_repo_for_memory = repos.todos.clone();
@@ -536,6 +542,69 @@ impl AgentLoopBuilder {
             );
 
             tool_registry.register(finance_tool);
+        }
+
+        // ── Plugin tools (WASM) ───────────────────────────────────────────
+        if config.plugins.enabled {
+            let plugins_dir = config.data_dir_path().join("plugins");
+            match plugin_runtime::PluginManager::load_all(
+                &plugins_dir,
+                storage_pool.inner().clone(),
+                &config.plugins,
+                Some(bus.outbound_sender()),
+            ) {
+                Ok(plugin_manager) => {
+                    let loaded_count = plugin_manager.packages().len();
+                    for package in plugin_manager.into_packages() {
+                        // Register plugin cron jobs
+                        if let Some(ref handler) = cron_handler {
+                            for cron_job in &package.manifest().cron_jobs {
+                                let params = tools::cron_tool::AddCronJobParams {
+                                    name: format!("plugin:{}:{}", package.name(), cron_job.tool),
+                                    schedule: tools::cron_tool::CronSchedule::Cron {
+                                        expr: cron_job.schedule.clone(),
+                                        tz: None,
+                                    },
+                                    message: format!("Run plugin tool: {}", cron_job.tool),
+                                    enabled: true,
+                                    channel: None,
+                                    to: None,
+                                    internal: true,
+                                };
+                                match handler.add_job(params).await {
+                                    Ok(job) => {
+                                        info!(
+                                            plugin = %package.name(),
+                                            job_id = %job.id,
+                                            tool = %cron_job.tool,
+                                            "registered plugin cron job"
+                                        );
+                                    }
+                                    Err(e) => {
+                                        warn!(
+                                            plugin = %package.name(),
+                                            tool = %cron_job.tool,
+                                            error = %e,
+                                            "failed to register plugin cron job"
+                                        );
+                                    }
+                                }
+                            }
+                        }
+
+                        // Register plugin tools
+                        for tool in package.tools() {
+                            tool_registry.register_dyn(tool);
+                        }
+                    }
+                    if loaded_count > 0 {
+                        info!(count = loaded_count, "WASM plugin tools registered");
+                    }
+                }
+                Err(e) => {
+                    warn!(error = %e, "failed to load WASM plugins");
+                }
+            }
         }
 
         // ── Confidence evaluator ──────────────────────────────────────────

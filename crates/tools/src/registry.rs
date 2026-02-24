@@ -39,6 +39,14 @@ impl ToolRegistry {
         *self.cached_definitions.lock().expect("cache lock poisoned") = None;
     }
 
+    /// Register a pre-wrapped dynamic tool.
+    pub fn register_dyn(&mut self, tool: DynTool) {
+        let name = tool.name().to_string();
+        debug!("Registering dynamic tool: {}", name);
+        self.tools.insert(name, tool);
+        *self.cached_definitions.lock().expect("cache lock poisoned") = None;
+    }
+
     /// Unregister a tool by name
     pub fn unregister(&mut self, name: &str) {
         self.tools.remove(name);
