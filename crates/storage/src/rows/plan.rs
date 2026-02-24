@@ -1,10 +1,12 @@
 //! Row structs for `plans` and `plan_steps` tables.
 
 use chrono::{DateTime, Utc};
+use serde::Serialize;
 use sqlx::FromRow;
 
 /// Row struct for the `plans` table.
-#[derive(Debug, Clone, FromRow)]
+#[derive(Debug, Clone, FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PlanRow {
     pub id: uuid::Uuid,
     pub session_key: String,
@@ -21,7 +23,8 @@ pub struct PlanRow {
 }
 
 /// Row struct for the `plan_steps` table.
-#[derive(Debug, Clone, FromRow)]
+#[derive(Debug, Clone, FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PlanStepRow {
     pub id: uuid::Uuid,
     pub plan_id: uuid::Uuid,

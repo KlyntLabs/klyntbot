@@ -2,10 +2,12 @@
 //! and `enrichment_feedback` tables.
 
 use chrono::{DateTime, Utc};
+use serde::Serialize;
 use sqlx::FromRow;
 
 /// Row struct for the `learning_outcomes` table.
-#[derive(Debug, Clone, FromRow)]
+#[derive(Debug, Clone, FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct OutcomeRow {
     pub id: String,
     pub session_key: String,
@@ -20,7 +22,8 @@ pub struct OutcomeRow {
 }
 
 /// Row struct for the `strategy_records` table.
-#[derive(Debug, Clone, FromRow)]
+#[derive(Debug, Clone, FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct StrategyRecordRow {
     pub id: uuid::Uuid,
     pub timestamp: DateTime<Utc>,
@@ -40,7 +43,8 @@ pub struct StrategyRecordRow {
 }
 
 /// Row struct for the `enrichment_feedback` table.
-#[derive(Debug, Clone, FromRow)]
+#[derive(Debug, Clone, FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct EnrichmentFeedbackRow {
     pub id: i32,
     pub task_id: String,
@@ -53,7 +57,8 @@ pub struct EnrichmentFeedbackRow {
 }
 
 /// Row struct for the `learning_state` key-value table.
-#[derive(Debug, Clone, FromRow)]
+#[derive(Debug, Clone, FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct LearningStateRow {
     pub key: String,
     pub value: serde_json::Value,
@@ -61,7 +66,8 @@ pub struct LearningStateRow {
 }
 
 /// Aggregated strategy performance summary (from GROUP BY query).
-#[derive(Debug, Clone, FromRow)]
+#[derive(Debug, Clone, FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct StrategySummaryRow {
     pub predicted_strategy: String,
     pub sample_count: i64,
@@ -70,7 +76,8 @@ pub struct StrategySummaryRow {
 }
 
 /// Row struct for the `decision_log` table.
-#[derive(Debug, Clone, FromRow)]
+#[derive(Debug, Clone, FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DecisionLogRow {
     pub id: String,
     pub session_key: String,

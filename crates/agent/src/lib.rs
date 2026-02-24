@@ -3,6 +3,9 @@
 //! This crate provides the AgentLoop and related agent functionality.
 
 pub mod agent_loop;
+
+#[cfg(test)]
+mod events_tests;
 pub mod calendar_reconcile;
 pub mod calendar_sync_adapter;
 pub mod confidence;

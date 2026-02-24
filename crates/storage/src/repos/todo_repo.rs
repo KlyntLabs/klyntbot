@@ -2,6 +2,7 @@
 //! (`todo_attachments`, `todo_time_entries`, `todo_dependencies`).
 
 use chrono::{DateTime, Utc};
+use serde::Serialize;
 use sqlx::SqlitePool;
 
 use crate::error::StorageError;
@@ -19,7 +20,8 @@ pub struct TodoFilter {
 }
 
 /// Aggregate counts by status.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TodoSummary {
     pub todo: i64,
     pub doing: i64,

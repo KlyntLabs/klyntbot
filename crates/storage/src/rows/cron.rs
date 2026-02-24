@@ -1,9 +1,11 @@
 //! Row struct for the `cron_jobs` table.
 
+use serde::Serialize;
 use sqlx::FromRow;
 
 /// Row struct for the `cron_jobs` table.
-#[derive(Debug, Clone, FromRow)]
+#[derive(Debug, Clone, FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CronJobRow {
     pub id: String,
     pub name: String,

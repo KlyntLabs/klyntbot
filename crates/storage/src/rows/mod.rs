@@ -11,3 +11,6 @@ pub mod project;
 pub mod session;
 pub mod todo;
 pub mod usage;
+
+#[cfg(test)]
+mod serialization_tests;

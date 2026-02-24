@@ -327,7 +327,7 @@ async fn run_with_streaming(
                     AgentEvent::IterationStart { iteration, max } => {
                         thinking.on_iteration_start(iteration, max);
                     }
-                    AgentEvent::ContentChunk(chunk) => {
+                    AgentEvent::ContentChunk { data: chunk } => {
                         if thinking_active {
                             // Erase thinking trace before showing content
                             thinking.collapse();
@@ -335,14 +335,14 @@ async fn run_with_streaming(
                         }
                         renderer.on_content_chunk(&chunk);
                     }
-                    AgentEvent::Done(_) => {
+                    AgentEvent::Done { .. } => {
                         clean_exit = true;
                         break;
                     }
                     AgentEvent::ConfidenceAssessed { .. } => {
                         // Internal-only event; not displayed to user
                     }
-                    AgentEvent::Error(e) => {
+                    AgentEvent::Error { message: e } => {
                         eprintln!("\n{} {}", status_error(), e);
                         clean_exit = true;
                         break;

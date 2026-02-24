@@ -2,6 +2,9 @@
 
 mod builder;
 
+#[cfg(test)]
+mod refactor_tests;
+
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -19,7 +22,7 @@ use tokio::sync::mpsc;
 use tools::{plan_tool::PlanCompletionHandler, RoutingContext};
 
 use super::confidence::ConfidenceEvaluator;
-use super::{AgentEvent, CalendarSyncAdapter};
+use super::{AgentEvent, CalendarSyncAdapter, SkillManager};
 
 /// A request to execute an approved plan via the execution queue.
 ///
@@ -51,6 +54,7 @@ pub(crate) type LastActiveChannel = Arc<RwLock<Option<(common::ChannelName, comm
 pub struct AgentLoop {
     pub(crate) bus: Arc<MessageBus>,
     pub(crate) inbound_rx: Option<mpsc::Receiver<InboundMessage>>,
+    pub(crate) skill_manager: Arc<SkillManager>,
     pub(crate) provider: DynProvider,
     pub(crate) config: Config,
     pub(crate) context_engine: Arc<context_engine::ContextEngine>,
@@ -132,19 +136,25 @@ impl AgentLoop {
         Ok(())
     }
 
-    /// Run the agent loop, processing messages from the bus
-    pub async fn run(&mut self) -> Result<()> {
+    /// Extract the inbound receiver from the agent loop.
+    ///
+    /// Should be called once before wrapping in `Arc`. Returns `None` if already taken.
+    /// Use `run_with_rx` to drive the agent loop after extracting the receiver.
+    pub fn take_inbound_rx(&mut self) -> Option<mpsc::Receiver<InboundMessage>> {
+        self.inbound_rx.take()
+    }
+
+    /// Run the agent loop with an externally-provided inbound receiver.
+    ///
+    /// Takes `&self` (not `&mut self`) so it can be called on `Arc<AgentLoop>` without
+    /// any Mutex wrapper. Call `take_inbound_rx()` before wrapping in `Arc`, then pass
+    /// the extracted receiver here.
+    pub async fn run_with_rx(&self, mut inbound_rx: mpsc::Receiver<InboundMessage>) -> Result<()> {
         self.running.store(true, Ordering::SeqCst);
 
         info!("Agent loop started");
 
-        // Take ownership of the receiver
-        let mut inbound_rx = self.inbound_rx.take().ok_or_else(|| {
-            common::KlyntbotError::Bus("AgentLoop::run can only be called once".into())
-        })?;
-
         while self.running.load(Ordering::SeqCst) {
-            // Wait for next message with timeout
             match tokio::time::timeout(Duration::from_secs(1), inbound_rx.recv()).await {
                 Ok(Some(msg)) => {
                     if let Err(e) = self.process_message(msg).await {
@@ -164,6 +174,16 @@ impl AgentLoop {
 
         info!("Agent loop stopped");
         Ok(())
+    }
+
+    /// Run the agent loop, processing messages from the bus.
+    ///
+    /// Backward-compatible method that calls `take_inbound_rx()` + `run_with_rx()`.
+    pub async fn run(&mut self) -> Result<()> {
+        let inbound_rx = self.inbound_rx.take().ok_or_else(|| {
+            common::KlyntbotError::Bus("AgentLoop::run can only be called once".into())
+        })?;
+        self.run_with_rx(inbound_rx).await
     }
 
     /// Get a handle to the shutdown flag.
@@ -587,13 +607,23 @@ impl AgentLoop {
                 Ok(response) => {
                     // Emit the full response for the CLI renderer
                     let _ = event_tx
-                        .send(AgentEvent::ContentChunk(response.clone()))
+                        .send(AgentEvent::ContentChunk {
+                            data: response.clone(),
+                        })
                         .await;
-                    let _ = event_tx.send(AgentEvent::Done(response.clone())).await;
+                    let _ = event_tx
+                        .send(AgentEvent::Done {
+                            content: response.clone(),
+                        })
+                        .await;
                     Ok(response)
                 }
                 Err(e) => {
-                    let _ = event_tx.send(AgentEvent::Error(e.to_string())).await;
+                    let _ = event_tx
+                        .send(AgentEvent::Error {
+                            message: e.to_string(),
+                        })
+                        .await;
                     Err(e)
                 }
             };
@@ -612,6 +642,21 @@ impl AgentLoop {
             cancel_token,
             handle,
         })
+    }
+
+    /// Get a reference to the skill manager.
+    pub fn skill_manager(&self) -> &SkillManager {
+        &self.skill_manager
+    }
+
+    /// Get all tool definitions from the registry (for /api/status).
+    pub async fn list_tools(&self) -> Vec<serde_json::Value> {
+        self.tool_registry.read().await.get_definitions()
+    }
+
+    /// Get all registered tool names (for /api/status).
+    pub async fn tool_names(&self) -> Vec<String> {
+        self.tool_registry.read().await.tool_names()
     }
 
     /// Get the model name from config (for display purposes).

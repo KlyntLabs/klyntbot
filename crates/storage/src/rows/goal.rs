@@ -1,6 +1,7 @@
 //! Row structs for `goals` and `goal_project_links` tables.
 
 use chrono::{DateTime, Utc};
+use serde::Serialize;
 use sqlx::FromRow;
 
 /// Row struct for the `goals` table.
@@ -8,7 +9,8 @@ use sqlx::FromRow;
 /// Note: The underlying table still has dead `metrics` and `metadata` JSON
 /// columns from the original schema. We avoid `SELECT *` and use an explicit
 /// column list (`GOAL_COLS`) so that `FromRow` never sees those columns.
-#[derive(Debug, Clone, FromRow)]
+#[derive(Debug, Clone, FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GoalRow {
     pub id: uuid::Uuid,
     pub title: String,
@@ -25,7 +27,8 @@ pub struct GoalRow {
 }
 
 /// Row struct for the `goal_project_links` many-to-many table.
-#[derive(Debug, Clone, FromRow)]
+#[derive(Debug, Clone, FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct GoalProjectLinkRow {
     pub goal_id: uuid::Uuid,
     pub project_id: String,

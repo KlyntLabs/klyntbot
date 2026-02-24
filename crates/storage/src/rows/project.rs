@@ -1,10 +1,12 @@
 //! Row struct for the `projects` table.
 
 use chrono::{DateTime, Utc};
+use serde::Serialize;
 use sqlx::FromRow;
 
 /// Row struct for the `projects` table.
-#[derive(Debug, Clone, FromRow)]
+#[derive(Debug, Clone, FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ProjectRow {
     pub id: String,
     pub name: String,

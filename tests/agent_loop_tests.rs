@@ -296,8 +296,8 @@ async fn test_streaming_emits_done() {
 
     while let Some(event) = event_rx.recv().await {
         match event {
-            AgentEvent::ContentChunk(_) => got_content = true,
-            AgentEvent::Done(content) => {
+            AgentEvent::ContentChunk { .. } => got_content = true,
+            AgentEvent::Done { content } => {
                 got_done = true;
                 done_content = content;
                 break;
@@ -344,7 +344,7 @@ async fn test_streaming_emits_error_on_failure() {
     let mut got_error = false;
     while let Some(event) = event_rx.recv().await {
         match event {
-            AgentEvent::Error(msg) => {
+            AgentEvent::Error { message: msg } => {
                 got_error = true;
                 assert!(
                     msg.contains("provider crashed"),
@@ -353,7 +353,7 @@ async fn test_streaming_emits_error_on_failure() {
                 );
                 break;
             }
-            AgentEvent::Done(_) => break,
+            AgentEvent::Done { .. } => break,
             _ => {}
         }
     }

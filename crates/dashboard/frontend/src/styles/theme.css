@@ -1,0 +1,161 @@
+@import "tailwindcss";
+
+@theme {
+  /* Codex dark theme color tokens */
+  --color-codex-bg: #0d0d0d;
+  --color-codex-surface: #1a1a1a;
+  --color-codex-surface-elevated: #222222;
+  --color-codex-border: #2a2a2a;
+  --color-codex-accent: #10a37f;
+  --color-codex-accent-hover: #0d8c6f;
+  --color-codex-text: #e0e0e0;
+  --color-codex-text-secondary: #9b9b9b;
+  --color-codex-text-tertiary: #6b6b6b;
+  --color-codex-danger: #ef4444;
+  --color-codex-warning: #f59e0b;
+
+  /* Typography */
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", monospace;
+}
+
+@layer base {
+  :root {
+    /* Figma design token variables */
+    --codex-bg: #0d0d0d;
+    --codex-bg-secondary: #141414;
+    --codex-bg-tertiary: #1a1a1a;
+    --codex-bg-nav: #0a0a0a;
+    --codex-bg-user: #1e1e1e;
+    --codex-border: #2a2a2a;
+    --codex-border-subtle: #1f1f1f;
+    --codex-fg: #e0e0e0;
+    --codex-fg-muted: #9b9b9b;
+    --codex-fg-subtle: #6b6b6b;
+    --codex-accent: #10a37f;
+    --codex-accent-hover: #0d8c6f;
+    --codex-accent-dim: rgba(16, 163, 127, 0.15);
+
+    /* Backward-compat aliases */
+    --codex-surface: #1a1a1a;
+    --codex-surface-elevated: #222222;
+    --codex-text: #e0e0e0;
+    --codex-text-secondary: #9b9b9b;
+    --codex-text-tertiary: #6b6b6b;
+    --codex-danger: #ef4444;
+    --codex-warning: #f59e0b;
+
+    /* Font families */
+    --font-ui: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+    --font-mono: "JetBrains Mono", "SF Mono", monospace;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    background-color: var(--codex-bg);
+    color: var(--codex-fg);
+    font-family: var(--font-ui);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Focus ring using accent color */
+  :focus-visible {
+    outline: 2px solid var(--codex-accent);
+    outline-offset: 2px;
+  }
+
+  /* Prose styles for rich text editor */
+  .prose {
+    max-width: none;
+  }
+
+  .prose h2 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-top: 1.5em;
+    margin-bottom: 0.75em;
+    color: var(--codex-fg);
+  }
+
+  .prose h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-top: 1.25em;
+    margin-bottom: 0.5em;
+    color: var(--codex-fg);
+  }
+
+  .prose p {
+    margin-top: 0.75em;
+    margin-bottom: 0.75em;
+    color: var(--codex-fg-muted);
+  }
+
+  .prose ul {
+    margin-top: 0.75em;
+    margin-bottom: 0.75em;
+    padding-left: 1.5em;
+    list-style-type: disc;
+  }
+
+  .prose ul li {
+    margin-top: 0.25em;
+    margin-bottom: 0.25em;
+    color: var(--codex-fg-muted);
+  }
+
+  .prose ol {
+    margin-top: 0.75em;
+    margin-bottom: 0.75em;
+    padding-left: 1.5em;
+    list-style-type: decimal;
+  }
+
+  .prose ol li {
+    margin-top: 0.25em;
+    margin-bottom: 0.25em;
+    color: var(--codex-fg-muted);
+  }
+
+  .prose pre {
+    margin-top: 1em;
+    margin-bottom: 1em;
+    padding: 1em;
+    border-radius: 0.5rem;
+    background-color: var(--codex-bg);
+    border: 1px solid var(--codex-border);
+    overflow-x: auto;
+  }
+
+  .prose code {
+    font-family: var(--font-mono);
+    font-size: 0.875em;
+    color: var(--codex-fg);
+  }
+
+  .prose pre code {
+    font-size: 0.8125rem;
+    line-height: 1.5;
+  }
+
+  .prose a {
+    color: var(--codex-accent);
+    text-decoration: underline;
+  }
+
+  .prose a:hover {
+    color: var(--codex-accent-hover);
+  }
+}

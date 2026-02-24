@@ -23,6 +23,7 @@ members = [
     "crates/feature-finance",
     "crates/feature-todo",
     "crates/plugin-runtime",
+    "crates/dashboard",
 ]
 
 [workspace.package]
@@ -34,6 +35,7 @@ license = "MIT"
 [workspace.dependencies]
 # Internal workspace crates
 common = { path = "crates/common" }
+dashboard = { path = "crates/dashboard" }
 config = { path = "crates/config" }
 bus = { path = "crates/bus" }
 providers = { path = "crates/providers" }
@@ -89,6 +91,10 @@ html2text = "0.13.1"
 url = "2.5.4"
 which = "7.0.0"
 mime_guess = "2.0.5"
+axum = { version = "0.8", features = ["ws", "macros"] }
+tower-http = { version = "0.6", features = ["cors", "compression-gzip"] }
+tower = { version = "0.5", features = ["util"] }
+include_dir = { version = "0.7", features = ["glob"] }
 urlencoding = "2.1"
 once_cell = "1.19"
 futures-util = "0.3.31"

@@ -2,10 +2,12 @@
 //! and `todo_dependencies` tables.
 
 use chrono::{DateTime, Utc};
+use serde::Serialize;
 use sqlx::FromRow;
 
 /// Row struct for the `todos` table.
-#[derive(Debug, Clone, FromRow)]
+#[derive(Debug, Clone, FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TodoRow {
     pub id: String,
     pub title: String,
@@ -34,7 +36,8 @@ pub struct TodoRow {
 }
 
 /// Row struct for the `todo_attachments` table.
-#[derive(Debug, Clone, FromRow)]
+#[derive(Debug, Clone, FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TodoAttachmentRow {
     pub id: uuid::Uuid,
     pub todo_id: String,
@@ -47,7 +50,8 @@ pub struct TodoAttachmentRow {
 }
 
 /// Row struct for the `todo_time_entries` table.
-#[derive(Debug, Clone, FromRow)]
+#[derive(Debug, Clone, FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TodoTimeEntryRow {
     pub id: uuid::Uuid,
     pub todo_id: String,
@@ -59,7 +63,8 @@ pub struct TodoTimeEntryRow {
 }
 
 /// Row struct for the `todo_dependencies` edge table.
-#[derive(Debug, Clone, FromRow)]
+#[derive(Debug, Clone, FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TodoDependencyRow {
     pub task_id: String,
     pub blocker_id: String,

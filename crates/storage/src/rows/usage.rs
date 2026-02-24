@@ -1,10 +1,12 @@
 //! Row struct for the `usage_records` table.
 
 use chrono::{DateTime, Utc};
+use serde::Serialize;
 use sqlx::FromRow;
 
 /// Row struct for the `usage_records` table.
-#[derive(Debug, Clone, FromRow)]
+#[derive(Debug, Clone, FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct UsageRecordRow {
     pub id: uuid::Uuid,
     pub timestamp: DateTime<Utc>,

@@ -783,6 +783,7 @@ impl AgentLoopBuilder {
         Ok(AgentLoop {
             bus,
             inbound_rx: Some(inbound_rx),
+            skill_manager: Arc::clone(&skill_manager),
             provider,
             config,
             context_engine,

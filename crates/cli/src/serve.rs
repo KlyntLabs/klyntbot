@@ -4,6 +4,7 @@ use agent::AgentLoop;
 use anyhow::Result;
 use bus::MessageBus;
 use channels::ChannelManager;
+use dashboard::{AppState as DashboardState, DashboardServer};
 use heartbeat::HeartbeatService;
 use scheduling::CronService;
 use std::sync::atomic::Ordering;
@@ -41,7 +42,7 @@ pub async fn handle_serve(port: u16) -> Result<()> {
     info!("Message bus initialized");
 
     // Initialize cron service (SQL-backed)
-    let mut cron_service = CronService::new(repos.cron);
+    let mut cron_service = CronService::new(repos.cron.clone());
     cron_service.start().await?;
     info!("Cron service started");
 
@@ -477,18 +478,47 @@ pub async fn handle_serve(port: u16) -> Result<()> {
     info!("Todo cron jobs registered");
 
     // Initialize agent loop WITH cron service and shared instances
-    let agent_loop = Arc::new(Mutex::new(
-        AgentLoop::builder()
-            .with_bus(bus.clone())
-            .with_provider(provider)
-            .with_config(config.clone())
-            .with_pool(storage_pool.inner().clone())
-            .with_cron_service(cron_service.clone())
-            .with_notification_handle(notification_dispatcher.last_active_handle())
-            .build()
-            .await?,
-    ));
+    let mut agent_loop_raw = AgentLoop::builder()
+        .with_bus(bus.clone())
+        .with_provider(provider)
+        .with_config(config.clone())
+        .with_pool(storage_pool.inner().clone())
+        .with_cron_service(cron_service.clone())
+        .with_notification_handle(notification_dispatcher.last_active_handle())
+        .build()
+        .await?;
+    let inbound_rx = agent_loop_raw
+        .take_inbound_rx()
+        .expect("Inbound receiver already taken");
+    let agent_loop = Arc::new(agent_loop_raw);
     info!("Agent loop initialized");
+
+    // Build dashboard state and start server
+    let dashboard_state = DashboardState {
+        repos: repos.clone(),
+        agent_loop: Arc::clone(&agent_loop),
+        cron_service: cron_service.clone(),
+        config: Arc::new(config.clone()),
+        started_at: std::time::Instant::now(),
+    };
+    let dashboard = DashboardServer::new(config.gateway.clone(), dashboard_state);
+    // Give the dashboard its own shutdown signal watchers — tokio supports multiple listeners.
+    let dashboard_shutdown = {
+        async move {
+            let mut sigterm = signal::unix::signal(signal::unix::SignalKind::terminate())
+                .expect("Failed to install SIGTERM handler for dashboard");
+            tokio::select! {
+                _ = signal::ctrl_c() => {},
+                _ = sigterm.recv() => {},
+            }
+        }
+    };
+    let dashboard_handle = tokio::spawn(async move {
+        if let Err(e) = dashboard.start(dashboard_shutdown).await {
+            error!("Dashboard server error: {}", e);
+        }
+    });
+    info!("Dashboard server started");
 
     // Initialize channel manager
     let channel_manager = Arc::new(Mutex::new(ChannelManager::new(
@@ -525,15 +555,14 @@ pub async fn handle_serve(port: u16) -> Result<()> {
     heartbeat_service.start().await;
     info!("Heartbeat service started");
 
-    // Grab the agent's shutdown flag before spawning — this lets us signal
-    // stop without acquiring the Mutex (which run() holds for its lifetime).
-    let agent_shutdown = agent_loop.lock().await.shutdown_flag();
+    // Grab the agent's shutdown flag — no Mutex needed since we have Arc<AgentLoop>.
+    let agent_shutdown = agent_loop.shutdown_flag();
 
     // Start agent loop in background
     let agent_loop_handle = {
-        let agent = agent_loop.clone();
+        let agent = Arc::clone(&agent_loop);
         tokio::spawn(async move {
-            if let Err(e) = agent.lock().await.run().await {
+            if let Err(e) = agent.run_with_rx(inbound_rx).await {
                 error!("Agent loop error: {}", e);
             }
         })
@@ -550,10 +579,15 @@ pub async fn handle_serve(port: u16) -> Result<()> {
     };
 
     println!("\nklyntbot gateway running on port {}", port);
+    println!(
+        "  Dashboard: http://{}:{}",
+        config.gateway.host, config.gateway.port
+    );
     println!("\nServices:");
     println!("  Agent loop");
     println!("  Cron scheduler");
     println!("  Heartbeat monitor");
+    println!("  Dashboard server");
     println!("\nChannels:");
     for (name, enabled) in [
         ("Telegram", config.channels.telegram.enabled),
@@ -592,7 +626,7 @@ pub async fn handle_serve(port: u16) -> Result<()> {
     // on long-polling, so abort them after the timeout.
     let shutdown_timeout = tokio::time::Duration::from_secs(5);
     if tokio::time::timeout(shutdown_timeout, async {
-        let _ = tokio::join!(agent_loop_handle, channel_manager_handle);
+        let _ = tokio::join!(agent_loop_handle, channel_manager_handle, dashboard_handle);
     })
     .await
     .is_err()

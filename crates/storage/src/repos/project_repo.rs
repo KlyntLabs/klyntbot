@@ -1,5 +1,6 @@
 //! Repository for the `projects` table.
 
+use serde::Serialize;
 use sqlx::SqlitePool;
 
 use crate::error::StorageError;
@@ -14,7 +15,8 @@ pub struct ProjectFilter {
 }
 
 /// Project with aggregated task counts.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ProjectWithStats {
     pub project: ProjectRow,
     pub task_count_todo: i64,

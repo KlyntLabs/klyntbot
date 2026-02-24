@@ -1,6 +1,7 @@
 //! Strategy repository — strategy_records table.
 
 use chrono::{DateTime, Utc};
+use serde::Serialize;
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
@@ -14,7 +15,8 @@ pub struct StrategyRepo {
 }
 
 /// Overall stats returned by get_overall_stats().
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct OverallStats {
     pub total_records: i64,
     pub accuracy: f64,
@@ -23,7 +25,8 @@ pub struct OverallStats {
 }
 
 /// Per-tool stats returned by get_tool_stats().
-#[derive(Debug, Clone, sqlx::FromRow)]
+#[derive(Debug, Clone, sqlx::FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ToolStatsRow {
     pub tool_name: String,
     pub total_calls: i64,

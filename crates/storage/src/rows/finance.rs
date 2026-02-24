@@ -4,6 +4,7 @@
 //! `finance_goals`, `finance_liabilities`.
 
 use chrono::{DateTime, NaiveDate, Utc};
+use serde::Serialize;
 use sqlx::FromRow;
 
 // ============================================================
@@ -11,7 +12,8 @@ use sqlx::FromRow;
 // ============================================================
 
 /// Row struct for the `finance_accounts` table.
-#[derive(Debug, Clone, FromRow)]
+#[derive(Debug, Clone, FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FinanceAccountRow {
     pub id: String,
     pub name: String,
@@ -26,7 +28,8 @@ pub struct FinanceAccountRow {
 }
 
 /// Row struct for the `finance_transactions` table.
-#[derive(Debug, Clone, FromRow)]
+#[derive(Debug, Clone, FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FinanceTransactionRow {
     pub id: String,
     pub account_id: String,
@@ -46,7 +49,8 @@ pub struct FinanceTransactionRow {
 }
 
 /// Row struct for the `finance_budgets` table.
-#[derive(Debug, Clone, FromRow)]
+#[derive(Debug, Clone, FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FinanceBudgetRow {
     pub id: String,
     pub name: String,
@@ -65,7 +69,8 @@ pub struct FinanceBudgetRow {
 }
 
 /// Row struct for the `finance_portfolios` table.
-#[derive(Debug, Clone, FromRow)]
+#[derive(Debug, Clone, FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FinancePortfolioRow {
     pub id: String,
     pub name: String,
@@ -76,7 +81,8 @@ pub struct FinancePortfolioRow {
 }
 
 /// Row struct for the `finance_investments` table.
-#[derive(Debug, Clone, FromRow)]
+#[derive(Debug, Clone, FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FinanceInvestmentRow {
     pub id: String,
     pub portfolio_id: String,
@@ -95,7 +101,8 @@ pub struct FinanceInvestmentRow {
 }
 
 /// Row struct for the `finance_investment_transactions` table.
-#[derive(Debug, Clone, FromRow)]
+#[derive(Debug, Clone, FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FinanceInvestmentTxRow {
     pub id: String,
     pub investment_id: String,
@@ -111,7 +118,8 @@ pub struct FinanceInvestmentTxRow {
 }
 
 /// Row struct for the `finance_goals` table.
-#[derive(Debug, Clone, FromRow)]
+#[derive(Debug, Clone, FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FinanceGoalRow {
     pub id: String,
     pub name: String,
@@ -130,7 +138,8 @@ pub struct FinanceGoalRow {
 }
 
 /// Row struct for the `finance_liabilities` table.
-#[derive(Debug, Clone, FromRow)]
+#[derive(Debug, Clone, FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FinanceLiabilityRow {
     pub id: String,
     pub name: String,
@@ -258,7 +267,8 @@ pub struct FinanceInvestmentFilter {
 
 /// Result of the `budget_usage` join query: all budget fields plus the
 /// `spent` amount (sum of matching expense transactions in the current period).
-#[derive(Debug, Clone, FromRow)]
+#[derive(Debug, Clone, FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct BudgetUsageRow {
     pub id: String,
     pub name: String,
@@ -279,7 +289,8 @@ pub struct BudgetUsageRow {
 }
 
 /// Aggregated portfolio summary (holdings count + cost/value totals).
-#[derive(Debug, Clone, FromRow)]
+#[derive(Debug, Clone, FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PortfolioSummaryRow {
     pub portfolio_id: String,
     pub total_cost_basis: i64,
