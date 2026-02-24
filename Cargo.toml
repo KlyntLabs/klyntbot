@@ -1,5 +1,6 @@
 [workspace]
 resolver = "2"
+exclude = ["crates/plugin-sdk"]
 members = [
     "crates/common",
     "crates/config",
@@ -21,6 +22,7 @@ members = [
     "crates/tools-core-macros",
     "crates/feature-finance",
     "crates/feature-todo",
+    "crates/plugin-runtime",
 ]
 
 [workspace.package]
@@ -51,6 +53,8 @@ tools-core = { path = "crates/tools-core" }
 tools-core-macros = { path = "crates/tools-core-macros" }
 feature-finance = { path = "crates/feature-finance" }
 feature-todo = { path = "crates/feature-todo" }
+plugin-runtime = { path = "crates/plugin-runtime" }
+extism = "1"
 
 # Proc-macro dependencies
 syn = { version = "2", features = ["full", "extra-traits"] }
@@ -121,6 +125,7 @@ license.workspace = true
 default = ["email"]
 email = ["channels/email"]
 browser-integration = ["tools/browser-integration"]
+plugin-integration = ["plugin-runtime/plugin-integration"]
 
 [dependencies]
 # Re-export all workspace crates
@@ -140,6 +145,7 @@ agent.workspace = true
 cli.workspace = true
 context_engine.workspace = true
 storage.workspace = true
+plugin-runtime.workspace = true
 
 # Binary-specific dependencies
 clap.workspace = true
@@ -160,6 +166,7 @@ uuid.workspace = true
 assert_cmd = "2.1.2"
 feature-todo.workspace = true
 feature-finance.workspace = true
+plugin-runtime.workspace = true
 
 [[bench]]
 name = "core_benchmarks"
