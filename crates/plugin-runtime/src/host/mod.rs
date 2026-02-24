@@ -13,7 +13,7 @@ struct HostContext {
     pool: sqlx::SqlitePool,
     plugin_id: String,
     permissions: Vec<PluginPermission>,
-    bus_sender: Option<tokio::sync::mpsc::UnboundedSender<bus::OutboundMessage>>,
+    bus_sender: Option<tokio::sync::mpsc::Sender<bus::OutboundMessage>>,
     http_client: reqwest::Client,
 }
 
@@ -32,10 +32,7 @@ fn is_select_only(sql: &str) -> bool {
     let upper = trimmed.to_uppercase();
 
     // Must start with SELECT, WITH (for CTEs), or EXPLAIN
-    if !(upper.starts_with("SELECT")
-        || upper.starts_with("WITH")
-        || upper.starts_with("EXPLAIN"))
-    {
+    if !(upper.starts_with("SELECT") || upper.starts_with("WITH") || upper.starts_with("EXPLAIN")) {
         return false;
     }
 
@@ -47,8 +44,8 @@ fn is_select_only(sql: &str) -> bool {
 
     // Reject mutation keywords appearing as standalone tokens
     let mutation_keywords = [
-        "INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "CREATE",
-        "REPLACE", "ATTACH", "DETACH", "PRAGMA", "VACUUM", "REINDEX",
+        "INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "CREATE", "REPLACE", "ATTACH", "DETACH",
+        "PRAGMA", "VACUUM", "REINDEX",
     ];
     for word in upper.split(|c: char| !c.is_alphanumeric() && c != '_') {
         if mutation_keywords.contains(&word) {
@@ -73,7 +70,7 @@ pub fn build_host_functions(
     pool: sqlx::SqlitePool,
     plugin_id: String,
     permissions: Vec<PluginPermission>,
-    bus_sender: Option<tokio::sync::mpsc::UnboundedSender<bus::OutboundMessage>>,
+    bus_sender: Option<tokio::sync::mpsc::Sender<bus::OutboundMessage>>,
 ) -> Vec<Function> {
     let ctx = HostContext {
         pool,
@@ -174,10 +171,7 @@ pub fn build_host_functions(
                     Ok(handle) => std::thread::scope(|s| {
                         s.spawn(|| {
                             handle.block_on(async {
-                                match sqlx::query(&input)
-                                    .execute(&pool)
-                                    .await
-                                {
+                                match sqlx::query(&input).execute(&pool).await {
                                     Ok(r) => {
                                         format!("{{\"rows_affected\":{}}}", r.rows_affected())
                                     }
@@ -333,8 +327,7 @@ pub fn build_host_functions(
                                 match req_builder.send().await {
                                     Ok(resp) => {
                                         let status = resp.status().as_u16();
-                                        let body_text =
-                                            resp.text().await.unwrap_or_default();
+                                        let body_text = resp.text().await.unwrap_or_default();
                                         serde_json::json!({
                                             "status": status,
                                             "body": body_text
@@ -382,18 +375,12 @@ pub fn build_host_functions(
 
                 let msg: serde_json::Value =
                     serde_json::from_str(&input).unwrap_or(serde_json::Value::Null);
-                let channel = msg
-                    .get("channel")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("cli");
+                let channel = msg.get("channel").and_then(|v| v.as_str()).unwrap_or("cli");
                 let chat_id = msg
                     .get("chat_id")
                     .and_then(|v| v.as_str())
                     .unwrap_or("default");
-                let content = msg
-                    .get("content")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("");
+                let content = msg.get("content").and_then(|v| v.as_str()).unwrap_or("");
 
                 debug!(
                     plugin_id = %ctx.plugin_id,
@@ -404,7 +391,7 @@ pub fn build_host_functions(
 
                 let output = if let Some(ref sender) = ctx.bus_sender {
                     let outbound = bus::OutboundMessage::new(channel, chat_id, content);
-                    match sender.send(outbound) {
+                    match sender.try_send(outbound) {
                         Ok(()) => r#"{"ok":true}"#.to_string(),
                         Err(e) => format!(r#"{{"ok":false,"error":"{}"}}"#, e),
                     }
@@ -445,8 +432,7 @@ pub fn build_host_functions(
                     "agent_ask_user"
                 );
 
-                let handle = plugin
-                    .memory_new(r#"{"error":"agent callbacks not connected"}"#)?;
+                let handle = plugin.memory_new(r#"{"error":"agent callbacks not connected"}"#)?;
                 outputs[0] = plugin.memory_to_val(handle);
                 Ok(())
             },

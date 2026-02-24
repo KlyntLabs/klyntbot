@@ -78,7 +78,7 @@ impl PluginManager {
         plugins_dir: &Path,
         pool: sqlx::SqlitePool,
         config: &PluginsConfig,
-        bus_sender: Option<tokio::sync::mpsc::UnboundedSender<bus::OutboundMessage>>,
+        bus_sender: Option<tokio::sync::mpsc::Sender<bus::OutboundMessage>>,
     ) -> common::Result<Self> {
         if !config.enabled {
             info!("plugin system disabled, skipping plugin loading");
@@ -101,8 +101,13 @@ impl PluginManager {
 
         for (manifest, wasm_path) in discovered {
             let plugin_id = manifest.id.clone();
-            match Self::load_plugin(manifest, &wasm_path, pool.clone(), config, bus_sender.clone())
-            {
+            match Self::load_plugin(
+                manifest,
+                &wasm_path,
+                pool.clone(),
+                config,
+                bus_sender.clone(),
+            ) {
                 Ok(pkg) => {
                     info!(plugin_id = %plugin_id, "loaded plugin");
                     packages.push(pkg);
@@ -127,7 +132,7 @@ impl PluginManager {
         wasm_path: &Path,
         pool: sqlx::SqlitePool,
         config: &PluginsConfig,
-        bus_sender: Option<tokio::sync::mpsc::UnboundedSender<bus::OutboundMessage>>,
+        bus_sender: Option<tokio::sync::mpsc::Sender<bus::OutboundMessage>>,
     ) -> common::Result<PluginPackage> {
         let wasm_bytes = std::fs::read(wasm_path)?;
 
@@ -140,8 +145,8 @@ impl PluginManager {
 
         // Convert sandbox_memory_mb to wasm pages (1 page = 64KB)
         let memory_pages = (config.sandbox_memory_mb as u64 * 1024 * 1024 / (64 * 1024)) as u32;
-        let extism_manifest = extism::Manifest::new([extism::Wasm::data(wasm_bytes)])
-            .with_memory_max(memory_pages);
+        let extism_manifest =
+            extism::Manifest::new([extism::Wasm::data(wasm_bytes)]).with_memory_max(memory_pages);
 
         let plugin = extism::Plugin::new(&extism_manifest, host_fns, true).map_err(|e| {
             common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(format!(
@@ -229,8 +234,7 @@ mod tests {
             ..PluginsConfig::default()
         };
         let pool = storage::StoragePool::connect_in_memory().await.unwrap();
-        let mgr = PluginManager::load_all(tmp.path(), pool.inner().clone(), &config, None)
-            .unwrap();
+        let mgr = PluginManager::load_all(tmp.path(), pool.inner().clone(), &config, None).unwrap();
         assert!(mgr.packages().is_empty());
     }
 
@@ -238,9 +242,13 @@ mod tests {
     async fn test_load_all_nonexistent_dir() {
         let config = PluginsConfig::default();
         let pool = storage::StoragePool::connect_in_memory().await.unwrap();
-        let mgr =
-            PluginManager::load_all(Path::new("/nonexistent"), pool.inner().clone(), &config, None)
-                .unwrap();
+        let mgr = PluginManager::load_all(
+            Path::new("/nonexistent"),
+            pool.inner().clone(),
+            &config,
+            None,
+        )
+        .unwrap();
         assert!(mgr.packages().is_empty());
     }
 }
