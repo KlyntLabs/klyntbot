@@ -1,6 +1,8 @@
-# openclaw vs klyntbot: Deep Comparative Analysis
+# openclaw vs klyntbot: Comparative Analysis
 
-> Generated: 2026-02-23 — Full codebase scan via 5 parallel agents (100+ files read, ~470k tokens analysed)
+> Generated: 2026-02-23, Updated: 2026-02-24
+> Original scan: 5 parallel agents, 100+ files, ~470k tokens
+> Update: Reflects completed SQLite+LanceDB migration, WASM plugin system, browser automation, learning loop + hierarchical sub-agents
 
 ---
 
@@ -27,30 +29,29 @@
 19. [Security Model](#19-security-model)
 20. [Deployment & Distribution](#20-deployment--distribution)
 21. [Testing Architecture](#21-testing-architecture)
-22. [Maturity Assessment](#22-maturity-assessment)
-23. [Strategic Gap Analysis](#23-strategic-gap-analysis)
-24. [Summary Scorecard](#24-summary-scorecard)
+22. [Remaining Gap Analysis](#22-remaining-gap-analysis)
+23. [Summary Scorecard](#23-summary-scorecard)
 
 ---
 
 ## 1. Executive Summary
 
-**openclaw** and **klyntbot** are both multi-channel AI agent frameworks with strikingly similar goals — a single agent serving multiple chat platforms, persistent memory, scheduling, and extensibility — but they diverge radically in almost every architectural and engineering decision.
+**openclaw** and **klyntbot** are both multi-channel AI agent frameworks with strikingly similar goals — a single agent serving multiple chat platforms, persistent memory, scheduling, and extensibility — but they diverge in architectural and engineering decisions.
 
 | Dimension | openclaw | klyntbot |
 |-----------|----------|----------|
 | **Language** | TypeScript (Node 22+, ESM) | Rust (Edition 2021, Tokio) |
-| **Distribution** | npm package + Docker + mobile apps | Single stripped binary + PostgreSQL |
-| **Storage** | SQLite + JSONL flat files | PostgreSQL + pgvector |
-| **Embeddings** | 5 cloud providers (OpenAI, Gemini, Voyage, Mistral) + local llama-cpp | fastembed local only (paraphrase-MiniLM, 384d) |
-| **Plugin System** | Rich SDK: 24 lifecycle hooks, 40+ bundled plugins, npm-loadable | Feature packs + built-in skills (no external plugin loading) |
-| **Browser automation** | Playwright/CDP + Docker sandboxes | Not implemented |
+| **Distribution** | npm package + Docker + mobile apps | Single stripped binary (zero-infra) |
+| **Storage** | SQLite + JSONL flat files | SQLite + LanceDB (zero-infra) |
+| **Embeddings** | 5 cloud providers + local llama-cpp | fastembed local only (384d) |
+| **Plugin System** | npm SDK: 24 lifecycle hooks, 40+ plugins | WASM sandbox (Extism): multi-lang, registry, CLI |
+| **Browser automation** | Playwright/CDP + Docker sandboxes | agent-browser CLI + trust-level guards |
 | **Planning engine** | Not implemented | Full 6-state lifecycle + backtracking |
 | **Channels** | 8 core + extensions (Matrix, Teams, etc.) | 6 (Telegram, Discord, Slack, WhatsApp, QQ, Email) |
 | **Mobile apps** | iOS (SwiftUI), Android (Jetpack), macOS native | None |
 | **Canvas / Generative UI** | Yes (HTTP/WebSocket canvas host) | None |
 
-**Bottom line**: openclaw is a TypeScript-native, community-driven ecosystem play with a rich plugin SDK, browser control, mobile apps, and broad channel coverage. klyntbot is a tightly-engineered Rust binary optimised for single-operator reliability, advanced planning, and zero-dependency deployment. Each has critical gaps the other fills.
+**Bottom line**: Both frameworks now have plugin systems, browser automation, and zero-infrastructure storage. openclaw leads in ecosystem breadth (mobile, canvas, channel count, npm community). klyntbot leads in architectural depth (planning, orchestration with active learning loop, hierarchical sub-agents, domain models, WASM sandboxing, Rust safety).
 
 ---
 
@@ -63,15 +64,15 @@
 │ Feature                     │  openclaw    │     klyntbot       │
 ├─────────────────────────────┼──────────────┼────────────────────┤
 │ Multi-channel agent         │ ✅ 8+ channels│ ✅ 6 channels      │
-│ Persistent memory           │ ✅ SQLite+FTS5│ ✅ PG+pgvector     │
-│ Semantic (vector) search    │ ✅ sqlite-vec │ ✅ pgvector ANN    │
+│ Persistent memory           │ ✅ SQLite+FTS5│ ✅ SQLite+LanceDB  │
+│ Semantic (vector) search    │ ✅ sqlite-vec │ ✅ LanceDB ANN     │
 │ Hybrid search (RRF)         │ ✅           │ ✅                  │
 │ LLM provider abstraction    │ ✅ 6+         │ ✅ 10+             │
 │ Tool calling                │ ✅           │ ✅                  │
 │ Cron / scheduling           │ ✅ croner     │ ✅ tokio tasks      │
-│ Session persistence         │ ✅ JSONL      │ ✅ PostgreSQL       │
-│ Plugin / extension SDK      │ ✅ Rich SDK   │ ❌ (packs only)    │
-│ Browser automation          │ ✅ Playwright │ ❌                  │
+│ Session persistence         │ ✅ JSONL      │ ✅ SQLite            │
+│ Plugin / extension SDK      │ ✅ Rich SDK   │ ✅ WASM (Extism)    │
+│ Browser automation          │ ✅ Playwright │ ✅ agent-browser    │
 │ Media understanding         │ ✅ multi-prov │ ❌                  │
 │ Canvas / Generative UI      │ ✅           │ ❌                  │
 │ Multi-step planning engine  │ ❌           │ ✅ Full lifecycle   │
@@ -79,7 +80,10 @@
 │ Task enrichment (AI)        │ ❌           │ ✅                  │
 │ Calendar (CalDAV)           │ ❌           │ ✅ Apple/Google Cal │
 │ Finance tools               │ ❌           │ ✅ (optional pack)  │
-│ Adaptive orchestration      │ ❌           │ ✅ heuristic+LLM   │
+│ Adaptive orchestration      │ ❌           │ ✅ heuristic+LLM    │
+│                             │              │   + learning loop   │
+│ Hierarchical sub-agents     │ Partial      │ ✅ 4 profiles       │
+│ User satisfaction feedback  │ ❌           │ ✅ reaction→score   │
 │ Mobile apps                 │ ✅ iOS/Android│ ❌                  │
 │ Docker sandbox              │ ✅           │ ❌                  │
 │ Daemon management (OS)      │ ✅ launchd/   │ ❌ (manual/serve)  │
@@ -87,7 +91,7 @@
 │ Pairing / allowlist         │ ✅           │ Partial            │
 │ ACP protocol (IDE integr.)  │ ✅           │ ❌                  │
 │ Single binary deploy        │ ❌           │ ✅                  │
-│ Zero-deps deploy            │ ❌ (Node+PG) │ ❌ (Rust+PG)       │
+│ Zero-deps deploy            │ ❌ (Node+PG) │ ✅ (single binary)  │
 │ Test coverage enforcement   │ ✅ 70% thresh │ ✅ nextest+clippy  │
 └─────────────────────────────┴──────────────┴────────────────────┘
 ```
@@ -121,7 +125,7 @@
 | Aspect | openclaw | klyntbot |
 |--------|----------|----------|
 | **Primary metaphor** | Personal assistant across all your apps | Autonomous agent with persistent intelligence |
-| **Setup complexity** | Medium (daemon, config wizard, channel auth) | Medium (PostgreSQL required, init wizard) |
+| **Setup complexity** | Medium (daemon, config wizard, channel auth) | Low (init wizard, zero infrastructure) |
 | **Extensibility model** | Community plugins (npm ecosystem) | Source-code modifications + skill files |
 | **End-user vs developer** | Both (mobile app for end users) | Developer-first |
 | **Operator model** | Self-hosted on your devices | Self-hosted on server/laptop |
@@ -175,21 +179,23 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│            klyntbot — Rust Workspace (Cargo, 20 crates)         │
+│            klyntbot — Rust Workspace (Cargo, 15+ crates)        │
 ├─────────────────────────────────────────────────────────────────┤
 │  Layer 0: common     ← KlyntbotError, MessageRole, ChatId       │
 │  Layer 1: config     ← Config schema (camelCase JSON + serde)   │
 │  Layer 1: bus        ← tokio::mpsc message bus                  │
-│  Layer 1.5: storage  ← PgPool, sqlx, 17 repos, auto-migrations  │
+│  Layer 1.5: storage  ← SqlitePool, LanceDB VectorStore, 24 repos│
 │                                                                  │
 │  Layer 2: providers  ← LlmProvider trait, 10+ implementations   │
 │  Layer 2: session    ← SessionManager, SessionRepo              │
 │  Layer 2: context_engine ← Budget alloc, compression, assembly  │
 │  Layer 2: scheduling ← Cron types, CronRepo                     │
 │  Layer 2: calendar   ← CalDAV sync engine                       │
+│  Layer 2.5: plugin-runtime ← Extism WASM sandbox, PluginManager │
 │                                                                  │
-│  Layer 3: tools      ← Tool trait, 12+ implementations          │
+│  Layer 3: tools      ← Tool trait, 13+ implementations          │
 │                        Handler traits (SpawnHandler, etc.)       │
+│                        BrowserTool (agent-browser subprocess)    │
 │                                                                  │
 │  Layer 4: channels   ← Channel trait, 6 implementations         │
 │  Layer 4: heartbeat  ← Scheduled agent turns                    │
@@ -197,11 +203,13 @@
 │  Layer 5: agent      ← AgentLoop, Orchestrator, ContextEngine   │
 │                        EngineDispatch, PlanExecutor,            │
 │                        MemoryStore, SkillManager, SubagentMgr   │
+│                        SubagentProfile (4 profiles, tool gates) │
+│                        Strategy persistence (pipeline Step 6)   │
 │                                                                  │
-│  Layer 6: cli        ← Clap CLI (4 commands), init wizard       │
+│  Layer 6: cli        ← Clap CLI (5 commands), init wizard       │
 │  Layer 7: klyntbot   ← Re-export facade + binary entry point    │
 │                                                                  │
-│  Storage: PostgreSQL + pgvector (ANN embeddings)                │
+│  Storage: SQLite (relational) + LanceDB (vector embeddings)    │
 │  Binary: Single stripped executable (~50MB release)             │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -209,7 +217,7 @@
 **Key characteristics**:
 - **Strict dependency layers**: No circular deps, enforced by Cargo
 - **Single process**: All components in one binary, communication via `Arc<MessageBus>`
-- **Repository pattern**: All state via typed repos backed by `PgPool`
+- **Repository pattern**: All state via typed repos backed by `SqlitePool` + LanceDB
 - **Dependency inversion**: Handler traits prevent circular deps between tool ↔ agent layers
 
 ### Architectural Philosophy Comparison
@@ -219,7 +227,7 @@
 | **Modularity model** | Plugin/npm packages | Cargo workspace crates |
 | **Extension boundary** | npm plugin API (public) | Source code (internal) |
 | **Communication** | WebSocket, event emitters, streams | `Arc<MessageBus>` (tokio mpsc) |
-| **State sharing** | In-process + SQLite | PgPool clones (Arc-backed) |
+| **State sharing** | In-process + SQLite | SqlitePool + LanceDB (Arc-backed) |
 | **Process model** | Single Node.js process (multi-process optional via ACP) | Single Rust process |
 | **Startup time** | ~2-5s (Node boot + channel init) | ~200ms (Rust binary) |
 | **Memory footprint** | ~150-300MB (Node.js baseline) | ~50-150MB (Rust, no GC) |
@@ -260,12 +268,13 @@ Test runner:  cargo-nextest (parallel) + cargo test (doctests)
 Linting:      cargo clippy (zero warnings enforced)
 Key deps:
   - tokio                 1.49    (async runtime)
-  - sqlx                  0.8     (PostgreSQL + auto-migrations)
+  - sqlx                  0.8     (SQLite + auto-migrations)
+  - lancedb              0.26     (vector storage)
   - serde / serde_json            (serialization)
   - reqwest               0.13    (HTTP client)
   - tokio-tungstenite             (WebSocket)
   - fastembed             5       (local embedding inference)
-  - pgvector              0.4     (PG vector type)
+  - extism                1       (WASM plugin runtime)
   - dashmap                       (concurrent hash map)
   - async-trait                   (trait objects)
   - clap                          (CLI)
@@ -349,17 +358,23 @@ AgentPipeline::process_message()
   │    └─ ExecutionCore — plan step execution with backtracking
   │
   ├─ 4. ResponseValidator::validate()
-  └─ 5. CostTracker::record()
+  ├─ 5. CostTracker::record()
+  └─ 6. StrategyPersistence::record()
+  │    └─ Writes StrategyRecordRow (predicted/actual strategy, escalation,
+  │       iterations_used, response_time_ms, chat_id)
   ↓
 OutboundMessage → MessageBus → Channels
+  ↑ (feedback loop)
+  └─ User reactions (👍/👎) → satisfaction score → backfilled to strategy record
 ```
 
 **Characteristics**:
 - **Adaptive routing**: Strategy selection based on message heuristics + LLM confidence
 - **Budget-aware context**: Token allocation varies by execution strategy
 - **Multiple execution engines**: Different loop behaviours for different task types
-- **Learning feedback**: Strategy performance (accuracy, escalation rate) recorded and fed back to classifier
-- **Planning integration**: Plan execution steps have their own cycle with backtracking
+- **Active learning loop**: Pipeline Step 6 persists every strategy outcome (`StrategyRecordRow` with predicted/actual strategy, escalation count, iterations used, response time, chat_id). The orchestrator reads these records to calibrate future classification decisions. User reactions (emoji on channel messages) backfill a satisfaction score to the most recent strategy record via `set_satisfaction_for_chat()`.
+- **Hierarchical sub-agents**: `SubagentProfile` enum (General, Research, Code, Analyst) with profile-based tool registration and iteration limits. LLM selects profile via `SpawnTool` parameter. Each profile gets a role-specific system prompt and restricted tool set (e.g., Analyst gets read-only filesystem, no shell/web).
+- **Planning integration**: Plan execution steps have their own cycle with backtracking. `PlanCompletionHandler` increments typed goal columns (`plans_completed`, `plans_failed`, `avg_duration_ms`) on plan completion.
 
 ### Comparison
 
@@ -371,8 +386,9 @@ OutboundMessage → MessageBus → Channels
 | **Execution engines** | 1 (single agent loop) | 4 (Direct, ReAct+, PlanGenerate, ExecutionCore) |
 | **Token budget management** | Implicit (PI library handles) | Explicit per-strategy budget splits |
 | **History compression** | Native LLM compaction | 3 modes: extractive, abstractive, sliding |
-| **Adaptive learning** | None | Strategy performance feedback |
-| **Subagent spawning** | Yes (isolated sessions, descendant tracking) | Yes (SpawnHandler, session key hierarchy) |
+| **Adaptive learning** | None | Active loop: strategy persistence → classifier feedback → satisfaction backfill |
+| **Subagent spawning** | Yes (isolated sessions, descendant tracking) | Yes (SpawnHandler, 4 profiles: General/Research/Code/Analyst) |
+| **User satisfaction** | None | Emoji reactions → satisfaction score on strategy records |
 
 **klyntbot advantage**: Sophisticated orchestration, adaptive routing, and multiple execution engines.
 **openclaw advantage**: Less opinionated loop — easier to extend without modifying the core.
@@ -520,7 +536,7 @@ pub trait Tool: Send + Sync {
 }
 ```
 
-**12+ core tools**:
+**13+ core tools**:
 
 | Tool | Actions | Notes |
 |------|---------|-------|
@@ -528,7 +544,8 @@ pub trait Tool: Send + Sync {
 | `ShellTool` | run_command, kill_process | Timeout enforcement |
 | `WebTool` | fetch_page, query_api | HTML→text conversion |
 | `MessageTool` | send | Cross-channel via bus |
-| `SpawnTool` | spawn_subagent | Session key hierarchy |
+| `SpawnTool` | spawn_subagent | Profile-based (general/research/code/analyst) |
+| `GoalTool` | create, show, list, update, metrics | Typed plan completion tracking |
 | `CronTool` | schedule, list_jobs, cancel_job | Delegates to CronHandler |
 | `AskUserTool` | ask | Blocks on interaction_rx |
 | `TodoTool` | add, get, update, delete, search, search-semantic, search-hybrid | Full CRUD + RRF |
@@ -536,8 +553,9 @@ pub trait Tool: Send + Sync {
 | `PlanTool` | create, approve, execute, status | Plan lifecycle |
 | `CalendarTool` | sync_now, list_events, get_status | Delegates to CalendarHandler |
 | `EnrichmentTool` | enrich | AI-powered task field inference |
+| `BrowserTool` | navigate, snapshot, click, type, fill, scroll, screenshot, eval, fill_form, login_flow, submit_and_confirm | agent-browser subprocess, trust-level write guards |
 
-**Dependency inversion**: `SpawnHandler`, `CronHandler`, `CalendarHandler`, `EnrichmentHandler`, `PlanHandler` — all defined in `tools` (Layer 3), implemented in `agent` (Layer 5), injected at construction as `Arc<dyn Trait>`.
+**Dependency inversion**: `SpawnHandler`, `CronHandler`, `CalendarHandler`, `EnrichmentHandler`, `PlanHandler`, `PlanCompletionHandler`, `GoalHandler` — all defined in `tools` (Layer 3), implemented in `agent` (Layer 5), injected at construction as `Arc<dyn Trait>`. The `SpawnHandler` now carries a `profile: String` parameter that gets converted to `SubagentProfile` at the trait implementation boundary.
 
 ### Comparison
 
@@ -545,16 +563,16 @@ pub trait Tool: Send + Sync {
 |--------|----------|----------|
 | **Tool interface** | TypeBox-validated async function | Rust trait with `execute(&action, params, ctx)` |
 | **Schema generation** | TypeBox (runtime, typed) | `serde_json::Value` (manual JSON schema) |
-| **Tool count (built-in)** | ~15 (via bundled plugins) | 12 core tools |
+| **Tool count (built-in)** | ~15 (via bundled plugins) | 13+ core tools |
 | **Tool discovery** | Plugin load time | `ToolRegistry::get_definitions()` |
-| **Browser tool** | ✅ (Playwright, full CDP) | ❌ |
+| **Browser tool** | ✅ (Playwright, full CDP) | ✅ (agent-browser, trust-level guards) |
 | **Media tool** | ✅ (multi-provider vision) | ❌ |
 | **Calendar tool** | ❌ | ✅ (CalDAV + Apple/Google Cal) |
 | **Task/todo tool** | ❌ (no dedicated tool) | ✅ (full CRUD + semantic search) |
 | **Plan tool** | ❌ | ✅ (full lifecycle) |
 | **Enrichment tool** | ❌ | ✅ (AI-inferred priority/duration/deadline) |
 | **Ask user tool** | ✅ (interactive prompts) | ✅ (blocks on interaction_rx) |
-| **Extensibility** | Plugin API (npm) | Source code only |
+| **Extensibility** | Plugin API (npm) | WASM plugins (Extism) + source code |
 | **Dependency injection** | Plugin constructor injection | `Arc<dyn Trait>` at loop construction |
 
 ---
@@ -603,85 +621,56 @@ pub trait Tool: Send + Sync {
 
 ### klyntbot Storage
 
-**PostgreSQL + pgvector**:
+**SQLite + LanceDB** (zero infrastructure):
 
-```sql
--- Embeddings
-CREATE TABLE embeddings (
-  id TEXT PRIMARY KEY,
-  text TEXT NOT NULL,
-  embedding vector(384) NOT NULL
-);
-
--- ANN index
-CREATE INDEX ON embeddings USING ivfflat (embedding vector_cosine_ops);
-
--- Todos (full schema)
-CREATE TABLE todos (
-  id TEXT PRIMARY KEY,
-  title TEXT NOT NULL,
-  description TEXT,
-  priority SMALLINT DEFAULT 3,
-  status TEXT DEFAULT 'todo',
-  tags TEXT[] DEFAULT '{}',
-  project_id TEXT REFERENCES projects(id),
-  parent_id TEXT REFERENCES todos(id),
-  due_date TIMESTAMPTZ,
-  estimated_minutes INT,
-  total_tracked_secs INT DEFAULT 0,
-  recurrence_rule TEXT,
-  is_template BOOL DEFAULT FALSE,
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW(),
-  completed_at TIMESTAMPTZ
-);
+```
+~/.klyntbot/
+├── data.db              ← SQLite (all relational data, WAL mode)
+├── lance/               ← LanceDB (vector embeddings)
+│   ├── todo_embeddings.lance/
+│   ├── conv_embeddings.lance/
+│   └── memory_note_embeddings.lance/
+└── config.json
 ```
 
-**17 repository types**:
-- `TodoRepo`, `ProjectRepo`, `EmbeddingRepo`
-- `MemoryNoteRepo`, `MemoryNoteEmbeddingRepo`
-- `SessionRepo`, `CronRepo`, `UsageRepo`
-- `PlanRepo`, `GoalRepo`, `StrategyRepo`
-- `OutcomeRepo`, `DecisionLogRepo`, `LearningStateRepo`
-- `CalendarEventCacheRepo`, `CalendarSyncRepo`, `ConvEmbeddingRepo`
-- Finance repos: `FinanceAccountRepo`, `FinanceBudgetRepo`, `FinanceGoalRepo`
+**24 repository types** in `storage` crate:
+- Core: `TodoRepo`, `ProjectRepo`, `SessionRepo`, `CronRepo`, `UsageRepo`
+- Planning: `PlanRepo`, `GoalRepo`, `StrategyRepo`, `OutcomeRepo`, `DecisionLogRepo`
+- Memory: `MemoryNoteRepo`, `LearningStateRepo`
+- Calendar: `CalendarEventCacheRepo`, `CalendarSyncRepo`
+- Finance: `FinanceAccountRepo`, `FinanceBudgetRepo`, `FinanceGoalRepo`
+- Vector: `VectorStore` (LanceDB — todo, conversation, memory note embeddings)
 
-**PgPool pattern**:
-- `PgPool` is `Clone + Send + Sync` (Arc-backed by sqlx internally)
-- All repos hold `PgPool`, clone freely — no `Arc<RwLock<>>` needed
-- Auto-migrations on first `StoragePool::connect()` via `sqlx::migrate!()`
+**SqlitePool pattern**:
+- `SqlitePool` is `Clone + Send + Sync` (Arc-backed by sqlx internally)
+- All repos hold `SqlitePool`, clone freely — no `Arc<RwLock<>>` needed
+- Auto-migrations on `StoragePool::connect(data_dir)` via `sqlx::migrate!()`
+- WAL mode + foreign keys enabled at connection time
 
-**Semantic search**:
-```sql
--- pgvector cosine ANN
-SELECT id, text, 1 - (embedding <=> $1) as similarity
-FROM embeddings
-WHERE 1 - (embedding <=> $1) > $threshold
-ORDER BY embedding <=> $1
-LIMIT $limit;
-```
+**Semantic search** (LanceDB ANN):
+- 384-dimension vectors via fastembed (paraphrase-multilingual-MiniLM-L12-v2)
+- Approximate nearest neighbor search with cosine similarity
+- Hybrid search: keyword (SQL) + semantic (LanceDB) merged via RRF
 
 ### Comparison
 
 | Aspect | openclaw | klyntbot |
 |--------|----------|----------|
-| **Session storage** | JSONL flat files | PostgreSQL (sessions table) |
-| **Memory/embedding storage** | SQLite (node:sqlite) | PostgreSQL + pgvector |
-| **FTS search** | FTS5 BM25 | PostgreSQL full-text search |
-| **Vector search** | sqlite-vec (optional extension) | pgvector (required, ANN ivfflat) |
-| **Hybrid search** | ✅ RRF (FTS5 + vector) | ✅ RRF (keyword + pgvector) |
+| **Session storage** | JSONL flat files | SQLite (sessions table) |
+| **Memory/embedding storage** | SQLite (node:sqlite) | SQLite + LanceDB |
+| **FTS search** | FTS5 BM25 | SQLite full-text search |
+| **Vector search** | sqlite-vec (optional extension) | LanceDB ANN (cosine similarity) |
+| **Hybrid search** | ✅ RRF (FTS5 + vector) | ✅ RRF (keyword + LanceDB) |
 | **Embedding providers** | 5 cloud + 1 local | 1 local only (fastembed, 384d) |
 | **No-cloud embedding** | ✅ (node-llama-cpp) | ✅ (fastembed, default) |
 | **Task/project storage** | None (no task management) | Full schema: todos, projects, plans, goals |
-| **Repository pattern** | MemoryIndexManager | 17 typed repos, `Repos` aggregate |
+| **Repository pattern** | MemoryIndexManager | 24 typed repos, `Repos` aggregate |
 | **Migration strategy** | Auto on first access (schema versioning) | Auto via `sqlx::migrate!()` |
-| **Portability** | ✅ (SQLite file, copyable) | Requires PostgreSQL server |
-| **Scale** | Millions of embeddings (SQLite limits) | Billions of embeddings (pgvector ANN) |
-| **Multi-user** | Single-agent-scoped | Multi-tenant capable |
-| **Data richness** | Memory + sessions | 17 domain models (todos, goals, plans, finance...) |
+| **Portability** | ✅ (SQLite file, copyable) | ✅ (SQLite + LanceDB files, copyable) |
+| **Infrastructure requirement** | None (SQLite bundled) | None (SQLite + LanceDB embedded) |
+| **Data richness** | Memory + sessions | 24 domain models (todos, goals, plans, finance...) |
 
-**klyntbot advantage**: PostgreSQL is more robust, scalable, and multi-tenant capable. 17 rich domain models. pgvector ANN scales to billions of vectors.
-**openclaw advantage**: SQLite is portable and zero-infrastructure. Multiple cloud embedding providers give flexibility. JSONL sessions are auditable and copyable.
+**Both use embedded storage** — no external database required. klyntbot has richer domain models (24 repos). openclaw has more embedding provider options (5 cloud + local).
 
 ---
 
@@ -827,7 +816,7 @@ pub struct ProviderCapabilities {
 
 ```json
 {
-  "database": { "url": "postgres://localhost/klyntbot" },
+  "dataDir": "~/.klyntbot",
   "agents": {
     "defaults": { "model": "claude-3-5-sonnet-20241022", "temperature": 0.7 }
   },
@@ -923,41 +912,52 @@ subagent_ended          gateway_start          gateway_stop
 
 ### klyntbot Extension System
 
-**No external plugin loading**. Extension happens via:
+**WASM plugin sandbox** (Extism) + feature packs:
 
-1. **Feature packs** (built-in, config-selected):
+1. **WASM Plugins** (runtime-loadable, multi-language):
+   - `plugin-runtime` crate (Layer 2.5): Extism runtime, host ABI, `WasmPlugin` wrapper
+   - `plugin-sdk` crate: `#[plugin_tool]` macro for Rust authors, typed host bindings
+   - Multi-language: Rust, TypeScript (Javy), Python (py2wasm), Go (TinyGo)
+   - Permission model: `network`, `storage`, `agent` — explicit per plugin
+   - Distribution: registry (`plugins.klyntbot.io`), GitHub releases, local file
+   - CLI: `klyntbot plugin install|list|remove|update|search|new|publish`
+   - Sandboxed storage: each plugin gets its own table namespace (`plugin_{id}_*`)
+   - Cron integration: plugin manifests declare scheduled jobs
+
+2. **Feature packs** (built-in, config-selected):
    ```rust
    pub enum PackTier { Core, Recommended, Optional }
    pub struct Pack { id, tier, skills: Vec<String>, description }
    ```
    7 packs: task-management, productivity, ai-intelligence, developer-tools, finance, weather, skill-creator
 
-2. **Skills** (SKILL.md files, filesystem-loaded):
+3. **Skills** (SKILL.md files, filesystem-loaded):
    - Loaded from `skills/` at startup
    - Filtered by enabled packs
    - Injected into system prompt as capability descriptions
-
-3. **Source-code modifications**: Adding a new tool, channel, or provider requires modifying the Rust source and recompiling.
 
 ### Comparison
 
 | Aspect | openclaw | klyntbot |
 |--------|----------|----------|
-| **External plugin loading** | ✅ (npm, jiti, 3 discovery paths) | ❌ |
-| **Lifecycle hooks** | ✅ 24 hooks | ❌ |
-| **Plugin can add tools** | ✅ | Source only |
-| **Plugin can add channels** | ✅ | Source only |
-| **Plugin can add CLI commands** | ✅ | Source only |
-| **Plugin can add LLM providers** | ✅ | Source only |
-| **Plugin can add HTTP routes** | ✅ | Source only |
-| **Plugin config schema** | ✅ (Zod + UI hints) | N/A |
-| **Plugin TypeScript support** | ✅ (jiti loads .ts directly) | N/A |
-| **Bundled extensions** | 40+ | N/A |
-| **Community ecosystem** | ✅ (npm-publishable) | ❌ |
+| **External plugin loading** | ✅ (npm, jiti, 3 discovery paths) | ✅ (WASM via Extism, 3 install paths) |
+| **Plugin sandboxing** | ❌ (runs in Node process) | ✅ (WASM sandbox, explicit permissions) |
+| **Multi-language plugins** | TypeScript only | ✅ (Rust, TypeScript, Python, Go) |
+| **Lifecycle hooks** | ✅ 24 hooks | ❌ (tools + cron only) |
+| **Plugin can add tools** | ✅ | ✅ (via manifest) |
+| **Plugin can add channels** | ✅ | ❌ (source only) |
+| **Plugin can add CLI commands** | ✅ | ❌ |
+| **Plugin can add LLM providers** | ✅ | ❌ |
+| **Plugin can add HTTP routes** | ✅ | ❌ |
+| **Plugin config schema** | ✅ (Zod + UI hints) | ✅ (manifest `config_schema` + secrets) |
+| **Plugin storage** | Shared (in-process) | ✅ (sandboxed per-plugin tables) |
+| **Plugin CLI** | npm install | ✅ (install, list, remove, update, search, new, publish) |
+| **Registry distribution** | ✅ (npm) | ✅ (plugins.klyntbot.io + GitHub) |
+| **Bundled extensions** | 40+ | N/A (plugins are external) |
 | **Feature packs** | ❌ | ✅ (7 packs, wizard selection) |
 
-**openclaw decisive advantage**: Plugin system is a complete ecosystem enabler. Community can publish npm packages that add channels, tools, providers, and behaviors without modifying core.
-**klyntbot gap**: No external plugin system is the biggest architectural limitation for ecosystem growth.
+**openclaw advantage**: Broader plugin capabilities (channels, providers, hooks, HTTP routes). Larger existing npm ecosystem.
+**klyntbot advantage**: WASM sandboxing (security), multi-language support, explicit permission model, per-plugin storage isolation.
 
 ---
 
@@ -1071,7 +1071,7 @@ pub enum CronPayload {
 }
 ```
 
-Jobs stored in `CronRepo` (PostgreSQL). Background Tokio task calculates next run times. Fires as `InboundMessage` to the agent loop. Managed via `CronTool` (natural language scheduling through chat) and `CronHandler` dependency injection.
+Jobs stored in `CronRepo` (SQLite). Background Tokio task calculates next run times. Fires as `InboundMessage` to the agent loop. Managed via `CronTool` (natural language scheduling through chat) and `CronHandler` dependency injection.
 
 ### Comparison
 
@@ -1084,7 +1084,7 @@ Jobs stored in `CronRepo` (PostgreSQL). Background Tokio task calculates next ru
 | **Multi-account delivery** | ✅ | ❌ |
 | **Subagent followup** | ✅ (wait for descendant summary) | ❌ |
 | **Heartbeat system** | ✅ (HEARTBEAT.md, 30m default, OK token) | Partial (heartbeat crate) |
-| **Persistence** | File-based run logs | PostgreSQL (CronRepo) |
+| **Persistence** | File-based run logs | SQLite (CronRepo) |
 | **Natural language scheduling** | ❌ (manual config) | ✅ (CronTool via chat) |
 | **Timezone support** | ✅ | ✅ (tz field on Cron schedule) |
 
@@ -1127,22 +1127,30 @@ Full **Playwright CDP** integration:
 
 ### klyntbot Browser Automation
 
-**Not implemented.** No browser control, no web scraping beyond `WebTool::fetch_page` (HTTP GET + HTML→text).
+**`BrowserTool`** wraps the `agent-browser` CLI (subprocess pattern, same as `ExecTool`):
+
+- **13 actions**: navigate, snapshot, click, type, fill, press, scroll, wait, get_text, screenshot, eval, fill_form, login_flow, submit_and_confirm
+- **Semantic element refs**: `@e1`, `@e2` — 93% token reduction vs raw Playwright
+- **Trust-level write guard**: `Strict` (confirm everything), `Autonomous` (confirm dangerous actions), `Full` (no guards)
+- **Composite helpers**: `fill_form` (multi-field), `login_flow` (auth pages), `submit_and_confirm` (always guarded)
+- **Feature-gated**: opt-in via `config.tools.browser.enabled`, init wizard handles binary detection
 
 ### Comparison
 
 | Aspect | openclaw | klyntbot |
 |--------|----------|----------|
-| **Browser control** | ✅ Full Playwright/CDP | ❌ |
-| **Screenshots** | ✅ | ❌ |
-| **Form filling** | ✅ | ❌ |
-| **JavaScript execution** | ✅ | ❌ |
-| **Docker sandbox** | ✅ 3-tier | ❌ |
+| **Browser control** | ✅ Full Playwright/CDP | ✅ agent-browser CLI (semantic refs) |
+| **Screenshots** | ✅ | ✅ |
+| **Form filling** | ✅ | ✅ (fill_form composite helper) |
+| **JavaScript execution** | ✅ | ✅ (eval action) |
+| **Trust-level guards** | ❌ | ✅ (Strict/Autonomous/Full) |
+| **Docker sandbox** | ✅ 3-tier | ❌ (runs with user permissions) |
 | **Visual debugging (noVNC)** | ✅ | ❌ |
-| **SSRF protection** | ✅ (URL guard + policy) | ❌ (WebTool: no SSRF guard) |
-| **Web scraping** | ✅ (browser + link-understanding CLI) | Basic (HTML→text via reqwest) |
+| **SSRF protection** | ✅ (URL guard + policy) | ❌ |
+| **Token efficiency** | Standard DOM selectors | ✅ 93% reduction via semantic `@e` refs |
 
-**openclaw decisive advantage**: Browser automation is a major differentiator. No equivalent in klyntbot.
+**openclaw advantage**: Docker sandbox isolation, SSRF protection, visual debugging.
+**klyntbot advantage**: Trust-level write guards with user confirmation, token-efficient semantic element refs.
 
 ---
 
@@ -1269,7 +1277,7 @@ impl PlanStatus {
 | **Step-level retry** | ❌ | ✅ (3 attempts per step) |
 | **Backtracking** | ❌ | ✅ (LLM regenerates from failure point) |
 | **Goal linkage** | ❌ | ✅ (GoalRepo + metrics) |
-| **Plan persistence** | ❌ | ✅ (PlanRepo, PostgreSQL) |
+| **Plan persistence** | ❌ | ✅ (PlanRepo, SQLite) |
 | **Natural language management** | ❌ | ✅ (PlanTool via chat) |
 
 **klyntbot decisive advantage**: Planning engine is a major differentiator. No equivalent in openclaw.
@@ -1316,9 +1324,13 @@ impl PlanStatus {
 **Access control**:
 - `Channel::is_allowed(sender_id)` per-channel allowlist
 - Email: IMAP/SMTP credential isolation
+- Browser trust-level guards (Strict/Autonomous/Full)
 
-**Deployment note (from CLAUDE.md)**:
-> "Run behind reverse proxy. No TLS, auth, or rate limiting in-app."
+**Plugin sandboxing**:
+- WASM sandbox via Extism/Wasmtime — plugins cannot access host memory
+- Explicit permission model: `network`, `storage`, `agent`
+- Per-plugin storage isolation (`plugin_{id}_*` table namespace)
+- Permission display at install time before user confirmation
 
 ### Comparison
 
@@ -1327,7 +1339,7 @@ impl PlanStatus {
 | **TLS pinning** | ✅ | ❌ (no TLS server) |
 | **Auth layer** | ✅ (token/OAuth2 gateway) | ❌ (proxy required) |
 | **Rate limiting** | ✅ (session creation) | ❌ |
-| **Sandbox (Docker)** | ✅ (browser + code execution) | ❌ |
+| **Sandbox (Docker)** | ✅ (browser + code execution) | ✅ (WASM sandbox for plugins) |
 | **SSRF protection** | ✅ | ❌ |
 | **Secret redaction** | Manual | ✅ (Secret<String>) |
 | **Sender allowlist** | ✅ (full pairing system) | Basic (`is_allowed()`) |
@@ -1388,11 +1400,11 @@ cargo build --release  # ~50MB stripped binary
 ./klyntbot serve       # Start gateway + channels
 ./klyntbot chat        # Interactive REPL
 ./klyntbot status      # Health check
+./klyntbot plugin      # Install/list/remove WASM plugins
 ```
 
 **External dependencies**:
-- PostgreSQL 13+ with pgvector extension
-- `CREATE EXTENSION vector;` once per database
+- None. SQLite + LanceDB are embedded. Data stored at `~/.klyntbot/`.
 
 **No daemon management**: Must use external supervisor (systemd, launchd, Docker, pm2) for auto-restart.
 
@@ -1408,13 +1420,13 @@ cargo build --release  # ~50MB stripped binary
 | **Mobile apps** | ✅ iOS + Android + macOS | ❌ |
 | **Cold start** | ~2-5s | ~200ms |
 | **Runtime requirement** | Node.js 22+ | None (binary) |
-| **Database requirement** | SQLite (bundled) | PostgreSQL + pgvector |
+| **Database requirement** | SQLite (bundled) | None (SQLite + LanceDB embedded) |
 | **Memory footprint** | ~150-300MB | ~50-150MB |
 | **ARM/edge support** | Partial (Node.js ARM) | ✅ (cross-compile via Cargo) |
 | **Auto-update** | npm / macOS app | Manual binary replacement |
 
 **openclaw advantage**: OS daemon management, mobile apps, npm ecosystem distribution, auto-restart.
-**klyntbot advantage**: Single binary (no runtime), lower memory, faster startup, true cross-compilation.
+**klyntbot advantage**: Single binary (no runtime), zero infrastructure (no DB server), lower memory, faster startup, true cross-compilation.
 
 ---
 
@@ -1456,7 +1468,7 @@ DB tests:      DATABASE_URL=postgres://localhost/klyntbot_test
 
 **Mock provider**: `tests/mock_provider.rs` (shared mock `LlmProvider` across all integration tests)
 
-**Database requirement**: Integration tests require real PostgreSQL + pgvector.
+**No database requirement**: All tests use ephemeral SQLite (`StoragePool::connect_in_memory()`).
 
 ### Comparison
 
@@ -1469,148 +1481,68 @@ DB tests:      DATABASE_URL=postgres://localhost/klyntbot_test
 | **Mock LLM provider** | ✅ | ✅ (mock_provider.rs) |
 | **Zero-warning linting** | ✅ (TypeScript strict) | ✅ (clippy zero warnings) |
 | **Doctest support** | ❌ (no doctests in TS) | ✅ (cargo test --doc) |
-| **DB requirement for tests** | ❌ (SQLite in-memory) | ✅ (PostgreSQL required) |
+| **DB requirement for tests** | ❌ (SQLite in-memory) | ❌ (SQLite in-memory) |
 
 **openclaw advantage**: Docker-based E2E tests, coverage threshold enforcement, no external DB for unit tests.
 **klyntbot advantage**: Doctests, nextest filtering, compile-time correctness (fewer runtime surprises).
 
 ---
 
-## 22. Maturity Assessment
+## 22. Remaining Gap Analysis
 
-### openclaw — Strengths
+All four original klyntbot gaps have been closed: plugin system (WASM/Extism), browser automation (agent-browser), storage infrastructure (SQLite+LanceDB), and learning loop + sub-agents (strategy persistence, 4 profiles, satisfaction feedback).
 
-1. **Ecosystem completeness**: Browser control, mobile apps, canvas, 40+ plugins, 54+ skills, 8+ channels
-2. **Plugin SDK maturity**: 24 lifecycle hooks, npm-publishable, jiti TypeScript loading
-3. **Security model**: TLS pinning, Docker sandboxing, SSRF protection, rate limiting
-4. **Multi-platform deployment**: launchd/systemd/schtasks, iOS, Android, macOS menubar
-5. **Channel richness**: Pairing system, per-channel capability matrix, rich markdown rendering
-6. **Community-ready**: npm ecosystem, plugin discovery, extension marketplace potential
-7. **Test infrastructure**: Docker E2E, 70% coverage threshold, live API tests
+### What klyntbot still needs
 
-### openclaw — Gaps
+| Gap | Priority | Notes |
+|-----|----------|-------|
+| **Media understanding (vision/audio)** | High | No vision model integration, no audio transcription |
+| **More channels (iMessage, Signal, LINE, IRC)** | High | 6 vs 8+ channels |
+| **Pairing / sender approval system** | High | Simple allowlist only, no approval codes |
+| **Generative UI (Canvas)** | Medium | Text-only output |
+| **OS daemon management (launchd/systemd)** | Medium | Must use external supervisor |
+| **Mobile apps (iOS/Android)** | Medium | No native clients |
+| **Docker sandbox for browser** | Medium | Browser runs with user permissions (no SSRF protection) |
+| **Plugin lifecycle hooks** | Low | WASM plugins can add tools + cron, but no 24-hook interception |
+| **Plugin-added channels/providers** | Low | Plugins limited to tools; channels/providers require source |
+| **Coverage threshold enforcement** | Low | CI config change |
 
-1. **No planning engine**: No multi-step plan management or goal tracking
-2. **No task management**: No todo/project system native to the agent
-3. **No CalDAV / calendar integration**: No calendar sync
-4. **Storage fragility at scale**: SQLite limits; JSONL sessions not queryable
-5. **No adaptive orchestration**: Single agent loop, no strategy routing
-6. **External agent core dependency**: `@mariozechner/pi-*` is an external dependency — potential maintenance risk
-7. **No prompt caching optimisation**: No token cost optimisation beyond model-level fields
-8. **No finance / domain tools**: No built-in domain-specific tooling beyond basics
+### What openclaw still needs
 
-### klyntbot — Strengths
-
-1. **Orchestration sophistication**: Adaptive two-stage routing, 4 execution engines, learning feedback
-2. **Planning engine**: Full 6-state lifecycle, step retry, backtracking, goal linkage
-3. **Storage richness**: 17 PostgreSQL repos, pgvector ANN, RRF hybrid search
-4. **Domain depth**: Todos, projects, goals, plans, finance, calendar, enrichment — all first-class
-5. **Rust safety**: Memory safety, zero-cost abstractions, single binary, no GC pauses
-6. **Provider breadth**: 10+ providers including Asian market (DeepSeek, Zhipu, Qwen)
-7. **Dependency inversion**: Clean layer boundaries enforced by Cargo workspace
-8. **CalDAV calendar**: Apple Calendar + Google Calendar sync, reminder engine
-
-### klyntbot — Gaps
-
-1. **No browser automation**: Can't control browsers, no web scraping beyond basic fetch
-2. **No media understanding**: No vision, no audio transcription
-3. **No plugin system**: Extensions require source modification and recompilation
-4. **Fewer channels**: 6 vs 8+ (missing iMessage, Signal, IRC, LINE, Google Chat)
-5. **No mobile apps**: No iOS, Android, or macOS native client
-6. **No generative UI**: Text-only output, no canvas
-7. **No OS daemon management**: Must use external supervisor for auto-restart
-8. **No pairing system**: Simple allowlist only, no 8-char approval codes
-9. **PostgreSQL dependency**: Harder to get started than SQLite-backed systems
-10. **No community extension model**: Ecosystem growth requires project contribution
+| Gap | Priority | Notes |
+|-----|----------|-------|
+| **Multi-step planning engine** | High | No plan management or goal tracking |
+| **Task/todo management** | High | No native todo/project system |
+| **Adaptive orchestration** | Medium | Single agent loop, no strategy routing or learning feedback |
+| **CalDAV calendar integration** | Medium | No calendar sync |
+| **Finance domain tools** | Low | No built-in domain tooling |
 
 ---
 
-## 23. Strategic Gap Analysis
-
-### What openclaw needs from klyntbot's playbook
-
-| Gap | Priority | Estimated Effort |
-|-----|----------|-----------------|
-| **Multi-step planning engine** | High | Large (planning state machine + executor + backtracking) |
-| **Task/todo management** | High | Medium (CRUD tool + storage) |
-| **Goal tracking** | Medium | Medium |
-| **Adaptive orchestration** | Medium | Large (two-stage classifier + engine dispatch) |
-| **CalDAV calendar integration** | Medium | Medium |
-| **Native token cost optimisation (per strategy)** | Low | Small |
-| **Finance domain tools** | Low | Medium |
-
-### What klyntbot needs from openclaw's playbook
-
-| Gap | Priority | Estimated Effort |
-|-----|----------|-----------------|
-| **Plugin SDK (npm-loadable)** | Critical | Very Large (foundational architecture change) |
-| **Browser automation (Playwright)** | High | Large (entire browser module + Docker sandbox) |
-| **Media understanding (vision/audio)** | High | Medium (provider abstraction + preprocessing) |
-| **Pairing / sender approval system** | High | Medium |
-| **More channels (iMessage, Signal, LINE, IRC)** | High | Medium per channel |
-| **OS daemon management (launchd/systemd)** | Medium | Medium |
-| **Generative UI (Canvas)** | Medium | Large |
-| **Mobile apps (iOS/Android)** | Medium | Very Large |
-| **Coverage threshold enforcement** | Low | Small (CI config) |
-| **Docker E2E tests** | Low | Medium |
-
-### Synthesis: Which framework is right for which use case?
-
-**Choose openclaw when**:
-- You need browser automation (web scraping, UI testing, form filling via AI)
-- You want a community plugin ecosystem (publish/consume npm extensions)
-- You need mobile app access to the agent
-- You want OS-native daemon management (auto-start, auto-restart)
-- Multi-channel breadth is critical (iMessage, Signal, LINE)
-- You want canvas/generative UI for rich outputs
-- Security and sandboxing are paramount (multi-user / public-facing)
-
-**Choose klyntbot when**:
-- You need multi-step autonomous planning with backtracking
-- You want deep task/project/goal management integrated into the agent
-- You need CalDAV calendar sync (Apple Calendar, Google Calendar)
-- You want a single binary with minimal external dependencies
-- You need adaptive query routing without manual configuration
-- You work with Chinese LLM providers (DeepSeek, Qwen, Zhipu, Moonshot)
-- You want Rust-level safety, performance, and memory efficiency
-- You need rich semantic search over tasks/memory (pgvector ANN + RRF)
-
----
-
-## 24. Summary Scorecard
+## 23. Summary Scorecard
 
 | Category | openclaw | klyntbot | Winner |
 |----------|----------|----------|--------|
-| **Language & Runtime** | TypeScript/Node | Rust/Binary | Tie (different goals) |
-| **Agent orchestration** | Single loop | Adaptive 4-engine | klyntbot ✅ |
+| **Language & Runtime** | TypeScript/Node | Rust/Binary | Tie |
+| **Agent orchestration** | Single loop | Adaptive 4-engine + learning loop | klyntbot ✅✅ |
 | **Planning engine** | ❌ | Full lifecycle | klyntbot ✅✅ |
-| **Task/goal management** | ❌ | Rich (17 repos) | klyntbot ✅✅ |
+| **Task/goal management** | ❌ | Rich (24 repos) | klyntbot ✅✅ |
 | **Channel count** | 8+ | 6 | openclaw ✅ |
 | **Channel richness** | Full capability matrix | Simple trait | openclaw ✅ |
-| **Memory storage** | SQLite + JSONL | PostgreSQL + pgvector | Tie (tradeoffs) |
+| **Storage** | SQLite + JSONL | SQLite + LanceDB | Tie |
 | **Embedding providers** | 6 (cloud+local) | 1 (local only) | openclaw ✅ |
 | **LLM provider breadth** | 6 | 10+ | klyntbot ✅ |
-| **Plugin ecosystem** | Rich SDK (24 hooks, npm) | None | openclaw ✅✅ |
-| **Skills library** | 54+ | 10 | openclaw ✅ |
-| **Browser automation** | Full Playwright | ❌ | openclaw ✅✅ |
+| **Plugin system** | npm SDK (24 hooks) | WASM sandbox (multi-lang) | Tie (different strengths) |
+| **Browser automation** | Playwright + Docker sandbox | agent-browser + trust guards | Tie (different strengths) |
 | **Media understanding** | Multi-provider | ❌ | openclaw ✅✅ |
 | **Generative UI** | Canvas host | ❌ | openclaw ✅ |
 | **Calendar integration** | ❌ | CalDAV full | klyntbot ✅ |
-| **Security model** | Comprehensive | Minimal (proxy required) | openclaw ✅✅ |
-| **Deployment** | Node + daemon mgmt + mobile | Single binary | Tie (different strengths) |
-| **Docker/sandbox** | Full 3-tier | ❌ | openclaw ✅ |
+| **Security model** | TLS, Docker, SSRF, rate limits | WASM sandbox, trust guards | openclaw ✅ |
+| **Deployment** | Node + daemon mgmt + mobile | Single binary, zero infra | Tie |
 | **Mobile apps** | iOS + Android + macOS | ❌ | openclaw ✅✅ |
-| **Adaptive orchestration** | ❌ | Two-stage + learning | klyntbot ✅ |
-| **Test coverage** | 70% enforced + Docker E2E | nextest + clippy | openclaw ✅ |
-| **Binary footprint** | ~300MB (Node) | ~50MB | klyntbot ✅ |
-| **Startup time** | ~3-5s | ~200ms | klyntbot ✅ |
-| **Memory safety** | V8/GC | Ownership/no GC | klyntbot ✅ |
+| **Adaptive orchestration** | ❌ | Two-stage + active learning + satisfaction | klyntbot ✅✅ |
+| **Hierarchical sub-agents** | Partial (isolated sessions) | 4 profiles + tool restriction | klyntbot ✅ |
+| **Infrastructure requirement** | Node.js 22+ | None | klyntbot ✅ |
+| **Startup / footprint** | ~3-5s / ~300MB | ~200ms / ~50MB | klyntbot ✅ |
 
-**Overall feature breadth**: openclaw leads (browser, mobile, canvas, plugins, media, channels)
-**Overall architectural depth**: klyntbot leads (planning, orchestration, domain models, storage)
-
----
-
-*Analysis generated from full codebase scan: 5 parallel agents, 100+ files read, ~470k tokens analysed.*
-*openclaw commit: main branch @ 2026-02-23*
-*klyntbot commit: main branch (eff12b0) @ 2026-02-23*
+**Overall**: The gap has narrowed significantly. openclaw leads in ecosystem breadth (mobile, canvas, media, channels). klyntbot leads in architectural depth (planning, active learning loop, hierarchical sub-agents, domain models) and operational simplicity (zero infrastructure, single binary, WASM sandboxing). The learning loop closes what was previously a write-only strategy system — klyntbot now persists every strategy outcome, feeds it back to the orchestrator, and incorporates user satisfaction signals from emoji reactions across Telegram, Discord, and Slack.
