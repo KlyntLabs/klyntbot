@@ -24,8 +24,9 @@ impl StrategyRepo {
             "INSERT INTO strategy_records (id, timestamp, request_id, predicted_strategy,
                                            actual_strategy, escalation_count, iterations_used,
                                            max_iterations, success, user_satisfaction,
-                                           response_time_ms, chat_id)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+                                           response_time_ms, chat_id,
+                                           tool_name, tool_success, tool_duration_ms)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
              RETURNING *",
         )
         .bind(row.id)
@@ -40,6 +41,9 @@ impl StrategyRepo {
         .bind(row.user_satisfaction)
         .bind(row.response_time_ms)
         .bind(&row.chat_id)
+        .bind(&row.tool_name)
+        .bind(row.tool_success)
+        .bind(row.tool_duration_ms)
         .fetch_one(&self.pool)
         .await?;
         Ok(result)
@@ -188,6 +192,9 @@ mod tests {
             user_satisfaction: None,
             response_time_ms: 1200,
             chat_id: Some("tg:12345".to_string()),
+            tool_name: None,
+            tool_success: None,
+            tool_duration_ms: None,
         };
 
         let created = repo.create(&row).await.unwrap();
@@ -215,6 +222,9 @@ mod tests {
             user_satisfaction: None,
             response_time_ms: 200,
             chat_id: None,
+            tool_name: None,
+            tool_success: None,
+            tool_duration_ms: None,
         };
 
         let created = repo.create(&row).await.unwrap();
@@ -242,6 +252,9 @@ mod tests {
             user_satisfaction: None,
             response_time_ms: 500,
             chat_id: Some("tg:123".to_string()),
+            tool_name: None,
+            tool_success: None,
+            tool_duration_ms: None,
         };
         repo.create(&row).await.unwrap();
 
@@ -292,6 +305,9 @@ mod tests {
             user_satisfaction: None,
             response_time_ms: 200,
             chat_id: Some("tg:456".to_string()),
+            tool_name: None,
+            tool_success: None,
+            tool_duration_ms: None,
         };
         let newer = StrategyRecordRow {
             id: uuid::Uuid::new_v4(),
@@ -306,6 +322,9 @@ mod tests {
             user_satisfaction: None,
             response_time_ms: 1500,
             chat_id: Some("tg:456".to_string()),
+            tool_name: None,
+            tool_success: None,
+            tool_duration_ms: None,
         };
 
         repo.create(&older).await.unwrap();

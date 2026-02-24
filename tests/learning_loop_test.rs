@@ -27,6 +27,9 @@ async fn test_strategy_record_roundtrip_with_satisfaction() {
         user_satisfaction: None,
         response_time_ms: 1500,
         chat_id: Some("tg:user123".to_string()),
+        tool_name: None,
+        tool_success: None,
+        tool_duration_ms: None,
     };
     repos.strategies.create(&record).await.unwrap();
 
