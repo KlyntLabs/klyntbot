@@ -2,7 +2,6 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::fmt;
 use std::str::FromStr;
 use uuid::Uuid;
@@ -19,12 +18,16 @@ pub struct Goal {
     pub target_date: Option<DateTime<Utc>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
-    /// Progress indicators
-    pub metrics: Vec<Metric>,
+    /// Number of plans that completed successfully for this goal.
+    pub plans_completed: i32,
+    /// Number of plans that failed for this goal.
+    pub plans_failed: i32,
+    /// Rolling average duration of completed plans in milliseconds.
+    pub avg_duration_ms: Option<i64>,
+    /// Timestamp of the most recent plan completion/failure.
+    pub last_plan_at: Option<DateTime<Utc>>,
     /// Projects contributing to this goal
     pub linked_project_ids: Vec<Uuid>,
-    /// Extensible key-value metadata
-    pub metadata: HashMap<String, String>,
 }
 
 /// Current state of a goal.
@@ -118,33 +121,13 @@ impl Goal {
     }
 }
 
-/// A quantifiable progress indicator for a goal.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Metric {
-    pub name: String,
-    pub current: f64,
-    pub target: f64,
-    pub unit: String,
-}
-
-impl Metric {
-    /// Calculate progress as a percentage (0.0-100.0), capped at 100.
-    pub fn progress_percentage(&self) -> f64 {
-        if self.target == 0.0 {
-            return 0.0;
-        }
-        ((self.current / self.target) * 100.0).min(100.0)
-    }
-}
-
 /// Aggregated progress snapshot for a goal.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GoalProgress {
     pub goal_id: Uuid,
     /// Overall completion (0.0-100.0)
     pub completion_percentage: f64,
-    pub metrics: Vec<Metric>,
-    /// Human-readable summary, e.g. "3 of 5 projects completed"
+    /// Human-readable summary, e.g. "3 of 5 plans succeeded"
     pub summary: String,
 }
 
@@ -211,65 +194,17 @@ mod tests {
     }
 
     #[test]
-    fn test_metric_progress_calculation() {
-        let metric = Metric {
-            name: "Tasks completed".to_string(),
-            current: 3.0,
-            target: 10.0,
-            unit: "tasks".to_string(),
-        };
-
-        assert_eq!(metric.name, "Tasks completed");
-        assert_eq!(metric.current, 3.0);
-        assert_eq!(metric.target, 10.0);
-        let progress = metric.progress_percentage();
-        assert!((progress - 30.0).abs() < f64::EPSILON);
-    }
-
-    #[test]
-    fn test_metric_progress_zero_target() {
-        let metric = Metric {
-            name: "Revenue".to_string(),
-            current: 100.0,
-            target: 0.0,
-            unit: "$".to_string(),
-        };
-
-        // Should return 0.0 for zero target to avoid division by zero
-        assert_eq!(metric.progress_percentage(), 0.0);
-    }
-
-    #[test]
-    fn test_metric_progress_capped_at_100() {
-        let metric = Metric {
-            name: "Steps".to_string(),
-            current: 15000.0,
-            target: 10000.0,
-            unit: "steps".to_string(),
-        };
-
-        assert_eq!(metric.progress_percentage(), 100.0);
-    }
-
-    #[test]
     fn test_goal_progress() {
         let goal_id = Uuid::new_v4();
         let progress = GoalProgress {
             goal_id,
             completion_percentage: 45.0,
-            metrics: vec![Metric {
-                name: "Projects done".to_string(),
-                current: 2.0,
-                target: 5.0,
-                unit: "projects".to_string(),
-            }],
-            summary: "2 of 5 projects completed".to_string(),
+            summary: "45% completion rate (9 of 20 plans succeeded)".to_string(),
         };
 
         assert_eq!(progress.goal_id, goal_id);
         assert_eq!(progress.completion_percentage, 45.0);
-        assert_eq!(progress.metrics.len(), 1);
-        assert_eq!(progress.summary, "2 of 5 projects completed");
+        assert!(progress.summary.contains("45%"));
     }
 
     #[test]
@@ -284,14 +219,11 @@ mod tests {
             target_date: None,
             created_at: now,
             updated_at: now,
-            metrics: vec![Metric {
-                name: "Features".to_string(),
-                current: 5.0,
-                target: 10.0,
-                unit: "features".to_string(),
-            }],
+            plans_completed: 3,
+            plans_failed: 1,
+            avg_duration_ms: Some(5000),
+            last_plan_at: Some(now),
             linked_project_ids: vec![Uuid::new_v4()],
-            metadata: HashMap::from([("category".to_string(), "engineering".to_string())]),
         };
 
         let json = serde_json::to_string(&goal).unwrap();
@@ -300,11 +232,10 @@ mod tests {
         assert_eq!(deserialized.id, goal.id);
         assert_eq!(deserialized.title, goal.title);
         assert!(matches!(deserialized.status, GoalStatus::Active));
-        assert_eq!(deserialized.metrics.len(), 1);
+        assert_eq!(deserialized.plans_completed, 3);
+        assert_eq!(deserialized.plans_failed, 1);
+        assert_eq!(deserialized.avg_duration_ms, Some(5000));
+        assert!(deserialized.last_plan_at.is_some());
         assert_eq!(deserialized.linked_project_ids.len(), 1);
-        assert_eq!(
-            deserialized.metadata.get("category").unwrap(),
-            "engineering"
-        );
     }
 }

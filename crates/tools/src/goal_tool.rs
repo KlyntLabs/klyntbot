@@ -5,7 +5,6 @@ use chrono::Utc;
 use common::Result;
 use goal::{Goal, GoalProgress, GoalStatus};
 use serde_json::Value;
-use std::collections::HashMap;
 use std::sync::Arc;
 use uuid::Uuid;
 
@@ -135,9 +134,11 @@ impl Tool for GoalTool {
                     target_date: None,
                     created_at: now,
                     updated_at: now,
-                    metrics: vec![],
+                    plans_completed: 0,
+                    plans_failed: 0,
+                    avg_duration_ms: None,
+                    last_plan_at: None,
                     linked_project_ids: vec![],
-                    metadata: HashMap::new(),
                 };
 
                 goal.validate_priority()?;
@@ -188,8 +189,12 @@ impl Tool for GoalTool {
                 if let Some(target) = goal.target_date {
                     lines.push(format!("Target: {}", target.format("%Y-%m-%d")));
                 }
-                if !goal.metrics.is_empty() {
-                    lines.push(format!("Metrics: {}", goal.metrics.len()));
+                let total_plans = goal.plans_completed + goal.plans_failed;
+                if total_plans > 0 {
+                    lines.push(format!(
+                        "Plans: {} completed, {} failed",
+                        goal.plans_completed, goal.plans_failed
+                    ));
                 }
                 lines.push(format!(
                     "Created: {}",
@@ -242,16 +247,6 @@ impl Tool for GoalTool {
                 )];
                 if !progress.summary.is_empty() {
                     lines.push(format!("Summary: {}", progress.summary));
-                }
-                for m in &progress.metrics {
-                    lines.push(format!(
-                        "  - {}: {}/{} {} ({:.1}%)",
-                        m.name,
-                        m.current,
-                        m.target,
-                        m.unit,
-                        m.progress_percentage(),
-                    ));
                 }
                 Ok(lines.join("\n"))
             }
@@ -335,7 +330,6 @@ mod tests {
             Ok(GoalProgress {
                 goal_id: *id,
                 completion_percentage: 50.0,
-                metrics: vec![],
                 summary: "Half done".to_string(),
             })
         }

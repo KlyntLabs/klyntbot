@@ -5,4 +5,4 @@ pub mod error;
 pub mod types;
 
 pub use error::GoalError;
-pub use types::{Goal, GoalProgress, GoalStatus, Metric};
+pub use types::{Goal, GoalProgress, GoalStatus};

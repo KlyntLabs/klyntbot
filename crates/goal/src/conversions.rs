@@ -3,37 +3,11 @@
 //! Extracted from the removed GoalStore to support direct GoalRepo usage.
 
 use crate::types::{Goal, GoalProgress, GoalStatus};
-use chrono::Utc;
 use std::str::FromStr;
 use uuid::Uuid;
 
 /// Convert a Goal domain type to a GoalRow for SQL persistence.
-///
-/// Note: The domain `Goal` still carries `metrics` and `metadata` fields, but
-/// those are no longer persisted in `GoalRow`. Plan-completion columns are
-/// populated from `metadata` when available, defaulting to zero/None otherwise.
 pub fn goal_to_row(goal: &Goal) -> storage::GoalRow {
-    // Extract plan-completion values from domain metadata when present.
-    let plans_completed: i32 = goal
-        .metadata
-        .get("plans_completed")
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(0);
-    let plans_failed: i32 = goal
-        .metadata
-        .get("plans_failed")
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(0);
-    let avg_duration_ms: Option<i64> = goal
-        .metadata
-        .get("avg_duration_ms")
-        .and_then(|v| v.parse().ok());
-    let last_plan_at = goal
-        .metadata
-        .get("last_plan_at")
-        .and_then(|v| chrono::DateTime::parse_from_rfc3339(v).ok())
-        .map(|dt| dt.with_timezone(&Utc));
-
     storage::GoalRow {
         id: goal.id,
         title: goal.title.clone(),
@@ -43,29 +17,15 @@ pub fn goal_to_row(goal: &Goal) -> storage::GoalRow {
         target_date: goal.target_date,
         created_at: goal.created_at,
         updated_at: goal.updated_at,
-        plans_completed,
-        plans_failed,
-        avg_duration_ms,
-        last_plan_at,
+        plans_completed: goal.plans_completed,
+        plans_failed: goal.plans_failed,
+        avg_duration_ms: goal.avg_duration_ms,
+        last_plan_at: goal.last_plan_at,
     }
 }
 
 /// Convert a GoalRow + linked project IDs back to a Goal domain type.
-///
-/// Plan-completion typed columns are projected back into `metadata` so
-/// that callers (e.g. `PlanCompletionHandlerImpl`) can read them without
-/// changing their API until the domain type is updated (Task 9).
 pub fn row_to_goal(row: storage::GoalRow, linked_project_ids: Vec<Uuid>) -> Goal {
-    let mut metadata = std::collections::HashMap::new();
-    metadata.insert("plans_completed".into(), row.plans_completed.to_string());
-    metadata.insert("plans_failed".into(), row.plans_failed.to_string());
-    if let Some(avg) = row.avg_duration_ms {
-        metadata.insert("avg_duration_ms".into(), avg.to_string());
-    }
-    if let Some(last) = row.last_plan_at {
-        metadata.insert("last_plan_at".into(), last.to_rfc3339());
-    }
-
     Goal {
         id: row.id,
         title: row.title,
@@ -75,35 +35,35 @@ pub fn row_to_goal(row: storage::GoalRow, linked_project_ids: Vec<Uuid>) -> Goal
         target_date: row.target_date,
         created_at: row.created_at,
         updated_at: row.updated_at,
-        metrics: vec![],
+        plans_completed: row.plans_completed,
+        plans_failed: row.plans_failed,
+        avg_duration_ms: row.avg_duration_ms,
+        last_plan_at: row.last_plan_at,
         linked_project_ids,
-        metadata,
     }
 }
 
-/// Compute a GoalProgress from a Goal.
+/// Compute a GoalProgress from a Goal based on plan completion statistics.
 pub fn compute_progress(goal: &Goal) -> GoalProgress {
-    let completion = if goal.metrics.is_empty() {
+    let total = goal.plans_completed + goal.plans_failed;
+    let completion = if total == 0 {
         0.0
     } else {
-        let sum: f64 = goal.metrics.iter().map(|m| m.progress_percentage()).sum();
-        sum / goal.metrics.len() as f64
+        (goal.plans_completed as f64 / total as f64) * 100.0
     };
 
-    let summary = if goal.metrics.is_empty() {
-        "No metrics defined".to_string()
+    let summary = if total == 0 {
+        "No plans executed yet".to_string()
     } else {
         format!(
-            "{:.0}% complete across {} metric(s)",
-            completion,
-            goal.metrics.len()
+            "{:.0}% completion rate ({} of {} plans succeeded)",
+            completion, goal.plans_completed, total
         )
     };
 
     GoalProgress {
         goal_id: goal.id,
         completion_percentage: completion,
-        metrics: goal.metrics.clone(),
         summary,
     }
 }

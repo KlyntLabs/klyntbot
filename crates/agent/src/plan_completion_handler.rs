@@ -1,20 +1,20 @@
 //! PlanCompletionHandlerImpl — records plan outcomes on linked goals.
 //!
 //! When a plan finishes (success or failure) and it has a `goal_id`,
-//! this handler writes structured metadata into the goal so the
-//! LLM and ContextEngine can review what happened.
+//! this handler updates the goal's typed plan-completion columns
+//! (`plans_completed`, `plans_failed`, `avg_duration_ms`, `last_plan_at`)
+//! directly via GoalRepo atomic increment methods.
 //!
 //! Follows the same dependency-inversion pattern as GoalHandlerImpl:
 //! the trait lives in `tools` (Layer 3), the impl lives here (Layer 5).
 
 use async_trait::async_trait;
-use chrono::Utc;
 use common::Result;
-use goal::conversions;
 use tools::plan_tool::PlanCompletionHandler;
+use tracing::warn;
 use uuid::Uuid;
 
-/// Implements PlanCompletionHandler by updating goal metadata in GoalRepo.
+/// Implements PlanCompletionHandler by updating typed goal columns in GoalRepo.
 pub struct PlanCompletionHandlerImpl {
     repo: storage::GoalRepo,
 }
@@ -29,46 +29,28 @@ impl PlanCompletionHandlerImpl {
 impl PlanCompletionHandler for PlanCompletionHandlerImpl {
     async fn on_plan_completed(
         &self,
-        plan_id: &Uuid,
+        _plan_id: &Uuid,
         goal_id: Option<Uuid>,
         success: bool,
-        summary: &str,
+        _summary: &str,
     ) -> Result<()> {
         let Some(gid) = goal_id else {
             // Not linked to a goal — nothing to update.
             return Ok(());
         };
 
-        let Some(mut goal) = conversions::load_goal(&self.repo, &gid).await? else {
-            // Goal was deleted — treat as no-op.
-            return Ok(());
-        };
-
-        let plans_completed: u64 = goal
-            .metadata
-            .get("plans_completed")
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(0);
-
-        let outcome = if success { "completed" } else { "failed" };
-
-        goal.metadata
-            .insert("last_completed_plan_id".into(), plan_id.to_string());
-        goal.metadata
-            .insert("last_plan_outcome".into(), outcome.into());
-        goal.metadata
-            .insert("last_plan_summary".into(), summary.to_string());
-        goal.metadata
-            .insert("last_plan_at".into(), Utc::now().to_rfc3339());
-
         if success {
-            goal.metadata
-                .insert("plans_completed".into(), (plans_completed + 1).to_string());
+            // Use a default duration of 0 when we don't have timing info.
+            // The plan runner will call increment_completed with the real
+            // duration once Task 10 wires up timing — for now, just record
+            // the success count and last_plan_at timestamp.
+            if let Err(e) = self.repo.increment_completed(gid, 0).await {
+                warn!("Failed to increment plans_completed for goal {}: {}", gid, e);
+            }
+        } else if let Err(e) = self.repo.increment_failed(gid).await {
+            warn!("Failed to increment plans_failed for goal {}: {}", gid, e);
         }
 
-        goal.updated_at = Utc::now();
-        let row = conversions::goal_to_row(&goal);
-        let _ = self.repo.update(&row).await;
         Ok(())
     }
 }
