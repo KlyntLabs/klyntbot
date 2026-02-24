@@ -33,6 +33,7 @@ pub struct StrategyRecordRow {
     pub success: bool,
     pub user_satisfaction: Option<f32>,
     pub response_time_ms: i64,
+    pub chat_id: Option<String>,
 }
 
 /// Row struct for the `enrichment_feedback` table.

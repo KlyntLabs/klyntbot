@@ -23,8 +23,9 @@ impl StrategyRepo {
         let result = sqlx::query_as::<_, StrategyRecordRow>(
             "INSERT INTO strategy_records (id, timestamp, request_id, predicted_strategy,
                                            actual_strategy, escalation_count, iterations_used,
-                                           max_iterations, success, user_satisfaction, response_time_ms)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+                                           max_iterations, success, user_satisfaction,
+                                           response_time_ms, chat_id)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
              RETURNING *",
         )
         .bind(row.id)
@@ -38,6 +39,7 @@ impl StrategyRepo {
         .bind(row.success)
         .bind(row.user_satisfaction)
         .bind(row.response_time_ms)
+        .bind(&row.chat_id)
         .fetch_one(&self.pool)
         .await?;
         Ok(result)
@@ -134,5 +136,61 @@ impl StrategyRepo {
         .fetch_all(&self.pool)
         .await?;
         Ok(rows)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_create_strategy_record_with_chat_id() {
+        let pool = crate::StoragePool::connect_in_memory().await.unwrap();
+        let repo = StrategyRepo::new(pool.inner().clone());
+
+        let row = StrategyRecordRow {
+            id: uuid::Uuid::new_v4(),
+            timestamp: chrono::Utc::now(),
+            request_id: "req-1".to_string(),
+            predicted_strategy: "DirectResponse".to_string(),
+            actual_strategy: "ToolAssisted".to_string(),
+            escalation_count: 1,
+            iterations_used: 3,
+            max_iterations: 5,
+            success: true,
+            user_satisfaction: None,
+            response_time_ms: 1200,
+            chat_id: Some("tg:12345".to_string()),
+        };
+
+        let created = repo.create(&row).await.unwrap();
+        assert_eq!(created.chat_id, Some("tg:12345".to_string()));
+
+        let fetched = repo.get(row.id).await.unwrap();
+        assert_eq!(fetched.chat_id, Some("tg:12345".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_create_strategy_record_without_chat_id() {
+        let pool = crate::StoragePool::connect_in_memory().await.unwrap();
+        let repo = StrategyRepo::new(pool.inner().clone());
+
+        let row = StrategyRecordRow {
+            id: uuid::Uuid::new_v4(),
+            timestamp: chrono::Utc::now(),
+            request_id: "req-2".to_string(),
+            predicted_strategy: "DirectResponse".to_string(),
+            actual_strategy: "DirectResponse".to_string(),
+            escalation_count: 0,
+            iterations_used: 1,
+            max_iterations: 1,
+            success: true,
+            user_satisfaction: None,
+            response_time_ms: 200,
+            chat_id: None,
+        };
+
+        let created = repo.create(&row).await.unwrap();
+        assert_eq!(created.chat_id, None);
     }
 }
