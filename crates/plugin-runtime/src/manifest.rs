@@ -203,4 +203,73 @@ mod tests {
         let result = PluginManifest::from_json(json);
         assert!(result.is_err());
     }
+
+    #[test]
+    fn test_from_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("klyntbot.plugin.json");
+        std::fs::write(&path, r#"{
+            "id": "file-test",
+            "name": "File Test",
+            "version": "0.1.0",
+            "description": "Loaded from file",
+            "author": "test"
+        }"#).unwrap();
+
+        let manifest = PluginManifest::from_file(&path).unwrap();
+        assert_eq!(manifest.id, "file-test");
+    }
+
+    #[test]
+    fn test_from_file_missing() {
+        let path = std::path::Path::new("/nonexistent/klyntbot.plugin.json");
+        assert!(PluginManifest::from_file(path).is_err());
+    }
+
+    #[test]
+    fn test_roundtrip_serialize() {
+        let json = r#"{
+            "id": "rt",
+            "name": "Roundtrip",
+            "version": "0.1.0",
+            "description": "Test roundtrip",
+            "author": "test",
+            "permissions": ["network", "agent"]
+        }"#;
+        let manifest = PluginManifest::from_json(json).unwrap();
+        let serialized = serde_json::to_string(&manifest).unwrap();
+        let restored = PluginManifest::from_json(&serialized).unwrap();
+        assert_eq!(manifest.id, restored.id);
+        assert_eq!(manifest.permissions, restored.permissions);
+    }
+
+    #[test]
+    fn test_cron_job_default_description() {
+        let json = r#"{
+            "id": "test",
+            "name": "Test",
+            "version": "0.1.0",
+            "description": "Test",
+            "author": "test",
+            "cron_jobs": [{"tool": "ping", "schedule": "* * * * *"}]
+        }"#;
+        let manifest = PluginManifest::from_json(json).unwrap();
+        assert_eq!(manifest.cron_jobs[0].description, "");
+    }
+
+    #[test]
+    fn test_config_field_defaults() {
+        let json = r#"{
+            "id": "test",
+            "name": "Test",
+            "version": "0.1.0",
+            "description": "Test",
+            "author": "test",
+            "config_schema": {"url": {"type": "string"}}
+        }"#;
+        let manifest = PluginManifest::from_json(json).unwrap();
+        let field = &manifest.config_schema["url"];
+        assert!(!field.secret);
+        assert_eq!(field.description, "");
+    }
 }
