@@ -29,6 +29,8 @@ pub trait GoalHandler: Send + Sync {
     /// Show progress of all plans linked to this goal — plan statuses and step completion.
     /// Returns a graceful message when no plan repository is configured.
     async fn goal_progress(&self, goal_id: &Uuid) -> Result<String>;
+    /// Return plan-completion metrics for a goal: completion rate, avg duration, last activity.
+    async fn goal_metrics(&self, goal_id: &Uuid) -> Result<String>;
 }
 
 /// GoalTool — Tool interface for strategic goal management.
@@ -59,7 +61,7 @@ impl Tool for GoalTool {
     }
 
     fn description(&self) -> &str {
-        "Manage strategic goals that span multiple projects. Actions: create, list, show, update, delete, progress, decompose, status."
+        "Manage strategic goals that span multiple projects. Actions: create, list, show, update, delete, progress, decompose, status, metrics."
     }
 
     fn parameters(&self) -> Value {
@@ -68,7 +70,7 @@ impl Tool for GoalTool {
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": ["create", "list", "show", "update", "delete", "progress", "decompose", "status"],
+                    "enum": ["create", "list", "show", "update", "delete", "progress", "decompose", "status", "metrics"],
                     "description": "The goal action to perform"
                 },
                 "title": {
@@ -263,6 +265,11 @@ impl Tool for GoalTool {
                 Ok(result)
             }
 
+            "metrics" => {
+                let id = parse_goal_id(&args)?;
+                handler.goal_metrics(&id).await
+            }
+
             other => Err(ToolError::InvalidParams(format!("Unknown action: {}", other)).into()),
         }
     }
@@ -340,6 +347,18 @@ mod tests {
 
         async fn goal_progress(&self, _goal_id: &Uuid) -> Result<String> {
             Ok("No plans linked to this goal.".to_string())
+        }
+
+        async fn goal_metrics(&self, goal_id: &Uuid) -> Result<String> {
+            let goals = self.goals.lock().unwrap();
+            let goal = goals
+                .iter()
+                .find(|g| g.id == *goal_id)
+                .ok_or_else(|| ToolError::ExecutionFailed(format!("Goal {} not found", goal_id)))?;
+            Ok(format!(
+                "Goal: \"{}\"\nCompletion rate: No plans executed yet\nAverage plan duration: N/A\nLast activity: Never\nActive plans: 0",
+                goal.title
+            ))
         }
     }
 
@@ -659,5 +678,32 @@ mod tests {
         let action_enum = params["properties"]["action"]["enum"].as_array().unwrap();
         assert!(action_enum.contains(&serde_json::json!("decompose")));
         assert!(action_enum.contains(&serde_json::json!("status")));
+        assert!(action_enum.contains(&serde_json::json!("metrics")));
+    }
+
+    #[tokio::test]
+    async fn test_metrics_action() {
+        use crate::Tool;
+        let (tool, handler) = make_tool();
+        tool.execute(
+            serde_json::json!({"action": "create", "title": "Health Check Goal"}),
+            &ctx(),
+        )
+        .await
+        .unwrap();
+
+        let id = handler.goals.lock().unwrap()[0].id.to_string();
+        let result = tool
+            .execute(
+                serde_json::json!({"action": "metrics", "goal_id": id}),
+                &ctx(),
+            )
+            .await
+            .unwrap();
+        assert!(result.contains("Health Check Goal"));
+        assert!(result.contains("Completion rate"));
+        assert!(result.contains("Average plan duration"));
+        assert!(result.contains("Last activity"));
+        assert!(result.contains("Active plans"));
     }
 }

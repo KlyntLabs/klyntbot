@@ -184,6 +184,54 @@ impl GoalHandler for GoalHandlerImpl {
         ))
     }
 
+    async fn goal_metrics(&self, goal_id: &Uuid) -> Result<String> {
+        let goal = conversions::load_goal(&self.repo, goal_id)
+            .await?
+            .ok_or_else(|| GoalError::NotFound(goal_id.to_string()))?;
+
+        let total = goal.plans_completed + goal.plans_failed;
+        let completion_rate = if total > 0 {
+            format!(
+                "{:.0}% ({} of {} plans)",
+                (goal.plans_completed as f64 / total as f64) * 100.0,
+                goal.plans_completed,
+                total
+            )
+        } else {
+            "No plans executed yet".to_string()
+        };
+
+        let avg_duration = match goal.avg_duration_ms {
+            Some(ms) if ms >= 3_600_000 => format!("{:.1} hours", ms as f64 / 3_600_000.0),
+            Some(ms) if ms >= 60_000 => format!("{:.1} minutes", ms as f64 / 60_000.0),
+            Some(ms) => format!("{} ms", ms),
+            None => "N/A".to_string(),
+        };
+
+        let last_activity = match goal.last_plan_at {
+            Some(dt) => dt.format("%Y-%m-%d %H:%M UTC").to_string(),
+            None => "Never".to_string(),
+        };
+
+        // Count active plans if plan_repo is available
+        let active_plans = if let Some(ref plan_repo) = self.plan_repo {
+            match plan_repo.list(None, None, Some(*goal_id)).await {
+                Ok(plans) => plans
+                    .iter()
+                    .filter(|p| p.status == "Executing" || p.status == "Approved")
+                    .count(),
+                Err(_) => 0,
+            }
+        } else {
+            0
+        };
+
+        Ok(format!(
+            "Goal: \"{}\"\nCompletion rate: {}\nAverage plan duration: {}\nLast activity: {}\nActive plans: {}",
+            goal.title, completion_rate, avg_duration, last_activity, active_plans
+        ))
+    }
+
     async fn goal_progress(&self, goal_id: &Uuid) -> Result<String> {
         let plan_repo = match &self.plan_repo {
             Some(r) => r,
