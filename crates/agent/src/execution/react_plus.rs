@@ -35,6 +35,8 @@ pub enum ReactOutcome {
         traces: Vec<ReasoningTrace>,
         iterations: u32,
         usage: Usage,
+        /// Name of the last tool called (for learning analytics). None if no tools called.
+        last_tool_name: Option<String>,
     },
     /// Complexity exceeds ReAct+ capacity; escalate to autonomous planner.
     EscalateToAutonomous { reason: String, usage: Usage },
@@ -92,6 +94,8 @@ impl ReactPlusEngine {
         // Each entry is a string key: "tool_name|canonical_args_json".
         // Passed into run_cycle so duplicates are blocked BEFORE execution.
         let mut seen_tool_calls: HashSet<String> = HashSet::new();
+        // Track the last tool name for analytics.
+        let mut last_tool_name: Option<String> = None;
 
         for iteration in 1..=self.max_iterations {
             if let Some(ref tx) = event_tx {
@@ -132,6 +136,7 @@ impl ReactPlusEngine {
                         traces: scratchpad.traces().to_vec(),
                         iterations: iteration,
                         usage: accumulated_usage,
+                        last_tool_name: last_tool_name.clone(),
                     });
                 }
 
@@ -152,6 +157,7 @@ impl ReactPlusEngine {
                             traces: scratchpad.traces().to_vec(),
                             iterations: iteration,
                             usage: accumulated_usage,
+                            last_tool_name: last_tool_name.clone(),
                         });
                     }
 
@@ -194,6 +200,10 @@ impl ReactPlusEngine {
                 CycleOutcome::ToolsExecuted { results } => {
                     let tool_names: Vec<String> =
                         results.iter().map(|r| r.tool_name.clone()).collect();
+                    // Capture the last tool name for analytics.
+                    if let Some(name) = tool_names.last() {
+                        last_tool_name = Some(name.clone());
+                    }
                     let had_failure = results.iter().any(|r| !r.success);
                     let failure_details: Vec<String> = results
                         .iter()

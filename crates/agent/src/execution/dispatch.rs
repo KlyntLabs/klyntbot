@@ -29,6 +29,8 @@ pub struct DispatchResult {
     pub usage: Usage,
     /// Number of iterations the execution engine used.
     pub iterations_used: u32,
+    /// Name of the last tool called (for learning analytics). None if no tools called.
+    pub last_tool_name: Option<String>,
 }
 
 /// Dispatches execution to the appropriate engine based on strategy,
@@ -106,6 +108,7 @@ impl EngineDispatch {
                                 escalation_count,
                                 usage: Usage::default(),
                                 iterations_used: 1,
+                                last_tool_name: None,
                             });
                         }
                         DirectOutcome::EscalateToToolAssisted { messages } => {
@@ -116,6 +119,7 @@ impl EngineDispatch {
                                     escalation_count,
                                     usage: Usage::default(),
                                     iterations_used: 0,
+                                    last_tool_name: None,
                                 });
                             }
                             debug!("DirectEngine escalated to ToolAssisted");
@@ -151,6 +155,7 @@ impl EngineDispatch {
                             content,
                             usage,
                             iterations,
+                            last_tool_name,
                             ..
                         } => {
                             return Ok(DispatchResult {
@@ -159,6 +164,7 @@ impl EngineDispatch {
                                 escalation_count,
                                 usage,
                                 iterations_used: iterations,
+                                last_tool_name,
                             });
                         }
                         ReactOutcome::EscalateToAutonomous { reason, usage } => {
@@ -173,6 +179,7 @@ impl EngineDispatch {
                                     escalation_count,
                                     usage,
                                     iterations_used: 0,
+                                    last_tool_name: None,
                                 });
                             }
                             debug!("ReactPlusEngine escalated: {}", reason);
@@ -192,6 +199,7 @@ impl EngineDispatch {
                                 escalation_count,
                                 usage,
                                 iterations_used: max_iter,
+                                last_tool_name: None,
                             });
                         }
                     }
@@ -253,6 +261,7 @@ impl EngineDispatch {
                         escalation_count,
                         usage,
                         iterations_used,
+                        last_tool_name: None,
                     });
                 }
 
@@ -263,6 +272,7 @@ impl EngineDispatch {
                         escalation_count: 0,
                         usage: Usage::default(),
                         iterations_used: 0,
+                        last_tool_name: None,
                     });
                 }
             }
@@ -504,6 +514,7 @@ mod tests {
             escalation_count: 0,
             usage: Usage::default(),
             iterations_used: 1,
+            last_tool_name: None,
         };
         assert_eq!(result.iterations_used, 1);
     }

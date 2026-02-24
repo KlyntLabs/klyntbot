@@ -261,9 +261,15 @@ impl AgentPipeline {
                 user_satisfaction: None,
                 response_time_ms: classify_start.elapsed().as_millis() as i64,
                 chat_id: Some(ctx.chat_id.to_string()),
-                tool_name: None,
-                tool_success: None,
-                tool_duration_ms: None,
+                tool_name: dispatch_result.last_tool_name.clone(),
+                tool_success: dispatch_result
+                    .last_tool_name
+                    .as_ref()
+                    .map(|_| validation.is_valid),
+                tool_duration_ms: dispatch_result
+                    .last_tool_name
+                    .as_ref()
+                    .map(|_| classify_start.elapsed().as_millis() as i64),
             };
             if let Err(e) = strategy_repo.create(&record).await {
                 warn!("Pipeline: failed to record strategy: {}", e);

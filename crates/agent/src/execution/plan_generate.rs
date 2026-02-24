@@ -123,6 +123,7 @@ impl PlanGenerateEngine {
             escalation_count: 0,
             usage: Usage::default(),
             iterations_used: 1,
+            last_tool_name: None,
         })
     }
 
@@ -239,6 +240,7 @@ impl PlanGenerateEngine {
             escalation_count: 0,
             usage,
             iterations_used,
+            last_tool_name: None,
         })
     }
 }
