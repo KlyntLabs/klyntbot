@@ -16,7 +16,7 @@ use tracing::{debug, error, info, warn};
 
 use crate::formatter::ChannelFormatter;
 use crate::{check_allowlist, Channel};
-use bus::{InboundMessage, MessageBus, OutboundMessage};
+use bus::{InboundMessage, MessageBus, MessageKind, OutboundMessage};
 use common::{ChannelError, Result};
 use config::schema::TelegramConfig;
 use providers::TranscriptionProvider;
@@ -142,7 +142,7 @@ impl TelegramChannel {
             let params = json!({
                 "offset": offset,
                 "timeout": 30,
-                "allowed_updates": ["message"]
+                "allowed_updates": ["message", "message_reaction"]
             });
 
             match self.api_call("getUpdates", params).await {
@@ -172,8 +172,74 @@ impl TelegramChannel {
         Ok(())
     }
 
+    /// Handle a reaction update (message_reaction field in the update)
+    async fn handle_reaction_update(&self, reaction: &Value, bus: &MessageBus) -> Result<()> {
+        // Extract user info — Telegram sends "user" or "actor_chat" for reaction updates
+        let user_id = reaction
+            .get("user")
+            .and_then(|u| u.get("id"))
+            .and_then(|v| v.as_i64())
+            .map(|id| id.to_string())
+            .unwrap_or_default();
+
+        if user_id.is_empty() {
+            debug!("Reaction update missing user ID, skipping");
+            return Ok(());
+        }
+
+        // Check allowlist
+        if !check_allowlist(&self.config.allow_from, &user_id) {
+            warn!("Access denied for sender {} on Telegram reaction", user_id);
+            return Ok(());
+        }
+
+        let chat_id = reaction
+            .get("chat")
+            .and_then(|c| c.get("id"))
+            .and_then(|v| v.as_i64())
+            .ok_or_else(|| {
+                ChannelError::InvalidConfig("Reaction update missing chat.id".to_string())
+            })?;
+
+        // Extract emoji from new_reaction array
+        // Telegram sends: "new_reaction": [{"type": "emoji", "emoji": "👍"}]
+        let emoji = reaction
+            .get("new_reaction")
+            .and_then(|v| v.as_array())
+            .and_then(|arr| arr.first())
+            .and_then(|r| r.get("emoji"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+
+        if emoji.is_empty() {
+            // Reaction was removed (new_reaction is empty), ignore
+            debug!("Telegram reaction removed (empty new_reaction), skipping");
+            return Ok(());
+        }
+
+        debug!(
+            "Telegram reaction from {}: {} in chat {}",
+            user_id, emoji, chat_id
+        );
+
+        let inbound = InboundMessage::new("telegram", &user_id, chat_id.to_string(), &emoji)
+            .with_kind(MessageKind::Reaction);
+
+        bus.publish_inbound(inbound)
+            .await
+            .map_err(|e| ChannelError::SendFailed(format!("Failed to publish to bus: {}", e)))?;
+
+        Ok(())
+    }
+
     /// Handle a single update
     async fn handle_update(&self, update: &Value, bus: &MessageBus) -> Result<()> {
+        // Handle reaction updates
+        if let Some(reaction) = update.get("message_reaction") {
+            return self.handle_reaction_update(reaction, bus).await;
+        }
+
         let message = match update.get("message") {
             Some(m) => m,
             None => return Ok(()), // Not a message update

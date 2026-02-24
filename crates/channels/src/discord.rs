@@ -17,7 +17,7 @@ use tracing::{debug, error, info, warn};
 
 use crate::ws_manager::{HeartbeatStrategy, WebSocketManager, WsConfig, WsHandler, WsSink};
 use crate::{check_allowlist, Channel};
-use bus::{InboundMessage, MessageBus, OutboundMessage};
+use bus::{InboundMessage, MessageBus, MessageKind, OutboundMessage};
 use common::{ChannelError, Result};
 use config::DiscordConfig;
 
@@ -331,6 +331,78 @@ impl DiscordChannel {
         Ok(())
     }
 
+    /// Handle MESSAGE_REACTION_ADD event
+    async fn handle_reaction_add(&self, payload: &Value, bus: &MessageBus) -> Result<()> {
+        // Ignore reactions from bots (no user_id means system/bot)
+        let user_id = payload
+            .get("user_id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+
+        if user_id.is_empty() {
+            return Ok(());
+        }
+
+        // Check allowlist
+        if !check_allowlist(&self.config.allow_from, user_id) {
+            warn!("Access denied for sender {} on Discord reaction", user_id);
+            return Ok(());
+        }
+
+        let channel_id = payload
+            .get("channel_id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+
+        if channel_id.is_empty() {
+            return Ok(());
+        }
+
+        // Extract emoji — Discord sends { "emoji": { "name": "🔥", "id": null } }
+        // For custom emoji: { "emoji": { "name": "custom_name", "id": "123456" } }
+        let emoji = payload
+            .get("emoji")
+            .map(|e| {
+                let name = e.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                let id = e.get("id").and_then(|v| v.as_str());
+                if let Some(emoji_id) = id {
+                    // Custom emoji: use <:name:id> format
+                    format!("<:{}:{}>", name, emoji_id)
+                } else {
+                    // Unicode emoji
+                    name.to_string()
+                }
+            })
+            .unwrap_or_default();
+
+        if emoji.is_empty() {
+            return Ok(());
+        }
+
+        debug!(
+            "Discord reaction from {}: {} in channel {}",
+            user_id, emoji, channel_id
+        );
+
+        let mut metadata = HashMap::with_capacity(2);
+        if let Some(msg_id) = payload.get("message_id").and_then(|v| v.as_str()) {
+            metadata.insert("message_id".to_string(), json!(msg_id));
+        }
+        if let Some(guild_id) = payload.get("guild_id") {
+            metadata.insert("guild_id".to_string(), guild_id.clone());
+        }
+
+        let mut inbound = InboundMessage::new("discord", user_id, channel_id, &emoji)
+            .with_kind(MessageKind::Reaction);
+        inbound.metadata = metadata;
+
+        bus.publish_inbound(inbound)
+            .await
+            .map_err(|e| ChannelError::SendFailed(format!("Failed to publish to bus: {}", e)))?;
+
+        Ok(())
+    }
+
     /// Send a message via REST API
     async fn send_message_rest(
         &self,
@@ -462,6 +534,16 @@ impl WsHandler for DiscordChannel {
                             if let Some(bus) = bus_guard.as_ref() {
                                 if let Err(e) = self.handle_message_create(p, bus).await {
                                     error!("Error handling MESSAGE_CREATE: {}", e);
+                                }
+                            }
+                        }
+                    }
+                    Some("MESSAGE_REACTION_ADD") => {
+                        if let Some(p) = payload {
+                            let bus_guard = self.bus.lock().await;
+                            if let Some(bus) = bus_guard.as_ref() {
+                                if let Err(e) = self.handle_reaction_add(p, bus).await {
+                                    error!("Error handling MESSAGE_REACTION_ADD: {}", e);
                                 }
                             }
                         }
@@ -624,7 +706,7 @@ mod tests {
             config.gateway_url,
             "wss://gateway.discord.gg/?v=10&encoding=json"
         );
-        assert_eq!(config.intents, 37377);
+        assert_eq!(config.intents, 46593);
     }
 
     #[test]

@@ -15,7 +15,7 @@ use tracing::{debug, info, warn};
 
 use crate::ws_manager::{HeartbeatStrategy, WebSocketManager, WsConfig, WsHandler, WsSink};
 use crate::{check_allowlist, Channel};
-use bus::{InboundMessage, MessageBus, OutboundMessage};
+use bus::{InboundMessage, MessageBus, MessageKind, OutboundMessage};
 use common::{ChannelError, Result};
 use config::SlackConfig;
 
@@ -176,6 +176,11 @@ impl SlackChannel {
         let event_type = event.get("type").and_then(|v| v.as_str()).unwrap_or("");
         let subtype = event.get("subtype").and_then(|v| v.as_str());
 
+        // Handle reaction_added events
+        if event_type == "reaction_added" {
+            return self.handle_reaction_added(event, bus).await;
+        }
+
         // Only handle message and app_mention events
         if event_type != "message" && event_type != "app_mention" {
             return Ok(());
@@ -282,6 +287,69 @@ impl SlackChannel {
         Ok(())
     }
 
+    /// Handle a reaction_added event from Slack
+    async fn handle_reaction_added(&self, event: &Value, bus: &MessageBus) -> Result<()> {
+        let sender_id = event.get("user").and_then(|v| v.as_str()).unwrap_or("");
+
+        if sender_id.is_empty() {
+            return Ok(());
+        }
+
+        // Ignore self reactions
+        let bot_id = self.bot_user_id.read().await;
+        if let Some(bot_user_id) = bot_id.as_ref() {
+            if sender_id == bot_user_id {
+                return Ok(());
+            }
+        }
+
+        // Check allowlist
+        if !check_allowlist(&self.config.allow_from, sender_id) {
+            warn!(
+                "Access denied for sender {} on Slack reaction",
+                sender_id
+            );
+            return Ok(());
+        }
+
+        // Extract channel from item (reaction_added has item.channel, not top-level channel)
+        let chat_id = event
+            .get("item")
+            .and_then(|item| item.get("channel"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+
+        if chat_id.is_empty() {
+            return Ok(());
+        }
+
+        // Extract reaction name and convert to emoji
+        let reaction_name = event
+            .get("reaction")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+
+        if reaction_name.is_empty() {
+            return Ok(());
+        }
+
+        let emoji = slack_reaction_to_unicode(reaction_name);
+
+        debug!(
+            "Slack reaction from {}: {} ({}) in channel {}",
+            sender_id, emoji, reaction_name, chat_id
+        );
+
+        let inbound = InboundMessage::new("slack", sender_id, chat_id, &emoji)
+            .with_kind(MessageKind::Reaction);
+
+        bus.publish_inbound(inbound)
+            .await
+            .map_err(|e| ChannelError::SendFailed(format!("Failed to publish to bus: {}", e)))?;
+
+        Ok(())
+    }
+
     /// Add a reaction to a message
     async fn add_reaction(&self, channel: &str, timestamp: &str, name: &str) -> Result<()> {
         let url = format!("{}/reactions.add", SLACK_API_BASE);
@@ -336,6 +404,32 @@ impl SlackChannel {
         }
 
         Ok(())
+    }
+}
+
+/// Convert a Slack reaction shortcode to its Unicode emoji representation.
+/// Falls back to `:name:` format for unknown reactions.
+fn slack_reaction_to_unicode(name: &str) -> String {
+    match name {
+        "thumbsup" | "+1" => "\u{1F44D}".to_string(),
+        "thumbsdown" | "-1" => "\u{1F44E}".to_string(),
+        "heart" => "\u{2764}\u{FE0F}".to_string(),
+        "tada" => "\u{1F389}".to_string(),
+        "confused" => "\u{1F615}".to_string(),
+        "eyes" => "\u{1F440}".to_string(),
+        "fire" => "\u{1F525}".to_string(),
+        "rocket" => "\u{1F680}".to_string(),
+        "white_check_mark" => "\u{2705}".to_string(),
+        "x" => "\u{274C}".to_string(),
+        "wave" => "\u{1F44B}".to_string(),
+        "clap" => "\u{1F44F}".to_string(),
+        "100" => "\u{1F4AF}".to_string(),
+        "raised_hands" => "\u{1F64C}".to_string(),
+        "thinking_face" => "\u{1F914}".to_string(),
+        "laughing" | "satisfied" => "\u{1F606}".to_string(),
+        "cry" => "\u{1F622}".to_string(),
+        "pray" => "\u{1F64F}".to_string(),
+        other => format!(":{}:", other),
     }
 }
 

@@ -91,7 +91,9 @@ fn default_discord_gateway_url() -> String {
 }
 
 fn default_discord_intents() -> u32 {
-    37377 // GUILD_MESSAGES | DIRECT_MESSAGES | MESSAGE_CONTENT
+    // GUILD_MESSAGES (1<<9) | GUILD_MESSAGE_REACTIONS (1<<10) | DIRECT_MESSAGES (1<<12)
+    // | DIRECT_MESSAGE_REACTIONS (1<<13) | MESSAGE_CONTENT (1<<15)
+    46593
 }
 
 /// WhatsApp channel configuration
