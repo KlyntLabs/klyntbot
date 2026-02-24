@@ -13,6 +13,7 @@ use super::finance::FinanceConfig;
 use super::gateway::GatewayConfig;
 use super::learning::LearningConfig;
 use super::packs::PacksConfig;
+use super::plugins::PluginsConfig;
 use super::project::ProjectConfig;
 use super::providers::{ProviderManagerConfig, ProvidersConfig};
 use super::todo::TodoConfig;
@@ -127,6 +128,10 @@ pub struct Config {
     /// Feature packs (controls which skills and config sections are active).
     #[serde(default)]
     pub packs: PacksConfig,
+
+    /// Plugin system configuration.
+    #[serde(default)]
+    pub plugins: PluginsConfig,
 }
 
 impl Config {
