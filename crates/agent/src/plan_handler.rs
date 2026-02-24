@@ -216,4 +216,22 @@ impl PlanHandler for PlanHandlerImpl {
         conversions::save_plan(&self.repo, &plan).await?;
         Ok(())
     }
+
+    async fn preview_steps(&self, description: &str) -> Result<Vec<String>> {
+        let provider = match &self.provider {
+            Some(p) => p,
+            None => return Ok(Vec::new()),
+        };
+        let model = self.model.as_deref().unwrap_or("gpt-4o-mini");
+
+        let drafts = match generate_plan_steps(provider, model, description, &[], &[]).await {
+            Ok(d) => d,
+            Err(e) => {
+                warn!("preview_steps: LLM call failed: {}", e);
+                return Ok(Vec::new());
+            }
+        };
+
+        Ok(drafts.iter().map(|d| d.description.clone()).collect())
+    }
 }

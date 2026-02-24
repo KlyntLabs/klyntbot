@@ -54,6 +54,80 @@ pub trait PlanHandler: Send + Sync {
     /// not steps were generated — callers must not treat an empty result as an
     /// error.
     async fn generate_steps(&self, plan_id: &Uuid) -> Result<()>;
+    /// Generate plan steps as a preview without persisting.
+    /// Returns a list of step descriptions for user review.
+    async fn preview_steps(&self, description: &str) -> Result<Vec<String>>;
+}
+
+/// Result of asking the user to approve a plan.
+enum PlanApproval {
+    Approved,
+    Abandoned,
+    /// No interaction channel — fall back to conversational approval.
+    NoInteraction,
+}
+
+/// Ask the user to approve a plan preview via the interaction channel.
+async fn ask_plan_approval(ctx: &RoutingContext, preview: &str) -> PlanApproval {
+    use common::{
+        AnswerOption, AnswerType, AnswerValue, FormResponse, InteractionRequest, Question,
+    };
+
+    let interaction_tx = match &ctx.interaction_tx {
+        Some(tx) => tx,
+        None => return PlanApproval::NoInteraction,
+    };
+
+    let request = InteractionRequest {
+        title: "Plan Review".to_string(),
+        questions: vec![Question {
+            id: "approval".to_string(),
+            title: "Plan".to_string(),
+            text: format!("{}\n\nDo you want to create this plan?", preview),
+            answer_type: AnswerType::SingleSelect {
+                options: vec![
+                    AnswerOption {
+                        value: "approve".to_string(),
+                        label: "Approve".to_string(),
+                        description: Some("Save and create this plan".to_string()),
+                    },
+                    AnswerOption {
+                        value: "abandon".to_string(),
+                        label: "Abandon".to_string(),
+                        description: Some("Discard — nothing saved".to_string()),
+                    },
+                ],
+            },
+        }],
+    };
+
+    let (response_tx, response_rx) = tokio::sync::oneshot::channel();
+
+    if interaction_tx
+        .send(crate::InteractionBundle {
+            request,
+            response_tx,
+        })
+        .await
+        .is_err()
+    {
+        return PlanApproval::NoInteraction;
+    }
+
+    match response_rx.await {
+        Ok(FormResponse::Completed(answers)) => {
+            if let Some(answer) = answers.first() {
+                match &answer.value {
+                    AnswerValue::Selected { value } if value == "approve" => PlanApproval::Approved,
+                    _ => PlanApproval::Abandoned,
+                }
+            } else {
+                PlanApproval::Abandoned
+            }
+        }
+        Ok(FormResponse::Cancelled) => PlanApproval::Abandoned,
+        Err(_) => PlanApproval::NoInteraction,
+    }
 }
 
 /// PlanTool — Tool interface for multi-step plan management.
@@ -145,17 +219,51 @@ impl Tool for PlanTool {
                     .and_then(|v| v.as_str())
                     .unwrap_or(&default_session_key);
 
-                let plan = handler
-                    .create_plan(title, description, session_key, goal_id)
-                    .await?;
+                // Preview steps via LLM (without persisting)
+                let steps = handler.preview_steps(description).await?;
 
-                // Auto-generate steps from description (best-effort; ignore errors)
-                let _ = handler.generate_steps(&plan.id).await;
+                // Format preview for user
+                let mut preview = format!("**Plan: {}**\n", title);
+                if !description.is_empty() {
+                    preview.push_str(&format!("Description: {}\n", description));
+                }
+                if steps.is_empty() {
+                    preview.push_str("\n(No steps generated — try a more specific description)\n");
+                } else {
+                    preview.push_str(&format!("\n**Steps ({}):**\n", steps.len()));
+                    for (i, step) in steps.iter().enumerate() {
+                        preview.push_str(&format!("{}. {}\n", i + 1, step));
+                    }
+                }
 
-                Ok(format!(
-                    "Created plan '{}' (id: {}, status: {:?})",
-                    plan.title, plan.id, plan.status
-                ))
+                // Ask user for approval via interaction channel (or fallback to text)
+                let approval_result = ask_plan_approval(ctx, &preview).await;
+
+                match approval_result {
+                    PlanApproval::Approved => {
+                        let plan = handler
+                            .create_plan(title, description, session_key, goal_id)
+                            .await?;
+                        // Generate and save steps
+                        let _ = handler.generate_steps(&plan.id).await;
+                        Ok(format!(
+                            "Created plan '{}' (id: {}, status: {:?})",
+                            plan.title, plan.id, plan.status
+                        ))
+                    }
+                    PlanApproval::Abandoned => {
+                        Ok("Plan abandoned — nothing was saved.".to_string())
+                    }
+                    PlanApproval::NoInteraction => {
+                        // Non-TTY: present preview and instruct LLM to ask conversationally
+                        Ok(format!(
+                            "{}\n\nPlease ask the user if they want to approve this plan, \
+                             revise the description, or abandon it. Do NOT save the plan until \
+                             the user explicitly approves.",
+                            preview
+                        ))
+                    }
+                }
             }
 
             "show" => {
