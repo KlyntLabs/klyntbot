@@ -823,6 +823,7 @@ impl AgentLoopBuilder {
             learning_service,
             plan_completion_handler,
             pipeline,
+            strategy_repo: Some(repos.strategies.clone()),
             history_limit,
             _session_cleanup_token: session_cleanup_token,
             _memory_maintenance_token: memory_maintenance_token,

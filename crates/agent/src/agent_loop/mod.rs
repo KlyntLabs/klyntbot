@@ -81,6 +81,8 @@ pub struct AgentLoop {
     pub(crate) plan_completion_handler: Option<Arc<dyn PlanCompletionHandler>>,
     /// Adaptive orchestrator pipeline: classify → assemble → dispatch → validate → record.
     pub(crate) pipeline: Arc<crate::pipeline::AgentPipeline>,
+    /// Strategy repo for updating satisfaction scores from reactions.
+    pub(crate) strategy_repo: Option<storage::StrategyRepo>,
     /// Maximum number of history messages to load per request.
     pub(crate) history_limit: usize,
     /// Cancellation token for the session cleanup background service.
@@ -95,6 +97,44 @@ impl AgentLoop {
     /// This determines the iteration limit: 50 for plans, 20 for chat.
     pub fn is_plan_executing(&self) -> bool {
         self.plan_executing.load(Ordering::SeqCst)
+    }
+
+    /// Handle emoji reactions by mapping to satisfaction scores.
+    /// Updates the most recent strategy_record for this chat. No response sent.
+    async fn handle_reaction(&self, msg: &bus::InboundMessage) -> common::Result<()> {
+        let score = match reaction_to_satisfaction(&msg.content) {
+            Some(s) => s,
+            None => {
+                debug!("Ignoring unrecognized reaction emoji: {}", msg.content);
+                return Ok(());
+            }
+        };
+
+        if let Some(ref strategy_repo) = self.strategy_repo {
+            let since = chrono::Utc::now() - chrono::Duration::minutes(5);
+            match strategy_repo
+                .set_satisfaction_for_chat(msg.chat_id.as_str(), since, score)
+                .await
+            {
+                Ok(true) => {
+                    info!(
+                        "Updated satisfaction score {} for chat {}",
+                        score, msg.chat_id
+                    );
+                }
+                Ok(false) => {
+                    debug!(
+                        "No recent strategy record found for chat {}",
+                        msg.chat_id
+                    );
+                }
+                Err(e) => {
+                    warn!("Failed to update satisfaction: {}", e);
+                }
+            }
+        }
+
+        Ok(())
     }
 
     /// Run the agent loop, processing messages from the bus
@@ -190,6 +230,11 @@ impl AgentLoop {
         if let Err(e) = msg.validate() {
             warn!("Message validation failed: {}", e);
             return Ok(()); // silently drop oversized messages
+        }
+
+        // Handle reaction messages — update satisfaction, no LLM call
+        if msg.kind == bus::MessageKind::Reaction {
+            return self.handle_reaction(&msg).await;
         }
 
         // Handle system messages (subagent results)
@@ -580,6 +625,19 @@ impl AgentLoop {
     }
 }
 
+/// Map emoji reactions to satisfaction scores.
+/// Returns None for unrecognized emoji (silently ignored).
+fn reaction_to_satisfaction(emoji: &str) -> Option<f32> {
+    match emoji.trim() {
+        "\u{1F44D}" => Some(1.0),  // 👍
+        "\u{2764}\u{FE0F}" | "\u{2764}" => Some(1.0), // ❤️ / ❤
+        "\u{1F389}" => Some(1.0),  // 🎉
+        "\u{1F44E}" => Some(0.0),  // 👎
+        "\u{1F615}" => Some(0.0),  // 😕
+        _ => None,
+    }
+}
+
 /// Safely truncate a string to approximately `max_bytes` without splitting
 /// multi-byte UTF-8 characters. Returns the original string if already short enough.
 fn truncate_safe(s: &str, max_bytes: usize) -> &str {
@@ -599,6 +657,27 @@ fn truncate_safe(s: &str, max_bytes: usize) -> &str {
 mod tests {
     use super::*;
     use bus::{LearningEvent, LearningEventBus};
+
+    #[test]
+    fn test_reaction_to_satisfaction_positive() {
+        assert_eq!(reaction_to_satisfaction("\u{1F44D}"), Some(1.0));
+        assert_eq!(reaction_to_satisfaction("\u{2764}\u{FE0F}"), Some(1.0));
+        assert_eq!(reaction_to_satisfaction("\u{2764}"), Some(1.0));
+        assert_eq!(reaction_to_satisfaction("\u{1F389}"), Some(1.0));
+    }
+
+    #[test]
+    fn test_reaction_to_satisfaction_negative() {
+        assert_eq!(reaction_to_satisfaction("\u{1F44E}"), Some(0.0));
+        assert_eq!(reaction_to_satisfaction("\u{1F615}"), Some(0.0));
+    }
+
+    #[test]
+    fn test_reaction_to_satisfaction_unknown() {
+        assert_eq!(reaction_to_satisfaction("\u{1F914}"), None);
+        assert_eq!(reaction_to_satisfaction("hello"), None);
+        assert_eq!(reaction_to_satisfaction(""), None);
+    }
 
     /// AC-I2.3/2.4: Learning subscriber updates ConfidenceSource threshold
     /// when LearningService publishes a ThresholdChanged event.
