@@ -27,6 +27,8 @@ pub struct DispatchResult {
     pub escalation_count: u32,
     /// Accumulated token usage across all engine cycles.
     pub usage: Usage,
+    /// Number of iterations the execution engine used.
+    pub iterations_used: u32,
 }
 
 /// Dispatches execution to the appropriate engine based on strategy,
@@ -103,6 +105,7 @@ impl EngineDispatch {
                                 final_strategy: current_strategy,
                                 escalation_count,
                                 usage: Usage::default(),
+                                iterations_used: 1,
                             });
                         }
                         DirectOutcome::EscalateToToolAssisted { messages } => {
@@ -112,6 +115,7 @@ impl EngineDispatch {
                                     final_strategy: current_strategy,
                                     escalation_count,
                                     usage: Usage::default(),
+                                    iterations_used: 0,
                                 });
                             }
                             debug!("DirectEngine escalated to ToolAssisted");
@@ -125,8 +129,9 @@ impl EngineDispatch {
                 }
 
                 ExecutionStrategy::ToolAssisted { max_iterations } => {
+                    let max_iter = *max_iterations;
                     let engine = ReactPlusEngine::new(self.core.clone())
-                        .with_max_iterations(*max_iterations)
+                        .with_max_iterations(max_iter)
                         .with_reflection_mode(ReflectionMode::OnFailure);
 
                     // Clone the Arc (O(1)) — we may need current_messages again
@@ -142,12 +147,18 @@ impl EngineDispatch {
                         .await?;
 
                     match outcome {
-                        ReactOutcome::Response { content, usage, .. } => {
+                        ReactOutcome::Response {
+                            content,
+                            usage,
+                            iterations,
+                            ..
+                        } => {
                             return Ok(DispatchResult {
                                 content,
                                 final_strategy: current_strategy,
                                 escalation_count,
                                 usage,
+                                iterations_used: iterations,
                             });
                         }
                         ReactOutcome::EscalateToAutonomous { reason, usage } => {
@@ -161,6 +172,7 @@ impl EngineDispatch {
                                     final_strategy: current_strategy,
                                     escalation_count,
                                     usage,
+                                    iterations_used: 0,
                                 });
                             }
                             debug!("ReactPlusEngine escalated: {}", reason);
@@ -179,12 +191,15 @@ impl EngineDispatch {
                                 final_strategy: current_strategy,
                                 escalation_count,
                                 usage,
+                                iterations_used: max_iter,
                             });
                         }
                     }
                 }
 
                 ExecutionStrategy::AutonomousTask { max_iterations } => {
+                    let max_iter = *max_iterations;
+
                     // Prefer plan-based execution when a PlanGenerateEngine is wired in.
                     if let Some(ref plan_engine) = self.plan_generate_engine {
                         let mut result = plan_engine
@@ -197,7 +212,7 @@ impl EngineDispatch {
 
                     // Fallback: ReactPlus with higher iteration limits (no PlanRepo wired).
                     let engine = ReactPlusEngine::new(self.core.clone())
-                        .with_max_iterations(*max_iterations)
+                        .with_max_iterations(max_iter)
                         .with_reflection_mode(ReflectionMode::EveryN(5));
 
                     // Move the Arc — AutonomousTask always returns.
@@ -205,13 +220,19 @@ impl EngineDispatch {
                         .execute(current_messages, tools, params, ctx, event_tx.clone())
                         .await?;
 
-                    let (content, usage) = match outcome {
-                        ReactOutcome::Response { content, usage, .. } => (content, usage),
+                    let (content, usage, iterations_used) = match outcome {
+                        ReactOutcome::Response {
+                            content,
+                            usage,
+                            iterations,
+                            ..
+                        } => (content, usage, iterations),
                         ReactOutcome::EscalateToAutonomous { reason, usage } => {
                             warn!("Autonomous task hit escalation: {}", reason);
                             (
                                 format!("Task complexity exceeded autonomous capacity: {}", reason),
                                 usage,
+                                0,
                             )
                         }
                         ReactOutcome::MaxIterationsReached {
@@ -222,6 +243,7 @@ impl EngineDispatch {
                                 "Autonomous task hit iteration limit".to_string()
                             }),
                             usage,
+                            max_iter,
                         ),
                     };
 
@@ -230,6 +252,7 @@ impl EngineDispatch {
                         final_strategy: current_strategy,
                         escalation_count,
                         usage,
+                        iterations_used,
                     });
                 }
 
@@ -239,6 +262,7 @@ impl EngineDispatch {
                         final_strategy: current_strategy,
                         escalation_count: 0,
                         usage: Usage::default(),
+                        iterations_used: 0,
                     });
                 }
             }
@@ -470,5 +494,85 @@ mod tests {
             result.final_strategy,
             ExecutionStrategy::Clarification { .. }
         ));
+    }
+
+    #[test]
+    fn test_dispatch_result_has_iterations_used() {
+        let result = DispatchResult {
+            content: "hello".to_string(),
+            final_strategy: ExecutionStrategy::DirectResponse,
+            escalation_count: 0,
+            usage: Usage::default(),
+            iterations_used: 1,
+        };
+        assert_eq!(result.iterations_used, 1);
+    }
+
+    #[tokio::test]
+    async fn test_direct_response_iterations_used_is_one() {
+        let provider = SequenceProvider::new(vec![text_response("answer")]);
+        let dispatch = EngineDispatch::new(make_core(provider));
+
+        let result = dispatch
+            .execute(
+                ExecutionStrategy::DirectResponse,
+                Arc::new(vec![Message::user("hi")]),
+                &[],
+                &default_params(),
+                &routing_ctx(),
+                None,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(result.iterations_used, 1);
+    }
+
+    #[tokio::test]
+    async fn test_clarification_iterations_used_is_zero() {
+        let provider = SequenceProvider::new(vec![]);
+        let dispatch = EngineDispatch::new(make_core(provider));
+
+        let result = dispatch
+            .execute(
+                ExecutionStrategy::Clarification {
+                    reason: "What?".to_string(),
+                },
+                Arc::new(vec![Message::user("help")]),
+                &[],
+                &default_params(),
+                &routing_ctx(),
+                None,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(result.iterations_used, 0);
+    }
+
+    #[tokio::test]
+    async fn test_escalated_to_react_carries_iterations() {
+        // Direct escalates to ToolAssisted, which returns a response on iteration 1
+        let provider = SequenceProvider::new(vec![
+            tool_call_response("web_search"),
+            text_response("Found it"),
+        ]);
+        let dispatch = EngineDispatch::new(make_core(provider));
+
+        let result = dispatch
+            .execute(
+                ExecutionStrategy::DirectResponse,
+                Arc::new(vec![Message::user("search")]),
+                &[],
+                &default_params(),
+                &routing_ctx(),
+                None,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(result.escalation_count, 1);
+        // ReactPlus returned on iteration 1 (final response)
+        assert_eq!(result.iterations_used, 1);
     }
 }

@@ -122,6 +122,7 @@ impl PlanGenerateEngine {
             final_strategy: ExecutionStrategy::AutonomousTask { max_iterations: 50 },
             escalation_count: 0,
             usage: Usage::default(),
+            iterations_used: 1,
         })
     }
 
@@ -210,11 +211,17 @@ impl PlanGenerateEngine {
             .execute(messages, &tools, params, ctx, event_tx.cloned())
             .await?;
 
-        let (content, usage) = match outcome {
-            ReactOutcome::Response { content, usage, .. } => (content, usage),
+        let (content, usage, iterations_used) = match outcome {
+            ReactOutcome::Response {
+                content,
+                usage,
+                iterations,
+                ..
+            } => (content, usage, iterations),
             ReactOutcome::EscalateToAutonomous { reason, usage } => (
                 format!("Task complexity exceeded capacity: {}", reason),
                 usage,
+                0,
             ),
             ReactOutcome::MaxIterationsReached {
                 partial_content,
@@ -222,6 +229,7 @@ impl PlanGenerateEngine {
             } => (
                 partial_content.unwrap_or_else(|| "Max iterations reached".to_string()),
                 usage,
+                50,
             ),
         };
 
@@ -230,6 +238,7 @@ impl PlanGenerateEngine {
             final_strategy: ExecutionStrategy::AutonomousTask { max_iterations: 50 },
             escalation_count: 0,
             usage,
+            iterations_used,
         })
     }
 }
