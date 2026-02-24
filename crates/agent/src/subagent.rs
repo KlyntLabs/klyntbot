@@ -188,6 +188,7 @@ impl SubagentManager {
         &self,
         task: String,
         label: Option<String>,
+        profile: SubagentProfile,
         origin_channel: String,
         origin_chat_id: String,
     ) -> String {
@@ -203,6 +204,7 @@ impl SubagentManager {
         let origin_key = format!("{}:{}", origin_channel, origin_chat_id);
         let subagent_id_clone = subagent_id.clone();
         let label_clone = label_text.clone();
+        let _profile = profile; // Captured for future use (Task 7 will wire into run_subagent_task)
 
         let config = SubagentConfig {
             brave_api_key: self.brave_api_key.clone(),
@@ -271,10 +273,12 @@ impl SpawnHandler for SubagentManager {
         &self,
         task: String,
         label: Option<String>,
+        profile: String,
         origin_channel: String,
         origin_chat_id: String,
     ) -> String {
-        self.spawn(task, label, origin_channel, origin_chat_id)
+        let profile = SubagentProfile::from_str(&profile).unwrap_or_default();
+        self.spawn(task, label, profile, origin_channel, origin_chat_id)
             .await
     }
 }

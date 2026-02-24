@@ -18,6 +18,7 @@ pub trait SpawnHandler: Send + Sync {
         &self,
         task: String,
         label: Option<String>,
+        profile: String,
         origin_channel: String,
         origin_chat_id: String,
     ) -> String;
@@ -73,6 +74,11 @@ impl Tool for SpawnTool {
                 "label": {
                     "type": "string",
                     "description": "Optional short label for the task (for display)"
+                },
+                "profile": {
+                    "type": "string",
+                    "description": "Sub-agent specialization profile. Options: general (default, full access), research (web + read-only files), code (files + shell, no web), analyst (read-only files, pure reasoning)",
+                    "enum": ["general", "research", "code", "analyst"]
                 }
             },
             "required": ["task"]
@@ -83,8 +89,13 @@ impl Tool for SpawnTool {
         let p = ParamExtractor::new(&args);
         let task = p.required_str("task")?;
         let label = p.optional_str("label")?.map(|s| s.to_string());
+        let profile = args
+            .get("profile")
+            .and_then(|v| v.as_str())
+            .unwrap_or("general")
+            .to_string();
 
-        debug!("Spawning subagent for task: {}", task);
+        debug!("Spawning subagent for task: {} (profile: {})", task, profile);
 
         let handler = self
             .handler
@@ -96,6 +107,7 @@ impl Tool for SpawnTool {
             .spawn(
                 task.to_string(),
                 label,
+                profile,
                 ctx.channel.as_str().to_string(),
                 ctx.chat_id.as_str().to_string(),
             )
