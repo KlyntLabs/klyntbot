@@ -373,6 +373,16 @@ pub fn register_fs_tools(
     registry.register(ListDirTool::new(allowed_dir));
 }
 
+/// Register read-only filesystem tools (ReadFile + ListDir only).
+/// Used by Research and Analyst sub-agent profiles.
+pub fn register_fs_read_tools(
+    registry: &mut crate::registry::ToolRegistry,
+    allowed_dir: Option<PathBuf>,
+) {
+    registry.register(ReadFileTool::new(allowed_dir.clone()));
+    registry.register(ListDirTool::new(allowed_dir));
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -601,5 +611,34 @@ mod tests {
         assert_eq!(schema["function"]["name"], "read_file");
         assert!(schema["function"]["description"].is_string());
         assert!(schema["function"]["parameters"]["properties"]["path"].is_object());
+    }
+
+    #[test]
+    fn test_register_fs_read_tools_only_registers_read_and_list() {
+        let mut registry = crate::registry::ToolRegistry::new();
+        register_fs_read_tools(&mut registry, None);
+        let defs = registry.get_definitions();
+        let names: Vec<&str> = defs
+            .iter()
+            .filter_map(|d| d["function"]["name"].as_str())
+            .collect();
+        assert!(
+            names.contains(&"read_file"),
+            "Expected read_file in {:?}",
+            names
+        );
+        assert!(
+            names.contains(&"list_dir"),
+            "Expected list_dir in {:?}",
+            names
+        );
+        assert!(
+            !names.contains(&"write_file"),
+            "write_file should NOT be registered"
+        );
+        assert!(
+            !names.contains(&"edit_file"),
+            "edit_file should NOT be registered"
+        );
     }
 }

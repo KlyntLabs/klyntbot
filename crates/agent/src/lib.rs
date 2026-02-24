@@ -61,4 +61,4 @@ pub use plan_handler::PlanHandlerImpl;
 pub use recurring_tasks::RecurringTaskSpawner;
 pub use reminders::{CalendarEvent, ReminderEngine};
 pub use skills::SkillManager;
-pub use subagent::SubagentManager;
+pub use subagent::{SubagentManager, SubagentProfile};

@@ -1,6 +1,7 @@
 //! Subagent manager for background task execution.
 
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::{mpsc, Semaphore};
 use tracing::{debug, info, warn};
@@ -17,6 +18,55 @@ use tools::{
     web::{WebFetchTool, WebSearchTool},
     RoutingContext,
 };
+
+/// Specialized profiles for sub-agents with different tool sets and behaviors.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum SubagentProfile {
+    /// Full access: filesystem + shell + web (default)
+    #[default]
+    General,
+    /// Web + filesystem read-only, no shell
+    Research,
+    /// Filesystem + shell, no web
+    Code,
+    /// Filesystem read-only only (pure reasoning)
+    Analyst,
+}
+
+impl FromStr for SubagentProfile {
+    type Err = std::convert::Infallible;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        Ok(match s.to_lowercase().as_str() {
+            "research" => Self::Research,
+            "code" => Self::Code,
+            "analyst" => Self::Analyst,
+            _ => Self::General,
+        })
+    }
+}
+
+impl SubagentProfile {
+    /// Maximum iteration count for this profile.
+    pub fn max_iterations(&self) -> u32 {
+        match self {
+            Self::General => 15,
+            Self::Research => 10,
+            Self::Code => 15,
+            Self::Analyst => 5,
+        }
+    }
+
+    /// System prompt role preamble for this profile.
+    pub fn role_prompt(&self) -> &'static str {
+        match self {
+            Self::General => "You are a general-purpose subagent. You have full access to filesystem, shell, and web tools.",
+            Self::Research => "You are a research specialist. Focus on finding and synthesizing information from web sources and files. You have read-only file access and web tools, but no shell.",
+            Self::Code => "You are a code specialist. Focus on reading, writing, and executing code to complete the task. You have filesystem and shell access, but no web tools.",
+            Self::Analyst => "You are an analyst. Reason about the information provided. You have read-only file access but no shell or web tools.",
+        }
+    }
+}
 
 /// Configuration for subagent execution
 struct SubagentConfig {
@@ -487,5 +537,43 @@ mod tests {
         assert!(p3.is_ok());
 
         drop(p2);
+    }
+
+    #[test]
+    fn test_subagent_profile_default_is_general() {
+        let profile = SubagentProfile::default();
+        assert!(matches!(profile, SubagentProfile::General));
+    }
+
+    #[test]
+    fn test_subagent_profile_from_str() {
+        assert!(matches!(
+            SubagentProfile::from_str("research"),
+            Ok(SubagentProfile::Research)
+        ));
+        assert!(matches!(
+            SubagentProfile::from_str("code"),
+            Ok(SubagentProfile::Code)
+        ));
+        assert!(matches!(
+            SubagentProfile::from_str("analyst"),
+            Ok(SubagentProfile::Analyst)
+        ));
+        assert!(matches!(
+            SubagentProfile::from_str("general"),
+            Ok(SubagentProfile::General)
+        ));
+        assert!(matches!(
+            SubagentProfile::from_str("unknown"),
+            Ok(SubagentProfile::General)
+        ));
+    }
+
+    #[test]
+    fn test_subagent_profile_max_iterations() {
+        assert_eq!(SubagentProfile::General.max_iterations(), 15);
+        assert_eq!(SubagentProfile::Research.max_iterations(), 10);
+        assert_eq!(SubagentProfile::Code.max_iterations(), 15);
+        assert_eq!(SubagentProfile::Analyst.max_iterations(), 5);
     }
 }
