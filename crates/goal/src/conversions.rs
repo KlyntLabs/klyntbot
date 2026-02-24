@@ -2,12 +2,38 @@
 //!
 //! Extracted from the removed GoalStore to support direct GoalRepo usage.
 
-use crate::types::{Goal, GoalProgress, GoalStatus, Metric};
+use crate::types::{Goal, GoalProgress, GoalStatus};
+use chrono::Utc;
 use std::str::FromStr;
 use uuid::Uuid;
 
 /// Convert a Goal domain type to a GoalRow for SQL persistence.
+///
+/// Note: The domain `Goal` still carries `metrics` and `metadata` fields, but
+/// those are no longer persisted in `GoalRow`. Plan-completion columns are
+/// populated from `metadata` when available, defaulting to zero/None otherwise.
 pub fn goal_to_row(goal: &Goal) -> storage::GoalRow {
+    // Extract plan-completion values from domain metadata when present.
+    let plans_completed: i32 = goal
+        .metadata
+        .get("plans_completed")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
+    let plans_failed: i32 = goal
+        .metadata
+        .get("plans_failed")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
+    let avg_duration_ms: Option<i64> = goal
+        .metadata
+        .get("avg_duration_ms")
+        .and_then(|v| v.parse().ok());
+    let last_plan_at = goal
+        .metadata
+        .get("last_plan_at")
+        .and_then(|v| chrono::DateTime::parse_from_rfc3339(v).ok())
+        .map(|dt| dt.with_timezone(&Utc));
+
     storage::GoalRow {
         id: goal.id,
         title: goal.title.clone(),
@@ -17,13 +43,29 @@ pub fn goal_to_row(goal: &Goal) -> storage::GoalRow {
         target_date: goal.target_date,
         created_at: goal.created_at,
         updated_at: goal.updated_at,
-        metrics: serde_json::to_value(&goal.metrics).unwrap_or_default(),
-        metadata: serde_json::to_value(&goal.metadata).unwrap_or_default(),
+        plans_completed,
+        plans_failed,
+        avg_duration_ms,
+        last_plan_at,
     }
 }
 
 /// Convert a GoalRow + linked project IDs back to a Goal domain type.
+///
+/// Plan-completion typed columns are projected back into `metadata` so
+/// that callers (e.g. `PlanCompletionHandlerImpl`) can read them without
+/// changing their API until the domain type is updated (Task 9).
 pub fn row_to_goal(row: storage::GoalRow, linked_project_ids: Vec<Uuid>) -> Goal {
+    let mut metadata = std::collections::HashMap::new();
+    metadata.insert("plans_completed".into(), row.plans_completed.to_string());
+    metadata.insert("plans_failed".into(), row.plans_failed.to_string());
+    if let Some(avg) = row.avg_duration_ms {
+        metadata.insert("avg_duration_ms".into(), avg.to_string());
+    }
+    if let Some(last) = row.last_plan_at {
+        metadata.insert("last_plan_at".into(), last.to_rfc3339());
+    }
+
     Goal {
         id: row.id,
         title: row.title,
@@ -33,9 +75,9 @@ pub fn row_to_goal(row: storage::GoalRow, linked_project_ids: Vec<Uuid>) -> Goal
         target_date: row.target_date,
         created_at: row.created_at,
         updated_at: row.updated_at,
-        metrics: serde_json::from_value::<Vec<Metric>>(row.metrics).unwrap_or_default(),
+        metrics: vec![],
         linked_project_ids,
-        metadata: serde_json::from_value(row.metadata).unwrap_or_default(),
+        metadata,
     }
 }
 
