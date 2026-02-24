@@ -9,6 +9,14 @@ use common::{ChannelName, ChatId, SessionKey};
 /// Maximum message content size (64 KB)
 pub const MAX_MESSAGE_SIZE: usize = 65536;
 
+/// Distinguishes text messages from reactions (emoji on a previous message).
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum MessageKind {
+    #[default]
+    Text,
+    Reaction,
+}
+
 /// Message received from a chat channel
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InboundMessage {
@@ -35,6 +43,10 @@ pub struct InboundMessage {
     /// Channel-specific metadata
     #[serde(default)]
     pub metadata: HashMap<String, serde_json::Value>,
+
+    /// Whether this is a text message or a reaction
+    #[serde(default)]
+    pub kind: MessageKind,
 }
 
 impl InboundMessage {
@@ -53,7 +65,14 @@ impl InboundMessage {
             timestamp: Utc::now(),
             media: Vec::new(),
             metadata: HashMap::new(),
+            kind: MessageKind::Text,
         }
+    }
+
+    /// Set the message kind (text or reaction)
+    pub fn with_kind(mut self, kind: MessageKind) -> Self {
+        self.kind = kind;
+        self
     }
 
     /// Get the session key for this message (channel:chat_id)
@@ -126,5 +145,30 @@ impl OutboundMessage {
     pub fn with_media(mut self, media_url: impl Into<String>) -> Self {
         self.media.push(media_url.into());
         self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_inbound_message_default_kind_is_text() {
+        let msg = InboundMessage::new("telegram", "user1", "chat1", "hello");
+        assert!(matches!(msg.kind, MessageKind::Text));
+    }
+
+    #[test]
+    fn test_inbound_message_with_reaction_kind() {
+        let msg = InboundMessage::new("telegram", "user1", "chat1", "\u{1F44D}")
+            .with_kind(MessageKind::Reaction);
+        assert!(matches!(msg.kind, MessageKind::Reaction));
+        assert_eq!(msg.content, "\u{1F44D}");
+    }
+
+    #[test]
+    fn test_message_kind_default_trait() {
+        let kind = MessageKind::default();
+        assert!(matches!(kind, MessageKind::Text));
     }
 }
