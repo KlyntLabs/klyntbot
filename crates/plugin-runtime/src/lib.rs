@@ -5,8 +5,8 @@
 //! into the agent's `ToolRegistry` via `PluginPackage`.
 
 pub mod host;
-pub mod manifest;
 pub mod manager;
+pub mod manifest;
 pub mod plugin_package;
 pub mod wasm_plugin;
 

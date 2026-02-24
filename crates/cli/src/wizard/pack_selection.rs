@@ -115,7 +115,11 @@ pub fn apply_pack_config(config: &mut Config, enabled_packs: &[String]) {
 fn offer_agent_browser_install() -> anyhow::Result<()> {
     use common::utils::terminal::*;
 
-    let which_cmd = if cfg!(target_os = "windows") { "where" } else { "which" };
+    let which_cmd = if cfg!(target_os = "windows") {
+        "where"
+    } else {
+        "which"
+    };
     let found = std::process::Command::new(which_cmd)
         .arg("agent-browser")
         .output()
@@ -123,7 +127,10 @@ fn offer_agent_browser_install() -> anyhow::Result<()> {
         .unwrap_or(false);
 
     if found {
-        println!("  {} agent-browser already installed.", colorize("✓", SUCCESS));
+        println!(
+            "  {} agent-browser already installed.",
+            colorize("✓", SUCCESS)
+        );
         // Also check that Chromium browser binary is installed
         offer_chromium_install()?;
         return Ok(());
@@ -133,7 +140,11 @@ fn offer_agent_browser_install() -> anyhow::Result<()> {
     println!("  Install it to enable browser automation.\n");
 
     let choices = if cfg!(target_os = "macos") {
-        vec!["npm install -g agent-browser", "brew install agent-browser", "Skip (install later)"]
+        vec![
+            "npm install -g agent-browser",
+            "brew install agent-browser",
+            "Skip (install later)",
+        ]
     } else {
         vec!["npm install -g agent-browser", "Skip (install later)"]
     };
@@ -152,7 +163,10 @@ fn offer_agent_browser_install() -> anyhow::Result<()> {
     let choice = line.trim().parse::<usize>().unwrap_or(1);
 
     if choice == choices.len()
-        || choices.get(choice - 1).map(|c| c.contains("Skip")).unwrap_or(true)
+        || choices
+            .get(choice - 1)
+            .map(|c| c.contains("Skip"))
+            .unwrap_or(true)
     {
         println!("  Skipped. Run manually: npm install -g agent-browser\n");
         return Ok(());
@@ -167,10 +181,17 @@ fn offer_agent_browser_install() -> anyhow::Result<()> {
         .status()?;
 
     if status.success() {
-        println!("  {} agent-browser installed successfully.", colorize("✓", SUCCESS));
+        println!(
+            "  {} agent-browser installed successfully.",
+            colorize("✓", SUCCESS)
+        );
         offer_chromium_install()?;
     } else {
-        println!("  {} Install failed. Run manually: {}\n", colorize("✗", ERROR), cmd);
+        println!(
+            "  {} Install failed. Run manually: {}\n",
+            colorize("✗", ERROR),
+            cmd
+        );
     }
 
     Ok(())
@@ -212,7 +233,10 @@ fn offer_chromium_install() -> anyhow::Result<()> {
     }
 
     if chromium_ok {
-        println!("  {} Chromium browser already installed.\n", colorize("✓", SUCCESS));
+        println!(
+            "  {} Chromium browser already installed.\n",
+            colorize("✓", SUCCESS)
+        );
         return Ok(());
     }
 
@@ -225,7 +249,10 @@ fn offer_chromium_install() -> anyhow::Result<()> {
 
     match status {
         Ok(s) if s.success() => {
-            println!("  {} Chromium installed successfully.\n", colorize("✓", SUCCESS));
+            println!(
+                "  {} Chromium installed successfully.\n",
+                colorize("✓", SUCCESS)
+            );
         }
         _ => {
             println!(

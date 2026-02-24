@@ -1,0 +1,20 @@
+{
+    "id": "hello-plugin",
+    "name": "Hello Plugin",
+    "version": "0.1.0",
+    "description": "Integration test plugin",
+    "author": "test",
+    "tools": [
+        {
+            "name": "hello_tool",
+            "description": "Say hello",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "description": "Name to greet"}
+                }
+            }
+        }
+    ],
+    "permissions": []
+}

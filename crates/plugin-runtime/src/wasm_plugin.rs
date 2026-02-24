@@ -79,13 +79,11 @@ impl Tool for WasmPlugin {
         );
 
         let mut plugin = self.plugin.lock().await;
-        let output = plugin
-            .call::<&str, &str>(func_name, &input)
-            .map_err(|e| {
-                common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(format!(
-                    "WASM plugin call failed: {e}"
-                )))
-            })?;
+        let output = plugin.call::<&str, &str>(func_name, &input).map_err(|e| {
+            common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(format!(
+                "WASM plugin call failed: {e}"
+            )))
+        })?;
 
         Ok(output.to_string())
     }
@@ -116,9 +114,8 @@ mod tests {
                 PluginPermission::Agent => "agent".to_string(),
             })
             .collect();
-        json["permissions"] = serde_json::Value::Array(
-            perms.into_iter().map(serde_json::Value::String).collect(),
-        );
+        json["permissions"] =
+            serde_json::Value::Array(perms.into_iter().map(serde_json::Value::String).collect());
         serde_json::from_value(json).unwrap()
     }
 
@@ -160,8 +157,7 @@ mod tests {
 
     #[test]
     fn test_permission_level_elevated_both() {
-        let manifest =
-            make_manifest(vec![PluginPermission::Network, PluginPermission::Agent]);
+        let manifest = make_manifest(vec![PluginPermission::Network, PluginPermission::Agent]);
         assert_eq!(
             WasmPlugin::compute_permission_level(&manifest),
             PermissionLevel::Elevated

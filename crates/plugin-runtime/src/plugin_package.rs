@@ -98,9 +98,7 @@ impl FeaturePackage for PluginPackage {
         if self.plugin.is_some() {
             Ok(HealthStatus::Healthy)
         } else {
-            Ok(HealthStatus::Degraded(
-                "WASM plugin not loaded".to_string(),
-            ))
+            Ok(HealthStatus::Degraded("WASM plugin not loaded".to_string()))
         }
     }
 }

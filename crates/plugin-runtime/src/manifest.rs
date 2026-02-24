@@ -122,10 +122,7 @@ mod tests {
         assert_eq!(manifest.id, "notion-connector");
         assert_eq!(manifest.name, "Notion Connector");
         assert_eq!(manifest.version, "1.2.0");
-        assert_eq!(
-            manifest.min_klyntbot_version.as_deref(),
-            Some("0.4.0")
-        );
+        assert_eq!(manifest.min_klyntbot_version.as_deref(), Some("0.4.0"));
 
         // Tools
         assert_eq!(manifest.tools.len(), 1);
@@ -140,7 +137,9 @@ mod tests {
         // Migrations
         assert_eq!(manifest.migrations.len(), 1);
         assert_eq!(manifest.migrations[0].version, 1);
-        assert!(manifest.migrations[0].sql.contains("plugin_notion_connector_cache"));
+        assert!(manifest.migrations[0]
+            .sql
+            .contains("plugin_notion_connector_cache"));
 
         // Permissions
         assert_eq!(manifest.permissions.len(), 2);

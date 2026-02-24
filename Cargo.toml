@@ -167,6 +167,8 @@ assert_cmd = "2.1.2"
 feature-todo.workspace = true
 feature-finance.workspace = true
 plugin-runtime.workspace = true
+tools-core.workspace = true
+extism.workspace = true
 
 [[bench]]
 name = "core_benchmarks"

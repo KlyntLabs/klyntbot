@@ -24,8 +24,16 @@ pub fn is_write_action(action: &str, element_label: &str) -> bool {
     // Dangerous click targets
     if action == "click" {
         let dangerous = [
-            "submit", "checkout", "buy", "purchase", "confirm",
-            "place order", "delete", "remove", "send", "pay",
+            "submit",
+            "checkout",
+            "buy",
+            "purchase",
+            "confirm",
+            "place order",
+            "delete",
+            "remove",
+            "send",
+            "pay",
         ];
         if dangerous.iter().any(|k| label.contains(k)) {
             return true;
@@ -49,8 +57,8 @@ pub fn is_write_action(action: &str, element_label: &str) -> bool {
 #[derive(Debug)]
 pub struct SnapshotElement {
     pub ref_id: String,
-    pub kind:   String,
-    pub label:  String,
+    pub kind: String,
+    pub label: String,
 }
 
 // ── BrowserTool ───────────────────────────────────────────────────────────────
@@ -67,7 +75,10 @@ impl BrowserTool {
     /// available on `PATH`. Returns an error if not found.
     pub fn new(trust_level: TrustLevel) -> Result<Self> {
         let binary_path = find_agent_browser()?;
-        Ok(Self { trust_level, binary_path })
+        Ok(Self {
+            trust_level,
+            binary_path,
+        })
     }
 
     /// Construct without binary check — for tests only.
@@ -95,7 +106,7 @@ impl BrowserTool {
     pub fn build_args(action: &str, extra: &[&str]) -> Vec<String> {
         let cmd = match action {
             "navigate" => "open",
-            other      => other,
+            other => other,
         };
         let mut args = vec![cmd.to_string()];
         args.extend(extra.iter().map(|s| s.to_string()));
@@ -108,15 +119,18 @@ impl BrowserTool {
         raw.lines()
             .filter_map(|line| {
                 let line = line.trim();
-                if !line.starts_with('@') { return None; }
+                if !line.starts_with('@') {
+                    return None;
+                }
                 let mut parts = line.splitn(3, ' ');
                 let ref_id = parts.next()?.to_string();
-                let kind   = parts.next().unwrap_or("").to_string();
-                let label  = parts.next()
-                    .unwrap_or("")
-                    .trim_matches('"')
-                    .to_string();
-                Some(SnapshotElement { ref_id, kind, label })
+                let kind = parts.next().unwrap_or("").to_string();
+                let label = parts.next().unwrap_or("").trim_matches('"').to_string();
+                Some(SnapshotElement {
+                    ref_id,
+                    kind,
+                    label,
+                })
             })
             .collect()
     }
@@ -127,7 +141,9 @@ impl BrowserTool {
         query: &str,
     ) -> Option<&'a SnapshotElement> {
         let q = query.to_lowercase();
-        elements.iter().find(|e| e.label.to_lowercase().contains(&q))
+        elements
+            .iter()
+            .find(|e| e.label.to_lowercase().contains(&q))
     }
 
     /// Format the message returned to the LLM when a write action is guarded.
@@ -146,16 +162,16 @@ impl BrowserTool {
 
         let output = tokio::time::timeout(
             tokio::time::Duration::from_secs(30),
-            tokio::process::Command::new(&self.binary_path).args(args).output(),
+            tokio::process::Command::new(&self.binary_path)
+                .args(args)
+                .output(),
         )
         .await
-        .map_err(|_| ToolError::ExecutionFailed(
-            "Browser action timed out after 30s".to_string()
-        ))?
+        .map_err(|_| ToolError::ExecutionFailed("Browser action timed out after 30s".to_string()))?
         .map_err(|e| {
             warn!("agent-browser connection error: {}", e);
             ToolError::ExecutionFailed(
-                "Browser session unavailable. Try navigating again.".to_string()
+                "Browser session unavailable. Try navigating again.".to_string(),
             )
         })?;
 
@@ -175,7 +191,11 @@ impl BrowserTool {
 
 /// Locate the agent-browser binary. Returns its path or a helpful error.
 fn find_agent_browser() -> Result<String> {
-    let which_cmd = if cfg!(target_os = "windows") { "where" } else { "which" };
+    let which_cmd = if cfg!(target_os = "windows") {
+        "where"
+    } else {
+        "which"
+    };
 
     if let Ok(output) = std::process::Command::new(which_cmd)
         .arg("agent-browser")
@@ -285,23 +305,23 @@ impl Tool for BrowserTool {
         debug!("browser action: {}", action);
 
         match action {
-            "navigate"           => self.act_navigate(&p).await,
-            "snapshot"           => self.act_snapshot().await,
-            "click"              => self.act_click(&p).await,
-            "type"               => self.act_type(&p).await,
-            "fill"               => self.act_fill(&p).await,
-            "press"              => self.act_press(&p).await,
-            "scroll"             => self.act_scroll(&p).await,
-            "wait"               => self.act_wait(&p).await,
-            "get_text"           => self.act_get_text(&p).await,
-            "screenshot"         => self.act_screenshot().await,
-            "eval"               => self.act_eval(&p).await,
-            "fill_form"          => self.act_fill_form(&p).await,
-            "login_flow"         => self.act_login_flow(&p).await,
+            "navigate" => self.act_navigate(&p).await,
+            "snapshot" => self.act_snapshot().await,
+            "click" => self.act_click(&p).await,
+            "type" => self.act_type(&p).await,
+            "fill" => self.act_fill(&p).await,
+            "press" => self.act_press(&p).await,
+            "scroll" => self.act_scroll(&p).await,
+            "wait" => self.act_wait(&p).await,
+            "get_text" => self.act_get_text(&p).await,
+            "screenshot" => self.act_screenshot().await,
+            "eval" => self.act_eval(&p).await,
+            "fill_form" => self.act_fill_form(&p).await,
+            "login_flow" => self.act_login_flow(&p).await,
             "submit_and_confirm" => self.act_submit_and_confirm(&p).await,
-            unknown => Err(ToolError::InvalidParams(
-                format!("Unknown browser action: {}", unknown)
-            ).into()),
+            unknown => {
+                Err(ToolError::InvalidParams(format!("Unknown browser action: {}", unknown)).into())
+            }
         }
     }
 }
@@ -330,7 +350,7 @@ impl BrowserTool {
 
     async fn act_type(&self, p: &ParamExtractor<'_>) -> Result<String> {
         let element = p.required_str("element")?;
-        let text    = p.required_str("text")?;
+        let text = p.required_str("text")?;
         if self.should_guard("type", element) {
             return Ok(Self::guard_message("type", element));
         }
@@ -340,7 +360,7 @@ impl BrowserTool {
 
     async fn act_fill(&self, p: &ParamExtractor<'_>) -> Result<String> {
         let element = p.required_str("element")?;
-        let value   = p.required_str("value")?;
+        let value = p.required_str("value")?;
         if self.should_guard("fill", element) {
             return Ok(Self::guard_message("fill", element));
         }
@@ -349,7 +369,7 @@ impl BrowserTool {
     }
 
     async fn act_press(&self, p: &ParamExtractor<'_>) -> Result<String> {
-        let key  = p.required_str("key")?;
+        let key = p.required_str("key")?;
         let args = Self::build_args("press", &[key]);
         self.run(&args).await
     }
@@ -421,9 +441,11 @@ impl BrowserTool {
         }
 
         if filled.is_empty() {
-            return Err(ToolError::ExecutionFailed(
-                format!("No fields filled. Not found: {}", not_found.join(", "))
-            ).into());
+            return Err(ToolError::ExecutionFailed(format!(
+                "No fields filled. Not found: {}",
+                not_found.join(", ")
+            ))
+            .into());
         }
 
         let mut result = format!("Filled: {}", filled.join(", "));
@@ -435,7 +457,7 @@ impl BrowserTool {
 
     /// login_flow: navigate → snapshot → fill credentials → Enter → wait.
     async fn act_login_flow(&self, p: &ParamExtractor<'_>) -> Result<String> {
-        let url      = p.required_str("url")?;
+        let url = p.required_str("url")?;
         let username = p.required_str("username")?;
         let password = p.required_str("password")?;
 
@@ -448,28 +470,33 @@ impl BrowserTool {
 
         // 3. Fill username
         let username_labels = ["email", "username", "user", "login"];
-        let user_elem = elements.iter()
+        let user_elem = elements
+            .iter()
             .find(|e| {
                 let l = e.label.to_lowercase();
                 username_labels.iter().any(|k| l.contains(k))
             })
-            .ok_or_else(|| ToolError::ExecutionFailed(
-                "Could not find username/email field on page".into()
-            ))?;
+            .ok_or_else(|| {
+                ToolError::ExecutionFailed("Could not find username/email field on page".into())
+            })?;
 
-        self.run(&Self::build_args("fill", &[&user_elem.ref_id, username])).await?;
+        self.run(&Self::build_args("fill", &[&user_elem.ref_id, username]))
+            .await?;
 
         // 4. Fill password
-        let pass_elem = elements.iter()
+        let pass_elem = elements
+            .iter()
             .find(|e| e.label.to_lowercase().contains("password"))
-            .ok_or_else(|| ToolError::ExecutionFailed(
-                "Could not find password field on page".into()
-            ))?;
+            .ok_or_else(|| {
+                ToolError::ExecutionFailed("Could not find password field on page".into())
+            })?;
 
-        self.run(&Self::build_args("fill", &[&pass_elem.ref_id, password])).await?;
+        self.run(&Self::build_args("fill", &[&pass_elem.ref_id, password]))
+            .await?;
 
         // 5. Press Enter to submit
-        self.run(&["press".to_string(), "Enter".to_string()]).await?;
+        self.run(&["press".to_string(), "Enter".to_string()])
+            .await?;
 
         // 6. Wait for navigation
         self.run(&["wait".to_string(), "load".to_string()]).await?;
@@ -574,8 +601,8 @@ mod tests {
     fn test_trust_level_strict_guards_all_writes() {
         let tool = BrowserTool::new_unchecked(TrustLevel::Strict);
         // Strict: guards any click/fill/type/submit
-        assert!(tool.should_guard("click", "Search"));   // safe label but strict mode
-        assert!(tool.should_guard("fill", "Email"));     // non-payment field but strict mode
+        assert!(tool.should_guard("click", "Search")); // safe label but strict mode
+        assert!(tool.should_guard("fill", "Email")); // non-payment field but strict mode
     }
 
     #[test]
@@ -635,9 +662,21 @@ mod tests {
     #[test]
     fn test_find_element_by_label_exact() {
         let elements = vec![
-            SnapshotElement { ref_id: "@e1".into(), kind: "input".into(), label: "Email".into() },
-            SnapshotElement { ref_id: "@e2".into(), kind: "input".into(), label: "Password".into() },
-            SnapshotElement { ref_id: "@e3".into(), kind: "button".into(), label: "Sign In".into() },
+            SnapshotElement {
+                ref_id: "@e1".into(),
+                kind: "input".into(),
+                label: "Email".into(),
+            },
+            SnapshotElement {
+                ref_id: "@e2".into(),
+                kind: "input".into(),
+                label: "Password".into(),
+            },
+            SnapshotElement {
+                ref_id: "@e3".into(),
+                kind: "button".into(),
+                label: "Sign In".into(),
+            },
         ];
         let found = BrowserTool::find_element_by_label(&elements, "Email");
         assert!(found.is_some());
@@ -646,27 +685,33 @@ mod tests {
 
     #[test]
     fn test_find_element_by_label_case_insensitive() {
-        let elements = vec![
-            SnapshotElement { ref_id: "@e1".into(), kind: "input".into(), label: "Email Address".into() },
-        ];
+        let elements = vec![SnapshotElement {
+            ref_id: "@e1".into(),
+            kind: "input".into(),
+            label: "Email Address".into(),
+        }];
         let found = BrowserTool::find_element_by_label(&elements, "email address");
         assert!(found.is_some());
     }
 
     #[test]
     fn test_find_element_by_label_partial_match() {
-        let elements = vec![
-            SnapshotElement { ref_id: "@e1".into(), kind: "input".into(), label: "Card Number".into() },
-        ];
+        let elements = vec![SnapshotElement {
+            ref_id: "@e1".into(),
+            kind: "input".into(),
+            label: "Card Number".into(),
+        }];
         let found = BrowserTool::find_element_by_label(&elements, "card");
         assert!(found.is_some());
     }
 
     #[test]
     fn test_find_element_by_label_not_found() {
-        let elements = vec![
-            SnapshotElement { ref_id: "@e1".into(), kind: "input".into(), label: "Email".into() },
-        ];
+        let elements = vec![SnapshotElement {
+            ref_id: "@e1".into(),
+            kind: "input".into(),
+            label: "Email".into(),
+        }];
         let found = BrowserTool::find_element_by_label(&elements, "nonexistent");
         assert!(found.is_none());
     }
