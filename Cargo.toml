@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-exclude = ["crates/plugin-sdk"]
+exclude = ["crates/plugin-sdk", "tests/fixtures/hello_plugin"]
 members = [
     "crates/common",
     "crates/config",
