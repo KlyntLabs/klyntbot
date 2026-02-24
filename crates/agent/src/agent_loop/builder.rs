@@ -755,12 +755,15 @@ impl AgentLoopBuilder {
             provider_name: provider.name().to_string(),
         };
 
-        let pipeline = Arc::new(crate::pipeline::AgentPipeline::new(
-            orchestrator,
-            engine_dispatch,
-            cost_tracker,
-            pipeline_config,
-        ));
+        let pipeline = Arc::new(
+            crate::pipeline::AgentPipeline::new(
+                orchestrator,
+                engine_dispatch,
+                cost_tracker,
+                pipeline_config,
+            )
+            .with_strategy_repo(repos.strategies.clone()),
+        );
 
         info!("Adaptive orchestrator pipeline initialized");
 

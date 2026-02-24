@@ -72,6 +72,7 @@ pub struct AgentPipeline {
     validator: ResponseValidator,
     cost_tracker: Arc<CostTracker>,
     config: PipelineConfig,
+    strategy_repo: Option<storage::StrategyRepo>,
 }
 
 impl AgentPipeline {
@@ -88,7 +89,14 @@ impl AgentPipeline {
             validator: ResponseValidator::new(config.max_response_tokens),
             cost_tracker,
             config,
+            strategy_repo: None,
         }
+    }
+
+    /// Attach a strategy repository for recording execution outcomes.
+    pub fn with_strategy_repo(mut self, repo: storage::StrategyRepo) -> Self {
+        self.strategy_repo = Some(repo);
+        self
     }
 
     /// Process a user message through the full pipeline.
@@ -227,6 +235,36 @@ impl AgentPipeline {
             .await
         {
             warn!("Pipeline: failed to record usage: {}", e);
+        }
+
+        // Step 6: Record strategy outcome (best-effort)
+        if let Some(ref strategy_repo) = self.strategy_repo {
+            let max_iterations = match &classification.strategy {
+                context_engine::ExecutionStrategy::ToolAssisted { max_iterations } => {
+                    *max_iterations as i32
+                }
+                context_engine::ExecutionStrategy::AutonomousTask { max_iterations } => {
+                    *max_iterations as i32
+                }
+                _ => 1,
+            };
+            let record = storage::StrategyRecordRow {
+                id: uuid::Uuid::new_v4(),
+                timestamp: chrono::Utc::now(),
+                request_id: uuid::Uuid::new_v4().to_string(),
+                predicted_strategy: format!("{:?}", classification.strategy),
+                actual_strategy: strategy_name.clone(),
+                escalation_count: dispatch_result.escalation_count as i32,
+                iterations_used: dispatch_result.iterations_used as i32,
+                max_iterations,
+                success: validation.is_valid,
+                user_satisfaction: None,
+                response_time_ms: classify_start.elapsed().as_millis() as i64,
+                chat_id: Some(ctx.chat_id.to_string()),
+            };
+            if let Err(e) = strategy_repo.create(&record).await {
+                warn!("Pipeline: failed to record strategy: {}", e);
+            }
         }
 
         Ok(PipelineResult {
@@ -534,5 +572,55 @@ mod tests {
             found_classification,
             "Expected ClassificationComplete event"
         );
+    }
+
+    #[tokio::test]
+    async fn test_pipeline_writes_strategy_record() {
+        // Build pipeline with a real StoragePool (migrations applied)
+        let storage_pool = storage::StoragePool::connect_in_memory()
+            .await
+            .expect("in-memory StoragePool");
+        let repos = storage::Repos::from_pool(&storage_pool);
+
+        let provider = MockPipelineProvider::new(vec![text_response("Hi there!")]);
+        let provider: Arc<dyn LlmProvider> = provider;
+
+        let registry = Arc::new(RwLock::new(ToolRegistry::new()));
+        let core = Arc::new(ExecutionCore::new(provider.clone(), registry));
+        let orchestrator = Arc::new(Orchestrator::new(provider.clone(), "mock"));
+        let dispatch = Arc::new(EngineDispatch::new(core));
+        let cost_tracker = Arc::new(CostTracker::from_repo(repos.usage.clone()));
+
+        let pipeline = AgentPipeline::new(
+            orchestrator,
+            dispatch,
+            cost_tracker,
+            PipelineConfig::default(),
+        )
+        .with_strategy_repo(repos.strategies.clone());
+
+        let result = pipeline
+            .process_message("hello", vec![], &[], &[], &routing_ctx(), None, None)
+            .await
+            .unwrap();
+
+        assert_eq!(result.content, "Hi there!");
+
+        // Verify a strategy record was written
+        let since = chrono::Utc::now() - chrono::Duration::minutes(1);
+        let records = repos
+            .strategies
+            .list_by_date_range(since, chrono::Utc::now())
+            .await
+            .expect("should list strategy records");
+
+        assert_eq!(records.len(), 1, "Expected exactly one strategy record");
+        let record = &records[0];
+        assert!(record.predicted_strategy.contains("DirectResponse"));
+        assert!(record.actual_strategy.contains("DirectResponse"));
+        assert_eq!(record.escalation_count, 0);
+        assert!(record.success);
+        assert_eq!(record.chat_id, Some("test".to_string()));
+        assert!(record.response_time_ms >= 0);
     }
 }
