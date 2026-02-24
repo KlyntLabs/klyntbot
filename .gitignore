@@ -2,6 +2,11 @@
 .worktrees/
 .fastembed_cache/
 
+# Test fixture build artifacts
+tests/fixtures/hello_plugin/target/
+tests/fixtures/hello_plugin/Cargo.lock
+tests/fixtures/hello_plugin/plugin.wasm
+
 # User data directories (runtime)
 .klyntbot/
 
