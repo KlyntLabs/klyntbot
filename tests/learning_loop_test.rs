@@ -103,6 +103,47 @@ async fn test_goal_plan_completion_metrics_end_to_end() {
 }
 
 #[tokio::test]
+async fn test_learning_handler_reads_strategy_records() {
+    let pool = klyntbot::StoragePool::connect_in_memory().await.unwrap();
+    let repos = klyntbot::Repos::from_pool(&pool);
+
+    // Insert a strategy record with tool info
+    let row = klyntbot::storage::StrategyRecordRow {
+        id: uuid::Uuid::new_v4(),
+        timestamp: chrono::Utc::now(),
+        request_id: "req-learn".to_string(),
+        predicted_strategy: "ToolAssisted".to_string(),
+        actual_strategy: "ToolAssisted".to_string(),
+        escalation_count: 0,
+        iterations_used: 2,
+        max_iterations: 5,
+        success: true,
+        user_satisfaction: Some(1.0),
+        response_time_ms: 1500,
+        chat_id: Some("tg:test".to_string()),
+        tool_name: Some("todo".to_string()),
+        tool_success: Some(true),
+        tool_duration_ms: Some(45),
+    };
+    repos.strategies.create(&row).await.unwrap();
+
+    // Verify count
+    let count = repos.strategies.count_all().await.unwrap();
+    assert_eq!(count, 1);
+
+    // Verify overall stats
+    let stats = repos.strategies.get_overall_stats().await.unwrap();
+    assert_eq!(stats.total_records, 1);
+    assert!((stats.accuracy - 1.0).abs() < 0.01);
+
+    // Verify tool stats
+    let tool_stats = repos.strategies.get_tool_stats().await.unwrap();
+    assert_eq!(tool_stats.len(), 1);
+    assert_eq!(tool_stats[0].tool_name, "todo");
+    assert_eq!(tool_stats[0].success_count, 1);
+}
+
+#[tokio::test]
 async fn test_satisfaction_no_match_returns_false() {
     let pool = klyntbot::StoragePool::connect_in_memory().await.unwrap();
     let repos = klyntbot::Repos::from_pool(&pool);
