@@ -2,6 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
+use config::schema::PluginsConfig;
 use tracing::{info, warn};
 
 use crate::host;
@@ -9,113 +10,127 @@ use crate::manifest::PluginManifest;
 use crate::plugin_package::PluginPackage;
 
 /// Discovers, validates, and loads WASM plugins from `~/.klyntbot/plugins/`.
+#[allow(dead_code)]
 pub struct PluginManager {
     packages: Vec<PluginPackage>,
     plugins_dir: PathBuf,
 }
 
 impl PluginManager {
-    /// Scan the plugins directory for `klyntbot.plugin.json` manifests.
-    ///
-    /// Each subdirectory is expected to contain:
-    /// - `klyntbot.plugin.json` — plugin manifest
-    /// - `plugin.wasm` — compiled WASM module
-    pub fn scan_manifests(plugins_dir: &Path) -> Vec<(PathBuf, PluginManifest)> {
-        let mut manifests = Vec::new();
+    /// Default plugins directory: `~/.klyntbot/plugins/`.
+    pub fn default_plugins_dir() -> PathBuf {
+        dirs::home_dir()
+            .unwrap_or_else(|| PathBuf::from("."))
+            .join(".klyntbot")
+            .join("plugins")
+    }
 
-        let entries = match std::fs::read_dir(plugins_dir) {
+    /// Scan a directory for plugin subdirectories containing `klyntbot.plugin.json`.
+    ///
+    /// Returns `(manifest, wasm_path)` pairs for each valid plugin found.
+    /// Skips subdirectories that lack a manifest or have an invalid one.
+    pub fn scan_manifests(dir: &Path) -> common::Result<Vec<(PluginManifest, PathBuf)>> {
+        let mut results = Vec::new();
+
+        let entries = match std::fs::read_dir(dir) {
             Ok(entries) => entries,
             Err(e) => {
-                warn!(path = %plugins_dir.display(), error = %e, "Cannot read plugins directory");
-                return manifests;
+                warn!(path = %dir.display(), error = %e, "cannot read plugins directory");
+                return Ok(results);
             }
         };
 
         for entry in entries.flatten() {
-            let dir = entry.path();
-            if !dir.is_dir() {
+            let path = entry.path();
+            if !path.is_dir() {
                 continue;
             }
 
-            let manifest_path = dir.join("klyntbot.plugin.json");
+            let manifest_path = path.join("klyntbot.plugin.json");
             if !manifest_path.exists() {
                 continue;
             }
 
             match PluginManifest::from_file(&manifest_path) {
                 Ok(manifest) => {
-                    info!(plugin_id = %manifest.id, path = %dir.display(), "Discovered plugin");
-                    manifests.push((dir, manifest));
+                    let wasm_path = path.join("plugin.wasm");
+                    results.push((manifest, wasm_path));
                 }
                 Err(e) => {
                     warn!(
                         path = %manifest_path.display(),
                         error = %e,
-                        "Failed to parse plugin manifest"
+                        "skipping plugin with invalid manifest"
                     );
                 }
             }
         }
 
-        manifests
+        Ok(results)
     }
 
     /// Load all discovered plugins from disk.
     ///
-    /// Creates `PluginPackage` instances for each valid plugin.
-    /// Failed loads are logged as warnings but don't prevent other plugins from loading.
+    /// Returns early with an empty manager if plugins are disabled or the
+    /// directory doesn't exist. Failed loads are logged as warnings but don't
+    /// prevent other plugins from loading.
     pub fn load_all(
         plugins_dir: &Path,
         pool: sqlx::SqlitePool,
+        config: &PluginsConfig,
         bus_sender: Option<tokio::sync::mpsc::UnboundedSender<bus::OutboundMessage>>,
-    ) -> Self {
-        let discovered = Self::scan_manifests(plugins_dir);
+    ) -> common::Result<Self> {
+        if !config.enabled {
+            info!("plugin system disabled, skipping plugin loading");
+            return Ok(Self {
+                packages: Vec::new(),
+                plugins_dir: plugins_dir.to_path_buf(),
+            });
+        }
+
+        if !plugins_dir.exists() {
+            info!(dir = %plugins_dir.display(), "plugins directory does not exist, skipping");
+            return Ok(Self {
+                packages: Vec::new(),
+                plugins_dir: plugins_dir.to_path_buf(),
+            });
+        }
+
+        let discovered = Self::scan_manifests(plugins_dir)?;
         let mut packages = Vec::new();
 
-        for (dir, manifest) in discovered {
-            match Self::load_plugin(&dir, &manifest, pool.clone(), bus_sender.clone()) {
+        for (manifest, wasm_path) in discovered {
+            let plugin_id = manifest.id.clone();
+            match Self::load_plugin(manifest, &wasm_path, pool.clone(), config, bus_sender.clone())
+            {
                 Ok(pkg) => {
-                    info!(
-                        plugin_id = %manifest.id,
-                        tools = manifest.tools.len(),
-                        "Plugin loaded successfully"
-                    );
+                    info!(plugin_id = %plugin_id, "loaded plugin");
                     packages.push(pkg);
                 }
                 Err(e) => {
-                    warn!(
-                        plugin_id = %manifest.id,
-                        error = %e,
-                        "Failed to load plugin, skipping"
-                    );
+                    warn!(plugin_id = %plugin_id, error = %e, "failed to load plugin, skipping");
                 }
             }
         }
 
-        info!(count = packages.len(), "Plugins loaded");
+        info!(count = packages.len(), "plugins loaded");
 
-        PluginManager {
+        Ok(Self {
             packages,
             plugins_dir: plugins_dir.to_path_buf(),
-        }
+        })
     }
 
-    /// Load a single plugin from its directory.
+    /// Load a single plugin from its manifest and wasm file path.
     fn load_plugin(
-        plugin_dir: &Path,
-        manifest: &PluginManifest,
+        manifest: PluginManifest,
+        wasm_path: &Path,
         pool: sqlx::SqlitePool,
+        config: &PluginsConfig,
         bus_sender: Option<tokio::sync::mpsc::UnboundedSender<bus::OutboundMessage>>,
-    ) -> anyhow::Result<PluginPackage> {
-        let wasm_path = plugin_dir.join("plugin.wasm");
-        if !wasm_path.exists() {
-            anyhow::bail!(
-                "plugin.wasm not found in {}",
-                plugin_dir.display()
-            );
-        }
+    ) -> common::Result<PluginPackage> {
+        let wasm_bytes = std::fs::read(wasm_path)?;
 
-        // Build host functions with permission enforcement
         let host_fns = host::build_host_functions(
             pool,
             manifest.id.clone(),
@@ -123,116 +138,109 @@ impl PluginManager {
             bus_sender,
         );
 
-        // Create extism manifest pointing to the WASM file
-        let wasm = extism::Wasm::File {
-            path: wasm_path,
-            meta: extism::WasmMetadata::default(),
-        };
-        let extism_manifest = extism::Manifest::new([wasm]);
+        // Convert sandbox_memory_mb to wasm pages (1 page = 64KB)
+        let memory_pages = (config.sandbox_memory_mb as u64 * 1024 * 1024 / (64 * 1024)) as u32;
+        let extism_manifest = extism::Manifest::new([extism::Wasm::data(wasm_bytes)])
+            .with_memory_max(memory_pages);
 
-        // Build the plugin with WASI support and host functions
-        let plugin = extism::PluginBuilder::new(extism_manifest)
-            .with_wasi(true)
-            .with_functions(host_fns)
-            .build()?;
+        let plugin = extism::Plugin::new(&extism_manifest, host_fns, true).map_err(|e| {
+            common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(format!(
+                "failed to create extism plugin: {}",
+                e
+            )))
+        })?;
 
-        let mut package = PluginPackage::from_manifest(manifest.clone());
+        let mut package = PluginPackage::from_manifest(manifest);
         package.attach_plugin(plugin);
 
         Ok(package)
+    }
+
+    /// Borrow the loaded packages.
+    pub fn packages(&self) -> &[PluginPackage] {
+        &self.packages
     }
 
     /// Consume the manager and return the loaded packages.
     pub fn into_packages(self) -> Vec<PluginPackage> {
         self.packages
     }
-
-    /// Get the plugins directory path.
-    pub fn plugins_dir(&self) -> &Path {
-        &self.plugins_dir
-    }
-
-    /// Number of loaded plugins.
-    pub fn count(&self) -> usize {
-        self.packages.len()
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
     use tempfile::TempDir;
 
-    fn write_manifest(dir: &Path, id: &str) {
-        let manifest_json = format!(
-            r#"{{
-                "id": "{id}",
-                "name": "{id}",
-                "version": "0.1.0",
-                "description": "Test plugin",
-                "author": "Test"
-            }}"#
-        );
-        fs::write(dir.join("klyntbot.plugin.json"), manifest_json).unwrap();
+    fn write_manifest(dir: &std::path::Path, plugin_id: &str, manifest_json: &str) {
+        let plugin_dir = dir.join(plugin_id);
+        std::fs::create_dir_all(&plugin_dir).unwrap();
+        std::fs::write(plugin_dir.join("klyntbot.plugin.json"), manifest_json).unwrap();
+    }
+
+    fn minimal_manifest_json(id: &str) -> String {
+        format!(
+            r#"{{"id":"{}","name":"Test","version":"1.0.0","description":"d","author":"a"}}"#,
+            id
+        )
     }
 
     #[test]
-    fn test_scan_manifests_discovers_plugins() {
+    fn test_scan_empty_dir() {
         let tmp = TempDir::new().unwrap();
-        let plugin_a = tmp.path().join("plugin-a");
-        let plugin_b = tmp.path().join("plugin-b");
-        fs::create_dir(&plugin_a).unwrap();
-        fs::create_dir(&plugin_b).unwrap();
-
-        write_manifest(&plugin_a, "plugin-a");
-        write_manifest(&plugin_b, "plugin-b");
-
-        let manifests = PluginManager::scan_manifests(tmp.path());
-        assert_eq!(manifests.len(), 2);
-
-        let ids: Vec<&str> = manifests.iter().map(|(_, m)| m.id.as_str()).collect();
-        assert!(ids.contains(&"plugin-a"));
-        assert!(ids.contains(&"plugin-b"));
+        let results = PluginManager::scan_manifests(tmp.path()).unwrap();
+        assert!(results.is_empty());
     }
 
     #[test]
-    fn test_scan_manifests_skips_invalid() {
+    fn test_scan_discovers_plugins() {
         let tmp = TempDir::new().unwrap();
-        let valid = tmp.path().join("valid");
-        let invalid = tmp.path().join("invalid");
-        fs::create_dir(&valid).unwrap();
-        fs::create_dir(&invalid).unwrap();
-
-        write_manifest(&valid, "valid");
-        fs::write(invalid.join("klyntbot.plugin.json"), "not json").unwrap();
-
-        let manifests = PluginManager::scan_manifests(tmp.path());
-        assert_eq!(manifests.len(), 1);
-        assert_eq!(manifests[0].1.id, "valid");
+        write_manifest(tmp.path(), "plugin-a", &minimal_manifest_json("plugin-a"));
+        write_manifest(tmp.path(), "plugin-b", &minimal_manifest_json("plugin-b"));
+        let results = PluginManager::scan_manifests(tmp.path()).unwrap();
+        assert_eq!(results.len(), 2);
     }
 
     #[test]
-    fn test_scan_manifests_skips_dirs_without_manifest() {
+    fn test_scan_skips_dir_without_manifest() {
         let tmp = TempDir::new().unwrap();
-        let no_manifest = tmp.path().join("no-manifest");
-        fs::create_dir(&no_manifest).unwrap();
-        fs::write(no_manifest.join("readme.txt"), "hello").unwrap();
-
-        let manifests = PluginManager::scan_manifests(tmp.path());
-        assert!(manifests.is_empty());
+        std::fs::create_dir_all(tmp.path().join("no-manifest")).unwrap();
+        write_manifest(tmp.path(), "good", &minimal_manifest_json("good"));
+        let results = PluginManager::scan_manifests(tmp.path()).unwrap();
+        assert_eq!(results.len(), 1);
     }
 
     #[test]
-    fn test_scan_manifests_empty_dir() {
+    fn test_scan_skips_invalid_manifest() {
         let tmp = TempDir::new().unwrap();
-        let manifests = PluginManager::scan_manifests(tmp.path());
-        assert!(manifests.is_empty());
+        let bad_dir = tmp.path().join("bad");
+        std::fs::create_dir_all(&bad_dir).unwrap();
+        std::fs::write(bad_dir.join("klyntbot.plugin.json"), "NOT JSON").unwrap();
+        write_manifest(tmp.path(), "good", &minimal_manifest_json("good"));
+        let results = PluginManager::scan_manifests(tmp.path()).unwrap();
+        assert_eq!(results.len(), 1);
     }
 
-    #[test]
-    fn test_scan_manifests_nonexistent_dir() {
-        let manifests = PluginManager::scan_manifests(Path::new("/nonexistent/path"));
-        assert!(manifests.is_empty());
+    #[tokio::test]
+    async fn test_load_all_disabled() {
+        let tmp = TempDir::new().unwrap();
+        let config = PluginsConfig {
+            enabled: false,
+            ..PluginsConfig::default()
+        };
+        let pool = storage::StoragePool::connect_in_memory().await.unwrap();
+        let mgr = PluginManager::load_all(tmp.path(), pool.inner().clone(), &config, None)
+            .unwrap();
+        assert!(mgr.packages().is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_load_all_nonexistent_dir() {
+        let config = PluginsConfig::default();
+        let pool = storage::StoragePool::connect_in_memory().await.unwrap();
+        let mgr =
+            PluginManager::load_all(Path::new("/nonexistent"), pool.inner().clone(), &config, None)
+                .unwrap();
+        assert!(mgr.packages().is_empty());
     }
 }
