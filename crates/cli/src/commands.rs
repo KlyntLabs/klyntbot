@@ -2,6 +2,8 @@
 
 use clap::{Parser, Subcommand};
 
+use crate::plugin_cmd::PluginCommand;
+
 /// klyntbot - Personal AI Assistant
 #[derive(Parser, Debug)]
 #[command(name = "klyntbot")]
@@ -58,6 +60,10 @@ pub enum Commands {
         #[arg(short, long)]
         verbose: bool,
     },
+
+    /// Manage WASM plugins (install, list, remove, search, update, new, publish)
+    #[command(subcommand)]
+    Plugin(PluginCommand),
 }
 
 #[cfg(test)]
@@ -110,5 +116,109 @@ mod tests {
             }
             other => panic!("expected Init, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn plugin_install_local() {
+        let cli = Cli::parse_from(["klyntbot", "plugin", "install", "./my-plugin.wasm"]);
+        match cli.command {
+            Some(Commands::Plugin(PluginCommand::Install { source })) => {
+                assert_eq!(source, "./my-plugin.wasm");
+            }
+            other => panic!("expected Plugin Install, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn plugin_list() {
+        let cli = Cli::parse_from(["klyntbot", "plugin", "list"]);
+        assert!(matches!(
+            cli.command,
+            Some(Commands::Plugin(PluginCommand::List))
+        ));
+    }
+
+    #[test]
+    fn plugin_remove() {
+        let cli = Cli::parse_from(["klyntbot", "plugin", "remove", "notion-connector"]);
+        match cli.command {
+            Some(Commands::Plugin(PluginCommand::Remove { id })) => {
+                assert_eq!(id, "notion-connector");
+            }
+            other => panic!("expected Plugin Remove, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn plugin_search() {
+        let cli = Cli::parse_from(["klyntbot", "plugin", "search", "notion"]);
+        match cli.command {
+            Some(Commands::Plugin(PluginCommand::Search { query })) => {
+                assert_eq!(query, "notion");
+            }
+            other => panic!("expected Plugin Search, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn plugin_update_specific() {
+        let cli = Cli::parse_from(["klyntbot", "plugin", "update", "my-plugin"]);
+        match cli.command {
+            Some(Commands::Plugin(PluginCommand::Update { id })) => {
+                assert_eq!(id.as_deref(), Some("my-plugin"));
+            }
+            other => panic!("expected Plugin Update, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn plugin_update_all() {
+        let cli = Cli::parse_from(["klyntbot", "plugin", "update"]);
+        match cli.command {
+            Some(Commands::Plugin(PluginCommand::Update { id })) => {
+                assert!(id.is_none());
+            }
+            other => panic!("expected Plugin Update, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn plugin_new_default_lang() {
+        let cli = Cli::parse_from(["klyntbot", "plugin", "new", "my-plugin"]);
+        match cli.command {
+            Some(Commands::Plugin(PluginCommand::New { name, lang })) => {
+                assert_eq!(name, "my-plugin");
+                assert_eq!(lang, "rust");
+            }
+            other => panic!("expected Plugin New, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn plugin_new_typescript() {
+        let cli = Cli::parse_from([
+            "klyntbot",
+            "plugin",
+            "new",
+            "my-plugin",
+            "--lang",
+            "typescript",
+        ]);
+        match cli.command {
+            Some(Commands::Plugin(PluginCommand::New { name, lang })) => {
+                assert_eq!(name, "my-plugin");
+                assert_eq!(lang, "typescript");
+            }
+            other => panic!("expected Plugin New, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn plugin_publish() {
+        let cli = Cli::parse_from(["klyntbot", "plugin", "publish"]);
+        assert!(matches!(
+            cli.command,
+            Some(Commands::Plugin(PluginCommand::Publish))
+        ));
     }
 }

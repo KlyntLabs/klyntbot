@@ -19,6 +19,7 @@ session.workspace = true
 tools.workspace = true
 goal.workspace = true
 plan.workspace = true
+plugin-runtime.workspace = true
 clap = { workspace = true }
 rustyline.workspace = true
 tokio = { workspace = true }

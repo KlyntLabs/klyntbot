@@ -35,6 +35,11 @@ async fn main() {
 
         Some(Commands::Status { verbose }) => cli_handlers::handle_status(verbose).await,
 
+        Some(Commands::Plugin(cmd)) => match config::load_with_env_overrides().await {
+            Ok(config) => cli::plugin_cmd::handle_plugin(cmd, &config).await,
+            Err(e) => Err(e.into()),
+        },
+
         None => {
             // No command specified, show brief status
             cli_handlers::handle_brief_status().await

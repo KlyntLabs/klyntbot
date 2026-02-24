@@ -5,6 +5,7 @@
 pub mod chat;
 pub mod commands;
 pub mod interactive;
+pub mod plugin_cmd;
 pub mod serve;
 pub mod status;
 pub mod wizard;
