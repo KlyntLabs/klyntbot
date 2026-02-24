@@ -9027,7 +9027,6 @@ dependencies = [
  "fastembed",
  "goal",
  "html2text",
- "once_cell",
  "plan",
  "regex",
  "reqwest 0.13.2",

@@ -21,7 +21,7 @@ async fn test_builtin_skills_loading() {
 
     // Verify some built-in skills exist
     assert!(manager.get("cron").is_some());
-    assert!(manager.get("github").is_some());
+    assert!(manager.get("todo").is_some());
     assert!(manager.get("summarize").is_some());
 }
 

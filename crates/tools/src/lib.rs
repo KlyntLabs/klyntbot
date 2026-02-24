@@ -1,7 +1,7 @@
 //! Klyntbot Tools - Core tool implementations and domain tool interfaces.
 //!
 //! This crate provides:
-//! - Core tool implementations: filesystem (x4), shell, web (x2), message, spawn, cron
+//! - Core tool implementations: filesystem (x4), web (x2), message, spawn, cron
 //! - Domain tool interfaces: calendar, goal, plan, learning, memory, project
 //! - Embedding infrastructure: engine (fastembed), store (LanceDB)
 //! - Tool registry and permissions
@@ -22,7 +22,6 @@ pub mod browser;
 pub mod cron_tool;
 pub mod filesystem;
 pub mod message;
-pub mod shell;
 pub mod spawn;
 pub mod web;
 

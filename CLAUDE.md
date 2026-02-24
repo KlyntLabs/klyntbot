@@ -26,7 +26,7 @@ cargo build --no-default-features    # Build without email channel
 
 ## Architecture
 
-Klyntbot is a Rust AI agent framework — a single binary that connects to 6+ chat platforms, calls LLMs, executes tools, manages tasks/projects, syncs with Apple Calendar, and manages persistent memory. All persistent state is stored in SQLite (relational data) + LanceDB (vector embeddings).
+Klyntbot is a Rust personal AI agent — a single binary that connects to 6+ chat platforms, calls LLMs, manages tasks/projects, syncs with Apple Calendar, and manages persistent memory. It is **not** a code execution platform — users have dedicated tools (Claude Code, Cursor, Codex) for that. All persistent state is stored in SQLite (relational data) + LanceDB (vector embeddings).
 
 ### Workspace layout (15 crates in 9 dependency layers)
 
@@ -35,7 +35,7 @@ Layer 0: common          — Error types (KlyntbotError with 12 variants includi
 Layer 1: config, bus     — Config schema (camelCase JSON serde + CalendarConfig, ProjectConfig), async message bus (tokio::mpsc)
 Layer 1.5: storage       — SQLite connection pool (sqlx + SqlitePool), auto-migrations, row structs, repository pattern (TodoRepo, ProjectRepo, VectorStore, etc.)
 Layer 2: providers, session, scheduling, calendar, context_engine — LLM HTTP client, session persistence, cron service, CalDAV client + sync engine, token budget allocator + context assembler
-Layer 3: tools           — Tool trait + 12 implementations (file I/O ×4, shell, web ×2, message, spawn, cron, todo, project, calendar)
+Layer 3: tools           — Tool trait + 12 implementations (file I/O ×4, web ×2, message, spawn, cron, todo, project, calendar)
 Layer 4: channels, heartbeat — Chat platform integrations (Telegram, Discord, WhatsApp, Slack, Email, QQ)
 Layer 5: agent           — Agent loop, context builder, memory store, skill manager, subagent manager, calendar handler adapter, reminder engine, orchestrator, execution engines, pipeline
 Layer 6: cli             — Clap-derived CLI with 4 commands: chat, serve, init, status
@@ -232,15 +232,15 @@ Feature packs bundle related config settings and skills into selectable groups. 
 
 **Pack tiers:**
 - **Core** (always enabled): task-management
-- **Recommended** (pre-checked): productivity, ai-intelligence, developer-tools
+- **Recommended** (pre-checked): productivity, ai-intelligence
 - **Optional** (unchecked by default): finance, weather, skill-creator
 
 **Config schema** (`~/.klyntbot/config.json`):
 ```json
 {
   "packs": {
-    "enabled": ["task-management", "productivity", "ai-intelligence", "developer-tools"],
-    "enabledSkills": ["todo", "todo-party", "todo-yolo", "daily-planning", "cron", "summarize", "github", "tmux"]
+    "enabled": ["task-management", "productivity", "ai-intelligence"],
+    "enabledSkills": ["todo", "todo-party", "todo-yolo", "daily-planning", "cron", "summarize"]
   }
 }
 ```
@@ -256,7 +256,7 @@ Feature packs bundle related config settings and skills into selectable groups. 
 
 ## Skills
 
-Built-in skills live in `skills/` as `SKILL.md` files (summarize, skill-creator, github, tmux, weather, cron). The `SkillManager` in the agent crate discovers and loads them at runtime. Skills are filtered by enabled packs — only skills from selected packs are available.
+Built-in skills live in `skills/` as `SKILL.md` files (summarize, skill-creator, weather, cron, todo, todo-party, todo-yolo, daily-planning). The `SkillManager` in the agent crate discovers and loads them at runtime. Skills are filtered by enabled packs — only skills from selected packs are available.
 
 ## Gotchas & Common Pitfalls
 

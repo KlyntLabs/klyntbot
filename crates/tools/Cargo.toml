@@ -30,7 +30,6 @@ scraper.workspace = true
 html2text.workspace = true
 url.workspace = true
 urlencoding.workspace = true
-once_cell.workspace = true
 chrono = { workspace = true }
 uuid = { workspace = true }
 serde = { workspace = true }

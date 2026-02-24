@@ -13,22 +13,22 @@ use providers::{DynProvider, Message};
 use tools::{
     filesystem::{register_fs_read_tools, register_fs_tools},
     registry::ToolRegistry,
-    shell::ExecTool,
     spawn::SpawnHandler,
     web::{WebFetchTool, WebSearchTool},
     RoutingContext,
 };
 
 /// Specialized profiles for sub-agents with different tool sets and behaviors.
+///
+/// klyntbot is a personal AI agent — no code execution tools are provided.
+/// Profiles control access to filesystem (read/write), web, and browser tools.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum SubagentProfile {
-    /// Full access: filesystem + shell + web (default)
+    /// Full access: filesystem + web (default)
     #[default]
     General,
-    /// Web + filesystem read-only, no shell
+    /// Web + filesystem read-only
     Research,
-    /// Filesystem + shell, no web
-    Code,
     /// Filesystem read-only only (pure reasoning)
     Analyst,
 }
@@ -39,7 +39,6 @@ impl FromStr for SubagentProfile {
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         Ok(match s.to_lowercase().as_str() {
             "research" => Self::Research,
-            "code" => Self::Code,
             "analyst" => Self::Analyst,
             _ => Self::General,
         })
@@ -52,7 +51,6 @@ impl SubagentProfile {
         match self {
             Self::General => 15,
             Self::Research => 10,
-            Self::Code => 15,
             Self::Analyst => 5,
         }
     }
@@ -60,10 +58,9 @@ impl SubagentProfile {
     /// System prompt role preamble for this profile.
     pub fn role_prompt(&self) -> &'static str {
         match self {
-            Self::General => "You are a general-purpose subagent. You have full access to filesystem, shell, and web tools.",
-            Self::Research => "You are a research specialist. Focus on finding and synthesizing information from web sources and files. You have read-only file access and web tools, but no shell.",
-            Self::Code => "You are a code specialist. Focus on reading, writing, and executing code to complete the task. You have filesystem and shell access, but no web tools.",
-            Self::Analyst => "You are an analyst. Reason about the information provided. You have read-only file access but no shell or web tools.",
+            Self::General => "You are a general-purpose subagent. You have full access to filesystem and web tools.",
+            Self::Research => "You are a research specialist. Focus on finding and synthesizing information from web sources and files. You have read-only file access and web tools.",
+            Self::Analyst => "You are an analyst. Reason about the information provided. You have read-only file access but no web tools.",
         }
     }
 }
@@ -72,7 +69,8 @@ impl SubagentProfile {
 struct SubagentConfig {
     brave_api_key: Option<String>,
     web_max_results: u8,
-    exec_timeout: u64,
+    /// Timeout in seconds for the subagent task.
+    task_timeout: u64,
     restrict_to_workspace: bool,
 }
 
@@ -84,7 +82,7 @@ pub struct SubagentManager {
     model: String,
     brave_api_key: Option<String>,
     web_max_results: u8,
-    exec_timeout: u64,
+    task_timeout: u64,
     restrict_to_workspace: bool,
     semaphore: Arc<Semaphore>,
 }
@@ -97,7 +95,7 @@ pub struct SubagentManagerBuilder {
     model: Option<String>,
     brave_api_key: Option<String>,
     web_max_results: u8,
-    exec_timeout: u64,
+    task_timeout: u64,
     restrict_to_workspace: bool,
     max_concurrent_subagents: usize,
 }
@@ -112,7 +110,7 @@ impl SubagentManagerBuilder {
             model: None,
             brave_api_key: None,
             web_max_results: 5,
-            exec_timeout: 60,
+            task_timeout: 60,
             restrict_to_workspace: true,
             max_concurrent_subagents: 3,
         }
@@ -138,8 +136,8 @@ impl SubagentManagerBuilder {
         self
     }
 
-    pub fn exec_timeout(mut self, timeout: u64) -> Self {
-        self.exec_timeout = timeout;
+    pub fn task_timeout(mut self, timeout: u64) -> Self {
+        self.task_timeout = timeout;
         self
     }
 
@@ -161,7 +159,7 @@ impl SubagentManagerBuilder {
             model: self.model.unwrap_or_else(|| "claude-sonnet-4".to_string()),
             brave_api_key: self.brave_api_key,
             web_max_results: self.web_max_results,
-            exec_timeout: self.exec_timeout,
+            task_timeout: self.task_timeout,
             restrict_to_workspace: self.restrict_to_workspace,
             semaphore: Arc::new(Semaphore::new(self.max_concurrent_subagents)),
         }
@@ -207,7 +205,7 @@ impl SubagentManager {
         let config = SubagentConfig {
             brave_api_key: self.brave_api_key.clone(),
             web_max_results: self.web_max_results,
-            exec_timeout: self.exec_timeout,
+            task_timeout: self.task_timeout,
             restrict_to_workspace: self.restrict_to_workspace,
         };
 
@@ -285,9 +283,8 @@ impl SpawnHandler for SubagentManager {
 /// Run an agent loop for a subagent task with profile-based tools.
 ///
 /// Tool access is determined by `SubagentProfile`:
-/// - General: filesystem + shell + web (full access)
-/// - Research: read-only filesystem + web (no shell, no writes)
-/// - Code: filesystem + shell (no web)
+/// - General: filesystem + web (full access)
+/// - Research: read-only filesystem + web (no writes)
 /// - Analyst: read-only filesystem only (pure reasoning)
 async fn run_subagent_task(
     provider: &DynProvider,
@@ -314,11 +311,6 @@ async fn run_subagent_task(
     match profile {
         SubagentProfile::General => {
             register_fs_tools(&mut tools, allowed_dir);
-            tools.register(ExecTool::new(
-                config.exec_timeout,
-                Some(workspace.to_path_buf()),
-                config.restrict_to_workspace,
-            ));
             tools.register(WebSearchTool::new(
                 config.brave_api_key,
                 config.web_max_results,
@@ -332,14 +324,6 @@ async fn run_subagent_task(
                 config.web_max_results,
             ));
             tools.register(WebFetchTool::new());
-        }
-        SubagentProfile::Code => {
-            register_fs_tools(&mut tools, allowed_dir);
-            tools.register(ExecTool::new(
-                config.exec_timeout,
-                Some(workspace.to_path_buf()),
-                config.restrict_to_workspace,
-            ));
         }
         SubagentProfile::Analyst => {
             register_fs_read_tools(&mut tools, allowed_dir);
@@ -365,7 +349,7 @@ async fn run_subagent_task(
     ];
 
     let params = ExecutionParams::new(model)
-        .with_timeout(std::time::Duration::from_secs(config.exec_timeout));
+        .with_timeout(std::time::Duration::from_secs(config.task_timeout));
     let routing_ctx = RoutingContext::new("subagent".into(), "background".into());
 
     // Execute via ReactPlusEngine
@@ -398,9 +382,8 @@ fn build_subagent_prompt(
     profile: SubagentProfile,
 ) -> String {
     let tool_description = match profile {
-        SubagentProfile::General => "- Read and write files in the workspace\n- Execute shell commands\n- Search the web and fetch web pages",
+        SubagentProfile::General => "- Read and write files in the workspace\n- Search the web and fetch web pages",
         SubagentProfile::Research => "- Read files in the workspace (read-only)\n- Search the web and fetch web pages",
-        SubagentProfile::Code => "- Read and write files in the workspace\n- Execute shell commands",
         SubagentProfile::Analyst => "- Read files in the workspace (read-only)",
     };
 
@@ -538,7 +521,7 @@ mod tests {
         let config = SubagentConfig {
             brave_api_key: None,
             web_max_results: 5,
-            exec_timeout: 60,
+            task_timeout: 60,
             restrict_to_workspace: false,
         };
         let result = run_subagent_task(
@@ -588,15 +571,16 @@ mod tests {
             Ok(SubagentProfile::Research)
         ));
         assert!(matches!(
-            SubagentProfile::from_str("code"),
-            Ok(SubagentProfile::Code)
-        ));
-        assert!(matches!(
             SubagentProfile::from_str("analyst"),
             Ok(SubagentProfile::Analyst)
         ));
         assert!(matches!(
             SubagentProfile::from_str("general"),
+            Ok(SubagentProfile::General)
+        ));
+        // Unknown profiles default to General
+        assert!(matches!(
+            SubagentProfile::from_str("code"),
             Ok(SubagentProfile::General)
         ));
         assert!(matches!(
@@ -609,7 +593,6 @@ mod tests {
     fn test_subagent_profile_max_iterations() {
         assert_eq!(SubagentProfile::General.max_iterations(), 15);
         assert_eq!(SubagentProfile::Research.max_iterations(), 10);
-        assert_eq!(SubagentProfile::Code.max_iterations(), 15);
         assert_eq!(SubagentProfile::Analyst.max_iterations(), 5);
     }
 
@@ -633,20 +616,7 @@ mod tests {
             SubagentProfile::General,
         );
         assert!(prompt.contains("general-purpose subagent"));
-        assert!(prompt.contains("Execute shell commands"));
-    }
-
-    #[test]
-    fn test_build_subagent_prompt_code_profile() {
-        let prompt = build_subagent_prompt(
-            std::path::Path::new("/tmp"),
-            "Fix the bug",
-            SubagentProfile::Code,
-        );
-        assert!(prompt.contains("code specialist"));
-        // "What You Can Do" section should NOT list web capabilities
-        assert!(!prompt.contains("Search the web"));
-        assert!(!prompt.contains("fetch web pages"));
+        assert!(prompt.contains("Search the web"));
     }
 
     #[test]

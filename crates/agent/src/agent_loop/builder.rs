@@ -23,7 +23,6 @@ use tools::{
     message::MessageTool,
     plan_tool::PlanCompletionHandler,
     registry::ToolRegistry,
-    shell::ExecTool,
     spawn::SpawnTool,
     web::{WebFetchTool, WebSearchTool},
 };
@@ -133,7 +132,7 @@ impl AgentLoopBuilder {
 
         let workspace = config.workspace_path();
 
-        // Ensure workspace directory exists so exec and fs tools work correctly
+        // Ensure workspace directory exists so fs tools work correctly
         if !workspace.exists() {
             tokio::fs::create_dir_all(&workspace).await.map_err(|e| {
                 common::KlyntbotError::Config(common::ConfigError::Invalid(format!(
@@ -231,7 +230,6 @@ impl AgentLoopBuilder {
                 .model(config.agents.defaults.model.clone())
                 .brave_api_key(brave_api_key.clone())
                 .web_max_results(config.tools.web.max_results)
-                .exec_timeout(config.tools.exec.timeout)
                 .restrict_to_workspace(config.tools.restrict_to_workspace)
                 .max_concurrent_subagents(config.agents.defaults.max_concurrent_subagents)
                 .build(),
@@ -247,13 +245,6 @@ impl AgentLoopBuilder {
             None
         };
         register_fs_tools(&mut tool_registry, allowed_dir);
-
-        // Shell tool
-        tool_registry.register(ExecTool::new(
-            config.tools.exec.timeout,
-            Some(workspace.clone()),
-            config.tools.restrict_to_workspace,
-        ));
 
         // Web tools
         tool_registry.register(WebSearchTool::new(

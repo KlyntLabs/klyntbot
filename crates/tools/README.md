@@ -6,10 +6,10 @@
 
 `tools` provides the tool system for klyntbot:
 - `Tool` trait for extensible capabilities
-- 10 built-in tool implementations
+- 9 built-in tool implementations (no code execution)
 - Handler traits for dependency inversion
 - Parameter validation and JSON schema
-- Workspace sandboxing for safety
+- Workspace sandboxing for filesystem safety
 
 ## Contents
 
@@ -37,7 +37,6 @@ pub trait Tool: Send + Sync {
 | `write_file` | Write files, auto-creating parent directories |
 | `edit_file` | Find-and-replace with uniqueness validation |
 | `list_dir` | List directory contents with type indicators |
-| `exec` | Execute shell commands with safety guards |
 | `web_search` | Search the web via Brave Search API |
 | `web_fetch` | Fetch and extract readable content from URLs |
 | `message` | Send messages to users through any channel |
@@ -55,8 +54,6 @@ let mut registry = ToolRegistry::new();
 // Register tools
 registry.register(Arc::new(ReadFileTool::new(workspace)));
 registry.register(Arc::new(WriteFileTool::new(workspace)));
-registry.register(Arc::new(ExecTool::new(timeout)));
-
 // Get tool
 let tool = registry.get("read_file")?;
 let result = tool.execute(args, &ctx).await?;
@@ -106,23 +103,6 @@ let listing = list_tool.execute(
 ).await?;
 ```
 
-### Shell Tool
-
-```rust
-use tools::ExecTool;
-
-let exec_tool = ExecTool::new(60);  // 60 second timeout
-let output = exec_tool.execute(
-    serde_json::json!({
-        "command": "ls -la",
-        "cwd": "/workspace"
-    }),
-    &ctx
-).await?;
-
-// Safety: Blocks destructive commands like rm -rf, fork bombs, etc.
-```
-
 ### Web Tools
 
 ```rust
@@ -158,7 +138,7 @@ tools.workspace = true
 Example:
 
 ```rust
-use tools::{ToolRegistry, ReadFileTool, WriteFileTool, ExecTool};
+use tools::{ToolRegistry, ReadFileTool, WriteFileTool};
 use std::sync::Arc;
 
 fn create_tools(workspace: &str) -> ToolRegistry {
@@ -167,9 +147,6 @@ fn create_tools(workspace: &str) -> ToolRegistry {
     // Filesystem tools
     registry.register(Arc::new(ReadFileTool::new(Some(workspace.into()))));
     registry.register(Arc::new(WriteFileTool::new(Some(workspace.into()))));
-
-    // Shell tool
-    registry.register(Arc::new(ExecTool::new(60)));
 
     registry
 }
@@ -233,24 +210,9 @@ pub struct CronTool {
 
 ## Safety Features
 
-### Command Deny Patterns
-
-Blocks destructive commands via regex:
-
-```rust
-// Blocked patterns (case-insensitive)
-r"rm\s+-rf"           // rm -rf
-r"del\s+/f"           // del /f
-r"format\s"           // format
-r"mkfs\."             // mkfs.ext4
-r"dd\s+if="           // dd if=
-r"shutdown|reboot"    // system shutdown
-r":\(\)\{.*:\|:"      // fork bomb
-```
-
 ### Workspace Sandboxing
 
-Confine all file/shell operations to workspace:
+Confine all file operations to workspace:
 
 ```rust
 let read_tool = ReadFileTool::new(Some("/workspace"));
@@ -265,7 +227,6 @@ let read_tool = ReadFileTool::new(Some("/workspace"));
 Limits to prevent memory exhaustion:
 
 ```rust
-ExecTool::new(60)       // 10 KB output limit
 WebFetchTool::new()     // 50 KB content limit
 ```
 
@@ -331,7 +292,7 @@ Used for:
 - `tokio` — Async runtime
 - `serde_json` — JSON handling
 - `reqwest` — HTTP client (web tools)
-- `regex` — Command deny patterns
+- `regex` — Pattern matching (plan response parsing)
 - `shellexpand` — Tilde expansion
 - `scraper`, `html2text` — HTML to markdown
 - `url`, `urlencoding` — URL handling

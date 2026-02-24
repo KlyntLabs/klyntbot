@@ -85,13 +85,6 @@ static PACKS: &[Pack] = &[
         skills: &[],
     },
     Pack {
-        id: "developer-tools",
-        name: "Developer Tools",
-        description: "GitHub, tmux, shell execution, web search",
-        tier: PackTier::Recommended,
-        skills: &["github", "tmux"],
-    },
-    Pack {
         id: "browser",
         name: "Browser Automation",
         description: "Real-world task execution: booking, shopping, account management",
@@ -126,9 +119,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_all_packs_returns_8() {
+    fn test_all_packs_returns_7() {
         let packs = PackRegistry::all();
-        assert_eq!(packs.len(), 8);
+        assert_eq!(packs.len(), 7);
     }
 
     #[test]
@@ -141,7 +134,7 @@ mod tests {
     #[test]
     fn test_recommended_packs() {
         let rec = PackRegistry::by_tier(PackTier::Recommended);
-        assert_eq!(rec.len(), 3);
+        assert_eq!(rec.len(), 2);
     }
 
     #[test]
@@ -172,11 +165,10 @@ mod tests {
 
     #[test]
     fn test_skills_for_packs() {
-        let enabled = vec!["task-management".to_string(), "developer-tools".to_string()];
+        let enabled = vec!["task-management".to_string(), "productivity".to_string()];
         let skills = PackRegistry::skills_for_packs(&enabled);
         assert!(skills.contains(&"todo".to_string()));
-        assert!(skills.contains(&"github".to_string()));
-        assert!(skills.contains(&"tmux".to_string()));
+        assert!(skills.contains(&"daily-planning".to_string()));
         assert!(!skills.contains(&"weather".to_string()));
     }
 

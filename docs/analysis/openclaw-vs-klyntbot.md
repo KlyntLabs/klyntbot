@@ -51,7 +51,7 @@
 | **Mobile apps** | iOS (SwiftUI), Android (Jetpack), macOS native | None |
 | **Canvas / Generative UI** | Yes (HTTP/WebSocket canvas host) | None |
 
-**Bottom line**: Both frameworks now have plugin systems, browser automation, and zero-infrastructure storage. openclaw leads in ecosystem breadth (mobile, canvas, channel count, npm community). klyntbot leads in architectural depth (planning, orchestration with active learning loop, hierarchical sub-agents, domain models, WASM sandboxing, Rust safety).
+**Bottom line**: Both projects now have plugin systems, browser automation, and zero-infrastructure storage. openclaw leads in ecosystem breadth (mobile, canvas, channel count, npm community). klyntbot leads in architectural depth (planning, orchestration with active learning loop, hierarchical sub-agents, domain models, WASM sandboxing, Rust safety). klyntbot intentionally omits code execution — it's a personal AI agent for task management and app integration, not a developer tool.
 
 ---
 
@@ -82,7 +82,7 @@
 │ Finance tools               │ ❌           │ ✅ (optional pack)  │
 │ Adaptive orchestration      │ ❌           │ ✅ heuristic+LLM    │
 │                             │              │   + learning loop   │
-│ Hierarchical sub-agents     │ Partial      │ ✅ 4 profiles       │
+│ Hierarchical sub-agents     │ Partial      │ ✅ 3 profiles       │
 │ User satisfaction feedback  │ ❌           │ ✅ reaction→score   │
 │ Mobile apps                 │ ✅ iOS/Android│ ❌                  │
 │ Docker sandbox              │ ✅           │ ❌                  │
@@ -113,21 +113,22 @@
 
 ### klyntbot
 
-- **Framework-first**: Rust AI agent framework for developers building autonomous agents
+- **Personal AI agent**: Connects chat platforms, calendars, tasks, and third-party apps into a single autonomous assistant
 - **Operator-grade reliability**: Single binary, minimal attack surface, zero-downtime restarts
 - **Domain-intelligent**: Deep task/project/goal/planning integration, not just a chat relay
-- **Backend-native**: No mobile app — integrates with existing infrastructure (Telegram, Discord, etc. as front-ends)
+- **App integration hub**: No mobile app — orchestrates existing platforms (Telegram, Discord, etc.) as front-ends, with browser automation and WASM plugins for third-party connectivity
 - **Autonomous operation**: Multi-step planning, adaptive strategy routing, cron-driven autonomous turns
-- **Target user**: Developers who want a programmable autonomous agent with persistent state and intelligent scheduling
+- **Target user**: Anyone who wants an always-on personal agent that manages tasks, schedules, and app integrations across all their chat platforms
+- **Non-goal**: Code execution / IDE tooling — users have dedicated tools for that (Claude Code, Cursor, Codex, etc.). Future scope includes providing context/memory services to those tools.
 
 ### Comparison
 
 | Aspect | openclaw | klyntbot |
 |--------|----------|----------|
-| **Primary metaphor** | Personal assistant across all your apps | Autonomous agent with persistent intelligence |
+| **Primary metaphor** | Personal assistant across all your apps | Personal AI agent connecting apps + managing life |
 | **Setup complexity** | Medium (daemon, config wizard, channel auth) | Low (init wizard, zero infrastructure) |
-| **Extensibility model** | Community plugins (npm ecosystem) | Source-code modifications + skill files |
-| **End-user vs developer** | Both (mobile app for end users) | Developer-first |
+| **Extensibility model** | Community plugins (npm ecosystem) | WASM plugins + skill files |
+| **End-user vs developer** | Both (mobile app for end users) | End-user-first (no code execution) |
 | **Operator model** | Self-hosted on your devices | Self-hosted on server/laptop |
 
 ---
@@ -193,7 +194,7 @@
 │  Layer 2: calendar   ← CalDAV sync engine                       │
 │  Layer 2.5: plugin-runtime ← Extism WASM sandbox, PluginManager │
 │                                                                  │
-│  Layer 3: tools      ← Tool trait, 13+ implementations          │
+│  Layer 3: tools      ← Tool trait, 12+ implementations          │
 │                        Handler traits (SpawnHandler, etc.)       │
 │                        BrowserTool (agent-browser subprocess)    │
 │                                                                  │
@@ -203,7 +204,7 @@
 │  Layer 5: agent      ← AgentLoop, Orchestrator, ContextEngine   │
 │                        EngineDispatch, PlanExecutor,            │
 │                        MemoryStore, SkillManager, SubagentMgr   │
-│                        SubagentProfile (4 profiles, tool gates) │
+│                        SubagentProfile (3 profiles, tool gates) │
 │                        Strategy persistence (pipeline Step 6)   │
 │                                                                  │
 │  Layer 6: cli        ← Clap CLI (5 commands), init wizard       │
@@ -373,7 +374,7 @@ OutboundMessage → MessageBus → Channels
 - **Budget-aware context**: Token allocation varies by execution strategy
 - **Multiple execution engines**: Different loop behaviours for different task types
 - **Active learning loop**: Pipeline Step 6 persists every strategy outcome (`StrategyRecordRow` with predicted/actual strategy, escalation count, iterations used, response time, chat_id). The orchestrator reads these records to calibrate future classification decisions. User reactions (emoji on channel messages) backfill a satisfaction score to the most recent strategy record via `set_satisfaction_for_chat()`.
-- **Hierarchical sub-agents**: `SubagentProfile` enum (General, Research, Code, Analyst) with profile-based tool registration and iteration limits. LLM selects profile via `SpawnTool` parameter. Each profile gets a role-specific system prompt and restricted tool set (e.g., Analyst gets read-only filesystem, no shell/web).
+- **Hierarchical sub-agents**: `SubagentProfile` enum (General, Research, Analyst) with profile-based tool registration and iteration limits. LLM selects profile via `SpawnTool` parameter. Each profile gets a role-specific system prompt and restricted tool set (e.g., Analyst gets read-only web access, no filesystem).
 - **Planning integration**: Plan execution steps have their own cycle with backtracking. `PlanCompletionHandler` increments typed goal columns (`plans_completed`, `plans_failed`, `avg_duration_ms`) on plan completion.
 
 ### Comparison
@@ -387,7 +388,7 @@ OutboundMessage → MessageBus → Channels
 | **Token budget management** | Implicit (PI library handles) | Explicit per-strategy budget splits |
 | **History compression** | Native LLM compaction | 3 modes: extractive, abstractive, sliding |
 | **Adaptive learning** | None | Active loop: strategy persistence → classifier feedback → satisfaction backfill |
-| **Subagent spawning** | Yes (isolated sessions, descendant tracking) | Yes (SpawnHandler, 4 profiles: General/Research/Code/Analyst) |
+| **Subagent spawning** | Yes (isolated sessions, descendant tracking) | Yes (SpawnHandler, 3 profiles: General/Research/Analyst) |
 | **User satisfaction** | None | Emoji reactions → satisfaction score on strategy records |
 
 **klyntbot advantage**: Sophisticated orchestration, adaptive routing, and multiple execution engines.
@@ -536,15 +537,14 @@ pub trait Tool: Send + Sync {
 }
 ```
 
-**13+ core tools**:
+**12+ core tools** (no code execution — klyntbot is a personal agent, not a dev tool):
 
 | Tool | Actions | Notes |
 |------|---------|-------|
-| `FilesystemTool` | read_file, write_file, list_dir, delete_file | Path expansion, parent dir creation |
-| `ShellTool` | run_command, kill_process | Timeout enforcement |
+| `FilesystemTool` | read_file, write_file, list_dir, delete_file | Document/note management, path expansion |
 | `WebTool` | fetch_page, query_api | HTML→text conversion |
 | `MessageTool` | send | Cross-channel via bus |
-| `SpawnTool` | spawn_subagent | Profile-based (general/research/code/analyst) |
+| `SpawnTool` | spawn_subagent | Profile-based (general/research/analyst) |
 | `GoalTool` | create, show, list, update, metrics | Typed plan completion tracking |
 | `CronTool` | schedule, list_jobs, cancel_job | Delegates to CronHandler |
 | `AskUserTool` | ask | Blocks on interaction_rx |
@@ -563,7 +563,7 @@ pub trait Tool: Send + Sync {
 |--------|----------|----------|
 | **Tool interface** | TypeBox-validated async function | Rust trait with `execute(&action, params, ctx)` |
 | **Schema generation** | TypeBox (runtime, typed) | `serde_json::Value` (manual JSON schema) |
-| **Tool count (built-in)** | ~15 (via bundled plugins) | 13+ core tools |
+| **Tool count (built-in)** | ~15 (via bundled plugins) | 12+ core tools (no code execution) |
 | **Tool discovery** | Plugin load time | `ToolRegistry::get_definitions()` |
 | **Browser tool** | ✅ (Playwright, full CDP) | ✅ (agent-browser, trust-level guards) |
 | **Media tool** | ✅ (multi-provider vision) | ❌ |
@@ -929,7 +929,7 @@ subagent_ended          gateway_start          gateway_stop
    pub enum PackTier { Core, Recommended, Optional }
    pub struct Pack { id, tier, skills: Vec<String>, description }
    ```
-   7 packs: task-management, productivity, ai-intelligence, developer-tools, finance, weather, skill-creator
+   6 packs: task-management, productivity, ai-intelligence, finance, weather, skill-creator
 
 3. **Skills** (SKILL.md files, filesystem-loaded):
    - Loaded from `skills/` at startup
@@ -954,7 +954,7 @@ subagent_ended          gateway_start          gateway_stop
 | **Plugin CLI** | npm install | ✅ (install, list, remove, update, search, new, publish) |
 | **Registry distribution** | ✅ (npm) | ✅ (plugins.klyntbot.io + GitHub) |
 | **Bundled extensions** | 40+ | N/A (plugins are external) |
-| **Feature packs** | ❌ | ✅ (7 packs, wizard selection) |
+| **Feature packs** | ❌ | ✅ (6 packs, wizard selection) |
 
 **openclaw advantage**: Broader plugin capabilities (channels, providers, hooks, HTTP routes). Larger existing npm ecosystem.
 **klyntbot advantage**: WASM sandboxing (security), multi-language support, explicit permission model, per-plugin storage isolation.
@@ -989,7 +989,7 @@ metadata:
 
 ### klyntbot Skills
 
-10 built-in skills in `skills/{id}/SKILL.md`:
+8 built-in skills in `skills/{id}/SKILL.md`:
 
 ```
 todo           — Task management quick reference
@@ -997,8 +997,6 @@ todo-yolo      — Rapid task creation with auto-enrichment
 todo-party     — Interactive brainstorming task creation
 daily-planning — Morning/evening planning prompts
 summarize      — Document + conversation summarization
-github         — GitHub issue/PR queries + actions
-tmux           — tmux session management
 skill-creator  — User-defined skill generation
 finance        — Personal finance guidance
 weekly-report  — Auto-generated weekly summaries
@@ -1010,7 +1008,7 @@ Skills are **filtered by feature packs** — only skills from enabled packs are 
 
 | Aspect | openclaw | klyntbot |
 |--------|----------|----------|
-| **Built-in skills** | 54+ | 10 |
+| **Built-in skills** | 54+ | 8 |
 | **External skills (user)** | ✅ (workspace skills dir) | ✅ (workspace `~/.klyntbot/skills/`) |
 | **Installation metadata** | ✅ (brew/npm/pip instructions) | ❌ |
 | **OS compatibility** | ✅ (darwin/linux/win32) | ❌ |
@@ -1541,8 +1539,8 @@ All four original klyntbot gaps have been closed: plugin system (WASM/Extism), b
 | **Deployment** | Node + daemon mgmt + mobile | Single binary, zero infra | Tie |
 | **Mobile apps** | iOS + Android + macOS | ❌ | openclaw ✅✅ |
 | **Adaptive orchestration** | ❌ | Two-stage + active learning + satisfaction | klyntbot ✅✅ |
-| **Hierarchical sub-agents** | Partial (isolated sessions) | 4 profiles + tool restriction | klyntbot ✅ |
+| **Hierarchical sub-agents** | Partial (isolated sessions) | 3 profiles + tool restriction | klyntbot ✅ |
 | **Infrastructure requirement** | Node.js 22+ | None | klyntbot ✅ |
 | **Startup / footprint** | ~3-5s / ~300MB | ~200ms / ~50MB | klyntbot ✅ |
 
-**Overall**: The gap has narrowed significantly. openclaw leads in ecosystem breadth (mobile, canvas, media, channels). klyntbot leads in architectural depth (planning, active learning loop, hierarchical sub-agents, domain models) and operational simplicity (zero infrastructure, single binary, WASM sandboxing). The learning loop closes what was previously a write-only strategy system — klyntbot now persists every strategy outcome, feeds it back to the orchestrator, and incorporates user satisfaction signals from emoji reactions across Telegram, Discord, and Slack.
+**Overall**: The gap has narrowed significantly. openclaw leads in ecosystem breadth (mobile, canvas, media, channels, code execution). klyntbot leads in architectural depth (planning, active learning loop, hierarchical sub-agents, domain models) and operational simplicity (zero infrastructure, single binary, WASM sandboxing). klyntbot is positioned as a **personal AI agent** — it manages tasks, schedules, and app integrations but intentionally does not execute code (users have dedicated tools like Claude Code, Cursor, Codex for that). Future scope includes providing context/memory services to those coding tools.

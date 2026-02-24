@@ -15,7 +15,6 @@ const BUILTIN_SKILLS: &[(&str, &str)] = &[
         "daily-planning",
         include_str!("../../../skills/daily-planning/SKILL.md"),
     ),
-    ("github", include_str!("../../../skills/github/SKILL.md")),
     (
         "skill-creator",
         include_str!("../../../skills/skill-creator/SKILL.md"),
@@ -24,7 +23,6 @@ const BUILTIN_SKILLS: &[(&str, &str)] = &[
         "summarize",
         include_str!("../../../skills/summarize/SKILL.md"),
     ),
-    ("tmux", include_str!("../../../skills/tmux/SKILL.md")),
     ("todo", include_str!("../../../skills/todo/SKILL.md")),
     (
         "todo-party",
@@ -386,11 +384,11 @@ mod tests {
         let mut mgr = SkillManager::new();
         mgr.load_builtin_skills().unwrap();
 
-        let enabled_skills = vec!["todo".to_string(), "github".to_string()];
+        let enabled_skills = vec!["todo".to_string(), "summarize".to_string()];
         mgr.filter_by_skills(&enabled_skills);
 
         assert!(mgr.get("todo").is_some());
-        assert!(mgr.get("github").is_some());
+        assert!(mgr.get("summarize").is_some());
         assert!(mgr.get("weather").is_none());
     }
 

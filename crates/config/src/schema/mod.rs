@@ -102,28 +102,7 @@ mod tests {
     fn test_tools_config_default() {
         let config = ToolsConfig::default();
         assert!(!config.restrict_to_workspace);
-        assert_eq!(config.exec.timeout, 60);
         assert_eq!(config.web.brave_api_key.expose(), "");
-    }
-
-    #[test]
-    fn test_exec_tool_config() {
-        let config = ExecToolConfig {
-            timeout: 120,
-            allowed_commands: vec!["ls".to_string(), "pwd".to_string()],
-        };
-
-        let json = serde_json::to_value(&config).unwrap();
-        assert_eq!(json["timeout"], 120);
-        assert_eq!(json["allowedCommands"][0], "ls");
-        assert_eq!(json["allowedCommands"][1], "pwd");
-    }
-
-    #[test]
-    fn test_tools_exec_timeout_default() {
-        let config = ExecToolConfig::default();
-        assert_eq!(config.timeout, 60);
-        assert!(config.allowed_commands.is_empty());
     }
 
     #[test]

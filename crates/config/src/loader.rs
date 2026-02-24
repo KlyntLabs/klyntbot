@@ -389,7 +389,6 @@ mod tests {
     fn test_tools_config_defaults() {
         let config = super::super::schema::ToolsConfig::default();
         assert!(!config.restrict_to_workspace);
-        assert_eq!(config.exec.timeout, 60);
     }
 
     #[test]
@@ -743,7 +742,6 @@ mod tests {
         assert_eq!(loaded.agents.defaults.temperature, 0.7);
         assert_eq!(loaded.providers.anthropic.api_key.expose(), "");
         assert!(!loaded.channels.discord.enabled);
-        assert_eq!(loaded.tools.exec.timeout, 60);
         assert_eq!(loaded.gateway.port, 18790);
     }
 

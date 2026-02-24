@@ -1,4 +1,4 @@
-//! Tools configuration: ToolsConfig, PermissionsConfig, WebToolsConfig, ExecToolConfig.
+//! Tools configuration: ToolsConfig, PermissionsConfig, WebToolsConfig.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -12,9 +12,6 @@ use super::core::Secret;
 pub struct ToolsConfig {
     #[serde(default)]
     pub web: WebToolsConfig,
-
-    #[serde(default)]
-    pub exec: ExecToolConfig,
 
     #[serde(default)]
     pub browser: BrowserConfig,
@@ -65,30 +62,6 @@ impl Default for WebToolsConfig {
             max_results: default_web_max_results(),
         }
     }
-}
-
-/// Exec tool configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ExecToolConfig {
-    #[serde(default = "default_timeout")]
-    pub timeout: u64,
-
-    #[serde(default)]
-    pub allowed_commands: Vec<String>,
-}
-
-impl Default for ExecToolConfig {
-    fn default() -> Self {
-        Self {
-            timeout: default_timeout(),
-            allowed_commands: Vec::new(),
-        }
-    }
-}
-
-fn default_timeout() -> u64 {
-    60
 }
 
 fn default_web_max_results() -> u8 {

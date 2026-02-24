@@ -87,11 +87,6 @@ pub fn apply_pack_config(config: &mut Config, enabled_packs: &[String]) {
     config.conversation.search.enabled = has("ai-intelligence");
     config.learning.enabled = has("ai-intelligence");
 
-    // --- developer-tools ---
-    if has("developer-tools") {
-        config.tools.restrict_to_workspace = true;
-    }
-
     // --- finance ---
     config.finance.enabled = has("finance");
 
@@ -472,7 +467,7 @@ mod tests {
     #[test]
     fn test_build_pack_options_returns_all_packs() {
         let options = build_pack_options(&[]);
-        assert_eq!(options.len(), 8);
+        assert_eq!(options.len(), 7);
     }
 
     #[test]
@@ -556,25 +551,14 @@ mod tests {
     #[test]
     fn test_apply_pack_config_updates_packs_config() {
         let mut config = Config::default();
-        let selection = vec!["task-management".to_string(), "developer-tools".to_string()];
+        let selection = vec!["task-management".to_string(), "productivity".to_string()];
 
         apply_pack_config(&mut config, &selection);
 
         assert_eq!(config.packs.enabled, selection);
         assert!(config.packs.enabled_skills.contains(&"todo".to_string()));
-        assert!(config.packs.enabled_skills.contains(&"github".to_string()));
+        assert!(config.packs.enabled_skills.contains(&"daily-planning".to_string()));
         assert!(!config.packs.enabled_skills.contains(&"weather".to_string()));
-    }
-
-    #[test]
-    fn test_apply_pack_config_developer_tools_restricts_workspace() {
-        let mut config = Config::default();
-        config.tools.restrict_to_workspace = false;
-
-        let selection = vec!["task-management".to_string(), "developer-tools".to_string()];
-        apply_pack_config(&mut config, &selection);
-
-        assert!(config.tools.restrict_to_workspace);
     }
 
     #[test]
