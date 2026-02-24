@@ -44,6 +44,7 @@ pub struct PluginConfigField {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PluginManifest {
     pub id: String,
     pub name: String,
@@ -83,21 +84,30 @@ impl PluginManifest {
 mod tests {
     use super::*;
 
+    const MINIMAL: &str = r#"{"id":"hello-plugin","name":"Hello Plugin","version":"1.0.0","description":"A test plugin","author":"test"}"#;
+
+    const FULL: &str = r#"{
+        "id": "notion-connector",
+        "name": "Notion Connector",
+        "version": "1.2.0",
+        "description": "Search and create Notion pages",
+        "author": "jayden",
+        "minKlyntbotVersion": "0.4.0",
+        "tools": [{"name":"notion_search","description":"Search Notion pages","parameters":{"type":"object","properties":{"query":{"type":"string"}},"required":["query"]}}],
+        "cronJobs": [{"tool":"notion_sync","schedule":"0 * * * *","description":"Hourly Notion sync"}],
+        "migrations": [{"version":1,"description":"Create cache table","sql":"CREATE TABLE plugin_notion_connector_cache (id TEXT PRIMARY KEY)"}],
+        "permissions": ["network", "storage"],
+        "configSchema": {"api_key":{"type":"string","secret":true,"description":"Notion API key"}}
+    }"#;
+
     #[test]
-    fn test_parse_minimal_manifest() {
-        let json = r#"{
-            "id": "hello",
-            "name": "Hello Plugin",
-            "version": "0.1.0",
-            "description": "A test plugin",
-            "author": "Test Author"
-        }"#;
-        let manifest = PluginManifest::from_json(json).unwrap();
-        assert_eq!(manifest.id, "hello");
+    fn test_minimal_manifest_parses() {
+        let manifest = PluginManifest::from_json(MINIMAL).unwrap();
+        assert_eq!(manifest.id, "hello-plugin");
         assert_eq!(manifest.name, "Hello Plugin");
-        assert_eq!(manifest.version, "0.1.0");
+        assert_eq!(manifest.version, "1.0.0");
         assert_eq!(manifest.description, "A test plugin");
-        assert_eq!(manifest.author, "Test Author");
+        assert_eq!(manifest.author, "test");
         assert!(manifest.min_klyntbot_version.is_none());
         assert!(manifest.tools.is_empty());
         assert!(manifest.cron_jobs.is_empty());
@@ -107,97 +117,66 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_full_manifest() {
-        let json = r#"{
-            "id": "weather",
-            "name": "Weather Plugin",
-            "version": "1.2.3",
-            "description": "Fetches weather data",
-            "author": "Jane Doe",
-            "min_klyntbot_version": "0.3.0",
-            "tools": [
-                {
-                    "name": "get_weather",
-                    "description": "Get current weather",
-                    "parameters": {"type": "object", "properties": {"city": {"type": "string"}}}
-                }
-            ],
-            "cron_jobs": [
-                {
-                    "tool": "get_weather",
-                    "schedule": "0 */6 * * *",
-                    "description": "Check weather every 6 hours"
-                }
-            ],
-            "migrations": [
-                {
-                    "version": 1,
-                    "description": "Create weather cache table",
-                    "sql": "CREATE TABLE weather_cache (id INTEGER PRIMARY KEY);"
-                }
-            ],
-            "permissions": ["network", "storage"],
-            "config_schema": {
-                "api_key": {
-                    "type": "string",
-                    "secret": true,
-                    "description": "Weather API key"
-                }
-            }
-        }"#;
-        let manifest = PluginManifest::from_json(json).unwrap();
-        assert_eq!(manifest.id, "weather");
-        assert_eq!(manifest.version, "1.2.3");
+    fn test_full_manifest_parses() {
+        let manifest = PluginManifest::from_json(FULL).unwrap();
+        assert_eq!(manifest.id, "notion-connector");
+        assert_eq!(manifest.name, "Notion Connector");
+        assert_eq!(manifest.version, "1.2.0");
         assert_eq!(
-            manifest.min_klyntbot_version,
-            Some("0.3.0".to_string())
+            manifest.min_klyntbot_version.as_deref(),
+            Some("0.4.0")
         );
+
+        // Tools
         assert_eq!(manifest.tools.len(), 1);
-        assert_eq!(manifest.tools[0].name, "get_weather");
+        assert_eq!(manifest.tools[0].name, "notion_search");
+        assert_eq!(manifest.tools[0].parameters["required"][0], "query");
+
+        // Cron jobs
         assert_eq!(manifest.cron_jobs.len(), 1);
-        assert_eq!(manifest.cron_jobs[0].schedule, "0 */6 * * *");
+        assert_eq!(manifest.cron_jobs[0].tool, "notion_sync");
+        assert_eq!(manifest.cron_jobs[0].schedule, "0 * * * *");
+
+        // Migrations
         assert_eq!(manifest.migrations.len(), 1);
         assert_eq!(manifest.migrations[0].version, 1);
+        assert!(manifest.migrations[0].sql.contains("plugin_notion_connector_cache"));
+
+        // Permissions
         assert_eq!(manifest.permissions.len(), 2);
         assert!(manifest.has_permission(&PluginPermission::Network));
         assert!(manifest.has_permission(&PluginPermission::Storage));
         assert!(!manifest.has_permission(&PluginPermission::Agent));
-        let api_key_field = manifest.config_schema.get("api_key").unwrap();
-        assert!(api_key_field.secret);
-        assert_eq!(api_key_field.field_type, "string");
+
+        // Config schema
+        let api_key = &manifest.config_schema["api_key"];
+        assert_eq!(api_key.field_type, "string");
+        assert!(api_key.secret);
+        assert_eq!(api_key.description, "Notion API key");
     }
 
     #[test]
     fn test_has_permission() {
-        let json = r#"{
-            "id": "test",
-            "name": "Test",
-            "version": "0.1.0",
-            "description": "Test",
-            "author": "Test",
-            "permissions": ["network", "agent"]
-        }"#;
-        let manifest = PluginManifest::from_json(json).unwrap();
+        let manifest = PluginManifest::from_json(FULL).unwrap();
         assert!(manifest.has_permission(&PluginPermission::Network));
-        assert!(manifest.has_permission(&PluginPermission::Agent));
-        assert!(!manifest.has_permission(&PluginPermission::Storage));
+        assert!(manifest.has_permission(&PluginPermission::Storage));
+        assert!(!manifest.has_permission(&PluginPermission::Agent));
     }
 
     #[test]
-    fn test_missing_required_fields() {
-        let json = r#"{"id": "incomplete"}"#;
-        let result = PluginManifest::from_json(json);
-        assert!(result.is_err());
+    fn test_missing_required_fields_errors() {
+        let json = r#"{"id":"incomplete"}"#;
+        assert!(PluginManifest::from_json(json).is_err());
     }
 
     #[test]
-    fn test_unknown_permission_fails() {
+    fn test_unknown_permission_errors() {
         let json = r#"{
-            "id": "test",
-            "name": "Test",
+            "id": "bad",
+            "name": "Bad",
             "version": "0.1.0",
-            "description": "Test",
-            "author": "Test",
+            "description": "Bad perms",
+            "author": "test",
             "permissions": ["unknown_perm"]
         }"#;
         let result = PluginManifest::from_json(json);
@@ -208,16 +187,10 @@ mod tests {
     fn test_from_file() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("klyntbot.plugin.json");
-        std::fs::write(&path, r#"{
-            "id": "file-test",
-            "name": "File Test",
-            "version": "0.1.0",
-            "description": "Loaded from file",
-            "author": "test"
-        }"#).unwrap();
+        std::fs::write(&path, MINIMAL).unwrap();
 
         let manifest = PluginManifest::from_file(&path).unwrap();
-        assert_eq!(manifest.id, "file-test");
+        assert_eq!(manifest.id, "hello-plugin");
     }
 
     #[test]
@@ -228,18 +201,11 @@ mod tests {
 
     #[test]
     fn test_roundtrip_serialize() {
-        let json = r#"{
-            "id": "rt",
-            "name": "Roundtrip",
-            "version": "0.1.0",
-            "description": "Test roundtrip",
-            "author": "test",
-            "permissions": ["network", "agent"]
-        }"#;
-        let manifest = PluginManifest::from_json(json).unwrap();
+        let manifest = PluginManifest::from_json(FULL).unwrap();
         let serialized = serde_json::to_string(&manifest).unwrap();
         let restored = PluginManifest::from_json(&serialized).unwrap();
         assert_eq!(manifest.id, restored.id);
+        assert_eq!(manifest.tools.len(), restored.tools.len());
         assert_eq!(manifest.permissions, restored.permissions);
     }
 
@@ -251,7 +217,7 @@ mod tests {
             "version": "0.1.0",
             "description": "Test",
             "author": "test",
-            "cron_jobs": [{"tool": "ping", "schedule": "* * * * *"}]
+            "cronJobs": [{"tool": "ping", "schedule": "* * * * *"}]
         }"#;
         let manifest = PluginManifest::from_json(json).unwrap();
         assert_eq!(manifest.cron_jobs[0].description, "");
@@ -265,11 +231,23 @@ mod tests {
             "version": "0.1.0",
             "description": "Test",
             "author": "test",
-            "config_schema": {"url": {"type": "string"}}
+            "configSchema": {"url": {"type": "string"}}
         }"#;
         let manifest = PluginManifest::from_json(json).unwrap();
         let field = &manifest.config_schema["url"];
         assert!(!field.secret);
         assert_eq!(field.description, "");
+    }
+
+    #[test]
+    fn test_serialized_keys_are_camel_case() {
+        let manifest = PluginManifest::from_json(FULL).unwrap();
+        let serialized = serde_json::to_string(&manifest).unwrap();
+        assert!(serialized.contains("minKlyntbotVersion"));
+        assert!(serialized.contains("cronJobs"));
+        assert!(serialized.contains("configSchema"));
+        assert!(!serialized.contains("min_klyntbot_version"));
+        assert!(!serialized.contains("cron_jobs"));
+        assert!(!serialized.contains("config_schema"));
     }
 }
