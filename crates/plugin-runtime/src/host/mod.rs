@@ -509,12 +509,8 @@ mod tests {
 
     #[test]
     fn test_is_select_only_accepts_select() {
-        assert!(is_select_only("SELECT * FROM users"));
-    }
-
-    #[test]
-    fn test_is_select_only_accepts_with_whitespace() {
-        assert!(is_select_only("  SELECT id FROM users"));
+        assert!(is_select_only("SELECT * FROM plugin_foo_bar"));
+        assert!(is_select_only("  select id from plugin_test_cache  "));
     }
 
     #[test]
@@ -524,23 +520,11 @@ mod tests {
     }
 
     #[test]
-    fn test_is_select_only_rejects_insert() {
-        assert!(!is_select_only("INSERT INTO users VALUES (1)"));
-    }
-
-    #[test]
-    fn test_is_select_only_rejects_delete() {
-        assert!(!is_select_only("DELETE FROM users"));
-    }
-
-    #[test]
-    fn test_is_select_only_rejects_update() {
-        assert!(!is_select_only("UPDATE users SET name='x'"));
-    }
-
-    #[test]
-    fn test_is_select_only_rejects_drop() {
-        assert!(!is_select_only("DROP TABLE users"));
+    fn test_is_select_only_rejects_write() {
+        assert!(!is_select_only("INSERT INTO plugin_foo VALUES (1)"));
+        assert!(!is_select_only("DELETE FROM plugin_foo"));
+        assert!(!is_select_only("UPDATE plugin_foo SET x=1"));
+        assert!(!is_select_only("DROP TABLE plugin_foo"));
     }
 
     #[test]
@@ -552,9 +536,13 @@ mod tests {
     // ── is_plugin_table ───────────────────────────────────────────
 
     #[test]
-    fn test_is_plugin_table_accepts_own_table() {
+    fn test_is_plugin_table_accepts_prefixed() {
         assert!(is_plugin_table(
             "plugin_notion_connector_cache",
+            "notion-connector"
+        ));
+        assert!(is_plugin_table(
+            "plugin_notion_connector_items",
             "notion-connector"
         ));
     }
@@ -565,16 +553,12 @@ mod tests {
     }
 
     #[test]
-    fn test_is_plugin_table_rejects_other_plugin() {
+    fn test_is_plugin_table_rejects_other_plugins() {
         assert!(!is_plugin_table(
-            "plugin_other_plugin_cache",
+            "plugin_other_plugin_data",
             "notion-connector"
         ));
-    }
-
-    #[test]
-    fn test_is_plugin_table_rejects_non_plugin_table() {
-        assert!(!is_plugin_table("users", "notion-connector"));
-        assert!(!is_plugin_table("todos", "my-plugin"));
+        assert!(!is_plugin_table("sessions", "notion-connector"));
+        assert!(!is_plugin_table("todos", "notion-connector"));
     }
 }
