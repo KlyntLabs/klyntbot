@@ -202,32 +202,42 @@ async fn test_e2e_outcomes_persist_and_are_analyzable_after_reload() {
 
 #[tokio::test]
 async fn test_e2e_learning_handler_analyze_now_with_real_data() {
-    let store = Arc::new(RwLock::new(OutcomeStore::new_in_memory()));
+    let pool = storage::StoragePool::connect_in_memory().await.unwrap();
+    let strategy_repo = storage::StrategyRepo::new(pool.inner().clone());
     let adaptive = Arc::new(RwLock::new(AdaptiveThresholds::new_in_memory(
         0.7, 0.4, 0.9, 50,
     )));
 
-    // Pre-populate the store
-    {
-        let sg = store.write().await;
-        for i in 0..10 {
-            sg.record(make_outcome(
-                &format!("r{}", i),
-                if i % 2 == 0 { "todo" } else { "shell" },
-                i % 3 != 0,
-                0.7,
-            ))
-            .await
-            .unwrap();
-        }
+    // Pre-populate the strategy_records table
+    for i in 0..10u32 {
+        let tool = if i % 2 == 0 { "todo" } else { "shell" };
+        let success = i % 3 != 0;
+        let row = storage::StrategyRecordRow {
+            id: uuid::Uuid::new_v4(),
+            timestamp: Utc::now(),
+            request_id: format!("r{}", i),
+            predicted_strategy: "ToolAssisted".to_string(),
+            actual_strategy: "ToolAssisted".to_string(),
+            escalation_count: 0,
+            iterations_used: 1,
+            max_iterations: 5,
+            success,
+            user_satisfaction: None,
+            response_time_ms: 50,
+            chat_id: None,
+            tool_name: Some(tool.to_string()),
+            tool_success: Some(success),
+            tool_duration_ms: Some(50),
+        };
+        strategy_repo.create(&row).await.unwrap();
     }
 
-    let handler = LearningHandlerImpl::new(Arc::clone(&store), Arc::clone(&adaptive));
+    let handler = LearningHandlerImpl::new(strategy_repo, adaptive);
     let status = handler.analyze_now().await.unwrap();
 
     assert_eq!(
-        status.total_outcomes, 10,
-        "must reflect 10 recorded outcomes"
+        status.total_strategy_records, 10,
+        "must reflect 10 recorded strategy records"
     );
     assert!(
         status.per_tool.contains_key("todo"),

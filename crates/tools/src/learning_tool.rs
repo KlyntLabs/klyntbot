@@ -16,16 +16,19 @@ use common::ToolError;
 /// Per-tool statistics summary exposed to the LLM via LearningTool.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolSummary {
-    pub total_calls: usize,
-    pub success_count: usize,
-    pub avg_duration_ms: f64,
+    pub total_calls: i64,
+    pub success_count: i64,
+    pub avg_duration_ms: i64,
 }
 
 /// High-level learning status returned to the LLM.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LearningStatus {
     pub current_threshold: f32,
-    pub total_outcomes: usize,
+    pub total_strategy_records: i64,
+    pub strategy_accuracy: f64,
+    pub avg_response_time_ms: i64,
+    pub avg_satisfaction: Option<f64>,
     pub suggested_threshold: f32,
     pub per_tool: HashMap<String, ToolSummary>,
 }

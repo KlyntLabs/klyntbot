@@ -667,7 +667,7 @@ impl AgentLoopBuilder {
 
             // Register LearningTool
             let learning_handler = Arc::new(super::super::LearningHandlerImpl::new(
-                Arc::clone(store),
+                repos.strategies.clone(),
                 Arc::clone(&adaptive),
             ));
             tool_registry.register(LearningTool::new(Some(

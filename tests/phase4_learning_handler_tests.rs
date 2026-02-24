@@ -2,8 +2,8 @@
 //!
 //! AC-I5.1: LearningHandler trait is defined in tools crate with get_status() and analyze_now()
 //! AC-I5.2: LearningTool implements Tool trait with name "learning", action enum in parameters
-//! AC-I5.3: LearningHandlerImpl returns None from get_status() when no outcomes exist,
-//!          Some(LearningStatus) when outcomes are present
+//! AC-I5.3: LearningHandlerImpl returns None from get_status() when no strategy records exist,
+//!          Some(LearningStatus) when strategy records are present
 //! AC-I5.4: LearningTool.execute() routes "status" and "analyze" actions correctly through handler
 //! AC-I5.5: get_threshold_history(limit) returns last N ThresholdEntry records; "history" action
 //!          in LearningTool routes correctly; empty Vec returned when no changes exist
@@ -14,7 +14,6 @@ use async_trait::async_trait;
 use chrono::Utc;
 use common::{ChannelName, ChatId, Result};
 use klyntbot::agent::learning::adaptive::AdaptiveThresholds;
-use klyntbot::agent::learning::{ExecutionMode, OutcomeRecord, OutcomeStore};
 use klyntbot::agent::learning_handler::LearningHandlerImpl;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -40,7 +39,10 @@ impl LearningHandler for MockLearningHandler {
     async fn analyze_now(&self) -> Result<LearningStatus> {
         Ok(self.status.clone().unwrap_or_else(|| LearningStatus {
             current_threshold: 0.7,
-            total_outcomes: 0,
+            total_strategy_records: 0,
+            strategy_accuracy: 0.0,
+            avg_response_time_ms: 0,
+            avg_satisfaction: None,
             suggested_threshold: 0.7,
             per_tool: HashMap::new(),
         }))
@@ -82,7 +84,10 @@ async fn test_learning_handler_trait_get_status_some() {
         history: vec![],
         status: Some(LearningStatus {
             current_threshold: 0.75,
-            total_outcomes: 10,
+            total_strategy_records: 10,
+            strategy_accuracy: 0.9,
+            avg_response_time_ms: 200,
+            avg_satisfaction: Some(0.8),
             suggested_threshold: 0.72,
             per_tool: HashMap::new(),
         }),
@@ -90,7 +95,7 @@ async fn test_learning_handler_trait_get_status_some() {
     let status = mock.get_status().await.unwrap();
     assert!(status.is_some());
     let s = status.unwrap();
-    assert_eq!(s.total_outcomes, 10);
+    assert_eq!(s.total_strategy_records, 10);
 }
 
 /// AC-I5.1: analyze_now() returns a LearningStatus even with no data.
@@ -101,7 +106,7 @@ async fn test_learning_handler_trait_analyze_now() {
         history: vec![],
     };
     let status = mock.analyze_now().await.unwrap();
-    assert_eq!(status.total_outcomes, 0);
+    assert_eq!(status.total_strategy_records, 0);
     assert!((status.current_threshold - 0.7).abs() < f32::EPSILON);
 }
 
@@ -179,60 +184,64 @@ fn test_learning_tool_to_schema() {
 }
 
 // ─────────────────────────────────────────────────────────────
-// AC-I5.3: LearningHandlerImpl with real OutcomeStore
+// AC-I5.3: LearningHandlerImpl with real StrategyRepo
 // ─────────────────────────────────────────────────────────────
 
-fn make_handler() -> (LearningHandlerImpl, Arc<RwLock<OutcomeStore>>) {
-    let store = Arc::new(RwLock::new(OutcomeStore::new_in_memory()));
+async fn make_handler() -> (LearningHandlerImpl, storage::StrategyRepo) {
+    let pool = storage::StoragePool::connect_in_memory().await.unwrap();
+    let strategy_repo = storage::StrategyRepo::new(pool.inner().clone());
     let adaptive = Arc::new(RwLock::new(AdaptiveThresholds::new_in_memory(
         0.7, 0.4, 0.9, 50,
     )));
-    let handler = LearningHandlerImpl::new(Arc::clone(&store), adaptive);
-    (handler, store)
+    let handler = LearningHandlerImpl::new(strategy_repo.clone(), adaptive);
+    (handler, strategy_repo)
 }
 
-/// AC-I5.3: get_status() returns None when OutcomeStore is empty.
+/// AC-I5.3: get_status() returns None when StrategyRepo is empty.
 #[tokio::test]
 async fn test_learning_handler_impl_get_status_empty_store() {
-    let (handler, _store) = make_handler();
+    let (handler, _repo) = make_handler().await;
 
     let status = handler.get_status().await.unwrap();
     assert!(
         status.is_none(),
-        "Expected None when no outcomes have been recorded"
+        "Expected None when no strategy records have been recorded"
     );
 }
 
-/// AC-I5.3: get_status() returns Some(LearningStatus) when outcomes exist.
+/// AC-I5.3: get_status() returns Some(LearningStatus) when strategy records exist.
 #[tokio::test]
 async fn test_learning_handler_impl_get_status_with_outcomes() {
-    let (handler, store) = make_handler();
+    let (handler, repo) = make_handler().await;
 
-    // Record an outcome
-    {
-        let store_guard = store.write().await;
-        store_guard
-            .record(OutcomeRecord {
-                id: "test-001".to_string(),
-                session_key: "cli:testhash".to_string(),
-                tool_name: "todo".to_string(),
-                success: true,
-                error_category: None,
-                duration_ms: 50,
-                confidence_score: Some(0.8),
-                confidence_dimensions: None,
-                execution_mode: ExecutionMode::Chat,
-                created_at: Utc::now(),
-            })
-            .await
-            .unwrap();
-    }
+    // Record a strategy record with tool info
+    let row = storage::StrategyRecordRow {
+        id: uuid::Uuid::new_v4(),
+        timestamp: Utc::now(),
+        request_id: "req-1".to_string(),
+        predicted_strategy: "DirectResponse".to_string(),
+        actual_strategy: "DirectResponse".to_string(),
+        escalation_count: 0,
+        iterations_used: 1,
+        max_iterations: 1,
+        success: true,
+        user_satisfaction: Some(1.0),
+        response_time_ms: 50,
+        chat_id: None,
+        tool_name: Some("todo".to_string()),
+        tool_success: Some(true),
+        tool_duration_ms: Some(25),
+    };
+    repo.create(&row).await.unwrap();
 
     let status = handler.get_status().await.unwrap();
-    assert!(status.is_some(), "Expected Some when outcomes exist");
+    assert!(
+        status.is_some(),
+        "Expected Some when strategy records exist"
+    );
 
     let s = status.unwrap();
-    assert_eq!(s.total_outcomes, 1);
+    assert_eq!(s.total_strategy_records, 1);
     assert!(
         s.per_tool.contains_key("todo"),
         "Expected 'todo' in per_tool stats"
@@ -241,13 +250,13 @@ async fn test_learning_handler_impl_get_status_with_outcomes() {
     assert_eq!(s.per_tool["todo"].success_count, 1);
 }
 
-/// AC-I5.3: analyze_now() always returns a LearningStatus (even with empty store).
+/// AC-I5.3: analyze_now() always returns a LearningStatus (even with empty repo).
 #[tokio::test]
 async fn test_learning_handler_impl_analyze_now_empty() {
-    let (handler, _store) = make_handler();
+    let (handler, _repo) = make_handler().await;
 
     let status = handler.analyze_now().await.unwrap();
-    assert_eq!(status.total_outcomes, 0);
+    assert_eq!(status.total_strategy_records, 0);
     // threshold should still be the initial 0.7
     assert!(
         (status.current_threshold - 0.7).abs() < 0.001,
@@ -256,48 +265,53 @@ async fn test_learning_handler_impl_analyze_now_empty() {
     );
 }
 
-/// AC-I5.3: analyze_now() reflects multiple outcomes with per-tool aggregation.
+/// AC-I5.3: analyze_now() reflects multiple records with per-tool aggregation.
 #[tokio::test]
 async fn test_learning_handler_impl_analyze_now_with_outcomes() {
-    let (handler, store) = make_handler();
+    let (handler, repo) = make_handler().await;
 
-    // Record two outcomes for "todo" and one for "shell"
-    {
-        let sg = store.write().await;
-        for i in 0..2 {
-            sg.record(OutcomeRecord {
-                id: format!("todo-{}", i),
-                session_key: "cli:hash".to_string(),
-                tool_name: "todo".to_string(),
-                success: true,
-                error_category: None,
-                duration_ms: 30,
-                confidence_score: None,
-                confidence_dimensions: None,
-                execution_mode: ExecutionMode::Chat,
-                created_at: Utc::now(),
-            })
-            .await
-            .unwrap();
-        }
-        sg.record(OutcomeRecord {
-            id: "shell-0".to_string(),
-            session_key: "cli:hash".to_string(),
-            tool_name: "shell".to_string(),
-            success: false,
-            error_category: Some("timeout".to_string()),
-            duration_ms: 5000,
-            confidence_score: None,
-            confidence_dimensions: None,
-            execution_mode: ExecutionMode::Chat,
-            created_at: Utc::now(),
-        })
-        .await
-        .unwrap();
+    // Record two strategy records with "todo" tool and one with "shell"
+    for i in 0..2 {
+        let row = storage::StrategyRecordRow {
+            id: uuid::Uuid::new_v4(),
+            timestamp: Utc::now(),
+            request_id: format!("req-todo-{}", i),
+            predicted_strategy: "ToolAssisted".to_string(),
+            actual_strategy: "ToolAssisted".to_string(),
+            escalation_count: 0,
+            iterations_used: 1,
+            max_iterations: 5,
+            success: true,
+            user_satisfaction: None,
+            response_time_ms: 100,
+            chat_id: None,
+            tool_name: Some("todo".to_string()),
+            tool_success: Some(true),
+            tool_duration_ms: Some(30),
+        };
+        repo.create(&row).await.unwrap();
     }
+    let shell_row = storage::StrategyRecordRow {
+        id: uuid::Uuid::new_v4(),
+        timestamp: Utc::now(),
+        request_id: "req-shell-0".to_string(),
+        predicted_strategy: "ToolAssisted".to_string(),
+        actual_strategy: "ToolAssisted".to_string(),
+        escalation_count: 0,
+        iterations_used: 1,
+        max_iterations: 5,
+        success: true,
+        user_satisfaction: None,
+        response_time_ms: 5000,
+        chat_id: None,
+        tool_name: Some("shell".to_string()),
+        tool_success: Some(false),
+        tool_duration_ms: Some(5000),
+    };
+    repo.create(&shell_row).await.unwrap();
 
     let status = handler.analyze_now().await.unwrap();
-    assert_eq!(status.total_outcomes, 3);
+    assert_eq!(status.total_strategy_records, 3);
     assert_eq!(status.per_tool["todo"].total_calls, 2);
     assert_eq!(status.per_tool["todo"].success_count, 2);
     assert_eq!(status.per_tool["shell"].total_calls, 1);
@@ -315,7 +329,10 @@ async fn test_learning_tool_execute_status_with_data() {
         history: vec![],
         status: Some(LearningStatus {
             current_threshold: 0.75,
-            total_outcomes: 42,
+            total_strategy_records: 42,
+            strategy_accuracy: 0.85,
+            avg_response_time_ms: 300,
+            avg_satisfaction: Some(0.9),
             suggested_threshold: 0.72,
             per_tool: HashMap::new(),
         }),
@@ -328,7 +345,7 @@ async fn test_learning_tool_execute_status_with_data() {
     let result = tool.execute(args, &ctx).await.unwrap();
     let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
 
-    assert_eq!(parsed["total_outcomes"], 42);
+    assert_eq!(parsed["total_strategy_records"], 42);
     assert!(
         (parsed["current_threshold"].as_f64().unwrap() as f32 - 0.75).abs() < 0.001,
         "Expected current_threshold ~0.75, got {}",
@@ -374,8 +391,8 @@ async fn test_learning_tool_execute_analyze() {
 
     // analyze_now always returns a status
     assert!(
-        parsed["total_outcomes"].is_number(),
-        "Expected total_outcomes in response"
+        parsed["total_strategy_records"].is_number(),
+        "Expected total_strategy_records in response"
     );
     assert!(
         parsed["current_threshold"].is_number(),
@@ -482,7 +499,7 @@ async fn test_learning_handler_trait_threshold_history_respects_limit() {
 /// AC-I5.5: LearningHandlerImpl.get_threshold_history() returns empty Vec with no changes.
 #[tokio::test]
 async fn test_learning_handler_impl_threshold_history_empty() {
-    let (handler, _store) = make_handler();
+    let (handler, _repo) = make_handler().await;
 
     let history = handler.get_threshold_history(10).await.unwrap();
     assert!(
