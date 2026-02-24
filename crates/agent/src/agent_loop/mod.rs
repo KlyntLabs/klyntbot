@@ -123,10 +123,7 @@ impl AgentLoop {
                     );
                 }
                 Ok(false) => {
-                    debug!(
-                        "No recent strategy record found for chat {}",
-                        msg.chat_id
-                    );
+                    debug!("No recent strategy record found for chat {}", msg.chat_id);
                 }
                 Err(e) => {
                     warn!("Failed to update satisfaction: {}", e);
@@ -629,11 +626,11 @@ impl AgentLoop {
 /// Returns None for unrecognized emoji (silently ignored).
 fn reaction_to_satisfaction(emoji: &str) -> Option<f32> {
     match emoji.trim() {
-        "\u{1F44D}" => Some(1.0),  // 👍
+        "\u{1F44D}" => Some(1.0),                     // 👍
         "\u{2764}\u{FE0F}" | "\u{2764}" => Some(1.0), // ❤️ / ❤
-        "\u{1F389}" => Some(1.0),  // 🎉
-        "\u{1F44E}" => Some(0.0),  // 👎
-        "\u{1F615}" => Some(0.0),  // 😕
+        "\u{1F389}" => Some(1.0),                     // 🎉
+        "\u{1F44E}" => Some(0.0),                     // 👎
+        "\u{1F615}" => Some(0.0),                     // 😕
         _ => None,
     }
 }

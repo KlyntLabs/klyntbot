@@ -305,10 +305,7 @@ impl SlackChannel {
 
         // Check allowlist
         if !check_allowlist(&self.config.allow_from, sender_id) {
-            warn!(
-                "Access denied for sender {} on Slack reaction",
-                sender_id
-            );
+            warn!("Access denied for sender {} on Slack reaction", sender_id);
             return Ok(());
         }
 
@@ -324,10 +321,7 @@ impl SlackChannel {
         }
 
         // Extract reaction name and convert to emoji
-        let reaction_name = event
-            .get("reaction")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+        let reaction_name = event.get("reaction").and_then(|v| v.as_str()).unwrap_or("");
 
         if reaction_name.is_empty() {
             return Ok(());

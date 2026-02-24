@@ -45,7 +45,10 @@ impl PlanCompletionHandler for PlanCompletionHandlerImpl {
             // duration once Task 10 wires up timing — for now, just record
             // the success count and last_plan_at timestamp.
             if let Err(e) = self.repo.increment_completed(gid, 0).await {
-                warn!("Failed to increment plans_completed for goal {}: {}", gid, e);
+                warn!(
+                    "Failed to increment plans_completed for goal {}: {}",
+                    gid, e
+                );
             }
         } else if let Err(e) = self.repo.increment_failed(gid).await {
             warn!("Failed to increment plans_failed for goal {}: {}", gid, e);

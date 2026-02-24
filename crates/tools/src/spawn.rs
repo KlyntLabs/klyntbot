@@ -95,7 +95,10 @@ impl Tool for SpawnTool {
             .unwrap_or("general")
             .to_string();
 
-        debug!("Spawning subagent for task: {} (profile: {})", task, profile);
+        debug!(
+            "Spawning subagent for task: {} (profile: {})",
+            task, profile
+        );
 
         let handler = self
             .handler
