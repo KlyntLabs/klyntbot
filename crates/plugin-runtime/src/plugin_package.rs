@@ -39,7 +39,9 @@ impl PluginPackage {
 
 #[async_trait]
 impl FeaturePackage for PluginPackage {
+    #[allow(clippy::misnamed_getters)]
     fn name(&self) -> &str {
+        // FeaturePackage::name() returns the unique plugin id, not the display name
         &self.manifest.id
     }
 
