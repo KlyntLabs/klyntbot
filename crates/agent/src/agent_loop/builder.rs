@@ -333,17 +333,14 @@ impl AgentLoopBuilder {
             None
         };
 
-        // ── Learning: outcome store + recorder ────────────────────────────
+        // ── Learning: outcome store ────────────────────────────
         let outcome_store = if config.learning.enabled {
-            Some(Arc::new(RwLock::new(crate::learning::OutcomeStore::new(
-                repos.outcomes.clone(),
-            ))))
+            Some(Arc::new(RwLock::new(
+                crate::learning::outcome_store::OutcomeStore::new(repos.outcomes.clone()),
+            )))
         } else {
             None
         };
-        let outcome_recorder = outcome_store
-            .as_ref()
-            .map(|store| Arc::new(crate::learning::OutcomeRecorder::new(Arc::clone(store))));
 
         // ── Wire automatic memory retrieval (cross-channel LanceDB ANN) ─
         let context_engine = if config.conversation.embedding.enabled && self.vector_store.is_some()
@@ -407,14 +404,6 @@ impl AgentLoopBuilder {
                     todo_tool
                         .with_enrichment_handler(Arc::clone(&enrichment_engine)
                             as Arc<dyn feature_todo::EnrichmentHandler>);
-            }
-
-            // Enrichment feedback → learning
-            if let Some(ref recorder) = outcome_recorder {
-                todo_tool =
-                    todo_tool
-                        .with_feedback_handler(Arc::clone(recorder)
-                            as Arc<dyn feature_todo::EnrichmentFeedbackHandler>);
             }
 
             // Todo embedding (semantic search)
@@ -819,7 +808,6 @@ impl AgentLoopBuilder {
             plan_execution_core,
             plan_repo: stored_plan_repo,
             plan_executing: Arc::new(std::sync::atomic::AtomicBool::new(false)),
-            outcome_recorder,
             learning_service,
             plan_completion_handler,
             pipeline,

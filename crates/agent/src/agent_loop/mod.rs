@@ -73,8 +73,6 @@ pub struct AgentLoop {
     pub(crate) plan_repo: Option<storage::PlanRepo>,
     /// Tracks if a plan is currently executing
     pub(crate) plan_executing: Arc<std::sync::atomic::AtomicBool>,
-    /// Outcome recorder for the learning system (None if learning disabled)
-    pub(crate) outcome_recorder: Option<Arc<crate::learning::OutcomeRecorder>>,
     /// Background learning service for adaptive threshold updates (None if learning disabled)
     pub(crate) learning_service: Option<Arc<RwLock<crate::learning::LearningService>>>,
     /// Handler called after plan execution finishes (updates linked goal metrics)

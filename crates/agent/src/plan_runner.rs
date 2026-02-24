@@ -6,7 +6,6 @@
 
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use std::time::Instant;
 
 use chrono::Utc;
 use common::Result;
@@ -124,7 +123,6 @@ impl AgentLoop {
             );
 
             // Execute the step — no lock held during the long-running LLM call
-            let step_start = Instant::now();
             let step_result = super::plan_executor::run_step(
                 core,
                 &step_snapshot,
@@ -133,42 +131,6 @@ impl AgentLoop {
                 self.confidence_evaluator.as_ref(),
             )
             .await;
-            let step_duration_ms = step_start.elapsed().as_millis() as u64;
-
-            // Record plan step outcome for the learning system (best-effort)
-            if let Some(recorder) = &self.outcome_recorder {
-                let (success, error_cat, step_confidence, recorded_tool_name) = match &step_result {
-                    Ok(r) => (
-                        r.success,
-                        None,
-                        r.confidence.as_ref(),
-                        r.tool_name
-                            .clone()
-                            .unwrap_or_else(|| step_description.clone()),
-                    ),
-                    Err(_) => (
-                        false,
-                        Some("execution_error"),
-                        None,
-                        step_description.clone(),
-                    ),
-                };
-                let session_key = format!("{}:{}", routing_ctx.channel, routing_ctx.chat_id);
-                recorder
-                    .record_tool_outcome(
-                        &recorded_tool_name,
-                        success,
-                        error_cat,
-                        step_duration_ms,
-                        step_confidence,
-                        crate::learning::ExecutionMode::PlanStep {
-                            plan_id: plan_id.to_string(),
-                            step_index: step_idx,
-                        },
-                        &session_key,
-                    )
-                    .await;
-            }
 
             // Reload plan to get latest state before applying results
             plan = conversions::load_plan(&repo, plan_id)

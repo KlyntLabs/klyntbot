@@ -50,7 +50,7 @@ pub use events::AgentEvent;
 pub use execution::{CycleOutcome, ExecutionCore, ExecutionParams, ToolExecutionResult};
 pub use finance_adapter::FinanceHandlerImpl;
 pub use goal_handler::GoalHandlerImpl;
-pub use learning::{LearningService, OutcomeRecorder, OutcomeStore};
+pub use learning::LearningService;
 pub use learning_handler::LearningHandlerImpl;
 pub use memory::MemoryStore;
 pub use notifications::NotificationDispatcher;

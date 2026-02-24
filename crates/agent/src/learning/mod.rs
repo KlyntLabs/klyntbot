@@ -16,8 +16,6 @@ pub mod strategy_tracker;
 pub mod tool_confidence;
 pub mod types;
 
-pub use outcome_store::OutcomeStore;
-pub use recorder::OutcomeRecorder;
 pub use service::LearningService;
 pub use strategy_tracker::{compute_stats, StrategyRecord, StrategyStats};
 pub use tool_confidence::ToolConfidenceMap;
