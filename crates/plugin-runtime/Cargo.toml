@@ -1,0 +1,29 @@
+[package]
+name = "plugin-runtime"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+common.workspace = true
+config.workspace = true
+storage.workspace = true
+tools-core.workspace = true
+extism = "1"
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+async-trait.workspace = true
+tracing.workspace = true
+reqwest.workspace = true
+dirs.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[features]
+default = []
+plugin-integration = []
