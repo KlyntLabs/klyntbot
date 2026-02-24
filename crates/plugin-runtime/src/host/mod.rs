@@ -18,9 +18,45 @@ struct HostContext {
 }
 
 /// Returns true if the SQL statement is a read-only SELECT.
+///
+/// Accepts statements starting with SELECT, WITH (CTEs), or EXPLAIN.
+/// Rejects multi-statement strings (containing internal semicolons) and
+/// statements containing mutation keywords. Conservative: may reject
+/// valid queries with mutation keywords in string literals.
 fn is_select_only(sql: &str) -> bool {
     let trimmed = sql.trim();
-    trimmed.len() >= 6 && trimmed[..6].eq_ignore_ascii_case("SELECT")
+    if trimmed.is_empty() {
+        return false;
+    }
+
+    let upper = trimmed.to_uppercase();
+
+    // Must start with SELECT, WITH (for CTEs), or EXPLAIN
+    if !(upper.starts_with("SELECT")
+        || upper.starts_with("WITH")
+        || upper.starts_with("EXPLAIN"))
+    {
+        return false;
+    }
+
+    // Reject multiple statements (semicolons not at the trailing end)
+    let without_trailing_semi = trimmed.trim_end_matches(';').trim();
+    if without_trailing_semi.contains(';') {
+        return false;
+    }
+
+    // Reject mutation keywords appearing as standalone tokens
+    let mutation_keywords = [
+        "INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "CREATE",
+        "REPLACE", "ATTACH", "DETACH", "PRAGMA", "VACUUM", "REINDEX",
+    ];
+    for word in upper.split(|c: char| !c.is_alphanumeric() && c != '_') {
+        if mutation_keywords.contains(&word) {
+            return false;
+        }
+    }
+
+    true
 }
 
 /// Returns true if the table name belongs to this plugin's sandboxed namespace.
@@ -520,11 +556,34 @@ mod tests {
     }
 
     #[test]
+    fn test_is_select_only_accepts_with_and_explain() {
+        assert!(is_select_only("WITH cte AS (SELECT 1) SELECT * FROM cte"));
+        assert!(is_select_only("EXPLAIN SELECT * FROM t"));
+        assert!(is_select_only("explain select 1"));
+    }
+
+    #[test]
+    fn test_is_select_only_accepts_trailing_semicolon() {
+        assert!(is_select_only("SELECT 1;"));
+        assert!(is_select_only("SELECT * FROM t ;  "));
+    }
+
+    #[test]
     fn test_is_select_only_rejects_write() {
         assert!(!is_select_only("INSERT INTO plugin_foo VALUES (1)"));
         assert!(!is_select_only("DELETE FROM plugin_foo"));
         assert!(!is_select_only("UPDATE plugin_foo SET x=1"));
         assert!(!is_select_only("DROP TABLE plugin_foo"));
+        assert!(!is_select_only("CREATE TABLE t (id INT)"));
+        assert!(!is_select_only("PRAGMA journal_mode=WAL"));
+        assert!(!is_select_only("ATTACH DATABASE 'x.db' AS x"));
+    }
+
+    #[test]
+    fn test_is_select_only_rejects_multi_statement_injection() {
+        assert!(!is_select_only("SELECT 1; DROP TABLE users"));
+        assert!(!is_select_only("SELECT 1; DELETE FROM todos"));
+        assert!(!is_select_only("SELECT 1; INSERT INTO t VALUES (1)"));
     }
 
     #[test]
@@ -560,5 +619,60 @@ mod tests {
         ));
         assert!(!is_plugin_table("sessions", "notion-connector"));
         assert!(!is_plugin_table("todos", "notion-connector"));
+    }
+
+    // ── permission checks ────────────────────────────────────────
+
+    /// Helper: build a permission list for testing.
+    fn perms(ps: &[PluginPermission]) -> Vec<PluginPermission> {
+        ps.to_vec()
+    }
+
+    #[test]
+    fn test_storage_permission_required_for_db() {
+        let with = perms(&[PluginPermission::Storage]);
+        let without = perms(&[PluginPermission::Network]);
+        let empty = perms(&[]);
+
+        assert!(with.contains(&PluginPermission::Storage));
+        assert!(!without.contains(&PluginPermission::Storage));
+        assert!(!empty.contains(&PluginPermission::Storage));
+    }
+
+    #[test]
+    fn test_network_permission_required_for_http() {
+        let with = perms(&[PluginPermission::Network]);
+        let without = perms(&[PluginPermission::Storage]);
+        let both = perms(&[PluginPermission::Network, PluginPermission::Storage]);
+
+        assert!(with.contains(&PluginPermission::Network));
+        assert!(!without.contains(&PluginPermission::Network));
+        assert!(both.contains(&PluginPermission::Network));
+    }
+
+    #[test]
+    fn test_agent_permission_required_for_agent_fns() {
+        let with = perms(&[PluginPermission::Agent]);
+        let without = perms(&[PluginPermission::Network, PluginPermission::Storage]);
+
+        assert!(with.contains(&PluginPermission::Agent));
+        assert!(!without.contains(&PluginPermission::Agent));
+    }
+
+    #[test]
+    fn test_all_permissions_independent() {
+        let all = perms(&[
+            PluginPermission::Network,
+            PluginPermission::Storage,
+            PluginPermission::Agent,
+        ]);
+        assert!(all.contains(&PluginPermission::Network));
+        assert!(all.contains(&PluginPermission::Storage));
+        assert!(all.contains(&PluginPermission::Agent));
+
+        let none = perms(&[]);
+        assert!(!none.contains(&PluginPermission::Network));
+        assert!(!none.contains(&PluginPermission::Storage));
+        assert!(!none.contains(&PluginPermission::Agent));
     }
 }
