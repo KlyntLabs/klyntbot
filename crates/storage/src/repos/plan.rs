@@ -118,11 +118,14 @@ impl PlanRepo {
     pub async fn update(&self, row: &PlanRow) -> Result<PlanRow, StorageError> {
         let now = Utc::now();
         let result = sqlx::query_as::<_, PlanRow>(
-            "UPDATE plans SET status = ?1, current_step_index = ?2, iteration_limit = ?3,
-                              backtrack_history = ?4, updated_at = ?5, completed_at = ?6
-             WHERE id = ?7
+            "UPDATE plans SET title = ?1, description = ?2, status = ?3,
+                              current_step_index = ?4, iteration_limit = ?5,
+                              backtrack_history = ?6, updated_at = ?7, completed_at = ?8
+             WHERE id = ?9
              RETURNING *",
         )
+        .bind(&row.title)
+        .bind(&row.description)
         .bind(&row.status)
         .bind(row.current_step_index)
         .bind(row.iteration_limit)
@@ -148,8 +151,8 @@ impl PlanRepo {
     /// Update plan status with timestamp bookkeeping.
     pub async fn update_status(&self, id: Uuid, status: &str) -> Result<(), StorageError> {
         let now = Utc::now();
-        let completed_at = match status {
-            "Completed" | "Failed" | "Abandoned" => Some(now),
+        let completed_at = match status.to_lowercase().as_str() {
+            "completed" | "failed" | "abandoned" => Some(now),
             _ => None,
         };
         let result = sqlx::query(

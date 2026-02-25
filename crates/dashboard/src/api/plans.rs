@@ -210,3 +210,13 @@ pub async fn update_plan_status(
 
     Ok(Json(serde_json::json!({ "status": req.status })))
 }
+
+// ── DELETE /api/plans/:id ────────────────────────────────────────────────────
+
+pub async fn delete_plan(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+) -> Result<StatusCode, ApiError> {
+    state.repos.plans.delete(id).await.map_err(storage_err)?;
+    Ok(StatusCode::NO_CONTENT)
+}

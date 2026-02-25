@@ -19,7 +19,10 @@ use crate::api::{
         patch_liability, patch_transaction,
     },
     health::health,
-    plans::{create_plan, get_plan, get_plan_steps, list_plans, patch_plan, update_plan_status},
+    plans::{
+        create_plan, delete_plan, get_plan, get_plan_steps, list_plans, patch_plan,
+        update_plan_status,
+    },
     projects::{create_project, delete_project, get_project, list_projects, patch_project},
     sessions::{delete_session, get_session, list_sessions},
     settings::{get_settings, get_settings_section, patch_settings_section},
@@ -62,6 +65,7 @@ use crate::ws::ws_handler;
 /// POST /api/plans                        → create plan
 /// GET  /api/plans/:id                    → get plan + steps
 /// PATCH  /api/plans/:id                  → update plan metadata
+/// DELETE /api/plans/:id                  → delete plan (cascades steps)
 /// GET  /api/plans/:id/steps              → get steps only
 /// POST /api/plans/:id/status             → transition plan status
 /// GET  /api/sessions                     → list sessions
@@ -110,7 +114,7 @@ pub fn build(state: AppState) -> Router {
         .route("/projects/{id}", get(get_project).patch(patch_project).delete(delete_project))
         // Plans
         .route("/plans", get(list_plans).post(create_plan))
-        .route("/plans/{id}", get(get_plan).patch(patch_plan))
+        .route("/plans/{id}", get(get_plan).patch(patch_plan).delete(delete_plan))
         .route("/plans/{id}/steps", get(get_plan_steps))
         .route("/plans/{id}/status", post(update_plan_status))
         // Sessions
