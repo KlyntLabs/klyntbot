@@ -75,7 +75,8 @@ fn json_merge_patch(target: &mut Value, patch: Value) {
 pub async fn get_settings(
     State(state): State<AppState>,
 ) -> Result<Json<Value>, ApiError> {
-    let mut v = serde_json::to_value(&*state.config)
+    let config = state.config.read().map_err(|e| ApiError::internal(e.to_string()))?;
+    let mut v = serde_json::to_value(&*config)
         .map_err(|e| ApiError::internal(e.to_string()))?;
     redact_secrets(&mut v);
     Ok(Json(v))
@@ -86,7 +87,8 @@ pub async fn get_settings_section(
     State(state): State<AppState>,
     Path(section): Path<String>,
 ) -> Result<Json<Value>, ApiError> {
-    let full = serde_json::to_value(&*state.config)
+    let config = state.config.read().map_err(|e| ApiError::internal(e.to_string()))?;
+    let full = serde_json::to_value(&*config)
         .map_err(|e| ApiError::internal(e.to_string()))?;
     let map = full
         .as_object()
@@ -101,7 +103,7 @@ pub async fn get_settings_section(
 
 /// PATCH /api/settings/:section — merge-patch a config section and save to disk.
 pub async fn patch_settings_section(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     Path(section): Path<String>,
     Json(mut patch): Json<Value>,
 ) -> Result<Json<Value>, ApiError> {
@@ -152,6 +154,12 @@ pub async fn patch_settings_section(
     config::save(&updated_config)
         .await
         .map_err(|e| ApiError::internal(e.to_string()))?;
+
+    // Update in-memory config so subsequent GET requests reflect the change
+    {
+        let mut config = state.config.write().map_err(|e| ApiError::internal(e.to_string()))?;
+        *config = updated_config.clone();
+    }
 
     // Return the updated section (redacted)
     let saved_val = serde_json::to_value(&updated_config)

@@ -20,6 +20,8 @@ export interface UseApiResult<T> {
   loading: boolean;
   error: ApiError | Error | null;
   refetch: () => void;
+  /** Optimistically update local data without refetching */
+  setData: React.Dispatch<React.SetStateAction<T | undefined>>;
 }
 
 const TIMEOUT_MS = 5000;
@@ -95,5 +97,5 @@ export function useApi<T>(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url, fetchData, refetchTrigger.current, options.skip]);
 
-  return { data, loading, error, refetch };
+  return { data, loading, error, refetch, setData };
 }

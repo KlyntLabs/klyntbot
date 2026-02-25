@@ -498,7 +498,7 @@ pub async fn handle_serve(port: u16) -> Result<()> {
         repos: repos.clone(),
         agent_loop: Arc::clone(&agent_loop),
         cron_service: cron_service.clone(),
-        config: Arc::new(config.clone()),
+        config: Arc::new(std::sync::RwLock::new(config.clone())),
         started_at: std::time::Instant::now(),
     };
     let dashboard = DashboardServer::new(config.gateway.clone(), dashboard_state);

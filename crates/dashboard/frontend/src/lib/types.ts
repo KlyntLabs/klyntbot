@@ -312,6 +312,9 @@ export interface Skill {
 export interface AgentStatus {
   version: string;
   model: string;
+  provider: string | null;
+  permissionLevel: string;
+  configuredProviders: string[];
   uptimeSeconds: number;
   storage: {
     taskCount: number;

@@ -1,6 +1,6 @@
 //! Shared application state injected into every Axum handler.
 
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
 use agent::AgentLoop;
 use scheduling::CronService;
@@ -15,6 +15,6 @@ pub struct AppState {
     pub repos: storage::Repos,
     pub agent_loop: Arc<AgentLoop>,
     pub cron_service: Arc<CronService>,
-    pub config: Arc<config::Config>,
+    pub config: Arc<RwLock<config::Config>>,
     pub started_at: std::time::Instant,
 }
