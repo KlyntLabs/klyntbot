@@ -69,6 +69,10 @@ const SECTIONS: SectionDef[] = [
 
 export default function Settings() {
   const [activeSection, setActiveSection] = useState('general');
+  const [activeProvider, setActiveProvider] = useState('anthropic');
+  const [activeChannel, setActiveChannel] = useState('telegram');
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [customModel, setCustomModel] = useState(false);
 
   const { data: config, loading, error, refetch, setData: setConfig } = useApi<ConfigMap>('/api/settings');
 
@@ -106,6 +110,25 @@ export default function Settings() {
 
   // ── Config section accessors ──────────────────────────────────────────────
   const gateway = asRecord(config?.gateway);
+  const providersMap = asRecord(config?.providers);
+  const providerNames = Object.keys(providersMap);
+  const providerTabs = providerNames.length > 0
+    ? providerNames
+    : ['anthropic', 'openai', 'openrouter', 'deepseek', 'gemini', 'groq', 'vllm', 'zhipu', 'dashscope', 'moonshot', 'minimax', 'aihubmix'];
+
+  const channelsMap = asRecord(config?.channels);
+  const channelNames = Object.keys(channelsMap);
+  const channelTabs = channelNames.length > 0
+    ? channelNames
+    : ['telegram', 'discord', 'whatsapp', 'slack', 'email', 'qq', 'feishu', 'dingtalk', 'mochat'];
+
+  const currentProviderConfig = asRecord(providersMap[activeProvider]);
+  const currentChannelConfig = asRecord(channelsMap[activeChannel]);
+  const agents = asRecord(config?.agents);
+  const agentDefaults = asRecord(agents.defaults);
+  const tools = asRecord(config?.tools);
+  const toolsWeb = asRecord(tools.web);
+  const toolsBrowser = asRecord(tools.browser);
 
   // ── Loading / error states ────────────────────────────────────────────────
   if (loading && !config) {
@@ -238,17 +261,276 @@ export default function Settings() {
 
             {/* ── AI & MODELS ──────────────────────────────────────── */}
             {activeSection === 'ai-models' && (
-              <p className="text-[13px]" style={{ color: 'var(--codex-fg-subtle)' }}>Coming soon</p>
+              <>
+                {/* Providers sub-section */}
+                <SettingSection title="Providers" defaultOpen>
+                  <TabStrip
+                    tabs={providerTabs.map(p => ({ id: p, label: displayName(p) }))}
+                    active={activeProvider}
+                    onChange={setActiveProvider}
+                  />
+                  <SettingRow label="API Key">
+                    <SecretInput
+                      value={str(currentProviderConfig, 'apiKey', '')}
+                      onChange={(v) => debouncedPatch('providers', { [activeProvider]: { apiKey: v } }, 1200)}
+                      width="220px"
+                    />
+                  </SettingRow>
+                  <SettingRow label="API Base URL" description="Custom endpoint (leave empty for default)"
+                    tip="Override the default API endpoint. Useful for proxies, self-hosted models, or region-specific endpoints.">
+                    <TextInput
+                      value={str(currentProviderConfig, 'apiBase', '')}
+                      placeholder={`https://api.${activeProvider}.com`}
+                      onChange={(v) => debouncedPatch('providers', { [activeProvider]: { apiBase: v || null } })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Native Mode"
+                    tip="Send requests using the provider's native API format rather than converting through a unified schema.">
+                    <Toggle
+                      checked={bool(currentProviderConfig, 'native', false)}
+                      onChange={() => patchSection('providers', { [activeProvider]: { native: !bool(currentProviderConfig, 'native', false) } })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Cache System Prompt"
+                    tip="Caches the system prompt on the provider side to reduce token usage on repeated calls. Supported by Anthropic.">
+                    <Toggle
+                      checked={bool(currentProviderConfig, 'cacheSystemPrompt', false)}
+                      onChange={() => patchSection('providers', { [activeProvider]: { cacheSystemPrompt: !bool(currentProviderConfig, 'cacheSystemPrompt', false) } })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Extended Thinking"
+                    tip="Gives the model a dedicated thinking budget to reason through complex problems before responding.">
+                    <Toggle
+                      checked={bool(asRecord(currentProviderConfig.extendedThinking), 'enabled', false)}
+                      onChange={() => patchSection('providers', { [activeProvider]: { extendedThinking: { enabled: !bool(asRecord(currentProviderConfig.extendedThinking), 'enabled', false) } } })}
+                    />
+                  </SettingRow>
+                  {bool(asRecord(currentProviderConfig.extendedThinking), 'enabled', false) && (
+                    <SettingRow label="Budget Tokens" description="Max tokens for internal reasoning (5,000-50,000)"
+                      tip="Higher = deeper thinking but more expensive.">
+                      <NumberInput
+                        value={num(asRecord(currentProviderConfig.extendedThinking), 'budgetTokens', 10000)}
+                        onChange={(v) => debouncedPatch('providers', { [activeProvider]: { extendedThinking: { budgetTokens: v } } })}
+                      />
+                    </SettingRow>
+                  )}
+                  <SettingRow label="API Version" description="Provider-specific version (e.g. 2023-06-01)"
+                    tip="Only set if you need a specific version for beta features." last>
+                    <TextInput
+                      value={str(currentProviderConfig, 'apiVersion', '')}
+                      placeholder="2023-06-01"
+                      onChange={(v) => debouncedPatch('providers', { [activeProvider]: { apiVersion: v || null } })}
+                      width="160px"
+                    />
+                  </SettingRow>
+                </SettingSection>
+
+                {/* Agent Defaults sub-section */}
+                <SettingSection title="Agent Defaults">
+                  <SettingRow label="Provider">
+                    <Select
+                      value={str(agentDefaults, 'provider', '')}
+                      options={providerTabs.map(p => ({ value: p, label: displayName(p) }))}
+                      placeholder="Auto-detect from model"
+                      onChange={(v) => patchSection('agents', { defaults: { provider: v || null } })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Model">
+                    {customModel ? (
+                      <TextInput
+                        value={str(agentDefaults, 'model', '')}
+                        placeholder="model-name"
+                        onChange={(v) => debouncedPatch('agents', { defaults: { model: v } })}
+                        width="200px"
+                      />
+                    ) : (
+                      <Select
+                        value={str(agentDefaults, 'model', '')}
+                        options={[
+                          ...(PROVIDER_MODELS[str(agentDefaults, 'provider', 'anthropic')] ?? []).map(m => ({ value: m, label: m })),
+                          { value: '__custom__', label: 'Custom...' },
+                        ]}
+                        onChange={(v) => {
+                          if (v === '__custom__') { setCustomModel(true); return; }
+                          patchSection('agents', { defaults: { model: v } });
+                        }}
+                      />
+                    )}
+                  </SettingRow>
+                  <SettingRow label="Temperature" description="0 = deterministic, 1 = creative">
+                    <Slider
+                      value={num(agentDefaults, 'temperature', 0.7)}
+                      onChange={(v) => patchSection('agents', { defaults: { temperature: v } })}
+                      min={0} max={1} step={0.1}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Max Tokens"
+                    tip="Maximum output tokens per LLM response. Most tasks work fine with 4096-8192.">
+                    <NumberInput
+                      value={num(agentDefaults, 'maxTokens', 8192)}
+                      onChange={(v) => debouncedPatch('agents', { defaults: { maxTokens: v } })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Max Tool Iterations"
+                    tip="Safety limit to prevent runaway tool loops.">
+                    <NumberInput
+                      value={num(agentDefaults, 'maxToolIterations', 20)}
+                      onChange={(v) => debouncedPatch('agents', { defaults: { maxToolIterations: v } })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Max Concurrent Subagents" last>
+                    <NumberInput
+                      value={num(agentDefaults, 'maxConcurrentSubagents', 3)}
+                      onChange={(v) => debouncedPatch('agents', { defaults: { maxConcurrentSubagents: v } })}
+                    />
+                  </SettingRow>
+                </SettingSection>
+
+                {/* Routing sub-section */}
+                <SettingSection title="Routing">
+                  <SettingRow label="Primary Provider">
+                    <Select
+                      value={str(asRecord(config?.providerManager), 'primary', '')}
+                      options={providerTabs.map(p => ({ value: p, label: displayName(p) }))}
+                      placeholder="Auto-detect"
+                      onChange={(v) => patchSection('providerManager', { primary: v || null })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Fallback Provider">
+                    <Select
+                      value={str(asRecord(config?.providerManager), 'fallback', '')}
+                      options={providerTabs.map(p => ({ value: p, label: displayName(p) }))}
+                      placeholder="None"
+                      onChange={(v) => patchSection('providerManager', { fallback: v || null })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Classifier Model" description="Lightweight model for routing decisions"
+                    tip="A fast, cheap model that decides which provider/model to use for each request." last>
+                    <TextInput
+                      value={str(asRecord(config?.providerManager), 'classifierModel', '')}
+                      placeholder="gpt-4o-mini"
+                      onChange={(v) => debouncedPatch('providerManager', { classifierModel: v || null })}
+                      width="180px"
+                    />
+                  </SettingRow>
+                </SettingSection>
+              </>
             )}
 
             {/* ── CHANNELS ─────────────────────────────────────────── */}
             {activeSection === 'channels' && (
-              <p className="text-[13px]" style={{ color: 'var(--codex-fg-subtle)' }}>Coming soon</p>
+              <SettingSection title="Channels" defaultOpen>
+                <TabStrip
+                  tabs={channelTabs.map(c => ({ id: c, label: displayName(c) }))}
+                  active={activeChannel}
+                  onChange={setActiveChannel}
+                />
+                <SettingRow label="Enabled">
+                  <Toggle
+                    checked={bool(currentChannelConfig, 'enabled', false)}
+                    onChange={() => patchSection('channels', { [activeChannel]: { enabled: !bool(currentChannelConfig, 'enabled', false) } })}
+                  />
+                </SettingRow>
+                <SettingRow label="Token">
+                  <SecretInput
+                    value={str(currentChannelConfig, 'token', str(currentChannelConfig, 'botToken', ''))}
+                    onChange={(v) => {
+                      const key = currentChannelConfig.botToken !== undefined ? 'botToken' : 'token';
+                      debouncedPatch('channels', { [activeChannel]: { [key]: v } }, 1200);
+                    }}
+                    width="220px"
+                  />
+                </SettingRow>
+                <SettingRow label="Allow From" description="Permitted user/chat IDs">
+                  <TagInput
+                    tags={arr(currentChannelConfig, 'allowFrom').map(String)}
+                    onChange={(tags) => patchSection('channels', { [activeChannel]: { allowFrom: tags } })}
+                    placeholder="Add ID..."
+                  />
+                </SettingRow>
+                {(activeChannel === 'telegram' || str(currentChannelConfig, 'proxy', '') !== '') && (
+                  <SettingRow label="Proxy" description="SOCKS5/HTTP proxy URL" last>
+                    <TextInput
+                      value={str(currentChannelConfig, 'proxy', '')}
+                      placeholder="socks5://127.0.0.1:1080"
+                      onChange={(v) => debouncedPatch('channels', { [activeChannel]: { proxy: v || null } })}
+                    />
+                  </SettingRow>
+                )}
+              </SettingSection>
             )}
 
             {/* ── TOOLS ────────────────────────────────────────────── */}
             {activeSection === 'tools' && (
-              <p className="text-[13px]" style={{ color: 'var(--codex-fg-subtle)' }}>Coming soon</p>
+              <>
+                <SettingSection title="Web Search" defaultOpen>
+                  <SettingRow label="Brave API Key">
+                    <SecretInput
+                      value={str(toolsWeb, 'braveApiKey', '')}
+                      onChange={(v) => debouncedPatch('tools', { web: { braveApiKey: v } }, 1200)}
+                      width="220px"
+                    />
+                  </SettingRow>
+                  <SettingRow label="Max Results" last>
+                    <NumberInput
+                      value={num(toolsWeb, 'maxResults', 5)}
+                      onChange={(v) => debouncedPatch('tools', { web: { maxResults: v } })}
+                    />
+                  </SettingRow>
+                </SettingSection>
+
+                <SettingSection title="Browser Automation">
+                  <SettingRow label="Enabled">
+                    <Toggle
+                      checked={bool(toolsBrowser, 'enabled', false)}
+                      onChange={() => patchSection('tools', { browser: { enabled: !bool(toolsBrowser, 'enabled', false) } })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Trust Level"
+                    tip="Strict: asks before every action. Autonomous: asks only for dangerous actions. Full: no confirmations.">
+                    <Select
+                      value={str(toolsBrowser, 'trustLevel', 'autonomous')}
+                      options={[
+                        { value: 'strict', label: 'Strict' },
+                        { value: 'autonomous', label: 'Autonomous' },
+                        { value: 'full', label: 'Full' },
+                      ]}
+                      onChange={(v) => patchSection('tools', { browser: { trustLevel: v } })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Session Timeout" last>
+                    <NumberInput
+                      value={num(toolsBrowser, 'sessionTimeoutSecs', 300)}
+                      onChange={(v) => debouncedPatch('tools', { browser: { sessionTimeoutSecs: v } })}
+                      suffix="sec"
+                    />
+                  </SettingRow>
+                </SettingSection>
+
+                <SettingSection title="Permissions">
+                  <SettingRow label="Restrict to Workspace"
+                    tip="When enabled, file tools can only access files within the workspace directory.">
+                    <Toggle
+                      checked={bool(tools, 'restrictToWorkspace', false)}
+                      onChange={() => patchSection('tools', { restrictToWorkspace: !bool(tools, 'restrictToWorkspace', false) })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Default Permission Level"
+                    tip="Controls which tools the agent can use. You can override per-channel." last>
+                    <Select
+                      value={str(asRecord(tools.permissions), 'defaultLevel', 'standard')}
+                      options={[
+                        { value: 'full', label: 'Full' },
+                        { value: 'admin', label: 'Admin' },
+                        { value: 'elevated', label: 'Elevated' },
+                        { value: 'standard', label: 'Standard' },
+                        { value: 'readOnly', label: 'Read Only' },
+                      ]}
+                      onChange={(v) => patchSection('tools', { permissions: { defaultLevel: v } })}
+                    />
+                  </SettingRow>
+                </SettingSection>
+              </>
             )}
 
             {/* ── TASKS ────────────────────────────────────────────── */}
