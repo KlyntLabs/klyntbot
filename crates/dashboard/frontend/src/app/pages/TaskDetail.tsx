@@ -1,13 +1,11 @@
-// TODO: Replace all mock data in this file with real API calls:
-//   - Task detail: useApi<Task>('/api/tasks/:id')
-//   - Subtasks: useApi<Task[]>('/api/tasks/:id/subtasks')
-//   - Attachments: useApi<TaskAttachment[]>('/api/tasks/:id/attachments')
-//   - Time entries: useApi<TaskTimeEntry[]>('/api/tasks/:id/time-entries')
-//   - Project lookup: useApi<Project[]>('/api/projects')
-//   - Status/priority changes: PATCH /api/tasks/:id
-//   - Focus/unfocus: POST/DELETE /api/tasks/:id/focus
-//   - Timer: POST /api/tasks/:id/time-entries
+// TODO: Wire write operations:
+//   - Status changes: PATCH /api/tasks/:id { status }
+//   - Priority changes: PATCH /api/tasks/:id { priority }
+//   - Title edit: PATCH /api/tasks/:id { title }
 //   - Description edit: PATCH /api/tasks/:id { description }
+//   - Focus/unfocus: POST/DELETE /api/tasks/:id/focus
+//   - Timer start/stop: POST /api/tasks/:id/time-entries
+//   - Tag add/remove: PATCH /api/tasks/:id { tags }
 import { useNavigate, useParams } from 'react-router';
 import {
   ArrowLeft,
@@ -29,92 +27,59 @@ import {
   FileCode,
   FileText,
   Link,
-  StickyNote
+  StickyNote,
+  Loader2,
+  AlertTriangle
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
+import { useApi } from '../../lib/hooks/useApi';
+import type { Task, TaskAttachment, TaskTimeEntry, Project } from '../../lib/types';
 
 export default function TaskDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [isTimerRunning, setIsTimerRunning] = useState(false);
 
-  const task = {
-    id: '3f2a1b8c',
-    title: 'Fix auth token refresh',
-    description: `<h2>Overview</h2>
-<p>We need to implement an automatic token refresh mechanism for expired JWT tokens. Currently, users are being logged out unexpectedly when their tokens expire.</p>
+  const { data: task, loading, error } = useApi<Task>(`/api/tasks/${id}`);
+  const { data: subtasks } = useApi<Task[]>(`/api/tasks/${id}/subtasks`);
+  const { data: attachments } = useApi<TaskAttachment[]>(`/api/tasks/${id}/attachments`);
+  const { data: timeEntries } = useApi<TaskTimeEntry[]>(`/api/tasks/${id}/time-entries`);
+  const { data: projects } = useApi<Project[]>('/api/projects');
 
-<h3>Steps to implement:</h3>
-<ul>
-  <li>Add token expiry check interceptor</li>
-  <li>Implement refresh token endpoint call</li>
-  <li>Update token storage mechanism</li>
-  <li>Add retry logic for failed requests</li>
-</ul>
-
-<h3>JWT Example:</h3>
-<pre><code>const refreshToken = async () => {
-  const response = await fetch('/api/auth/refresh', {
-    method: 'POST',
-    headers: {
-      'Authorization': \`Bearer \${refreshToken}\`
+  // Build project lookup map
+  const projectMap = useMemo(() => {
+    const map = new Map<string, Project>();
+    if (projects) {
+      for (const p of projects) map.set(p.id, p);
     }
-  });
-  return response.json();
-};</code></pre>
+    return map;
+  }, [projects]);
 
-<p>This will significantly improve the user experience and reduce support tickets related to unexpected logouts.</p>`,
-    status: 'Doing',
-    priority: 1,
-    due_date: '2026-02-24',
-    estimated_minutes: 60,
-    project: 'Backend',
-    projectColor: '#4a9eff',
-    tags: ['backend', 'security'],
-    created_at: '2026-02-20',
-    updated_at: '2026-02-24',
-    focused_at: '2026-02-24T14:00:00',
-    focus_deadline: '2026-02-24T17:00:00',
-    blocked_by: [{ id: '9d7e4f2a', title: 'Review PR #142' }],
-    blocks: [] as { id: string; title: string }[],
-    attachments: [
-      { id: 'a1', type: 'URL', title: 'JWT Spec', value: 'https://jwt.io/introduction' },
-      { id: 'a2', type: 'Note', title: 'Implementation Notes', value: 'Check existing middleware patterns' }
-    ],
-    subtasks: [
-      { id: 's1', title: 'Add interceptor', status: 'Done', priority: 1 },
-      { id: 's2', title: 'Implement refresh endpoint', status: 'Doing', priority: 1 },
-      { id: 's3', title: 'Add retry logic', status: 'Todo', priority: 2 }
-    ],
-    time_entries: [
-      { id: 't1', date: '2026-02-24', startTime: '14:00', endTime: '14:45', source: 'Focus', note: 'Working on auth' }
-    ],
-    total_tracked_secs: 2700,
-    calendar_event_uid: 'auth-work-session@calendar'
-  };
+  const project = task?.projectId ? projectMap.get(task.projectId) : undefined;
 
-  const getPriorityColor = (priority: number) => {
+  const getPriorityColor = (priority: number | null) => {
     switch (priority) {
       case 1: return '#e55050';
       case 2: return '#d4a017';
       case 3: return '#e5c07b';
       case 4: return '#666';
+      default: return '#666';
     }
   };
 
   const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'Done':
+    switch (status.toLowerCase()) {
+      case 'done':
         return <Circle className="w-4 h-4 fill-current" strokeWidth={1.5} style={{ color: '#10a37f' }} />;
-      case 'Doing':
+      case 'doing':
         return <Circle className="w-4 h-4 fill-current" strokeWidth={1.5} style={{ color: '#10a37f' }} />;
       default:
         return <Circle className="w-4 h-4" strokeWidth={1.5} style={{ color: '#666' }} />;
     }
   };
 
-  const getAttachmentIcon = (type: string) => {
-    switch (type) {
+  const getAttachmentIcon = (attachmentType: string) => {
+    switch (attachmentType) {
       case 'File': return <FileText className="w-4 h-4" strokeWidth={1.5} />;
       case 'URL': return <Link className="w-4 h-4" strokeWidth={1.5} />;
       case 'Note': return <StickyNote className="w-4 h-4" strokeWidth={1.5} />;
@@ -126,6 +91,51 @@ export default function TaskDetail() {
     const date = new Date(dateStr);
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
+
+  const formatDateTime = (isoStr: string) => {
+    const date = new Date(isoStr);
+    const datePart = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const timePart = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+    return `${datePart} ${timePart}`;
+  };
+
+  const formatDuration = (secs: number) => {
+    const mins = Math.floor(secs / 60);
+    if (mins < 60) return `${mins}m`;
+    const hours = Math.floor(mins / 60);
+    const remainMins = mins % 60;
+    return remainMins > 0 ? `${hours}h ${remainMins}m` : `${hours}h`;
+  };
+
+  const statusDisplayValue = (status: string) => {
+    // Capitalize first letter for display in select
+    return status.charAt(0).toUpperCase() + status.slice(1).toLowerCase();
+  };
+
+  if (loading && !task) {
+    return (
+      <div className="flex-1 flex items-center justify-center" style={{ backgroundColor: 'var(--codex-bg)' }}>
+        <Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--codex-fg-subtle)' }} />
+      </div>
+    );
+  }
+
+  if (error && !task) {
+    return (
+      <div className="flex-1 flex items-center justify-center gap-2" style={{ backgroundColor: 'var(--codex-bg)', color: 'var(--codex-fg-subtle)' }}>
+        <AlertTriangle className="w-4 h-4" strokeWidth={1.5} />
+        <span className="text-[13px]">Failed to load task</span>
+      </div>
+    );
+  }
+
+  if (!task) return null;
+
+  const subtaskList = subtasks ?? [];
+  const attachmentList = attachments ?? [];
+  const timeEntryList = timeEntries ?? [];
+  const statusDisplay = statusDisplayValue(task.status);
+  const isStatusDoing = task.status.toLowerCase() === 'doing';
 
   return (
     <div className="flex-1 flex overflow-hidden">
@@ -155,13 +165,14 @@ export default function TaskDetail() {
               {task.id}
             </div>
 
+            {/* TODO: wire onChange to PATCH /api/tasks/:id { status } */}
             <select
-              defaultValue={task.status}
+              defaultValue={statusDisplay}
               className="px-3 py-1.5 rounded text-[12px] outline-none cursor-pointer"
               style={{
-                backgroundColor: task.status === 'Doing' ? 'rgba(16, 163, 127, 0.2)' : '#141414',
-                color: task.status === 'Doing' ? '#10a37f' : 'var(--codex-fg-subtle)',
-                border: `1px solid ${task.status === 'Doing' ? '#10a37f' : 'var(--codex-border)'}`
+                backgroundColor: isStatusDoing ? 'rgba(16, 163, 127, 0.2)' : '#141414',
+                color: isStatusDoing ? '#10a37f' : 'var(--codex-fg-subtle)',
+                border: `1px solid ${isStatusDoing ? '#10a37f' : 'var(--codex-border)'}`
               }}
             >
               <option>Todo</option>
@@ -170,20 +181,23 @@ export default function TaskDetail() {
               <option>Archived</option>
             </select>
 
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded text-[12px]" style={{
-              backgroundColor: getPriorityColor(task.priority) + '20',
-              color: getPriorityColor(task.priority),
-              border: `1px solid ${getPriorityColor(task.priority)}40`
-            }}>
-              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: getPriorityColor(task.priority) }} />
-              P{task.priority}
-            </div>
+            {task.priority != null && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded text-[12px]" style={{
+                backgroundColor: getPriorityColor(task.priority) + '20',
+                color: getPriorityColor(task.priority),
+                border: `1px solid ${getPriorityColor(task.priority)}40`
+              }}>
+                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: getPriorityColor(task.priority) }} />
+                P{task.priority}
+              </div>
+            )}
           </div>
         </div>
 
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto p-8" style={{ backgroundColor: 'var(--codex-bg)' }}>
           <div className="max-w-4xl mx-auto">
+            {/* TODO: wire onBlur to PATCH /api/tasks/:id { title } */}
             <input
               type="text"
               defaultValue={task.title}
@@ -252,6 +266,7 @@ export default function TaskDetail() {
                   ))}
                 </div>
 
+                {/* TODO: wire contentEditable onBlur to PATCH /api/tasks/:id { description } */}
                 <div
                   className="p-4 min-h-[400px] prose prose-invert max-w-none"
                   style={{
@@ -259,19 +274,19 @@ export default function TaskDetail() {
                     fontSize: '14px',
                     lineHeight: '1.6'
                   }}
-                  dangerouslySetInnerHTML={{ __html: task.description }}
+                  dangerouslySetInnerHTML={{ __html: task.description ?? '' }}
                 />
               </div>
             </div>
 
             {/* Attachments */}
-            {task.attachments.length > 0 && (
+            {attachmentList.length > 0 && (
               <div className="mb-8">
                 <h3 className="text-[14px] mb-3" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>
                   Attachments
                 </h3>
                 <div className="grid grid-cols-2 gap-3">
-                  {task.attachments.map(att => (
+                  {attachmentList.map(att => (
                     <div
                       key={att.id}
                       className="p-3 rounded-lg border cursor-pointer transition-colors"
@@ -284,11 +299,11 @@ export default function TaskDetail() {
                     >
                       <div className="flex items-start gap-3">
                         <div style={{ color: 'var(--codex-fg-subtle)' }}>
-                          {getAttachmentIcon(att.type)}
+                          {getAttachmentIcon(att.attachmentType)}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="text-[13px] mb-1" style={{ color: 'var(--codex-fg)' }}>
-                            {att.title}
+                            {att.title ?? att.attachmentType}
                           </div>
                           <div className="text-[11px] truncate" style={{
                             color: 'var(--codex-fg-subtle)',
@@ -305,32 +320,35 @@ export default function TaskDetail() {
             )}
 
             {/* Subtasks */}
-            {task.subtasks.length > 0 && (
+            {subtaskList.length > 0 && (
               <div className="mb-8">
                 <h3 className="text-[14px] mb-3" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>
                   Subtasks
                 </h3>
                 <div className="space-y-2">
-                  {task.subtasks.map(subtask => (
+                  {subtaskList.map(subtask => (
                     <div
                       key={subtask.id}
-                      className="flex items-center gap-3 p-3 rounded-lg border"
+                      className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer"
                       style={{
                         backgroundColor: '#141414',
                         borderColor: 'var(--codex-border)'
                       }}
+                      onClick={() => navigate(`/tasks/${subtask.id}`)}
                     >
                       {getStatusIcon(subtask.status)}
                       <div className="flex-1 text-[13px]" style={{
                         color: 'var(--codex-fg)',
-                        textDecoration: subtask.status === 'Done' ? 'line-through' : 'none'
+                        textDecoration: subtask.status.toLowerCase() === 'done' ? 'line-through' : 'none'
                       }}>
                         {subtask.title}
                       </div>
-                      <div className="flex items-center gap-1.5 text-[11px]">
-                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: getPriorityColor(subtask.priority) }} />
-                        <span style={{ color: getPriorityColor(subtask.priority) }}>P{subtask.priority}</span>
-                      </div>
+                      {subtask.priority != null && (
+                        <div className="flex items-center gap-1.5 text-[11px]">
+                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: getPriorityColor(subtask.priority) }} />
+                          <span style={{ color: getPriorityColor(subtask.priority) }}>P{subtask.priority}</span>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -357,8 +375,9 @@ export default function TaskDetail() {
             <div className="space-y-3">
               <div className="flex justify-between text-[12px]">
                 <span style={{ color: 'var(--codex-fg-subtle)' }}>Status</span>
+                {/* TODO: wire onChange to PATCH /api/tasks/:id { status } */}
                 <select
-                  defaultValue={task.status}
+                  defaultValue={statusDisplay}
                   className="px-2 py-1 rounded text-[11px] outline-none cursor-pointer"
                   style={{
                     backgroundColor: 'var(--codex-bg)',
@@ -376,31 +395,48 @@ export default function TaskDetail() {
 
               <div className="flex justify-between text-[12px]">
                 <span style={{ color: 'var(--codex-fg-subtle)' }}>Priority</span>
+                {/* TODO: wire onClick to PATCH /api/tasks/:id { priority } */}
                 <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: getPriorityColor(task.priority) }} />
-                  <span style={{ color: getPriorityColor(task.priority) }}>P{task.priority}</span>
+                  {task.priority != null ? (
+                    <>
+                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: getPriorityColor(task.priority) }} />
+                      <span style={{ color: getPriorityColor(task.priority) }}>P{task.priority}</span>
+                    </>
+                  ) : (
+                    <span style={{ color: 'var(--codex-fg-subtle)' }}>None</span>
+                  )}
                 </div>
               </div>
 
               <div className="flex justify-between text-[12px]">
                 <span style={{ color: 'var(--codex-fg-subtle)' }}>Due Date</span>
-                <div className="flex items-center gap-1.5" style={{ color: 'var(--codex-fg)' }}>
-                  <CalendarIcon className="w-3.5 h-3.5" strokeWidth={1.5} />
-                  {formatDate(task.due_date)}
-                </div>
+                {task.dueDate ? (
+                  <div className="flex items-center gap-1.5" style={{ color: 'var(--codex-fg)' }}>
+                    <CalendarIcon className="w-3.5 h-3.5" strokeWidth={1.5} />
+                    {formatDate(task.dueDate)}
+                  </div>
+                ) : (
+                  <span style={{ color: 'var(--codex-fg-subtle)' }}>None</span>
+                )}
               </div>
 
               <div className="flex justify-between text-[12px]">
                 <span style={{ color: 'var(--codex-fg-subtle)' }}>Estimated</span>
-                <span style={{ color: 'var(--codex-fg)' }}>{task.estimated_minutes} min</span>
+                <span style={{ color: 'var(--codex-fg)' }}>
+                  {task.estimatedMinutes != null ? `${task.estimatedMinutes} min` : 'None'}
+                </span>
               </div>
 
               <div className="flex justify-between text-[12px]">
                 <span style={{ color: 'var(--codex-fg-subtle)' }}>Project</span>
-                <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: task.projectColor }} />
-                  <span style={{ color: 'var(--codex-fg)' }}>{task.project}</span>
-                </div>
+                {project ? (
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: project.color }} />
+                    <span style={{ color: 'var(--codex-fg)' }}>{project.name}</span>
+                  </div>
+                ) : (
+                  <span style={{ color: 'var(--codex-fg-subtle)' }}>None</span>
+                )}
               </div>
 
               <div>
@@ -419,6 +455,7 @@ export default function TaskDetail() {
                       {tag}
                     </span>
                   ))}
+                  {/* TODO: wire to PATCH /api/tasks/:id { tags } */}
                   <button
                     className="px-2 py-0.5 rounded text-[11px] transition-colors"
                     style={{
@@ -436,12 +473,12 @@ export default function TaskDetail() {
 
               <div className="flex justify-between text-[12px] pt-2 border-t" style={{ borderColor: 'var(--codex-border)' }}>
                 <span style={{ color: 'var(--codex-fg-subtle)' }}>Created</span>
-                <span style={{ color: 'var(--codex-fg)' }}>{formatDate(task.created_at)}</span>
+                <span style={{ color: 'var(--codex-fg)' }}>{formatDate(task.createdAt)}</span>
               </div>
 
               <div className="flex justify-between text-[12px]">
                 <span style={{ color: 'var(--codex-fg-subtle)' }}>Updated</span>
-                <span style={{ color: 'var(--codex-fg)' }}>{formatDate(task.updated_at)}</span>
+                <span style={{ color: 'var(--codex-fg)' }}>{formatDate(task.updatedAt)}</span>
               </div>
             </div>
           </div>
@@ -455,38 +492,9 @@ export default function TaskDetail() {
               Dependencies
             </h3>
             <div className="space-y-3">
-              {task.blocked_by.length > 0 && (
-                <div>
-                  <div className="text-[11px] mb-2" style={{ color: '#e55050' }}>Blocked by</div>
-                  {task.blocked_by.map(dep => (
-                    <button
-                      key={dep.id}
-                      onClick={() => navigate(`/tasks/${dep.id}`)}
-                      className="w-full text-left p-2 rounded text-[12px] transition-colors"
-                      style={{
-                        backgroundColor: 'var(--codex-bg)',
-                        color: 'var(--codex-fg)',
-                        border: '1px solid var(--codex-border)'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.backgroundColor = '#1a1a1a';
-                        e.currentTarget.style.color = '#10a37f';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.backgroundColor = 'var(--codex-bg)';
-                        e.currentTarget.style.color = 'var(--codex-fg)';
-                      }}
-                    >
-                      {dep.title}
-                    </button>
-                  ))}
-                </div>
-              )}
-              {task.blocks.length === 0 && task.blocked_by.length === 0 && (
-                <div className="text-[12px]" style={{ color: 'var(--codex-fg-subtle)' }}>
-                  No dependencies
-                </div>
-              )}
+              <div className="text-[12px]" style={{ color: 'var(--codex-fg-subtle)' }}>
+                No dependencies
+              </div>
             </div>
           </div>
 
@@ -500,8 +508,9 @@ export default function TaskDetail() {
             </h3>
             <div className="space-y-3">
               <div className="text-[18px]" style={{ color: '#10a37f', fontWeight: 500 }}>
-                {Math.floor(task.total_tracked_secs / 60)}m
+                {formatDuration(task.totalTrackedSecs)}
               </div>
+              {/* TODO: wire to POST /api/tasks/:id/time-entries (start) and PATCH to stop */}
               <button
                 onClick={() => setIsTimerRunning(!isTimerRunning)}
                 className="w-full flex items-center justify-center gap-2 py-2 rounded text-[13px] transition-colors"
@@ -523,21 +532,23 @@ export default function TaskDetail() {
                   </>
                 )}
               </button>
-              {task.time_entries.length > 0 && (
+              {timeEntryList.length > 0 && (
                 <div className="pt-3 border-t" style={{ borderColor: 'var(--codex-border)' }}>
                   <div className="text-[11px] mb-2" style={{ color: 'var(--codex-fg-subtle)' }}>Recent Entries</div>
-                  {task.time_entries.map(entry => (
+                  {timeEntryList.map(entry => (
                     <div key={entry.id} className="text-[11px] mb-2">
                       <div className="flex items-center gap-2 mb-1">
                         <span style={{ color: 'var(--codex-fg-muted)' }}>
-                          {formatDate(entry.date)}
+                          {formatDateTime(entry.startedAt)}
                         </span>
-                        <span style={{
-                          color: 'var(--codex-fg-subtle)',
-                          fontFamily: 'var(--font-mono)'
-                        }}>
-                          {entry.startTime}-{entry.endTime}
-                        </span>
+                        {entry.durationSecs != null && (
+                          <span style={{
+                            color: 'var(--codex-fg-subtle)',
+                            fontFamily: 'var(--font-mono)'
+                          }}>
+                            {formatDuration(entry.durationSecs)}
+                          </span>
+                        )}
                         <span className="px-1.5 py-0.5 rounded text-[9px]" style={{
                           backgroundColor: entry.source === 'Focus' ? 'rgba(229, 192, 123, 0.2)' : 'var(--codex-bg)',
                           color: entry.source === 'Focus' ? '#e5c07b' : 'var(--codex-fg-subtle)',
@@ -559,7 +570,7 @@ export default function TaskDetail() {
           </div>
 
           {/* Focus Card */}
-          {task.focused_at && (
+          {task.focusedAt && (
             <div className="p-4 rounded-lg" style={{
               backgroundColor: '#141414',
               border: '1px solid var(--codex-border)'
@@ -571,15 +582,18 @@ export default function TaskDetail() {
                 <div className="flex justify-between text-[12px]">
                   <span style={{ color: 'var(--codex-fg-subtle)' }}>Focused since</span>
                   <span style={{ color: '#e5c07b' }}>
-                    {formatDate(task.focused_at.split('T')[0])} {task.focused_at.split('T')[1]?.slice(0, 5)}
+                    {formatDateTime(task.focusedAt)}
                   </span>
                 </div>
-                <div className="flex justify-between text-[12px]">
-                  <span style={{ color: 'var(--codex-fg-subtle)' }}>Deadline</span>
-                  <span style={{ color: 'var(--codex-fg)' }}>
-                    {formatDate(task.focus_deadline.split('T')[0])} {task.focus_deadline.split('T')[1]?.slice(0, 5)}
-                  </span>
-                </div>
+                {task.focusDeadline && (
+                  <div className="flex justify-between text-[12px]">
+                    <span style={{ color: 'var(--codex-fg-subtle)' }}>Deadline</span>
+                    <span style={{ color: 'var(--codex-fg)' }}>
+                      {formatDateTime(task.focusDeadline)}
+                    </span>
+                  </div>
+                )}
+                {/* TODO: wire to DELETE /api/tasks/:id/focus */}
                 <button
                   className="w-full flex items-center justify-center gap-2 py-2 rounded text-[13px] transition-colors"
                   style={{
@@ -596,7 +610,7 @@ export default function TaskDetail() {
           )}
 
           {/* Calendar Card */}
-          {task.calendar_event_uid && (
+          {task.calendarEventUid && (
             <div className="p-4 rounded-lg" style={{
               backgroundColor: '#141414',
               border: '1px solid var(--codex-border)'
@@ -614,7 +628,7 @@ export default function TaskDetail() {
                   fontFamily: 'var(--font-mono)',
                   wordBreak: 'break-all'
                 }}>
-                  {task.calendar_event_uid}
+                  {task.calendarEventUid}
                 </div>
               </div>
             </div>

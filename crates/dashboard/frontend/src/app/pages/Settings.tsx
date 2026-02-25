@@ -1,8 +1,9 @@
-// TODO: Replace all mock data in this file with real API calls:
-//   - Read config: useApi<Record<string, unknown>>('/api/settings')
-//   - Read section: useApi('/api/settings/:section')
-//   - Write config: PATCH /api/settings (JSON merge-patch)
-//   - All toggle/input changes should debounce and PATCH the config
+// Settings page — wired to GET /api/settings for read-only display.
+// TODO: Wire write operations:
+//   - PATCH /api/settings/:section (JSON merge-patch) for all toggle/input changes
+//   - Debounce input changes before PATCHing
+//   - "Save Changes" button should PATCH the active section
+//   - "Reset to Defaults" should confirm then PATCH with defaults
 import { useState } from 'react';
 import {
   Sliders,
@@ -23,14 +24,63 @@ import {
   ChevronRight,
   Plus,
   X,
-  Plug
+  Plug,
+  Loader2,
+  AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
+import { useApi } from '../../lib/hooks/useApi';
 
 type SettingsSection = {
   id: string;
   label: string;
   icon: typeof Sliders;
 };
+
+// ── Type helpers for accessing nested config sections ────────────────────────
+
+type ConfigMap = Record<string, unknown>;
+
+/** Safely cast an unknown config section to a flat record. */
+function asRecord(val: unknown): Record<string, unknown> {
+  if (val && typeof val === 'object' && !Array.isArray(val)) {
+    return val as Record<string, unknown>;
+  }
+  return {};
+}
+
+/** Safely get a string value from a record, with an optional fallback. */
+function str(rec: Record<string, unknown>, key: string, fallback = ''): string {
+  const v = rec[key];
+  if (typeof v === 'string') return v;
+  if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+  return fallback;
+}
+
+/** Safely get a number value from a record, with an optional fallback. */
+function num(rec: Record<string, unknown>, key: string, fallback = 0): number {
+  const v = rec[key];
+  if (typeof v === 'number') return v;
+  if (typeof v === 'string') {
+    const n = Number(v);
+    if (!Number.isNaN(n)) return n;
+  }
+  return fallback;
+}
+
+/** Safely get a boolean value from a record. */
+function bool(rec: Record<string, unknown>, key: string, fallback = false): boolean {
+  const v = rec[key];
+  if (typeof v === 'boolean') return v;
+  return fallback;
+}
+
+/** Safely get an array value from a record. */
+function arr(rec: Record<string, unknown>, key: string): unknown[] {
+  const v = rec[key];
+  if (Array.isArray(v)) return v;
+  return [];
+}
 
 export default function Settings() {
   const [activeSection, setActiveSection] = useState('providers');
@@ -39,6 +89,8 @@ export default function Settings() {
   const [sessionOpen, setSessionOpen] = useState(true);
   const [tokenOpen, setTokenOpen] = useState(true);
   const [configOpen, setConfigOpen] = useState(true);
+
+  const { data: config, loading, error, refetch } = useApi<ConfigMap>('/api/settings');
 
   const sections: SettingsSection[] = [
     { id: 'general', label: 'General', icon: Sliders },
@@ -57,13 +109,89 @@ export default function Settings() {
     { id: 'plugins', label: 'Plugins', icon: Plug },
   ];
 
-  const providers = ['Anthropic', 'OpenAI', 'OpenRouter', 'DeepSeek', 'Gemini', 'Groq', 'vLLM', 'Zhipu', 'DashScope', 'Moonshot', 'MiniMax', 'AIHubMix'];
-  const channels = ['Telegram', 'Discord', 'WhatsApp', 'Slack', 'Email', 'QQ', 'Feishu', 'DingTalk', 'Mochat'];
+  // ── Derive provider/channel lists from config ──────────────────────────────
+
+  const providersMap = asRecord(config?.providers);
+  const providerNames = Object.keys(providersMap);
+  // Fallback list if config hasn't loaded yet
+  const providerTabs = providerNames.length > 0
+    ? providerNames
+    : ['anthropic', 'openai', 'openrouter', 'deepseek', 'gemini', 'groq', 'vllm', 'zhipu', 'dashscope', 'moonshot', 'minimax', 'aihubmix'];
+
+  const channelsMap = asRecord(config?.channels);
+  const channelNames = Object.keys(channelsMap);
+  const channelTabs = channelNames.length > 0
+    ? channelNames
+    : ['telegram', 'discord', 'whatsapp', 'slack', 'email', 'qq', 'feishu', 'dingtalk', 'mochat'];
 
   const [activeChannel, setActiveChannel] = useState('telegram');
-  const [extendedThinking, setExtendedThinking] = useState(false);
-  const [temperature, setTemperature] = useState(0.7);
-  const [confidenceThreshold, setConfidenceThreshold] = useState(0.7);
+
+  // ── Read config sections ───────────────────────────────────────────────────
+
+  const gateway = asRecord(config?.gateway);
+  const agents = asRecord(config?.agents);
+  const agentDefaults = asRecord(agents.defaults);
+  const tools = asRecord(config?.tools);
+  const todo = asRecord(config?.todo);
+  const enrichment = asRecord(todo.enrichment);
+  const search = asRecord(todo.search);
+  const todoNotifications = asRecord(todo.notifications);
+  const todoFocus = asRecord(todo.focus);
+  const todoDailyPlanning = asRecord(todo.dailyPlanning);
+  const calendar = asRecord(config?.calendar);
+  const calendarProviders = arr(calendar, 'providers');
+  const conversation = asRecord(config?.conversation);
+  const conversationEmbedding = asRecord(conversation.embedding);
+  const conversationSearch = asRecord(conversation.search);
+  const conversationSession = asRecord(conversation.session);
+  const conversationMemory = asRecord(conversation.memory);
+  const learning = asRecord(config?.learning);
+  const confidence = asRecord(config?.confidence);
+  const finance = asRecord(config?.finance);
+  const financeInflation = asRecord(finance.inflation);
+  const financeExpectedReturns = asRecord(finance.expectedReturns);
+  const financeBudgeting = asRecord(finance.budgeting);
+  const financePriceRefresh = asRecord(finance.priceRefresh);
+  const financeScheduling = asRecord(finance.scheduling);
+  const projects = asRecord(config?.projects);
+  const packs = asRecord(config?.packs);
+  const plugins = asRecord(config?.plugins);
+  const toolsWeb = asRecord(tools.web);
+  const toolsBrowser = asRecord(tools.browser);
+
+  // Current provider/channel data
+  const currentProviderConfig = asRecord(providersMap[activeProvider]);
+  const currentChannelConfig = asRecord(channelsMap[activeChannel]);
+
+  // ── Display helper: format a provider name for display ─────────────────────
+
+  function displayName(key: string): string {
+    // Capitalize well-known provider/channel names
+    const map: Record<string, string> = {
+      anthropic: 'Anthropic',
+      openai: 'OpenAI',
+      openrouter: 'OpenRouter',
+      deepseek: 'DeepSeek',
+      gemini: 'Gemini',
+      groq: 'Groq',
+      vllm: 'vLLM',
+      zhipu: 'Zhipu',
+      dashscope: 'DashScope',
+      moonshot: 'Moonshot',
+      minimax: 'MiniMax',
+      aihubmix: 'AIHubMix',
+      telegram: 'Telegram',
+      discord: 'Discord',
+      whatsapp: 'WhatsApp',
+      slack: 'Slack',
+      email: 'Email',
+      qq: 'QQ',
+      feishu: 'Feishu',
+      dingtalk: 'DingTalk',
+      mochat: 'Mochat',
+    };
+    return map[key] ?? key;
+  }
 
   const FormCard = ({ children, title, description }: any) => (
     <div className="p-5 rounded-lg mb-4" style={{
@@ -72,7 +200,7 @@ export default function Settings() {
     }}>
       {title && (
         <>
-          <label className="text-[13px] block mb-1" style={{ 
+          <label className="text-[13px] block mb-1" style={{
             color: 'var(--codex-fg)',
             fontWeight: 500
           }}>
@@ -101,6 +229,8 @@ export default function Settings() {
         color: 'var(--codex-fg)',
         fontFamily: secret ? 'var(--font-mono)' : 'var(--font-ui)'
       }}
+      readOnly
+      // TODO: Remove readOnly and add onChange handler that debounces + PATCHes
     />
   );
 
@@ -118,6 +248,41 @@ export default function Settings() {
     </button>
   );
 
+  // ── Loading state ──────────────────────────────────────────────────────────
+
+  if (loading && !config) {
+    return (
+      <div className="flex-1 flex items-center justify-center" style={{ backgroundColor: 'var(--codex-bg)' }}>
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--codex-accent)' }} />
+          <span className="text-[13px]" style={{ color: 'var(--codex-fg-subtle)' }}>Loading settings...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Error state ────────────────────────────────────────────────────────────
+
+  if (error && !config) {
+    return (
+      <div className="flex-1 flex items-center justify-center" style={{ backgroundColor: 'var(--codex-bg)' }}>
+        <div className="flex flex-col items-center gap-3 max-w-sm text-center">
+          <AlertTriangle className="w-6 h-6" style={{ color: '#e5534b' }} />
+          <span className="text-[13px]" style={{ color: 'var(--codex-fg)' }}>Failed to load settings</span>
+          <span className="text-[12px]" style={{ color: '#666' }}>{error.message}</span>
+          <button
+            onClick={refetch}
+            className="flex items-center gap-2 px-4 py-2 rounded text-[13px] mt-2 transition-colors"
+            style={{ backgroundColor: 'var(--codex-accent)', color: 'white' }}
+          >
+            <RefreshCw className="w-3.5 h-3.5" strokeWidth={1.5} />
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       {/* Main Content Area */}
@@ -128,7 +293,7 @@ export default function Settings() {
           borderColor: 'var(--codex-border-subtle)'
         }}>
           <div className="p-4">
-            <h2 className="text-[10px] uppercase tracking-wider mb-3 px-3" style={{ 
+            <h2 className="text-[10px] uppercase tracking-wider mb-3 px-3" style={{
               color: 'var(--codex-fg-subtle)',
               fontWeight: 500
             }}>
@@ -170,11 +335,11 @@ export default function Settings() {
         {/* Content Area */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Header */}
-          <div className="border-b px-8 py-6" style={{ 
+          <div className="border-b px-8 py-6" style={{
             borderColor: 'var(--codex-border-subtle)',
             backgroundColor: 'var(--codex-bg)'
           }}>
-            <h1 className="text-xl mb-1" style={{ 
+            <h1 className="text-xl mb-1" style={{
               color: 'var(--codex-fg)',
               fontWeight: 400
             }}>
@@ -201,21 +366,21 @@ export default function Settings() {
           {/* Content */}
           <div className="flex-1 overflow-y-auto px-8 py-6" style={{ backgroundColor: 'var(--codex-bg)' }}>
             <div className="max-w-3xl">
-              
+
               {/* GENERAL */}
               {activeSection === 'general' && (
                 <>
                   <FormCard title="Timezone" description="Default timezone for the application">
-                    <TextInput value="UTC" placeholder="UTC" />
+                    <TextInput value={str(config ?? {}, 'timezone', 'UTC')} placeholder="UTC" />
                   </FormCard>
                   <FormCard title="Data Directory" description="Where klyntbot stores its data">
-                    <TextInput value="~/.klyntbot" placeholder="~/.klyntbot" />
+                    <TextInput value={str(config ?? {}, 'dataDir', '~/.klyntbot')} placeholder="~/.klyntbot" />
                   </FormCard>
                   <FormCard title="Gateway Host" description="API gateway host address">
-                    <TextInput value="0.0.0.0" placeholder="0.0.0.0" />
+                    <TextInput value={str(gateway, 'host', '0.0.0.0')} placeholder="0.0.0.0" />
                   </FormCard>
                   <FormCard title="Gateway Port" description="API gateway port number">
-                    <TextInput value="18790" placeholder="18790" />
+                    <TextInput value={str(gateway, 'port', '18790')} placeholder="18790" />
                   </FormCard>
                 </>
               )}
@@ -226,12 +391,12 @@ export default function Settings() {
                   {/* Provider Tabs */}
                   <div className="mb-6 overflow-x-auto">
                     <div className="flex gap-4 pb-2 min-w-max">
-                      {providers.map((provider) => {
-                        const isActive = provider.toLowerCase() === activeProvider;
+                      {providerTabs.map((provider) => {
+                        const isActive = provider === activeProvider;
                         return (
                           <button
                             key={provider}
-                            onClick={() => setActiveProvider(provider.toLowerCase())}
+                            onClick={() => setActiveProvider(provider)}
                             className="px-3 py-2 text-[13px] relative transition-colors whitespace-nowrap"
                             style={{
                               color: isActive ? 'var(--codex-accent)' : 'var(--codex-fg-subtle)'
@@ -243,7 +408,7 @@ export default function Settings() {
                               if (!isActive) e.currentTarget.style.color = 'var(--codex-fg-subtle)';
                             }}
                           >
-                            {provider}
+                            {displayName(provider)}
                             {isActive && (
                               <div className="absolute bottom-0 left-0 right-0 h-[2px]" style={{
                                 backgroundColor: 'var(--codex-accent)'
@@ -258,14 +423,14 @@ export default function Settings() {
                   <FormCard>
                     <div className="flex items-start justify-between mb-3">
                       <div>
-                        <label className="text-[13px] block mb-1" style={{ 
+                        <label className="text-[13px] block mb-1" style={{
                           color: 'var(--codex-fg)',
                           fontWeight: 500
                         }}>
                           API Key
                         </label>
                         <p className="text-[12px]" style={{ color: '#666' }}>
-                          Your {activeProvider} API key for authentication
+                          Your {displayName(activeProvider)} API key for authentication
                         </p>
                       </div>
                       <button
@@ -276,6 +441,7 @@ export default function Settings() {
                         }}
                         onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--codex-accent-hover)'}
                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--codex-accent)'}
+                        // TODO: onClick should PATCH /api/settings/providers with { [activeProvider]: { apiKey: newValue } }
                       >
                         Save
                       </button>
@@ -283,7 +449,7 @@ export default function Settings() {
                     <div className="relative">
                       <input
                         type={showApiKey ? 'text' : 'password'}
-                        defaultValue="••••••••••••••••••••••••••••••••"
+                        defaultValue={str(currentProviderConfig, 'apiKey', '')}
                         className="w-full px-3 py-2 rounded border outline-none text-[13px] pr-10"
                         style={{
                           backgroundColor: 'var(--codex-bg)',
@@ -291,6 +457,8 @@ export default function Settings() {
                           color: 'var(--codex-fg)',
                           fontFamily: 'var(--font-mono)'
                         }}
+                        readOnly
+                        // TODO: Remove readOnly and wire onChange to collect new API key value
                       />
                       <button
                         onClick={() => setShowApiKey(!showApiKey)}
@@ -306,19 +474,40 @@ export default function Settings() {
                     </div>
                   </FormCard>
 
+                  <FormCard title="Default Model" description="Default model for this provider">
+                    <TextInput value={str(currentProviderConfig, 'defaultModel', '')} placeholder="model-name" />
+                  </FormCard>
+
                   <FormCard title="API Base URL" description="Custom API endpoint">
-                    <TextInput value={`https://api.${activeProvider}.com`} />
+                    <TextInput value={str(currentProviderConfig, 'apiBase', str(currentProviderConfig, 'baseUrl', ''))} placeholder={`https://api.${activeProvider}.com`} />
                   </FormCard>
 
                   <FormCard title="Extra Headers" description="Additional HTTP headers for API requests">
                     <div className="space-y-2">
-                      <div className="flex gap-2">
-                        <TextInput placeholder="Header name" />
-                        <TextInput placeholder="Header value" />
-                        <button className="px-3 py-2 rounded border" style={{ borderColor: 'var(--codex-border)', color: 'var(--codex-fg-subtle)' }}>
-                          <X className="w-4 h-4" strokeWidth={1.5} />
-                        </button>
-                      </div>
+                      {(() => {
+                        const headers = asRecord(currentProviderConfig.extraHeaders);
+                        const entries = Object.entries(headers);
+                        if (entries.length === 0) {
+                          return (
+                            <div className="flex gap-2">
+                              <TextInput placeholder="Header name" />
+                              <TextInput placeholder="Header value" />
+                              <button className="px-3 py-2 rounded border" style={{ borderColor: 'var(--codex-border)', color: 'var(--codex-fg-subtle)' }}>
+                                <X className="w-4 h-4" strokeWidth={1.5} />
+                              </button>
+                            </div>
+                          );
+                        }
+                        return entries.map(([key, val]) => (
+                          <div key={key} className="flex gap-2">
+                            <TextInput value={key} placeholder="Header name" />
+                            <TextInput value={String(val)} placeholder="Header value" />
+                            <button className="px-3 py-2 rounded border" style={{ borderColor: 'var(--codex-border)', color: 'var(--codex-fg-subtle)' }}>
+                              <X className="w-4 h-4" strokeWidth={1.5} />
+                            </button>
+                          </div>
+                        ));
+                      })()}
                       <button className="flex items-center gap-2 px-3 py-2 rounded text-[12px]" style={{ color: 'var(--codex-accent)' }}>
                         <Plus className="w-3.5 h-3.5" strokeWidth={1.5} />
                         Add Header
@@ -329,7 +518,7 @@ export default function Settings() {
                   <FormCard>
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <label className="text-[13px] block mb-1" style={{ 
+                        <label className="text-[13px] block mb-1" style={{
                           color: 'var(--codex-fg)',
                           fontWeight: 500
                         }}>
@@ -339,14 +528,15 @@ export default function Settings() {
                           Use provider's native API format
                         </p>
                       </div>
-                      <Toggle checked={true} onChange={() => {}} />
+                      {/* TODO: Wire toggle to PATCH /api/settings/providers */}
+                      <Toggle checked={bool(currentProviderConfig, 'native', false)} onChange={() => {}} />
                     </div>
                   </FormCard>
 
                   <FormCard>
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
-                        <label className="text-[13px] block mb-1" style={{ 
+                        <label className="text-[13px] block mb-1" style={{
                           color: 'var(--codex-fg)',
                           fontWeight: 500
                         }}>
@@ -356,28 +546,38 @@ export default function Settings() {
                           Allow the model to think longer for complex tasks
                         </p>
                       </div>
-                      <Toggle checked={extendedThinking} onChange={() => setExtendedThinking(!extendedThinking)} />
+                      {/* TODO: Wire toggle to PATCH /api/settings/providers */}
+                      <Toggle
+                        checked={bool(asRecord(currentProviderConfig.extendedThinking), 'enabled', false)}
+                        onChange={() => {}}
+                      />
                     </div>
-                    {extendedThinking && (
+                    {bool(asRecord(currentProviderConfig.extendedThinking), 'enabled', false) && (
                       <div className="space-y-3 pt-3 border-t" style={{ borderColor: 'var(--codex-border)' }}>
                         <div>
                           <label className="text-[12px] block mb-2" style={{ color: 'var(--codex-fg-subtle)' }}>
                             Budget Tokens
                           </label>
-                          <TextInput value="10000" placeholder="10000" />
+                          <TextInput
+                            value={str(asRecord(currentProviderConfig.extendedThinking), 'budgetTokens', '')}
+                            placeholder="10000"
+                          />
                         </div>
                         <div>
                           <label className="text-[12px] block mb-2" style={{ color: 'var(--codex-fg-subtle)' }}>
                             Use For
                           </label>
-                          <TextInput placeholder="Complex reasoning tasks" />
+                          <TextInput
+                            value={str(asRecord(currentProviderConfig.extendedThinking), 'useFor', '')}
+                            placeholder="Complex reasoning tasks"
+                          />
                         </div>
                       </div>
                     )}
                   </FormCard>
 
                   <FormCard title="API Version">
-                    <TextInput value="2023-06-01" placeholder="2023-06-01" />
+                    <TextInput value={str(currentProviderConfig, 'apiVersion', '')} placeholder="2023-06-01" />
                   </FormCard>
 
                   {/* Routing */}
@@ -392,10 +592,14 @@ export default function Settings() {
                       backgroundColor: 'var(--codex-bg)',
                       borderColor: 'var(--codex-border)',
                       color: 'var(--codex-fg)'
-                    }}>
-                      <option>Anthropic</option>
-                      <option>OpenAI</option>
-                      <option>OpenRouter</option>
+                    }}
+                      // TODO: Wire onChange to PATCH /api/settings/providers
+                      value={str(asRecord(config?.routing), 'primary', providerTabs[0] ?? '')}
+                      onChange={() => {}} // TODO: PATCH on change
+                    >
+                      {providerTabs.map((p) => (
+                        <option key={p} value={p}>{displayName(p)}</option>
+                      ))}
                     </select>
                   </FormCard>
 
@@ -404,15 +608,22 @@ export default function Settings() {
                       backgroundColor: 'var(--codex-bg)',
                       borderColor: 'var(--codex-border)',
                       color: 'var(--codex-fg)'
-                    }}>
-                      <option>OpenAI</option>
-                      <option>Anthropic</option>
-                      <option>Groq</option>
+                    }}
+                      // TODO: Wire onChange to PATCH /api/settings/providers
+                      value={str(asRecord(config?.routing), 'fallback', '')}
+                      onChange={() => {}} // TODO: PATCH on change
+                    >
+                      {providerTabs.map((p) => (
+                        <option key={p} value={p}>{displayName(p)}</option>
+                      ))}
                     </select>
                   </FormCard>
 
                   <FormCard title="Classifier Model">
-                    <TextInput value="gpt-4o-mini" placeholder="gpt-4o-mini" />
+                    <TextInput
+                      value={str(asRecord(config?.routing), 'classifierModel', '')}
+                      placeholder="gpt-4o-mini"
+                    />
                   </FormCard>
                 </>
               )}
@@ -422,18 +633,18 @@ export default function Settings() {
                 <>
                   <div className="mb-6 overflow-x-auto">
                     <div className="flex gap-4 pb-2 min-w-max">
-                      {channels.map((channel) => {
-                        const isActive = channel.toLowerCase() === activeChannel;
+                      {channelTabs.map((channel) => {
+                        const isActive = channel === activeChannel;
                         return (
                           <button
                             key={channel}
-                            onClick={() => setActiveChannel(channel.toLowerCase())}
+                            onClick={() => setActiveChannel(channel)}
                             className="px-3 py-2 text-[13px] relative transition-colors whitespace-nowrap"
                             style={{
                               color: isActive ? 'var(--codex-accent)' : 'var(--codex-fg-subtle)'
                             }}
                           >
-                            {channel}
+                            {displayName(channel)}
                             {isActive && (
                               <div className="absolute bottom-0 left-0 right-0 h-[2px]" style={{
                                 backgroundColor: 'var(--codex-accent)'
@@ -450,20 +661,30 @@ export default function Settings() {
                       <label className="text-[13px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>
                         Enabled
                       </label>
-                      <Toggle checked={true} onChange={() => {}} />
+                      {/* TODO: Wire toggle to PATCH /api/settings/channels */}
+                      <Toggle checked={bool(currentChannelConfig, 'enabled', false)} onChange={() => {}} />
                     </div>
                   </FormCard>
 
                   <FormCard title="Token" description="Bot authentication token">
-                    <TextInput value="••••••••••••••••" secret />
+                    <TextInput
+                      value={str(currentChannelConfig, 'token', str(currentChannelConfig, 'botToken', ''))}
+                      secret
+                    />
                   </FormCard>
 
                   <FormCard title="Allow From" description="Allowed user IDs (comma-separated)">
-                    <TextInput placeholder="user1, user2, user3" />
+                    <TextInput
+                      value={(() => {
+                        const ids = arr(currentChannelConfig, 'allowedChatIds');
+                        return ids.length > 0 ? ids.join(', ') : '';
+                      })()}
+                      placeholder="user1, user2, user3"
+                    />
                   </FormCard>
 
                   <FormCard title="Proxy" description="Proxy URL for connections">
-                    <TextInput placeholder="socks5://127.0.0.1:1080" />
+                    <TextInput value={str(currentChannelConfig, 'proxy', '')} placeholder="socks5://127.0.0.1:1080" />
                   </FormCard>
                 </>
               )}
@@ -472,16 +693,16 @@ export default function Settings() {
               {activeSection === 'agent-defaults' && (
                 <>
                   <FormCard title="Model" description="Default model identifier">
-                    <TextInput value="anthropic/claude-opus-4-5" />
+                    <TextInput value={str(agentDefaults, 'model', '')} />
                   </FormCard>
                   <FormCard title="Workspace" description="Agent workspace directory">
-                    <TextInput value="~/.klyntbot/workspace" />
+                    <TextInput value={str(agentDefaults, 'workspace', str(agentDefaults, 'workspacePath', ''))} placeholder="~/.klyntbot/workspace" />
                   </FormCard>
                   <FormCard title="Provider" description="Override default provider (optional)">
-                    <TextInput placeholder="anthropic" />
+                    <TextInput value={str(agentDefaults, 'provider', '')} placeholder="anthropic" />
                   </FormCard>
                   <FormCard title="Max Tokens">
-                    <TextInput value="8192" />
+                    <TextInput value={str(agentDefaults, 'maxTokens', '')} />
                   </FormCard>
                   <FormCard title="Temperature" description="Model creativity (0-1)">
                     <input
@@ -489,21 +710,25 @@ export default function Settings() {
                       min="0"
                       max="1"
                       step="0.1"
-                      value={temperature}
-                      onChange={(e) => setTemperature(parseFloat(e.target.value))}
+                      value={num(agentDefaults, 'temperature', 0.7)}
                       className="w-full"
+                      readOnly
+                      // TODO: Wire onChange to PATCH /api/settings/agents
                     />
                     <div className="flex justify-between text-[12px] mt-2" style={{ color: 'var(--codex-fg-subtle)' }}>
                       <span>0</span>
-                      <span style={{ color: 'var(--codex-accent)' }}>{temperature}</span>
+                      <span style={{ color: 'var(--codex-accent)' }}>{num(agentDefaults, 'temperature', 0.7)}</span>
                       <span>1</span>
                     </div>
                   </FormCard>
                   <FormCard title="Max Tool Iterations">
-                    <TextInput value="20" />
+                    <TextInput value={str(agentDefaults, 'maxToolIterations', str(agentDefaults, 'maxIterations', ''))} />
                   </FormCard>
-                  <FormCard title="Max Concurrent Subagents">
-                    <TextInput value="3" />
+                  <FormCard title="Permission Mode">
+                    <TextInput value={str(agentDefaults, 'permissionMode', '')} />
+                  </FormCard>
+                  <FormCard title="System Prompt File">
+                    <TextInput value={str(agentDefaults, 'systemPromptFile', '')} placeholder="(none)" />
                   </FormCard>
                 </>
               )}
@@ -515,10 +740,10 @@ export default function Settings() {
                     <h3 className="text-[14px] mb-4" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Web</h3>
                   </div>
                   <FormCard title="Brave API Key">
-                    <TextInput secret value="••••••••••••" />
+                    <TextInput secret value={str(toolsWeb, 'braveApiKey', str(toolsWeb, 'apiKey', ''))} />
                   </FormCard>
                   <FormCard title="Max Results">
-                    <TextInput value="5" />
+                    <TextInput value={str(toolsWeb, 'maxResults', str(tools, 'maxSearchResults', ''))} />
                   </FormCard>
 
                   <div className="mb-4 mt-8">
@@ -527,7 +752,8 @@ export default function Settings() {
                   <FormCard>
                     <div className="flex items-center justify-between mb-4">
                       <label className="text-[13px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Enabled</label>
-                      <Toggle checked={true} onChange={() => {}} />
+                      {/* TODO: Wire toggle to PATCH /api/settings/tools */}
+                      <Toggle checked={bool(toolsBrowser, 'enabled', false)} onChange={() => {}} />
                     </div>
                   </FormCard>
                   <FormCard title="Trust Level">
@@ -535,14 +761,17 @@ export default function Settings() {
                       backgroundColor: 'var(--codex-bg)',
                       borderColor: 'var(--codex-border)',
                       color: 'var(--codex-fg)'
-                    }}>
+                    }}
+                      value={str(toolsBrowser, 'trustLevel', 'strict')}
+                      onChange={() => {}} // TODO: Wire to PATCH /api/settings/tools
+                    >
                       <option>strict</option>
                       <option>autonomous</option>
                       <option>full</option>
                     </select>
                   </FormCard>
                   <FormCard title="Session Timeout (seconds)">
-                    <TextInput value="300" />
+                    <TextInput value={str(toolsBrowser, 'sessionTimeout', '')} />
                   </FormCard>
 
                   <div className="mb-4 mt-8">
@@ -558,9 +787,28 @@ export default function Settings() {
                           Limit file operations to workspace directory
                         </p>
                       </div>
-                      <Toggle checked={false} onChange={() => {}} />
+                      {/* TODO: Wire toggle to PATCH /api/settings/tools */}
+                      <Toggle checked={bool(tools, 'restrictToWorkspace', false)} onChange={() => {}} />
                     </div>
                   </FormCard>
+
+                  {str(tools, 'workspacePath') && (
+                    <FormCard title="Workspace Path">
+                      <TextInput value={str(tools, 'workspacePath')} />
+                    </FormCard>
+                  )}
+
+                  {arr(tools, 'disabled').length > 0 && (
+                    <FormCard title="Disabled Tools">
+                      <TextInput value={arr(tools, 'disabled').join(', ')} />
+                    </FormCard>
+                  )}
+
+                  {str(tools, 'maxFileSizeBytes') && (
+                    <FormCard title="Max File Size (bytes)">
+                      <TextInput value={str(tools, 'maxFileSizeBytes')} />
+                    </FormCard>
+                  )}
                 </>
               )}
 
@@ -572,7 +820,10 @@ export default function Settings() {
                       backgroundColor: 'var(--codex-bg)',
                       borderColor: 'var(--codex-border)',
                       color: 'var(--codex-fg)'
-                    }}>
+                    }}
+                      value={str(todo, 'creationMode', 'ask-first')}
+                      onChange={() => {}} // TODO: Wire to PATCH /api/settings/todo
+                    >
                       <option>ask-first</option>
                       <option>yolo</option>
                       <option>party</option>
@@ -585,16 +836,18 @@ export default function Settings() {
                   <FormCard>
                     <div className="flex items-center justify-between mb-3">
                       <label className="text-[13px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Enabled</label>
-                      <Toggle checked={true} onChange={() => {}} />
+                      {/* TODO: Wire toggle to PATCH /api/settings/todo */}
+                      <Toggle checked={bool(enrichment, 'enabled', false)} onChange={() => {}} />
                     </div>
                   </FormCard>
                   <FormCard title="Auto Apply Threshold">
-                    <TextInput value="0.85" />
+                    <TextInput value={str(enrichment, 'autoApplyThreshold', '')} />
                   </FormCard>
                   <FormCard>
                     <div className="flex items-center justify-between">
                       <label className="text-[13px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Use LLM</label>
-                      <Toggle checked={true} onChange={() => {}} />
+                      {/* TODO: Wire toggle to PATCH /api/settings/todo */}
+                      <Toggle checked={bool(enrichment, 'useLlm', false)} onChange={() => {}} />
                     </div>
                   </FormCard>
 
@@ -604,17 +857,18 @@ export default function Settings() {
                   <FormCard>
                     <div className="flex items-center justify-between mb-3">
                       <label className="text-[13px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Enabled</label>
-                      <Toggle checked={true} onChange={() => {}} />
+                      {/* TODO: Wire toggle to PATCH /api/settings/todo */}
+                      <Toggle checked={bool(search, 'enabled', false)} onChange={() => {}} />
                     </div>
                   </FormCard>
                   <FormCard title="Semantic Threshold">
-                    <TextInput value="0.5" />
+                    <TextInput value={str(search, 'semanticThreshold', '')} />
                   </FormCard>
                   <FormCard title="Embedding Model">
-                    <TextInput value="text-embedding-3-small" />
+                    <TextInput value={str(search, 'embeddingModel', '')} />
                   </FormCard>
                   <FormCard title="RRF K">
-                    <TextInput value="60" />
+                    <TextInput value={str(search, 'rrfK', '')} />
                   </FormCard>
 
                   <div className="mb-4 mt-8">
@@ -623,27 +877,29 @@ export default function Settings() {
                   <FormCard>
                     <div className="flex items-center justify-between mb-3">
                       <label className="text-[13px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Focus Reminders</label>
-                      <Toggle checked={true} onChange={() => {}} />
+                      {/* TODO: Wire toggle to PATCH /api/settings/todo */}
+                      <Toggle checked={bool(todoNotifications, 'focusReminders', false)} onChange={() => {}} />
                     </div>
                   </FormCard>
                   <FormCard>
                     <div className="flex items-center justify-between mb-3">
                       <label className="text-[13px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Daily Digest</label>
-                      <Toggle checked={true} onChange={() => {}} />
+                      {/* TODO: Wire toggle to PATCH /api/settings/todo */}
+                      <Toggle checked={bool(todoNotifications, 'dailyDigest', false)} onChange={() => {}} />
                     </div>
                   </FormCard>
                   <FormCard title="Digest Time">
-                    <TextInput value="09:00" />
+                    <TextInput value={str(todoNotifications, 'digestTime', '')} />
                   </FormCard>
 
                   <div className="mb-4 mt-8">
                     <h3 className="text-[14px] mb-4" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Focus</h3>
                   </div>
                   <FormCard title="Max Slots">
-                    <TextInput value="3" />
+                    <TextInput value={str(todoFocus, 'maxSlots', '')} />
                   </FormCard>
                   <FormCard title="Deadline Hours">
-                    <TextInput value="18" />
+                    <TextInput value={str(todoFocus, 'deadlineHours', '')} />
                   </FormCard>
 
                   <div className="mb-4 mt-8">
@@ -652,11 +908,12 @@ export default function Settings() {
                   <FormCard>
                     <div className="flex items-center justify-between mb-3">
                       <label className="text-[13px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Enabled</label>
-                      <Toggle checked={true} onChange={() => {}} />
+                      {/* TODO: Wire toggle to PATCH /api/settings/todo */}
+                      <Toggle checked={bool(todoDailyPlanning, 'enabled', false)} onChange={() => {}} />
                     </div>
                   </FormCard>
                   <FormCard title="Planning Time">
-                    <TextInput value="08:00" />
+                    <TextInput value={str(todoDailyPlanning, 'time', '')} />
                   </FormCard>
                 </>
               )}
@@ -674,7 +931,8 @@ export default function Settings() {
                           Sync changes both ways
                         </p>
                       </div>
-                      <Toggle checked={true} onChange={() => {}} />
+                      {/* TODO: Wire toggle to PATCH /api/settings/calendar */}
+                      <Toggle checked={bool(calendar, 'bidirectionalSync', bool(calendar, 'bidirectional', false))} onChange={() => {}} />
                     </div>
                   </FormCard>
 
@@ -683,7 +941,10 @@ export default function Settings() {
                       backgroundColor: 'var(--codex-bg)',
                       borderColor: 'var(--codex-border)',
                       color: 'var(--codex-fg)'
-                    }}>
+                    }}
+                      value={str(calendar, 'conflictResolution', 'manual')}
+                      onChange={() => {}} // TODO: Wire to PATCH /api/settings/calendar
+                    >
                       <option>manual</option>
                       <option>local-wins</option>
                       <option>remote-wins</option>
@@ -696,56 +957,78 @@ export default function Settings() {
                     <button className="flex items-center gap-2 px-3 py-1.5 rounded text-[12px]" style={{
                       backgroundColor: 'var(--codex-accent)',
                       color: 'white'
-                    }}>
+                    }}
+                      // TODO: Wire onClick to add a new calendar provider via PATCH
+                    >
                       <Plus className="w-3.5 h-3.5" strokeWidth={1.5} />
                       Add Provider
                     </button>
                   </div>
 
-                  <div className="p-4 rounded-lg mb-4" style={{
-                    backgroundColor: '#141414',
-                    border: '1px solid var(--codex-border)'
-                  }}>
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <div className="text-[13px] mb-1" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Google Calendar</div>
-                        <div className="text-[11px]" style={{ color: '#666' }}>CalDAV</div>
+                  {calendarProviders.length > 0 ? calendarProviders.map((prov, idx) => {
+                    const p = asRecord(prov);
+                    return (
+                      <div key={idx} className="p-4 rounded-lg mb-4" style={{
+                        backgroundColor: '#141414',
+                        border: '1px solid var(--codex-border)'
+                      }}>
+                        <div className="flex items-center justify-between mb-4">
+                          <div>
+                            <div className="text-[13px] mb-1" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>
+                              {str(p, 'name', str(p, 'calendarName', `Provider ${idx + 1}`))}
+                            </div>
+                            <div className="text-[11px]" style={{ color: '#666' }}>
+                              {str(p, 'provider', str(p, 'type', 'CalDAV'))}
+                            </div>
+                          </div>
+                          {/* TODO: Wire toggle to PATCH /api/settings/calendar */}
+                          <Toggle checked={bool(p, 'enabled', true)} onChange={() => {}} />
+                        </div>
+                        <div className="space-y-3">
+                          <div>
+                            <label className="text-[11px] block mb-1" style={{ color: 'var(--codex-fg-subtle)' }}>CalDAV URL</label>
+                            <TextInput value={str(p, 'url', str(p, 'caldavUrl', ''))} placeholder="https://calendar.example.com/..." />
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-[11px] block mb-1" style={{ color: 'var(--codex-fg-subtle)' }}>Username</label>
+                              <TextInput value={str(p, 'username', '')} placeholder="user@example.com" />
+                            </div>
+                            <div>
+                              <label className="text-[11px] block mb-1" style={{ color: 'var(--codex-fg-subtle)' }}>Password</label>
+                              <TextInput value={str(p, 'password', '')} secret />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-[11px] block mb-1" style={{ color: 'var(--codex-fg-subtle)' }}>Calendar Name</label>
+                            <TextInput value={str(p, 'calendarName', '')} />
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-[11px] block mb-1" style={{ color: 'var(--codex-fg-subtle)' }}>Sync Interval (min)</label>
+                              <TextInput value={str(p, 'syncIntervalMinutes', str(p, 'syncInterval', ''))} />
+                            </div>
+                            <div className="flex items-end">
+                              <label className="flex items-center gap-2 text-[11px]" style={{ color: 'var(--codex-fg-subtle)' }}>
+                                <input type="checkbox" checked={bool(p, 'syncDueDates', bool(p, 'autoSyncDueDates', false))} readOnly />
+                                Auto sync due dates
+                              </label>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <Toggle checked={true} onChange={() => {}} />
+                    );
+                  }) : (
+                    // Fallback when no providers are configured — show empty card
+                    <div className="p-4 rounded-lg mb-4" style={{
+                      backgroundColor: '#141414',
+                      border: '1px solid var(--codex-border)'
+                    }}>
+                      <div className="text-[13px] text-center py-4" style={{ color: '#666' }}>
+                        No calendar providers configured
+                      </div>
                     </div>
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-[11px] block mb-1" style={{ color: 'var(--codex-fg-subtle)' }}>CalDAV URL</label>
-                        <TextInput placeholder="https://calendar.google.com/..." />
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-[11px] block mb-1" style={{ color: 'var(--codex-fg-subtle)' }}>Username</label>
-                          <TextInput placeholder="user@gmail.com" />
-                        </div>
-                        <div>
-                          <label className="text-[11px] block mb-1" style={{ color: 'var(--codex-fg-subtle)' }}>Password</label>
-                          <TextInput secret />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="text-[11px] block mb-1" style={{ color: 'var(--codex-fg-subtle)' }}>Calendar Name</label>
-                        <TextInput value="Primary" />
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-[11px] block mb-1" style={{ color: 'var(--codex-fg-subtle)' }}>Sync Interval (min)</label>
-                          <TextInput value="15" />
-                        </div>
-                        <div className="flex items-end">
-                          <label className="flex items-center gap-2 text-[11px]" style={{ color: 'var(--codex-fg-subtle)' }}>
-                            <input type="checkbox" defaultChecked />
-                            Auto sync due dates
-                          </label>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  )}
                 </>
               )}
 
@@ -758,14 +1041,21 @@ export default function Settings() {
                   <FormCard>
                     <div className="flex items-center justify-between mb-3">
                       <label className="text-[13px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Enabled</label>
-                      <Toggle checked={true} onChange={() => {}} />
+                      {/* TODO: Wire toggle to PATCH /api/settings/conversation */}
+                      <Toggle checked={bool(conversationEmbedding, 'enabled', false)} onChange={() => {}} />
                     </div>
                   </FormCard>
                   <FormCard title="Exclude Channels">
-                    <TextInput placeholder="channel1, channel2" />
+                    <TextInput
+                      value={arr(conversationEmbedding, 'excludeChannels').join(', ')}
+                      placeholder="channel1, channel2"
+                    />
                   </FormCard>
                   <FormCard title="Exclude Roles">
-                    <TextInput placeholder="role1, role2" />
+                    <TextInput
+                      value={arr(conversationEmbedding, 'excludeRoles').join(', ')}
+                      placeholder="role1, role2"
+                    />
                   </FormCard>
 
                   <div className="mb-4 mt-8">
@@ -774,46 +1064,48 @@ export default function Settings() {
                   <FormCard>
                     <div className="flex items-center justify-between mb-3">
                       <label className="text-[13px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Enabled</label>
-                      <Toggle checked={true} onChange={() => {}} />
+                      {/* TODO: Wire toggle to PATCH /api/settings/conversation */}
+                      <Toggle checked={bool(conversationSearch, 'enabled', false)} onChange={() => {}} />
                     </div>
                   </FormCard>
                   <FormCard title="Semantic Threshold">
-                    <TextInput value="0.5" />
+                    <TextInput value={str(conversationSearch, 'semanticThreshold', '')} />
                   </FormCard>
                   <FormCard title="Max Results">
-                    <TextInput value="20" />
+                    <TextInput value={str(conversationSearch, 'maxResults', '')} />
                   </FormCard>
 
                   <div className="mb-4 mt-8">
                     <h3 className="text-[14px] mb-4" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Session</h3>
                   </div>
                   <FormCard title="History Limit">
-                    <TextInput value="50" />
+                    <TextInput value={str(conversation, 'maxHistory', str(conversationSession, 'historyLimit', ''))} />
                   </FormCard>
                   <FormCard title="TTL (days)">
-                    <TextInput value="30" />
+                    <TextInput value={str(conversationSession, 'ttlDays', str(conversationSession, 'ttl', ''))} />
                   </FormCard>
                   <FormCard title="Cleanup Interval (hours)">
-                    <TextInput value="1" />
+                    <TextInput value={str(conversationSession, 'cleanupIntervalHours', str(conversationSession, 'cleanupInterval', ''))} />
                   </FormCard>
 
                   <div className="mb-4 mt-8">
                     <h3 className="text-[14px] mb-4" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Memory</h3>
                   </div>
                   <FormCard title="Decay Half Life (days)">
-                    <TextInput value="138" />
+                    <TextInput value={str(conversationMemory, 'decayHalfLifeDays', str(conversationMemory, 'decayHalfLife', ''))} />
                   </FormCard>
                   <FormCard title="Max Age (days)">
-                    <TextInput value="90" />
+                    <TextInput value={str(conversationMemory, 'maxAgeDays', str(conversationMemory, 'maxAge', ''))} />
                   </FormCard>
                   <FormCard>
                     <div className="flex items-center justify-between mb-3">
                       <label className="text-[13px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Consolidation Enabled</label>
-                      <Toggle checked={true} onChange={() => {}} />
+                      {/* TODO: Wire toggle to PATCH /api/settings/conversation */}
+                      <Toggle checked={bool(conversationMemory, 'consolidationEnabled', bool(conversationMemory, 'consolidation', false))} onChange={() => {}} />
                     </div>
                   </FormCard>
                   <FormCard title="Maintenance Interval (hours)">
-                    <TextInput value="24" />
+                    <TextInput value={str(conversationMemory, 'maintenanceIntervalHours', str(conversationMemory, 'maintenanceInterval', ''))} />
                   </FormCard>
                 </>
               )}
@@ -824,20 +1116,21 @@ export default function Settings() {
                   <FormCard>
                     <div className="flex items-center justify-between mb-3">
                       <label className="text-[13px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Enabled</label>
-                      <Toggle checked={true} onChange={() => {}} />
+                      {/* TODO: Wire toggle to PATCH /api/settings/learning */}
+                      <Toggle checked={bool(learning, 'enabled', false)} onChange={() => {}} />
                     </div>
                   </FormCard>
                   <FormCard title="Analysis Interval (seconds)">
-                    <TextInput value="3600" />
+                    <TextInput value={str(learning, 'analysisInterval', str(learning, 'analysisIntervalSecs', ''))} />
                   </FormCard>
                   <FormCard title="Min Threshold">
-                    <TextInput value="0.4" />
+                    <TextInput value={str(learning, 'minThreshold', '')} />
                   </FormCard>
                   <FormCard title="Max Threshold">
-                    <TextInput value="0.9" />
+                    <TextInput value={str(learning, 'maxThreshold', '')} />
                   </FormCard>
                   <FormCard title="Min Outcomes for Adaptation">
-                    <TextInput value="50" />
+                    <TextInput value={str(learning, 'minOutcomesForAdaptation', str(learning, 'minOutcomes', ''))} />
                   </FormCard>
                 </>
               )}
@@ -848,7 +1141,8 @@ export default function Settings() {
                   <FormCard>
                     <div className="flex items-center justify-between mb-3">
                       <label className="text-[13px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Enabled</label>
-                      <Toggle checked={true} onChange={() => {}} />
+                      {/* TODO: Wire toggle to PATCH /api/settings/confidence */}
+                      <Toggle checked={bool(confidence, 'enabled', false)} onChange={() => {}} />
                     </div>
                   </FormCard>
                   <FormCard title="Threshold" description="Minimum confidence level (0-1)">
@@ -857,25 +1151,43 @@ export default function Settings() {
                       min="0"
                       max="1"
                       step="0.1"
-                      value={confidenceThreshold}
-                      onChange={(e) => setConfidenceThreshold(parseFloat(e.target.value))}
+                      value={num(confidence, 'threshold', 0.7)}
                       className="w-full"
+                      readOnly
+                      // TODO: Wire onChange to PATCH /api/settings/confidence
                     />
                     <div className="flex justify-between text-[12px] mt-2" style={{ color: 'var(--codex-fg-subtle)' }}>
                       <span>0</span>
-                      <span style={{ color: 'var(--codex-accent)' }}>{confidenceThreshold}</span>
+                      <span style={{ color: 'var(--codex-accent)' }}>{num(confidence, 'threshold', 0.7)}</span>
                       <span>1</span>
                     </div>
                   </FormCard>
                   <FormCard title="Tool Overrides" description="Per-tool confidence settings">
                     <div className="space-y-2">
-                      <div className="flex gap-2">
-                        <TextInput placeholder="Tool name" />
-                        <TextInput placeholder="0.8" />
-                        <button className="px-3 py-2 rounded border" style={{ borderColor: 'var(--codex-border)', color: 'var(--codex-fg-subtle)' }}>
-                          <X className="w-4 h-4" strokeWidth={1.5} />
-                        </button>
-                      </div>
+                      {(() => {
+                        const overrides = asRecord(confidence.toolOverrides);
+                        const entries = Object.entries(overrides);
+                        if (entries.length === 0) {
+                          return (
+                            <div className="flex gap-2">
+                              <TextInput placeholder="Tool name" />
+                              <TextInput placeholder="0.8" />
+                              <button className="px-3 py-2 rounded border" style={{ borderColor: 'var(--codex-border)', color: 'var(--codex-fg-subtle)' }}>
+                                <X className="w-4 h-4" strokeWidth={1.5} />
+                              </button>
+                            </div>
+                          );
+                        }
+                        return entries.map(([tool, threshold]) => (
+                          <div key={tool} className="flex gap-2">
+                            <TextInput value={tool} placeholder="Tool name" />
+                            <TextInput value={String(threshold)} placeholder="0.8" />
+                            <button className="px-3 py-2 rounded border" style={{ borderColor: 'var(--codex-border)', color: 'var(--codex-fg-subtle)' }}>
+                              <X className="w-4 h-4" strokeWidth={1.5} />
+                            </button>
+                          </div>
+                        ));
+                      })()}
                       <button className="flex items-center gap-2 px-3 py-2 rounded text-[12px]" style={{ color: 'var(--codex-accent)' }}>
                         <Plus className="w-3.5 h-3.5" strokeWidth={1.5} />
                         Add Override
@@ -891,18 +1203,22 @@ export default function Settings() {
                   <FormCard>
                     <div className="flex items-center justify-between mb-3">
                       <label className="text-[13px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Enabled</label>
-                      <Toggle checked={true} onChange={() => {}} />
+                      {/* TODO: Wire toggle to PATCH /api/settings/finance */}
+                      <Toggle checked={bool(finance, 'enabled', false)} onChange={() => {}} />
                     </div>
                   </FormCard>
                   <FormCard title="Default Currency">
-                    <TextInput value="USD" />
+                    <TextInput value={str(finance, 'defaultCurrency', '')} />
                   </FormCard>
                   <FormCard title="Proactivity Level">
                     <select className="w-full px-3 py-2 rounded border text-[13px]" style={{
                       backgroundColor: 'var(--codex-bg)',
                       borderColor: 'var(--codex-border)',
                       color: 'var(--codex-fg)'
-                    }}>
+                    }}
+                      value={str(finance, 'proactivityLevel', str(finance, 'proactivity', 'medium'))}
+                      onChange={() => {}} // TODO: Wire to PATCH /api/settings/finance
+                    >
                       <option>low</option>
                       <option>medium</option>
                       <option>high</option>
@@ -913,26 +1229,26 @@ export default function Settings() {
                     <h3 className="text-[14px] mb-4" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Inflation</h3>
                   </div>
                   <FormCard title="Rate (%)">
-                    <TextInput value="3.3" />
+                    <TextInput value={str(financeInflation, 'rate', '')} />
                   </FormCard>
                   <FormCard title="Source">
-                    <TextInput value="CPI" />
+                    <TextInput value={str(financeInflation, 'source', '')} />
                   </FormCard>
 
                   <div className="mb-4 mt-8">
                     <h3 className="text-[14px] mb-4" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Expected Returns</h3>
                   </div>
                   <FormCard title="Stocks (%)">
-                    <TextInput value="10" />
+                    <TextInput value={str(financeExpectedReturns, 'stocks', '')} />
                   </FormCard>
                   <FormCard title="Crypto (%)">
-                    <TextInput value="15" />
+                    <TextInput value={str(financeExpectedReturns, 'crypto', '')} />
                   </FormCard>
                   <FormCard title="Real Estate (%)">
-                    <TextInput value="8" />
+                    <TextInput value={str(financeExpectedReturns, 'realEstate', '')} />
                   </FormCard>
                   <FormCard title="Bonds (%)">
-                    <TextInput value="5" />
+                    <TextInput value={str(financeExpectedReturns, 'bonds', '')} />
                   </FormCard>
 
                   <div className="mb-4 mt-8">
@@ -943,17 +1259,20 @@ export default function Settings() {
                       backgroundColor: 'var(--codex-bg)',
                       borderColor: 'var(--codex-border)',
                       color: 'var(--codex-fg)'
-                    }}>
+                    }}
+                      value={str(financeBudgeting, 'defaultMethod', str(financeBudgeting, 'method', 'six-jar'))}
+                      onChange={() => {}} // TODO: Wire to PATCH /api/settings/finance
+                    >
                       <option>six-jar</option>
                       <option>50-30-20</option>
                       <option>zero-based</option>
                     </select>
                   </FormCard>
                   <FormCard title="Alert Threshold (%)">
-                    <TextInput value="80" />
+                    <TextInput value={str(financeBudgeting, 'alertThreshold', '')} />
                   </FormCard>
                   <FormCard title="Six Jar Ratios" description="Essentials/Savings/Investment/Education/Entertainment/Charity">
-                    <TextInput value="55/10/10/10/10/5" />
+                    <TextInput value={str(financeBudgeting, 'sixJarRatios', '')} />
                   </FormCard>
 
                   <div className="mb-4 mt-8">
@@ -962,28 +1281,32 @@ export default function Settings() {
                   <FormCard>
                     <div className="flex items-center justify-between mb-3">
                       <label className="text-[13px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Enabled</label>
-                      <Toggle checked={true} onChange={() => {}} />
+                      {/* TODO: Wire toggle to PATCH /api/settings/finance */}
+                      <Toggle checked={bool(financePriceRefresh, 'enabled', false)} onChange={() => {}} />
                     </div>
                   </FormCard>
                   <FormCard title="Interval (hours)">
-                    <TextInput value="4" />
+                    <TextInput value={str(financePriceRefresh, 'intervalHours', str(financePriceRefresh, 'interval', ''))} />
                   </FormCard>
                   <FormCard title="Cache TTL (minutes)">
-                    <TextInput value="15" />
+                    <TextInput value={str(financePriceRefresh, 'cacheTtlMinutes', str(financePriceRefresh, 'cacheTtl', ''))} />
                   </FormCard>
 
                   <div className="mb-4 mt-8">
                     <h3 className="text-[14px] mb-4" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Scheduling</h3>
                   </div>
                   <FormCard title="Daily Review Time">
-                    <TextInput value="21:00" />
+                    <TextInput value={str(financeScheduling, 'dailyReviewTime', '')} />
                   </FormCard>
                   <FormCard title="Weekly Report Day">
                     <select className="w-full px-3 py-2 rounded border text-[13px]" style={{
                       backgroundColor: 'var(--codex-bg)',
                       borderColor: 'var(--codex-border)',
                       color: 'var(--codex-fg)'
-                    }}>
+                    }}
+                      value={str(financeScheduling, 'weeklyReportDay', 'monday')}
+                      onChange={() => {}} // TODO: Wire to PATCH /api/settings/finance
+                    >
                       <option>monday</option>
                       <option>tuesday</option>
                       <option>wednesday</option>
@@ -994,7 +1317,7 @@ export default function Settings() {
                     </select>
                   </FormCard>
                   <FormCard title="Budget Check Time">
-                    <TextInput value="09:00" />
+                    <TextInput value={str(financeScheduling, 'budgetCheckTime', '')} />
                   </FormCard>
                 </>
               )}
@@ -1012,7 +1335,8 @@ export default function Settings() {
                           Enable project management features
                         </p>
                       </div>
-                      <Toggle checked={true} onChange={() => {}} />
+                      {/* TODO: Wire toggle to PATCH /api/settings/projects */}
+                      <Toggle checked={bool(projects, 'enabled', false)} onChange={() => {}} />
                     </div>
                   </FormCard>
                 </>
@@ -1025,24 +1349,34 @@ export default function Settings() {
                     <h3 className="text-[14px] mb-3" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Feature Packs</h3>
                     <p className="text-[12px] mb-4" style={{ color: '#666' }}>Select feature packs to enable</p>
                     <div className="flex flex-wrap gap-2">
-                      {['task-management', 'productivity', 'ai-intelligence', 'developer-tools'].map((pack) => (
-                        <button
-                          key={pack}
-                          className="px-3 py-1.5 rounded text-[12px] border transition-all"
-                          style={{
-                            backgroundColor: 'var(--codex-accent-dim)',
-                            borderColor: 'var(--codex-accent)',
-                            color: 'var(--codex-accent)'
-                          }}
-                        >
-                          {pack}
-                        </button>
-                      ))}
+                      {(() => {
+                        const enabledPacks = arr(packs, 'enabled').map(String);
+                        // Show enabled packs from config; if empty, show a placeholder
+                        if (enabledPacks.length === 0) {
+                          return (
+                            <span className="text-[12px]" style={{ color: '#666' }}>No packs enabled</span>
+                          );
+                        }
+                        return enabledPacks.map((pack) => (
+                          <button
+                            key={pack}
+                            className="px-3 py-1.5 rounded text-[12px] border transition-all"
+                            style={{
+                              backgroundColor: 'var(--codex-accent-dim)',
+                              borderColor: 'var(--codex-accent)',
+                              color: 'var(--codex-accent)'
+                            }}
+                            // TODO: Wire onClick to toggle pack via PATCH /api/settings/packs
+                          >
+                            {pack}
+                          </button>
+                        ));
+                      })()}
                     </div>
                   </div>
 
                   <FormCard title="Enabled Skills" description="Comma-separated list of enabled skills">
-                    <TextInput value="todo, daily-planning, finance, cron, skill-creator" />
+                    <TextInput value={arr(packs, 'enabledSkills').map(String).join(', ')} />
                   </FormCard>
 
                   <div className="mb-4 mt-8">
@@ -1051,19 +1385,21 @@ export default function Settings() {
                   <FormCard>
                     <div className="flex items-center justify-between mb-3">
                       <label className="text-[13px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Enabled</label>
-                      <Toggle checked={true} onChange={() => {}} />
+                      {/* TODO: Wire toggle to PATCH /api/settings/plugins */}
+                      <Toggle checked={bool(plugins, 'enabled', false)} onChange={() => {}} />
                     </div>
                   </FormCard>
                   <FormCard title="Registry URL">
-                    <TextInput value="https://plugins.klyntbot.com" />
+                    <TextInput value={str(plugins, 'registryUrl', str(plugins, 'registry', ''))} />
                   </FormCard>
                   <FormCard title="Sandbox Memory (MB)">
-                    <TextInput value="64" />
+                    <TextInput value={str(plugins, 'sandboxMemoryMb', str(plugins, 'sandboxMemory', ''))} />
                   </FormCard>
                   <FormCard>
                     <div className="flex items-center justify-between">
                       <label className="text-[13px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Allow Network by Default</label>
-                      <Toggle checked={false} onChange={() => {}} />
+                      {/* TODO: Wire toggle to PATCH /api/settings/plugins */}
+                      <Toggle checked={bool(plugins, 'allowNetworkByDefault', bool(plugins, 'allowNetwork', false))} onChange={() => {}} />
                     </div>
                   </FormCard>
                 </>
@@ -1075,19 +1411,21 @@ export default function Settings() {
                   <FormCard>
                     <div className="flex items-center justify-between mb-3">
                       <label className="text-[13px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Enabled</label>
-                      <Toggle checked={true} onChange={() => {}} />
+                      {/* TODO: Wire toggle to PATCH /api/settings/plugins */}
+                      <Toggle checked={bool(plugins, 'enabled', false)} onChange={() => {}} />
                     </div>
                   </FormCard>
                   <FormCard title="Registry URL">
-                    <TextInput value="https://plugins.klyntbot.com" />
+                    <TextInput value={str(plugins, 'registryUrl', str(plugins, 'registry', ''))} />
                   </FormCard>
                   <FormCard title="Sandbox Memory (MB)">
-                    <TextInput value="64" />
+                    <TextInput value={str(plugins, 'sandboxMemoryMb', str(plugins, 'sandboxMemory', ''))} />
                   </FormCard>
                   <FormCard>
                     <div className="flex items-center justify-between">
                       <label className="text-[13px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Allow Network by Default</label>
-                      <Toggle checked={false} onChange={() => {}} />
+                      {/* TODO: Wire toggle to PATCH /api/settings/plugins */}
+                      <Toggle checked={bool(plugins, 'allowNetworkByDefault', bool(plugins, 'allowNetwork', false))} onChange={() => {}} />
                     </div>
                   </FormCard>
                 </>
@@ -1100,6 +1438,7 @@ export default function Settings() {
                   style={{ color: 'var(--codex-fg-subtle)' }}
                   onMouseEnter={(e) => e.currentTarget.style.color = 'var(--codex-fg-muted)'}
                   onMouseLeave={(e) => e.currentTarget.style.color = 'var(--codex-fg-subtle)'}
+                  // TODO: Wire onClick to confirm + PATCH defaults for the active section
                 >
                   Reset to Defaults
                 </button>
@@ -1111,6 +1450,7 @@ export default function Settings() {
                   }}
                   onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--codex-accent-hover)'}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--codex-accent)'}
+                  // TODO: Wire onClick to collect all changed fields and PATCH /api/settings/:section
                 >
                   Save Changes
                 </button>
@@ -1127,10 +1467,10 @@ export default function Settings() {
       }}>
         {/* Session Info */}
         <div className="border-b" style={{ borderColor: 'var(--codex-border-subtle)' }}>
-          <button 
+          <button
             onClick={() => setSessionOpen(!sessionOpen)}
             className="w-full px-4 py-3 flex items-center justify-between transition-colors"
-            style={{ 
+            style={{
               backgroundColor: 'transparent',
               color: 'var(--codex-fg-subtle)'
             }}
@@ -1140,8 +1480,8 @@ export default function Settings() {
             <span className="text-[10px] uppercase tracking-wider" style={{ fontWeight: 500 }}>
               Session Info
             </span>
-            {sessionOpen ? 
-              <ChevronDown className="w-3.5 h-3.5" strokeWidth={1.5} /> : 
+            {sessionOpen ?
+              <ChevronDown className="w-3.5 h-3.5" strokeWidth={1.5} /> :
               <ChevronRight className="w-3.5 h-3.5" strokeWidth={1.5} />
             }
           </button>
@@ -1149,7 +1489,7 @@ export default function Settings() {
             <div className="px-4 pb-4 space-y-3 text-[13px]">
               <div className="flex justify-between items-center">
                 <span style={{ color: 'var(--codex-fg-subtle)' }}>Session ID</span>
-                <span style={{ 
+                <span style={{
                   color: 'var(--codex-fg)',
                   fontFamily: 'var(--font-mono)',
                   fontSize: '12px'
@@ -1171,10 +1511,10 @@ export default function Settings() {
 
         {/* Token Usage */}
         <div className="border-b" style={{ borderColor: 'var(--codex-border-subtle)' }}>
-          <button 
+          <button
             onClick={() => setTokenOpen(!tokenOpen)}
             className="w-full px-4 py-3 flex items-center justify-between transition-colors"
-            style={{ 
+            style={{
               backgroundColor: 'transparent',
               color: 'var(--codex-fg-subtle)'
             }}
@@ -1184,8 +1524,8 @@ export default function Settings() {
             <span className="text-[10px] uppercase tracking-wider" style={{ fontWeight: 500 }}>
               Token Usage
             </span>
-            {tokenOpen ? 
-              <ChevronDown className="w-3.5 h-3.5" strokeWidth={1.5} /> : 
+            {tokenOpen ?
+              <ChevronDown className="w-3.5 h-3.5" strokeWidth={1.5} /> :
               <ChevronRight className="w-3.5 h-3.5" strokeWidth={1.5} />
             }
           </button>
@@ -1197,7 +1537,7 @@ export default function Settings() {
                   <span style={{ color: 'var(--codex-fg-subtle)' }}>8%</span>
                 </div>
                 <div className="h-1 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--codex-bg)' }}>
-                  <div className="h-full rounded-full transition-all" style={{ 
+                  <div className="h-full rounded-full transition-all" style={{
                     width: '8%',
                     backgroundColor: 'var(--codex-accent)'
                   }} />
@@ -1205,7 +1545,7 @@ export default function Settings() {
               </div>
               <div className="text-[13px] flex justify-between items-center pt-1">
                 <span style={{ color: 'var(--codex-fg-subtle)' }}>Cost</span>
-                <span style={{ 
+                <span style={{
                   color: 'var(--codex-accent)',
                   fontFamily: 'var(--font-mono)'
                 }}>
@@ -1218,10 +1558,10 @@ export default function Settings() {
 
         {/* Config Status */}
         <div>
-          <button 
+          <button
             onClick={() => setConfigOpen(!configOpen)}
             className="w-full px-4 py-3 flex items-center justify-between transition-colors"
-            style={{ 
+            style={{
               backgroundColor: 'transparent',
               color: 'var(--codex-fg-subtle)'
             }}
@@ -1231,8 +1571,8 @@ export default function Settings() {
             <span className="text-[10px] uppercase tracking-wider" style={{ fontWeight: 500 }}>
               Config Status
             </span>
-            {configOpen ? 
-              <ChevronDown className="w-3.5 h-3.5" strokeWidth={1.5} /> : 
+            {configOpen ?
+              <ChevronDown className="w-3.5 h-3.5" strokeWidth={1.5} /> :
               <ChevronRight className="w-3.5 h-3.5" strokeWidth={1.5} />
             }
           </button>
@@ -1242,12 +1582,12 @@ export default function Settings() {
                 <div className="text-[11px] mb-1" style={{ color: 'var(--codex-fg-subtle)' }}>
                   Config file
                 </div>
-                <div style={{ 
+                <div style={{
                   color: 'var(--codex-fg-muted)',
                   fontFamily: 'var(--font-mono)',
                   fontSize: '11px'
                 }}>
-                  ~/.klyntbot/config.json
+                  {str(config ?? {}, 'dataDir', '~/.klyntbot')}/config.json
                 </div>
               </div>
               <div>
@@ -1255,27 +1595,27 @@ export default function Settings() {
                   Last modified
                 </div>
                 <div style={{ color: 'var(--codex-fg)' }}>
-                  2 hours ago
+                  {loading ? '...' : (error ? 'Unknown' : 'Loaded')}
                 </div>
               </div>
               <div>
                 <div className="text-[11px] mb-1" style={{ color: 'var(--codex-fg-subtle)' }}>
                   Data directory
                 </div>
-                <div style={{ 
+                <div style={{
                   color: 'var(--codex-fg-muted)',
                   fontFamily: 'var(--font-mono)',
                   fontSize: '11px'
                 }}>
-                  ~/.klyntbot
+                  {str(config ?? {}, 'dataDir', '~/.klyntbot')}
                 </div>
               </div>
               <div>
                 <div className="text-[11px] mb-1" style={{ color: 'var(--codex-fg-subtle)' }}>
-                  Database size
+                  Sections loaded
                 </div>
                 <div style={{ color: 'var(--codex-fg)' }}>
-                  12.4 MB
+                  {config ? Object.keys(config).length : 0}
                 </div>
               </div>
             </div>

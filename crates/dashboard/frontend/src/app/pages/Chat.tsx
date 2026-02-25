@@ -1,17 +1,9 @@
-// TODO: Wire Chat page to real WebSocket agent:
-//   - Replace mock messages with useAgent() hook (already in lib/hooks/useAgent.ts)
-//   - Send messages via AgentSocket.sendChatMessage()
-//   - Handle streaming events (contentChunk, done, error, toolStart/toolEnd)
-//   - Handle interaction.request events for ask-first workflows
-//   - Session management: useApi<SessionListItem[]>('/api/sessions') for sidebar
-//   - Session detail: useApi<SessionWithMessages>('/api/sessions/:key')
-import { useState } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   Send,
   ChevronDown,
   ChevronRight,
   Terminal,
-  ArrowRight,
   Sparkles,
   Code,
   Lightbulb,
@@ -19,29 +11,18 @@ import {
   Loader2,
   Check,
   Slash,
+  X,
+  Wifi,
+  WifiOff,
+  Clock,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-
-type Message = {
-  id: string;
-  type:
-    | 'agent'
-    | 'user'
-    | 'tool'
-    | 'delegation'
-    | 'ask-form'
-    | 'parallel-tools';
-  content: string;
-  timestamp: string;
-  toolName?: string;
-  delegationFrom?: string;
-  delegationTo?: string;
-  strategy?: {
-    type: string;
-    confidence: number;
-  };
-  toolData?: any;
-};
+import { useAgent } from '../../lib/hooks/useAgent';
+import type { ThinkingState, ToolCallState } from '../../lib/hooks/useAgent';
+import { useApi } from '../../lib/hooks/useApi';
+import type { SessionListItem } from '../../lib/types';
+import type { ChatMessage } from '../../lib/types';
+import type { ConnectionStatus } from '../../lib/ws';
 
 type SuggestionCard = {
   id: string;
@@ -50,101 +31,141 @@ type SuggestionCard = {
   description: string;
 };
 
+/** Map thinking phase to a human-readable label */
+function phaseLabel(phase: ThinkingState['phase']): string {
+  switch (phase) {
+    case 'classifying':
+      return 'Classifying';
+    case 'buildingContext':
+      return 'Building context';
+    case 'thinking':
+      return 'Thinking';
+    case 'idle':
+      return 'Idle';
+  }
+}
+
+/** Format a Date to a short time string like "10:32 AM" */
+function formatTime(d: Date): string {
+  return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
+/** Compute a human-readable duration between two ISO date strings */
+function formatDuration(createdAt: string, updatedAt: string): string {
+  const start = new Date(createdAt).getTime();
+  const end = new Date(updatedAt).getTime();
+  const diffMs = Math.max(0, end - start);
+  const totalMinutes = Math.floor(diffMs / 60000);
+  if (totalMinutes < 1) return '<1m';
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours === 0) return `${minutes}m`;
+  return `${hours}h ${minutes}m`;
+}
+
+/** Connection status indicator component */
+function StatusDot({ status }: { status: ConnectionStatus }) {
+  const color =
+    status === 'connected'
+      ? '#10b981'
+      : status === 'connecting' || status === 'reconnecting'
+        ? '#f59e0b'
+        : '#ef4444';
+
+  const Icon =
+    status === 'connected' || status === 'connecting' || status === 'reconnecting'
+      ? Wifi
+      : WifiOff;
+
+  return (
+    <div className="flex items-center gap-1.5" title={`WebSocket: ${status}`}>
+      <Icon className="w-3 h-3" strokeWidth={1.5} style={{ color }} />
+      <span
+        className="text-[10px] uppercase tracking-wide"
+        style={{ color, fontFamily: 'var(--font-mono)' }}
+      >
+        {status}
+      </span>
+    </div>
+  );
+}
+
 export default function Chat() {
   const [sessionOpen, setSessionOpen] = useState(true);
-  const [tokenOpen, setTokenOpen] = useState(true);
-  const [tokenBreakdownOpen, setTokenBreakdownOpen] = useState(false);
-  const [costBreakdownOpen, setCostBreakdownOpen] = useState(false);
-  const [planOpen, setPlanOpen] = useState(true);
+  const [sessionsListOpen, setSessionsListOpen] = useState(false);
   const [memoryOpen, setMemoryOpen] = useState(true);
   const [tasksOpen, setTasksOpen] = useState(true);
   const [calendarOpen, setCalendarOpen] = useState(true);
-  const [subagentsOpen, setSubagentsOpen] = useState(false);
   const [message, setMessage] = useState('');
-  const [hasMessages, setHasMessages] = useState(true);
-  const [expandedOutput, setExpandedOutput] = useState<string | null>(null);
   const [selectedModel] = useState('GPT-4');
 
-  const messages: Message[] = [
-    {
-      id: '1',
-      type: 'user',
-      content:
-        'Can you help me refactor the authentication module and add unit tests?',
-      timestamp: '10:32 AM',
+  // Real agent hook
+  const { messages, thinking, isStreaming, status, sendMessage, cancel } =
+    useAgent();
+
+  // Session list from API
+  const {
+    data: sessions,
+    loading: sessionsLoading,
+  } = useApi<SessionListItem[]>('/api/sessions');
+
+  // Sorted sessions (most recent first)
+  const sortedSessions = (sessions ?? [])
+    .slice()
+    .sort(
+      (a, b) =>
+        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+    );
+
+  // Ref for auto-scrolling chat
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-scroll to bottom on new messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages, thinking]);
+
+  const hasMessages = messages.length > 0;
+
+  const handleSend = useCallback(() => {
+    const text = message.trim();
+    if (!text) return;
+    setMessage('');
+    sendMessage(text);
+    // Reset textarea height
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
+  }, [message, sendMessage]);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleSend();
+      }
     },
-    {
-      id: '2',
-      type: 'agent',
-      content:
-        "I'll help you refactor the authentication module and add comprehensive unit tests. Let me break this down into a plan and delegate to the coding agent.",
-      timestamp: '10:32 AM',
-      strategy: { type: 'ToolAssisted', confidence: 87 },
+    [handleSend],
+  );
+
+  const handleSuggestionClick = useCallback(
+    (description: string) => {
+      sendMessage(description);
     },
-    {
-      id: '3',
-      type: 'delegation',
-      content: 'Delegating task to coding specialist',
-      timestamp: '10:32 AM',
-      delegationFrom: 'root',
-      delegationTo: 'coding-agent',
+    [sendMessage],
+  );
+
+  // Auto-resize textarea
+  const handleTextareaChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      setMessage(e.target.value);
+      // Auto-resize
+      e.target.style.height = 'auto';
+      e.target.style.height = `${Math.min(e.target.scrollHeight, 200)}px`;
     },
-    {
-      id: '4',
-      type: 'parallel-tools',
-      content: 'Running parallel analysis',
-      timestamp: '10:33 AM',
-      toolData: {
-        tools: [
-          {
-            name: 'web_search',
-            status: 'running',
-            args: { query: 'Rust async patterns' },
-          },
-          {
-            name: 'read_file',
-            status: 'success',
-            args: { path: 'src/main.rs' },
-            duration: '342ms',
-          },
-        ],
-      },
-    },
-    {
-      id: '5',
-      type: 'agent',
-      content: 'I need some details before creating this task:',
-      timestamp: '10:33 AM',
-      strategy: { type: 'Direct', confidence: 95 },
-    },
-    {
-      id: '6',
-      type: 'ask-form',
-      content: 'Task details form',
-      timestamp: '10:33 AM',
-    },
-    {
-      id: '7',
-      type: 'tool',
-      content:
-        'cargo test --workspace\n\nrunning 42 tests\ntest auth::test_login ... ok\ntest auth::test_logout ... ok\ntest utils::test_hash ... ok\n\ntest result: ok. 42 passed; 0 failed; 0 ignored\n\nFinished in 2.4s',
-      timestamp: '10:33 AM',
-      toolName: 'shell',
-      toolData: {
-        command: 'cargo test --workspace',
-        status: 'success',
-        duration: '2.4s',
-      },
-    },
-    {
-      id: '8',
-      type: 'agent',
-      content:
-        "I've successfully refactored the authentication module with improved error handling and added 20 unit tests. Code coverage is now at 94.2%.",
-      timestamp: '10:34 AM',
-      strategy: { type: 'Autonomous', confidence: 72 },
-    },
-  ];
+    [],
+  );
 
   const suggestions: SuggestionCard[] = [
     {
@@ -183,6 +204,27 @@ export default function Chat() {
     <>
       {/* Center Chat Area */}
       <div className="flex-1 flex flex-col">
+        {/* Connection status bar */}
+        {status !== 'connected' && (
+          <div
+            className="px-4 py-1.5 flex items-center justify-center gap-2 border-b"
+            style={{
+              backgroundColor: 'var(--codex-bg-secondary)',
+              borderColor: 'var(--codex-border-subtle)',
+            }}
+          >
+            <StatusDot status={status} />
+            {status === 'reconnecting' && (
+              <span
+                className="text-[11px]"
+                style={{ color: 'var(--codex-fg-subtle)' }}
+              >
+                Reconnecting...
+              </span>
+            )}
+          </div>
+        )}
+
         {/* Chat Messages */}
         <div className="flex-1 overflow-y-auto px-6 py-8">
           {!hasMessages ? (
@@ -224,6 +266,9 @@ export default function Chat() {
                       e.currentTarget.style.backgroundColor =
                         'var(--codex-bg-tertiary)';
                     }}
+                    onClick={() =>
+                      handleSuggestionClick(suggestion.description)
+                    }
                   >
                     <suggestion.icon
                       className="w-5 h-5 mb-3"
@@ -250,467 +295,29 @@ export default function Chat() {
             /* Messages */
             <div className="max-w-3xl mx-auto space-y-6">
               {messages.map((msg) => (
-                <motion.div
+                <MessageBubble
                   key={msg.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="flex flex-col"
-                >
-                  {msg.type === 'user' && (
-                    <div className="flex justify-end">
-                      <div
-                        className="max-w-[85%] px-4 py-3 rounded-lg"
-                        style={{
-                          backgroundColor: 'var(--codex-bg-user)',
-                          color: 'var(--codex-fg)',
-                        }}
-                      >
-                        <div
-                          className="text-[14px] leading-relaxed"
-                          style={{ color: 'var(--codex-fg)' }}
-                        >
-                          {msg.content}
-                        </div>
-                        <div
-                          className="text-[11px] mt-2"
-                          style={{
-                            color: 'var(--codex-fg-subtle)',
-                            fontFamily: 'var(--font-mono)',
-                          }}
-                        >
-                          {msg.timestamp}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {msg.type === 'agent' && (
-                    <div className="flex gap-3">
-                      <div className="flex-1">
-                        <div
-                          className="text-[14px] leading-relaxed"
-                          style={{ color: 'var(--codex-fg)' }}
-                        >
-                          {msg.content}
-                        </div>
-                        <div className="flex items-center gap-2 mt-2">
-                          <div
-                            className="text-[11px]"
-                            style={{
-                              color: 'var(--codex-fg-subtle)',
-                              fontFamily: 'var(--font-mono)',
-                            }}
-                          >
-                            {msg.timestamp}
-                          </div>
-                          {msg.strategy && (
-                            <div
-                              className="flex items-center gap-1 px-2 py-0.5 rounded"
-                              style={{
-                                backgroundColor: 'var(--codex-bg-tertiary)',
-                                border: '1px solid var(--codex-border)',
-                              }}
-                            >
-                              <span
-                                className="text-[10px]"
-                                style={{
-                                  color: '#888',
-                                  fontFamily: 'var(--font-mono)',
-                                }}
-                              >
-                                {msg.strategy.type}
-                              </span>
-                              <span
-                                className="text-[10px]"
-                                style={{ color: '#666' }}
-                              >
-                                &middot;
-                              </span>
-                              <span
-                                className="text-[10px]"
-                                style={{
-                                  color: getStrategyColor(
-                                    msg.strategy.confidence,
-                                  ),
-                                  fontFamily: 'var(--font-mono)',
-                                  fontWeight: 500,
-                                }}
-                              >
-                                {msg.strategy.confidence}%
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {msg.type === 'parallel-tools' && msg.toolData && (
-                    <div className="flex gap-3">
-                      {msg.toolData.tools.map((tool: any, idx: number) => (
-                        <div
-                          key={idx}
-                          className="flex-1 rounded-lg overflow-hidden"
-                          style={{
-                            backgroundColor: '#141414',
-                            border: '1px solid var(--codex-border)',
-                          }}
-                        >
-                          <div
-                            className="px-3 py-2 flex items-center gap-2"
-                            style={{
-                              backgroundColor: 'var(--codex-bg-secondary)',
-                              borderBottom: '1px solid var(--codex-border)',
-                            }}
-                          >
-                            {tool.status === 'running' ? (
-                              <Loader2
-                                className="w-3.5 h-3.5 animate-spin"
-                                strokeWidth={1.5}
-                                style={{ color: 'var(--codex-accent)' }}
-                              />
-                            ) : (
-                              <Check
-                                className="w-3.5 h-3.5"
-                                strokeWidth={1.5}
-                                style={{ color: '#10b981' }}
-                              />
-                            )}
-                            <span
-                              className="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide"
-                              style={{
-                                backgroundColor:
-                                  tool.status === 'running'
-                                    ? 'var(--codex-accent-dim)'
-                                    : 'rgba(16, 185, 129, 0.1)',
-                                color:
-                                  tool.status === 'running'
-                                    ? 'var(--codex-accent)'
-                                    : '#10b981',
-                                fontFamily: 'var(--font-mono)',
-                                fontWeight: 500,
-                              }}
-                            >
-                              {tool.name}
-                            </span>
-                          </div>
-                          <div
-                            className="px-3 py-3 text-[12px]"
-                            style={{
-                              fontFamily: 'var(--font-mono)',
-                              color: 'var(--codex-fg-muted)',
-                            }}
-                          >
-                            <div className="mb-1" style={{ color: '#888' }}>
-                              {Object.keys(tool.args)[0]}:
-                            </div>
-                            <div>
-                              {Object.values(tool.args)[0] as string}
-                            </div>
-                            {tool.duration && (
-                              <div
-                                className="mt-2 text-[11px]"
-                                style={{ color: '#888' }}
-                              >
-                                {tool.duration}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {msg.type === 'ask-form' && (
-                    <div
-                      className="rounded-lg overflow-hidden"
-                      style={{
-                        backgroundColor: '#141414',
-                        borderLeft: '2px solid var(--codex-accent)',
-                      }}
-                    >
-                      <div className="p-4">
-                        <h3
-                          className="text-[14px] mb-4"
-                          style={{
-                            color: 'var(--codex-fg)',
-                            fontWeight: 500,
-                          }}
-                        >
-                          Task Details
-                        </h3>
-
-                        {/* Priority */}
-                        <div className="mb-4">
-                          <label
-                            className="block text-[12px] mb-2"
-                            style={{ color: 'var(--codex-fg-subtle)' }}
-                          >
-                            Priority
-                          </label>
-                          <div className="flex gap-2">
-                            {['Critical', 'High', 'Medium', 'Low'].map(
-                              (priority) => (
-                                <button
-                                  key={priority}
-                                  className="flex-1 px-3 py-2 rounded text-[12px] border transition-all"
-                                  style={{
-                                    backgroundColor:
-                                      priority === 'Medium'
-                                        ? 'var(--codex-accent-dim)'
-                                        : 'transparent',
-                                    borderColor:
-                                      priority === 'Medium'
-                                        ? 'var(--codex-accent)'
-                                        : 'var(--codex-border)',
-                                    color:
-                                      priority === 'Medium'
-                                        ? 'var(--codex-accent)'
-                                        : 'var(--codex-fg-subtle)',
-                                  }}
-                                >
-                                  {priority}
-                                </button>
-                              ),
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Category */}
-                        <div className="mb-4">
-                          <label
-                            className="block text-[12px] mb-2"
-                            style={{ color: 'var(--codex-fg-subtle)' }}
-                          >
-                            Category
-                          </label>
-                          <div className="relative">
-                            <select
-                              className="w-full px-3 py-2 rounded border text-[13px] appearance-none"
-                              style={{
-                                backgroundColor: 'var(--codex-bg)',
-                                borderColor: 'var(--codex-border)',
-                                color: 'var(--codex-fg)',
-                              }}
-                            >
-                              <option>Development</option>
-                              <option>Design</option>
-                              <option>Research</option>
-                              <option>Documentation</option>
-                            </select>
-                            <ChevronDown
-                              className="w-4 h-4 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none"
-                              strokeWidth={1.5}
-                              style={{ color: 'var(--codex-fg-subtle)' }}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Due date */}
-                        <div className="mb-4">
-                          <label
-                            className="block text-[12px] mb-2"
-                            style={{ color: 'var(--codex-fg-subtle)' }}
-                          >
-                            Due date
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="e.g., next Friday"
-                            className="w-full px-3 py-2 rounded border text-[13px] outline-none"
-                            style={{
-                              backgroundColor: 'var(--codex-bg)',
-                              borderColor: 'var(--codex-border)',
-                              color: 'var(--codex-fg)',
-                            }}
-                          />
-                        </div>
-
-                        {/* Actions */}
-                        <div className="flex items-center justify-end gap-3">
-                          <button
-                            className="text-[12px]"
-                            style={{ color: 'var(--codex-fg-subtle)' }}
-                          >
-                            Skip
-                          </button>
-                          <button
-                            className="px-4 py-2 rounded text-[13px]"
-                            style={{
-                              backgroundColor: 'var(--codex-accent)',
-                              color: 'white',
-                            }}
-                          >
-                            Submit
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {msg.type === 'tool' && msg.toolData && (
-                    <div className="flex">
-                      <div
-                        className="flex-1 max-w-[85%] rounded-lg overflow-hidden"
-                        style={{
-                          backgroundColor: 'var(--codex-bg-tertiary)',
-                          border: '1px solid var(--codex-border)',
-                        }}
-                      >
-                        <div
-                          className="px-3 py-2 flex items-center justify-between"
-                          style={{
-                            backgroundColor: 'var(--codex-bg-secondary)',
-                            borderBottom: '1px solid var(--codex-border)',
-                          }}
-                        >
-                          <div className="flex items-center gap-2">
-                            <Terminal
-                              className="w-3.5 h-3.5"
-                              strokeWidth={1.5}
-                              style={{ color: 'var(--codex-fg-subtle)' }}
-                            />
-                            <span
-                              className="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide"
-                              style={{
-                                backgroundColor: 'var(--codex-accent-dim)',
-                                color: 'var(--codex-accent)',
-                                fontFamily: 'var(--font-mono)',
-                                fontWeight: 500,
-                              }}
-                            >
-                              {msg.toolName}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {msg.toolData.status === 'success' && (
-                              <div
-                                className="w-1.5 h-1.5 rounded-full"
-                                style={{ backgroundColor: '#10b981' }}
-                              />
-                            )}
-                            <span
-                              className="text-[11px]"
-                              style={{
-                                color: '#888',
-                                fontFamily: 'var(--font-mono)',
-                              }}
-                            >
-                              {msg.toolData.duration}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="px-3 py-2.5">
-                          <div
-                            className="text-[12px] mb-2"
-                            style={{
-                              fontFamily: 'var(--font-mono)',
-                              color: 'var(--codex-fg-muted)',
-                            }}
-                          >
-                            {msg.toolData.command}
-                          </div>
-                          <button
-                            onClick={() =>
-                              setExpandedOutput(
-                                expandedOutput === msg.id ? null : msg.id,
-                              )
-                            }
-                            className="flex items-center gap-1 text-[11px] transition-colors"
-                            style={{ color: 'var(--codex-accent)' }}
-                          >
-                            {expandedOutput === msg.id ? '\u25BC' : '\u25B6'}{' '}
-                            {expandedOutput === msg.id ? 'Hide' : 'Show'} output
-                          </button>
-                          <AnimatePresence>
-                            {expandedOutput === msg.id && (
-                              <motion.div
-                                initial={{ height: 0, opacity: 0 }}
-                                animate={{ height: 'auto', opacity: 1 }}
-                                exit={{ height: 0, opacity: 0 }}
-                                className="mt-2 pt-2 border-t text-[12px]"
-                                style={{
-                                  borderColor: 'var(--codex-border)',
-                                  fontFamily: 'var(--font-mono)',
-                                  color: 'var(--codex-fg-muted)',
-                                }}
-                              >
-                                <pre className="whitespace-pre-wrap">
-                                  {msg.content}
-                                </pre>
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {msg.type === 'delegation' && (
-                    <div className="flex justify-center py-2">
-                      <div
-                        className="flex items-center gap-2.5 px-3 py-1.5 rounded-md"
-                        style={{
-                          backgroundColor: 'var(--codex-bg-secondary)',
-                          border: '1px solid var(--codex-border)',
-                        }}
-                      >
-                        <span
-                          className="px-2 py-0.5 rounded text-[11px]"
-                          style={{
-                            backgroundColor: 'var(--codex-bg-tertiary)',
-                            color: 'var(--codex-fg-subtle)',
-                            fontFamily: 'var(--font-mono)',
-                            border: '1px solid var(--codex-border)',
-                          }}
-                        >
-                          {msg.delegationFrom}
-                        </span>
-                        <ArrowRight
-                          className="w-3 h-3"
-                          strokeWidth={1.5}
-                          style={{ color: 'var(--codex-fg-subtle)' }}
-                        />
-                        <span
-                          className="px-2 py-0.5 rounded text-[11px]"
-                          style={{
-                            backgroundColor: 'var(--codex-bg-tertiary)',
-                            color: 'var(--codex-fg-subtle)',
-                            fontFamily: 'var(--font-mono)',
-                            border: '1px solid var(--codex-border)',
-                          }}
-                        >
-                          {msg.delegationTo}
-                        </span>
-                        <button
-                          onClick={() => setSubagentsOpen(!subagentsOpen)}
-                          className="ml-2 flex items-center gap-1.5 px-2 py-0.5 rounded text-[10px] transition-colors"
-                          style={{
-                            backgroundColor: 'var(--codex-bg-tertiary)',
-                            color: 'var(--codex-fg-subtle)',
-                            border: '1px solid var(--codex-border)',
-                          }}
-                        >
-                          <div className="flex gap-0.5">
-                            <div
-                              className="w-1 h-1 rounded-full animate-pulse"
-                              style={{ backgroundColor: '#10b981' }}
-                            />
-                            <div
-                              className="w-1 h-1 rounded-full animate-pulse"
-                              style={{
-                                backgroundColor: '#10b981',
-                                animationDelay: '0.2s',
-                              }}
-                            />
-                          </div>
-                          2 active
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </motion.div>
+                  msg={msg}
+                />
               ))}
+
+              {/* Thinking indicator */}
+              <AnimatePresence>
+                {thinking && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -5 }}
+                    className="flex gap-3"
+                  >
+                    <div className="flex-1">
+                      <ThinkingIndicator thinking={thinking} />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div ref={messagesEndRef} />
             </div>
           )}
         </div>
@@ -724,6 +331,32 @@ export default function Chat() {
           }}
         >
           <div className="px-4">
+            {/* Cancel button when streaming */}
+            {isStreaming && (
+              <div className="flex justify-center mb-2">
+                <button
+                  onClick={cancel}
+                  className="flex items-center gap-1.5 px-3 py-1 rounded-md text-[12px] border transition-colors"
+                  style={{
+                    borderColor: 'var(--codex-border)',
+                    color: 'var(--codex-fg-subtle)',
+                    backgroundColor: 'var(--codex-bg-secondary)',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = '#ef4444';
+                    e.currentTarget.style.color = '#ef4444';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = 'var(--codex-border)';
+                    e.currentTarget.style.color = 'var(--codex-fg-subtle)';
+                  }}
+                >
+                  <X className="w-3 h-3" strokeWidth={1.5} />
+                  Cancel
+                </button>
+              </div>
+            )}
+
             <div
               className="flex gap-2 items-end px-3 py-2.5 rounded-lg border"
               style={{
@@ -752,27 +385,35 @@ export default function Chat() {
               </button>
 
               <textarea
+                ref={textareaRef}
                 value={message}
-                onChange={(e) => setMessage(e.target.value)}
+                onChange={handleTextareaChange}
+                onKeyDown={handleKeyDown}
                 placeholder="Message klyntbot..."
                 rows={1}
+                disabled={isStreaming}
                 className="flex-1 bg-transparent outline-none resize-none text-[14px]"
                 style={{
                   color: 'var(--codex-fg)',
                   fontFamily: 'var(--font-ui)',
                   maxHeight: '200px',
+                  opacity: isStreaming ? 0.5 : 1,
                 }}
               />
 
               <button
+                onClick={handleSend}
+                disabled={!message.trim() || isStreaming}
                 className="p-1.5 rounded transition-colors"
                 style={{
-                  color: message
-                    ? 'var(--codex-fg)'
-                    : 'var(--codex-fg-subtle)',
+                  color:
+                    message.trim() && !isStreaming
+                      ? 'var(--codex-fg)'
+                      : 'var(--codex-fg-subtle)',
+                  opacity: isStreaming ? 0.5 : 1,
                 }}
                 onMouseEnter={(e) => {
-                  if (message)
+                  if (message.trim() && !isStreaming)
                     e.currentTarget.style.backgroundColor =
                       'var(--codex-bg-secondary)';
                 }}
@@ -795,6 +436,21 @@ export default function Chat() {
           borderColor: 'var(--codex-border-subtle)',
         }}
       >
+        {/* Connection Status */}
+        <div
+          className="px-4 py-2.5 border-b flex items-center justify-between"
+          style={{ borderColor: 'var(--codex-border-subtle)' }}
+        >
+          <StatusDot status={status} />
+          {isStreaming && (
+            <Loader2
+              className="w-3 h-3 animate-spin"
+              strokeWidth={1.5}
+              style={{ color: 'var(--codex-accent)' }}
+            />
+          )}
+        </div>
+
         {/* Session Info */}
         <SidebarSection
           title="Session Info"
@@ -802,181 +458,161 @@ export default function Chat() {
           onToggle={() => setSessionOpen(!sessionOpen)}
         >
           <div className="px-4 pb-4 space-y-3 text-[13px]">
-            <SidebarRow label="Session ID">
-              <span
-                style={{
-                  color: 'var(--codex-fg)',
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: '12px',
-                }}
-              >
-                #a8f32e
+            <SidebarRow label="Messages">
+              <span style={{ color: 'var(--codex-fg)' }}>
+                {messages.length}
               </span>
             </SidebarRow>
-            <SidebarRow label="Duration">1h 24m</SidebarRow>
-            <SidebarRow label="Messages">47</SidebarRow>
-          </div>
-        </SidebarSection>
-
-        {/* Token Usage */}
-        <SidebarSection
-          title="Token Usage"
-          open={tokenOpen}
-          onToggle={() => setTokenOpen(!tokenOpen)}
-        >
-          <div className="px-4 pb-4 space-y-3">
-            <div className="space-y-2">
-              <div className="flex justify-between text-[13px] items-center">
-                <span style={{ color: 'var(--codex-fg)' }}>12.4K tokens</span>
-                <span style={{ color: 'var(--codex-fg-subtle)' }}>8%</span>
-              </div>
-              <div
-                className="h-1 rounded-full overflow-hidden"
-                style={{ backgroundColor: 'var(--codex-bg)' }}
-              >
-                <div
-                  className="h-full rounded-full transition-all"
-                  style={{
-                    width: '8%',
-                    backgroundColor: 'var(--codex-accent)',
-                  }}
-                />
-              </div>
-            </div>
-
-            {/* Token Breakdown */}
-            <button
-              onClick={() => setTokenBreakdownOpen(!tokenBreakdownOpen)}
-              className="w-full text-left text-[11px]"
-              style={{ color: '#888' }}
-            >
-              {tokenBreakdownOpen ? '\u25BC' : '\u25B6'} Breakdown
-            </button>
-            <AnimatePresence>
-              {tokenBreakdownOpen && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="text-[11px] space-y-1"
-                  style={{
-                    color: '#888',
-                    fontFamily: 'var(--font-mono)',
-                  }}
-                >
-                  <div>Prompt: 8.2K</div>
-                  <div>Completion: 4.2K</div>
-                  <div>Cache: 2.1K</div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            <div className="text-[13px] flex justify-between items-center pt-1">
-              <span style={{ color: 'var(--codex-fg-subtle)' }}>Cost</span>
+            <SidebarRow label="Streaming">
               <span
                 style={{
-                  color: 'var(--codex-accent)',
-                  fontFamily: 'var(--font-mono)',
+                  color: isStreaming
+                    ? 'var(--codex-accent)'
+                    : 'var(--codex-fg-subtle)',
                 }}
               >
-                $0.05
+                {isStreaming ? 'Active' : '--'}
               </span>
-            </div>
-
-            {/* Cost Breakdown */}
-            <button
-              onClick={() => setCostBreakdownOpen(!costBreakdownOpen)}
-              className="w-full text-left text-[11px]"
-              style={{ color: '#888' }}
-            >
-              {costBreakdownOpen ? '\u25BC' : '\u25B6'} Cost breakdown
-            </button>
-            <AnimatePresence>
-              {costBreakdownOpen && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="text-[11px]"
+            </SidebarRow>
+            {thinking && (
+              <SidebarRow label="Phase">
+                <span
                   style={{
-                    color: '#888',
+                    color: 'var(--codex-accent)',
                     fontFamily: 'var(--font-mono)',
+                    fontSize: '12px',
                   }}
                 >
-                  $0.02 prompt + $0.03 completion = $0.05
-                </motion.div>
-              )}
-            </AnimatePresence>
+                  {phaseLabel(thinking.phase)}
+                </span>
+              </SidebarRow>
+            )}
+            {thinking?.strategy && (
+              <SidebarRow label="Strategy">
+                <div className="flex items-center gap-1">
+                  <span
+                    style={{
+                      color: 'var(--codex-fg)',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: '12px',
+                    }}
+                  >
+                    {thinking.strategy}
+                  </span>
+                  {thinking.confidence != null && (
+                    <span
+                      className="text-[10px]"
+                      style={{
+                        color: getStrategyColor(thinking.confidence * 100),
+                        fontFamily: 'var(--font-mono)',
+                      }}
+                    >
+                      {Math.round(thinking.confidence * 100)}%
+                    </span>
+                  )}
+                </div>
+              </SidebarRow>
+            )}
+            {thinking?.engine && (
+              <SidebarRow label="Engine">
+                <span
+                  style={{
+                    color: 'var(--codex-fg)',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '12px',
+                  }}
+                >
+                  {thinking.engine}
+                </span>
+              </SidebarRow>
+            )}
+            {thinking?.iteration != null && thinking?.maxIterations != null && (
+              <SidebarRow label="Iteration">
+                <span
+                  style={{
+                    color: 'var(--codex-fg)',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '12px',
+                  }}
+                >
+                  {thinking.iteration}/{thinking.maxIterations}
+                </span>
+              </SidebarRow>
+            )}
           </div>
         </SidebarSection>
 
-        {/* Active Plan */}
+        {/* Active Tool Calls (shown during streaming) */}
+        {thinking && thinking.toolCalls.length > 0 && (
+          <SidebarSection title="Tool Calls" open={true} onToggle={() => {}}>
+            <div className="px-4 pb-4 space-y-2">
+              {thinking.toolCalls.map((tc, idx) => (
+                <ToolCallItem key={`${tc.name}-${idx}`} toolCall={tc} />
+              ))}
+            </div>
+          </SidebarSection>
+        )}
+
+        {/* Recent Sessions */}
         <SidebarSection
-          title="Active Plan"
-          open={planOpen}
-          onToggle={() => setPlanOpen(!planOpen)}
+          title="Recent Sessions"
+          open={sessionsListOpen}
+          onToggle={() => setSessionsListOpen(!sessionsListOpen)}
         >
-          <div className="px-4 pb-4 space-y-3">
-            <div
-              className="text-[13px]"
-              style={{ color: 'var(--codex-fg)' }}
-            >
-              Refactor authentication module
-            </div>
-            <div className="space-y-2">
-              <div className="flex justify-between text-[13px] items-center">
-                <span style={{ color: 'var(--codex-fg-subtle)' }}>
-                  Step 3/7
-                </span>
-                <span style={{ color: 'var(--codex-fg)' }}>43%</span>
+          <div className="px-4 pb-4 space-y-2">
+            {sessionsLoading && (
+              <div className="flex items-center gap-2 text-[12px]" style={{ color: 'var(--codex-fg-subtle)' }}>
+                <Loader2 className="w-3 h-3 animate-spin" strokeWidth={1.5} />
+                Loading...
               </div>
+            )}
+            {!sessionsLoading && sortedSessions.length === 0 && (
               <div
-                className="h-1 rounded-full overflow-hidden"
-                style={{ backgroundColor: 'var(--codex-bg)' }}
+                className="text-[12px]"
+                style={{ color: 'var(--codex-fg-subtle)' }}
               >
-                <div
-                  className="h-full rounded-full transition-all"
-                  style={{
-                    width: '43%',
-                    backgroundColor: 'var(--codex-accent)',
-                  }}
-                />
+                No sessions yet
               </div>
-            </div>
-            {/* Step list */}
-            <div className="space-y-1.5 text-[11px] pt-2">
-              <div
-                className="flex items-center gap-2"
-                style={{ color: '#10b981' }}
+            )}
+            {sortedSessions.slice(0, 10).map((session) => (
+              <button
+                key={session.key}
+                // TODO: Load session messages when clicked
+                // onClick={() => loadSession(session.key)}
+                className="w-full text-left p-2 rounded transition-colors"
+                style={{
+                  backgroundColor: 'transparent',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--codex-bg)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
               >
-                <Check className="w-3 h-3" strokeWidth={2} />
-                <span>Step 1</span>
-              </div>
-              <div
-                className="flex items-center gap-2"
-                style={{ color: '#10b981' }}
-              >
-                <Check className="w-3 h-3" strokeWidth={2} />
-                <span>Step 2</span>
-              </div>
-              <div
-                className="flex items-center gap-2"
-                style={{ color: 'var(--codex-accent)' }}
-              >
-                <ArrowRight className="w-3 h-3" strokeWidth={2} />
-                <span>Step 3</span>
-              </div>
-              <div
-                className="flex items-center gap-2"
-                style={{ color: '#666' }}
-              >
-                <div
-                  className="w-3 h-3 rounded-full border"
-                  style={{ borderColor: '#666' }}
-                />
-                <span>Steps 4-7</span>
-              </div>
-            </div>
+                <div className="flex items-center justify-between mb-1">
+                  <span
+                    className="text-[11px]"
+                    style={{
+                      color: 'var(--codex-fg)',
+                      fontFamily: 'var(--font-mono)',
+                    }}
+                  >
+                    #{session.key.slice(0, 8)}
+                  </span>
+                  <span
+                    className="text-[10px]"
+                    style={{ color: 'var(--codex-fg-subtle)' }}
+                  >
+                    {session.messageCount} msgs
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 text-[10px]" style={{ color: '#888' }}>
+                  <Clock className="w-2.5 h-2.5" strokeWidth={1.5} />
+                  {formatDuration(session.createdAt, session.updatedAt)}
+                </div>
+              </button>
+            ))}
           </div>
         </SidebarSection>
 
@@ -986,32 +622,12 @@ export default function Chat() {
           open={memoryOpen}
           onToggle={() => setMemoryOpen(!memoryOpen)}
         >
-          <div className="px-4 pb-4 space-y-2">
+          <div className="px-4 pb-4">
             <div
-              className="text-[12px] mb-2"
-              style={{ color: 'var(--codex-fg)' }}
+              className="text-[12px]"
+              style={{ color: 'var(--codex-fg-subtle)' }}
             >
-              3 memories recalled
-            </div>
-            <div
-              className="space-y-2 text-[11px]"
-              style={{ color: 'var(--codex-fg-muted)' }}
-            >
-              {[
-                { name: 'Auth refactor discussion', relevance: 0.82 },
-                { name: 'Testing strategy notes', relevance: 0.74 },
-                { name: 'Code review patterns', relevance: 0.68 },
-              ].map((memory) => (
-                <div key={memory.name} className="flex gap-2">
-                  <span>&middot;</span>
-                  <div>
-                    <div>{memory.name}</div>
-                    <div style={{ color: '#888' }}>
-                      ({memory.relevance} relevance)
-                    </div>
-                  </div>
-                </div>
-              ))}
+              --
             </div>
           </div>
         </SidebarSection>
@@ -1023,38 +639,12 @@ export default function Chat() {
           onToggle={() => setTasksOpen(!tasksOpen)}
         >
           <div className="px-4 pb-4 space-y-3">
-            <div className="flex items-center gap-2 text-[13px]">
-              <div
-                className="w-1.5 h-1.5 rounded-full"
-                style={{ backgroundColor: 'var(--codex-accent)' }}
-              />
-              <span style={{ color: 'var(--codex-fg)' }}>4 active</span>
-            </div>
-            <div className="flex items-center gap-2 text-[13px]">
-              <div
-                className="w-1.5 h-1.5 rounded-full"
-                style={{ backgroundColor: '#ef4444' }}
-              />
-              <span style={{ color: 'var(--codex-fg)' }}>1 overdue</span>
-            </div>
-            <button
-              className="w-full mt-2 px-3 py-1.5 rounded text-[12px] border transition-all"
-              style={{
-                borderColor: 'var(--codex-border)',
-                color: 'var(--codex-fg-subtle)',
-                backgroundColor: 'transparent',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = 'var(--codex-bg)';
-                e.currentTarget.style.color = 'var(--codex-fg)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = 'transparent';
-                e.currentTarget.style.color = 'var(--codex-fg-subtle)';
-              }}
+            <div
+              className="text-[12px]"
+              style={{ color: 'var(--codex-fg-subtle)' }}
             >
-              View all tasks
-            </button>
+              --
+            </div>
           </div>
         </SidebarSection>
 
@@ -1065,34 +655,12 @@ export default function Chat() {
           onToggle={() => setCalendarOpen(!calendarOpen)}
           noBorder
         >
-          <div className="px-4 pb-4 space-y-4">
-            <div className="space-y-1">
-              <div
-                className="text-[11px]"
-                style={{ color: 'var(--codex-fg-subtle)' }}
-              >
-                Today, 2:00 PM
-              </div>
-              <div
-                className="text-[13px]"
-                style={{ color: 'var(--codex-fg)' }}
-              >
-                Team standup
-              </div>
-            </div>
-            <div className="space-y-1">
-              <div
-                className="text-[11px]"
-                style={{ color: 'var(--codex-fg-subtle)' }}
-              >
-                Tomorrow, 10:00 AM
-              </div>
-              <div
-                className="text-[13px]"
-                style={{ color: 'var(--codex-fg)' }}
-              >
-                Code review session
-              </div>
+          <div className="px-4 pb-4">
+            <div
+              className="text-[12px]"
+              style={{ color: 'var(--codex-fg-subtle)' }}
+            >
+              --
             </div>
           </div>
         </SidebarSection>
@@ -1101,7 +669,336 @@ export default function Chat() {
   );
 }
 
-/* Reusable sidebar section */
+/* ── Message rendering ───────────────────────────────────────────────────── */
+
+function MessageBubble({
+  msg,
+}: {
+  msg: ChatMessage;
+}) {
+  return (
+    <motion.div
+      key={msg.id}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="flex flex-col"
+    >
+      {msg.role === 'user' && (
+        <div className="flex justify-end">
+          <div
+            className="max-w-[85%] px-4 py-3 rounded-lg"
+            style={{
+              backgroundColor: 'var(--codex-bg-user)',
+              color: 'var(--codex-fg)',
+            }}
+          >
+            <div
+              className="text-[14px] leading-relaxed whitespace-pre-wrap"
+              style={{ color: 'var(--codex-fg)' }}
+            >
+              {msg.content}
+            </div>
+            <div
+              className="text-[11px] mt-2"
+              style={{
+                color: 'var(--codex-fg-subtle)',
+                fontFamily: 'var(--font-mono)',
+              }}
+            >
+              {formatTime(msg.timestamp)}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {msg.role === 'assistant' && (
+        <div className="flex gap-3">
+          <div className="flex-1">
+            <div
+              className="text-[14px] leading-relaxed whitespace-pre-wrap"
+              style={{ color: 'var(--codex-fg)' }}
+            >
+              {msg.content}
+              {msg.isStreaming && (
+                <span
+                  className="inline-block w-[2px] h-[14px] ml-0.5 align-text-bottom animate-pulse"
+                  style={{ backgroundColor: 'var(--codex-accent)' }}
+                />
+              )}
+            </div>
+            <div className="flex items-center gap-2 mt-2">
+              <div
+                className="text-[11px]"
+                style={{
+                  color: 'var(--codex-fg-subtle)',
+                  fontFamily: 'var(--font-mono)',
+                }}
+              >
+                {formatTime(msg.timestamp)}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {msg.role === 'system' && (
+        <div className="flex justify-center py-2">
+          <div
+            className="flex items-center gap-2 px-3 py-1.5 rounded-md text-[12px]"
+            style={{
+              backgroundColor: 'var(--codex-bg-secondary)',
+              border: '1px solid var(--codex-border)',
+              color: 'var(--codex-fg-subtle)',
+              fontFamily: 'var(--font-mono)',
+            }}
+          >
+            <Terminal className="w-3 h-3" strokeWidth={1.5} />
+            {msg.content}
+          </div>
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+/* ── Thinking / streaming indicator ──────────────────────────────────────── */
+
+function ThinkingIndicator({ thinking }: { thinking: ThinkingState }) {
+  return (
+    <div
+      className="rounded-lg overflow-hidden"
+      style={{
+        backgroundColor: '#141414',
+        border: '1px solid var(--codex-border)',
+      }}
+    >
+      {/* Phase header */}
+      <div
+        className="px-3 py-2 flex items-center gap-2"
+        style={{
+          backgroundColor: 'var(--codex-bg-secondary)',
+          borderBottom: '1px solid var(--codex-border)',
+        }}
+      >
+        <Loader2
+          className="w-3.5 h-3.5 animate-spin"
+          strokeWidth={1.5}
+          style={{ color: 'var(--codex-accent)' }}
+        />
+        <span
+          className="text-[12px]"
+          style={{
+            color: 'var(--codex-fg)',
+            fontFamily: 'var(--font-mono)',
+          }}
+        >
+          {phaseLabel(thinking.phase)}
+        </span>
+
+        {/* Strategy badge */}
+        {thinking.strategy && (
+          <div
+            className="flex items-center gap-1 px-2 py-0.5 rounded ml-auto"
+            style={{
+              backgroundColor: 'var(--codex-bg-tertiary)',
+              border: '1px solid var(--codex-border)',
+            }}
+          >
+            <span
+              className="text-[10px]"
+              style={{
+                color: '#888',
+                fontFamily: 'var(--font-mono)',
+              }}
+            >
+              {thinking.strategy}
+            </span>
+            {thinking.confidence != null && (
+              <>
+                <span className="text-[10px]" style={{ color: '#666' }}>
+                  &middot;
+                </span>
+                <span
+                  className="text-[10px]"
+                  style={{
+                    color:
+                      thinking.confidence > 0.8
+                        ? 'var(--codex-accent)'
+                        : thinking.confidence > 0.5
+                          ? '#e5a00d'
+                          : '#ef4444',
+                    fontFamily: 'var(--font-mono)',
+                    fontWeight: 500,
+                  }}
+                >
+                  {Math.round(thinking.confidence * 100)}%
+                </span>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Iteration counter */}
+        {thinking.iteration != null && thinking.maxIterations != null && (
+          <span
+            className="text-[10px] ml-2"
+            style={{
+              color: 'var(--codex-fg-subtle)',
+              fontFamily: 'var(--font-mono)',
+            }}
+          >
+            {thinking.iteration}/{thinking.maxIterations}
+          </span>
+        )}
+      </div>
+
+      {/* Tool calls */}
+      {thinking.toolCalls.length > 0 && (
+        <div className="px-3 py-2 space-y-1.5">
+          {thinking.toolCalls.map((tc, idx) => (
+            <div
+              key={`${tc.name}-${idx}`}
+              className="flex items-center gap-2"
+            >
+              {tc.completed ? (
+                tc.success ? (
+                  <Check
+                    className="w-3 h-3"
+                    strokeWidth={2}
+                    style={{ color: '#10b981' }}
+                  />
+                ) : (
+                  <X
+                    className="w-3 h-3"
+                    strokeWidth={2}
+                    style={{ color: '#ef4444' }}
+                  />
+                )
+              ) : (
+                <Loader2
+                  className="w-3 h-3 animate-spin"
+                  strokeWidth={1.5}
+                  style={{ color: 'var(--codex-accent)' }}
+                />
+              )}
+              <span
+                className="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide"
+                style={{
+                  backgroundColor: tc.completed
+                    ? tc.success
+                      ? 'rgba(16, 185, 129, 0.1)'
+                      : 'rgba(239, 68, 68, 0.1)'
+                    : 'var(--codex-accent-dim)',
+                  color: tc.completed
+                    ? tc.success
+                      ? '#10b981'
+                      : '#ef4444'
+                    : 'var(--codex-accent)',
+                  fontFamily: 'var(--font-mono)',
+                  fontWeight: 500,
+                }}
+              >
+                {tc.name}
+              </span>
+              {tc.durationMs != null && (
+                <span
+                  className="text-[10px]"
+                  style={{
+                    color: '#888',
+                    fontFamily: 'var(--font-mono)',
+                  }}
+                >
+                  {tc.durationMs}ms
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Pulsing dots when no tool calls yet */}
+      {thinking.toolCalls.length === 0 && (
+        <div className="px-3 py-3 flex gap-1.5">
+          <div
+            className="w-1.5 h-1.5 rounded-full animate-pulse"
+            style={{ backgroundColor: 'var(--codex-accent)' }}
+          />
+          <div
+            className="w-1.5 h-1.5 rounded-full animate-pulse"
+            style={{
+              backgroundColor: 'var(--codex-accent)',
+              animationDelay: '0.2s',
+            }}
+          />
+          <div
+            className="w-1.5 h-1.5 rounded-full animate-pulse"
+            style={{
+              backgroundColor: 'var(--codex-accent)',
+              animationDelay: '0.4s',
+            }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── Tool call item for sidebar ──────────────────────────────────────────── */
+
+function ToolCallItem({ toolCall }: { toolCall: ToolCallState }) {
+  return (
+    <div
+      className="flex items-center gap-2 p-1.5 rounded"
+      style={{ backgroundColor: 'var(--codex-bg)' }}
+    >
+      {toolCall.completed ? (
+        toolCall.success ? (
+          <Check
+            className="w-3 h-3 flex-shrink-0"
+            strokeWidth={2}
+            style={{ color: '#10b981' }}
+          />
+        ) : (
+          <X
+            className="w-3 h-3 flex-shrink-0"
+            strokeWidth={2}
+            style={{ color: '#ef4444' }}
+          />
+        )
+      ) : (
+        <Loader2
+          className="w-3 h-3 flex-shrink-0 animate-spin"
+          strokeWidth={1.5}
+          style={{ color: 'var(--codex-accent)' }}
+        />
+      )}
+      <span
+        className="text-[11px] truncate"
+        style={{
+          color: toolCall.completed
+            ? toolCall.success
+              ? '#10b981'
+              : '#ef4444'
+            : 'var(--codex-accent)',
+          fontFamily: 'var(--font-mono)',
+        }}
+      >
+        {toolCall.name}
+      </span>
+      {toolCall.durationMs != null && (
+        <span
+          className="text-[10px] ml-auto flex-shrink-0"
+          style={{ color: '#888', fontFamily: 'var(--font-mono)' }}
+        >
+          {toolCall.durationMs}ms
+        </span>
+      )}
+    </div>
+  );
+}
+
+/* ── Reusable sidebar section ────────────────────────────────────────────── */
+
 function SidebarSection({
   title,
   open,
