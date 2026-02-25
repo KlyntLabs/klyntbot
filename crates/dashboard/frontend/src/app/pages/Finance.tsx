@@ -1,6 +1,12 @@
-import { useState, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Plus, RefreshCw, AlertCircle, Target, Loader2, AlertTriangle } from 'lucide-react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import {
+  ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Plus, RefreshCw,
+  AlertCircle, Target, Loader2, AlertTriangle, X, Pencil, Trash2,
+  Building2, CreditCard, Wallet, PiggyBank,
+} from 'lucide-react';
 import { useApi } from '../../lib/hooks/useApi';
+import { apiFetch } from '../../lib/api';
 import type {
   FinanceAccount,
   FinanceTransaction,
@@ -12,7 +18,6 @@ import type {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Format integer cents as a currency string (e.g. 123456 → "1,234.56"). */
 function formatCents(cents: number, currency = 'USD'): string {
   const abs = Math.abs(cents);
   const symbol = currency === 'USD' ? '$' : currency;
@@ -20,7 +25,6 @@ function formatCents(cents: number, currency = 'USD'): string {
   return cents < 0 ? `-${symbol}${formatted}` : `${symbol}${formatted}`;
 }
 
-/** Format integer cents with explicit +/- sign for display (e.g. +$50.00 / -$50.00). */
 function formatCentsSigned(cents: number, currency = 'USD'): string {
   const abs = Math.abs(cents);
   const symbol = currency === 'USD' ? '$' : currency;
@@ -28,27 +32,28 @@ function formatCentsSigned(cents: number, currency = 'USD'): string {
   return cents >= 0 ? `+${symbol}${formatted}` : `-${symbol}${formatted}`;
 }
 
-/** Colour for a transaction based on its type. */
 function txColor(txType: string): string {
   switch (txType) {
     case 'income': return '#10a37f';
     case 'transfer': return '#3b82f6';
-    default: return '#ef4444'; // expense
+    default: return '#ef4444';
   }
 }
 
-/** Dot colour for transaction list. */
-function txDotColor(txType: string): string {
-  return txColor(txType);
-}
-
-/** Format a date string as "Mon DD" (e.g. "Feb 24"). */
 function shortDate(dateStr: string): string {
   const d = new Date(dateStr);
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-// ── Shared UI components ─────────────────────────────────────────────────────
+function addMonths(date: Date, n: number): Date {
+  const d = new Date(date);
+  d.setMonth(d.getMonth() + n);
+  return d;
+}
+
+const todayStr = () => new Date().toISOString().split('T')[0];
+
+// ── Shared UI ────────────────────────────────────────────────────────────────
 
 function LoadingState({ message = 'Loading...' }: { message?: string }) {
   return (
@@ -77,11 +82,123 @@ function EmptyState({ message }: { message: string }) {
   );
 }
 
+// ── Slide-over drawer ────────────────────────────────────────────────────────
+
+interface DrawerProps {
+  title: string;
+  open: boolean;
+  onClose: () => void;
+  onSave: () => void;
+  saving: boolean;
+  error: string | null;
+  children: React.ReactNode;
+}
+
+function SlideOverDrawer({ title, open, onClose, onSave, saving, error, children }: DrawerProps) {
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return createPortal(
+    <>
+      <div className="fixed inset-0 z-40" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }} onClick={onClose} />
+      <div className="fixed right-0 top-0 bottom-0 z-50 flex flex-col w-[440px]" style={{ backgroundColor: '#141414', borderLeft: '1px solid var(--codex-border)' }}>
+        <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--codex-border)' }}>
+          <span className="text-[15px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>{title}</span>
+          <button onClick={onClose} className="p-1.5 rounded transition-colors" style={{ color: 'var(--codex-fg-subtle)' }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#2a2a2a'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
+            <X className="w-4 h-4" strokeWidth={1.5} />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4">
+          {children}
+          {error && (
+            <div className="p-3 rounded text-[13px]" style={{ backgroundColor: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }}>
+              {error}
+            </div>
+          )}
+        </div>
+        <div className="px-6 py-4 border-t flex items-center justify-end gap-3" style={{ borderColor: 'var(--codex-border)' }}>
+          <button onClick={onClose} className="px-4 py-2 rounded text-[13px] transition-colors"
+            style={{ backgroundColor: 'transparent', color: 'var(--codex-fg-subtle)', border: '1px solid var(--codex-border)' }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1a1a1a'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>Cancel</button>
+          <button onClick={onSave} disabled={saving}
+            className="px-4 py-2 rounded text-[13px] flex items-center gap-2 transition-colors"
+            style={{ backgroundColor: 'var(--codex-accent)', color: 'white', opacity: saving ? 0.6 : 1 }}
+            onMouseEnter={(e) => { if (!saving) e.currentTarget.style.backgroundColor = 'var(--codex-accent-hover)'; }}
+            onMouseLeave={(e) => { if (!saving) e.currentTarget.style.backgroundColor = 'var(--codex-accent)'; }}>
+            {saving && <Loader2 className="w-3.5 h-3.5 animate-spin" strokeWidth={1.5} />}
+            Save
+          </button>
+        </div>
+      </div>
+    </>,
+    document.body,
+  );
+}
+
+// ── Form helpers ─────────────────────────────────────────────────────────────
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="text-[12px] block mb-1.5" style={{ color: '#888' }}>{label}</label>
+      {children}
+    </div>
+  );
+}
+
+const inputCss: React.CSSProperties = {
+  backgroundColor: '#1a1a1a', border: '1px solid var(--codex-border)',
+  color: 'var(--codex-fg)', borderRadius: '6px', padding: '8px 10px',
+  fontSize: '13px', width: '100%', outline: 'none',
+};
+
+const selectCss: React.CSSProperties = { ...inputCss, cursor: 'pointer' };
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type Tab = 'dashboard' | 'transactions' | 'budgets' | 'investments' | 'goals' | 'reports';
+type Tab = 'dashboard' | 'transactions' | 'budgets' | 'investments' | 'goals' | 'accounts' | 'liabilities' | 'reports';
 type BudgetMode = 'standard' | 'six-jar';
 type ReportPeriod = 'weekly' | 'monthly' | 'yearly';
+type TxFilter = 'all' | 'income' | 'expense' | 'transfer';
+
+type DrawerMode =
+  | { kind: 'none' }
+  | { kind: 'create-transaction' }
+  | { kind: 'edit-transaction'; item: FinanceTransaction }
+  | { kind: 'create-budget' }
+  | { kind: 'edit-budget'; item: BudgetUsage }
+  | { kind: 'create-investment' }
+  | { kind: 'edit-investment'; item: FinanceInvestment }
+  | { kind: 'create-goal' }
+  | { kind: 'edit-goal'; item: FinanceGoal }
+  | { kind: 'create-account' }
+  | { kind: 'edit-account'; item: FinanceAccount }
+  | { kind: 'create-liability' }
+  | { kind: 'edit-liability'; item: FinanceLiability };
+
+// Form state types
+interface TxForm { accountId: string; txType: string; amount: string; currency: string; txDate: string; category: string; counterparty: string; notes: string; isRecurring: boolean; }
+interface BudgetForm { name: string; amount: string; currency: string; period: string; method: string; jarType: string; category: string; startDate: string; alertThreshold: string; }
+interface InvestmentForm { portfolioId: string; assetType: string; symbol: string; name: string; quantity: string; costBasis: string; currency: string; currentPrice: string; currentValue: string; purchaseDate: string; notes: string; }
+interface GoalForm { name: string; goalType: string; targetAmount: string; currentAmount: string; currency: string; deadline: string; monthlyContribution: string; expectedReturnRate: string; inflationRate: string; notes: string; }
+interface AccountForm { name: string; accountType: string; currency: string; balance: string; institution: string; notes: string; }
+interface LiabilityForm { name: string; liabilityType: string; principal: string; remaining: string; currency: string; interestRate: string; monthlyPayment: string; dueDate: string; notes: string; }
+
+const emptyTxForm: TxForm = { accountId: '', txType: 'expense', amount: '', currency: 'USD', txDate: todayStr(), category: '', counterparty: '', notes: '', isRecurring: false };
+const emptyBudgetForm: BudgetForm = { name: '', amount: '', currency: 'USD', period: 'monthly', method: 'envelope', jarType: '', category: '', startDate: todayStr(), alertThreshold: '80' };
+const emptyInvestmentForm: InvestmentForm = { portfolioId: 'main', assetType: 'stock', symbol: '', name: '', quantity: '', costBasis: '', currency: 'USD', currentPrice: '', currentValue: '', purchaseDate: '', notes: '' };
+const emptyGoalForm: GoalForm = { name: '', goalType: 'savings', targetAmount: '', currentAmount: '0', currency: 'USD', deadline: '', monthlyContribution: '', expectedReturnRate: '', inflationRate: '', notes: '' };
+const emptyAccountForm: AccountForm = { name: '', accountType: 'checking', currency: 'USD', balance: '0', institution: '', notes: '' };
+const emptyLiabilityForm: LiabilityForm = { name: '', liabilityType: 'loan', principal: '', remaining: '', currency: 'USD', interestRate: '', monthlyPayment: '', dueDate: '', notes: '' };
 
 // ── Component ────────────────────────────────────────────────────────────────
 
@@ -91,6 +208,27 @@ export default function Finance() {
   const [reportPeriod, setReportPeriod] = useState<ReportPeriod>('monthly');
   const [expandedGoal, setExpandedGoal] = useState<string | null>(null);
 
+  // Drawer state
+  const [drawer, setDrawer] = useState<DrawerMode>({ kind: 'none' });
+  const [mutating, setMutating] = useState(false);
+  const [mutationError, setMutationError] = useState<string | null>(null);
+
+  // Transaction filter state
+  const [txTypeFilter, setTxTypeFilter] = useState<TxFilter>('all');
+  const [txMonth, setTxMonth] = useState<Date>(new Date());
+  const [txCategory, setTxCategory] = useState<string>('all');
+
+  // Delete confirmation
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  // Form state
+  const [txForm, setTxForm] = useState<TxForm>(emptyTxForm);
+  const [budgetForm, setBudgetForm] = useState<BudgetForm>(emptyBudgetForm);
+  const [investmentForm, setInvestmentForm] = useState<InvestmentForm>(emptyInvestmentForm);
+  const [goalForm, setGoalForm] = useState<GoalForm>(emptyGoalForm);
+  const [accountForm, setAccountForm] = useState<AccountForm>(emptyAccountForm);
+  const [liabilityForm, setLiabilityForm] = useState<LiabilityForm>(emptyLiabilityForm);
+
   // ── API calls ──────────────────────────────────────────────────────────────
   const accounts = useApi<FinanceAccount[]>('/api/finance/accounts');
   const transactions = useApi<FinanceTransaction[]>('/api/finance/transactions');
@@ -99,7 +237,50 @@ export default function Finance() {
   const goals = useApi<FinanceGoal[]>('/api/finance/goals');
   const liabilities = useApi<FinanceLiability[]>('/api/finance/liabilities');
 
-  // ── Derived dashboard data ─────────────────────────────────────────────────
+  // ── Populate form on drawer open ───────────────────────────────────────────
+  useEffect(() => {
+    setMutationError(null);
+    switch (drawer.kind) {
+      case 'create-transaction': setTxForm(emptyTxForm); break;
+      case 'edit-transaction': {
+        const t = drawer.item;
+        setTxForm({ accountId: t.accountId, txType: t.txType, amount: String(t.amount / 100), currency: t.currency, txDate: t.txDate, category: t.category ?? '', counterparty: t.counterparty ?? '', notes: t.notes ?? '', isRecurring: t.isRecurring });
+        break;
+      }
+      case 'create-budget': setBudgetForm(emptyBudgetForm); break;
+      case 'edit-budget': {
+        const b = drawer.item;
+        setBudgetForm({ name: b.name, amount: String(b.amount / 100), currency: b.currency, period: b.period, method: b.method, jarType: b.jarType ?? '', category: b.category ?? '', startDate: b.startDate, alertThreshold: String(b.alertThreshold) });
+        break;
+      }
+      case 'create-investment': setInvestmentForm(emptyInvestmentForm); break;
+      case 'edit-investment': {
+        const inv = drawer.item;
+        setInvestmentForm({ portfolioId: inv.portfolioId, assetType: inv.assetType, symbol: inv.symbol ?? '', name: inv.name, quantity: String(inv.quantity), costBasis: String(inv.costBasis / 100), currency: inv.currency, currentPrice: inv.currentPrice != null ? String(inv.currentPrice / 100) : '', currentValue: inv.currentValue != null ? String(inv.currentValue / 100) : '', purchaseDate: inv.purchaseDate ?? '', notes: inv.notes ?? '' });
+        break;
+      }
+      case 'create-goal': setGoalForm(emptyGoalForm); break;
+      case 'edit-goal': {
+        const g = drawer.item;
+        setGoalForm({ name: g.name, goalType: g.goalType, targetAmount: String(g.targetAmount / 100), currentAmount: String(g.currentAmount / 100), currency: g.currency, deadline: g.deadline ?? '', monthlyContribution: g.monthlyContribution != null ? String(g.monthlyContribution / 100) : '', expectedReturnRate: g.expectedReturnRate != null ? String(g.expectedReturnRate) : '', inflationRate: g.inflationRate != null ? String(g.inflationRate) : '', notes: g.notes ?? '' });
+        break;
+      }
+      case 'create-account': setAccountForm(emptyAccountForm); break;
+      case 'edit-account': {
+        const a = drawer.item;
+        setAccountForm({ name: a.name, accountType: a.accountType, currency: a.currency, balance: String(a.balance / 100), institution: a.institution ?? '', notes: a.notes ?? '' });
+        break;
+      }
+      case 'create-liability': setLiabilityForm(emptyLiabilityForm); break;
+      case 'edit-liability': {
+        const l = drawer.item;
+        setLiabilityForm({ name: l.name, liabilityType: l.liabilityType, principal: String(l.principal / 100), remaining: String(l.remaining / 100), currency: l.currency, interestRate: l.interestRate != null ? String(l.interestRate) : '', monthlyPayment: l.monthlyPayment != null ? String(l.monthlyPayment / 100) : '', dueDate: l.dueDate ?? '', notes: l.notes ?? '' });
+        break;
+      }
+    }
+  }, [drawer]);
+
+  // ── Derived data ───────────────────────────────────────────────────────────
 
   const dashboardSummary = useMemo(() => {
     const accts = accounts.data ?? [];
@@ -109,18 +290,15 @@ export default function Finance() {
     const gls = goals.data ?? [];
     const liabs = liabilities.data ?? [];
 
-    // Net worth = sum(account balances) + sum(investment current values) - sum(liability remaining)
     const totalAccountBalance = accts.reduce((sum, a) => sum + a.balance, 0);
     const totalInvestmentValue = invs.reduce((sum, inv) => sum + (inv.currentValue ?? 0), 0);
     const totalLiabilityRemaining = liabs.reduce((sum, l) => sum + l.remaining, 0);
     const netWorth = totalAccountBalance + totalInvestmentValue - totalLiabilityRemaining;
 
-    // Total investment cost basis for P&L
     const totalCostBasis = invs.reduce((sum, inv) => sum + inv.costBasis, 0);
     const investmentPL = totalInvestmentValue - totalCostBasis;
     const investmentPLPct = totalCostBasis > 0 ? (investmentPL / totalCostBasis) * 100 : 0;
 
-    // Monthly spending: sum of expense transactions in the current month
     const now = new Date();
     const currentMonth = now.getMonth();
     const currentYear = now.getFullYear();
@@ -130,17 +308,13 @@ export default function Finance() {
     });
     const totalMonthlySpending = monthlyExpenses.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
 
-    // Spending by category for the breakdown bar
     const categorySpending: Record<string, number> = {};
     for (const tx of monthlyExpenses) {
       const cat = tx.category ?? 'Other';
       categorySpending[cat] = (categorySpending[cat] ?? 0) + Math.abs(tx.amount);
     }
-    const topCategories = Object.entries(categorySpending)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 3);
+    const topCategories = Object.entries(categorySpending).sort(([, a], [, b]) => b - a).slice(0, 3);
 
-    // Budget status
     const activeBudgets = budgs.filter((b) => b.isActive);
     const overBudgetCount = activeBudgets.filter((b) => b.amount > 0 && b.spent > b.amount).length;
     const onTrackCount = activeBudgets.length - overBudgetCount;
@@ -148,38 +322,165 @@ export default function Finance() {
     const totalBudgetSpent = activeBudgets.reduce((s, b) => s + b.spent, 0);
     const budgetPct = totalBudgetAmount > 0 ? Math.round((totalBudgetSpent / totalBudgetAmount) * 100) : 0;
 
-    // Recent transactions (latest 5)
-    const recentTxs = [...txs]
-      .sort((a, b) => new Date(b.txDate).getTime() - new Date(a.txDate).getTime())
-      .slice(0, 5);
+    const recentTxs = [...txs].sort((a, b) => new Date(b.txDate).getTime() - new Date(a.txDate).getTime()).slice(0, 5);
 
-    // Active goals count + top 3 for preview
     const activeGoals = gls.filter((g) => g.status === 'active');
     const topGoals = activeGoals.slice(0, 3);
-    const nextDeadline = activeGoals
-      .filter((g) => g.deadline)
-      .sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime())[0]?.deadline;
+    const nextDeadline = activeGoals.filter((g) => g.deadline).sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime())[0]?.deadline;
 
-    return {
-      netWorth,
-      totalMonthlySpending,
-      topCategories,
-      budgetPct,
-      activeBudgetCount: activeBudgets.length,
-      onTrackCount,
-      overBudgetCount,
-      totalInvestmentValue,
-      investmentPL,
-      investmentPLPct,
-      recentTxs,
-      activeGoals,
-      topGoals,
-      nextDeadline,
-    };
+    return { netWorth, totalMonthlySpending, topCategories, budgetPct, activeBudgetCount: activeBudgets.length, onTrackCount, overBudgetCount, totalInvestmentValue, investmentPL, investmentPLPct, recentTxs, activeGoals, topGoals, nextDeadline };
   }, [accounts.data, transactions.data, budgets.data, investments.data, goals.data, liabilities.data]);
 
   const dashboardLoading = accounts.loading || transactions.loading || budgets.loading || investments.loading || goals.loading || liabilities.loading;
   const dashboardError = accounts.error || transactions.error || budgets.error || investments.error || goals.error || liabilities.error;
+
+  // Unique categories for filter dropdown
+  const txCategories = useMemo(() => {
+    const cats = new Set<string>();
+    for (const tx of transactions.data ?? []) { if (tx.category) cats.add(tx.category); }
+    return Array.from(cats).sort();
+  }, [transactions.data]);
+
+  // Filtered + sorted transactions
+  const filteredTransactions = useMemo(() => {
+    let txs = transactions.data ?? [];
+    if (txTypeFilter !== 'all') txs = txs.filter(t => t.txType === txTypeFilter);
+    txs = txs.filter(t => {
+      const d = new Date(t.txDate);
+      return d.getFullYear() === txMonth.getFullYear() && d.getMonth() === txMonth.getMonth();
+    });
+    if (txCategory !== 'all') txs = txs.filter(t => t.category === txCategory);
+    return [...txs].sort((a, b) => new Date(b.txDate).getTime() - new Date(a.txDate).getTime());
+  }, [transactions.data, txTypeFilter, txMonth, txCategory]);
+
+  // ── Mutation helpers ───────────────────────────────────────────────────────
+
+  const closeDrawer = useCallback(() => { setDrawer({ kind: 'none' }); setMutationError(null); }, []);
+
+  async function runMutation(fn: () => Promise<void>, refetchFn: () => void) {
+    setMutating(true);
+    setMutationError(null);
+    try {
+      await fn();
+      refetchFn();
+      closeDrawer();
+    } catch (err) {
+      setMutationError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setMutating(false);
+    }
+  }
+
+  async function handleDelete(id: string, path: string, refetchFn: () => void) {
+    if (deletingId !== id) { setDeletingId(id); return; }
+    try {
+      await apiFetch(`${path}/${id}`, { method: 'DELETE' });
+      refetchFn();
+    } catch {
+      // silently handle
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  function dollars(s: string): number {
+    const v = Math.round(parseFloat(s) * 100);
+    if (isNaN(v)) throw new Error('Invalid amount');
+    return v;
+  }
+
+  function optDollars(s: string): number | undefined {
+    if (!s) return undefined;
+    return dollars(s);
+  }
+
+  function optFloat(s: string): number | undefined {
+    if (!s) return undefined;
+    const v = parseFloat(s);
+    if (isNaN(v)) return undefined;
+    return v;
+  }
+
+  function optStr(s: string): string | undefined { return s || undefined; }
+
+  // ── Save handlers ──────────────────────────────────────────────────────────
+
+  function handleSaveTransaction() {
+    if (!txForm.accountId) { setMutationError('Account is required'); return; }
+    if (!txForm.amount) { setMutationError('Amount is required'); return; }
+    if (!txForm.txDate) { setMutationError('Date is required'); return; }
+    runMutation(async () => {
+      const body = { accountId: txForm.accountId, txType: txForm.txType, amount: dollars(txForm.amount), currency: txForm.currency || 'USD', txDate: txForm.txDate, category: optStr(txForm.category), counterparty: optStr(txForm.counterparty), notes: optStr(txForm.notes), isRecurring: txForm.isRecurring };
+      if (drawer.kind === 'edit-transaction') {
+        await apiFetch(`/api/finance/transactions/${drawer.item.id}`, { method: 'PATCH', body });
+      } else {
+        await apiFetch<FinanceTransaction>('/api/finance/transactions', { body });
+      }
+    }, () => { transactions.refetch(); accounts.refetch(); });
+  }
+
+  function handleSaveBudget() {
+    if (!budgetForm.name) { setMutationError('Name is required'); return; }
+    if (!budgetForm.amount) { setMutationError('Amount is required'); return; }
+    runMutation(async () => {
+      const body = { name: budgetForm.name, amount: dollars(budgetForm.amount), currency: budgetForm.currency || 'USD', period: budgetForm.period, method: budgetForm.method, jarType: budgetForm.method === 'six-jar' ? optStr(budgetForm.jarType) : undefined, category: optStr(budgetForm.category), startDate: budgetForm.startDate, alertThreshold: parseInt(budgetForm.alertThreshold) || 80 };
+      if (drawer.kind === 'edit-budget') {
+        await apiFetch(`/api/finance/budgets/${drawer.item.id}`, { method: 'PATCH', body: { name: body.name, amount: body.amount, category: body.category } });
+      } else {
+        await apiFetch('/api/finance/budgets', { body });
+      }
+    }, budgets.refetch);
+  }
+
+  function handleSaveInvestment() {
+    if (!investmentForm.name) { setMutationError('Name is required'); return; }
+    if (!investmentForm.quantity) { setMutationError('Quantity is required'); return; }
+    if (!investmentForm.costBasis) { setMutationError('Cost basis is required'); return; }
+    runMutation(async () => {
+      if (drawer.kind === 'edit-investment') {
+        await apiFetch(`/api/finance/investments/${drawer.item.id}`, { method: 'PATCH', body: { currentPrice: optDollars(investmentForm.currentPrice), currentValue: optDollars(investmentForm.currentValue), quantity: optFloat(investmentForm.quantity), costBasis: optDollars(investmentForm.costBasis), notes: optStr(investmentForm.notes) } });
+      } else {
+        await apiFetch('/api/finance/investments', { body: { portfolioId: investmentForm.portfolioId || 'main', assetType: investmentForm.assetType, symbol: optStr(investmentForm.symbol), name: investmentForm.name, quantity: parseFloat(investmentForm.quantity), costBasis: dollars(investmentForm.costBasis), currency: investmentForm.currency || 'USD', currentPrice: optDollars(investmentForm.currentPrice), currentValue: optDollars(investmentForm.currentValue), purchaseDate: optStr(investmentForm.purchaseDate), notes: optStr(investmentForm.notes) } });
+      }
+    }, investments.refetch);
+  }
+
+  function handleSaveGoal() {
+    if (!goalForm.name) { setMutationError('Name is required'); return; }
+    if (!goalForm.targetAmount) { setMutationError('Target amount is required'); return; }
+    runMutation(async () => {
+      if (drawer.kind === 'edit-goal') {
+        await apiFetch(`/api/finance/goals/${drawer.item.id}`, { method: 'PATCH', body: { name: goalForm.name, currentAmount: dollars(goalForm.currentAmount), targetAmount: dollars(goalForm.targetAmount), monthlyContribution: optDollars(goalForm.monthlyContribution), expectedReturnRate: optFloat(goalForm.expectedReturnRate), inflationRate: optFloat(goalForm.inflationRate), deadline: optStr(goalForm.deadline) } });
+      } else {
+        await apiFetch('/api/finance/goals', { body: { name: goalForm.name, goalType: goalForm.goalType, targetAmount: dollars(goalForm.targetAmount), currentAmount: optDollars(goalForm.currentAmount), currency: goalForm.currency || 'USD', deadline: optStr(goalForm.deadline), monthlyContribution: optDollars(goalForm.monthlyContribution), expectedReturnRate: optFloat(goalForm.expectedReturnRate), inflationRate: optFloat(goalForm.inflationRate), notes: optStr(goalForm.notes) } });
+      }
+    }, goals.refetch);
+  }
+
+  function handleSaveAccount() {
+    if (!accountForm.name) { setMutationError('Name is required'); return; }
+    runMutation(async () => {
+      if (drawer.kind === 'edit-account') {
+        await apiFetch(`/api/finance/accounts/${drawer.item.id}`, { method: 'PATCH', body: { name: accountForm.name, balance: dollars(accountForm.balance), institution: optStr(accountForm.institution), notes: optStr(accountForm.notes) } });
+      } else {
+        await apiFetch('/api/finance/accounts', { body: { name: accountForm.name, accountType: accountForm.accountType, currency: accountForm.currency || 'USD', balance: optDollars(accountForm.balance), institution: optStr(accountForm.institution), notes: optStr(accountForm.notes) } });
+      }
+    }, accounts.refetch);
+  }
+
+  function handleSaveLiability() {
+    if (!liabilityForm.name) { setMutationError('Name is required'); return; }
+    if (!liabilityForm.principal) { setMutationError('Principal is required'); return; }
+    runMutation(async () => {
+      if (drawer.kind === 'edit-liability') {
+        await apiFetch(`/api/finance/liabilities/${drawer.item.id}`, { method: 'PATCH', body: { remaining: optDollars(liabilityForm.remaining), monthlyPayment: optDollars(liabilityForm.monthlyPayment), interestRate: optFloat(liabilityForm.interestRate), notes: optStr(liabilityForm.notes) } });
+      } else {
+        await apiFetch('/api/finance/liabilities', { body: { name: liabilityForm.name, liabilityType: liabilityForm.liabilityType, principal: dollars(liabilityForm.principal), remaining: optDollars(liabilityForm.remaining), currency: liabilityForm.currency || 'USD', interestRate: optFloat(liabilityForm.interestRate), monthlyPayment: optDollars(liabilityForm.monthlyPayment), dueDate: optStr(liabilityForm.dueDate), notes: optStr(liabilityForm.notes) } });
+      }
+    }, liabilities.refetch);
+  }
+
+  // ── Tabs ────────────────────────────────────────────────────────────────────
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'dashboard', label: 'Dashboard' },
@@ -187,38 +488,77 @@ export default function Finance() {
     { id: 'budgets', label: 'Budgets' },
     { id: 'investments', label: 'Investments' },
     { id: 'goals', label: 'Goals' },
+    { id: 'accounts', label: 'Accounts' },
+    { id: 'liabilities', label: 'Liabilities' },
     { id: 'reports', label: 'Reports' },
   ];
+
+  // ── Render helpers (inline action buttons) ─────────────────────────────────
+
+  const actionBtn = (onClick: () => void, icon: React.ReactNode, danger = false) => (
+    <button onClick={(e) => { e.stopPropagation(); onClick(); }}
+      className="p-1.5 rounded transition-colors"
+      style={{ color: danger ? '#ef4444' : 'var(--codex-fg-subtle)' }}
+      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#2a2a2a'}
+      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}>
+      {icon}
+    </button>
+  );
+
+  const confirmDeleteBtn = (id: string, path: string, refetchFn: () => void) => (
+    deletingId === id ? (
+      <button onClick={(e) => { e.stopPropagation(); handleDelete(id, path, refetchFn); }}
+        className="px-2 py-1 rounded text-[11px] transition-colors"
+        style={{ backgroundColor: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }}>
+        Confirm?
+      </button>
+    ) : actionBtn(() => handleDelete(id, path, refetchFn), <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />, true)
+  );
+
+  // ── Main render ────────────────────────────────────────────────────────────
+
+  // Determine which save handler to call
+  const drawerTitle = (() => {
+    switch (drawer.kind) {
+      case 'create-transaction': return 'Add Transaction';
+      case 'edit-transaction': return 'Edit Transaction';
+      case 'create-budget': return 'Create Budget';
+      case 'edit-budget': return 'Edit Budget';
+      case 'create-investment': return 'Add Holding';
+      case 'edit-investment': return 'Edit Holding';
+      case 'create-goal': return 'Create Goal';
+      case 'edit-goal': return 'Edit Goal';
+      case 'create-account': return 'Add Account';
+      case 'edit-account': return 'Edit Account';
+      case 'create-liability': return 'Add Liability';
+      case 'edit-liability': return 'Edit Liability';
+      default: return '';
+    }
+  })();
+
+  const drawerSave = (() => {
+    switch (drawer.kind) {
+      case 'create-transaction': case 'edit-transaction': return handleSaveTransaction;
+      case 'create-budget': case 'edit-budget': return handleSaveBudget;
+      case 'create-investment': case 'edit-investment': return handleSaveInvestment;
+      case 'create-goal': case 'edit-goal': return handleSaveGoal;
+      case 'create-account': case 'edit-account': return handleSaveAccount;
+      case 'create-liability': case 'edit-liability': return handleSaveLiability;
+      default: return () => {};
+    }
+  })();
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden" style={{ backgroundColor: 'var(--codex-bg)' }}>
       {/* Tab Bar */}
-      <div className="border-b px-6 py-3" style={{
-        borderColor: 'var(--codex-border-subtle)',
-        backgroundColor: 'var(--codex-bg)'
-      }}>
+      <div className="border-b px-6 py-3" style={{ borderColor: 'var(--codex-border-subtle)', backgroundColor: 'var(--codex-bg)' }}>
         <div className="flex gap-2">
           {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
               className="px-4 py-1.5 rounded-full text-[13px] transition-all"
-              style={{
-                backgroundColor: activeTab === tab.id ? 'var(--codex-accent)' : 'transparent',
-                color: activeTab === tab.id ? 'white' : 'var(--codex-fg-subtle)',
-                border: `1px solid ${activeTab === tab.id ? 'var(--codex-accent)' : 'transparent'}`
-              }}
-              onMouseEnter={(e) => {
-                if (activeTab !== tab.id) {
-                  e.currentTarget.style.backgroundColor = 'var(--codex-bg-secondary)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (activeTab !== tab.id) {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }
-              }}
-            >
+              style={{ backgroundColor: activeTab === tab.id ? 'var(--codex-accent)' : 'transparent', color: activeTab === tab.id ? 'white' : 'var(--codex-fg-subtle)', border: `1px solid ${activeTab === tab.id ? 'var(--codex-accent)' : 'transparent'}` }}
+              onMouseEnter={(e) => { if (activeTab !== tab.id) e.currentTarget.style.backgroundColor = 'var(--codex-bg-secondary)'; }}
+              onMouseLeave={(e) => { if (activeTab !== tab.id) e.currentTarget.style.backgroundColor = 'transparent'; }}>
               {tab.label}
             </button>
           ))}
@@ -227,7 +567,7 @@ export default function Finance() {
 
       {/* Tab Content */}
       <div className="flex-1 overflow-y-auto p-6">
-        {/* Dashboard Tab */}
+        {/* ════ Dashboard Tab ════ */}
         {activeTab === 'dashboard' && (
           <>
             {dashboardLoading && <LoadingState message="Loading financial data..." />}
@@ -235,38 +575,26 @@ export default function Finance() {
             {!dashboardLoading && !dashboardError && (
               <div className="grid grid-cols-2 gap-6">
                 {/* Card 1: Net Worth */}
-                <div
-                  className="p-5 rounded-lg border cursor-pointer transition-all"
-                  style={{ backgroundColor: '#141414', borderColor: '#1a1a1a' }}
-                  onClick={() => setActiveTab('dashboard')}
+                <div className="p-5 rounded-lg border cursor-pointer transition-all" style={{ backgroundColor: '#141414', borderColor: '#1a1a1a' }}
+                  onClick={() => setActiveTab('accounts')}
                   onMouseEnter={(e) => e.currentTarget.style.filter = 'brightness(1.1)'}
-                  onMouseLeave={(e) => e.currentTarget.style.filter = 'brightness(1)'}
-                >
+                  onMouseLeave={(e) => e.currentTarget.style.filter = 'brightness(1)'}>
                   <div className="text-[12px] mb-3" style={{ color: '#888' }}>Net Worth</div>
-                  <div className="text-[28px] mb-2" style={{ color: 'var(--codex-fg)', fontWeight: 600 }}>
-                    {formatCents(dashboardSummary.netWorth)}
-                  </div>
+                  <div className="text-[28px] mb-2" style={{ color: 'var(--codex-fg)', fontWeight: 600 }}>{formatCents(dashboardSummary.netWorth)}</div>
                   <div className="flex items-center gap-1.5 text-[13px]" style={{ color: dashboardSummary.netWorth >= 0 ? '#10a37f' : '#ef4444' }}>
-                    {dashboardSummary.netWorth >= 0
-                      ? <TrendingUp className="w-4 h-4" strokeWidth={1.5} />
-                      : <TrendingDown className="w-4 h-4" strokeWidth={1.5} />}
+                    {dashboardSummary.netWorth >= 0 ? <TrendingUp className="w-4 h-4" strokeWidth={1.5} /> : <TrendingDown className="w-4 h-4" strokeWidth={1.5} />}
                     {(accounts.data?.length ?? 0)} accounts
                   </div>
                 </div>
 
                 {/* Card 2: Monthly Spending */}
-                <div
-                  className="p-5 rounded-lg border cursor-pointer transition-all"
-                  style={{ backgroundColor: '#141414', borderColor: '#1a1a1a' }}
+                <div className="p-5 rounded-lg border cursor-pointer transition-all" style={{ backgroundColor: '#141414', borderColor: '#1a1a1a' }}
                   onClick={() => setActiveTab('transactions')}
                   onMouseEnter={(e) => e.currentTarget.style.filter = 'brightness(1.1)'}
-                  onMouseLeave={(e) => e.currentTarget.style.filter = 'brightness(1)'}
-                >
+                  onMouseLeave={(e) => e.currentTarget.style.filter = 'brightness(1)'}>
                   <div className="text-[12px] mb-3" style={{ color: '#888' }}>Monthly Spending</div>
-                  <div className="text-[28px] mb-3" style={{ color: 'var(--codex-fg)', fontWeight: 600 }}>
-                    {formatCents(dashboardSummary.totalMonthlySpending)}
-                  </div>
-                  {dashboardSummary.topCategories.length > 0 && (
+                  <div className="text-[28px] mb-3" style={{ color: 'var(--codex-fg)', fontWeight: 600 }}>{formatCents(dashboardSummary.totalMonthlySpending)}</div>
+                  {dashboardSummary.topCategories.length > 0 ? (
                     <>
                       <div className="h-1 rounded-full mb-2 flex overflow-hidden" style={{ backgroundColor: '#0d0d0d' }}>
                         {(() => {
@@ -281,20 +609,16 @@ export default function Finance() {
                         {dashboardSummary.topCategories.map(([cat, amount]) => `${cat} ${formatCents(amount)}`).join(' \u00B7 ')}
                       </div>
                     </>
-                  )}
-                  {dashboardSummary.topCategories.length === 0 && (
+                  ) : (
                     <div className="text-[11px]" style={{ color: '#888' }}>No expenses this month</div>
                   )}
                 </div>
 
                 {/* Card 3: Budget Status */}
-                <div
-                  className="p-5 rounded-lg border cursor-pointer transition-all"
-                  style={{ backgroundColor: '#141414', borderColor: '#1a1a1a' }}
+                <div className="p-5 rounded-lg border cursor-pointer transition-all" style={{ backgroundColor: '#141414', borderColor: '#1a1a1a' }}
                   onClick={() => setActiveTab('budgets')}
                   onMouseEnter={(e) => e.currentTarget.style.filter = 'brightness(1.1)'}
-                  onMouseLeave={(e) => e.currentTarget.style.filter = 'brightness(1)'}
-                >
+                  onMouseLeave={(e) => e.currentTarget.style.filter = 'brightness(1)'}>
                   <div className="text-[12px] mb-3" style={{ color: '#888' }}>Budget Status</div>
                   {dashboardSummary.activeBudgetCount === 0 ? (
                     <div className="text-[13px]" style={{ color: '#888' }}>No active budgets</div>
@@ -303,27 +627,19 @@ export default function Finance() {
                       <div className="relative" style={{ width: '64px', height: '64px' }}>
                         <svg viewBox="0 0 64 64" style={{ transform: 'rotate(-90deg)' }}>
                           <circle cx="32" cy="32" r="28" fill="none" stroke="#1a1a1a" strokeWidth="6" />
-                          <circle
-                            cx="32" cy="32" r="28"
-                            fill="none"
+                          <circle cx="32" cy="32" r="28" fill="none"
                             stroke={dashboardSummary.budgetPct > 100 ? '#ef4444' : '#10a37f'}
                             strokeWidth="6"
                             strokeDasharray={`${2 * Math.PI * 28 * Math.min(dashboardSummary.budgetPct, 100) / 100} ${2 * Math.PI * 28}`}
-                            strokeLinecap="round"
-                          />
+                            strokeLinecap="round" />
                         </svg>
-                        <div className="absolute inset-0 flex items-center justify-center text-[18px]" style={{ color: 'var(--codex-fg)', fontWeight: 600 }}>
-                          {dashboardSummary.budgetPct}%
-                        </div>
+                        <div className="absolute inset-0 flex items-center justify-center text-[18px]" style={{ color: 'var(--codex-fg)', fontWeight: 600 }}>{dashboardSummary.budgetPct}%</div>
                       </div>
                       <div>
-                        <div className="text-[13px] mb-1" style={{ color: 'var(--codex-fg-subtle)' }}>
-                          {dashboardSummary.onTrackCount} of {dashboardSummary.activeBudgetCount} budgets on track
-                        </div>
+                        <div className="text-[13px] mb-1" style={{ color: 'var(--codex-fg-subtle)' }}>{dashboardSummary.onTrackCount} of {dashboardSummary.activeBudgetCount} budgets on track</div>
                         {dashboardSummary.overBudgetCount > 0 && (
                           <div className="flex items-center gap-1.5 text-[12px]" style={{ color: '#ef4444' }}>
-                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#ef4444' }} />
-                            {dashboardSummary.overBudgetCount} over limit
+                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#ef4444' }} />{dashboardSummary.overBudgetCount} over limit
                           </div>
                         )}
                       </div>
@@ -332,33 +648,23 @@ export default function Finance() {
                 </div>
 
                 {/* Card 4: Portfolio Value */}
-                <div
-                  className="p-5 rounded-lg border cursor-pointer transition-all"
-                  style={{ backgroundColor: '#141414', borderColor: '#1a1a1a' }}
+                <div className="p-5 rounded-lg border cursor-pointer transition-all" style={{ backgroundColor: '#141414', borderColor: '#1a1a1a' }}
                   onClick={() => setActiveTab('investments')}
                   onMouseEnter={(e) => e.currentTarget.style.filter = 'brightness(1.1)'}
-                  onMouseLeave={(e) => e.currentTarget.style.filter = 'brightness(1)'}
-                >
+                  onMouseLeave={(e) => e.currentTarget.style.filter = 'brightness(1)'}>
                   <div className="text-[12px] mb-3" style={{ color: '#888' }}>Portfolio Value</div>
-                  <div className="text-[28px] mb-2" style={{ color: 'var(--codex-fg)', fontWeight: 600 }}>
-                    {formatCents(dashboardSummary.totalInvestmentValue)}
-                  </div>
+                  <div className="text-[28px] mb-2" style={{ color: 'var(--codex-fg)', fontWeight: 600 }}>{formatCents(dashboardSummary.totalInvestmentValue)}</div>
                   <div className="flex items-center gap-1.5 text-[13px]" style={{ color: dashboardSummary.investmentPL >= 0 ? '#10a37f' : '#ef4444' }}>
-                    {dashboardSummary.investmentPL >= 0
-                      ? <TrendingUp className="w-4 h-4" strokeWidth={1.5} />
-                      : <TrendingDown className="w-4 h-4" strokeWidth={1.5} />}
+                    {dashboardSummary.investmentPL >= 0 ? <TrendingUp className="w-4 h-4" strokeWidth={1.5} /> : <TrendingDown className="w-4 h-4" strokeWidth={1.5} />}
                     {formatCentsSigned(dashboardSummary.investmentPL)} ({dashboardSummary.investmentPLPct >= 0 ? '+' : ''}{dashboardSummary.investmentPLPct.toFixed(1)}%)
                   </div>
                 </div>
 
                 {/* Card 5: Active Goals */}
-                <div
-                  className="p-5 rounded-lg border cursor-pointer transition-all"
-                  style={{ backgroundColor: '#141414', borderColor: '#1a1a1a' }}
+                <div className="p-5 rounded-lg border cursor-pointer transition-all" style={{ backgroundColor: '#141414', borderColor: '#1a1a1a' }}
                   onClick={() => setActiveTab('goals')}
                   onMouseEnter={(e) => e.currentTarget.style.filter = 'brightness(1.1)'}
-                  onMouseLeave={(e) => e.currentTarget.style.filter = 'brightness(1)'}
-                >
+                  onMouseLeave={(e) => e.currentTarget.style.filter = 'brightness(1)'}>
                   <div className="text-[12px] mb-3" style={{ color: '#888' }}>Active Goals</div>
                   <div className="flex items-baseline gap-2 mb-3">
                     <span className="text-[28px]" style={{ color: 'var(--codex-fg)', fontWeight: 600 }}>{dashboardSummary.activeGoals.length}</span>
@@ -382,20 +688,15 @@ export default function Finance() {
                     <div className="text-[11px]" style={{ color: '#888' }}>No active goals</div>
                   )}
                   {dashboardSummary.nextDeadline && (
-                    <div className="text-[11px]" style={{ color: '#888' }}>
-                      Next deadline: {new Date(dashboardSummary.nextDeadline).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-                    </div>
+                    <div className="text-[11px]" style={{ color: '#888' }}>Next deadline: {new Date(dashboardSummary.nextDeadline).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</div>
                   )}
                 </div>
 
                 {/* Card 6: Recent Transactions */}
-                <div
-                  className="p-5 rounded-lg border cursor-pointer transition-all"
-                  style={{ backgroundColor: '#141414', borderColor: '#1a1a1a' }}
+                <div className="p-5 rounded-lg border cursor-pointer transition-all" style={{ backgroundColor: '#141414', borderColor: '#1a1a1a' }}
                   onClick={() => setActiveTab('transactions')}
                   onMouseEnter={(e) => e.currentTarget.style.filter = 'brightness(1.1)'}
-                  onMouseLeave={(e) => e.currentTarget.style.filter = 'brightness(1)'}
-                >
+                  onMouseLeave={(e) => e.currentTarget.style.filter = 'brightness(1)'}>
                   <div className="text-[12px] mb-3" style={{ color: '#888' }}>Recent Transactions</div>
                   {dashboardSummary.recentTxs.length > 0 ? (
                     <div className="space-y-2">
@@ -407,9 +708,7 @@ export default function Finance() {
                               <div className="text-[13px]" style={{ color: 'var(--codex-fg)' }}>{tx.counterparty ?? tx.category ?? tx.txType}</div>
                               <div className="text-[11px]" style={{ color: '#888' }}>{shortDate(tx.txDate)}</div>
                             </div>
-                            <div className="text-[13px]" style={{ color: txColor(tx.txType), fontFamily: 'var(--font-mono)' }}>
-                              {formatCentsSigned(displayAmount, tx.currency)}
-                            </div>
+                            <div className="text-[13px]" style={{ color: txColor(tx.txType), fontFamily: 'var(--font-mono)' }}>{formatCentsSigned(displayAmount, tx.currency)}</div>
                           </div>
                         );
                       })}
@@ -423,127 +722,100 @@ export default function Finance() {
           </>
         )}
 
-        {/* Transactions Tab */}
+        {/* ════ Transactions Tab ════ */}
         {activeTab === 'transactions' && (
           <div>
-            {/* TODO: Wire up add-transaction form — POST /api/finance/transactions */}
-            <div className="mb-4 flex items-center gap-3 p-3 rounded-lg border" style={{ backgroundColor: '#1a1a1a', borderColor: '#2a2a2a' }}>
-              <span className="text-[14px]" style={{ color: '#888' }}>$</span>
-              <input
-                type="text"
-                placeholder='"$50 groceries" or "income 2000 salary"'
-                className="flex-1 bg-transparent outline-none text-[14px]"
-                style={{ color: 'var(--codex-fg)' }}
-              />
-              <button className="px-3 py-1.5 rounded-full text-[12px]" style={{ backgroundColor: 'var(--codex-accent)', color: 'white' }}>
-                + Add
+            <div className="mb-4 flex items-center gap-3">
+              <button onClick={() => setDrawer({ kind: 'create-transaction' })}
+                className="px-3 py-1.5 rounded-full text-[12px] flex items-center gap-1.5"
+                style={{ backgroundColor: 'var(--codex-accent)', color: 'white' }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--codex-accent-hover)'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--codex-accent)'}>
+                <Plus className="w-3 h-3" strokeWidth={1.5} />Add Transaction
               </button>
             </div>
 
-            {/* TODO: Wire up filter buttons to actually filter the transaction list */}
             <div className="mb-4 flex items-center gap-3">
               <div className="flex gap-2">
-                {['All', 'Income', 'Expense', 'Transfer'].map((type) => (
-                  <button
-                    key={type}
-                    className="px-3 py-1.5 rounded-full text-[12px]"
-                    style={{
-                      backgroundColor: type === 'All' ? 'var(--codex-accent)' : 'transparent',
-                      color: type === 'All' ? 'white' : 'var(--codex-fg-subtle)',
-                      border: `1px solid ${type === 'All' ? 'var(--codex-accent)' : 'var(--codex-border)'}`
-                    }}
-                  >
-                    {type}
+                {(['all', 'income', 'expense', 'transfer'] as TxFilter[]).map((type) => (
+                  <button key={type} onClick={() => setTxTypeFilter(type)}
+                    className="px-3 py-1.5 rounded-full text-[12px] capitalize"
+                    style={{ backgroundColor: txTypeFilter === type ? 'var(--codex-accent)' : 'transparent', color: txTypeFilter === type ? 'white' : 'var(--codex-fg-subtle)', border: `1px solid ${txTypeFilter === type ? 'var(--codex-accent)' : 'var(--codex-border)'}` }}>
+                    {type === 'all' ? 'All' : type}
                   </button>
                 ))}
               </div>
-              {/* TODO: Wire up month navigation to filter by date range */}
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded text-[12px]" style={{ backgroundColor: '#1a1a1a', color: 'var(--codex-fg)' }}>
-                <ChevronLeft className="w-3 h-3" strokeWidth={1.5} />
-                {new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-                <ChevronRight className="w-3 h-3" strokeWidth={1.5} />
+              <div className="flex items-center gap-1 px-3 py-1.5 rounded text-[12px]" style={{ backgroundColor: '#1a1a1a', color: 'var(--codex-fg)' }}>
+                <button onClick={() => setTxMonth(addMonths(txMonth, -1))} className="p-0.5 rounded hover:bg-white/10"><ChevronLeft className="w-3 h-3" strokeWidth={1.5} /></button>
+                <span className="min-w-[80px] text-center">{txMonth.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</span>
+                <button onClick={() => setTxMonth(addMonths(txMonth, 1))} className="p-0.5 rounded hover:bg-white/10"><ChevronRight className="w-3 h-3" strokeWidth={1.5} /></button>
               </div>
-              <select className="px-3 py-1.5 rounded text-[12px] outline-none" style={{ backgroundColor: '#1a1a1a', color: 'var(--codex-fg)', border: '1px solid var(--codex-border)' }}>
-                <option>Category</option>
+              <select value={txCategory} onChange={(e) => setTxCategory(e.target.value)}
+                className="px-3 py-1.5 rounded text-[12px] outline-none"
+                style={{ backgroundColor: '#1a1a1a', color: 'var(--codex-fg)', border: '1px solid var(--codex-border)' }}>
+                <option value="all">All Categories</option>
+                {txCategories.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
 
             {transactions.loading && <LoadingState message="Loading transactions..." />}
             {!transactions.loading && transactions.error && <ErrorState message={transactions.error.message} />}
-            {!transactions.loading && !transactions.error && (transactions.data?.length ?? 0) === 0 && (
-              <EmptyState message="No transactions recorded yet. Add your first transaction above." />
+            {!transactions.loading && !transactions.error && filteredTransactions.length === 0 && (
+              <EmptyState message="No transactions for this period." />
             )}
-            {!transactions.loading && !transactions.error && (transactions.data?.length ?? 0) > 0 && (
+            {!transactions.loading && !transactions.error && filteredTransactions.length > 0 && (
               <div className="space-y-1.5">
-                {[...(transactions.data ?? [])]
-                  .sort((a, b) => new Date(b.txDate).getTime() - new Date(a.txDate).getTime())
-                  .map((tx) => {
-                    const displayAmount = tx.txType === 'income' ? tx.amount : -Math.abs(tx.amount);
-                    const accountName = accounts.data?.find((a) => a.id === tx.accountId)?.name ?? tx.accountId;
-                    return (
-                      <div key={tx.id} className="flex items-center justify-between p-3 rounded border" style={{ backgroundColor: '#141414', borderColor: '#1a1a1a' }}>
-                        <div className="flex items-center gap-3">
-                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: txDotColor(tx.txType) }} />
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-[14px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>{tx.counterparty ?? tx.category ?? tx.txType}</span>
-                              {tx.isRecurring && <span className="text-[11px]" style={{ color: '#888' }}>{'\u21BB'}</span>}
-                            </div>
-                            <div className="text-[12px]" style={{ color: '#888' }}>
-                              {tx.txType === 'transfer'
-                                ? `\u2192 ${tx.notes ?? 'Transfer'}`
-                                : tx.category ?? tx.txType}
-                            </div>
+                {filteredTransactions.map((tx) => {
+                  const displayAmount = tx.txType === 'income' ? tx.amount : -Math.abs(tx.amount);
+                  const accountName = accounts.data?.find((a) => a.id === tx.accountId)?.name ?? tx.accountId.slice(0, 8);
+                  return (
+                    <div key={tx.id} className="group flex items-center justify-between p-3 rounded border" style={{ backgroundColor: '#141414', borderColor: '#1a1a1a' }}>
+                      <div className="flex items-center gap-3">
+                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: txColor(tx.txType) }} />
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[14px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>{tx.counterparty ?? tx.category ?? tx.txType}</span>
+                            {tx.isRecurring && <span className="text-[11px]" style={{ color: '#888' }}>{'\u21BB'}</span>}
                           </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-[14px]" style={{ color: txColor(tx.txType), fontFamily: 'var(--font-mono)', fontWeight: 500 }}>
-                            {formatCentsSigned(displayAmount, tx.currency)}
-                          </div>
-                          <div className="text-[11px]" style={{ color: '#888' }}>
-                            {shortDate(tx.txDate)} &middot; {accountName}
+                          <div className="text-[12px]" style={{ color: '#888' }}>
+                            {tx.txType === 'transfer' ? `\u2192 ${tx.notes ?? 'Transfer'}` : tx.category ?? tx.txType}
                           </div>
                         </div>
                       </div>
-                    );
-                  })}
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <div className="text-[14px]" style={{ color: txColor(tx.txType), fontFamily: 'var(--font-mono)', fontWeight: 500 }}>{formatCentsSigned(displayAmount, tx.currency)}</div>
+                          <div className="text-[11px]" style={{ color: '#888' }}>{shortDate(tx.txDate)} &middot; {accountName}</div>
+                        </div>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {actionBtn(() => setDrawer({ kind: 'edit-transaction', item: tx }), <Pencil className="w-3.5 h-3.5" strokeWidth={1.5} />)}
+                          {confirmDeleteBtn(tx.id, '/api/finance/transactions', () => { transactions.refetch(); accounts.refetch(); })}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
         )}
 
-        {/* Budgets Tab */}
+        {/* ════ Budgets Tab ════ */}
         {activeTab === 'budgets' && (
           <div>
             <div className="mb-4 flex items-center justify-between">
               <div className="flex gap-2">
-                <button
-                  onClick={() => setBudgetMode('standard')}
-                  className="px-3 py-1.5 rounded-full text-[12px]"
-                  style={{
-                    backgroundColor: budgetMode === 'standard' ? 'var(--codex-accent)' : 'transparent',
-                    color: budgetMode === 'standard' ? 'white' : 'var(--codex-fg-subtle)',
-                    border: `1px solid ${budgetMode === 'standard' ? 'var(--codex-accent)' : 'var(--codex-border)'}`
-                  }}
-                >
-                  Standard
-                </button>
-                <button
-                  onClick={() => setBudgetMode('six-jar')}
-                  className="px-3 py-1.5 rounded-full text-[12px]"
-                  style={{
-                    backgroundColor: budgetMode === 'six-jar' ? 'var(--codex-accent)' : 'transparent',
-                    color: budgetMode === 'six-jar' ? 'white' : 'var(--codex-fg-subtle)',
-                    border: `1px solid ${budgetMode === 'six-jar' ? 'var(--codex-accent)' : 'var(--codex-border)'}`
-                  }}
-                >
-                  Six-Jar
-                </button>
+                <button onClick={() => setBudgetMode('standard')} className="px-3 py-1.5 rounded-full text-[12px]"
+                  style={{ backgroundColor: budgetMode === 'standard' ? 'var(--codex-accent)' : 'transparent', color: budgetMode === 'standard' ? 'white' : 'var(--codex-fg-subtle)', border: `1px solid ${budgetMode === 'standard' ? 'var(--codex-accent)' : 'var(--codex-border)'}` }}>Standard</button>
+                <button onClick={() => setBudgetMode('six-jar')} className="px-3 py-1.5 rounded-full text-[12px]"
+                  style={{ backgroundColor: budgetMode === 'six-jar' ? 'var(--codex-accent)' : 'transparent', color: budgetMode === 'six-jar' ? 'white' : 'var(--codex-fg-subtle)', border: `1px solid ${budgetMode === 'six-jar' ? 'var(--codex-accent)' : 'var(--codex-border)'}` }}>Six-Jar</button>
               </div>
-              {/* TODO: Wire up create budget — POST /api/finance/budgets */}
-              <button className="px-3 py-1.5 rounded-full text-[12px] flex items-center gap-1.5" style={{ backgroundColor: 'var(--codex-accent)', color: 'white' }}>
-                <Plus className="w-3 h-3" strokeWidth={1.5} />
-                Create Budget
+              <button onClick={() => setDrawer({ kind: 'create-budget' })}
+                className="px-3 py-1.5 rounded-full text-[12px] flex items-center gap-1.5"
+                style={{ backgroundColor: 'var(--codex-accent)', color: 'white' }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--codex-accent-hover)'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--codex-accent)'}>
+                <Plus className="w-3 h-3" strokeWidth={1.5} />Create Budget
               </button>
             </div>
 
@@ -555,92 +827,74 @@ export default function Finance() {
 
             {!budgets.loading && !budgets.error && (budgets.data?.length ?? 0) > 0 && budgetMode === 'standard' && (
               <div className="space-y-3">
-                {(budgets.data ?? [])
-                  .filter((b) => b.method !== 'six-jar')
-                  .map((budget) => {
-                    const pct = budget.amount > 0 ? Math.round((budget.spent / budget.amount) * 100) : 0;
-                    const barColor = pct > 100 ? '#ef4444' : pct > 80 ? '#eab308' : '#10a37f';
-                    return (
-                      <div key={budget.id} className="p-4 rounded-lg border" style={{ backgroundColor: '#141414', borderColor: '#1a1a1a' }}>
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[14px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>{budget.name}</span>
-                            <span className="px-2 py-0.5 rounded text-[10px]" style={{ backgroundColor: '#1a1a1a', color: '#888' }}>{budget.period}</span>
-                          </div>
-                          <div className="text-[13px]" style={{ color: barColor }}>
-                            {pct}%{pct > 100 ? ' Over!' : pct > 80 ? ' \u26A0' : ''}
-                          </div>
+                {(budgets.data ?? []).filter((b) => b.method !== 'six-jar').map((budget) => {
+                  const pct = budget.amount > 0 ? Math.round((budget.spent / budget.amount) * 100) : 0;
+                  const barColor = pct > 100 ? '#ef4444' : pct > 80 ? '#eab308' : '#10a37f';
+                  return (
+                    <div key={budget.id} className="group p-4 rounded-lg border" style={{ backgroundColor: '#141414', borderColor: '#1a1a1a' }}>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[14px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>{budget.name}</span>
+                          <span className="px-2 py-0.5 rounded text-[10px]" style={{ backgroundColor: '#1a1a1a', color: '#888' }}>{budget.period}</span>
                         </div>
-                        <div className="h-2 rounded-full overflow-hidden mb-2" style={{ backgroundColor: '#1a1a1a' }}>
-                          <div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', backgroundColor: barColor }} />
-                        </div>
-                        <div className="text-[12px] text-right" style={{ color: 'var(--codex-fg-subtle)' }}>
-                          {formatCents(budget.spent)} / {formatCents(budget.amount)}
+                        <div className="flex items-center gap-2">
+                          <span className="text-[13px]" style={{ color: barColor }}>{pct}%{pct > 100 ? ' Over!' : pct > 80 ? ' \u26A0' : ''}</span>
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {actionBtn(() => setDrawer({ kind: 'edit-budget', item: budget }), <Pencil className="w-3.5 h-3.5" strokeWidth={1.5} />)}
+                            {confirmDeleteBtn(budget.id, '/api/finance/budgets', budgets.refetch)}
+                          </div>
                         </div>
                       </div>
-                    );
-                  })}
+                      <div className="h-2 rounded-full overflow-hidden mb-2" style={{ backgroundColor: '#1a1a1a' }}>
+                        <div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', backgroundColor: barColor }} />
+                      </div>
+                      <div className="text-[12px] text-right" style={{ color: 'var(--codex-fg-subtle)' }}>{formatCents(budget.spent)} / {formatCents(budget.amount)}</div>
+                    </div>
+                  );
+                })}
               </div>
             )}
 
             {!budgets.loading && !budgets.error && (budgets.data?.length ?? 0) > 0 && budgetMode === 'six-jar' && (
               <div className="grid grid-cols-3 gap-4">
-                {(budgets.data ?? [])
-                  .filter((b) => b.method === 'six-jar' && b.jarType)
-                  .map((jar) => {
-                    const pct = jar.amount > 0 ? Math.round((jar.spent / jar.amount) * 100) : 0;
-                    const jarColors: Record<string, string> = {
-                      essentials: '#3b82f6',
-                      savings: '#10a37f',
-                      investment: '#14b8a6',
-                      education: '#8b5cf6',
-                      entertainment: '#f97316',
-                      charity: '#ec4899',
-                    };
-                    const color = jarColors[jar.jarType ?? ''] ?? '#888';
-                    return (
-                      <div key={jar.id} className="p-5 rounded-lg border" style={{ backgroundColor: '#141414', borderColor: '#1a1a1a', borderLeft: `3px solid ${color}` }}>
-                        <div className="text-[14px] mb-3" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>{jar.name}</div>
-                        <div className="flex justify-center mb-3">
-                          <div className="relative" style={{ width: '56px', height: '56px' }}>
-                            <svg viewBox="0 0 56 56" style={{ transform: 'rotate(-90deg)' }}>
-                              <circle cx="28" cy="28" r="24" fill="none" stroke="#1a1a1a" strokeWidth="5" />
-                              <circle
-                                cx="28" cy="28" r="24"
-                                fill="none"
-                                stroke={color}
-                                strokeWidth="5"
-                                strokeDasharray={`${2 * Math.PI * 24 * (Math.min(pct, 100) / 100)} ${2 * Math.PI * 24}`}
-                                strokeLinecap="round"
-                              />
-                            </svg>
-                            <div className="absolute inset-0 flex items-center justify-center text-[14px]" style={{ color: 'var(--codex-fg)', fontWeight: 600 }}>
-                              {pct}%
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-[13px] mb-1" style={{ color: 'var(--codex-fg)' }}>
-                            {formatCents(jar.spent)} / {formatCents(jar.amount)}
-                          </div>
-                          <div className="text-[11px]" style={{ color: '#888' }}>
-                            {jar.category ?? jar.jarType}
-                          </div>
+                {(budgets.data ?? []).filter((b) => b.method === 'six-jar' && b.jarType).map((jar) => {
+                  const pct = jar.amount > 0 ? Math.round((jar.spent / jar.amount) * 100) : 0;
+                  const jarColors: Record<string, string> = { essentials: '#3b82f6', savings: '#10a37f', investment: '#14b8a6', education: '#8b5cf6', entertainment: '#f97316', charity: '#ec4899' };
+                  const color = jarColors[jar.jarType ?? ''] ?? '#888';
+                  return (
+                    <div key={jar.id} className="group p-5 rounded-lg border" style={{ backgroundColor: '#141414', borderColor: '#1a1a1a', borderLeft: `3px solid ${color}` }}>
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-[14px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>{jar.name}</span>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {actionBtn(() => setDrawer({ kind: 'edit-budget', item: jar }), <Pencil className="w-3 h-3" strokeWidth={1.5} />)}
                         </div>
                       </div>
-                    );
-                  })}
+                      <div className="flex justify-center mb-3">
+                        <div className="relative" style={{ width: '56px', height: '56px' }}>
+                          <svg viewBox="0 0 56 56" style={{ transform: 'rotate(-90deg)' }}>
+                            <circle cx="28" cy="28" r="24" fill="none" stroke="#1a1a1a" strokeWidth="5" />
+                            <circle cx="28" cy="28" r="24" fill="none" stroke={color} strokeWidth="5"
+                              strokeDasharray={`${2 * Math.PI * 24 * (Math.min(pct, 100) / 100)} ${2 * Math.PI * 24}`} strokeLinecap="round" />
+                          </svg>
+                          <div className="absolute inset-0 flex items-center justify-center text-[14px]" style={{ color: 'var(--codex-fg)', fontWeight: 600 }}>{pct}%</div>
+                        </div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-[13px] mb-1" style={{ color: 'var(--codex-fg)' }}>{formatCents(jar.spent)} / {formatCents(jar.amount)}</div>
+                        <div className="text-[11px]" style={{ color: '#888' }}>{jar.category ?? jar.jarType}</div>
+                      </div>
+                    </div>
+                  );
+                })}
                 {(budgets.data ?? []).filter((b) => b.method === 'six-jar' && b.jarType).length === 0 && (
-                  <div className="col-span-3">
-                    <EmptyState message="No six-jar budgets configured. Create budgets with the six-jar method to see them here." />
-                  </div>
+                  <div className="col-span-3"><EmptyState message="No six-jar budgets configured." /></div>
                 )}
               </div>
             )}
           </div>
         )}
 
-        {/* Investments Tab */}
+        {/* ════ Investments Tab ════ */}
         {activeTab === 'investments' && (
           <div>
             {investments.loading && <LoadingState message="Loading investments..." />}
@@ -652,11 +906,8 @@ export default function Finance() {
               const totalPL = totalValue - totalCost;
               const totalPLPct = totalCost > 0 ? (totalPL / totalCost) * 100 : 0;
 
-              // Asset type allocation for the donut chart
               const byType: Record<string, number> = {};
-              for (const inv of invs) {
-                byType[inv.assetType] = (byType[inv.assetType] ?? 0) + (inv.currentValue ?? 0);
-              }
+              for (const inv of invs) { byType[inv.assetType] = (byType[inv.assetType] ?? 0) + (inv.currentValue ?? 0); }
               const typeEntries = Object.entries(byType).sort(([, a], [, b]) => b - a);
               const typeColors = ['#10a37f', '#f97316', '#3b82f6', '#8b5cf6', '#ec4899', '#666'];
 
@@ -680,17 +931,9 @@ export default function Finance() {
                             let offset = 0;
                             return typeEntries.map(([, value], i) => {
                               const frac = totalValue > 0 ? value / totalValue : 0;
-                              const el = (
-                                <circle
-                                  key={i}
-                                  cx="32" cy="32" r="28"
-                                  fill="none"
-                                  stroke={typeColors[i] ?? '#666'}
-                                  strokeWidth="8"
-                                  strokeDasharray={`${2 * Math.PI * 28 * frac} ${2 * Math.PI * 28}`}
-                                  strokeDashoffset={`${-2 * Math.PI * 28 * offset}`}
-                                />
-                              );
+                              const el = <circle key={i} cx="32" cy="32" r="28" fill="none" stroke={typeColors[i] ?? '#666'} strokeWidth="8"
+                                strokeDasharray={`${2 * Math.PI * 28 * frac} ${2 * Math.PI * 28}`}
+                                strokeDashoffset={`${-2 * Math.PI * 28 * offset}`} />;
                               offset += frac;
                               return el;
                             });
@@ -700,26 +943,31 @@ export default function Finance() {
                     )}
                   </div>
 
-                  <div className="mb-4 flex items-center justify-between">
-                    <select className="px-3 py-1.5 rounded text-[13px] outline-none" style={{ backgroundColor: '#1a1a1a', color: 'var(--codex-fg)', border: '1px solid var(--codex-border)' }}>
-                      <option>All Portfolios</option>
-                    </select>
-                    <div className="flex gap-2">
-                      {/* TODO: Wire up add holding — POST /api/finance/investments */}
-                      <button className="px-3 py-1.5 rounded text-[12px] flex items-center gap-1.5" style={{ backgroundColor: 'var(--codex-accent)', color: 'white' }}>
-                        <Plus className="w-3 h-3" strokeWidth={1.5} />
-                        Add Holding
-                      </button>
-                      {/* TODO: Wire up refresh prices — PATCH /api/finance/investments/:id */}
-                      <button className="px-3 py-1.5 rounded text-[12px] flex items-center gap-1.5" style={{ backgroundColor: 'transparent', color: 'var(--codex-fg-subtle)', border: '1px solid var(--codex-border)' }}>
-                        <RefreshCw className="w-3 h-3" strokeWidth={1.5} />
-                        Refresh Prices
-                      </button>
-                    </div>
+                  <div className="mb-4 flex items-center justify-end gap-2">
+                    <button onClick={() => setDrawer({ kind: 'create-investment' })}
+                      className="px-3 py-1.5 rounded text-[12px] flex items-center gap-1.5"
+                      style={{ backgroundColor: 'var(--codex-accent)', color: 'white' }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--codex-accent-hover)'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--codex-accent)'}>
+                      <Plus className="w-3 h-3" strokeWidth={1.5} />Add Holding
+                    </button>
+                    <button onClick={async () => {
+                      const invsList = investments.data ?? [];
+                      for (const inv of invsList) {
+                        if (inv.currentPrice != null && inv.quantity > 0) {
+                          const val = Math.round(inv.currentPrice * inv.quantity);
+                          await apiFetch(`/api/finance/investments/${inv.id}`, { method: 'PATCH', body: { currentValue: val } });
+                        }
+                      }
+                      investments.refetch();
+                    }} className="px-3 py-1.5 rounded text-[12px] flex items-center gap-1.5"
+                      style={{ backgroundColor: 'transparent', color: 'var(--codex-fg-subtle)', border: '1px solid var(--codex-border)' }}>
+                      <RefreshCw className="w-3 h-3" strokeWidth={1.5} />Refresh Values
+                    </button>
                   </div>
 
                   {invs.length === 0 ? (
-                    <EmptyState message="No investments tracked yet. Add your first holding to get started." />
+                    <EmptyState message="No investments tracked yet." />
                   ) : (
                     <div className="rounded-lg overflow-hidden border" style={{ backgroundColor: '#141414', borderColor: '#1a1a1a' }}>
                       <table className="w-full">
@@ -733,7 +981,7 @@ export default function Finance() {
                             <th className="text-right px-4 py-3 text-[11px] font-normal" style={{ color: '#888' }}>Price</th>
                             <th className="text-right px-4 py-3 text-[11px] font-normal" style={{ color: '#888' }}>Value</th>
                             <th className="text-right px-4 py-3 text-[11px] font-normal" style={{ color: '#888' }}>P&L</th>
-                            <th className="text-right px-4 py-3 text-[11px] font-normal" style={{ color: '#888' }}>P&L %</th>
+                            <th className="text-right px-4 py-3 text-[11px] font-normal" style={{ color: '#888' }}></th>
                           </tr>
                         </thead>
                         <tbody>
@@ -744,7 +992,7 @@ export default function Finance() {
                             const plPct = inv.costBasis > 0 ? (pl / inv.costBasis) * 100 : 0;
                             const plColor = pl >= 0 ? '#10a37f' : '#ef4444';
                             return (
-                              <tr key={inv.id} style={{ borderTop: '1px solid #1a1a1a' }}>
+                              <tr key={inv.id} className="group" style={{ borderTop: '1px solid #1a1a1a' }}>
                                 <td className="px-4 py-3 text-[13px]" style={{ color: 'var(--codex-fg)', fontFamily: 'var(--font-mono)', fontWeight: 500 }}>{inv.symbol ?? '-'}</td>
                                 <td className="px-4 py-3 text-[13px]" style={{ color: 'var(--codex-fg)' }}>{inv.name}</td>
                                 <td className="px-4 py-3 text-[12px]" style={{ color: '#888' }}>{inv.assetType}</td>
@@ -752,8 +1000,13 @@ export default function Finance() {
                                 <td className="px-4 py-3 text-[13px] text-right" style={{ color: '#888', fontFamily: 'var(--font-mono)' }}>{formatCents(Math.round(avgCost), inv.currency)}</td>
                                 <td className="px-4 py-3 text-[13px] text-right" style={{ color: 'var(--codex-fg)', fontFamily: 'var(--font-mono)' }}>{inv.currentPrice != null ? formatCents(inv.currentPrice, inv.currency) : '-'}</td>
                                 <td className="px-4 py-3 text-[13px] text-right" style={{ color: 'var(--codex-fg)', fontFamily: 'var(--font-mono)', fontWeight: 500 }}>{formatCents(value, inv.currency)}</td>
-                                <td className="px-4 py-3 text-[13px] text-right" style={{ color: plColor, fontFamily: 'var(--font-mono)' }}>{formatCentsSigned(pl, inv.currency)}</td>
-                                <td className="px-4 py-3 text-[13px] text-right" style={{ color: plColor, fontFamily: 'var(--font-mono)' }}>{plPct >= 0 ? '+' : ''}{plPct.toFixed(1)}%</td>
+                                <td className="px-4 py-3 text-[13px] text-right" style={{ color: plColor, fontFamily: 'var(--font-mono)' }}>{formatCentsSigned(pl, inv.currency)} ({plPct >= 0 ? '+' : ''}{plPct.toFixed(1)}%)</td>
+                                <td className="px-4 py-3">
+                                  <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                                    {actionBtn(() => setDrawer({ kind: 'edit-investment', item: inv }), <Pencil className="w-3.5 h-3.5" strokeWidth={1.5} />)}
+                                    {confirmDeleteBtn(inv.id, '/api/finance/investments', investments.refetch)}
+                                  </div>
+                                </td>
                               </tr>
                             );
                           })}
@@ -767,21 +1020,23 @@ export default function Finance() {
           </div>
         )}
 
-        {/* Goals Tab */}
+        {/* ════ Goals Tab ════ */}
         {activeTab === 'goals' && (
           <div>
             <div className="mb-4 flex justify-end">
-              {/* TODO: Wire up create goal — POST /api/finance/goals */}
-              <button className="px-3 py-1.5 rounded-full text-[12px] flex items-center gap-1.5" style={{ backgroundColor: 'var(--codex-accent)', color: 'white' }}>
-                <Plus className="w-3 h-3" strokeWidth={1.5} />
-                Create Goal
+              <button onClick={() => setDrawer({ kind: 'create-goal' })}
+                className="px-3 py-1.5 rounded-full text-[12px] flex items-center gap-1.5"
+                style={{ backgroundColor: 'var(--codex-accent)', color: 'white' }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--codex-accent-hover)'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--codex-accent)'}>
+                <Plus className="w-3 h-3" strokeWidth={1.5} />Create Goal
               </button>
             </div>
 
             {goals.loading && <LoadingState message="Loading goals..." />}
             {!goals.loading && goals.error && <ErrorState message={goals.error.message} />}
             {!goals.loading && !goals.error && (goals.data?.length ?? 0) === 0 && (
-              <EmptyState message="No financial goals yet. Create one to start tracking your progress." />
+              <EmptyState message="No financial goals yet." />
             )}
 
             {!goals.loading && !goals.error && (goals.data?.length ?? 0) > 0 && (
@@ -792,7 +1047,6 @@ export default function Finance() {
                   const tagColor = isFire ? '#f97316' : goal.goalType === 'savings' ? '#10a37f' : '#3b82f6';
                   const tagLabel = isFire ? 'FIRE' : goal.goalType.charAt(0).toUpperCase() + goal.goalType.slice(1);
 
-                  // Compute deadline display
                   let deadlineDisplay: string | null = null;
                   if (goal.deadline) {
                     const deadlineDate = new Date(goal.deadline);
@@ -802,33 +1056,34 @@ export default function Finance() {
                     deadlineDisplay = monthsLeft > 0 ? `${dateStr} \u00B7 ${monthsLeft} months left` : dateStr;
                   }
 
-                  const contribDisplay = goal.monthlyContribution != null
-                    ? `${formatCents(goal.monthlyContribution, goal.currency)}/mo`
-                    : null;
+                  const contribDisplay = goal.monthlyContribution != null ? `${formatCents(goal.monthlyContribution, goal.currency)}/mo` : null;
 
                   return (
-                    <div key={goal.id} className="p-5 rounded-lg border" style={{ backgroundColor: '#141414', borderColor: '#1a1a1a' }}>
+                    <div key={goal.id} className="group p-5 rounded-lg border" style={{ backgroundColor: '#141414', borderColor: '#1a1a1a' }}>
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
                           <span className="text-[16px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>{goal.name}</span>
                           <span className="px-2 py-0.5 rounded text-[10px]" style={{ backgroundColor: tagColor + '20', color: tagColor }}>{tagLabel}</span>
                         </div>
-                        <div className="flex items-center gap-1.5 text-[12px]" style={{ color: goal.status === 'active' ? '#10a37f' : '#888' }}>
-                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: goal.status === 'active' ? '#10a37f' : '#888' }} />
-                          {goal.status.charAt(0).toUpperCase() + goal.status.slice(1)}
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5 text-[12px]" style={{ color: goal.status === 'active' ? '#10a37f' : '#888' }}>
+                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: goal.status === 'active' ? '#10a37f' : '#888' }} />
+                            {goal.status.charAt(0).toUpperCase() + goal.status.slice(1)}
+                          </div>
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {actionBtn(() => setDrawer({ kind: 'edit-goal', item: goal }), <Pencil className="w-3.5 h-3.5" strokeWidth={1.5} />)}
+                            {confirmDeleteBtn(goal.id, '/api/finance/goals', goals.refetch)}
+                          </div>
                         </div>
                       </div>
                       <div className="h-2 rounded-full overflow-hidden mb-2" style={{ backgroundColor: '#1a1a1a' }}>
                         <div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', backgroundColor: '#10a37f' }} />
                       </div>
                       <div className="flex items-center justify-between mb-3">
-                        <span className="text-[14px]" style={{ color: 'var(--codex-fg)', fontFamily: 'var(--font-mono)' }}>
-                          {formatCents(goal.currentAmount, goal.currency)} / {formatCents(goal.targetAmount, goal.currency)}
-                        </span>
+                        <span className="text-[14px]" style={{ color: 'var(--codex-fg)', fontFamily: 'var(--font-mono)' }}>{formatCents(goal.currentAmount, goal.currency)} / {formatCents(goal.targetAmount, goal.currency)}</span>
                         <span className="text-[14px]" style={{ color: '#10a37f', fontWeight: 500 }}>{pct}%</span>
                       </div>
 
-                      {/* FIRE-specific details */}
                       {isFire && (goal.expectedReturnRate != null || goal.inflationRate != null) && (
                         <div className="grid grid-cols-2 gap-3 mb-3 p-3 rounded" style={{ backgroundColor: '#1a1a1a' }}>
                           {goal.monthlyContribution != null && (
@@ -852,49 +1107,12 @@ export default function Finance() {
                           {goal.deadline && (
                             <div>
                               <div className="text-[11px] mb-0.5" style={{ color: '#888' }}>Target Date</div>
-                              <div className="text-[13px]" style={{ color: 'var(--codex-fg)' }}>
-                                {new Date(goal.deadline).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-                              </div>
+                              <div className="text-[13px]" style={{ color: 'var(--codex-fg)' }}>{new Date(goal.deadline).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</div>
                             </div>
                           )}
                         </div>
                       )}
 
-                      {/* What-if toggle for FIRE goals */}
-                      {isFire && (
-                        <>
-                          <button
-                            onClick={() => setExpandedGoal(expandedGoal === goal.id ? null : goal.id)}
-                            className="text-[12px]"
-                            style={{ color: 'var(--codex-accent)' }}
-                          >
-                            What-if {expandedGoal === goal.id ? '\u25B4' : '\u25BE'}
-                          </button>
-
-                          {expandedGoal === goal.id && (
-                            <div className="mt-3 p-3 rounded space-y-3" style={{ backgroundColor: '#1a1a1a' }}>
-                              {/* TODO: Wire up what-if calculator with actual projections */}
-                              <div>
-                                <label className="text-[12px] mb-1 block" style={{ color: '#888' }}>Extra monthly savings: $0</label>
-                                <input type="range" className="w-full" style={{ accentColor: 'var(--codex-accent)' }} />
-                              </div>
-                              <div>
-                                <label className="text-[12px] mb-1 block" style={{ color: '#888' }}>Expected return: {goal.expectedReturnRate ?? 10}%</label>
-                                <input type="range" className="w-full" style={{ accentColor: 'var(--codex-accent)' }} />
-                              </div>
-                              <div>
-                                <label className="text-[12px] mb-1 block" style={{ color: '#888' }}>Inflation: {goal.inflationRate ?? 3}%</label>
-                                <input type="range" className="w-full" style={{ accentColor: 'var(--codex-accent)' }} />
-                              </div>
-                              <div className="text-[13px] pt-2 border-t" style={{ color: 'var(--codex-accent)', borderColor: '#2a2a2a' }}>
-                                What-if projections coming soon
-                              </div>
-                            </div>
-                          )}
-                        </>
-                      )}
-
-                      {/* Non-FIRE goal footer */}
                       {!isFire && (
                         <div className="flex items-center justify-between text-[12px]" style={{ color: '#888' }}>
                           {deadlineDisplay && <span>Deadline: {deadlineDisplay}</span>}
@@ -909,181 +1127,621 @@ export default function Finance() {
           </div>
         )}
 
-        {/* Reports Tab */}
-        {/* TODO: Wire reports to real data — requires server-side aggregation endpoints
-            or client-side aggregation from transactions. Keeping mock charts for now. */}
-        {activeTab === 'reports' && (
+        {/* ════ Accounts Tab ════ */}
+        {activeTab === 'accounts' && (
           <div>
-            <div className="mb-6 flex items-center gap-4">
-              <div className="flex gap-2">
-                {(['weekly', 'monthly', 'yearly'] as ReportPeriod[]).map((period) => (
-                  <button
-                    key={period}
-                    onClick={() => setReportPeriod(period)}
-                    className="px-3 py-1.5 rounded-full text-[12px] capitalize"
-                    style={{
-                      backgroundColor: reportPeriod === period ? 'var(--codex-accent)' : 'transparent',
-                      color: reportPeriod === period ? 'white' : 'var(--codex-fg-subtle)',
-                      border: `1px solid ${reportPeriod === period ? 'var(--codex-accent)' : 'var(--codex-border)'}`
-                    }}
-                  >
-                    {period}
-                  </button>
-                ))}
-              </div>
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded text-[13px]" style={{ backgroundColor: '#1a1a1a', color: 'var(--codex-fg)' }}>
-                <ChevronLeft className="w-3.5 h-3.5" strokeWidth={1.5} />
-                February 2026
-                <ChevronRight className="w-3.5 h-3.5" strokeWidth={1.5} />
-              </div>
+            <div className="mb-4 flex justify-end">
+              <button onClick={() => setDrawer({ kind: 'create-account' })}
+                className="px-3 py-1.5 rounded-full text-[12px] flex items-center gap-1.5"
+                style={{ backgroundColor: 'var(--codex-accent)', color: 'white' }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--codex-accent-hover)'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--codex-accent)'}>
+                <Plus className="w-3 h-3" strokeWidth={1.5} />Add Account
+              </button>
             </div>
 
-            <div className="space-y-4">
-              {/* TODO: Replace with real spending-by-category aggregation from transactions */}
-              <div className="p-5 rounded-lg border" style={{ backgroundColor: '#141414', borderColor: '#1a1a1a' }}>
-                <h3 className="text-[15px] mb-4" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Spending by Category</h3>
-                {transactions.loading && <LoadingState message="Loading..." />}
-                {!transactions.loading && transactions.error && <ErrorState message={transactions.error.message} />}
-                {!transactions.loading && !transactions.error && (() => {
-                  const txs = transactions.data ?? [];
-                  const now = new Date();
-                  const expenses = txs.filter((tx) => {
-                    const d = new Date(tx.txDate);
-                    return tx.txType === 'expense' && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-                  });
-                  const byCat: Record<string, number> = {};
-                  for (const tx of expenses) {
-                    const cat = tx.category ?? 'Other';
-                    byCat[cat] = (byCat[cat] ?? 0) + Math.abs(tx.amount);
-                  }
-                  const sorted = Object.entries(byCat).sort(([, a], [, b]) => b - a);
-                  const maxAmount = sorted[0]?.[1] ?? 1;
-                  const catColors = ['#10a37f', '#3b82f6', '#f97316', '#8b5cf6', '#ec4899', '#666'];
+            {accounts.loading && <LoadingState message="Loading accounts..." />}
+            {!accounts.loading && accounts.error && <ErrorState message={accounts.error.message} />}
+            {!accounts.loading && !accounts.error && (accounts.data?.length ?? 0) === 0 && (
+              <EmptyState message="No accounts yet. Add your first account." />
+            )}
 
-                  if (sorted.length === 0) {
-                    return <div className="text-[13px]" style={{ color: '#888' }}>No expense data for this period</div>;
-                  }
+            {!accounts.loading && !accounts.error && (accounts.data?.length ?? 0) > 0 && (
+              <div className="grid grid-cols-2 gap-4">
+                {(accounts.data ?? []).map((acct) => {
+                  const typeIcons: Record<string, React.ReactNode> = {
+                    checking: <Wallet className="w-5 h-5" strokeWidth={1.5} />,
+                    savings: <PiggyBank className="w-5 h-5" strokeWidth={1.5} />,
+                    credit: <CreditCard className="w-5 h-5" strokeWidth={1.5} />,
+                    investment: <TrendingUp className="w-5 h-5" strokeWidth={1.5} />,
+                  };
+                  const icon = typeIcons[acct.accountType] ?? <Building2 className="w-5 h-5" strokeWidth={1.5} />;
+                  const balColor = acct.balance >= 0 ? 'var(--codex-fg)' : '#ef4444';
 
                   return (
-                    <div className="space-y-2">
-                      {sorted.map(([cat, amount], i) => (
-                        <div key={cat} className="flex items-center gap-3">
-                          <div className="w-32 text-[13px]" style={{ color: 'var(--codex-fg-subtle)' }}>{cat}</div>
-                          <div className="flex-1 h-6 rounded overflow-hidden" style={{ backgroundColor: '#1a1a1a' }}>
-                            <div style={{ width: `${(amount / maxAmount) * 100}%`, height: '100%', backgroundColor: catColors[i] ?? '#666' }} />
-                          </div>
-                          <div className="w-20 text-right text-[13px]" style={{ color: 'var(--codex-fg)', fontFamily: 'var(--font-mono)' }}>
-                            {formatCents(amount)}
+                    <div key={acct.id} className="group p-5 rounded-lg border" style={{ backgroundColor: '#141414', borderColor: '#1a1a1a' }}>
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <div style={{ color: '#888' }}>{icon}</div>
+                          <div>
+                            <div className="text-[14px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>{acct.name}</div>
+                            <div className="text-[12px]" style={{ color: '#888' }}>{acct.accountType} {acct.institution ? `\u00B7 ${acct.institution}` : ''}</div>
                           </div>
                         </div>
-                      ))}
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* TODO: Replace with real income-by-source aggregation from transactions */}
-              <div className="p-5 rounded-lg border" style={{ backgroundColor: '#141414', borderColor: '#1a1a1a' }}>
-                <h3 className="text-[15px] mb-4" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Income by Source</h3>
-                {transactions.loading && <LoadingState message="Loading..." />}
-                {!transactions.loading && transactions.error && <ErrorState message={transactions.error.message} />}
-                {!transactions.loading && !transactions.error && (() => {
-                  const txs = transactions.data ?? [];
-                  const now = new Date();
-                  const incomes = txs.filter((tx) => {
-                    const d = new Date(tx.txDate);
-                    return tx.txType === 'income' && d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-                  });
-                  const bySrc: Record<string, number> = {};
-                  for (const tx of incomes) {
-                    const src = tx.category ?? tx.counterparty ?? 'Other';
-                    bySrc[src] = (bySrc[src] ?? 0) + tx.amount;
-                  }
-                  const sorted = Object.entries(bySrc).sort(([, a], [, b]) => b - a);
-                  const maxAmount = sorted[0]?.[1] ?? 1;
-                  const srcColors = ['#10a37f', '#3b82f6', '#14b8a6', '#8b5cf6', '#666'];
-
-                  if (sorted.length === 0) {
-                    return <div className="text-[13px]" style={{ color: '#888' }}>No income data for this period</div>;
-                  }
-
-                  return (
-                    <div className="space-y-2">
-                      {sorted.map(([src, amount], i) => (
-                        <div key={src} className="flex items-center gap-3">
-                          <div className="w-32 text-[13px]" style={{ color: 'var(--codex-fg-subtle)' }}>{src}</div>
-                          <div className="flex-1 h-6 rounded overflow-hidden" style={{ backgroundColor: '#1a1a1a' }}>
-                            <div style={{ width: `${(amount / maxAmount) * 100}%`, height: '100%', backgroundColor: srcColors[i] ?? '#666' }} />
-                          </div>
-                          <div className="w-20 text-right text-[13px]" style={{ color: 'var(--codex-fg)', fontFamily: 'var(--font-mono)' }}>
-                            {formatCents(amount)}
-                          </div>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {actionBtn(() => setDrawer({ kind: 'edit-account', item: acct }), <Pencil className="w-3.5 h-3.5" strokeWidth={1.5} />)}
+                          {confirmDeleteBtn(acct.id, '/api/finance/accounts', accounts.refetch)}
                         </div>
-                      ))}
+                      </div>
+                      <div className="text-[24px]" style={{ color: balColor, fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{formatCents(acct.balance, acct.currency)}</div>
+                      {acct.notes && <div className="text-[11px] mt-2" style={{ color: '#888' }}>{acct.notes}</div>}
                     </div>
                   );
-                })()}
+                })}
               </div>
-
-              {/* TODO: Replace with real time-series chart from historical transaction data */}
-              <div className="p-5 rounded-lg border" style={{ backgroundColor: '#141414', borderColor: '#1a1a1a' }}>
-                <h3 className="text-[15px] mb-4" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Spending Trends</h3>
-                <div className="h-48 relative" style={{ backgroundColor: '#0d0d0d', borderRadius: '8px', padding: '20px' }}>
-                  <svg width="100%" height="100%" viewBox="0 0 500 150" preserveAspectRatio="none">
-                    <defs>
-                      <linearGradient id="lineGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" stopColor="#10a37f" stopOpacity="0.3" />
-                        <stop offset="100%" stopColor="#10a37f" stopOpacity="0" />
-                      </linearGradient>
-                    </defs>
-                    <path d="M 0 50 L 100 30 L 200 70 L 300 40 L 400 52 L 500 60" fill="url(#lineGradient)" />
-                    <path d="M 0 50 L 100 30 L 200 70 L 300 40 L 400 52 L 500 60" fill="none" stroke="#10a37f" strokeWidth="2" />
-                    <circle cx="0" cy="50" r="3" fill="#10a37f" />
-                    <circle cx="100" cy="30" r="3" fill="#10a37f" />
-                    <circle cx="200" cy="70" r="3" fill="#10a37f" />
-                    <circle cx="300" cy="40" r="3" fill="#10a37f" />
-                    <circle cx="400" cy="52" r="3" fill="#10a37f" />
-                    <circle cx="500" cy="60" r="3" fill="#10a37f" />
-                  </svg>
-                  <div className="absolute bottom-2 left-0 right-0 flex justify-between px-5 text-[11px]" style={{ color: '#666' }}>
-                    <span>Oct</span>
-                    <span>Nov</span>
-                    <span>Dec</span>
-                    <span>Jan</span>
-                    <span>Feb</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* TODO: Replace with real net worth time-series from account/investment snapshots */}
-              <div className="p-5 rounded-lg border" style={{ backgroundColor: '#141414', borderColor: '#1a1a1a' }}>
-                <h3 className="text-[15px] mb-4" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Net Worth Over Time</h3>
-                <div className="h-48 relative" style={{ backgroundColor: '#0d0d0d', borderRadius: '8px', padding: '20px' }}>
-                  <svg width="100%" height="100%" viewBox="0 0 600 150" preserveAspectRatio="none">
-                    <defs>
-                      <linearGradient id="assetGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" stopColor="#10a37f" stopOpacity="0.3" />
-                        <stop offset="100%" stopColor="#10a37f" stopOpacity="0.1" />
-                      </linearGradient>
-                    </defs>
-                    <path d="M 0 60 L 100 55 L 200 50 L 300 45 L 400 42 L 500 38 L 500 150 L 0 150 Z" fill="url(#assetGradient)" />
-                    <path d="M 0 60 L 100 55 L 200 50 L 300 45 L 400 42 L 500 38" fill="none" stroke="white" strokeWidth="2" />
-                    <path d="M 0 140 L 100 138 L 200 136 L 300 135 L 400 134 L 500 133 L 500 150 L 0 150 Z" fill="rgba(239, 68, 68, 0.2)" />
-                  </svg>
-                  <div className="absolute bottom-2 left-0 right-0 flex justify-between px-5 text-[11px]" style={{ color: '#666' }}>
-                    <span>Sep</span>
-                    <span>Oct</span>
-                    <span>Nov</span>
-                    <span>Dec</span>
-                    <span>Jan</span>
-                    <span>Feb</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         )}
+
+        {/* ════ Liabilities Tab ════ */}
+        {activeTab === 'liabilities' && (
+          <div>
+            <div className="mb-4 flex items-center justify-between">
+              <div className="text-[13px]" style={{ color: 'var(--codex-fg-subtle)' }}>
+                Total: {formatCents((liabilities.data ?? []).reduce((s, l) => s + l.remaining, 0))} remaining
+              </div>
+              <button onClick={() => setDrawer({ kind: 'create-liability' })}
+                className="px-3 py-1.5 rounded-full text-[12px] flex items-center gap-1.5"
+                style={{ backgroundColor: 'var(--codex-accent)', color: 'white' }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--codex-accent-hover)'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--codex-accent)'}>
+                <Plus className="w-3 h-3" strokeWidth={1.5} />Add Liability
+              </button>
+            </div>
+
+            {liabilities.loading && <LoadingState message="Loading liabilities..." />}
+            {!liabilities.loading && liabilities.error && <ErrorState message={liabilities.error.message} />}
+            {!liabilities.loading && !liabilities.error && (liabilities.data?.length ?? 0) === 0 && (
+              <EmptyState message="No liabilities tracked." />
+            )}
+
+            {!liabilities.loading && !liabilities.error && (liabilities.data?.length ?? 0) > 0 && (
+              <div className="space-y-4">
+                {[...(liabilities.data ?? [])].sort((a, b) => b.remaining - a.remaining).map((liability) => {
+                  const paidOff = liability.principal - liability.remaining;
+                  const pct = liability.principal > 0 ? Math.round((paidOff / liability.principal) * 100) : 0;
+                  return (
+                    <div key={liability.id} className="group p-5 rounded-lg border" style={{ backgroundColor: '#141414', borderColor: '#1a1a1a' }}>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[16px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>{liability.name}</span>
+                          <span className="px-2 py-0.5 rounded text-[10px]" style={{ backgroundColor: '#1a1a1a', color: '#888' }}>{liability.liabilityType}</span>
+                          {liability.interestRate != null && (
+                            <span className="text-[12px]" style={{ color: '#ef4444' }}>{liability.interestRate}% APR</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {liability.monthlyPayment != null && (
+                            <span className="text-[12px]" style={{ color: 'var(--codex-fg-subtle)' }}>{formatCents(liability.monthlyPayment, liability.currency)}/mo</span>
+                          )}
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {actionBtn(() => setDrawer({ kind: 'edit-liability', item: liability }), <Pencil className="w-3.5 h-3.5" strokeWidth={1.5} />)}
+                            {confirmDeleteBtn(liability.id, '/api/finance/liabilities', liabilities.refetch)}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="h-2 rounded-full overflow-hidden mb-2" style={{ backgroundColor: '#1a1a1a' }}>
+                        <div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', backgroundColor: '#10a37f' }} />
+                      </div>
+                      <div className="flex items-center justify-between text-[13px]">
+                        <span style={{ color: 'var(--codex-fg)', fontFamily: 'var(--font-mono)' }}>
+                          {formatCents(liability.remaining, liability.currency)} remaining
+                        </span>
+                        <span style={{ color: '#888' }}>
+                          {pct}% paid ({formatCents(paidOff, liability.currency)} of {formatCents(liability.principal, liability.currency)})
+                        </span>
+                      </div>
+                      {liability.dueDate && (
+                        <div className="text-[11px] mt-2" style={{ color: '#888' }}>
+                          Due: {new Date(liability.dueDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ════ Reports Tab ════ */}
+        {activeTab === 'reports' && (() => {
+          const txs = transactions.data ?? [];
+          const budgetList = budgets.data ?? [];
+          const acctList = accounts.data ?? [];
+          const liabList = liabilities.data ?? [];
+          const now = new Date();
+
+          // Period filter logic
+          const inPeriod = (dateStr: string): boolean => {
+            const d = new Date(dateStr);
+            if (reportPeriod === 'weekly') {
+              const weekAgo = new Date(now);
+              weekAgo.setDate(weekAgo.getDate() - 7);
+              return d >= weekAgo && d <= now;
+            }
+            if (reportPeriod === 'yearly') return d.getFullYear() === now.getFullYear();
+            return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+          };
+
+          const periodLabel = reportPeriod === 'weekly' ? 'This Week' : reportPeriod === 'yearly' ? String(now.getFullYear()) : now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+          const periodTxs = txs.filter(tx => inPeriod(tx.txDate));
+          const totalIncome = periodTxs.filter(tx => tx.txType === 'income').reduce((s, tx) => s + tx.amount, 0);
+          const totalExpenses = periodTxs.filter(tx => tx.txType === 'expense').reduce((s, tx) => s + Math.abs(tx.amount), 0);
+          const netCashFlow = totalIncome - totalExpenses;
+          const savingsRate = totalIncome > 0 ? Math.round((netCashFlow / totalIncome) * 100) : 0;
+
+          // Spending by category
+          const expenseTxs = periodTxs.filter(tx => tx.txType === 'expense');
+          const byCat: Record<string, number> = {};
+          for (const tx of expenseTxs) { const cat = tx.category ?? 'Other'; byCat[cat] = (byCat[cat] ?? 0) + Math.abs(tx.amount); }
+          const catSorted = Object.entries(byCat).sort(([, a], [, b]) => b - a);
+          const catMax = catSorted[0]?.[1] ?? 1;
+          const catColors = ['#10a37f', '#3b82f6', '#f97316', '#8b5cf6', '#ec4899', '#14b8a6', '#eab308', '#666'];
+
+          // Income by source
+          const incomeTxs = periodTxs.filter(tx => tx.txType === 'income');
+          const bySrc: Record<string, number> = {};
+          for (const tx of incomeTxs) { const src = tx.category ?? tx.counterparty ?? 'Other'; bySrc[src] = (bySrc[src] ?? 0) + tx.amount; }
+          const srcSorted = Object.entries(bySrc).sort(([, a], [, b]) => b - a);
+          const srcMax = srcSorted[0]?.[1] ?? 1;
+          const srcColors = ['#10a37f', '#3b82f6', '#14b8a6', '#8b5cf6', '#666'];
+
+          // Top expenses
+          const topExpenses = [...expenseTxs].sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount)).slice(0, 5);
+          const acctMap = new Map(acctList.map(a => [a.id, a.name]));
+
+          // Net worth
+          const totalAssets = acctList.filter(a => !a.isArchived && a.balance >= 0).reduce((s, a) => s + a.balance, 0);
+          const totalLiab = liabList.reduce((s, l) => s + l.remaining, 0);
+          const netWorth = totalAssets - totalLiab;
+
+          const cardStyle: React.CSSProperties = { backgroundColor: '#141414', borderColor: '#1a1a1a' };
+
+          return (
+            <div>
+              {/* Period toggle + label */}
+              <div className="mb-6 flex items-center justify-between">
+                <div className="flex gap-2">
+                  {(['weekly', 'monthly', 'yearly'] as ReportPeriod[]).map((period) => (
+                    <button key={period} onClick={() => setReportPeriod(period)}
+                      className="px-3 py-1.5 rounded-full text-[12px] capitalize"
+                      style={{ backgroundColor: reportPeriod === period ? 'var(--codex-accent)' : 'transparent', color: reportPeriod === period ? 'white' : 'var(--codex-fg-subtle)', border: `1px solid ${reportPeriod === period ? 'var(--codex-accent)' : 'var(--codex-border)'}` }}>
+                      {period}
+                    </button>
+                  ))}
+                </div>
+                <span className="text-[13px]" style={{ color: 'var(--codex-fg-muted)' }}>{periodLabel}</span>
+              </div>
+
+              {transactions.loading && <LoadingState message="Loading report data..." />}
+              {!transactions.loading && transactions.error && <ErrorState message={transactions.error.message} />}
+              {!transactions.loading && !transactions.error && (
+                <div className="space-y-4">
+                  {/* ── Summary cards ── */}
+                  <div className="grid grid-cols-4 gap-3">
+                    <div className="p-4 rounded-lg border" style={cardStyle}>
+                      <div className="text-[11px] uppercase tracking-wider mb-1" style={{ color: '#888' }}>Total Income</div>
+                      <div className="text-[18px]" style={{ color: '#10a37f', fontFamily: 'var(--font-mono)' }}>{formatCents(totalIncome)}</div>
+                    </div>
+                    <div className="p-4 rounded-lg border" style={cardStyle}>
+                      <div className="text-[11px] uppercase tracking-wider mb-1" style={{ color: '#888' }}>Total Expenses</div>
+                      <div className="text-[18px]" style={{ color: '#ef4444', fontFamily: 'var(--font-mono)' }}>{formatCents(totalExpenses)}</div>
+                    </div>
+                    <div className="p-4 rounded-lg border" style={cardStyle}>
+                      <div className="text-[11px] uppercase tracking-wider mb-1" style={{ color: '#888' }}>Net Cash Flow</div>
+                      <div className="text-[18px]" style={{ color: netCashFlow >= 0 ? '#10a37f' : '#ef4444', fontFamily: 'var(--font-mono)' }}>{formatCentsSigned(netCashFlow)}</div>
+                    </div>
+                    <div className="p-4 rounded-lg border" style={cardStyle}>
+                      <div className="text-[11px] uppercase tracking-wider mb-1" style={{ color: '#888' }}>Savings Rate</div>
+                      <div className="text-[18px]" style={{ color: savingsRate >= 20 ? '#10a37f' : savingsRate >= 0 ? '#eab308' : '#ef4444', fontFamily: 'var(--font-mono)' }}>{savingsRate}%</div>
+                    </div>
+                  </div>
+
+                  {/* ── Spending by Category ── */}
+                  <div className="p-5 rounded-lg border" style={cardStyle}>
+                    <h3 className="text-[15px] mb-4" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Spending by Category</h3>
+                    {catSorted.length === 0
+                      ? <div className="text-[13px]" style={{ color: '#888' }}>No expense data for this period.</div>
+                      : <div className="space-y-2">
+                          {catSorted.map(([cat, amount], i) => (
+                            <div key={cat} className="flex items-center gap-3">
+                              <div className="w-32 text-[13px] truncate" style={{ color: 'var(--codex-fg-subtle)' }}>{cat}</div>
+                              <div className="flex-1 h-6 rounded overflow-hidden" style={{ backgroundColor: '#1a1a1a' }}>
+                                <div style={{ width: `${(amount / catMax) * 100}%`, height: '100%', backgroundColor: catColors[i % catColors.length], borderRadius: '4px', transition: 'width 0.3s ease' }} />
+                              </div>
+                              <div className="w-24 text-right text-[13px]" style={{ color: 'var(--codex-fg)', fontFamily: 'var(--font-mono)' }}>{formatCents(amount)}</div>
+                            </div>
+                          ))}
+                          <div className="flex justify-end pt-2 border-t" style={{ borderColor: '#222' }}>
+                            <span className="text-[13px]" style={{ color: 'var(--codex-fg-muted)', fontFamily: 'var(--font-mono)' }}>Total: {formatCents(totalExpenses)}</span>
+                          </div>
+                        </div>
+                    }
+                  </div>
+
+                  {/* ── Income by Source ── */}
+                  <div className="p-5 rounded-lg border" style={cardStyle}>
+                    <h3 className="text-[15px] mb-4" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Income by Source</h3>
+                    {srcSorted.length === 0
+                      ? <div className="text-[13px]" style={{ color: '#888' }}>No income data for this period.</div>
+                      : <div className="space-y-2">
+                          {srcSorted.map(([src, amount], i) => (
+                            <div key={src} className="flex items-center gap-3">
+                              <div className="w-32 text-[13px] truncate" style={{ color: 'var(--codex-fg-subtle)' }}>{src}</div>
+                              <div className="flex-1 h-6 rounded overflow-hidden" style={{ backgroundColor: '#1a1a1a' }}>
+                                <div style={{ width: `${(amount / srcMax) * 100}%`, height: '100%', backgroundColor: srcColors[i % srcColors.length], borderRadius: '4px', transition: 'width 0.3s ease' }} />
+                              </div>
+                              <div className="w-24 text-right text-[13px]" style={{ color: 'var(--codex-fg)', fontFamily: 'var(--font-mono)' }}>{formatCents(amount)}</div>
+                            </div>
+                          ))}
+                          <div className="flex justify-end pt-2 border-t" style={{ borderColor: '#222' }}>
+                            <span className="text-[13px]" style={{ color: 'var(--codex-fg-muted)', fontFamily: 'var(--font-mono)' }}>Total: {formatCents(totalIncome)}</span>
+                          </div>
+                        </div>
+                    }
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* ── Budget vs Actual ── */}
+                    <div className="p-5 rounded-lg border" style={cardStyle}>
+                      <h3 className="text-[15px] mb-4" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Budget vs Actual</h3>
+                      {budgetList.length === 0
+                        ? <div className="text-[13px]" style={{ color: '#888' }}>No budgets configured.</div>
+                        : <div className="space-y-3">
+                            {budgetList.filter(b => b.method !== 'six-jar').map(b => {
+                              const pct = b.amount > 0 ? Math.round((b.spent / b.amount) * 100) : 0;
+                              const over = pct > 100;
+                              return (
+                                <div key={b.id}>
+                                  <div className="flex justify-between text-[12px] mb-1">
+                                    <span style={{ color: 'var(--codex-fg-subtle)' }}>{b.name}</span>
+                                    <span style={{ color: over ? '#ef4444' : 'var(--codex-fg-muted)', fontFamily: 'var(--font-mono)' }}>{formatCents(b.spent)} / {formatCents(b.amount)}</span>
+                                  </div>
+                                  <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: '#1a1a1a' }}>
+                                    <div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', backgroundColor: over ? '#ef4444' : pct > 80 ? '#eab308' : '#10a37f', borderRadius: '4px', transition: 'width 0.3s ease' }} />
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                      }
+                    </div>
+
+                    {/* ── Top Expenses ── */}
+                    <div className="p-5 rounded-lg border" style={cardStyle}>
+                      <h3 className="text-[15px] mb-4" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Top Expenses</h3>
+                      {topExpenses.length === 0
+                        ? <div className="text-[13px]" style={{ color: '#888' }}>No expenses this period.</div>
+                        : <div className="space-y-2.5">
+                            {topExpenses.map((tx, i) => (
+                              <div key={tx.id} className="flex items-center gap-3">
+                                <span className="w-5 text-[11px] text-center" style={{ color: '#666' }}>{i + 1}</span>
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-[13px] truncate" style={{ color: 'var(--codex-fg)' }}>{tx.counterparty ?? tx.category ?? 'Unknown'}</div>
+                                  <div className="text-[11px]" style={{ color: '#666' }}>{tx.category ?? ''} · {shortDate(tx.txDate)} · {acctMap.get(tx.accountId) ?? ''}</div>
+                                </div>
+                                <span className="text-[13px]" style={{ color: '#ef4444', fontFamily: 'var(--font-mono)' }}>{formatCents(Math.abs(tx.amount))}</span>
+                              </div>
+                            ))}
+                          </div>
+                      }
+                    </div>
+                  </div>
+
+                  {/* ── Account Balances & Net Worth ── */}
+                  <div className="p-5 rounded-lg border" style={cardStyle}>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-[15px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Account Summary</h3>
+                      <div className="text-[13px]" style={{ color: 'var(--codex-fg-muted)' }}>
+                        Net Worth: <span style={{ color: netWorth >= 0 ? '#10a37f' : '#ef4444', fontFamily: 'var(--font-mono)', fontWeight: 500 }}>{formatCents(netWorth)}</span>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+                      {acctList.filter(a => !a.isArchived).map(a => (
+                        <div key={a.id} className="flex items-center justify-between py-1.5 border-b" style={{ borderColor: '#1a1a1a' }}>
+                          <div>
+                            <div className="text-[13px]" style={{ color: 'var(--codex-fg)' }}>{a.name}</div>
+                            <div className="text-[11px]" style={{ color: '#666' }}>{a.accountType}{a.institution ? ` · ${a.institution}` : ''}</div>
+                          </div>
+                          <span className="text-[13px]" style={{ color: a.balance >= 0 ? 'var(--codex-fg)' : '#ef4444', fontFamily: 'var(--font-mono)' }}>{formatCents(a.balance)}</span>
+                        </div>
+                      ))}
+                      {liabList.length > 0 && (
+                        <>
+                          <div className="col-span-2 mt-2 mb-1 text-[11px] uppercase tracking-wider" style={{ color: '#666' }}>Liabilities</div>
+                          {liabList.map(l => (
+                            <div key={l.id} className="flex items-center justify-between py-1.5 border-b" style={{ borderColor: '#1a1a1a' }}>
+                              <div>
+                                <div className="text-[13px]" style={{ color: 'var(--codex-fg)' }}>{l.name}</div>
+                                <div className="text-[11px]" style={{ color: '#666' }}>{l.liabilityType}{l.interestRate ? ` · ${l.interestRate}% APR` : ''}</div>
+                              </div>
+                              <span className="text-[13px]" style={{ color: '#ef4444', fontFamily: 'var(--font-mono)' }}>-{formatCents(l.remaining)}</span>
+                            </div>
+                          ))}
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
+
+      {/* ════ Slide-over drawer forms ════ */}
+      <SlideOverDrawer title={drawerTitle} open={drawer.kind !== 'none'} onClose={closeDrawer} onSave={drawerSave} saving={mutating} error={mutationError}>
+        {/* Transaction form */}
+        {(drawer.kind === 'create-transaction' || drawer.kind === 'edit-transaction') && (
+          <>
+            <Field label="Account">
+              <select value={txForm.accountId} onChange={(e) => setTxForm({ ...txForm, accountId: e.target.value })} style={selectCss}>
+                <option value="">Select account...</option>
+                {(accounts.data ?? []).map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
+            </Field>
+            <Field label="Type">
+              <select value={txForm.txType} onChange={(e) => setTxForm({ ...txForm, txType: e.target.value })} style={selectCss}>
+                <option value="expense">Expense</option>
+                <option value="income">Income</option>
+                <option value="transfer">Transfer</option>
+              </select>
+            </Field>
+            <Field label="Amount ($)">
+              <input type="number" step="0.01" value={txForm.amount} onChange={(e) => setTxForm({ ...txForm, amount: e.target.value })} placeholder="0.00" style={inputCss} />
+            </Field>
+            <Field label="Date">
+              <input type="date" value={txForm.txDate} onChange={(e) => setTxForm({ ...txForm, txDate: e.target.value })} style={inputCss} />
+            </Field>
+            <Field label="Category">
+              <input type="text" value={txForm.category} onChange={(e) => setTxForm({ ...txForm, category: e.target.value })} placeholder="e.g. Groceries, Dining, Salary" style={inputCss} list="categories" />
+              <datalist id="categories">{txCategories.map(c => <option key={c} value={c} />)}</datalist>
+            </Field>
+            <Field label="Counterparty">
+              <input type="text" value={txForm.counterparty} onChange={(e) => setTxForm({ ...txForm, counterparty: e.target.value })} placeholder="e.g. Whole Foods, Acme Corp" style={inputCss} />
+            </Field>
+            <Field label="Notes">
+              <textarea value={txForm.notes} onChange={(e) => setTxForm({ ...txForm, notes: e.target.value })} rows={2} style={{ ...inputCss, resize: 'vertical' }} />
+            </Field>
+            <label className="flex items-center gap-2 text-[13px]" style={{ color: 'var(--codex-fg-subtle)' }}>
+              <input type="checkbox" checked={txForm.isRecurring} onChange={(e) => setTxForm({ ...txForm, isRecurring: e.target.checked })} style={{ accentColor: 'var(--codex-accent)' }} />
+              Recurring transaction
+            </label>
+          </>
+        )}
+
+        {/* Budget form */}
+        {(drawer.kind === 'create-budget' || drawer.kind === 'edit-budget') && (
+          <>
+            <Field label="Name">
+              <input type="text" value={budgetForm.name} onChange={(e) => setBudgetForm({ ...budgetForm, name: e.target.value })} placeholder="e.g. Groceries" style={inputCss} />
+            </Field>
+            <Field label="Amount ($)">
+              <input type="number" step="0.01" value={budgetForm.amount} onChange={(e) => setBudgetForm({ ...budgetForm, amount: e.target.value })} placeholder="0.00" style={inputCss} />
+            </Field>
+            <Field label="Period">
+              <select value={budgetForm.period} onChange={(e) => setBudgetForm({ ...budgetForm, period: e.target.value })} style={selectCss}>
+                <option value="monthly">Monthly</option>
+                <option value="weekly">Weekly</option>
+                <option value="yearly">Yearly</option>
+              </select>
+            </Field>
+            {drawer.kind === 'create-budget' && (
+              <>
+                <Field label="Method">
+                  <select value={budgetForm.method} onChange={(e) => setBudgetForm({ ...budgetForm, method: e.target.value })} style={selectCss}>
+                    <option value="envelope">Envelope</option>
+                    <option value="six-jar">Six-Jar</option>
+                  </select>
+                </Field>
+                {budgetForm.method === 'six-jar' && (
+                  <Field label="Jar Type">
+                    <select value={budgetForm.jarType} onChange={(e) => setBudgetForm({ ...budgetForm, jarType: e.target.value })} style={selectCss}>
+                      <option value="">Select jar...</option>
+                      <option value="essentials">Essentials (55%)</option>
+                      <option value="savings">Long-term Savings (10%)</option>
+                      <option value="investment">Financial Freedom (10%)</option>
+                      <option value="education">Education (10%)</option>
+                      <option value="entertainment">Play (10%)</option>
+                      <option value="charity">Give (5%)</option>
+                    </select>
+                  </Field>
+                )}
+              </>
+            )}
+            <Field label="Category">
+              <input type="text" value={budgetForm.category} onChange={(e) => setBudgetForm({ ...budgetForm, category: e.target.value })} placeholder="e.g. Food, Transport" style={inputCss} />
+            </Field>
+            {drawer.kind === 'create-budget' && (
+              <Field label="Start Date">
+                <input type="date" value={budgetForm.startDate} onChange={(e) => setBudgetForm({ ...budgetForm, startDate: e.target.value })} style={inputCss} />
+              </Field>
+            )}
+            <Field label="Alert Threshold (%)">
+              <input type="number" min="0" max="100" value={budgetForm.alertThreshold} onChange={(e) => setBudgetForm({ ...budgetForm, alertThreshold: e.target.value })} style={inputCss} />
+            </Field>
+          </>
+        )}
+
+        {/* Investment form */}
+        {(drawer.kind === 'create-investment' || drawer.kind === 'edit-investment') && (
+          <>
+            {drawer.kind === 'create-investment' && (
+              <>
+                <Field label="Name">
+                  <input type="text" value={investmentForm.name} onChange={(e) => setInvestmentForm({ ...investmentForm, name: e.target.value })} placeholder="e.g. Apple Inc." style={inputCss} />
+                </Field>
+                <Field label="Symbol">
+                  <input type="text" value={investmentForm.symbol} onChange={(e) => setInvestmentForm({ ...investmentForm, symbol: e.target.value.toUpperCase() })} placeholder="e.g. AAPL" style={inputCss} />
+                </Field>
+                <Field label="Asset Type">
+                  <select value={investmentForm.assetType} onChange={(e) => setInvestmentForm({ ...investmentForm, assetType: e.target.value })} style={selectCss}>
+                    <option value="stock">Stock</option>
+                    <option value="etf">ETF</option>
+                    <option value="crypto">Crypto</option>
+                    <option value="bond">Bond</option>
+                    <option value="real-estate">Real Estate</option>
+                    <option value="cash">Cash</option>
+                    <option value="other">Other</option>
+                  </select>
+                </Field>
+                <Field label="Portfolio">
+                  <input type="text" value={investmentForm.portfolioId} onChange={(e) => setInvestmentForm({ ...investmentForm, portfolioId: e.target.value })} style={inputCss} />
+                </Field>
+              </>
+            )}
+            <Field label="Quantity">
+              <input type="number" step="0.0001" value={investmentForm.quantity} onChange={(e) => setInvestmentForm({ ...investmentForm, quantity: e.target.value })} placeholder="0" style={inputCss} />
+            </Field>
+            <Field label="Cost Basis ($)">
+              <input type="number" step="0.01" value={investmentForm.costBasis} onChange={(e) => setInvestmentForm({ ...investmentForm, costBasis: e.target.value })} placeholder="0.00" style={inputCss} />
+            </Field>
+            <Field label="Current Price ($)">
+              <input type="number" step="0.01" value={investmentForm.currentPrice} onChange={(e) => setInvestmentForm({ ...investmentForm, currentPrice: e.target.value })} placeholder="0.00" style={inputCss} />
+            </Field>
+            <Field label="Current Value ($)">
+              <input type="number" step="0.01" value={investmentForm.currentValue} onChange={(e) => setInvestmentForm({ ...investmentForm, currentValue: e.target.value })} placeholder="Auto-calculated or manual" style={inputCss} />
+            </Field>
+            {drawer.kind === 'create-investment' && (
+              <Field label="Purchase Date">
+                <input type="date" value={investmentForm.purchaseDate} onChange={(e) => setInvestmentForm({ ...investmentForm, purchaseDate: e.target.value })} style={inputCss} />
+              </Field>
+            )}
+            <Field label="Notes">
+              <textarea value={investmentForm.notes} onChange={(e) => setInvestmentForm({ ...investmentForm, notes: e.target.value })} rows={2} style={{ ...inputCss, resize: 'vertical' }} />
+            </Field>
+          </>
+        )}
+
+        {/* Goal form */}
+        {(drawer.kind === 'create-goal' || drawer.kind === 'edit-goal') && (
+          <>
+            <Field label="Name">
+              <input type="text" value={goalForm.name} onChange={(e) => setGoalForm({ ...goalForm, name: e.target.value })} placeholder="e.g. Emergency Fund" style={inputCss} />
+            </Field>
+            {drawer.kind === 'create-goal' && (
+              <Field label="Goal Type">
+                <select value={goalForm.goalType} onChange={(e) => setGoalForm({ ...goalForm, goalType: e.target.value })} style={selectCss}>
+                  <option value="savings">Savings</option>
+                  <option value="investment">Investment</option>
+                  <option value="fire">FIRE</option>
+                  <option value="debt-payoff">Debt Payoff</option>
+                  <option value="emergency-fund">Emergency Fund</option>
+                  <option value="other">Other</option>
+                </select>
+              </Field>
+            )}
+            <Field label="Target Amount ($)">
+              <input type="number" step="0.01" value={goalForm.targetAmount} onChange={(e) => setGoalForm({ ...goalForm, targetAmount: e.target.value })} placeholder="0.00" style={inputCss} />
+            </Field>
+            <Field label="Current Amount ($)">
+              <input type="number" step="0.01" value={goalForm.currentAmount} onChange={(e) => setGoalForm({ ...goalForm, currentAmount: e.target.value })} placeholder="0.00" style={inputCss} />
+            </Field>
+            <Field label="Deadline">
+              <input type="date" value={goalForm.deadline} onChange={(e) => setGoalForm({ ...goalForm, deadline: e.target.value })} style={inputCss} />
+            </Field>
+            <Field label="Monthly Contribution ($)">
+              <input type="number" step="0.01" value={goalForm.monthlyContribution} onChange={(e) => setGoalForm({ ...goalForm, monthlyContribution: e.target.value })} placeholder="Optional" style={inputCss} />
+            </Field>
+            {(goalForm.goalType === 'fire' || goalForm.goalType === 'investment') && (
+              <Field label="Expected Return Rate (%)">
+                <input type="number" step="0.1" value={goalForm.expectedReturnRate} onChange={(e) => setGoalForm({ ...goalForm, expectedReturnRate: e.target.value })} placeholder="e.g. 7.0" style={inputCss} />
+              </Field>
+            )}
+            {goalForm.goalType === 'fire' && (
+              <Field label="Inflation Rate (%)">
+                <input type="number" step="0.1" value={goalForm.inflationRate} onChange={(e) => setGoalForm({ ...goalForm, inflationRate: e.target.value })} placeholder="e.g. 3.0" style={inputCss} />
+              </Field>
+            )}
+            <Field label="Notes">
+              <textarea value={goalForm.notes} onChange={(e) => setGoalForm({ ...goalForm, notes: e.target.value })} rows={2} style={{ ...inputCss, resize: 'vertical' }} />
+            </Field>
+          </>
+        )}
+
+        {/* Account form */}
+        {(drawer.kind === 'create-account' || drawer.kind === 'edit-account') && (
+          <>
+            <Field label="Name">
+              <input type="text" value={accountForm.name} onChange={(e) => setAccountForm({ ...accountForm, name: e.target.value })} placeholder="e.g. Chase Checking" style={inputCss} />
+            </Field>
+            {drawer.kind === 'create-account' && (
+              <Field label="Account Type">
+                <select value={accountForm.accountType} onChange={(e) => setAccountForm({ ...accountForm, accountType: e.target.value })} style={selectCss}>
+                  <option value="checking">Checking</option>
+                  <option value="savings">Savings</option>
+                  <option value="credit">Credit Card</option>
+                  <option value="investment">Investment</option>
+                  <option value="cash">Cash</option>
+                  <option value="other">Other</option>
+                </select>
+              </Field>
+            )}
+            <Field label="Balance ($)">
+              <input type="number" step="0.01" value={accountForm.balance} onChange={(e) => setAccountForm({ ...accountForm, balance: e.target.value })} placeholder="0.00" style={inputCss} />
+            </Field>
+            <Field label="Institution">
+              <input type="text" value={accountForm.institution} onChange={(e) => setAccountForm({ ...accountForm, institution: e.target.value })} placeholder="e.g. JPMorgan Chase" style={inputCss} />
+            </Field>
+            <Field label="Notes">
+              <textarea value={accountForm.notes} onChange={(e) => setAccountForm({ ...accountForm, notes: e.target.value })} rows={2} style={{ ...inputCss, resize: 'vertical' }} />
+            </Field>
+          </>
+        )}
+
+        {/* Liability form */}
+        {(drawer.kind === 'create-liability' || drawer.kind === 'edit-liability') && (
+          <>
+            {drawer.kind === 'create-liability' && (
+              <>
+                <Field label="Name">
+                  <input type="text" value={liabilityForm.name} onChange={(e) => setLiabilityForm({ ...liabilityForm, name: e.target.value })} placeholder="e.g. Student Loan" style={inputCss} />
+                </Field>
+                <Field label="Type">
+                  <select value={liabilityForm.liabilityType} onChange={(e) => setLiabilityForm({ ...liabilityForm, liabilityType: e.target.value })} style={selectCss}>
+                    <option value="loan">Loan</option>
+                    <option value="mortgage">Mortgage</option>
+                    <option value="credit_card">Credit Card</option>
+                    <option value="personal">Personal</option>
+                    <option value="other">Other</option>
+                  </select>
+                </Field>
+                <Field label="Principal ($)">
+                  <input type="number" step="0.01" value={liabilityForm.principal} onChange={(e) => setLiabilityForm({ ...liabilityForm, principal: e.target.value })} placeholder="0.00" style={inputCss} />
+                </Field>
+              </>
+            )}
+            <Field label="Remaining ($)">
+              <input type="number" step="0.01" value={liabilityForm.remaining} onChange={(e) => setLiabilityForm({ ...liabilityForm, remaining: e.target.value })} placeholder="0.00" style={inputCss} />
+            </Field>
+            <Field label="Interest Rate (%)">
+              <input type="number" step="0.01" value={liabilityForm.interestRate} onChange={(e) => setLiabilityForm({ ...liabilityForm, interestRate: e.target.value })} placeholder="e.g. 4.5" style={inputCss} />
+            </Field>
+            <Field label="Monthly Payment ($)">
+              <input type="number" step="0.01" value={liabilityForm.monthlyPayment} onChange={(e) => setLiabilityForm({ ...liabilityForm, monthlyPayment: e.target.value })} placeholder="0.00" style={inputCss} />
+            </Field>
+            {drawer.kind === 'create-liability' && (
+              <Field label="Due Date">
+                <input type="date" value={liabilityForm.dueDate} onChange={(e) => setLiabilityForm({ ...liabilityForm, dueDate: e.target.value })} style={inputCss} />
+              </Field>
+            )}
+            <Field label="Notes">
+              <textarea value={liabilityForm.notes} onChange={(e) => setLiabilityForm({ ...liabilityForm, notes: e.target.value })} rows={2} style={{ ...inputCss, resize: 'vertical' }} />
+            </Field>
+          </>
+        )}
+      </SlideOverDrawer>
     </div>
   );
 }
