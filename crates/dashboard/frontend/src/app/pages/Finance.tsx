@@ -1,6 +1,15 @@
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Plus, RefreshCw, AlertCircle, Target } from 'lucide-react';
 
+// TODO: Replace all mock data in this file with real API calls:
+//   - Dashboard summary: compute from /api/finance/accounts, /api/finance/transactions, /api/finance/budgets/usage, /api/finance/investments, /api/finance/goals
+//   - Transactions tab: useApi<FinanceTransaction[]>('/api/finance/transactions')
+//   - Budgets tab: useApi<BudgetUsage[]>('/api/finance/budgets/usage')
+//   - Investments tab: useApi<FinanceInvestment[]>('/api/finance/investments')
+//   - Goals tab: useApi<FinanceGoal[]>('/api/finance/goals')
+//   - Reports tab: aggregate from transaction data
+//   - All write operations: POST/PATCH/DELETE for each resource
+
 type Tab = 'dashboard' | 'transactions' | 'budgets' | 'investments' | 'goals' | 'reports';
 type BudgetMode = 'standard' | 'six-jar';
 type ReportPeriod = 'weekly' | 'monthly' | 'yearly';

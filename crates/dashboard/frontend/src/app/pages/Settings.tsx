@@ -1,5 +1,10 @@
+// TODO: Replace all mock data in this file with real API calls:
+//   - Read config: useApi<Record<string, unknown>>('/api/settings')
+//   - Read section: useApi('/api/settings/:section')
+//   - Write config: PATCH /api/settings (JSON merge-patch)
+//   - All toggle/input changes should debounce and PATCH the config
 import { useState } from 'react';
-import { 
+import {
   Sliders,
   Cpu,
   MessageCircle,

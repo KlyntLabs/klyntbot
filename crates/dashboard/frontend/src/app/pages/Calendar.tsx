@@ -1,17 +1,19 @@
-import { useState } from 'react';
-import { ChevronLeft, ChevronRight, RefreshCw, X } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { ChevronLeft, ChevronRight, RefreshCw, Loader2, X } from 'lucide-react';
 import { useNavigate } from 'react-router';
+import { useApi } from '../../lib/hooks/useApi';
+import type { CalendarEvent as ApiCalendarEvent, Task, CalendarSyncStatus, Project } from '../../lib/types';
 
 type ViewMode = 'day' | 'week' | 'month';
 
-type CalendarEvent = {
+type CalendarItem = {
   id: string;
   type: 'caldav' | 'task';
   title: string;
   description?: string;
-  startTime: string;
+  startTime: string; // HH:MM
   endTime?: string;
-  date: string;
+  date: string; // YYYY-MM-DD
   source?: string;
   status?: string;
   priority?: number;
@@ -19,47 +21,94 @@ type CalendarEvent = {
   tags?: string[];
   project?: string;
   projectColor?: string;
-  subtaskCount?: number;
-  dependencyCount?: number;
-  timeTracked?: number;
-  attachments?: number;
-  provider?: 'apple' | 'google';
-  etag?: string;
-  blocked_by?: string;
+  provider?: string;
 };
 
 export default function Calendar() {
   const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<ViewMode>('month');
-  const [selectedDate, setSelectedDate] = useState('2026-02-24');
-  const [selectedItem, setSelectedItem] = useState<CalendarEvent | null>(null);
-  const [currentMonth, setCurrentMonth] = useState(2);
-  const [currentYear, setCurrentYear] = useState(2026);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedItem, setSelectedItem] = useState<CalendarItem | null>(null);
+  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
+  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
 
-  const events: CalendarEvent[] = [
-    { id: '1', type: 'caldav', title: 'Team Standup', startTime: '09:00', endTime: '09:30', date: '2026-02-24', source: 'CalDAV', status: 'CONFIRMED', provider: 'google' },
-    { id: '2', type: 'task', title: 'Fix auth token refresh', startTime: '10:00', date: '2026-02-24', priority: 1, status: 'Doing', estimatedMinutes: 60, tags: ['backend', 'security'], project: 'Backend', projectColor: '#4a9eff', timeTracked: 45, blocked_by: 'Review PR #142' },
-    { id: '3', type: 'caldav', title: 'Team Standup', startTime: '09:00', endTime: '09:30', date: '2026-02-25', source: 'CalDAV', status: 'CONFIRMED', provider: 'google' },
-    { id: '4', type: 'task', title: 'Update API docs', startTime: '14:00', date: '2026-02-25', priority: 3, status: 'Todo', estimatedMinutes: 30, tags: ['docs'], project: 'Documentation', projectColor: '#d4a017' },
-    { id: '5', type: 'caldav', title: 'Team Standup', startTime: '09:00', endTime: '09:30', date: '2026-02-26', source: 'CalDAV', status: 'CONFIRMED', provider: 'google' },
-    { id: '6', type: 'task', title: 'Refactor storage layer', startTime: '11:00', date: '2026-02-26', priority: 2, status: 'Todo', estimatedMinutes: 120, tags: ['backend', 'tech-debt'], project: 'Backend', projectColor: '#4a9eff' },
-    { id: '7', type: 'caldav', title: 'Team Standup', startTime: '09:00', endTime: '09:30', date: '2026-02-27', source: 'CalDAV', status: 'CONFIRMED', provider: 'google' },
-    { id: '8', type: 'caldav', title: 'Sprint Review', startTime: '14:00', endTime: '15:00', date: '2026-02-27', source: 'CalDAV', status: 'CONFIRMED', provider: 'google' },
-    { id: '9', type: 'task', title: 'Review PR #142', startTime: '16:00', date: '2026-02-22', priority: 2, status: 'Todo', estimatedMinutes: 15, tags: ['review'] },
-  ];
+  const { data: calendarEvents } = useApi<ApiCalendarEvent[]>('/api/calendar/events');
+  const { data: tasks } = useApi<Task[]>('/api/tasks');
+  const { data: syncStatus } = useApi<CalendarSyncStatus[]>('/api/calendar/sync-status');
+  const { data: projects } = useApi<Project[]>('/api/projects');
 
-  const getItemColor = (item: CalendarEvent) => {
+  const items = useMemo(() => {
+    const result: CalendarItem[] = [];
+    // Map CalDAV events
+    if (calendarEvents) {
+      for (const e of calendarEvents) {
+        const startDate = new Date(e.startAt);
+        const endDate = new Date(e.endAt);
+        result.push({
+          id: e.uid,
+          type: 'caldav',
+          title: e.summary,
+          description: e.description ?? undefined,
+          startTime: startDate.toTimeString().slice(0, 5),
+          endTime: endDate.toTimeString().slice(0, 5),
+          date: e.startAt.split('T')[0],
+          source: e.source,
+          status: e.status ?? undefined,
+          provider: e.providerId,
+        });
+      }
+    }
+    // Map tasks with due dates
+    if (tasks) {
+      const projectMap = new Map((projects ?? []).map(p => [p.id, p]));
+      for (const t of tasks) {
+        if (!t.dueDate) continue;
+        const proj = t.projectId ? projectMap.get(t.projectId) : undefined;
+        result.push({
+          id: t.id,
+          type: 'task',
+          title: t.title,
+          description: t.description ?? undefined,
+          startTime: '09:00', // tasks don't have specific times, default to morning
+          date: t.dueDate.split('T')[0],
+          status: t.status,
+          priority: t.priority ?? undefined,
+          estimatedMinutes: t.estimatedMinutes ?? undefined,
+          tags: t.tags,
+          project: proj?.name,
+          projectColor: proj?.color,
+        });
+      }
+    }
+    return result;
+  }, [calendarEvents, tasks, projects]);
+
+  const getLastSyncLabel = (): string => {
+    if (!syncStatus || syncStatus.length === 0) return 'Never synced';
+    const latest = syncStatus
+      .filter(s => s.lastSyncAt !== null)
+      .sort((a, b) => new Date(b.lastSyncAt!).getTime() - new Date(a.lastSyncAt!).getTime())[0];
+    if (!latest?.lastSyncAt) return 'Never synced';
+    const diffMs = Date.now() - new Date(latest.lastSyncAt).getTime();
+    const diffMin = Math.round(diffMs / 60000);
+    if (diffMin < 1) return 'Last synced: just now';
+    if (diffMin < 60) return `Last synced: ${diffMin} min ago`;
+    const diffHr = Math.round(diffMin / 60);
+    return `Last synced: ${diffHr}h ago`;
+  };
+
+  const getItemColor = (item: CalendarItem) => {
     if (item.type === 'caldav') return '#10a37f';
     if (item.date < selectedDate) return '#e55050';
     return '#d4a017';
   };
 
   const getItemsForDate = (date: string) => {
-    return events.filter(e => e.date === date).sort((a, b) => a.startTime.localeCompare(b.startTime));
+    return items.filter(e => e.date === date).sort((a, b) => a.startTime.localeCompare(b.startTime));
   };
 
   const getTodayItems = () => {
-    return events.filter(e => e.date === selectedDate).sort((a, b) => a.startTime.localeCompare(b.startTime));
+    return items.filter(e => e.date === selectedDate).sort((a, b) => a.startTime.localeCompare(b.startTime));
   };
 
   const formatDate = (dateStr: string) => {
@@ -416,7 +465,13 @@ export default function Calendar() {
             </div>
 
             <button
-              onClick={() => setSelectedDate('2026-02-24')}
+              onClick={() => {
+                const today = new Date().toISOString().split('T')[0];
+                setSelectedDate(today);
+                const now = new Date();
+                setCurrentMonth(now.getMonth() + 1);
+                setCurrentYear(now.getFullYear());
+              }}
               className="px-3 py-1.5 rounded text-[13px] border transition-colors"
               style={{
                 borderColor: 'var(--codex-border)',
@@ -452,8 +507,12 @@ export default function Calendar() {
           </div>
 
           <div className="flex items-center gap-2 text-[12px]" style={{ color: 'var(--codex-fg-subtle)' }}>
-            <RefreshCw className="w-3.5 h-3.5" strokeWidth={1.5} />
-            <span>Last synced: 2 min ago</span>
+            {!syncStatus ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" strokeWidth={1.5} />
+            ) : (
+              <RefreshCw className="w-3.5 h-3.5" strokeWidth={1.5} />
+            )}
+            <span>{getLastSyncLabel()}</span>
           </div>
         </div>
 
@@ -602,20 +661,6 @@ export default function Calendar() {
                       </div>
                     </div>
                   )}
-
-                  {selectedItem.timeTracked !== undefined && selectedItem.timeTracked > 0 && (
-                    <div className="flex items-center justify-between text-[13px]">
-                      <span style={{ color: 'var(--codex-fg-subtle)' }}>Time Tracked</span>
-                      <span style={{ color: '#10a37f' }}>{selectedItem.timeTracked}m</span>
-                    </div>
-                  )}
-
-                  {selectedItem.blocked_by && (
-                    <div className="flex items-center justify-between text-[13px]">
-                      <span style={{ color: 'var(--codex-fg-subtle)' }}>Blocked By</span>
-                      <span style={{ color: '#e55050' }}>{selectedItem.blocked_by}</span>
-                    </div>
-                  )}
                 </>
               ) : (
                 <>
@@ -657,6 +702,8 @@ export default function Calendar() {
               )}
             </div>
 
+            {/* TODO: add edit/delete actions for calendar events */}
+            {/* TODO: add "mark complete" action for task items */}
             {selectedItem.type === 'task' && (
               <button
                 onClick={() => navigate(`/tasks/${selectedItem.id}`)}

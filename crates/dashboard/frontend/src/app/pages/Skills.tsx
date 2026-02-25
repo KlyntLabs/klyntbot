@@ -1,24 +1,37 @@
 import { useState } from 'react';
-import { Plus, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, ChevronDown, ChevronRight, Loader2, AlertTriangle } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useApi } from '../../lib/hooks/useApi';
+import type { Skill } from '../../lib/types';
 
-type SkillSource = 'built-in' | 'workspace';
-type SkillStatus = 'available' | 'missing';
+// Client-side enrichment map for known skill names — adds UI-only display properties
+const SKILL_UI: Record<string, { icon: string; color: string; triggers?: string[]; requirements?: string; alwaysLoaded?: boolean }> = {
+  'todo': { icon: '\u2713', color: '#10a37f', triggers: ['todo', 'task', 'focus'], requirements: 'None', alwaysLoaded: true },
+  'daily-planning': { icon: '\u2600\uFE0F', color: '#fbbf24' },
+  'finance': { icon: '$', color: '#10b981' },
+  'cron': { icon: '\u23F0', color: '#3b82f6' },
+  'skill-creator': { icon: '\u26A1', color: '#8b5cf6' },
+  'summarize': { icon: '\uD83D\uDCC4', color: '#6b7280' },
+  'todo-party': { icon: '\uD83C\uDF89', color: '#ec4899' },
+  'weather': { icon: '\uD83C\uDF24\uFE0F', color: '#06b6d4' },
+  'todo-yolo': { icon: '\uD83D\uDE80', color: '#f97316' },
+};
+const DEFAULT_UI = { icon: '\uD83D\uDD27', color: '#6b7280' };
 
-type Skill = {
-  id: string;
+type SkillSource = 'Built-in' | 'Workspace';
+
+type DisplaySkill = {
   name: string;
   description: string;
   version: string;
+  available: boolean;
   source: SkillSource;
-  status: SkillStatus;
-  statusMessage?: string;
-  enabled: boolean;
   icon: string;
   color: string;
   triggers?: string[];
   requirements?: string;
   alwaysLoaded?: boolean;
+  enabled: boolean;
 };
 
 export default function Skills() {
@@ -27,140 +40,79 @@ export default function Skills() {
   const [tokenOpen, setTokenOpen] = useState(true);
   const [skillStatsOpen, setSkillStatsOpen] = useState(true);
 
-  const [skills, setSkills] = useState<Skill[]>([
-    {
-      id: 'todo',
-      name: 'todo',
-      description: 'Task creation with ask-first workflow and enrichment',
-      version: 'v1.0',
-      source: 'built-in',
-      status: 'available',
-      enabled: true,
-      icon: '\u2713',
-      color: '#10a37f',
-      triggers: ['todo', 'task', 'focus'],
-      requirements: 'None',
-      alwaysLoaded: true
-    },
-    {
-      id: 'daily-planning',
-      name: 'daily-planning',
-      description: 'Morning planning and focus prioritization',
-      version: 'v1.0',
-      source: 'built-in',
-      status: 'available',
-      enabled: true,
-      icon: '\u2600\uFE0F',
-      color: '#fbbf24'
-    },
-    {
-      id: 'finance',
-      name: 'finance',
-      description: 'Personal finance tracking, budgeting, investments',
-      version: 'v1.0',
-      source: 'built-in',
-      status: 'available',
-      enabled: true,
-      icon: '$',
-      color: '#10b981'
-    },
-    {
-      id: 'cron',
-      name: 'cron',
-      description: 'Schedule reminders and recurring tasks',
-      version: 'v1.0',
-      source: 'built-in',
-      status: 'available',
-      enabled: true,
-      icon: '\u23F0',
-      color: '#3b82f6'
-    },
-    {
-      id: 'skill-creator',
-      name: 'skill-creator',
-      description: 'Create and manage custom skills',
-      version: 'v1.0',
-      source: 'built-in',
-      status: 'available',
-      enabled: true,
-      icon: '\u26A1',
-      color: '#8b5cf6'
-    },
-    {
-      id: 'summarize',
-      name: 'summarize',
-      description: 'Summarize URLs, files, and videos',
-      version: 'v1.0',
-      source: 'built-in',
-      status: 'missing',
-      statusMessage: 'Missing: summarize binary',
-      enabled: false,
-      icon: '\uD83D\uDCC4',
-      color: '#6b7280'
-    },
-    {
-      id: 'todo-party',
-      name: 'todo-party',
-      description: 'Interactive brainstorming for task creation',
-      version: 'v1.0',
-      source: 'built-in',
-      status: 'available',
-      enabled: true,
-      icon: '\uD83C\uDF89',
-      color: '#ec4899'
-    },
-    {
-      id: 'weather',
-      name: 'weather',
-      description: 'Get current weather and forecasts',
-      version: 'v1.0',
-      source: 'built-in',
-      status: 'missing',
-      statusMessage: 'Missing: curl',
-      enabled: false,
-      icon: '\uD83C\uDF24\uFE0F',
-      color: '#06b6d4'
-    }
-  ]);
+  const { data: skills, loading, error } = useApi<Skill[]>('/api/skills');
+  const skillList = skills ?? [];
 
-  const [workspaceSkills, setWorkspaceSkills] = useState<Skill[]>([
-    {
-      id: 'weekly-report',
-      name: 'weekly-report',
-      description: 'Weekly summary generation',
-      version: 'v1.0',
-      source: 'workspace',
-      status: 'available',
-      enabled: true,
-      icon: '\uD83D\uDCCA',
-      color: '#f97316'
-    }
-  ]);
+  // In-memory toggle tracking — no backend persistence yet
+  // TODO: PATCH /api/skills/:name to persist enabled/disabled state
+  const [disabledSkills, setDisabledSkills] = useState<Set<string>>(new Set());
 
-  const toggleSkill = (skillId: string, isWorkspace: boolean = false) => {
-    if (isWorkspace) {
-      setWorkspaceSkills(workspaceSkills.map(s =>
-        s.id === skillId ? { ...s, enabled: !s.enabled } : s
-      ));
-    } else {
-      setSkills(skills.map(s =>
-        s.id === skillId ? { ...s, enabled: !s.enabled } : s
-      ));
-    }
+  const toggleSkill = (skillName: string) => {
+    setDisabledSkills(prev => {
+      const next = new Set(prev);
+      if (next.has(skillName)) {
+        next.delete(skillName);
+      } else {
+        next.add(skillName);
+      }
+      return next;
+    });
   };
 
-  const allSkills = [...skills, ...workspaceSkills];
-  const totalSkills = allSkills.length;
-  const activeSkills = allSkills.filter(s => s.enabled).length;
-  const unavailableSkills = allSkills.filter(s => s.status === 'missing').length;
+  // Merge API data with client-side UI enrichment
+  const enrichSkill = (skill: Skill): DisplaySkill => {
+    const ui = SKILL_UI[skill.name] ?? DEFAULT_UI;
+    const source: SkillSource = skill.name in SKILL_UI ? 'Built-in' : 'Workspace';
+    return {
+      name: skill.name,
+      description: skill.description,
+      version: skill.version,
+      available: skill.available,
+      source,
+      icon: ui.icon,
+      color: ui.color,
+      triggers: ui.triggers,
+      requirements: ui.requirements,
+      alwaysLoaded: ui.alwaysLoaded,
+      enabled: skill.available && !disabledSkills.has(skill.name),
+    };
+  };
 
-  const renderSkillCard = (skill: Skill, isWorkspace: boolean = false) => {
-    const isExpanded = expandedSkill === skill.id;
-    const canToggle = skill.status === 'available';
+  const displaySkills = skillList.map(enrichSkill);
+  const builtInSkills = displaySkills.filter(s => s.source === 'Built-in');
+  const workspaceSkills = displaySkills.filter(s => s.source === 'Workspace');
+
+  // Sidebar stats computed from fetched data
+  const totalSkills = displaySkills.length;
+  const activeSkills = displaySkills.filter(s => s.enabled).length;
+  const unavailableSkills = displaySkills.filter(s => !s.available).length;
+
+  // Loading state
+  if (loading && !skills) {
+    return (
+      <div className="flex-1 flex items-center justify-center" style={{ backgroundColor: 'var(--codex-bg)' }}>
+        <Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--codex-fg-subtle)' }} />
+      </div>
+    );
+  }
+
+  // Error state
+  if (error && !skills) {
+    return (
+      <div className="flex-1 flex items-center justify-center gap-2" style={{ backgroundColor: 'var(--codex-bg)', color: 'var(--codex-fg-subtle)' }}>
+        <AlertTriangle className="w-4 h-4" strokeWidth={1.5} />
+        <span className="text-[13px]">Failed to load skills</span>
+      </div>
+    );
+  }
+
+  const renderSkillCard = (skill: DisplaySkill) => {
+    const isExpanded = expandedSkill === skill.name;
+    const canToggle = skill.available;
 
     return (
       <motion.div
-        key={skill.id}
+        key={skill.name}
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         className="rounded-lg border"
@@ -197,11 +149,11 @@ export default function Skills() {
                       {skill.version}
                     </span>
                     <span className="px-2 py-0.5 rounded text-[10px]" style={{
-                      backgroundColor: skill.source === 'workspace' ? 'transparent' : 'var(--codex-bg)',
-                      color: skill.source === 'workspace' ? 'var(--codex-accent)' : 'var(--codex-fg-subtle)',
-                      border: skill.source === 'workspace' ? '1px solid var(--codex-accent)' : 'none'
+                      backgroundColor: skill.source === 'Workspace' ? 'transparent' : 'var(--codex-bg)',
+                      color: skill.source === 'Workspace' ? 'var(--codex-accent)' : 'var(--codex-fg-subtle)',
+                      border: skill.source === 'Workspace' ? '1px solid var(--codex-accent)' : 'none'
                     }}>
-                      {skill.source === 'built-in' ? 'Built-in' : 'Workspace'}
+                      {skill.source}
                     </span>
                   </div>
                   <p className="text-[13px] mb-2" style={{ color: '#888' }}>
@@ -210,19 +162,19 @@ export default function Skills() {
                   <div className="flex items-center gap-2 text-[12px]">
                     <div className="flex items-center gap-1.5">
                       <div className="w-1.5 h-1.5 rounded-full" style={{
-                        backgroundColor: skill.status === 'available' ? '#10b981' : '#ef4444'
+                        backgroundColor: skill.available ? '#10b981' : '#ef4444'
                       }} />
                       <span style={{
-                        color: skill.status === 'available' ? '#10b981' : '#ef4444'
+                        color: skill.available ? '#10b981' : '#ef4444'
                       }}>
-                        {skill.status === 'available' ? 'Available' : skill.statusMessage}
+                        {skill.available ? 'Available' : 'Unavailable'}
                       </span>
                     </div>
                   </div>
                 </div>
 
                 <button
-                  onClick={() => canToggle && toggleSkill(skill.id, isWorkspace)}
+                  onClick={() => canToggle && toggleSkill(skill.name)}
                   disabled={!canToggle}
                   className="w-11 h-6 rounded-full relative transition-all flex-shrink-0"
                   style={{
@@ -237,9 +189,9 @@ export default function Skills() {
                 </button>
               </div>
 
-              {skill.status === 'available' && (
+              {skill.available && (
                 <button
-                  onClick={() => setExpandedSkill(isExpanded ? null : skill.id)}
+                  onClick={() => setExpandedSkill(isExpanded ? null : skill.name)}
                   className="flex items-center gap-1 text-[12px] mt-2 transition-colors"
                   style={{ color: 'var(--codex-fg-subtle)' }}
                   onMouseEnter={(e) => e.currentTarget.style.color = 'var(--codex-fg-muted)'}
@@ -365,6 +317,7 @@ export default function Skills() {
               </p>
             </div>
 
+            {/* TODO: Implement skill creation flow */}
             <button
               className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors text-[14px]"
               style={{
@@ -382,19 +335,28 @@ export default function Skills() {
 
         <div className="flex-1 overflow-y-auto px-8 py-6" style={{ backgroundColor: 'var(--codex-bg)' }}>
           <div className="max-w-4xl space-y-3">
-            {skills.map((skill) => renderSkillCard(skill))}
-
-            <div className="pt-6">
-              <h2 className="text-[10px] uppercase tracking-wider mb-3" style={{
-                color: 'var(--codex-fg-subtle)',
-                fontWeight: 500
-              }}>
-                Workspace Skills
-              </h2>
-              <div className="space-y-3">
-                {workspaceSkills.map((skill) => renderSkillCard(skill, true))}
+            {/* Empty state */}
+            {skillList.length === 0 && !loading && (
+              <div className="text-center py-16 text-[13px]" style={{ color: 'var(--codex-fg-subtle)' }}>
+                No skills found. Install packs or create a custom skill.
               </div>
-            </div>
+            )}
+
+            {builtInSkills.map((skill) => renderSkillCard(skill))}
+
+            {workspaceSkills.length > 0 && (
+              <div className="pt-6">
+                <h2 className="text-[10px] uppercase tracking-wider mb-3" style={{
+                  color: 'var(--codex-fg-subtle)',
+                  fontWeight: 500
+                }}>
+                  Workspace Skills
+                </h2>
+                <div className="space-y-3">
+                  {workspaceSkills.map((skill) => renderSkillCard(skill))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -533,7 +495,7 @@ export default function Skills() {
                 <div className="space-y-1 text-[12px]">
                   <div className="flex justify-between">
                     <span style={{ color: 'var(--codex-fg-muted)' }}>Built-in</span>
-                    <span style={{ color: 'var(--codex-fg)' }}>{skills.length}</span>
+                    <span style={{ color: 'var(--codex-fg)' }}>{builtInSkills.length}</span>
                   </div>
                   <div className="flex justify-between">
                     <span style={{ color: 'var(--codex-fg-muted)' }}>Workspace</span>

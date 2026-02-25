@@ -1,7 +1,14 @@
+// TODO: Wire setup wizard to real API:
+//   - Step 1 (Provider): POST /api/settings to save provider + API key
+//   - Step 2 (Channel): POST /api/settings to save channel config
+//   - Step 3 (Calendar): POST /api/settings to save CalDAV config
+//   - Step 4 (Packs): POST /api/settings to save pack selection
+//   - Verify button: POST /api/settings/verify-provider
+//   - No read-only integration needed (wizard is write-only)
 import { useState } from 'react';
-import { 
-  Check, 
-  ChevronLeft, 
+import {
+  Check,
+  ChevronLeft,
   ChevronRight, 
   Eye, 
   EyeOff, 

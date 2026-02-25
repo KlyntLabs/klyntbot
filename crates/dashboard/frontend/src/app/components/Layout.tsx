@@ -11,6 +11,8 @@ import {
   ChevronDown,
   DollarSign,
 } from 'lucide-react';
+import { useApi } from '../../lib/hooks/useApi';
+import type { AgentStatus } from '../../lib/types';
 
 type NavItem = {
   id: string;
@@ -23,6 +25,7 @@ export function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [modelOpen, setModelOpen] = useState(false);
+  const { data: status } = useApi<AgentStatus>('/api/status');
 
   const navItems: NavItem[] = [
     { id: 'chat', icon: MessageSquare, label: 'Chat', path: '/' },
@@ -208,18 +211,18 @@ export function Layout() {
             className="flex items-center gap-1.5 hover:text-[var(--codex-fg-muted)] transition-colors"
             onClick={() => setModelOpen(!modelOpen)}
           >
-            <span>GPT-4</span>
+            <span>{status?.model ?? '—'}</span>
             <ChevronDown className="w-3 h-3" />
           </button>
           <span style={{ color: 'var(--codex-border)' }}>&middot;</span>
           <span>Full permissions</span>
           <span style={{ color: 'var(--codex-border)' }}>&middot;</span>
-          <span>Session #a8f32e</span>
+          <span>{status?.version ?? '—'}</span>
         </div>
         <div className="flex items-center gap-3">
-          <span style={{ color: 'var(--codex-accent)' }}>$0.05</span>
+          <span>{status?.storage.taskCount ?? 0} tasks</span>
           <span style={{ color: 'var(--codex-border)' }}>&middot;</span>
-          <span>12.4K tokens</span>
+          <span>{status?.storage.sessionCount ?? 0} sessions</span>
         </div>
       </div>
     </div>

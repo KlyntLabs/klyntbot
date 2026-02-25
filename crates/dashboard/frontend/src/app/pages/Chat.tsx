@@ -1,3 +1,10 @@
+// TODO: Wire Chat page to real WebSocket agent:
+//   - Replace mock messages with useAgent() hook (already in lib/hooks/useAgent.ts)
+//   - Send messages via AgentSocket.sendChatMessage()
+//   - Handle streaming events (contentChunk, done, error, toolStart/toolEnd)
+//   - Handle interaction.request events for ask-first workflows
+//   - Session management: useApi<SessionListItem[]>('/api/sessions') for sidebar
+//   - Session detail: useApi<SessionWithMessages>('/api/sessions/:key')
 import { useState } from 'react';
 import {
   Send,

@@ -33,6 +33,33 @@ export interface Task {
   nextInstanceDate: string | null;
 }
 
+export interface TaskSummary {
+  todo: number;
+  doing: number;
+  done: number;
+  total: number;
+}
+
+export interface TaskAttachment {
+  id: string;
+  todoId: string;
+  attachmentType: string;
+  value: string;
+  title: string | null;
+  tags: string[];
+  createdAt: string;
+}
+
+export interface TaskTimeEntry {
+  id: string;
+  todoId: string;
+  source: string;
+  startedAt: string;
+  endedAt: string | null;
+  durationSecs: number | null;
+  note: string | null;
+}
+
 // ── Project (ProjectRow) ──────────────────────────────────────────────────────
 
 export interface Project {
@@ -44,6 +71,14 @@ export interface Project {
   status: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ProjectWithStats {
+  project: Project;
+  taskCountTodo: number;
+  taskCountDoing: number;
+  taskCountDone: number;
+  taskCountTotal: number;
 }
 
 // ── Plan (PlanRow + PlanStepRow) ──────────────────────────────────────────────
@@ -79,6 +114,11 @@ export interface Plan {
   steps?: PlanStep[];
 }
 
+export interface PlanWithSteps {
+  plan: Plan;
+  steps: PlanStep[];
+}
+
 // ── Session ───────────────────────────────────────────────────────────────────
 
 export interface Session {
@@ -88,8 +128,22 @@ export interface Session {
   updatedAt: string;
 }
 
+export interface SessionListItem {
+  key: string;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+  messageCount: number;
+}
+
+/** @deprecated Use SessionListItem for list endpoint */
 export interface SessionWithCount extends Session {
   messageCount: number;
+}
+
+export interface SessionWithMessages {
+  session: Session;
+  messages: SessionMessage[];
 }
 
 export interface SessionMessage {
@@ -120,6 +174,27 @@ export interface CronJob {
   deleteAfterRun: boolean;
 }
 
+// ── Calendar ─────────────────────────────────────────────────────────────────
+
+export interface CalendarEvent {
+  uid: string;
+  providerId: string;
+  summary: string;
+  description: string | null;
+  startAt: string;
+  endAt: string;
+  source: string;
+  etag: string | null;
+  status: string | null;
+  cachedAt: string;
+}
+
+export interface CalendarSyncStatus {
+  providerId: string;
+  syncToken: string | null;
+  lastSyncAt: string | null;
+}
+
 // ── Finance ───────────────────────────────────────────────────────────────────
 
 export interface FinanceAccount {
@@ -130,6 +205,7 @@ export interface FinanceAccount {
   balance: number;
   institution: string | null;
   notes: string | null;
+  isArchived: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -145,6 +221,9 @@ export interface FinanceTransaction {
   counterparty: string | null;
   notes: string | null;
   txDate: string;
+  transferId: string | null;
+  isRecurring: boolean;
+  recurringRule: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -156,18 +235,64 @@ export interface FinanceBudget {
   currency: string;
   period: string;
   category: string | null;
-  spent: number;
+  method: string;
+  jarType: string | null;
+  startDate: string;
+  endDate: string | null;
+  isActive: boolean;
+  alertThreshold: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface BudgetUsage extends FinanceBudget {
+  spent: number;
 }
 
 export interface FinanceGoal {
   id: string;
   name: string;
+  goalType: string;
   targetAmount: number;
   currentAmount: number;
   currency: string;
-  targetDate: string | null;
+  status: string;
+  deadline: string | null;
+  monthlyContribution: number | null;
+  expectedReturnRate: number | null;
+  inflationRate: number | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FinanceInvestment {
+  id: string;
+  portfolioId: string;
+  assetType: string;
+  symbol: string | null;
+  name: string;
+  quantity: number;
+  costBasis: number;
+  currency: string;
+  currentPrice: number | null;
+  currentValue: number | null;
+  purchaseDate: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FinanceLiability {
+  id: string;
+  name: string;
+  liabilityType: string;
+  principal: number;
+  remaining: number;
+  currency: string;
+  interestRate: number | null;
+  monthlyPayment: number | null;
+  dueDate: string | null;
   notes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -178,20 +303,19 @@ export interface FinanceGoal {
 export interface Skill {
   name: string;
   description: string;
-  source: 'builtin' | 'workspace';
-  enabled: boolean;
+  version: string;
+  available: boolean;
 }
 
 // ── Status ────────────────────────────────────────────────────────────────────
 
 export interface AgentStatus {
-  model: string;
-  uptime: number;
   version: string;
-  storageStats: {
+  model: string;
+  uptimeSeconds: number;
+  storage: {
     taskCount: number;
     sessionCount: number;
-    planCount: number;
   };
 }
 

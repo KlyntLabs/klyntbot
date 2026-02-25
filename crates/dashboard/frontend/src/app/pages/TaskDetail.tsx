@@ -1,3 +1,13 @@
+// TODO: Replace all mock data in this file with real API calls:
+//   - Task detail: useApi<Task>('/api/tasks/:id')
+//   - Subtasks: useApi<Task[]>('/api/tasks/:id/subtasks')
+//   - Attachments: useApi<TaskAttachment[]>('/api/tasks/:id/attachments')
+//   - Time entries: useApi<TaskTimeEntry[]>('/api/tasks/:id/time-entries')
+//   - Project lookup: useApi<Project[]>('/api/projects')
+//   - Status/priority changes: PATCH /api/tasks/:id
+//   - Focus/unfocus: POST/DELETE /api/tasks/:id/focus
+//   - Timer: POST /api/tasks/:id/time-entries
+//   - Description edit: PATCH /api/tasks/:id { description }
 import { useNavigate, useParams } from 'react-router';
 import {
   ArrowLeft,

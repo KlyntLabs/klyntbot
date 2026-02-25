@@ -1,92 +1,72 @@
 import { useState } from 'react';
-import { Plus, Play, Pause, Trash2, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Plus, Play, Pause, Trash2, Clock, CheckCircle2, AlertCircle, Loader2, AlertTriangle } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useApi } from '../../lib/hooks/useApi';
+import type { CronJob } from '../../lib/types';
 
-type CronJob = {
-  id: string;
-  name: string;
-  schedule: string;
-  command: string;
-  status: 'active' | 'paused' | 'failed';
-  lastRun: string;
-  nextRun: string;
-  successRate: number;
-  description: string;
+type JobStatus = 'active' | 'paused' | 'failed';
+
+const getJobStatus = (job: CronJob): JobStatus => {
+  if (job.lastStatus?.toLowerCase() === 'failed') return 'failed';
+  if (!job.enabled) return 'paused';
+  return 'active';
+};
+
+const getCronExpr = (schedule: unknown): string => {
+  if (typeof schedule !== 'object' || !schedule) return String(schedule);
+  const s = schedule as Record<string, unknown>;
+  if (s.kind === 'cron' && s.expr) return String(s.expr);
+  if (s.kind === 'every' && s.everyMs) {
+    const ms = Number(s.everyMs);
+    if (ms >= 3_600_000) return `Every ${Math.round(ms / 3_600_000)}h`;
+    if (ms >= 60_000) return `Every ${Math.round(ms / 60_000)}m`;
+    return `Every ${Math.round(ms / 1_000)}s`;
+  }
+  // Legacy format: { Cron: "..." }
+  if ('Cron' in s) return String(s.Cron);
+  return JSON.stringify(schedule);
+};
+
+const getPayload = (payload: unknown): string => {
+  if (typeof payload === 'string') return payload;
+  if (typeof payload === 'object' && payload && 'message' in payload)
+    return String((payload as Record<string, unknown>).message);
+  return JSON.stringify(payload);
+};
+
+const formatRelativeTime = (ms: number | null): string => {
+  if (ms === null) return 'Never';
+  const now = Date.now();
+  const diff = ms - now;
+  const absDiff = Math.abs(diff);
+
+  if (absDiff < 60_000) {
+    const secs = Math.round(absDiff / 1_000);
+    return diff < 0 ? `${secs}s ago` : `In ${secs}s`;
+  }
+  if (absDiff < 3_600_000) {
+    const mins = Math.round(absDiff / 60_000);
+    return diff < 0 ? `${mins}m ago` : `In ${mins}m`;
+  }
+  if (absDiff < 86_400_000) {
+    const hours = Math.round(absDiff / 3_600_000);
+    return diff < 0 ? `${hours}h ago` : `In ${hours}h`;
+  }
+  const days = Math.round(absDiff / 86_400_000);
+  return diff < 0 ? `${days}d ago` : `In ${days}d`;
 };
 
 export default function Cron() {
   const [searchQuery, setSearchQuery] = useState('');
+  const { data: cronJobs, loading, error } = useApi<CronJob[]>('/api/cron');
 
-  const cronJobs: CronJob[] = [
-    {
-      id: '1',
-      name: 'Database Backup',
-      schedule: '0 2 * * *',
-      command: 'npm run backup:db',
-      status: 'active',
-      lastRun: '2h ago',
-      nextRun: 'In 22h',
-      successRate: 99.8,
-      description: 'Daily backup of production database at 2:00 AM'
-    },
-    {
-      id: '2',
-      name: 'Email Digest',
-      schedule: '0 9 * * MON-FRI',
-      command: 'npm run email:digest',
-      status: 'active',
-      lastRun: '1h ago',
-      nextRun: 'Tomorrow 9:00 AM',
-      successRate: 100,
-      description: 'Send weekly summary emails to users'
-    },
-    {
-      id: '3',
-      name: 'Cache Cleanup',
-      schedule: '*/30 * * * *',
-      command: 'npm run cache:clear',
-      status: 'active',
-      lastRun: '15m ago',
-      nextRun: 'In 15m',
-      successRate: 97.5,
-      description: 'Clean up expired cache entries every 30 minutes'
-    },
-    {
-      id: '4',
-      name: 'API Health Check',
-      schedule: '*/5 * * * *',
-      command: 'npm run health:check',
-      status: 'active',
-      lastRun: '2m ago',
-      nextRun: 'In 3m',
-      successRate: 99.9,
-      description: 'Monitor API endpoints every 5 minutes'
-    },
-    {
-      id: '5',
-      name: 'Log Rotation',
-      schedule: '0 0 * * SUN',
-      command: 'npm run logs:rotate',
-      status: 'paused',
-      lastRun: '3 days ago',
-      nextRun: 'Paused',
-      successRate: 95.2,
-      description: 'Rotate and archive log files weekly'
-    },
-    {
-      id: '6',
-      name: 'Report Generation',
-      schedule: '0 8 1 * *',
-      command: 'npm run reports:generate',
-      status: 'failed',
-      lastRun: '4 days ago (failed)',
-      nextRun: 'In 7 days',
-      successRate: 88.5,
-      description: 'Generate monthly analytics reports'
-    }
-  ];
+  const jobList = cronJobs ?? [];
 
-  const getStatusColor = (status: CronJob['status']) => {
+  const activeCount = jobList.filter(j => j.enabled && j.lastStatus?.toLowerCase() !== 'failed').length;
+  const pausedCount = jobList.filter(j => !j.enabled).length;
+  const failedCount = jobList.filter(j => j.lastStatus?.toLowerCase() === 'failed').length;
+
+  const getStatusColor = (status: JobStatus) => {
     switch (status) {
       case 'active': return 'var(--codex-accent)';
       case 'paused': return '#fbbf24';
@@ -94,7 +74,7 @@ export default function Cron() {
     }
   };
 
-  const getStatusIcon = (status: CronJob['status']) => {
+  const getStatusIcon = (status: JobStatus) => {
     switch (status) {
       case 'active': return CheckCircle2;
       case 'paused': return Pause;
@@ -112,6 +92,28 @@ export default function Cron() {
     return schedule;
   };
 
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center" style={{ backgroundColor: 'var(--codex-bg)' }}>
+        <div className="flex items-center gap-3" style={{ color: 'var(--codex-fg-muted)' }}>
+          <Loader2 className="w-5 h-5 animate-spin" strokeWidth={1.5} />
+          <span className="text-[14px]">Loading cron jobs...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex-1 flex items-center justify-center" style={{ backgroundColor: 'var(--codex-bg)' }}>
+        <div className="flex items-center gap-3" style={{ color: '#ef4444' }}>
+          <AlertTriangle className="w-5 h-5" strokeWidth={1.5} />
+          <span className="text-[14px]">Failed to load cron jobs: {error.message}</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 flex flex-col overflow-hidden" style={{ backgroundColor: 'var(--codex-bg)' }}>
       {/* Header */}
@@ -125,6 +127,7 @@ export default function Cron() {
               Cron Jobs
             </h1>
 
+            {/* TODO: Implement create cron job */}
             <button
               className="flex items-center gap-2 px-4 py-2 rounded-lg transition-colors text-[14px]"
               style={{
@@ -143,15 +146,15 @@ export default function Cron() {
           <div className="flex gap-6 text-[13px]">
             <div className="flex items-center gap-2">
               <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--codex-accent)' }} />
-              <span style={{ color: 'var(--codex-fg-muted)' }}>4 Active</span>
+              <span style={{ color: 'var(--codex-fg-muted)' }}>{activeCount} Active</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#fbbf24' }} />
-              <span style={{ color: 'var(--codex-fg-muted)' }}>1 Paused</span>
+              <span style={{ color: 'var(--codex-fg-muted)' }}>{pausedCount} Paused</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#ef4444' }} />
-              <span style={{ color: 'var(--codex-fg-muted)' }}>1 Failed</span>
+              <span style={{ color: 'var(--codex-fg-muted)' }}>{failedCount} Failed</span>
             </div>
           </div>
         </div>
@@ -160,8 +163,18 @@ export default function Cron() {
       {/* Jobs List */}
       <div className="flex-1 overflow-y-auto px-8 py-6">
         <div className="max-w-5xl mx-auto space-y-3">
-          {cronJobs.map((job, index) => {
-            const StatusIcon = getStatusIcon(job.status);
+          {jobList.length === 0 && (
+            <div className="text-center py-16" style={{ color: 'var(--codex-fg-subtle)' }}>
+              <Clock className="w-10 h-10 mx-auto mb-3" strokeWidth={1} />
+              <p className="text-[14px]">No cron jobs configured</p>
+              <p className="text-[12px] mt-1">Create a job to get started</p>
+            </div>
+          )}
+          {jobList.map((job, index) => {
+            const status = getJobStatus(job);
+            const StatusIcon = getStatusIcon(status);
+            const cronExpr = getCronExpr(job.schedule);
+            const command = getPayload(job.payload);
             return (
               <motion.div
                 key={job.id}
@@ -188,7 +201,7 @@ export default function Cron() {
                         <StatusIcon
                           className="w-5 h-5 mt-0.5"
                           strokeWidth={1.5}
-                          style={{ color: getStatusColor(job.status) }}
+                          style={{ color: getStatusColor(status) }}
                         />
                         <div>
                           <h3 className="text-[14px] mb-1" style={{
@@ -198,22 +211,22 @@ export default function Cron() {
                             {job.name}
                           </h3>
                           <p className="text-[12px]" style={{ color: 'var(--codex-fg-subtle)' }}>
-                            {job.description}
+                            {command}
                           </p>
                         </div>
                       </div>
 
                       <span className="px-2 py-0.5 rounded text-[10px] uppercase tracking-wide" style={{
-                        backgroundColor: job.status === 'active' ? 'var(--codex-accent-dim)' : 'var(--codex-bg)',
-                        color: getStatusColor(job.status),
+                        backgroundColor: status === 'active' ? 'var(--codex-accent-dim)' : 'var(--codex-bg)',
+                        color: getStatusColor(status),
                         border: '1px solid var(--codex-border)'
                       }}>
-                        {job.status}
+                        {status}
                       </span>
                     </div>
 
                     {/* Schedule */}
-                    <div className="grid grid-cols-3 gap-6 mb-4 px-10">
+                    <div className="grid grid-cols-2 gap-6 mb-4 px-10">
                       <div>
                         <div className="text-[10px] uppercase tracking-wider mb-1" style={{
                           color: 'var(--codex-fg-subtle)',
@@ -222,13 +235,13 @@ export default function Cron() {
                           Schedule
                         </div>
                         <div className="text-[13px]" style={{ color: 'var(--codex-fg-muted)' }}>
-                          {parseSchedule(job.schedule)}
+                          {parseSchedule(cronExpr)}
                         </div>
                         <div className="text-[11px] mt-0.5" style={{
                           color: 'var(--codex-fg-subtle)',
                           fontFamily: 'var(--font-mono)'
                         }}>
-                          {job.schedule}
+                          {cronExpr}
                         </div>
                       </div>
 
@@ -243,21 +256,7 @@ export default function Cron() {
                           color: 'var(--codex-fg-muted)',
                           fontFamily: 'var(--font-mono)'
                         }}>
-                          {job.command}
-                        </div>
-                      </div>
-
-                      <div>
-                        <div className="text-[10px] uppercase tracking-wider mb-1" style={{
-                          color: 'var(--codex-fg-subtle)',
-                          fontWeight: 500
-                        }}>
-                          Success Rate
-                        </div>
-                        <div className="text-[13px]" style={{
-                          color: job.successRate > 95 ? 'var(--codex-accent)' : job.successRate > 90 ? '#fbbf24' : '#ef4444'
-                        }}>
-                          {job.successRate}%
+                          {command}
                         </div>
                       </div>
                     </div>
@@ -267,17 +266,18 @@ export default function Cron() {
                       <div className="flex items-center gap-6 text-[12px]">
                         <div className="flex items-center gap-2" style={{ color: 'var(--codex-fg-subtle)' }}>
                           <Clock className="w-3.5 h-3.5" strokeWidth={1.5} />
-                          <span>Last run: {job.lastRun}</span>
+                          <span>Last run: {formatRelativeTime(job.lastRunAtMs)}</span>
                         </div>
                         <div className="flex items-center gap-2" style={{ color: 'var(--codex-fg-subtle)' }}>
                           <Clock className="w-3.5 h-3.5" strokeWidth={1.5} />
-                          <span>Next run: {job.nextRun}</span>
+                          <span>Next run: {!job.enabled ? 'Paused' : formatRelativeTime(job.nextRunAtMs)}</span>
                         </div>
                       </div>
 
                       {/* Actions */}
                       <div className="flex items-center gap-2">
-                        {job.status === 'active' ? (
+                        {status === 'active' ? (
+                          // TODO: Implement pause cron job
                           <button
                             className="p-1.5 rounded transition-colors"
                             style={{ color: 'var(--codex-fg-subtle)' }}
@@ -287,6 +287,7 @@ export default function Cron() {
                             <Pause className="w-4 h-4" strokeWidth={1.5} />
                           </button>
                         ) : (
+                          // TODO: Implement resume cron job
                           <button
                             className="p-1.5 rounded transition-colors"
                             style={{ color: 'var(--codex-accent)' }}
@@ -296,6 +297,7 @@ export default function Cron() {
                             <Play className="w-4 h-4" strokeWidth={1.5} />
                           </button>
                         )}
+                        {/* TODO: Implement delete cron job */}
                         <button
                           className="p-1.5 rounded transition-colors"
                           style={{ color: 'var(--codex-fg-subtle)' }}
