@@ -129,6 +129,20 @@ export default function Settings() {
   const tools = asRecord(config?.tools);
   const toolsWeb = asRecord(tools.web);
   const toolsBrowser = asRecord(tools.browser);
+  const todo = asRecord(config?.todo);
+  const enrichment = asRecord(todo.enrichment);
+  const search = asRecord(todo.search);
+  const todoNotifications = asRecord(todo.notifications);
+  const todoFocus = asRecord(todo.focus);
+  const todoDailyPlanning = asRecord(todo.dailyPlanning);
+  const projects = asRecord(config?.project);
+  const conversation = asRecord(config?.conversation);
+  const conversationEmbedding = asRecord(conversation.embedding);
+  const conversationSearch = asRecord(conversation.search);
+  const conversationSession = asRecord(conversation.session);
+  const conversationMemory = asRecord(conversation.memory);
+  const learning = asRecord(config?.learning);
+  const confidence = asRecord(config?.confidence);
 
   // ── Loading / error states ────────────────────────────────────────────────
   if (loading && !config) {
@@ -535,12 +549,312 @@ export default function Settings() {
 
             {/* ── TASKS ────────────────────────────────────────────── */}
             {activeSection === 'tasks' && (
-              <p className="text-[13px]" style={{ color: 'var(--codex-fg-subtle)' }}>Coming soon</p>
+              <>
+                <SettingSection title="General" defaultOpen>
+                  <SettingRow label="Creation Mode" description="How the agent handles task creation">
+                    <Select
+                      value={str(todo, 'creationMode', 'ask-first')}
+                      options={[
+                        { value: 'ask-first', label: 'Ask First' },
+                        { value: 'yolo', label: 'Yolo' },
+                        { value: 'party', label: 'Party' },
+                      ]}
+                      onChange={(v) => patchSection('todo', { creationMode: v })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Projects Enabled" last>
+                    <Toggle
+                      checked={bool(projects, 'enabled', true)}
+                      onChange={() => patchSection('project', { enabled: !bool(projects, 'enabled', true) })}
+                    />
+                  </SettingRow>
+                </SettingSection>
+
+                <SettingSection title="Enrichment" description="Auto-infer missing task fields">
+                  <SettingRow label="Enabled">
+                    <Toggle
+                      checked={bool(enrichment, 'enabled', true)}
+                      onChange={() => patchSection('todo', { enrichment: { enabled: !bool(enrichment, 'enabled', true) } })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Auto Apply Threshold" description="Confidence threshold for auto-applying suggestions (0-1)"
+                    tip="Only suggestions above this threshold are automatically applied. Lower = more auto-fills.">
+                    <NumberInput
+                      value={num(enrichment, 'autoApplyThreshold', 0.85)}
+                      onChange={(v) => debouncedPatch('todo', { enrichment: { autoApplyThreshold: v } })}
+                      step={0.05} min={0} max={1}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Use LLM" description="Use an LLM for richer enrichment instead of keyword matching" last>
+                    <Toggle
+                      checked={bool(enrichment, 'useLlm', false)}
+                      onChange={() => patchSection('todo', { enrichment: { useLlm: !bool(enrichment, 'useLlm', false) } })}
+                    />
+                  </SettingRow>
+                </SettingSection>
+
+                <SettingSection title="Search" description="Semantic search for task retrieval">
+                  <SettingRow label="Semantic Search">
+                    <Toggle
+                      checked={bool(search, 'enabled', true)}
+                      onChange={() => patchSection('todo', { search: { enabled: !bool(search, 'enabled', true) } })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Semantic Threshold" description="Minimum cosine similarity (0-1)"
+                    tip="Controls how similar results must be to your query. Lower for broader matches.">
+                    <NumberInput
+                      value={num(search, 'semanticThreshold', 0.5)}
+                      onChange={(v) => debouncedPatch('todo', { search: { semanticThreshold: v } })}
+                      step={0.1} min={0} max={1}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Embedding Model"
+                    tip="Local model for vector embeddings. Supports 50+ languages.">
+                    <TextInput
+                      value={str(search, 'embeddingModel', 'paraphrase-multilingual-MiniLM-L12-v2')}
+                      onChange={(v) => debouncedPatch('todo', { search: { embeddingModel: v } })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="RRF K" description="Reciprocal Rank Fusion parameter for hybrid search"
+                    tip="Controls blending of keyword and semantic results. K=60 balances both signals." last>
+                    <NumberInput
+                      value={num(search, 'rrfK', 60)}
+                      onChange={(v) => debouncedPatch('todo', { search: { rrfK: v } })}
+                    />
+                  </SettingRow>
+                </SettingSection>
+
+                <SettingSection title="Notifications">
+                  <SettingRow label="Targets" description="Where to send notifications">
+                    <TagInput
+                      tags={arr(todoNotifications, 'targets').map(String)}
+                      onChange={(tags) => patchSection('todo', { notifications: { targets: tags } })}
+                      placeholder="os_native"
+                    />
+                  </SettingRow>
+                  <SettingRow label="Focus Reminders">
+                    <Toggle
+                      checked={bool(todoNotifications, 'focusReminders', true)}
+                      onChange={() => patchSection('todo', { notifications: { focusReminders: !bool(todoNotifications, 'focusReminders', true) } })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Daily Digest">
+                    <Toggle
+                      checked={bool(todoNotifications, 'dailyDigest', true)}
+                      onChange={() => patchSection('todo', { notifications: { dailyDigest: !bool(todoNotifications, 'dailyDigest', true) } })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Digest Time" last>
+                    <TimeInput
+                      value={str(todoNotifications, 'dailyDigestTime', '09:00')}
+                      onChange={(v) => debouncedPatch('todo', { notifications: { dailyDigestTime: v } })}
+                    />
+                  </SettingRow>
+                </SettingSection>
+
+                <SettingSection title="Focus & Planning">
+                  <SettingRow label="Max Slots" description="Maximum tasks in the focus queue">
+                    <NumberInput
+                      value={num(todoFocus, 'maxSlots', 3)}
+                      onChange={(v) => debouncedPatch('todo', { focus: { maxSlots: v } })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Deadline Hours" description="Hours before deadline when reminders begin"
+                    tip="Set to 18 for morning-of reminders on tasks due that day.">
+                    <NumberInput
+                      value={num(todoFocus, 'deadlineHours', 18)}
+                      onChange={(v) => debouncedPatch('todo', { focus: { deadlineHours: v } })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Daily Planning">
+                    <Toggle
+                      checked={bool(todoDailyPlanning, 'enabled', true)}
+                      onChange={() => patchSection('todo', { dailyPlanning: { enabled: !bool(todoDailyPlanning, 'enabled', true) } })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Planning Time" last>
+                    <TimeInput
+                      value={str(todoDailyPlanning, 'planningTime', '08:00')}
+                      onChange={(v) => debouncedPatch('todo', { dailyPlanning: { planningTime: v } })}
+                    />
+                  </SettingRow>
+                </SettingSection>
+              </>
             )}
 
             {/* ── AI BEHAVIOR ──────────────────────────────────────── */}
             {activeSection === 'ai-behavior' && (
-              <p className="text-[13px]" style={{ color: 'var(--codex-fg-subtle)' }}>Coming soon</p>
+              <>
+                <SettingSection title="Conversation" defaultOpen>
+                  <SettingRow label="Embedding Enabled" description="Store conversation embeddings for semantic recall">
+                    <Toggle
+                      checked={bool(conversationEmbedding, 'enabled', true)}
+                      onChange={() => patchSection('conversation', { embedding: { enabled: !bool(conversationEmbedding, 'enabled', true) } })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Exclude Channels" description="Channels to skip for embeddings">
+                    <TagInput
+                      tags={arr(conversationEmbedding, 'excludeChannels').map(String)}
+                      onChange={(tags) => patchSection('conversation', { embedding: { excludeChannels: tags } })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Exclude Roles">
+                    <TagInput
+                      tags={arr(conversationEmbedding, 'excludeRoles').map(String)}
+                      onChange={(tags) => patchSection('conversation', { embedding: { excludeRoles: tags } })}
+                      placeholder="system"
+                    />
+                  </SettingRow>
+                  <SettingRow label="Search Enabled">
+                    <Toggle
+                      checked={bool(conversationSearch, 'enabled', true)}
+                      onChange={() => patchSection('conversation', { search: { enabled: !bool(conversationSearch, 'enabled', true) } })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Semantic Threshold"
+                    tip="Same concept as todo search threshold — controls similarity for conversation search.">
+                    <NumberInput
+                      value={num(conversationSearch, 'semanticThreshold', 0.5)}
+                      onChange={(v) => debouncedPatch('conversation', { search: { semanticThreshold: v } })}
+                      step={0.1} min={0} max={1}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Max Results" last>
+                    <NumberInput
+                      value={num(conversationSearch, 'maxResults', 20)}
+                      onChange={(v) => debouncedPatch('conversation', { search: { maxResults: v } })}
+                    />
+                  </SettingRow>
+                </SettingSection>
+
+                <SettingSection title="Session">
+                  <SettingRow label="History Limit" description="Max messages kept in session context">
+                    <NumberInput
+                      value={num(conversationSession, 'historyLimit', 50)}
+                      onChange={(v) => debouncedPatch('conversation', { session: { historyLimit: v } })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="TTL" suffix="days" description="Days before inactive sessions expire">
+                    <NumberInput
+                      value={num(conversationSession, 'ttlDays', 30)}
+                      onChange={(v) => debouncedPatch('conversation', { session: { ttlDays: v } })}
+                      suffix="days"
+                    />
+                  </SettingRow>
+                  <SettingRow label="Cleanup Interval" last>
+                    <NumberInput
+                      value={num(conversationSession, 'cleanupIntervalHours', 1)}
+                      onChange={(v) => debouncedPatch('conversation', { session: { cleanupIntervalHours: v } })}
+                      suffix="hrs"
+                    />
+                  </SettingRow>
+                </SettingSection>
+
+                <SettingSection title="Memory" description="Long-term memory with time-based decay">
+                  <SettingRow label="Decay Half-Life" description="Days for memory relevance to halve"
+                    tip="Memories lose relevance over time using exponential decay. 138 days means 50% relevance after ~4.5 months.">
+                    <NumberInput
+                      value={num(conversationMemory, 'decayHalfLifeDays', 138)}
+                      onChange={(v) => debouncedPatch('conversation', { memory: { decayHalfLifeDays: v } })}
+                      suffix="days"
+                    />
+                  </SettingRow>
+                  <SettingRow label="Max Age">
+                    <NumberInput
+                      value={num(conversationMemory, 'maxAgeDays', 90)}
+                      onChange={(v) => debouncedPatch('conversation', { memory: { maxAgeDays: v } })}
+                      suffix="days"
+                    />
+                  </SettingRow>
+                  <SettingRow label="Consolidation" description="Merge similar memories to reduce redundancy"
+                    tip="Periodically merges similar memories into a single summary. Reduces storage and prevents duplicate context.">
+                    <Toggle
+                      checked={bool(conversationMemory, 'consolidationEnabled', false)}
+                      onChange={() => patchSection('conversation', { memory: { consolidationEnabled: !bool(conversationMemory, 'consolidationEnabled', false) } })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Maintenance Interval" last>
+                    <NumberInput
+                      value={num(conversationMemory, 'maintenanceIntervalHours', 24)}
+                      onChange={(v) => debouncedPatch('conversation', { memory: { maintenanceIntervalHours: v } })}
+                      suffix="hrs"
+                    />
+                  </SettingRow>
+                </SettingSection>
+
+                <SettingSection title="Learning & Confidence">
+                  <SettingRow label="Learning Enabled" description="Adapt strategies based on outcome analysis">
+                    <Toggle
+                      checked={bool(learning, 'enabled', true)}
+                      onChange={() => patchSection('learning', { enabled: !bool(learning, 'enabled', true) })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Analysis Interval" description="How often to analyze outcomes"
+                    tip="The agent reviews past outcomes to learn which strategies work. Default 3600s (1 hour).">
+                    <NumberInput
+                      value={num(learning, 'analysisIntervalSecs', 3600)}
+                      onChange={(v) => debouncedPatch('learning', { analysisIntervalSecs: v })}
+                      suffix="sec"
+                    />
+                  </SettingRow>
+                  <SettingRow label="Min Threshold" description="Minimum success rate before deprioritizing"
+                    tip="Strategies below this rate get deprioritized.">
+                    <NumberInput
+                      value={num(learning, 'minThreshold', 0.4)}
+                      onChange={(v) => debouncedPatch('learning', { minThreshold: v })}
+                      step={0.1} min={0} max={1}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Max Threshold">
+                    <NumberInput
+                      value={num(learning, 'maxThreshold', 0.9)}
+                      onChange={(v) => debouncedPatch('learning', { maxThreshold: v })}
+                      step={0.1} min={0} max={1}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Min Outcomes" description="Outcomes required before adapting"
+                    tip="Prevents premature adaptation based on too few data points.">
+                    <NumberInput
+                      value={num(learning, 'minOutcomesForAdaptation', 50)}
+                      onChange={(v) => debouncedPatch('learning', { minOutcomesForAdaptation: v })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Confidence Enabled" description="Require minimum confidence before executing tool calls">
+                    <Toggle
+                      checked={bool(confidence, 'enabled', true)}
+                      onChange={() => patchSection('confidence', { enabled: !bool(confidence, 'enabled', true) })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Confidence Threshold"
+                    tip="Below this threshold, the agent asks for confirmation instead of executing.">
+                    <Slider
+                      value={num(confidence, 'threshold', 0.7)}
+                      onChange={(v) => patchSection('confidence', { threshold: v })}
+                      min={0} max={1} step={0.05}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Tool Overrides" description="Per-tool confidence thresholds"
+                    tip="Set higher thresholds for dangerous tools and lower for safe ones." last>
+                    <div className="flex flex-col gap-1.5">
+                      {Object.entries(asRecord(confidence.toolOverrides)).map(([tool, threshold]) => (
+                        <div key={tool} className="flex items-center gap-1.5">
+                          <span className="text-[12px]" style={{ color: 'var(--codex-fg-muted)' }}>{tool}</span>
+                          <span className="text-[12px]" style={{ color: 'var(--codex-fg-subtle)' }}>{String(threshold)}</span>
+                          <button
+                            onClick={() => patchSection('confidence', { toolOverrides: { [tool]: null } })}
+                            style={{ color: 'var(--codex-fg-subtle)' }}
+                          >
+                            <span className="text-[11px]">✕</span>
+                          </button>
+                        </div>
+                      ))}
+                      {Object.keys(asRecord(confidence.toolOverrides)).length === 0 && (
+                        <span className="text-[12px]" style={{ color: 'var(--codex-fg-subtle)' }}>No overrides</span>
+                      )}
+                    </div>
+                  </SettingRow>
+                </SettingSection>
+              </>
             )}
 
             {/* ── FINANCE ──────────────────────────────────────────── */}
