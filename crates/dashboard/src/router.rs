@@ -9,7 +9,7 @@ use tower_http::cors::{Any, CorsLayer};
 
 use crate::api::{
     calendar::{get_sync_status, list_events, trigger_sync},
-    cron::{create_cron, delete_cron, list_cron, toggle_cron},
+    cron::{create_cron, delete_cron, list_cron, run_cron, toggle_cron},
     finance::{
         create_account, create_budget, create_goal, create_investment, create_liability,
         create_transaction, delete_account, delete_budget, delete_goal, delete_investment,
@@ -70,6 +70,7 @@ use crate::ws::ws_handler;
 /// GET  /api/cron                         → list cron jobs
 /// POST /api/cron                         → create cron job
 /// PATCH  /api/cron/:id/toggle            → enable/disable cron job
+/// POST /api/cron/:id/run                 → manually trigger cron job
 /// DELETE /api/cron/:id                   → delete cron job
 /// GET  /api/calendar/events              → calendar events
 /// GET  /api/calendar/sync-status         → sync state
@@ -118,6 +119,7 @@ pub fn build(state: AppState) -> Router {
         // Cron
         .route("/cron", get(list_cron).post(create_cron))
         .route("/cron/{id}/toggle", patch(toggle_cron))
+        .route("/cron/{id}/run", post(run_cron))
         .route("/cron/{id}", delete(delete_cron))
         // Calendar
         .route("/calendar/events", get(list_events))

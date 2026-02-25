@@ -67,7 +67,9 @@ pub async fn handle_serve(port: u16) -> Result<()> {
             let bus = Arc::clone(&bus_for_cron);
             let job_name = job.name.clone();
 
-            rt.block_on(async move {
+            // block_in_place moves the current thread out of the Tokio worker pool
+            // so that block_on can safely create a nested runtime context.
+            tokio::task::block_in_place(|| rt.block_on(async move {
                 match job_name.as_str() {
                     "todo_focus_check" => {
                         let focused = todo_repo.list_focused().await?;
@@ -253,88 +255,82 @@ pub async fn handle_serve(port: u16) -> Result<()> {
                     }
                     _ => Ok(None),
                 }
-            })
+            }))
         }));
     }
 
     // NOW wrap in Arc
     let cron_service = Arc::new(cron_service);
 
-    // Register cron jobs (add_job takes &self, works on Arc)
-    cron_service
-        .add_job(
-            "todo_focus_check",
-            scheduling::CronSchedule::Every {
-                every_ms: 30 * 60 * 1000,
-            },
-            "Check focus task deadlines",
-            false,
-            None,
-            None,
-            false,
-        )
-        .await?;
+    // Collect names of existing jobs so we don't create duplicates on restart.
+    // CronService::start() already loaded persisted jobs from SQLite above.
+    let existing_job_names: std::collections::HashSet<String> = cron_service
+        .list_jobs(true)
+        .await
+        .into_iter()
+        .map(|j| j.name)
+        .collect();
 
-    cron_service
-        .add_job(
-            "todo_daily_digest",
-            scheduling::CronSchedule::Cron {
-                expr: "0 9 * * *".to_string(),
-                tz: None,
-            },
-            "Daily task summary",
-            false,
-            None,
-            None,
-            false,
-        )
-        .await?;
+    /// Helper macro: only call add_job if a job with this name doesn't already exist.
+    macro_rules! ensure_job {
+        ($svc:expr, $name:expr, $schedule:expr, $msg:expr, $deliver:expr, $channel:expr, $to:expr, $dar:expr) => {
+            if !existing_job_names.contains($name) {
+                $svc.add_job($name, $schedule, $msg, $deliver, $channel, $to, $dar)
+                    .await?;
+            }
+        };
+    }
 
-    cron_service
-        .add_job(
-            "todo_overdue_check",
-            scheduling::CronSchedule::Every {
-                every_ms: 60 * 60 * 1000,
-            },
-            "Check for overdue focus tasks",
-            false,
-            None,
-            None,
-            false,
-        )
-        .await?;
+    // Register cron jobs (skipped if already persisted from a previous run)
+    ensure_job!(cron_service,
+        "todo_focus_check",
+        scheduling::CronSchedule::Every {
+            every_ms: 30 * 60 * 1000,
+        },
+        "Check focus task deadlines",
+        false, None, None, false
+    );
 
-    cron_service
-        .add_job(
-            "__klyntbot_weekly_report",
-            scheduling::CronSchedule::Cron {
-                expr: "0 18 * * 0".to_string(), // Sunday at 18:00
-                tz: None,
-            },
-            "Generate weekly progress report",
-            false,
-            None,
-            None,
-            false,
-        )
-        .await?;
+    ensure_job!(cron_service,
+        "todo_daily_digest",
+        scheduling::CronSchedule::Cron {
+            expr: "0 9 * * *".to_string(),
+            tz: None,
+        },
+        "Daily task summary",
+        false, None, None, false
+    );
+
+    ensure_job!(cron_service,
+        "todo_overdue_check",
+        scheduling::CronSchedule::Every {
+            every_ms: 60 * 60 * 1000,
+        },
+        "Check for overdue focus tasks",
+        false, None, None, false
+    );
+
+    ensure_job!(cron_service,
+        "__klyntbot_weekly_report",
+        scheduling::CronSchedule::Cron {
+            expr: "0 18 * * 0".to_string(), // Sunday at 18:00
+            tz: None,
+        },
+        "Generate weekly progress report",
+        false, None, None, false
+    );
 
     // Register calendar sync cron job if any provider is enabled
     if config.calendar.is_any_enabled() {
         let sync_interval_secs = config.calendar.min_sync_interval_secs();
-        cron_service
-            .add_job(
-                "__klyntbot_calendar_sync",
-                scheduling::CronSchedule::Every {
-                    every_ms: sync_interval_secs * 1000,
-                },
-                "Sync calendar events with configured providers",
-                false,
-                None,
-                None,
-                false,
-            )
-            .await?;
+        ensure_job!(cron_service,
+            "__klyntbot_calendar_sync",
+            scheduling::CronSchedule::Every {
+                every_ms: sync_interval_secs * 1000,
+            },
+            "Sync calendar events with configured providers",
+            false, None, None, false
+        );
         info!(
             "Calendar sync cron registered (interval: {}s)",
             sync_interval_secs
@@ -351,20 +347,15 @@ pub async fn handle_serve(port: u16) -> Result<()> {
             if let (Ok(hour), Ok(minute)) = (parts[0].parse::<u8>(), parts[1].parse::<u8>()) {
                 if hour < 24 && minute < 60 {
                     let cron_expr = format!("{} {} * * *", minute, hour);
-                    cron_service
-                        .add_job(
-                            "__klyntbot_daily_planning",
-                            scheduling::CronSchedule::Cron {
-                                expr: cron_expr.clone(),
-                                tz: None,
-                            },
-                            "Generate daily planning notification",
-                            false,
-                            None,
-                            None,
-                            false,
-                        )
-                        .await?;
+                    ensure_job!(cron_service,
+                        "__klyntbot_daily_planning",
+                        scheduling::CronSchedule::Cron {
+                            expr: cron_expr.clone(),
+                            tz: None,
+                        },
+                        "Generate daily planning notification",
+                        false, None, None, false
+                    );
                     info!(
                         "Daily planning cron registered (time: {}, cron: {})",
                         planning_time, cron_expr
@@ -398,20 +389,15 @@ pub async fn handle_serve(port: u16) -> Result<()> {
             if let (Ok(hour), Ok(minute)) = (parts[0].parse::<u8>(), parts[1].parse::<u8>()) {
                 if hour < 24 && minute < 60 {
                     let cron_expr = format!("{} {} * * *", minute, hour);
-                    cron_service
-                        .add_job(
-                            "__klyntbot_finance_daily_review",
-                            scheduling::CronSchedule::Cron {
-                                expr: cron_expr,
-                                tz: None,
-                            },
-                            "Daily financial review",
-                            false,
-                            None,
-                            None,
-                            false,
-                        )
-                        .await?;
+                    ensure_job!(cron_service,
+                        "__klyntbot_finance_daily_review",
+                        scheduling::CronSchedule::Cron {
+                            expr: cron_expr,
+                            tz: None,
+                        },
+                        "Daily financial review",
+                        false, None, None, false
+                    );
                     info!(
                         "Finance daily review cron registered (time: {})",
                         review_time
@@ -421,53 +407,38 @@ pub async fn handle_serve(port: u16) -> Result<()> {
         }
 
         // Budget check every 6 hours
-        cron_service
-            .add_job(
-                "__klyntbot_finance_budget_check",
-                scheduling::CronSchedule::Every {
-                    every_ms: 6 * 60 * 60 * 1000,
-                },
-                "Check budget thresholds",
-                false,
-                None,
-                None,
-                false,
-            )
-            .await?;
+        ensure_job!(cron_service,
+            "__klyntbot_finance_budget_check",
+            scheduling::CronSchedule::Every {
+                every_ms: 6 * 60 * 60 * 1000,
+            },
+            "Check budget thresholds",
+            false, None, None, false
+        );
 
         // Price refresh (configurable interval)
         if config.finance.price_refresh.enabled {
             let interval_ms = config.finance.price_refresh.interval_hours as u64 * 60 * 60 * 1000;
-            cron_service
-                .add_job(
-                    "__klyntbot_finance_price_refresh",
-                    scheduling::CronSchedule::Every {
-                        every_ms: interval_ms,
-                    },
-                    "Refresh investment prices",
-                    false,
-                    None,
-                    None,
-                    false,
-                )
-                .await?;
+            ensure_job!(cron_service,
+                "__klyntbot_finance_price_refresh",
+                scheduling::CronSchedule::Every {
+                    every_ms: interval_ms,
+                },
+                "Refresh investment prices",
+                false, None, None, false
+            );
         }
 
         // Daily health check at midnight
-        cron_service
-            .add_job(
-                "__klyntbot_finance_health_check",
-                scheduling::CronSchedule::Cron {
-                    expr: "0 0 * * *".to_string(),
-                    tz: None,
-                },
-                "Finance data health check",
-                false,
-                None,
-                None,
-                false,
-            )
-            .await?;
+        ensure_job!(cron_service,
+            "__klyntbot_finance_health_check",
+            scheduling::CronSchedule::Cron {
+                expr: "0 0 * * *".to_string(),
+                tz: None,
+            },
+            "Finance data health check",
+            false, None, None, false
+        );
 
         info!(
             "Finance cron jobs registered (proactivity: {})",
@@ -541,13 +512,13 @@ pub async fn handle_serve(port: u16) -> Result<()> {
         heartbeat_service.set_callback(Arc::new(move |prompt: &str| {
             let bus = bus_for_heartbeat.clone();
             let prompt = prompt.to_string();
-            rt.block_on(async {
+            tokio::task::block_in_place(|| rt.block_on(async {
                 let msg = bus::InboundMessage::new("system", "heartbeat", "heartbeat", prompt);
                 bus.publish_inbound(msg)
                     .await
                     .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
                 Ok("Heartbeat message published".to_string())
-            })
+            }))
         }));
     }
 

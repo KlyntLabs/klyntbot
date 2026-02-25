@@ -75,6 +75,31 @@ pub async fn toggle_cron(
     Ok(Json(updated))
 }
 
+/// POST /api/cron/:id/run — manually trigger a cron job immediately.
+///
+/// Returns 202 Accepted and executes the job in the background so the
+/// response isn't blocked by `block_in_place` inside the cron callback.
+pub async fn run_cron(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    // Verify the job exists (fast, read-only check via DB).
+    let exists = state.repos.cron.get(&id).await.is_ok();
+    if !exists {
+        return Err(ApiError::not_found(format!("cron job '{id}' not found")));
+    }
+
+    // Spawn execution in background so we don't block the HTTP response.
+    let svc = state.cron_service.clone();
+    tokio::spawn(async move {
+        if let Err(e) = svc.run_job(&id, true).await {
+            tracing::error!("run_cron background: {e}");
+        }
+    });
+
+    Ok(StatusCode::ACCEPTED)
+}
+
 /// DELETE /api/cron/:id — delete a cron job.
 pub async fn delete_cron(
     State(state): State<AppState>,

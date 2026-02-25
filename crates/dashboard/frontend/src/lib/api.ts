@@ -80,8 +80,8 @@ export async function apiFetch<T>(
     throw new ApiError(response.status, message);
   }
 
-  // 204 No Content has no body — return undefined (cast to T for convenience)
-  if (response.status === 204) {
+  // 202 Accepted / 204 No Content have no body — return undefined
+  if (response.status === 202 || response.status === 204) {
     return undefined as T;
   }
 
