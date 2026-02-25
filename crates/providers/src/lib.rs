@@ -213,7 +213,9 @@ fn try_create_from_spec(spec: &ProviderSpec, config: &Config, model: &str) -> Op
                 config::Secret::new(pc.api_key.expose().to_string()),
                 api_base.to_string(),
                 model.to_string(),
-            );
+            )
+            .with_cache_system_prompt(pc.cache_system_prompt)
+            .with_extended_thinking(pc.extended_thinking.clone());
             if let Some(ref version) = pc.api_version {
                 provider = provider.with_api_version(version);
             }

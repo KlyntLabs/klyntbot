@@ -177,7 +177,7 @@ export function Slider({ value, onChange, min, max, step }: {
         onChange={(e) => onChange(parseFloat(e.target.value))}
       />
       <span className="text-[13px] tabular-nums w-10 text-right" style={{ color: 'var(--codex-accent)', fontFamily: 'var(--font-mono)' }}>
-        {value}
+        {parseFloat(value.toFixed(2))}
       </span>
     </div>
   );
@@ -223,7 +223,7 @@ export function TagInput({ tags, onChange, placeholder }: {
 }
 
 export function TabStrip({ tabs, active, onChange }: {
-  tabs: { id: string; label: string }[];
+  tabs: { id: string; label: string; configured?: boolean }[];
   active: string;
   onChange: (id: string) => void;
 }) {
@@ -235,14 +235,17 @@ export function TabStrip({ tabs, active, onChange }: {
           <button
             key={tab.id}
             onClick={() => onChange(tab.id)}
-            className="px-3 py-1.5 text-[12px] rounded transition-colors whitespace-nowrap"
+            className="px-3 py-1.5 text-[12px] rounded transition-colors whitespace-nowrap inline-flex items-center gap-1.5"
             style={{
-              color: isActive ? 'var(--codex-accent)' : 'var(--codex-fg-subtle)',
+              color: isActive ? 'var(--codex-accent)' : tab.configured ? 'var(--codex-fg)' : 'var(--codex-fg-subtle)',
               backgroundColor: isActive ? 'var(--codex-accent-dim)' : 'transparent',
               fontWeight: isActive ? 500 : 400,
             }}
           >
             {tab.label}
+            {tab.configured && !isActive && (
+              <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ backgroundColor: 'var(--codex-accent)' }} />
+            )}
           </button>
         );
       })}

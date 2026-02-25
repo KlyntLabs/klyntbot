@@ -11,7 +11,7 @@ use std::time::Duration;
 use tracing::{debug, warn};
 
 use common::{KlyntbotError, ProviderError, Result};
-use config::Secret;
+use config::{ExtendedThinkingConfig, Secret};
 
 use crate::registry::ProviderRegistry;
 use crate::types::{
@@ -29,6 +29,8 @@ pub struct AnthropicNativeProvider {
     base_url: String,
     model: String,
     api_version: String,
+    cache_system_prompt: bool,
+    extended_thinking: Option<ExtendedThinkingConfig>,
 }
 
 impl AnthropicNativeProvider {
@@ -51,12 +53,26 @@ impl AnthropicNativeProvider {
             base_url,
             model,
             api_version,
+            cache_system_prompt: true,
+            extended_thinking: None,
         }
     }
 
     /// Set a custom API version.
     pub fn with_api_version(mut self, version: impl Into<String>) -> Self {
         self.api_version = version.into();
+        self
+    }
+
+    /// Enable or disable prompt caching for system prompts.
+    pub fn with_cache_system_prompt(mut self, enabled: bool) -> Self {
+        self.cache_system_prompt = enabled;
+        self
+    }
+
+    /// Configure extended thinking (chain-of-thought).
+    pub fn with_extended_thinking(mut self, config: Option<ExtendedThinkingConfig>) -> Self {
+        self.extended_thinking = config;
         self
     }
 
@@ -430,19 +446,35 @@ impl LlmProvider for AnthropicNativeProvider {
             "max_tokens": params.max_tokens.unwrap_or(4096),
         });
 
-        // System prompt with cache_control for prompt caching
+        // System prompt — conditionally apply cache_control for prompt caching
         if let Some(system_prompt) = Self::extract_system_prompt(messages) {
-            body["system"] = json!([{
-                "type": "text",
-                "text": system_prompt,
-                "cache_control": {"type": "ephemeral"}
-            }]);
+            if self.cache_system_prompt {
+                body["system"] = json!([{
+                    "type": "text",
+                    "text": system_prompt,
+                    "cache_control": {"type": "ephemeral"}
+                }]);
+            } else {
+                body["system"] = json!(system_prompt);
+            }
         }
 
         if let Some(temp) = params.temperature {
             body["temperature"] = json!(temp);
         } else if let Some(temp) = overrides.get("temperature").and_then(|v| v.as_f64()) {
             body["temperature"] = json!(temp);
+        }
+
+        // Extended thinking — inject thinking block and remove temperature
+        if let Some(ref et) = self.extended_thinking {
+            if et.enabled {
+                body["thinking"] = json!({
+                    "type": "enabled",
+                    "budget_tokens": et.budget_tokens
+                });
+                // Anthropic requires temperature=1 (or absent) when thinking is enabled
+                body.as_object_mut().unwrap().remove("temperature");
+            }
         }
 
         // Convert and collect tools (mutable for response_format injection)
@@ -459,9 +491,10 @@ impl LlmProvider for AnthropicNativeProvider {
         }
 
         debug!(
-            "Calling Anthropic native: model={}, messages={}",
+            "Calling Anthropic native: model={}, messages={}, thinking={}",
             params.model,
-            messages.len()
+            messages.len(),
+            self.extended_thinking.as_ref().is_some_and(|et| et.enabled),
         );
 
         let response = self
@@ -515,19 +548,35 @@ impl LlmProvider for AnthropicNativeProvider {
             "stream": true,
         });
 
-        // System prompt with cache_control for prompt caching
+        // System prompt — conditionally apply cache_control for prompt caching
         if let Some(system_prompt) = Self::extract_system_prompt(messages) {
-            body["system"] = json!([{
-                "type": "text",
-                "text": system_prompt,
-                "cache_control": {"type": "ephemeral"}
-            }]);
+            if self.cache_system_prompt {
+                body["system"] = json!([{
+                    "type": "text",
+                    "text": system_prompt,
+                    "cache_control": {"type": "ephemeral"}
+                }]);
+            } else {
+                body["system"] = json!(system_prompt);
+            }
         }
 
         if let Some(temp) = params.temperature {
             body["temperature"] = json!(temp);
         } else if let Some(temp) = overrides.get("temperature").and_then(|v| v.as_f64()) {
             body["temperature"] = json!(temp);
+        }
+
+        // Extended thinking — inject thinking block and remove temperature
+        if let Some(ref et) = self.extended_thinking {
+            if et.enabled {
+                body["thinking"] = json!({
+                    "type": "enabled",
+                    "budget_tokens": et.budget_tokens
+                });
+                // Anthropic requires temperature=1 (or absent) when thinking is enabled
+                body.as_object_mut().unwrap().remove("temperature");
+            }
         }
 
         // Convert and collect tools (mutable for response_format injection)
@@ -544,9 +593,10 @@ impl LlmProvider for AnthropicNativeProvider {
         }
 
         debug!(
-            "Calling Anthropic native (streaming): model={}, messages={}",
+            "Calling Anthropic native (streaming): model={}, messages={}, thinking={}",
             params.model,
-            messages.len()
+            messages.len(),
+            self.extended_thinking.as_ref().is_some_and(|et| et.enabled),
         );
 
         let response = self

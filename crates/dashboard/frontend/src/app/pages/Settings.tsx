@@ -77,6 +77,8 @@ export default function Settings() {
   const exchangeRates = useExchangeRates();
 
   const { data: config, loading, error, refetch, setData: setConfig } = useApi<ConfigMap>('/api/settings');
+  const { data: status } = useApi<{ configuredProviders?: string[] }>('/api/status');
+  const configuredProviders = new Set(status?.configuredProviders ?? []);
 
   // ── Save helpers ──────────────────────────────────────────────────────────
   const [saving, setSaving] = useState(false);
@@ -255,7 +257,7 @@ export default function Settings() {
 
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
-          <div className="max-w-2xl">
+          <div>
 
             {/* ── GENERAL ──────────────────────────────────────────── */}
             {activeSection === 'general' && (
@@ -288,71 +290,8 @@ export default function Settings() {
             {/* ── AI & MODELS ──────────────────────────────────────── */}
             {activeSection === 'ai-models' && (
               <>
-                {/* Providers sub-section */}
-                <SettingSection title="Providers" defaultOpen>
-                  <TabStrip
-                    tabs={providerTabs.map(p => ({ id: p, label: displayName(p) }))}
-                    active={activeProvider}
-                    onChange={setActiveProvider}
-                  />
-                  <SettingRow label="API Key">
-                    <SecretInput
-                      value={str(currentProviderConfig, 'apiKey', '')}
-                      onChange={(v) => debouncedPatch('providers', { [activeProvider]: { apiKey: v } }, 1200)}
-                      width="220px"
-                    />
-                  </SettingRow>
-                  <SettingRow label="API Base URL" description="Custom endpoint (leave empty for default)"
-                    tip="Override the default API endpoint. Useful for proxies, self-hosted models, or region-specific endpoints.">
-                    <TextInput
-                      value={str(currentProviderConfig, 'apiBase', '')}
-                      placeholder={`https://api.${activeProvider}.com`}
-                      onChange={(v) => debouncedPatch('providers', { [activeProvider]: { apiBase: v || null } })}
-                    />
-                  </SettingRow>
-                  <SettingRow label="Native Mode"
-                    tip="Send requests using the provider's native API format rather than converting through a unified schema.">
-                    <Toggle
-                      checked={bool(currentProviderConfig, 'native', false)}
-                      onChange={() => patchSection('providers', { [activeProvider]: { native: !bool(currentProviderConfig, 'native', false) } })}
-                    />
-                  </SettingRow>
-                  <SettingRow label="Cache System Prompt"
-                    tip="Caches the system prompt on the provider side to reduce token usage on repeated calls. Supported by Anthropic.">
-                    <Toggle
-                      checked={bool(currentProviderConfig, 'cacheSystemPrompt', false)}
-                      onChange={() => patchSection('providers', { [activeProvider]: { cacheSystemPrompt: !bool(currentProviderConfig, 'cacheSystemPrompt', false) } })}
-                    />
-                  </SettingRow>
-                  <SettingRow label="Extended Thinking"
-                    tip="Gives the model a dedicated thinking budget to reason through complex problems before responding.">
-                    <Toggle
-                      checked={bool(asRecord(currentProviderConfig.extendedThinking), 'enabled', false)}
-                      onChange={() => patchSection('providers', { [activeProvider]: { extendedThinking: { enabled: !bool(asRecord(currentProviderConfig.extendedThinking), 'enabled', false) } } })}
-                    />
-                  </SettingRow>
-                  {bool(asRecord(currentProviderConfig.extendedThinking), 'enabled', false) && (
-                    <SettingRow label="Budget Tokens" description="Max tokens for internal reasoning (5,000-50,000)"
-                      tip="Higher = deeper thinking but more expensive.">
-                      <NumberInput
-                        value={num(asRecord(currentProviderConfig.extendedThinking), 'budgetTokens', 10000)}
-                        onChange={(v) => debouncedPatch('providers', { [activeProvider]: { extendedThinking: { budgetTokens: v } } })}
-                      />
-                    </SettingRow>
-                  )}
-                  <SettingRow label="API Version" description="Provider-specific version (e.g. 2023-06-01)"
-                    tip="Only set if you need a specific version for beta features." last>
-                    <TextInput
-                      value={str(currentProviderConfig, 'apiVersion', '')}
-                      placeholder="2023-06-01"
-                      onChange={(v) => debouncedPatch('providers', { [activeProvider]: { apiVersion: v || null } })}
-                      width="160px"
-                    />
-                  </SettingRow>
-                </SettingSection>
-
-                {/* Agent Defaults sub-section */}
-                <SettingSection title="Agent Defaults">
+                {/* Active model — always visible at top */}
+                <SettingSection title="Active Model" defaultOpen>
                   <SettingRow label="Provider">
                     <Select
                       value={str(agentDefaults, 'provider', '')}
@@ -412,34 +351,70 @@ export default function Settings() {
                   </SettingRow>
                 </SettingSection>
 
-                {/* Routing sub-section */}
-                <SettingSection title="Routing">
-                  <SettingRow label="Primary Provider">
-                    <Select
-                      value={str(asRecord(config?.providerManager), 'primary', '')}
-                      options={providerTabs.map(p => ({ value: p, label: displayName(p) }))}
-                      placeholder="Auto-detect"
-                      onChange={(v) => patchSection('providerManager', { primary: v || null })}
+                {/* Provider configuration */}
+                <SettingSection title="Providers" description="Configure API keys and provider-specific settings">
+                  <TabStrip
+                    tabs={providerTabs.map(p => ({
+                      id: p,
+                      label: displayName(p),
+                      configured: configuredProviders.has(p),
+                    }))}
+                    active={activeProvider}
+                    onChange={setActiveProvider}
+                  />
+                  <SettingRow label="API Key">
+                    <SecretInput
+                      value={str(currentProviderConfig, 'apiKey', '')}
+                      onChange={(v) => debouncedPatch('providers', { [activeProvider]: { apiKey: v } }, 1200)}
+                      width="220px"
                     />
                   </SettingRow>
-                  <SettingRow label="Fallback Provider">
-                    <Select
-                      value={str(asRecord(config?.providerManager), 'fallback', '')}
-                      options={providerTabs.map(p => ({ value: p, label: displayName(p) }))}
-                      placeholder="None"
-                      onChange={(v) => patchSection('providerManager', { fallback: v || null })}
-                    />
-                  </SettingRow>
-                  <SettingRow label="Classifier Model" description="Lightweight model for routing decisions"
-                    tip="A fast, cheap model that decides which provider/model to use for each request." last>
+                  <SettingRow label="API Base URL" description="Custom endpoint (leave empty for default)"
+                    tip="Override the default API endpoint. Useful for proxies, self-hosted models, or region-specific endpoints."
+                    last={activeProvider !== 'anthropic'}>
                     <TextInput
-                      value={str(asRecord(config?.providerManager), 'classifierModel', '')}
-                      placeholder="gpt-4o-mini"
-                      onChange={(v) => debouncedPatch('providerManager', { classifierModel: v || null })}
-                      width="180px"
+                      value={str(currentProviderConfig, 'apiBase', '')}
+                      placeholder={`https://api.${activeProvider}.com`}
+                      onChange={(v) => debouncedPatch('providers', { [activeProvider]: { apiBase: v || null } })}
                     />
                   </SettingRow>
+                  {activeProvider === 'anthropic' && (
+                    <>
+                      <SettingRow label="Native Mode"
+                        tip="Use Anthropic's native Messages API directly instead of OpenAI-compatible format. Enables prompt caching and extended thinking.">
+                        <Toggle
+                          checked={bool(currentProviderConfig, 'native', false)}
+                          onChange={() => patchSection('providers', { [activeProvider]: { native: !bool(currentProviderConfig, 'native', false) } })}
+                        />
+                      </SettingRow>
+                      <SettingRow label="Cache System Prompt"
+                        tip="Caches the system prompt on Anthropic's side to reduce token usage on repeated calls. Requires native mode.">
+                        <Toggle
+                          checked={bool(currentProviderConfig, 'cacheSystemPrompt', false)}
+                          onChange={() => patchSection('providers', { [activeProvider]: { cacheSystemPrompt: !bool(currentProviderConfig, 'cacheSystemPrompt', false) } })}
+                        />
+                      </SettingRow>
+                      <SettingRow label="Extended Thinking"
+                        tip="Gives the model a dedicated thinking budget to reason through complex problems before responding. Requires native mode."
+                        last={!bool(asRecord(currentProviderConfig.extendedThinking), 'enabled', false)}>
+                        <Toggle
+                          checked={bool(asRecord(currentProviderConfig.extendedThinking), 'enabled', false)}
+                          onChange={() => patchSection('providers', { [activeProvider]: { extendedThinking: { enabled: !bool(asRecord(currentProviderConfig.extendedThinking), 'enabled', false) } } })}
+                        />
+                      </SettingRow>
+                      {bool(asRecord(currentProviderConfig.extendedThinking), 'enabled', false) && (
+                        <SettingRow label="Budget Tokens" description="Max tokens for internal reasoning (5,000-50,000)"
+                          tip="Higher = deeper thinking but more expensive." last>
+                          <NumberInput
+                            value={num(asRecord(currentProviderConfig.extendedThinking), 'budgetTokens', 10000)}
+                            onChange={(v) => debouncedPatch('providers', { [activeProvider]: { extendedThinking: { budgetTokens: v } } })}
+                          />
+                        </SettingRow>
+                      )}
+                    </>
+                  )}
                 </SettingSection>
+
               </>
             )}
 
