@@ -1,82 +1,29 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import {
-  Sliders,
-  Cpu,
-  MessageCircle,
-  Bot,
-  Wrench,
-  CheckSquare,
-  Calendar as CalendarIcon,
-  MessageSquare,
-  Brain,
-  DollarSign,
-  Folder,
-  Package,
-  Eye,
-  EyeOff,
-  ChevronDown,
-  ChevronRight,
-  Plus,
-  X,
-  Plug,
-  Loader2,
-  AlertTriangle,
-  RefreshCw,
-  HelpCircle,
+  Sliders, Cpu, MessageCircle, Wrench, CheckSquare,
+  Brain, DollarSign, Package, Loader2, AlertTriangle, RefreshCw,
 } from 'lucide-react';
 import { useApi } from '../../lib/hooks/useApi';
 import { apiFetch } from '../../lib/api';
+import { SettingRow } from '../../app/components/settings/SettingRow';
+import { SettingSection } from '../../app/components/settings/SettingSection';
+import {
+  Toggle, Select, NumberInput, TextInput, SecretInput,
+  Slider, TagInput, TabStrip, TimeInput,
+} from '../../app/components/settings/controls';
+import {
+  PROVIDER_MODELS, displayName, TIMEZONES, CURRENCIES, CURRENCY_SYMBOLS,
+} from '../../app/components/settings/model-data';
 
-type SettingsSection = {
-  id: string;
-  label: string;
-  icon: typeof Sliders;
-};
-
-/** Inline tooltip — shows an info icon that reveals a tooltip on hover. */
-function Tip({ text }: { text: string }) {
-  const [show, setShow] = useState(false);
-  const ref = useRef<HTMLSpanElement>(null);
-  return (
-    <span
-      ref={ref}
-      className="inline-flex items-center ml-1.5 relative"
-      onMouseEnter={() => setShow(true)}
-      onMouseLeave={() => setShow(false)}
-    >
-      <HelpCircle className="w-3.5 h-3.5 cursor-help" strokeWidth={1.5} style={{ color: '#555' }} />
-      {show && (
-        <span
-          className="fixed z-[9999] px-3 py-2 rounded-lg text-[12px] leading-[1.6] w-[320px] shadow-xl pointer-events-none"
-          style={{
-            backgroundColor: '#1e1e1e',
-            color: '#ccc',
-            border: '1px solid #333',
-            left: ref.current ? Math.min(ref.current.getBoundingClientRect().left, window.innerWidth - 340) : 0,
-            top: ref.current ? ref.current.getBoundingClientRect().top - 8 : 0,
-            transform: 'translateY(-100%)',
-          }}
-        >
-          {text}
-        </span>
-      )}
-    </span>
-  );
-}
-
-// ── Type helpers for accessing nested config sections ────────────────────────
+// ── Type helpers ──────────────────────────────────────────────────────────────
 
 type ConfigMap = Record<string, unknown>;
 
-/** Safely cast an unknown config section to a flat record. */
 function asRecord(val: unknown): Record<string, unknown> {
-  if (val && typeof val === 'object' && !Array.isArray(val)) {
-    return val as Record<string, unknown>;
-  }
+  if (val && typeof val === 'object' && !Array.isArray(val)) return val as Record<string, unknown>;
   return {};
 }
 
-/** Safely get a string value from a record, with an optional fallback. */
 function str(rec: Record<string, unknown>, key: string, fallback = ''): string {
   const v = rec[key];
   if (typeof v === 'string') return v;
@@ -84,41 +31,48 @@ function str(rec: Record<string, unknown>, key: string, fallback = ''): string {
   return fallback;
 }
 
-/** Safely get a number value from a record, with an optional fallback. */
 function num(rec: Record<string, unknown>, key: string, fallback = 0): number {
   const v = rec[key];
   if (typeof v === 'number') return v;
-  if (typeof v === 'string') {
-    const n = Number(v);
-    if (!Number.isNaN(n)) return n;
-  }
+  if (typeof v === 'string') { const n = Number(v); if (!Number.isNaN(n)) return n; }
   return fallback;
 }
 
-/** Safely get a boolean value from a record. */
 function bool(rec: Record<string, unknown>, key: string, fallback = false): boolean {
   const v = rec[key];
   if (typeof v === 'boolean') return v;
   return fallback;
 }
 
-/** Safely get an array value from a record. */
 function arr(rec: Record<string, unknown>, key: string): unknown[] {
   const v = rec[key];
   if (Array.isArray(v)) return v;
   return [];
 }
 
+// ── Section definitions ───────────────────────────────────────────────────────
+
+type SectionDef = { id: string; label: string; icon: typeof Sliders; desc: string };
+
+const SECTIONS: SectionDef[] = [
+  { id: 'general', label: 'General', icon: Sliders, desc: 'Application settings' },
+  { id: 'ai-models', label: 'AI & Models', icon: Cpu, desc: 'Providers, model defaults, and routing' },
+  { id: 'channels', label: 'Channels', icon: MessageCircle, desc: 'Chat platform integrations' },
+  { id: 'tools', label: 'Tools', icon: Wrench, desc: 'Tool permissions and configuration' },
+  { id: 'tasks', label: 'Tasks', icon: CheckSquare, desc: 'Task management and productivity' },
+  { id: 'ai-behavior', label: 'AI Behavior', icon: Brain, desc: 'Conversation, memory, and learning' },
+  { id: 'finance', label: 'Finance', icon: DollarSign, desc: 'Financial tracking and budgets' },
+  { id: 'extensions', label: 'Extensions', icon: Package, desc: 'Packs, skills, and plugins' },
+];
+
+// ── Main component ────────────────────────────────────────────────────────────
+
 export default function Settings() {
-  const [activeSection, setActiveSection] = useState('providers');
-  const [activeProvider, setActiveProvider] = useState('anthropic');
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [sessionOpen, setSessionOpen] = useState(true);
-  const [configOpen, setConfigOpen] = useState(true);
+  const [activeSection, setActiveSection] = useState('general');
 
   const { data: config, loading, error, refetch, setData: setConfig } = useApi<ConfigMap>('/api/settings');
 
-  // ── PATCH helper for saving settings ──────────────────────────────────────
+  // ── Save helpers ──────────────────────────────────────────────────────────
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<{ ok: boolean; msg: string } | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
@@ -129,15 +83,14 @@ export default function Settings() {
     try {
       await apiFetch(`/api/settings/${section}`, { method: 'PATCH', body: patch });
       setSaveStatus({ ok: true, msg: 'Saved' });
-      // Optimistically merge the patch into local config
-      // (GET /api/settings reads in-memory state which doesn't update after PATCH)
       setConfig(prev => {
         if (!prev) return prev;
         const sectionData = (prev[section] ?? {}) as Record<string, unknown>;
         return { ...prev, [section]: { ...sectionData, ...patch } };
       });
-    } catch (e: any) {
-      setSaveStatus({ ok: false, msg: e.message ?? 'Failed to save' });
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to save';
+      setSaveStatus({ ok: false, msg });
     } finally {
       setSaving(false);
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -145,249 +98,16 @@ export default function Settings() {
     }
   }, [setConfig]);
 
-  // Debounced patch for text inputs
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const debouncedPatch = useCallback((section: string, patch: Record<string, unknown>, delay = 800) => {
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     debounceTimerRef.current = setTimeout(() => patchSection(section, patch), delay);
   }, [patchSection]);
 
-  // ── Exchange rate state (for finance section) ──────────────────────────────
-  const [liveRates, setLiveRates] = useState<Record<string, number> | null>(null);
-  const [ratesLoadingState, setRatesLoadingState] = useState(false);
-  const [ratesTimestamp, setRatesTimestamp] = useState<string | null>(null);
-
-  const fetchRates = useCallback(async (force = false) => {
-    setRatesLoadingState(true);
-    if (!force) {
-      try {
-        const cached = localStorage.getItem('klyntbot_exchange_rates');
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (Date.now() - parsed.fetchedAt < 3_600_000) {
-            setLiveRates(parsed.rates);
-            setRatesTimestamp(new Date(parsed.fetchedAt).toLocaleString());
-            setRatesLoadingState(false);
-            return;
-          }
-        }
-      } catch { /* ignore */ }
-    }
-    try {
-      const fiatRes = await fetch('https://open.er-api.com/v6/latest/USD');
-      const rates: Record<string, number> = { USD: 1 };
-      if (fiatRes.ok) {
-        const data = await fiatRes.json();
-        if (data.result === 'success' && data.rates) {
-          for (const [cur, perUSD] of Object.entries(data.rates as Record<string, number>)) {
-            if (cur !== 'USD' && perUSD > 0) rates[cur] = 1 / perUSD;
-          }
-        }
-      }
-      try {
-        const cryptoRes = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,tether&vs_currencies=usd');
-        if (cryptoRes.ok) {
-          const cd = await cryptoRes.json();
-          if (cd.bitcoin?.usd) rates.BTC = cd.bitcoin.usd;
-          if (cd.ethereum?.usd) rates.ETH = cd.ethereum.usd;
-          if (cd.tether?.usd) rates.USDT = cd.tether.usd;
-        }
-      } catch { /* crypto optional */ }
-      setLiveRates(rates);
-      const now = new Date();
-      setRatesTimestamp(now.toLocaleString());
-      localStorage.setItem('klyntbot_exchange_rates', JSON.stringify({ rates, fetchedAt: now.getTime() }));
-    } catch { /* silent */ }
-    setRatesLoadingState(false);
-  }, []);
-
-  // Load rates when finance section is active
-  useEffect(() => {
-    if (activeSection === 'finance' && !liveRates) fetchRates();
-  }, [activeSection, liveRates, fetchRates]);
-
-  const sections: SettingsSection[] = [
-    { id: 'general', label: 'General', icon: Sliders },
-    { id: 'providers', label: 'Providers', icon: Cpu },
-    { id: 'channels', label: 'Channels', icon: MessageCircle },
-    { id: 'agent-defaults', label: 'Agent Defaults', icon: Bot },
-    { id: 'tools', label: 'Tools', icon: Wrench },
-    { id: 'tasks-todo', label: 'Tasks & Todo', icon: CheckSquare },
-    { id: 'calendar', label: 'Calendar', icon: CalendarIcon },
-    { id: 'conversation', label: 'Conversation', icon: MessageSquare },
-    { id: 'learning', label: 'Learning', icon: Brain },
-    { id: 'confidence', label: 'Confidence', icon: Brain },
-    { id: 'finance', label: 'Finance', icon: DollarSign },
-    { id: 'projects', label: 'Projects', icon: Folder },
-    { id: 'packs-skills', label: 'Packs & Skills', icon: Package },
-    { id: 'plugins', label: 'Plugins', icon: Plug },
-  ];
-
-  // ── Derive provider/channel lists from config ──────────────────────────────
-
-  const providersMap = asRecord(config?.providers);
-  const providerNames = Object.keys(providersMap);
-  // Fallback list if config hasn't loaded yet
-  const providerTabs = providerNames.length > 0
-    ? providerNames
-    : ['anthropic', 'openai', 'openrouter', 'deepseek', 'gemini', 'groq', 'vllm', 'zhipu', 'dashscope', 'moonshot', 'minimax', 'aihubmix'];
-
-  const channelsMap = asRecord(config?.channels);
-  const channelNames = Object.keys(channelsMap);
-  const channelTabs = channelNames.length > 0
-    ? channelNames
-    : ['telegram', 'discord', 'whatsapp', 'slack', 'email', 'qq', 'feishu', 'dingtalk', 'mochat'];
-
-  const [activeChannel, setActiveChannel] = useState('telegram');
-
-  // ── Read config sections ───────────────────────────────────────────────────
-
+  // ── Config section accessors ──────────────────────────────────────────────
   const gateway = asRecord(config?.gateway);
-  const agents = asRecord(config?.agents);
-  const agentDefaults = asRecord(agents.defaults);
-  const tools = asRecord(config?.tools);
-  const todo = asRecord(config?.todo);
-  const enrichment = asRecord(todo.enrichment);
-  const search = asRecord(todo.search);
-  const todoNotifications = asRecord(todo.notifications);
-  const todoFocus = asRecord(todo.focus);
-  const todoDailyPlanning = asRecord(todo.dailyPlanning);
-  const calendar = asRecord(config?.calendar);
-  const calendarProviders = arr(calendar, 'providers');
-  const conversation = asRecord(config?.conversation);
-  const conversationEmbedding = asRecord(conversation.embedding);
-  const conversationSearch = asRecord(conversation.search);
-  const conversationSession = asRecord(conversation.session);
-  const conversationMemory = asRecord(conversation.memory);
-  const learning = asRecord(config?.learning);
-  const confidence = asRecord(config?.confidence);
-  const finance = asRecord(config?.finance);
-  const financeInflation = asRecord(finance.inflation);
-  const financeExpectedReturns = asRecord(finance.expectedReturns);
-  const financeBudgeting = asRecord(finance.budgeting);
-  const financePriceRefresh = asRecord(finance.priceRefresh);
-  const financeScheduling = asRecord(finance.scheduling);
-  const financeCategories = asRecord(finance.categories);
-  const sixJarRatios = asRecord(financeBudgeting.sixJarRatios);
-  const projects = asRecord(config?.project);
-  const packs = asRecord(config?.packs);
-  const plugins = asRecord(config?.plugins);
-  const toolsWeb = asRecord(tools.web);
-  const toolsBrowser = asRecord(tools.browser);
 
-  // Current provider/channel data
-  const currentProviderConfig = asRecord(providersMap[activeProvider]);
-  const currentChannelConfig = asRecord(channelsMap[activeChannel]);
-
-  // ── Display helper: format a provider name for display ─────────────────────
-
-  function displayName(key: string): string {
-    // Capitalize well-known provider/channel names
-    const map: Record<string, string> = {
-      anthropic: 'Anthropic',
-      openai: 'OpenAI',
-      openrouter: 'OpenRouter',
-      deepseek: 'DeepSeek',
-      gemini: 'Gemini',
-      groq: 'Groq',
-      vllm: 'vLLM',
-      zhipu: 'Zhipu',
-      dashscope: 'DashScope',
-      moonshot: 'Moonshot',
-      minimax: 'MiniMax',
-      aihubmix: 'AIHubMix',
-      telegram: 'Telegram',
-      discord: 'Discord',
-      whatsapp: 'WhatsApp',
-      slack: 'Slack',
-      email: 'Email',
-      qq: 'QQ',
-      feishu: 'Feishu',
-      dingtalk: 'DingTalk',
-      mochat: 'Mochat',
-    };
-    return map[key] ?? key;
-  }
-
-  const FormCard = ({ children, title, description, tip }: {
-    children: React.ReactNode;
-    title?: string;
-    description?: string;
-    tip?: string;
-  }) => (
-    <div className="p-5 rounded-lg mb-4" style={{
-      backgroundColor: '#141414',
-      border: '1px solid var(--codex-border)'
-    }}>
-      {title && (
-        <>
-          <label className="text-[13px] flex items-center mb-1" style={{
-            color: 'var(--codex-fg)',
-            fontWeight: 500
-          }}>
-            {title}
-            {tip && <Tip text={tip} />}
-          </label>
-          {description && (
-            <p className="text-[12px] mb-3" style={{ color: '#666' }}>
-              {description}
-            </p>
-          )}
-        </>
-      )}
-      {children}
-    </div>
-  );
-
-  const TextInput = ({ value, placeholder, secret = false, onChange, disabled = false, type }: {
-    value?: string;
-    placeholder?: string;
-    secret?: boolean;
-    onChange?: (val: string) => void;
-    disabled?: boolean;
-    type?: string;
-  }) => (
-    <input
-      type={type ?? (secret ? 'password' : 'text')}
-      defaultValue={value}
-      key={value} // re-mount when value changes from server
-      placeholder={placeholder}
-      disabled={disabled}
-      className="w-full px-3 py-2 rounded border outline-none text-[13px]"
-      style={{
-        backgroundColor: 'var(--codex-bg)',
-        borderColor: 'var(--codex-border)',
-        color: disabled ? 'var(--codex-fg-subtle)' : 'var(--codex-fg)',
-        fontFamily: secret ? 'var(--font-mono)' : 'var(--font-ui)',
-        opacity: disabled ? 0.6 : 1,
-      }}
-      readOnly={!onChange}
-      onChange={onChange ? (e) => onChange(e.target.value) : undefined}
-    />
-  );
-
-  const Toggle = ({ checked, onChange, disabled = false }: {
-    checked: boolean;
-    onChange: () => void;
-    disabled?: boolean;
-  }) => (
-    <button
-      onClick={disabled ? undefined : onChange}
-      className="w-11 h-6 rounded-full relative transition-all flex-shrink-0"
-      style={{
-        backgroundColor: checked ? 'var(--codex-accent)' : '#333',
-        opacity: disabled ? 0.5 : 1,
-        cursor: disabled ? 'not-allowed' : 'pointer',
-      }}
-    >
-      <div className="w-5 h-5 bg-white rounded-full absolute top-0.5 transition-all" style={{
-        left: checked ? '22px' : '2px'
-      }} />
-    </button>
-  );
-
-  // ── Loading state ──────────────────────────────────────────────────────────
-
+  // ── Loading / error states ────────────────────────────────────────────────
   if (loading && !config) {
     return (
       <div className="flex-1 flex items-center justify-center" style={{ backgroundColor: 'var(--codex-bg)' }}>
@@ -399,8 +119,6 @@ export default function Settings() {
     );
   }
 
-  // ── Error state ────────────────────────────────────────────────────────────
-
   if (error && !config) {
     return (
       <div className="flex-1 flex items-center justify-center" style={{ backgroundColor: 'var(--codex-bg)' }}>
@@ -408,1617 +126,154 @@ export default function Settings() {
           <AlertTriangle className="w-6 h-6" style={{ color: '#e5534b' }} />
           <span className="text-[13px]" style={{ color: 'var(--codex-fg)' }}>Failed to load settings</span>
           <span className="text-[12px]" style={{ color: '#666' }}>{error.message}</span>
-          <button
-            onClick={refetch}
-            className="flex items-center gap-2 px-4 py-2 rounded text-[13px] mt-2 transition-colors"
-            style={{ backgroundColor: 'var(--codex-accent)', color: 'white' }}
-          >
-            <RefreshCw className="w-3.5 h-3.5" strokeWidth={1.5} />
-            Retry
+          <button onClick={refetch} className="flex items-center gap-2 px-4 py-2 rounded text-[13px] mt-2"
+            style={{ backgroundColor: 'var(--codex-accent)', color: 'white' }}>
+            <RefreshCw className="w-3.5 h-3.5" strokeWidth={1.5} /> Retry
           </button>
         </div>
       </div>
     );
   }
 
-  return (
-    <>
-      {/* Main Content Area */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Settings Navigation */}
-        <nav className="w-[220px] border-r overflow-y-auto" style={{
-          backgroundColor: 'var(--codex-bg-secondary)',
-          borderColor: 'var(--codex-border-subtle)'
-        }}>
-          <div className="p-4">
-            <h2 className="text-[10px] uppercase tracking-wider mb-3 px-3" style={{
-              color: 'var(--codex-fg-subtle)',
-              fontWeight: 500
-            }}>
-              Settings
-            </h2>
-            <div className="space-y-0.5">
-              {sections.map((section) => {
-                const isActive = activeSection === section.id;
-                return (
-                  <button
-                    key={section.id}
-                    onClick={() => setActiveSection(section.id)}
-                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] transition-all relative"
-                    style={{
-                      color: isActive ? 'var(--codex-accent)' : 'var(--codex-fg-subtle)',
-                      backgroundColor: isActive ? 'var(--codex-accent-dim)' : 'transparent'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!isActive) e.currentTarget.style.backgroundColor = 'var(--codex-bg)';
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isActive) e.currentTarget.style.backgroundColor = 'transparent';
-                    }}
-                  >
-                    {isActive && (
-                      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-4 rounded-r" style={{
-                        backgroundColor: 'var(--codex-accent)'
-                      }} />
-                    )}
-                    <section.icon className="w-4 h-4" strokeWidth={1.5} />
-                    {section.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </nav>
+  const currentSection = SECTIONS.find(s => s.id === activeSection)!;
 
-        {/* Content Area */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Header */}
-          <div className="border-b px-8 py-6" style={{
-            borderColor: 'var(--codex-border-subtle)',
-            backgroundColor: 'var(--codex-bg)'
-          }}>
-            <h1 className="text-xl mb-1" style={{
-              color: 'var(--codex-fg)',
-              fontWeight: 400
-            }}>
-              {sections.find(s => s.id === activeSection)?.label}
+  return (
+    <div className="flex-1 flex overflow-hidden">
+      {/* Left Settings Nav */}
+      <nav className="w-[200px] border-r overflow-y-auto flex-shrink-0" style={{
+        backgroundColor: 'var(--codex-bg-secondary)',
+        borderColor: 'var(--codex-border-subtle)',
+      }}>
+        <div className="p-3">
+          <h2 className="text-[10px] uppercase tracking-wider mb-3 px-3" style={{
+            color: 'var(--codex-fg-subtle)', fontWeight: 500,
+          }}>Settings</h2>
+          <div className="space-y-0.5">
+            {SECTIONS.map((s) => {
+              const isActive = activeSection === s.id;
+              return (
+                <button key={s.id} onClick={() => setActiveSection(s.id)}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] transition-all relative"
+                  style={{
+                    color: isActive ? 'var(--codex-accent)' : 'var(--codex-fg-subtle)',
+                    backgroundColor: isActive ? 'var(--codex-accent-dim)' : 'transparent',
+                  }}
+                  onMouseEnter={(e) => { if (!isActive) e.currentTarget.style.backgroundColor = 'var(--codex-bg)'; }}
+                  onMouseLeave={(e) => { if (!isActive) e.currentTarget.style.backgroundColor = 'transparent'; }}
+                >
+                  {isActive && (
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-4 rounded-r"
+                      style={{ backgroundColor: 'var(--codex-accent)' }} />
+                  )}
+                  <s.icon className="w-4 h-4" strokeWidth={1.5} />
+                  {s.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </nav>
+
+      {/* Content Area */}
+      <div className="flex-1 flex flex-col overflow-hidden" style={{ backgroundColor: 'var(--codex-bg)' }}>
+        {/* Header */}
+        <div className="border-b px-6 py-4 flex items-center justify-between flex-shrink-0" style={{
+          borderColor: 'var(--codex-border-subtle)',
+        }}>
+          <div>
+            <h1 className="text-lg" style={{ color: 'var(--codex-fg)', fontWeight: 400 }}>
+              {currentSection.label}
             </h1>
-            <p className="text-[13px]" style={{ color: '#666' }}>
-              {activeSection === 'providers' && 'Configure AI provider connections'}
-              {activeSection === 'general' && 'General application settings'}
-              {activeSection === 'channels' && 'Configure chat channel integrations'}
-              {activeSection === 'agent-defaults' && 'Default agent behavior settings'}
-              {activeSection === 'tools' && 'Tool permissions and configuration'}
-              {activeSection === 'tasks-todo' && 'Task management preferences'}
-              {activeSection === 'calendar' && 'Calendar synchronization settings'}
-              {activeSection === 'conversation' && 'Conversation history and memory'}
-              {activeSection === 'learning' && 'Agent learning configuration'}
-              {activeSection === 'confidence' && 'Confidence threshold settings'}
-              {activeSection === 'finance' && 'Financial tracking configuration'}
-              {activeSection === 'projects' && 'Project management settings'}
-              {activeSection === 'packs-skills' && 'Feature packs and skills'}
-              {activeSection === 'plugins' && 'Plugin system configuration'}
+            <p className="text-[12px] mt-0.5" style={{ color: 'var(--codex-fg-subtle)' }}>
+              {currentSection.desc}
             </p>
           </div>
+          {/* Save indicator */}
+          <div className="flex items-center gap-2 text-[12px]">
+            {saving && (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--codex-accent)' }} strokeWidth={1.5} />
+                <span style={{ color: 'var(--codex-fg-subtle)' }}>Saving...</span>
+              </>
+            )}
+            {saveStatus && !saving && (
+              <span style={{ color: saveStatus.ok ? 'var(--codex-accent)' : '#ef4444' }}>
+                {saveStatus.msg}
+              </span>
+            )}
+          </div>
+        </div>
 
-          {/* Content */}
-          <div className="flex-1 overflow-y-auto px-8 py-6" style={{ backgroundColor: 'var(--codex-bg)' }}>
-            <div className="max-w-3xl">
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          <div className="max-w-2xl">
 
-              {/* GENERAL */}
-              {activeSection === 'general' && (
-                <>
-                  <FormCard title="Timezone" description="IANA timezone identifier used for scheduling and display">
-                    <TextInput value={str(config ?? {}, 'timezone', 'UTC')} placeholder="UTC"
-                      onChange={(v) => {
-                        // timezone is a top-level string — PATCH replaces the value directly
-                        if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-                        debounceTimerRef.current = setTimeout(async () => {
-                          try {
-                            await apiFetch('/api/settings/timezone', { method: 'PATCH', body: v });
-                            setConfig(prev => prev ? { ...prev, timezone: v } : prev);
-                          } catch { /* silent */ }
-                        }, 800);
-                      }}
-                    />
-                  </FormCard>
-                  <FormCard title="Data Directory" description="Where klyntbot stores its SQLite DB and LanceDB vectors. Cannot be changed at runtime.">
-                    <TextInput value={str(config ?? {}, 'dataDir', '~/.klyntbot')} placeholder="~/.klyntbot" disabled />
-                  </FormCard>
-                  <FormCard title="Gateway Host" description="API gateway listen address">
-                    <TextInput value={str(gateway, 'host', '127.0.0.1')} placeholder="127.0.0.1"
-                      onChange={(v) => debouncedPatch('gateway', { host: v })}
-                    />
-                  </FormCard>
-                  <FormCard title="Gateway Port" description="API gateway port number. Requires restart.">
-                    <TextInput value={str(gateway, 'port', '18790')} placeholder="18790" type="number"
-                      onChange={(v) => debouncedPatch('gateway', { port: parseInt(v) || 18790 })}
-                    />
-                  </FormCard>
-                </>
-              )}
-
-              {/* PROVIDERS */}
-              {activeSection === 'providers' && (
-                <>
-                  {/* Provider Tabs */}
-                  <div className="mb-6 overflow-x-auto">
-                    <div className="flex gap-4 pb-2 min-w-max">
-                      {providerTabs.map((provider) => {
-                        const isActive = provider === activeProvider;
-                        return (
-                          <button
-                            key={provider}
-                            onClick={() => setActiveProvider(provider)}
-                            className="px-3 py-2 text-[13px] relative transition-colors whitespace-nowrap"
-                            style={{
-                              color: isActive ? 'var(--codex-accent)' : 'var(--codex-fg-subtle)'
-                            }}
-                            onMouseEnter={(e) => {
-                              if (!isActive) e.currentTarget.style.color = 'var(--codex-fg-muted)';
-                            }}
-                            onMouseLeave={(e) => {
-                              if (!isActive) e.currentTarget.style.color = 'var(--codex-fg-subtle)';
-                            }}
-                          >
-                            {displayName(provider)}
-                            {isActive && (
-                              <div className="absolute bottom-0 left-0 right-0 h-[2px]" style={{
-                                backgroundColor: 'var(--codex-accent)'
-                              }} />
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <FormCard>
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <label className="text-[13px] block mb-1" style={{
-                          color: 'var(--codex-fg)',
-                          fontWeight: 500
-                        }}>
-                          API Key
-                        </label>
-                        <p className="text-[12px]" style={{ color: '#666' }}>
-                          Your {displayName(activeProvider)} API key for authentication
-                        </p>
-                      </div>
-                    </div>
-                    <div className="relative">
-                      <input
-                        type={showApiKey ? 'text' : 'password'}
-                        defaultValue={str(currentProviderConfig, 'apiKey', '')}
-                        key={`${activeProvider}-apikey-${str(currentProviderConfig, 'apiKey', '')}`}
-                        className="w-full px-3 py-2 rounded border outline-none text-[13px] pr-10"
-                        style={{
-                          backgroundColor: 'var(--codex-bg)',
-                          borderColor: 'var(--codex-border)',
-                          color: 'var(--codex-fg)',
-                          fontFamily: 'var(--font-mono)'
-                        }}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-                          debounceTimerRef.current = setTimeout(() => {
-                            patchSection('providers', { [activeProvider]: { apiKey: val } });
-                          }, 1200);
-                        }}
-                      />
-                      <button
-                        onClick={() => setShowApiKey(!showApiKey)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1"
-                        style={{ color: 'var(--codex-fg-subtle)' }}
-                      >
-                        {showApiKey ? (
-                          <EyeOff className="w-4 h-4" strokeWidth={1.5} />
-                        ) : (
-                          <Eye className="w-4 h-4" strokeWidth={1.5} />
-                        )}
-                      </button>
-                    </div>
-                  </FormCard>
-
-                  <FormCard title="API Base URL" description="Custom API endpoint (leave empty for default)" tip="Override the default API endpoint. Useful for proxies, self-hosted models, or region-specific endpoints.">
-                    <TextInput value={str(currentProviderConfig, 'apiBase', '')} placeholder={`https://api.${activeProvider}.com`}
-                      onChange={(v) => debouncedPatch('providers', { [activeProvider]: { apiBase: v || null } })}
-                    />
-                  </FormCard>
-
-                  <FormCard title="Extra Headers" description="Additional HTTP headers for API requests">
-                    <div className="space-y-2">
-                      {(() => {
-                        const headers = asRecord(currentProviderConfig.extraHeaders);
-                        const entries = Object.entries(headers);
-                        if (entries.length === 0) {
-                          return (
-                            <p className="text-[12px] py-1" style={{ color: '#555' }}>No extra headers configured</p>
-                          );
-                        }
-                        return entries.map(([key, val]) => (
-                          <div key={key} className="flex gap-2">
-                            <TextInput value={key} placeholder="Header name" />
-                            <TextInput value={String(val)} placeholder="Header value"
-                              onChange={(v) => debouncedPatch('providers', { [activeProvider]: { extraHeaders: { [key]: v } } })}
-                            />
-                            <button className="px-3 py-2 rounded border" style={{ borderColor: 'var(--codex-border)', color: 'var(--codex-fg-subtle)' }}
-                              onClick={() => patchSection('providers', { [activeProvider]: { extraHeaders: { [key]: null } } })}
-                            >
-                              <X className="w-4 h-4" strokeWidth={1.5} />
-                            </button>
-                          </div>
-                        ));
-                      })()}
-                    </div>
-                  </FormCard>
-
-                  <FormCard>
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <label className="text-[13px] block mb-1" style={{
-                          color: 'var(--codex-fg)',
-                          fontWeight: 500
-                        }}>
-                          Native Mode
-                          <Tip text="When enabled, sends requests using the provider's own API format rather than converting through a unified schema. May enable provider-specific features but reduces portability." />
-                        </label>
-                        <p className="text-[12px]" style={{ color: '#666' }}>
-                          Use provider's native API format instead of unified format
-                        </p>
-                      </div>
-                      <Toggle checked={bool(currentProviderConfig, 'native', false)}
-                        onChange={() => patchSection('providers', { [activeProvider]: { native: !bool(currentProviderConfig, 'native', false) } })}
-                      />
-                    </div>
-                  </FormCard>
-
-                  <FormCard>
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <label className="text-[13px] block mb-1" style={{
-                          color: 'var(--codex-fg)',
-                          fontWeight: 500
-                        }}>
-                          Cache System Prompt
-                          <Tip text="Caches the system prompt on the provider side so it doesn't count against your input tokens on subsequent requests. Supported by Anthropic (prompt caching)." />
-                        </label>
-                        <p className="text-[12px]" style={{ color: '#666' }}>
-                          Cache the system prompt to reduce token usage on repeated calls
-                        </p>
-                      </div>
-                      <Toggle checked={bool(currentProviderConfig, 'cacheSystemPrompt', false)}
-                        onChange={() => patchSection('providers', { [activeProvider]: { cacheSystemPrompt: !bool(currentProviderConfig, 'cacheSystemPrompt', false) } })}
-                      />
-                    </div>
-                  </FormCard>
-
-                  <FormCard>
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
-                        <label className="text-[13px] block mb-1" style={{
-                          color: 'var(--codex-fg)',
-                          fontWeight: 500
-                        }}>
-                          Extended Thinking
-                          <Tip text="Gives the model a dedicated 'thinking' budget to reason through complex problems before responding. Uses additional tokens but significantly improves quality for hard tasks." />
-                        </label>
-                        <p className="text-[12px]" style={{ color: '#666' }}>
-                          Allow the model to use more tokens for reasoning before responding
-                        </p>
-                      </div>
-                      <Toggle
-                        checked={bool(asRecord(currentProviderConfig.extendedThinking), 'enabled', false)}
-                        onChange={() => patchSection('providers', { [activeProvider]: { extendedThinking: { enabled: !bool(asRecord(currentProviderConfig.extendedThinking), 'enabled', false) } } })}
-                      />
-                    </div>
-                    {bool(asRecord(currentProviderConfig.extendedThinking), 'enabled', false) && (
-                      <div className="space-y-3 pt-3 border-t" style={{ borderColor: 'var(--codex-border)' }}>
-                        <div>
-                          <label className="text-[12px] flex items-center mb-2" style={{ color: 'var(--codex-fg-subtle)' }}>
-                            Budget Tokens
-                            <Tip text="Maximum tokens the model can use for internal reasoning. Higher = deeper thinking but more expensive. Typically 5,000–50,000." />
-                          </label>
-                          <TextInput
-                            value={str(asRecord(currentProviderConfig.extendedThinking), 'budgetTokens', '10000')}
-                            placeholder="10000"
-                            type="number"
-                            onChange={(v) => debouncedPatch('providers', { [activeProvider]: { extendedThinking: { budgetTokens: parseInt(v) || 10000 } } })}
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </FormCard>
-
-                  <FormCard title="API Version" description="Provider-specific API version string (e.g. Anthropic: 2023-06-01)" tip="Some providers version their API. Only set this if you need a specific version (e.g. for beta features). Leave empty to use the latest.">
-                    <TextInput value={str(currentProviderConfig, 'apiVersion', '')} placeholder="2023-06-01"
-                      onChange={(v) => debouncedPatch('providers', { [activeProvider]: { apiVersion: v || null } })}
-                    />
-                  </FormCard>
-
-                  {/* Provider Manager / Routing */}
-                  <div className="mt-8 mb-4">
-                    <h3 className="text-[14px] mb-4" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>
-                      Routing
-                    </h3>
-                  </div>
-
-                  <FormCard title="Primary Provider" description="Main provider used for all requests">
-                    <select className="w-full px-3 py-2 rounded border text-[13px] appearance-none" style={{
-                      backgroundColor: 'var(--codex-bg)',
-                      borderColor: 'var(--codex-border)',
-                      color: 'var(--codex-fg)'
+            {/* ── GENERAL ──────────────────────────────────────────── */}
+            {activeSection === 'general' && (
+              <SettingSection title="General" defaultOpen>
+                <SettingRow label="Timezone" description="IANA timezone for scheduling and display">
+                  <Select
+                    value={str(config ?? {}, 'timezone', 'UTC')}
+                    options={TIMEZONES.map(tz => ({ value: tz, label: tz }))}
+                    onChange={(v) => {
+                      apiFetch('/api/settings/timezone', { method: 'PATCH', body: v })
+                        .then(() => setConfig(prev => prev ? { ...prev, timezone: v } : prev))
+                        .catch(() => {});
                     }}
-                      value={str(asRecord(config?.providerManager), 'primary', '')}
-                      onChange={(e) => patchSection('providerManager', { primary: e.target.value || null })}
-                    >
-                      <option value="">Auto-detect</option>
-                      {providerTabs.map((p) => (
-                        <option key={p} value={p}>{displayName(p)}</option>
-                      ))}
-                    </select>
-                  </FormCard>
+                  />
+                </SettingRow>
+                <SettingRow label="Data Directory" description="SQLite DB and LanceDB vectors. Read-only.">
+                  <TextInput value={str(config ?? {}, 'dataDir', '~/.klyntbot')} disabled />
+                </SettingRow>
+                <SettingRow label="Gateway Host">
+                  <TextInput value={str(gateway, 'host', '127.0.0.1')}
+                    onChange={(v) => debouncedPatch('gateway', { host: v })} />
+                </SettingRow>
+                <SettingRow label="Gateway Port" description="Requires server restart" last>
+                  <NumberInput value={num(gateway, 'port', 18790)}
+                    onChange={(v) => debouncedPatch('gateway', { port: v })} />
+                </SettingRow>
+              </SettingSection>
+            )}
 
-                  <FormCard title="Fallback Provider" description="Used when primary provider fails">
-                    <select className="w-full px-3 py-2 rounded border text-[13px]" style={{
-                      backgroundColor: 'var(--codex-bg)',
-                      borderColor: 'var(--codex-border)',
-                      color: 'var(--codex-fg)'
-                    }}
-                      value={str(asRecord(config?.providerManager), 'fallback', '')}
-                      onChange={(e) => patchSection('providerManager', { fallback: e.target.value || null })}
-                    >
-                      <option value="">None</option>
-                      {providerTabs.map((p) => (
-                        <option key={p} value={p}>{displayName(p)}</option>
-                      ))}
-                    </select>
-                  </FormCard>
+            {/* ── AI & MODELS ──────────────────────────────────────── */}
+            {activeSection === 'ai-models' && (
+              <p className="text-[13px]" style={{ color: 'var(--codex-fg-subtle)' }}>Coming soon</p>
+            )}
 
-                  <FormCard title="Classifier Model" description="Model used for routing decisions (e.g. gpt-4o-mini)" tip="A lightweight model that decides which provider/model to use for each request. Keep this fast and cheap — it's called before every main request.">
-                    <TextInput
-                      value={str(asRecord(config?.providerManager), 'classifierModel', '')}
-                      placeholder="gpt-4o-mini"
-                      onChange={(v) => debouncedPatch('providerManager', { classifierModel: v || null })}
-                    />
-                  </FormCard>
-                </>
-              )}
+            {/* ── CHANNELS ─────────────────────────────────────────── */}
+            {activeSection === 'channels' && (
+              <p className="text-[13px]" style={{ color: 'var(--codex-fg-subtle)' }}>Coming soon</p>
+            )}
 
-              {/* CHANNELS */}
-              {activeSection === 'channels' && (
-                <>
-                  <div className="mb-6 overflow-x-auto">
-                    <div className="flex gap-4 pb-2 min-w-max">
-                      {channelTabs.map((channel) => {
-                        const isActive = channel === activeChannel;
-                        return (
-                          <button
-                            key={channel}
-                            onClick={() => setActiveChannel(channel)}
-                            className="px-3 py-2 text-[13px] relative transition-colors whitespace-nowrap"
-                            style={{
-                              color: isActive ? 'var(--codex-accent)' : 'var(--codex-fg-subtle)'
-                            }}
-                          >
-                            {displayName(channel)}
-                            {isActive && (
-                              <div className="absolute bottom-0 left-0 right-0 h-[2px]" style={{
-                                backgroundColor: 'var(--codex-accent)'
-                              }} />
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
+            {/* ── TOOLS ────────────────────────────────────────────── */}
+            {activeSection === 'tools' && (
+              <p className="text-[13px]" style={{ color: 'var(--codex-fg-subtle)' }}>Coming soon</p>
+            )}
 
-                  <FormCard>
-                    <div className="flex items-center justify-between mb-4">
-                      <label className="text-[13px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>
-                        Enabled
-                      </label>
-                      <Toggle checked={bool(currentChannelConfig, 'enabled', false)}
-                        onChange={() => patchSection('channels', { [activeChannel]: { enabled: !bool(currentChannelConfig, 'enabled', false) } })}
-                      />
-                    </div>
-                  </FormCard>
+            {/* ── TASKS ────────────────────────────────────────────── */}
+            {activeSection === 'tasks' && (
+              <p className="text-[13px]" style={{ color: 'var(--codex-fg-subtle)' }}>Coming soon</p>
+            )}
 
-                  <FormCard title="Token" description="Bot authentication token">
-                    <TextInput
-                      value={str(currentChannelConfig, 'token', str(currentChannelConfig, 'botToken', ''))}
-                      secret
-                      onChange={(v) => {
-                        // Different channels use different token field names
-                        const key = currentChannelConfig.botToken !== undefined ? 'botToken' : 'token';
-                        debouncedPatch('channels', { [activeChannel]: { [key]: v } }, 1200);
-                      }}
-                    />
-                  </FormCard>
+            {/* ── AI BEHAVIOR ──────────────────────────────────────── */}
+            {activeSection === 'ai-behavior' && (
+              <p className="text-[13px]" style={{ color: 'var(--codex-fg-subtle)' }}>Coming soon</p>
+            )}
 
-                  <FormCard title="Allow From" description="Allowed user/chat IDs (comma-separated)">
-                    <TextInput
-                      value={arr(currentChannelConfig, 'allowFrom').map(String).join(', ')}
-                      placeholder="user1, user2, user3"
-                      onChange={(v) => {
-                        const ids = v.split(',').map(s => s.trim()).filter(Boolean);
-                        debouncedPatch('channels', { [activeChannel]: { allowFrom: ids } });
-                      }}
-                    />
-                  </FormCard>
+            {/* ── FINANCE ──────────────────────────────────────────── */}
+            {activeSection === 'finance' && (
+              <p className="text-[13px]" style={{ color: 'var(--codex-fg-subtle)' }}>Coming soon</p>
+            )}
 
-                  {/* Proxy — only shown for channels that support it (e.g. Telegram) */}
-                  {(activeChannel === 'telegram' || str(currentChannelConfig, 'proxy', '') !== '') && (
-                    <FormCard title="Proxy" description="SOCKS5/HTTP proxy URL for connections">
-                      <TextInput value={str(currentChannelConfig, 'proxy', '')} placeholder="socks5://127.0.0.1:1080"
-                        onChange={(v) => debouncedPatch('channels', { [activeChannel]: { proxy: v || null } })}
-                      />
-                    </FormCard>
-                  )}
-                </>
-              )}
+            {/* ── EXTENSIONS ───────────────────────────────────────── */}
+            {activeSection === 'extensions' && (
+              <p className="text-[13px]" style={{ color: 'var(--codex-fg-subtle)' }}>Coming soon</p>
+            )}
 
-              {/* AGENT DEFAULTS */}
-              {activeSection === 'agent-defaults' && (
-                <>
-                  <FormCard title="Model" description="Default LLM model identifier (e.g. anthropic/claude-opus-4-5)">
-                    <TextInput value={str(agentDefaults, 'model', 'anthropic/claude-opus-4-5')}
-                      onChange={(v) => debouncedPatch('agents', { defaults: { model: v } })}
-                    />
-                  </FormCard>
-                  <FormCard title="Provider" description="Override provider auto-detection. Leave empty to infer from model name.">
-                    <select className="w-full px-3 py-2 rounded border text-[13px]" style={{
-                      backgroundColor: 'var(--codex-bg)',
-                      borderColor: 'var(--codex-border)',
-                      color: 'var(--codex-fg)'
-                    }}
-                      value={str(agentDefaults, 'provider', '')}
-                      onChange={(e) => patchSection('agents', { defaults: { provider: e.target.value || null } })}
-                    >
-                      <option value="">Auto-detect from model</option>
-                      {providerTabs.map((p) => (
-                        <option key={p} value={p}>{displayName(p)}</option>
-                      ))}
-                    </select>
-                  </FormCard>
-                  <FormCard title="Workspace" description="Agent workspace directory for file operations">
-                    <TextInput value={str(agentDefaults, 'workspace', '~/.klyntbot/workspace')} placeholder="~/.klyntbot/workspace"
-                      onChange={(v) => debouncedPatch('agents', { defaults: { workspace: v } })}
-                    />
-                  </FormCard>
-                  <FormCard title="Max Tokens" description="Maximum output tokens per LLM response" tip="Caps the length of each LLM response. Higher values allow longer answers but cost more. Most tasks work fine with 4096–8192.">
-                    <TextInput value={str(agentDefaults, 'maxTokens', '8192')} type="number"
-                      onChange={(v) => debouncedPatch('agents', { defaults: { maxTokens: parseInt(v) || 8192 } })}
-                    />
-                  </FormCard>
-                  <FormCard title="Temperature" description="Controls randomness: 0 = deterministic, 1 = creative">
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.1"
-                      value={num(agentDefaults, 'temperature', 0.7)}
-                      className="w-full"
-                      onChange={(e) => patchSection('agents', { defaults: { temperature: parseFloat(e.target.value) } })}
-                    />
-                    <div className="flex justify-between text-[12px] mt-2" style={{ color: 'var(--codex-fg-subtle)' }}>
-                      <span>0</span>
-                      <span style={{ color: 'var(--codex-accent)' }}>{num(agentDefaults, 'temperature', 0.7)}</span>
-                      <span>1</span>
-                    </div>
-                  </FormCard>
-                  <FormCard title="Max Tool Iterations" description="Maximum number of tool calls per agent turn before stopping" tip="Safety limit to prevent runaway tool loops. The agent stops after this many tool calls in a single turn, even if the task isn't complete.">
-                    <TextInput value={str(agentDefaults, 'maxToolIterations', '20')} type="number"
-                      onChange={(v) => debouncedPatch('agents', { defaults: { maxToolIterations: parseInt(v) || 20 } })}
-                    />
-                  </FormCard>
-                  <FormCard title="Max Concurrent Subagents" description="Maximum parallel subagent tasks">
-                    <TextInput value={str(agentDefaults, 'maxConcurrentSubagents', '3')} type="number"
-                      onChange={(v) => debouncedPatch('agents', { defaults: { maxConcurrentSubagents: parseInt(v) || 3 } })}
-                    />
-                  </FormCard>
-                </>
-              )}
-
-              {/* TOOLS */}
-              {activeSection === 'tools' && (
-                <>
-                  <div className="mb-4">
-                    <h3 className="text-[14px] mb-4" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Web Search</h3>
-                  </div>
-                  <FormCard title="Brave API Key" description="API key for Brave Search integration">
-                    <TextInput secret value={str(toolsWeb, 'braveApiKey', '')}
-                      onChange={(v) => debouncedPatch('tools', { web: { braveApiKey: v } }, 1200)}
-                    />
-                  </FormCard>
-                  <FormCard title="Max Results" description="Maximum number of search results to return">
-                    <TextInput value={str(toolsWeb, 'maxResults', '5')} type="number"
-                      onChange={(v) => debouncedPatch('tools', { web: { maxResults: parseInt(v) || 5 } })}
-                    />
-                  </FormCard>
-
-                  <div className="mb-4 mt-8">
-                    <h3 className="text-[14px] mb-4" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Browser Automation</h3>
-                  </div>
-                  <FormCard>
-                    <div className="flex items-center justify-between mb-4">
-                      <label className="text-[13px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Enabled</label>
-                      <Toggle checked={bool(toolsBrowser, 'enabled', false)}
-                        onChange={() => patchSection('tools', { browser: { enabled: !bool(toolsBrowser, 'enabled', false) } })}
-                      />
-                    </div>
-                  </FormCard>
-                  <FormCard title="Trust Level" description="Controls what actions the browser can take autonomously" tip="Strict: asks permission for every action. Autonomous: only asks for dangerous actions like form submissions or purchases. Full: no confirmations.">
-                    <select className="w-full px-3 py-2 rounded border text-[13px]" style={{
-                      backgroundColor: 'var(--codex-bg)',
-                      borderColor: 'var(--codex-border)',
-                      color: 'var(--codex-fg)'
-                    }}
-                      value={str(toolsBrowser, 'trustLevel', 'autonomous')}
-                      onChange={(e) => patchSection('tools', { browser: { trustLevel: e.target.value } })}
-                    >
-                      <option value="strict">Strict — ask before every write action</option>
-                      <option value="autonomous">Autonomous — ask only for dangerous actions</option>
-                      <option value="full">Full — execute all without confirmation</option>
-                    </select>
-                  </FormCard>
-                  <FormCard title="Session Timeout" description="Browser session timeout in seconds">
-                    <TextInput value={str(toolsBrowser, 'sessionTimeoutSecs', '300')} type="number"
-                      onChange={(v) => debouncedPatch('tools', { browser: { sessionTimeoutSecs: parseInt(v) || 300 } })}
-                    />
-                  </FormCard>
-
-                  <div className="mb-4 mt-8">
-                    <h3 className="text-[14px] mb-4" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Permissions</h3>
-                  </div>
-                  <FormCard>
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <label className="text-[13px] block mb-1" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>
-                          Restrict to Workspace
-                          <Tip text="Security sandbox: when enabled, file read/write tools can only access files within the workspace directory. Prevents the agent from accessing system files or other projects." />
-                        </label>
-                        <p className="text-[12px]" style={{ color: '#666' }}>
-                          Limit file operations to the agent workspace directory
-                        </p>
-                      </div>
-                      <Toggle checked={bool(tools, 'restrictToWorkspace', false)}
-                        onChange={() => patchSection('tools', { restrictToWorkspace: !bool(tools, 'restrictToWorkspace', false) })}
-                      />
-                    </div>
-                  </FormCard>
-
-                  <FormCard title="Default Permission Level" description="Default tool permission level for all channels" tip="Controls which tools the agent can use. 'Full' allows everything. 'Standard' restricts to safe tools. You can override per-channel in the channel config.">
-                    <select className="w-full px-3 py-2 rounded border text-[13px]" style={{
-                      backgroundColor: 'var(--codex-bg)',
-                      borderColor: 'var(--codex-border)',
-                      color: 'var(--codex-fg)'
-                    }}
-                      value={str(asRecord(tools.permissions), 'defaultLevel', 'standard')}
-                      onChange={(e) => patchSection('tools', { permissions: { defaultLevel: e.target.value } })}
-                    >
-                      <option value="full">Full — all tools, no restrictions</option>
-                      <option value="admin">Admin — all tools, logged</option>
-                      <option value="elevated">Elevated — most tools, some require approval</option>
-                      <option value="standard">Standard — safe tools only</option>
-                      <option value="readOnly">Read Only — no write operations</option>
-                    </select>
-                  </FormCard>
-                </>
-              )}
-
-              {/* TASKS & TODO */}
-              {activeSection === 'tasks-todo' && (
-                <>
-                  <FormCard title="Creation Mode" description="How the agent handles task creation">
-                    <select className="w-full px-3 py-2 rounded border text-[13px]" style={{
-                      backgroundColor: 'var(--codex-bg)',
-                      borderColor: 'var(--codex-border)',
-                      color: 'var(--codex-fg)'
-                    }}
-                      value={str(todo, 'creationMode', 'ask-first')}
-                      onChange={(e) => patchSection('todo', { creationMode: e.target.value })}
-                    >
-                      <option value="ask-first">Ask First — gather details before creating</option>
-                      <option value="yolo">Yolo — auto-enrich from context, confirm before applying</option>
-                      <option value="party">Party — interactive brainstorming, one question at a time</option>
-                    </select>
-                  </FormCard>
-
-                  <div className="mb-4 mt-8">
-                    <h3 className="text-[14px] mb-4" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Enrichment</h3>
-                    <p className="text-[12px]" style={{ color: '#666' }}>Auto-infer missing task fields (priority, duration, due date) from keywords</p>
-                  </div>
-                  <FormCard>
-                    <div className="flex items-center justify-between mb-3">
-                      <label className="text-[13px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Enabled</label>
-                      <Toggle checked={bool(enrichment, 'enabled', true)}
-                        onChange={() => patchSection('todo', { enrichment: { enabled: !bool(enrichment, 'enabled', true) } })}
-                      />
-                    </div>
-                  </FormCard>
-                  <FormCard title="Auto Apply Threshold" description="Confidence threshold (0.0-1.0) for auto-applying enrichment suggestions" tip="When the enrichment engine infers task fields (priority, duration), it assigns a confidence score. Only suggestions above this threshold are automatically applied. Lower = more auto-fills, higher = fewer but more accurate.">
-                    <TextInput value={str(enrichment, 'autoApplyThreshold', '0.85')} type="number"
-                      onChange={(v) => debouncedPatch('todo', { enrichment: { autoApplyThreshold: parseFloat(v) || 0.85 } })}
-                    />
-                  </FormCard>
-                  <FormCard>
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <label className="text-[13px] block mb-1" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Use LLM</label>
-                        <p className="text-[12px]" style={{ color: '#666' }}>Use an LLM for richer enrichment instead of keyword matching only</p>
-                      </div>
-                      <Toggle checked={bool(enrichment, 'useLlm', false)}
-                        onChange={() => patchSection('todo', { enrichment: { useLlm: !bool(enrichment, 'useLlm', false) } })}
-                      />
-                    </div>
-                  </FormCard>
-
-                  <div className="mb-4 mt-8">
-                    <h3 className="text-[14px] mb-4" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Search</h3>
-                    <p className="text-[12px]" style={{ color: '#666' }}>Semantic search uses local embeddings for meaning-based task retrieval</p>
-                  </div>
-                  <FormCard>
-                    <div className="flex items-center justify-between mb-3">
-                      <label className="text-[13px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Semantic Search</label>
-                      <Toggle checked={bool(search, 'enabled', true)}
-                        onChange={() => patchSection('todo', { search: { enabled: !bool(search, 'enabled', true) } })}
-                      />
-                    </div>
-                  </FormCard>
-                  <FormCard title="Semantic Threshold" description="Minimum cosine similarity (0.0-1.0) for results. Lower = more results." tip="Cosine similarity measures how close two meanings are (1.0 = identical, 0.0 = unrelated). A threshold of 0.5 means only moderately similar results are returned. Lower it to 0.3 for broader matches.">
-                    <TextInput value={str(search, 'semanticThreshold', '0.5')} type="number"
-                      onChange={(v) => debouncedPatch('todo', { search: { semanticThreshold: parseFloat(v) || 0.5 } })}
-                    />
-                  </FormCard>
-                  <FormCard title="Embedding Model" description="Model used for generating vector embeddings" tip="The local embedding model that converts text to vectors. The default (paraphrase-multilingual-MiniLM-L12-v2) supports 50+ languages and runs entirely on your machine.">
-                    <TextInput value={str(search, 'embeddingModel', 'paraphrase-multilingual-MiniLM-L12-v2')}
-                      onChange={(v) => debouncedPatch('todo', { search: { embeddingModel: v } })}
-                    />
-                  </FormCard>
-                  <FormCard title="RRF K" description="Reciprocal Rank Fusion k parameter for hybrid search. Higher values give more weight to lower-ranked results." tip="Hybrid search merges keyword and semantic results using RRF. The K parameter controls blending: K=60 (default) balances both signals. Lower K emphasizes top-ranked results more; higher K gives more equal weight across all results.">
-                    <TextInput value={str(search, 'rrfK', '60')} type="number"
-                      onChange={(v) => debouncedPatch('todo', { search: { rrfK: parseInt(v) || 60 } })}
-                    />
-                  </FormCard>
-
-                  <div className="mb-4 mt-8">
-                    <h3 className="text-[14px] mb-4" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Notifications</h3>
-                  </div>
-                  <FormCard title="Notification Targets" description="Where to send notifications (e.g. os_native)">
-                    <TextInput value={arr(todoNotifications, 'targets').map(String).join(', ') || 'os_native'}
-                      onChange={(v) => {
-                        const targets = v.split(',').map(s => s.trim()).filter(Boolean);
-                        debouncedPatch('todo', { notifications: { targets } });
-                      }}
-                    />
-                  </FormCard>
-                  <FormCard>
-                    <div className="flex items-center justify-between mb-3">
-                      <label className="text-[13px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Focus Reminders</label>
-                      <Toggle checked={bool(todoNotifications, 'focusReminders', true)}
-                        onChange={() => patchSection('todo', { notifications: { focusReminders: !bool(todoNotifications, 'focusReminders', true) } })}
-                      />
-                    </div>
-                  </FormCard>
-                  <FormCard>
-                    <div className="flex items-center justify-between mb-3">
-                      <label className="text-[13px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Daily Digest</label>
-                      <Toggle checked={bool(todoNotifications, 'dailyDigest', true)}
-                        onChange={() => patchSection('todo', { notifications: { dailyDigest: !bool(todoNotifications, 'dailyDigest', true) } })}
-                      />
-                    </div>
-                  </FormCard>
-                  <FormCard title="Digest Time" description="Time to send the daily digest (HH:MM)">
-                    <TextInput value={str(todoNotifications, 'dailyDigestTime', '09:00')} type="time"
-                      onChange={(v) => debouncedPatch('todo', { notifications: { dailyDigestTime: v } })}
-                    />
-                  </FormCard>
-
-                  <div className="mb-4 mt-8">
-                    <h3 className="text-[14px] mb-4" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Focus</h3>
-                    <p className="text-[12px]" style={{ color: '#666' }}>Focus mode limits active tasks to prevent overwhelm</p>
-                  </div>
-                  <FormCard title="Max Slots" description="Maximum number of tasks in the focus queue">
-                    <TextInput value={str(todoFocus, 'maxSlots', '3')} type="number"
-                      onChange={(v) => debouncedPatch('todo', { focus: { maxSlots: parseInt(v) || 3 } })}
-                    />
-                  </FormCard>
-                  <FormCard title="Deadline Hours" description="Hours before a deadline when focus reminders begin" tip="The agent starts sending reminders this many hours before a task's due date. Set to 18 for morning-of reminders on tasks due that day.">
-                    <TextInput value={str(todoFocus, 'deadlineHours', '18')} type="number"
-                      onChange={(v) => debouncedPatch('todo', { focus: { deadlineHours: parseInt(v) || 18 } })}
-                    />
-                  </FormCard>
-
-                  <div className="mb-4 mt-8">
-                    <h3 className="text-[14px] mb-4" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Daily Planning</h3>
-                  </div>
-                  <FormCard>
-                    <div className="flex items-center justify-between mb-3">
-                      <label className="text-[13px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Enabled</label>
-                      <Toggle checked={bool(todoDailyPlanning, 'enabled', true)}
-                        onChange={() => patchSection('todo', { dailyPlanning: { enabled: !bool(todoDailyPlanning, 'enabled', true) } })}
-                      />
-                    </div>
-                  </FormCard>
-                  <FormCard title="Planning Time" description="Time to trigger daily planning session (HH:MM)">
-                    <TextInput value={str(todoDailyPlanning, 'planningTime', '08:00')} type="time"
-                      onChange={(v) => debouncedPatch('todo', { dailyPlanning: { planningTime: v } })}
-                    />
-                  </FormCard>
-                </>
-              )}
-
-              {/* CALENDAR */}
-              {activeSection === 'calendar' && (
-                <>
-                  <FormCard>
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex-1">
-                        <label className="text-[13px] block mb-1" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>
-                          Bidirectional Sync
-                        </label>
-                        <p className="text-[12px]" style={{ color: '#666' }}>
-                          Sync changes both ways between local and remote calendars
-                        </p>
-                      </div>
-                      <Toggle checked={bool(calendar, 'bidirectionalSync', true)}
-                        onChange={() => patchSection('calendar', { bidirectionalSync: !bool(calendar, 'bidirectionalSync', true) })}
-                      />
-                    </div>
-                  </FormCard>
-
-                  <FormCard title="Conflict Resolution" description="How to handle conflicting changes between local and remote">
-                    <select className="w-full px-3 py-2 rounded border text-[13px]" style={{
-                      backgroundColor: 'var(--codex-bg)',
-                      borderColor: 'var(--codex-border)',
-                      color: 'var(--codex-fg)'
-                    }}
-                      value={str(calendar, 'conflictResolution', 'server_wins')}
-                      onChange={(e) => patchSection('calendar', { conflictResolution: e.target.value })}
-                    >
-                      <option value="server_wins">Server Wins — remote changes take priority</option>
-                      <option value="local_wins">Local Wins — local changes take priority</option>
-                      <option value="newest_wins">Newest Wins — most recent change wins</option>
-                    </select>
-                  </FormCard>
-
-                  <div className="flex justify-between items-center my-6">
-                    <h3 className="text-[14px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Providers</h3>
-                  </div>
-
-                  {calendarProviders.length > 0 ? calendarProviders.map((prov, idx) => {
-                    const p = asRecord(prov);
-                    const provType = str(p, 'provider', str(p, 'type', 'genericCaldav'));
-                    const patchProv = (field: Record<string, unknown>) => {
-                      // Calendar providers is an array — rebuild the whole array with the patched entry
-                      const updated = [...calendarProviders.map(asRecord)];
-                      updated[idx] = { ...updated[idx], ...field };
-                      patchSection('calendar', { providers: updated });
-                    };
-                    return (
-                      <div key={idx} className="p-4 rounded-lg mb-4" style={{
-                        backgroundColor: '#141414',
-                        border: '1px solid var(--codex-border)'
-                      }}>
-                        <div className="flex items-center justify-between mb-4">
-                          <div>
-                            <div className="text-[13px] mb-1" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>
-                              {str(p, 'name', str(p, 'calendarName', `Provider ${idx + 1}`))}
-                            </div>
-                            <div className="text-[11px]" style={{ color: '#666' }}>
-                              {provType === 'apple' ? 'Apple iCloud' : provType === 'google' ? 'Google Calendar' : 'CalDAV'}
-                            </div>
-                          </div>
-                          <Toggle checked={bool(p, 'enabled', true)}
-                            onChange={() => patchProv({ enabled: !bool(p, 'enabled', true) })}
-                          />
-                        </div>
-                        <div className="space-y-3">
-                          <div>
-                            <label className="text-[11px] block mb-1" style={{ color: 'var(--codex-fg-subtle)' }}>CalDAV URL</label>
-                            <TextInput value={str(p, 'caldavUrl', str(p, 'url', ''))} placeholder="https://caldav.icloud.com"
-                              onChange={(v) => patchProv({ caldavUrl: v })}
-                            />
-                          </div>
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <label className="text-[11px] block mb-1" style={{ color: 'var(--codex-fg-subtle)' }}>Username</label>
-                              <TextInput value={str(p, 'username', '')} placeholder="user@example.com"
-                                onChange={(v) => patchProv({ username: v })}
-                              />
-                            </div>
-                            <div>
-                              <label className="text-[11px] block mb-1" style={{ color: 'var(--codex-fg-subtle)' }}>Password</label>
-                              <TextInput value={str(p, 'password', '')} secret
-                                onChange={(v) => patchProv({ password: v })}
-                              />
-                            </div>
-                          </div>
-                          <div>
-                            <label className="text-[11px] block mb-1" style={{ color: 'var(--codex-fg-subtle)' }}>Calendar Name</label>
-                            <TextInput value={str(p, 'calendarName', 'Personal')}
-                              onChange={(v) => patchProv({ calendarName: v })}
-                            />
-                          </div>
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <label className="text-[11px] block mb-1" style={{ color: 'var(--codex-fg-subtle)' }}>Sync Interval (seconds)</label>
-                              <TextInput value={str(p, 'syncIntervalSecs', '300')} type="number"
-                                onChange={(v) => patchProv({ syncIntervalSecs: parseInt(v) || 300 })}
-                              />
-                            </div>
-                            <div className="flex items-end pb-1">
-                              <label className="flex items-center gap-2 text-[11px] cursor-pointer" style={{ color: 'var(--codex-fg-subtle)' }}>
-                                <input type="checkbox" checked={bool(p, 'autoSyncDueDates', true)}
-                                  onChange={() => patchProv({ autoSyncDueDates: !bool(p, 'autoSyncDueDates', true) })}
-                                />
-                                Auto sync due dates
-                              </label>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }) : (
-                    <div className="p-4 rounded-lg mb-4" style={{
-                      backgroundColor: '#141414',
-                      border: '1px solid var(--codex-border)'
-                    }}>
-                      <div className="text-[13px] text-center py-4" style={{ color: '#666' }}>
-                        No calendar providers configured. Add one via <code className="text-[12px]" style={{ color: 'var(--codex-accent)' }}>klyntbot init</code>
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-
-              {/* CONVERSATION */}
-              {activeSection === 'conversation' && (
-                <>
-                  <div className="mb-4">
-                    <h3 className="text-[14px] mb-4" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Embedding</h3>
-                    <p className="text-[12px]" style={{ color: '#666' }}>Store conversation embeddings for semantic recall</p>
-                  </div>
-                  <FormCard>
-                    <div className="flex items-center justify-between mb-3">
-                      <label className="text-[13px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Enabled</label>
-                      <Toggle checked={bool(conversationEmbedding, 'enabled', true)}
-                        onChange={() => patchSection('conversation', { embedding: { enabled: !bool(conversationEmbedding, 'enabled', true) } })}
-                      />
-                    </div>
-                  </FormCard>
-                  <FormCard title="Exclude Channels" description="Channels to skip when generating embeddings (comma-separated)">
-                    <TextInput
-                      value={arr(conversationEmbedding, 'excludeChannels').join(', ')}
-                      placeholder="channel1, channel2"
-                      onChange={(v) => {
-                        const channels = v.split(',').map(s => s.trim()).filter(Boolean);
-                        debouncedPatch('conversation', { embedding: { excludeChannels: channels } });
-                      }}
-                    />
-                  </FormCard>
-                  <FormCard title="Exclude Roles" description="Message roles to skip (e.g. system, tool)">
-                    <TextInput
-                      value={arr(conversationEmbedding, 'excludeRoles').join(', ') || 'system, tool'}
-                      placeholder="system, tool"
-                      onChange={(v) => {
-                        const roles = v.split(',').map(s => s.trim()).filter(Boolean);
-                        debouncedPatch('conversation', { embedding: { excludeRoles: roles } });
-                      }}
-                    />
-                  </FormCard>
-
-                  <div className="mb-4 mt-8">
-                    <h3 className="text-[14px] mb-4" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Search</h3>
-                    <p className="text-[12px]" style={{ color: '#666' }}>Semantic search over past conversations</p>
-                  </div>
-                  <FormCard>
-                    <div className="flex items-center justify-between mb-3">
-                      <label className="text-[13px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Enabled</label>
-                      <Toggle checked={bool(conversationSearch, 'enabled', true)}
-                        onChange={() => patchSection('conversation', { search: { enabled: !bool(conversationSearch, 'enabled', true) } })}
-                      />
-                    </div>
-                  </FormCard>
-                  <FormCard title="Semantic Threshold" description="Minimum cosine similarity (0.0-1.0) for conversation search results" tip="Same concept as todo search threshold — controls how similar past conversations must be to your query. Lower values return more (possibly less relevant) results.">
-                    <TextInput value={str(conversationSearch, 'semanticThreshold', '0.5')} type="number"
-                      onChange={(v) => debouncedPatch('conversation', { search: { semanticThreshold: parseFloat(v) || 0.5 } })}
-                    />
-                  </FormCard>
-                  <FormCard title="Max Results" description="Maximum number of past conversations to return">
-                    <TextInput value={str(conversationSearch, 'maxResults', '20')} type="number"
-                      onChange={(v) => debouncedPatch('conversation', { search: { maxResults: parseInt(v) || 20 } })}
-                    />
-                  </FormCard>
-
-                  <div className="mb-4 mt-8">
-                    <h3 className="text-[14px] mb-4" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Session</h3>
-                  </div>
-                  <FormCard title="History Limit" description="Max messages kept in session context">
-                    <TextInput value={str(conversationSession, 'historyLimit', '50')} type="number"
-                      onChange={(v) => debouncedPatch('conversation', { session: { historyLimit: parseInt(v) || 50 } })}
-                    />
-                  </FormCard>
-                  <FormCard title="TTL (days)" description="Days before inactive sessions are eligible for cleanup">
-                    <TextInput value={str(conversationSession, 'ttlDays', '30')} type="number"
-                      onChange={(v) => debouncedPatch('conversation', { session: { ttlDays: parseInt(v) || 30 } })}
-                    />
-                  </FormCard>
-                  <FormCard title="Cleanup Interval (hours)" description="How often to check for expired sessions">
-                    <TextInput value={str(conversationSession, 'cleanupIntervalHours', '1')} type="number"
-                      onChange={(v) => debouncedPatch('conversation', { session: { cleanupIntervalHours: parseInt(v) || 1 } })}
-                    />
-                  </FormCard>
-
-                  <div className="mb-4 mt-8">
-                    <h3 className="text-[14px] mb-4" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Memory</h3>
-                    <p className="text-[12px]" style={{ color: '#666' }}>Long-term memory with time-based decay</p>
-                  </div>
-                  <FormCard title="Decay Half-Life (days)" description="Days for memory relevance to halve. Higher = slower forgetting." tip="Memories lose relevance over time using exponential decay. A half-life of 138 days means a memory is 50% as relevant after ~4.5 months. Increase to make the agent remember longer.">
-                    <TextInput value={str(conversationMemory, 'decayHalfLifeDays', '138')} type="number"
-                      onChange={(v) => debouncedPatch('conversation', { memory: { decayHalfLifeDays: parseInt(v) || 138 } })}
-                    />
-                  </FormCard>
-                  <FormCard title="Max Age (days)" description="Absolute maximum age before memories are pruned">
-                    <TextInput value={str(conversationMemory, 'maxAgeDays', '90')} type="number"
-                      onChange={(v) => debouncedPatch('conversation', { memory: { maxAgeDays: parseInt(v) || 90 } })}
-                    />
-                  </FormCard>
-                  <FormCard>
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex-1">
-                        <label className="text-[13px] flex items-center mb-1" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>
-                          Consolidation
-                          <Tip text="Periodically merges similar memories into a single summary. Reduces storage and prevents the agent from retrieving near-duplicate memories that dilute context." />
-                        </label>
-                        <p className="text-[12px]" style={{ color: '#666' }}>Merge similar memories to reduce redundancy</p>
-                      </div>
-                      <Toggle checked={bool(conversationMemory, 'consolidationEnabled', false)}
-                        onChange={() => patchSection('conversation', { memory: { consolidationEnabled: !bool(conversationMemory, 'consolidationEnabled', false) } })}
-                      />
-                    </div>
-                  </FormCard>
-                  <FormCard title="Maintenance Interval (hours)" description="How often to run memory maintenance (decay, pruning, consolidation)">
-                    <TextInput value={str(conversationMemory, 'maintenanceIntervalHours', '24')} type="number"
-                      onChange={(v) => debouncedPatch('conversation', { memory: { maintenanceIntervalHours: parseInt(v) || 24 } })}
-                    />
-                  </FormCard>
-                </>
-              )}
-
-              {/* LEARNING */}
-              {activeSection === 'learning' && (
-                <>
-                  <FormCard>
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex-1">
-                        <label className="text-[13px] block mb-1" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Enabled</label>
-                        <p className="text-[12px]" style={{ color: '#666' }}>Allow the agent to adapt strategies based on outcome analysis</p>
-                      </div>
-                      <Toggle checked={bool(learning, 'enabled', true)}
-                        onChange={() => patchSection('learning', { enabled: !bool(learning, 'enabled', true) })}
-                      />
-                    </div>
-                  </FormCard>
-                  <FormCard title="Analysis Interval (seconds)" description="How often to analyze outcomes for strategy adaptation" tip="The agent periodically reviews past tool call outcomes to learn which strategies work best. Default is 3600s (1 hour). Lower values mean faster adaptation but more CPU usage.">
-                    <TextInput value={str(learning, 'analysisIntervalSecs', '3600')} type="number"
-                      onChange={(v) => debouncedPatch('learning', { analysisIntervalSecs: parseInt(v) || 3600 })}
-                    />
-                  </FormCard>
-                  <FormCard title="Min Threshold" description="Minimum success rate (0.0-1.0) before reducing a strategy's weight" tip="Strategies with success rates below this threshold get deprioritized. Set low (0.3-0.4) to be tolerant of failure, or higher (0.6+) to aggressively drop underperforming strategies.">
-                    <TextInput value={str(learning, 'minThreshold', '0.4')} type="number"
-                      onChange={(v) => debouncedPatch('learning', { minThreshold: parseFloat(v) || 0.4 })}
-                    />
-                  </FormCard>
-                  <FormCard title="Max Threshold" description="Success rate (0.0-1.0) above which a strategy is strongly preferred">
-                    <TextInput value={str(learning, 'maxThreshold', '0.9')} type="number"
-                      onChange={(v) => debouncedPatch('learning', { maxThreshold: parseFloat(v) || 0.9 })}
-                    />
-                  </FormCard>
-                  <FormCard title="Min Outcomes for Adaptation" description="Number of outcomes required before adapting strategies" tip="Prevents premature adaptation based on too few data points. The agent waits until it has at least this many outcomes before adjusting strategy weights. Higher = more stable but slower to adapt.">
-                    <TextInput value={str(learning, 'minOutcomesForAdaptation', '50')} type="number"
-                      onChange={(v) => debouncedPatch('learning', { minOutcomesForAdaptation: parseInt(v) || 50 })}
-                    />
-                  </FormCard>
-                </>
-              )}
-
-              {/* CONFIDENCE */}
-              {activeSection === 'confidence' && (
-                <>
-                  <FormCard>
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex-1">
-                        <label className="text-[13px] block mb-1" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Enabled</label>
-                        <p className="text-[12px]" style={{ color: '#666' }}>Require minimum confidence before executing tool calls</p>
-                      </div>
-                      <Toggle checked={bool(confidence, 'enabled', true)}
-                        onChange={() => patchSection('confidence', { enabled: !bool(confidence, 'enabled', true) })}
-                      />
-                    </div>
-                  </FormCard>
-                  <FormCard title="Threshold" description="Global minimum confidence (0-1) required for tool execution" tip="Before calling a tool, the agent estimates how confident it is that the call is correct. Below this threshold, it will ask for confirmation or try a different approach instead.">
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.05"
-                      value={num(confidence, 'threshold', 0.7)}
-                      className="w-full"
-                      onChange={(e) => patchSection('confidence', { threshold: parseFloat(e.target.value) })}
-                    />
-                    <div className="flex justify-between text-[12px] mt-2" style={{ color: 'var(--codex-fg-subtle)' }}>
-                      <span>0</span>
-                      <span style={{ color: 'var(--codex-accent)' }}>{num(confidence, 'threshold', 0.7)}</span>
-                      <span>1</span>
-                    </div>
-                  </FormCard>
-                  <FormCard title="Tool Overrides" description="Per-tool confidence thresholds (overrides global threshold)" tip="Set higher thresholds for dangerous tools (e.g. file_write: 0.9) and lower for safe ones (e.g. web_search: 0.5). Overrides take precedence over the global threshold above.">
-                    <div className="space-y-2">
-                      {(() => {
-                        const overrides = asRecord(confidence.toolOverrides);
-                        const entries = Object.entries(overrides);
-                        return entries.map(([tool, threshold]) => (
-                          <div key={tool} className="flex gap-2">
-                            <TextInput value={tool} placeholder="Tool name" />
-                            <TextInput value={String(threshold)} placeholder="0.8"
-                              onChange={(v) => debouncedPatch('confidence', { toolOverrides: { [tool]: parseFloat(v) || 0 } })}
-                            />
-                            <button className="px-3 py-2 rounded border" style={{ borderColor: 'var(--codex-border)', color: 'var(--codex-fg-subtle)' }}
-                              onClick={() => patchSection('confidence', { toolOverrides: { [tool]: null } })}
-                            >
-                              <X className="w-4 h-4" strokeWidth={1.5} />
-                            </button>
-                          </div>
-                        ));
-                      })()}
-                      {Object.keys(asRecord(confidence.toolOverrides)).length === 0 && (
-                        <p className="text-[12px] py-1" style={{ color: '#555' }}>No per-tool overrides configured</p>
-                      )}
-                    </div>
-                  </FormCard>
-                </>
-              )}
-
-              {/* FINANCE */}
-              {activeSection === 'finance' && (() => {
-                const selectCss: React.CSSProperties = { backgroundColor: 'var(--codex-bg)', borderColor: 'var(--codex-border)', color: 'var(--codex-fg)' };
-                const inputCss: React.CSSProperties = { ...selectCss, fontFamily: 'var(--font-ui)' };
-                const currencies = ['USD', 'VND', 'EUR', 'GBP', 'JPY', 'KRW', 'CNY', 'THB', 'BTC', 'ETH', 'USDT'];
-                const currSymbols: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', JPY: '¥', KRW: '₩', VND: '₫', CNY: '¥', THB: '฿', BTC: '₿' };
-
-                // Key exchange rates to display relative to default currency
-                const defaultCur = str(finance, 'defaultCurrency', 'USD');
-                const rateDisplayCurrencies = ['USD', 'VND', 'EUR', 'GBP', 'JPY', 'BTC', 'ETH', 'USDT'].filter(c => c !== defaultCur);
-
-                const formatRate = (from: string, to: string) => {
-                  if (!liveRates) return '—';
-                  const fromR = liveRates[from] ?? 1;
-                  const toR = liveRates[to] ?? 1;
-                  const rate = toR / fromR; // how many "to" units per 1 "from" unit... actually inverted
-                  // We want: 1 FROM = X TO. rates are "value of 1 unit in USD"
-                  // 1 FROM in USD = fromR. 1 TO in USD = toR. So 1 FROM = fromR/toR TO units.
-                  const r = fromR / toR;
-                  if (r >= 100) return r.toLocaleString('en-US', { maximumFractionDigits: 0 });
-                  if (r >= 1) return r.toLocaleString('en-US', { maximumFractionDigits: 2 });
-                  if (r >= 0.01) return r.toLocaleString('en-US', { maximumFractionDigits: 4 });
-                  return r.toLocaleString('en-US', { maximumFractionDigits: 8 });
-                };
-
-                return (
-                <>
-                  {/* Save status indicator */}
-                  {saveStatus && (
-                    <div className="mb-4 px-4 py-2.5 rounded-lg text-[13px]" style={{
-                      backgroundColor: saveStatus.ok ? 'rgba(16,163,127,0.1)' : 'rgba(239,68,68,0.1)',
-                      color: saveStatus.ok ? '#10a37f' : '#ef4444',
-                      border: `1px solid ${saveStatus.ok ? 'rgba(16,163,127,0.3)' : 'rgba(239,68,68,0.3)'}`
-                    }}>
-                      {saveStatus.msg}
-                    </div>
-                  )}
-
-                  {/* ── General ──────────────────────────────────────────────── */}
-                  <FormCard>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <label className="text-[13px] block mb-0.5" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Finance Module</label>
-                        <p className="text-[12px]" style={{ color: '#666' }}>Enable financial tracking, budgets, and investment monitoring</p>
-                      </div>
-                      <Toggle checked={bool(finance, 'enabled', false)} onChange={() => patchSection('finance', { enabled: !bool(finance, 'enabled', false) })} />
-                    </div>
-                  </FormCard>
-
-                  <FormCard title="Display Currency" description="All amounts on the Finance page will be converted to this currency using live exchange rates">
-                    <select className="w-full px-3 py-2 rounded border text-[13px]" style={selectCss}
-                      value={str(finance, 'defaultCurrency', 'USD')}
-                      onChange={(e) => patchSection('finance', { defaultCurrency: e.target.value })}
-                    >
-                      {currencies.map(c => <option key={c} value={c}>{c}{currSymbols[c] ? ` (${currSymbols[c]})` : ''}</option>)}
-                    </select>
-                  </FormCard>
-
-                  <FormCard title="Proactivity Level" description="How proactively the AI agent manages your finances">
-                    <select className="w-full px-3 py-2 rounded border text-[13px]" style={selectCss}
-                      value={str(finance, 'proactivityLevel', 'full')}
-                      onChange={(e) => patchSection('finance', { proactivityLevel: e.target.value })}
-                    >
-                      <option value="full">Full — auto-categorize, budget alerts, spending insights</option>
-                      <option value="moderate">Moderate — alerts and categorization only</option>
-                      <option value="reactive">Reactive — only respond when asked</option>
-                    </select>
-                  </FormCard>
-
-                  {/* ── Exchange Rates ───────────────────────────────────────── */}
-                  <div className="mb-4 mt-8">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-[14px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Exchange Rates</h3>
-                      <button
-                        onClick={() => fetchRates(true)}
-                        disabled={ratesLoadingState}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] transition-colors"
-                        style={{ backgroundColor: '#1a1a1a', color: 'var(--codex-fg-subtle)', border: '1px solid var(--codex-border)', opacity: ratesLoadingState ? 0.5 : 1 }}
-                        onMouseEnter={(e) => { if (!ratesLoadingState) e.currentTarget.style.backgroundColor = '#222'; }}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1a1a1a'}
-                      >
-                        <RefreshCw className={`w-3 h-3 ${ratesLoadingState ? 'animate-spin' : ''}`} strokeWidth={1.5} />
-                        {ratesLoadingState ? 'Fetching...' : 'Refresh'}
-                      </button>
-                    </div>
-                    {ratesTimestamp && (
-                      <p className="text-[11px] mt-1" style={{ color: '#555' }}>Last updated: {ratesTimestamp} · Source: open.er-api.com + CoinGecko</p>
-                    )}
-                  </div>
-
-                  <div className="p-4 rounded-lg mb-4" style={{ backgroundColor: '#141414', border: '1px solid var(--codex-border)' }}>
-                    {!liveRates ? (
-                      <div className="flex items-center gap-2 py-2">
-                        <Loader2 className="w-4 h-4 animate-spin" style={{ color: 'var(--codex-accent)' }} strokeWidth={1.5} />
-                        <span className="text-[13px]" style={{ color: 'var(--codex-fg-subtle)' }}>Loading exchange rates...</span>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-2 gap-x-6 gap-y-2">
-                        {rateDisplayCurrencies.map(cur => {
-                          const rate = liveRates[cur];
-                          if (!rate) return null;
-                          return (
-                            <div key={cur} className="flex items-center justify-between py-1.5">
-                              <span className="text-[13px]" style={{ color: 'var(--codex-fg-muted)' }}>
-                                {currSymbols[cur] ? `${cur} (${currSymbols[cur]})` : cur}
-                              </span>
-                              <span className="text-[13px] tabular-nums" style={{ color: 'var(--codex-fg)', fontFamily: 'var(--font-mono)' }}>
-                                {formatRate(cur, defaultCur)}
-                              </span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                    <p className="text-[11px] mt-3 pt-3" style={{ color: '#555', borderTop: '1px solid var(--codex-border)' }}>
-                      Rates shown as 1 {defaultCur} = X units. Cached for 1 hour. Finance page auto-converts all amounts.
-                    </p>
-                  </div>
-
-                  {/* ── Inflation ────────────────────────────────────────────── */}
-                  <div className="mb-4 mt-8">
-                    <h3 className="text-[14px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Inflation</h3>
-                    <p className="text-[12px] mt-0.5" style={{ color: '#666' }}>Used for real-return calculations on goals and investments</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <FormCard title="Annual Rate (%)">
-                      <input type="number" step="0.1" className="w-full px-3 py-2 rounded border outline-none text-[13px]" style={inputCss}
-                        defaultValue={num(financeInflation, 'rate', 3.3)}
-                        onChange={(e) => debouncedPatch('finance', { inflation: { rate: parseFloat(e.target.value) || 0 } })}
-                      />
-                    </FormCard>
-                    <FormCard title="Source">
-                      <select className="w-full px-3 py-2 rounded border text-[13px]" style={selectCss}
-                        value={str(financeInflation, 'source', 'manual')}
-                        onChange={(e) => patchSection('finance', { inflation: { source: e.target.value } })}
-                      >
-                        <option value="manual">Manual</option>
-                        <option value="api">API (auto-fetch)</option>
-                      </select>
-                    </FormCard>
-                  </div>
-
-                  {/* ── Expected Returns ─────────────────────────────────────── */}
-                  <div className="mb-4 mt-8">
-                    <h3 className="text-[14px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Expected Annual Returns (%)</h3>
-                    <p className="text-[12px] mt-0.5" style={{ color: '#666' }}>Default return assumptions for goal projections</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    {[
-                      { key: 'stocks', label: 'Stocks', def: 10 },
-                      { key: 'crypto', label: 'Crypto', def: 15 },
-                      { key: 'realEstate', label: 'Real Estate', def: 8 },
-                      { key: 'bonds', label: 'Bonds', def: 5 },
-                    ].map(({ key, label, def }) => (
-                      <FormCard key={key} title={label}>
-                        <input type="number" step="0.5" className="w-full px-3 py-2 rounded border outline-none text-[13px]" style={inputCss}
-                          defaultValue={num(financeExpectedReturns, key, def)}
-                          onChange={(e) => debouncedPatch('finance', { expectedReturns: { [key]: parseFloat(e.target.value) || 0 } })}
-                        />
-                      </FormCard>
-                    ))}
-                  </div>
-
-                  {/* ── Budgeting ────────────────────────────────────────────── */}
-                  <div className="mb-4 mt-8">
-                    <h3 className="text-[14px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Budgeting</h3>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <FormCard title="Default Method">
-                      <select className="w-full px-3 py-2 rounded border text-[13px]" style={selectCss}
-                        value={str(financeBudgeting, 'defaultMethod', 'standard')}
-                        onChange={(e) => patchSection('finance', { budgeting: { defaultMethod: e.target.value } })}
-                      >
-                        <option value="standard">Standard (envelope)</option>
-                        <option value="six_jar">Six Jar Method</option>
-                      </select>
-                    </FormCard>
-                    <FormCard title="Alert Threshold (%)" description="Warn when spending exceeds this % of budget">
-                      <input type="number" min="0" max="100" className="w-full px-3 py-2 rounded border outline-none text-[13px]" style={inputCss}
-                        defaultValue={num(financeBudgeting, 'alertThreshold', 80)}
-                        onChange={(e) => debouncedPatch('finance', { budgeting: { alertThreshold: parseInt(e.target.value) || 80 } })}
-                      />
-                    </FormCard>
-                  </div>
-
-                  <FormCard title="Six Jar Ratios" description="Income allocation percentages (should sum to 100%)" tip="T. Harv Eker's six jar budgeting method splits income into 6 categories: Essentials (55%), Savings (10%), Investment (10%), Education (10%), Play (10%), Charity (5%). Adjust ratios to match your priorities.">
-                    <div className="grid grid-cols-3 gap-3 mt-1">
-                      {[
-                        { key: 'essentials', label: 'Essentials', def: 55 },
-                        { key: 'savings', label: 'Savings', def: 10 },
-                        { key: 'investment', label: 'Investment', def: 10 },
-                        { key: 'education', label: 'Education', def: 10 },
-                        { key: 'entertainment', label: 'Play', def: 10 },
-                        { key: 'charity', label: 'Charity', def: 5 },
-                      ].map(({ key, label, def }) => (
-                        <div key={key}>
-                          <label className="text-[11px] block mb-1" style={{ color: '#666' }}>{label}</label>
-                          <div className="relative">
-                            <input type="number" min="0" max="100" className="w-full px-3 py-1.5 pr-7 rounded border outline-none text-[13px]" style={inputCss}
-                              defaultValue={num(sixJarRatios, key, def)}
-                              onChange={(e) => debouncedPatch('finance', { budgeting: { sixJarRatios: { [key]: parseInt(e.target.value) || 0 } } })}
-                            />
-                            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[12px]" style={{ color: '#555' }}>%</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </FormCard>
-
-                  {/* ── Categories ────────────────────────────────────────────── */}
-                  <div className="mb-4 mt-8">
-                    <h3 className="text-[14px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Auto-Categorization</h3>
-                    <p className="text-[12px] mt-0.5" style={{ color: '#666' }}>AI-powered automatic transaction categorization</p>
-                  </div>
-                  <FormCard>
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <label className="text-[13px] block mb-0.5" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Auto-Categorize Transactions</label>
-                        <p className="text-[12px]" style={{ color: '#666' }}>Automatically assign categories to new transactions</p>
-                      </div>
-                      <Toggle checked={bool(financeCategories, 'autoCategorize', true)} onChange={() => patchSection('finance', { categories: { autoCategorize: !bool(financeCategories, 'autoCategorize', true) } })} />
-                    </div>
-                    <div>
-                      <label className="text-[12px] block mb-1.5" style={{ color: '#888' }}>Confidence Threshold</label>
-                      <div className="flex items-center gap-3">
-                        <input type="range" min="0" max="100" step="5" className="flex-1"
-                          value={Math.round(num(financeCategories, 'confidenceThreshold', 0.8) * 100)}
-                          onChange={(e) => patchSection('finance', { categories: { confidenceThreshold: parseInt(e.target.value) / 100 } })}
-                        />
-                        <span className="text-[13px] tabular-nums w-10 text-right" style={{ color: 'var(--codex-fg)', fontFamily: 'var(--font-mono)' }}>
-                          {Math.round(num(financeCategories, 'confidenceThreshold', 0.8) * 100)}%
-                        </span>
-                      </div>
-                      <p className="text-[11px] mt-1" style={{ color: '#555' }}>Only auto-apply when AI confidence exceeds this threshold</p>
-                    </div>
-                  </FormCard>
-
-                  {/* ── Price Refresh ──────────────────────────────────────── */}
-                  <div className="mb-4 mt-8">
-                    <h3 className="text-[14px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Price Refresh</h3>
-                    <p className="text-[12px] mt-0.5" style={{ color: '#666' }}>Automatic investment price updates</p>
-                  </div>
-                  <FormCard>
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <label className="text-[13px] block mb-0.5" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Auto-Refresh Prices</label>
-                        <p className="text-[12px]" style={{ color: '#666' }}>Periodically fetch current prices for investments</p>
-                      </div>
-                      <Toggle checked={bool(financePriceRefresh, 'enabled', true)} onChange={() => patchSection('finance', { priceRefresh: { enabled: !bool(financePriceRefresh, 'enabled', true) } })} />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-[12px] block mb-1.5" style={{ color: '#888' }}>Refresh Interval</label>
-                        <div className="relative">
-                          <input type="number" min="1" max="24" className="w-full px-3 py-2 pr-14 rounded border outline-none text-[13px]" style={inputCss}
-                            defaultValue={num(financePriceRefresh, 'intervalHours', 4)}
-                            onChange={(e) => debouncedPatch('finance', { priceRefresh: { intervalHours: parseInt(e.target.value) || 4 } })}
-                          />
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[12px]" style={{ color: '#555' }}>hours</span>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="text-[12px] block mb-1.5" style={{ color: '#888' }}>Cache TTL</label>
-                        <div className="relative">
-                          <input type="number" min="1" max="60" className="w-full px-3 py-2 pr-10 rounded border outline-none text-[13px]" style={inputCss}
-                            defaultValue={num(financePriceRefresh, 'cacheTtlMinutes', 15)}
-                            onChange={(e) => debouncedPatch('finance', { priceRefresh: { cacheTtlMinutes: parseInt(e.target.value) || 15 } })}
-                          />
-                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[12px]" style={{ color: '#555' }}>min</span>
-                        </div>
-                      </div>
-                    </div>
-                  </FormCard>
-
-                  {/* ── Scheduling ─────────────────────────────────────────── */}
-                  <div className="mb-4 mt-8">
-                    <h3 className="text-[14px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Scheduling</h3>
-                    <p className="text-[12px] mt-0.5" style={{ color: '#666' }}>Automated financial review and reporting schedule</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <FormCard title="Daily Review Time">
-                      <input type="time" className="w-full px-3 py-2 rounded border outline-none text-[13px]" style={inputCss}
-                        defaultValue={str(financeScheduling, 'dailyReviewTime', '21:00')}
-                        onChange={(e) => debouncedPatch('finance', { scheduling: { dailyReviewTime: e.target.value } })}
-                      />
-                    </FormCard>
-                    <FormCard title="Budget Check Time">
-                      <input type="time" className="w-full px-3 py-2 rounded border outline-none text-[13px]" style={inputCss}
-                        defaultValue={str(financeScheduling, 'budgetCheckTime', '09:00')}
-                        onChange={(e) => debouncedPatch('finance', { scheduling: { budgetCheckTime: e.target.value } })}
-                      />
-                    </FormCard>
-                  </div>
-                  <FormCard title="Weekly Report Day">
-                    <select className="w-full px-3 py-2 rounded border text-[13px]" style={selectCss}
-                      value={str(financeScheduling, 'weeklyReportDay', 'monday')}
-                      onChange={(e) => patchSection('finance', { scheduling: { weeklyReportDay: e.target.value } })}
-                    >
-                      {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(d => (
-                        <option key={d} value={d}>{d.charAt(0).toUpperCase() + d.slice(1)}</option>
-                      ))}
-                    </select>
-                  </FormCard>
-                </>
-                );
-              })()}
-
-              {/* PROJECTS */}
-              {activeSection === 'projects' && (
-                <>
-                  <FormCard>
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <label className="text-[13px] block mb-1" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>
-                          Enabled
-                        </label>
-                        <p className="text-[12px]" style={{ color: '#666' }}>
-                          Enable project management features (grouping tasks, tracking progress)
-                        </p>
-                      </div>
-                      <Toggle checked={bool(projects, 'enabled', true)}
-                        onChange={() => patchSection('project', { enabled: !bool(projects, 'enabled', true) })}
-                      />
-                    </div>
-                  </FormCard>
-                </>
-              )}
-
-              {/* PACKS & SKILLS */}
-              {activeSection === 'packs-skills' && (
-                <>
-                  <div className="mb-4">
-                    <h3 className="text-[14px] mb-3" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Feature Packs</h3>
-                    <p className="text-[12px] mb-4" style={{ color: '#666' }}>Enabled feature packs. Manage via <code className="text-[12px]" style={{ color: 'var(--codex-accent)' }}>klyntbot init --packs</code></p>
-                    <div className="flex flex-wrap gap-2">
-                      {(() => {
-                        const enabledPacks = arr(packs, 'enabled').map(String);
-                        if (enabledPacks.length === 0) {
-                          return (
-                            <span className="text-[12px]" style={{ color: '#666' }}>No packs enabled</span>
-                          );
-                        }
-                        return enabledPacks.map((pack) => (
-                          <span
-                            key={pack}
-                            className="px-3 py-1.5 rounded text-[12px] border"
-                            style={{
-                              backgroundColor: 'var(--codex-accent-dim)',
-                              borderColor: 'var(--codex-accent)',
-                              color: 'var(--codex-accent)'
-                            }}
-                          >
-                            {pack}
-                          </span>
-                        ));
-                      })()}
-                    </div>
-                  </div>
-
-                  <FormCard title="Enabled Skills" description="Skills activated by selected packs (comma-separated)">
-                    <TextInput value={arr(packs, 'enabledSkills').map(String).join(', ')}
-                      onChange={(v) => {
-                        const skills = v.split(',').map(s => s.trim()).filter(Boolean);
-                        debouncedPatch('packs', { enabledSkills: skills });
-                      }}
-                    />
-                  </FormCard>
-                </>
-              )}
-
-              {/* PLUGINS */}
-              {activeSection === 'plugins' && (
-                <>
-                  <FormCard>
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex-1">
-                        <label className="text-[13px] block mb-1" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Plugin System</label>
-                        <p className="text-[12px]" style={{ color: '#666' }}>Enable loading and running third-party plugins</p>
-                      </div>
-                      <Toggle checked={bool(plugins, 'enabled', true)}
-                        onChange={() => patchSection('plugins', { enabled: !bool(plugins, 'enabled', true) })}
-                      />
-                    </div>
-                  </FormCard>
-                  <FormCard title="Registry URL" description="Plugin registry endpoint for discovering available plugins">
-                    <TextInput value={str(plugins, 'registryUrl', 'https://plugins.klyntbot.io/index.json')}
-                      onChange={(v) => debouncedPatch('plugins', { registryUrl: v })}
-                    />
-                  </FormCard>
-                  <FormCard title="Sandbox Memory (MB)" description="Max memory each plugin sandbox can use" tip="Each plugin runs in an isolated sandbox with a memory cap. If a plugin exceeds this limit, it's terminated. Increase for memory-heavy plugins; lower for tighter security.">
-                    <TextInput value={str(plugins, 'sandboxMemoryMb', '64')} type="number"
-                      onChange={(v) => debouncedPatch('plugins', { sandboxMemoryMb: parseInt(v) || 64 })}
-                    />
-                  </FormCard>
-                  <FormCard>
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <label className="text-[13px] block mb-1" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Allow Network by Default</label>
-                        <p className="text-[12px]" style={{ color: '#666' }}>Grant network access to plugins unless explicitly denied</p>
-                      </div>
-                      <Toggle checked={bool(plugins, 'allowNetworkByDefault', false)}
-                        onChange={() => patchSection('plugins', { allowNetworkByDefault: !bool(plugins, 'allowNetworkByDefault', false) })}
-                      />
-                    </div>
-                  </FormCard>
-                </>
-              )}
-
-              {/* Bottom Status */}
-              <div className="flex items-center justify-between pt-6 border-t mt-8" style={{ borderColor: 'var(--codex-border)' }}>
-                <p className="text-[12px]" style={{ color: '#555' }}>
-                  Changes are saved automatically. Requires server restart for some settings.
-                </p>
-                {saving && (
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: 'var(--codex-accent)' }} strokeWidth={1.5} />
-                    <span className="text-[12px]" style={{ color: 'var(--codex-fg-subtle)' }}>Saving...</span>
-                  </div>
-                )}
-                {saveStatus && !saving && (
-                  <span className="text-[12px]" style={{ color: saveStatus.ok ? '#10a37f' : '#ef4444' }}>
-                    {saveStatus.msg}
-                  </span>
-                )}
-              </div>
-            </div>
           </div>
         </div>
       </div>
-
-      {/* Right Sidebar */}
-      <aside className="w-[260px] border-l overflow-y-auto" style={{
-        backgroundColor: 'var(--codex-bg-secondary)',
-        borderColor: 'var(--codex-border-subtle)'
-      }}>
-        {/* Save Status */}
-        <div className="border-b" style={{ borderColor: 'var(--codex-border-subtle)' }}>
-          <button
-            onClick={() => setSessionOpen(!sessionOpen)}
-            className="w-full px-4 py-3 flex items-center justify-between transition-colors"
-            style={{
-              backgroundColor: 'transparent',
-              color: 'var(--codex-fg-subtle)'
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--codex-fg-muted)'}
-            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--codex-fg-subtle)'}
-          >
-            <span className="text-[10px] uppercase tracking-wider" style={{ fontWeight: 500 }}>
-              Save Status
-            </span>
-            {sessionOpen ?
-              <ChevronDown className="w-3.5 h-3.5" strokeWidth={1.5} /> :
-              <ChevronRight className="w-3.5 h-3.5" strokeWidth={1.5} />
-            }
-          </button>
-          {sessionOpen && (
-            <div className="px-4 pb-4 space-y-3 text-[13px]">
-              <div className="flex justify-between items-center">
-                <span style={{ color: 'var(--codex-fg-subtle)' }}>Status</span>
-                <span style={{ color: saving ? 'var(--codex-accent)' : saveStatus ? (saveStatus.ok ? '#10a37f' : '#ef4444') : 'var(--codex-fg)' }}>
-                  {saving ? 'Saving...' : saveStatus ? saveStatus.msg : 'Ready'}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span style={{ color: 'var(--codex-fg-subtle)' }}>Auto-save</span>
-                <span style={{ color: '#10a37f' }}>On</span>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Config Status */}
-        <div>
-          <button
-            onClick={() => setConfigOpen(!configOpen)}
-            className="w-full px-4 py-3 flex items-center justify-between transition-colors"
-            style={{
-              backgroundColor: 'transparent',
-              color: 'var(--codex-fg-subtle)'
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--codex-fg-muted)'}
-            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--codex-fg-subtle)'}
-          >
-            <span className="text-[10px] uppercase tracking-wider" style={{ fontWeight: 500 }}>
-              Config Status
-            </span>
-            {configOpen ?
-              <ChevronDown className="w-3.5 h-3.5" strokeWidth={1.5} /> :
-              <ChevronRight className="w-3.5 h-3.5" strokeWidth={1.5} />
-            }
-          </button>
-          {configOpen && (
-            <div className="px-4 pb-4 space-y-3 text-[13px]">
-              <div>
-                <div className="text-[11px] mb-1" style={{ color: 'var(--codex-fg-subtle)' }}>
-                  Config file
-                </div>
-                <div style={{
-                  color: 'var(--codex-fg-muted)',
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: '11px'
-                }}>
-                  {str(config ?? {}, 'dataDir', '~/.klyntbot')}/config.json
-                </div>
-              </div>
-              <div>
-                <div className="text-[11px] mb-1" style={{ color: 'var(--codex-fg-subtle)' }}>
-                  Last modified
-                </div>
-                <div style={{ color: 'var(--codex-fg)' }}>
-                  {loading ? '...' : (error ? 'Unknown' : 'Loaded')}
-                </div>
-              </div>
-              <div>
-                <div className="text-[11px] mb-1" style={{ color: 'var(--codex-fg-subtle)' }}>
-                  Data directory
-                </div>
-                <div style={{
-                  color: 'var(--codex-fg-muted)',
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: '11px'
-                }}>
-                  {str(config ?? {}, 'dataDir', '~/.klyntbot')}
-                </div>
-              </div>
-              <div>
-                <div className="text-[11px] mb-1" style={{ color: 'var(--codex-fg-subtle)' }}>
-                  Sections loaded
-                </div>
-                <div style={{ color: 'var(--codex-fg)' }}>
-                  {config ? Object.keys(config).length : 0}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </aside>
-    </>
+    </div>
   );
 }
