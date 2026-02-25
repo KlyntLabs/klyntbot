@@ -305,6 +305,13 @@ export interface Skill {
   description: string;
   version: string;
   available: boolean;
+  always: boolean;
+  source: 'built-in' | 'workspace';
+  triggers: string[];
+  requiresBins: string[];
+  requiresEnv: string[];
+  content: string | null;
+  enabled: boolean;
 }
 
 // ── Status ────────────────────────────────────────────────────────────────────

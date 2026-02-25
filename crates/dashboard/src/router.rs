@@ -23,7 +23,7 @@ use crate::api::{
     projects::{create_project, delete_project, get_project, list_projects, patch_project},
     sessions::{delete_session, get_session, list_sessions},
     settings::{get_settings, get_settings_section, patch_settings_section},
-    skills::{list_skills, toggle_skill},
+    skills::{create_skill, delete_skill, get_skill, list_skills, update_skill},
     status::get_status,
     tasks::{
         add_time_entry, create_task, delete_focus, delete_task, get_attachments, get_subtasks,
@@ -75,7 +75,10 @@ use crate::ws::ws_handler;
 /// GET  /api/calendar/sync-status         → sync state
 /// POST /api/calendar/sync                → trigger sync
 /// GET  /api/skills                       → list skills
+/// POST /api/skills                       → create workspace skill
+/// GET  /api/skills/:name                 → get skill detail
 /// PATCH  /api/skills/:name               → toggle skill
+/// DELETE /api/skills/:name               → delete workspace skill
 /// GET  /api/finance/accounts             → accounts
 /// POST /api/finance/accounts             → create account
 /// … (full finance CRUD)
@@ -121,8 +124,8 @@ pub fn build(state: AppState) -> Router {
         .route("/calendar/sync-status", get(get_sync_status))
         .route("/calendar/sync", post(trigger_sync))
         // Skills
-        .route("/skills", get(list_skills))
-        .route("/skills/{name}", patch(toggle_skill))
+        .route("/skills", get(list_skills).post(create_skill))
+        .route("/skills/{name}", get(get_skill).patch(update_skill).delete(delete_skill))
         // Finance
         .route("/finance/accounts", get(list_accounts).post(create_account))
         .route("/finance/accounts/{id}", get(get_account).patch(patch_account).delete(delete_account))

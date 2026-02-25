@@ -80,5 +80,10 @@ export async function apiFetch<T>(
     throw new ApiError(response.status, message);
   }
 
+  // 204 No Content has no body — return undefined (cast to T for convenience)
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
   return response.json() as Promise<T>;
 }
