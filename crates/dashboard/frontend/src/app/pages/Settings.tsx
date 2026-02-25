@@ -1,10 +1,4 @@
-// Settings page — wired to GET /api/settings for read-only display.
-// TODO: Wire write operations:
-//   - PATCH /api/settings/:section (JSON merge-patch) for all toggle/input changes
-//   - Debounce input changes before PATCHing
-//   - "Save Changes" button should PATCH the active section
-//   - "Reset to Defaults" should confirm then PATCH with defaults
-import { useState } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   Sliders,
   Cpu,
@@ -30,6 +24,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { useApi } from '../../lib/hooks/useApi';
+import { apiFetch } from '../../lib/api';
 
 type SettingsSection = {
   id: string;
@@ -90,7 +85,95 @@ export default function Settings() {
   const [tokenOpen, setTokenOpen] = useState(true);
   const [configOpen, setConfigOpen] = useState(true);
 
-  const { data: config, loading, error, refetch } = useApi<ConfigMap>('/api/settings');
+  const { data: config, loading, error, refetch, setData: setConfig } = useApi<ConfigMap>('/api/settings');
+
+  // ── PATCH helper for saving settings ──────────────────────────────────────
+  const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<{ ok: boolean; msg: string } | null>(null);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  const patchSection = useCallback(async (section: string, patch: Record<string, unknown>) => {
+    setSaving(true);
+    setSaveStatus(null);
+    try {
+      await apiFetch(`/api/settings/${section}`, { method: 'PATCH', body: patch });
+      setSaveStatus({ ok: true, msg: 'Saved' });
+      // Optimistically merge the patch into local config
+      // (GET /api/settings reads in-memory state which doesn't update after PATCH)
+      setConfig(prev => {
+        if (!prev) return prev;
+        const sectionData = (prev[section] ?? {}) as Record<string, unknown>;
+        return { ...prev, [section]: { ...sectionData, ...patch } };
+      });
+    } catch (e: any) {
+      setSaveStatus({ ok: false, msg: e.message ?? 'Failed to save' });
+    } finally {
+      setSaving(false);
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = setTimeout(() => setSaveStatus(null), 3000);
+    }
+  }, [setConfig]);
+
+  // Debounced patch for text inputs
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const debouncedPatch = useCallback((section: string, patch: Record<string, unknown>, delay = 800) => {
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => patchSection(section, patch), delay);
+  }, [patchSection]);
+
+  // ── Exchange rate state (for finance section) ──────────────────────────────
+  const [liveRates, setLiveRates] = useState<Record<string, number> | null>(null);
+  const [ratesLoadingState, setRatesLoadingState] = useState(false);
+  const [ratesTimestamp, setRatesTimestamp] = useState<string | null>(null);
+
+  const fetchRates = useCallback(async (force = false) => {
+    setRatesLoadingState(true);
+    if (!force) {
+      try {
+        const cached = localStorage.getItem('klyntbot_exchange_rates');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (Date.now() - parsed.fetchedAt < 3_600_000) {
+            setLiveRates(parsed.rates);
+            setRatesTimestamp(new Date(parsed.fetchedAt).toLocaleString());
+            setRatesLoadingState(false);
+            return;
+          }
+        }
+      } catch { /* ignore */ }
+    }
+    try {
+      const fiatRes = await fetch('https://open.er-api.com/v6/latest/USD');
+      const rates: Record<string, number> = { USD: 1 };
+      if (fiatRes.ok) {
+        const data = await fiatRes.json();
+        if (data.result === 'success' && data.rates) {
+          for (const [cur, perUSD] of Object.entries(data.rates as Record<string, number>)) {
+            if (cur !== 'USD' && perUSD > 0) rates[cur] = 1 / perUSD;
+          }
+        }
+      }
+      try {
+        const cryptoRes = await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,tether&vs_currencies=usd');
+        if (cryptoRes.ok) {
+          const cd = await cryptoRes.json();
+          if (cd.bitcoin?.usd) rates.BTC = cd.bitcoin.usd;
+          if (cd.ethereum?.usd) rates.ETH = cd.ethereum.usd;
+          if (cd.tether?.usd) rates.USDT = cd.tether.usd;
+        }
+      } catch { /* crypto optional */ }
+      setLiveRates(rates);
+      const now = new Date();
+      setRatesTimestamp(now.toLocaleString());
+      localStorage.setItem('klyntbot_exchange_rates', JSON.stringify({ rates, fetchedAt: now.getTime() }));
+    } catch { /* silent */ }
+    setRatesLoadingState(false);
+  }, []);
+
+  // Load rates when finance section is active
+  useEffect(() => {
+    if (activeSection === 'finance' && !liveRates) fetchRates();
+  }, [activeSection, liveRates, fetchRates]);
 
   const sections: SettingsSection[] = [
     { id: 'general', label: 'General', icon: Sliders },
@@ -153,6 +236,8 @@ export default function Settings() {
   const financeBudgeting = asRecord(finance.budgeting);
   const financePriceRefresh = asRecord(finance.priceRefresh);
   const financeScheduling = asRecord(finance.scheduling);
+  const financeCategories = asRecord(finance.categories);
+  const sixJarRatios = asRecord(financeBudgeting.sixJarRatios);
   const projects = asRecord(config?.projects);
   const packs = asRecord(config?.packs);
   const plugins = asRecord(config?.plugins);
@@ -1198,129 +1283,311 @@ export default function Settings() {
               )}
 
               {/* FINANCE */}
-              {activeSection === 'finance' && (
+              {activeSection === 'finance' && (() => {
+                const selectCss: React.CSSProperties = { backgroundColor: 'var(--codex-bg)', borderColor: 'var(--codex-border)', color: 'var(--codex-fg)' };
+                const inputCss: React.CSSProperties = { ...selectCss, fontFamily: 'var(--font-ui)' };
+                const currencies = ['USD', 'VND', 'EUR', 'GBP', 'JPY', 'KRW', 'CNY', 'THB', 'BTC', 'ETH', 'USDT'];
+                const currSymbols: Record<string, string> = { USD: '$', EUR: '€', GBP: '£', JPY: '¥', KRW: '₩', VND: '₫', CNY: '¥', THB: '฿', BTC: '₿' };
+
+                // Key exchange rates to display relative to default currency
+                const defaultCur = str(finance, 'defaultCurrency', 'USD');
+                const rateDisplayCurrencies = ['USD', 'VND', 'EUR', 'GBP', 'JPY', 'BTC', 'ETH', 'USDT'].filter(c => c !== defaultCur);
+
+                const formatRate = (from: string, to: string) => {
+                  if (!liveRates) return '—';
+                  const fromR = liveRates[from] ?? 1;
+                  const toR = liveRates[to] ?? 1;
+                  const rate = toR / fromR; // how many "to" units per 1 "from" unit... actually inverted
+                  // We want: 1 FROM = X TO. rates are "value of 1 unit in USD"
+                  // 1 FROM in USD = fromR. 1 TO in USD = toR. So 1 FROM = fromR/toR TO units.
+                  const r = fromR / toR;
+                  if (r >= 100) return r.toLocaleString('en-US', { maximumFractionDigits: 0 });
+                  if (r >= 1) return r.toLocaleString('en-US', { maximumFractionDigits: 2 });
+                  if (r >= 0.01) return r.toLocaleString('en-US', { maximumFractionDigits: 4 });
+                  return r.toLocaleString('en-US', { maximumFractionDigits: 8 });
+                };
+
+                return (
                 <>
+                  {/* Save status indicator */}
+                  {saveStatus && (
+                    <div className="mb-4 px-4 py-2.5 rounded-lg text-[13px]" style={{
+                      backgroundColor: saveStatus.ok ? 'rgba(16,163,127,0.1)' : 'rgba(239,68,68,0.1)',
+                      color: saveStatus.ok ? '#10a37f' : '#ef4444',
+                      border: `1px solid ${saveStatus.ok ? 'rgba(16,163,127,0.3)' : 'rgba(239,68,68,0.3)'}`
+                    }}>
+                      {saveStatus.msg}
+                    </div>
+                  )}
+
+                  {/* ── General ──────────────────────────────────────────────── */}
                   <FormCard>
-                    <div className="flex items-center justify-between mb-3">
-                      <label className="text-[13px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Enabled</label>
-                      {/* TODO: Wire toggle to PATCH /api/settings/finance */}
-                      <Toggle checked={bool(finance, 'enabled', false)} onChange={() => {}} />
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <label className="text-[13px] block mb-0.5" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Finance Module</label>
+                        <p className="text-[12px]" style={{ color: '#666' }}>Enable financial tracking, budgets, and investment monitoring</p>
+                      </div>
+                      <Toggle checked={bool(finance, 'enabled', false)} onChange={() => patchSection('finance', { enabled: !bool(finance, 'enabled', false) })} />
                     </div>
                   </FormCard>
-                  <FormCard title="Default Currency">
-                    <TextInput value={str(finance, 'defaultCurrency', '')} />
-                  </FormCard>
-                  <FormCard title="Proactivity Level">
-                    <select className="w-full px-3 py-2 rounded border text-[13px]" style={{
-                      backgroundColor: 'var(--codex-bg)',
-                      borderColor: 'var(--codex-border)',
-                      color: 'var(--codex-fg)'
-                    }}
-                      value={str(finance, 'proactivityLevel', str(finance, 'proactivity', 'medium'))}
-                      onChange={() => {}} // TODO: Wire to PATCH /api/settings/finance
+
+                  <FormCard title="Display Currency" description="All amounts on the Finance page will be converted to this currency using live exchange rates">
+                    <select className="w-full px-3 py-2 rounded border text-[13px]" style={selectCss}
+                      value={str(finance, 'defaultCurrency', 'USD')}
+                      onChange={(e) => patchSection('finance', { defaultCurrency: e.target.value })}
                     >
-                      <option>low</option>
-                      <option>medium</option>
-                      <option>high</option>
+                      {currencies.map(c => <option key={c} value={c}>{c}{currSymbols[c] ? ` (${currSymbols[c]})` : ''}</option>)}
                     </select>
                   </FormCard>
 
-                  <div className="mb-4 mt-8">
-                    <h3 className="text-[14px] mb-4" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Inflation</h3>
-                  </div>
-                  <FormCard title="Rate (%)">
-                    <TextInput value={str(financeInflation, 'rate', '')} />
-                  </FormCard>
-                  <FormCard title="Source">
-                    <TextInput value={str(financeInflation, 'source', '')} />
-                  </FormCard>
-
-                  <div className="mb-4 mt-8">
-                    <h3 className="text-[14px] mb-4" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Expected Returns</h3>
-                  </div>
-                  <FormCard title="Stocks (%)">
-                    <TextInput value={str(financeExpectedReturns, 'stocks', '')} />
-                  </FormCard>
-                  <FormCard title="Crypto (%)">
-                    <TextInput value={str(financeExpectedReturns, 'crypto', '')} />
-                  </FormCard>
-                  <FormCard title="Real Estate (%)">
-                    <TextInput value={str(financeExpectedReturns, 'realEstate', '')} />
-                  </FormCard>
-                  <FormCard title="Bonds (%)">
-                    <TextInput value={str(financeExpectedReturns, 'bonds', '')} />
-                  </FormCard>
-
-                  <div className="mb-4 mt-8">
-                    <h3 className="text-[14px] mb-4" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Budgeting</h3>
-                  </div>
-                  <FormCard title="Default Method">
-                    <select className="w-full px-3 py-2 rounded border text-[13px]" style={{
-                      backgroundColor: 'var(--codex-bg)',
-                      borderColor: 'var(--codex-border)',
-                      color: 'var(--codex-fg)'
-                    }}
-                      value={str(financeBudgeting, 'defaultMethod', str(financeBudgeting, 'method', 'six-jar'))}
-                      onChange={() => {}} // TODO: Wire to PATCH /api/settings/finance
+                  <FormCard title="Proactivity Level" description="How proactively the AI agent manages your finances">
+                    <select className="w-full px-3 py-2 rounded border text-[13px]" style={selectCss}
+                      value={str(finance, 'proactivityLevel', 'full')}
+                      onChange={(e) => patchSection('finance', { proactivityLevel: e.target.value })}
                     >
-                      <option>six-jar</option>
-                      <option>50-30-20</option>
-                      <option>zero-based</option>
+                      <option value="full">Full — auto-categorize, budget alerts, spending insights</option>
+                      <option value="moderate">Moderate — alerts and categorization only</option>
+                      <option value="reactive">Reactive — only respond when asked</option>
                     </select>
                   </FormCard>
-                  <FormCard title="Alert Threshold (%)">
-                    <TextInput value={str(financeBudgeting, 'alertThreshold', '')} />
-                  </FormCard>
-                  <FormCard title="Six Jar Ratios" description="Essentials/Savings/Investment/Education/Entertainment/Charity">
-                    <TextInput value={str(financeBudgeting, 'sixJarRatios', '')} />
-                  </FormCard>
 
+                  {/* ── Exchange Rates ───────────────────────────────────────── */}
                   <div className="mb-4 mt-8">
-                    <h3 className="text-[14px] mb-4" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Price Refresh</h3>
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-[14px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Exchange Rates</h3>
+                      <button
+                        onClick={() => fetchRates(true)}
+                        disabled={ratesLoadingState}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] transition-colors"
+                        style={{ backgroundColor: '#1a1a1a', color: 'var(--codex-fg-subtle)', border: '1px solid var(--codex-border)', opacity: ratesLoadingState ? 0.5 : 1 }}
+                        onMouseEnter={(e) => { if (!ratesLoadingState) e.currentTarget.style.backgroundColor = '#222'; }}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#1a1a1a'}
+                      >
+                        <RefreshCw className={`w-3 h-3 ${ratesLoadingState ? 'animate-spin' : ''}`} strokeWidth={1.5} />
+                        {ratesLoadingState ? 'Fetching...' : 'Refresh'}
+                      </button>
+                    </div>
+                    {ratesTimestamp && (
+                      <p className="text-[11px] mt-1" style={{ color: '#555' }}>Last updated: {ratesTimestamp} · Source: open.er-api.com + CoinGecko</p>
+                    )}
                   </div>
-                  <FormCard>
-                    <div className="flex items-center justify-between mb-3">
-                      <label className="text-[13px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Enabled</label>
-                      {/* TODO: Wire toggle to PATCH /api/settings/finance */}
-                      <Toggle checked={bool(financePriceRefresh, 'enabled', false)} onChange={() => {}} />
+
+                  <div className="p-4 rounded-lg mb-4" style={{ backgroundColor: '#141414', border: '1px solid var(--codex-border)' }}>
+                    {!liveRates ? (
+                      <div className="flex items-center gap-2 py-2">
+                        <Loader2 className="w-4 h-4 animate-spin" style={{ color: 'var(--codex-accent)' }} strokeWidth={1.5} />
+                        <span className="text-[13px]" style={{ color: 'var(--codex-fg-subtle)' }}>Loading exchange rates...</span>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-x-6 gap-y-2">
+                        {rateDisplayCurrencies.map(cur => {
+                          const rate = liveRates[cur];
+                          if (!rate) return null;
+                          return (
+                            <div key={cur} className="flex items-center justify-between py-1.5">
+                              <span className="text-[13px]" style={{ color: 'var(--codex-fg-muted)' }}>
+                                {currSymbols[cur] ? `${cur} (${currSymbols[cur]})` : cur}
+                              </span>
+                              <span className="text-[13px] tabular-nums" style={{ color: 'var(--codex-fg)', fontFamily: 'var(--font-mono)' }}>
+                                {formatRate(cur, defaultCur)}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <p className="text-[11px] mt-3 pt-3" style={{ color: '#555', borderTop: '1px solid var(--codex-border)' }}>
+                      Rates shown as 1 {defaultCur} = X units. Cached for 1 hour. Finance page auto-converts all amounts.
+                    </p>
+                  </div>
+
+                  {/* ── Inflation ────────────────────────────────────────────── */}
+                  <div className="mb-4 mt-8">
+                    <h3 className="text-[14px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Inflation</h3>
+                    <p className="text-[12px] mt-0.5" style={{ color: '#666' }}>Used for real-return calculations on goals and investments</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <FormCard title="Annual Rate (%)">
+                      <input type="number" step="0.1" className="w-full px-3 py-2 rounded border outline-none text-[13px]" style={inputCss}
+                        defaultValue={num(financeInflation, 'rate', 3.3)}
+                        onChange={(e) => debouncedPatch('finance', { inflation: { rate: parseFloat(e.target.value) || 0 } })}
+                      />
+                    </FormCard>
+                    <FormCard title="Source">
+                      <select className="w-full px-3 py-2 rounded border text-[13px]" style={selectCss}
+                        value={str(financeInflation, 'source', 'manual')}
+                        onChange={(e) => patchSection('finance', { inflation: { source: e.target.value } })}
+                      >
+                        <option value="manual">Manual</option>
+                        <option value="api">API (auto-fetch)</option>
+                      </select>
+                    </FormCard>
+                  </div>
+
+                  {/* ── Expected Returns ─────────────────────────────────────── */}
+                  <div className="mb-4 mt-8">
+                    <h3 className="text-[14px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Expected Annual Returns (%)</h3>
+                    <p className="text-[12px] mt-0.5" style={{ color: '#666' }}>Default return assumptions for goal projections</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { key: 'stocks', label: 'Stocks', def: 10 },
+                      { key: 'crypto', label: 'Crypto', def: 15 },
+                      { key: 'realEstate', label: 'Real Estate', def: 8 },
+                      { key: 'bonds', label: 'Bonds', def: 5 },
+                    ].map(({ key, label, def }) => (
+                      <FormCard key={key} title={label}>
+                        <input type="number" step="0.5" className="w-full px-3 py-2 rounded border outline-none text-[13px]" style={inputCss}
+                          defaultValue={num(financeExpectedReturns, key, def)}
+                          onChange={(e) => debouncedPatch('finance', { expectedReturns: { [key]: parseFloat(e.target.value) || 0 } })}
+                        />
+                      </FormCard>
+                    ))}
+                  </div>
+
+                  {/* ── Budgeting ────────────────────────────────────────────── */}
+                  <div className="mb-4 mt-8">
+                    <h3 className="text-[14px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Budgeting</h3>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <FormCard title="Default Method">
+                      <select className="w-full px-3 py-2 rounded border text-[13px]" style={selectCss}
+                        value={str(financeBudgeting, 'defaultMethod', 'standard')}
+                        onChange={(e) => patchSection('finance', { budgeting: { defaultMethod: e.target.value } })}
+                      >
+                        <option value="standard">Standard (envelope)</option>
+                        <option value="six_jar">Six Jar Method</option>
+                      </select>
+                    </FormCard>
+                    <FormCard title="Alert Threshold (%)" description="Warn when spending exceeds this % of budget">
+                      <input type="number" min="0" max="100" className="w-full px-3 py-2 rounded border outline-none text-[13px]" style={inputCss}
+                        defaultValue={num(financeBudgeting, 'alertThreshold', 80)}
+                        onChange={(e) => debouncedPatch('finance', { budgeting: { alertThreshold: parseInt(e.target.value) || 80 } })}
+                      />
+                    </FormCard>
+                  </div>
+
+                  <FormCard title="Six Jar Ratios" description="Income allocation percentages (should sum to 100%)">
+                    <div className="grid grid-cols-3 gap-3 mt-1">
+                      {[
+                        { key: 'essentials', label: 'Essentials', def: 55 },
+                        { key: 'savings', label: 'Savings', def: 10 },
+                        { key: 'investment', label: 'Investment', def: 10 },
+                        { key: 'education', label: 'Education', def: 10 },
+                        { key: 'entertainment', label: 'Play', def: 10 },
+                        { key: 'charity', label: 'Charity', def: 5 },
+                      ].map(({ key, label, def }) => (
+                        <div key={key}>
+                          <label className="text-[11px] block mb-1" style={{ color: '#666' }}>{label}</label>
+                          <div className="relative">
+                            <input type="number" min="0" max="100" className="w-full px-3 py-1.5 pr-7 rounded border outline-none text-[13px]" style={inputCss}
+                              defaultValue={num(sixJarRatios, key, def)}
+                              onChange={(e) => debouncedPatch('finance', { budgeting: { sixJarRatios: { [key]: parseInt(e.target.value) || 0 } } })}
+                            />
+                            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[12px]" style={{ color: '#555' }}>%</span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </FormCard>
-                  <FormCard title="Interval (hours)">
-                    <TextInput value={str(financePriceRefresh, 'intervalHours', str(financePriceRefresh, 'interval', ''))} />
-                  </FormCard>
-                  <FormCard title="Cache TTL (minutes)">
-                    <TextInput value={str(financePriceRefresh, 'cacheTtlMinutes', str(financePriceRefresh, 'cacheTtl', ''))} />
+
+                  {/* ── Categories ────────────────────────────────────────────── */}
+                  <div className="mb-4 mt-8">
+                    <h3 className="text-[14px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Auto-Categorization</h3>
+                    <p className="text-[12px] mt-0.5" style={{ color: '#666' }}>AI-powered automatic transaction categorization</p>
+                  </div>
+                  <FormCard>
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <label className="text-[13px] block mb-0.5" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Auto-Categorize Transactions</label>
+                        <p className="text-[12px]" style={{ color: '#666' }}>Automatically assign categories to new transactions</p>
+                      </div>
+                      <Toggle checked={bool(financeCategories, 'autoCategorize', true)} onChange={() => patchSection('finance', { categories: { autoCategorize: !bool(financeCategories, 'autoCategorize', true) } })} />
+                    </div>
+                    <div>
+                      <label className="text-[12px] block mb-1.5" style={{ color: '#888' }}>Confidence Threshold</label>
+                      <div className="flex items-center gap-3">
+                        <input type="range" min="0" max="100" step="5" className="flex-1"
+                          value={Math.round(num(financeCategories, 'confidenceThreshold', 0.8) * 100)}
+                          onChange={(e) => patchSection('finance', { categories: { confidenceThreshold: parseInt(e.target.value) / 100 } })}
+                        />
+                        <span className="text-[13px] tabular-nums w-10 text-right" style={{ color: 'var(--codex-fg)', fontFamily: 'var(--font-mono)' }}>
+                          {Math.round(num(financeCategories, 'confidenceThreshold', 0.8) * 100)}%
+                        </span>
+                      </div>
+                      <p className="text-[11px] mt-1" style={{ color: '#555' }}>Only auto-apply when AI confidence exceeds this threshold</p>
+                    </div>
                   </FormCard>
 
+                  {/* ── Price Refresh ──────────────────────────────────────── */}
                   <div className="mb-4 mt-8">
-                    <h3 className="text-[14px] mb-4" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Scheduling</h3>
+                    <h3 className="text-[14px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Price Refresh</h3>
+                    <p className="text-[12px] mt-0.5" style={{ color: '#666' }}>Automatic investment price updates</p>
                   </div>
-                  <FormCard title="Daily Review Time">
-                    <TextInput value={str(financeScheduling, 'dailyReviewTime', '')} />
+                  <FormCard>
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <label className="text-[13px] block mb-0.5" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Auto-Refresh Prices</label>
+                        <p className="text-[12px]" style={{ color: '#666' }}>Periodically fetch current prices for investments</p>
+                      </div>
+                      <Toggle checked={bool(financePriceRefresh, 'enabled', true)} onChange={() => patchSection('finance', { priceRefresh: { enabled: !bool(financePriceRefresh, 'enabled', true) } })} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[12px] block mb-1.5" style={{ color: '#888' }}>Refresh Interval</label>
+                        <div className="relative">
+                          <input type="number" min="1" max="24" className="w-full px-3 py-2 pr-14 rounded border outline-none text-[13px]" style={inputCss}
+                            defaultValue={num(financePriceRefresh, 'intervalHours', 4)}
+                            onChange={(e) => debouncedPatch('finance', { priceRefresh: { intervalHours: parseInt(e.target.value) || 4 } })}
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[12px]" style={{ color: '#555' }}>hours</span>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-[12px] block mb-1.5" style={{ color: '#888' }}>Cache TTL</label>
+                        <div className="relative">
+                          <input type="number" min="1" max="60" className="w-full px-3 py-2 pr-10 rounded border outline-none text-[13px]" style={inputCss}
+                            defaultValue={num(financePriceRefresh, 'cacheTtlMinutes', 15)}
+                            onChange={(e) => debouncedPatch('finance', { priceRefresh: { cacheTtlMinutes: parseInt(e.target.value) || 15 } })}
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[12px]" style={{ color: '#555' }}>min</span>
+                        </div>
+                      </div>
+                    </div>
                   </FormCard>
+
+                  {/* ── Scheduling ─────────────────────────────────────────── */}
+                  <div className="mb-4 mt-8">
+                    <h3 className="text-[14px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Scheduling</h3>
+                    <p className="text-[12px] mt-0.5" style={{ color: '#666' }}>Automated financial review and reporting schedule</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <FormCard title="Daily Review Time">
+                      <input type="time" className="w-full px-3 py-2 rounded border outline-none text-[13px]" style={inputCss}
+                        defaultValue={str(financeScheduling, 'dailyReviewTime', '21:00')}
+                        onChange={(e) => debouncedPatch('finance', { scheduling: { dailyReviewTime: e.target.value } })}
+                      />
+                    </FormCard>
+                    <FormCard title="Budget Check Time">
+                      <input type="time" className="w-full px-3 py-2 rounded border outline-none text-[13px]" style={inputCss}
+                        defaultValue={str(financeScheduling, 'budgetCheckTime', '09:00')}
+                        onChange={(e) => debouncedPatch('finance', { scheduling: { budgetCheckTime: e.target.value } })}
+                      />
+                    </FormCard>
+                  </div>
                   <FormCard title="Weekly Report Day">
-                    <select className="w-full px-3 py-2 rounded border text-[13px]" style={{
-                      backgroundColor: 'var(--codex-bg)',
-                      borderColor: 'var(--codex-border)',
-                      color: 'var(--codex-fg)'
-                    }}
+                    <select className="w-full px-3 py-2 rounded border text-[13px]" style={selectCss}
                       value={str(financeScheduling, 'weeklyReportDay', 'monday')}
-                      onChange={() => {}} // TODO: Wire to PATCH /api/settings/finance
+                      onChange={(e) => patchSection('finance', { scheduling: { weeklyReportDay: e.target.value } })}
                     >
-                      <option>monday</option>
-                      <option>tuesday</option>
-                      <option>wednesday</option>
-                      <option>thursday</option>
-                      <option>friday</option>
-                      <option>saturday</option>
-                      <option>sunday</option>
+                      {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(d => (
+                        <option key={d} value={d}>{d.charAt(0).toUpperCase() + d.slice(1)}</option>
+                      ))}
                     </select>
-                  </FormCard>
-                  <FormCard title="Budget Check Time">
-                    <TextInput value={str(financeScheduling, 'budgetCheckTime', '')} />
                   </FormCard>
                 </>
-              )}
+                );
+              })()}
 
               {/* PROJECTS */}
               {activeSection === 'projects' && (

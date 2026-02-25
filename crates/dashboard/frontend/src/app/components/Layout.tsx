@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router';
 import {
   MessageSquare,
@@ -10,8 +10,10 @@ import {
   Settings,
   ChevronDown,
   DollarSign,
+  Check,
 } from 'lucide-react';
 import { useApi } from '../../lib/hooks/useApi';
+import { apiFetch } from '../../lib/api';
 import type { AgentStatus } from '../../lib/types';
 
 type NavItem = {
@@ -21,11 +23,92 @@ type NavItem = {
   path: string;
 };
 
+/** Well-known default models per provider. */
+const PROVIDER_MODELS: Record<string, string[]> = {
+  anthropic: ['anthropic/claude-opus-4-5', 'anthropic/claude-sonnet-4-5', 'anthropic/claude-haiku-3-5'],
+  openai: ['openai/gpt-4o', 'openai/gpt-4o-mini', 'openai/o1', 'openai/o3-mini'],
+  deepseek: ['deepseek-chat', 'deepseek-reasoner'],
+  gemini: ['gemini-2.0-flash', 'gemini-2.5-pro'],
+  groq: ['groq/llama-3.3-70b', 'groq/mixtral-8x7b'],
+  openrouter: ['openrouter/auto'],
+  moonshot: ['moonshot-v1-8k', 'moonshot-v1-32k'],
+  dashscope: ['qwen-max', 'qwen-plus', 'qwen-turbo'],
+  zhipu: ['glm-4', 'glm-4-flash'],
+  minimax: ['abab6.5s-chat'],
+  aihubmix: ['aihubmix/auto'],
+  vllm: ['vllm/default'],
+};
+
+const PERMISSION_LEVELS = [
+  { value: 'full', label: 'Full permissions', desc: 'All tools allowed' },
+  { value: 'admin', label: 'Admin', desc: 'All tools, all channels' },
+  { value: 'elevated', label: 'Elevated', desc: 'Most tools allowed' },
+  { value: 'standard', label: 'Standard', desc: 'Safe tools only' },
+  { value: 'readOnly', label: 'Read only', desc: 'No write operations' },
+];
+
 export function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [providerOpen, setProviderOpen] = useState(false);
   const [modelOpen, setModelOpen] = useState(false);
-  const { data: status } = useApi<AgentStatus>('/api/status');
+  const [permOpen, setPermOpen] = useState(false);
+  const { data: status, refetch: refetchStatus } = useApi<AgentStatus>('/api/status');
+
+  const providerRef = useRef<HTMLDivElement>(null);
+  const modelRef = useRef<HTMLDivElement>(null);
+  const permRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (providerRef.current && !providerRef.current.contains(e.target as Node)) setProviderOpen(false);
+      if (modelRef.current && !modelRef.current.contains(e.target as Node)) setModelOpen(false);
+      if (permRef.current && !permRef.current.contains(e.target as Node)) setPermOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const activeProvider = status?.provider ?? null;
+  const activeModel = status?.model ?? '';
+  const configuredProviders = status?.configuredProviders ?? [];
+  const activeModels = PROVIDER_MODELS[activeProvider ?? ''] ?? (activeModel ? [activeModel] : []);
+
+  const switchProvider = useCallback(async (provider: string) => {
+    // Pick first model of the new provider as default
+    const models = PROVIDER_MODELS[provider] ?? [`${provider}/default`];
+    try {
+      await apiFetch('/api/settings/agents', { method: 'PATCH', body: { defaults: { provider, model: models[0] } } });
+      refetchStatus();
+      setProviderOpen(false);
+    } catch { /* ignore */ }
+  }, [refetchStatus]);
+
+  const switchModel = useCallback(async (model: string) => {
+    try {
+      await apiFetch('/api/settings/agents', { method: 'PATCH', body: { defaults: { model } } });
+      refetchStatus();
+      setModelOpen(false);
+    } catch { /* ignore */ }
+  }, [refetchStatus]);
+
+  const switchPermission = useCallback(async (level: string) => {
+    try {
+      if (level === 'full') {
+        await apiFetch('/api/settings/tools', { method: 'PATCH', body: { permissions: null } });
+      } else {
+        await apiFetch('/api/settings/tools', { method: 'PATCH', body: { permissions: { defaultLevel: level } } });
+      }
+      refetchStatus();
+      setPermOpen(false);
+    } catch { /* ignore */ }
+  }, [refetchStatus]);
+
+  const shortModel = activeModel.includes('/') ? activeModel.split('/').pop()! : activeModel;
+  const displayPerm = status?.permissionLevel
+    ? `${status.permissionLevel[0].toUpperCase()}${status.permissionLevel.slice(1)} permissions`
+    : '—';
 
   const navItems: NavItem[] = [
     { id: 'chat', icon: MessageSquare, label: 'Chat', path: '/' },
@@ -207,15 +290,129 @@ export function Layout() {
         }}
       >
         <div className="flex items-center gap-3">
-          <button
-            className="flex items-center gap-1.5 hover:text-[var(--codex-fg-muted)] transition-colors"
-            onClick={() => setModelOpen(!modelOpen)}
-          >
-            <span>{status?.model ?? '—'}</span>
-            <ChevronDown className="w-3 h-3" />
-          </button>
+          {/* Provider dropdown */}
+          <div ref={providerRef}>
+            <button
+              className="flex items-center gap-1.5 hover:text-[var(--codex-fg-muted)] transition-colors"
+              onClick={() => { setProviderOpen(!providerOpen); setModelOpen(false); setPermOpen(false); }}
+            >
+              <span>{activeProvider ?? '—'}</span>
+              <ChevronDown className="w-3 h-3" style={{ transform: providerOpen ? 'rotate(180deg)' : undefined, transition: 'transform 0.15s' }} />
+            </button>
+          </div>
+          {providerOpen && providerRef.current && (() => {
+            const r = providerRef.current!.getBoundingClientRect();
+            return (
+              <div
+                className="fixed min-w-[180px] rounded-lg border py-1 shadow-xl"
+                style={{ left: r.left, bottom: window.innerHeight - r.top + 4, backgroundColor: 'var(--codex-bg-tertiary)', borderColor: 'var(--codex-border)', zIndex: 9999 }}
+              >
+                {configuredProviders.length === 0 ? (
+                  <div className="px-3 py-2 text-[11px]" style={{ color: 'var(--codex-fg-subtle)' }}>
+                    No providers configured.<br />Add API keys in Settings.
+                  </div>
+                ) : configuredProviders.map(prov => {
+                  const isActive = activeProvider === prov;
+                  return (
+                    <button
+                      key={prov}
+                      className="w-full px-3 py-1.5 flex items-center gap-2 text-left text-[11px] transition-colors"
+                      style={{ color: isActive ? 'var(--codex-accent)' : 'var(--codex-fg-muted)' }}
+                      onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'var(--codex-bg-secondary)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                      onClick={() => switchProvider(prov)}
+                    >
+                      <Check className="w-3 h-3 flex-shrink-0" style={{ opacity: isActive ? 1 : 0 }} strokeWidth={2} />
+                      <span>{prov}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })()}
+
+          <span style={{ color: 'var(--codex-border)' }}>/</span>
+
+          {/* Model dropdown */}
+          <div ref={modelRef}>
+            <button
+              className="flex items-center gap-1.5 hover:text-[var(--codex-fg-muted)] transition-colors"
+              onClick={() => { setModelOpen(!modelOpen); setProviderOpen(false); setPermOpen(false); }}
+            >
+              <span>{shortModel || '—'}</span>
+              <ChevronDown className="w-3 h-3" style={{ transform: modelOpen ? 'rotate(180deg)' : undefined, transition: 'transform 0.15s' }} />
+            </button>
+          </div>
+          {modelOpen && modelRef.current && (() => {
+            const r = modelRef.current!.getBoundingClientRect();
+            return (
+              <div
+                className="fixed min-w-[220px] rounded-lg border py-1 shadow-xl"
+                style={{ left: r.left, bottom: window.innerHeight - r.top + 4, backgroundColor: 'var(--codex-bg-tertiary)', borderColor: 'var(--codex-border)', zIndex: 9999 }}
+              >
+                {activeModels.map(m => {
+                  const isActive = activeModel === m;
+                  const label = m.includes('/') ? m.split('/').pop()! : m;
+                  return (
+                    <button
+                      key={m}
+                      className="w-full px-3 py-1.5 flex items-center gap-2 text-left text-[11px] transition-colors"
+                      style={{ color: isActive ? 'var(--codex-accent)' : 'var(--codex-fg-muted)' }}
+                      onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'var(--codex-bg-secondary)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                      onClick={() => switchModel(m)}
+                    >
+                      <Check className="w-3 h-3 flex-shrink-0" style={{ opacity: isActive ? 1 : 0 }} strokeWidth={2} />
+                      <span style={{ fontFamily: 'var(--font-mono)' }}>{label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })()}
+
           <span style={{ color: 'var(--codex-border)' }}>&middot;</span>
-          <span>Full permissions</span>
+
+          {/* Permission level dropdown */}
+          <div ref={permRef}>
+            <button
+              className="flex items-center gap-1.5 hover:text-[var(--codex-fg-muted)] transition-colors"
+              onClick={() => { setPermOpen(!permOpen); setProviderOpen(false); setModelOpen(false); }}
+            >
+              <span>{displayPerm}</span>
+              <ChevronDown className="w-3 h-3" style={{ transform: permOpen ? 'rotate(180deg)' : undefined, transition: 'transform 0.15s' }} />
+            </button>
+          </div>
+          {permOpen && permRef.current && (() => {
+            const r = permRef.current!.getBoundingClientRect();
+            return (
+              <div
+                className="fixed min-w-[220px] rounded-lg border py-1 shadow-xl"
+                style={{ left: r.left, bottom: window.innerHeight - r.top + 4, backgroundColor: 'var(--codex-bg-tertiary)', borderColor: 'var(--codex-border)', zIndex: 9999 }}
+              >
+                {PERMISSION_LEVELS.map(({ value, label, desc }) => {
+                  const isActive = status?.permissionLevel === value;
+                  return (
+                    <button
+                      key={value}
+                      className="w-full px-3 py-1.5 flex items-center gap-2 text-left text-[11px] transition-colors"
+                      style={{ color: isActive ? 'var(--codex-accent)' : 'var(--codex-fg-muted)' }}
+                      onMouseEnter={e => { e.currentTarget.style.backgroundColor = 'var(--codex-bg-secondary)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                      onClick={() => switchPermission(value)}
+                    >
+                      <Check className="w-3 h-3 flex-shrink-0" style={{ opacity: isActive ? 1 : 0 }} strokeWidth={2} />
+                      <div>
+                        <div>{label}</div>
+                        <div className="text-[10px]" style={{ color: 'var(--codex-fg-subtle)' }}>{desc}</div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })()}
+
           <span style={{ color: 'var(--codex-border)' }}>&middot;</span>
           <span>{status?.version ?? '—'}</span>
         </div>

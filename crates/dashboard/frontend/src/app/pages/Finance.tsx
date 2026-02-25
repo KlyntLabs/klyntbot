@@ -16,20 +16,113 @@ import type {
   FinanceLiability,
 } from '../../lib/types';
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Currency helpers ─────────────────────────────────────────────────────────
+
+/** Zero-decimal currencies — no subunits, display without fractional digits. */
+const ZERO_DECIMAL = new Set(['VND', 'JPY', 'KRW', 'IDR', 'CLP', 'ISK', 'HUF', 'TWD']);
+
+/** Prefix symbols for well-known currencies. */
+const SYMBOLS: Record<string, string> = {
+  USD: '$', EUR: '€', GBP: '£', JPY: '¥', KRW: '₩', VND: '₫',
+  CNY: '¥', THB: '฿', BTC: '₿',
+};
+
+const CURRENCY_OPTIONS = ['VND', 'USD', 'USDT', 'EUR', 'GBP', 'JPY', 'BTC', 'ETH'];
 
 function formatCents(cents: number, currency = 'USD'): string {
   const abs = Math.abs(cents);
-  const symbol = currency === 'USD' ? '$' : currency;
-  const formatted = (abs / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return cents < 0 ? `-${symbol}${formatted}` : `${symbol}${formatted}`;
+  const decimals = ZERO_DECIMAL.has(currency) ? 0 : 2;
+  const value = abs / 100;
+  const formatted = value.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  const sym = SYMBOLS[currency];
+  if (sym) return cents < 0 ? `-${sym}${formatted}` : `${sym}${formatted}`;
+  return cents < 0 ? `-${formatted} ${currency}` : `${formatted} ${currency}`;
 }
 
 function formatCentsSigned(cents: number, currency = 'USD'): string {
   const abs = Math.abs(cents);
-  const symbol = currency === 'USD' ? '$' : currency;
-  const formatted = (abs / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  return cents >= 0 ? `+${symbol}${formatted}` : `-${symbol}${formatted}`;
+  const decimals = ZERO_DECIMAL.has(currency) ? 0 : 2;
+  const value = abs / 100;
+  const formatted = value.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  const sym = SYMBOLS[currency];
+  if (sym) return cents >= 0 ? `+${sym}${formatted}` : `-${sym}${formatted}`;
+  return cents >= 0 ? `+${formatted} ${currency}` : `-${formatted} ${currency}`;
+}
+
+// ── Exchange rate conversion ────────────────────────────────────────────────
+
+/**
+ * All rates are "value of 1 unit in USD" — a universal reference.
+ * convertCents(cents, from, to) = cents * rates[from] / rates[to]
+ * Rates are ALWAYS fetched live — no hardcoded fallbacks for accuracy.
+ */
+
+const CRYPTO_IDS: Record<string, string> = { BTC: 'bitcoin', ETH: 'ethereum', USDT: 'tether' };
+const RATE_CACHE_KEY = 'klyntbot_exchange_rates';
+const RATE_TTL_MS = 3_600_000; // 1 hour
+
+interface CachedRates { rates: Record<string, number>; fetchedAt: number; }
+
+function loadCachedRates(): CachedRates | null {
+  try {
+    const raw = localStorage.getItem(RATE_CACHE_KEY);
+    if (!raw) return null;
+    const parsed: CachedRates = JSON.parse(raw);
+    if (Date.now() - parsed.fetchedAt < RATE_TTL_MS) return parsed;
+    return null;
+  } catch { return null; }
+}
+
+function saveCachedRates(rates: Record<string, number>) {
+  localStorage.setItem(RATE_CACHE_KEY, JSON.stringify({ rates, fetchedAt: Date.now() }));
+}
+
+/**
+ * Fetch live rates — all expressed as "value of 1 unit in USD".
+ * Fiat from open.er-api.com (free, no API key, 150+ currencies incl. VND).
+ * Crypto from CoinGecko (free, rate-limited).
+ */
+async function fetchLiveRates(): Promise<Record<string, number>> {
+  const rates: Record<string, number> = { USD: 1 };
+
+  // Fiat: open.er-api.com returns { rates: { VND: 25880, EUR: 0.849, ... } }
+  //       meaning 1 USD = 25880 VND, so 1 VND = 1/25880 USD
+  try {
+    const res = await fetch('https://open.er-api.com/v6/latest/USD');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.result === 'success' && data.rates) {
+        for (const [cur, perUSD] of Object.entries(data.rates as Record<string, number>)) {
+          if (cur !== 'USD' && perUSD > 0) rates[cur] = 1 / perUSD;
+        }
+      }
+    }
+  } catch { /* fall through — crypto still attempted */ }
+
+  // Crypto: price in USD → rates[symbol] = price directly
+  const cryptoIds = Object.values(CRYPTO_IDS).join(',');
+  try {
+    const res = await fetch(
+      `https://api.coingecko.com/api/v3/simple/price?ids=${cryptoIds}&vs_currencies=usd`
+    );
+    if (res.ok) {
+      const data = await res.json();
+      for (const [symbol, geckoId] of Object.entries(CRYPTO_IDS)) {
+        const price = data[geckoId]?.usd;
+        if (price) rates[symbol] = price;
+      }
+    }
+  } catch { /* fall through */ }
+
+  return rates;
+}
+
+/** Convert cents from one currency to another using the rates table. */
+function convertCents(cents: number, from: string, to: string, rates: Record<string, number>): number {
+  if (from === to) return cents;
+  const fromRate = rates[from] ?? 1;
+  const toRate = rates[to] ?? 1;
+  return Math.round(cents * fromRate / toRate);
 }
 
 function txColor(txType: string): string {
@@ -163,6 +256,20 @@ const inputCss: React.CSSProperties = {
 
 const selectCss: React.CSSProperties = { ...inputCss, cursor: 'pointer' };
 
+/** Renders a currency <select> with common options. */
+function CurrencySelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <select value={value} onChange={(e) => onChange(e.target.value)} style={selectCss}>
+      {CURRENCY_OPTIONS.map(c => <option key={c} value={c}>{c}{SYMBOLS[c] ? ` (${SYMBOLS[c]})` : ''}</option>)}
+    </select>
+  );
+}
+
+/** Returns a currency symbol for form labels, e.g. "₫" or "$" or "USDT". */
+function currLabel(currency: string): string {
+  return SYMBOLS[currency] ?? currency;
+}
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type Tab = 'dashboard' | 'transactions' | 'budgets' | 'investments' | 'goals' | 'accounts' | 'liabilities' | 'reports';
@@ -193,12 +300,16 @@ interface GoalForm { name: string; goalType: string; targetAmount: string; curre
 interface AccountForm { name: string; accountType: string; currency: string; balance: string; institution: string; notes: string; }
 interface LiabilityForm { name: string; liabilityType: string; principal: string; remaining: string; currency: string; interestRate: string; monthlyPayment: string; dueDate: string; notes: string; }
 
-const emptyTxForm: TxForm = { accountId: '', txType: 'expense', amount: '', currency: 'USD', txDate: todayStr(), category: '', counterparty: '', notes: '', isRecurring: false };
-const emptyBudgetForm: BudgetForm = { name: '', amount: '', currency: 'USD', period: 'monthly', method: 'envelope', jarType: '', category: '', startDate: todayStr(), alertThreshold: '80' };
-const emptyInvestmentForm: InvestmentForm = { portfolioId: 'main', assetType: 'stock', symbol: '', name: '', quantity: '', costBasis: '', currency: 'USD', currentPrice: '', currentValue: '', purchaseDate: '', notes: '' };
-const emptyGoalForm: GoalForm = { name: '', goalType: 'savings', targetAmount: '', currentAmount: '0', currency: 'USD', deadline: '', monthlyContribution: '', expectedReturnRate: '', inflationRate: '', notes: '' };
-const emptyAccountForm: AccountForm = { name: '', accountType: 'checking', currency: 'USD', balance: '0', institution: '', notes: '' };
-const emptyLiabilityForm: LiabilityForm = { name: '', liabilityType: 'loan', principal: '', remaining: '', currency: 'USD', interestRate: '', monthlyPayment: '', dueDate: '', notes: '' };
+function makeEmptyForms(cur: string) {
+  return {
+    tx: { accountId: '', txType: 'expense', amount: '', currency: cur, txDate: todayStr(), category: '', counterparty: '', notes: '', isRecurring: false } as TxForm,
+    budget: { name: '', amount: '', currency: cur, period: 'monthly', method: 'envelope', jarType: '', category: '', startDate: todayStr(), alertThreshold: '80' } as BudgetForm,
+    investment: { portfolioId: 'main', assetType: 'stock', symbol: '', name: '', quantity: '', costBasis: '', currency: cur, currentPrice: '', currentValue: '', purchaseDate: '', notes: '' } as InvestmentForm,
+    goal: { name: '', goalType: 'savings', targetAmount: '', currentAmount: '0', currency: cur, deadline: '', monthlyContribution: '', expectedReturnRate: '', inflationRate: '', notes: '' } as GoalForm,
+    account: { name: '', accountType: 'checking', currency: cur, balance: '0', institution: '', notes: '' } as AccountForm,
+    liability: { name: '', liabilityType: 'loan', principal: '', remaining: '', currency: cur, interestRate: '', monthlyPayment: '', dueDate: '', notes: '' } as LiabilityForm,
+  };
+}
 
 // ── Component ────────────────────────────────────────────────────────────────
 
@@ -207,6 +318,11 @@ export default function Finance() {
   const [budgetMode, setBudgetMode] = useState<BudgetMode>('standard');
   const [reportPeriod, setReportPeriod] = useState<ReportPeriod>('monthly');
   const [expandedGoal, setExpandedGoal] = useState<string | null>(null);
+
+  // Load default currency from config
+  const { data: financeSettings } = useApi<{ defaultCurrency?: string }>('/api/settings/finance');
+  const defaultCurrency = financeSettings?.defaultCurrency || 'VND';
+  const emptyForms = useMemo(() => makeEmptyForms(defaultCurrency), [defaultCurrency]);
 
   // Drawer state
   const [drawer, setDrawer] = useState<DrawerMode>({ kind: 'none' });
@@ -222,12 +338,12 @@ export default function Finance() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Form state
-  const [txForm, setTxForm] = useState<TxForm>(emptyTxForm);
-  const [budgetForm, setBudgetForm] = useState<BudgetForm>(emptyBudgetForm);
-  const [investmentForm, setInvestmentForm] = useState<InvestmentForm>(emptyInvestmentForm);
-  const [goalForm, setGoalForm] = useState<GoalForm>(emptyGoalForm);
-  const [accountForm, setAccountForm] = useState<AccountForm>(emptyAccountForm);
-  const [liabilityForm, setLiabilityForm] = useState<LiabilityForm>(emptyLiabilityForm);
+  const [txForm, setTxForm] = useState<TxForm>(emptyForms.tx);
+  const [budgetForm, setBudgetForm] = useState<BudgetForm>(emptyForms.budget);
+  const [investmentForm, setInvestmentForm] = useState<InvestmentForm>(emptyForms.investment);
+  const [goalForm, setGoalForm] = useState<GoalForm>(emptyForms.goal);
+  const [accountForm, setAccountForm] = useState<AccountForm>(emptyForms.account);
+  const [liabilityForm, setLiabilityForm] = useState<LiabilityForm>(emptyForms.liability);
 
   // ── API calls ──────────────────────────────────────────────────────────────
   const accounts = useApi<FinanceAccount[]>('/api/finance/accounts');
@@ -237,48 +353,104 @@ export default function Finance() {
   const goals = useApi<FinanceGoal[]>('/api/finance/goals');
   const liabilities = useApi<FinanceLiability[]>('/api/finance/liabilities');
 
+  // ── Live exchange rates (no fallbacks — always real rates) ──────────────
+  const [rates, setRates] = useState<Record<string, number> | null>(() => loadCachedRates()?.rates ?? null);
+  const [ratesLoading, setRatesLoading] = useState(!rates);
+  const [ratesError, setRatesError] = useState<string | null>(null);
+  const [ratesUpdatedAt, setRatesUpdatedAt] = useState<Date | null>(() => {
+    const cached = loadCachedRates();
+    return cached ? new Date(cached.fetchedAt) : null;
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    const cached = loadCachedRates();
+    if (cached) {
+      setRates(cached.rates);
+      setRatesUpdatedAt(new Date(cached.fetchedAt));
+      setRatesLoading(false);
+      return;
+    }
+    setRatesLoading(true);
+    setRatesError(null);
+    fetchLiveRates().then((live) => {
+      if (cancelled) return;
+      setRates(live);
+      setRatesUpdatedAt(new Date());
+      setRatesLoading(false);
+      saveCachedRates(live);
+    }).catch((err) => {
+      if (cancelled) return;
+      setRatesError(err?.message ?? 'Failed to fetch exchange rates');
+      setRatesLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [defaultCurrency]);
+
+  /** Convert cents from a source currency to the display currency.
+   *  When rates aren't loaded yet, returns cents unchanged (no conversion). */
+  const cvt = useCallback((cents: number, fromCurrency?: string) => {
+    const from = fromCurrency ?? defaultCurrency;
+    if (!rates || from === defaultCurrency) return cents;
+    return convertCents(cents, from, defaultCurrency, rates);
+  }, [defaultCurrency, rates]);
+
+  /** Format with rate conversion: converts to display currency then formats.
+   *  When rates aren't loaded, formats in the original currency. */
+  const fmt = useCallback((cents: number, currency?: string) => {
+    const from = currency ?? defaultCurrency;
+    if (!rates || from === defaultCurrency) return formatCents(cents, from);
+    return formatCents(convertCents(cents, from, defaultCurrency, rates), defaultCurrency);
+  }, [defaultCurrency, rates]);
+
+  const fmtSigned = useCallback((cents: number, currency?: string) => {
+    const from = currency ?? defaultCurrency;
+    if (!rates || from === defaultCurrency) return formatCentsSigned(cents, from);
+    return formatCentsSigned(convertCents(cents, from, defaultCurrency, rates), defaultCurrency);
+  }, [defaultCurrency, rates]);
+
   // ── Populate form on drawer open ───────────────────────────────────────────
   useEffect(() => {
     setMutationError(null);
     switch (drawer.kind) {
-      case 'create-transaction': setTxForm(emptyTxForm); break;
+      case 'create-transaction': setTxForm(emptyForms.tx); break;
       case 'edit-transaction': {
         const t = drawer.item;
         setTxForm({ accountId: t.accountId, txType: t.txType, amount: String(t.amount / 100), currency: t.currency, txDate: t.txDate, category: t.category ?? '', counterparty: t.counterparty ?? '', notes: t.notes ?? '', isRecurring: t.isRecurring });
         break;
       }
-      case 'create-budget': setBudgetForm(emptyBudgetForm); break;
+      case 'create-budget': setBudgetForm(emptyForms.budget); break;
       case 'edit-budget': {
         const b = drawer.item;
         setBudgetForm({ name: b.name, amount: String(b.amount / 100), currency: b.currency, period: b.period, method: b.method, jarType: b.jarType ?? '', category: b.category ?? '', startDate: b.startDate, alertThreshold: String(b.alertThreshold) });
         break;
       }
-      case 'create-investment': setInvestmentForm(emptyInvestmentForm); break;
+      case 'create-investment': setInvestmentForm(emptyForms.investment); break;
       case 'edit-investment': {
         const inv = drawer.item;
         setInvestmentForm({ portfolioId: inv.portfolioId, assetType: inv.assetType, symbol: inv.symbol ?? '', name: inv.name, quantity: String(inv.quantity), costBasis: String(inv.costBasis / 100), currency: inv.currency, currentPrice: inv.currentPrice != null ? String(inv.currentPrice / 100) : '', currentValue: inv.currentValue != null ? String(inv.currentValue / 100) : '', purchaseDate: inv.purchaseDate ?? '', notes: inv.notes ?? '' });
         break;
       }
-      case 'create-goal': setGoalForm(emptyGoalForm); break;
+      case 'create-goal': setGoalForm(emptyForms.goal); break;
       case 'edit-goal': {
         const g = drawer.item;
         setGoalForm({ name: g.name, goalType: g.goalType, targetAmount: String(g.targetAmount / 100), currentAmount: String(g.currentAmount / 100), currency: g.currency, deadline: g.deadline ?? '', monthlyContribution: g.monthlyContribution != null ? String(g.monthlyContribution / 100) : '', expectedReturnRate: g.expectedReturnRate != null ? String(g.expectedReturnRate) : '', inflationRate: g.inflationRate != null ? String(g.inflationRate) : '', notes: g.notes ?? '' });
         break;
       }
-      case 'create-account': setAccountForm(emptyAccountForm); break;
+      case 'create-account': setAccountForm(emptyForms.account); break;
       case 'edit-account': {
         const a = drawer.item;
         setAccountForm({ name: a.name, accountType: a.accountType, currency: a.currency, balance: String(a.balance / 100), institution: a.institution ?? '', notes: a.notes ?? '' });
         break;
       }
-      case 'create-liability': setLiabilityForm(emptyLiabilityForm); break;
+      case 'create-liability': setLiabilityForm(emptyForms.liability); break;
       case 'edit-liability': {
         const l = drawer.item;
         setLiabilityForm({ name: l.name, liabilityType: l.liabilityType, principal: String(l.principal / 100), remaining: String(l.remaining / 100), currency: l.currency, interestRate: l.interestRate != null ? String(l.interestRate) : '', monthlyPayment: l.monthlyPayment != null ? String(l.monthlyPayment / 100) : '', dueDate: l.dueDate ?? '', notes: l.notes ?? '' });
         break;
       }
     }
-  }, [drawer]);
+  }, [drawer, emptyForms]);
 
   // ── Derived data ───────────────────────────────────────────────────────────
 
@@ -290,12 +462,13 @@ export default function Finance() {
     const gls = goals.data ?? [];
     const liabs = liabilities.data ?? [];
 
-    const totalAccountBalance = accts.reduce((sum, a) => sum + a.balance, 0);
-    const totalInvestmentValue = invs.reduce((sum, inv) => sum + (inv.currentValue ?? 0), 0);
-    const totalLiabilityRemaining = liabs.reduce((sum, l) => sum + l.remaining, 0);
+    // All aggregations convert to the display currency first
+    const totalAccountBalance = accts.reduce((sum, a) => sum + cvt(a.balance, a.currency), 0);
+    const totalInvestmentValue = invs.reduce((sum, inv) => sum + cvt(inv.currentValue ?? 0, inv.currency), 0);
+    const totalLiabilityRemaining = liabs.reduce((sum, l) => sum + cvt(l.remaining, l.currency), 0);
     const netWorth = totalAccountBalance + totalInvestmentValue - totalLiabilityRemaining;
 
-    const totalCostBasis = invs.reduce((sum, inv) => sum + inv.costBasis, 0);
+    const totalCostBasis = invs.reduce((sum, inv) => sum + cvt(inv.costBasis, inv.currency), 0);
     const investmentPL = totalInvestmentValue - totalCostBasis;
     const investmentPLPct = totalCostBasis > 0 ? (investmentPL / totalCostBasis) * 100 : 0;
 
@@ -306,12 +479,12 @@ export default function Finance() {
       const d = new Date(tx.txDate);
       return d.getMonth() === currentMonth && d.getFullYear() === currentYear && tx.txType === 'expense';
     });
-    const totalMonthlySpending = monthlyExpenses.reduce((sum, tx) => sum + Math.abs(tx.amount), 0);
+    const totalMonthlySpending = monthlyExpenses.reduce((sum, tx) => sum + cvt(Math.abs(tx.amount), tx.currency), 0);
 
     const categorySpending: Record<string, number> = {};
     for (const tx of monthlyExpenses) {
       const cat = tx.category ?? 'Other';
-      categorySpending[cat] = (categorySpending[cat] ?? 0) + Math.abs(tx.amount);
+      categorySpending[cat] = (categorySpending[cat] ?? 0) + cvt(Math.abs(tx.amount), tx.currency);
     }
     const topCategories = Object.entries(categorySpending).sort(([, a], [, b]) => b - a).slice(0, 3);
 
@@ -329,7 +502,7 @@ export default function Finance() {
     const nextDeadline = activeGoals.filter((g) => g.deadline).sort((a, b) => new Date(a.deadline!).getTime() - new Date(b.deadline!).getTime())[0]?.deadline;
 
     return { netWorth, totalMonthlySpending, topCategories, budgetPct, activeBudgetCount: activeBudgets.length, onTrackCount, overBudgetCount, totalInvestmentValue, investmentPL, investmentPLPct, recentTxs, activeGoals, topGoals, nextDeadline };
-  }, [accounts.data, transactions.data, budgets.data, investments.data, goals.data, liabilities.data]);
+  }, [accounts.data, transactions.data, budgets.data, investments.data, goals.data, liabilities.data, cvt]);
 
   const dashboardLoading = accounts.loading || transactions.loading || budgets.loading || investments.loading || goals.loading || liabilities.loading;
   const dashboardError = accounts.error || transactions.error || budgets.error || investments.error || goals.error || liabilities.error;
@@ -410,7 +583,7 @@ export default function Finance() {
     if (!txForm.amount) { setMutationError('Amount is required'); return; }
     if (!txForm.txDate) { setMutationError('Date is required'); return; }
     runMutation(async () => {
-      const body = { accountId: txForm.accountId, txType: txForm.txType, amount: dollars(txForm.amount), currency: txForm.currency || 'USD', txDate: txForm.txDate, category: optStr(txForm.category), counterparty: optStr(txForm.counterparty), notes: optStr(txForm.notes), isRecurring: txForm.isRecurring };
+      const body = { accountId: txForm.accountId, txType: txForm.txType, amount: dollars(txForm.amount), currency: txForm.currency || defaultCurrency, txDate: txForm.txDate, category: optStr(txForm.category), counterparty: optStr(txForm.counterparty), notes: optStr(txForm.notes), isRecurring: txForm.isRecurring };
       if (drawer.kind === 'edit-transaction') {
         await apiFetch(`/api/finance/transactions/${drawer.item.id}`, { method: 'PATCH', body });
       } else {
@@ -423,7 +596,7 @@ export default function Finance() {
     if (!budgetForm.name) { setMutationError('Name is required'); return; }
     if (!budgetForm.amount) { setMutationError('Amount is required'); return; }
     runMutation(async () => {
-      const body = { name: budgetForm.name, amount: dollars(budgetForm.amount), currency: budgetForm.currency || 'USD', period: budgetForm.period, method: budgetForm.method, jarType: budgetForm.method === 'six-jar' ? optStr(budgetForm.jarType) : undefined, category: optStr(budgetForm.category), startDate: budgetForm.startDate, alertThreshold: parseInt(budgetForm.alertThreshold) || 80 };
+      const body = { name: budgetForm.name, amount: dollars(budgetForm.amount), currency: budgetForm.currency || defaultCurrency, period: budgetForm.period, method: budgetForm.method, jarType: budgetForm.method === 'six-jar' ? optStr(budgetForm.jarType) : undefined, category: optStr(budgetForm.category), startDate: budgetForm.startDate, alertThreshold: parseInt(budgetForm.alertThreshold) || 80 };
       if (drawer.kind === 'edit-budget') {
         await apiFetch(`/api/finance/budgets/${drawer.item.id}`, { method: 'PATCH', body: { name: body.name, amount: body.amount, category: body.category } });
       } else {
@@ -440,7 +613,7 @@ export default function Finance() {
       if (drawer.kind === 'edit-investment') {
         await apiFetch(`/api/finance/investments/${drawer.item.id}`, { method: 'PATCH', body: { currentPrice: optDollars(investmentForm.currentPrice), currentValue: optDollars(investmentForm.currentValue), quantity: optFloat(investmentForm.quantity), costBasis: optDollars(investmentForm.costBasis), notes: optStr(investmentForm.notes) } });
       } else {
-        await apiFetch('/api/finance/investments', { body: { portfolioId: investmentForm.portfolioId || 'main', assetType: investmentForm.assetType, symbol: optStr(investmentForm.symbol), name: investmentForm.name, quantity: parseFloat(investmentForm.quantity), costBasis: dollars(investmentForm.costBasis), currency: investmentForm.currency || 'USD', currentPrice: optDollars(investmentForm.currentPrice), currentValue: optDollars(investmentForm.currentValue), purchaseDate: optStr(investmentForm.purchaseDate), notes: optStr(investmentForm.notes) } });
+        await apiFetch('/api/finance/investments', { body: { portfolioId: investmentForm.portfolioId || 'main', assetType: investmentForm.assetType, symbol: optStr(investmentForm.symbol), name: investmentForm.name, quantity: parseFloat(investmentForm.quantity), costBasis: dollars(investmentForm.costBasis), currency: investmentForm.currency || defaultCurrency, currentPrice: optDollars(investmentForm.currentPrice), currentValue: optDollars(investmentForm.currentValue), purchaseDate: optStr(investmentForm.purchaseDate), notes: optStr(investmentForm.notes) } });
       }
     }, investments.refetch);
   }
@@ -452,7 +625,7 @@ export default function Finance() {
       if (drawer.kind === 'edit-goal') {
         await apiFetch(`/api/finance/goals/${drawer.item.id}`, { method: 'PATCH', body: { name: goalForm.name, currentAmount: dollars(goalForm.currentAmount), targetAmount: dollars(goalForm.targetAmount), monthlyContribution: optDollars(goalForm.monthlyContribution), expectedReturnRate: optFloat(goalForm.expectedReturnRate), inflationRate: optFloat(goalForm.inflationRate), deadline: optStr(goalForm.deadline) } });
       } else {
-        await apiFetch('/api/finance/goals', { body: { name: goalForm.name, goalType: goalForm.goalType, targetAmount: dollars(goalForm.targetAmount), currentAmount: optDollars(goalForm.currentAmount), currency: goalForm.currency || 'USD', deadline: optStr(goalForm.deadline), monthlyContribution: optDollars(goalForm.monthlyContribution), expectedReturnRate: optFloat(goalForm.expectedReturnRate), inflationRate: optFloat(goalForm.inflationRate), notes: optStr(goalForm.notes) } });
+        await apiFetch('/api/finance/goals', { body: { name: goalForm.name, goalType: goalForm.goalType, targetAmount: dollars(goalForm.targetAmount), currentAmount: optDollars(goalForm.currentAmount), currency: goalForm.currency || defaultCurrency, deadline: optStr(goalForm.deadline), monthlyContribution: optDollars(goalForm.monthlyContribution), expectedReturnRate: optFloat(goalForm.expectedReturnRate), inflationRate: optFloat(goalForm.inflationRate), notes: optStr(goalForm.notes) } });
       }
     }, goals.refetch);
   }
@@ -463,7 +636,7 @@ export default function Finance() {
       if (drawer.kind === 'edit-account') {
         await apiFetch(`/api/finance/accounts/${drawer.item.id}`, { method: 'PATCH', body: { name: accountForm.name, balance: dollars(accountForm.balance), institution: optStr(accountForm.institution), notes: optStr(accountForm.notes) } });
       } else {
-        await apiFetch('/api/finance/accounts', { body: { name: accountForm.name, accountType: accountForm.accountType, currency: accountForm.currency || 'USD', balance: optDollars(accountForm.balance), institution: optStr(accountForm.institution), notes: optStr(accountForm.notes) } });
+        await apiFetch('/api/finance/accounts', { body: { name: accountForm.name, accountType: accountForm.accountType, currency: accountForm.currency || defaultCurrency, balance: optDollars(accountForm.balance), institution: optStr(accountForm.institution), notes: optStr(accountForm.notes) } });
       }
     }, accounts.refetch);
   }
@@ -475,7 +648,7 @@ export default function Finance() {
       if (drawer.kind === 'edit-liability') {
         await apiFetch(`/api/finance/liabilities/${drawer.item.id}`, { method: 'PATCH', body: { remaining: optDollars(liabilityForm.remaining), monthlyPayment: optDollars(liabilityForm.monthlyPayment), interestRate: optFloat(liabilityForm.interestRate), notes: optStr(liabilityForm.notes) } });
       } else {
-        await apiFetch('/api/finance/liabilities', { body: { name: liabilityForm.name, liabilityType: liabilityForm.liabilityType, principal: dollars(liabilityForm.principal), remaining: optDollars(liabilityForm.remaining), currency: liabilityForm.currency || 'USD', interestRate: optFloat(liabilityForm.interestRate), monthlyPayment: optDollars(liabilityForm.monthlyPayment), dueDate: optStr(liabilityForm.dueDate), notes: optStr(liabilityForm.notes) } });
+        await apiFetch('/api/finance/liabilities', { body: { name: liabilityForm.name, liabilityType: liabilityForm.liabilityType, principal: dollars(liabilityForm.principal), remaining: optDollars(liabilityForm.remaining), currency: liabilityForm.currency || defaultCurrency, interestRate: optFloat(liabilityForm.interestRate), monthlyPayment: optDollars(liabilityForm.monthlyPayment), dueDate: optStr(liabilityForm.dueDate), notes: optStr(liabilityForm.notes) } });
       }
     }, liabilities.refetch);
   }
@@ -580,7 +753,7 @@ export default function Finance() {
                   onMouseEnter={(e) => e.currentTarget.style.filter = 'brightness(1.1)'}
                   onMouseLeave={(e) => e.currentTarget.style.filter = 'brightness(1)'}>
                   <div className="text-[12px] mb-3" style={{ color: '#888' }}>Net Worth</div>
-                  <div className="text-[28px] mb-2" style={{ color: 'var(--codex-fg)', fontWeight: 600 }}>{formatCents(dashboardSummary.netWorth)}</div>
+                  <div className="text-[28px] mb-2" style={{ color: 'var(--codex-fg)', fontWeight: 600 }}>{fmt(dashboardSummary.netWorth)}</div>
                   <div className="flex items-center gap-1.5 text-[13px]" style={{ color: dashboardSummary.netWorth >= 0 ? '#10a37f' : '#ef4444' }}>
                     {dashboardSummary.netWorth >= 0 ? <TrendingUp className="w-4 h-4" strokeWidth={1.5} /> : <TrendingDown className="w-4 h-4" strokeWidth={1.5} />}
                     {(accounts.data?.length ?? 0)} accounts
@@ -593,7 +766,7 @@ export default function Finance() {
                   onMouseEnter={(e) => e.currentTarget.style.filter = 'brightness(1.1)'}
                   onMouseLeave={(e) => e.currentTarget.style.filter = 'brightness(1)'}>
                   <div className="text-[12px] mb-3" style={{ color: '#888' }}>Monthly Spending</div>
-                  <div className="text-[28px] mb-3" style={{ color: 'var(--codex-fg)', fontWeight: 600 }}>{formatCents(dashboardSummary.totalMonthlySpending)}</div>
+                  <div className="text-[28px] mb-3" style={{ color: 'var(--codex-fg)', fontWeight: 600 }}>{fmt(dashboardSummary.totalMonthlySpending)}</div>
                   {dashboardSummary.topCategories.length > 0 ? (
                     <>
                       <div className="h-1 rounded-full mb-2 flex overflow-hidden" style={{ backgroundColor: '#0d0d0d' }}>
@@ -606,7 +779,7 @@ export default function Finance() {
                         })()}
                       </div>
                       <div className="text-[11px]" style={{ color: '#888' }}>
-                        {dashboardSummary.topCategories.map(([cat, amount]) => `${cat} ${formatCents(amount)}`).join(' \u00B7 ')}
+                        {dashboardSummary.topCategories.map(([cat, amount]) => `${cat} ${fmt(amount)}`).join(' \u00B7 ')}
                       </div>
                     </>
                   ) : (
@@ -653,10 +826,10 @@ export default function Finance() {
                   onMouseEnter={(e) => e.currentTarget.style.filter = 'brightness(1.1)'}
                   onMouseLeave={(e) => e.currentTarget.style.filter = 'brightness(1)'}>
                   <div className="text-[12px] mb-3" style={{ color: '#888' }}>Portfolio Value</div>
-                  <div className="text-[28px] mb-2" style={{ color: 'var(--codex-fg)', fontWeight: 600 }}>{formatCents(dashboardSummary.totalInvestmentValue)}</div>
+                  <div className="text-[28px] mb-2" style={{ color: 'var(--codex-fg)', fontWeight: 600 }}>{fmt(dashboardSummary.totalInvestmentValue)}</div>
                   <div className="flex items-center gap-1.5 text-[13px]" style={{ color: dashboardSummary.investmentPL >= 0 ? '#10a37f' : '#ef4444' }}>
                     {dashboardSummary.investmentPL >= 0 ? <TrendingUp className="w-4 h-4" strokeWidth={1.5} /> : <TrendingDown className="w-4 h-4" strokeWidth={1.5} />}
-                    {formatCentsSigned(dashboardSummary.investmentPL)} ({dashboardSummary.investmentPLPct >= 0 ? '+' : ''}{dashboardSummary.investmentPLPct.toFixed(1)}%)
+                    {fmtSigned(dashboardSummary.investmentPL)} ({dashboardSummary.investmentPLPct >= 0 ? '+' : ''}{dashboardSummary.investmentPLPct.toFixed(1)}%)
                   </div>
                 </div>
 
@@ -708,7 +881,7 @@ export default function Finance() {
                               <div className="text-[13px]" style={{ color: 'var(--codex-fg)' }}>{tx.counterparty ?? tx.category ?? tx.txType}</div>
                               <div className="text-[11px]" style={{ color: '#888' }}>{shortDate(tx.txDate)}</div>
                             </div>
-                            <div className="text-[13px]" style={{ color: txColor(tx.txType), fontFamily: 'var(--font-mono)' }}>{formatCentsSigned(displayAmount, tx.currency)}</div>
+                            <div className="text-[13px]" style={{ color: txColor(tx.txType), fontFamily: 'var(--font-mono)' }}>{fmtSigned(displayAmount, tx.currency)}</div>
                           </div>
                         );
                       })}
@@ -784,8 +957,8 @@ export default function Finance() {
                       </div>
                       <div className="flex items-center gap-3">
                         <div className="text-right">
-                          <div className="text-[14px]" style={{ color: txColor(tx.txType), fontFamily: 'var(--font-mono)', fontWeight: 500 }}>{formatCentsSigned(displayAmount, tx.currency)}</div>
-                          <div className="text-[11px]" style={{ color: '#888' }}>{shortDate(tx.txDate)} &middot; {accountName}</div>
+                          <div className="text-[14px]" style={{ color: txColor(tx.txType), fontFamily: 'var(--font-mono)', fontWeight: 500 }}>{fmtSigned(displayAmount, tx.currency)}</div>
+                          <div className="text-[11px]" style={{ color: '#888' }}>{shortDate(tx.txDate)} &middot; {accountName}{tx.currency !== defaultCurrency ? ` (${formatCents(displayAmount, tx.currency)})` : ''}</div>
                         </div>
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           {actionBtn(() => setDrawer({ kind: 'edit-transaction', item: tx }), <Pencil className="w-3.5 h-3.5" strokeWidth={1.5} />)}
@@ -848,7 +1021,7 @@ export default function Finance() {
                       <div className="h-2 rounded-full overflow-hidden mb-2" style={{ backgroundColor: '#1a1a1a' }}>
                         <div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', backgroundColor: barColor }} />
                       </div>
-                      <div className="text-[12px] text-right" style={{ color: 'var(--codex-fg-subtle)' }}>{formatCents(budget.spent)} / {formatCents(budget.amount)}</div>
+                      <div className="text-[12px] text-right" style={{ color: 'var(--codex-fg-subtle)' }}>{fmt(budget.spent, budget.currency)} / {fmt(budget.amount, budget.currency)}</div>
                     </div>
                   );
                 })}
@@ -880,7 +1053,7 @@ export default function Finance() {
                         </div>
                       </div>
                       <div className="text-center">
-                        <div className="text-[13px] mb-1" style={{ color: 'var(--codex-fg)' }}>{formatCents(jar.spent)} / {formatCents(jar.amount)}</div>
+                        <div className="text-[13px] mb-1" style={{ color: 'var(--codex-fg)' }}>{fmt(jar.spent, jar.currency)} / {fmt(jar.amount, jar.currency)}</div>
                         <div className="text-[11px]" style={{ color: '#888' }}>{jar.category ?? jar.jarType}</div>
                       </div>
                     </div>
@@ -916,12 +1089,12 @@ export default function Finance() {
                   <div className="mb-4 p-5 rounded-lg border flex items-center justify-between" style={{ backgroundColor: '#141414', borderColor: '#1a1a1a' }}>
                     <div>
                       <div className="text-[11px] mb-1" style={{ color: '#888' }}>Total Value</div>
-                      <div className="text-[20px]" style={{ color: 'var(--codex-fg)', fontWeight: 600 }}>{formatCents(totalValue)}</div>
+                      <div className="text-[20px]" style={{ color: 'var(--codex-fg)', fontWeight: 600 }}>{fmt(totalValue)}</div>
                     </div>
                     <div>
                       <div className="text-[11px] mb-1" style={{ color: '#888' }}>Total Gain/Loss</div>
                       <div className="text-[16px]" style={{ color: totalPL >= 0 ? '#10a37f' : '#ef4444', fontWeight: 500 }}>
-                        {formatCentsSigned(totalPL)} ({totalPLPct >= 0 ? '+' : ''}{totalPLPct.toFixed(1)}%)
+                        {fmtSigned(totalPL)} ({totalPLPct >= 0 ? '+' : ''}{totalPLPct.toFixed(1)}%)
                       </div>
                     </div>
                     {typeEntries.length > 0 && (
@@ -997,10 +1170,10 @@ export default function Finance() {
                                 <td className="px-4 py-3 text-[13px]" style={{ color: 'var(--codex-fg)' }}>{inv.name}</td>
                                 <td className="px-4 py-3 text-[12px]" style={{ color: '#888' }}>{inv.assetType}</td>
                                 <td className="px-4 py-3 text-[13px] text-right" style={{ color: 'var(--codex-fg)' }}>{inv.quantity % 1 === 0 ? inv.quantity : inv.quantity.toFixed(4)}</td>
-                                <td className="px-4 py-3 text-[13px] text-right" style={{ color: '#888', fontFamily: 'var(--font-mono)' }}>{formatCents(Math.round(avgCost), inv.currency)}</td>
-                                <td className="px-4 py-3 text-[13px] text-right" style={{ color: 'var(--codex-fg)', fontFamily: 'var(--font-mono)' }}>{inv.currentPrice != null ? formatCents(inv.currentPrice, inv.currency) : '-'}</td>
-                                <td className="px-4 py-3 text-[13px] text-right" style={{ color: 'var(--codex-fg)', fontFamily: 'var(--font-mono)', fontWeight: 500 }}>{formatCents(value, inv.currency)}</td>
-                                <td className="px-4 py-3 text-[13px] text-right" style={{ color: plColor, fontFamily: 'var(--font-mono)' }}>{formatCentsSigned(pl, inv.currency)} ({plPct >= 0 ? '+' : ''}{plPct.toFixed(1)}%)</td>
+                                <td className="px-4 py-3 text-[13px] text-right" style={{ color: '#888', fontFamily: 'var(--font-mono)' }}>{fmt(Math.round(avgCost), inv.currency)}</td>
+                                <td className="px-4 py-3 text-[13px] text-right" style={{ color: 'var(--codex-fg)', fontFamily: 'var(--font-mono)' }}>{inv.currentPrice != null ? fmt(inv.currentPrice, inv.currency) : '-'}</td>
+                                <td className="px-4 py-3 text-[13px] text-right" style={{ color: 'var(--codex-fg)', fontFamily: 'var(--font-mono)', fontWeight: 500 }}>{fmt(value, inv.currency)}</td>
+                                <td className="px-4 py-3 text-[13px] text-right" style={{ color: plColor, fontFamily: 'var(--font-mono)' }}>{fmtSigned(pl, inv.currency)} ({plPct >= 0 ? '+' : ''}{plPct.toFixed(1)}%)</td>
                                 <td className="px-4 py-3">
                                   <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
                                     {actionBtn(() => setDrawer({ kind: 'edit-investment', item: inv }), <Pencil className="w-3.5 h-3.5" strokeWidth={1.5} />)}
@@ -1056,7 +1229,7 @@ export default function Finance() {
                     deadlineDisplay = monthsLeft > 0 ? `${dateStr} \u00B7 ${monthsLeft} months left` : dateStr;
                   }
 
-                  const contribDisplay = goal.monthlyContribution != null ? `${formatCents(goal.monthlyContribution, goal.currency)}/mo` : null;
+                  const contribDisplay = goal.monthlyContribution != null ? `${fmt(goal.monthlyContribution, goal.currency)}/mo` : null;
 
                   return (
                     <div key={goal.id} className="group p-5 rounded-lg border" style={{ backgroundColor: '#141414', borderColor: '#1a1a1a' }}>
@@ -1080,7 +1253,7 @@ export default function Finance() {
                         <div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', backgroundColor: '#10a37f' }} />
                       </div>
                       <div className="flex items-center justify-between mb-3">
-                        <span className="text-[14px]" style={{ color: 'var(--codex-fg)', fontFamily: 'var(--font-mono)' }}>{formatCents(goal.currentAmount, goal.currency)} / {formatCents(goal.targetAmount, goal.currency)}</span>
+                        <span className="text-[14px]" style={{ color: 'var(--codex-fg)', fontFamily: 'var(--font-mono)' }}>{fmt(goal.currentAmount, goal.currency)} / {fmt(goal.targetAmount, goal.currency)}</span>
                         <span className="text-[14px]" style={{ color: '#10a37f', fontWeight: 500 }}>{pct}%</span>
                       </div>
 
@@ -1089,7 +1262,7 @@ export default function Finance() {
                           {goal.monthlyContribution != null && (
                             <div>
                               <div className="text-[11px] mb-0.5" style={{ color: '#888' }}>Monthly Contribution</div>
-                              <div className="text-[13px]" style={{ color: 'var(--codex-fg)' }}>{formatCents(goal.monthlyContribution, goal.currency)}</div>
+                              <div className="text-[13px]" style={{ color: 'var(--codex-fg)' }}>{fmt(goal.monthlyContribution, goal.currency)}</div>
                             </div>
                           )}
                           {goal.expectedReturnRate != null && (
@@ -1173,7 +1346,7 @@ export default function Finance() {
                           {confirmDeleteBtn(acct.id, '/api/finance/accounts', accounts.refetch)}
                         </div>
                       </div>
-                      <div className="text-[24px]" style={{ color: balColor, fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{formatCents(acct.balance, acct.currency)}</div>
+                      <div className="text-[24px]" style={{ color: balColor, fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{fmt(acct.balance, acct.currency)}</div>
                       {acct.notes && <div className="text-[11px] mt-2" style={{ color: '#888' }}>{acct.notes}</div>}
                     </div>
                   );
@@ -1188,7 +1361,7 @@ export default function Finance() {
           <div>
             <div className="mb-4 flex items-center justify-between">
               <div className="text-[13px]" style={{ color: 'var(--codex-fg-subtle)' }}>
-                Total: {formatCents((liabilities.data ?? []).reduce((s, l) => s + l.remaining, 0))} remaining
+                Total: {fmt((liabilities.data ?? []).reduce((s, l) => s + l.remaining, 0))} remaining
               </div>
               <button onClick={() => setDrawer({ kind: 'create-liability' })}
                 className="px-3 py-1.5 rounded-full text-[12px] flex items-center gap-1.5"
@@ -1222,7 +1395,7 @@ export default function Finance() {
                         </div>
                         <div className="flex items-center gap-2">
                           {liability.monthlyPayment != null && (
-                            <span className="text-[12px]" style={{ color: 'var(--codex-fg-subtle)' }}>{formatCents(liability.monthlyPayment, liability.currency)}/mo</span>
+                            <span className="text-[12px]" style={{ color: 'var(--codex-fg-subtle)' }}>{fmt(liability.monthlyPayment, liability.currency)}/mo</span>
                           )}
                           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             {actionBtn(() => setDrawer({ kind: 'edit-liability', item: liability }), <Pencil className="w-3.5 h-3.5" strokeWidth={1.5} />)}
@@ -1235,10 +1408,10 @@ export default function Finance() {
                       </div>
                       <div className="flex items-center justify-between text-[13px]">
                         <span style={{ color: 'var(--codex-fg)', fontFamily: 'var(--font-mono)' }}>
-                          {formatCents(liability.remaining, liability.currency)} remaining
+                          {fmt(liability.remaining, liability.currency)} remaining
                         </span>
                         <span style={{ color: '#888' }}>
-                          {pct}% paid ({formatCents(paidOff, liability.currency)} of {formatCents(liability.principal, liability.currency)})
+                          {pct}% paid ({fmt(paidOff, liability.currency)} of {fmt(liability.principal, liability.currency)})
                         </span>
                       </div>
                       {liability.dueDate && (
@@ -1276,34 +1449,34 @@ export default function Finance() {
 
           const periodLabel = reportPeriod === 'weekly' ? 'This Week' : reportPeriod === 'yearly' ? String(now.getFullYear()) : now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
           const periodTxs = txs.filter(tx => inPeriod(tx.txDate));
-          const totalIncome = periodTxs.filter(tx => tx.txType === 'income').reduce((s, tx) => s + tx.amount, 0);
-          const totalExpenses = periodTxs.filter(tx => tx.txType === 'expense').reduce((s, tx) => s + Math.abs(tx.amount), 0);
+          const totalIncome = periodTxs.filter(tx => tx.txType === 'income').reduce((s, tx) => s + cvt(tx.amount, tx.currency), 0);
+          const totalExpenses = periodTxs.filter(tx => tx.txType === 'expense').reduce((s, tx) => s + cvt(Math.abs(tx.amount), tx.currency), 0);
           const netCashFlow = totalIncome - totalExpenses;
           const savingsRate = totalIncome > 0 ? Math.round((netCashFlow / totalIncome) * 100) : 0;
 
-          // Spending by category
+          // Spending by category (converted to display currency)
           const expenseTxs = periodTxs.filter(tx => tx.txType === 'expense');
           const byCat: Record<string, number> = {};
-          for (const tx of expenseTxs) { const cat = tx.category ?? 'Other'; byCat[cat] = (byCat[cat] ?? 0) + Math.abs(tx.amount); }
+          for (const tx of expenseTxs) { const cat = tx.category ?? 'Other'; byCat[cat] = (byCat[cat] ?? 0) + cvt(Math.abs(tx.amount), tx.currency); }
           const catSorted = Object.entries(byCat).sort(([, a], [, b]) => b - a);
           const catMax = catSorted[0]?.[1] ?? 1;
           const catColors = ['#10a37f', '#3b82f6', '#f97316', '#8b5cf6', '#ec4899', '#14b8a6', '#eab308', '#666'];
 
-          // Income by source
+          // Income by source (converted to display currency)
           const incomeTxs = periodTxs.filter(tx => tx.txType === 'income');
           const bySrc: Record<string, number> = {};
-          for (const tx of incomeTxs) { const src = tx.category ?? tx.counterparty ?? 'Other'; bySrc[src] = (bySrc[src] ?? 0) + tx.amount; }
+          for (const tx of incomeTxs) { const src = tx.category ?? tx.counterparty ?? 'Other'; bySrc[src] = (bySrc[src] ?? 0) + cvt(tx.amount, tx.currency); }
           const srcSorted = Object.entries(bySrc).sort(([, a], [, b]) => b - a);
           const srcMax = srcSorted[0]?.[1] ?? 1;
           const srcColors = ['#10a37f', '#3b82f6', '#14b8a6', '#8b5cf6', '#666'];
 
-          // Top expenses
-          const topExpenses = [...expenseTxs].sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount)).slice(0, 5);
+          // Top expenses (sort by converted amount)
+          const topExpenses = [...expenseTxs].sort((a, b) => cvt(Math.abs(b.amount), b.currency) - cvt(Math.abs(a.amount), a.currency)).slice(0, 5);
           const acctMap = new Map(acctList.map(a => [a.id, a.name]));
 
-          // Net worth
-          const totalAssets = acctList.filter(a => !a.isArchived && a.balance >= 0).reduce((s, a) => s + a.balance, 0);
-          const totalLiab = liabList.reduce((s, l) => s + l.remaining, 0);
+          // Net worth (converted)
+          const totalAssets = acctList.filter(a => !a.isArchived && a.balance >= 0).reduce((s, a) => s + cvt(a.balance, a.currency), 0);
+          const totalLiab = liabList.reduce((s, l) => s + cvt(l.remaining, l.currency), 0);
           const netWorth = totalAssets - totalLiab;
 
           const cardStyle: React.CSSProperties = { backgroundColor: '#141414', borderColor: '#1a1a1a' };
@@ -1332,15 +1505,15 @@ export default function Finance() {
                   <div className="grid grid-cols-4 gap-3">
                     <div className="p-4 rounded-lg border" style={cardStyle}>
                       <div className="text-[11px] uppercase tracking-wider mb-1" style={{ color: '#888' }}>Total Income</div>
-                      <div className="text-[18px]" style={{ color: '#10a37f', fontFamily: 'var(--font-mono)' }}>{formatCents(totalIncome)}</div>
+                      <div className="text-[18px]" style={{ color: '#10a37f', fontFamily: 'var(--font-mono)' }}>{fmt(totalIncome)}</div>
                     </div>
                     <div className="p-4 rounded-lg border" style={cardStyle}>
                       <div className="text-[11px] uppercase tracking-wider mb-1" style={{ color: '#888' }}>Total Expenses</div>
-                      <div className="text-[18px]" style={{ color: '#ef4444', fontFamily: 'var(--font-mono)' }}>{formatCents(totalExpenses)}</div>
+                      <div className="text-[18px]" style={{ color: '#ef4444', fontFamily: 'var(--font-mono)' }}>{fmt(totalExpenses)}</div>
                     </div>
                     <div className="p-4 rounded-lg border" style={cardStyle}>
                       <div className="text-[11px] uppercase tracking-wider mb-1" style={{ color: '#888' }}>Net Cash Flow</div>
-                      <div className="text-[18px]" style={{ color: netCashFlow >= 0 ? '#10a37f' : '#ef4444', fontFamily: 'var(--font-mono)' }}>{formatCentsSigned(netCashFlow)}</div>
+                      <div className="text-[18px]" style={{ color: netCashFlow >= 0 ? '#10a37f' : '#ef4444', fontFamily: 'var(--font-mono)' }}>{fmtSigned(netCashFlow)}</div>
                     </div>
                     <div className="p-4 rounded-lg border" style={cardStyle}>
                       <div className="text-[11px] uppercase tracking-wider mb-1" style={{ color: '#888' }}>Savings Rate</div>
@@ -1360,11 +1533,11 @@ export default function Finance() {
                               <div className="flex-1 h-6 rounded overflow-hidden" style={{ backgroundColor: '#1a1a1a' }}>
                                 <div style={{ width: `${(amount / catMax) * 100}%`, height: '100%', backgroundColor: catColors[i % catColors.length], borderRadius: '4px', transition: 'width 0.3s ease' }} />
                               </div>
-                              <div className="w-24 text-right text-[13px]" style={{ color: 'var(--codex-fg)', fontFamily: 'var(--font-mono)' }}>{formatCents(amount)}</div>
+                              <div className="w-24 text-right text-[13px]" style={{ color: 'var(--codex-fg)', fontFamily: 'var(--font-mono)' }}>{fmt(amount)}</div>
                             </div>
                           ))}
                           <div className="flex justify-end pt-2 border-t" style={{ borderColor: '#222' }}>
-                            <span className="text-[13px]" style={{ color: 'var(--codex-fg-muted)', fontFamily: 'var(--font-mono)' }}>Total: {formatCents(totalExpenses)}</span>
+                            <span className="text-[13px]" style={{ color: 'var(--codex-fg-muted)', fontFamily: 'var(--font-mono)' }}>Total: {fmt(totalExpenses)}</span>
                           </div>
                         </div>
                     }
@@ -1382,11 +1555,11 @@ export default function Finance() {
                               <div className="flex-1 h-6 rounded overflow-hidden" style={{ backgroundColor: '#1a1a1a' }}>
                                 <div style={{ width: `${(amount / srcMax) * 100}%`, height: '100%', backgroundColor: srcColors[i % srcColors.length], borderRadius: '4px', transition: 'width 0.3s ease' }} />
                               </div>
-                              <div className="w-24 text-right text-[13px]" style={{ color: 'var(--codex-fg)', fontFamily: 'var(--font-mono)' }}>{formatCents(amount)}</div>
+                              <div className="w-24 text-right text-[13px]" style={{ color: 'var(--codex-fg)', fontFamily: 'var(--font-mono)' }}>{fmt(amount)}</div>
                             </div>
                           ))}
                           <div className="flex justify-end pt-2 border-t" style={{ borderColor: '#222' }}>
-                            <span className="text-[13px]" style={{ color: 'var(--codex-fg-muted)', fontFamily: 'var(--font-mono)' }}>Total: {formatCents(totalIncome)}</span>
+                            <span className="text-[13px]" style={{ color: 'var(--codex-fg-muted)', fontFamily: 'var(--font-mono)' }}>Total: {fmt(totalIncome)}</span>
                           </div>
                         </div>
                     }
@@ -1406,7 +1579,7 @@ export default function Finance() {
                                 <div key={b.id}>
                                   <div className="flex justify-between text-[12px] mb-1">
                                     <span style={{ color: 'var(--codex-fg-subtle)' }}>{b.name}</span>
-                                    <span style={{ color: over ? '#ef4444' : 'var(--codex-fg-muted)', fontFamily: 'var(--font-mono)' }}>{formatCents(b.spent)} / {formatCents(b.amount)}</span>
+                                    <span style={{ color: over ? '#ef4444' : 'var(--codex-fg-muted)', fontFamily: 'var(--font-mono)' }}>{fmt(b.spent, b.currency)} / {fmt(b.amount, b.currency)}</span>
                                   </div>
                                   <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: '#1a1a1a' }}>
                                     <div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', backgroundColor: over ? '#ef4444' : pct > 80 ? '#eab308' : '#10a37f', borderRadius: '4px', transition: 'width 0.3s ease' }} />
@@ -1431,7 +1604,7 @@ export default function Finance() {
                                   <div className="text-[13px] truncate" style={{ color: 'var(--codex-fg)' }}>{tx.counterparty ?? tx.category ?? 'Unknown'}</div>
                                   <div className="text-[11px]" style={{ color: '#666' }}>{tx.category ?? ''} · {shortDate(tx.txDate)} · {acctMap.get(tx.accountId) ?? ''}</div>
                                 </div>
-                                <span className="text-[13px]" style={{ color: '#ef4444', fontFamily: 'var(--font-mono)' }}>{formatCents(Math.abs(tx.amount))}</span>
+                                <span className="text-[13px]" style={{ color: '#ef4444', fontFamily: 'var(--font-mono)' }}>{fmt(Math.abs(tx.amount), tx.currency)}</span>
                               </div>
                             ))}
                           </div>
@@ -1444,7 +1617,7 @@ export default function Finance() {
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-[15px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Account Summary</h3>
                       <div className="text-[13px]" style={{ color: 'var(--codex-fg-muted)' }}>
-                        Net Worth: <span style={{ color: netWorth >= 0 ? '#10a37f' : '#ef4444', fontFamily: 'var(--font-mono)', fontWeight: 500 }}>{formatCents(netWorth)}</span>
+                        Net Worth: <span style={{ color: netWorth >= 0 ? '#10a37f' : '#ef4444', fontFamily: 'var(--font-mono)', fontWeight: 500 }}>{fmt(netWorth)}</span>
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-x-6 gap-y-2">
@@ -1454,7 +1627,7 @@ export default function Finance() {
                             <div className="text-[13px]" style={{ color: 'var(--codex-fg)' }}>{a.name}</div>
                             <div className="text-[11px]" style={{ color: '#666' }}>{a.accountType}{a.institution ? ` · ${a.institution}` : ''}</div>
                           </div>
-                          <span className="text-[13px]" style={{ color: a.balance >= 0 ? 'var(--codex-fg)' : '#ef4444', fontFamily: 'var(--font-mono)' }}>{formatCents(a.balance)}</span>
+                          <span className="text-[13px]" style={{ color: a.balance >= 0 ? 'var(--codex-fg)' : '#ef4444', fontFamily: 'var(--font-mono)' }}>{fmt(a.balance, a.currency)}</span>
                         </div>
                       ))}
                       {liabList.length > 0 && (
@@ -1466,7 +1639,7 @@ export default function Finance() {
                                 <div className="text-[13px]" style={{ color: 'var(--codex-fg)' }}>{l.name}</div>
                                 <div className="text-[11px]" style={{ color: '#666' }}>{l.liabilityType}{l.interestRate ? ` · ${l.interestRate}% APR` : ''}</div>
                               </div>
-                              <span className="text-[13px]" style={{ color: '#ef4444', fontFamily: 'var(--font-mono)' }}>-{formatCents(l.remaining)}</span>
+                              <span className="text-[13px]" style={{ color: '#ef4444', fontFamily: 'var(--font-mono)' }}>-{fmt(l.remaining, l.currency)}</span>
                             </div>
                           ))}
                         </>
@@ -1498,8 +1671,11 @@ export default function Finance() {
                 <option value="transfer">Transfer</option>
               </select>
             </Field>
-            <Field label="Amount ($)">
-              <input type="number" step="0.01" value={txForm.amount} onChange={(e) => setTxForm({ ...txForm, amount: e.target.value })} placeholder="0.00" style={inputCss} />
+            <Field label={`Amount (${currLabel(txForm.currency)})`}>
+              <input type="number" step={ZERO_DECIMAL.has(txForm.currency) ? '1' : '0.01'} value={txForm.amount} onChange={(e) => setTxForm({ ...txForm, amount: e.target.value })} placeholder={ZERO_DECIMAL.has(txForm.currency) ? '0' : '0.00'} style={inputCss} />
+            </Field>
+            <Field label="Currency">
+              <CurrencySelect value={txForm.currency} onChange={(v) => setTxForm({ ...txForm, currency: v })} />
             </Field>
             <Field label="Date">
               <input type="date" value={txForm.txDate} onChange={(e) => setTxForm({ ...txForm, txDate: e.target.value })} style={inputCss} />
@@ -1527,8 +1703,11 @@ export default function Finance() {
             <Field label="Name">
               <input type="text" value={budgetForm.name} onChange={(e) => setBudgetForm({ ...budgetForm, name: e.target.value })} placeholder="e.g. Groceries" style={inputCss} />
             </Field>
-            <Field label="Amount ($)">
-              <input type="number" step="0.01" value={budgetForm.amount} onChange={(e) => setBudgetForm({ ...budgetForm, amount: e.target.value })} placeholder="0.00" style={inputCss} />
+            <Field label={`Amount (${currLabel(budgetForm.currency)})`}>
+              <input type="number" step={ZERO_DECIMAL.has(budgetForm.currency) ? '1' : '0.01'} value={budgetForm.amount} onChange={(e) => setBudgetForm({ ...budgetForm, amount: e.target.value })} placeholder={ZERO_DECIMAL.has(budgetForm.currency) ? '0' : '0.00'} style={inputCss} />
+            </Field>
+            <Field label="Currency">
+              <CurrencySelect value={budgetForm.currency} onChange={(v) => setBudgetForm({ ...budgetForm, currency: v })} />
             </Field>
             <Field label="Period">
               <select value={budgetForm.period} onChange={(e) => setBudgetForm({ ...budgetForm, period: e.target.value })} style={selectCss}>
@@ -1604,14 +1783,17 @@ export default function Finance() {
             <Field label="Quantity">
               <input type="number" step="0.0001" value={investmentForm.quantity} onChange={(e) => setInvestmentForm({ ...investmentForm, quantity: e.target.value })} placeholder="0" style={inputCss} />
             </Field>
-            <Field label="Cost Basis ($)">
-              <input type="number" step="0.01" value={investmentForm.costBasis} onChange={(e) => setInvestmentForm({ ...investmentForm, costBasis: e.target.value })} placeholder="0.00" style={inputCss} />
+            <Field label={`Cost Basis (${currLabel(investmentForm.currency)})`}>
+              <input type="number" step={ZERO_DECIMAL.has(investmentForm.currency) ? '1' : '0.01'} value={investmentForm.costBasis} onChange={(e) => setInvestmentForm({ ...investmentForm, costBasis: e.target.value })} placeholder={ZERO_DECIMAL.has(investmentForm.currency) ? '0' : '0.00'} style={inputCss} />
             </Field>
-            <Field label="Current Price ($)">
-              <input type="number" step="0.01" value={investmentForm.currentPrice} onChange={(e) => setInvestmentForm({ ...investmentForm, currentPrice: e.target.value })} placeholder="0.00" style={inputCss} />
+            <Field label="Currency">
+              <CurrencySelect value={investmentForm.currency} onChange={(v) => setInvestmentForm({ ...investmentForm, currency: v })} />
             </Field>
-            <Field label="Current Value ($)">
-              <input type="number" step="0.01" value={investmentForm.currentValue} onChange={(e) => setInvestmentForm({ ...investmentForm, currentValue: e.target.value })} placeholder="Auto-calculated or manual" style={inputCss} />
+            <Field label={`Current Price (${currLabel(investmentForm.currency)})`}>
+              <input type="number" step={ZERO_DECIMAL.has(investmentForm.currency) ? '1' : '0.01'} value={investmentForm.currentPrice} onChange={(e) => setInvestmentForm({ ...investmentForm, currentPrice: e.target.value })} placeholder={ZERO_DECIMAL.has(investmentForm.currency) ? '0' : '0.00'} style={inputCss} />
+            </Field>
+            <Field label={`Current Value (${currLabel(investmentForm.currency)})`}>
+              <input type="number" step={ZERO_DECIMAL.has(investmentForm.currency) ? '1' : '0.01'} value={investmentForm.currentValue} onChange={(e) => setInvestmentForm({ ...investmentForm, currentValue: e.target.value })} placeholder="Auto-calculated or manual" style={inputCss} />
             </Field>
             {drawer.kind === 'create-investment' && (
               <Field label="Purchase Date">
@@ -1642,17 +1824,20 @@ export default function Finance() {
                 </select>
               </Field>
             )}
-            <Field label="Target Amount ($)">
-              <input type="number" step="0.01" value={goalForm.targetAmount} onChange={(e) => setGoalForm({ ...goalForm, targetAmount: e.target.value })} placeholder="0.00" style={inputCss} />
+            <Field label={`Target Amount (${currLabel(goalForm.currency)})`}>
+              <input type="number" step={ZERO_DECIMAL.has(goalForm.currency) ? '1' : '0.01'} value={goalForm.targetAmount} onChange={(e) => setGoalForm({ ...goalForm, targetAmount: e.target.value })} placeholder={ZERO_DECIMAL.has(goalForm.currency) ? '0' : '0.00'} style={inputCss} />
             </Field>
-            <Field label="Current Amount ($)">
-              <input type="number" step="0.01" value={goalForm.currentAmount} onChange={(e) => setGoalForm({ ...goalForm, currentAmount: e.target.value })} placeholder="0.00" style={inputCss} />
+            <Field label={`Current Amount (${currLabel(goalForm.currency)})`}>
+              <input type="number" step={ZERO_DECIMAL.has(goalForm.currency) ? '1' : '0.01'} value={goalForm.currentAmount} onChange={(e) => setGoalForm({ ...goalForm, currentAmount: e.target.value })} placeholder={ZERO_DECIMAL.has(goalForm.currency) ? '0' : '0.00'} style={inputCss} />
+            </Field>
+            <Field label="Currency">
+              <CurrencySelect value={goalForm.currency} onChange={(v) => setGoalForm({ ...goalForm, currency: v })} />
             </Field>
             <Field label="Deadline">
               <input type="date" value={goalForm.deadline} onChange={(e) => setGoalForm({ ...goalForm, deadline: e.target.value })} style={inputCss} />
             </Field>
-            <Field label="Monthly Contribution ($)">
-              <input type="number" step="0.01" value={goalForm.monthlyContribution} onChange={(e) => setGoalForm({ ...goalForm, monthlyContribution: e.target.value })} placeholder="Optional" style={inputCss} />
+            <Field label={`Monthly Contribution (${currLabel(goalForm.currency)})`}>
+              <input type="number" step={ZERO_DECIMAL.has(goalForm.currency) ? '1' : '0.01'} value={goalForm.monthlyContribution} onChange={(e) => setGoalForm({ ...goalForm, monthlyContribution: e.target.value })} placeholder="Optional" style={inputCss} />
             </Field>
             {(goalForm.goalType === 'fire' || goalForm.goalType === 'investment') && (
               <Field label="Expected Return Rate (%)">
@@ -1688,8 +1873,11 @@ export default function Finance() {
                 </select>
               </Field>
             )}
-            <Field label="Balance ($)">
-              <input type="number" step="0.01" value={accountForm.balance} onChange={(e) => setAccountForm({ ...accountForm, balance: e.target.value })} placeholder="0.00" style={inputCss} />
+            <Field label={`Balance (${currLabel(accountForm.currency)})`}>
+              <input type="number" step={ZERO_DECIMAL.has(accountForm.currency) ? '1' : '0.01'} value={accountForm.balance} onChange={(e) => setAccountForm({ ...accountForm, balance: e.target.value })} placeholder={ZERO_DECIMAL.has(accountForm.currency) ? '0' : '0.00'} style={inputCss} />
+            </Field>
+            <Field label="Currency">
+              <CurrencySelect value={accountForm.currency} onChange={(v) => setAccountForm({ ...accountForm, currency: v })} />
             </Field>
             <Field label="Institution">
               <input type="text" value={accountForm.institution} onChange={(e) => setAccountForm({ ...accountForm, institution: e.target.value })} placeholder="e.g. JPMorgan Chase" style={inputCss} />
@@ -1717,19 +1905,22 @@ export default function Finance() {
                     <option value="other">Other</option>
                   </select>
                 </Field>
-                <Field label="Principal ($)">
-                  <input type="number" step="0.01" value={liabilityForm.principal} onChange={(e) => setLiabilityForm({ ...liabilityForm, principal: e.target.value })} placeholder="0.00" style={inputCss} />
+                <Field label={`Principal (${currLabel(liabilityForm.currency)})`}>
+                  <input type="number" step={ZERO_DECIMAL.has(liabilityForm.currency) ? '1' : '0.01'} value={liabilityForm.principal} onChange={(e) => setLiabilityForm({ ...liabilityForm, principal: e.target.value })} placeholder={ZERO_DECIMAL.has(liabilityForm.currency) ? '0' : '0.00'} style={inputCss} />
+                </Field>
+                <Field label="Currency">
+                  <CurrencySelect value={liabilityForm.currency} onChange={(v) => setLiabilityForm({ ...liabilityForm, currency: v })} />
                 </Field>
               </>
             )}
-            <Field label="Remaining ($)">
-              <input type="number" step="0.01" value={liabilityForm.remaining} onChange={(e) => setLiabilityForm({ ...liabilityForm, remaining: e.target.value })} placeholder="0.00" style={inputCss} />
+            <Field label={`Remaining (${currLabel(liabilityForm.currency)})`}>
+              <input type="number" step={ZERO_DECIMAL.has(liabilityForm.currency) ? '1' : '0.01'} value={liabilityForm.remaining} onChange={(e) => setLiabilityForm({ ...liabilityForm, remaining: e.target.value })} placeholder={ZERO_DECIMAL.has(liabilityForm.currency) ? '0' : '0.00'} style={inputCss} />
             </Field>
             <Field label="Interest Rate (%)">
               <input type="number" step="0.01" value={liabilityForm.interestRate} onChange={(e) => setLiabilityForm({ ...liabilityForm, interestRate: e.target.value })} placeholder="e.g. 4.5" style={inputCss} />
             </Field>
-            <Field label="Monthly Payment ($)">
-              <input type="number" step="0.01" value={liabilityForm.monthlyPayment} onChange={(e) => setLiabilityForm({ ...liabilityForm, monthlyPayment: e.target.value })} placeholder="0.00" style={inputCss} />
+            <Field label={`Monthly Payment (${currLabel(liabilityForm.currency)})`}>
+              <input type="number" step={ZERO_DECIMAL.has(liabilityForm.currency) ? '1' : '0.01'} value={liabilityForm.monthlyPayment} onChange={(e) => setLiabilityForm({ ...liabilityForm, monthlyPayment: e.target.value })} placeholder={ZERO_DECIMAL.has(liabilityForm.currency) ? '0' : '0.00'} style={inputCss} />
             </Field>
             {drawer.kind === 'create-liability' && (
               <Field label="Due Date">
