@@ -1,9 +1,10 @@
 import { useState, useCallback, useRef } from 'react';
 import {
   Sliders, Cpu, MessageCircle, Wrench, CheckSquare,
-  Brain, DollarSign, Package, Loader2, AlertTriangle, RefreshCw,
+  Brain, DollarSign, Package, Loader2, AlertTriangle, RefreshCw, X,
 } from 'lucide-react';
 import { useApi } from '../../lib/hooks/useApi';
+import { useExchangeRates } from '../../lib/hooks/useExchangeRates';
 import { apiFetch } from '../../lib/api';
 import { SettingRow } from '../../app/components/settings/SettingRow';
 import { SettingSection } from '../../app/components/settings/SettingSection';
@@ -73,6 +74,7 @@ export default function Settings() {
   const [activeChannel, setActiveChannel] = useState('telegram');
   const [showApiKey, setShowApiKey] = useState(false);
   const [customModel, setCustomModel] = useState(false);
+  const exchangeRates = useExchangeRates();
 
   const { data: config, loading, error, refetch, setData: setConfig } = useApi<ConfigMap>('/api/settings');
 
@@ -143,6 +145,16 @@ export default function Settings() {
   const conversationMemory = asRecord(conversation.memory);
   const learning = asRecord(config?.learning);
   const confidence = asRecord(config?.confidence);
+  const finance = asRecord(config?.finance);
+  const financeInflation = asRecord(finance.inflation);
+  const financeExpectedReturns = asRecord(finance.expectedReturns);
+  const financeBudgeting = asRecord(finance.budgeting);
+  const sixJarRatios = asRecord(financeBudgeting.sixJarRatios);
+  const financeCategories = asRecord(finance.categories);
+  const financePriceRefresh = asRecord(finance.priceRefresh);
+  const financeScheduling = asRecord(finance.scheduling);
+  const packs = asRecord(config?.packs);
+  const plugins = asRecord(config?.plugins);
 
   // ── Loading / error states ────────────────────────────────────────────────
   if (loading && !config) {
@@ -858,13 +870,258 @@ export default function Settings() {
             )}
 
             {/* ── FINANCE ──────────────────────────────────────────── */}
-            {activeSection === 'finance' && (
-              <p className="text-[13px]" style={{ color: 'var(--codex-fg-subtle)' }}>Coming soon</p>
-            )}
+            {activeSection === 'finance' && (() => {
+              // Load exchange rates when finance section is shown
+              if (!exchangeRates.rates && !exchangeRates.loading) exchangeRates.load();
+              const defaultCur = str(finance, 'defaultCurrency', 'USD');
+              const rateDisplayCurrencies = ['USD', 'VND', 'EUR', 'GBP', 'JPY', 'BTC', 'ETH', 'USDT'].filter(c => c !== defaultCur);
+              const formatRate = (from: string) => {
+                if (!exchangeRates.rates) return '—';
+                const fromR = exchangeRates.rates[from] ?? 1;
+                const toR = exchangeRates.rates[defaultCur] ?? 1;
+                const r = fromR / toR;
+                if (r >= 100) return r.toLocaleString('en-US', { maximumFractionDigits: 0 });
+                if (r >= 1) return r.toLocaleString('en-US', { maximumFractionDigits: 2 });
+                if (r >= 0.01) return r.toLocaleString('en-US', { maximumFractionDigits: 4 });
+                return r.toLocaleString('en-US', { maximumFractionDigits: 8 });
+              };
+
+              return (
+              <>
+                <SettingSection title="General" defaultOpen>
+                  <SettingRow label="Finance Module">
+                    <Toggle
+                      checked={bool(finance, 'enabled', false)}
+                      onChange={() => patchSection('finance', { enabled: !bool(finance, 'enabled', false) })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Display Currency">
+                    <Select
+                      value={str(finance, 'defaultCurrency', 'USD')}
+                      options={CURRENCIES.map(c => ({ value: c, label: `${c}${CURRENCY_SYMBOLS[c] ? ` (${CURRENCY_SYMBOLS[c]})` : ''}` }))}
+                      onChange={(v) => patchSection('finance', { defaultCurrency: v })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Proactivity" last>
+                    <Select
+                      value={str(finance, 'proactivityLevel', 'full')}
+                      options={[
+                        { value: 'full', label: 'Full' },
+                        { value: 'moderate', label: 'Moderate' },
+                        { value: 'reactive', label: 'Reactive' },
+                      ]}
+                      onChange={(v) => patchSection('finance', { proactivityLevel: v })}
+                    />
+                  </SettingRow>
+                </SettingSection>
+
+                {/* Exchange rates display */}
+                {exchangeRates.rates && (
+                  <div className="mx-1 mb-2 px-4 py-3 rounded-lg" style={{ backgroundColor: 'var(--codex-bg-secondary)', border: '1px solid var(--codex-border-subtle)' }}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-[12px]" style={{ color: 'var(--codex-fg-subtle)', fontWeight: 500 }}>Exchange Rates (1 {defaultCur})</span>
+                      <button onClick={exchangeRates.refresh} className="text-[11px] px-2 py-0.5 rounded"
+                        style={{ color: 'var(--codex-fg-subtle)', border: '1px solid var(--codex-border)' }}>
+                        {exchangeRates.loading ? 'Refreshing...' : 'Refresh'}
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-4 gap-x-4 gap-y-1">
+                      {rateDisplayCurrencies.map(cur => (
+                        <div key={cur} className="flex justify-between text-[12px]">
+                          <span style={{ color: 'var(--codex-fg-subtle)' }}>{cur}</span>
+                          <span style={{ color: 'var(--codex-fg-muted)', fontFamily: 'var(--font-mono)' }}>{formatRate(cur)}</span>
+                        </div>
+                      ))}
+                    </div>
+                    {exchangeRates.timestamp && (
+                      <p className="text-[10px] mt-2" style={{ color: '#555' }}>Updated: {exchangeRates.timestamp}</p>
+                    )}
+                  </div>
+                )}
+
+                <SettingSection title="Budgeting">
+                  <SettingRow label="Default Method">
+                    <Select
+                      value={str(financeBudgeting, 'defaultMethod', 'standard')}
+                      options={[
+                        { value: 'standard', label: 'Standard (envelope)' },
+                        { value: 'six_jar', label: 'Six Jar Method' },
+                      ]}
+                      onChange={(v) => patchSection('finance', { budgeting: { defaultMethod: v } })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Alert Threshold"
+                    tip="Warn when spending exceeds this % of budget.">
+                    <NumberInput
+                      value={num(financeBudgeting, 'alertThreshold', 80)}
+                      onChange={(v) => debouncedPatch('finance', { budgeting: { alertThreshold: v } })}
+                      suffix="%"
+                    />
+                  </SettingRow>
+                  {str(financeBudgeting, 'defaultMethod', 'standard') === 'six_jar' && (
+                    <SettingRow label="Six Jar Ratios" description="Income allocation percentages (should sum to 100%)"
+                      tip="T. Harv Eker's method: Essentials 55%, Savings 10%, Investment 10%, Education 10%, Play 10%, Charity 5%." last>
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {[
+                          { key: 'essentials', label: 'Ess', def: 55 },
+                          { key: 'savings', label: 'Sav', def: 10 },
+                          { key: 'investment', label: 'Inv', def: 10 },
+                          { key: 'education', label: 'Edu', def: 10 },
+                          { key: 'entertainment', label: 'Play', def: 10 },
+                          { key: 'charity', label: 'Give', def: 5 },
+                        ].map(({ key, label, def }) => (
+                          <div key={key} className="flex items-center gap-1">
+                            <span className="text-[10px] w-7" style={{ color: 'var(--codex-fg-subtle)' }}>{label}</span>
+                            <NumberInput
+                              value={num(sixJarRatios, key, def)}
+                              onChange={(v) => debouncedPatch('finance', { budgeting: { sixJarRatios: { [key]: v } } })}
+                              width="50px" suffix="%"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </SettingRow>
+                  )}
+                </SettingSection>
+
+                <SettingSection title="Investment Returns" description="Default return assumptions for projections">
+                  {[
+                    { key: 'stocks', label: 'Stocks', def: 10 },
+                    { key: 'crypto', label: 'Crypto', def: 15 },
+                    { key: 'realEstate', label: 'Real Estate', def: 8 },
+                    { key: 'bonds', label: 'Bonds', def: 5 },
+                  ].map(({ key, label, def }, i, a) => (
+                    <SettingRow key={key} label={label} last={i === a.length - 1}>
+                      <NumberInput
+                        value={num(financeExpectedReturns, key, def)}
+                        onChange={(v) => debouncedPatch('finance', { expectedReturns: { [key]: v } })}
+                        suffix="%" step={0.5}
+                      />
+                    </SettingRow>
+                  ))}
+                </SettingSection>
+
+                <SettingSection title="Inflation">
+                  <SettingRow label="Annual Rate">
+                    <NumberInput
+                      value={num(financeInflation, 'rate', 3.3)}
+                      onChange={(v) => debouncedPatch('finance', { inflation: { rate: v } })}
+                      suffix="%" step={0.1}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Source" last>
+                    <Select
+                      value={str(financeInflation, 'source', 'manual')}
+                      options={[
+                        { value: 'manual', label: 'Manual' },
+                        { value: 'api', label: 'API (auto-fetch)' },
+                      ]}
+                      onChange={(v) => patchSection('finance', { inflation: { source: v } })}
+                    />
+                  </SettingRow>
+                </SettingSection>
+
+                <SettingSection title="Auto-Categorization">
+                  <SettingRow label="Auto-Categorize" description="AI-powered automatic transaction categorization">
+                    <Toggle
+                      checked={bool(financeCategories, 'autoCategorize', true)}
+                      onChange={() => patchSection('finance', { categories: { autoCategorize: !bool(financeCategories, 'autoCategorize', true) } })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Confidence Threshold" description="Only auto-apply above this confidence" last>
+                    <Slider
+                      value={Math.round(num(financeCategories, 'confidenceThreshold', 0.8) * 100)}
+                      onChange={(v) => patchSection('finance', { categories: { confidenceThreshold: v / 100 } })}
+                      min={0} max={100} step={5}
+                    />
+                  </SettingRow>
+                </SettingSection>
+
+                <SettingSection title="Scheduling">
+                  <SettingRow label="Daily Review Time">
+                    <TimeInput
+                      value={str(financeScheduling, 'dailyReviewTime', '21:00')}
+                      onChange={(v) => debouncedPatch('finance', { scheduling: { dailyReviewTime: v } })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Budget Check Time">
+                    <TimeInput
+                      value={str(financeScheduling, 'budgetCheckTime', '09:00')}
+                      onChange={(v) => debouncedPatch('finance', { scheduling: { budgetCheckTime: v } })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Weekly Report Day" last>
+                    <Select
+                      value={str(financeScheduling, 'weeklyReportDay', 'monday')}
+                      options={['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(d => ({
+                        value: d, label: d.charAt(0).toUpperCase() + d.slice(1),
+                      }))}
+                      onChange={(v) => patchSection('finance', { scheduling: { weeklyReportDay: v } })}
+                    />
+                  </SettingRow>
+                </SettingSection>
+              </>
+              );
+            })()}
 
             {/* ── EXTENSIONS ───────────────────────────────────────── */}
             {activeSection === 'extensions' && (
-              <p className="text-[13px]" style={{ color: 'var(--codex-fg-subtle)' }}>Coming soon</p>
+              <>
+                <SettingSection title="Feature Packs" defaultOpen>
+                  <SettingRow label="Enabled Packs" description="Manage via klyntbot init --packs" last>
+                    <div className="flex flex-wrap gap-1.5">
+                      {arr(packs, 'enabled').length > 0
+                        ? arr(packs, 'enabled').map(String).map(pack => (
+                          <span key={pack} className="px-2 py-0.5 rounded text-[11px]"
+                            style={{ backgroundColor: 'var(--codex-accent-dim)', color: 'var(--codex-accent)', border: '1px solid var(--codex-accent)' }}>
+                            {pack}
+                          </span>
+                        ))
+                        : <span className="text-[12px]" style={{ color: 'var(--codex-fg-subtle)' }}>No packs enabled</span>
+                      }
+                    </div>
+                  </SettingRow>
+                </SettingSection>
+
+                <SettingSection title="Skills">
+                  <SettingRow label="Enabled Skills" last>
+                    <TagInput
+                      tags={arr(packs, 'enabledSkills').map(String)}
+                      onChange={(skills) => debouncedPatch('packs', { enabledSkills: skills })}
+                      placeholder="Add skill..."
+                    />
+                  </SettingRow>
+                </SettingSection>
+
+                <SettingSection title="Plugins">
+                  <SettingRow label="Plugin System">
+                    <Toggle
+                      checked={bool(plugins, 'enabled', true)}
+                      onChange={() => patchSection('plugins', { enabled: !bool(plugins, 'enabled', true) })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Registry URL">
+                    <TextInput
+                      value={str(plugins, 'registryUrl', 'https://plugins.klyntbot.io/index.json')}
+                      onChange={(v) => debouncedPatch('plugins', { registryUrl: v })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Sandbox Memory"
+                    tip="Max memory each plugin sandbox can use. Exceeded plugins are terminated.">
+                    <NumberInput
+                      value={num(plugins, 'sandboxMemoryMb', 64)}
+                      onChange={(v) => debouncedPatch('plugins', { sandboxMemoryMb: v })}
+                      suffix="MB"
+                    />
+                  </SettingRow>
+                  <SettingRow label="Allow Network by Default" description="Grant network access to plugins unless explicitly denied" last>
+                    <Toggle
+                      checked={bool(plugins, 'allowNetworkByDefault', false)}
+                      onChange={() => patchSection('plugins', { allowNetworkByDefault: !bool(plugins, 'allowNetworkByDefault', false) })}
+                    />
+                  </SettingRow>
+                </SettingSection>
+              </>
             )}
 
           </div>
