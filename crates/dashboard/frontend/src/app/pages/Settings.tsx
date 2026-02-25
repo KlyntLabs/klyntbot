@@ -22,6 +22,7 @@ import {
   Loader2,
   AlertTriangle,
   RefreshCw,
+  HelpCircle,
 } from 'lucide-react';
 import { useApi } from '../../lib/hooks/useApi';
 import { apiFetch } from '../../lib/api';
@@ -31,6 +32,37 @@ type SettingsSection = {
   label: string;
   icon: typeof Sliders;
 };
+
+/** Inline tooltip — shows an info icon that reveals a tooltip on hover. */
+function Tip({ text }: { text: string }) {
+  const [show, setShow] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+  return (
+    <span
+      ref={ref}
+      className="inline-flex items-center ml-1.5 relative"
+      onMouseEnter={() => setShow(true)}
+      onMouseLeave={() => setShow(false)}
+    >
+      <HelpCircle className="w-3.5 h-3.5 cursor-help" strokeWidth={1.5} style={{ color: '#555' }} />
+      {show && (
+        <span
+          className="fixed z-[9999] px-3 py-2 rounded-lg text-[12px] leading-[1.6] w-[320px] shadow-xl pointer-events-none"
+          style={{
+            backgroundColor: '#1e1e1e',
+            color: '#ccc',
+            border: '1px solid #333',
+            left: ref.current ? Math.min(ref.current.getBoundingClientRect().left, window.innerWidth - 340) : 0,
+            top: ref.current ? ref.current.getBoundingClientRect().top - 8 : 0,
+            transform: 'translateY(-100%)',
+          }}
+        >
+          {text}
+        </span>
+      )}
+    </span>
+  );
+}
 
 // ── Type helpers for accessing nested config sections ────────────────────────
 
@@ -277,18 +309,24 @@ export default function Settings() {
     return map[key] ?? key;
   }
 
-  const FormCard = ({ children, title, description }: any) => (
+  const FormCard = ({ children, title, description, tip }: {
+    children: React.ReactNode;
+    title?: string;
+    description?: string;
+    tip?: string;
+  }) => (
     <div className="p-5 rounded-lg mb-4" style={{
       backgroundColor: '#141414',
       border: '1px solid var(--codex-border)'
     }}>
       {title && (
         <>
-          <label className="text-[13px] block mb-1" style={{
+          <label className="text-[13px] flex items-center mb-1" style={{
             color: 'var(--codex-fg)',
             fontWeight: 500
           }}>
             {title}
+            {tip && <Tip text={tip} />}
           </label>
           {description && (
             <p className="text-[12px] mb-3" style={{ color: '#666' }}>
@@ -583,7 +621,7 @@ export default function Settings() {
                     </div>
                   </FormCard>
 
-                  <FormCard title="API Base URL" description="Custom API endpoint (leave empty for default)">
+                  <FormCard title="API Base URL" description="Custom API endpoint (leave empty for default)" tip="Override the default API endpoint. Useful for proxies, self-hosted models, or region-specific endpoints.">
                     <TextInput value={str(currentProviderConfig, 'apiBase', '')} placeholder={`https://api.${activeProvider}.com`}
                       onChange={(v) => debouncedPatch('providers', { [activeProvider]: { apiBase: v || null } })}
                     />
@@ -624,6 +662,7 @@ export default function Settings() {
                           fontWeight: 500
                         }}>
                           Native Mode
+                          <Tip text="When enabled, sends requests using the provider's own API format rather than converting through a unified schema. May enable provider-specific features but reduces portability." />
                         </label>
                         <p className="text-[12px]" style={{ color: '#666' }}>
                           Use provider's native API format instead of unified format
@@ -643,6 +682,7 @@ export default function Settings() {
                           fontWeight: 500
                         }}>
                           Cache System Prompt
+                          <Tip text="Caches the system prompt on the provider side so it doesn't count against your input tokens on subsequent requests. Supported by Anthropic (prompt caching)." />
                         </label>
                         <p className="text-[12px]" style={{ color: '#666' }}>
                           Cache the system prompt to reduce token usage on repeated calls
@@ -662,6 +702,7 @@ export default function Settings() {
                           fontWeight: 500
                         }}>
                           Extended Thinking
+                          <Tip text="Gives the model a dedicated 'thinking' budget to reason through complex problems before responding. Uses additional tokens but significantly improves quality for hard tasks." />
                         </label>
                         <p className="text-[12px]" style={{ color: '#666' }}>
                           Allow the model to use more tokens for reasoning before responding
@@ -675,8 +716,9 @@ export default function Settings() {
                     {bool(asRecord(currentProviderConfig.extendedThinking), 'enabled', false) && (
                       <div className="space-y-3 pt-3 border-t" style={{ borderColor: 'var(--codex-border)' }}>
                         <div>
-                          <label className="text-[12px] block mb-2" style={{ color: 'var(--codex-fg-subtle)' }}>
+                          <label className="text-[12px] flex items-center mb-2" style={{ color: 'var(--codex-fg-subtle)' }}>
                             Budget Tokens
+                            <Tip text="Maximum tokens the model can use for internal reasoning. Higher = deeper thinking but more expensive. Typically 5,000–50,000." />
                           </label>
                           <TextInput
                             value={str(asRecord(currentProviderConfig.extendedThinking), 'budgetTokens', '10000')}
@@ -689,7 +731,7 @@ export default function Settings() {
                     )}
                   </FormCard>
 
-                  <FormCard title="API Version" description="Provider-specific API version string (e.g. Anthropic: 2023-06-01)">
+                  <FormCard title="API Version" description="Provider-specific API version string (e.g. Anthropic: 2023-06-01)" tip="Some providers version their API. Only set this if you need a specific version (e.g. for beta features). Leave empty to use the latest.">
                     <TextInput value={str(currentProviderConfig, 'apiVersion', '')} placeholder="2023-06-01"
                       onChange={(v) => debouncedPatch('providers', { [activeProvider]: { apiVersion: v || null } })}
                     />
@@ -734,7 +776,7 @@ export default function Settings() {
                     </select>
                   </FormCard>
 
-                  <FormCard title="Classifier Model" description="Model used for routing decisions (e.g. gpt-4o-mini)">
+                  <FormCard title="Classifier Model" description="Model used for routing decisions (e.g. gpt-4o-mini)" tip="A lightweight model that decides which provider/model to use for each request. Keep this fast and cheap — it's called before every main request.">
                     <TextInput
                       value={str(asRecord(config?.providerManager), 'classifierModel', '')}
                       placeholder="gpt-4o-mini"
@@ -845,7 +887,7 @@ export default function Settings() {
                       onChange={(v) => debouncedPatch('agents', { defaults: { workspace: v } })}
                     />
                   </FormCard>
-                  <FormCard title="Max Tokens" description="Maximum output tokens per LLM response">
+                  <FormCard title="Max Tokens" description="Maximum output tokens per LLM response" tip="Caps the length of each LLM response. Higher values allow longer answers but cost more. Most tasks work fine with 4096–8192.">
                     <TextInput value={str(agentDefaults, 'maxTokens', '8192')} type="number"
                       onChange={(v) => debouncedPatch('agents', { defaults: { maxTokens: parseInt(v) || 8192 } })}
                     />
@@ -866,7 +908,7 @@ export default function Settings() {
                       <span>1</span>
                     </div>
                   </FormCard>
-                  <FormCard title="Max Tool Iterations" description="Maximum number of tool calls per agent turn before stopping">
+                  <FormCard title="Max Tool Iterations" description="Maximum number of tool calls per agent turn before stopping" tip="Safety limit to prevent runaway tool loops. The agent stops after this many tool calls in a single turn, even if the task isn't complete.">
                     <TextInput value={str(agentDefaults, 'maxToolIterations', '20')} type="number"
                       onChange={(v) => debouncedPatch('agents', { defaults: { maxToolIterations: parseInt(v) || 20 } })}
                     />
@@ -907,7 +949,7 @@ export default function Settings() {
                       />
                     </div>
                   </FormCard>
-                  <FormCard title="Trust Level" description="Controls what actions the browser can take autonomously">
+                  <FormCard title="Trust Level" description="Controls what actions the browser can take autonomously" tip="Strict: asks permission for every action. Autonomous: only asks for dangerous actions like form submissions or purchases. Full: no confirmations.">
                     <select className="w-full px-3 py-2 rounded border text-[13px]" style={{
                       backgroundColor: 'var(--codex-bg)',
                       borderColor: 'var(--codex-border)',
@@ -935,6 +977,7 @@ export default function Settings() {
                       <div className="flex-1">
                         <label className="text-[13px] block mb-1" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>
                           Restrict to Workspace
+                          <Tip text="Security sandbox: when enabled, file read/write tools can only access files within the workspace directory. Prevents the agent from accessing system files or other projects." />
                         </label>
                         <p className="text-[12px]" style={{ color: '#666' }}>
                           Limit file operations to the agent workspace directory
@@ -946,7 +989,7 @@ export default function Settings() {
                     </div>
                   </FormCard>
 
-                  <FormCard title="Default Permission Level" description="Default tool permission level for all channels">
+                  <FormCard title="Default Permission Level" description="Default tool permission level for all channels" tip="Controls which tools the agent can use. 'Full' allows everything. 'Standard' restricts to safe tools. You can override per-channel in the channel config.">
                     <select className="w-full px-3 py-2 rounded border text-[13px]" style={{
                       backgroundColor: 'var(--codex-bg)',
                       borderColor: 'var(--codex-border)',
@@ -995,7 +1038,7 @@ export default function Settings() {
                       />
                     </div>
                   </FormCard>
-                  <FormCard title="Auto Apply Threshold" description="Confidence threshold (0.0-1.0) for auto-applying enrichment suggestions">
+                  <FormCard title="Auto Apply Threshold" description="Confidence threshold (0.0-1.0) for auto-applying enrichment suggestions" tip="When the enrichment engine infers task fields (priority, duration), it assigns a confidence score. Only suggestions above this threshold are automatically applied. Lower = more auto-fills, higher = fewer but more accurate.">
                     <TextInput value={str(enrichment, 'autoApplyThreshold', '0.85')} type="number"
                       onChange={(v) => debouncedPatch('todo', { enrichment: { autoApplyThreshold: parseFloat(v) || 0.85 } })}
                     />
@@ -1024,17 +1067,17 @@ export default function Settings() {
                       />
                     </div>
                   </FormCard>
-                  <FormCard title="Semantic Threshold" description="Minimum cosine similarity (0.0-1.0) for results. Lower = more results.">
+                  <FormCard title="Semantic Threshold" description="Minimum cosine similarity (0.0-1.0) for results. Lower = more results." tip="Cosine similarity measures how close two meanings are (1.0 = identical, 0.0 = unrelated). A threshold of 0.5 means only moderately similar results are returned. Lower it to 0.3 for broader matches.">
                     <TextInput value={str(search, 'semanticThreshold', '0.5')} type="number"
                       onChange={(v) => debouncedPatch('todo', { search: { semanticThreshold: parseFloat(v) || 0.5 } })}
                     />
                   </FormCard>
-                  <FormCard title="Embedding Model" description="Model used for generating vector embeddings">
+                  <FormCard title="Embedding Model" description="Model used for generating vector embeddings" tip="The local embedding model that converts text to vectors. The default (paraphrase-multilingual-MiniLM-L12-v2) supports 50+ languages and runs entirely on your machine.">
                     <TextInput value={str(search, 'embeddingModel', 'paraphrase-multilingual-MiniLM-L12-v2')}
                       onChange={(v) => debouncedPatch('todo', { search: { embeddingModel: v } })}
                     />
                   </FormCard>
-                  <FormCard title="RRF K" description="Reciprocal Rank Fusion k parameter for hybrid search. Higher values give more weight to lower-ranked results.">
+                  <FormCard title="RRF K" description="Reciprocal Rank Fusion k parameter for hybrid search. Higher values give more weight to lower-ranked results." tip="Hybrid search merges keyword and semantic results using RRF. The K parameter controls blending: K=60 (default) balances both signals. Lower K emphasizes top-ranked results more; higher K gives more equal weight across all results.">
                     <TextInput value={str(search, 'rrfK', '60')} type="number"
                       onChange={(v) => debouncedPatch('todo', { search: { rrfK: parseInt(v) || 60 } })}
                     />
@@ -1082,7 +1125,7 @@ export default function Settings() {
                       onChange={(v) => debouncedPatch('todo', { focus: { maxSlots: parseInt(v) || 3 } })}
                     />
                   </FormCard>
-                  <FormCard title="Deadline Hours" description="Hours before a deadline when focus reminders begin">
+                  <FormCard title="Deadline Hours" description="Hours before a deadline when focus reminders begin" tip="The agent starts sending reminders this many hours before a task's due date. Set to 18 for morning-of reminders on tasks due that day.">
                     <TextInput value={str(todoFocus, 'deadlineHours', '18')} type="number"
                       onChange={(v) => debouncedPatch('todo', { focus: { deadlineHours: parseInt(v) || 18 } })}
                     />
@@ -1279,7 +1322,7 @@ export default function Settings() {
                       />
                     </div>
                   </FormCard>
-                  <FormCard title="Semantic Threshold" description="Minimum cosine similarity (0.0-1.0) for conversation search results">
+                  <FormCard title="Semantic Threshold" description="Minimum cosine similarity (0.0-1.0) for conversation search results" tip="Same concept as todo search threshold — controls how similar past conversations must be to your query. Lower values return more (possibly less relevant) results.">
                     <TextInput value={str(conversationSearch, 'semanticThreshold', '0.5')} type="number"
                       onChange={(v) => debouncedPatch('conversation', { search: { semanticThreshold: parseFloat(v) || 0.5 } })}
                     />
@@ -1313,7 +1356,7 @@ export default function Settings() {
                     <h3 className="text-[14px] mb-4" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Memory</h3>
                     <p className="text-[12px]" style={{ color: '#666' }}>Long-term memory with time-based decay</p>
                   </div>
-                  <FormCard title="Decay Half-Life (days)" description="Days for memory relevance to halve. Higher = slower forgetting.">
+                  <FormCard title="Decay Half-Life (days)" description="Days for memory relevance to halve. Higher = slower forgetting." tip="Memories lose relevance over time using exponential decay. A half-life of 138 days means a memory is 50% as relevant after ~4.5 months. Increase to make the agent remember longer.">
                     <TextInput value={str(conversationMemory, 'decayHalfLifeDays', '138')} type="number"
                       onChange={(v) => debouncedPatch('conversation', { memory: { decayHalfLifeDays: parseInt(v) || 138 } })}
                     />
@@ -1326,7 +1369,10 @@ export default function Settings() {
                   <FormCard>
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex-1">
-                        <label className="text-[13px] block mb-1" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>Consolidation</label>
+                        <label className="text-[13px] flex items-center mb-1" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>
+                          Consolidation
+                          <Tip text="Periodically merges similar memories into a single summary. Reduces storage and prevents the agent from retrieving near-duplicate memories that dilute context." />
+                        </label>
                         <p className="text-[12px]" style={{ color: '#666' }}>Merge similar memories to reduce redundancy</p>
                       </div>
                       <Toggle checked={bool(conversationMemory, 'consolidationEnabled', false)}
@@ -1356,12 +1402,12 @@ export default function Settings() {
                       />
                     </div>
                   </FormCard>
-                  <FormCard title="Analysis Interval (seconds)" description="How often to analyze outcomes for strategy adaptation">
+                  <FormCard title="Analysis Interval (seconds)" description="How often to analyze outcomes for strategy adaptation" tip="The agent periodically reviews past tool call outcomes to learn which strategies work best. Default is 3600s (1 hour). Lower values mean faster adaptation but more CPU usage.">
                     <TextInput value={str(learning, 'analysisIntervalSecs', '3600')} type="number"
                       onChange={(v) => debouncedPatch('learning', { analysisIntervalSecs: parseInt(v) || 3600 })}
                     />
                   </FormCard>
-                  <FormCard title="Min Threshold" description="Minimum success rate (0.0-1.0) before reducing a strategy's weight">
+                  <FormCard title="Min Threshold" description="Minimum success rate (0.0-1.0) before reducing a strategy's weight" tip="Strategies with success rates below this threshold get deprioritized. Set low (0.3-0.4) to be tolerant of failure, or higher (0.6+) to aggressively drop underperforming strategies.">
                     <TextInput value={str(learning, 'minThreshold', '0.4')} type="number"
                       onChange={(v) => debouncedPatch('learning', { minThreshold: parseFloat(v) || 0.4 })}
                     />
@@ -1371,7 +1417,7 @@ export default function Settings() {
                       onChange={(v) => debouncedPatch('learning', { maxThreshold: parseFloat(v) || 0.9 })}
                     />
                   </FormCard>
-                  <FormCard title="Min Outcomes for Adaptation" description="Number of outcomes required before adapting strategies">
+                  <FormCard title="Min Outcomes for Adaptation" description="Number of outcomes required before adapting strategies" tip="Prevents premature adaptation based on too few data points. The agent waits until it has at least this many outcomes before adjusting strategy weights. Higher = more stable but slower to adapt.">
                     <TextInput value={str(learning, 'minOutcomesForAdaptation', '50')} type="number"
                       onChange={(v) => debouncedPatch('learning', { minOutcomesForAdaptation: parseInt(v) || 50 })}
                     />
@@ -1393,7 +1439,7 @@ export default function Settings() {
                       />
                     </div>
                   </FormCard>
-                  <FormCard title="Threshold" description="Global minimum confidence (0-1) required for tool execution">
+                  <FormCard title="Threshold" description="Global minimum confidence (0-1) required for tool execution" tip="Before calling a tool, the agent estimates how confident it is that the call is correct. Below this threshold, it will ask for confirmation or try a different approach instead.">
                     <input
                       type="range"
                       min="0"
@@ -1409,7 +1455,7 @@ export default function Settings() {
                       <span>1</span>
                     </div>
                   </FormCard>
-                  <FormCard title="Tool Overrides" description="Per-tool confidence thresholds (overrides global threshold)">
+                  <FormCard title="Tool Overrides" description="Per-tool confidence thresholds (overrides global threshold)" tip="Set higher thresholds for dangerous tools (e.g. file_write: 0.9) and lower for safe ones (e.g. web_search: 0.5). Overrides take precedence over the global threshold above.">
                     <div className="space-y-2">
                       {(() => {
                         const overrides = asRecord(confidence.toolOverrides);
@@ -1621,7 +1667,7 @@ export default function Settings() {
                     </FormCard>
                   </div>
 
-                  <FormCard title="Six Jar Ratios" description="Income allocation percentages (should sum to 100%)">
+                  <FormCard title="Six Jar Ratios" description="Income allocation percentages (should sum to 100%)" tip="T. Harv Eker's six jar budgeting method splits income into 6 categories: Essentials (55%), Savings (10%), Investment (10%), Education (10%), Play (10%), Charity (5%). Adjust ratios to match your priorities.">
                     <div className="grid grid-cols-3 gap-3 mt-1">
                       {[
                         { key: 'essentials', label: 'Essentials', def: 55 },
@@ -1825,7 +1871,7 @@ export default function Settings() {
                       onChange={(v) => debouncedPatch('plugins', { registryUrl: v })}
                     />
                   </FormCard>
-                  <FormCard title="Sandbox Memory (MB)" description="Max memory each plugin sandbox can use">
+                  <FormCard title="Sandbox Memory (MB)" description="Max memory each plugin sandbox can use" tip="Each plugin runs in an isolated sandbox with a memory cap. If a plugin exceeds this limit, it's terminated. Increase for memory-heavy plugins; lower for tighter security.">
                     <TextInput value={str(plugins, 'sandboxMemoryMb', '64')} type="number"
                       onChange={(v) => debouncedPatch('plugins', { sandboxMemoryMb: parseInt(v) || 64 })}
                     />
