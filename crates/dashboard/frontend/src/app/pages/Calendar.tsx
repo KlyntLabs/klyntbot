@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, RefreshCw, Loader2, X, CheckCircle2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, RefreshCw, Loader2, X, CheckCircle2, Plus } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router';
 import { useApi } from '../../lib/hooks/useApi';
 import { apiFetch } from '../../lib/api';
@@ -34,6 +35,10 @@ export default function Calendar() {
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
 
   const [syncing, setSyncing] = useState(false);
+  const [creatingEvent, setCreatingEvent] = useState(false);
+  const [eventForm, setEventForm] = useState({ summary: '', description: '', start: '', end: '' });
+  const [eventSaving, setEventSaving] = useState(false);
+  const [eventError, setEventError] = useState('');
 
   const { data: calendarEvents, refetch: refetchEvents } = useApi<ApiCalendarEvent[]>('/api/calendar/events');
   const { data: tasks, setData: setTasks, refetch: refetchTasks } = useApi<Task[]>('/api/tasks');
@@ -52,6 +57,30 @@ export default function Calendar() {
       setSyncing(false);
     }
   }, [refetchEvents, refetchSyncStatus]);
+
+  async function handleCreateEvent() {
+    if (!eventForm.summary.trim()) { setEventError('Title is required'); return; }
+    if (!eventForm.start || !eventForm.end) { setEventError('Start and end are required'); return; }
+    setEventSaving(true);
+    setEventError('');
+    try {
+      await apiFetch('/api/calendar/events', {
+        body: {
+          summary: eventForm.summary.trim(),
+          description: eventForm.description.trim() || undefined,
+          start: new Date(eventForm.start).toISOString(),
+          end: new Date(eventForm.end).toISOString(),
+        },
+      });
+      setCreatingEvent(false);
+      setEventForm({ summary: '', description: '', start: '', end: '' });
+      refetchEvents();
+    } catch (e: any) {
+      setEventError(e?.message || 'Failed to create event');
+    } finally {
+      setEventSaving(false);
+    }
+  }
 
   const handleMarkComplete = useCallback(async (taskId: string) => {
     setTasks(prev => prev?.map(t => t.id === taskId ? { ...t, status: 'done' } : t));
@@ -536,22 +565,95 @@ export default function Calendar() {
             </div>
           </div>
 
-          <button
-            onClick={handleSync}
-            disabled={syncing}
-            className="flex items-center gap-2 text-[12px] px-3 py-1.5 rounded transition-colors"
-            style={{ color: 'var(--codex-fg-subtle)', border: '1px solid var(--codex-border)' }}
-            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#141414'; e.currentTarget.style.color = '#10a37f'; }}
-            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--codex-fg-subtle)'; }}
-          >
-            {syncing || !syncStatus ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" strokeWidth={1.5} />
-            ) : (
-              <RefreshCw className="w-3.5 h-3.5" strokeWidth={1.5} />
-            )}
-            <span>{syncing ? 'Syncing...' : getLastSyncLabel()}</span>
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setCreatingEvent(!creatingEvent)}
+              className="px-4 py-2 rounded-lg text-[13px] flex items-center gap-2"
+              style={{ backgroundColor: 'var(--codex-accent)', color: 'white' }}
+              onMouseEnter={e => e.currentTarget.style.backgroundColor = 'var(--codex-accent-hover)'}
+              onMouseLeave={e => e.currentTarget.style.backgroundColor = 'var(--codex-accent)'}
+            >
+              <Plus className="w-4 h-4" strokeWidth={1.5} />
+              New Event
+            </button>
+            <button
+              onClick={handleSync}
+              disabled={syncing}
+              className="flex items-center gap-2 text-[12px] px-3 py-1.5 rounded transition-colors"
+              style={{ color: 'var(--codex-fg-subtle)', border: '1px solid var(--codex-border)' }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#141414'; e.currentTarget.style.color = '#10a37f'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--codex-fg-subtle)'; }}
+            >
+              {syncing || !syncStatus ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" strokeWidth={1.5} />
+              ) : (
+                <RefreshCw className="w-3.5 h-3.5" strokeWidth={1.5} />
+              )}
+              <span>{syncing ? 'Syncing...' : getLastSyncLabel()}</span>
+            </button>
+          </div>
         </div>
+
+        {/* Create Event Form */}
+        <AnimatePresence>
+          {creatingEvent && (
+            <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
+              className="border-b px-6 py-4"
+              style={{ backgroundColor: '#141414', borderColor: 'var(--codex-border)' }}>
+              <div className="max-w-2xl space-y-3">
+                <h3 className="text-[14px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>New Event</h3>
+                {/* Summary input */}
+                <input type="text" placeholder="Event title..." value={eventForm.summary}
+                  onChange={e => setEventForm(f => ({ ...f, summary: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-lg text-[13px] outline-none"
+                  style={{ backgroundColor: 'var(--codex-bg)', color: 'var(--codex-fg)', border: '1px solid var(--codex-border)' }}
+                  onFocus={e => e.currentTarget.style.borderColor = 'var(--codex-accent)'}
+                  onBlur={e => e.currentTarget.style.borderColor = 'var(--codex-border)'}
+                  autoFocus />
+                {/* Description */}
+                <input type="text" placeholder="Description (optional)" value={eventForm.description}
+                  onChange={e => setEventForm(f => ({ ...f, description: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-lg text-[13px] outline-none"
+                  style={{ backgroundColor: 'var(--codex-bg)', color: 'var(--codex-fg)', border: '1px solid var(--codex-border)' }}
+                  onFocus={e => e.currentTarget.style.borderColor = 'var(--codex-accent)'}
+                  onBlur={e => e.currentTarget.style.borderColor = 'var(--codex-border)'} />
+                {/* Start + End datetime row */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] mb-1" style={{ color: 'var(--codex-fg-subtle)' }}>Start</label>
+                    <input type="datetime-local" value={eventForm.start}
+                      onChange={e => setEventForm(f => ({ ...f, start: e.target.value }))}
+                      className="w-full px-3 py-2 rounded-lg text-[13px] outline-none"
+                      style={{ backgroundColor: 'var(--codex-bg)', color: 'var(--codex-fg)', border: '1px solid var(--codex-border)' }} />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] mb-1" style={{ color: 'var(--codex-fg-subtle)' }}>End</label>
+                    <input type="datetime-local" value={eventForm.end}
+                      onChange={e => setEventForm(f => ({ ...f, end: e.target.value }))}
+                      className="w-full px-3 py-2 rounded-lg text-[13px] outline-none"
+                      style={{ backgroundColor: 'var(--codex-bg)', color: 'var(--codex-fg)', border: '1px solid var(--codex-border)' }} />
+                  </div>
+                </div>
+                {/* Error */}
+                {eventError && <div className="text-[12px]" style={{ color: '#ef4444' }}>{eventError}</div>}
+                {/* Buttons */}
+                <div className="flex justify-end gap-3">
+                  <button onClick={() => { setCreatingEvent(false); setEventError(''); }}
+                    className="px-4 py-2 rounded-lg text-[13px]"
+                    style={{ color: 'var(--codex-fg-muted)', border: '1px solid var(--codex-border)' }}>
+                    Cancel
+                  </button>
+                  <button onClick={handleCreateEvent} disabled={eventSaving}
+                    className="px-4 py-2 rounded-lg text-[13px] flex items-center gap-2"
+                    style={{ backgroundColor: 'var(--codex-accent)', color: 'white', opacity: eventSaving ? 0.7 : 1 }}>
+                    {eventSaving && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    Create Event
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Calendar Grid */}
         <div className="flex-1 overflow-auto p-6" style={{ backgroundColor: 'var(--codex-bg)' }}>
