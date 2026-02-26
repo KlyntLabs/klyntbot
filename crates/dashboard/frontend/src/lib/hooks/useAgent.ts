@@ -11,6 +11,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { AgentSocket, type ConnectionStatus } from '../ws';
 import type { ChatMessage } from '../types';
+import { apiFetch } from '../api';
+import type { SessionWithMessages, InteractionQuestion } from '../types';
 
 export interface ToolCallState {
   name: string;
@@ -34,13 +36,25 @@ export interface ThinkingState {
   toolCalls: ToolCallState[];
 }
 
+export interface PendingInteraction {
+  requestId: string;
+  title: string;
+  questions: InteractionQuestion[];
+}
+
 export interface UseAgentResult {
   messages: ChatMessage[];
   thinking: ThinkingState | null;
   isStreaming: boolean;
   status: ConnectionStatus;
+  sessionKey: string | null;
+  pendingInteraction: PendingInteraction | null;
   sendMessage: (text: string, sessionKey?: string) => void;
   cancel: () => void;
+  loadSession: (key: string) => Promise<void>;
+  newSession: () => void;
+  deleteSession: (key: string) => Promise<void>;
+  respondToInteraction: (requestId: string, response: Record<string, unknown>) => void;
 }
 
 function generateId(): string {
@@ -52,12 +66,24 @@ export function useAgent(): UseAgentResult {
   const [thinking, setThinking] = useState<ThinkingState | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [status, setStatus] = useState<ConnectionStatus>('disconnected');
+  const [sessionKey, setSessionKey] = useState<string | null>(() => {
+    return sessionStorage.getItem('klyntbot-session-key');
+  });
+  const [pendingInteraction, setPendingInteraction] = useState<PendingInteraction | null>(null);
 
   const socketRef = useRef<AgentSocket | null>(null);
   const streamingMessageIdRef = useRef<string | null>(null);
   const accumulatedContentRef = useRef('');
   // Ref to track isStreaming without stale closure issues
   const isStreamingRef = useRef(false);
+
+  useEffect(() => {
+    if (sessionKey) {
+      sessionStorage.setItem('klyntbot-session-key', sessionKey);
+    } else {
+      sessionStorage.removeItem('klyntbot-session-key');
+    }
+  }, [sessionKey]);
 
   useEffect(() => {
     const socket = new AgentSocket();
@@ -251,6 +277,15 @@ export function useAgent(): UseAgentResult {
           break;
         }
 
+        case 'interaction.request': {
+          setPendingInteraction({
+            requestId: event.requestId as string,
+            title: event.title as string,
+            questions: event.questions as InteractionQuestion[],
+          });
+          break;
+        }
+
         default:
           break;
       }
@@ -266,12 +301,19 @@ export function useAgent(): UseAgentResult {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    const savedKey = sessionStorage.getItem('klyntbot-session-key');
+    if (savedKey) {
+      loadSession(savedKey);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const sendMessage = useCallback(
-    (text: string, sessionKey?: string) => {
+    (text: string, overrideSessionKey?: string) => {
       if (isStreamingRef.current) return;
       if (!socketRef.current) return;
 
-      // Add user message optimistically
       setMessages((prev) => [
         ...prev,
         {
@@ -287,9 +329,10 @@ export function useAgent(): UseAgentResult {
       accumulatedContentRef.current = '';
       streamingMessageIdRef.current = null;
 
-      socketRef.current.sendChatMessage(sessionKey, text);
+      const key = overrideSessionKey ?? sessionKey ?? undefined;
+      socketRef.current.sendChatMessage(key, text);
     },
-    [],
+    [sessionKey],
   );
 
   const cancel = useCallback(() => {
@@ -322,5 +365,64 @@ export function useAgent(): UseAgentResult {
     ]);
   }, []);
 
-  return { messages, thinking, isStreaming, status, sendMessage, cancel };
+  const loadSession = useCallback(async (key: string) => {
+    try {
+      const data = await apiFetch<SessionWithMessages>(`/api/sessions/${key}`);
+      const loaded: ChatMessage[] = data.messages.map((m) => ({
+        id: m.id,
+        role: m.role as ChatMessage['role'],
+        content: m.content,
+        timestamp: new Date(m.timestamp),
+      }));
+      setMessages(loaded);
+      setSessionKey(key);
+      setThinking(null);
+      setPendingInteraction(null);
+      isStreamingRef.current = false;
+      setIsStreaming(false);
+      streamingMessageIdRef.current = null;
+      accumulatedContentRef.current = '';
+    } catch (err) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: generateId(),
+          role: 'system',
+          content: `Failed to load session: ${err instanceof Error ? err.message : 'Unknown error'}`,
+          timestamp: new Date(),
+        },
+      ]);
+    }
+  }, []);
+
+  const newSession = useCallback(() => {
+    setMessages([]);
+    setSessionKey(null);
+    setThinking(null);
+    setPendingInteraction(null);
+    isStreamingRef.current = false;
+    setIsStreaming(false);
+    streamingMessageIdRef.current = null;
+    accumulatedContentRef.current = '';
+  }, []);
+
+  const deleteSession = useCallback(async (key: string) => {
+    await apiFetch(`/api/sessions/${key}`, { method: 'DELETE' });
+    if (key === sessionKey) {
+      newSession();
+    }
+  }, [sessionKey, newSession]);
+
+  const respondToInteraction = useCallback(
+    (requestId: string, response: Record<string, unknown>) => {
+      socketRef.current?.sendInteractionResponse(requestId, response);
+      setPendingInteraction(null);
+    },
+    [],
+  );
+
+  return {
+    messages, thinking, isStreaming, status, sessionKey, pendingInteraction,
+    sendMessage, cancel, loadSession, newSession, deleteSession, respondToInteraction,
+  };
 }

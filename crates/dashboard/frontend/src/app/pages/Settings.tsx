@@ -73,7 +73,6 @@ export default function Settings() {
   const [activeProvider, setActiveProvider] = useState('anthropic');
   const [activeChannel, setActiveChannel] = useState('telegram');
   const [showApiKey, setShowApiKey] = useState(false);
-  const [customModel, setCustomModel] = useState(false);
   const exchangeRates = useExchangeRates();
 
   const { data: config, loading, error, refetch, setData: setConfig } = useApi<ConfigMap>('/api/settings');
@@ -83,7 +82,7 @@ export default function Settings() {
   // ── Save helpers ──────────────────────────────────────────────────────────
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<{ ok: boolean; msg: string } | null>(null);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   const patchSection = useCallback(async (section: string, patch: Record<string, unknown>) => {
     setSaving(true);
@@ -106,7 +105,7 @@ export default function Settings() {
     }
   }, [setConfig]);
 
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const debouncedPatch = useCallback((section: string, patch: Record<string, unknown>, delay = 800) => {
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
     debounceTimerRef.current = setTimeout(() => patchSection(section, patch), delay);
@@ -290,38 +289,8 @@ export default function Settings() {
             {/* ── AI & MODELS ──────────────────────────────────────── */}
             {activeSection === 'ai-models' && (
               <>
-                {/* Active model — always visible at top */}
-                <SettingSection title="Active Model" defaultOpen>
-                  <SettingRow label="Provider">
-                    <Select
-                      value={str(agentDefaults, 'provider', '')}
-                      options={providerTabs.map(p => ({ value: p, label: displayName(p) }))}
-                      placeholder="Auto-detect from model"
-                      onChange={(v) => patchSection('agents', { defaults: { provider: v || null } })}
-                    />
-                  </SettingRow>
-                  <SettingRow label="Model">
-                    {customModel ? (
-                      <TextInput
-                        value={str(agentDefaults, 'model', '')}
-                        placeholder="model-name"
-                        onChange={(v) => debouncedPatch('agents', { defaults: { model: v } })}
-                        width="200px"
-                      />
-                    ) : (
-                      <Select
-                        value={str(agentDefaults, 'model', '')}
-                        options={[
-                          ...(PROVIDER_MODELS[str(agentDefaults, 'provider', 'anthropic')] ?? []).map(m => ({ value: m, label: m })),
-                          { value: '__custom__', label: 'Custom...' },
-                        ]}
-                        onChange={(v) => {
-                          if (v === '__custom__') { setCustomModel(true); return; }
-                          patchSection('agents', { defaults: { model: v } });
-                        }}
-                      />
-                    )}
-                  </SettingRow>
+                {/* Agent defaults — provider/model are switched via the status bar */}
+                <SettingSection title="Agent Defaults" defaultOpen>
                   <SettingRow label="Temperature" description="0 = deterministic, 1 = creative">
                     <Slider
                       value={num(agentDefaults, 'temperature', 0.7)}
@@ -721,7 +690,7 @@ export default function Settings() {
                       onChange={(v) => debouncedPatch('conversation', { session: { historyLimit: v } })}
                     />
                   </SettingRow>
-                  <SettingRow label="TTL" suffix="days" description="Days before inactive sessions expire">
+                  <SettingRow label="TTL (days)" description="Days before inactive sessions expire">
                     <NumberInput
                       value={num(conversationSession, 'ttlDays', 30)}
                       onChange={(v) => debouncedPatch('conversation', { session: { ttlDays: v } })}

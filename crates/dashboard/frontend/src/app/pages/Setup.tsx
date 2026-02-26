@@ -1,11 +1,5 @@
-// TODO: Wire setup wizard to real API:
-//   - Step 1 (Provider): POST /api/settings to save provider + API key
-//   - Step 2 (Channel): POST /api/settings to save channel config
-//   - Step 3 (Calendar): POST /api/settings to save CalDAV config
-//   - Step 4 (Packs): POST /api/settings to save pack selection
-//   - Verify button: POST /api/settings/verify-provider
-//   - No read-only integration needed (wizard is write-only)
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { apiFetch } from '../../lib/api';
 import {
   Check,
   ChevronLeft,
@@ -101,7 +95,8 @@ export default function Setup() {
   const [apiKey, setApiKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
   const [verifyStatus, setVerifyStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
-  const [envDetected] = useState(true);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
+  const [envDetected, setEnvDetected] = useState(false);
 
   const [selectedChannel, setSelectedChannel] = useState<string | null>('none');
   const [channelToken, setChannelToken] = useState('');
@@ -222,26 +217,121 @@ export default function Setup() {
     { number: 4, label: 'Packs', completed: currentStep > 4 },
   ];
 
-  const handleVerifyConnection = () => {
+  // Check if provider API key is already set in env/config
+  useEffect(() => {
+    (async () => {
+      try {
+        const settings = await apiFetch<Record<string, unknown>>('/api/settings', { method: 'GET' });
+        const providers = settings?.providers as Record<string, Record<string, unknown>> | undefined;
+        if (providers) {
+          // Check if any provider has an API key configured
+          for (const [provId, provConfig] of Object.entries(providers)) {
+            if (provConfig?.apiKey && String(provConfig.apiKey).length > 0) {
+              setSelectedProvider(provId);
+              setEnvDetected(true);
+              break;
+            }
+          }
+        }
+      } catch {
+        // Settings not available yet — fresh install
+      }
+    })();
+  }, []);
+
+  const handleVerifyConnection = useCallback(async () => {
+    if (!selectedProvider || !apiKey.trim()) {
+      setVerifyStatus('error');
+      setVerifyError('Please enter an API key');
+      return;
+    }
     setVerifyStatus('loading');
-    setTimeout(() => {
-      setVerifyStatus(apiKey.length > 10 ? 'success' : 'error');
-    }, 1500);
-  };
+    setVerifyError(null);
+    try {
+      await apiFetch(`/api/settings/providers`, {
+        method: 'PATCH',
+        body: { [selectedProvider]: { apiKey: apiKey.trim() } },
+      });
+      setVerifyStatus('success');
+    } catch (err) {
+      setVerifyStatus('error');
+      setVerifyError(err instanceof Error ? err.message : 'Failed to save');
+    }
+  }, [selectedProvider, apiKey]);
 
-  const handleTestChannel = () => {
+  const handleTestChannel = useCallback(async () => {
+    if (!selectedChannel || selectedChannel === 'none') return;
     setChannelTestStatus('loading');
-    setTimeout(() => {
-      setChannelTestStatus(channelToken.length > 5 ? 'success' : 'error');
-    }, 1500);
-  };
+    try {
+      const channelConfig: Record<string, unknown> = {};
+      if (selectedChannel === 'telegram') {
+        channelConfig.telegram = { token: channelToken.trim() };
+      } else if (selectedChannel === 'discord') {
+        channelConfig.discord = { token: channelToken.trim() };
+      } else if (selectedChannel === 'slack') {
+        channelConfig.slack = { botToken: channelToken.trim(), appToken: channelToken2.trim() };
+      }
+      await apiFetch('/api/settings/channels', {
+        method: 'PATCH',
+        body: channelConfig,
+      });
+      setChannelTestStatus('success');
+    } catch {
+      setChannelTestStatus('error');
+    }
+  }, [selectedChannel, channelToken, channelToken2]);
 
-  const handleTestCalendar = () => {
+  const handleTestCalendar = useCallback(async () => {
+    if (!selectedCalendar || selectedCalendar === 'none') return;
     setCalendarTestStatus('loading');
-    setTimeout(() => {
+    try {
+      const calConfig: Record<string, unknown> = {};
+      if (selectedCalendar === 'apple') {
+        calConfig.providers = [{
+          type: 'caldav',
+          url: calendarFields.caldavUrl,
+          username: calendarFields.appleId,
+          password: calendarFields.appPassword,
+          calendarName: calendarFields.calendarName,
+        }];
+      } else if (selectedCalendar === 'google') {
+        calConfig.providers = [{
+          type: 'google',
+          clientId: calendarFields.googleClientId,
+          clientSecret: calendarFields.googleClientSecret,
+        }];
+      } else if (selectedCalendar === 'caldav') {
+        calConfig.providers = [{
+          type: 'caldav',
+          url: calendarFields.caldavUrl2,
+          username: calendarFields.caldavUsername,
+          password: calendarFields.caldavPassword,
+        }];
+      }
+      await apiFetch('/api/settings/calendar', {
+        method: 'PATCH',
+        body: calConfig,
+      });
       setCalendarTestStatus('success');
-    }, 1500);
-  };
+    } catch {
+      setCalendarTestStatus('error');
+    }
+  }, [selectedCalendar, calendarFields]);
+
+  const handleCompleteSetup = useCallback(async () => {
+    try {
+      const enabledPacks = packs.filter(p => p.enabled).map(p => p.id);
+      const enabledSkills = getEnabledSkills();
+      await apiFetch('/api/settings/packs', {
+        method: 'PATCH',
+        body: { enabled: enabledPacks, enabledSkills },
+      });
+      window.location.href = '/';
+    } catch {
+      // Still navigate — config may have partially saved
+      window.location.href = '/';
+    }
+  }, [packs]);
 
   const getEnabledSkills = () => {
     return packs.filter(p => p.enabled).flatMap(p => p.skills);
@@ -481,10 +571,15 @@ export default function Setup() {
                 )}
                 {envDetected && verifyStatus === 'idle' && (
                   <span className="text-[10px] whitespace-nowrap" style={{ color: '#10a37f' }}>
-                    Detected from env
+                    Detected from config
                   </span>
                 )}
               </div>
+              {verifyError && (
+                <div className="text-[11px] mt-1 pl-[68px]" style={{ color: '#e55050' }}>
+                  {verifyError}
+                </div>
+              )}
             </div>
           )}
 
@@ -828,17 +923,27 @@ export default function Setup() {
                       />
                     </div>
                   </div>
-                  <button
-                    onClick={handleTestCalendar}
-                    className="px-3 py-1.5 rounded border text-[12px]"
-                    style={{
-                      borderColor: 'var(--codex-accent)',
-                      color: 'var(--codex-accent)',
-                      height: '32px'
-                    }}
-                  >
-                    Test Sync
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleTestCalendar}
+                      disabled={calendarTestStatus === 'loading'}
+                      className="px-3 py-1.5 rounded border text-[12px] flex items-center gap-1.5"
+                      style={{
+                        borderColor: 'var(--codex-accent)',
+                        color: 'var(--codex-accent)',
+                        height: '32px'
+                      }}
+                    >
+                      {calendarTestStatus === 'loading' && <Loader2 className="w-3 h-3 animate-spin" strokeWidth={1.5} />}
+                      Test Sync
+                    </button>
+                    {calendarTestStatus === 'success' && (
+                      <CheckCircle2 className="w-4 h-4" strokeWidth={1.5} style={{ color: '#10a37f' }} />
+                    )}
+                    {calendarTestStatus === 'error' && (
+                      <X className="w-4 h-4" strokeWidth={1.5} style={{ color: '#e55050' }} />
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -876,17 +981,27 @@ export default function Setup() {
                         }}
                       />
                     </div>
-                    <button
-                      onClick={handleTestCalendar}
-                      className="px-3 py-1.5 rounded border text-[12px] self-end whitespace-nowrap"
-                      style={{
-                        borderColor: 'var(--codex-accent)',
-                        color: 'var(--codex-accent)',
-                        height: '32px'
-                      }}
-                    >
-                      Test Sync
-                    </button>
+                    <div className="flex items-center gap-2 self-end">
+                      <button
+                        onClick={handleTestCalendar}
+                        disabled={calendarTestStatus === 'loading'}
+                        className="px-3 py-1.5 rounded border text-[12px] flex items-center gap-1.5 whitespace-nowrap"
+                        style={{
+                          borderColor: 'var(--codex-accent)',
+                          color: 'var(--codex-accent)',
+                          height: '32px'
+                        }}
+                      >
+                        {calendarTestStatus === 'loading' && <Loader2 className="w-3 h-3 animate-spin" strokeWidth={1.5} />}
+                        Test Sync
+                      </button>
+                      {calendarTestStatus === 'success' && (
+                        <CheckCircle2 className="w-4 h-4" strokeWidth={1.5} style={{ color: '#10a37f' }} />
+                      )}
+                      {calendarTestStatus === 'error' && (
+                        <X className="w-4 h-4" strokeWidth={1.5} style={{ color: '#e55050' }} />
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
@@ -959,17 +1074,27 @@ export default function Setup() {
                       />
                     </div>
                   </div>
-                  <button
-                    onClick={handleTestCalendar}
-                    className="px-3 py-1.5 rounded border text-[12px]"
-                    style={{
-                      borderColor: 'var(--codex-accent)',
-                      color: 'var(--codex-accent)',
-                      height: '32px'
-                    }}
-                  >
-                    Test Sync
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleTestCalendar}
+                      disabled={calendarTestStatus === 'loading'}
+                      className="px-3 py-1.5 rounded border text-[12px] flex items-center gap-1.5"
+                      style={{
+                        borderColor: 'var(--codex-accent)',
+                        color: 'var(--codex-accent)',
+                        height: '32px'
+                      }}
+                    >
+                      {calendarTestStatus === 'loading' && <Loader2 className="w-3 h-3 animate-spin" strokeWidth={1.5} />}
+                      Test Sync
+                    </button>
+                    {calendarTestStatus === 'success' && (
+                      <CheckCircle2 className="w-4 h-4" strokeWidth={1.5} style={{ color: '#10a37f' }} />
+                    )}
+                    {calendarTestStatus === 'error' && (
+                      <X className="w-4 h-4" strokeWidth={1.5} style={{ color: '#e55050' }} />
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -1109,7 +1234,7 @@ export default function Setup() {
           <button
             onClick={() => {
               if (currentStep === 4) {
-                window.location.href = '/';
+                handleCompleteSetup();
               } else {
                 setCurrentStep(Math.min(4, currentStep + 1));
               }

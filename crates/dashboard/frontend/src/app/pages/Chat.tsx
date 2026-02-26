@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   Send,
   ChevronDown,
@@ -10,19 +10,71 @@ import {
   FileCode,
   Loader2,
   Check,
-  Slash,
   X,
   Wifi,
   WifiOff,
   Clock,
+  Plus,
+  Trash2,
+  Calendar,
+  Circle,
+  MessageSquare,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { marked } from 'marked';
 import { useAgent } from '../../lib/hooks/useAgent';
-import type { ThinkingState, ToolCallState } from '../../lib/hooks/useAgent';
+import type { ThinkingState, ToolCallState, PendingInteraction } from '../../lib/hooks/useAgent';
 import { useApi } from '../../lib/hooks/useApi';
-import type { SessionListItem } from '../../lib/types';
-import type { ChatMessage } from '../../lib/types';
+import { apiFetch } from '../../lib/api';
+import type {
+  SessionListItem,
+  ChatMessage,
+  Task,
+  CalendarEvent,
+  InteractionQuestion,
+} from '../../lib/types';
 import type { ConnectionStatus } from '../../lib/ws';
+
+// Configure marked for safe rendering
+marked.setOptions({
+  gfm: true,
+  breaks: true,
+});
+
+/** Render markdown to sanitized HTML */
+function renderMarkdown(content: string): string {
+  const html = marked.parse(content, { async: false }) as string;
+  return html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/on\w+="[^"]*"/gi, '')
+    .replace(/on\w+='[^']*'/gi, '');
+}
+
+/** Format relative time like "in 2h", "tomorrow", "in 3d" */
+function formatRelativeTime(dateStr: string): string {
+  const now = Date.now();
+  const target = new Date(dateStr).getTime();
+  const diffMs = target - now;
+  if (diffMs < 0) return 'past';
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 60) return `in ${diffMin}m`;
+  const diffHours = Math.floor(diffMin / 60);
+  if (diffHours < 24) return `in ${diffHours}h`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays === 1) return 'tomorrow';
+  return `in ${diffDays}d`;
+}
+
+/** Priority label + color */
+function priorityDisplay(p: number | null): { label: string; color: string } {
+  switch (p) {
+    case 1: return { label: 'P1', color: '#ef4444' };
+    case 2: return { label: 'P2', color: '#f59e0b' };
+    case 3: return { label: 'P3', color: 'var(--codex-accent)' };
+    case 4: return { label: 'P4', color: 'var(--codex-fg-subtle)' };
+    default: return { label: '--', color: 'var(--codex-fg-subtle)' };
+  }
+}
 
 type SuggestionCard = {
   id: string;
@@ -97,17 +149,41 @@ export default function Chat() {
   const [tasksOpen, setTasksOpen] = useState(true);
   const [calendarOpen, setCalendarOpen] = useState(true);
   const [message, setMessage] = useState('');
-  const [selectedModel] = useState('GPT-4');
-
   // Real agent hook
-  const { messages, thinking, isStreaming, status, sendMessage, cancel } =
-    useAgent();
+  const {
+    messages, thinking, isStreaming, status, sessionKey, pendingInteraction,
+    sendMessage, cancel, loadSession, newSession, deleteSession, respondToInteraction,
+  } = useAgent();
 
   // Session list from API
   const {
     data: sessions,
     loading: sessionsLoading,
   } = useApi<SessionListItem[]>('/api/sessions');
+
+  // Tasks for sidebar
+  const { data: tasks } = useApi<Task[]>('/api/tasks');
+
+  // Calendar events for sidebar
+  const { data: calendarEvents } = useApi<CalendarEvent[]>('/api/calendar/events', {
+    params: { limit: 5 },
+  });
+
+  // Filtered pending tasks (top 5)
+  const pendingTasks = useMemo(() => {
+    if (!tasks) return [];
+    return tasks
+      .filter((t) => t.status === 'todo' || t.status === 'doing')
+      .sort((a, b) => (a.priority ?? 99) - (b.priority ?? 99))
+      .slice(0, 5);
+  }, [tasks]);
+
+  // Session stats
+  const sessionStats = useMemo(() => {
+    const userMsgs = messages.filter((m) => m.role === 'user').length;
+    const assistantMsgs = messages.filter((m) => m.role === 'assistant').length;
+    return { userMsgs, assistantMsgs, total: messages.length };
+  }, [messages]);
 
   // Sorted sessions (most recent first)
   const sortedSessions = (sessions ?? [])
@@ -154,6 +230,14 @@ export default function Chat() {
       sendMessage(description);
     },
     [sendMessage],
+  );
+
+  const handleDeleteSession = useCallback(
+    async (e: React.MouseEvent, key: string) => {
+      e.stopPropagation();
+      await deleteSession(key);
+    },
+    [deleteSession],
   );
 
   // Auto-resize textarea
@@ -317,6 +401,22 @@ export default function Chat() {
                 )}
               </AnimatePresence>
 
+              {/* Interaction request panel */}
+              <AnimatePresence>
+                {pendingInteraction && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -5 }}
+                  >
+                    <InteractionPanel
+                      interaction={pendingInteraction}
+                      onRespond={respondToInteraction}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               <div ref={messagesEndRef} />
             </div>
           )}
@@ -364,25 +464,28 @@ export default function Chat() {
                 borderColor: 'var(--codex-border)',
               }}
             >
-              <div className="flex items-center gap-2">
-                <div
-                  className="w-px h-5"
-                  style={{ backgroundColor: 'var(--codex-border)' }}
-                />
-                <Slash
-                  className="w-3.5 h-3.5"
-                  strokeWidth={1.5}
-                  style={{ color: 'var(--codex-fg-subtle)', opacity: 0.5 }}
-                />
-              </div>
-
               <button
-                className="flex items-center gap-1.5 px-2 py-1 rounded text-xs hover:bg-[var(--codex-bg-secondary)] transition-colors"
+                onClick={newSession}
+                className="flex items-center gap-1.5 px-2 py-1 rounded text-xs transition-colors"
                 style={{ color: 'var(--codex-fg-subtle)' }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--codex-bg-secondary)';
+                  e.currentTarget.style.color = 'var(--codex-fg)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.color = 'var(--codex-fg-subtle)';
+                }}
+                title="New conversation"
               >
-                <span>{selectedModel}</span>
-                <ChevronDown className="w-3 h-3" strokeWidth={1.5} />
+                <Plus className="w-3.5 h-3.5" strokeWidth={1.5} />
+                <span>New</span>
               </button>
+
+              <div
+                className="w-px h-5"
+                style={{ backgroundColor: 'var(--codex-border)' }}
+              />
 
               <textarea
                 ref={textareaRef}
@@ -575,60 +678,102 @@ export default function Chat() {
               </div>
             )}
             {sortedSessions.slice(0, 10).map((session) => (
-              <button
+              <div
                 key={session.key}
-                // TODO: Load session messages when clicked
-                // onClick={() => loadSession(session.key)}
-                className="w-full text-left p-2 rounded transition-colors"
-                style={{
-                  backgroundColor: 'transparent',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'var(--codex-bg)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }}
+                className="flex items-center gap-1 group"
               >
-                <div className="flex items-center justify-between mb-1">
-                  <span
-                    className="text-[11px]"
-                    style={{
-                      color: 'var(--codex-fg)',
-                      fontFamily: 'var(--font-mono)',
-                    }}
-                  >
-                    #{session.key.slice(0, 8)}
-                  </span>
-                  <span
-                    className="text-[10px]"
-                    style={{ color: 'var(--codex-fg-subtle)' }}
-                  >
-                    {session.messageCount} msgs
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5 text-[10px]" style={{ color: '#888' }}>
-                  <Clock className="w-2.5 h-2.5" strokeWidth={1.5} />
-                  {formatDuration(session.createdAt, session.updatedAt)}
-                </div>
-              </button>
+                <button
+                  onClick={() => loadSession(session.key)}
+                  className="flex-1 text-left p-2 rounded transition-colors"
+                  style={{
+                    backgroundColor: session.key === sessionKey
+                      ? 'var(--codex-bg)'
+                      : 'transparent',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--codex-bg)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor =
+                      session.key === sessionKey ? 'var(--codex-bg)' : 'transparent';
+                  }}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span
+                      className="text-[11px]"
+                      style={{
+                        color: 'var(--codex-fg)',
+                        fontFamily: 'var(--font-mono)',
+                      }}
+                    >
+                      #{session.key.slice(0, 8)}
+                    </span>
+                    <span
+                      className="text-[10px]"
+                      style={{ color: 'var(--codex-fg-subtle)' }}
+                    >
+                      {session.messageCount} msgs
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[10px]" style={{ color: '#888' }}>
+                    <Clock className="w-2.5 h-2.5" strokeWidth={1.5} />
+                    {formatDuration(session.createdAt, session.updatedAt)}
+                  </div>
+                </button>
+                <button
+                  onClick={(e) => handleDeleteSession(e, session.key)}
+                  className="p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                  style={{ color: 'var(--codex-fg-subtle)' }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.color = '#ef4444';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.color = 'var(--codex-fg-subtle)';
+                  }}
+                  title="Delete session"
+                >
+                  <Trash2 className="w-3 h-3" strokeWidth={1.5} />
+                </button>
+              </div>
             ))}
           </div>
         </SidebarSection>
 
-        {/* Memory Context */}
+        {/* Session Context */}
         <SidebarSection
-          title="Memory Context"
+          title="Session Context"
           open={memoryOpen}
           onToggle={() => setMemoryOpen(!memoryOpen)}
         >
-          <div className="px-4 pb-4">
-            <div
-              className="text-[12px]"
-              style={{ color: 'var(--codex-fg-subtle)' }}
-            >
-              --
-            </div>
+          <div className="px-4 pb-4 space-y-3 text-[13px]">
+            {sessionKey && (
+              <SidebarRow label="Session">
+                <span
+                  style={{
+                    color: 'var(--codex-fg)',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '11px',
+                  }}
+                >
+                  #{sessionKey.slice(0, 8)}
+                </span>
+              </SidebarRow>
+            )}
+            <SidebarRow label="You">
+              <span style={{ color: 'var(--codex-fg)' }}>
+                {sessionStats.userMsgs}
+              </span>
+            </SidebarRow>
+            <SidebarRow label="Assistant">
+              <span style={{ color: 'var(--codex-fg)' }}>
+                {sessionStats.assistantMsgs}
+              </span>
+            </SidebarRow>
+            <SidebarRow label="Total">
+              <span style={{ color: 'var(--codex-fg)' }}>
+                {sessionStats.total}
+              </span>
+            </SidebarRow>
           </div>
         </SidebarSection>
 
@@ -638,13 +783,57 @@ export default function Chat() {
           open={tasksOpen}
           onToggle={() => setTasksOpen(!tasksOpen)}
         >
-          <div className="px-4 pb-4 space-y-3">
-            <div
-              className="text-[12px]"
-              style={{ color: 'var(--codex-fg-subtle)' }}
-            >
-              --
-            </div>
+          <div className="px-4 pb-4 space-y-2">
+            {pendingTasks.length === 0 && (
+              <div
+                className="text-[12px]"
+                style={{ color: 'var(--codex-fg-subtle)' }}
+              >
+                No pending tasks
+              </div>
+            )}
+            {pendingTasks.map((task) => {
+              const p = priorityDisplay(task.priority);
+              return (
+                <div
+                  key={task.id}
+                  className="flex items-center gap-2 p-1.5 rounded cursor-default"
+                  style={{ backgroundColor: 'transparent' }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = 'var(--codex-bg)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  <Circle
+                    className="w-3 h-3 flex-shrink-0"
+                    strokeWidth={1.5}
+                    style={{
+                      color: task.status === 'doing'
+                        ? 'var(--codex-accent)'
+                        : 'var(--codex-fg-subtle)',
+                    }}
+                  />
+                  <span
+                    className="text-[12px] truncate flex-1"
+                    style={{ color: 'var(--codex-fg)' }}
+                  >
+                    {task.title}
+                  </span>
+                  <span
+                    className="text-[10px] flex-shrink-0"
+                    style={{
+                      color: p.color,
+                      fontFamily: 'var(--font-mono)',
+                      fontWeight: 500,
+                    }}
+                  >
+                    {p.label}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </SidebarSection>
 
@@ -655,13 +844,49 @@ export default function Chat() {
           onToggle={() => setCalendarOpen(!calendarOpen)}
           noBorder
         >
-          <div className="px-4 pb-4">
-            <div
-              className="text-[12px]"
-              style={{ color: 'var(--codex-fg-subtle)' }}
-            >
-              --
-            </div>
+          <div className="px-4 pb-4 space-y-2">
+            {(!calendarEvents || calendarEvents.length === 0) && (
+              <div
+                className="text-[12px]"
+                style={{ color: 'var(--codex-fg-subtle)' }}
+              >
+                No upcoming events
+              </div>
+            )}
+            {calendarEvents?.slice(0, 5).map((event) => (
+              <div
+                key={event.uid}
+                className="flex items-center gap-2 p-1.5 rounded"
+                style={{ backgroundColor: 'transparent' }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'var(--codex-bg)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+              >
+                <Calendar
+                  className="w-3 h-3 flex-shrink-0"
+                  strokeWidth={1.5}
+                  style={{ color: 'var(--codex-accent)' }}
+                />
+                <span
+                  className="text-[12px] truncate flex-1"
+                  style={{ color: 'var(--codex-fg)' }}
+                >
+                  {event.summary}
+                </span>
+                <span
+                  className="text-[10px] flex-shrink-0"
+                  style={{
+                    color: 'var(--codex-fg-subtle)',
+                    fontFamily: 'var(--font-mono)',
+                  }}
+                >
+                  {formatRelativeTime(event.startAt)}
+                </span>
+              </div>
+            ))}
           </div>
         </SidebarSection>
       </aside>
@@ -715,17 +940,16 @@ function MessageBubble({
         <div className="flex gap-3">
           <div className="flex-1">
             <div
-              className="text-[14px] leading-relaxed whitespace-pre-wrap"
+              className="text-[14px] leading-relaxed prose-chat"
               style={{ color: 'var(--codex-fg)' }}
-            >
-              {msg.content}
-              {msg.isStreaming && (
-                <span
-                  className="inline-block w-[2px] h-[14px] ml-0.5 align-text-bottom animate-pulse"
-                  style={{ backgroundColor: 'var(--codex-accent)' }}
-                />
-              )}
-            </div>
+              dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
+            />
+            {msg.isStreaming && (
+              <span
+                className="inline-block w-[2px] h-[14px] ml-0.5 align-text-bottom animate-pulse"
+                style={{ backgroundColor: 'var(--codex-accent)' }}
+              />
+            )}
             <div className="flex items-center gap-2 mt-2">
               <div
                 className="text-[11px]"
@@ -995,6 +1219,252 @@ function ToolCallItem({ toolCall }: { toolCall: ToolCallState }) {
       )}
     </div>
   );
+}
+
+/* ── Interaction request panel ──────────────────────────────────────────── */
+
+function InteractionPanel({
+  interaction,
+  onRespond,
+}: {
+  interaction: PendingInteraction;
+  onRespond: (requestId: string, response: Record<string, unknown>) => void;
+}) {
+  const [answers, setAnswers] = useState<Record<number, unknown>>({});
+
+  const handleSubmit = useCallback(() => {
+    const response: Record<string, unknown> = {};
+    interaction.questions.forEach((q, idx) => {
+      response[q.label] = answers[idx] ?? (q.type === 'yesNo' ? (q.default ?? false) : '');
+    });
+    onRespond(interaction.requestId, response);
+  }, [interaction, answers, onRespond]);
+
+  return (
+    <div
+      className="rounded-lg overflow-hidden"
+      style={{
+        backgroundColor: '#141414',
+        border: '1px solid var(--codex-accent)',
+      }}
+    >
+      <div
+        className="px-4 py-3 flex items-center gap-2"
+        style={{
+          backgroundColor: 'var(--codex-bg-secondary)',
+          borderBottom: '1px solid var(--codex-border)',
+        }}
+      >
+        <MessageSquare
+          className="w-4 h-4"
+          strokeWidth={1.5}
+          style={{ color: 'var(--codex-accent)' }}
+        />
+        <span
+          className="text-[13px]"
+          style={{ color: 'var(--codex-fg)', fontWeight: 500 }}
+        >
+          {interaction.title}
+        </span>
+      </div>
+
+      <div className="px-4 py-3 space-y-4">
+        {interaction.questions.map((q, idx) => (
+          <InteractionField
+            key={idx}
+            question={q}
+            value={answers[idx]}
+            onChange={(val) => setAnswers((prev) => ({ ...prev, [idx]: val }))}
+          />
+        ))}
+
+        <button
+          onClick={handleSubmit}
+          className="w-full py-2 rounded-md text-[13px] transition-colors"
+          style={{
+            backgroundColor: 'var(--codex-accent)',
+            color: '#000',
+            fontWeight: 500,
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.opacity = '0.9';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.opacity = '1';
+          }}
+        >
+          Submit
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function InteractionField({
+  question,
+  value,
+  onChange,
+}: {
+  question: InteractionQuestion;
+  value: unknown;
+  onChange: (val: unknown) => void;
+}) {
+  switch (question.type) {
+    case 'freeText':
+      return (
+        <div>
+          <label
+            className="block text-[12px] mb-1.5"
+            style={{ color: 'var(--codex-fg-subtle)' }}
+          >
+            {question.label}
+          </label>
+          <input
+            type="text"
+            value={(value as string) ?? ''}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={question.placeholder ?? ''}
+            className="w-full px-3 py-2 rounded-md text-[13px] outline-none"
+            style={{
+              backgroundColor: 'var(--codex-bg-tertiary)',
+              border: '1px solid var(--codex-border)',
+              color: 'var(--codex-fg)',
+            }}
+          />
+        </div>
+      );
+
+    case 'yesNo':
+      return (
+        <div>
+          <label
+            className="block text-[12px] mb-1.5"
+            style={{ color: 'var(--codex-fg-subtle)' }}
+          >
+            {question.label}
+          </label>
+          <div className="flex gap-2">
+            {(['Yes', 'No'] as const).map((opt) => {
+              const selected =
+                (opt === 'Yes' && value === true) ||
+                (opt === 'No' && value === false);
+              return (
+                <button
+                  key={opt}
+                  onClick={() => onChange(opt === 'Yes')}
+                  className="flex-1 py-1.5 rounded-md text-[12px] transition-colors"
+                  style={{
+                    backgroundColor: selected
+                      ? 'var(--codex-accent)'
+                      : 'var(--codex-bg-tertiary)',
+                    color: selected ? '#000' : 'var(--codex-fg)',
+                    border: `1px solid ${selected ? 'var(--codex-accent)' : 'var(--codex-border)'}`,
+                    fontWeight: selected ? 500 : 400,
+                  }}
+                >
+                  {opt}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      );
+
+    case 'singleSelect':
+      return (
+        <div>
+          <label
+            className="block text-[12px] mb-1.5"
+            style={{ color: 'var(--codex-fg-subtle)' }}
+          >
+            {question.label}
+          </label>
+          <div className="space-y-1">
+            {question.options.map((opt) => (
+              <button
+                key={opt}
+                onClick={() => onChange(opt)}
+                className="w-full text-left px-3 py-1.5 rounded-md text-[12px] transition-colors"
+                style={{
+                  backgroundColor:
+                    value === opt
+                      ? 'var(--codex-accent-dim)'
+                      : 'var(--codex-bg-tertiary)',
+                  color:
+                    value === opt
+                      ? 'var(--codex-accent)'
+                      : 'var(--codex-fg)',
+                  border: `1px solid ${value === opt ? 'var(--codex-accent)' : 'var(--codex-border)'}`,
+                }}
+              >
+                {opt}
+              </button>
+            ))}
+          </div>
+        </div>
+      );
+
+    case 'multiSelect':
+      return (
+        <div>
+          <label
+            className="block text-[12px] mb-1.5"
+            style={{ color: 'var(--codex-fg-subtle)' }}
+          >
+            {question.label}
+          </label>
+          <div className="space-y-1">
+            {question.options.map((opt) => {
+              const selected = Array.isArray(value) && (value as string[]).includes(opt);
+              return (
+                <button
+                  key={opt}
+                  onClick={() => {
+                    const current = (Array.isArray(value) ? value : []) as string[];
+                    onChange(
+                      selected
+                        ? current.filter((v) => v !== opt)
+                        : [...current, opt],
+                    );
+                  }}
+                  className="w-full text-left px-3 py-1.5 rounded-md text-[12px] transition-colors flex items-center gap-2"
+                  style={{
+                    backgroundColor: selected
+                      ? 'var(--codex-accent-dim)'
+                      : 'var(--codex-bg-tertiary)',
+                    color: selected
+                      ? 'var(--codex-accent)'
+                      : 'var(--codex-fg)',
+                    border: `1px solid ${selected ? 'var(--codex-accent)' : 'var(--codex-border)'}`,
+                  }}
+                >
+                  <div
+                    className="w-3 h-3 rounded-sm border flex items-center justify-center"
+                    style={{
+                      borderColor: selected
+                        ? 'var(--codex-accent)'
+                        : 'var(--codex-border)',
+                      backgroundColor: selected
+                        ? 'var(--codex-accent)'
+                        : 'transparent',
+                    }}
+                  >
+                    {selected && (
+                      <Check
+                        className="w-2 h-2"
+                        strokeWidth={3}
+                        style={{ color: '#000' }}
+                      />
+                    )}
+                  </div>
+                  {opt}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      );
+  }
 }
 
 /* ── Reusable sidebar section ────────────────────────────────────────────── */

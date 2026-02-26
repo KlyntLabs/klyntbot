@@ -8,7 +8,7 @@ interface SettingSectionProps {
   children: React.ReactNode;
 }
 
-export function SettingSection({ title, description, defaultOpen = false, children }: SettingSectionProps) {
+export function SettingSection({ title, description, defaultOpen = true, children }: SettingSectionProps) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="mb-2">

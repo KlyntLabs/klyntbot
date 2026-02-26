@@ -1,7 +1,8 @@
-import { useState, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, RefreshCw, Loader2, X } from 'lucide-react';
+import { useState, useMemo, useCallback } from 'react';
+import { ChevronLeft, ChevronRight, RefreshCw, Loader2, X, CheckCircle2 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { useApi } from '../../lib/hooks/useApi';
+import { apiFetch } from '../../lib/api';
 import type { CalendarEvent as ApiCalendarEvent, Task, CalendarSyncStatus, Project } from '../../lib/types';
 
 type ViewMode = 'day' | 'week' | 'month';
@@ -32,10 +33,39 @@ export default function Calendar() {
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
 
-  const { data: calendarEvents } = useApi<ApiCalendarEvent[]>('/api/calendar/events');
-  const { data: tasks } = useApi<Task[]>('/api/tasks');
-  const { data: syncStatus } = useApi<CalendarSyncStatus[]>('/api/calendar/sync-status');
+  const [syncing, setSyncing] = useState(false);
+
+  const { data: calendarEvents, refetch: refetchEvents } = useApi<ApiCalendarEvent[]>('/api/calendar/events');
+  const { data: tasks, setData: setTasks, refetch: refetchTasks } = useApi<Task[]>('/api/tasks');
+  const { data: syncStatus, refetch: refetchSyncStatus } = useApi<CalendarSyncStatus[]>('/api/calendar/sync-status');
   const { data: projects } = useApi<Project[]>('/api/projects');
+
+  const handleSync = useCallback(async () => {
+    setSyncing(true);
+    try {
+      await apiFetch('/api/calendar/sync', { method: 'POST' });
+      refetchEvents();
+      refetchSyncStatus();
+    } catch {
+      // Sync may have partially succeeded
+    } finally {
+      setSyncing(false);
+    }
+  }, [refetchEvents, refetchSyncStatus]);
+
+  const handleMarkComplete = useCallback(async (taskId: string) => {
+    setTasks(prev => prev?.map(t => t.id === taskId ? { ...t, status: 'done' } : t));
+    setSelectedItem(prev => prev ? { ...prev, status: 'done' } : prev);
+    try {
+      await apiFetch(`/api/tasks/${encodeURIComponent(taskId)}`, {
+        method: 'PATCH',
+        body: { status: 'done' },
+      });
+      refetchTasks();
+    } catch {
+      refetchTasks();
+    }
+  }, [setTasks, refetchTasks]);
 
   const items = useMemo(() => {
     const result: CalendarItem[] = [];
@@ -506,14 +536,21 @@ export default function Calendar() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 text-[12px]" style={{ color: 'var(--codex-fg-subtle)' }}>
-            {!syncStatus ? (
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            className="flex items-center gap-2 text-[12px] px-3 py-1.5 rounded transition-colors"
+            style={{ color: 'var(--codex-fg-subtle)', border: '1px solid var(--codex-border)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#141414'; e.currentTarget.style.color = '#10a37f'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--codex-fg-subtle)'; }}
+          >
+            {syncing || !syncStatus ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" strokeWidth={1.5} />
             ) : (
               <RefreshCw className="w-3.5 h-3.5" strokeWidth={1.5} />
             )}
-            <span>{getLastSyncLabel()}</span>
-          </div>
+            <span>{syncing ? 'Syncing...' : getLastSyncLabel()}</span>
+          </button>
         </div>
 
         {/* Calendar Grid */}
@@ -702,26 +739,44 @@ export default function Calendar() {
               )}
             </div>
 
-            {/* TODO: add edit/delete actions for calendar events */}
-            {/* TODO: add "mark complete" action for task items */}
             {selectedItem.type === 'task' && (
-              <button
-                onClick={() => navigate(`/tasks/${selectedItem.id}`)}
-                className="w-full mt-4 px-4 py-2 rounded text-[13px] border transition-colors"
-                style={{
-                  borderColor: '#10a37f',
-                  color: '#10a37f',
-                  backgroundColor: 'transparent'
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = 'rgba(16, 163, 127, 0.1)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }}
-              >
-                View in Tasks
-              </button>
+              <div className="mt-4 space-y-2">
+                {selectedItem.status?.toLowerCase() !== 'done' && (
+                  <button
+                    onClick={() => handleMarkComplete(selectedItem.id)}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded text-[13px] transition-colors"
+                    style={{
+                      backgroundColor: 'rgba(16, 163, 127, 0.15)',
+                      color: '#10a37f',
+                      border: '1px solid #10a37f40'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'rgba(16, 163, 127, 0.25)'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'rgba(16, 163, 127, 0.15)'}
+                  >
+                    <CheckCircle2 className="w-4 h-4" strokeWidth={1.5} />
+                    Mark Complete
+                  </button>
+                )}
+                <button
+                  onClick={() => navigate(`/tasks/${selectedItem.id}`)}
+                  className="w-full px-4 py-2 rounded text-[13px] border transition-colors"
+                  style={{
+                    borderColor: 'var(--codex-border)',
+                    color: 'var(--codex-fg-subtle)',
+                    backgroundColor: 'transparent'
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#141414';
+                    e.currentTarget.style.color = 'var(--codex-fg)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                    e.currentTarget.style.color = 'var(--codex-fg-subtle)';
+                  }}
+                >
+                  View in Tasks
+                </button>
+              </div>
             )}
           </div>
         ) : (

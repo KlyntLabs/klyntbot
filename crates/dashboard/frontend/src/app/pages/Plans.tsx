@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   CheckCircle2, Circle, Clock, ChevronRight, Plus, Loader2,
   AlertTriangle, XCircle, SkipForward, Search, X, Trash2,
@@ -256,6 +256,36 @@ export default function Plans() {
       setTransitioningPlan(null);
     }
   }, [setData]);
+
+  // ── Poll executing plan steps ───────────────────────────────────────────
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    // If an expanded plan is "executing", poll its steps every 3s
+    if (expandedPlan) {
+      const plan = planList.find(p => p.id === expandedPlan);
+      if (plan && plan.status.toLowerCase() === 'executing') {
+        pollRef.current = setInterval(async () => {
+          try {
+            const result = await apiFetch<PlanWithSteps>('/api/plans/' + expandedPlan);
+            setExpandedPlanSteps(prev => ({ ...prev, [expandedPlan]: result.steps }));
+            // If plan status changed, update the list too
+            if (result.plan.status.toLowerCase() !== 'executing') {
+              setData(prev => prev?.map(p => p.id === expandedPlan ? { ...p, status: result.plan.status } : p));
+            }
+          } catch {
+            // Ignore poll errors
+          }
+        }, 3000);
+      }
+    }
+    return () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+  }, [expandedPlan, planList, setData]);
 
   // ── Shared styles ────────────────────────────────────────────────────────
 

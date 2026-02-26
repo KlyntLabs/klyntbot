@@ -15,28 +15,13 @@ import {
 import { useApi } from '../../lib/hooks/useApi';
 import { apiFetch } from '../../lib/api';
 import type { AgentStatus } from '../../lib/types';
+import { PROVIDER_MODELS, displayName } from './settings/model-data';
 
 type NavItem = {
   id: string;
   icon: typeof MessageSquare;
   label: string;
   path: string;
-};
-
-/** Well-known default models per provider. */
-const PROVIDER_MODELS: Record<string, string[]> = {
-  anthropic: ['anthropic/claude-opus-4-5', 'anthropic/claude-sonnet-4-5', 'anthropic/claude-haiku-3-5'],
-  openai: ['openai/gpt-4o', 'openai/gpt-4o-mini', 'openai/o1', 'openai/o3-mini'],
-  deepseek: ['deepseek-chat', 'deepseek-reasoner'],
-  gemini: ['gemini-2.0-flash', 'gemini-2.5-pro'],
-  groq: ['groq/llama-3.3-70b', 'groq/mixtral-8x7b'],
-  openrouter: ['openrouter/auto'],
-  moonshot: ['moonshot-v1-8k', 'moonshot-v1-32k'],
-  dashscope: ['qwen-max', 'qwen-plus', 'qwen-turbo'],
-  zhipu: ['glm-4', 'glm-4-flash'],
-  minimax: ['abab6.5s-chat'],
-  aihubmix: ['aihubmix/auto'],
-  vllm: ['vllm/default'],
 };
 
 const PERMISSION_LEVELS = [
@@ -296,7 +281,7 @@ export function Layout() {
               className="flex items-center gap-1.5 hover:text-[var(--codex-fg-muted)] transition-colors"
               onClick={() => { setProviderOpen(!providerOpen); setModelOpen(false); setPermOpen(false); }}
             >
-              <span>{activeProvider ?? '—'}</span>
+              <span>{activeProvider ? displayName(activeProvider) : '—'}</span>
               <ChevronDown className="w-3 h-3" style={{ transform: providerOpen ? 'rotate(180deg)' : undefined, transition: 'transform 0.15s' }} />
             </button>
           </div>
@@ -323,7 +308,7 @@ export function Layout() {
                       onClick={() => switchProvider(prov)}
                     >
                       <Check className="w-3 h-3 flex-shrink-0" style={{ opacity: isActive ? 1 : 0 }} strokeWidth={2} />
-                      <span>{prov}</span>
+                      <span>{displayName(prov)}</span>
                     </button>
                   );
                 })}
