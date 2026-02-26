@@ -14,12 +14,14 @@ import {
   AlertTriangle,
   Trash2,
   X,
+  Search,
+  GitBranch,
 } from 'lucide-react';
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useApi } from '../../lib/hooks/useApi';
 import { apiFetch } from '../../lib/api';
-import type { Task, TaskAttachment, TaskTimeEntry, Project } from '../../lib/types';
+import type { Task, TaskAttachment, TaskTimeEntry, Project, TaskDependencies } from '../../lib/types';
 
 export default function TaskDetail() {
   const { id } = useParams();
@@ -43,11 +45,19 @@ export default function TaskDetail() {
   // Delete state
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
+  // Dependency state
+  const [depSearchOpen, setDepSearchOpen] = useState(false);
+  const [depSearchQuery, setDepSearchQuery] = useState('');
+  const [depSearchResults, setDepSearchResults] = useState<Task[]>([]);
+  const [depSearchLoading, setDepSearchLoading] = useState(false);
+  const depSearchRef = useRef<HTMLDivElement>(null);
+
   const { data: task, loading, error, setData: setTask, refetch: refetchTask } = useApi<Task>(`/api/tasks/${id}`);
   const { data: subtasks } = useApi<Task[]>(`/api/tasks/${id}/subtasks`);
   const { data: attachments } = useApi<TaskAttachment[]>(`/api/tasks/${id}/attachments`);
   const { data: timeEntries, refetch: refetchTimeEntries } = useApi<TaskTimeEntry[]>(`/api/tasks/${id}/time-entries`);
   const { data: projects } = useApi<Project[]>('/api/projects');
+  const deps = useApi<TaskDependencies>(`/api/tasks/${id}/dependencies`);
 
   // Sync local state when task loads
   useEffect(() => {
@@ -298,6 +308,96 @@ export default function TaskDetail() {
       setConfirmingDelete(false);
     }
   }, [id, navigate]);
+
+  // ── Dependency search ─────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!depSearchOpen || !depSearchQuery.trim()) {
+      setDepSearchResults([]);
+      return;
+    }
+    let cancelled = false;
+    setDepSearchLoading(true);
+    apiFetch<Task[]>('/api/tasks', { params: { limit: 20 } })
+      .then((tasks) => {
+        if (cancelled) return;
+        const q = depSearchQuery.toLowerCase();
+        const blockedByIds = new Set((deps.data?.blockedBy ?? []).map(t => t.id));
+        const blocksIds = new Set((deps.data?.blocks ?? []).map(t => t.id));
+        const filtered = tasks.filter(t =>
+          t.id !== id &&
+          !blockedByIds.has(t.id) &&
+          !blocksIds.has(t.id) &&
+          t.title.toLowerCase().includes(q)
+        );
+        setDepSearchResults(filtered.slice(0, 8));
+      })
+      .catch(() => { if (!cancelled) setDepSearchResults([]); })
+      .finally(() => { if (!cancelled) setDepSearchLoading(false); });
+    return () => { cancelled = true; };
+  }, [depSearchQuery, depSearchOpen, id, deps.data]);
+
+  // Close dep search on outside click
+  useEffect(() => {
+    if (!depSearchOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (depSearchRef.current && !depSearchRef.current.contains(e.target as Node)) {
+        setDepSearchOpen(false);
+        setDepSearchQuery('');
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [depSearchOpen]);
+
+  const handleAddDependency = useCallback(async (blockerId: string) => {
+    if (!id) return;
+    try {
+      await apiFetch(`/api/tasks/${encodeURIComponent(id)}/dependencies`, {
+        body: { blockerId },
+      });
+      deps.refetch();
+    } catch {
+      // Silently fail
+    }
+    setDepSearchOpen(false);
+    setDepSearchQuery('');
+  }, [id, deps]);
+
+  const handleRemoveBlockedBy = useCallback(async (blockerId: string) => {
+    if (!id) return;
+    try {
+      await apiFetch<void>(`/api/tasks/${encodeURIComponent(id)}/dependencies/${encodeURIComponent(blockerId)}`, {
+        method: 'DELETE',
+      });
+      deps.refetch();
+    } catch {
+      // Silently fail
+    }
+  }, [id, deps]);
+
+  const handleRemoveBlocks = useCallback(async (blockedId: string) => {
+    if (!id) return;
+    try {
+      await apiFetch<void>(`/api/tasks/${encodeURIComponent(blockedId)}/dependencies/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      });
+      deps.refetch();
+    } catch {
+      // Silently fail
+    }
+  }, [id, deps]);
+
+  // ── DAG helpers ──────────────────────────────────────────────────────────────
+  const getStatusDotColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'done': return '#10a37f';
+      case 'doing': return '#e5c07b';
+      default: return '#666';
+    }
+  };
+
+  const truncateTitle = (title: string, max: number) =>
+    title.length > max ? title.slice(0, max) + '...' : title;
 
   if (loading && !task) {
     return (
@@ -824,6 +924,331 @@ export default function TaskDetail() {
               )}
             </div>
           </div>
+
+          {/* Dependencies Card */}
+          {deps.data && (() => {
+            const blockedBy = deps.data.blockedBy;
+            const blocks = deps.data.blocks;
+            const hasDeps = blockedBy.length > 0 || blocks.length > 0;
+
+            // ── DAG layout computation ──────────────────────────────────
+            const nodeW = 150;
+            const nodeH = 34;
+            const colGap = 200;
+            const rowGap = 46;
+            const padX = 20;
+            const padY = 20;
+
+            const col0Count = blockedBy.length;
+            const col1Count = 1; // current task
+            const col2Count = blocks.length;
+            const maxRows = Math.max(col0Count, col1Count, col2Count, 1);
+
+            const svgW = (col2Count > 0 ? 3 : col0Count > 0 ? 2 : 1) * colGap - colGap + nodeW + padX * 2;
+            const svgH = maxRows * nodeH + (maxRows - 1) * (rowGap - nodeH) + padY * 2;
+
+            const colX = (col: number) => padX + col * colGap;
+
+            const centerY = (count: number, index: number) => {
+              const totalH = count * nodeH + (count - 1) * (rowGap - nodeH);
+              const startY = padY + (svgH - padY * 2 - totalH) / 2;
+              return startY + index * rowGap;
+            };
+
+            type DagNode = { id: string; title: string; status: string; x: number; y: number; isCurrent: boolean };
+            const nodes: DagNode[] = [];
+            const edges: { sx: number; sy: number; tx: number; ty: number }[] = [];
+
+            // Column 0: blocked by
+            blockedBy.forEach((t, i) => {
+              nodes.push({ id: t.id, title: t.title, status: t.status, x: colX(0), y: centerY(col0Count, i), isCurrent: false });
+            });
+
+            // Column 1: current task (always at center col — shift left if no blockers)
+            const currentCol = col0Count > 0 ? 1 : 0;
+            const currentX = colX(currentCol);
+            const currentY = centerY(1, 0);
+            nodes.push({ id: task.id, title: task.title, status: task.status, x: currentX, y: currentY, isCurrent: true });
+
+            // Column 2: blocks
+            const blocksCol = col0Count > 0 ? 2 : 1;
+            blocks.forEach((t, i) => {
+              nodes.push({ id: t.id, title: t.title, status: t.status, x: colX(blocksCol), y: centerY(col2Count, i), isCurrent: false });
+            });
+
+            // Edges: blocked by → current
+            blockedBy.forEach((_, i) => {
+              const sy = centerY(col0Count, i) + nodeH / 2;
+              const sx = colX(0) + nodeW;
+              const ty = currentY + nodeH / 2;
+              const tx = currentX;
+              edges.push({ sx, sy, tx, ty });
+            });
+
+            // Edges: current → blocks
+            blocks.forEach((_, i) => {
+              const sy = currentY + nodeH / 2;
+              const sx = currentX + nodeW;
+              const ty = centerY(col2Count, i) + nodeH / 2;
+              const tx = colX(blocksCol);
+              edges.push({ sx, sy, tx, ty });
+            });
+
+            return (
+              <div className="p-4 rounded-lg" style={{
+                backgroundColor: '#141414',
+                border: '1px solid var(--codex-border)'
+              }}>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-[13px] flex items-center gap-2" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>
+                    <GitBranch className="w-3.5 h-3.5" strokeWidth={1.5} />
+                    Dependencies
+                  </h3>
+                </div>
+
+                {/* Blocked By */}
+                <div className="mb-3">
+                  <div className="text-[11px] mb-1.5" style={{ color: 'var(--codex-fg-subtle)' }}>Blocked By</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {blockedBy.length === 0 && (
+                      <span className="text-[11px]" style={{ color: 'var(--codex-fg-muted)' }}>None</span>
+                    )}
+                    {blockedBy.map(t => (
+                      <span
+                        key={t.id}
+                        className="group flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] transition-colors"
+                        style={{
+                          backgroundColor: 'var(--codex-bg)',
+                          border: '1px solid var(--codex-border)',
+                          cursor: 'pointer',
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1a1a1a'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--codex-bg)'}
+                      >
+                        <span
+                          className="w-2 h-2 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: getStatusDotColor(t.status) }}
+                        />
+                        <span
+                          onClick={() => navigate(`/tasks/${t.id}`)}
+                          style={{ color: 'var(--codex-fg)' }}
+                        >
+                          {truncateTitle(t.title, 20)}
+                        </span>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleRemoveBlockedBy(t.id); }}
+                          className="ml-0.5 opacity-50 hover:opacity-100 transition-opacity"
+                          style={{ color: 'var(--codex-fg-subtle)' }}
+                          onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
+                          onMouseLeave={(e) => e.currentTarget.style.color = 'var(--codex-fg-subtle)'}
+                        >
+                          <X className="w-2.5 h-2.5" strokeWidth={2} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Blocks */}
+                <div className="mb-3">
+                  <div className="text-[11px] mb-1.5" style={{ color: 'var(--codex-fg-subtle)' }}>Blocks</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {blocks.length === 0 && (
+                      <span className="text-[11px]" style={{ color: 'var(--codex-fg-muted)' }}>None</span>
+                    )}
+                    {blocks.map(t => (
+                      <span
+                        key={t.id}
+                        className="group flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] transition-colors"
+                        style={{
+                          backgroundColor: 'var(--codex-bg)',
+                          border: '1px solid var(--codex-border)',
+                          cursor: 'pointer',
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1a1a1a'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'var(--codex-bg)'}
+                      >
+                        <span
+                          className="w-2 h-2 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: getStatusDotColor(t.status) }}
+                        />
+                        <span
+                          onClick={() => navigate(`/tasks/${t.id}`)}
+                          style={{ color: 'var(--codex-fg)' }}
+                        >
+                          {truncateTitle(t.title, 20)}
+                        </span>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleRemoveBlocks(t.id); }}
+                          className="ml-0.5 opacity-50 hover:opacity-100 transition-opacity"
+                          style={{ color: 'var(--codex-fg-subtle)' }}
+                          onMouseEnter={(e) => e.currentTarget.style.color = '#ef4444'}
+                          onMouseLeave={(e) => e.currentTarget.style.color = 'var(--codex-fg-subtle)'}
+                        >
+                          <X className="w-2.5 h-2.5" strokeWidth={2} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Add Dependency */}
+                <div className="relative" ref={depSearchRef}>
+                  {depSearchOpen ? (
+                    <div>
+                      <div className="flex items-center gap-2 px-2 py-1.5 rounded border" style={{
+                        backgroundColor: 'var(--codex-bg)',
+                        borderColor: 'var(--codex-accent)',
+                      }}>
+                        <Search className="w-3 h-3 flex-shrink-0" strokeWidth={1.5} style={{ color: 'var(--codex-fg-subtle)' }} />
+                        <input
+                          value={depSearchQuery}
+                          onChange={(e) => setDepSearchQuery(e.target.value)}
+                          autoFocus
+                          placeholder="Search tasks..."
+                          className="flex-1 bg-transparent outline-none text-[11px]"
+                          style={{ color: 'var(--codex-fg)' }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Escape') { setDepSearchOpen(false); setDepSearchQuery(''); }
+                          }}
+                        />
+                        {depSearchLoading && <Loader2 className="w-3 h-3 animate-spin" style={{ color: 'var(--codex-fg-subtle)' }} />}
+                      </div>
+                      {depSearchResults.length > 0 && (
+                        <div className="absolute left-0 right-0 mt-1 rounded border overflow-hidden" style={{
+                          backgroundColor: '#141414',
+                          borderColor: 'var(--codex-border)',
+                          zIndex: 10,
+                          maxHeight: '200px',
+                          overflowY: 'auto',
+                        }}>
+                          {depSearchResults.map(t => (
+                            <button
+                              key={t.id}
+                              onClick={() => handleAddDependency(t.id)}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-[11px] text-left transition-colors"
+                              style={{ color: 'var(--codex-fg)' }}
+                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1a1a1a'}
+                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                            >
+                              <span
+                                className="w-2 h-2 rounded-full flex-shrink-0"
+                                style={{ backgroundColor: getStatusDotColor(t.status) }}
+                              />
+                              <span className="truncate">{t.title}</span>
+                              <span className="ml-auto flex-shrink-0" style={{ color: 'var(--codex-fg-muted)', fontFamily: 'var(--font-mono)', fontSize: '10px' }}>
+                                {t.id.slice(0, 6)}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {depSearchQuery.trim() && !depSearchLoading && depSearchResults.length === 0 && (
+                        <div className="absolute left-0 right-0 mt-1 px-3 py-2 rounded border text-[11px]" style={{
+                          backgroundColor: '#141414',
+                          borderColor: 'var(--codex-border)',
+                          color: 'var(--codex-fg-muted)',
+                          zIndex: 10,
+                        }}>
+                          No matching tasks
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setDepSearchOpen(true)}
+                      className="flex items-center gap-1.5 px-2 py-1 rounded text-[11px] transition-colors"
+                      style={{
+                        backgroundColor: 'transparent',
+                        color: 'var(--codex-fg-subtle)',
+                        border: '1px solid var(--codex-border)',
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.color = '#10a37f'}
+                      onMouseLeave={(e) => e.currentTarget.style.color = 'var(--codex-fg-subtle)'}
+                    >
+                      <Plus className="w-3 h-3" strokeWidth={1.5} />
+                      Add Blocker
+                    </button>
+                  )}
+                </div>
+
+                {/* DAG Visualization */}
+                {hasDeps && (
+                  <div className="mt-4 pt-3 border-t" style={{ borderColor: 'var(--codex-border)' }}>
+                    <svg
+                      width={svgW}
+                      height={svgH}
+                      viewBox={`0 0 ${svgW} ${svgH}`}
+                      style={{ display: 'block', maxWidth: '100%' }}
+                    >
+                      <defs>
+                        <marker
+                          id="arrowhead"
+                          markerWidth="8"
+                          markerHeight="6"
+                          refX="8"
+                          refY="3"
+                          orient="auto"
+                        >
+                          <polygon points="0 0, 8 3, 0 6" fill="#444" />
+                        </marker>
+                      </defs>
+
+                      {/* Edges */}
+                      {edges.map((e, i) => {
+                        const dx = e.tx - e.sx;
+                        const cx1 = e.sx + dx * 0.6;
+                        const cx2 = e.tx - dx * 0.6;
+                        return (
+                          <path
+                            key={`edge-${i}`}
+                            d={`M ${e.sx},${e.sy} C ${cx1},${e.sy} ${cx2},${e.ty} ${e.tx},${e.ty}`}
+                            stroke="#444"
+                            strokeWidth={1}
+                            fill="none"
+                            markerEnd="url(#arrowhead)"
+                          />
+                        );
+                      })}
+
+                      {/* Nodes */}
+                      {nodes.map((node) => (
+                        <g
+                          key={node.id}
+                          transform={`translate(${node.x}, ${node.y})`}
+                          style={{ cursor: node.isCurrent ? 'default' : 'pointer' }}
+                          onClick={() => { if (!node.isCurrent) navigate(`/tasks/${node.id}`); }}
+                        >
+                          <rect
+                            width={nodeW}
+                            height={nodeH}
+                            rx={6}
+                            fill="#1a1a1a"
+                            stroke={node.isCurrent ? 'var(--codex-accent)' : 'var(--codex-border)'}
+                            strokeWidth={node.isCurrent ? 1.5 : 1}
+                          />
+                          <circle
+                            cx={14}
+                            cy={nodeH / 2}
+                            r={3}
+                            fill={getStatusDotColor(node.status)}
+                          />
+                          <text
+                            x={24}
+                            y={nodeH / 2 + 4}
+                            fontSize={11}
+                            fill="var(--codex-fg)"
+                          >
+                            {truncateTitle(node.title, 18)}
+                          </text>
+                        </g>
+                      ))}
+                    </svg>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Focus Card */}
           {task.focusedAt && (
