@@ -2,6 +2,7 @@ import { useNavigate, useParams } from 'react-router';
 import {
   ArrowLeft,
   Calendar as CalendarIcon,
+  CalendarPlus,
   Plus,
   Play,
   Square,
@@ -51,6 +52,11 @@ export default function TaskDetail() {
   const [depSearchResults, setDepSearchResults] = useState<Task[]>([]);
   const [depSearchLoading, setDepSearchLoading] = useState(false);
   const depSearchRef = useRef<HTMLDivElement>(null);
+
+  // Schedule to calendar state
+  const [scheduling, setScheduling] = useState(false);
+  const [scheduleForm, setScheduleForm] = useState({ start: '', end: '' });
+  const [scheduleSaving, setScheduleSaving] = useState(false);
 
   const { data: task, loading, error, setData: setTask, refetch: refetchTask } = useApi<Task>(`/api/tasks/${id}`);
   const { data: subtasks } = useApi<Task[]>(`/api/tasks/${id}/subtasks`);
@@ -387,6 +393,26 @@ export default function TaskDetail() {
     }
   }, [id, deps]);
 
+  // ── Schedule to calendar ─────────────────────────────────────────────────────
+  async function handleScheduleToCalendar() {
+    if (!task || !scheduleForm.start || !scheduleForm.end) return;
+    setScheduleSaving(true);
+    try {
+      await apiFetch('/api/calendar/events', {
+        body: {
+          summary: task.title,
+          description: task.description || undefined,
+          start: new Date(scheduleForm.start).toISOString(),
+          end: new Date(scheduleForm.end).toISOString(),
+        },
+      });
+      setScheduling(false);
+      setScheduleForm({ start: '', end: '' });
+    } catch { /* ignore */ } finally {
+      setScheduleSaving(false);
+    }
+  }
+
   // ── DAG helpers ──────────────────────────────────────────────────────────────
   const getStatusDotColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -499,6 +525,28 @@ export default function TaskDetail() {
               </button>
             )}
 
+            {/* Schedule to calendar button */}
+            <button
+              onClick={() => {
+                if (task.dueDate) {
+                  const due = new Date(task.dueDate);
+                  const start = due.toISOString().slice(0, 16);
+                  const end = task.estimatedMinutes
+                    ? new Date(due.getTime() + task.estimatedMinutes * 60000).toISOString().slice(0, 16)
+                    : new Date(due.getTime() + 3600000).toISOString().slice(0, 16);
+                  setScheduleForm({ start, end });
+                }
+                setScheduling(!scheduling);
+              }}
+              title="Schedule to calendar"
+              className="p-2 rounded transition-colors"
+              style={{ color: 'var(--codex-fg-subtle)' }}
+              onMouseEnter={e => { e.currentTarget.style.color = 'var(--codex-accent)'; e.currentTarget.style.backgroundColor = 'var(--codex-bg)'; }}
+              onMouseLeave={e => { e.currentTarget.style.color = 'var(--codex-fg-subtle)'; e.currentTarget.style.backgroundColor = 'transparent'; }}
+            >
+              <CalendarPlus className="w-4 h-4" strokeWidth={1.5} />
+            </button>
+
             <div className="flex-1" />
 
             {/* Delete button */}
@@ -549,6 +597,50 @@ export default function TaskDetail() {
             )}
           </AnimatePresence>
         </div>
+
+        {/* Schedule to Calendar form */}
+        <AnimatePresence>
+          {scheduling && (
+            <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+              className="border-b px-6 py-4"
+              style={{ backgroundColor: '#141414', borderColor: 'var(--codex-border)' }}>
+              <div className="space-y-3">
+                <h3 className="text-[13px]" style={{ color: 'var(--codex-fg)', fontWeight: 500 }}>
+                  Schedule to Calendar
+                </h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] mb-1" style={{ color: 'var(--codex-fg-subtle)' }}>Start</label>
+                    <input type="datetime-local" value={scheduleForm.start}
+                      onChange={e => setScheduleForm(f => ({ ...f, start: e.target.value }))}
+                      className="w-full px-3 py-2 rounded-lg text-[13px] outline-none"
+                      style={{ backgroundColor: 'var(--codex-bg)', color: 'var(--codex-fg)', border: '1px solid var(--codex-border)', colorScheme: 'dark' }} />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] mb-1" style={{ color: 'var(--codex-fg-subtle)' }}>End</label>
+                    <input type="datetime-local" value={scheduleForm.end}
+                      onChange={e => setScheduleForm(f => ({ ...f, end: e.target.value }))}
+                      className="w-full px-3 py-2 rounded-lg text-[13px] outline-none"
+                      style={{ backgroundColor: 'var(--codex-bg)', color: 'var(--codex-fg)', border: '1px solid var(--codex-border)', colorScheme: 'dark' }} />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-3">
+                  <button onClick={() => setScheduling(false)}
+                    className="px-3 py-1.5 rounded text-[12px]"
+                    style={{ color: 'var(--codex-fg-muted)', border: '1px solid var(--codex-border)' }}>
+                    Cancel
+                  </button>
+                  <button onClick={handleScheduleToCalendar} disabled={scheduleSaving || !scheduleForm.start || !scheduleForm.end}
+                    className="px-3 py-1.5 rounded text-[12px] flex items-center gap-1.5"
+                    style={{ backgroundColor: 'var(--codex-accent)', color: 'white', opacity: (scheduleSaving || !scheduleForm.start || !scheduleForm.end) ? 0.5 : 1 }}>
+                    {scheduleSaving && <Loader2 className="w-3 h-3 animate-spin" />}
+                    Schedule
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto p-8" style={{ backgroundColor: 'var(--codex-bg)' }}>
