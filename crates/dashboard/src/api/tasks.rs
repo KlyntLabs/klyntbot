@@ -449,6 +449,8 @@ pub async fn remove_task_dependency(
     State(state): State<AppState>,
     Path((id, blocker_id)): Path<(String, String)>,
 ) -> Result<StatusCode, ApiError> {
+    state.repos.todos.get_or_err(&id).await.map_err(storage_err)?;
+
     let removed = state
         .repos
         .todos
