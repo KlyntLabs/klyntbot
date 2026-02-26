@@ -3,6 +3,8 @@ import Layout from './components/Layout';
 import Chat from './pages/Chat';
 import Tasks from './pages/Tasks';
 import TaskDetail from './pages/TaskDetail';
+import Projects from './pages/Projects';
+import ProjectDetail from './pages/ProjectDetail';
 import Plans from './pages/Plans';
 import Calendar from './pages/Calendar';
 import Cron from './pages/Cron';
@@ -32,6 +34,8 @@ export const routes = [
       { index: true, element: <Chat /> },
       { path: 'tasks', element: <Tasks /> },
       { path: 'tasks/:id', element: <TaskDetail /> },
+      { path: 'projects', element: <Projects /> },
+      { path: 'projects/:id', element: <ProjectDetail /> },
       { path: 'plans', element: <Plans /> },
       { path: 'calendar', element: <Calendar /> },
       { path: 'cron', element: <Cron /> },

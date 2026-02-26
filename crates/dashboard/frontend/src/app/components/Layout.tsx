@@ -3,6 +3,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router';
 import {
   MessageSquare,
   CheckSquare,
+  FolderKanban,
   FileText,
   Calendar,
   Clock,
@@ -98,6 +99,7 @@ export function Layout() {
   const navItems: NavItem[] = [
     { id: 'chat', icon: MessageSquare, label: 'Chat', path: '/' },
     { id: 'tasks', icon: CheckSquare, label: 'Tasks', path: '/tasks' },
+    { id: 'projects', icon: FolderKanban, label: 'Projects', path: '/projects' },
     { id: 'plans', icon: FileText, label: 'Plans', path: '/plans' },
     { id: 'calendar', icon: Calendar, label: 'Calendar', path: '/calendar' },
     { id: 'cron', icon: Clock, label: 'Cron', path: '/cron' },

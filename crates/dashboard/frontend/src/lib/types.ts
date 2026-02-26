@@ -81,6 +81,11 @@ export interface ProjectWithStats {
   taskCountTotal: number;
 }
 
+export interface TaskDependencies {
+  blockedBy: Task[];
+  blocks: Task[];
+}
+
 // ── Plan (PlanRow + PlanStepRow) ──────────────────────────────────────────────
 
 export interface PlanStep {
