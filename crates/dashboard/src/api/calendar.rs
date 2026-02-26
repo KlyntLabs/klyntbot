@@ -58,3 +58,52 @@ pub async fn trigger_sync(
 ) -> (StatusCode, Json<serde_json::Value>) {
     (StatusCode::ACCEPTED, Json(serde_json::json!({"status": "sync_queued"})))
 }
+
+/// Body for `POST /api/calendar/events`.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateEventRequest {
+    pub summary: String,
+    pub description: Option<String>,
+    pub start: String,
+    pub end: String,
+}
+
+/// POST /api/calendar/events — create a calendar event in the local cache.
+pub async fn create_event(
+    State(state): State<AppState>,
+    Json(req): Json<CreateEventRequest>,
+) -> Result<(StatusCode, Json<storage::rows::calendar::CalendarEventCacheRow>), ApiError> {
+    if req.summary.trim().is_empty() {
+        return Err(ApiError::unprocessable("summary must not be empty"));
+    }
+
+    let uid = format!("dashboard-{}", uuid::Uuid::new_v4());
+    let start_at: chrono::DateTime<chrono::Utc> = req
+        .start
+        .parse()
+        .map_err(|_| ApiError::unprocessable("invalid start datetime (expected RFC3339)"))?;
+    let end_at: chrono::DateTime<chrono::Utc> = req
+        .end
+        .parse()
+        .map_err(|_| ApiError::unprocessable("invalid end datetime (expected RFC3339)"))?;
+
+    let row = state
+        .repos
+        .calendar_event_cache
+        .upsert(
+            &uid,
+            "local",
+            req.summary.trim(),
+            req.description.as_deref(),
+            start_at,
+            end_at,
+            "dashboard",
+            None,
+            Some("CONFIRMED"),
+        )
+        .await
+        .map_err(ApiError::from)?;
+
+    Ok((StatusCode::CREATED, Json(row)))
+}

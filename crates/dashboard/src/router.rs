@@ -8,7 +8,7 @@ use tower_http::compression::CompressionLayer;
 use tower_http::cors::{Any, CorsLayer};
 
 use crate::api::{
-    calendar::{get_sync_status, list_events, trigger_sync},
+    calendar::{create_event, get_sync_status, list_events, trigger_sync},
     cron::{create_cron, delete_cron, list_cron, run_cron, toggle_cron},
     finance::{
         create_account, create_budget, create_goal, create_investment, create_liability,
@@ -129,7 +129,7 @@ pub fn build(state: AppState) -> Router {
         .route("/cron/{id}/run", post(run_cron))
         .route("/cron/{id}", delete(delete_cron))
         // Calendar
-        .route("/calendar/events", get(list_events))
+        .route("/calendar/events", get(list_events).post(create_event))
         .route("/calendar/sync-status", get(get_sync_status))
         .route("/calendar/sync", post(trigger_sync))
         // Skills
