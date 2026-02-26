@@ -29,8 +29,9 @@ use crate::api::{
     skills::{create_skill, delete_skill, get_skill, list_skills, update_skill},
     status::get_status,
     tasks::{
-        add_time_entry, create_task, delete_focus, delete_task, get_attachments, get_subtasks,
-        get_summary, get_task, get_time_entries, list_tasks, patch_task, set_focus,
+        add_task_dependency, add_time_entry, create_task, delete_focus, delete_task,
+        get_attachments, get_subtasks, get_summary, get_task, get_task_dependencies,
+        get_time_entries, list_tasks, patch_task, remove_task_dependency, set_focus,
     },
 };
 use crate::embed::spa_handler;
@@ -109,6 +110,8 @@ pub fn build(state: AppState) -> Router {
         .route("/tasks/{id}/attachments", get(get_attachments))
         .route("/tasks/{id}/time-entries", get(get_time_entries).post(add_time_entry))
         .route("/tasks/{id}/focus", post(set_focus).delete(delete_focus))
+        .route("/tasks/{id}/dependencies", get(get_task_dependencies).post(add_task_dependency))
+        .route("/tasks/{id}/dependencies/{blocker_id}", delete(remove_task_dependency))
         // Projects
         .route("/projects", get(list_projects).post(create_project))
         .route("/projects/{id}", get(get_project).patch(patch_project).delete(delete_project))

@@ -393,3 +393,74 @@ pub async fn delete_focus(
 
     Ok(StatusCode::NO_CONTENT)
 }
+
+// ── Dependency types ────────────────────────────────────────────────────────
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AddDependencyRequest {
+    pub blocker_id: String,
+}
+
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DependenciesResponse {
+    pub blocked_by: Vec<TodoRow>,
+    pub blocks: Vec<TodoRow>,
+}
+
+// ── GET /api/tasks/:id/dependencies ─────────────────────────────────────────
+
+pub async fn get_task_dependencies(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<Json<DependenciesResponse>, ApiError> {
+    state.repos.todos.get_or_err(&id).await.map_err(storage_err)?;
+
+    let blocked_by = state.repos.todos.get_blockers(&id).await.map_err(storage_err)?;
+    let blocks = state.repos.todos.get_blocking(&id).await.map_err(storage_err)?;
+
+    Ok(Json(DependenciesResponse { blocked_by, blocks }))
+}
+
+// ── POST /api/tasks/:id/dependencies ────────────────────────────────────────
+
+pub async fn add_task_dependency(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(req): Json<AddDependencyRequest>,
+) -> Result<StatusCode, ApiError> {
+    state.repos.todos.get_or_err(&id).await.map_err(storage_err)?;
+    state.repos.todos.get_or_err(&req.blocker_id).await.map_err(storage_err)?;
+
+    state
+        .repos
+        .todos
+        .add_dependency(&id, &req.blocker_id)
+        .await
+        .map_err(storage_err)?;
+
+    Ok(StatusCode::CREATED)
+}
+
+// ── DELETE /api/tasks/:id/dependencies/:blocker_id ──────────────────────────
+
+pub async fn remove_task_dependency(
+    State(state): State<AppState>,
+    Path((id, blocker_id)): Path<(String, String)>,
+) -> Result<StatusCode, ApiError> {
+    let removed = state
+        .repos
+        .todos
+        .remove_dependency(&id, &blocker_id)
+        .await
+        .map_err(storage_err)?;
+
+    if removed {
+        Ok(StatusCode::NO_CONTENT)
+    } else {
+        Err(ApiError::not_found(format!(
+            "dependency {id} -> {blocker_id} not found"
+        )))
+    }
+}
