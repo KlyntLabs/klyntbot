@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router';
 import {
   MessageSquare,
+  History,
   CheckSquare,
   FolderKanban,
   FileText,
@@ -98,6 +99,7 @@ export function Layout() {
 
   const navItems: NavItem[] = [
     { id: 'chat', icon: MessageSquare, label: 'Chat', path: '/' },
+    { id: 'sessions', icon: History, label: 'Sessions', path: '/sessions' },
     { id: 'tasks', icon: CheckSquare, label: 'Tasks', path: '/tasks' },
     { id: 'projects', icon: FolderKanban, label: 'Projects', path: '/projects' },
     { id: 'plans', icon: FileText, label: 'Plans', path: '/plans' },
@@ -108,7 +110,7 @@ export function Layout() {
   ];
 
   const isActive = (path: string) => {
-    if (path === '/') return location.pathname === '/';
+    if (path === '/') return location.pathname === '/' || location.pathname.startsWith('/chat/');
     return location.pathname.startsWith(path);
   };
 

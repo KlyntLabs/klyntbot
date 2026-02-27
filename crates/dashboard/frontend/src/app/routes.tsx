@@ -1,6 +1,6 @@
 import { createBrowserRouter, Navigate } from 'react-router';
 import Layout from './components/Layout';
-import Chat from './pages/Chat';
+import ChatPage from './chat/ChatPage';
 import Tasks from './pages/Tasks';
 import TaskDetail from './pages/TaskDetail';
 import Projects from './pages/Projects';
@@ -11,6 +11,7 @@ import Calendar from './pages/Calendar';
 import Cron from './pages/Cron';
 import Skills from './pages/Skills';
 import Finance from './pages/Finance';
+import Sessions from './pages/Sessions';
 import Settings from './pages/Settings';
 import Setup from './pages/Setup';
 
@@ -32,7 +33,9 @@ export const routes = [
     path: '/',
     element: <Layout />,
     children: [
-      { index: true, element: <Chat /> },
+      { index: true, element: <ChatPage /> },
+      { path: 'chat/:sessionId', element: <ChatPage /> },
+      { path: 'sessions', element: <Sessions /> },
       { path: 'tasks', element: <Tasks /> },
       { path: 'tasks/:id', element: <TaskDetail /> },
       { path: 'projects', element: <Projects /> },
