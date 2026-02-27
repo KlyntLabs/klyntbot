@@ -295,8 +295,9 @@ async fn run_subagent_task(
     profile: SubagentProfile,
 ) -> std::result::Result<(String, String), Box<dyn std::error::Error + Send + Sync>> {
     use crate::execution::core::ExecutionCore;
-    use crate::execution::react_plus::{ReactOutcome, ReactPlusEngine, ReflectionMode};
     use crate::execution::types::ExecutionParams;
+    use crate::intent_pipeline::engines::reactive::ReactiveEngine;
+    use crate::intent_pipeline::engines::{EngineResult, ExecutionEngine};
     use tokio::sync::RwLock;
 
     // Build subagent tool registry based on profile
@@ -337,9 +338,7 @@ async fn run_subagent_task(
         Arc::clone(provider),
         Arc::new(RwLock::new(tools)),
     ));
-    let engine = ReactPlusEngine::new(core)
-        .with_max_iterations(profile.max_iterations())
-        .with_reflection_mode(ReflectionMode::OnFailure);
+    let engine = ReactiveEngine::new(core, profile.max_iterations());
 
     // Build system prompt and messages
     let system_prompt = build_subagent_prompt(workspace, task, profile);
@@ -352,26 +351,18 @@ async fn run_subagent_task(
         .with_timeout(std::time::Duration::from_secs(config.task_timeout));
     let routing_ctx = RoutingContext::new("subagent".into(), "background".into());
 
-    // Execute via ReactPlusEngine
+    // Execute via ReactiveEngine
     let outcome = engine
-        .execute(Arc::new(messages), &tool_defs, &params, &routing_ctx, None)
+        .execute(messages, &tool_defs, &params, &routing_ctx, None)
         .await
         .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
 
     match outcome {
-        ReactOutcome::Response { content, .. } => Ok(("ok".to_string(), content)),
-        ReactOutcome::EscalateToAutonomous { reason, .. } => Ok((
+        EngineResult::Complete { content, .. } => Ok(("ok".to_string(), content)),
+        EngineResult::Escalate { reason, .. } => Ok((
             "ok".to_string(),
             format!("Task requires more complex handling: {}", reason),
         )),
-        ReactOutcome::MaxIterationsReached {
-            partial_content, ..
-        } => {
-            let text = partial_content.unwrap_or_else(|| {
-                "Task completed but no final response was generated.".to_string()
-            });
-            Ok(("ok".to_string(), text))
-        }
     }
 }
 

@@ -12,7 +12,7 @@ use tracing::{debug, warn};
 use super::classifier::IntentClassifier;
 use super::heuristics::analyze_heuristic;
 use super::types::{AnalysisSource, ExecutionMode, IntentAnalysis};
-use crate::orchestrator::format_strategy_context;
+use super::format_strategy_context;
 
 /// Two-stage intent analyzer: heuristics → LLM classifier.
 pub struct IntentAnalyzer {
