@@ -160,7 +160,7 @@ pub async fn create_task(
         estimated_minutes: req.estimated_minutes,
         calendar_event_uid: None,
         last_reminded_at: None,
-        recurrence_rule: req.recurrence_rule,
+        recurrence_rule: req.recurrence_rule.filter(|s| !s.is_empty()),
         recurrence_parent_id: None,
         is_template: req.is_template.unwrap_or(false),
         next_instance_date: None,
@@ -215,7 +215,8 @@ pub async fn patch_task(
         next_instance_date: None,
         last_reminded_at: None,
         estimated_minutes: req.estimated_minutes,
-        recurrence_rule: req.recurrence_rule,
+        // Normalise empty string → None so the FE can clear the rule with "".
+        recurrence_rule: req.recurrence_rule.map(|v| v.filter(|s| !s.is_empty())),
     };
 
     // Confirm the task exists first so we get a clean 404.

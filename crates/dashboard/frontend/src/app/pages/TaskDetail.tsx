@@ -329,7 +329,7 @@ export default function TaskDetail() {
     try {
       const updated = await apiFetch<Task>(`/api/tasks/${encodeURIComponent(id!)}`, {
         method: 'PATCH',
-        body: { recurrenceRule: recurrenceValue || null },
+        body: { recurrenceRule: recurrenceValue },
       });
       setTask(updated);
       setEditingRecurrence(false);
