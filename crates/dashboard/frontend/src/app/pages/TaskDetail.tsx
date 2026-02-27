@@ -17,12 +17,14 @@ import {
   X,
   Search,
   GitBranch,
+  RefreshCw,
 } from 'lucide-react';
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useApi } from '../../lib/hooks/useApi';
 import { apiFetch } from '../../lib/api';
 import type { Task, TaskAttachment, TaskTimeEntry, Project, TaskDependencies } from '../../lib/types';
+import { RECURRENCE_PRESETS, rruleToLabel } from '../../lib/rrule';
 
 export default function TaskDetail() {
   const { id } = useParams();
@@ -58,6 +60,10 @@ export default function TaskDetail() {
   const [scheduleForm, setScheduleForm] = useState({ start: '', end: '' });
   const [scheduleSaving, setScheduleSaving] = useState(false);
 
+  // Recurrence editing state
+  const [editingRecurrence, setEditingRecurrence] = useState(false);
+  const [recurrenceValue, setRecurrenceValue] = useState('');
+
   const { data: task, loading, error, setData: setTask, refetch: refetchTask } = useApi<Task>(`/api/tasks/${id}`);
   const { data: subtasks } = useApi<Task[]>(`/api/tasks/${id}/subtasks`);
   const { data: attachments } = useApi<TaskAttachment[]>(`/api/tasks/${id}/attachments`);
@@ -70,6 +76,7 @@ export default function TaskDetail() {
     if (task) {
       setTitleValue(task.title);
       setDescValue(task.description ?? '');
+      setRecurrenceValue(task.recurrenceRule ?? '');
     }
   }, [task]);
 
@@ -314,6 +321,21 @@ export default function TaskDetail() {
       setConfirmingDelete(false);
     }
   }, [id, navigate]);
+
+  // ── Recurrence save ─────────────────────────────────────────────────────────
+  const handleSaveRecurrence = useCallback(async () => {
+    if (!task) return;
+    setPatchingField('recurrenceRule');
+    try {
+      const updated = await apiFetch<Task>(`/api/tasks/${encodeURIComponent(id!)}`, {
+        method: 'PATCH',
+        body: { recurrenceRule: recurrenceValue || null },
+      });
+      setTask(updated);
+      setEditingRecurrence(false);
+    } catch { /* ignore */ }
+    finally { setPatchingField(null); }
+  }, [task, id, recurrenceValue, setTask]);
 
   // ── Dependency search ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -937,6 +959,93 @@ export default function TaskDetail() {
               </div>
             </div>
           </div>
+
+          {/* Recurrence card (templates only) */}
+          {task.isTemplate && (
+            <div className="rounded-lg border p-5" style={{ backgroundColor: 'var(--codex-bg-tertiary)', borderColor: 'var(--codex-border)' }}>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="flex items-center gap-2 text-[13px]" style={{ color: 'var(--codex-fg)', fontWeight: 600 }}>
+                  <RefreshCw className="w-4 h-4" strokeWidth={1.5} />
+                  Recurrence
+                </h3>
+                {!editingRecurrence && (
+                  <button
+                    onClick={() => setEditingRecurrence(true)}
+                    className="text-[11px] transition-colors"
+                    style={{ color: 'var(--codex-accent)' }}
+                    onMouseEnter={(e) => e.currentTarget.style.opacity = '0.8'}
+                    onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+                  >
+                    Edit
+                  </button>
+                )}
+              </div>
+
+              {editingRecurrence ? (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-[11px] mb-1.5 uppercase tracking-wider" style={{ color: 'var(--codex-fg-subtle)', fontWeight: 500 }}>
+                      Frequency
+                    </label>
+                    <select
+                      value={recurrenceValue}
+                      onChange={(e) => setRecurrenceValue(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg text-[13px] outline-none transition-colors"
+                      style={{
+                        backgroundColor: 'var(--codex-bg)',
+                        color: 'var(--codex-fg)',
+                        border: '1px solid var(--codex-border)',
+                      }}
+                    >
+                      {RECURRENCE_PRESETS.map(p => (
+                        <option key={p.value} value={p.value}>{p.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button
+                      onClick={() => { setEditingRecurrence(false); setRecurrenceValue(task.recurrenceRule ?? ''); }}
+                      className="px-3 py-1.5 rounded text-[11px] transition-colors"
+                      style={{ color: 'var(--codex-fg-muted)', border: '1px solid var(--codex-border)' }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSaveRecurrence}
+                      disabled={patchingField === 'recurrenceRule'}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded text-[11px] transition-colors"
+                      style={{ backgroundColor: 'var(--codex-accent)', color: 'white', opacity: patchingField === 'recurrenceRule' ? 0.7 : 1 }}
+                    >
+                      {patchingField === 'recurrenceRule' && <Loader2 className="w-3 h-3 animate-spin" />}
+                      Save
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div>
+                    <div className="text-[11px] uppercase tracking-wider mb-1" style={{ color: 'var(--codex-fg-subtle)', fontWeight: 500 }}>
+                      Frequency
+                    </div>
+                    <div className="flex items-center gap-2 text-[13px]" style={{ color: 'var(--codex-fg)' }}>
+                      <RefreshCw className="w-3.5 h-3.5" strokeWidth={1.5} style={{ color: 'var(--codex-accent)' }} />
+                      {rruleToLabel(task.recurrenceRule)}
+                    </div>
+                  </div>
+                  {task.nextInstanceDate && (
+                    <div>
+                      <div className="text-[11px] uppercase tracking-wider mb-1" style={{ color: 'var(--codex-fg-subtle)', fontWeight: 500 }}>
+                        Next Instance
+                      </div>
+                      <div className="text-[13px]" style={{ color: 'var(--codex-fg)' }}>
+                        {new Date(task.nextInstanceDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Time Tracking Card */}
           <div className="p-4 rounded-lg" style={{
