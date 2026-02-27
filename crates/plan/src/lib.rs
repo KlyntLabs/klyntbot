@@ -16,4 +16,4 @@ pub mod types;
 
 // Re-export commonly used types
 pub use error::PlanError;
-pub use types::{BacktrackEntry, Plan, PlanStatus, PlanStep, StepStatus};
+pub use types::{BacktrackEntry, Plan, PlanStatus, PlanStep, PlanVisibility, StepStatus};

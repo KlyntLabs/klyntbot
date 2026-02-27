@@ -6,6 +6,18 @@ use common::Result;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+/// Controls whether auto-generated plans appear in the UI.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum PlanVisibility {
+    /// Never shown. Auto-cleanup after 24h.
+    Silent,
+    /// Hidden until step failure, then surfaced for review.
+    OnFailure,
+    /// Always visible (user-created plans, current behavior).
+    #[default]
+    Transparent,
+}
+
 /// A structured plan with multiple steps for sequential execution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Plan {
@@ -19,6 +31,10 @@ pub struct Plan {
     pub current_step_index: usize,
     pub iteration_limit: usize,
     pub backtrack_history: Vec<BacktrackEntry>,
+    #[serde(default)]
+    pub visibility: PlanVisibility,
+    #[serde(default)]
+    pub task_id: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub completed_at: Option<DateTime<Utc>>,
@@ -138,6 +154,8 @@ mod tests {
             current_step_index: 0,
             iteration_limit: 50,
             backtrack_history: vec![],
+            visibility: PlanVisibility::default(),
+            task_id: None,
             created_at: now,
             updated_at: now,
             completed_at: None,
@@ -236,6 +254,8 @@ mod tests {
             current_step_index: 0,
             iteration_limit: 50,
             backtrack_history: vec![backtrack],
+            visibility: PlanVisibility::default(),
+            task_id: None,
             created_at: now,
             updated_at: now,
             completed_at: None,
@@ -337,5 +357,24 @@ mod tests {
         assert!(
             PlanStatus::validate_transition(&PlanStatus::Approved, &PlanStatus::Failed).is_err()
         );
+    }
+
+    #[test]
+    fn plan_visibility_roundtrip() {
+        use crate::conversions::{str_to_visibility, visibility_to_str};
+
+        assert_eq!(visibility_to_str(&PlanVisibility::Silent), "silent");
+        assert_eq!(visibility_to_str(&PlanVisibility::OnFailure), "on_failure");
+        assert_eq!(visibility_to_str(&PlanVisibility::Transparent), "transparent");
+
+        assert_eq!(str_to_visibility("silent"), PlanVisibility::Silent);
+        assert_eq!(str_to_visibility("on_failure"), PlanVisibility::OnFailure);
+        assert_eq!(str_to_visibility("transparent"), PlanVisibility::Transparent);
+        assert_eq!(str_to_visibility("unknown"), PlanVisibility::Transparent);
+    }
+
+    #[test]
+    fn plan_visibility_default_is_transparent() {
+        assert_eq!(PlanVisibility::default(), PlanVisibility::Transparent);
     }
 }

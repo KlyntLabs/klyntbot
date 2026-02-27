@@ -2,7 +2,7 @@
 //!
 //! Extracted from the removed PlanStore to support direct PlanRepo usage.
 
-use crate::types::{BacktrackEntry, Plan, PlanStatus, PlanStep, StepStatus};
+use crate::types::{BacktrackEntry, Plan, PlanStatus, PlanStep, PlanVisibility, StepStatus};
 use uuid::Uuid;
 
 /// Convert PlanStatus to database string.
@@ -53,6 +53,24 @@ pub fn str_to_step_status(s: &str) -> StepStatus {
     }
 }
 
+/// Convert PlanVisibility to database string.
+pub fn visibility_to_str(v: &PlanVisibility) -> &'static str {
+    match v {
+        PlanVisibility::Silent => "silent",
+        PlanVisibility::OnFailure => "on_failure",
+        PlanVisibility::Transparent => "transparent",
+    }
+}
+
+/// Convert database string to PlanVisibility.
+pub fn str_to_visibility(s: &str) -> PlanVisibility {
+    match s {
+        "silent" => PlanVisibility::Silent,
+        "on_failure" => PlanVisibility::OnFailure,
+        _ => PlanVisibility::Transparent,
+    }
+}
+
 /// Convert a Plan domain type to a PlanRow for SQL persistence.
 pub fn plan_to_row(plan: &Plan) -> storage::PlanRow {
     storage::PlanRow {
@@ -65,8 +83,8 @@ pub fn plan_to_row(plan: &Plan) -> storage::PlanRow {
         current_step_index: plan.current_step_index as i32,
         iteration_limit: plan.iteration_limit as i32,
         backtrack_history: serde_json::to_value(&plan.backtrack_history).unwrap_or_default(),
-        visibility: "transparent".to_string(),
-        task_id: None,
+        visibility: visibility_to_str(&plan.visibility).to_string(),
+        task_id: plan.task_id.clone(),
         created_at: plan.created_at,
         updated_at: plan.updated_at,
         completed_at: plan.completed_at,
@@ -122,6 +140,8 @@ pub fn row_to_plan(row: storage::PlanRow, step_rows: Vec<storage::PlanStepRow>) 
         iteration_limit: row.iteration_limit as usize,
         backtrack_history: serde_json::from_value::<Vec<BacktrackEntry>>(row.backtrack_history)
             .unwrap_or_default(),
+        visibility: str_to_visibility(&row.visibility),
+        task_id: row.task_id,
         created_at: row.created_at,
         updated_at: row.updated_at,
         completed_at: row.completed_at,
