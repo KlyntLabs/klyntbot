@@ -11,6 +11,7 @@ use super::escalation::EscalationContext;
 use crate::execution::{ExecutionParams, ReasoningTrace};
 
 pub mod direct;
+pub mod reactive;
 
 /// Result from an execution engine.
 pub enum EngineResult {
