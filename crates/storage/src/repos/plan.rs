@@ -199,6 +199,34 @@ impl PlanRepo {
         Ok(())
     }
 
+    /// Delete stale plans based on visibility and terminal status age.
+    ///
+    /// - `silent` plans in terminal state (completed/failed/abandoned) older than `silent_age_hours`
+    /// - `on_failure` plans that completed successfully older than `on_failure_age_hours`
+    pub async fn delete_stale_plans(
+        &self,
+        silent_age_hours: i64,
+        on_failure_age_hours: i64,
+    ) -> Result<u64, StorageError> {
+        let now = Utc::now();
+        let silent_cutoff = now - chrono::Duration::hours(silent_age_hours);
+        let on_failure_cutoff = now - chrono::Duration::hours(on_failure_age_hours);
+
+        let result = sqlx::query(
+            "DELETE FROM plans WHERE
+                (visibility = 'silent' AND status IN ('completed', 'failed', 'abandoned')
+                 AND completed_at < ?1)
+                OR
+                (visibility = 'on_failure' AND status = 'completed'
+                 AND completed_at < ?2)",
+        )
+        .bind(silent_cutoff)
+        .bind(on_failure_cutoff)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected())
+    }
+
     // ── Plan Steps ──────────────────────────────────────────────
 
     /// Add a step to a plan.

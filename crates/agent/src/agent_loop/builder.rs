@@ -793,6 +793,20 @@ impl AgentLoopBuilder {
             None
         };
 
+        // ── Plan cleanup service ──────────────────────────────────────────
+        let plan_cleanup_token = if self.pool.is_some() {
+            let token = CancellationToken::new();
+            let cleanup_service =
+                crate::intent_pipeline::visibility::PlanCleanupService::new(
+                    repos.plans.clone(),
+                    token.clone(),
+                );
+            cleanup_service.spawn();
+            Some(token)
+        } else {
+            None
+        };
+
         // ── Assemble AgentLoop ────────────────────────────────────────────
         let history_limit = config.conversation.session.history_limit;
         Ok(AgentLoop {
@@ -822,6 +836,7 @@ impl AgentLoopBuilder {
             history_limit,
             _session_cleanup_token: session_cleanup_token,
             _memory_maintenance_token: memory_maintenance_token,
+            _plan_cleanup_token: plan_cleanup_token,
         })
     }
 }

@@ -91,6 +91,8 @@ pub struct AgentLoop {
     pub(crate) _session_cleanup_token: Option<CancellationToken>,
     /// Cancellation token for the memory maintenance background service.
     pub(crate) _memory_maintenance_token: Option<CancellationToken>,
+    /// Cancellation token for the plan visibility cleanup background service.
+    pub(crate) _plan_cleanup_token: Option<CancellationToken>,
 }
 
 impl AgentLoop {
