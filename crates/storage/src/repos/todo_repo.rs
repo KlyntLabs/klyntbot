@@ -655,6 +655,17 @@ impl TodoRepo {
         Ok(rows)
     }
 
+    /// Count immediate children of a todo without loading full rows.
+    pub async fn count_children(&self, parent_id: &str) -> Result<i64, StorageError> {
+        let row: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM todos WHERE parent_id = ?1",
+        )
+        .bind(parent_id)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(row.0)
+    }
+
     /// Get full subtree of a todo (recursive CTE).
     pub async fn get_subtree(&self, root_id: &str) -> Result<Vec<TodoRow>, StorageError> {
         let rows = sqlx::query_as::<_, TodoRow>(

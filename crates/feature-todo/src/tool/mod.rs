@@ -184,7 +184,8 @@ impl Tool for TodoTool {
                         "focus", "unfocus", "add_subtask", "move", "attach", "detach",
                         "log_time", "tree", "search", "search_semantic", "search_hybrid",
                         "report", "add_dependency", "remove_dependency",
-                        "recur", "list_recurring", "delete_recurring", "enrich", "plan"
+                        "recur", "list_recurring", "delete_recurring", "enrich", "plan",
+                        "execute"
                     ],
                     "description": "Action to perform"
                 },
@@ -285,6 +286,7 @@ impl Tool for TodoTool {
             "list_recurring" => self.handle_list_recurring().await,
             "delete_recurring" => self.handle_delete_recurring(&p).await,
             "plan" => self.handle_plan(&p).await,
+            "execute" => self.handle_execute(&p).await,
             _ => Err(ToolError::InvalidParams(format!("Unknown action: {}", action)).into()),
         }
     }

@@ -16,6 +16,7 @@ pub mod enrichment;
 pub mod handler;
 pub mod rrule_utils;
 pub mod search;
+pub mod task_complexity;
 pub mod tool;
 pub mod types;
 
