@@ -1,5 +1,6 @@
 //! Core types for the intent pipeline: execution modes, complexity signals, intent analysis.
 
+use context_engine::ExecutionStrategy;
 use plan::PlanVisibility;
 use serde::{Deserialize, Serialize};
 
@@ -15,6 +16,24 @@ pub enum ExecutionMode {
         visibility: PlanVisibility,
         max_steps: u8,
     },
+}
+
+/// Bridge: `ExecutionMode` → `ExecutionStrategy` for the `ContextEngine`.
+///
+/// The `ContextEngine` allocates token budgets based on `ExecutionStrategy`.
+/// This conversion lets us keep `ContextEngine` unchanged.
+impl From<&ExecutionMode> for ExecutionStrategy {
+    fn from(mode: &ExecutionMode) -> Self {
+        match mode {
+            ExecutionMode::Direct => ExecutionStrategy::DirectResponse,
+            ExecutionMode::Reactive { max_iterations } => ExecutionStrategy::ToolAssisted {
+                max_iterations: *max_iterations,
+            },
+            ExecutionMode::Planned { .. } => ExecutionStrategy::AutonomousTask {
+                max_iterations: 50,
+            },
+        }
+    }
 }
 
 /// Risk level for operations that could fail or have side effects.
