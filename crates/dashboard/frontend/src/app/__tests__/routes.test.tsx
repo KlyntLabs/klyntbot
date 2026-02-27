@@ -14,16 +14,18 @@ import { createMemoryRouter, RouterProvider } from 'react-router';
 import { routes } from '../routes';
 
 const ALL_ROUTES = [
-  { path: '/',          label: 'Chat' },
-  { path: '/tasks',     label: 'Tasks' },
-  { path: '/tasks/123', label: 'Task Detail' },
-  { path: '/plans',     label: 'Plans' },
-  { path: '/calendar',  label: 'Calendar' },
-  { path: '/cron',      label: 'Cron' },
-  { path: '/skills',    label: 'Skills' },
-  { path: '/finance',   label: 'Finance' },
-  { path: '/settings',  label: 'Settings' },
-  { path: '/setup',     label: 'Setup' },
+  { path: '/',              label: 'Chat' },
+  { path: '/chat/test-123', label: 'Chat Session' },
+  { path: '/sessions',      label: 'Sessions' },
+  { path: '/tasks',         label: 'Tasks' },
+  { path: '/tasks/123',     label: 'Task Detail' },
+  { path: '/plans',         label: 'Plans' },
+  { path: '/calendar',      label: 'Calendar' },
+  { path: '/cron',          label: 'Cron' },
+  { path: '/skills',        label: 'Skills' },
+  { path: '/finance',       label: 'Finance' },
+  { path: '/settings',      label: 'Settings' },
+  { path: '/setup',         label: 'Setup' },
 ];
 
 describe('Routes', () => {
