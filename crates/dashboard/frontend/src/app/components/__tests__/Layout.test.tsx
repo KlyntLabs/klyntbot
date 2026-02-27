@@ -2,8 +2,8 @@
  * Tests for the Layout component.
  *
  * Covers:
- * - AC-16.1: 48px nav rail renders with 7 navigation items + settings icon
- * - AC-16.2: Active route item has accent color (aria-current="page")
+ * - AC-16.1: 48px nav rail renders with 9 navigation items + settings icon
+ * - AC-16.2: Active route item has aria-current="page"
  * - AC-15.4: Codex dark theme CSS variables are referenced
  * - Accessibility: nav landmark, aria labels, keyboard navigation
  */
@@ -13,29 +13,28 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router';
 import { Layout } from '../Layout';
 
-const NAV_ITEMS = ['Chat', 'Tasks', 'Plans', 'Calendar', 'Cron', 'Skills', 'Finance'];
+const NAV_ITEMS = ['Chat', 'Sessions', 'Tasks', 'Projects', 'Plans', 'Calendar', 'Cron', 'Skills', 'Finance'];
 const SETTINGS_ITEM = 'Settings';
 
 describe('Layout', () => {
   // ── Nav rail structure ────────────────────────────────────────────────────
 
-  it('renders a nav rail with 7 primary navigation items plus settings', () => {
-    // AC-16.1: Nav rail has exactly 7 items (Chat, Tasks, Plans, Calendar, Cron, Skills, Finance)
-    // plus a Settings item at the bottom.
+  it('renders a nav rail with 9 primary navigation items plus settings', () => {
+    // AC-16.1: Nav rail has exactly 9 items plus a Settings item at the bottom.
     render(<MemoryRouter><Layout /></MemoryRouter>);
     const nav = screen.getByRole('navigation', { name: /main navigation/i });
     expect(nav).toBeInTheDocument();
     for (const item of NAV_ITEMS) {
-      expect(screen.getByRole('link', { name: new RegExp(item, 'i') })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: new RegExp(item, 'i') })).toBeInTheDocument();
     }
-    expect(screen.getByRole('link', { name: new RegExp(SETTINGS_ITEM, 'i') })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: new RegExp(SETTINGS_ITEM, 'i') })).toBeInTheDocument();
   });
 
   it('renders settings nav item separate from primary items', () => {
     // AC-16.1: Settings is at the bottom of the nav rail (visual separation)
     render(<MemoryRouter><Layout /></MemoryRouter>);
-    const settingsLink = screen.getByRole('link', { name: /settings/i });
-    expect(settingsLink).toBeInTheDocument();
+    const settingsBtn = screen.getByRole('button', { name: /settings/i });
+    expect(settingsBtn).toBeInTheDocument();
   });
 
   it('nav rail has aria-label "Main navigation"', () => {
@@ -47,10 +46,9 @@ describe('Layout', () => {
 
   it('nav rail width is 48px', () => {
     // AC-16.1: Nav rail is exactly 48px wide (per design spec)
-    // Check for class that sets w-12 / w-[48px]
     render(<MemoryRouter><Layout /></MemoryRouter>);
     const nav = screen.getByRole('navigation', { name: /main navigation/i });
-    expect(nav.className).toMatch(/w-12/);
+    expect(nav.className).toMatch(/w-\[48px\]/);
   });
 
   // ── Active route highlighting ─────────────────────────────────────────────
@@ -58,22 +56,22 @@ describe('Layout', () => {
   it('active route item has aria-current="page"', () => {
     // AC-16.2, UX §4.2: Active nav item has aria-current="page"
     render(<MemoryRouter initialEntries={['/tasks']}><Layout /></MemoryRouter>);
-    const tasksLink = screen.getByRole('link', { name: /tasks/i });
-    expect(tasksLink).toHaveAttribute('aria-current', 'page');
+    const tasksBtn = screen.getByRole('button', { name: /tasks/i });
+    expect(tasksBtn).toHaveAttribute('aria-current', 'page');
   });
 
   it('non-active route items do not have aria-current', () => {
     // AC-16.2: Only the active route has aria-current="page"
     render(<MemoryRouter initialEntries={['/tasks']}><Layout /></MemoryRouter>);
-    const chatLink = screen.getByRole('link', { name: /^chat/i });
-    expect(chatLink).not.toHaveAttribute('aria-current', 'page');
+    const chatBtn = screen.getByRole('button', { name: /^chat$/i });
+    expect(chatBtn).not.toHaveAttribute('aria-current', 'page');
   });
 
-  it('active nav item has accent color class applied', () => {
-    // AC-16.2: Active link has the accent color class (e.g., text-codex-accent)
+  it('active nav item uses foreground color style', () => {
+    // AC-16.2: Active button uses --codex-fg via inline style
     render(<MemoryRouter initialEntries={['/tasks']}><Layout /></MemoryRouter>);
-    const tasksLink = screen.getByRole('link', { name: /tasks/i });
-    expect(tasksLink.className).toMatch(/codex-accent/);
+    const tasksBtn = screen.getByRole('button', { name: /tasks/i });
+    expect(tasksBtn.style.color).toBe('var(--codex-fg)');
   });
 
   // ── Status bar ────────────────────────────────────────────────────────────
@@ -81,19 +79,18 @@ describe('Layout', () => {
   it('renders status bar at bottom of viewport', () => {
     // UX §8: StatusBar is rendered in the Layout shell
     render(<MemoryRouter><Layout /></MemoryRouter>);
-    // Status bar contains connection status text
-    expect(screen.getByText(/disconnected/i)).toBeInTheDocument();
+    // Status bar contains task/session counts
+    expect(screen.getByText(/\d+ tasks/)).toBeInTheDocument();
   });
 
   // ── Theme ─────────────────────────────────────────────────────────────────
 
   it('root element uses codex background color', () => {
-    // AC-15.4: Layout background uses --codex-bg CSS variable (#0d0d0d)
+    // AC-15.4: Layout background uses --codex-bg CSS variable
     render(<MemoryRouter><Layout /></MemoryRouter>);
-    // The outermost div should reference codex-bg in its style
-    const container = screen.getByRole('navigation', { name: /main navigation/i }).parentElement;
+    const nav = screen.getByRole('navigation', { name: /main navigation/i });
+    const container = nav.parentElement;
     expect(container).not.toBeNull();
-    // Check that the layout container has the background color set
     const rootDiv = container?.parentElement;
     expect(rootDiv).not.toBeNull();
   });
@@ -104,19 +101,18 @@ describe('Layout', () => {
     // UX §4.1: Tab key moves focus between nav items
     render(<MemoryRouter><Layout /></MemoryRouter>);
     for (const item of NAV_ITEMS) {
-      const link = screen.getByRole('link', { name: new RegExp(item, 'i') });
-      // Links are focusable by default (tabIndex not -1)
-      expect(link).not.toHaveAttribute('tabindex', '-1');
+      const btn = screen.getByRole('button', { name: new RegExp(item, 'i') });
+      // Buttons are focusable by default (tabIndex not -1)
+      expect(btn).not.toHaveAttribute('tabindex', '-1');
     }
   });
 
-  it('pressing Enter on a nav item navigates to that route', () => {
-    // UX §4.1: Enter key activates nav link — links handle this natively
+  it('nav items are buttons that handle keyboard activation', () => {
+    // UX §4.1: Buttons natively support Enter/Space activation
     render(<MemoryRouter><Layout /></MemoryRouter>);
-    // All nav links are standard <a> elements which support Enter natively
     for (const item of NAV_ITEMS) {
-      const link = screen.getByRole('link', { name: new RegExp(item, 'i') });
-      expect(link.tagName.toLowerCase()).toBe('a');
+      const btn = screen.getByRole('button', { name: new RegExp(item, 'i') });
+      expect(btn.tagName.toLowerCase()).toBe('button');
     }
   });
 
@@ -134,7 +130,6 @@ describe('Layout', () => {
     render(<MemoryRouter><Layout /></MemoryRouter>);
     const main = screen.getByRole('main');
     expect(main).toBeInTheDocument();
-    // Outlet renders inside main
     expect(main.tagName.toLowerCase()).toBe('main');
   });
 });

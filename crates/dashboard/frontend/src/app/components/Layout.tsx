@@ -160,6 +160,7 @@ export function Layout() {
       <div className="flex-1 flex overflow-hidden">
         {/* Left Navigation Rail */}
         <nav
+          aria-label="Main navigation"
           className="w-[48px] flex flex-col items-center py-3 border-r"
           style={{
             backgroundColor: 'var(--codex-bg-nav)',
@@ -173,6 +174,8 @@ export function Layout() {
                 <button
                   key={item.id}
                   onClick={() => navigate(item.path)}
+                  aria-label={item.label}
+                  aria-current={active ? 'page' : undefined}
                   className="w-full h-9 flex items-center justify-center relative group"
                   style={{
                     color: active
@@ -220,6 +223,8 @@ export function Layout() {
           {/* Settings at bottom */}
           <button
             onClick={() => navigate('/settings')}
+            aria-label="Settings"
+            aria-current={location.pathname === '/settings' ? 'page' : undefined}
             className="w-full h-9 flex items-center justify-center relative group mt-2 border-t pt-2"
             style={{
               color:
@@ -265,7 +270,9 @@ export function Layout() {
         </nav>
 
         {/* Page Content */}
-        <Outlet />
+        <main className="flex-1 flex min-w-0 overflow-hidden">
+          <Outlet />
+        </main>
       </div>
 
       {/* Bottom Status Bar */}
