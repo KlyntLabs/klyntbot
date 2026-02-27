@@ -12,6 +12,7 @@ use tracing::{debug, warn};
 use super::classifier::IntentClassifier;
 use super::heuristics::analyze_heuristic;
 use super::types::{AnalysisSource, ExecutionMode, IntentAnalysis};
+use crate::orchestrator::format_strategy_context;
 
 /// Two-stage intent analyzer: heuristics → LLM classifier.
 pub struct IntentAnalyzer {
@@ -106,23 +107,6 @@ impl IntentAnalyzer {
             }
         }
     }
-}
-
-fn format_strategy_context(summaries: &[storage::StrategySummaryRow]) -> String {
-    let mut ctx = String::from("Historical strategy performance (last 30 days):\n");
-    for s in summaries {
-        let accuracy = if s.sample_count > 0 {
-            s.correct_count as f32 / s.sample_count as f32 * 100.0
-        } else {
-            0.0
-        };
-        ctx.push_str(&format!(
-            "- {}: {:.0}% accuracy ({} samples)\n",
-            s.predicted_strategy, accuracy, s.sample_count
-        ));
-    }
-    ctx.push_str("Prefer strategies with higher accuracy.\n");
-    ctx
 }
 
 #[cfg(test)]

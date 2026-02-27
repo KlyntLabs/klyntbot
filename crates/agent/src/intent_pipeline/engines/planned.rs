@@ -20,6 +20,7 @@ use super::{EngineResult, ExecutionEngine};
 use crate::execution::{ExecutionCore, ExecutionParams};
 use crate::intent_pipeline::escalation::EscalationContext;
 use crate::plan_executor;
+use crate::execution::plan_generate::{extract_last_user_message, truncate};
 use crate::plan_step_generator::{drafts_to_plan_steps, generate_plan_steps};
 
 /// Engine that decomposes a task into a plan via LLM, persists it, and executes
@@ -404,36 +405,6 @@ impl ExecutionEngine for PlannedEngine {
 
     fn mode(&self) -> &str {
         "planned"
-    }
-}
-
-/// Extract the text of the last user message from a conversation history.
-fn extract_last_user_message(messages: &[Message]) -> String {
-    messages
-        .iter()
-        .rev()
-        .find_map(|m| match m {
-            Message::User { content } => match content {
-                providers::UserContent::Text(t) => {
-                    if t.trim().is_empty() {
-                        None
-                    } else {
-                        Some(t.clone())
-                    }
-                }
-                providers::UserContent::MultiPart(_) => None,
-            },
-            _ => None,
-        })
-        .unwrap_or_else(|| "Complete the task".to_string())
-}
-
-/// Truncate a string at a character boundary so it fits in `max_chars`.
-fn truncate(s: &str, max_chars: usize) -> String {
-    if s.chars().count() <= max_chars {
-        s.to_string()
-    } else {
-        s.chars().take(max_chars).collect::<String>() + "..."
     }
 }
 

@@ -248,7 +248,7 @@ impl PlanGenerateEngine {
 }
 
 /// Extract the text of the last user message from a conversation history.
-fn extract_last_user_message(messages: &[Message]) -> String {
+pub(crate) fn extract_last_user_message(messages: &[Message]) -> String {
     messages
         .iter()
         .rev()
@@ -269,7 +269,7 @@ fn extract_last_user_message(messages: &[Message]) -> String {
 }
 
 /// Truncate a string at a character boundary so it fits in `max_chars`.
-fn truncate(s: &str, max_chars: usize) -> String {
+pub(crate) fn truncate(s: &str, max_chars: usize) -> String {
     if s.chars().count() <= max_chars {
         s.to_string()
     } else {

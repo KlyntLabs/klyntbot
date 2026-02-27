@@ -119,7 +119,7 @@ impl Orchestrator {
 }
 
 /// Format strategy summaries into a human-readable context for the LLM classifier.
-fn format_strategy_context(summaries: &[storage::StrategySummaryRow]) -> String {
+pub(crate) fn format_strategy_context(summaries: &[storage::StrategySummaryRow]) -> String {
     let mut ctx = String::from("Historical strategy performance (last 30 days):\n");
     for s in summaries {
         let accuracy = if s.sample_count > 0 {
