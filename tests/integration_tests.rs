@@ -374,7 +374,7 @@ fn test_backward_compat_minimal_config() {
     assert!(!config.channels.feishu.enabled);
     assert!(!config.channels.dingtalk.enabled);
     assert!(!config.channels.mochat.enabled);
-    assert_eq!(config.gateway.host, "0.0.0.0");
+    assert_eq!(config.gateway.host, "127.0.0.1");
     assert_eq!(config.gateway.port, 18790);
 }
 
