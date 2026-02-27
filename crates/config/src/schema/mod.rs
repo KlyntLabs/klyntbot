@@ -24,6 +24,7 @@ mod core;
 mod finance;
 mod gateway;
 mod learning;
+mod orchestrator;
 mod packs;
 mod plugins;
 mod project;
@@ -40,6 +41,7 @@ pub use self::core::*;
 pub use self::finance::*;
 pub use self::gateway::*;
 pub use self::learning::*;
+pub use self::orchestrator::*;
 pub use self::packs::*;
 pub use self::plugins::*;
 pub use self::project::*;
@@ -291,6 +293,7 @@ mod tests {
             search: TodoSearchConfig::default(),
             daily_planning: DailyPlanningConfig::default(),
             creation_mode: CreationMode::default(),
+            ..Default::default()
         };
 
         let json = serde_json::to_string(&config).unwrap();

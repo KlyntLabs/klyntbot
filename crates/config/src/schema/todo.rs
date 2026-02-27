@@ -33,7 +33,7 @@ where
 }
 
 /// Todo system configuration
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TodoConfig {
     #[serde(default)]
@@ -49,6 +49,18 @@ pub struct TodoConfig {
     /// Task creation mode: ask-first (default), yolo, or party
     #[serde(default, deserialize_with = "deserialize_creation_mode")]
     pub creation_mode: CreationMode,
+
+    /// Suggest creating a plan when a complex task is added (default: true)
+    #[serde(default = "default_true")]
+    pub auto_plan_suggestion: bool,
+
+    /// Auto-generate a plan when a complex task is focused (default: false)
+    #[serde(default)]
+    pub auto_plan_on_focus: bool,
+
+    /// Complexity score threshold for plan suggestions (default: 3)
+    #[serde(default = "default_plan_complexity_threshold")]
+    pub plan_complexity_threshold: u8,
 }
 
 /// Smart enrichment configuration for auto-inferring task metadata
@@ -170,6 +182,26 @@ impl Default for TodoSearchConfig {
             rrf_k: default_rrf_k(),
         }
     }
+}
+
+impl Default for TodoConfig {
+    fn default() -> Self {
+        Self {
+            notifications: TodoNotificationConfig::default(),
+            focus: TodoFocusConfig::default(),
+            enrichment: TodoEnrichmentConfig::default(),
+            search: TodoSearchConfig::default(),
+            daily_planning: DailyPlanningConfig::default(),
+            creation_mode: CreationMode::default(),
+            auto_plan_suggestion: true,
+            auto_plan_on_focus: false,
+            plan_complexity_threshold: default_plan_complexity_threshold(),
+        }
+    }
+}
+
+fn default_plan_complexity_threshold() -> u8 {
+    3
 }
 
 fn default_embedding_model() -> String {

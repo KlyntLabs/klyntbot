@@ -12,6 +12,7 @@ use super::conversation::ConversationConfig;
 use super::finance::FinanceConfig;
 use super::gateway::GatewayConfig;
 use super::learning::LearningConfig;
+use super::orchestrator::OrchestratorConfig;
 use super::packs::PacksConfig;
 use super::plugins::PluginsConfig;
 use super::project::ProjectConfig;
@@ -113,6 +114,9 @@ pub struct Config {
 
     #[serde(default)]
     pub finance: FinanceConfig,
+
+    #[serde(default)]
+    pub orchestrator: OrchestratorConfig,
 
     /// Provider manager routing (primary/fallback/classifier)
     #[serde(default)]
