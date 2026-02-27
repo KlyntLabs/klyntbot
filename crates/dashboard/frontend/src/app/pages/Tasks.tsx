@@ -22,6 +22,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useApi } from '../../lib/hooks/useApi';
 import { apiFetch } from '../../lib/api';
 import type { Task, TaskSummary, Project } from '../../lib/types';
+import { RECURRENCE_PRESETS, rruleToLabel } from '../../lib/rrule';
 
 export default function Tasks() {
   const navigate = useNavigate();
@@ -45,6 +46,11 @@ export default function Tasks() {
   const [newTags, setNewTags] = useState('');
   const [newProjectId, setNewProjectId] = useState('');
   const [newEstimatedMinutes, setNewEstimatedMinutes] = useState('');
+  const [newIsTemplate, setNewIsTemplate] = useState(false);
+  const [newRecurrenceRule, setNewRecurrenceRule] = useState('');
+
+  // View mode: tasks vs templates
+  const [viewMode, setViewMode] = useState<'tasks' | 'templates'>('tasks');
 
   // Delete state
   const [deletingTask, setDeletingTask] = useState<string | null>(null);
@@ -52,6 +58,7 @@ export default function Tasks() {
   const { data: tasks, loading, error, setData } = useApi<Task[]>('/api/tasks');
   const { data: summary, setData: setSummary } = useApi<TaskSummary>('/api/tasks/summary');
   const { data: projects } = useApi<Project[]>('/api/projects');
+  const { data: templates, loading: templatesLoading, setData: setTemplates } = useApi<Task[]>('/api/tasks?templatesOnly=true');
 
   // Build project lookup map
   const projectMap = useMemo(() => {
@@ -163,10 +170,17 @@ export default function Tasks() {
       if (newTags.trim()) body.tags = newTags.split(',').map(t => t.trim()).filter(Boolean);
       if (newProjectId) body.projectId = newProjectId;
       if (newEstimatedMinutes) body.estimatedMinutes = parseInt(newEstimatedMinutes);
+      if (newIsTemplate) {
+        body.isTemplate = true;
+        if (newRecurrenceRule) body.recurrenceRule = newRecurrenceRule;
+      }
 
       const created = await apiFetch<Task>('/api/tasks', { body });
       setData(prev => [...(prev ?? []), created]);
       setSummary(prev => prev ? { ...prev, todo: prev.todo + 1, total: prev.total + 1 } : prev);
+      if (newIsTemplate) {
+        setTemplates(prev => [...(prev ?? []), created]);
+      }
 
       // Reset form
       resetCreateForm();
@@ -175,7 +189,7 @@ export default function Tasks() {
     } finally {
       setSaving(false);
     }
-  }, [newTitle, newDescription, newPriority, newDueDate, newTags, newProjectId, newEstimatedMinutes, setData, setSummary]);
+  }, [newTitle, newDescription, newPriority, newDueDate, newTags, newProjectId, newEstimatedMinutes, newIsTemplate, newRecurrenceRule, setData, setSummary, setTemplates]);
 
   const resetCreateForm = useCallback(() => {
     setCreating(false);
@@ -187,6 +201,8 @@ export default function Tasks() {
     setNewTags('');
     setNewProjectId('');
     setNewEstimatedMinutes('');
+    setNewIsTemplate(false);
+    setNewRecurrenceRule('');
   }, []);
 
   // Delete task
@@ -367,6 +383,31 @@ export default function Tasks() {
         {/* Task List */}
         <div className="flex-1 overflow-y-auto p-6" style={{ backgroundColor: 'var(--codex-bg)' }}>
           <div className="max-w-4xl mx-auto space-y-3">
+            {/* Tab toggle */}
+            <div className="flex items-center gap-1 p-1 rounded-lg mb-4" style={{ backgroundColor: 'var(--codex-bg)' }}>
+              <button
+                onClick={() => setViewMode('tasks')}
+                className="px-4 py-1.5 rounded-md text-[12px] transition-colors"
+                style={{
+                  backgroundColor: viewMode === 'tasks' ? 'var(--codex-bg-tertiary)' : 'transparent',
+                  color: viewMode === 'tasks' ? 'var(--codex-fg)' : 'var(--codex-fg-subtle)',
+                  fontWeight: viewMode === 'tasks' ? 500 : 400,
+                }}
+              >
+                Tasks
+              </button>
+              <button
+                onClick={() => setViewMode('templates')}
+                className="px-4 py-1.5 rounded-md text-[12px] transition-colors"
+                style={{
+                  backgroundColor: viewMode === 'templates' ? 'var(--codex-bg-tertiary)' : 'transparent',
+                  color: viewMode === 'templates' ? 'var(--codex-fg)' : 'var(--codex-fg-subtle)',
+                  fontWeight: viewMode === 'templates' ? 500 : 400,
+                }}
+              >
+                Templates
+              </button>
+            </div>
             {/* Create Form */}
             <AnimatePresence>
               {creating && (
@@ -511,6 +552,49 @@ export default function Tasks() {
                       </div>
                     </div>
 
+                    {/* Template toggle + Recurrence */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] mb-1.5 uppercase tracking-wider" style={{ color: 'var(--codex-fg-subtle)', fontWeight: 500 }}>
+                          Template
+                        </label>
+                        <label className="flex items-center gap-2 cursor-pointer py-2">
+                          <input
+                            type="checkbox"
+                            checked={newIsTemplate}
+                            onChange={(e) => {
+                              setNewIsTemplate(e.target.checked);
+                              if (!e.target.checked) setNewRecurrenceRule('');
+                            }}
+                            className="rounded"
+                            style={{ accentColor: 'var(--codex-accent)' }}
+                          />
+                          <span className="text-[13px]" style={{ color: 'var(--codex-fg)' }}>
+                            Is template
+                          </span>
+                        </label>
+                      </div>
+                      {newIsTemplate && (
+                        <div>
+                          <label className="block text-[11px] mb-1.5 uppercase tracking-wider" style={{ color: 'var(--codex-fg-subtle)', fontWeight: 500 }}>
+                            Recurrence
+                          </label>
+                          <select
+                            value={newRecurrenceRule}
+                            onChange={(e) => setNewRecurrenceRule(e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg text-[13px] outline-none transition-colors"
+                            style={inputStyle}
+                            onFocus={focusHandler}
+                            onBlur={blurHandler}
+                          >
+                            {RECURRENCE_PRESETS.map(p => (
+                              <option key={p.value} value={p.value}>{p.label}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+
                     {createError && (
                       <div className="text-[12px] flex items-center gap-1.5" style={{ color: '#ef4444' }}>
                         <AlertTriangle className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -545,147 +629,205 @@ export default function Tasks() {
               )}
             </AnimatePresence>
 
-            {filteredTasks.length === 0 && !loading && !searchQuery && (
-              <div className="text-center py-16 text-[13px]" style={{ color: 'var(--codex-fg-subtle)' }}>
-                No tasks yet. Create one to get started.
-              </div>
-            )}
-
-            {filteredTasks.length === 0 && searchQuery && (
-              <div className="text-center py-16 text-[13px]" style={{ color: 'var(--codex-fg-subtle)' }}>
-                No tasks matching "{searchQuery}"
-              </div>
-            )}
-
-            {filteredTasks.map((task) => {
-              const project = task.projectId ? projectMap.get(task.projectId) : undefined;
-              return (
-                <div key={task.id}>
-                  <div
-                    className="group p-4 rounded-lg border cursor-pointer transition-all"
-                    style={{ backgroundColor: '#141414', borderColor: 'var(--codex-border)' }}
-                    onClick={() => navigate(`/tasks/${task.id}`)}
-                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#1a1a1a'; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#141414'; }}
-                  >
-                    <div className="flex items-start gap-3">
-                      {/* Clickable status icon to cycle status */}
-                      <button
-                        className="flex-shrink-0 mt-0.5 hover:scale-110 transition-transform"
-                        onClick={(e) => cycleStatus(e, task)}
-                        title={`Status: ${task.status} (click to cycle)`}
-                      >
-                        {getStatusIcon(task.status)}
-                      </button>
-                      <div className="flex-1 min-w-0">
-                        <div className="mb-2">
-                          <div className="text-[14px] mb-1" style={{ color: 'var(--codex-fg)', fontWeight: 500, textDecoration: task.status.toLowerCase() === 'archived' ? 'line-through' : 'none' }}>
-                            {task.title}
-                          </div>
-                          {task.description && (
-                            <div className="text-[13px] truncate" style={{ color: 'var(--codex-fg-muted)' }}>{task.description}</div>
-                          )}
-                        </div>
-
-                        {/* Metadata */}
-                        <div className="flex items-center gap-3 mb-2 flex-wrap">
-                          {task.priority != null && (
-                            <div className="flex items-center gap-1.5 text-[12px]">
-                              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: getPriorityColor(task.priority) }} />
-                              <span style={{ color: getPriorityColor(task.priority), fontWeight: 500 }}>P{task.priority}</span>
-                            </div>
-                          )}
-                          {task.dueDate && (
-                            <div className="flex items-center gap-1.5 text-[12px]" style={{ color: isOverdue(task.dueDate) ? '#e55050' : 'var(--codex-fg-subtle)' }}>
-                              <Clock className="w-3.5 h-3.5" strokeWidth={1.5} />{formatDate(task.dueDate)}
-                            </div>
-                          )}
-                          {task.estimatedMinutes != null && (
-                            <div className="flex items-center gap-1.5 text-[12px]" style={{ color: 'var(--codex-fg-subtle)' }}>
-                              <Timer className="w-3.5 h-3.5" strokeWidth={1.5} />~{formatTime(task.estimatedMinutes)}
-                            </div>
-                          )}
-                          {project && (
-                            <div className="flex items-center gap-1.5 text-[12px]" style={{ color: 'var(--codex-fg-subtle)' }}>
-                              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: project.color }} />
-                              {project.name}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Tags */}
-                        {task.tags.length > 0 && (
-                          <div className="flex items-center gap-1.5 mb-2 flex-wrap">
-                            {task.tags.map(tag => (
-                              <span key={tag} className="px-2 py-0.5 rounded text-[11px]" style={{ backgroundColor: 'var(--codex-bg)', color: 'var(--codex-fg-subtle)', border: '1px solid var(--codex-border)' }}>
-                                {tag}
-                              </span>
-                            ))}
-                          </div>
+            {/* Templates view */}
+            {viewMode === 'templates' && (
+              <div className="space-y-2">
+                {templatesLoading ? (
+                  <div className="flex items-center justify-center py-16">
+                    <Loader2 className="w-5 h-5 animate-spin" style={{ color: 'var(--codex-fg-subtle)' }} />
+                  </div>
+                ) : (templates ?? []).length === 0 ? (
+                  <div className="text-center py-16" style={{ color: 'var(--codex-fg-subtle)' }}>
+                    <RefreshCw className="w-10 h-10 mx-auto mb-3" strokeWidth={1} />
+                    <p className="text-[14px]">No templates yet</p>
+                    <p className="text-[12px] mt-1">Create a template to automate recurring tasks</p>
+                  </div>
+                ) : (
+                  (templates ?? []).map((tmpl, index) => (
+                    <motion.button
+                      key={tmpl.id}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.03 }}
+                      onClick={() => navigate(`/tasks/${tmpl.id}`)}
+                      className="w-full text-left p-4 rounded-lg border transition-colors"
+                      style={{ backgroundColor: 'var(--codex-bg-tertiary)', borderColor: 'var(--codex-border)' }}
+                      onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--codex-accent)'}
+                      onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--codex-border)'}
+                    >
+                      <div className="flex items-center gap-3 mb-1">
+                        <span className="px-2 py-0.5 rounded text-[10px] uppercase tracking-wide" style={{
+                          backgroundColor: 'var(--codex-accent-dim)',
+                          color: 'var(--codex-accent)',
+                          border: '1px solid var(--codex-border)',
+                        }}>
+                          Template
+                        </span>
+                        <h3 className="text-[14px]" style={{ color: 'var(--codex-fg)' }}>{tmpl.title}</h3>
+                      </div>
+                      <div className="flex items-center gap-3 mt-2 text-[12px]" style={{ color: 'var(--codex-fg-subtle)' }}>
+                        {tmpl.recurrenceRule && (
+                          <span className="flex items-center gap-1">
+                            <RefreshCw className="w-3 h-3" strokeWidth={1.5} />
+                            {rruleToLabel(tmpl.recurrenceRule)}
+                          </span>
                         )}
+                        {tmpl.tags.length > 0 && (
+                          <span>{tmpl.tags.join(', ')}</span>
+                        )}
+                      </div>
+                    </motion.button>
+                  ))
+                )}
+              </div>
+            )}
 
-                        {/* Indicators */}
-                        <div className="flex items-center gap-3 flex-wrap text-[11px]" style={{ color: 'var(--codex-fg-subtle)' }}>
-                          {task.recurrenceRule && (<div className="flex items-center gap-1"><RefreshCw className="w-3 h-3" strokeWidth={1.5} />Recurring</div>)}
-                          {task.focusedAt && (<div className="flex items-center gap-1" style={{ color: '#e5c07b' }}><Zap className="w-3 h-3" strokeWidth={1.5} />Focused</div>)}
-                          {task.calendarEventUid && (<div className="flex items-center gap-1"><CalendarIcon className="w-3 h-3" strokeWidth={1.5} />Calendar</div>)}
-                          {task.parentId && (<div className="flex items-center gap-1"><Link className="w-3 h-3" strokeWidth={1.5} />Subtask</div>)}
-                          {task.totalTrackedSecs > 0 && (<div className="flex items-center gap-1" style={{ color: '#10a37f' }}><Timer className="w-3 h-3" strokeWidth={1.5} />{formatTrackedTime(task.totalTrackedSecs)} tracked</div>)}
-                          {task.isTemplate && (<div className="px-2 py-0.5 rounded text-[10px]" style={{ backgroundColor: 'var(--codex-accent-dim)', color: 'var(--codex-accent)', border: '1px solid var(--codex-accent)' }}>TEMPLATE</div>)}
+            {/* Tasks view */}
+            {viewMode === 'tasks' && (
+              <>
+                {filteredTasks.length === 0 && !loading && !searchQuery && (
+                  <div className="text-center py-16 text-[13px]" style={{ color: 'var(--codex-fg-subtle)' }}>
+                    No tasks yet. Create one to get started.
+                  </div>
+                )}
+
+                {filteredTasks.length === 0 && searchQuery && (
+                  <div className="text-center py-16 text-[13px]" style={{ color: 'var(--codex-fg-subtle)' }}>
+                    No tasks matching "{searchQuery}"
+                  </div>
+                )}
+
+                {filteredTasks.map((task) => {
+                  const project = task.projectId ? projectMap.get(task.projectId) : undefined;
+                  return (
+                    <div key={task.id}>
+                      <div
+                        className="group p-4 rounded-lg border cursor-pointer transition-all"
+                        style={{ backgroundColor: '#141414', borderColor: 'var(--codex-border)' }}
+                        onClick={() => navigate(`/tasks/${task.id}`)}
+                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#1a1a1a'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#141414'; }}
+                      >
+                        <div className="flex items-start gap-3">
+                          {/* Clickable status icon to cycle status */}
+                          <button
+                            className="flex-shrink-0 mt-0.5 hover:scale-110 transition-transform"
+                            onClick={(e) => cycleStatus(e, task)}
+                            title={`Status: ${task.status} (click to cycle)`}
+                          >
+                            {getStatusIcon(task.status)}
+                          </button>
+                          <div className="flex-1 min-w-0">
+                            <div className="mb-2">
+                              <div className="text-[14px] mb-1" style={{ color: 'var(--codex-fg)', fontWeight: 500, textDecoration: task.status.toLowerCase() === 'archived' ? 'line-through' : 'none' }}>
+                                {task.title}
+                              </div>
+                              {task.description && (
+                                <div className="text-[13px] truncate" style={{ color: 'var(--codex-fg-muted)' }}>{task.description}</div>
+                              )}
+                            </div>
+
+                            {/* Metadata */}
+                            <div className="flex items-center gap-3 mb-2 flex-wrap">
+                              {task.priority != null && (
+                                <div className="flex items-center gap-1.5 text-[12px]">
+                                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: getPriorityColor(task.priority) }} />
+                                  <span style={{ color: getPriorityColor(task.priority), fontWeight: 500 }}>P{task.priority}</span>
+                                </div>
+                              )}
+                              {task.dueDate && (
+                                <div className="flex items-center gap-1.5 text-[12px]" style={{ color: isOverdue(task.dueDate) ? '#e55050' : 'var(--codex-fg-subtle)' }}>
+                                  <Clock className="w-3.5 h-3.5" strokeWidth={1.5} />{formatDate(task.dueDate)}
+                                </div>
+                              )}
+                              {task.estimatedMinutes != null && (
+                                <div className="flex items-center gap-1.5 text-[12px]" style={{ color: 'var(--codex-fg-subtle)' }}>
+                                  <Timer className="w-3.5 h-3.5" strokeWidth={1.5} />~{formatTime(task.estimatedMinutes)}
+                                </div>
+                              )}
+                              {project && (
+                                <div className="flex items-center gap-1.5 text-[12px]" style={{ color: 'var(--codex-fg-subtle)' }}>
+                                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: project.color }} />
+                                  {project.name}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Tags */}
+                            {task.tags.length > 0 && (
+                              <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+                                {task.tags.map(tag => (
+                                  <span key={tag} className="px-2 py-0.5 rounded text-[11px]" style={{ backgroundColor: 'var(--codex-bg)', color: 'var(--codex-fg-subtle)', border: '1px solid var(--codex-border)' }}>
+                                    {tag}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* Indicators */}
+                            <div className="flex items-center gap-3 flex-wrap text-[11px]" style={{ color: 'var(--codex-fg-subtle)' }}>
+                              {task.recurrenceRule && (<div className="flex items-center gap-1"><RefreshCw className="w-3 h-3" strokeWidth={1.5} />Recurring</div>)}
+                              {task.focusedAt && (<div className="flex items-center gap-1" style={{ color: '#e5c07b' }}><Zap className="w-3 h-3" strokeWidth={1.5} />Focused</div>)}
+                              {task.calendarEventUid && (<div className="flex items-center gap-1"><CalendarIcon className="w-3 h-3" strokeWidth={1.5} />Calendar</div>)}
+                              {task.parentId && (<div className="flex items-center gap-1"><Link className="w-3 h-3" strokeWidth={1.5} />Subtask</div>)}
+                              {task.totalTrackedSecs > 0 && (<div className="flex items-center gap-1" style={{ color: '#10a37f' }}><Timer className="w-3 h-3" strokeWidth={1.5} />{formatTrackedTime(task.totalTrackedSecs)} tracked</div>)}
+                              {task.isTemplate && (<div className="px-2 py-0.5 rounded text-[10px]" style={{ backgroundColor: 'var(--codex-accent-dim)', color: 'var(--codex-accent)', border: '1px solid var(--codex-accent)' }}>TEMPLATE</div>)}
+                            </div>
+                          </div>
+
+                          {/* Delete button */}
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setDeletingTask(deletingTask === task.id ? null : task.id); }}
+                            title="Delete task"
+                            className="flex-shrink-0 p-1.5 rounded transition-colors opacity-0 group-hover:opacity-100"
+                            style={{ color: 'var(--codex-fg-subtle)' }}
+                            onMouseEnter={(e) => { e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.backgroundColor = 'var(--codex-bg)'; }}
+                            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--codex-fg-subtle)'; e.currentTarget.style.backgroundColor = 'transparent'; }}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />
+                          </button>
                         </div>
                       </div>
 
-                      {/* Delete button */}
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setDeletingTask(deletingTask === task.id ? null : task.id); }}
-                        title="Delete task"
-                        className="flex-shrink-0 p-1.5 rounded transition-colors opacity-0 group-hover:opacity-100"
-                        style={{ color: 'var(--codex-fg-subtle)' }}
-                        onMouseEnter={(e) => { e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.backgroundColor = 'var(--codex-bg)'; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--codex-fg-subtle)'; e.currentTarget.style.backgroundColor = 'transparent'; }}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />
-                      </button>
+                      {/* Delete confirmation */}
+                      <AnimatePresence>
+                        {deletingTask === task.id && (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="mt-1 p-3 rounded-lg border"
+                            style={{ backgroundColor: 'rgba(239, 68, 68, 0.05)', borderColor: 'rgba(239, 68, 68, 0.2)' }}
+                          >
+                            <p className="text-[12px] mb-3" style={{ color: 'var(--codex-fg-muted)' }}>
+                              Delete <strong style={{ color: 'var(--codex-fg)' }}>{task.title}</strong>? This cannot be undone.
+                            </p>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); confirmDelete(task.id); }}
+                                className="px-3 py-1.5 rounded text-[12px] transition-colors"
+                                style={{ backgroundColor: '#ef4444', color: 'white' }}
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#dc2626'}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ef4444'}
+                              >
+                                Delete
+                              </button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setDeletingTask(null); }}
+                                className="px-3 py-1.5 rounded text-[12px] transition-colors"
+                                style={{ color: 'var(--codex-fg-muted)', border: '1px solid var(--codex-border)' }}
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
-                  </div>
-
-                  {/* Delete confirmation */}
-                  <AnimatePresence>
-                    {deletingTask === task.id && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="mt-1 p-3 rounded-lg border"
-                        style={{ backgroundColor: 'rgba(239, 68, 68, 0.05)', borderColor: 'rgba(239, 68, 68, 0.2)' }}
-                      >
-                        <p className="text-[12px] mb-3" style={{ color: 'var(--codex-fg-muted)' }}>
-                          Delete <strong style={{ color: 'var(--codex-fg)' }}>{task.title}</strong>? This cannot be undone.
-                        </p>
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={(e) => { e.stopPropagation(); confirmDelete(task.id); }}
-                            className="px-3 py-1.5 rounded text-[12px] transition-colors"
-                            style={{ backgroundColor: '#ef4444', color: 'white' }}
-                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#dc2626'}
-                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ef4444'}
-                          >
-                            Delete
-                          </button>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setDeletingTask(null); }}
-                            className="px-3 py-1.5 rounded text-[12px] transition-colors"
-                            style={{ color: 'var(--codex-fg-muted)', border: '1px solid var(--codex-border)' }}
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              );
-            })}
+                  );
+                })}
+              </>
+            )}
           </div>
         </div>
       </div>
