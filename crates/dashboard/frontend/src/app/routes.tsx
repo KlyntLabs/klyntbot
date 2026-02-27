@@ -6,6 +6,7 @@ import TaskDetail from './pages/TaskDetail';
 import Projects from './pages/Projects';
 import ProjectDetail from './pages/ProjectDetail';
 import Plans from './pages/Plans';
+import PlanDetail from './pages/PlanDetail';
 import Calendar from './pages/Calendar';
 import Cron from './pages/Cron';
 import Skills from './pages/Skills';
@@ -37,6 +38,7 @@ export const routes = [
       { path: 'projects', element: <Projects /> },
       { path: 'projects/:id', element: <ProjectDetail /> },
       { path: 'plans', element: <Plans /> },
+      { path: 'plans/:id', element: <PlanDetail /> },
       { path: 'calendar', element: <Calendar /> },
       { path: 'cron', element: <Cron /> },
       { path: 'skills', element: <Skills /> },
