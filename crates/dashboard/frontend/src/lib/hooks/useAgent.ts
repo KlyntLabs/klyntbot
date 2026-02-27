@@ -66,9 +66,7 @@ export function useAgent(): UseAgentResult {
   const [thinking, setThinking] = useState<ThinkingState | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [status, setStatus] = useState<ConnectionStatus>('disconnected');
-  const [sessionKey, setSessionKey] = useState<string | null>(() => {
-    return sessionStorage.getItem('klyntbot-session-key');
-  });
+  const [sessionKey, setSessionKey] = useState<string | null>(null);
   const [pendingInteraction, setPendingInteraction] = useState<PendingInteraction | null>(null);
 
   const socketRef = useRef<AgentSocket | null>(null);
@@ -76,14 +74,6 @@ export function useAgent(): UseAgentResult {
   const accumulatedContentRef = useRef('');
   // Ref to track isStreaming without stale closure issues
   const isStreamingRef = useRef(false);
-
-  useEffect(() => {
-    if (sessionKey) {
-      sessionStorage.setItem('klyntbot-session-key', sessionKey);
-    } else {
-      sessionStorage.removeItem('klyntbot-session-key');
-    }
-  }, [sessionKey]);
 
   useEffect(() => {
     const socket = new AgentSocket();
@@ -298,14 +288,6 @@ export function useAgent(): UseAgentResult {
       socketRef.current = null;
     };
     // Run only once on mount
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    const savedKey = sessionStorage.getItem('klyntbot-session-key');
-    if (savedKey) {
-      loadSession(savedKey);
-    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
