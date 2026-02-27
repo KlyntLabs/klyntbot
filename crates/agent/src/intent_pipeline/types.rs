@@ -89,9 +89,7 @@ impl IntentAnalysis {
     /// Fallback analysis when classification fails entirely.
     pub fn fallback() -> Self {
         Self {
-            mode: ExecutionMode::Reactive {
-                max_iterations: 10,
-            },
+            mode: ExecutionMode::Reactive { max_iterations: 10 },
             signals: ComplexitySignals {
                 estimated_tool_calls: 1,
                 has_sequential_deps: false,

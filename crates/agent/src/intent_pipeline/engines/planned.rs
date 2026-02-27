@@ -17,10 +17,10 @@ use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 use super::{EngineResult, ExecutionEngine};
+use crate::execution::plan_generate::{extract_last_user_message, truncate};
 use crate::execution::{ExecutionCore, ExecutionParams};
 use crate::intent_pipeline::escalation::EscalationContext;
 use crate::plan_executor;
-use crate::execution::plan_generate::{extract_last_user_message, truncate};
 use crate::plan_step_generator::{drafts_to_plan_steps, generate_plan_steps};
 
 /// Engine that decomposes a task into a plan via LLM, persists it, and executes
@@ -238,11 +238,7 @@ impl PlannedEngine {
     }
 
     /// Execute plan steps sequentially with retry + backtracking.
-    async fn run_plan_steps(
-        &self,
-        plan: &mut plan::Plan,
-        ctx: &RoutingContext,
-    ) -> Result<String> {
+    async fn run_plan_steps(&self, plan: &mut plan::Plan, ctx: &RoutingContext) -> Result<String> {
         let step_count = plan.steps.len();
         let mut outputs: Vec<String> = Vec::with_capacity(step_count);
         let mut step_idx = plan.current_step_index;
@@ -326,13 +322,9 @@ impl PlannedEngine {
                     plan.updated_at = Utc::now();
                     let _ = save_plan(&self.plan_repo, plan).await;
 
-                    let new_steps = plan_executor::regenerate_from(
-                        plan,
-                        step_idx,
-                        &reason,
-                        &self.provider,
-                    )
-                    .await?;
+                    let new_steps =
+                        plan_executor::regenerate_from(plan, step_idx, &reason, &self.provider)
+                            .await?;
 
                     plan.steps.truncate(step_idx);
                     plan.steps.extend(new_steps);
@@ -370,8 +362,7 @@ impl PlannedEngine {
         ctx: &RoutingContext,
         event_tx: Option<tokio::sync::mpsc::Sender<crate::events::AgentEvent>>,
     ) -> Result<EngineResult> {
-        let engine =
-            super::reactive::ReactiveEngine::new(self.core.clone(), 50);
+        let engine = super::reactive::ReactiveEngine::new(self.core.clone(), 50);
         engine.execute(messages, tools, params, ctx, event_tx).await
     }
 
@@ -411,8 +402,8 @@ impl ExecutionEngine for PlannedEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use async_trait::async_trait;
     use crate::intent_pipeline::escalation::CompletedStep;
+    use async_trait::async_trait;
     use providers::{ChatParams, LlmProvider, LlmResponse, Usage};
     use serde_json::Value;
     use std::sync::Mutex;
@@ -572,7 +563,10 @@ mod tests {
 
         match result {
             EngineResult::Complete { content, .. } => {
-                assert!(!content.is_empty(), "should have output from step execution");
+                assert!(
+                    !content.is_empty(),
+                    "should have output from step execution"
+                );
             }
             EngineResult::Escalate { .. } => panic!("Expected Complete, got Escalate"),
         }
@@ -608,13 +602,7 @@ mod tests {
         };
 
         let result = engine
-            .execute_with_prior_work(
-                escalation,
-                &[],
-                &default_params(),
-                &routing_ctx(),
-                None,
-            )
+            .execute_with_prior_work(escalation, &[], &default_params(), &routing_ctx(), None)
             .await
             .unwrap();
 

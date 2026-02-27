@@ -213,9 +213,7 @@ mod tests {
             "model",
             &OrchestratorConfig::default(),
         );
-        let result = analyzer
-            .analyze("I need help with something", &[])
-            .await;
+        let result = analyzer.analyze("I need help with something", &[]).await;
         // Low confidence should force Reactive regardless of LLM's "planned" suggestion
         assert!(matches!(
             result.mode,

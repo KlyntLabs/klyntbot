@@ -38,26 +38,18 @@ impl ExecutionEngine for DirectEngine {
         let mut messages = messages;
         let (outcome, usage) = self
             .core
-            .run_cycle(
-                &mut messages,
-                &[],
-                params,
-                ctx,
-                event_tx.as_ref(),
-                None,
-            )
+            .run_cycle(&mut messages, &[], params, ctx, event_tx.as_ref(), None)
             .await?;
 
         match outcome {
-            CycleOutcome::FinalResponse { content } | CycleOutcome::FabricatedResponse { content } => {
-                Ok(EngineResult::Complete {
-                    content,
-                    usage,
-                    iterations: 1,
-                    traces: vec![],
-                    tool_name: None,
-                })
-            }
+            CycleOutcome::FinalResponse { content }
+            | CycleOutcome::FabricatedResponse { content } => Ok(EngineResult::Complete {
+                content,
+                usage,
+                iterations: 1,
+                traces: vec![],
+                tool_name: None,
+            }),
             CycleOutcome::ToolsExecuted { .. } => {
                 // LLM wanted tools despite being given none — escalate
                 Ok(EngineResult::Escalate {
@@ -206,7 +198,11 @@ mod tests {
             .unwrap();
 
         match result {
-            EngineResult::Complete { content, iterations, .. } => {
+            EngineResult::Complete {
+                content,
+                iterations,
+                ..
+            } => {
                 assert_eq!(content, "Hello! How can I help?");
                 assert_eq!(iterations, 1);
             }
@@ -230,7 +226,11 @@ mod tests {
             .unwrap();
 
         match result {
-            EngineResult::Escalate { reason, carried_context, .. } => {
+            EngineResult::Escalate {
+                reason,
+                carried_context,
+                ..
+            } => {
                 assert!(reason.contains("Direct mode"));
                 assert!(!carried_context.messages.is_empty());
             }

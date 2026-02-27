@@ -12,6 +12,4 @@ pub mod heuristics;
 pub mod router;
 pub mod types;
 
-pub use types::{
-    AnalysisSource, ComplexitySignals, ExecutionMode, FailureRisk, IntentAnalysis,
-};
+pub use types::{AnalysisSource, ComplexitySignals, ExecutionMode, FailureRisk, IntentAnalysis};

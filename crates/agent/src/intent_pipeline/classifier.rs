@@ -9,9 +9,7 @@ use std::time::Duration;
 use common::Result;
 use providers::{ChatParams, DynProvider, Message};
 
-use super::types::{
-    AnalysisSource, ComplexitySignals, ExecutionMode, FailureRisk, IntentAnalysis,
-};
+use super::types::{AnalysisSource, ComplexitySignals, ExecutionMode, FailureRisk, IntentAnalysis};
 
 /// Classifies user intent via a lightweight LLM call, returning structured
 /// `IntentAnalysis` with `ComplexitySignals`.
@@ -196,10 +194,14 @@ mod tests {
     #[tokio::test]
     async fn parses_structured_classification() {
         let response = r#"{"mode":"planned","estimated_tool_calls":5,"has_sequential_deps":true,"failure_risk":"high","requires_state_tracking":true,"requires_retries":false,"confidence":0.9,"reasoning":"Multi-step booking"}"#;
-        let classifier =
-            IntentClassifier::new(mock_provider(response), Duration::from_secs(2));
+        let classifier = IntentClassifier::new(mock_provider(response), Duration::from_secs(2));
         let result = classifier
-            .classify("book a flight", &["web_search", "web_fetch"], &default_params(), None)
+            .classify(
+                "book a flight",
+                &["web_search", "web_fetch"],
+                &default_params(),
+                None,
+            )
             .await
             .unwrap();
         assert!(matches!(result.mode, ExecutionMode::Planned { .. }));
@@ -212,10 +214,8 @@ mod tests {
 
     #[tokio::test]
     async fn parses_direct_mode() {
-        let response =
-            r#"{"mode":"direct","estimated_tool_calls":0,"has_sequential_deps":false,"failure_risk":"low","requires_state_tracking":false,"requires_retries":false,"confidence":0.95,"reasoning":"Simple greeting"}"#;
-        let classifier =
-            IntentClassifier::new(mock_provider(response), Duration::from_secs(2));
+        let response = r#"{"mode":"direct","estimated_tool_calls":0,"has_sequential_deps":false,"failure_risk":"low","requires_state_tracking":false,"requires_retries":false,"confidence":0.95,"reasoning":"Simple greeting"}"#;
+        let classifier = IntentClassifier::new(mock_provider(response), Duration::from_secs(2));
         let result = classifier
             .classify("hello", &[], &default_params(), None)
             .await
@@ -225,10 +225,8 @@ mod tests {
 
     #[tokio::test]
     async fn parses_reactive_mode() {
-        let response =
-            r#"{"mode":"reactive","estimated_tool_calls":2,"has_sequential_deps":false,"failure_risk":"low","requires_state_tracking":false,"requires_retries":false,"confidence":0.85,"reasoning":"Needs search"}"#;
-        let classifier =
-            IntentClassifier::new(mock_provider(response), Duration::from_secs(2));
+        let response = r#"{"mode":"reactive","estimated_tool_calls":2,"has_sequential_deps":false,"failure_risk":"low","requires_state_tracking":false,"requires_retries":false,"confidence":0.85,"reasoning":"Needs search"}"#;
+        let classifier = IntentClassifier::new(mock_provider(response), Duration::from_secs(2));
         let result = classifier
             .classify("search for tasks", &["todo"], &default_params(), None)
             .await
@@ -259,8 +257,7 @@ mod tests {
     #[tokio::test]
     async fn json_embedded_in_text() {
         let response = r#"Sure: {"mode":"direct","estimated_tool_calls":0,"has_sequential_deps":false,"failure_risk":"low","requires_state_tracking":false,"requires_retries":false,"confidence":0.9,"reasoning":"Greeting"} done"#;
-        let classifier =
-            IntentClassifier::new(mock_provider(response), Duration::from_secs(2));
+        let classifier = IntentClassifier::new(mock_provider(response), Duration::from_secs(2));
         let result = classifier
             .classify("hi", &[], &default_params(), None)
             .await

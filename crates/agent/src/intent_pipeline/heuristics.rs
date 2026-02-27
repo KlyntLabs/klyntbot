@@ -3,9 +3,7 @@
 //! Returns `Option<IntentAnalysis>` with full `ComplexitySignals` instead of
 //! the old `ExecutionStrategy`. Defers to LLM classifier when ambiguous.
 
-use super::types::{
-    AnalysisSource, ComplexitySignals, ExecutionMode, FailureRisk, IntentAnalysis,
-};
+use super::types::{AnalysisSource, ComplexitySignals, ExecutionMode, FailureRisk, IntentAnalysis};
 
 /// Attempt to classify a message using keyword/pattern heuristics.
 ///
@@ -132,9 +130,7 @@ fn is_greeting(msg: &str) -> bool {
     ];
     msg.len() < 20
         && GREETINGS.iter().any(|g| {
-            msg == *g
-                || msg.starts_with(&format!("{} ", g))
-                || msg.starts_with(&format!("{}!", g))
+            msg == *g || msg.starts_with(&format!("{} ", g)) || msg.starts_with(&format!("{}!", g))
         })
 }
 
@@ -270,14 +266,7 @@ fn assess_failure_risk(msg: &str) -> FailureRisk {
         "delete all",
     ];
     let medium_risk = [
-        "api",
-        "external",
-        "network",
-        "download",
-        "upload",
-        "install",
-        "booking",
-        "book ",
+        "api", "external", "network", "download", "upload", "install", "booking", "book ",
     ];
 
     if high_risk.iter().any(|k| msg.contains(k)) {
@@ -440,14 +429,16 @@ mod tests {
         let result = analyze_heuristic("create a task: implement the new auth system");
         assert!(result.is_some());
         let analysis = result.unwrap();
-        assert!(matches!(analysis.mode, ExecutionMode::Reactive { max_iterations: 5 }));
+        assert!(matches!(
+            analysis.mode,
+            ExecutionMode::Reactive { max_iterations: 5 }
+        ));
     }
 
     #[test]
     fn ambiguous_defers_to_llm() {
         // "what is the best way to implement" has both direct + action signals
-        let result =
-            analyze_heuristic("what is the best way to implement error handling in Rust?");
+        let result = analyze_heuristic("what is the best way to implement error handling in Rust?");
         assert!(result.is_none(), "Conflicting signals should defer to LLM");
     }
 
