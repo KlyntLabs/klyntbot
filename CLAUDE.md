@@ -37,7 +37,7 @@ Layer 1.5: storage       — SQLite connection pool (sqlx + SqlitePool), auto-mi
 Layer 2: providers, session, scheduling, calendar, context_engine — LLM HTTP client, session persistence, cron service, CalDAV client + sync engine, token budget allocator + context assembler
 Layer 3: tools           — Tool trait + 12 implementations (file I/O ×4, web ×2, message, spawn, cron, todo, project, calendar)
 Layer 4: channels, heartbeat — Chat platform integrations (Telegram, Discord, WhatsApp, Slack, Email, QQ)
-Layer 5: agent           — Agent loop, context builder, memory store, skill manager, subagent manager, calendar handler adapter, reminder engine, orchestrator, execution engines, pipeline
+Layer 5: agent           — Agent loop, context builder, memory store, skill manager, subagent manager, calendar handler adapter, reminder engine, intent pipeline (analyzer + router + engines), execution core
 Layer 6: cli             — Clap-derived CLI with 4 commands: chat, serve, init, status
 Layer 7: klyntbot        — Re-export facade (src/lib.rs) + binary entry point (src/main.rs)
 ```
@@ -73,7 +73,7 @@ Dependencies flow strictly upward. No circular dependencies — enforced by Carg
 | `CronHandler` | `tools` | Dependency inversion for cron job management |
 | `CalendarHandler` | `tools` | Dependency inversion for calendar sync (NEW: `async fn sync_now()`, `async fn get_status()`, `async fn list_events()`, etc.) |
 | `EnrichmentHandler` | `tools` | Dependency inversion for AI-powered task enrichment (NEW: `async fn enrich_task()`) |
-| `AgentPipeline` | `agent` | Full orchestration pipeline: Orchestrator → ContextEngine → EngineDispatch → ResponseValidator → CostTracker (`async fn process_message()`) |
+| `IntentPipeline` | `agent` | Full execution pipeline: IntentAnalyzer → ContextEngine → ExecutionRouter → ResponseValidator → CostTracker (`async fn process_message()`) |
 
 ### Conventions
 
@@ -268,6 +268,55 @@ Built-in skills live in `skills/` as `SKILL.md` files (summarize, skill-creator,
 - **Dependency inversion gotcha**: When adding new tools that need agent context (spawn/cron handlers), inject via `Arc<dyn Trait>` at construction to avoid circular deps.
 - **SqlitePool is Clone+Send+Sync**: Unlike the old `Arc<RwLock<Store>>` pattern, `SqlitePool` (and therefore all `*Repo` structs) can be freely cloned and shared across tasks without locking. Connection pooling is handled internally by sqlx.
 
+## Intent Pipeline (Phase 5 — v0.4.0)
+
+### Architecture
+
+The IntentPipeline replaces the former Orchestrator + EngineDispatch + AgentPipeline with a unified flow:
+
+```
+IntentAnalyzer → ContextEngine → ExecutionRouter → ResponseValidator → CostTracker
+```
+
+**Modules** in `crates/agent/src/intent_pipeline/`:
+
+| Module | Purpose |
+|--------|---------|
+| `types.rs` | `ExecutionMode` (Direct/Reactive/Planned), `ComplexitySignals`, `IntentAnalysis` |
+| `heuristics.rs` | Zero-cost keyword classification (greetings, CRUD, complex tasks) |
+| `classifier.rs` | LLM-based classifier for ambiguous messages |
+| `analyzer.rs` | Two-stage analysis: heuristics → LLM classifier |
+| `engines/` | `ExecutionEngine` trait + `DirectEngine`, `ReactiveEngine`, `PlannedEngine` |
+| `router.rs` | Maps mode to engine, handles escalation chain (Direct → Reactive → Planned) |
+| `pipeline.rs` | `IntentPipeline` struct — wires everything into `process_message()` |
+| `visibility.rs` | Background cleanup service for stale silent/on_failure plans |
+
+### Execution Modes
+
+- **Direct**: Single LLM call, no tools. For greetings, simple questions, acknowledgments.
+- **Reactive**: ReAct loop with tool calls. For task CRUD, search, calendar ops.
+- **Planned**: Multi-step plan generation and execution. For complex multi-tool workflows.
+
+### Escalation Chain
+
+When an engine signals it cannot handle a request (`EngineResult::Escalate`), the router automatically escalates: Direct → Reactive → Planned. Max escalations are configurable via `config.orchestrator.max_escalations` (default: 3).
+
+### Configuration
+
+```json
+{
+  "orchestrator": {
+    "maxEscalations": 3,
+    "heuristicConfidenceThreshold": 0.9,
+    "llmClassifierTimeout": 5000
+  }
+}
+```
+
+### Task Complexity Bridge
+
+`feature-todo` crate provides `TaskComplexitySignals` to evaluate whether a task warrants plan-based execution. The `execute` action on `TodoTool` checks complexity (dependencies, subtasks, duration, priority) and either starts the task directly or suggests creating a plan.
+
 ## Planning Engine (Phase 4 — v0.3.0)
 
 ### Plan Lifecycle
@@ -281,6 +330,15 @@ Draft → Approved → Executing → Completed
 ```
 
 Any state can transition to `Abandoned`. From `Completed`, `Failed`, or `Abandoned` — no further transitions are allowed.
+
+### Plan Visibility
+
+Plans have a `visibility` field (`PlanVisibility` enum):
+- **transparent** (default): Always visible in dashboard and API responses.
+- **on_failure**: Only surfaced to the user if the plan fails. Completed plans auto-cleaned after 7 days.
+- **silent**: Never shown to the user. Auto-cleaned 24 hours after reaching terminal state.
+
+A `PlanCleanupService` runs hourly to delete stale plans based on visibility rules.
 
 ### Creating and Executing Plans
 
@@ -309,6 +367,6 @@ When a step exceeds `max_attempts` (default: 3 retries per step):
 
 ### Known Limitations
 
-- **Single-cycle execution**: `execute_step()` makes one LLM call per step. The LLM generates tool calls with arguments from step context (description, previous results, plan goal). A multi-cycle ReAct loop is available via `PlanExecuteEngine`.
+- **Single-cycle execution**: `execute_step()` makes one LLM call per step. The LLM generates tool calls with arguments from step context (description, previous results, plan goal). A multi-cycle ReAct loop is available via `PlannedEngine` in the intent pipeline.
 - **Iteration limit enforcement**: `iteration_limit` field persists but is checked in `run_plan_execution()` — exceeded limits mark the plan as `Failed`.
 - **No real-time progress**: Plan progress is only visible between executions; there's no streaming progress update.

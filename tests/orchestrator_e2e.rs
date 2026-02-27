@@ -168,3 +168,129 @@ async fn test_e2e_context_budget_respected() {
     // Should succeed without panicking, even with large history
     assert!(!result.content.is_empty());
 }
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Plan-specified integration tests (Task 19)
+// ═════════════════════════════════════════════════════════════════════════════
+
+// ── Test 6: Greeting is routed via Direct mode ──
+
+#[tokio::test]
+async fn intent_pipeline_routes_greeting_directly() {
+    let provider = Arc::new(MockProvider::new("Hi! How can I help you today?"));
+    let pipeline = make_pipeline(provider).await;
+
+    let result = pipeline
+        .process_message("hey there", vec![], &[], &[], &routing_ctx(), None, None)
+        .await
+        .unwrap();
+
+    assert_eq!(result.mode_used, "direct");
+    assert_eq!(result.escalations, 0);
+    assert!(result.validation.is_valid);
+    assert_eq!(result.content, "Hi! How can I help you today?");
+}
+
+// ── Test 7: Search query is routed via Reactive mode ──
+
+#[tokio::test]
+async fn intent_pipeline_routes_search_as_reactive() {
+    let provider = Arc::new(MockProvider::new("Found 5 tasks about databases."));
+    let pipeline = make_pipeline(provider).await;
+
+    let result = pipeline
+        .process_message(
+            "search for tasks about databases",
+            vec![],
+            &[],
+            &[],
+            &routing_ctx(),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(result.mode_used, "reactive");
+    assert_eq!(result.escalations, 0);
+    assert!(result.validation.is_valid);
+    assert_eq!(result.content, "Found 5 tasks about databases.");
+}
+
+// ── Test 8: Plan keywords trigger Planned classification ──
+
+#[tokio::test]
+async fn intent_pipeline_auto_plans_complex_request() {
+    // "create a plan..." triggers has_plan_keyword → Planned mode via heuristics.
+    // No PlannedEngine configured in test setup → router falls back to Reactive.
+    let provider = Arc::new(MockProvider::new(
+        "I'll create a plan for reorganizing the codebase.",
+    ));
+    let pipeline = make_pipeline(provider).await;
+
+    let result = pipeline
+        .process_message(
+            "create a plan to reorganize the entire codebase",
+            vec![],
+            &[],
+            &[],
+            &routing_ctx(),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+
+    // Heuristic should detect plan keywords → classify as Planned
+    assert!(
+        format!("{:?}", result.classification.mode).contains("Planned"),
+        "Expected Planned classification, got: {:?}",
+        result.classification.mode
+    );
+    // Router reports "planned" as final_mode (initial mode), even though it
+    // internally fell back to reactive since PlannedEngine is not configured.
+    assert_eq!(result.mode_used, "planned");
+    assert!(result.validation.is_valid);
+}
+
+// ── Test 9: Reactive engine escalates when overwhelmed ──
+
+#[tokio::test]
+async fn intent_pipeline_escalates_reactive_to_planned() {
+    // Provider always returns tool calls → Reactive engine exhausts iterations
+    // (escalation threshold = ceil(10 * 0.8) = 8) → signals Escalate.
+    // No PlannedEngine configured → router returns "needs planning" message.
+    let provider = Arc::new(MockProvider::with_tool_call(
+        "web_search",
+        serde_json::json!({"query": "test"}),
+    ));
+    let pipeline = make_pipeline(provider).await;
+
+    let result = pipeline
+        .process_message(
+            "search for tasks about databases",
+            vec![],
+            &[],
+            &[],
+            &routing_ctx(),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+
+    // Should have escalated (Reactive → Planned, but no PlannedEngine)
+    assert!(
+        result.escalations >= 1,
+        "Expected escalation, got {} escalations",
+        result.escalations
+    );
+    // Content should indicate planning not configured
+    assert!(
+        result.content.contains("planning")
+            || result.content.contains("not configured")
+            || result.content.contains("exceeded"),
+        "Expected escalation message, got: {}",
+        result.content
+    );
+}
