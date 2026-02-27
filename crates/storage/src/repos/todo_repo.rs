@@ -657,12 +657,10 @@ impl TodoRepo {
 
     /// Count immediate children of a todo without loading full rows.
     pub async fn count_children(&self, parent_id: &str) -> Result<i64, StorageError> {
-        let row: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM todos WHERE parent_id = ?1",
-        )
-        .bind(parent_id)
-        .fetch_one(&self.pool)
-        .await?;
+        let row: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM todos WHERE parent_id = ?1")
+            .bind(parent_id)
+            .fetch_one(&self.pool)
+            .await?;
         Ok(row.0)
     }
 

@@ -29,9 +29,9 @@ impl From<&ExecutionMode> for ExecutionStrategy {
             ExecutionMode::Reactive { max_iterations } => ExecutionStrategy::ToolAssisted {
                 max_iterations: *max_iterations,
             },
-            ExecutionMode::Planned { .. } => ExecutionStrategy::AutonomousTask {
-                max_iterations: 50,
-            },
+            ExecutionMode::Planned { .. } => {
+                ExecutionStrategy::AutonomousTask { max_iterations: 50 }
+            }
         }
     }
 }

@@ -181,7 +181,9 @@ pub async fn get_active_plan(
 ) -> common::Result<Option<Plan>> {
     let mut candidates = Vec::new();
     for status in &["draft", "approved", "executing"] {
-        let rows = repo.list(Some(status), Some(session_key), None, None).await?;
+        let rows = repo
+            .list(Some(status), Some(session_key), None, None)
+            .await?;
         for row in rows {
             let steps = repo.get_steps(row.id).await?;
             candidates.push(row_to_plan(row, steps));

@@ -177,7 +177,10 @@ async fn on_client_text(
     };
 
     match msg {
-        ClientMessage::ChatSend { session_key, message } => {
+        ClientMessage::ChatSend {
+            session_key,
+            message,
+        } => {
             // AC-WS.7: one stream at a time — reject if already active.
             if cancel_token.is_some() {
                 send_error(fwd_tx, "A chat request is already in progress".into()).await;
@@ -247,7 +250,10 @@ async fn on_client_text(
             }
         }
 
-        ClientMessage::InteractionRespond { request_id, response } => {
+        ClientMessage::InteractionRespond {
+            request_id,
+            response,
+        } => {
             // Pop and fulfill the waiting oneshot sender.
             // Unknown requestIds are silently ignored (AC-WS.5).
             if let Some(sender) = pending.lock().await.remove(&request_id) {

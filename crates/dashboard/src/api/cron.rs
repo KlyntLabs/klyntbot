@@ -55,7 +55,12 @@ pub async fn create_cron(
         delete_after_run: req.delete_after_run.unwrap_or(false),
     };
 
-    let created = state.repos.cron.upsert(&row).await.map_err(ApiError::from)?;
+    let created = state
+        .repos
+        .cron
+        .upsert(&row)
+        .await
+        .map_err(ApiError::from)?;
     Ok(Json(created))
 }
 

@@ -4,8 +4,6 @@
 
 pub mod agent_loop;
 
-#[cfg(test)]
-mod events_tests;
 pub mod calendar_reconcile;
 pub mod calendar_sync_adapter;
 pub mod confidence;
@@ -15,10 +13,12 @@ pub mod conversation_memory_retriever;
 pub mod cron_handler_adapter;
 pub mod enrichment;
 pub mod events;
+#[cfg(test)]
+mod events_tests;
 pub mod execution;
 pub mod finance_adapter;
-pub mod intent_pipeline;
 pub mod goal_handler;
+pub mod intent_pipeline;
 pub mod learning;
 pub mod learning_handler;
 pub mod llm_summary_provider;
@@ -51,11 +51,11 @@ pub use events::AgentEvent;
 pub use execution::{CycleOutcome, ExecutionCore, ExecutionParams, ToolExecutionResult};
 pub use finance_adapter::FinanceHandlerImpl;
 pub use goal_handler::GoalHandlerImpl;
+pub use intent_pipeline::IntentPipeline;
 pub use learning::LearningService;
 pub use learning_handler::LearningHandlerImpl;
 pub use memory::MemoryStore;
 pub use notifications::NotificationDispatcher;
-pub use intent_pipeline::IntentPipeline;
 pub use plan_completion_handler::PlanCompletionHandlerImpl;
 pub use plan_executor::StepExecutionResult;
 pub use plan_handler::PlanHandlerImpl;

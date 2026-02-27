@@ -105,19 +105,37 @@ pub fn build(state: AppState) -> Router {
         // Tasks
         .route("/tasks", get(list_tasks).post(create_task))
         .route("/tasks/summary", get(get_summary))
-        .route("/tasks/{id}", get(get_task).patch(patch_task).delete(delete_task))
+        .route(
+            "/tasks/{id}",
+            get(get_task).patch(patch_task).delete(delete_task),
+        )
         .route("/tasks/{id}/subtasks", get(get_subtasks))
         .route("/tasks/{id}/attachments", get(get_attachments))
-        .route("/tasks/{id}/time-entries", get(get_time_entries).post(add_time_entry))
+        .route(
+            "/tasks/{id}/time-entries",
+            get(get_time_entries).post(add_time_entry),
+        )
         .route("/tasks/{id}/focus", post(set_focus).delete(delete_focus))
-        .route("/tasks/{id}/dependencies", get(get_task_dependencies).post(add_task_dependency))
-        .route("/tasks/{id}/dependencies/{blocker_id}", delete(remove_task_dependency))
+        .route(
+            "/tasks/{id}/dependencies",
+            get(get_task_dependencies).post(add_task_dependency),
+        )
+        .route(
+            "/tasks/{id}/dependencies/{blocker_id}",
+            delete(remove_task_dependency),
+        )
         // Projects
         .route("/projects", get(list_projects).post(create_project))
-        .route("/projects/{id}", get(get_project).patch(patch_project).delete(delete_project))
+        .route(
+            "/projects/{id}",
+            get(get_project).patch(patch_project).delete(delete_project),
+        )
         // Plans
         .route("/plans", get(list_plans).post(create_plan))
-        .route("/plans/{id}", get(get_plan).patch(patch_plan).delete(delete_plan))
+        .route(
+            "/plans/{id}",
+            get(get_plan).patch(patch_plan).delete(delete_plan),
+        )
         .route("/plans/{id}/steps", get(get_plan_steps))
         .route("/plans/{id}/status", post(update_plan_status))
         // Sessions
@@ -134,24 +152,56 @@ pub fn build(state: AppState) -> Router {
         .route("/calendar/sync", post(trigger_sync))
         // Skills
         .route("/skills", get(list_skills).post(create_skill))
-        .route("/skills/{name}", get(get_skill).patch(update_skill).delete(delete_skill))
+        .route(
+            "/skills/{name}",
+            get(get_skill).patch(update_skill).delete(delete_skill),
+        )
         // Finance
         .route("/finance/accounts", get(list_accounts).post(create_account))
-        .route("/finance/accounts/{id}", get(get_account).patch(patch_account).delete(delete_account))
-        .route("/finance/transactions", get(list_transactions).post(create_transaction))
-        .route("/finance/transactions/{id}", get(get_transaction).patch(patch_transaction).delete(delete_transaction))
+        .route(
+            "/finance/accounts/{id}",
+            get(get_account).patch(patch_account).delete(delete_account),
+        )
+        .route(
+            "/finance/transactions",
+            get(list_transactions).post(create_transaction),
+        )
+        .route(
+            "/finance/transactions/{id}",
+            get(get_transaction)
+                .patch(patch_transaction)
+                .delete(delete_transaction),
+        )
         .route("/finance/budgets", get(list_budgets).post(create_budget))
-        .route("/finance/budgets/{id}", patch(patch_budget).delete(delete_budget))
+        .route(
+            "/finance/budgets/{id}",
+            patch(patch_budget).delete(delete_budget),
+        )
         .route("/finance/budgets/usage", get(get_budget_usage))
-        .route("/finance/investments", get(list_investments).post(create_investment))
-        .route("/finance/investments/{id}", patch(patch_investment).delete(delete_investment))
+        .route(
+            "/finance/investments",
+            get(list_investments).post(create_investment),
+        )
+        .route(
+            "/finance/investments/{id}",
+            patch(patch_investment).delete(delete_investment),
+        )
         .route("/finance/goals", get(list_goals).post(create_goal))
         .route("/finance/goals/{id}", patch(patch_goal).delete(delete_goal))
-        .route("/finance/liabilities", get(list_liabilities).post(create_liability))
-        .route("/finance/liabilities/{id}", patch(patch_liability).delete(delete_liability))
+        .route(
+            "/finance/liabilities",
+            get(list_liabilities).post(create_liability),
+        )
+        .route(
+            "/finance/liabilities/{id}",
+            patch(patch_liability).delete(delete_liability),
+        )
         // Settings
         .route("/settings", get(get_settings))
-        .route("/settings/{section}", get(get_settings_section).patch(patch_settings_section));
+        .route(
+            "/settings/{section}",
+            get(get_settings_section).patch(patch_settings_section),
+        );
 
     Router::new()
         .route("/ws", get(ws_handler))

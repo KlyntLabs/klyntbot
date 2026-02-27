@@ -373,8 +373,12 @@ fn build_subagent_prompt(
     profile: SubagentProfile,
 ) -> String {
     let tool_description = match profile {
-        SubagentProfile::General => "- Read and write files in the workspace\n- Search the web and fetch web pages",
-        SubagentProfile::Research => "- Read files in the workspace (read-only)\n- Search the web and fetch web pages",
+        SubagentProfile::General => {
+            "- Read and write files in the workspace\n- Search the web and fetch web pages"
+        }
+        SubagentProfile::Research => {
+            "- Read files in the workspace (read-only)\n- Search the web and fetch web pages"
+        }
         SubagentProfile::Analyst => "- Read files in the workspace (read-only)",
     };
 

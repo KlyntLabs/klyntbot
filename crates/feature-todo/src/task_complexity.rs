@@ -45,21 +45,12 @@ impl TaskComplexitySignals {
 }
 
 /// Query a task's structural complexity from the database.
-pub async fn evaluate_task_complexity(
-    repo: &TodoRepo,
-    task_id: &str,
-) -> TaskComplexitySignals {
+pub async fn evaluate_task_complexity(repo: &TodoRepo, task_id: &str) -> TaskComplexitySignals {
     // Count direct subtasks
-    let subtask_count = repo
-        .count_children(task_id)
-        .await
-        .unwrap_or(0) as u16;
+    let subtask_count = repo.count_children(task_id).await.unwrap_or(0) as u16;
 
     // Check if this task has any blockers
-    let deps = repo
-        .get_dependencies(task_id)
-        .await
-        .unwrap_or_default();
+    let deps = repo.get_dependencies(task_id).await.unwrap_or_default();
     let has_dependencies = !deps.is_empty();
 
     // Dependency depth: count how many levels of blockers exist
@@ -88,25 +79,23 @@ pub async fn evaluate_task_complexity(
 }
 
 /// Recursively compute dependency depth with a max-depth guard.
-async fn compute_dependency_depth(
-    repo: &TodoRepo,
-    task_id: &str,
-    current: u8,
-    max: u8,
-) -> u8 {
+async fn compute_dependency_depth(repo: &TodoRepo, task_id: &str, current: u8, max: u8) -> u8 {
     if current >= max {
         return current;
     }
-    let deps = repo
-        .get_dependencies(task_id)
-        .await
-        .unwrap_or_default();
+    let deps = repo.get_dependencies(task_id).await.unwrap_or_default();
     if deps.is_empty() {
         return current;
     }
     let mut deepest = current + 1;
     for dep in &deps {
-        let d = Box::pin(compute_dependency_depth(repo, &dep.blocker_id, current + 1, max)).await;
+        let d = Box::pin(compute_dependency_depth(
+            repo,
+            &dep.blocker_id,
+            current + 1,
+            max,
+        ))
+        .await;
         if d > deepest {
             deepest = d;
         }

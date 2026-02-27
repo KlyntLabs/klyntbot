@@ -128,12 +128,7 @@ pub async fn get_plan(
     Path(id): Path<Uuid>,
 ) -> Result<Json<PlanWithSteps>, ApiError> {
     let plan = state.repos.plans.get(id).await.map_err(storage_err)?;
-    let steps = state
-        .repos
-        .plans
-        .get_steps(id)
-        .await
-        .map_err(storage_err)?;
+    let steps = state.repos.plans.get_steps(id).await.map_err(storage_err)?;
     Ok(Json(PlanWithSteps { plan, steps }))
 }
 
@@ -176,12 +171,7 @@ pub async fn get_plan_steps(
     // Confirm the plan exists — get() returns NotFound if absent.
     state.repos.plans.get(id).await.map_err(storage_err)?;
 
-    let steps = state
-        .repos
-        .plans
-        .get_steps(id)
-        .await
-        .map_err(storage_err)?;
+    let steps = state.repos.plans.get_steps(id).await.map_err(storage_err)?;
     Ok(Json(steps))
 }
 

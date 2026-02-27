@@ -242,12 +242,7 @@ pub async fn delete_task(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
-    let deleted = state
-        .repos
-        .todos
-        .delete(&id)
-        .await
-        .map_err(storage_err)?;
+    let deleted = state.repos.todos.delete(&id).await.map_err(storage_err)?;
 
     if deleted {
         Ok(StatusCode::NO_CONTENT)
@@ -343,7 +338,13 @@ pub async fn add_time_entry(
     let entry = state
         .repos
         .todos
-        .add_time_entry(&id, source, started_at, req.duration_secs, req.note.as_deref())
+        .add_time_entry(
+            &id,
+            source,
+            started_at,
+            req.duration_secs,
+            req.note.as_deref(),
+        )
         .await
         .map_err(storage_err)?;
 
@@ -388,12 +389,7 @@ pub async fn delete_focus(
         .await
         .map_err(storage_err)?;
 
-    state
-        .repos
-        .todos
-        .unfocus(&id)
-        .await
-        .map_err(storage_err)?;
+    state.repos.todos.unfocus(&id).await.map_err(storage_err)?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -419,10 +415,25 @@ pub async fn get_task_dependencies(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<DependenciesResponse>, ApiError> {
-    state.repos.todos.get_or_err(&id).await.map_err(storage_err)?;
+    state
+        .repos
+        .todos
+        .get_or_err(&id)
+        .await
+        .map_err(storage_err)?;
 
-    let blocked_by = state.repos.todos.get_blockers(&id).await.map_err(storage_err)?;
-    let blocks = state.repos.todos.get_blocking(&id).await.map_err(storage_err)?;
+    let blocked_by = state
+        .repos
+        .todos
+        .get_blockers(&id)
+        .await
+        .map_err(storage_err)?;
+    let blocks = state
+        .repos
+        .todos
+        .get_blocking(&id)
+        .await
+        .map_err(storage_err)?;
 
     Ok(Json(DependenciesResponse { blocked_by, blocks }))
 }
@@ -434,8 +445,18 @@ pub async fn add_task_dependency(
     Path(id): Path<String>,
     Json(req): Json<AddDependencyRequest>,
 ) -> Result<StatusCode, ApiError> {
-    state.repos.todos.get_or_err(&id).await.map_err(storage_err)?;
-    state.repos.todos.get_or_err(&req.blocker_id).await.map_err(storage_err)?;
+    state
+        .repos
+        .todos
+        .get_or_err(&id)
+        .await
+        .map_err(storage_err)?;
+    state
+        .repos
+        .todos
+        .get_or_err(&req.blocker_id)
+        .await
+        .map_err(storage_err)?;
 
     state
         .repos
@@ -453,7 +474,12 @@ pub async fn remove_task_dependency(
     State(state): State<AppState>,
     Path((id, blocker_id)): Path<(String, String)>,
 ) -> Result<StatusCode, ApiError> {
-    state.repos.todos.get_or_err(&id).await.map_err(storage_err)?;
+    state
+        .repos
+        .todos
+        .get_or_err(&id)
+        .await
+        .map_err(storage_err)?;
 
     let removed = state
         .repos

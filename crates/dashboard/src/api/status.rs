@@ -27,9 +27,7 @@ pub struct StorageStats {
     pub session_count: i64,
 }
 
-pub async fn get_status(
-    State(state): State<AppState>,
-) -> Result<Json<StatusResponse>, ApiError> {
+pub async fn get_status(State(state): State<AppState>) -> Result<Json<StatusResponse>, ApiError> {
     let task_count = state
         .repos
         .todos
@@ -46,7 +44,10 @@ pub async fn get_status(
         .map(|s| s.len() as i64)
         .unwrap_or(0);
 
-    let config = state.config.read().map_err(|e| ApiError::internal(e.to_string()))?;
+    let config = state
+        .config
+        .read()
+        .map_err(|e| ApiError::internal(e.to_string()))?;
 
     let provider = config.agents.defaults.provider.clone();
     let model = config.agents.defaults.model.clone();
@@ -87,6 +88,9 @@ pub async fn get_status(
         permission_level,
         configured_providers,
         uptime_seconds: state.started_at.elapsed().as_secs(),
-        storage: StorageStats { task_count, session_count },
+        storage: StorageStats {
+            task_count,
+            session_count,
+        },
     }))
 }

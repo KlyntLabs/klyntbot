@@ -135,9 +135,8 @@ fn build_skill_md(
     always: bool,
     body: &str,
 ) -> Result<String, ApiError> {
-    let mut frontmatter = format!(
-        "---\nname: {name}\ndescription: {description}\nversion: {version}\n",
-    );
+    let mut frontmatter =
+        format!("---\nname: {name}\ndescription: {description}\nversion: {version}\n",);
 
     if !triggers.is_empty() || always {
         let mut meta = serde_json::Map::new();
@@ -190,8 +189,8 @@ pub async fn update_skill(
                 .await
                 .map_err(|e| ApiError::internal(e.to_string()))?;
 
-            let mut config_value = serde_json::to_value(&current)
-                .map_err(|e| ApiError::internal(e.to_string()))?;
+            let mut config_value =
+                serde_json::to_value(&current).map_err(|e| ApiError::internal(e.to_string()))?;
 
             {
                 let packs = config_value
@@ -257,8 +256,14 @@ pub async fn update_skill(
         let triggers = req.triggers.unwrap_or_else(|| skill.triggers.clone());
         let always = req.always.unwrap_or(skill.always);
 
-        let file_content =
-            build_skill_md(&skill.name, &description, &skill.version, &triggers, always, &content_body)?;
+        let file_content = build_skill_md(
+            &skill.name,
+            &description,
+            &skill.version,
+            &triggers,
+            always,
+            &content_body,
+        )?;
 
         // Write to the existing SKILL.md path
         tokio::fs::write(&skill.path, &file_content)
@@ -329,8 +334,14 @@ pub async fn create_skill(
         req.content.clone()
     };
 
-    let file_content =
-        build_skill_md(&req.name, &req.description, &req.version, &req.triggers, req.always, &body)?;
+    let file_content = build_skill_md(
+        &req.name,
+        &req.description,
+        &req.version,
+        &req.triggers,
+        req.always,
+        &body,
+    )?;
     let skill_file = skill_dir.join("SKILL.md");
 
     tokio::fs::write(&skill_file, &file_content)
@@ -374,9 +385,10 @@ pub async fn delete_skill(
     }
 
     // Delete the skill directory
-    let skill_dir = skill.path.parent().ok_or_else(|| {
-        ApiError::internal("skill path has no parent directory")
-    })?;
+    let skill_dir = skill
+        .path
+        .parent()
+        .ok_or_else(|| ApiError::internal("skill path has no parent directory"))?;
 
     tokio::fs::remove_dir_all(skill_dir)
         .await

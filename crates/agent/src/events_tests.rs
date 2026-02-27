@@ -121,7 +121,10 @@ mod tests {
         assert_eq!(v["success"], true);
         assert_eq!(v["durationMs"], 42);
         // Confirm snake_case key is absent
-        assert!(v.get("duration_ms").is_none(), "should not have duration_ms key");
+        assert!(
+            v.get("duration_ms").is_none(),
+            "should not have duration_ms key"
+        );
     }
 
     #[test]
@@ -322,11 +325,7 @@ mod tests {
         // a "type" field (from #[serde(tag = "type")]).
         for event in all_variants() {
             let v = serialize(&event);
-            assert!(
-                v.get("type").is_some(),
-                "Missing 'type' field in: {:?}",
-                v
-            );
+            assert!(v.get("type").is_some(), "Missing 'type' field in: {:?}", v);
         }
     }
 
@@ -336,11 +335,7 @@ mod tests {
         for event in all_variants() {
             let v = serialize(&event);
             let tag = v["type"].as_str().unwrap();
-            assert!(
-                !tag.contains('_'),
-                "Type tag '{}' contains underscore",
-                tag
-            );
+            assert!(!tag.contains('_'), "Type tag '{}' contains underscore", tag);
         }
     }
 

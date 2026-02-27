@@ -119,7 +119,9 @@ async fn ask_plan_approval(ctx: &RoutingContext, preview: &str) -> PlanApproval 
             if let Some(answer) = answers.first() {
                 match &answer.value {
                     AnswerValue::Selected { value } if value == "approve" => PlanApproval::Approved,
-                    AnswerValue::Selected { value } if value == "abandon" => PlanApproval::Abandoned,
+                    AnswerValue::Selected { value } if value == "abandon" => {
+                        PlanApproval::Abandoned
+                    }
                     AnswerValue::Skipped => PlanApproval::NoInteraction,
                     _ => PlanApproval::Abandoned,
                 }

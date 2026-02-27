@@ -60,10 +60,7 @@ fn json_merge_patch(target: &mut Value, patch: Value) {
                 if value.is_null() {
                     target_map.remove(&key);
                 } else {
-                    json_merge_patch(
-                        target_map.entry(key).or_insert(Value::Null),
-                        value,
-                    );
+                    json_merge_patch(target_map.entry(key).or_insert(Value::Null), value);
                 }
             }
         }
@@ -72,12 +69,12 @@ fn json_merge_patch(target: &mut Value, patch: Value) {
 }
 
 /// GET /api/settings — return full redacted config.
-pub async fn get_settings(
-    State(state): State<AppState>,
-) -> Result<Json<Value>, ApiError> {
-    let config = state.config.read().map_err(|e| ApiError::internal(e.to_string()))?;
-    let mut v = serde_json::to_value(&*config)
+pub async fn get_settings(State(state): State<AppState>) -> Result<Json<Value>, ApiError> {
+    let config = state
+        .config
+        .read()
         .map_err(|e| ApiError::internal(e.to_string()))?;
+    let mut v = serde_json::to_value(&*config).map_err(|e| ApiError::internal(e.to_string()))?;
     redact_secrets(&mut v);
     Ok(Json(v))
 }
@@ -87,9 +84,11 @@ pub async fn get_settings_section(
     State(state): State<AppState>,
     Path(section): Path<String>,
 ) -> Result<Json<Value>, ApiError> {
-    let config = state.config.read().map_err(|e| ApiError::internal(e.to_string()))?;
-    let full = serde_json::to_value(&*config)
+    let config = state
+        .config
+        .read()
         .map_err(|e| ApiError::internal(e.to_string()))?;
+    let full = serde_json::to_value(&*config).map_err(|e| ApiError::internal(e.to_string()))?;
     let map = full
         .as_object()
         .ok_or_else(|| ApiError::internal("config is not an object"))?;
@@ -124,8 +123,8 @@ pub async fn patch_settings_section(
         .await
         .map_err(|e| ApiError::internal(e.to_string()))?;
 
-    let mut config_value = serde_json::to_value(&current)
-        .map_err(|e| ApiError::internal(e.to_string()))?;
+    let mut config_value =
+        serde_json::to_value(&current).map_err(|e| ApiError::internal(e.to_string()))?;
 
     {
         let config_map = config_value
@@ -140,15 +139,13 @@ pub async fn patch_settings_section(
         }
 
         // Apply JSON merge-patch (RFC 7396) to the section
-        let section_val = config_map
-            .entry(section.clone())
-            .or_insert(Value::Null);
+        let section_val = config_map.entry(section.clone()).or_insert(Value::Null);
         json_merge_patch(section_val, patch);
     }
 
     // Re-deserialize back to Config to validate the merged result
-    let updated_config: config::Config = serde_json::from_value(config_value)
-        .map_err(|e| ApiError::unprocessable(e.to_string()))?;
+    let updated_config: config::Config =
+        serde_json::from_value(config_value).map_err(|e| ApiError::unprocessable(e.to_string()))?;
 
     // Save to disk
     config::save(&updated_config)
@@ -157,20 +154,20 @@ pub async fn patch_settings_section(
 
     // Update in-memory config so subsequent GET requests reflect the change
     {
-        let mut config = state.config.write().map_err(|e| ApiError::internal(e.to_string()))?;
+        let mut config = state
+            .config
+            .write()
+            .map_err(|e| ApiError::internal(e.to_string()))?;
         *config = updated_config.clone();
     }
 
     // Return the updated section (redacted)
-    let saved_val = serde_json::to_value(&updated_config)
-        .map_err(|e| ApiError::internal(e.to_string()))?;
+    let saved_val =
+        serde_json::to_value(&updated_config).map_err(|e| ApiError::internal(e.to_string()))?;
     let saved_map = saved_val
         .as_object()
         .ok_or_else(|| ApiError::internal("saved config is not an object"))?;
-    let mut result = saved_map
-        .get(&section)
-        .cloned()
-        .unwrap_or(Value::Null);
+    let mut result = saved_map.get(&section).cloned().unwrap_or(Value::Null);
     redact_secrets(&mut result);
     Ok(Json(result))
 }

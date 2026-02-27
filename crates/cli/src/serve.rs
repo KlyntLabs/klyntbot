@@ -69,193 +69,198 @@ pub async fn handle_serve(port: u16) -> Result<()> {
 
             // block_in_place moves the current thread out of the Tokio worker pool
             // so that block_on can safely create a nested runtime context.
-            tokio::task::block_in_place(|| rt.block_on(async move {
-                match job_name.as_str() {
-                    "todo_focus_check" => {
-                        let focused = todo_repo.list_focused().await?;
-                        for task in &focused {
-                            if let Some(deadline) = task.focus_deadline {
-                                let remaining = deadline - chrono::Utc::now();
-                                let hours_left = remaining.num_hours();
-                                // Send reminders at 6h, 3h, 1h thresholds
-                                if hours_left <= 1 && hours_left > 0 {
-                                    dispatcher
-                                        .notify(
-                                            "⏰ Focus Deadline: 1h left",
-                                            &format!("\"{}\" — deadline approaching!", task.title),
-                                        )
-                                        .await
-                                        .ok();
-                                } else if hours_left <= 3 && hours_left > 1 {
-                                    dispatcher
-                                        .notify(
-                                            "⏰ Focus Deadline: 3h left",
-                                            &format!("\"{}\" — stay on track", task.title),
-                                        )
-                                        .await
-                                        .ok();
-                                } else if hours_left <= 6 && hours_left > 3 {
-                                    dispatcher
-                                        .notify(
-                                            "⏰ Focus Deadline: 6h left",
-                                            &format!("\"{}\" — keep going", task.title),
-                                        )
-                                        .await
-                                        .ok();
+            tokio::task::block_in_place(|| {
+                rt.block_on(async move {
+                    match job_name.as_str() {
+                        "todo_focus_check" => {
+                            let focused = todo_repo.list_focused().await?;
+                            for task in &focused {
+                                if let Some(deadline) = task.focus_deadline {
+                                    let remaining = deadline - chrono::Utc::now();
+                                    let hours_left = remaining.num_hours();
+                                    // Send reminders at 6h, 3h, 1h thresholds
+                                    if hours_left <= 1 && hours_left > 0 {
+                                        dispatcher
+                                            .notify(
+                                                "⏰ Focus Deadline: 1h left",
+                                                &format!(
+                                                    "\"{}\" — deadline approaching!",
+                                                    task.title
+                                                ),
+                                            )
+                                            .await
+                                            .ok();
+                                    } else if hours_left <= 3 && hours_left > 1 {
+                                        dispatcher
+                                            .notify(
+                                                "⏰ Focus Deadline: 3h left",
+                                                &format!("\"{}\" — stay on track", task.title),
+                                            )
+                                            .await
+                                            .ok();
+                                    } else if hours_left <= 6 && hours_left > 3 {
+                                        dispatcher
+                                            .notify(
+                                                "⏰ Focus Deadline: 6h left",
+                                                &format!("\"{}\" — keep going", task.title),
+                                            )
+                                            .await
+                                            .ok();
+                                    }
                                 }
                             }
+                            Ok(Some(format!("Checked {} focused tasks", focused.len())))
                         }
-                        Ok(Some(format!("Checked {} focused tasks", focused.len())))
-                    }
-                    "todo_daily_digest" => {
-                        let summary = todo_repo.summary().await?;
-                        let overdue = todo_repo.overdue().await?;
-                        let body = format!(
-                            "Total: {} | Todo: {} | Doing: {} | Done: {} | Overdue: {}",
-                            summary.total,
-                            summary.todo,
-                            summary.doing,
-                            summary.done,
-                            overdue.len()
-                        );
-                        dispatcher.notify("📋 Daily Task Digest", &body).await.ok();
-                        Ok(Some("Daily digest sent".to_string()))
-                    }
-                    "todo_overdue_check" => {
-                        // Auto-unfocus tasks with expired focus deadlines
-                        let focused = todo_repo.list_focused().await?;
-                        let now = chrono::Utc::now();
-                        let mut expired_count = 0u32;
-                        for task in &focused {
-                            if task.focus_deadline.map(|d| d < now).unwrap_or(false) {
-                                let _ = todo_repo.unfocus(&task.id).await;
-                                expired_count += 1;
-                            }
-                        }
-                        if expired_count > 0 {
+                        "todo_daily_digest" => {
+                            let summary = todo_repo.summary().await?;
+                            let overdue = todo_repo.overdue().await?;
                             let body = format!(
-                                "{} task(s) auto-unfocused due to {}h deadline",
-                                expired_count, config_focus.deadline_hours
+                                "Total: {} | Todo: {} | Doing: {} | Done: {} | Overdue: {}",
+                                summary.total,
+                                summary.todo,
+                                summary.doing,
+                                summary.done,
+                                overdue.len()
                             );
-                            dispatcher
-                                .notify("⏰ Focus Tasks Expired", &body)
-                                .await
-                                .ok();
+                            dispatcher.notify("📋 Daily Task Digest", &body).await.ok();
+                            Ok(Some("Daily digest sent".to_string()))
                         }
-                        Ok(Some("Overdue check complete".to_string()))
+                        "todo_overdue_check" => {
+                            // Auto-unfocus tasks with expired focus deadlines
+                            let focused = todo_repo.list_focused().await?;
+                            let now = chrono::Utc::now();
+                            let mut expired_count = 0u32;
+                            for task in &focused {
+                                if task.focus_deadline.map(|d| d < now).unwrap_or(false) {
+                                    let _ = todo_repo.unfocus(&task.id).await;
+                                    expired_count += 1;
+                                }
+                            }
+                            if expired_count > 0 {
+                                let body = format!(
+                                    "{} task(s) auto-unfocused due to {}h deadline",
+                                    expired_count, config_focus.deadline_hours
+                                );
+                                dispatcher
+                                    .notify("⏰ Focus Tasks Expired", &body)
+                                    .await
+                                    .ok();
+                            }
+                            Ok(Some("Overdue check complete".to_string()))
+                        }
+                        "__klyntbot_weekly_report" => {
+                            // Trigger agent turn with weekly-report skill via bus
+                            let msg = bus::InboundMessage::new(
+                                "system",
+                                "cron",
+                                "weekly_report",
+                                "Generate weekly progress report using the weekly-report skill"
+                                    .to_string(),
+                            );
+                            bus.publish_inbound(msg).await.map_err(|e| {
+                                common::KlyntbotError::Bus(format!(
+                                    "Failed to publish weekly report message: {}",
+                                    e
+                                ))
+                            })?;
+                            Ok(Some("Weekly report triggered".to_string()))
+                        }
+                        "__klyntbot_calendar_sync" => {
+                            // Trigger calendar sync via bus message
+                            let msg = bus::InboundMessage::new(
+                                "system",
+                                "cron",
+                                "calendar_sync",
+                                "Sync calendar events with configured providers".to_string(),
+                            );
+                            bus.publish_inbound(msg).await.map_err(|e| {
+                                common::KlyntbotError::Bus(format!(
+                                    "Failed to publish calendar sync message: {}",
+                                    e
+                                ))
+                            })?;
+                            Ok(Some("Calendar sync triggered".to_string()))
+                        }
+                        "__klyntbot_daily_planning" => {
+                            // Trigger daily planning skill via bus message
+                            let msg = bus::InboundMessage::new(
+                                "system",
+                                "cron",
+                                "daily_planning",
+                                "/daily-planning".to_string(),
+                            );
+                            bus.publish_inbound(msg).await.map_err(|e| {
+                                common::KlyntbotError::Bus(format!(
+                                    "Failed to publish daily planning message: {}",
+                                    e
+                                ))
+                            })?;
+                            Ok(Some("Daily planning triggered".to_string()))
+                        }
+                        "__klyntbot_finance_daily_review" => {
+                            let msg = bus::InboundMessage::new(
+                                "system",
+                                "cron",
+                                "finance_daily_review",
+                                "Run finance daily review and send summary".to_string(),
+                            );
+                            bus.publish_inbound(msg).await.map_err(|e| {
+                                common::KlyntbotError::Bus(format!(
+                                    "Failed to publish finance daily review: {}",
+                                    e
+                                ))
+                            })?;
+                            Ok(Some("Finance daily review triggered".to_string()))
+                        }
+                        "__klyntbot_finance_budget_check" => {
+                            let msg = bus::InboundMessage::new(
+                                "system",
+                                "cron",
+                                "finance_budget_check",
+                                "Check budget thresholds and send alerts".to_string(),
+                            );
+                            bus.publish_inbound(msg).await.map_err(|e| {
+                                common::KlyntbotError::Bus(format!(
+                                    "Failed to publish budget check: {}",
+                                    e
+                                ))
+                            })?;
+                            Ok(Some("Finance budget check triggered".to_string()))
+                        }
+                        "__klyntbot_finance_price_refresh" => {
+                            let msg = bus::InboundMessage::new(
+                                "system",
+                                "cron",
+                                "finance_price_refresh",
+                                "Refresh investment prices".to_string(),
+                            );
+                            bus.publish_inbound(msg).await.map_err(|e| {
+                                common::KlyntbotError::Bus(format!(
+                                    "Failed to publish price refresh: {}",
+                                    e
+                                ))
+                            })?;
+                            Ok(Some("Finance price refresh triggered".to_string()))
+                        }
+                        "__klyntbot_finance_health_check" => {
+                            let msg = bus::InboundMessage::new(
+                                "system",
+                                "cron",
+                                "finance_health_check",
+                                "Run finance data health check".to_string(),
+                            );
+                            bus.publish_inbound(msg).await.map_err(|e| {
+                                common::KlyntbotError::Bus(format!(
+                                    "Failed to publish health check: {}",
+                                    e
+                                ))
+                            })?;
+                            Ok(Some("Finance health check triggered".to_string()))
+                        }
+                        _ => Ok(None),
                     }
-                    "__klyntbot_weekly_report" => {
-                        // Trigger agent turn with weekly-report skill via bus
-                        let msg = bus::InboundMessage::new(
-                            "system",
-                            "cron",
-                            "weekly_report",
-                            "Generate weekly progress report using the weekly-report skill"
-                                .to_string(),
-                        );
-                        bus.publish_inbound(msg).await.map_err(|e| {
-                            common::KlyntbotError::Bus(format!(
-                                "Failed to publish weekly report message: {}",
-                                e
-                            ))
-                        })?;
-                        Ok(Some("Weekly report triggered".to_string()))
-                    }
-                    "__klyntbot_calendar_sync" => {
-                        // Trigger calendar sync via bus message
-                        let msg = bus::InboundMessage::new(
-                            "system",
-                            "cron",
-                            "calendar_sync",
-                            "Sync calendar events with configured providers".to_string(),
-                        );
-                        bus.publish_inbound(msg).await.map_err(|e| {
-                            common::KlyntbotError::Bus(format!(
-                                "Failed to publish calendar sync message: {}",
-                                e
-                            ))
-                        })?;
-                        Ok(Some("Calendar sync triggered".to_string()))
-                    }
-                    "__klyntbot_daily_planning" => {
-                        // Trigger daily planning skill via bus message
-                        let msg = bus::InboundMessage::new(
-                            "system",
-                            "cron",
-                            "daily_planning",
-                            "/daily-planning".to_string(),
-                        );
-                        bus.publish_inbound(msg).await.map_err(|e| {
-                            common::KlyntbotError::Bus(format!(
-                                "Failed to publish daily planning message: {}",
-                                e
-                            ))
-                        })?;
-                        Ok(Some("Daily planning triggered".to_string()))
-                    }
-                    "__klyntbot_finance_daily_review" => {
-                        let msg = bus::InboundMessage::new(
-                            "system",
-                            "cron",
-                            "finance_daily_review",
-                            "Run finance daily review and send summary".to_string(),
-                        );
-                        bus.publish_inbound(msg).await.map_err(|e| {
-                            common::KlyntbotError::Bus(format!(
-                                "Failed to publish finance daily review: {}",
-                                e
-                            ))
-                        })?;
-                        Ok(Some("Finance daily review triggered".to_string()))
-                    }
-                    "__klyntbot_finance_budget_check" => {
-                        let msg = bus::InboundMessage::new(
-                            "system",
-                            "cron",
-                            "finance_budget_check",
-                            "Check budget thresholds and send alerts".to_string(),
-                        );
-                        bus.publish_inbound(msg).await.map_err(|e| {
-                            common::KlyntbotError::Bus(format!(
-                                "Failed to publish budget check: {}",
-                                e
-                            ))
-                        })?;
-                        Ok(Some("Finance budget check triggered".to_string()))
-                    }
-                    "__klyntbot_finance_price_refresh" => {
-                        let msg = bus::InboundMessage::new(
-                            "system",
-                            "cron",
-                            "finance_price_refresh",
-                            "Refresh investment prices".to_string(),
-                        );
-                        bus.publish_inbound(msg).await.map_err(|e| {
-                            common::KlyntbotError::Bus(format!(
-                                "Failed to publish price refresh: {}",
-                                e
-                            ))
-                        })?;
-                        Ok(Some("Finance price refresh triggered".to_string()))
-                    }
-                    "__klyntbot_finance_health_check" => {
-                        let msg = bus::InboundMessage::new(
-                            "system",
-                            "cron",
-                            "finance_health_check",
-                            "Run finance data health check".to_string(),
-                        );
-                        bus.publish_inbound(msg).await.map_err(|e| {
-                            common::KlyntbotError::Bus(format!(
-                                "Failed to publish health check: {}",
-                                e
-                            ))
-                        })?;
-                        Ok(Some("Finance health check triggered".to_string()))
-                    }
-                    _ => Ok(None),
-                }
-            }))
+                })
+            })
         }));
     }
 
@@ -282,54 +287,74 @@ pub async fn handle_serve(port: u16) -> Result<()> {
     }
 
     // Register cron jobs (skipped if already persisted from a previous run)
-    ensure_job!(cron_service,
+    ensure_job!(
+        cron_service,
         "todo_focus_check",
         scheduling::CronSchedule::Every {
             every_ms: 30 * 60 * 1000,
         },
         "Check focus task deadlines",
-        false, None, None, false
+        false,
+        None,
+        None,
+        false
     );
 
-    ensure_job!(cron_service,
+    ensure_job!(
+        cron_service,
         "todo_daily_digest",
         scheduling::CronSchedule::Cron {
             expr: "0 9 * * *".to_string(),
             tz: None,
         },
         "Daily task summary",
-        false, None, None, false
+        false,
+        None,
+        None,
+        false
     );
 
-    ensure_job!(cron_service,
+    ensure_job!(
+        cron_service,
         "todo_overdue_check",
         scheduling::CronSchedule::Every {
             every_ms: 60 * 60 * 1000,
         },
         "Check for overdue focus tasks",
-        false, None, None, false
+        false,
+        None,
+        None,
+        false
     );
 
-    ensure_job!(cron_service,
+    ensure_job!(
+        cron_service,
         "__klyntbot_weekly_report",
         scheduling::CronSchedule::Cron {
             expr: "0 18 * * 0".to_string(), // Sunday at 18:00
             tz: None,
         },
         "Generate weekly progress report",
-        false, None, None, false
+        false,
+        None,
+        None,
+        false
     );
 
     // Register calendar sync cron job if any provider is enabled
     if config.calendar.is_any_enabled() {
         let sync_interval_secs = config.calendar.min_sync_interval_secs();
-        ensure_job!(cron_service,
+        ensure_job!(
+            cron_service,
             "__klyntbot_calendar_sync",
             scheduling::CronSchedule::Every {
                 every_ms: sync_interval_secs * 1000,
             },
             "Sync calendar events with configured providers",
-            false, None, None, false
+            false,
+            None,
+            None,
+            false
         );
         info!(
             "Calendar sync cron registered (interval: {}s)",
@@ -347,14 +372,18 @@ pub async fn handle_serve(port: u16) -> Result<()> {
             if let (Ok(hour), Ok(minute)) = (parts[0].parse::<u8>(), parts[1].parse::<u8>()) {
                 if hour < 24 && minute < 60 {
                     let cron_expr = format!("{} {} * * *", minute, hour);
-                    ensure_job!(cron_service,
+                    ensure_job!(
+                        cron_service,
                         "__klyntbot_daily_planning",
                         scheduling::CronSchedule::Cron {
                             expr: cron_expr.clone(),
                             tz: None,
                         },
                         "Generate daily planning notification",
-                        false, None, None, false
+                        false,
+                        None,
+                        None,
+                        false
                     );
                     info!(
                         "Daily planning cron registered (time: {}, cron: {})",
@@ -389,14 +418,18 @@ pub async fn handle_serve(port: u16) -> Result<()> {
             if let (Ok(hour), Ok(minute)) = (parts[0].parse::<u8>(), parts[1].parse::<u8>()) {
                 if hour < 24 && minute < 60 {
                     let cron_expr = format!("{} {} * * *", minute, hour);
-                    ensure_job!(cron_service,
+                    ensure_job!(
+                        cron_service,
                         "__klyntbot_finance_daily_review",
                         scheduling::CronSchedule::Cron {
                             expr: cron_expr,
                             tz: None,
                         },
                         "Daily financial review",
-                        false, None, None, false
+                        false,
+                        None,
+                        None,
+                        false
                     );
                     info!(
                         "Finance daily review cron registered (time: {})",
@@ -407,37 +440,49 @@ pub async fn handle_serve(port: u16) -> Result<()> {
         }
 
         // Budget check every 6 hours
-        ensure_job!(cron_service,
+        ensure_job!(
+            cron_service,
             "__klyntbot_finance_budget_check",
             scheduling::CronSchedule::Every {
                 every_ms: 6 * 60 * 60 * 1000,
             },
             "Check budget thresholds",
-            false, None, None, false
+            false,
+            None,
+            None,
+            false
         );
 
         // Price refresh (configurable interval)
         if config.finance.price_refresh.enabled {
             let interval_ms = config.finance.price_refresh.interval_hours as u64 * 60 * 60 * 1000;
-            ensure_job!(cron_service,
+            ensure_job!(
+                cron_service,
                 "__klyntbot_finance_price_refresh",
                 scheduling::CronSchedule::Every {
                     every_ms: interval_ms,
                 },
                 "Refresh investment prices",
-                false, None, None, false
+                false,
+                None,
+                None,
+                false
             );
         }
 
         // Daily health check at midnight
-        ensure_job!(cron_service,
+        ensure_job!(
+            cron_service,
             "__klyntbot_finance_health_check",
             scheduling::CronSchedule::Cron {
                 expr: "0 0 * * *".to_string(),
                 tz: None,
             },
             "Finance data health check",
-            false, None, None, false
+            false,
+            None,
+            None,
+            false
         );
 
         info!(
@@ -512,13 +557,15 @@ pub async fn handle_serve(port: u16) -> Result<()> {
         heartbeat_service.set_callback(Arc::new(move |prompt: &str| {
             let bus = bus_for_heartbeat.clone();
             let prompt = prompt.to_string();
-            tokio::task::block_in_place(|| rt.block_on(async {
-                let msg = bus::InboundMessage::new("system", "heartbeat", "heartbeat", prompt);
-                bus.publish_inbound(msg)
-                    .await
-                    .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
-                Ok("Heartbeat message published".to_string())
-            }))
+            tokio::task::block_in_place(|| {
+                rt.block_on(async {
+                    let msg = bus::InboundMessage::new("system", "heartbeat", "heartbeat", prompt);
+                    bus.publish_inbound(msg)
+                        .await
+                        .map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+                    Ok("Heartbeat message published".to_string())
+                })
+            })
         }));
     }
 

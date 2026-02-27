@@ -421,8 +421,7 @@ mod tests {
 
     #[tokio::test]
     async fn pipeline_processes_tool_task() {
-        let provider =
-            MockPipelineProvider::new(vec![text_response("Here are your tasks: ...")]);
+        let provider = MockPipelineProvider::new(vec![text_response("Here are your tasks: ...")]);
         let pipeline = make_pipeline(provider).await;
 
         let result = pipeline

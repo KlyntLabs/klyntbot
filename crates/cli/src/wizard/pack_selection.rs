@@ -557,7 +557,10 @@ mod tests {
 
         assert_eq!(config.packs.enabled, selection);
         assert!(config.packs.enabled_skills.contains(&"todo".to_string()));
-        assert!(config.packs.enabled_skills.contains(&"daily-planning".to_string()));
+        assert!(config
+            .packs
+            .enabled_skills
+            .contains(&"daily-planning".to_string()));
         assert!(!config.packs.enabled_skills.contains(&"weather".to_string()));
     }
 

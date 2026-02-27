@@ -704,9 +704,8 @@ impl AgentLoopBuilder {
         };
 
         // Build IntentPipeline (replaces AgentPipeline + Orchestrator + EngineDispatch)
-        let direct_engine = crate::intent_pipeline::engines::direct::DirectEngine::new(
-            Arc::clone(&execution_core),
-        );
+        let direct_engine =
+            crate::intent_pipeline::engines::direct::DirectEngine::new(Arc::clone(&execution_core));
         let reactive_engine = crate::intent_pipeline::engines::reactive::ReactiveEngine::new(
             Arc::clone(&execution_core),
             config.agents.defaults.max_tool_iterations,
@@ -796,11 +795,10 @@ impl AgentLoopBuilder {
         // ── Plan cleanup service ──────────────────────────────────────────
         let plan_cleanup_token = if self.pool.is_some() {
             let token = CancellationToken::new();
-            let cleanup_service =
-                crate::intent_pipeline::visibility::PlanCleanupService::new(
-                    repos.plans.clone(),
-                    token.clone(),
-                );
+            let cleanup_service = crate::intent_pipeline::visibility::PlanCleanupService::new(
+                repos.plans.clone(),
+                token.clone(),
+            );
             cleanup_service.spawn();
             Some(token)
         } else {

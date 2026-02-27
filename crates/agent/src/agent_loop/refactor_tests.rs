@@ -15,8 +15,8 @@ mod tests {
     use providers::{ChatParams, LlmResponse, Message, Usage};
     use tempfile::TempDir;
 
-    use crate::AgentEvent;
     use crate::agent_loop::AgentLoop;
+    use crate::AgentEvent;
 
     /// Minimal mock LLM provider for unit tests.
     struct MockProvider {
@@ -266,7 +266,10 @@ mod tests {
         // Should include tools registered unconditionally (no pool required).
         let (agent, _bus, _tmp) = build_test_agent("hello").await;
         let names = agent.tool_names().await;
-        assert!(!names.is_empty(), "Should have at least some registered tools");
+        assert!(
+            !names.is_empty(),
+            "Should have at least some registered tools"
+        );
         assert!(
             names.iter().any(|n| n.contains("spawn") || n == "spawn"),
             "Should include spawn tool, got: {:?}",

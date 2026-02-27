@@ -53,10 +53,11 @@ pub async fn get_sync_status(
 }
 
 /// POST /api/calendar/sync — trigger a calendar sync (queued).
-pub async fn trigger_sync(
-    State(_state): State<AppState>,
-) -> (StatusCode, Json<serde_json::Value>) {
-    (StatusCode::ACCEPTED, Json(serde_json::json!({"status": "sync_queued"})))
+pub async fn trigger_sync(State(_state): State<AppState>) -> (StatusCode, Json<serde_json::Value>) {
+    (
+        StatusCode::ACCEPTED,
+        Json(serde_json::json!({"status": "sync_queued"})),
+    )
 }
 
 /// Body for `POST /api/calendar/events`.
@@ -73,7 +74,13 @@ pub struct CreateEventRequest {
 pub async fn create_event(
     State(state): State<AppState>,
     Json(req): Json<CreateEventRequest>,
-) -> Result<(StatusCode, Json<storage::rows::calendar::CalendarEventCacheRow>), ApiError> {
+) -> Result<
+    (
+        StatusCode,
+        Json<storage::rows::calendar::CalendarEventCacheRow>,
+    ),
+    ApiError,
+> {
     if req.summary.trim().is_empty() {
         return Err(ApiError::unprocessable("summary must not be empty"));
     }

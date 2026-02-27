@@ -365,11 +365,17 @@ mod tests {
 
         assert_eq!(visibility_to_str(&PlanVisibility::Silent), "silent");
         assert_eq!(visibility_to_str(&PlanVisibility::OnFailure), "on_failure");
-        assert_eq!(visibility_to_str(&PlanVisibility::Transparent), "transparent");
+        assert_eq!(
+            visibility_to_str(&PlanVisibility::Transparent),
+            "transparent"
+        );
 
         assert_eq!(str_to_visibility("silent"), PlanVisibility::Silent);
         assert_eq!(str_to_visibility("on_failure"), PlanVisibility::OnFailure);
-        assert_eq!(str_to_visibility("transparent"), PlanVisibility::Transparent);
+        assert_eq!(
+            str_to_visibility("transparent"),
+            PlanVisibility::Transparent
+        );
         assert_eq!(str_to_visibility("unknown"), PlanVisibility::Transparent);
     }
 

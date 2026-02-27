@@ -14,8 +14,7 @@ use include_dir::{include_dir, Dir};
 /// If `frontend/dist/` doesn't exist at compile time, `include_dir!` embeds
 /// an empty directory — the SPA fallback returns a development stub instead
 /// of panicking.
-static FRONTEND_DIR: Dir<'static> =
-    include_dir!("$CARGO_MANIFEST_DIR/frontend/dist");
+static FRONTEND_DIR: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/frontend/dist");
 
 /// Serve a static asset from the embedded dist directory, or fall back to
 /// `index.html` for SPA client-side routing (any non-asset path).
