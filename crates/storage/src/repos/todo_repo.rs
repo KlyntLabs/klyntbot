@@ -146,6 +146,7 @@ impl TodoRepo {
                 next_instance_date = CASE WHEN ?13 THEN ?14 ELSE next_instance_date END,
                 last_reminded_at   = CASE WHEN ?15 THEN ?16 ELSE last_reminded_at END,
                 estimated_minutes  = CASE WHEN ?17 THEN ?18 ELSE estimated_minutes END,
+                recurrence_rule    = CASE WHEN ?19 THEN ?20 ELSE recurrence_rule END,
                 updated_at         = datetime('now')
             WHERE id = ?1
             RETURNING *
@@ -169,6 +170,8 @@ impl TodoRepo {
         .bind(patch.last_reminded_at.unwrap_or_default())
         .bind(patch.estimated_minutes.is_some())
         .bind(patch.estimated_minutes.unwrap_or_default())
+        .bind(patch.recurrence_rule.is_some())
+        .bind(patch.recurrence_rule.as_ref().and_then(|v| v.as_deref()))
         .fetch_optional(&self.pool)
         .await?
         .ok_or_else(|| StorageError::NotFound(format!("todo {}", patch.id)))?;
@@ -886,4 +889,5 @@ pub struct TodoPatch {
     pub next_instance_date: Option<Option<DateTime<Utc>>>,
     pub last_reminded_at: Option<Option<DateTime<Utc>>>,
     pub estimated_minutes: Option<Option<i32>>,
+    pub recurrence_rule: Option<Option<String>>,
 }

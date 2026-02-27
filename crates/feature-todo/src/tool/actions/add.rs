@@ -72,6 +72,7 @@ impl TodoTool {
                             next_instance_date: None,
                             last_reminded_at: None,
                             estimated_minutes: update_est,
+                            recurrence_rule: None,
                         };
                         if self.repo.update(&patch).await.is_ok() {
                             enriched_info = format!(" (enriched: {})", applied.join(", "));

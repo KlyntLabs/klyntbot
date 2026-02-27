@@ -38,6 +38,7 @@ pub struct CreateTaskRequest {
     pub project_id: Option<String>,
     pub estimated_minutes: Option<i32>,
     pub is_template: Option<bool>,
+    pub recurrence_rule: Option<String>,
 }
 
 /// Body for `PATCH /api/tasks/:id`.
@@ -51,6 +52,7 @@ pub struct PatchTaskRequest {
     pub tags: Option<Vec<String>>,
     pub status: Option<String>,
     pub estimated_minutes: Option<Option<i32>>,
+    pub recurrence_rule: Option<Option<String>>,
 }
 
 /// Body for `POST /api/tasks/:id/time-entries`.
@@ -158,7 +160,7 @@ pub async fn create_task(
         estimated_minutes: req.estimated_minutes,
         calendar_event_uid: None,
         last_reminded_at: None,
-        recurrence_rule: None,
+        recurrence_rule: req.recurrence_rule,
         recurrence_parent_id: None,
         is_template: req.is_template.unwrap_or(false),
         next_instance_date: None,
@@ -213,6 +215,7 @@ pub async fn patch_task(
         next_instance_date: None,
         last_reminded_at: None,
         estimated_minutes: req.estimated_minutes,
+        recurrence_rule: req.recurrence_rule,
     };
 
     // Confirm the task exists first so we get a clean 404.

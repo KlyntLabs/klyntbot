@@ -35,6 +35,7 @@ impl TodoTool {
             calendar_event_uid: None,
             next_instance_date: None,
             estimated_minutes: p.optional_u64("estimated_minutes")?.map(|v| Some(v as i32)),
+            recurrence_rule: None,
         };
 
         match self.repo.update(&patch).await {

@@ -366,6 +366,7 @@ impl TodoPatch {
             next_instance_date: None,
             estimated_minutes: self.estimated_minutes.map(|opt| opt.map(|m| m as i32)),
             last_reminded_at: self.last_reminded_at,
+            recurrence_rule: None,
         }
     }
 }
