@@ -9,6 +9,7 @@ pub mod classifier;
 pub mod engines;
 pub mod escalation;
 pub mod heuristics;
+pub mod router;
 pub mod types;
 
 pub use types::{
