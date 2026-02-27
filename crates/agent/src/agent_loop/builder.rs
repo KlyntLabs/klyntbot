@@ -703,30 +703,44 @@ impl AgentLoopBuilder {
             None
         };
 
-        let mut engine_dispatch = crate::execution::EngineDispatch::new(execution_core);
+        // Build IntentPipeline (replaces AgentPipeline + Orchestrator + EngineDispatch)
+        let direct_engine = crate::intent_pipeline::engines::direct::DirectEngine::new(
+            Arc::clone(&execution_core),
+        );
+        let reactive_engine = crate::intent_pipeline::engines::reactive::ReactiveEngine::new(
+            Arc::clone(&execution_core),
+            config.agents.defaults.max_tool_iterations,
+        );
 
-        // Inject PlanGenerateEngine when a PlanRepo is available.
-        if let (Some(ref plan_repo), Some(ref core)) = (&stored_plan_repo, &plan_execution_core) {
-            let plan_gen_engine = Arc::new(crate::execution::PlanGenerateEngine::new(
-                Arc::clone(core),
-                plan_repo.clone(),
+        let planned_engine = stored_plan_repo.as_ref().map(|repo| {
+            crate::intent_pipeline::engines::planned::PlannedEngine::new(
+                Arc::clone(&execution_core),
+                repo.clone(),
                 provider.clone(),
                 config.agents.defaults.model.clone(),
-            ));
-            engine_dispatch = engine_dispatch.with_plan_generate_engine(plan_gen_engine);
-        }
+                plan::conversions::str_to_visibility(&config.orchestrator.default_plan_visibility),
+            )
+        });
 
-        let engine_dispatch = Arc::new(engine_dispatch);
-        let mut orchestrator =
-            crate::orchestrator::Orchestrator::new(provider.clone(), &config.agents.defaults.model);
-        orchestrator = orchestrator.with_strategy_repo(repos.strategies.clone());
-        let orchestrator = Arc::new(orchestrator);
+        let router = crate::intent_pipeline::router::ExecutionRouter::new(
+            direct_engine,
+            reactive_engine,
+            planned_engine,
+            config.orchestrator.max_escalations,
+        );
+
+        let analyzer = crate::intent_pipeline::analyzer::IntentAnalyzer::new(
+            provider.clone(),
+            &config.agents.defaults.model,
+            &config.orchestrator,
+        )
+        .with_strategy_repo(repos.strategies.clone());
 
         let cost_tracker = Arc::new(crate::output::CostTracker::from_repo(
             storage::UsageRepo::new(storage_pool.inner().clone()),
         ));
 
-        let pipeline_config = crate::pipeline::PipelineConfig {
+        let pipeline_config = crate::intent_pipeline::pipeline::PipelineConfig {
             execution_model: config.agents.defaults.model.clone(),
             system_prompt: String::new(),
             context_window: provider.context_window(),
@@ -736,16 +750,17 @@ impl AgentLoopBuilder {
         };
 
         let pipeline = Arc::new(
-            crate::pipeline::AgentPipeline::new(
-                orchestrator,
-                engine_dispatch,
+            crate::intent_pipeline::IntentPipeline::new(
+                analyzer,
+                context_engine::ContextEngine::new(),
+                router,
                 cost_tracker,
                 pipeline_config,
             )
             .with_strategy_repo(repos.strategies.clone()),
         );
 
-        info!("Adaptive orchestrator pipeline initialized");
+        info!("Intent pipeline initialized");
 
         // ── Session cleanup service ───────────────────────────────────────
         let session_cleanup_token = if self.pool.is_some() {

@@ -81,8 +81,8 @@ pub struct AgentLoop {
     pub(crate) learning_service: Option<Arc<RwLock<crate::learning::LearningService>>>,
     /// Handler called after plan execution finishes (updates linked goal metrics)
     pub(crate) plan_completion_handler: Option<Arc<dyn PlanCompletionHandler>>,
-    /// Adaptive orchestrator pipeline: classify → assemble → dispatch → validate → record.
-    pub(crate) pipeline: Arc<crate::pipeline::AgentPipeline>,
+    /// Intent pipeline: classify → assemble → route → validate → record.
+    pub(crate) pipeline: Arc<crate::intent_pipeline::IntentPipeline>,
     /// Strategy repo for updating satisfaction scores from reactions.
     pub(crate) strategy_repo: Option<storage::StrategyRepo>,
     /// Maximum number of history messages to load per request.
@@ -500,8 +500,8 @@ impl AgentLoop {
             .await?;
 
         info!(
-            "Pipeline: strategy={}, escalations={}",
-            result.strategy_used, result.escalations
+            "Pipeline: mode={}, escalations={}",
+            result.mode_used, result.escalations
         );
 
         Ok(result.content)

@@ -58,6 +58,7 @@ pub use learning::LearningService;
 pub use learning_handler::LearningHandlerImpl;
 pub use memory::MemoryStore;
 pub use notifications::NotificationDispatcher;
+pub use intent_pipeline::IntentPipeline;
 pub use pipeline::{AgentPipeline, PipelineConfig, PipelineResult};
 pub use plan_completion_handler::PlanCompletionHandlerImpl;
 pub use plan_executor::StepExecutionResult;
