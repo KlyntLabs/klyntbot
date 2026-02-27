@@ -42,6 +42,14 @@ function isActiveStatus(status: string): boolean {
   return s === 'executing' || s === 'approved';
 }
 
+function getVisibilityColor(visibility: string): string {
+  switch (visibility) {
+    case 'silent': return '#6b7280';
+    case 'on_failure': return '#f59e0b';
+    default: return '';
+  }
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function Plans() {
@@ -66,7 +74,8 @@ export default function Plans() {
     return planList.filter(p =>
       p.title.toLowerCase().includes(q) ||
       p.description.toLowerCase().includes(q) ||
-      p.status.toLowerCase().includes(q)
+      p.status.toLowerCase().includes(q) ||
+      (p.visibility && p.visibility.toLowerCase().includes(q))
     );
   }, [planList, searchQuery]);
 
@@ -369,6 +378,15 @@ export default function Plans() {
                       }}>
                         {plan.status}
                       </span>
+                      {plan.visibility && plan.visibility !== 'transparent' && (
+                        <span className="px-2 py-0.5 rounded text-[10px] tracking-wide" style={{
+                          backgroundColor: 'var(--codex-bg)',
+                          color: getVisibilityColor(plan.visibility),
+                          border: '1px solid var(--codex-border)',
+                        }}>
+                          {plan.visibility === 'silent' ? 'silent' : 'on failure'}
+                        </span>
+                      )}
                     </div>
 
                     {plan.description && (

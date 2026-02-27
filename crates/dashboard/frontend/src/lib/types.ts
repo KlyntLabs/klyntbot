@@ -113,6 +113,8 @@ export interface Plan {
   currentStepIndex: number;
   iterationLimit: number;
   backtrackHistory: unknown;
+  visibility: string;
+  taskId: string | null;
   createdAt: string;
   updatedAt: string;
   completedAt: string | null;

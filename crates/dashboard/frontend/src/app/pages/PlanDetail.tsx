@@ -811,6 +811,36 @@ export default function PlanDetail() {
                 </span>
               </div>
 
+              {/* Visibility */}
+              {plan.visibility && plan.visibility !== 'transparent' && (
+                <div className="flex justify-between items-center text-[12px]">
+                  <span style={{ color: 'var(--codex-fg-subtle)' }}>Visibility</span>
+                  <span className="px-2 py-0.5 rounded text-[10px] tracking-wide" style={{
+                    backgroundColor: 'var(--codex-bg)',
+                    color: plan.visibility === 'silent' ? '#6b7280' : '#f59e0b',
+                    border: '1px solid var(--codex-border)',
+                  }}>
+                    {plan.visibility === 'silent' ? 'silent' : 'on failure'}
+                  </span>
+                </div>
+              )}
+
+              {/* Task ID */}
+              {plan.taskId && (
+                <div className="flex justify-between items-center text-[12px]">
+                  <span style={{ color: 'var(--codex-fg-subtle)' }}>Linked Task</span>
+                  <span className="text-[11px] truncate max-w-[200px]" style={{
+                    color: 'var(--codex-accent)',
+                    fontFamily: 'var(--font-mono)',
+                    cursor: 'pointer',
+                  }}
+                    onClick={() => navigate(`/tasks/${plan.taskId}`)}
+                  >
+                    {plan.taskId.slice(0, 8)}...
+                  </span>
+                </div>
+              )}
+
               {/* Session Key */}
               <div className="flex justify-between items-center text-[12px]">
                 <span style={{ color: 'var(--codex-fg-subtle)' }}>Session</span>
