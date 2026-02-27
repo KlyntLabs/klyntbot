@@ -17,6 +17,8 @@ pub struct PlanRow {
     pub current_step_index: i32,
     pub iteration_limit: i32,
     pub backtrack_history: serde_json::Value,
+    pub visibility: String,
+    pub task_id: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub completed_at: Option<DateTime<Utc>>,

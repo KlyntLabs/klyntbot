@@ -20,6 +20,7 @@ pub struct PlanQueryParams {
     pub status: Option<String>,
     pub session_key: Option<String>,
     pub goal_id: Option<Uuid>,
+    pub visibility: Option<String>,
 }
 
 /// Body for `POST /api/plans`.
@@ -83,6 +84,7 @@ pub async fn list_plans(
             params.status.as_deref(),
             params.session_key.as_deref(),
             params.goal_id,
+            params.visibility.as_deref(),
         )
         .await
         .map_err(storage_err)?;
@@ -108,6 +110,8 @@ pub async fn create_plan(
         current_step_index: 0,
         iteration_limit: req.iteration_limit.unwrap_or(20),
         backtrack_history: serde_json::json!([]),
+        visibility: "transparent".to_string(),
+        task_id: None,
         created_at: now,
         updated_at: now,
         completed_at: None,

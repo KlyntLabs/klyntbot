@@ -215,7 +215,7 @@ impl GoalHandler for GoalHandlerImpl {
 
         // Count active plans if plan_repo is available
         let active_plans = if let Some(ref plan_repo) = self.plan_repo {
-            match plan_repo.list(None, None, Some(*goal_id)).await {
+            match plan_repo.list(None, None, Some(*goal_id), None).await {
                 Ok(plans) => plans
                     .iter()
                     .filter(|p| p.status == "Executing" || p.status == "Approved")
@@ -242,7 +242,7 @@ impl GoalHandler for GoalHandlerImpl {
             .await?
             .ok_or_else(|| GoalError::NotFound(goal_id.to_string()))?;
 
-        let plan_rows = plan_repo.list(None, None, Some(*goal_id)).await?;
+        let plan_rows = plan_repo.list(None, None, Some(*goal_id), None).await?;
 
         if plan_rows.is_empty() {
             return Ok(format!("Goal '{}': no plans linked.", goal.title));

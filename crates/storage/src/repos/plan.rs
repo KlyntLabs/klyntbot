@@ -23,8 +23,9 @@ impl PlanRepo {
         let result = sqlx::query_as::<_, PlanRow>(
             "INSERT INTO plans (id, session_key, goal_id, title, description, status,
                                 current_step_index, iteration_limit, backtrack_history,
+                                visibility, task_id,
                                 created_at, updated_at, completed_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
              RETURNING *",
         )
         .bind(row.id)
@@ -36,6 +37,8 @@ impl PlanRepo {
         .bind(row.current_step_index)
         .bind(row.iteration_limit)
         .bind(&row.backtrack_history)
+        .bind(&row.visibility)
+        .bind(&row.task_id)
         .bind(row.created_at)
         .bind(row.updated_at)
         .bind(row.completed_at)
@@ -49,13 +52,16 @@ impl PlanRepo {
         let result = sqlx::query_as::<_, PlanRow>(
             "INSERT INTO plans (id, session_key, goal_id, title, description, status,
                                 current_step_index, iteration_limit, backtrack_history,
+                                visibility, task_id,
                                 created_at, updated_at, completed_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
              ON CONFLICT(id) DO UPDATE SET
                 status = EXCLUDED.status,
                 current_step_index = EXCLUDED.current_step_index,
                 iteration_limit = EXCLUDED.iteration_limit,
                 backtrack_history = EXCLUDED.backtrack_history,
+                visibility = EXCLUDED.visibility,
+                task_id = EXCLUDED.task_id,
                 updated_at = EXCLUDED.updated_at,
                 completed_at = EXCLUDED.completed_at
              RETURNING *",
@@ -69,6 +75,8 @@ impl PlanRepo {
         .bind(row.current_step_index)
         .bind(row.iteration_limit)
         .bind(&row.backtrack_history)
+        .bind(&row.visibility)
+        .bind(&row.task_id)
         .bind(row.created_at)
         .bind(row.updated_at)
         .bind(row.completed_at)
@@ -87,11 +95,17 @@ impl PlanRepo {
     }
 
     /// List plans with optional filters.
+    ///
+    /// `visibility` controls filtering:
+    /// - `None` (default): excludes `silent` plans
+    /// - `Some("all")`: returns all plans regardless of visibility
+    /// - `Some(value)`: filters to only that visibility level
     pub async fn list(
         &self,
         status: Option<&str>,
         session_key: Option<&str>,
         goal_id: Option<Uuid>,
+        visibility: Option<&str>,
     ) -> Result<Vec<PlanRow>, StorageError> {
         let mut qb = sqlx::QueryBuilder::<sqlx::Sqlite>::new("SELECT * FROM plans WHERE 1=1");
 
@@ -108,6 +122,17 @@ impl PlanRepo {
             qb.push_bind(gid);
         }
 
+        match visibility {
+            Some("all") => { /* no filter */ }
+            Some(v) => {
+                qb.push(" AND visibility = ");
+                qb.push_bind(v);
+            }
+            None => {
+                qb.push(" AND visibility != 'silent'");
+            }
+        }
+
         qb.push(" ORDER BY created_at DESC");
 
         let rows = qb.build_query_as::<PlanRow>().fetch_all(&self.pool).await?;
@@ -120,8 +145,9 @@ impl PlanRepo {
         let result = sqlx::query_as::<_, PlanRow>(
             "UPDATE plans SET title = ?1, description = ?2, status = ?3,
                               current_step_index = ?4, iteration_limit = ?5,
-                              backtrack_history = ?6, updated_at = ?7, completed_at = ?8
-             WHERE id = ?9
+                              backtrack_history = ?6, visibility = ?7, task_id = ?8,
+                              updated_at = ?9, completed_at = ?10
+             WHERE id = ?11
              RETURNING *",
         )
         .bind(&row.title)
@@ -130,6 +156,8 @@ impl PlanRepo {
         .bind(row.current_step_index)
         .bind(row.iteration_limit)
         .bind(&row.backtrack_history)
+        .bind(&row.visibility)
+        .bind(&row.task_id)
         .bind(now)
         .bind(row.completed_at)
         .bind(row.id)
@@ -260,5 +288,68 @@ impl PlanRepo {
         .fetch_all(&self.pool)
         .await?;
         Ok(rows)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono::Utc;
+
+    fn test_plan_row() -> PlanRow {
+        let now = Utc::now();
+        PlanRow {
+            id: Uuid::new_v4(),
+            session_key: "test-session".to_string(),
+            goal_id: None,
+            title: "Test plan".to_string(),
+            description: "A test plan".to_string(),
+            status: "draft".to_string(),
+            current_step_index: 0,
+            iteration_limit: 20,
+            backtrack_history: serde_json::json!([]),
+            visibility: "transparent".to_string(),
+            task_id: None,
+            created_at: now,
+            updated_at: now,
+            completed_at: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn plan_visibility_and_task_id() {
+        let pool = crate::StoragePool::connect_in_memory().await.unwrap();
+        let repo = PlanRepo::new(pool.inner().clone());
+
+        // Create plan with on_failure visibility (task_id left None to avoid FK)
+        let mut row = test_plan_row();
+        row.visibility = "on_failure".to_string();
+
+        let created = repo.create(&row).await.unwrap();
+        assert_eq!(created.visibility, "on_failure");
+        assert_eq!(created.task_id, None);
+
+        // Verify get returns the new fields
+        let fetched = repo.get(created.id).await.unwrap();
+        assert_eq!(fetched.visibility, "on_failure");
+
+        // Create a silent plan
+        let mut silent_row = test_plan_row();
+        silent_row.id = Uuid::new_v4();
+        silent_row.visibility = "silent".to_string();
+        repo.create(&silent_row).await.unwrap();
+
+        // list with default visibility excludes silent
+        let visible = repo.list(None, None, None, None).await.unwrap();
+        assert!(visible.iter().all(|p| p.visibility != "silent"));
+
+        // list with "all" returns everything
+        let all = repo.list(None, None, None, Some("all")).await.unwrap();
+        assert!(all.len() > visible.len());
+
+        // list with specific visibility
+        let silent_only = repo.list(None, None, None, Some("silent")).await.unwrap();
+        assert!(silent_only.iter().all(|p| p.visibility == "silent"));
+        assert_eq!(silent_only.len(), 1);
     }
 }

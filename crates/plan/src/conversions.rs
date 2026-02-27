@@ -65,6 +65,8 @@ pub fn plan_to_row(plan: &Plan) -> storage::PlanRow {
         current_step_index: plan.current_step_index as i32,
         iteration_limit: plan.iteration_limit as i32,
         backtrack_history: serde_json::to_value(&plan.backtrack_history).unwrap_or_default(),
+        visibility: "transparent".to_string(),
+        task_id: None,
         created_at: plan.created_at,
         updated_at: plan.updated_at,
         completed_at: plan.completed_at,
@@ -159,7 +161,7 @@ pub async fn get_active_plan(
 ) -> common::Result<Option<Plan>> {
     let mut candidates = Vec::new();
     for status in &["draft", "approved", "executing"] {
-        let rows = repo.list(Some(status), Some(session_key), None).await?;
+        let rows = repo.list(Some(status), Some(session_key), None, None).await?;
         for row in rows {
             let steps = repo.get_steps(row.id).await?;
             candidates.push(row_to_plan(row, steps));
