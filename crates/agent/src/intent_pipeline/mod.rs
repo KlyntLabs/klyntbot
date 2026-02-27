@@ -6,6 +6,8 @@
 
 pub mod analyzer;
 pub mod classifier;
+pub mod engines;
+pub mod escalation;
 pub mod heuristics;
 pub mod types;
 
