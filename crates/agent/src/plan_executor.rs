@@ -450,6 +450,8 @@ mod tests {
             current_step_index: 0,
             iteration_limit: 50,
             backtrack_history: vec![],
+            visibility: plan::PlanVisibility::default(),
+            task_id: None,
             created_at: now,
             updated_at: now,
             completed_at: None,

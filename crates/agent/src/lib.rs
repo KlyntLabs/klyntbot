@@ -17,6 +17,7 @@ pub mod enrichment;
 pub mod events;
 pub mod execution;
 pub mod finance_adapter;
+pub mod intent_pipeline;
 pub mod goal_handler;
 pub mod learning;
 pub mod learning_handler;
