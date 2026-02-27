@@ -124,7 +124,7 @@ export class AgentSocket {
   }
 
   sendChatMessage(sessionKey: string | undefined, message: string): void {
-    this.sendRaw({ type: 'chat.send', sessionKey, message });
+    this.sendRaw({ type: 'chat.send', sessionKey: sessionKey ?? '', message });
   }
 
   sendCancel(): void {

@@ -296,6 +296,13 @@ export function useAgent(): UseAgentResult {
       if (isStreamingRef.current) return;
       if (!socketRef.current) return;
 
+      // Resolve or generate a session key — backend requires a non-null string
+      let key = overrideSessionKey ?? sessionKey;
+      if (!key) {
+        key = `dashboard-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        setSessionKey(key);
+      }
+
       setMessages((prev) => [
         ...prev,
         {
@@ -311,7 +318,6 @@ export function useAgent(): UseAgentResult {
       accumulatedContentRef.current = '';
       streamingMessageIdRef.current = null;
 
-      const key = overrideSessionKey ?? sessionKey ?? undefined;
       socketRef.current.sendChatMessage(key, text);
     },
     [sessionKey],
