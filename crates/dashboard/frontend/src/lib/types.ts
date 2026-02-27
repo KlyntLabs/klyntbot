@@ -419,3 +419,46 @@ export interface ChatMessage {
   timestamp: Date;
   isStreaming?: boolean;
 }
+
+// ── Tool Activity (chat sidebar) ─────────────────────────────────────────────
+
+export type ToolCategory =
+  | 'Tasks'
+  | 'Plans'
+  | 'Calendar'
+  | 'Finance'
+  | 'Skills'
+  | 'Cron'
+  | 'Projects'
+  | 'Web'
+  | 'Files'
+  | 'Message'
+  | 'Spawn';
+
+export interface ToolActivityEntry {
+  category: ToolCategory;
+  toolName: string;
+  args?: Record<string, unknown>;
+  timestamp: number;
+  status: 'active' | 'completed' | 'failed';
+}
+
+/** Maps raw tool names from WebSocket events to display categories */
+export const TOOL_CATEGORY_MAP: Record<string, ToolCategory> = {
+  todo: 'Tasks',
+  plan: 'Plans',
+  calendar: 'Calendar',
+  finance: 'Finance',
+  skill: 'Skills',
+  cron: 'Cron',
+  project: 'Projects',
+  web_search: 'Web',
+  web_fetch: 'Web',
+  file_read: 'Files',
+  file_write: 'Files',
+  file_list: 'Files',
+  file_append: 'Files',
+  message: 'Message',
+  ask_user: 'Message',
+  spawn: 'Spawn',
+};
