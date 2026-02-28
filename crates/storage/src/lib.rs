@@ -10,7 +10,7 @@ pub mod repos;
 pub mod rows;
 pub mod vector_store;
 
-pub use error::StorageError;
+pub use error::{OptionExt, StorageError};
 pub use pool::StoragePool;
 pub use repos::Repos;
 pub use vector_store::VectorStore;

@@ -3,7 +3,7 @@
 use serde::Serialize;
 use sqlx::SqlitePool;
 
-use crate::error::StorageError;
+use crate::error::{OptionExt, StorageError};
 use crate::rows::project::ProjectRow;
 
 /// Filter criteria for listing projects.
@@ -75,7 +75,7 @@ impl ProjectRepo {
     pub async fn get_or_err(&self, id: &str) -> Result<ProjectRow, StorageError> {
         self.get(id)
             .await?
-            .ok_or_else(|| StorageError::NotFound(format!("project {id}")))
+            .ok_or_not_found(&format!("project {id}"))
     }
 
     /// Update mutable fields on a project. Only non-None patch fields are overwritten.
@@ -108,7 +108,7 @@ impl ProjectRepo {
         .bind(&patch.status)
         .fetch_optional(&self.pool)
         .await?
-        .ok_or_else(|| StorageError::NotFound(format!("project {}", patch.id)))?;
+        .ok_or_not_found(&format!("project {}", patch.id))?;
 
         Ok(row)
     }

@@ -5,7 +5,7 @@ use chrono::{DateTime, Utc};
 use serde::Serialize;
 use sqlx::SqlitePool;
 
-use crate::error::StorageError;
+use crate::error::{OptionExt, StorageError};
 use crate::rows::todo::{TodoAttachmentRow, TodoDependencyRow, TodoRow, TodoTimeEntryRow};
 
 /// Filter criteria for listing todos.
@@ -108,7 +108,7 @@ impl TodoRepo {
     pub async fn get_or_err(&self, id: &str) -> Result<TodoRow, StorageError> {
         self.get(id)
             .await?
-            .ok_or_else(|| StorageError::NotFound(format!("todo {id}")))
+            .ok_or_not_found(&format!("todo {id}"))
     }
 
     /// Fetch todos by a list of IDs. Missing IDs are silently skipped.
@@ -174,7 +174,7 @@ impl TodoRepo {
         .bind(patch.recurrence_rule.as_ref().and_then(|v| v.as_deref()))
         .fetch_optional(&self.pool)
         .await?
-        .ok_or_else(|| StorageError::NotFound(format!("todo {}", patch.id)))?;
+        .ok_or_not_found(&format!("todo {}", patch.id))?;
 
         Ok(row)
     }
@@ -712,7 +712,7 @@ impl TodoRepo {
         .bind(new_project_id)
         .fetch_optional(&self.pool)
         .await?
-        .ok_or_else(|| StorageError::NotFound(format!("todo {id}")))?;
+        .ok_or_not_found(&format!("todo {id}"))?;
 
         Ok(row)
     }

@@ -3,7 +3,7 @@
 use chrono::Utc;
 use sqlx::SqlitePool;
 
-use crate::error::StorageError;
+use crate::error::{OptionExt, StorageError};
 use crate::rows::session::{SessionListRow, SessionMessageRow, SessionRow};
 
 /// Repository for session and message persistence.
@@ -45,7 +45,7 @@ impl SessionRepo {
             .bind(key)
             .fetch_optional(&self.pool)
             .await?
-            .ok_or_else(|| StorageError::NotFound(format!("session '{}'", key)))
+            .ok_or_not_found(&format!("session '{}'", key))
     }
 
     /// List all sessions with message counts, ordered by updated_at descending.

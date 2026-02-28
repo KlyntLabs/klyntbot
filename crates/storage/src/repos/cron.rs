@@ -2,7 +2,7 @@
 
 use sqlx::SqlitePool;
 
-use crate::error::StorageError;
+use crate::error::{OptionExt, StorageError};
 use crate::rows::cron::CronJobRow;
 
 /// Repository for cron job persistence.
@@ -59,7 +59,7 @@ impl CronRepo {
             .bind(id)
             .fetch_optional(&self.pool)
             .await?
-            .ok_or_else(|| StorageError::NotFound(format!("cron job '{}'", id)))
+            .ok_or_not_found(&format!("cron job '{}'", id))
     }
 
     /// List all cron jobs.

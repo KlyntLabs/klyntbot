@@ -719,7 +719,7 @@ impl AgentLoopBuilder {
                 repo.clone(),
                 provider.clone(),
                 config.agents.defaults.model.clone(),
-                plan::conversions::str_to_visibility(&config.orchestrator.default_plan_visibility),
+                config.orchestrator.default_plan_visibility.parse().unwrap_or_default(),
             )
         });
 

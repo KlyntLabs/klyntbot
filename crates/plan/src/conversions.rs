@@ -2,74 +2,8 @@
 //!
 //! Extracted from the removed PlanStore to support direct PlanRepo usage.
 
-use crate::types::{BacktrackEntry, Plan, PlanStatus, PlanStep, PlanVisibility, StepStatus};
+use crate::types::{BacktrackEntry, Plan, PlanStep};
 use uuid::Uuid;
-
-/// Convert PlanStatus to database string.
-pub fn plan_status_to_str(status: &PlanStatus) -> &'static str {
-    match status {
-        PlanStatus::Draft => "draft",
-        PlanStatus::Approved => "approved",
-        PlanStatus::Executing => "executing",
-        PlanStatus::Completed => "completed",
-        PlanStatus::Failed => "failed",
-        PlanStatus::Abandoned => "abandoned",
-    }
-}
-
-/// Convert database string to PlanStatus.
-pub fn str_to_plan_status(s: &str) -> PlanStatus {
-    match s.to_lowercase().as_str() {
-        "draft" => PlanStatus::Draft,
-        "approved" => PlanStatus::Approved,
-        "executing" => PlanStatus::Executing,
-        "completed" => PlanStatus::Completed,
-        "failed" => PlanStatus::Failed,
-        "abandoned" => PlanStatus::Abandoned,
-        _ => PlanStatus::Draft,
-    }
-}
-
-/// Convert StepStatus to database string.
-pub fn step_status_to_str(status: &StepStatus) -> &'static str {
-    match status {
-        StepStatus::Pending => "pending",
-        StepStatus::Executing => "executing",
-        StepStatus::Completed => "completed",
-        StepStatus::Failed => "failed",
-        StepStatus::Skipped => "skipped",
-    }
-}
-
-/// Convert database string to StepStatus.
-pub fn str_to_step_status(s: &str) -> StepStatus {
-    match s.to_lowercase().as_str() {
-        "pending" => StepStatus::Pending,
-        "executing" => StepStatus::Executing,
-        "completed" => StepStatus::Completed,
-        "failed" => StepStatus::Failed,
-        "skipped" => StepStatus::Skipped,
-        _ => StepStatus::Pending,
-    }
-}
-
-/// Convert PlanVisibility to database string.
-pub fn visibility_to_str(v: &PlanVisibility) -> &'static str {
-    match v {
-        PlanVisibility::Silent => "silent",
-        PlanVisibility::OnFailure => "on_failure",
-        PlanVisibility::Transparent => "transparent",
-    }
-}
-
-/// Convert database string to PlanVisibility.
-pub fn str_to_visibility(s: &str) -> PlanVisibility {
-    match s {
-        "silent" => PlanVisibility::Silent,
-        "on_failure" => PlanVisibility::OnFailure,
-        _ => PlanVisibility::Transparent,
-    }
-}
 
 /// Convert a Plan domain type to a PlanRow for SQL persistence.
 pub fn plan_to_row(plan: &Plan) -> storage::PlanRow {
@@ -79,11 +13,11 @@ pub fn plan_to_row(plan: &Plan) -> storage::PlanRow {
         goal_id: plan.goal_id,
         title: plan.title.clone(),
         description: plan.description.clone(),
-        status: plan_status_to_str(&plan.status).to_string(),
+        status: plan.status.to_string(),
         current_step_index: plan.current_step_index as i32,
         iteration_limit: plan.iteration_limit as i32,
         backtrack_history: serde_json::to_value(&plan.backtrack_history).unwrap_or_default(),
-        visibility: visibility_to_str(&plan.visibility).to_string(),
+        visibility: plan.visibility.to_string(),
         task_id: plan.task_id.clone(),
         created_at: plan.created_at,
         updated_at: plan.updated_at,
@@ -100,7 +34,7 @@ pub fn step_to_row(step: &PlanStep, plan_id: Uuid) -> storage::PlanStepRow {
         description: step.description.clone(),
         reasoning: step.reasoning.clone(),
         expected_tools: step.expected_tools.clone(),
-        status: step_status_to_str(&step.status).to_string(),
+        status: step.status.to_string(),
         attempt_count: step.attempt_count as i16,
         max_attempts: step.max_attempts as i16,
         result: step.result.clone(),
@@ -119,7 +53,7 @@ pub fn row_to_plan(row: storage::PlanRow, step_rows: Vec<storage::PlanStepRow>) 
             description: sr.description,
             reasoning: sr.reasoning,
             expected_tools: sr.expected_tools,
-            status: str_to_step_status(&sr.status),
+            status: sr.status.parse().unwrap_or_default(),
             attempt_count: sr.attempt_count as u8,
             max_attempts: sr.max_attempts as u8,
             result: sr.result,
@@ -134,13 +68,13 @@ pub fn row_to_plan(row: storage::PlanRow, step_rows: Vec<storage::PlanStepRow>) 
         goal_id: row.goal_id,
         title: row.title,
         description: row.description,
-        status: str_to_plan_status(&row.status),
+        status: row.status.parse().unwrap_or_default(),
         steps,
         current_step_index: row.current_step_index as usize,
         iteration_limit: row.iteration_limit as usize,
         backtrack_history: serde_json::from_value::<Vec<BacktrackEntry>>(row.backtrack_history)
             .unwrap_or_default(),
-        visibility: str_to_visibility(&row.visibility),
+        visibility: row.visibility.parse().unwrap_or_default(),
         task_id: row.task_id,
         created_at: row.created_at,
         updated_at: row.updated_at,
@@ -174,21 +108,14 @@ pub async fn save_plan(repo: &storage::PlanRepo, plan: &Plan) -> common::Result<
 }
 
 /// Get the most recent active plan for a session.
-/// Returns Draft, Approved, or Executing plans only, sorted by most recent first.
+/// Returns Draft, Approved, or Executing plans only.
 pub async fn get_active_plan(
     repo: &storage::PlanRepo,
     session_key: &str,
 ) -> common::Result<Option<Plan>> {
-    let mut candidates = Vec::new();
-    for status in &["draft", "approved", "executing"] {
-        let rows = repo
-            .list(Some(status), Some(session_key), None, None)
-            .await?;
-        for row in rows {
-            let steps = repo.get_steps(row.id).await?;
-            candidates.push(row_to_plan(row, steps));
-        }
-    }
-    candidates.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
-    Ok(candidates.into_iter().next())
+    let Some(row) = repo.get_active(session_key).await? else {
+        return Ok(None);
+    };
+    let steps = repo.get_steps(row.id).await?;
+    Ok(Some(row_to_plan(row, steps)))
 }

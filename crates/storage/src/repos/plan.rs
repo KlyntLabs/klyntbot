@@ -4,7 +4,7 @@ use chrono::Utc;
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
-use crate::error::StorageError;
+use crate::error::{OptionExt, StorageError};
 use crate::rows::plan::{PlanRow, PlanStepRow};
 
 /// Repository for plan persistence.
@@ -91,7 +91,7 @@ impl PlanRepo {
             .bind(id)
             .fetch_optional(&self.pool)
             .await?
-            .ok_or_else(|| StorageError::NotFound(format!("plan '{}'", id)))
+            .ok_or_not_found(&format!("plan '{}'", id))
     }
 
     /// List plans with optional filters.
@@ -163,7 +163,7 @@ impl PlanRepo {
         .bind(row.id)
         .fetch_optional(&self.pool)
         .await?
-        .ok_or_else(|| StorageError::NotFound(format!("plan '{}'", row.id)))?;
+        .ok_or_not_found(&format!("plan '{}'", row.id))?;
         Ok(result)
     }
 
@@ -271,7 +271,7 @@ impl PlanRepo {
         .bind(step.id)
         .fetch_optional(&self.pool)
         .await?
-        .ok_or_else(|| StorageError::NotFound(format!("plan_step '{}'", step.id)))?;
+        .ok_or_not_found(&format!("plan_step '{}'", step.id))?;
         Ok(result)
     }
 
@@ -305,6 +305,23 @@ impl PlanRepo {
         .fetch_one(&self.pool)
         .await?;
         Ok(result)
+    }
+
+    /// Get the most recent active plan (draft/approved/executing) for a session.
+    pub async fn get_active(
+        &self,
+        session_key: &str,
+    ) -> Result<Option<PlanRow>, StorageError> {
+        let row = sqlx::query_as::<_, PlanRow>(
+            "SELECT * FROM plans
+             WHERE session_key = ?1 AND status IN ('draft', 'approved', 'executing')
+             ORDER BY updated_at DESC
+             LIMIT 1",
+        )
+        .bind(session_key)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row)
     }
 
     /// Get all steps for a plan, ordered by step_index.

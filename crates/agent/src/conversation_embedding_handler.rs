@@ -41,25 +41,14 @@ impl ConversationEmbeddingHandler for ConversationEmbeddingHandlerImpl {
         // Compose text with role prefix (e.g., "User: hello" or "Assistant: response")
         let text = format!("{}: {}", role, content);
 
-        // Generate embedding (CPU-bound work in blocking thread pool)
-        let embedding_result = {
-            let engine = Arc::clone(&self.engine);
-            let text_clone = text.clone();
-            tokio::task::spawn_blocking(move || engine.embed(&text_clone)).await
-        };
-
-        let embedding = match embedding_result {
-            Ok(Ok(emb)) => emb,
-            Ok(Err(e)) => {
+        let embedding = match self.engine.clone().embed_async(text).await {
+            Ok(emb) => emb,
+            Err(e) => {
                 warn!(
                     "Failed to generate conversation embedding for message {}: {}",
                     message_id, e
                 );
                 return Ok(()); // Best-effort: don't propagate errors
-            }
-            Err(e) => {
-                warn!("Spawn blocking failed for conversation embedding: {}", e);
-                return Ok(());
             }
         };
 
@@ -103,16 +92,7 @@ impl ConversationEmbeddingHandler for ConversationEmbeddingHandlerImpl {
         limit: usize,
         threshold: f64,
     ) -> Result<Vec<(ConversationEmbeddingRecord, f64)>> {
-        // Generate query embedding (CPU-bound work in blocking thread pool)
-        let query_embedding = {
-            let engine = Arc::clone(&self.engine);
-            let query_clone = query.to_string();
-            tokio::task::spawn_blocking(move || engine.embed(&query_clone))
-                .await
-                .map_err(|e| {
-                    common::ToolError::ExecutionFailed(format!("Spawn blocking failed: {}", e))
-                })??
-        };
+        let query_embedding = self.engine.clone().embed_async(query.to_string()).await?;
 
         // LanceDB ANN search (cross-channel).
         // Explicit user searches use decay_factor=1.0 (no time decay) for unbiased results.

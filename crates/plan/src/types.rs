@@ -1,9 +1,14 @@
 //! Plan types for structured multi-step execution.
 
+/// Default maximum attempts per plan step before the step is marked failed.
+pub const DEFAULT_MAX_STEP_ATTEMPTS: u8 = 3;
+
 use crate::PlanError;
 use chrono::{DateTime, Utc};
 use common::Result;
 use serde::{Deserialize, Serialize};
+use std::fmt;
+use std::str::FromStr;
 use uuid::Uuid;
 
 /// Controls whether auto-generated plans appear in the UI.
@@ -16,6 +21,27 @@ pub enum PlanVisibility {
     /// Always visible (user-created plans, current behavior).
     #[default]
     Transparent,
+}
+
+impl fmt::Display for PlanVisibility {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PlanVisibility::Silent => write!(f, "silent"),
+            PlanVisibility::OnFailure => write!(f, "on_failure"),
+            PlanVisibility::Transparent => write!(f, "transparent"),
+        }
+    }
+}
+
+impl FromStr for PlanVisibility {
+    type Err = ();
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "silent" => Ok(PlanVisibility::Silent),
+            "on_failure" => Ok(PlanVisibility::OnFailure),
+            _ => Ok(PlanVisibility::Transparent),
+        }
+    }
 }
 
 /// A structured plan with multiple steps for sequential execution.
@@ -90,6 +116,34 @@ impl PlanStatus {
     }
 }
 
+impl fmt::Display for PlanStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            PlanStatus::Draft => write!(f, "draft"),
+            PlanStatus::Approved => write!(f, "approved"),
+            PlanStatus::Executing => write!(f, "executing"),
+            PlanStatus::Completed => write!(f, "completed"),
+            PlanStatus::Failed => write!(f, "failed"),
+            PlanStatus::Abandoned => write!(f, "abandoned"),
+        }
+    }
+}
+
+impl FromStr for PlanStatus {
+    type Err = ();
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "draft" => Ok(PlanStatus::Draft),
+            "approved" => Ok(PlanStatus::Approved),
+            "executing" => Ok(PlanStatus::Executing),
+            "completed" => Ok(PlanStatus::Completed),
+            "failed" => Ok(PlanStatus::Failed),
+            "abandoned" => Ok(PlanStatus::Abandoned),
+            _ => Ok(PlanStatus::Draft),
+        }
+    }
+}
+
 /// A single step in a plan
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlanStep {
@@ -115,6 +169,32 @@ pub enum StepStatus {
     Completed,
     Failed,
     Skipped,
+}
+
+impl fmt::Display for StepStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            StepStatus::Pending => write!(f, "pending"),
+            StepStatus::Executing => write!(f, "executing"),
+            StepStatus::Completed => write!(f, "completed"),
+            StepStatus::Failed => write!(f, "failed"),
+            StepStatus::Skipped => write!(f, "skipped"),
+        }
+    }
+}
+
+impl FromStr for StepStatus {
+    type Err = ();
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "pending" => Ok(StepStatus::Pending),
+            "executing" => Ok(StepStatus::Executing),
+            "completed" => Ok(StepStatus::Completed),
+            "failed" => Ok(StepStatus::Failed),
+            "skipped" => Ok(StepStatus::Skipped),
+            _ => Ok(StepStatus::Pending),
+        }
+    }
 }
 
 /// Backtrack entry for retry tracking
@@ -230,7 +310,7 @@ mod tests {
             expected_tools: vec!["test_tool".to_string()],
             status: StepStatus::Pending,
             attempt_count: 0,
-            max_attempts: 3,
+            max_attempts: DEFAULT_MAX_STEP_ATTEMPTS,
             result: None,
             started_at: None,
             completed_at: None,
@@ -361,22 +441,14 @@ mod tests {
 
     #[test]
     fn plan_visibility_roundtrip() {
-        use crate::conversions::{str_to_visibility, visibility_to_str};
+        assert_eq!(PlanVisibility::Silent.to_string(), "silent");
+        assert_eq!(PlanVisibility::OnFailure.to_string(), "on_failure");
+        assert_eq!(PlanVisibility::Transparent.to_string(), "transparent");
 
-        assert_eq!(visibility_to_str(&PlanVisibility::Silent), "silent");
-        assert_eq!(visibility_to_str(&PlanVisibility::OnFailure), "on_failure");
-        assert_eq!(
-            visibility_to_str(&PlanVisibility::Transparent),
-            "transparent"
-        );
-
-        assert_eq!(str_to_visibility("silent"), PlanVisibility::Silent);
-        assert_eq!(str_to_visibility("on_failure"), PlanVisibility::OnFailure);
-        assert_eq!(
-            str_to_visibility("transparent"),
-            PlanVisibility::Transparent
-        );
-        assert_eq!(str_to_visibility("unknown"), PlanVisibility::Transparent);
+        assert_eq!("silent".parse::<PlanVisibility>().unwrap(), PlanVisibility::Silent);
+        assert_eq!("on_failure".parse::<PlanVisibility>().unwrap(), PlanVisibility::OnFailure);
+        assert_eq!("transparent".parse::<PlanVisibility>().unwrap(), PlanVisibility::Transparent);
+        assert_eq!("unknown".parse::<PlanVisibility>().unwrap(), PlanVisibility::Transparent);
     }
 
     #[test]

@@ -125,6 +125,31 @@ impl EmbeddingEngine {
         .into())
     }
 
+    /// Async wrapper: runs `embed` on a blocking thread pool.
+    ///
+    /// Takes `Arc<Self>` as receiver so the engine can be moved into
+    /// `spawn_blocking` (which requires `'static`). Callers with
+    /// `engine: Arc<EmbeddingEngine>` call it as `engine.clone().embed_async(text).await`.
+    #[cfg(feature = "semantic-search")]
+    pub async fn embed_async(self: Arc<Self>, text: String) -> Result<Vec<f32>> {
+        tokio::task::spawn_blocking(move || self.embed(&text))
+            .await
+            .map_err(|e| {
+                common::KlyntbotError::from(common::ToolError::ExecutionFailed(format!(
+                    "Embedding task panicked: {e}"
+                )))
+            })?
+    }
+
+    /// Stub when `semantic-search` feature is disabled.
+    #[cfg(not(feature = "semantic-search"))]
+    pub async fn embed_async(self: Arc<Self>, _text: String) -> Result<Vec<f32>> {
+        Err(common::ToolError::ExecutionFailed(
+            "Semantic search is disabled. Rebuild with the `semantic-search` feature to enable embeddings.".to_string(),
+        )
+        .into())
+    }
+
     /// Check if the embedding model is initialized and available.
     #[cfg(feature = "semantic-search")]
     pub fn is_available(&self) -> bool {
@@ -217,17 +242,11 @@ impl EmbeddingHandler for EmbeddingEngineImpl {
     async fn embed_todo(&self, todo: &Todo) -> Result<Option<EmbeddingRecord>> {
         let text = Self::compose_text(todo);
         let todo_id = todo.id.clone();
-        let engine = self.engine.clone();
 
         debug!(todo_id = %todo_id, text_len = text.len(), "Generating embedding for todo");
         let start = std::time::Instant::now();
 
-        // CPU-bound work — run in blocking thread
-        let embedding = tokio::task::spawn_blocking(move || engine.embed(&text))
-            .await
-            .map_err(|e| {
-                common::ToolError::ExecutionFailed(format!("Embedding task panicked: {}", e))
-            })??;
+        let embedding = self.engine.clone().embed_async(text).await?;
 
         debug!(
             todo_id = %todo_id,
@@ -237,7 +256,6 @@ impl EmbeddingHandler for EmbeddingEngineImpl {
 
         let model_name = "paraphrase-multilingual-MiniLM-L12-v2";
 
-        // Persist to LanceDB via VectorStore
         self.store
             .upsert_embedding(
                 "todo_embeddings",
@@ -259,17 +277,10 @@ impl EmbeddingHandler for EmbeddingEngineImpl {
     }
 
     async fn embed_query(&self, query: &str) -> Result<Vec<f32>> {
-        let query = query.to_string();
-        let engine = self.engine.clone();
-
         debug!(query_len = query.len(), "Generating query embedding");
         let start = std::time::Instant::now();
 
-        let result = tokio::task::spawn_blocking(move || engine.embed(&query))
-            .await
-            .map_err(|e| {
-                common::ToolError::ExecutionFailed(format!("Embedding task panicked: {}", e))
-            })?;
+        let result = self.engine.clone().embed_async(query.to_string()).await;
 
         debug!(
             elapsed_ms = start.elapsed().as_millis() as u64,

@@ -5,7 +5,7 @@ use serde::Serialize;
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
-use crate::error::StorageError;
+use crate::error::{OptionExt, StorageError};
 use crate::rows::learning::{StrategyRecordRow, StrategySummaryRow};
 
 /// Repository for strategy execution record persistence.
@@ -76,7 +76,7 @@ impl StrategyRepo {
             .bind(id)
             .fetch_optional(&self.pool)
             .await?
-            .ok_or_else(|| StorageError::NotFound(format!("strategy record '{}'", id)))
+            .ok_or_not_found(&format!("strategy record '{}'", id))
     }
 
     /// List strategy records by predicted strategy within a date range.

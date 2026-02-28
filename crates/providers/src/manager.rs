@@ -1,5 +1,6 @@
 //! ProviderManager — failover, retry with backoff, and circuit breaker for LLM providers.
 
+use std::future::Future;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
@@ -97,80 +98,59 @@ impl ProviderManager {
         self.failure_count.store(0, Ordering::SeqCst);
     }
 
-    /// Try primary with exponential backoff on rate-limit errors.
-    /// 3 attempts max, delays: 500ms → 1s → 2s. Non-rate-limit errors fail fast.
+    /// Exponential backoff on rate-limit errors: 3 attempts, delays 500ms → 1s → 2s.
+    /// Non-rate-limit errors fail fast. Wraps any async call via a closure.
+    async fn retry_with_backoff<F, Fut, T>(&self, call: F) -> Result<T>
+    where
+        F: Fn() -> Fut,
+        Fut: Future<Output = Result<T>>,
+    {
+        let delays = [
+            std::time::Duration::from_millis(500),
+            std::time::Duration::from_secs(1),
+            std::time::Duration::from_secs(2),
+        ];
+        let mut last_err = None;
+        for (attempt, delay) in delays.iter().enumerate() {
+            match call().await {
+                Ok(val) => {
+                    self.reset_failures();
+                    return Ok(val);
+                }
+                Err(e @ KlyntbotError::Provider(ProviderError::RateLimited { .. })) => {
+                    last_err = Some(e);
+                    if attempt < delays.len() - 1 {
+                        tokio::time::sleep(*delay).await;
+                    }
+                }
+                Err(e) => {
+                    self.record_failure().await;
+                    return Err(e);
+                }
+            }
+        }
+        self.record_failure().await;
+        Err(last_err.unwrap())
+    }
+
     async fn try_primary_with_retry(
         &self,
         messages: &[Message],
         tools: Option<&[Value]>,
         params: &ChatParams,
     ) -> Result<LlmResponse> {
-        let delays = [
-            std::time::Duration::from_millis(500),
-            std::time::Duration::from_secs(1),
-            std::time::Duration::from_secs(2),
-        ];
-
-        let mut last_err = None;
-        for (attempt, delay) in delays.iter().enumerate() {
-            match self.primary.chat(messages, tools, params).await {
-                Ok(response) => {
-                    self.reset_failures();
-                    return Ok(response);
-                }
-                Err(e @ KlyntbotError::Provider(ProviderError::RateLimited { .. })) => {
-                    last_err = Some(e);
-                    if attempt < delays.len() - 1 {
-                        tokio::time::sleep(*delay).await;
-                    }
-                }
-                Err(e) => {
-                    // Non-rate-limit error: record failure and bail
-                    self.record_failure().await;
-                    return Err(e);
-                }
-            }
-        }
-        // Exhausted all retries — record failure
-        self.record_failure().await;
-        Err(last_err.unwrap())
+        self.retry_with_backoff(|| self.primary.chat(messages, tools, params))
+            .await
     }
 
-    /// Try primary streaming with exponential backoff on rate-limit errors.
-    /// 3 attempts max, delays: 500ms → 1s → 2s. Non-rate-limit errors fail fast.
     async fn try_primary_stream_with_retry(
         &self,
         messages: &[Message],
         tools: Option<&[Value]>,
         params: &ChatParams,
     ) -> Result<LlmStream> {
-        let delays = [
-            std::time::Duration::from_millis(500),
-            std::time::Duration::from_secs(1),
-            std::time::Duration::from_secs(2),
-        ];
-
-        let mut last_err = None;
-        for (attempt, delay) in delays.iter().enumerate() {
-            match self.primary.chat_stream(messages, tools, params).await {
-                Ok(stream) => {
-                    self.reset_failures();
-                    return Ok(stream);
-                }
-                Err(e @ KlyntbotError::Provider(ProviderError::RateLimited { .. })) => {
-                    last_err = Some(e);
-                    if attempt < delays.len() - 1 {
-                        tokio::time::sleep(*delay).await;
-                    }
-                }
-                Err(e) => {
-                    self.record_failure().await;
-                    return Err(e);
-                }
-            }
-        }
-        self.record_failure().await;
-        Err(last_err.unwrap())
+        self.retry_with_backoff(|| self.primary.chat_stream(messages, tools, params))
+            .await
     }
 
     /// Check health of primary and fallback providers.

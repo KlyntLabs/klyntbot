@@ -206,8 +206,8 @@ pub async fn update_plan_status(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let plan = state.repos.plans.get(id).await.map_err(ApiError::from)?;
 
-    let from = plan::conversions::str_to_plan_status(&plan.status);
-    let to = plan::conversions::str_to_plan_status(&req.status);
+    let from = plan.status.parse::<plan::PlanStatus>().unwrap_or_default();
+    let to = req.status.parse::<plan::PlanStatus>().unwrap_or_default();
 
     plan::PlanStatus::validate_transition(&from, &to).map_err(|_| ApiError {
         status: 409,

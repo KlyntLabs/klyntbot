@@ -3,7 +3,7 @@
 use chrono::{DateTime, Utc};
 use sqlx::SqlitePool;
 
-use crate::error::StorageError;
+use crate::error::{OptionExt, StorageError};
 use crate::rows::calendar::CalendarSyncStateRow;
 
 /// Repository for calendar sync state persistence.
@@ -25,7 +25,7 @@ impl CalendarSyncRepo {
         .bind(provider_id)
         .fetch_optional(&self.pool)
         .await?
-        .ok_or_else(|| StorageError::NotFound(format!("calendar sync state '{}'", provider_id)))
+        .ok_or_not_found(&format!("calendar sync state '{}'", provider_id))
     }
 
     /// Upsert sync state for a provider.

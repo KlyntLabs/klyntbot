@@ -1,6 +1,7 @@
 //! Repository for the `agent_tasks` table — subagent coordination task board.
 
 use crate::rows::agent_task::AgentTaskRow;
+use crate::error::OptionExt;
 use crate::StorageError;
 use chrono::Utc;
 use sqlx::SqlitePool;
@@ -79,7 +80,7 @@ impl AgentTaskRepo {
         .bind(now)
         .fetch_optional(&self.pool)
         .await?
-        .ok_or_else(|| StorageError::NotFound(format!("Task {} not found", task_id)))
+        .ok_or_not_found(&format!("Task {} not found", task_id))
     }
 
     pub async fn list_by_session(
@@ -143,7 +144,7 @@ impl AgentTaskRepo {
             .bind(task_id)
             .fetch_optional(&self.pool)
             .await?
-            .ok_or_else(|| StorageError::NotFound(format!("Task {} not found", task_id)))
+            .ok_or_not_found(&format!("Task {} not found", task_id))
     }
 }
 

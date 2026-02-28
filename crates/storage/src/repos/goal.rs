@@ -4,7 +4,7 @@ use chrono::Utc;
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
-use crate::error::StorageError;
+use crate::error::{OptionExt, StorageError};
 use crate::rows::goal::{GoalProjectLinkRow, GoalRow};
 
 /// Explicit column list for the `goals` table.
@@ -60,7 +60,7 @@ impl GoalRepo {
             .bind(id)
             .fetch_optional(&self.pool)
             .await?
-            .ok_or_else(|| StorageError::NotFound(format!("goal '{}'", id)))
+            .ok_or_not_found(&format!("goal '{}'", id))
     }
 
     /// List goals with optional status filter.
@@ -114,7 +114,7 @@ impl GoalRepo {
             .bind(row.id)
             .fetch_optional(&self.pool)
             .await?
-            .ok_or_else(|| StorageError::NotFound(format!("goal '{}'", row.id)))?;
+            .ok_or_not_found(&format!("goal '{}'", row.id))?;
         Ok(result)
     }
 

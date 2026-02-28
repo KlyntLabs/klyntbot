@@ -3,7 +3,7 @@
 use chrono::{DateTime, Utc};
 use sqlx::SqlitePool;
 
-use crate::error::StorageError;
+use crate::error::{OptionExt, StorageError};
 use crate::rows::calendar::CalendarEventCacheRow;
 
 /// Repository for cached calendar events.
@@ -25,7 +25,7 @@ impl CalendarEventCacheRepo {
         .bind(uid)
         .fetch_optional(&self.pool)
         .await?
-        .ok_or_else(|| StorageError::NotFound(format!("cached event '{uid}'")))
+        .ok_or_not_found(&format!("cached event '{uid}'"))
     }
 
     /// List cached events for a provider, ordered by start time.
