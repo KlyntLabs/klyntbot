@@ -10,7 +10,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { AgentSocket, type ConnectionStatus } from '../ws';
-import type { ChatMessage, EntityCardData } from '../types';
+import type { ChatMessage, EntityCardData, MessageToolCall } from '../types';
 import { apiFetch } from '../api';
 import type { SessionWithMessages, InteractionQuestion } from '../types';
 
@@ -404,12 +404,21 @@ export function useAgent(): UseAgentResult {
   const loadSession = useCallback(async (key: string) => {
     try {
       const data = await apiFetch<SessionWithMessages>(`/api/sessions/${key}`);
-      const loaded: ChatMessage[] = data.messages.map((m) => ({
-        id: m.id,
-        role: m.role as ChatMessage['role'],
-        content: m.content,
-        timestamp: new Date(m.timestamp),
-      }));
+      const loaded: ChatMessage[] = data.messages.map((m) => {
+        const meta = m.metadata as Record<string, unknown> | null;
+        return {
+          id: m.id,
+          role: m.role as ChatMessage['role'],
+          content: m.content,
+          timestamp: new Date(m.timestamp),
+          toolCalls: Array.isArray(m.toolCalls)
+            ? (m.toolCalls as MessageToolCall[])
+            : undefined,
+          entityCards: Array.isArray(meta?.entityCards)
+            ? (meta.entityCards as EntityCardData[])
+            : undefined,
+        };
+      });
       setMessages(loaded);
       setSessionKey(key);
       setThinking(null);

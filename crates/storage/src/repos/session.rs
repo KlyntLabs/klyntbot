@@ -233,6 +233,34 @@ impl SessionRepo {
         Ok(result.rows_affected() > 0)
     }
 
+    /// Update the tool_calls and metadata columns on the most recent assistant
+    /// message for the given session key. Used by the dashboard WebSocket handler
+    /// to persist tool-call and entity-card data after the agent saves the message.
+    pub async fn update_last_assistant_metadata(
+        &self,
+        session_key: &str,
+        tool_calls: Option<&serde_json::Value>,
+        metadata: Option<&serde_json::Value>,
+    ) -> Result<bool, StorageError> {
+        let result = sqlx::query(
+            "UPDATE session_messages
+             SET tool_calls = COALESCE(?2, tool_calls),
+                 metadata   = COALESCE(?3, metadata)
+             WHERE id = (
+                 SELECT id FROM session_messages
+                 WHERE session_key = ?1 AND role = 'assistant'
+                 ORDER BY timestamp DESC
+                 LIMIT 1
+             )",
+        )
+        .bind(session_key)
+        .bind(tool_calls)
+        .bind(metadata)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected() > 0)
+    }
+
     /// Delete all sessions that have not been updated within the given TTL.
     ///
     /// Returns the number of sessions deleted (messages are cascade-deleted by the DB).

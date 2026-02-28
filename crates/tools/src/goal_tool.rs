@@ -153,7 +153,7 @@ impl Tool for GoalTool {
                             entity_id: id.to_string(),
                             title: title.to_string(),
                             subtitle: Some(format!("Priority {}", priority)),
-                            route: Some("/plans".to_string()),
+                            route: None,
                             icon_hint: "target".to_string(),
                             metadata: std::collections::HashMap::new(),
                         })

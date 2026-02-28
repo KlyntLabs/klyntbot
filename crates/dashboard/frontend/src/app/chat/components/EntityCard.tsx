@@ -21,6 +21,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string; strokeW
 export function EntityCard({ card }: { card: EntityCardData }) {
   const navigate = useNavigate();
   const Icon = ICON_MAP[card.iconHint] ?? CheckSquare;
+  const isClickable = !!card.route;
 
   const handleClick = () => {
     if (card.route) {
@@ -29,21 +30,23 @@ export function EntityCard({ card }: { card: EntityCardData }) {
   };
 
   return (
-    <motion.button
+    <motion.div
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
-      onClick={handleClick}
-      className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-left transition-colors cursor-pointer"
+      onClick={isClickable ? handleClick : undefined}
+      role={isClickable ? 'button' : undefined}
+      tabIndex={isClickable ? 0 : undefined}
+      className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-left transition-colors ${isClickable ? 'cursor-pointer' : ''}`}
       style={{
         backgroundColor: 'var(--codex-bg-secondary)',
         border: '1px solid var(--codex-border)',
       }}
-      onMouseEnter={(e) => {
+      onMouseEnter={isClickable ? (e) => {
         e.currentTarget.style.borderColor = 'var(--codex-accent)';
-      }}
-      onMouseLeave={(e) => {
+      } : undefined}
+      onMouseLeave={isClickable ? (e) => {
         e.currentTarget.style.borderColor = 'var(--codex-border)';
-      }}
+      } : undefined}
     >
       <div
         className="flex items-center justify-center w-8 h-8 rounded-md flex-shrink-0"
@@ -67,11 +70,13 @@ export function EntityCard({ card }: { card: EntityCardData }) {
           </div>
         )}
       </div>
-      <ChevronRight
-        className="w-4 h-4 flex-shrink-0"
-        strokeWidth={1.5}
-        style={{ color: 'var(--codex-fg-subtle)' }}
-      />
-    </motion.button>
+      {isClickable && (
+        <ChevronRight
+          className="w-4 h-4 flex-shrink-0"
+          strokeWidth={1.5}
+          style={{ color: 'var(--codex-fg-subtle)' }}
+        />
+      )}
+    </motion.div>
   );
 }

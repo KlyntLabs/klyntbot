@@ -187,6 +187,9 @@ async fn on_client_text(
                 return;
             }
 
+            // Clone session key before it's moved into process_direct_streaming.
+            let sk_for_persist = session_key.clone();
+
             match state
                 .agent_loop
                 .process_direct_streaming(message, session_key)
@@ -200,9 +203,48 @@ async fn on_client_text(
                     let fwd_events = fwd_tx.clone();
                     let fwd_interactions = fwd_tx.clone();
 
-                    // Task 1: Forward AgentEvents → FwdMsg::Frame; signal StreamEnded when done.
+                    // Clone state for metadata persistence after stream ends.
+                    let repos = state.repos.clone();
+                    let sk = sk_for_persist;
+
+                    // Task 1: Forward AgentEvents → FwdMsg::Frame; accumulate
+                    // tool calls and entity cards, then persist after stream ends.
                     tokio::spawn(async move {
+                        // Accumulate tool-call and entity-card data during streaming.
+                        let mut pending_args: Vec<(String, serde_json::Value)> = Vec::new();
+                        let mut completed_tools: Vec<serde_json::Value> = Vec::new();
+                        let mut entity_cards: Vec<serde_json::Value> = Vec::new();
+
                         while let Some(event) = event_rx.recv().await {
+                            // Collect structured metadata from specific event types.
+                            if let agent::AgentEvent::ToolStart { name, args } = &event {
+                                pending_args.push((name.clone(), args.clone()));
+                            }
+                            if let agent::AgentEvent::ToolEnd {
+                                name,
+                                success,
+                                duration_ms,
+                                result,
+                            } = &event
+                            {
+                                let args = pending_args
+                                    .iter()
+                                    .rposition(|t| t.0 == *name)
+                                    .map(|i| pending_args.remove(i).1);
+                                completed_tools.push(serde_json::json!({
+                                    "name": name,
+                                    "args": args,
+                                    "durationMs": duration_ms,
+                                    "success": success,
+                                    "result": result,
+                                }));
+                            }
+                            if let agent::AgentEvent::EntityCreated(card) = &event {
+                                if let Ok(v) = serde_json::to_value(card) {
+                                    entity_cards.push(v);
+                                }
+                            }
+
                             match serde_json::to_string(&event) {
                                 Ok(json) => {
                                     if fwd_events.send(FwdMsg::Frame(json)).await.is_err() {
@@ -212,6 +254,41 @@ async fn on_client_text(
                                 Err(_) => break,
                             }
                         }
+
+                        tracing::debug!(
+                            "WS stream ended for {}: {} tools, {} entities",
+                            sk,
+                            completed_tools.len(),
+                            entity_cards.len()
+                        );
+
+                        // Persist accumulated metadata to the latest assistant message.
+                        if !completed_tools.is_empty() || !entity_cards.is_empty() {
+                            let tc = if completed_tools.is_empty() {
+                                None
+                            } else {
+                                Some(serde_json::Value::Array(completed_tools))
+                            };
+                            let metadata = if entity_cards.is_empty() {
+                                None
+                            } else {
+                                let mut m = serde_json::Map::new();
+                                m.insert(
+                                    "entityCards".into(),
+                                    serde_json::Value::Array(entity_cards),
+                                );
+                                Some(serde_json::Value::Object(m))
+                            };
+                            let _ = repos
+                                .sessions
+                                .update_last_assistant_metadata(
+                                    &sk,
+                                    tc.as_ref(),
+                                    metadata.as_ref(),
+                                )
+                                .await;
+                        }
+
                         // Notify main loop that streaming is complete.
                         let _ = fwd_events.send(FwdMsg::StreamEnded).await;
                     });
