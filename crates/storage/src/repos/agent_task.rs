@@ -196,7 +196,7 @@ mod tests {
         let repo = setup().await;
         let t1 = repo.create("sess:1", "First", &[] as &[String]).await.unwrap();
         let _t2 = repo
-            .create("sess:1", "Second (blocked)", &[t1.id.clone()])
+            .create("sess:1", "Second (blocked)", std::slice::from_ref(&t1.id))
             .await
             .unwrap();
         let t3 = repo.create("sess:1", "Third (free)", &[] as &[String]).await.unwrap();
