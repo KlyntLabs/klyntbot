@@ -211,14 +211,21 @@ async fn on_client_text(
                     // tool calls and entity cards, then persist after stream ends.
                     tokio::spawn(async move {
                         // Accumulate tool-call and entity-card data during streaming.
-                        let mut pending_args: Vec<(String, serde_json::Value)> = Vec::new();
+                        // Use a HashMap of VecDeque for O(1) lookup + pop of pending tool args.
+                        let mut pending_args: HashMap<
+                            String,
+                            std::collections::VecDeque<serde_json::Value>,
+                        > = HashMap::new();
                         let mut completed_tools: Vec<serde_json::Value> = Vec::new();
                         let mut entity_cards: Vec<serde_json::Value> = Vec::new();
 
                         while let Some(event) = event_rx.recv().await {
                             // Collect structured metadata from specific event types.
                             if let agent::AgentEvent::ToolStart { name, args } = &event {
-                                pending_args.push((name.clone(), args.clone()));
+                                pending_args
+                                    .entry(name.clone())
+                                    .or_default()
+                                    .push_back(args.clone());
                             }
                             if let agent::AgentEvent::ToolEnd {
                                 name,
@@ -228,9 +235,8 @@ async fn on_client_text(
                             } = &event
                             {
                                 let args = pending_args
-                                    .iter()
-                                    .rposition(|t| t.0 == *name)
-                                    .map(|i| pending_args.remove(i).1);
+                                    .get_mut(name.as_str())
+                                    .and_then(|q| q.pop_front());
                                 completed_tools.push(serde_json::json!({
                                     "name": name,
                                     "args": args,

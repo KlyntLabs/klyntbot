@@ -13,6 +13,7 @@ use storage::rows::finance::{
     FinanceTransactionPatch, FinanceTransactionRow,
 };
 
+use crate::api::deleted_or_not_found;
 use crate::error::ApiError;
 use crate::state::AppState;
 
@@ -130,11 +131,7 @@ pub async fn delete_account(
         .delete(&id)
         .await
         .map_err(ApiError::from)?;
-    if deleted {
-        Ok(StatusCode::NO_CONTENT)
-    } else {
-        Err(ApiError::not_found(format!("account '{id}' not found")))
-    }
+    deleted_or_not_found(deleted, "account", &id)
 }
 
 // ============================================================
@@ -264,11 +261,7 @@ pub async fn delete_transaction(
         .delete(&id)
         .await
         .map_err(ApiError::from)?;
-    if deleted.is_some() {
-        Ok(StatusCode::NO_CONTENT)
-    } else {
-        Err(ApiError::not_found(format!("transaction '{id}' not found")))
-    }
+    deleted_or_not_found(deleted.is_some(), "transaction", &id)
 }
 
 // ============================================================
@@ -376,11 +369,7 @@ pub async fn delete_budget(
         .delete(&id)
         .await
         .map_err(ApiError::from)?;
-    if deleted {
-        Ok(StatusCode::NO_CONTENT)
-    } else {
-        Err(ApiError::not_found(format!("budget '{id}' not found")))
-    }
+    deleted_or_not_found(deleted, "budget", &id)
 }
 
 /// GET /api/finance/budgets/usage
@@ -504,11 +493,7 @@ pub async fn delete_investment(
         .delete_investment(&id)
         .await
         .map_err(ApiError::from)?;
-    if deleted {
-        Ok(StatusCode::NO_CONTENT)
-    } else {
-        Err(ApiError::not_found(format!("investment '{id}' not found")))
-    }
+    deleted_or_not_found(deleted, "investment", &id)
 }
 
 // ============================================================
@@ -624,11 +609,7 @@ pub async fn delete_goal(
         .delete(&id)
         .await
         .map_err(ApiError::from)?;
-    if deleted {
-        Ok(StatusCode::NO_CONTENT)
-    } else {
-        Err(ApiError::not_found(format!("goal '{id}' not found")))
-    }
+    deleted_or_not_found(deleted, "goal", &id)
 }
 
 // ============================================================
@@ -734,9 +715,5 @@ pub async fn delete_liability(
         .delete(&id)
         .await
         .map_err(ApiError::from)?;
-    if deleted {
-        Ok(StatusCode::NO_CONTENT)
-    } else {
-        Err(ApiError::not_found(format!("liability '{id}' not found")))
-    }
+    deleted_or_not_found(deleted, "liability", &id)
 }

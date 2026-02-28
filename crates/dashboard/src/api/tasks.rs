@@ -7,6 +7,7 @@ use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use storage::{TodoFilter, TodoPatch, TodoRow};
 
+use crate::api::{deleted_or_not_found, parse_comma_tags};
 use crate::error::ApiError;
 use crate::state::AppState;
 
@@ -75,10 +76,6 @@ pub struct FocusParams {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-fn storage_err(e: storage::StorageError) -> ApiError {
-    ApiError::from(common::KlyntbotError::from(e))
-}
-
 fn validate_create(req: &CreateTaskRequest) -> Result<(), ApiError> {
     if req.title.trim().is_empty() {
         return Err(ApiError::unprocessable("title must not be empty"));
@@ -111,12 +108,7 @@ pub async fn list_tasks(
     State(state): State<AppState>,
     Query(params): Query<TaskQueryParams>,
 ) -> Result<Json<Vec<TodoRow>>, ApiError> {
-    let tags = params.tags.as_deref().map(|s| {
-        s.split(',')
-            .map(|t| t.trim().to_string())
-            .filter(|t| !t.is_empty())
-            .collect::<Vec<_>>()
-    });
+    let tags = params.tags.as_deref().map(parse_comma_tags);
 
     let filter = TodoFilter {
         status: params.status,
@@ -127,7 +119,12 @@ pub async fn list_tasks(
         templates_only: params.templates_only.unwrap_or(false),
     };
 
-    let rows = state.repos.todos.list(&filter).await.map_err(storage_err)?;
+    let rows = state
+        .repos
+        .todos
+        .list(&filter)
+        .await
+        .map_err(ApiError::from)?;
     Ok(Json(rows))
 }
 
@@ -166,7 +163,7 @@ pub async fn create_task(
         next_instance_date: None,
     };
 
-    let inserted = state.repos.todos.add(&row).await.map_err(storage_err)?;
+    let inserted = state.repos.todos.add(&row).await.map_err(ApiError::from)?;
     Ok((StatusCode::CREATED, Json(inserted)))
 }
 
@@ -175,7 +172,7 @@ pub async fn create_task(
 pub async fn get_summary(
     State(state): State<AppState>,
 ) -> Result<Json<storage::TodoSummary>, ApiError> {
-    let summary = state.repos.todos.summary().await.map_err(storage_err)?;
+    let summary = state.repos.todos.summary().await.map_err(ApiError::from)?;
     Ok(Json(summary))
 }
 
@@ -190,7 +187,7 @@ pub async fn get_task(
         .todos
         .get_or_err(&id)
         .await
-        .map_err(storage_err)?;
+        .map_err(ApiError::from)?;
     Ok(Json(row))
 }
 
@@ -225,14 +222,14 @@ pub async fn patch_task(
         .todos
         .get_or_err(&id)
         .await
-        .map_err(storage_err)?;
+        .map_err(ApiError::from)?;
 
     let updated = state
         .repos
         .todos
         .update(&patch)
         .await
-        .map_err(storage_err)?;
+        .map_err(ApiError::from)?;
     Ok(Json(updated))
 }
 
@@ -242,13 +239,13 @@ pub async fn delete_task(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
-    let deleted = state.repos.todos.delete(&id).await.map_err(storage_err)?;
-
-    if deleted {
-        Ok(StatusCode::NO_CONTENT)
-    } else {
-        Err(ApiError::not_found(format!("task '{id}' not found")))
-    }
+    let deleted = state
+        .repos
+        .todos
+        .delete(&id)
+        .await
+        .map_err(ApiError::from)?;
+    deleted_or_not_found(deleted, "task", &id)
 }
 
 // ── GET /api/tasks/:id/subtasks ───────────────────────────────────────────────
@@ -263,14 +260,14 @@ pub async fn get_subtasks(
         .todos
         .get_or_err(&id)
         .await
-        .map_err(storage_err)?;
+        .map_err(ApiError::from)?;
 
     let children = state
         .repos
         .todos
         .get_children(&id)
         .await
-        .map_err(storage_err)?;
+        .map_err(ApiError::from)?;
     Ok(Json(children))
 }
 
@@ -285,14 +282,14 @@ pub async fn get_attachments(
         .todos
         .get_or_err(&id)
         .await
-        .map_err(storage_err)?;
+        .map_err(ApiError::from)?;
 
     let attachments = state
         .repos
         .todos
         .list_attachments(&id)
         .await
-        .map_err(storage_err)?;
+        .map_err(ApiError::from)?;
     Ok(Json(attachments))
 }
 
@@ -307,14 +304,14 @@ pub async fn get_time_entries(
         .todos
         .get_or_err(&id)
         .await
-        .map_err(storage_err)?;
+        .map_err(ApiError::from)?;
 
     let entries = state
         .repos
         .todos
         .list_time_entries(&id)
         .await
-        .map_err(storage_err)?;
+        .map_err(ApiError::from)?;
     Ok(Json(entries))
 }
 
@@ -330,7 +327,7 @@ pub async fn add_time_entry(
         .todos
         .get_or_err(&id)
         .await
-        .map_err(storage_err)?;
+        .map_err(ApiError::from)?;
 
     let source = req.source.as_deref().unwrap_or("manual");
     let started_at = req.started_at.unwrap_or_else(Utc::now);
@@ -346,7 +343,7 @@ pub async fn add_time_entry(
             req.note.as_deref(),
         )
         .await
-        .map_err(storage_err)?;
+        .map_err(ApiError::from)?;
 
     Ok((StatusCode::CREATED, Json(entry)))
 }
@@ -363,7 +360,7 @@ pub async fn set_focus(
         .todos
         .get_or_err(&id)
         .await
-        .map_err(storage_err)?;
+        .map_err(ApiError::from)?;
 
     let max_slots = params.max_slots.unwrap_or(3);
     let focused = state
@@ -371,7 +368,7 @@ pub async fn set_focus(
         .todos
         .focus(&id, max_slots, params.deadline)
         .await
-        .map_err(storage_err)?;
+        .map_err(ApiError::from)?;
 
     Ok(Json(serde_json::json!({ "focused": focused })))
 }
@@ -387,9 +384,14 @@ pub async fn delete_focus(
         .todos
         .get_or_err(&id)
         .await
-        .map_err(storage_err)?;
+        .map_err(ApiError::from)?;
 
-    state.repos.todos.unfocus(&id).await.map_err(storage_err)?;
+    state
+        .repos
+        .todos
+        .unfocus(&id)
+        .await
+        .map_err(ApiError::from)?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -420,20 +422,20 @@ pub async fn get_task_dependencies(
         .todos
         .get_or_err(&id)
         .await
-        .map_err(storage_err)?;
+        .map_err(ApiError::from)?;
 
     let blocked_by = state
         .repos
         .todos
         .get_blockers(&id)
         .await
-        .map_err(storage_err)?;
+        .map_err(ApiError::from)?;
     let blocks = state
         .repos
         .todos
         .get_blocking(&id)
         .await
-        .map_err(storage_err)?;
+        .map_err(ApiError::from)?;
 
     Ok(Json(DependenciesResponse { blocked_by, blocks }))
 }
@@ -450,20 +452,20 @@ pub async fn add_task_dependency(
         .todos
         .get_or_err(&id)
         .await
-        .map_err(storage_err)?;
+        .map_err(ApiError::from)?;
     state
         .repos
         .todos
         .get_or_err(&req.blocker_id)
         .await
-        .map_err(storage_err)?;
+        .map_err(ApiError::from)?;
 
     state
         .repos
         .todos
         .add_dependency(&id, &req.blocker_id)
         .await
-        .map_err(storage_err)?;
+        .map_err(ApiError::from)?;
 
     Ok(StatusCode::CREATED)
 }
@@ -479,20 +481,14 @@ pub async fn remove_task_dependency(
         .todos
         .get_or_err(&id)
         .await
-        .map_err(storage_err)?;
+        .map_err(ApiError::from)?;
 
     let removed = state
         .repos
         .todos
         .remove_dependency(&id, &blocker_id)
         .await
-        .map_err(storage_err)?;
+        .map_err(ApiError::from)?;
 
-    if removed {
-        Ok(StatusCode::NO_CONTENT)
-    } else {
-        Err(ApiError::not_found(format!(
-            "dependency {id} -> {blocker_id} not found"
-        )))
-    }
+    deleted_or_not_found(removed, "dependency", &format!("{id} -> {blocker_id}"))
 }

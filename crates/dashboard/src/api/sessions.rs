@@ -6,6 +6,7 @@ use axum::Json;
 use serde::Serialize;
 use storage::{SessionListRow, SessionMessageRow, SessionRow};
 
+use crate::api::deleted_or_not_found;
 use crate::error::ApiError;
 use crate::state::AppState;
 
@@ -19,12 +20,6 @@ pub struct SessionWithMessages {
     pub messages: Vec<SessionMessageRow>,
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-fn storage_err(e: storage::StorageError) -> ApiError {
-    ApiError::from(common::KlyntbotError::from(e))
-}
-
 // ── GET /api/sessions ─────────────────────────────────────────────────────────
 
 pub async fn list_sessions(
@@ -35,7 +30,7 @@ pub async fn list_sessions(
         .sessions
         .list_sessions()
         .await
-        .map_err(storage_err)?;
+        .map_err(ApiError::from)?;
     Ok(Json(rows))
 }
 
@@ -50,14 +45,14 @@ pub async fn get_session(
         .sessions
         .get_session(&key)
         .await
-        .map_err(storage_err)?;
+        .map_err(ApiError::from)?;
 
     let messages = state
         .repos
         .sessions
         .get_messages(&key)
         .await
-        .map_err(storage_err)?;
+        .map_err(ApiError::from)?;
 
     Ok(Json(SessionWithMessages { session, messages }))
 }
@@ -73,11 +68,7 @@ pub async fn delete_session(
         .sessions
         .delete_session(&key)
         .await
-        .map_err(storage_err)?;
+        .map_err(ApiError::from)?;
 
-    if deleted {
-        Ok(StatusCode::NO_CONTENT)
-    } else {
-        Err(ApiError::not_found(format!("session '{key}' not found")))
-    }
+    deleted_or_not_found(deleted, "session", &key)
 }

@@ -28,21 +28,26 @@ pub struct StorageStats {
 }
 
 pub async fn get_status(State(state): State<AppState>) -> Result<Json<StatusResponse>, ApiError> {
-    let task_count = state
-        .repos
-        .todos
-        .summary()
-        .await
-        .map(|s| s.total)
-        .unwrap_or(0);
-
-    let session_count = state
-        .repos
-        .sessions
-        .list_sessions()
-        .await
-        .map(|s| s.len() as i64)
-        .unwrap_or(0);
+    let (task_count, session_count) = tokio::join!(
+        async {
+            state
+                .repos
+                .todos
+                .summary()
+                .await
+                .map(|s| s.total)
+                .unwrap_or(0)
+        },
+        async {
+            state
+                .repos
+                .sessions
+                .list_sessions()
+                .await
+                .map(|s| s.len() as i64)
+                .unwrap_or(0)
+        },
+    );
 
     let config = state
         .config

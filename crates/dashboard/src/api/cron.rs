@@ -5,6 +5,7 @@ use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
 
+use crate::api::deleted_or_not_found;
 use crate::error::ApiError;
 use crate::state::AppState;
 
@@ -111,9 +112,5 @@ pub async fn delete_cron(
     Path(id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
     let deleted = state.repos.cron.delete(&id).await.map_err(ApiError::from)?;
-    if deleted {
-        Ok(StatusCode::NO_CONTENT)
-    } else {
-        Err(ApiError::not_found(format!("cron job '{id}' not found")))
-    }
+    deleted_or_not_found(deleted, "cron job", &id)
 }

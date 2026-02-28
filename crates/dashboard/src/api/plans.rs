@@ -60,10 +60,6 @@ pub struct PlanWithSteps {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-fn storage_err(e: storage::StorageError) -> ApiError {
-    ApiError::from(common::KlyntbotError::from(e))
-}
-
 fn validate_create(req: &CreatePlanRequest) -> Result<(), ApiError> {
     if req.title.trim().is_empty() {
         return Err(ApiError::unprocessable("title must not be empty"));
@@ -87,7 +83,7 @@ pub async fn list_plans(
             params.visibility.as_deref(),
         )
         .await
-        .map_err(storage_err)?;
+        .map_err(ApiError::from)?;
     Ok(Json(rows))
 }
 
@@ -123,7 +119,12 @@ pub async fn create_plan(
         completed_at: None,
     };
 
-    let inserted = state.repos.plans.create(&row).await.map_err(storage_err)?;
+    let inserted = state
+        .repos
+        .plans
+        .create(&row)
+        .await
+        .map_err(ApiError::from)?;
     Ok((StatusCode::CREATED, Json(inserted)))
 }
 
@@ -133,8 +134,13 @@ pub async fn get_plan(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<PlanWithSteps>, ApiError> {
-    let plan = state.repos.plans.get(id).await.map_err(storage_err)?;
-    let steps = state.repos.plans.get_steps(id).await.map_err(storage_err)?;
+    let plan = state.repos.plans.get(id).await.map_err(ApiError::from)?;
+    let steps = state
+        .repos
+        .plans
+        .get_steps(id)
+        .await
+        .map_err(ApiError::from)?;
     Ok(Json(PlanWithSteps { plan, steps }))
 }
 
@@ -151,7 +157,7 @@ pub async fn patch_plan(
         }
     }
 
-    let mut row = state.repos.plans.get(id).await.map_err(storage_err)?;
+    let mut row = state.repos.plans.get(id).await.map_err(ApiError::from)?;
 
     if let Some(title) = req.title {
         row.title = title.trim().to_string();
@@ -164,7 +170,12 @@ pub async fn patch_plan(
     }
     row.updated_at = Utc::now();
 
-    let updated = state.repos.plans.update(&row).await.map_err(storage_err)?;
+    let updated = state
+        .repos
+        .plans
+        .update(&row)
+        .await
+        .map_err(ApiError::from)?;
     Ok(Json(updated))
 }
 
@@ -175,9 +186,14 @@ pub async fn get_plan_steps(
     Path(id): Path<Uuid>,
 ) -> Result<Json<Vec<PlanStepRow>>, ApiError> {
     // Confirm the plan exists — get() returns NotFound if absent.
-    state.repos.plans.get(id).await.map_err(storage_err)?;
+    state.repos.plans.get(id).await.map_err(ApiError::from)?;
 
-    let steps = state.repos.plans.get_steps(id).await.map_err(storage_err)?;
+    let steps = state
+        .repos
+        .plans
+        .get_steps(id)
+        .await
+        .map_err(ApiError::from)?;
     Ok(Json(steps))
 }
 
@@ -188,7 +204,7 @@ pub async fn update_plan_status(
     Path(id): Path<Uuid>,
     Json(req): Json<UpdateStatusRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    let plan = state.repos.plans.get(id).await.map_err(storage_err)?;
+    let plan = state.repos.plans.get(id).await.map_err(ApiError::from)?;
 
     let from = plan::conversions::str_to_plan_status(&plan.status);
     let to = plan::conversions::str_to_plan_status(&req.status);
@@ -206,7 +222,7 @@ pub async fn update_plan_status(
         .plans
         .update_status(id, &req.status)
         .await
-        .map_err(storage_err)?;
+        .map_err(ApiError::from)?;
 
     Ok(Json(serde_json::json!({ "status": req.status })))
 }
@@ -217,6 +233,6 @@ pub async fn delete_plan(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
-    state.repos.plans.delete(id).await.map_err(storage_err)?;
+    state.repos.plans.delete(id).await.map_err(ApiError::from)?;
     Ok(StatusCode::NO_CONTENT)
 }

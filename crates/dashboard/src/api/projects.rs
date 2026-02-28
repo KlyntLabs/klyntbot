@@ -7,6 +7,7 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use storage::{ProjectFilter, ProjectPatch, ProjectRow, ProjectWithStats};
 
+use crate::api::{deleted_or_not_found, parse_comma_tags};
 use crate::error::ApiError;
 use crate::state::AppState;
 
@@ -60,10 +61,6 @@ pub enum ProjectGetResponse {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-fn storage_err(e: storage::StorageError) -> ApiError {
-    ApiError::from(common::KlyntbotError::from(e))
-}
-
 fn validate_create(req: &CreateProjectRequest) -> Result<(), ApiError> {
     if req.name.trim().is_empty() {
         return Err(ApiError::unprocessable("name must not be empty"));
@@ -86,12 +83,7 @@ pub async fn list_projects(
     State(state): State<AppState>,
     Query(params): Query<ProjectQueryParams>,
 ) -> Result<Json<Vec<ProjectRow>>, ApiError> {
-    let tags = params.tags.as_deref().map(|s| {
-        s.split(',')
-            .map(|t| t.trim().to_string())
-            .filter(|t| !t.is_empty())
-            .collect::<Vec<_>>()
-    });
+    let tags = params.tags.as_deref().map(parse_comma_tags);
 
     let filter = ProjectFilter {
         status: params.status,
@@ -104,7 +96,7 @@ pub async fn list_projects(
         .projects
         .list(&filter)
         .await
-        .map_err(storage_err)?;
+        .map_err(ApiError::from)?;
     Ok(Json(rows))
 }
 
@@ -133,7 +125,7 @@ pub async fn create_project(
         .projects
         .create(&row)
         .await
-        .map_err(storage_err)?;
+        .map_err(ApiError::from)?;
     Ok((StatusCode::CREATED, Json(inserted)))
 }
 
@@ -150,7 +142,7 @@ pub async fn get_project(
             .projects
             .get_with_stats(&id)
             .await
-            .map_err(storage_err)?;
+            .map_err(ApiError::from)?;
 
         match result {
             Some(stats) => Ok(Json(ProjectGetResponse::WithStats(stats))),
@@ -162,7 +154,7 @@ pub async fn get_project(
             .projects
             .get_or_err(&id)
             .await
-            .map_err(storage_err)?;
+            .map_err(ApiError::from)?;
         Ok(Json(ProjectGetResponse::Plain(row)))
     }
 }
@@ -182,7 +174,7 @@ pub async fn patch_project(
         .projects
         .get_or_err(&id)
         .await
-        .map_err(storage_err)?;
+        .map_err(ApiError::from)?;
 
     let patch = ProjectPatch {
         id: id.clone(),
@@ -198,7 +190,7 @@ pub async fn patch_project(
         .projects
         .update(&patch)
         .await
-        .map_err(storage_err)?;
+        .map_err(ApiError::from)?;
     Ok(Json(updated))
 }
 
@@ -213,11 +205,6 @@ pub async fn delete_project(
         .projects
         .delete(&id)
         .await
-        .map_err(storage_err)?;
-
-    if deleted {
-        Ok(StatusCode::NO_CONTENT)
-    } else {
-        Err(ApiError::not_found(format!("project '{id}' not found")))
-    }
+        .map_err(ApiError::from)?;
+    deleted_or_not_found(deleted, "project", &id)
 }

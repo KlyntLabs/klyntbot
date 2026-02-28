@@ -54,9 +54,14 @@ fn default_version() -> String {
     "1.0".to_string()
 }
 
-/// Derive source from the skill's path field.
+/// Check whether a skill is a built-in (bundled) skill vs. a workspace skill.
+fn is_builtin(skill: &agent::skills::Skill) -> bool {
+    skill.path.to_string_lossy().starts_with("builtin::")
+}
+
+/// Derive source label from the skill's origin.
 fn skill_source(skill: &agent::skills::Skill) -> String {
-    if skill.path.to_string_lossy().starts_with("builtin::") {
+    if is_builtin(skill) {
         "built-in".to_string()
     } else {
         "workspace".to_string()
@@ -82,9 +87,9 @@ fn to_response(skill: &agent::skills::Skill, enabled: bool) -> SkillResponse {
 
 /// GET /api/skills — list all skills with enabled state from config.
 pub async fn list_skills(State(state): State<AppState>) -> Json<Vec<SkillResponse>> {
-    let enabled_skills = {
+    let enabled_set: std::collections::HashSet<String> = {
         let config = state.config.read().unwrap_or_else(|e| e.into_inner());
-        config.packs.enabled_skills.clone()
+        config.packs.enabled_skills.iter().cloned().collect()
     };
     let skills = state
         .agent_loop
@@ -92,8 +97,8 @@ pub async fn list_skills(State(state): State<AppState>) -> Json<Vec<SkillRespons
         .all()
         .into_iter()
         .map(|s| {
-            let enabled = if s.path.to_string_lossy().starts_with("builtin::") {
-                enabled_skills.iter().any(|n| n == &s.name)
+            let enabled = if is_builtin(s) {
+                enabled_set.contains(&s.name)
             } else {
                 true // workspace skills are always enabled
             };
@@ -116,7 +121,7 @@ pub async fn get_skill(
 
     let enabled = {
         let config = state.config.read().unwrap_or_else(|e| e.into_inner());
-        if skill.path.to_string_lossy().starts_with("builtin::") {
+        if is_builtin(skill) {
             config.packs.enabled_skills.iter().any(|n| n == &skill.name)
         } else {
             true
@@ -172,10 +177,10 @@ pub async fn update_skill(
         .get(&name)
         .ok_or_else(|| ApiError::not_found(format!("skill '{name}' not found")))?;
 
-    let is_builtin = skill.path.to_string_lossy().starts_with("builtin::");
+    let builtin = is_builtin(skill);
 
     // Handle enabled toggle for built-in skills
-    let mut final_enabled = if is_builtin {
+    let mut final_enabled = if builtin {
         let config = state.config.read().unwrap_or_else(|e| e.into_inner());
         config.packs.enabled_skills.iter().any(|n| n == &skill.name)
     } else {
@@ -183,7 +188,7 @@ pub async fn update_skill(
     };
 
     if let Some(enabled) = req.enabled {
-        if is_builtin {
+        if builtin {
             // Update config.packs.enabledSkills
             let current = config::load()
                 .await
@@ -242,7 +247,7 @@ pub async fn update_skill(
         || req.always.is_some();
 
     if has_content_update {
-        if is_builtin {
+        if builtin {
             return Err(ApiError::unprocessable(
                 "cannot update content of a built-in skill",
             ));
@@ -380,7 +385,7 @@ pub async fn delete_skill(
         .ok_or_else(|| ApiError::not_found(format!("skill '{name}' not found")))?;
 
     // Only workspace skills can be deleted
-    if skill.path.to_string_lossy().starts_with("builtin::") {
+    if is_builtin(skill) {
         return Err(ApiError::unprocessable("cannot delete a built-in skill"));
     }
 
