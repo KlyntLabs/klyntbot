@@ -383,6 +383,9 @@ fn reactive_analysis(
 }
 
 /// Infer relevant tool groups from message keywords.
+///
+/// Reuses `is_task_management` and `has_tool_keyword` where possible,
+/// adding domain-specific keywords only for groups those helpers don't cover.
 fn infer_tool_groups(msg: &str) -> Vec<ToolGroup> {
     let mut groups = Vec::new();
 
@@ -407,19 +410,14 @@ fn infer_tool_groups(msg: &str) -> Vec<ToolGroup> {
         groups.push(ToolGroup::Finance);
     }
 
-    // Task/todo keywords
-    if msg.contains("task") || msg.contains("todo") || msg.contains("goal") || msg.contains("plan")
+    // Task/todo keywords — reuse is_task_management + extra domain terms
+    if is_task_management(msg) || msg.contains("task") || msg.contains("todo") || msg.contains("goal") || msg.contains("plan")
     {
         groups.push(ToolGroup::TaskManagement);
     }
 
-    // Search/file keywords
-    if msg.contains("search")
-        || msg.contains("find")
-        || msg.contains("look up")
-        || msg.contains("fetch")
-        || msg.contains("read")
-    {
+    // Search/file keywords — reuse has_tool_keyword
+    if has_tool_keyword(msg) {
         groups.push(ToolGroup::Search);
     }
 

@@ -72,7 +72,11 @@ impl Tool for AgentTaskTool {
                 },
                 "result": {
                     "type": "string",
-                    "description": "Result text (for update/complete) or error message (for fail)"
+                    "description": "Result text (for update/complete actions)"
+                },
+                "error": {
+                    "type": "string",
+                    "description": "Error message explaining the failure (for fail action)"
                 },
                 "status": {
                     "type": "string",
@@ -107,7 +111,7 @@ impl Tool for AgentTaskTool {
             }
             "fail" => {
                 let task_id = p.required_str("task_id")?;
-                let error = p.str_or("result", "Task failed")?;
+                let error = p.str_or("error", "Task failed")?;
                 self.handler.fail_task(task_id, error).await
             }
             _ => Err(ToolError::InvalidParams(format!("Unknown action: {}", action)).into()),

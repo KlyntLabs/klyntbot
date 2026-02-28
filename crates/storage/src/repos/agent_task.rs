@@ -2,6 +2,7 @@
 
 use crate::rows::agent_task::AgentTaskRow;
 use crate::StorageError;
+use chrono::Utc;
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
@@ -40,15 +41,16 @@ impl AgentTaskRepo {
     }
 
     pub async fn claim(&self, task_id: &str, agent_id: &str) -> Result<AgentTaskRow, StorageError> {
+        let now = Utc::now();
         sqlx::query_as::<_, AgentTaskRow>(
             "UPDATE agent_tasks
-             SET owner_agent_id = ?1, status = 'claimed',
-                 updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+             SET owner_agent_id = ?1, status = 'claimed', updated_at = ?3
              WHERE id = ?2 AND owner_agent_id IS NULL AND status = 'pending'
              RETURNING *",
         )
         .bind(agent_id)
         .bind(task_id)
+        .bind(now)
         .fetch_optional(&self.pool)
         .await?
         .ok_or_else(|| {
@@ -63,10 +65,10 @@ impl AgentTaskRepo {
         result: Option<&str>,
         error: Option<&str>,
     ) -> Result<AgentTaskRow, StorageError> {
+        let now = Utc::now();
         sqlx::query_as::<_, AgentTaskRow>(
             "UPDATE agent_tasks
-             SET status = ?1, result = ?2, error = ?3,
-                 updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+             SET status = ?1, result = ?2, error = ?3, updated_at = ?5
              WHERE id = ?4
              RETURNING *",
         )
@@ -74,6 +76,7 @@ impl AgentTaskRepo {
         .bind(result)
         .bind(error)
         .bind(task_id)
+        .bind(now)
         .fetch_optional(&self.pool)
         .await?
         .ok_or_else(|| StorageError::NotFound(format!("Task {} not found", task_id)))
@@ -96,20 +99,31 @@ impl AgentTaskRepo {
         &self,
         session_key: &str,
     ) -> Result<Vec<AgentTaskRow>, StorageError> {
-        // Available = unclaimed AND not blocked by any incomplete task
-        let all = self.list_by_session(session_key).await?;
-        let completed_ids: std::collections::HashSet<String> = all
-            .iter()
-            .filter(|t| t.status == "completed")
-            .map(|t| t.id.clone())
-            .collect();
+        // Available = pending, unclaimed, and all blocked_by tasks are completed.
+        // First fetch only pending+unclaimed rows (avoids loading completed/failed rows).
+        let pending: Vec<AgentTaskRow> = sqlx::query_as::<_, AgentTaskRow>(
+            "SELECT * FROM agent_tasks
+             WHERE session_key = ?1 AND status = 'pending' AND owner_agent_id IS NULL
+             ORDER BY created_at",
+        )
+        .bind(session_key)
+        .fetch_all(&self.pool)
+        .await?;
 
-        Ok(all
+        // For tasks with dependencies, check if all blockers are completed.
+        // Only fetch completed IDs (not full rows) for the dependency check.
+        let completed_ids: std::collections::HashSet<String> = sqlx::query_scalar::<_, String>(
+            "SELECT id FROM agent_tasks WHERE session_key = ?1 AND status = 'completed'",
+        )
+        .bind(session_key)
+        .fetch_all(&self.pool)
+        .await?
+        .into_iter()
+        .collect();
+
+        Ok(pending
             .into_iter()
             .filter(|t| {
-                if t.status != "pending" || t.owner_agent_id.is_some() {
-                    return false;
-                }
                 let blocked: Vec<String> = serde_json::from_str(&t.blocked_by).unwrap_or_default();
                 blocked.iter().all(|id| completed_ids.contains(id))
             })

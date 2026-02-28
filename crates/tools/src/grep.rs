@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use globset::{Glob, GlobMatcher};
 use regex::Regex;
 use serde_json::Value;
+use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use walkdir::WalkDir;
 
@@ -81,13 +82,7 @@ impl Tool for GrepTool {
         let re = Regex::new(pattern_str)
             .map_err(|e| ToolError::InvalidParams(format!("Invalid regex: {}", e)))?;
 
-        let search_path = if let Some(path) = p.optional_str("path")? {
-            self.base.resolve_path(path)?
-        } else if let Some(ref dir) = self.base.allowed_dir() {
-            dir.clone()
-        } else {
-            std::env::current_dir().map_err(|e| ToolError::ExecutionFailed(e.to_string()))?
-        };
+        let search_path = self.base.resolve_search_root(p.optional_str("path")?)?;
 
         let glob_matcher: Option<GlobMatcher> = if let Some(glob_str) = p.optional_str("glob")? {
             Some(
@@ -99,81 +94,98 @@ impl Tool for GrepTool {
             None
         };
 
-        let mut results = Vec::new();
-        let mut match_count = 0;
+        let pattern_display = pattern_str.to_string();
+        let search_display = search_path.display().to_string();
 
-        for entry in WalkDir::new(&search_path)
-            .follow_links(true)
-            .into_iter()
-            .filter_map(|e| e.ok())
-        {
-            if !entry.file_type().is_file() {
-                continue;
-            }
+        // Run all filesystem I/O on a blocking thread to avoid stalling the Tokio runtime.
+        let output = tokio::task::spawn_blocking(move || {
+            let mut results = Vec::new();
+            let mut match_count = 0;
 
-            let path = entry.path();
+            for entry in WalkDir::new(&search_path)
+                .follow_links(true)
+                .into_iter()
+                .filter_map(|e| e.ok())
+            {
+                if !entry.file_type().is_file() {
+                    continue;
+                }
 
-            if let Some(ref matcher) = glob_matcher {
-                if let Some(name) = path.file_name().and_then(|n| n.to_str()) {
-                    if !matcher.is_match(name) {
+                let path = entry.path();
+                let rel_path = path.strip_prefix(&search_path).unwrap_or(path);
+
+                if let Some(ref matcher) = glob_matcher {
+                    if !matcher.is_match(rel_path) {
                         continue;
                     }
                 }
-            }
 
-            // Skip unreadable/binary files
-            let content = match std::fs::read_to_string(path) {
-                Ok(c) => c,
-                Err(_) => continue,
-            };
+                let rel_path_str = rel_path.to_string_lossy().to_string();
 
-            let lines: Vec<&str> = content.lines().collect();
-            let rel_path = path
-                .strip_prefix(&search_path)
-                .unwrap_or(path)
-                .to_string_lossy();
+                // Use BufReader for line-by-line reading instead of loading entire file.
+                let file = match std::fs::File::open(path) {
+                    Ok(f) => f,
+                    Err(_) => continue,
+                };
+                let reader = BufReader::new(file);
 
-            for (i, line) in lines.iter().enumerate() {
-                if re.is_match(line) {
-                    if context_lines > 0 {
-                        let start = i.saturating_sub(context_lines);
-                        let end = (i + context_lines + 1).min(lines.len());
-                        for (j, line_content) in lines[start..end].iter().enumerate() {
-                            let line_num = start + j;
-                            let marker = if line_num == i { ">" } else { " " };
-                            results.push(format!(
-                                "{}{}:{}:{}",
-                                marker,
-                                rel_path,
-                                line_num + 1,
-                                line_content
-                            ));
+                if context_lines > 0 {
+                    // Context mode: need random access to nearby lines, so collect.
+                    let lines: Vec<String> = reader.lines().map_while(|l| l.ok()).collect();
+                    for (i, line) in lines.iter().enumerate() {
+                        if re.is_match(line) {
+                            let start = i.saturating_sub(context_lines);
+                            let end = (i + context_lines + 1).min(lines.len());
+                            for (j, line_content) in lines[start..end].iter().enumerate() {
+                                let line_num = start + j;
+                                let marker = if line_num == i { ">" } else { " " };
+                                results.push(format!(
+                                    "{}{}:{}:{}",
+                                    marker, rel_path_str, line_num + 1, line_content
+                                ));
+                            }
+                            results.push("--".to_string());
+
+                            match_count += 1;
+                            if match_count >= max_results {
+                                break;
+                            }
                         }
-                        results.push("--".to_string());
-                    } else {
-                        results.push(format!("{}:{}:{}", rel_path, i + 1, line));
                     }
+                } else {
+                    // No context: stream lines without collecting.
+                    for (i, line) in reader.lines().enumerate() {
+                        let line = match line {
+                            Ok(l) => l,
+                            Err(_) => break, // Binary/unreadable file
+                        };
+                        if re.is_match(&line) {
+                            results.push(format!("{}:{}:{}", rel_path_str, i + 1, line));
+                            match_count += 1;
+                            if match_count >= max_results {
+                                break;
+                            }
+                        }
+                    }
+                }
 
-                    match_count += 1;
-                    if match_count >= max_results {
-                        break;
-                    }
+                if match_count >= max_results {
+                    break;
                 }
             }
 
-            if match_count >= max_results {
-                break;
-            }
-        }
+            results
+        })
+        .await
+        .map_err(|e| ToolError::ExecutionFailed(format!("Search task failed: {}", e)))?;
 
-        if results.is_empty() {
+        if output.is_empty() {
             Ok(format!(
                 "No matches found for pattern '{}' in {}",
-                pattern_str,
-                search_path.display()
+                pattern_display, search_display
             ))
         } else {
-            Ok(results.join("\n"))
+            Ok(output.join("\n"))
         }
     }
 }

@@ -51,6 +51,19 @@ impl FsToolBase {
     pub fn allowed_dir(&self) -> &Option<PathBuf> {
         &self.allowed_dir
     }
+
+    /// Resolve the search root: explicit path > allowed_dir > cwd.
+    /// Shared by GrepTool and GlobTool.
+    pub fn resolve_search_root(&self, explicit_path: Option<&str>) -> Result<PathBuf> {
+        if let Some(path) = explicit_path {
+            self.resolve_path(path)
+        } else if let Some(dir) = self.allowed_dir.as_ref() {
+            Ok(dir.clone())
+        } else {
+            std::env::current_dir()
+                .map_err(|e| ToolError::ExecutionFailed(e.to_string()).into())
+        }
+    }
 }
 
 /// Tool to read file contents

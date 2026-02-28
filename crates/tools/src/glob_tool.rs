@@ -59,13 +59,7 @@ impl Tool for GlobTool {
         let p = ParamExtractor::new(&args);
         let pattern_str = p.required_str("pattern")?;
 
-        let search_path = if let Some(path) = p.optional_str("path")? {
-            self.base.resolve_path(path)?
-        } else if let Some(ref dir) = self.base.allowed_dir() {
-            dir.clone()
-        } else {
-            std::env::current_dir().map_err(|e| ToolError::ExecutionFailed(e.to_string()))?
-        };
+        let search_path = self.base.resolve_search_root(p.optional_str("path")?)?;
 
         let glob = Glob::new(pattern_str)
             .map_err(|e| ToolError::InvalidParams(format!("Invalid glob pattern: {}", e)))?
