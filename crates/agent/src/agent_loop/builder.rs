@@ -327,7 +327,7 @@ impl AgentLoopBuilder {
         // ── Learning: outcome store ────────────────────────────
         let outcome_store = if config.learning.enabled {
             Some(Arc::new(RwLock::new(
-                crate::learning::outcome_store::OutcomeStore::new(repos.outcomes.clone()),
+                crate::learning::OutcomeStore::new(repos.outcomes.clone()),
             )))
         } else {
             None

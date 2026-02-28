@@ -9,14 +9,12 @@
 
 pub mod adaptive;
 pub mod analyzer;
-pub mod outcome_store;
 pub mod recorder;
 pub mod service;
-pub mod strategy_tracker;
-pub mod tool_confidence;
+pub mod tool_tracking;
 pub mod types;
 
+pub use recorder::OutcomeStore;
 pub use service::LearningService;
-pub use strategy_tracker::{compute_stats, StrategyRecord, StrategyStats};
-pub use tool_confidence::ToolConfidenceMap;
+pub use tool_tracking::{compute_stats, StrategyRecord, StrategyStats, ToolConfidenceMap};
 pub use types::*;

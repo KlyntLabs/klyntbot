@@ -16,7 +16,7 @@ use common::Result;
 
 use super::adaptive::AdaptiveThresholds;
 use super::analyzer::LearningAnalyzer;
-use super::outcome_store::OutcomeStore;
+use super::recorder::OutcomeStore;
 
 /// Background service that periodically analyzes outcomes and adapts
 /// the confidence threshold.
