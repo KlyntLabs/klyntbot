@@ -10,7 +10,7 @@ use tokio::time::sleep;
 use tracing::{error, info};
 
 use bus::{MessageBus, OutboundMessage};
-use common::Result;
+use common::{FormResponse, InteractionRequest, Result};
 
 pub mod discord;
 #[cfg(feature = "email")]
@@ -54,6 +54,25 @@ pub trait Channel: Send + Sync {
     /// Send a typing indicator (default: no-op)
     async fn send_typing(&self, _chat_id: &str) -> Result<()> {
         Ok(())
+    }
+
+    /// Whether this channel supports structured interactions (buttons, menus).
+    /// Override in channel implementations that have native UI elements.
+    fn supports_interaction(&self) -> bool {
+        false
+    }
+
+    /// Send a structured interaction request using platform-native UI.
+    /// Only called when `supports_interaction()` returns true.
+    async fn send_interaction(
+        &self,
+        _chat_id: &str,
+        _request: &InteractionRequest,
+    ) -> Result<FormResponse> {
+        Err(common::ToolError::ExecutionFailed(
+            "Channel does not support structured interactions".into(),
+        )
+        .into())
     }
 }
 

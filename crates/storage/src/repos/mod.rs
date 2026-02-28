@@ -1,5 +1,6 @@
 //! Repository modules and aggregate struct.
 
+pub mod agent_task;
 pub mod calendar_event_cache;
 pub mod calendar_sync;
 pub mod cron;
@@ -24,6 +25,7 @@ pub mod usage;
 #[cfg(test)]
 pub mod tests;
 
+pub use agent_task::AgentTaskRepo;
 pub use calendar_event_cache::CalendarEventCacheRepo;
 pub use calendar_sync::CalendarSyncRepo;
 pub use cron::CronRepo;
@@ -51,6 +53,7 @@ pub use usage::UsageRepo;
 #[derive(Debug, Clone)]
 pub struct Repos {
     pool: sqlx::SqlitePool,
+    pub agent_tasks: AgentTaskRepo,
     pub todos: TodoRepo,
     pub projects: ProjectRepo,
     pub sessions: SessionRepo,
@@ -79,6 +82,7 @@ impl Repos {
     pub fn from_pool(pool: &crate::pool::StoragePool) -> Self {
         let db = pool.inner().clone();
         Self {
+            agent_tasks: AgentTaskRepo::new(db.clone()),
             todos: TodoRepo::new(db.clone()),
             projects: ProjectRepo::new(db.clone()),
             sessions: SessionRepo::new(db.clone()),

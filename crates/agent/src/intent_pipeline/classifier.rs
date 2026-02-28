@@ -9,7 +9,9 @@ use std::time::Duration;
 use common::Result;
 use providers::{ChatParams, DynProvider, Message};
 
-use super::types::{AnalysisSource, ComplexitySignals, ExecutionMode, FailureRisk, IntentAnalysis};
+use super::types::{
+    AnalysisSource, ComplexitySignals, ExecutionMode, FailureRisk, IntentAnalysis, ToolGroup,
+};
 
 /// Classifies user intent via a lightweight LLM call, returning structured
 /// `IntentAnalysis` with `ComplexitySignals`.
@@ -28,6 +30,7 @@ Respond ONLY with valid JSON:
   "failure_risk": "low" | "medium" | "high",
   "requires_state_tracking": <true|false>,
   "requires_retries": <true|false>,
+  "relevant_tools": ["tool1", "tool2"],
   "confidence": <0.0-1.0>,
   "reasoning": "<brief explanation>"
 }
@@ -36,6 +39,9 @@ Mode guide:
 - "direct": Greetings, factual Q&A, explanations — no tools needed
 - "reactive": Single-shot tasks needing tools — search, CRUD, lookups
 - "planned": Multi-step tasks with dependencies, state tracking, or high failure risk
+
+For "relevant_tools": list ONLY the tools from the available set that are needed.
+Use an empty array for "direct" mode (no tools needed).
 
 User message: "{message}"
 Available tools: {tools}"#;
@@ -117,13 +123,64 @@ impl IntentClassifier {
             },
         };
 
+        // Map relevant_tools from LLM response to ToolGroups
+        let tool_groups = match mode_str {
+            "direct" => vec![ToolGroup::None],
+            _ => {
+                let relevant: Vec<String> = v["relevant_tools"]
+                    .as_array()
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                            .collect()
+                    })
+                    .unwrap_or_default();
+
+                if relevant.is_empty() {
+                    vec![ToolGroup::Full]
+                } else {
+                    map_tool_names_to_groups(&relevant)
+                }
+            }
+        };
+
         IntentAnalysis {
             mode,
             signals,
             confidence,
             source: AnalysisSource::LlmClassifier,
             reasoning,
+            tool_groups,
         }
+    }
+}
+
+/// Map a list of tool names to the ToolGroups they belong to.
+fn map_tool_names_to_groups(tool_names: &[String]) -> Vec<ToolGroup> {
+    let all_groups = [
+        ToolGroup::TaskManagement,
+        ToolGroup::Search,
+        ToolGroup::Calendar,
+        ToolGroup::Finance,
+        ToolGroup::Communication,
+        ToolGroup::Automation,
+    ];
+
+    let mut matched = Vec::new();
+    for group in &all_groups {
+        let group_tools = group.tool_names();
+        if tool_names
+            .iter()
+            .any(|name| group_tools.contains(&name.as_str()))
+        {
+            matched.push(group.clone());
+        }
+    }
+
+    if matched.is_empty() {
+        vec![ToolGroup::Full]
+    } else {
+        matched
     }
 }
 

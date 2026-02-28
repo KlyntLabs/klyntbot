@@ -18,6 +18,7 @@ pub use vector_store::VectorStore;
 // Re-export repo types for consumer convenience.
 pub use repos::project_repo::{ProjectFilter, ProjectPatch, ProjectRepo, ProjectWithStats};
 pub use repos::todo_repo::{TodoFilter, TodoPatch, TodoRepo, TodoSummary};
+pub use repos::AgentTaskRepo;
 pub use repos::CalendarEventCacheRepo;
 pub use repos::CalendarSyncRepo;
 pub use repos::CronRepo;
@@ -40,6 +41,7 @@ pub use repos::FinanceLiabilityRepo;
 pub use repos::FinanceTransactionRepo;
 
 // Re-export row structs for consumer convenience.
+pub use rows::agent_task::AgentTaskRow;
 pub use rows::calendar::{CalendarEventCacheRow, CalendarSyncStateRow};
 pub use rows::cron::CronJobRow;
 pub use rows::goal::{GoalProjectLinkRow, GoalRow};

@@ -108,22 +108,37 @@ impl Tool for AskUserTool {
             }
         };
 
-        // 2. Check for interactive channel
-        let interaction_tx = match &ctx.interaction_tx {
-            Some(tx) => tx,
-            None => {
-                // Non-TTY fallback: Return text instructions for LLM
-                return Ok(format_text_fallback(&request));
+        // Path 1: CLI/dashboard interactive mode (oneshot channel)
+        if let Some(interaction_tx) = &ctx.interaction_tx {
+            return self.execute_via_cli(interaction_tx, request).await;
+        }
+
+        // Path 2: Platform-native channel interaction (Telegram buttons, Discord selects, etc.)
+        if let Some(channel) = &ctx.interaction_channel {
+            if channel.supports_interaction() {
+                let request_for_response = request.clone();
+                let response = channel
+                    .send_interaction(ctx.chat_id.as_str(), &request)
+                    .await?;
+                return Ok(format_semantic_response(&response, &request_for_response));
             }
-        };
+        }
 
-        // 3. Create oneshot channel for this request's response
+        // Path 3: Text fallback (non-TTY, no native channel support)
+        Ok(format_text_fallback(&request))
+    }
+}
+
+impl AskUserTool {
+    /// Execute via CLI/dashboard oneshot channel (Path 1).
+    async fn execute_via_cli(
+        &self,
+        interaction_tx: &tokio::sync::mpsc::Sender<InteractionBundle>,
+        request: InteractionRequest,
+    ) -> Result<String> {
         let (response_tx, response_rx) = tokio::sync::oneshot::channel();
-
-        // 4. Clone request before moving into bundle (needed for rich response formatting)
         let request_for_response = request.clone();
 
-        // 5. Send interaction bundle (request + response channel)
         if let Err(e) = interaction_tx
             .send(InteractionBundle {
                 request,
@@ -137,7 +152,6 @@ impl Tool for AskUserTool {
             return Err(ToolError::ExecutionFailed(msg).into());
         }
 
-        // 6. Block until user responds (or channel drops)
         let response = match response_rx.await {
             Ok(r) => r,
             Err(e) => {
@@ -151,7 +165,6 @@ impl Tool for AskUserTool {
             }
         };
 
-        // 7. Format rich semantic response with full question context
         Ok(format_semantic_response(&response, &request_for_response))
     }
 }

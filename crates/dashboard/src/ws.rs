@@ -281,24 +281,18 @@ async fn on_client_text(
                             };
                             match repos
                                 .sessions
-                                .update_last_assistant_metadata(
-                                    &sk,
-                                    tc.as_ref(),
-                                    metadata.as_ref(),
-                                )
+                                .update_last_assistant_metadata(&sk, tc.as_ref(), metadata.as_ref())
                                 .await
                             {
                                 Ok(updated) => {
                                     tracing::debug!(
                                         "Metadata persist for {}: updated={}",
-                                        sk, updated
+                                        sk,
+                                        updated
                                     );
                                 }
                                 Err(e) => {
-                                    tracing::warn!(
-                                        "Metadata persist FAILED for {}: {}",
-                                        sk, e
-                                    );
+                                    tracing::warn!("Metadata persist FAILED for {}: {}", sk, e);
                                 }
                             }
                         }

@@ -97,3 +97,11 @@ After creating a task, show the confidence score. If < 80%, offer enrichment opt
 - Max 3 tasks focused simultaneously
 - 18-hour deadline per focused task
 - Auto-unfocus when expired
+
+## Deep Dive
+
+For advanced task management topics, load these references with `read_file` when needed:
+
+- **Enrichment engine**: See `CLAUDE.md` section "Enrichment Configuration" for keyword-based priority/duration inference
+- **Semantic search**: See `CLAUDE.md` section "Semantic Search" for embedding-based task discovery
+- **Creation modes**: See `CLAUDE.md` section "Task Creation Mode" for ask-first vs yolo vs party modes

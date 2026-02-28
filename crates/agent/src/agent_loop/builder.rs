@@ -244,7 +244,11 @@ impl AgentLoopBuilder {
         } else {
             None
         };
-        register_fs_tools(&mut tool_registry, allowed_dir);
+        register_fs_tools(&mut tool_registry, allowed_dir.clone());
+
+        // Search tools
+        tool_registry.register(tools::grep::GrepTool::new(allowed_dir.clone()));
+        tool_registry.register(tools::glob_tool::GlobTool::new(allowed_dir.clone()));
 
         // Web tools
         tool_registry.register(WebSearchTool::new(

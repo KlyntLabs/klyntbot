@@ -35,17 +35,21 @@ fn resolve_path(path: &str, allowed_dir: Option<&PathBuf>) -> Result<PathBuf> {
 }
 
 /// Common fields for filesystem tools that need directory restriction.
-struct FsToolBase {
+pub struct FsToolBase {
     allowed_dir: Option<PathBuf>,
 }
 
 impl FsToolBase {
-    fn new(allowed_dir: Option<PathBuf>) -> Self {
+    pub fn new(allowed_dir: Option<PathBuf>) -> Self {
         Self { allowed_dir }
     }
 
-    fn resolve_path(&self, path: &str) -> Result<PathBuf> {
+    pub fn resolve_path(&self, path: &str) -> Result<PathBuf> {
         resolve_path(path, self.allowed_dir.as_ref())
+    }
+
+    pub fn allowed_dir(&self) -> &Option<PathBuf> {
+        &self.allowed_dir
     }
 }
 

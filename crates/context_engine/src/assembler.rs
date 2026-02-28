@@ -326,7 +326,11 @@ impl ContextEngine {
         allocator.allocate(Priority::ToolDefinitions, tool_tokens);
 
         // 3. Retrieve memories and allocate budget (Priority::RetrievedMemory)
-        let memory_content = self.retrieve_memory(request).await;
+        // Skip memory retrieval for Direct and Clarification modes (no RAG needed)
+        let memory_content = match &request.strategy {
+            ExecutionStrategy::DirectResponse | ExecutionStrategy::Clarification { .. } => None,
+            _ => self.retrieve_memory(request).await,
+        };
         let memory_tokens = memory_content
             .as_deref()
             .map(|c| self.estimate_text(c))
@@ -703,7 +707,8 @@ mod tests {
             message_text: "what do I work on?".into(),
             history: vec![],
             system_prompt: "You are helpful.".into(),
-            strategy: ExecutionStrategy::DirectResponse,
+            // Use ToolAssisted — Direct mode skips memory retrieval
+            strategy: ExecutionStrategy::ToolAssisted { max_iterations: 5 },
             tool_definitions: vec![],
 
             context_window: 128_000,
@@ -732,6 +737,65 @@ mod tests {
             .find(|(p, _)| *p == Priority::RetrievedMemory);
         assert!(mem_alloc.is_some(), "RetrievedMemory should be allocated");
         assert!(mem_alloc.unwrap().1 > 0);
+    }
+
+    #[tokio::test]
+    async fn test_direct_mode_skips_memory_retrieval() {
+        let retriever = Arc::new(MockRetriever {
+            entries: vec![
+                ("User likes Rust".into(), 0.95),
+                ("User works on klyntbot".into(), 0.80),
+            ],
+        });
+
+        let engine = ContextEngine::new().with_memory_retriever(retriever);
+        let request = ContextRequest {
+            message_text: "hi there".into(),
+            history: vec![],
+            system_prompt: "You are helpful.".into(),
+            strategy: ExecutionStrategy::DirectResponse,
+            tool_definitions: vec![],
+            context_window: 128_000,
+        };
+
+        let result = engine.assemble(request).await;
+
+        // Direct mode should NOT include memory — only system prompt
+        assert_eq!(result.messages.len(), 1);
+        assert!(result
+            .budget_report
+            .per_priority
+            .iter()
+            .all(|(p, _)| *p != Priority::RetrievedMemory));
+    }
+
+    #[tokio::test]
+    async fn test_clarification_mode_skips_memory_retrieval() {
+        let retriever = Arc::new(MockRetriever {
+            entries: vec![("Some memory".into(), 0.90)],
+        });
+
+        let engine = ContextEngine::new().with_memory_retriever(retriever);
+        let request = ContextRequest {
+            message_text: "what?".into(),
+            history: vec![],
+            system_prompt: "You are helpful.".into(),
+            strategy: ExecutionStrategy::Clarification {
+                reason: "Ambiguous request".into(),
+            },
+            tool_definitions: vec![],
+            context_window: 128_000,
+        };
+
+        let result = engine.assemble(request).await;
+
+        // Clarification mode should NOT include memory
+        assert_eq!(result.messages.len(), 1);
+        assert!(result
+            .budget_report
+            .per_priority
+            .iter()
+            .all(|(p, _)| *p != Priority::RetrievedMemory));
     }
 
     #[test]

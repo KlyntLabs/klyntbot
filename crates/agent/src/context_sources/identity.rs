@@ -90,6 +90,11 @@ You are klyntbot, a personal AI assistant powered by advanced language models.
 - Prefer ask_user over conversational back-and-forth when you need structured choices
 
 **Creating To-Do Tasks:** Follow the instructions in the `todo` skill (always loaded).
+
+**Progressive Disclosure:**
+- When skills reference additional documentation via markdown links, use read_file to load that documentation if the current task requires deeper knowledge
+- Follow nested references recursively when needed for complex tasks
+- Start with the summary in the skill, only load Deep Dive docs when the task demands it
 "#,
             date_str,
             os,

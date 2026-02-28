@@ -38,6 +38,27 @@ pub struct InteractionBundle {
     pub response_tx: oneshot::Sender<FormResponse>,
 }
 
+/// Trait for channels that support structured interactions (buttons, menus, etc.).
+///
+/// Defined in `tools-core` (Layer 3) to avoid circular deps with `channels` (Layer 4).
+/// Channel implementations that support native UI elements (Telegram inline keyboards,
+/// Discord buttons/selects, Slack Block Kit) implement this trait.
+#[async_trait]
+pub trait InteractionChannel: Send + Sync {
+    /// Whether this channel supports structured interactions.
+    fn supports_interaction(&self) -> bool;
+
+    /// Send a structured interaction request and wait for the user's response.
+    ///
+    /// The channel renders questions using platform-native UI (buttons, menus)
+    /// and returns the user's selections.
+    async fn send_interaction(
+        &self,
+        chat_id: &str,
+        request: &InteractionRequest,
+    ) -> Result<FormResponse>;
+}
+
 /// Routing context for tools that need channel/chat information.
 /// This is passed explicitly to execute() instead of using shared mutable state.
 ///
@@ -59,6 +80,9 @@ pub struct RoutingContext {
     /// Channel for tools to emit entity cards (e.g., after creating a task).
     /// The execution layer drains this and emits AgentEvent::EntityCreated.
     pub entity_tx: Option<mpsc::Sender<common::EntityCard>>,
+    /// Platform-native interaction channel (Telegram buttons, Discord selects, etc.).
+    /// When present, `ask_user` uses this for structured UI instead of text fallback.
+    pub interaction_channel: Option<Arc<dyn InteractionChannel>>,
 }
 
 impl RoutingContext {
@@ -70,6 +94,7 @@ impl RoutingContext {
             interaction_tx: None,
             is_direct_mode: false,
             entity_tx: None,
+            interaction_channel: None,
         }
     }
 
@@ -85,6 +110,7 @@ impl RoutingContext {
             interaction_tx: Some(interaction_tx),
             is_direct_mode: true,
             entity_tx: None,
+            interaction_channel: None,
         }
     }
 }
