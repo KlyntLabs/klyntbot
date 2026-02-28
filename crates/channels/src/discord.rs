@@ -1,6 +1,7 @@
 //! Discord channel using raw WebSocket Gateway (no serenity).
 
 use async_trait::async_trait;
+use dashmap::DashMap;
 use futures_util::SinkExt;
 use reqwest::Client;
 use serde_json::{json, Value};
@@ -9,7 +10,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::{oneshot, Mutex, RwLock};
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 use tokio_tungstenite::tungstenite::Message as WsMessage;
@@ -18,11 +19,21 @@ use tracing::{debug, error, info, warn};
 use crate::ws_manager::{HeartbeatStrategy, WebSocketManager, WsConfig, WsHandler, WsSink};
 use crate::{check_allowlist, Channel};
 use bus::{InboundMessage, MessageBus, MessageKind, OutboundMessage};
-use common::{ChannelError, Result};
+use common::{
+    Answer, AnswerType, AnswerValue, ChannelError, FormResponse, InteractionRequest, Result,
+};
 use config::DiscordConfig;
 
 const DISCORD_API_BASE: &str = "https://discord.com/api/v10";
 const MAX_ATTACHMENT_BYTES: usize = 20 * 1024 * 1024; // 20MB
+
+/// State for a pending Discord interaction callback.
+enum PendingCallback {
+    /// Waiting for a single button press (single_select, yes_no).
+    Single(oneshot::Sender<String>),
+    /// Waiting for free text reply from user.
+    FreeText(oneshot::Sender<String>),
+}
 
 /// Discord channel implementation
 pub struct DiscordChannel {
@@ -33,6 +44,8 @@ pub struct DiscordChannel {
     typing_tasks: Arc<RwLock<HashMap<String, JoinHandle<()>>>>,
     bus: Mutex<Option<Arc<MessageBus>>>,
     heartbeat_task: Mutex<Option<JoinHandle<()>>>,
+    /// Pending interaction callbacks keyed by `"{channel_id}:{question_id}"`.
+    pending_interactions: Arc<DashMap<String, PendingCallback>>,
 }
 
 impl DiscordChannel {
@@ -51,6 +64,7 @@ impl DiscordChannel {
             typing_tasks: Arc::new(RwLock::new(HashMap::new())),
             bus: Mutex::new(None),
             heartbeat_task: Mutex::new(None),
+            pending_interactions: Arc::new(DashMap::new()),
         })
     }
 
@@ -189,6 +203,34 @@ impl DiscordChannel {
             .get("channel_id")
             .and_then(|v| v.as_str())
             .unwrap_or("");
+
+        // Check if this is a pending free_text interaction response
+        if !channel_id.is_empty() {
+            let key_prefix = format!("{}:", channel_id);
+            let pending_key = self
+                .pending_interactions
+                .iter()
+                .find(|entry| {
+                    entry.key().starts_with(&key_prefix)
+                        && matches!(entry.value(), PendingCallback::FreeText(_))
+                })
+                .map(|entry| entry.key().clone());
+
+            if let Some(key) = pending_key {
+                let content = payload
+                    .get("content")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+                if !content.is_empty() {
+                    if let Some((_, PendingCallback::FreeText(tx))) =
+                        self.pending_interactions.remove(&key)
+                    {
+                        let _ = tx.send(content.to_string());
+                        return Ok(());
+                    }
+                }
+            }
+        }
 
         let content = payload
             .get("content")
@@ -403,6 +445,113 @@ impl DiscordChannel {
         Ok(())
     }
 
+    /// Handle INTERACTION_CREATE event (button clicks, select menu selections).
+    async fn handle_interaction_create(&self, payload: &Value) -> Result<()> {
+        let interaction_id = payload.get("id").and_then(|v| v.as_str()).unwrap_or("");
+        let interaction_token = payload
+            .get("token")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+
+        // Acknowledge the interaction (type 6 = DEFERRED_UPDATE_MESSAGE)
+        let ack_url = format!(
+            "{}/interactions/{}/{}/callback",
+            DISCORD_API_BASE, interaction_id, interaction_token
+        );
+        let _ = self
+            .client
+            .post(&ack_url)
+            .header(
+                "Authorization",
+                format!("Bot {}", self.config.token.expose()),
+            )
+            .json(&json!({ "type": 6 }))
+            .send()
+            .await;
+
+        // Parse custom_id format: "askuser:{channel_id}:{question_id}:{value}"
+        let custom_id = payload
+            .get("data")
+            .and_then(|d| d.get("custom_id"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+
+        let parts: Vec<&str> = custom_id.splitn(4, ':').collect();
+        if parts.len() < 4 || parts[0] != "askuser" {
+            // Check if it's a select menu (values array)
+            if let Some(values) = payload
+                .get("data")
+                .and_then(|d| d.get("values"))
+                .and_then(|v| v.as_array())
+            {
+                // Select menu: custom_id is "askuser:{channel_id}:{question_id}"
+                let select_parts: Vec<&str> = custom_id.splitn(3, ':').collect();
+                if select_parts.len() == 3 && select_parts[0] == "askuser" {
+                    let key = format!("{}:{}", select_parts[1], select_parts[2]);
+                    if let Some(value) = values.first().and_then(|v| v.as_str()) {
+                        if let Some((_, PendingCallback::Single(tx))) =
+                            self.pending_interactions.remove(&key)
+                        {
+                            let _ = tx.send(value.to_string());
+                        }
+                    }
+                }
+            }
+            return Ok(());
+        }
+
+        let channel_id = parts[1];
+        let question_id = parts[2];
+        let value = parts[3];
+        let key = format!("{}:{}", channel_id, question_id);
+
+        if let Some((_, PendingCallback::Single(tx))) = self.pending_interactions.remove(&key) {
+            let _ = tx.send(value.to_string());
+        }
+
+        Ok(())
+    }
+
+    /// Wait for an interaction callback with a 5-minute timeout.
+    async fn wait_for_callback(&self, channel_id: &str, question_id: &str) -> Result<String> {
+        let (tx, rx) = oneshot::channel();
+        let key = format!("{}:{}", channel_id, question_id);
+        self.pending_interactions
+            .insert(key.clone(), PendingCallback::Single(tx));
+
+        match tokio::time::timeout(Duration::from_secs(300), rx).await {
+            Ok(Ok(value)) => Ok(value),
+            Ok(Err(_)) => {
+                self.pending_interactions.remove(&key);
+                Err(ChannelError::SendFailed("Interaction cancelled".into()).into())
+            }
+            Err(_) => {
+                self.pending_interactions.remove(&key);
+                Err(ChannelError::SendFailed("Interaction timed out (5 min)".into()).into())
+            }
+        }
+    }
+
+    /// Wait for a free text message with a 5-minute timeout.
+    async fn wait_for_free_text(&self, channel_id: &str, question_id: &str) -> Result<String> {
+        let (tx, rx) = oneshot::channel();
+        let key = format!("{}:{}", channel_id, question_id);
+        self.pending_interactions
+            .insert(key.clone(), PendingCallback::FreeText(tx));
+
+        match tokio::time::timeout(Duration::from_secs(300), rx).await {
+            Ok(Ok(value)) => Ok(value),
+            Ok(Err(_)) => {
+                self.pending_interactions.remove(&key);
+                Err(ChannelError::SendFailed("Interaction cancelled".into()).into())
+            }
+            Err(_) => {
+                self.pending_interactions.remove(&key);
+                Err(ChannelError::SendFailed("Interaction timed out (5 min)".into()).into())
+            }
+        }
+    }
+
     /// Send a message via REST API
     async fn send_message_rest(
         &self,
@@ -548,6 +697,13 @@ impl WsHandler for DiscordChannel {
                             }
                         }
                     }
+                    Some("INTERACTION_CREATE") => {
+                        if let Some(p) = payload {
+                            if let Err(e) = self.handle_interaction_create(p).await {
+                                error!("Error handling INTERACTION_CREATE: {}", e);
+                            }
+                        }
+                    }
                     _ => {
                         debug!("Unhandled event: {:?}", event_type);
                     }
@@ -650,6 +806,199 @@ impl Channel for DiscordChannel {
         self.start_typing(chat_id.to_string()).await;
         Ok(())
     }
+
+    fn supports_interaction(&self) -> bool {
+        true
+    }
+
+    async fn send_interaction(
+        &self,
+        chat_id: &str,
+        request: &InteractionRequest,
+    ) -> Result<FormResponse> {
+        let mut answers = Vec::new();
+
+        for question in &request.questions {
+            let answer = match &question.answer_type {
+                AnswerType::SingleSelect { options } => {
+                    let components =
+                        build_discord_select_components(chat_id, &question.id, options);
+                    self.send_message_with_components(
+                        chat_id,
+                        &format!("**{}**\n{}", request.title, question.text),
+                        components,
+                    )
+                    .await?;
+
+                    let value = self.wait_for_callback(chat_id, &question.id).await?;
+                    Answer {
+                        question_id: question.id.clone(),
+                        value: AnswerValue::Selected { value },
+                    }
+                }
+                AnswerType::YesNo { .. } => {
+                    let components =
+                        build_discord_yes_no_components(chat_id, &question.id);
+                    self.send_message_with_components(
+                        chat_id,
+                        &format!("**{}**\n{}", request.title, question.text),
+                        components,
+                    )
+                    .await?;
+
+                    let value = self.wait_for_callback(chat_id, &question.id).await?;
+                    Answer {
+                        question_id: question.id.clone(),
+                        value: AnswerValue::YesNo {
+                            answer: value == "yes",
+                        },
+                    }
+                }
+                AnswerType::MultiSelect { options } => {
+                    let components =
+                        build_discord_select_components(chat_id, &question.id, options);
+                    self.send_message_with_components(
+                        chat_id,
+                        &format!(
+                            "**{}**\n{}\n*(Select one option)*",
+                            request.title, question.text
+                        ),
+                        components,
+                    )
+                    .await?;
+
+                    let value = self.wait_for_callback(chat_id, &question.id).await?;
+                    Answer {
+                        question_id: question.id.clone(),
+                        value: AnswerValue::MultiSelected {
+                            values: vec![value],
+                        },
+                    }
+                }
+                AnswerType::FreeText { placeholder } => {
+                    let prompt = if let Some(ph) = placeholder {
+                        format!("**{}**\n{}\n*{}*", request.title, question.text, ph)
+                    } else {
+                        format!("**{}**\n{}", request.title, question.text)
+                    };
+
+                    self.send_message_rest(chat_id, &prompt, None).await?;
+
+                    let content = self.wait_for_free_text(chat_id, &question.id).await?;
+                    Answer {
+                        question_id: question.id.clone(),
+                        value: AnswerValue::Text { content },
+                    }
+                }
+            };
+
+            answers.push(answer);
+        }
+
+        Ok(FormResponse::Completed(answers))
+    }
+}
+
+impl DiscordChannel {
+    /// Send a message with Discord component buttons/selects via REST API.
+    async fn send_message_with_components(
+        &self,
+        channel_id: &str,
+        content: &str,
+        components: Vec<Value>,
+    ) -> Result<()> {
+        let url = format!("{}/channels/{}/messages", DISCORD_API_BASE, channel_id);
+        let payload = json!({
+            "content": content,
+            "components": components,
+        });
+
+        self.client
+            .post(&url)
+            .header(
+                "Authorization",
+                format!("Bot {}", self.config.token.expose()),
+            )
+            .json(&payload)
+            .send()
+            .await
+            .map_err(|e| ChannelError::SendFailed(e.to_string()))?;
+
+        Ok(())
+    }
+}
+
+/// Build Discord button components for select options (≤5 buttons per row).
+/// For >5 options, uses a StringSelectMenu instead.
+fn build_discord_select_components(
+    channel_id: &str,
+    question_id: &str,
+    options: &[common::AnswerOption],
+) -> Vec<Value> {
+    if options.len() <= 5 {
+        // Use buttons in an ActionRow
+        let buttons: Vec<Value> = options
+            .iter()
+            .map(|opt| {
+                json!({
+                    "type": 2, // Button
+                    "style": 1, // Primary
+                    "label": opt.label,
+                    "custom_id": format!("askuser:{}:{}:{}", channel_id, question_id, opt.value),
+                })
+            })
+            .collect();
+
+        vec![json!({
+            "type": 1, // ActionRow
+            "components": buttons,
+        })]
+    } else {
+        // Use StringSelectMenu for >5 options
+        let menu_options: Vec<Value> = options
+            .iter()
+            .map(|opt| {
+                let mut o = json!({
+                    "label": opt.label,
+                    "value": opt.value,
+                });
+                if let Some(desc) = &opt.description {
+                    o["description"] = json!(desc);
+                }
+                o
+            })
+            .collect();
+
+        vec![json!({
+            "type": 1, // ActionRow
+            "components": [{
+                "type": 3, // StringSelect
+                "custom_id": format!("askuser:{}:{}", channel_id, question_id),
+                "options": menu_options,
+            }],
+        })]
+    }
+}
+
+/// Build Discord yes/no button components.
+fn build_discord_yes_no_components(channel_id: &str, question_id: &str) -> Vec<Value> {
+    vec![json!({
+        "type": 1, // ActionRow
+        "components": [
+            {
+                "type": 2, // Button
+                "style": 3, // Success (green)
+                "label": "Yes",
+                "custom_id": format!("askuser:{}:{}:yes", channel_id, question_id),
+            },
+            {
+                "type": 2, // Button
+                "style": 4, // Danger (red)
+                "label": "No",
+                "custom_id": format!("askuser:{}:{}:no", channel_id, question_id),
+            },
+        ],
+    })]
 }
 
 #[cfg(test)]
@@ -831,5 +1180,155 @@ mod tests {
         channel.running.store(true, Ordering::SeqCst);
         channel.stop().await.unwrap();
         assert!(!channel.running.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn test_discord_select_buttons_3_options() {
+        use common::AnswerOption;
+
+        let options = vec![
+            AnswerOption {
+                value: "high".into(),
+                label: "High".into(),
+                description: None,
+            },
+            AnswerOption {
+                value: "medium".into(),
+                label: "Medium".into(),
+                description: None,
+            },
+            AnswerOption {
+                value: "low".into(),
+                label: "Low".into(),
+                description: None,
+            },
+        ];
+
+        let components = build_discord_select_components("chan1", "priority", &options);
+        assert_eq!(components.len(), 1); // 1 ActionRow
+
+        let row = &components[0];
+        assert_eq!(row["type"], 1); // ActionRow
+        let buttons = row["components"].as_array().unwrap();
+        assert_eq!(buttons.len(), 3); // 3 buttons (≤5 → buttons)
+
+        // All buttons are type 2 (Button), style 1 (Primary)
+        for btn in buttons {
+            assert_eq!(btn["type"], 2);
+            assert_eq!(btn["style"], 1);
+        }
+
+        // Check first button
+        assert_eq!(buttons[0]["label"], "High");
+        assert_eq!(
+            buttons[0]["custom_id"].as_str().unwrap(),
+            "askuser:chan1:priority:high"
+        );
+
+        // Check last button
+        assert_eq!(buttons[2]["label"], "Low");
+        assert_eq!(
+            buttons[2]["custom_id"].as_str().unwrap(),
+            "askuser:chan1:priority:low"
+        );
+    }
+
+    #[test]
+    fn test_discord_select_menu_6_options() {
+        use common::AnswerOption;
+
+        let options: Vec<AnswerOption> = (1..=6)
+            .map(|i| AnswerOption {
+                value: format!("opt{i}"),
+                label: format!("Option {i}"),
+                description: if i == 1 {
+                    Some("First option".into())
+                } else {
+                    None
+                },
+            })
+            .collect();
+
+        let components = build_discord_select_components("chan2", "choice", &options);
+        assert_eq!(components.len(), 1); // 1 ActionRow
+
+        let row = &components[0];
+        assert_eq!(row["type"], 1); // ActionRow
+        let inner = row["components"].as_array().unwrap();
+        assert_eq!(inner.len(), 1); // 1 StringSelectMenu
+
+        let menu = &inner[0];
+        assert_eq!(menu["type"], 3); // StringSelect
+        assert_eq!(
+            menu["custom_id"].as_str().unwrap(),
+            "askuser:chan2:choice"
+        );
+
+        let menu_opts = menu["options"].as_array().unwrap();
+        assert_eq!(menu_opts.len(), 6);
+        assert_eq!(menu_opts[0]["label"], "Option 1");
+        assert_eq!(menu_opts[0]["value"], "opt1");
+        assert_eq!(menu_opts[0]["description"], "First option");
+        // Option 2 should have no description key
+        assert!(menu_opts[1].get("description").is_none());
+    }
+
+    #[test]
+    fn test_discord_yes_no_buttons() {
+        let components = build_discord_yes_no_components("chan3", "confirm");
+        assert_eq!(components.len(), 1); // 1 ActionRow
+
+        let row = &components[0];
+        let buttons = row["components"].as_array().unwrap();
+        assert_eq!(buttons.len(), 2);
+
+        // Yes button: green (style 3)
+        assert_eq!(buttons[0]["type"], 2);
+        assert_eq!(buttons[0]["style"], 3); // Success
+        assert_eq!(buttons[0]["label"], "Yes");
+        assert_eq!(
+            buttons[0]["custom_id"].as_str().unwrap(),
+            "askuser:chan3:confirm:yes"
+        );
+
+        // No button: red (style 4)
+        assert_eq!(buttons[1]["type"], 2);
+        assert_eq!(buttons[1]["style"], 4); // Danger
+        assert_eq!(buttons[1]["label"], "No");
+        assert_eq!(
+            buttons[1]["custom_id"].as_str().unwrap(),
+            "askuser:chan3:confirm:no"
+        );
+    }
+
+    #[test]
+    fn test_discord_custom_id_format() {
+        use common::AnswerOption;
+
+        let options = vec![
+            AnswerOption {
+                value: "oauth2".into(),
+                label: "OAuth 2.0".into(),
+                description: Some("Industry standard".into()),
+            },
+            AnswerOption {
+                value: "jwt".into(),
+                label: "JWT".into(),
+                description: None,
+            },
+        ];
+
+        let components = build_discord_select_components("789", "auth_method", &options);
+        let buttons = components[0]["components"].as_array().unwrap();
+
+        for btn in buttons {
+            let custom_id = btn["custom_id"].as_str().unwrap();
+            assert!(custom_id.starts_with("askuser:789:auth_method:"));
+            let parts: Vec<&str> = custom_id.split(':').collect();
+            assert_eq!(parts.len(), 4);
+            assert_eq!(parts[0], "askuser");
+            assert_eq!(parts[1], "789");
+            assert_eq!(parts[2], "auth_method");
+        }
     }
 }
