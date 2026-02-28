@@ -106,9 +106,10 @@ impl tools_core::ToolExecute for ReadFileTool {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
                 Err(ToolError::ExecutionFailed(format!("File not found: {}", path)).into())
             }
-            Err(e) => {
-                Err(ToolError::ExecutionFailed(format!("Error reading file: {}", e)).into())
+            Err(e) if e.raw_os_error() == Some(21 /* EISDIR */) => {
+                Err(ToolError::ExecutionFailed(format!("Not a file: {}", path)).into())
             }
+            Err(e) => Err(ToolError::ExecutionFailed(format!("Error reading file: {}", e)).into()),
         }
     }
 }
@@ -226,9 +227,10 @@ impl tools_core::ToolExecute for EditFileTool {
         let content = match fs::read_to_string(&file_path).await {
             Ok(content) => content,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                return Err(
-                    ToolError::ExecutionFailed(format!("File not found: {}", path)).into(),
-                );
+                return Err(ToolError::ExecutionFailed(format!("File not found: {}", path)).into());
+            }
+            Err(e) if e.raw_os_error() == Some(21 /* EISDIR */) => {
+                return Err(ToolError::ExecutionFailed(format!("Not a file: {}", path)).into());
             }
             Err(e) => {
                 return Err(
@@ -237,13 +239,14 @@ impl tools_core::ToolExecute for EditFileTool {
             }
         };
 
-        let count = content.matches(old_text.as_str()).count();
-        if count == 0 {
+        if !content.contains(old_text.as_str()) {
             return Err(ToolError::ExecutionFailed(
                 "old_text not found in file. Make sure it matches exactly.".to_string(),
             )
             .into());
         }
+
+        let count = content.matches(old_text.as_str()).count();
         if count > 1 {
             return Err(ToolError::ExecutionFailed(format!(
                 "old_text appears {} times. Please provide more context to make it unique.",
@@ -305,6 +308,11 @@ impl tools_core::ToolExecute for ListDirTool {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
                 return Err(
                     ToolError::ExecutionFailed(format!("Directory not found: {}", path)).into(),
+                );
+            }
+            Err(e) if e.raw_os_error() == Some(20 /* ENOTDIR */) => {
+                return Err(
+                    ToolError::ExecutionFailed(format!("Not a directory: {}", path)).into(),
                 );
             }
             Err(e) => {

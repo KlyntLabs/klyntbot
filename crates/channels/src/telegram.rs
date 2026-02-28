@@ -740,7 +740,10 @@ impl Channel for TelegramChannel {
                     )
                     .await?;
 
-                    let value = self.interactions.wait_for_callback(chat_id, &question.id).await?;
+                    let value = self
+                        .interactions
+                        .wait_for_callback(chat_id, &question.id)
+                        .await?;
                     Answer {
                         question_id: question.id.clone(),
                         value: AnswerValue::Selected { value },
@@ -759,7 +762,10 @@ impl Channel for TelegramChannel {
                     )
                     .await?;
 
-                    let value = self.interactions.wait_for_callback(chat_id, &question.id).await?;
+                    let value = self
+                        .interactions
+                        .wait_for_callback(chat_id, &question.id)
+                        .await?;
                     Answer {
                         question_id: question.id.clone(),
                         value: AnswerValue::YesNo {
@@ -782,7 +788,10 @@ impl Channel for TelegramChannel {
                     )
                     .await?;
 
-                    let value = self.interactions.wait_for_callback(chat_id, &question.id).await?;
+                    let value = self
+                        .interactions
+                        .wait_for_callback(chat_id, &question.id)
+                        .await?;
                     Answer {
                         question_id: question.id.clone(),
                         value: AnswerValue::MultiSelected {
@@ -810,7 +819,10 @@ impl Channel for TelegramChannel {
                     )
                     .await?;
 
-                    let content = self.interactions.wait_for_free_text(chat_id, &question.id).await?;
+                    let content = self
+                        .interactions
+                        .wait_for_free_text(chat_id, &question.id)
+                        .await?;
                     Answer {
                         question_id: question.id.clone(),
                         value: AnswerValue::Text { content },

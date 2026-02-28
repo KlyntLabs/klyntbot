@@ -35,7 +35,7 @@ impl TypingManager {
     }
 
     /// Start a typing indicator for the given chat ID.
-    /// Stops any existing typing task for the same chat first.
+    /// Aborts any existing typing task for the same chat before spawning the new one.
     ///
     /// `interval` is the repeat duration (e.g., 4s for Telegram, 8s for Discord).
     /// `send_fn` is called repeatedly to actually send the typing API request.
@@ -44,6 +44,11 @@ impl TypingManager {
         F: Fn() -> Fut + Send + 'static,
         Fut: std::future::Future<Output = ()> + Send,
     {
+        let mut tasks = self.tasks.write().await;
+        if let Some(old) = tasks.remove(chat_id) {
+            old.abort();
+        }
+
         let task = tokio::spawn(async move {
             loop {
                 send_fn().await;
@@ -51,10 +56,7 @@ impl TypingManager {
             }
         });
 
-        let mut tasks = self.tasks.write().await;
-        if let Some(old) = tasks.insert(chat_id.to_string(), task) {
-            old.abort();
-        }
+        tasks.insert(chat_id.to_string(), task);
     }
 
     /// Stop the typing indicator for the given chat ID.

@@ -54,7 +54,7 @@ impl InteractionTracker {
         &self,
         chat_id: &str,
         question_id: &str,
-        variant: impl FnOnce(oneshot::Sender<String>) -> PendingCallback,
+        variant: fn(oneshot::Sender<String>) -> PendingCallback,
     ) -> Result<String> {
         let (tx, rx) = oneshot::channel();
         let key = format!("{}:{}", chat_id, question_id);

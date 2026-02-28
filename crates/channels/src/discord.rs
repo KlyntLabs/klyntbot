@@ -481,20 +481,6 @@ impl DiscordChannel {
         Ok(())
     }
 
-    /// Wait for an interaction callback with a 5-minute timeout.
-    async fn wait_for_callback(&self, channel_id: &str, question_id: &str) -> Result<String> {
-        self.interactions
-            .wait_for_callback(channel_id, question_id)
-            .await
-    }
-
-    /// Wait for a free text message with a 5-minute timeout.
-    async fn wait_for_free_text(&self, channel_id: &str, question_id: &str) -> Result<String> {
-        self.interactions
-            .wait_for_free_text(channel_id, question_id)
-            .await
-    }
-
     /// Send a message via REST API
     async fn send_message_rest(
         &self,
@@ -760,7 +746,10 @@ impl Channel for DiscordChannel {
                     )
                     .await?;
 
-                    let value = self.wait_for_callback(chat_id, &question.id).await?;
+                    let value = self
+                        .interactions
+                        .wait_for_callback(chat_id, &question.id)
+                        .await?;
                     Answer {
                         question_id: question.id.clone(),
                         value: AnswerValue::Selected { value },
@@ -775,7 +764,10 @@ impl Channel for DiscordChannel {
                     )
                     .await?;
 
-                    let value = self.wait_for_callback(chat_id, &question.id).await?;
+                    let value = self
+                        .interactions
+                        .wait_for_callback(chat_id, &question.id)
+                        .await?;
                     Answer {
                         question_id: question.id.clone(),
                         value: AnswerValue::YesNo {
@@ -796,7 +788,10 @@ impl Channel for DiscordChannel {
                     )
                     .await?;
 
-                    let value = self.wait_for_callback(chat_id, &question.id).await?;
+                    let value = self
+                        .interactions
+                        .wait_for_callback(chat_id, &question.id)
+                        .await?;
                     Answer {
                         question_id: question.id.clone(),
                         value: AnswerValue::MultiSelected {
@@ -813,7 +808,10 @@ impl Channel for DiscordChannel {
 
                     self.send_message_rest(chat_id, &prompt, None).await?;
 
-                    let content = self.wait_for_free_text(chat_id, &question.id).await?;
+                    let content = self
+                        .interactions
+                        .wait_for_free_text(chat_id, &question.id)
+                        .await?;
                     Answer {
                         question_id: question.id.clone(),
                         value: AnswerValue::Text { content },
