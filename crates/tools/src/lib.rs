@@ -17,6 +17,7 @@ pub use tools_core::{
 };
 
 // ── Core tool implementations ────────────────────────────────────────────────
+pub mod agent_task_tool;
 pub mod ask_user;
 pub mod browser;
 pub mod cron_tool;
