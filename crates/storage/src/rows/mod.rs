@@ -1,5 +1,6 @@
 //! Row structs for `sqlx::FromRow` deserialization.
 
+pub mod agent_task;
 pub mod calendar;
 pub mod cron;
 pub mod finance;
