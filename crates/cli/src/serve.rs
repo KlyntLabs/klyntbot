@@ -5,7 +5,7 @@ use anyhow::Result;
 use bus::MessageBus;
 use channels::ChannelManager;
 use dashboard::{AppState as DashboardState, DashboardServer};
-use heartbeat::HeartbeatService;
+use crate::heartbeat::HeartbeatService;
 use scheduling::CronService;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;

@@ -14,7 +14,6 @@ agent.workspace = true
 channels.workspace = true
 scheduling.workspace = true
 storage.workspace = true
-heartbeat.workspace = true
 session.workspace = true
 tools.workspace = true
 domain.workspace = true

@@ -3,6 +3,7 @@
 //! This crate provides the command-line interface.
 
 pub mod commands;
+pub mod heartbeat;
 pub mod plugin_cmd;
 pub mod serve;
 pub mod status;

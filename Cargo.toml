@@ -12,7 +12,6 @@ members = [
     "crates/domain",
     "crates/tools",
     "crates/channels",
-    "crates/heartbeat",
     "crates/agent",
     "crates/cli",
     "crates/context_engine",
@@ -44,7 +43,6 @@ calendar = { path = "crates/calendar" }
 domain = { path = "crates/domain" }
 tools = { path = "crates/tools" }
 channels = { path = "crates/channels" }
-heartbeat = { path = "crates/heartbeat" }
 agent = { path = "crates/agent" }
 cli = { path = "crates/cli" }
 context_engine = { path = "crates/context_engine" }
@@ -142,7 +140,6 @@ calendar.workspace = true
 domain.workspace = true
 tools.workspace = true
 channels.workspace = true
-heartbeat.workspace = true
 agent.workspace = true
 cli.workspace = true
 context_engine.workspace = true

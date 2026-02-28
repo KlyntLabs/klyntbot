@@ -1258,7 +1258,6 @@ dependencies = [
  "dashboard",
  "dirs",
  "domain",
- "heartbeat",
  "lettre",
  "native-tls",
  "plugin-runtime",
@@ -3750,15 +3749,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "heartbeat"
-version = "0.1.0"
-dependencies = [
- "common",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "heck"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4526,7 +4516,6 @@ dependencies = [
  "extism",
  "feature-finance",
  "feature-todo",
- "heartbeat",
  "plugin-runtime",
  "providers",
  "scheduling",
