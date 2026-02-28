@@ -73,9 +73,13 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let permission_impl = if let Some(perm) = permission {
         let perm_variant = match perm.as_str() {
             "read_only" => quote! { ::tools_core::PermissionLevel::ReadOnly },
+            "standard" => quote! { ::tools_core::PermissionLevel::Standard },
             "elevated" => quote! { ::tools_core::PermissionLevel::Elevated },
             "admin" => quote! { ::tools_core::PermissionLevel::Admin },
-            _ => quote! { ::tools_core::PermissionLevel::Standard },
+            other => panic!(
+                "#[tool(permission = \"{}\")] is invalid. Use \"read_only\", \"standard\", \"elevated\", or \"admin\"",
+                other
+            ),
         };
         quote! {
             fn permission_level(&self) -> ::tools_core::PermissionLevel {

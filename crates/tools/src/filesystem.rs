@@ -101,17 +101,15 @@ impl tools_core::ToolExecute for ReadFileTool {
 
         let file_path = self.base.resolve_path(path)?;
 
-        if !file_path.exists() {
-            return Err(ToolError::ExecutionFailed(format!("File not found: {}", path)).into());
+        match fs::read_to_string(&file_path).await {
+            Ok(content) => Ok(content),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                Err(ToolError::ExecutionFailed(format!("File not found: {}", path)).into())
+            }
+            Err(e) => {
+                Err(ToolError::ExecutionFailed(format!("Error reading file: {}", e)).into())
+            }
         }
-
-        if !file_path.is_file() {
-            return Err(ToolError::ExecutionFailed(format!("Not a file: {}", path)).into());
-        }
-
-        fs::read_to_string(&file_path)
-            .await
-            .map_err(|e| ToolError::ExecutionFailed(format!("Error reading file: {}", e)).into())
     }
 }
 
@@ -225,23 +223,27 @@ impl tools_core::ToolExecute for EditFileTool {
 
         let file_path = self.base.resolve_path(path)?;
 
-        if !file_path.exists() {
-            return Err(ToolError::ExecutionFailed(format!("File not found: {}", path)).into());
-        }
+        let content = match fs::read_to_string(&file_path).await {
+            Ok(content) => content,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                return Err(
+                    ToolError::ExecutionFailed(format!("File not found: {}", path)).into(),
+                );
+            }
+            Err(e) => {
+                return Err(
+                    ToolError::ExecutionFailed(format!("Failed to read file: {}", e)).into(),
+                );
+            }
+        };
 
-        let content = fs::read_to_string(&file_path)
-            .await
-            .map_err(|e| ToolError::ExecutionFailed(format!("Failed to read file: {}", e)))?;
-
-        if !content.contains(old_text.as_str()) {
+        let count = content.matches(old_text.as_str()).count();
+        if count == 0 {
             return Err(ToolError::ExecutionFailed(
                 "old_text not found in file. Make sure it matches exactly.".to_string(),
             )
             .into());
         }
-
-        // Count occurrences
-        let count = content.matches(old_text.as_str()).count();
         if count > 1 {
             return Err(ToolError::ExecutionFailed(format!(
                 "old_text appears {} times. Please provide more context to make it unique.",
@@ -298,19 +300,19 @@ impl tools_core::ToolExecute for ListDirTool {
 
         let dir_path = self.base.resolve_path(path)?;
 
-        if !dir_path.exists() {
-            return Err(
-                ToolError::ExecutionFailed(format!("Directory not found: {}", path)).into(),
-            );
-        }
-
-        if !dir_path.is_dir() {
-            return Err(ToolError::ExecutionFailed(format!("Not a directory: {}", path)).into());
-        }
-
-        let mut entries = fs::read_dir(&dir_path)
-            .await
-            .map_err(|e| ToolError::ExecutionFailed(format!("Failed to read directory: {}", e)))?;
+        let mut entries = match fs::read_dir(&dir_path).await {
+            Ok(entries) => entries,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                return Err(
+                    ToolError::ExecutionFailed(format!("Directory not found: {}", path)).into(),
+                );
+            }
+            Err(e) => {
+                return Err(
+                    ToolError::ExecutionFailed(format!("Failed to read directory: {}", e)).into(),
+                );
+            }
+        };
 
         let mut items = Vec::new();
 

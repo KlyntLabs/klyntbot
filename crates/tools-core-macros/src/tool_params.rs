@@ -7,10 +7,7 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, Data, DeriveInput, Fields};
 
-use crate::helpers::{
-    classify_type, gen_from_value_extraction, gen_schema_property, get_doc_comment,
-    parse_param_attrs,
-};
+use crate::helpers::collect_field_tokens;
 
 pub fn derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -27,37 +24,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
         _ => panic!("ToolParams can only be derived for structs"),
     };
 
-    let mut schema_properties = Vec::new();
-    let mut required_fields = Vec::new();
-    let mut from_value_fields = Vec::new();
-
-    for field in fields {
-        let field_name = field.ident.as_ref().unwrap();
-        let field_name_str = field_name.to_string();
-        let field_ty = &field.ty;
-
-        let attrs = parse_param_attrs(&field.attrs);
-        let description = get_doc_comment(&field.attrs);
-        let type_info = classify_type(field_ty);
-
-        schema_properties.push(gen_schema_property(
-            &field_name_str,
-            &type_info,
-            &description,
-            &attrs,
-        ));
-
-        if attrs.is_required {
-            required_fields.push(quote! { #field_name_str });
-        }
-
-        from_value_fields.push(gen_from_value_extraction(
-            field_name,
-            &field_name_str,
-            &type_info,
-            attrs.is_required,
-        ));
-    }
+    let (schema_properties, required_fields, from_value_fields) = collect_field_tokens(fields);
 
     let expanded = quote! {
         impl ::tools_core::ToolParams for #name {

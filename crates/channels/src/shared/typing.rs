@@ -44,8 +44,6 @@ impl TypingManager {
         F: Fn() -> Fut + Send + 'static,
         Fut: std::future::Future<Output = ()> + Send,
     {
-        self.stop(chat_id).await;
-
         let task = tokio::spawn(async move {
             loop {
                 send_fn().await;
@@ -53,7 +51,10 @@ impl TypingManager {
             }
         });
 
-        self.tasks.write().await.insert(chat_id.to_string(), task);
+        let mut tasks = self.tasks.write().await;
+        if let Some(old) = tasks.insert(chat_id.to_string(), task) {
+            old.abort();
+        }
     }
 
     /// Stop the typing indicator for the given chat ID.
