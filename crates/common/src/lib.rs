@@ -3,6 +3,7 @@
 //! This crate provides the foundational types and error handling used across
 //! the entire klyntbot workspace.
 
+pub mod entity_card;
 pub mod error;
 pub mod prompts;
 pub mod types;
@@ -15,4 +16,5 @@ pub use error::{
 pub use prompts::{
     Answer, AnswerOption, AnswerType, AnswerValue, FormResponse, InteractionRequest, Question,
 };
+pub use entity_card::EntityCard;
 pub use types::{ChannelName, ChatId, MessageRole, SessionKey};
