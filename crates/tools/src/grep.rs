@@ -3,17 +3,43 @@
 use async_trait::async_trait;
 use globset::{Glob, GlobMatcher};
 use regex::Regex;
-use serde_json::Value;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use walkdir::WalkDir;
 
-use super::{PermissionLevel, RoutingContext, Tool};
-use crate::params::ParamExtractor;
+use tools_core::{RoutingContext, ToolParams};
 use common::{Result, ToolError};
 
 use crate::filesystem::FsToolBase;
 
+#[derive(Debug, ToolParams)]
+pub struct GrepParams {
+    /// Regex pattern to search for in file contents
+    #[param(required)]
+    pub pattern: String,
+
+    /// Directory to search in (default: workspace root)
+    pub path: Option<String>,
+
+    /// File filter pattern, e.g. '*.rs', '*.py'. Only files matching this pattern are searched.
+    pub glob: Option<String>,
+
+    /// Maximum number of matches to return (default: 20)
+    #[param(min = 1, max = 100)]
+    pub max_results: Option<i64>,
+
+    /// Number of lines of context to show before and after each match (default: 0)
+    #[param(min = 0, max = 5)]
+    pub context_lines: Option<i64>,
+}
+
+#[derive(tools_core::Tool)]
+#[tool(
+    name = "grep",
+    description = "Search file contents using regex patterns within a directory scope. Returns matching lines with file path and line number.",
+    params = "GrepParams",
+    permission = "read_only"
+)]
 pub struct GrepTool {
     base: FsToolBase,
 }
@@ -27,64 +53,20 @@ impl GrepTool {
 }
 
 #[async_trait]
-impl Tool for GrepTool {
-    fn name(&self) -> &str {
-        "grep"
-    }
+impl tools_core::ToolExecute for GrepTool {
+    type Params = GrepParams;
 
-    fn description(&self) -> &str {
-        "Search file contents using regex patterns within a directory scope. Returns matching lines with file path and line number."
-    }
-
-    fn permission_level(&self) -> PermissionLevel {
-        PermissionLevel::ReadOnly
-    }
-
-    fn parameters(&self) -> Value {
-        serde_json::json!({
-            "type": "object",
-            "properties": {
-                "pattern": {
-                    "type": "string",
-                    "description": "Regex pattern to search for in file contents"
-                },
-                "path": {
-                    "type": "string",
-                    "description": "Directory to search in (default: workspace root)"
-                },
-                "glob": {
-                    "type": "string",
-                    "description": "File filter pattern, e.g. '*.rs', '*.py'. Only files matching this pattern are searched."
-                },
-                "max_results": {
-                    "type": "integer",
-                    "description": "Maximum number of matches to return (default: 20)",
-                    "minimum": 1,
-                    "maximum": 100
-                },
-                "context_lines": {
-                    "type": "integer",
-                    "description": "Number of lines of context to show before and after each match (default: 0)",
-                    "minimum": 0,
-                    "maximum": 5
-                }
-            },
-            "required": ["pattern"]
-        })
-    }
-
-    async fn execute(&self, args: Value, _ctx: &RoutingContext) -> Result<String> {
-        let p = ParamExtractor::new(&args);
-        let pattern_str = p.required_str("pattern")?;
-        let max_results = p.i64_or("max_results", 20)? as usize;
-        let context_lines = p.i64_or("context_lines", 0)? as usize;
+    async fn execute(&self, params: GrepParams, _ctx: &RoutingContext) -> Result<String> {
+        let pattern_str = &params.pattern;
+        let max_results = params.max_results.unwrap_or(20) as usize;
+        let context_lines = params.context_lines.unwrap_or(0) as usize;
 
         let re = Regex::new(pattern_str)
             .map_err(|e| ToolError::InvalidParams(format!("Invalid regex: {}", e)))?;
 
-        let search_path = self.base.resolve_search_root(p.optional_str("path")?)?;
+        let search_path = self.base.resolve_search_root(params.path.as_deref())?;
 
-        let glob_matcher: Option<GlobMatcher> = if let Some(glob_str) = p.optional_str("glob")? {
+        let glob_matcher: Option<GlobMatcher> = if let Some(glob_str) = params.glob.as_deref() {
             Some(
                 Glob::new(glob_str)
                     .map_err(|e| ToolError::InvalidParams(format!("Invalid glob: {}", e)))?
@@ -193,6 +175,7 @@ impl Tool for GrepTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Tool;
     use std::fs;
     use tempfile::TempDir;
 

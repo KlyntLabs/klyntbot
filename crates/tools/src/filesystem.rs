@@ -1,13 +1,11 @@
 //! Filesystem tools: read, write, edit, list.
 
 use async_trait::async_trait;
-use serde_json::Value;
 use std::path::{Path, PathBuf};
 use tokio::fs;
 use tracing::debug;
 
-use super::{PermissionLevel, RoutingContext, Tool};
-use crate::params::ParamExtractor;
+use tools_core::{RoutingContext, ToolParams};
 use common::{Result, ToolError};
 
 /// Resolve path and optionally enforce directory restriction
@@ -66,7 +64,21 @@ impl FsToolBase {
     }
 }
 
+#[derive(Debug, ToolParams)]
+pub struct ReadFileParams {
+    /// The file path to read
+    #[param(required)]
+    pub path: String,
+}
+
 /// Tool to read file contents
+#[derive(tools_core::Tool)]
+#[tool(
+    name = "read_file",
+    description = "Read the contents of a file at the given path.",
+    params = "ReadFileParams",
+    permission = "read_only"
+)]
 pub struct ReadFileTool {
     base: FsToolBase,
 }
@@ -80,35 +92,11 @@ impl ReadFileTool {
 }
 
 #[async_trait]
-impl Tool for ReadFileTool {
-    fn name(&self) -> &str {
-        "read_file"
-    }
+impl tools_core::ToolExecute for ReadFileTool {
+    type Params = ReadFileParams;
 
-    fn description(&self) -> &str {
-        "Read the contents of a file at the given path."
-    }
-
-    fn permission_level(&self) -> PermissionLevel {
-        PermissionLevel::ReadOnly
-    }
-
-    fn parameters(&self) -> Value {
-        serde_json::json!({
-            "type": "object",
-            "properties": {
-                "path": {
-                    "type": "string",
-                    "description": "The file path to read"
-                }
-            },
-            "required": ["path"]
-        })
-    }
-
-    async fn execute(&self, args: Value, _ctx: &RoutingContext) -> Result<String> {
-        let p = ParamExtractor::new(&args);
-        let path = p.required_str("path")?;
+    async fn execute(&self, params: ReadFileParams, _ctx: &RoutingContext) -> Result<String> {
+        let path = &params.path;
 
         debug!("Reading file: {}", path);
 
@@ -128,7 +116,25 @@ impl Tool for ReadFileTool {
     }
 }
 
+#[derive(Debug, ToolParams)]
+pub struct WriteFileParams {
+    /// The file path to write to
+    #[param(required)]
+    pub path: String,
+
+    /// The content to write
+    #[param(required)]
+    pub content: String,
+}
+
 /// Tool to write content to a file
+#[derive(tools_core::Tool)]
+#[tool(
+    name = "write_file",
+    description = "Write content to a file at the given path. Creates parent directories if needed.",
+    params = "WriteFileParams",
+    permission = "elevated"
+)]
 pub struct WriteFileTool {
     base: FsToolBase,
 }
@@ -142,40 +148,12 @@ impl WriteFileTool {
 }
 
 #[async_trait]
-impl Tool for WriteFileTool {
-    fn name(&self) -> &str {
-        "write_file"
-    }
+impl tools_core::ToolExecute for WriteFileTool {
+    type Params = WriteFileParams;
 
-    fn description(&self) -> &str {
-        "Write content to a file at the given path. Creates parent directories if needed."
-    }
-
-    fn permission_level(&self) -> PermissionLevel {
-        PermissionLevel::Elevated
-    }
-
-    fn parameters(&self) -> Value {
-        serde_json::json!({
-            "type": "object",
-            "properties": {
-                "path": {
-                    "type": "string",
-                    "description": "The file path to write to"
-                },
-                "content": {
-                    "type": "string",
-                    "description": "The content to write"
-                }
-            },
-            "required": ["path", "content"]
-        })
-    }
-
-    async fn execute(&self, args: Value, _ctx: &RoutingContext) -> Result<String> {
-        let p = ParamExtractor::new(&args);
-        let path = p.required_str("path")?;
-        let content = p.required_str("content")?;
+    async fn execute(&self, params: WriteFileParams, _ctx: &RoutingContext) -> Result<String> {
+        let path = &params.path;
+        let content = &params.content;
 
         debug!("Writing file: {}", path);
 
@@ -200,7 +178,29 @@ impl Tool for WriteFileTool {
     }
 }
 
+#[derive(Debug, ToolParams)]
+pub struct EditFileParams {
+    /// The file path to edit
+    #[param(required)]
+    pub path: String,
+
+    /// The exact text to find and replace
+    #[param(required)]
+    pub old_text: String,
+
+    /// The text to replace with
+    #[param(required)]
+    pub new_text: String,
+}
+
 /// Tool to edit a file by replacing text
+#[derive(tools_core::Tool)]
+#[tool(
+    name = "edit_file",
+    description = "Edit a file by replacing old_text with new_text. The old_text must exist exactly in the file.",
+    params = "EditFileParams",
+    permission = "elevated"
+)]
 pub struct EditFileTool {
     base: FsToolBase,
 }
@@ -214,45 +214,13 @@ impl EditFileTool {
 }
 
 #[async_trait]
-impl Tool for EditFileTool {
-    fn name(&self) -> &str {
-        "edit_file"
-    }
+impl tools_core::ToolExecute for EditFileTool {
+    type Params = EditFileParams;
 
-    fn description(&self) -> &str {
-        "Edit a file by replacing old_text with new_text. The old_text must exist exactly in the file."
-    }
-
-    fn permission_level(&self) -> PermissionLevel {
-        PermissionLevel::Elevated
-    }
-
-    fn parameters(&self) -> Value {
-        serde_json::json!({
-            "type": "object",
-            "properties": {
-                "path": {
-                    "type": "string",
-                    "description": "The file path to edit"
-                },
-                "old_text": {
-                    "type": "string",
-                    "description": "The exact text to find and replace"
-                },
-                "new_text": {
-                    "type": "string",
-                    "description": "The text to replace with"
-                }
-            },
-            "required": ["path", "old_text", "new_text"]
-        })
-    }
-
-    async fn execute(&self, args: Value, _ctx: &RoutingContext) -> Result<String> {
-        let p = ParamExtractor::new(&args);
-        let path = p.required_str("path")?;
-        let old_text = p.required_str("old_text")?;
-        let new_text = p.required_str("new_text")?;
+    async fn execute(&self, params: EditFileParams, _ctx: &RoutingContext) -> Result<String> {
+        let path = &params.path;
+        let old_text = &params.old_text;
+        let new_text = &params.new_text;
 
         debug!("Editing file: {}", path);
 
@@ -266,7 +234,7 @@ impl Tool for EditFileTool {
             .await
             .map_err(|e| ToolError::ExecutionFailed(format!("Failed to read file: {}", e)))?;
 
-        if !content.contains(old_text) {
+        if !content.contains(old_text.as_str()) {
             return Err(ToolError::ExecutionFailed(
                 "old_text not found in file. Make sure it matches exactly.".to_string(),
             )
@@ -274,7 +242,7 @@ impl Tool for EditFileTool {
         }
 
         // Count occurrences
-        let count = content.matches(old_text).count();
+        let count = content.matches(old_text.as_str()).count();
         if count > 1 {
             return Err(ToolError::ExecutionFailed(format!(
                 "old_text appears {} times. Please provide more context to make it unique.",
@@ -283,7 +251,7 @@ impl Tool for EditFileTool {
             .into());
         }
 
-        let new_content = content.replacen(old_text, new_text, 1);
+        let new_content = content.replacen(old_text.as_str(), new_text, 1);
 
         fs::write(&file_path, new_content)
             .await
@@ -293,7 +261,21 @@ impl Tool for EditFileTool {
     }
 }
 
+#[derive(Debug, ToolParams)]
+pub struct ListDirParams {
+    /// The directory path to list
+    #[param(required)]
+    pub path: String,
+}
+
 /// Tool to list directory contents
+#[derive(tools_core::Tool)]
+#[tool(
+    name = "list_dir",
+    description = "List the contents of a directory.",
+    params = "ListDirParams",
+    permission = "read_only"
+)]
 pub struct ListDirTool {
     base: FsToolBase,
 }
@@ -307,35 +289,11 @@ impl ListDirTool {
 }
 
 #[async_trait]
-impl Tool for ListDirTool {
-    fn name(&self) -> &str {
-        "list_dir"
-    }
+impl tools_core::ToolExecute for ListDirTool {
+    type Params = ListDirParams;
 
-    fn description(&self) -> &str {
-        "List the contents of a directory."
-    }
-
-    fn permission_level(&self) -> PermissionLevel {
-        PermissionLevel::ReadOnly
-    }
-
-    fn parameters(&self) -> Value {
-        serde_json::json!({
-            "type": "object",
-            "properties": {
-                "path": {
-                    "type": "string",
-                    "description": "The directory path to list"
-                }
-            },
-            "required": ["path"]
-        })
-    }
-
-    async fn execute(&self, args: Value, _ctx: &RoutingContext) -> Result<String> {
-        let p = ParamExtractor::new(&args);
-        let path = p.required_str("path")?;
+    async fn execute(&self, params: ListDirParams, _ctx: &RoutingContext) -> Result<String> {
+        let path = &params.path;
 
         debug!("Listing directory: {}", path);
 
@@ -403,7 +361,7 @@ pub fn register_fs_read_tools(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::RoutingContext;
+    use crate::{RoutingContext, Tool};
     use tempfile::TempDir;
 
     fn test_ctx() -> RoutingContext {

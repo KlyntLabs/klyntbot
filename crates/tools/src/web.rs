@@ -6,11 +6,27 @@ use serde_json::Value;
 use tracing::{debug, warn};
 use url::Url;
 
-use super::{RoutingContext, Tool};
-use crate::params::ParamExtractor;
+use tools_core::{RoutingContext, ToolParams};
 use common::{Result, ToolError};
 
+#[derive(Debug, ToolParams)]
+pub struct WebSearchParams {
+    /// Search query
+    #[param(required)]
+    pub query: String,
+
+    /// Number of results (1-10)
+    #[param(min = 1, max = 10)]
+    pub count: Option<i64>,
+}
+
 /// Tool for web search via Brave Search API
+#[derive(tools_core::Tool)]
+#[tool(
+    name = "web_search",
+    description = "Search the web using Brave Search API. Returns titles, URLs, and snippets.",
+    params = "WebSearchParams"
+)]
 pub struct WebSearchTool {
     api_key: Option<String>,
     client: Client,
@@ -31,38 +47,12 @@ impl WebSearchTool {
 }
 
 #[async_trait]
-impl Tool for WebSearchTool {
-    fn name(&self) -> &str {
-        "web_search"
-    }
+impl tools_core::ToolExecute for WebSearchTool {
+    type Params = WebSearchParams;
 
-    fn description(&self) -> &str {
-        "Search the web using Brave Search API. Returns titles, URLs, and snippets."
-    }
-
-    fn parameters(&self) -> Value {
-        serde_json::json!({
-            "type": "object",
-            "properties": {
-                "query": {
-                    "type": "string",
-                    "description": "Search query"
-                },
-                "count": {
-                    "type": "integer",
-                    "description": "Number of results (1-10)",
-                    "minimum": 1,
-                    "maximum": 10
-                }
-            },
-            "required": ["query"]
-        })
-    }
-
-    async fn execute(&self, args: Value, _ctx: &RoutingContext) -> Result<String> {
-        let p = ParamExtractor::new(&args);
-        let query = p.required_str("query")?;
-        let count = p.i64_or("count", self.max_results as i64)?.clamp(1, 10);
+    async fn execute(&self, params: WebSearchParams, _ctx: &RoutingContext) -> Result<String> {
+        let query = &params.query;
+        let count = params.count.unwrap_or(self.max_results as i64).clamp(1, 10);
 
         let api_key = self.api_key.as_ref().ok_or_else(|| {
             ToolError::ExecutionFailed("Brave Search API key not configured".to_string())
@@ -138,7 +128,27 @@ impl Tool for WebSearchTool {
     }
 }
 
+#[derive(Debug, ToolParams)]
+pub struct WebFetchParams {
+    /// URL to fetch
+    #[param(required)]
+    pub url: String,
+
+    /// Extraction mode (default: markdown)
+    pub extract_mode: Option<String>,
+
+    /// Maximum characters to return
+    #[param(min = 100)]
+    pub max_chars: Option<i64>,
+}
+
 /// Tool for fetching web content
+#[derive(tools_core::Tool)]
+#[tool(
+    name = "web_fetch",
+    description = "Fetch URL and extract readable content (HTML -> text/markdown).",
+    params = "WebFetchParams"
+)]
 pub struct WebFetchTool {
     client: Client,
 }
@@ -162,42 +172,12 @@ impl Default for WebFetchTool {
 }
 
 #[async_trait]
-impl Tool for WebFetchTool {
-    fn name(&self) -> &str {
-        "web_fetch"
-    }
+impl tools_core::ToolExecute for WebFetchTool {
+    type Params = WebFetchParams;
 
-    fn description(&self) -> &str {
-        "Fetch URL and extract readable content (HTML -> text/markdown)."
-    }
-
-    fn parameters(&self) -> Value {
-        serde_json::json!({
-            "type": "object",
-            "properties": {
-                "url": {
-                    "type": "string",
-                    "description": "URL to fetch"
-                },
-                "extract_mode": {
-                    "type": "string",
-                    "enum": ["markdown", "text"],
-                    "description": "Extraction mode (default: markdown)"
-                },
-                "max_chars": {
-                    "type": "integer",
-                    "description": "Maximum characters to return",
-                    "minimum": 100
-                }
-            },
-            "required": ["url"]
-        })
-    }
-
-    async fn execute(&self, args: Value, _ctx: &RoutingContext) -> Result<String> {
-        let p = ParamExtractor::new(&args);
-        let url_str = p.required_str("url")?;
-        let max_chars = p.i64_or("max_chars", 50000)? as usize;
+    async fn execute(&self, params: WebFetchParams, _ctx: &RoutingContext) -> Result<String> {
+        let url_str = &params.url;
+        let max_chars = params.max_chars.unwrap_or(50000) as usize;
 
         debug!("Fetching URL: {}", url_str);
 
@@ -221,7 +201,7 @@ impl Tool for WebFetchTool {
         // Fetch content
         let response = self
             .client
-            .get(url_str)
+            .get(url_str.as_str())
             .send()
             .await
             .map_err(|e| ToolError::ExecutionFailed(format!("Failed to fetch URL: {}", e)))?;

@@ -1,16 +1,33 @@
 //! Message tool for cross-channel communication.
 
 use async_trait::async_trait;
-use serde_json::Value;
 use tokio::sync::mpsc;
 use tracing::debug;
 
-use super::{RoutingContext, Tool};
-use crate::params::ParamExtractor;
+use tools_core::{RoutingContext, ToolParams};
 use bus::OutboundMessage;
 use common::{Result, ToolError};
 
+#[derive(Debug, ToolParams)]
+pub struct MessageParams {
+    /// The message content to send
+    #[param(required)]
+    pub content: String,
+
+    /// Optional: target channel (telegram, discord, etc.)
+    pub channel: Option<String>,
+
+    /// Optional: target chat/user ID
+    pub chat_id: Option<String>,
+}
+
 /// Tool to send messages to channels
+#[derive(tools_core::Tool)]
+#[tool(
+    name = "message",
+    description = "Send a message to a specific channel (Telegram, Discord, etc.). In CLI/dashboard sessions, respond with text directly instead of calling this tool — your text is streamed to the user automatically.",
+    params = "MessageParams"
+)]
 pub struct MessageTool {
     outbound_tx: mpsc::Sender<OutboundMessage>,
 }
@@ -22,39 +39,11 @@ impl MessageTool {
 }
 
 #[async_trait]
-impl Tool for MessageTool {
-    fn name(&self) -> &str {
-        "message"
-    }
+impl tools_core::ToolExecute for MessageTool {
+    type Params = MessageParams;
 
-    fn description(&self) -> &str {
-        "Send a message to a specific channel (Telegram, Discord, etc.). In CLI/dashboard sessions, respond with text directly instead of calling this tool — your text is streamed to the user automatically."
-    }
-
-    fn parameters(&self) -> Value {
-        serde_json::json!({
-            "type": "object",
-            "properties": {
-                "content": {
-                    "type": "string",
-                    "description": "The message content to send"
-                },
-                "channel": {
-                    "type": "string",
-                    "description": "Optional: target channel (telegram, discord, etc.)"
-                },
-                "chat_id": {
-                    "type": "string",
-                    "description": "Optional: target chat/user ID"
-                }
-            },
-            "required": ["content"]
-        })
-    }
-
-    async fn execute(&self, args: Value, ctx: &RoutingContext) -> Result<String> {
-        let p = ParamExtractor::new(&args);
-        let content = p.required_str("content")?;
+    async fn execute(&self, params: MessageParams, ctx: &RoutingContext) -> Result<String> {
+        let content = &params.content;
 
         // In direct mode (CLI/dashboard), the user receives responses via the
         // event stream. Skip the bus and return the content inline so it becomes
@@ -65,14 +54,12 @@ impl Tool for MessageTool {
         }
 
         // Use provided context or optional overrides from args
-        let channel = p
-            .optional_str("channel")?
-            .map(|s| s.to_string())
+        let channel = params
+            .channel
             .unwrap_or_else(|| ctx.channel.as_str().to_string());
 
-        let chat_id = p
-            .optional_str("chat_id")?
-            .map(|s| s.to_string())
+        let chat_id = params
+            .chat_id
             .unwrap_or_else(|| ctx.chat_id.as_str().to_string());
 
         debug!("Sending message to {}:{}", channel, chat_id);

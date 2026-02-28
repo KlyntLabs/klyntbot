@@ -2,16 +2,31 @@
 
 use async_trait::async_trait;
 use globset::Glob;
-use serde_json::Value;
 use std::path::PathBuf;
 use walkdir::WalkDir;
 
-use super::{PermissionLevel, RoutingContext, Tool};
-use crate::params::ParamExtractor;
+use tools_core::{RoutingContext, ToolParams};
 use common::{Result, ToolError};
 
 use crate::filesystem::FsToolBase;
 
+#[derive(Debug, ToolParams)]
+pub struct GlobParams {
+    /// Glob pattern like '**/*.rs', 'src/**/*.ts', '*.json'
+    #[param(required)]
+    pub pattern: String,
+
+    /// Root directory to search from (default: workspace root)
+    pub path: Option<String>,
+}
+
+#[derive(tools_core::Tool)]
+#[tool(
+    name = "glob",
+    description = "Find files by glob pattern matching. Returns matching file paths sorted by modification time (most recent first).",
+    params = "GlobParams",
+    permission = "read_only"
+)]
 pub struct GlobTool {
     base: FsToolBase,
 }
@@ -25,41 +40,13 @@ impl GlobTool {
 }
 
 #[async_trait]
-impl Tool for GlobTool {
-    fn name(&self) -> &str {
-        "glob"
-    }
+impl tools_core::ToolExecute for GlobTool {
+    type Params = GlobParams;
 
-    fn description(&self) -> &str {
-        "Find files by glob pattern matching. Returns matching file paths sorted by modification time (most recent first)."
-    }
+    async fn execute(&self, params: GlobParams, _ctx: &RoutingContext) -> Result<String> {
+        let pattern_str = &params.pattern;
 
-    fn permission_level(&self) -> PermissionLevel {
-        PermissionLevel::ReadOnly
-    }
-
-    fn parameters(&self) -> Value {
-        serde_json::json!({
-            "type": "object",
-            "properties": {
-                "pattern": {
-                    "type": "string",
-                    "description": "Glob pattern like '**/*.rs', 'src/**/*.ts', '*.json'"
-                },
-                "path": {
-                    "type": "string",
-                    "description": "Root directory to search from (default: workspace root)"
-                }
-            },
-            "required": ["pattern"]
-        })
-    }
-
-    async fn execute(&self, args: Value, _ctx: &RoutingContext) -> Result<String> {
-        let p = ParamExtractor::new(&args);
-        let pattern_str = p.required_str("pattern")?;
-
-        let search_path = self.base.resolve_search_root(p.optional_str("path")?)?;
+        let search_path = self.base.resolve_search_root(params.path.as_deref())?;
 
         let glob = Glob::new(pattern_str)
             .map_err(|e| ToolError::InvalidParams(format!("Invalid glob pattern: {}", e)))?
@@ -114,6 +101,7 @@ impl Tool for GlobTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Tool;
     use std::fs;
     use tempfile::TempDir;
 
