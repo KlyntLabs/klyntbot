@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    use chrono::{NaiveDate, Utc};
+    use chrono::{Datelike, Local, NaiveDate, Utc};
 
     use crate::repos::finance_account_repo::FinanceAccountRepo;
     use crate::repos::finance_budget_repo::FinanceBudgetRepo;
@@ -39,6 +39,18 @@ mod tests {
         format!("{base}-{}", &uuid::Uuid::new_v4().to_string()[..8])
     }
 
+    /// Return the first day of the current month (local time).
+    fn current_month_start() -> NaiveDate {
+        let today = Local::now().date_naive();
+        NaiveDate::from_ymd_opt(today.year(), today.month(), 1).unwrap()
+    }
+
+    /// Return a date in the middle of the current month (local time).
+    fn mid_current_month() -> NaiveDate {
+        let today = Local::now().date_naive();
+        NaiveDate::from_ymd_opt(today.year(), today.month(), 15.min(today.day())).unwrap()
+    }
+
     fn sample_budget(
         id: &str,
         name: &str,
@@ -55,7 +67,7 @@ mod tests {
             category: category.map(|s| s.to_string()),
             method: "standard".to_string(),
             jar_type: None,
-            start_date: NaiveDate::from_ymd_opt(2026, 2, 1).unwrap(),
+            start_date: current_month_start(),
             end_date: None,
             is_active: true,
             alert_threshold: 80,
@@ -288,7 +300,7 @@ mod tests {
             ))
             .await
             .unwrap();
-        let feb15 = NaiveDate::from_ymd_opt(2026, 2, 15).unwrap();
+        let tx_date = mid_current_month();
         let ids: Vec<_> = [(100_000i64), (200_000), (300_000)]
             .iter()
             .enumerate()
@@ -301,7 +313,7 @@ mod tests {
             repos
                 .transactions
                 .add(&sample_tx_with_category(
-                    id, &acct_id, "expense", *amt, &cat, feb15,
+                    id, &acct_id, "expense", *amt, &cat, tx_date,
                 ))
                 .await
                 .unwrap();
@@ -334,20 +346,20 @@ mod tests {
             ))
             .await
             .unwrap();
-        let feb15 = NaiveDate::from_ymd_opt(2026, 2, 15).unwrap();
+        let tx_date = mid_current_month();
         let exp_id = unique_id("e");
         let inc_id = unique_id("i");
         repos
             .transactions
             .add(&sample_tx_with_category(
-                &exp_id, &acct_id, "expense", 200_000, &cat, feb15,
+                &exp_id, &acct_id, "expense", 200_000, &cat, tx_date,
             ))
             .await
             .unwrap();
         repos
             .transactions
             .add(&sample_tx_with_category(
-                &inc_id, &acct_id, "income", 500_000, &cat, feb15,
+                &inc_id, &acct_id, "income", 500_000, &cat, tx_date,
             ))
             .await
             .unwrap();
@@ -372,7 +384,7 @@ mod tests {
             .add(&sample_budget(&budget_id, "Total Budget", 10_000_000, None))
             .await
             .unwrap();
-        let feb15 = NaiveDate::from_ymd_opt(2026, 2, 15).unwrap();
+        let tx_date = mid_current_month();
         let id1 = unique_id("t1");
         let id2 = unique_id("t2");
         let id3 = unique_id("t3");
@@ -383,7 +395,7 @@ mod tests {
         repos
             .transactions
             .add(&sample_tx_with_category(
-                &id1, &acct_id, "expense", 100_000, &cat_food, feb15,
+                &id1, &acct_id, "expense", 100_000, &cat_food, tx_date,
             ))
             .await
             .unwrap();
@@ -395,7 +407,7 @@ mod tests {
                 "expense",
                 50_000,
                 &cat_transport,
-                feb15,
+                tx_date,
             ))
             .await
             .unwrap();
@@ -407,7 +419,7 @@ mod tests {
                 "expense",
                 200_000,
                 &cat_entertainment,
-                feb15,
+                tx_date,
             ))
             .await
             .unwrap();

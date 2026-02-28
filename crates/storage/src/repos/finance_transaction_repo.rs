@@ -251,7 +251,7 @@ impl FinanceTransactionRepo {
                 COALESCE(SUM(amount), 0)   AS total
             FROM finance_transactions
             WHERE tx_type = ?
-              AND tx_date >= date('now', 'start of month', '-' || (? - 1) || ' months')
+              AND tx_date >= date('now', 'localtime', 'start of month', '-' || (? - 1) || ' months')
             GROUP BY period_label
             ORDER BY period_label DESC
             "#,

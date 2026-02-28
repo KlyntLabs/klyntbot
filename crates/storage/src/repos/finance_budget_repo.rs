@@ -146,16 +146,16 @@ impl FinanceBudgetRepo {
                 ft.tx_type = 'expense'
                 AND (b.category IS NULL OR ft.category = b.category)
                 AND ft.tx_date >= CASE
-                    WHEN b.period = 'monthly' THEN date('now', 'start of month')
-                    WHEN b.period = 'weekly'  THEN date('now', '-' || ((strftime('%w', 'now') + 6) % 7) || ' days')
-                    WHEN b.period = 'yearly'  THEN date('now', 'start of year')
+                    WHEN b.period = 'monthly' THEN date('now', 'localtime', 'start of month')
+                    WHEN b.period = 'weekly'  THEN date('now', 'localtime', '-' || ((strftime('%w', 'now', 'localtime') + 6) % 7) || ' days')
+                    WHEN b.period = 'yearly'  THEN date('now', 'localtime', 'start of year')
                     ELSE b.start_date
                 END
                 AND ft.tx_date <= CASE
-                    WHEN b.period = 'monthly' THEN date('now', 'start of month', '+1 month', '-1 day')
-                    WHEN b.period = 'weekly'  THEN date('now', '-' || ((strftime('%w', 'now') + 6) % 7) || ' days', '+6 days')
-                    WHEN b.period = 'yearly'  THEN date('now', 'start of year', '+1 year', '-1 day')
-                    ELSE COALESCE(b.end_date, date('now'))
+                    WHEN b.period = 'monthly' THEN date('now', 'localtime', 'start of month', '+1 month', '-1 day')
+                    WHEN b.period = 'weekly'  THEN date('now', 'localtime', '-' || ((strftime('%w', 'now', 'localtime') + 6) % 7) || ' days', '+6 days')
+                    WHEN b.period = 'yearly'  THEN date('now', 'localtime', 'start of year', '+1 year', '-1 day')
+                    ELSE COALESCE(b.end_date, date('now', 'localtime'))
                 END
             WHERE b.id = ?
             GROUP BY b.id
@@ -196,16 +196,16 @@ impl FinanceBudgetRepo {
                 ft.tx_type = 'expense'
                 AND (b.category IS NULL OR ft.category = b.category)
                 AND ft.tx_date >= CASE
-                    WHEN b.period = 'monthly' THEN date('now', 'start of month')
-                    WHEN b.period = 'weekly'  THEN date('now', '-' || ((strftime('%w', 'now') + 6) % 7) || ' days')
-                    WHEN b.period = 'yearly'  THEN date('now', 'start of year')
+                    WHEN b.period = 'monthly' THEN date('now', 'localtime', 'start of month')
+                    WHEN b.period = 'weekly'  THEN date('now', 'localtime', '-' || ((strftime('%w', 'now', 'localtime') + 6) % 7) || ' days')
+                    WHEN b.period = 'yearly'  THEN date('now', 'localtime', 'start of year')
                     ELSE b.start_date
                 END
                 AND ft.tx_date <= CASE
-                    WHEN b.period = 'monthly' THEN date('now', 'start of month', '+1 month', '-1 day')
-                    WHEN b.period = 'weekly'  THEN date('now', '-' || ((strftime('%w', 'now') + 6) % 7) || ' days', '+6 days')
-                    WHEN b.period = 'yearly'  THEN date('now', 'start of year', '+1 year', '-1 day')
-                    ELSE COALESCE(b.end_date, date('now'))
+                    WHEN b.period = 'monthly' THEN date('now', 'localtime', 'start of month', '+1 month', '-1 day')
+                    WHEN b.period = 'weekly'  THEN date('now', 'localtime', '-' || ((strftime('%w', 'now', 'localtime') + 6) % 7) || ' days', '+6 days')
+                    WHEN b.period = 'yearly'  THEN date('now', 'localtime', 'start of year', '+1 year', '-1 day')
+                    ELSE COALESCE(b.end_date, date('now', 'localtime'))
                 END
             WHERE b.is_active = TRUE
             GROUP BY b.id
