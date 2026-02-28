@@ -13,7 +13,7 @@ use providers::Message;
 use tools::RoutingContext;
 use tracing::{debug, info, warn};
 
-use super::analyzer::IntentAnalyzer;
+use super::analysis::IntentAnalyzer;
 use super::router::{ExecutionRouter, RouterResult};
 use super::types::IntentAnalysis;
 use crate::events::AgentEvent;

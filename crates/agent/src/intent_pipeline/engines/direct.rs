@@ -12,7 +12,7 @@ use tools::RoutingContext;
 
 use super::{EngineResult, ExecutionEngine};
 use crate::execution::{CycleOutcome, ExecutionCore, ExecutionParams};
-use crate::intent_pipeline::escalation::EscalationContext;
+use crate::intent_pipeline::router::EscalationContext;
 
 /// Executes Direct mode: single LLM call with no tools.
 pub struct DirectEngine {

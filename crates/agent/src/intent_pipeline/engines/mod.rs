@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use providers::Usage;
 use tools::RoutingContext;
 
-use super::escalation::EscalationContext;
+use super::router::EscalationContext;
 use crate::execution::{ExecutionParams, ReasoningTrace};
 
 pub mod direct;

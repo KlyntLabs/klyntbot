@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use super::common::MockProvider;
 use klyntbot::agent::execution::ExecutionCore;
-use klyntbot::agent::intent_pipeline::analyzer::IntentAnalyzer;
+use klyntbot::agent::intent_pipeline::analysis::IntentAnalyzer;
 use klyntbot::agent::intent_pipeline::engines::direct::DirectEngine;
 use klyntbot::agent::intent_pipeline::engines::reactive::ReactiveEngine;
 use klyntbot::agent::intent_pipeline::pipeline::{IntentPipeline, PipelineConfig};

@@ -720,7 +720,7 @@ impl AgentLoopBuilder {
             config.orchestrator.max_escalations,
         );
 
-        let analyzer = crate::intent_pipeline::analyzer::IntentAnalyzer::new(
+        let analyzer = crate::intent_pipeline::analysis::IntentAnalyzer::new(
             provider.clone(),
             &config.agents.defaults.model,
             &config.orchestrator,

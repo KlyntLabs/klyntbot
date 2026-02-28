@@ -19,7 +19,7 @@ use uuid::Uuid;
 
 use super::{EngineResult, ExecutionEngine};
 use crate::execution::{ExecutionCore, ExecutionParams};
-use crate::intent_pipeline::escalation::EscalationContext;
+use crate::intent_pipeline::router::EscalationContext;
 use crate::plan_executor;
 use crate::plan_step_generator::{drafts_to_plan_steps, generate_plan_steps};
 
@@ -480,7 +480,7 @@ fn extract_last_user_message(messages: &[Message]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::intent_pipeline::escalation::CompletedStep;
+    use crate::intent_pipeline::router::CompletedStep;
     use async_trait::async_trait;
     use providers::{ChatParams, LlmProvider, LlmResponse, Usage};
     use serde_json::Value;

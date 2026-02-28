@@ -20,7 +20,7 @@ use super::{EngineResult, ExecutionEngine};
 use crate::execution::scratchpad::{ReasoningTrace, Scratchpad};
 use crate::execution::types::{accumulate_usage, CycleOutcome, ExecutionParams};
 use crate::execution::ExecutionCore;
-use crate::intent_pipeline::escalation::{CompletedStep, EscalationContext};
+use crate::intent_pipeline::router::{CompletedStep, EscalationContext};
 
 /// ReactiveEngine — ReAct loop that escalates when complexity exceeds capacity.
 pub struct ReactiveEngine {
