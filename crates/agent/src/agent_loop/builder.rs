@@ -37,61 +37,37 @@ use super::{AgentLoop, LastActiveChannel};
 
 /// Builder for constructing an [`AgentLoop`] with all its dependencies.
 ///
-/// Required fields: `bus`, `provider`, `config`.
+/// Required fields (`bus`, `provider`, `config`) are constructor params.
 /// Optional: `pool` (enables feature-todo, finance), `cron_service`, `notification_handle`.
 ///
 /// # Example
 /// ```ignore
-/// let agent = AgentLoop::builder()
-///     .with_bus(bus)
-///     .with_provider(provider)
-///     .with_config(config)
+/// let agent = AgentLoop::builder(bus, provider, config)
 ///     .with_pool(pool)
 ///     .build()
 ///     .await?;
 /// ```
 pub struct AgentLoopBuilder {
-    bus: Option<Arc<MessageBus>>,
-    provider: Option<DynProvider>,
-    config: Option<Config>,
+    bus: Arc<MessageBus>,
+    provider: DynProvider,
+    config: Config,
     pool: Option<sqlx::SqlitePool>,
     vector_store: Option<storage::VectorStore>,
     cron_service: Option<Arc<scheduling::CronService>>,
     notification_handle: Option<LastActiveChannel>,
 }
 
-impl Default for AgentLoopBuilder {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl AgentLoopBuilder {
-    pub fn new() -> Self {
+    pub fn new(bus: Arc<MessageBus>, provider: DynProvider, config: Config) -> Self {
         Self {
-            bus: None,
-            provider: None,
-            config: None,
+            bus,
+            provider,
+            config,
             pool: None,
             vector_store: None,
             cron_service: None,
             notification_handle: None,
         }
-    }
-
-    pub fn with_bus(mut self, bus: Arc<MessageBus>) -> Self {
-        self.bus = Some(bus);
-        self
-    }
-
-    pub fn with_provider(mut self, provider: DynProvider) -> Self {
-        self.provider = Some(provider);
-        self
-    }
-
-    pub fn with_config(mut self, config: Config) -> Self {
-        self.config = Some(config);
-        self
     }
 
     pub fn with_pool(mut self, pool: sqlx::SqlitePool) -> Self {
@@ -115,19 +91,10 @@ impl AgentLoopBuilder {
     }
 
     /// Consume the builder and construct an [`AgentLoop`].
-    ///
-    /// Returns an error if any required field is missing or if initialization fails.
     pub async fn build(self) -> Result<AgentLoop> {
-        // ── Validate required fields ──────────────────────────────────────
-        let bus = self.bus.ok_or_else(|| {
-            common::KlyntbotError::Config(common::ConfigError::MissingField("bus".into()))
-        })?;
-        let provider = self.provider.ok_or_else(|| {
-            common::KlyntbotError::Config(common::ConfigError::MissingField("provider".into()))
-        })?;
-        let config = self.config.ok_or_else(|| {
-            common::KlyntbotError::Config(common::ConfigError::MissingField("config".into()))
-        })?;
+        let bus = self.bus;
+        let provider = self.provider;
+        let config = self.config;
 
         let workspace = config.workspace_path();
 
@@ -828,7 +795,7 @@ impl AgentLoopBuilder {
 
 impl AgentLoop {
     /// Create a builder for constructing an `AgentLoop`.
-    pub fn builder() -> AgentLoopBuilder {
-        AgentLoopBuilder::new()
+    pub fn builder(bus: Arc<MessageBus>, provider: DynProvider, config: Config) -> AgentLoopBuilder {
+        AgentLoopBuilder::new(bus, provider, config)
     }
 }

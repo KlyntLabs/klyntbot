@@ -779,10 +779,7 @@ async fn learning_disabled_no_recording() {
     config.learning.enabled = false;
 
     let bus = Arc::new(MessageBus::new(10));
-    let agent = AgentLoop::builder()
-        .with_bus(bus)
-        .with_provider(provider.clone())
-        .with_config(config)
+    let agent = AgentLoop::builder(bus, provider.clone(), config)
         .build()
         .await
         .unwrap();

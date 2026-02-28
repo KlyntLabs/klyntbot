@@ -13,10 +13,7 @@ async fn build_test_agent(
     provider: Arc<dyn klyntbot::LlmProvider>,
     config: Config,
 ) -> AgentLoop {
-    AgentLoop::builder()
-        .with_bus(bus)
-        .with_provider(provider)
-        .with_config(config)
+    AgentLoop::builder(bus, provider, config)
         .build()
         .await
         .unwrap()

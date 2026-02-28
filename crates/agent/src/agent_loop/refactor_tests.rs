@@ -74,10 +74,7 @@ mod tests {
             .unwrap()
             .to_string();
 
-        let agent = AgentLoop::builder()
-            .with_bus(Arc::clone(&bus))
-            .with_provider(provider)
-            .with_config(config)
+        let agent = AgentLoop::builder(Arc::clone(&bus), provider, config)
             .build()
             .await
             .unwrap();

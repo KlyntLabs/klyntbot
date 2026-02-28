@@ -494,10 +494,7 @@ pub async fn handle_serve(port: u16) -> Result<()> {
     info!("Todo cron jobs registered");
 
     // Initialize agent loop WITH cron service and shared instances
-    let mut agent_loop_raw = AgentLoop::builder()
-        .with_bus(bus.clone())
-        .with_provider(provider)
-        .with_config(config.clone())
+    let mut agent_loop_raw = AgentLoop::builder(bus.clone(), provider, config.clone())
         .with_pool(storage_pool.inner().clone())
         .with_cron_service(cron_service.clone())
         .with_notification_handle(notification_dispatcher.last_active_handle())
