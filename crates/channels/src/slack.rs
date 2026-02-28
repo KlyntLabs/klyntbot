@@ -1,6 +1,7 @@
 //! Slack channel using Socket Mode WebSocket.
 
 use async_trait::async_trait;
+use dashmap::DashMap;
 use futures_util::SinkExt;
 use regex::Regex;
 use reqwest::Client;
@@ -9,17 +10,27 @@ use serde_json::{json, Value};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::{oneshot, Mutex, RwLock};
 use tokio_tungstenite::tungstenite::Message as WsMessage;
 use tracing::{debug, info, warn};
 
 use crate::ws_manager::{HeartbeatStrategy, WebSocketManager, WsConfig, WsHandler, WsSink};
 use crate::{check_allowlist, Channel};
 use bus::{InboundMessage, MessageBus, MessageKind, OutboundMessage};
-use common::{ChannelError, Result};
+use common::{
+    Answer, AnswerType, AnswerValue, ChannelError, FormResponse, InteractionRequest, Result,
+};
 use config::SlackConfig;
 
 const SLACK_API_BASE: &str = "https://slack.com/api";
+
+/// State for a pending Slack interaction callback.
+enum PendingCallback {
+    /// Waiting for a button/select action.
+    Single(oneshot::Sender<String>),
+    /// Waiting for free text reply from user.
+    FreeText(oneshot::Sender<String>),
+}
 
 /// Slack channel implementation using Socket Mode
 pub struct SlackChannel {
@@ -28,6 +39,8 @@ pub struct SlackChannel {
     bot_user_id: Arc<RwLock<Option<String>>>,
     running: Arc<AtomicBool>,
     bus: Mutex<Option<Arc<MessageBus>>>,
+    /// Pending interaction callbacks keyed by `"{channel_id}:{question_id}"`.
+    pending_interactions: Arc<DashMap<String, PendingCallback>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -66,6 +79,7 @@ impl SlackChannel {
             bot_user_id: Arc::new(RwLock::new(None)),
             running: Arc::new(AtomicBool::new(false)),
             bus: Mutex::new(None),
+            pending_interactions: Arc::new(DashMap::new()),
         })
     }
 
@@ -157,8 +171,13 @@ impl SlackChannel {
 
         // Handle events_api
         if envelope.envelope_type == "events_api" {
-            if let Some(payload) = envelope.payload {
-                self.handle_event_payload(&payload, bus).await?;
+            if let Some(ref payload) = envelope.payload {
+                self.handle_event_payload(payload, bus).await?;
+            }
+        } else if envelope.envelope_type == "interactive" {
+            // Handle interactive (block_actions from buttons/selects)
+            if let Some(ref payload) = envelope.payload {
+                self.handle_interactive_payload(payload).await;
             }
         }
 
@@ -253,6 +272,31 @@ impl SlackChannel {
         } else {
             text.to_string()
         };
+
+        // Intercept free-text replies for pending interactions
+        // Look for any pending FreeText interaction on this channel
+        let mut intercepted = false;
+        let keys_to_check: Vec<String> = self
+            .pending_interactions
+            .iter()
+            .filter(|entry| entry.key().starts_with(&format!("{}:", chat_id)))
+            .map(|entry| entry.key().clone())
+            .collect();
+        for key in keys_to_check {
+            if let Some((_, pending)) = self.pending_interactions.remove(&key) {
+                if let PendingCallback::FreeText(tx) = pending {
+                    let _ = tx.send(cleaned_text.clone());
+                    intercepted = true;
+                    break;
+                } else {
+                    // Put it back — was a Single callback, not free text
+                    self.pending_interactions.insert(key, pending);
+                }
+            }
+        }
+        if intercepted {
+            return Ok(());
+        }
 
         // Add :eyes: reaction (best-effort)
         if let Some(ts) = event.get("ts").and_then(|v| v.as_str()) {
@@ -365,6 +409,122 @@ impl SlackChannel {
                 "Failed to add reaction to Slack message {}: {}",
                 timestamp, e
             );
+        }
+
+        Ok(())
+    }
+
+    /// Handle an interactive payload (block_actions from buttons/selects).
+    async fn handle_interactive_payload(&self, payload: &Value) {
+        let payload_type = payload.get("type").and_then(|v| v.as_str()).unwrap_or("");
+        if payload_type != "block_actions" {
+            debug!("Ignoring interactive payload type: {}", payload_type);
+            return;
+        }
+
+        let actions = match payload.get("actions").and_then(|v| v.as_array()) {
+            Some(a) => a,
+            None => return,
+        };
+
+        for action in actions {
+            let action_id = action.get("action_id").and_then(|v| v.as_str()).unwrap_or("");
+
+            if !action_id.starts_with("askuser:") {
+                continue;
+            }
+
+            let parts: Vec<&str> = action_id.split(':').collect();
+            let action_type = action.get("type").and_then(|v| v.as_str()).unwrap_or("");
+
+            let (key, value) = if action_type == "static_select" {
+                // Select menu: action_id = "askuser:{channel}:{question_id}", value in selected_option
+                if parts.len() < 3 {
+                    continue;
+                }
+                let key = format!("{}:{}", parts[1], parts[2]);
+                let value = action
+                    .get("selected_option")
+                    .and_then(|o| o.get("value"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                (key, value)
+            } else {
+                // Button: action_id = "askuser:{channel}:{question_id}:{value}"
+                if parts.len() < 4 {
+                    continue;
+                }
+                let key = format!("{}:{}", parts[1], parts[2]);
+                let value = parts[3].to_string();
+                (key, value)
+            };
+
+            if let Some((_, pending)) = self.pending_interactions.remove(&key) {
+                if let PendingCallback::Single(tx) = pending {
+                    let _ = tx.send(value);
+                }
+            }
+        }
+    }
+
+    /// Wait for a button/select callback with timeout.
+    async fn wait_for_callback(&self, key: &str) -> Option<String> {
+        let (tx, rx) = oneshot::channel();
+        self.pending_interactions
+            .insert(key.to_string(), PendingCallback::Single(tx));
+
+        match tokio::time::timeout(Duration::from_secs(300), rx).await {
+            Ok(Ok(value)) => Some(value),
+            _ => {
+                self.pending_interactions.remove(key);
+                None
+            }
+        }
+    }
+
+    /// Wait for a free text reply with timeout.
+    async fn wait_for_free_text(&self, key: &str) -> Option<String> {
+        let (tx, rx) = oneshot::channel();
+        self.pending_interactions
+            .insert(key.to_string(), PendingCallback::FreeText(tx));
+
+        match tokio::time::timeout(Duration::from_secs(300), rx).await {
+            Ok(Ok(value)) => Some(value),
+            _ => {
+                self.pending_interactions.remove(key);
+                None
+            }
+        }
+    }
+
+    /// Send a message with Block Kit blocks via REST API.
+    async fn send_message_with_blocks(
+        &self,
+        channel: &str,
+        text: &str,
+        blocks: &[Value],
+    ) -> Result<()> {
+        let url = format!("{}/chat.postMessage", SLACK_API_BASE);
+        let payload = json!({
+            "channel": channel,
+            "text": text,
+            "blocks": blocks,
+        });
+
+        let response = self
+            .client
+            .post(&url)
+            .bearer_auth(self.config.bot_token.expose())
+            .json(&payload)
+            .send()
+            .await
+            .map_err(|e| ChannelError::SendFailed(format!("Request failed: {}", e)))?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await.unwrap_or_default();
+            return Err(ChannelError::SendFailed(format!("HTTP {}: {}", status, body)).into());
         }
 
         Ok(())
@@ -527,6 +687,176 @@ impl Channel for SlackChannel {
     fn is_allowed(&self, sender_id: &str) -> bool {
         check_allowlist(&self.config.allow_from, sender_id)
     }
+
+    fn supports_interaction(&self) -> bool {
+        true
+    }
+
+    async fn send_interaction(
+        &self,
+        chat_id: &str,
+        request: &InteractionRequest,
+    ) -> Result<FormResponse> {
+        let mut answers = Vec::new();
+
+        for question in &request.questions {
+            let answer = match &question.answer_type {
+                AnswerType::SingleSelect { options } => {
+                    let blocks =
+                        build_slack_select_blocks(chat_id, &question.id, &question.text, options);
+                    self.send_message_with_blocks(chat_id, &question.text, &blocks)
+                        .await?;
+
+                    let key = format!("{}:{}", chat_id, question.id);
+                    match self.wait_for_callback(&key).await {
+                        Some(value) => Answer {
+                            question_id: question.id.clone(),
+                            value: AnswerValue::Selected { value },
+                        },
+                        None => {
+                            return Err(common::ToolError::ExecutionFailed(
+                                "Slack interaction timed out (5 min)".into(),
+                            )
+                            .into())
+                        }
+                    }
+                }
+                AnswerType::YesNo { .. } => {
+                    let blocks =
+                        build_slack_yes_no_blocks(chat_id, &question.id, &question.text);
+                    self.send_message_with_blocks(chat_id, &question.text, &blocks)
+                        .await?;
+
+                    let key = format!("{}:{}", chat_id, question.id);
+                    match self.wait_for_callback(&key).await {
+                        Some(value) => Answer {
+                            question_id: question.id.clone(),
+                            value: AnswerValue::YesNo {
+                                answer: value == "yes",
+                            },
+                        },
+                        None => {
+                            return Err(common::ToolError::ExecutionFailed(
+                                "Slack interaction timed out (5 min)".into(),
+                            )
+                            .into())
+                        }
+                    }
+                }
+                AnswerType::MultiSelect { options } => {
+                    // Simplified: present as single select (same as Discord/Telegram)
+                    let blocks =
+                        build_slack_select_blocks(chat_id, &question.id, &question.text, options);
+                    self.send_message_with_blocks(chat_id, &question.text, &blocks)
+                        .await?;
+
+                    let key = format!("{}:{}", chat_id, question.id);
+                    match self.wait_for_callback(&key).await {
+                        Some(value) => Answer {
+                            question_id: question.id.clone(),
+                            value: AnswerValue::MultiSelected {
+                                values: vec![value],
+                            },
+                        },
+                        None => {
+                            return Err(common::ToolError::ExecutionFailed(
+                                "Slack interaction timed out (5 min)".into(),
+                            )
+                            .into())
+                        }
+                    }
+                }
+                AnswerType::FreeText { placeholder } => {
+                    let prompt = if let Some(ph) = placeholder {
+                        format!("*{}*\n{}\n_{}_", request.title, question.text, ph)
+                    } else {
+                        format!("*{}*\n{}", request.title, question.text)
+                    };
+
+                    self.send_message(chat_id, &prompt, None).await?;
+
+                    let key = format!("{}:{}", chat_id, question.id);
+                    match self.wait_for_free_text(&key).await {
+                        Some(content) => Answer {
+                            question_id: question.id.clone(),
+                            value: AnswerValue::Text { content },
+                        },
+                        None => {
+                            return Err(common::ToolError::ExecutionFailed(
+                                "Slack free text timed out (5 min)".into(),
+                            )
+                            .into())
+                        }
+                    }
+                }
+            };
+
+            answers.push(answer);
+        }
+
+        Ok(FormResponse::Completed(answers))
+    }
+}
+
+/// Build Slack Block Kit blocks with buttons for select options.
+/// Uses `actions` block with button elements.
+fn build_slack_select_blocks(
+    channel_id: &str,
+    question_id: &str,
+    question: &str,
+    options: &[common::AnswerOption],
+) -> Vec<Value> {
+    let buttons: Vec<Value> = options
+        .iter()
+        .map(|opt| {
+            json!({
+                "type": "button",
+                "text": { "type": "plain_text", "text": opt.label },
+                "action_id": format!("askuser:{}:{}:{}", channel_id, question_id, opt.value),
+                "value": opt.value,
+            })
+        })
+        .collect();
+
+    vec![
+        json!({
+            "type": "section",
+            "text": { "type": "mrkdwn", "text": question },
+        }),
+        json!({
+            "type": "actions",
+            "elements": buttons,
+        }),
+    ]
+}
+
+/// Build Slack Block Kit blocks with Yes/No buttons.
+fn build_slack_yes_no_blocks(channel_id: &str, question_id: &str, question: &str) -> Vec<Value> {
+    vec![
+        json!({
+            "type": "section",
+            "text": { "type": "mrkdwn", "text": question },
+        }),
+        json!({
+            "type": "actions",
+            "elements": [
+                {
+                    "type": "button",
+                    "text": { "type": "plain_text", "text": "Yes" },
+                    "style": "primary",
+                    "action_id": format!("askuser:{}:{}:yes", channel_id, question_id),
+                    "value": "yes",
+                },
+                {
+                    "type": "button",
+                    "text": { "type": "plain_text", "text": "No" },
+                    "style": "danger",
+                    "action_id": format!("askuser:{}:{}:no", channel_id, question_id),
+                    "value": "no",
+                },
+            ],
+        }),
+    ]
 }
 
 #[cfg(test)]
@@ -748,5 +1078,138 @@ mod tests {
         let auth: AuthTestResponse = serde_json::from_value(raw).unwrap();
         assert!(!auth.ok);
         assert_eq!(auth.error.unwrap(), "invalid_auth");
+    }
+
+    #[test]
+    fn test_slack_select_blocks_3_options() {
+        use common::AnswerOption;
+
+        let options = vec![
+            AnswerOption {
+                value: "high".into(),
+                label: "High".into(),
+                description: None,
+            },
+            AnswerOption {
+                value: "medium".into(),
+                label: "Medium".into(),
+                description: None,
+            },
+            AnswerOption {
+                value: "low".into(),
+                label: "Low".into(),
+                description: None,
+            },
+        ];
+
+        let blocks = build_slack_select_blocks("C123", "priority", "Pick priority", &options);
+        assert_eq!(blocks.len(), 2); // section + actions
+
+        // Section block
+        assert_eq!(blocks[0]["type"], "section");
+        assert_eq!(
+            blocks[0]["text"]["text"].as_str().unwrap(),
+            "Pick priority"
+        );
+
+        // Actions block with 3 buttons
+        assert_eq!(blocks[1]["type"], "actions");
+        let elements = blocks[1]["elements"].as_array().unwrap();
+        assert_eq!(elements.len(), 3);
+
+        for el in elements {
+            assert_eq!(el["type"], "button");
+        }
+
+        // Check first button
+        assert_eq!(elements[0]["text"]["text"], "High");
+        assert_eq!(
+            elements[0]["action_id"].as_str().unwrap(),
+            "askuser:C123:priority:high"
+        );
+        assert_eq!(elements[0]["value"], "high");
+    }
+
+    #[test]
+    fn test_slack_yes_no_blocks() {
+        let blocks = build_slack_yes_no_blocks("C456", "confirm", "Are you sure?");
+        assert_eq!(blocks.len(), 2); // section + actions
+
+        assert_eq!(blocks[0]["type"], "section");
+
+        let elements = blocks[1]["elements"].as_array().unwrap();
+        assert_eq!(elements.len(), 2);
+
+        // Yes button: primary style
+        assert_eq!(elements[0]["text"]["text"], "Yes");
+        assert_eq!(elements[0]["style"], "primary");
+        assert_eq!(
+            elements[0]["action_id"].as_str().unwrap(),
+            "askuser:C456:confirm:yes"
+        );
+
+        // No button: danger style
+        assert_eq!(elements[1]["text"]["text"], "No");
+        assert_eq!(elements[1]["style"], "danger");
+        assert_eq!(
+            elements[1]["action_id"].as_str().unwrap(),
+            "askuser:C456:confirm:no"
+        );
+    }
+
+    #[test]
+    fn test_slack_action_id_format() {
+        use common::AnswerOption;
+
+        let options = vec![
+            AnswerOption {
+                value: "oauth2".into(),
+                label: "OAuth 2.0".into(),
+                description: Some("Industry standard".into()),
+            },
+            AnswerOption {
+                value: "jwt".into(),
+                label: "JWT".into(),
+                description: None,
+            },
+        ];
+
+        let blocks = build_slack_select_blocks("C789", "auth_method", "Choose auth", &options);
+        let elements = blocks[1]["elements"].as_array().unwrap();
+
+        for el in elements {
+            let action_id = el["action_id"].as_str().unwrap();
+            assert!(action_id.starts_with("askuser:C789:auth_method:"));
+            let parts: Vec<&str> = action_id.split(':').collect();
+            assert_eq!(parts.len(), 4);
+            assert_eq!(parts[0], "askuser");
+            assert_eq!(parts[1], "C789");
+            assert_eq!(parts[2], "auth_method");
+        }
+    }
+
+    #[test]
+    fn test_interactive_payload_parse() {
+        // Simulate a block_actions payload from a button click
+        let payload = json!({
+            "type": "block_actions",
+            "user": { "id": "U123" },
+            "channel": { "id": "C456" },
+            "actions": [{
+                "action_id": "askuser:C456:priority:high",
+                "type": "button",
+                "value": "high"
+            }]
+        });
+
+        let payload_type = payload.get("type").and_then(|v| v.as_str()).unwrap();
+        assert_eq!(payload_type, "block_actions");
+
+        let actions = payload.get("actions").and_then(|v| v.as_array()).unwrap();
+        assert_eq!(actions.len(), 1);
+
+        let action_id = actions[0]["action_id"].as_str().unwrap();
+        let parts: Vec<&str> = action_id.split(':').collect();
+        assert_eq!(parts, vec!["askuser", "C456", "priority", "high"]);
     }
 }
