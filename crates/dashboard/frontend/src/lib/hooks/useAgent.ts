@@ -20,6 +20,7 @@ export interface ToolCallState {
   durationMs?: number;
   success?: boolean;
   completed: boolean;
+  result?: string;
 }
 
 export interface ThinkingState {
@@ -74,6 +75,8 @@ export function useAgent(): UseAgentResult {
   const accumulatedContentRef = useRef('');
   // Ref to track isStreaming without stale closure issues
   const isStreamingRef = useRef(false);
+  // Ref to capture tool calls before thinking state is cleared
+  const thinkingRef = useRef<ThinkingState | null>(null);
 
   useEffect(() => {
     const socket = new AgentSocket();
@@ -148,7 +151,7 @@ export function useAgent(): UseAgentResult {
         case 'toolStart': {
           setThinking((prev) => {
             if (!prev) return prev;
-            return {
+            const next = {
               ...prev,
               toolCalls: [
                 ...prev.toolCalls,
@@ -159,6 +162,8 @@ export function useAgent(): UseAgentResult {
                 },
               ],
             };
+            thinkingRef.current = next;
+            return next;
           });
           break;
         }
@@ -175,11 +180,14 @@ export function useAgent(): UseAgentResult {
                   completed: true,
                   success: event.success as boolean,
                   durationMs: event.durationMs as number,
+                  result: event.result as string | undefined,
                 };
                 break;
               }
             }
-            return { ...prev, toolCalls };
+            const next = { ...prev, toolCalls };
+            thinkingRef.current = next;
+            return next;
           });
           break;
         }
@@ -219,11 +227,25 @@ export function useAgent(): UseAgentResult {
           const finalContent = (event.content as string) ?? accumulatedContentRef.current;
           const id = streamingMessageIdRef.current;
 
+          // Capture completed tool calls before clearing thinking state
+          const completedToolCalls = thinkingRef.current?.toolCalls
+            ?.filter((tc) => tc.completed)
+            .map((tc) => ({
+              name: tc.name,
+              args: tc.args,
+              durationMs: tc.durationMs,
+              success: tc.success,
+              result: tc.result,
+            }));
+          const toolCalls = completedToolCalls && completedToolCalls.length > 0
+            ? completedToolCalls
+            : undefined;
+
           if (id) {
             setMessages((prev) =>
               prev.map((msg) =>
                 msg.id === id
-                  ? { ...msg, content: finalContent, isStreaming: false }
+                  ? { ...msg, content: finalContent, isStreaming: false, toolCalls }
                   : msg,
               ),
             );
@@ -236,6 +258,7 @@ export function useAgent(): UseAgentResult {
                 content: finalContent,
                 timestamp: new Date(),
                 isStreaming: false,
+                toolCalls,
               },
             ]);
           }
@@ -245,6 +268,7 @@ export function useAgent(): UseAgentResult {
           accumulatedContentRef.current = '';
           isStreamingRef.current = false;
           setIsStreaming(false);
+          thinkingRef.current = null;
           setThinking(null);
           break;
         }

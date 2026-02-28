@@ -90,11 +90,18 @@ impl ExecutionRouter {
                     .execute(messages.clone(), tools, params, ctx, event_tx.clone())
                     .await?
             }
-            ExecutionMode::Planned { .. } => {
+            ExecutionMode::Planned { visibility, .. } => {
                 debug!("ExecutionRouter: starting with Planned mode");
                 if let Some(ref planned) = self.planned {
                     planned
-                        .execute(messages.clone(), tools, params, ctx, event_tx.clone())
+                        .execute_with_visibility(
+                            messages.clone(),
+                            tools,
+                            params,
+                            ctx,
+                            event_tx.clone(),
+                            visibility.clone(),
+                        )
                         .await?
                 } else {
                     warn!("ExecutionRouter: Planned mode requested but no PlannedEngine configured, falling back to Reactive");

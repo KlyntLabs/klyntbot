@@ -114,12 +114,14 @@ mod tests {
             name: "todo".to_string(),
             success: true,
             duration_ms: 42,
+            result: Some("Found 3 tasks".to_string()),
         };
         let v = serialize(&event);
         assert_eq!(v["type"], "toolEnd");
         assert_eq!(v["name"], "todo");
         assert_eq!(v["success"], true);
         assert_eq!(v["durationMs"], 42);
+        assert_eq!(v["result"], "Found 3 tasks");
         // Confirm snake_case key is absent
         assert!(
             v.get("duration_ms").is_none(),
@@ -134,6 +136,7 @@ mod tests {
             name: "x".to_string(),
             success: false,
             duration_ms: 0,
+            result: None,
         };
         let v = serialize(&event);
         assert_eq!(v["type"].as_str().unwrap(), "toolEnd");
@@ -277,6 +280,7 @@ mod tests {
                 name: "tool".to_string(),
                 success: true,
                 duration_ms: 1,
+                result: Some("ok".to_string()),
             },
             AgentEvent::IterationStart {
                 iteration: 1,

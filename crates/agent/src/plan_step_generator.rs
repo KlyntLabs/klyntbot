@@ -48,12 +48,19 @@ pub async fn generate_plan_steps(
          Task: {description}\n\
          {tools_hint}\n\
          \n\
+         IMPORTANT: Each step description must specify the EXACT tool action and parameters to use.\n\
+         BAD: \"Add due dates to tasks\"\n\
+         GOOD: \"Call todo with action=update, id=<task_id>, due_date=<date> for each task missing a due date\"\n\
+         BAD: \"Review the tasks\"\n\
+         GOOD: \"Call todo with action=list to retrieve all current tasks\"\n\
+         \n\
          Respond ONLY with a valid JSON array (no markdown fences, no extra text):\n\
          [{{\"description\": \"...\", \"reasoning\": \"...\", \"expectedTools\": [\"tool_name\"]}}]"
     );
 
     let mut messages: Vec<Message> = vec![Message::system(
         "You are a planning assistant. Decompose tasks into clear, sequential steps. \
+         Each step must specify the exact tool action and arguments to use. \
          Respond ONLY with a valid JSON array. No markdown, no explanations.",
     )];
     messages.extend_from_slice(context);

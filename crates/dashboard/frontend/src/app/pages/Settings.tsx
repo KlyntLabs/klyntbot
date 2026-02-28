@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import {
   Sliders, Cpu, MessageCircle, Wrench, CheckSquare,
-  Brain, DollarSign, Package, Loader2, AlertTriangle, RefreshCw, X,
+  Brain, DollarSign, Package, Loader2, AlertTriangle, RefreshCw, X, Workflow,
 } from 'lucide-react';
 import { useApi } from '../../lib/hooks/useApi';
 import { useExchangeRates } from '../../lib/hooks/useExchangeRates';
@@ -62,6 +62,7 @@ const SECTIONS: SectionDef[] = [
   { id: 'tools', label: 'Tools', icon: Wrench, desc: 'Tool permissions and configuration' },
   { id: 'tasks', label: 'Tasks', icon: CheckSquare, desc: 'Task management and productivity' },
   { id: 'ai-behavior', label: 'AI Behavior', icon: Brain, desc: 'Conversation, memory, and learning' },
+  { id: 'intent-pipeline', label: 'Intent Pipeline', icon: Workflow, desc: 'Orchestrator, classification, and execution mode' },
   { id: 'finance', label: 'Finance', icon: DollarSign, desc: 'Financial tracking and budgets' },
   { id: 'extensions', label: 'Extensions', icon: Package, desc: 'Packs, skills, and plugins' },
 ];
@@ -146,6 +147,7 @@ export default function Settings() {
   const conversationMemory = asRecord(conversation.memory);
   const learning = asRecord(config?.learning);
   const confidence = asRecord(config?.confidence);
+  const orchestrator = asRecord(config?.orchestrator);
   const finance = asRecord(config?.finance);
   const financeInflation = asRecord(finance.inflation);
   const financeExpectedReturns = asRecord(finance.expectedReturns);
@@ -808,6 +810,64 @@ export default function Settings() {
                         <span className="text-[12px]" style={{ color: 'var(--codex-fg-subtle)' }}>No overrides</span>
                       )}
                     </div>
+                  </SettingRow>
+                </SettingSection>
+              </>
+            )}
+
+            {/* ── INTENT PIPELINE ──────────────────────────────────── */}
+            {activeSection === 'intent-pipeline' && (
+              <>
+                <SettingSection title="Classification" defaultOpen>
+                  <SettingRow label="Heuristic Confidence Threshold" description="Minimum confidence for zero-cost keyword classification (0–100%)">
+                    <Slider
+                      min={0} max={100} step={5}
+                      value={Math.round(num(orchestrator, 'heuristicConfidenceThreshold', 0.85) * 100)}
+                      onChange={(v) => patchSection('orchestrator', { heuristicConfidenceThreshold: v / 100 })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="LLM Classifier Timeout" description="Max wait time for LLM-based classification">
+                    <NumberInput
+                      min={100} max={30000} step={100}
+                      value={num(orchestrator, 'llmClassifierTimeout', 2000)}
+                      onChange={(v) => debouncedPatch('orchestrator', { llmClassifierTimeout: v })}
+                      suffix="ms"
+                    />
+                  </SettingRow>
+                  <SettingRow label="LLM Classifier Model" description="Override model for classifier (empty = use agent default)">
+                    <TextInput
+                      value={str(orchestrator, 'llmClassifierModel', '')}
+                      onChange={(v) => debouncedPatch('orchestrator', { llmClassifierModel: v || null })}
+                      placeholder="e.g. claude-haiku-4-5-20251001"
+                    />
+                  </SettingRow>
+                </SettingSection>
+
+                <SettingSection title="Execution" defaultOpen>
+                  <SettingRow label="Plan Complexity Threshold" description="Complexity score (0–7) above which requests trigger planned execution">
+                    <Slider
+                      min={0} max={7} step={1}
+                      value={num(orchestrator, 'planComplexityThreshold', 3)}
+                      onChange={(v) => patchSection('orchestrator', { planComplexityThreshold: v })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Max Escalations" description="Maximum escalation steps per request (Direct → Reactive → Planned)">
+                    <NumberInput
+                      min={0} max={5} step={1}
+                      value={num(orchestrator, 'maxEscalations', 1)}
+                      onChange={(v) => debouncedPatch('orchestrator', { maxEscalations: v })}
+                    />
+                  </SettingRow>
+                  <SettingRow label="Default Plan Visibility" description="Visibility for auto-generated plans">
+                    <Select
+                      value={str(orchestrator, 'defaultPlanVisibility', 'on_failure')}
+                      onChange={(v) => patchSection('orchestrator', { defaultPlanVisibility: v })}
+                      options={[
+                        { value: 'silent', label: 'Silent' },
+                        { value: 'on_failure', label: 'On Failure' },
+                        { value: 'transparent', label: 'Transparent' },
+                      ]}
+                    />
                   </SettingRow>
                 </SettingSection>
               </>

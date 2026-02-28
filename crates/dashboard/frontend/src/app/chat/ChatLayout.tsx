@@ -40,7 +40,6 @@ export function ChatLayout() {
       <ChatSidebar
         status={status}
         isStreaming={isStreaming}
-        thinking={thinking}
         activeTools={activeTools}
         toolHistory={toolHistory}
       />

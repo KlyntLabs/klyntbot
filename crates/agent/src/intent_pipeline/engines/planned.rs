@@ -127,11 +127,14 @@ impl PlannedEngine {
         let mut all_steps = completed_steps;
         all_steps.extend(new_steps);
 
-        let plan = self.build_plan(&description, all_steps, ctx);
+        let plan = self.build_plan(&description, all_steps, ctx, None);
         let mut plan = self.save_and_start_plan(plan).await?;
         plan.current_step_index = completed_count; // Skip already-completed steps
 
-        let content = self.run_plan_steps(&mut plan, ctx).await?;
+        let raw_output = self.run_plan_steps(&mut plan, ctx).await?;
+        let content = self
+            .synthesize_response(&plan.description, &raw_output)
+            .await;
 
         Ok(EngineResult::Complete {
             content,
@@ -152,6 +155,7 @@ impl PlannedEngine {
         params: &ExecutionParams,
         ctx: &RoutingContext,
         event_tx: Option<tokio::sync::mpsc::Sender<crate::events::AgentEvent>>,
+        visibility_override: Option<PlanVisibility>,
     ) -> Result<EngineResult> {
         let description = extract_last_user_message(&messages);
 
@@ -174,10 +178,13 @@ impl PlannedEngine {
         }
 
         let steps = drafts_to_plan_steps(&drafts, 0);
-        let plan = self.build_plan(&description, steps, ctx);
+        let plan = self.build_plan(&description, steps, ctx, visibility_override);
         let mut plan = self.save_and_start_plan(plan).await?;
 
-        let content = self.run_plan_steps(&mut plan, ctx).await?;
+        let raw_output = self.run_plan_steps(&mut plan, ctx).await?;
+        let content = self
+            .synthesize_response(&plan.description, &raw_output)
+            .await;
 
         Ok(EngineResult::Complete {
             content,
@@ -189,11 +196,17 @@ impl PlannedEngine {
     }
 
     /// Build a Plan domain object in Approved state.
+    ///
+    /// If `visibility_override` is provided, it is used instead of the
+    /// engine's default visibility. This lets the classifier/heuristics
+    /// decision (e.g. Transparent for user-requested plans) take precedence
+    /// over the config default (on_failure for auto-generated plans).
     fn build_plan(
         &self,
         description: &str,
         steps: Vec<plan::PlanStep>,
         ctx: &RoutingContext,
+        visibility_override: Option<PlanVisibility>,
     ) -> plan::Plan {
         let now = Utc::now();
         plan::Plan {
@@ -207,7 +220,7 @@ impl PlannedEngine {
             current_step_index: 0,
             iteration_limit: 50,
             backtrack_history: vec![],
-            visibility: self.default_visibility.clone(),
+            visibility: visibility_override.unwrap_or_else(|| self.default_visibility.clone()),
             task_id: None,
             created_at: now,
             updated_at: now,
@@ -352,6 +365,61 @@ impl PlannedEngine {
         Ok(outputs.join("\n"))
     }
 
+    /// Synthesize a human-readable summary from raw step outputs via LLM.
+    ///
+    /// Falls back to the raw output if the synthesis call fails.
+    async fn synthesize_response(&self, goal: &str, step_outputs: &str) -> String {
+        let prompt = format!(
+            "You just completed a multi-step plan for the user.\n\n\
+             **Goal:** {}\n\n\
+             **Raw step results:**\n{}\n\n\
+             Provide a clear, concise summary based ONLY on the actual tool outputs above. \
+             CRITICAL: Do NOT claim actions were taken unless the raw results show concrete \
+             evidence (e.g., \"Updated task X\" or changed field values). If a step was supposed \
+             to update data but the raw output only shows listings/reads without confirmation \
+             of changes, honestly report that those updates were NOT actually performed. \
+             Do NOT repeat raw tool outputs verbatim. Use markdown formatting where helpful.",
+            goal, step_outputs
+        );
+
+        match self
+            .provider
+            .chat(
+                &[Message::user(prompt)],
+                None,
+                &providers::ChatParams::new(&self.model),
+            )
+            .await
+        {
+            Ok(response) => response
+                .content
+                .filter(|c| !c.trim().is_empty())
+                .unwrap_or_else(|| step_outputs.to_string()),
+            Err(e) => {
+                warn!("PlannedEngine: synthesis call failed, returning raw output: {e}");
+                step_outputs.to_string()
+            }
+        }
+    }
+
+    /// Execute with a specific visibility override from the intent classifier.
+    ///
+    /// Called by the router when the `ExecutionMode::Planned` carries a
+    /// visibility set by the classifier/heuristics (e.g. Transparent for
+    /// user-requested plans).
+    pub async fn execute_with_visibility(
+        &self,
+        messages: Vec<Message>,
+        tools: &[serde_json::Value],
+        params: &ExecutionParams,
+        ctx: &RoutingContext,
+        event_tx: Option<tokio::sync::mpsc::Sender<crate::events::AgentEvent>>,
+        visibility: PlanVisibility,
+    ) -> Result<EngineResult> {
+        self.execute_fresh(messages, tools, params, ctx, event_tx, Some(visibility))
+            .await
+    }
+
     /// Fall back to ReactiveEngine when plan generation fails.
     async fn reactive_fallback(
         &self,
@@ -389,7 +457,7 @@ impl ExecutionEngine for PlannedEngine {
         ctx: &RoutingContext,
         event_tx: Option<tokio::sync::mpsc::Sender<crate::events::AgentEvent>>,
     ) -> Result<EngineResult> {
-        self.execute_fresh(messages, tools, params, ctx, event_tx)
+        self.execute_fresh(messages, tools, params, ctx, event_tx, None)
             .await
     }
 

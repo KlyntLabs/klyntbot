@@ -1,6 +1,7 @@
-import { Loader2, Check, X } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import type { ThinkingState } from '../../../lib/hooks/useAgent';
 import { phaseLabel, strategyLabel } from '../utils';
+import { ToolCallRow } from './ToolCallRow';
 
 export function ThinkingIndicator({ thinking }: { thinking: ThinkingState }) {
   return (
@@ -91,58 +92,11 @@ export function ThinkingIndicator({ thinking }: { thinking: ThinkingState }) {
         )}
       </div>
 
-      {/* Tool calls */}
+      {/* Tool calls — same expandable rows as InlineToolCalls */}
       {thinking.toolCalls.length > 0 && (
-        <div className="px-3 py-2 space-y-1.5">
+        <div className="px-3 py-2 space-y-1">
           {thinking.toolCalls.map((tc, idx) => (
-            <div
-              key={`${tc.name}-${idx}`}
-              className="flex items-center gap-2"
-            >
-              {tc.completed ? (
-                tc.success ? (
-                  <Check className="w-3 h-3" strokeWidth={2} style={{ color: '#10b981' }} />
-                ) : (
-                  <X className="w-3 h-3" strokeWidth={2} style={{ color: '#ef4444' }} />
-                )
-              ) : (
-                <Loader2
-                  className="w-3 h-3 animate-spin"
-                  strokeWidth={1.5}
-                  style={{ color: 'var(--codex-accent)' }}
-                />
-              )}
-              <span
-                className="px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide"
-                style={{
-                  backgroundColor: tc.completed
-                    ? tc.success
-                      ? 'rgba(16, 185, 129, 0.1)'
-                      : 'rgba(239, 68, 68, 0.1)'
-                    : 'var(--codex-accent-dim)',
-                  color: tc.completed
-                    ? tc.success
-                      ? '#10b981'
-                      : '#ef4444'
-                    : 'var(--codex-accent)',
-                  fontFamily: 'var(--font-mono)',
-                  fontWeight: 500,
-                }}
-              >
-                {tc.name}
-              </span>
-              {tc.durationMs != null && (
-                <span
-                  className="text-[10px]"
-                  style={{
-                    color: '#888',
-                    fontFamily: 'var(--font-mono)',
-                  }}
-                >
-                  {tc.durationMs}ms
-                </span>
-              )}
-            </div>
+            <ToolCallRow key={`${tc.name}-${idx}`} tc={tc} />
           ))}
         </div>
       )}

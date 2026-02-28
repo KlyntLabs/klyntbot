@@ -18,6 +18,20 @@ pub enum ExecutionMode {
     },
 }
 
+impl std::fmt::Display for ExecutionMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Direct => write!(f, "Direct"),
+            Self::Reactive { max_iterations } => {
+                write!(f, "Reactive(max={})", max_iterations)
+            }
+            Self::Planned { max_steps, .. } => {
+                write!(f, "Planned(steps={})", max_steps)
+            }
+        }
+    }
+}
+
 /// Bridge: `ExecutionMode` → `ExecutionStrategy` for the `ContextEngine`.
 ///
 /// The `ContextEngine` allocates token budgets based on `ExecutionStrategy`.

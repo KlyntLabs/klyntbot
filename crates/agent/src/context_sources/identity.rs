@@ -53,6 +53,18 @@ impl ContextSource for IdentitySource {
         let os = std::env::consts::OS;
         let arch = std::env::consts::ARCH;
 
+        // In direct mode (CLI/dashboard), responses stream directly to the user
+        // so the LLM should produce text responses, not call the `message` tool.
+        // For bus-driven channels (Telegram, Discord, etc.), the LLM must use
+        // the `message` tool to route responses to the correct channel/chat.
+        let messaging_instruction = if ctx.channel == "cli" {
+            "- Respond directly with text — do NOT use the `message` tool (your text response is streamed to the user automatically)\n\
+             - Only use the `message` tool if you need to send to a different channel"
+        } else {
+            "- Use the `message` tool to send responses to the user\n\
+             - Only use the `message` tool for actual communication — don't use it for internal reasoning"
+        };
+
         Some(format!(
             r#"# Identity
 
@@ -66,8 +78,7 @@ You are klyntbot, a personal AI assistant powered by advanced language models.
 - Chat ID: {}
 
 **Important Instructions:**
-- Use the `message` tool to send responses to the user
-- Only use the `message` tool for actual communication - don't use it for internal reasoning
+{}
 - Use other tools (read_file, web_search, etc.) to gather information before responding
 - Always be helpful, accurate, and concise
 
@@ -85,7 +96,8 @@ You are klyntbot, a personal AI assistant powered by advanced language models.
             arch,
             self.workspace.display(),
             ctx.channel,
-            ctx.chat_id
+            ctx.chat_id,
+            messaging_instruction
         ))
     }
 }

@@ -9,21 +9,17 @@ pub fn confidence_prompt(threshold: f32) -> String {
     format!(
         r#"## Internal Decision Confidence
 
-Before making tool calls, assess your confidence in understanding the user's intent.
-Output a <confidence> block with your assessment (this is internal, never shown to user):
+IMPORTANT: "confidence" is NOT a tool. Do NOT generate a tool call named "confidence".
 
-<confidence>
-{{"score": 0.0-1.0, "intent_clarity": 0.0-1.0, "tool_fit": 0.0-1.0, "info_sufficiency": 0.0-1.0, "reasoning": "brief explanation"}}
-</confidence>
+Before making tool calls, briefly assess your confidence in your text response (not as a tool call).
+Include a short XML tag in your text output like this:
+
+<confidence score="0.85" clarity="high" reasoning="clear intent" />
 
 Guidelines:
 - score >= {threshold:.2}: Proceed with tool calls
-- score < {threshold:.2}: Use ask_user to clarify before proceeding
-- intent_clarity: How well you understand what the user wants
-- tool_fit: How well the chosen tool matches the need
-- info_sufficiency: Whether you have enough info to execute
+- score < {threshold:.2}: Use ask_user tool to clarify before proceeding
 
-Always include a <confidence> block before tool calls. After tool execution, include another
-<confidence> block assessing the result quality."#
+This is purely internal text markup, not a function/tool call."#
     )
 }

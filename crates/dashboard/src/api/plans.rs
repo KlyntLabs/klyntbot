@@ -110,7 +110,13 @@ pub async fn create_plan(
         current_step_index: 0,
         iteration_limit: req.iteration_limit.unwrap_or(20),
         backtrack_history: serde_json::json!([]),
-        visibility: "transparent".to_string(),
+        visibility: {
+            let cfg = state
+                .config
+                .read()
+                .map_err(|e| ApiError::internal(e.to_string()))?;
+            cfg.orchestrator.default_plan_visibility.clone()
+        },
         task_id: None,
         created_at: now,
         updated_at: now,

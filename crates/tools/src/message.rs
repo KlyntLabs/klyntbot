@@ -28,7 +28,7 @@ impl Tool for MessageTool {
     }
 
     fn description(&self) -> &str {
-        "Send a message to the user. Use this when you want to communicate something."
+        "Send a message to a specific channel (Telegram, Discord, etc.). In CLI/dashboard sessions, respond with text directly instead of calling this tool — your text is streamed to the user automatically."
     }
 
     fn parameters(&self) -> Value {
@@ -55,6 +55,14 @@ impl Tool for MessageTool {
     async fn execute(&self, args: Value, ctx: &RoutingContext) -> Result<String> {
         let p = ParamExtractor::new(&args);
         let content = p.required_str("content")?;
+
+        // In direct mode (CLI/dashboard), the user receives responses via the
+        // event stream. Skip the bus and return the content inline so it becomes
+        // part of the LLM's final response context.
+        if ctx.is_direct_mode {
+            debug!("Direct mode: returning message content inline");
+            return Ok(content.to_string());
+        }
 
         // Use provided context or optional overrides from args
         let channel = p

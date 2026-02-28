@@ -52,6 +52,10 @@ pub struct RoutingContext {
     /// Only available when running in CLI chat mode (TTY).
     /// Clone-safe: mpsc::Sender is Clone.
     pub interaction_tx: Option<mpsc::Sender<InteractionBundle>>,
+    /// When true, the user receives responses directly via the event stream
+    /// (CLI or dashboard WebSocket), so the `message` tool should return
+    /// content inline rather than publishing to the bus.
+    pub is_direct_mode: bool,
 }
 
 impl RoutingContext {
@@ -61,10 +65,11 @@ impl RoutingContext {
             channel,
             chat_id,
             interaction_tx: None,
+            is_direct_mode: false,
         }
     }
 
-    /// Interactive CLI mode with user interaction support.
+    /// Interactive direct mode (CLI/dashboard) with user interaction support.
     pub fn with_interaction(
         channel: ChannelName,
         chat_id: ChatId,
@@ -74,6 +79,7 @@ impl RoutingContext {
             channel,
             chat_id,
             interaction_tx: Some(interaction_tx),
+            is_direct_mode: true,
         }
     }
 }

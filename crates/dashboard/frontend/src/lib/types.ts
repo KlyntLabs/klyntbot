@@ -393,6 +393,7 @@ export interface ToolEndEvent extends AgentEvent {
   name: string;
   success: boolean;
   durationMs: number;
+  result?: string;
 }
 
 export interface InteractionRequestEvent extends AgentEvent {
@@ -402,15 +403,40 @@ export interface InteractionRequestEvent extends AgentEvent {
   questions: InteractionQuestion[];
 }
 
-export type InteractionQuestion =
-  | { type: 'singleSelect'; label: string; options: string[] }
-  | { type: 'multiSelect'; label: string; options: string[] }
-  | { type: 'yesNo'; label: string; default?: boolean }
-  | { type: 'freeText'; label: string; placeholder?: string };
+/** Mirrors Rust AnswerOption in common::prompts */
+export interface InteractionAnswerOption {
+  value: string;
+  label: string;
+  description: string | null;
+}
+
+/** Mirrors Rust AnswerType — #[serde(tag = "type", rename_all = "snake_case")] */
+export type InteractionAnswerType =
+  | { type: 'single_select'; options: InteractionAnswerOption[] }
+  | { type: 'multi_select'; options: InteractionAnswerOption[] }
+  | { type: 'yes_no'; default: boolean | null }
+  | { type: 'free_text'; placeholder: string | null };
+
+/** Mirrors Rust Question struct in common::prompts */
+export interface InteractionQuestion {
+  id: string;
+  title: string;
+  text: string;
+  answer_type: InteractionAnswerType;
+}
 
 // ── Chat message (UI) ─────────────────────────────────────────────────────────
 
 export type MessageRole = 'user' | 'assistant' | 'system';
+
+/** Tool call snapshot attached to a completed assistant message. */
+export interface MessageToolCall {
+  name: string;
+  args?: Record<string, unknown>;
+  durationMs?: number;
+  success?: boolean;
+  result?: string;
+}
 
 export interface ChatMessage {
   id: string;
@@ -418,6 +444,8 @@ export interface ChatMessage {
   content: string;
   timestamp: Date;
   isStreaming?: boolean;
+  /** Tool calls executed during this response (set on completion). */
+  toolCalls?: MessageToolCall[];
 }
 
 // ── Tool Activity (chat sidebar) ─────────────────────────────────────────────

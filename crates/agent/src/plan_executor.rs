@@ -65,8 +65,9 @@ pub async fn run_step(
          {desc}\n\n\
          Reasoning: {reason}\n\
          Suggested tools: {expected}\n\n\
-         Use the tools above with the correct arguments to accomplish this step. \
-         Refer to the previous results for any values, paths, or IDs needed as arguments.",
+         Execute this step NOW by calling the appropriate tool(s) with the correct arguments. \
+         If this step requires modifying data, use the update/write action — do NOT just list or read. \
+         Use IDs, values, and context from previous step results as arguments.",
         desc = step.description,
         reason = step.reasoning,
     );
@@ -80,9 +81,21 @@ pub async fn run_step(
     // 3. Build messages
     let mut messages = vec![
         Message::system(
-            "You are executing a single step of a multi-step plan. \
-             Call the appropriate tools with the correct arguments based on the step \
-             description and previous step results. When done, provide a concise summary.",
+            "You are autonomously executing a single step of a multi-step plan. \
+             Call the appropriate tools with the correct arguments to accomplish the step.\n\n\
+             CRITICAL RULES:\n\
+             - You are executing AUTONOMOUSLY. Do NOT call ask_user or request user input. \
+               Make reasonable decisions yourself based on context and priorities.\n\
+             - If the step says to UPDATE, MODIFY, ADD, or SET a field, you MUST call the tool \
+               with the write/update action and the relevant parameters. Do NOT just read or list.\n\
+             - Use IDs from previous step results as arguments.\n\
+             - For the todo tool: use action=\"update\" with id and the field to change \
+               (e.g., due_date in YYYY-MM-DD format, priority, status). \
+               Use action=\"add\" to create new tasks.\n\
+             - When setting due dates, use reasonable dates based on task priority: \
+               P1 = today/tomorrow, P2 = this week, P3 = next week, P4/P5 = 2+ weeks out.\n\
+             - After making changes, do NOT re-list to verify — trust the tool output.\n\
+             - When done, provide a concise summary of what you changed.",
         ),
         Message::user(prompt),
     ];

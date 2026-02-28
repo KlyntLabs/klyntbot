@@ -24,6 +24,8 @@ pub enum AgentEvent {
         success: bool,
         #[serde(rename = "durationMs")]
         duration_ms: u64,
+        /// Truncated result of the tool execution (max 2KB).
+        result: Option<String>,
     },
 
     /// A new agent iteration has started.

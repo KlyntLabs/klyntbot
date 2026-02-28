@@ -1,16 +1,13 @@
-import type { ThinkingState } from '../../../lib/hooks/useAgent';
 import type { ConnectionStatus } from '../../../lib/ws';
 import type { ToolActivityEntry } from '../../../lib/types';
 import { ConnectionStatusBar } from './ConnectionStatus';
 import { ToolActivityPanel } from './ToolActivityPanel';
-import { ToolCallList } from './ToolCallList';
 import { QuickTasks } from './QuickTasks';
 import { UpcomingEvents } from './UpcomingEvents';
 
 interface ChatSidebarProps {
   status: ConnectionStatus;
   isStreaming: boolean;
-  thinking: ThinkingState | null;
   activeTools: Set<string>;
   toolHistory: ToolActivityEntry[];
 }
@@ -18,7 +15,6 @@ interface ChatSidebarProps {
 export function ChatSidebar({
   status,
   isStreaming,
-  thinking,
   activeTools,
   toolHistory,
 }: ChatSidebarProps) {
@@ -33,7 +29,6 @@ export function ChatSidebar({
       <ConnectionStatusBar status={status} isStreaming={isStreaming} />
       <ToolActivityPanel activeTools={activeTools} toolHistory={toolHistory} />
       <div className="border-b" style={{ borderColor: 'var(--codex-border-subtle)' }} />
-      <ToolCallList thinking={thinking} />
       <QuickTasks />
       <UpcomingEvents />
     </aside>

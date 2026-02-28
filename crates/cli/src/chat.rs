@@ -321,7 +321,7 @@ async fn run_with_streaming(
                     AgentEvent::ToolStart { name, .. } => {
                         thinking.on_tool_start(&name);
                     }
-                    AgentEvent::ToolEnd { name, success, duration_ms } => {
+                    AgentEvent::ToolEnd { name, success, duration_ms, .. } => {
                         thinking.on_tool_end(&name, success, duration_ms);
                     }
                     AgentEvent::IterationStart { iteration, max } => {

@@ -134,7 +134,7 @@ impl IntentPipeline {
         if let Some(ref tx) = event_tx {
             let _ = tx
                 .send(AgentEvent::ClassificationComplete {
-                    strategy: format!("{:?}", analysis.mode),
+                    strategy: analysis.mode.to_string(),
                     confidence: analysis.confidence,
                     source: format!("{:?}", analysis.source),
                     duration_ms: classify_ms,
@@ -185,7 +185,7 @@ impl IntentPipeline {
             };
             let _ = tx
                 .send(AgentEvent::ExecutionStarted {
-                    engine: format!("{:?}", analysis.mode),
+                    engine: analysis.mode.to_string(),
                     max_iterations: max_iter,
                 })
                 .await;
@@ -277,7 +277,7 @@ impl IntentPipeline {
             id: uuid::Uuid::new_v4(),
             timestamp: chrono::Utc::now(),
             request_id: uuid::Uuid::new_v4().to_string(),
-            predicted_strategy: format!("{:?}", analysis.mode),
+            predicted_strategy: analysis.mode.to_string(),
             actual_strategy: result.final_mode.clone(),
             escalation_count: result.escalation_count as i32,
             iterations_used: result.iterations as i32,

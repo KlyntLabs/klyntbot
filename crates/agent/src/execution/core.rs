@@ -275,7 +275,7 @@ impl ExecutionCore {
                             let _ = tx
                                 .send(crate::events::AgentEvent::ToolStart {
                                     name: name.clone(),
-                                    args: serde_json::Value::Null,
+                                    args: args.clone(),
                                 })
                                 .await;
                         }
@@ -304,11 +304,20 @@ impl ExecutionCore {
 
                         // Emit ToolEnd AFTER executing
                         if let Some(ref tx) = tx {
+                            // Truncate result to 2KB to avoid huge WebSocket payloads
+                            let truncated = if result_str.len() > 2048 {
+                                let mut s = result_str[..2048].to_string();
+                                s.push_str("…[truncated]");
+                                Some(s)
+                            } else {
+                                Some(result_str.clone())
+                            };
                             let _ = tx
                                 .send(crate::events::AgentEvent::ToolEnd {
                                     name: name.clone(),
                                     success,
                                     duration_ms,
+                                    result: truncated,
                                 })
                                 .await;
                         }

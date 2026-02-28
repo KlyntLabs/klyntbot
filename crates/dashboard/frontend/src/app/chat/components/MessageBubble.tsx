@@ -3,6 +3,7 @@ import { Terminal, Wifi, WifiOff } from 'lucide-react';
 import type { ChatMessage } from '../../../lib/types';
 import type { ConnectionStatus } from '../../../lib/ws';
 import { renderMarkdown, formatTime } from '../utils';
+import { InlineToolCalls } from './InlineToolCalls';
 
 /** Connection status indicator component */
 export function StatusDot({ status }: { status: ConnectionStatus }) {
@@ -70,6 +71,9 @@ export function MessageBubble({ msg }: { msg: ChatMessage }) {
       {msg.role === 'assistant' && (
         <div className="flex gap-3">
           <div className="flex-1">
+            {msg.toolCalls && msg.toolCalls.length > 0 && (
+              <InlineToolCalls toolCalls={msg.toolCalls} />
+            )}
             <div
               className="text-[14px] leading-relaxed prose-chat"
               style={{ color: 'var(--codex-fg)' }}
