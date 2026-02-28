@@ -21,9 +21,6 @@ pub struct TodoConfig {
     /// Semantic search settings.
     #[serde(default)]
     pub search: SearchConfig,
-    /// Task creation mode.
-    #[serde(default)]
-    pub creation_mode: CreationMode,
 }
 
 impl Default for TodoConfig {
@@ -34,7 +31,6 @@ impl Default for TodoConfig {
             timezone: default_timezone(),
             enrichment: EnrichmentConfig::default(),
             search: SearchConfig::default(),
-            creation_mode: CreationMode::default(),
         }
     }
 }
@@ -121,19 +117,6 @@ fn default_rrf_k() -> u32 {
     60
 }
 
-/// Task creation mode.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
-#[serde(rename_all = "kebab-case")]
-pub enum CreationMode {
-    /// Ask user for details before creating vague tasks.
-    #[default]
-    AskFirst,
-    /// Auto-enrich from context, then confirm.
-    Yolo,
-    /// Interactive brainstorming — questions one at a time.
-    Party,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -149,7 +132,6 @@ mod tests {
         assert!(cfg.search.enabled);
         assert!((cfg.search.semantic_threshold - 0.5).abs() < f64::EPSILON);
         assert_eq!(cfg.search.rrf_k, 60);
-        assert_eq!(cfg.creation_mode, CreationMode::AskFirst);
     }
 
     #[test]
@@ -161,14 +143,4 @@ mod tests {
         assert_eq!(parsed.timezone, cfg.timezone);
     }
 
-    #[test]
-    fn test_creation_mode_deserialize() {
-        let json = r#""ask-first""#;
-        let mode: CreationMode = serde_json::from_str(json).unwrap();
-        assert_eq!(mode, CreationMode::AskFirst);
-
-        let json2 = r#""yolo""#;
-        let mode2: CreationMode = serde_json::from_str(json2).unwrap();
-        assert_eq!(mode2, CreationMode::Yolo);
-    }
 }

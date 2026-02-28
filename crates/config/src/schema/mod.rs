@@ -292,7 +292,6 @@ mod tests {
             enrichment: TodoEnrichmentConfig::default(),
             search: TodoSearchConfig::default(),
             daily_planning: DailyPlanningConfig::default(),
-            creation_mode: CreationMode::default(),
             ..Default::default()
         };
 
@@ -315,40 +314,6 @@ mod tests {
         assert!(json.contains("focusReminders"));
         assert!(json.contains("dailyDigest"));
         assert!(json.contains("dailyDigestTime"));
-    }
-
-    #[test]
-    fn test_creation_mode_default_is_ask_first() {
-        let config = TodoConfig::default();
-        assert_eq!(config.creation_mode, CreationMode::AskFirst);
-    }
-
-    #[test]
-    fn test_creation_mode_deserialization() {
-        let json = r#"{"creationMode": "yolo"}"#;
-        let config: TodoConfig = serde_json::from_str(json).unwrap();
-        assert_eq!(config.creation_mode, CreationMode::Yolo);
-    }
-
-    #[test]
-    fn test_creation_mode_serialization_camel_case() {
-        let config = TodoConfig::default();
-        let json = serde_json::to_value(&config).unwrap();
-        assert_eq!(json["creationMode"], "ask-first");
-    }
-
-    #[test]
-    fn test_creation_mode_party() {
-        let json = r#"{"creationMode": "party"}"#;
-        let config: TodoConfig = serde_json::from_str(json).unwrap();
-        assert_eq!(config.creation_mode, CreationMode::Party);
-    }
-
-    #[test]
-    fn test_creation_mode_unknown_falls_back() {
-        let json = r#"{"creationMode": "unknown"}"#;
-        let config: TodoConfig = serde_json::from_str(json).unwrap();
-        assert_eq!(config.creation_mode, CreationMode::AskFirst);
     }
 
     #[test]

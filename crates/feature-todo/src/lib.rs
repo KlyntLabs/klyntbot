@@ -21,7 +21,7 @@ pub mod tool;
 pub mod types;
 
 pub use calendar_sync::CalendarSyncHandler;
-pub use config::{CreationMode, EnrichmentConfig, SearchConfig, TodoConfig};
+pub use config::{EnrichmentConfig, SearchConfig, TodoConfig};
 pub use embedding::EmbeddingHandler;
 pub use enrichment::{
     EnrichmentFeedbackEntry, EnrichmentFeedbackHandler, EnrichmentHandler, EnrichmentResult,
@@ -105,16 +105,4 @@ mod tests {
         assert!(sql.contains("CREATE TABLE IF NOT EXISTS todos"));
     }
 
-    #[test]
-    fn test_default_config_valid_json() {
-        let cfg = TodoConfig::default();
-        let json = serde_json::to_value(&cfg).unwrap();
-        assert!(json.is_object());
-        assert!(
-            json.get("maxFocusSlots").is_some() || json.get("max_focus_slots").is_some() || {
-                // camelCase via serde rename_all
-                true
-            }
-        );
-    }
 }

@@ -1,10 +1,7 @@
 //! Integration tests for the TodoFeature package.
 //! Tests that don't require a database.
 
-use feature_todo::{
-    config::{CreationMode, TodoConfig},
-    TodoFeature,
-};
+use feature_todo::{config::TodoConfig, TodoFeature};
 
 #[test]
 fn test_migration_sql_contains_todos_table() {
@@ -46,7 +43,6 @@ fn test_default_config_valid() {
     assert!(cfg.search.enabled);
     assert!((cfg.search.semantic_threshold - 0.5).abs() < f64::EPSILON);
     assert_eq!(cfg.search.rrf_k, 60);
-    assert_eq!(cfg.creation_mode, CreationMode::AskFirst);
 }
 
 #[test]
@@ -56,22 +52,6 @@ fn test_config_serde_round_trip() {
     let parsed: TodoConfig = serde_json::from_str(&json).unwrap();
     assert_eq!(parsed.max_focus_slots, cfg.max_focus_slots);
     assert_eq!(parsed.timezone, cfg.timezone);
-    assert_eq!(parsed.creation_mode, cfg.creation_mode);
-}
-
-#[test]
-fn test_creation_mode_values() {
-    let json_ask = r#""ask-first""#;
-    let mode: CreationMode = serde_json::from_str(json_ask).unwrap();
-    assert_eq!(mode, CreationMode::AskFirst);
-
-    let json_yolo = r#""yolo""#;
-    let mode2: CreationMode = serde_json::from_str(json_yolo).unwrap();
-    assert_eq!(mode2, CreationMode::Yolo);
-
-    let json_party = r#""party""#;
-    let mode3: CreationMode = serde_json::from_str(json_party).unwrap();
-    assert_eq!(mode3, CreationMode::Party);
 }
 
 #[test]

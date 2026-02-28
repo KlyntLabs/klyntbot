@@ -68,7 +68,7 @@ static PACKS: &[Pack] = &[
         name: "Task Management",
         description: "Tasks, focus mode, enrichment, semantic search",
         tier: PackTier::Core,
-        skills: &["todo", "todo-party", "todo-yolo"],
+        skills: &["todo"],
     },
     Pack {
         id: "productivity",
@@ -159,8 +159,6 @@ mod tests {
     fn test_task_management_skills() {
         let pack = PackRegistry::get("task-management").unwrap();
         assert!(pack.skills.contains(&"todo"));
-        assert!(pack.skills.contains(&"todo-party"));
-        assert!(pack.skills.contains(&"todo-yolo"));
     }
 
     #[test]

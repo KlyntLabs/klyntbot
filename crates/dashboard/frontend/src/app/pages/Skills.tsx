@@ -13,9 +13,7 @@ const SKILL_ICONS: Record<string, { icon: string; color: string }> = {
   'cron':            { icon: '\u23F0', color: '#3b82f6' },
   'skill-creator':   { icon: '\u26A1', color: '#8b5cf6' },
   'summarize':       { icon: '\uD83D\uDCC4', color: '#6b7280' },
-  'todo-party':      { icon: '\uD83C\uDF89', color: '#ec4899' },
   'weather':         { icon: '\uD83C\uDF24\uFE0F', color: '#06b6d4' },
-  'todo-yolo':       { icon: '\uD83D\uDE80', color: '#f97316' },
   'browser':         { icon: '\uD83C\uDF10', color: '#8b5cf6' },
   'weekly-report':   { icon: '\uD83D\uDCCA', color: '#f59e0b' },
 };

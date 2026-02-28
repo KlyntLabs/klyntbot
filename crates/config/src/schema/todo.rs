@@ -4,34 +4,6 @@ use serde::{Deserialize, Serialize};
 
 use super::core::{default_semantic_threshold, default_true};
 
-/// Task creation mode — controls whether the agent asks for details before creating tasks
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub enum CreationMode {
-    /// Ask the user for details via ask_user before creating (default)
-    #[default]
-    #[serde(rename = "ask-first")]
-    AskFirst,
-    /// Auto-enrich from conversation context, present for confirmation
-    #[serde(rename = "yolo")]
-    Yolo,
-    /// Interactive brainstorming, one question at a time
-    #[serde(rename = "party")]
-    Party,
-}
-
-fn deserialize_creation_mode<'de, D>(deserializer: D) -> std::result::Result<CreationMode, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let s = String::deserialize(deserializer)?;
-    match s.as_str() {
-        "ask-first" => Ok(CreationMode::AskFirst),
-        "yolo" => Ok(CreationMode::Yolo),
-        "party" => Ok(CreationMode::Party),
-        _ => Ok(CreationMode::AskFirst), // graceful fallback
-    }
-}
-
 /// Todo system configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -46,10 +18,6 @@ pub struct TodoConfig {
     pub search: TodoSearchConfig,
     #[serde(default)]
     pub daily_planning: DailyPlanningConfig,
-    /// Task creation mode: ask-first (default), yolo, or party
-    #[serde(default, deserialize_with = "deserialize_creation_mode")]
-    pub creation_mode: CreationMode,
-
     /// Suggest creating a plan when a complex task is added (default: true)
     #[serde(default = "default_true")]
     pub auto_plan_suggestion: bool,
@@ -192,7 +160,6 @@ impl Default for TodoConfig {
             enrichment: TodoEnrichmentConfig::default(),
             search: TodoSearchConfig::default(),
             daily_planning: DailyPlanningConfig::default(),
-            creation_mode: CreationMode::default(),
             auto_plan_suggestion: true,
             auto_plan_on_focus: false,
             plan_complexity_threshold: default_plan_complexity_threshold(),
