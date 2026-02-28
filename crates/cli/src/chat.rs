@@ -353,6 +353,9 @@ async fn run_with_streaming(
                     AgentEvent::PlanCompleted { summary, .. } => {
                         tracing::debug!("Plan completed: {}", summary);
                     }
+                    AgentEvent::EntityCreated(_) => {
+                        // Entity cards are rendered in the dashboard UI only
+                    }
                 }
             }
 
