@@ -181,12 +181,17 @@ impl FinanceTool {
             is_archived,
         };
 
-        let row = self.storage.accounts.update(&patch).await.map_err(|e| match e {
-            StorageError::NotFound(_) => {
-                ToolError::ExecutionFailed(format!("Account {} not found", id))
-            }
-            other => ToolError::ExecutionFailed(other.to_string()),
-        })?;
+        let row = self
+            .storage
+            .accounts
+            .update(&patch)
+            .await
+            .map_err(|e| match e {
+                StorageError::NotFound(_) => {
+                    ToolError::ExecutionFailed(format!("Account {} not found", id))
+                }
+                other => ToolError::ExecutionFailed(other.to_string()),
+            })?;
 
         let account = FinanceAccount::from(row);
         let result = json!({

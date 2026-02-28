@@ -37,14 +37,11 @@ impl InteractionTracker {
 
     /// Register a callback and wait for the user to press a button.
     /// Times out after 5 minutes.
-    pub async fn wait_for_callback(
-        &self,
-        chat_id: &str,
-        question_id: &str,
-    ) -> Result<String> {
+    pub async fn wait_for_callback(&self, chat_id: &str, question_id: &str) -> Result<String> {
         let (tx, rx) = oneshot::channel();
         let key = format!("{}:{}", chat_id, question_id);
-        self.pending.insert(key.clone(), PendingCallback::Single(tx));
+        self.pending
+            .insert(key.clone(), PendingCallback::Single(tx));
 
         match tokio::time::timeout(Duration::from_secs(300), rx).await {
             Ok(Ok(value)) => Ok(value),
@@ -61,14 +58,11 @@ impl InteractionTracker {
 
     /// Register a free-text callback and wait for the user's text reply.
     /// Times out after 5 minutes.
-    pub async fn wait_for_free_text(
-        &self,
-        chat_id: &str,
-        question_id: &str,
-    ) -> Result<String> {
+    pub async fn wait_for_free_text(&self, chat_id: &str, question_id: &str) -> Result<String> {
         let (tx, rx) = oneshot::channel();
         let key = format!("{}:{}", chat_id, question_id);
-        self.pending.insert(key.clone(), PendingCallback::FreeText(tx));
+        self.pending
+            .insert(key.clone(), PendingCallback::FreeText(tx));
 
         match tokio::time::timeout(Duration::from_secs(300), rx).await {
             Ok(Ok(value)) => Ok(value),

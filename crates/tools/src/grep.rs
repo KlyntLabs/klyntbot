@@ -7,8 +7,8 @@ use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use walkdir::WalkDir;
 
-use tools_core::{RoutingContext, ToolParams};
 use common::{Result, ToolError};
+use tools_core::{RoutingContext, ToolParams};
 
 use crate::filesystem::FsToolBase;
 
@@ -123,7 +123,10 @@ impl tools_core::ToolExecute for GrepTool {
                                 let marker = if line_num == i { ">" } else { " " };
                                 results.push(format!(
                                     "{}{}:{}:{}",
-                                    marker, rel_path_str, line_num + 1, line_content
+                                    marker,
+                                    rel_path_str,
+                                    line_num + 1,
+                                    line_content
                                 ));
                             }
                             results.push("--".to_string());

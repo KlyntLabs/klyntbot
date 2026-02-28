@@ -201,7 +201,9 @@ impl DiscordChannel {
                     .and_then(|v| v.as_str())
                     .unwrap_or("");
                 if !content.is_empty()
-                    && self.interactions.resolve_free_text(&key, content.to_string())
+                    && self
+                        .interactions
+                        .resolve_free_text(&key, content.to_string())
                 {
                     return Ok(());
                 }
@@ -481,12 +483,16 @@ impl DiscordChannel {
 
     /// Wait for an interaction callback with a 5-minute timeout.
     async fn wait_for_callback(&self, channel_id: &str, question_id: &str) -> Result<String> {
-        self.interactions.wait_for_callback(channel_id, question_id).await
+        self.interactions
+            .wait_for_callback(channel_id, question_id)
+            .await
     }
 
     /// Wait for a free text message with a 5-minute timeout.
     async fn wait_for_free_text(&self, channel_id: &str, question_id: &str) -> Result<String> {
-        self.interactions.wait_for_free_text(channel_id, question_id).await
+        self.interactions
+            .wait_for_free_text(channel_id, question_id)
+            .await
     }
 
     /// Send a message via REST API

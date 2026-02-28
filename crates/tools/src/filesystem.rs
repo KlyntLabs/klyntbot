@@ -5,8 +5,8 @@ use std::path::{Path, PathBuf};
 use tokio::fs;
 use tracing::debug;
 
-use tools_core::{RoutingContext, ToolParams};
 use common::{Result, ToolError};
+use tools_core::{RoutingContext, ToolParams};
 
 /// Resolve path and optionally enforce directory restriction
 fn resolve_path(path: &str, allowed_dir: Option<&PathBuf>) -> Result<PathBuf> {
@@ -58,8 +58,7 @@ impl FsToolBase {
         } else if let Some(dir) = self.allowed_dir.as_ref() {
             Ok(dir.clone())
         } else {
-            std::env::current_dir()
-                .map_err(|e| ToolError::ExecutionFailed(e.to_string()).into())
+            std::env::current_dir().map_err(|e| ToolError::ExecutionFailed(e.to_string()).into())
         }
     }
 }

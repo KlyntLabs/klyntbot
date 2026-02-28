@@ -69,8 +69,8 @@ impl ExecutionEngine for DirectEngine {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::test_utils::*;
+    use super::*;
 
     fn make_engine(provider: providers::DynProvider) -> DirectEngine {
         DirectEngine::new(make_core(provider))

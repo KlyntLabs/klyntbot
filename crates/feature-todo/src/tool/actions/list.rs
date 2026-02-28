@@ -308,7 +308,9 @@ impl TodoTool {
 
         // Batch-check blockers concurrently instead of N sequential queries
         let blocker_results: Vec<Vec<_>> = try_join_all(
-            candidates.iter().map(|t| self.repo.incomplete_blockers(&t.id)),
+            candidates
+                .iter()
+                .map(|t| self.repo.incomplete_blockers(&t.id)),
         )
         .await?;
 

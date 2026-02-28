@@ -89,8 +89,7 @@ impl FinanceTool {
             updated_at: now,
         };
 
-        let inserted = self.storage.goals.add(&row).await
-?;
+        let inserted = self.storage.goals.add(&row).await?;
 
         let goal = FinanceGoal::from(inserted);
         let progress_pct = if goal.target_amount > 0 {
@@ -120,8 +119,7 @@ impl FinanceTool {
     }
 
     async fn goal_list(&self) -> Result<String> {
-        let rows = self.storage.goals.list_active().await
-?;
+        let rows = self.storage.goals.list_active().await?;
 
         if rows.is_empty() {
             return Ok("No active goals.".to_string());
@@ -192,10 +190,17 @@ impl FinanceTool {
             status: status.map(|s| s.as_str().to_string()),
         };
 
-        let row = self.storage.goals.update(&patch).await.map_err(|e| match e {
-            StorageError::NotFound(_) => ToolError::ExecutionFailed(format!("Goal {id} not found")),
-            other => ToolError::ExecutionFailed(other.to_string()),
-        })?;
+        let row = self
+            .storage
+            .goals
+            .update(&patch)
+            .await
+            .map_err(|e| match e {
+                StorageError::NotFound(_) => {
+                    ToolError::ExecutionFailed(format!("Goal {id} not found"))
+                }
+                other => ToolError::ExecutionFailed(other.to_string()),
+            })?;
 
         let goal = FinanceGoal::from(row);
         let progress_pct = if goal.target_amount > 0 {
@@ -245,8 +250,7 @@ impl FinanceTool {
                     .storage
                     .transactions
                     .sum_by_category(date_from, today, "expense")
-                    .await
-        ?;
+                    .await?;
                 cats.iter().map(|(_, total)| total).sum()
             }
         };
@@ -262,8 +266,7 @@ impl FinanceTool {
             .storage
             .accounts
             .total_balance_by_currency()
-            .await
-?
+            .await?
             .iter()
             .map(|(_, v)| v)
             .sum();
@@ -271,8 +274,7 @@ impl FinanceTool {
             .storage
             .investments
             .total_value_by_currency()
-            .await
-?
+            .await?
             .iter()
             .map(|(_, v)| v)
             .sum();
@@ -280,8 +282,7 @@ impl FinanceTool {
             .storage
             .liabilities
             .total_remaining_by_currency()
-            .await
-?
+            .await?
             .iter()
             .map(|(_, v)| v)
             .sum();
@@ -429,8 +430,7 @@ impl FinanceTool {
             updated_at: now,
         };
 
-        let inserted = self.storage.liabilities.add(&row).await
-?;
+        let inserted = self.storage.liabilities.add(&row).await?;
 
         let l = FinanceLiability::from(inserted);
         let result = json!({
@@ -451,11 +451,13 @@ impl FinanceTool {
     }
 
     async fn liability_list(&self) -> Result<String> {
-        let rows = self.storage.liabilities.list_all().await
-?;
+        let rows = self.storage.liabilities.list_all().await?;
 
-        let totals = self.storage.liabilities.total_remaining_by_currency().await
-?;
+        let totals = self
+            .storage
+            .liabilities
+            .total_remaining_by_currency()
+            .await?;
 
         let liabilities: Vec<serde_json::Value> = rows
             .into_iter()
@@ -511,12 +513,17 @@ impl FinanceTool {
             notes: notes.map(|s| Some(s.to_string())),
         };
 
-        let row = self.storage.liabilities.update(&patch).await.map_err(|e| match e {
-            StorageError::NotFound(_) => {
-                ToolError::ExecutionFailed(format!("Liability {id} not found"))
-            }
-            other => ToolError::ExecutionFailed(other.to_string()),
-        })?;
+        let row = self
+            .storage
+            .liabilities
+            .update(&patch)
+            .await
+            .map_err(|e| match e {
+                StorageError::NotFound(_) => {
+                    ToolError::ExecutionFailed(format!("Liability {id} not found"))
+                }
+                other => ToolError::ExecutionFailed(other.to_string()),
+            })?;
 
         let l = FinanceLiability::from(row);
         let result = json!({
@@ -537,12 +544,13 @@ impl FinanceTool {
     }
 
     async fn net_worth(&self, _p: &ParamExtractor<'_>) -> Result<String> {
-        let accounts = self.storage.accounts.total_balance_by_currency().await
-?;
-        let investments = self.storage.investments.total_value_by_currency().await
-?;
-        let liabilities = self.storage.liabilities.total_remaining_by_currency().await
-?;
+        let accounts = self.storage.accounts.total_balance_by_currency().await?;
+        let investments = self.storage.investments.total_value_by_currency().await?;
+        let liabilities = self
+            .storage
+            .liabilities
+            .total_remaining_by_currency()
+            .await?;
 
         let mut currencies: std::collections::BTreeMap<String, [i64; 3]> =
             std::collections::BTreeMap::new();

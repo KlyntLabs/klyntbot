@@ -4,9 +4,9 @@ use async_trait::async_trait;
 use tokio::sync::mpsc;
 use tracing::debug;
 
-use tools_core::{RoutingContext, ToolParams};
 use bus::OutboundMessage;
 use common::{Result, ToolError};
+use tools_core::{RoutingContext, ToolParams};
 
 #[derive(Debug, ToolParams)]
 pub struct MessageParams {

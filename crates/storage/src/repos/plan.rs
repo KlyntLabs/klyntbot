@@ -308,10 +308,7 @@ impl PlanRepo {
     }
 
     /// Get the most recent active plan (draft/approved/executing) for a session.
-    pub async fn get_active(
-        &self,
-        session_key: &str,
-    ) -> Result<Option<PlanRow>, StorageError> {
+    pub async fn get_active(&self, session_key: &str) -> Result<Option<PlanRow>, StorageError> {
         let row = sqlx::query_as::<_, PlanRow>(
             "SELECT * FROM plans
              WHERE session_key = ?1 AND status IN ('draft', 'approved', 'executing')

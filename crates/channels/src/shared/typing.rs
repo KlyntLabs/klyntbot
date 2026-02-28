@@ -53,10 +53,7 @@ impl TypingManager {
             }
         });
 
-        self.tasks
-            .write()
-            .await
-            .insert(chat_id.to_string(), task);
+        self.tasks.write().await.insert(chat_id.to_string(), task);
     }
 
     /// Stop the typing indicator for the given chat ID.

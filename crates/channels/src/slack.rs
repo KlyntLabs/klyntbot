@@ -267,7 +267,10 @@ impl SlackChannel {
 
         // Intercept free-text replies for pending interactions
         if let Some(key) = self.interactions.find_free_text_key(chat_id) {
-            if self.interactions.resolve_free_text(&key, cleaned_text.clone()) {
+            if self
+                .interactions
+                .resolve_free_text(&key, cleaned_text.clone())
+            {
                 return Ok(());
             }
         }
@@ -650,7 +653,10 @@ impl Channel for SlackChannel {
                     self.send_message_with_blocks(chat_id, &question.text, &blocks)
                         .await?;
 
-                    let value = self.interactions.wait_for_callback(chat_id, &question.id).await?;
+                    let value = self
+                        .interactions
+                        .wait_for_callback(chat_id, &question.id)
+                        .await?;
                     Answer {
                         question_id: question.id.clone(),
                         value: AnswerValue::Selected { value },
@@ -661,7 +667,10 @@ impl Channel for SlackChannel {
                     self.send_message_with_blocks(chat_id, &question.text, &blocks)
                         .await?;
 
-                    let value = self.interactions.wait_for_callback(chat_id, &question.id).await?;
+                    let value = self
+                        .interactions
+                        .wait_for_callback(chat_id, &question.id)
+                        .await?;
                     Answer {
                         question_id: question.id.clone(),
                         value: AnswerValue::YesNo {
@@ -676,7 +685,10 @@ impl Channel for SlackChannel {
                     self.send_message_with_blocks(chat_id, &question.text, &blocks)
                         .await?;
 
-                    let value = self.interactions.wait_for_callback(chat_id, &question.id).await?;
+                    let value = self
+                        .interactions
+                        .wait_for_callback(chat_id, &question.id)
+                        .await?;
                     Answer {
                         question_id: question.id.clone(),
                         value: AnswerValue::MultiSelected {
@@ -693,7 +705,10 @@ impl Channel for SlackChannel {
 
                     self.send_message(chat_id, &prompt, None).await?;
 
-                    let content = self.interactions.wait_for_free_text(chat_id, &question.id).await?;
+                    let content = self
+                        .interactions
+                        .wait_for_free_text(chat_id, &question.id)
+                        .await?;
                     Answer {
                         question_id: question.id.clone(),
                         value: AnswerValue::Text { content },

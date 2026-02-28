@@ -424,7 +424,11 @@ fn infer_tool_groups(msg: &str) -> Vec<ToolGroup> {
     }
 
     // Task/todo keywords — reuse is_task_management + extra domain terms
-    if is_task_management(msg) || msg.contains("task") || msg.contains("todo") || msg.contains("goal") || msg.contains("plan")
+    if is_task_management(msg)
+        || msg.contains("task")
+        || msg.contains("todo")
+        || msg.contains("goal")
+        || msg.contains("plan")
     {
         groups.push(ToolGroup::TaskManagement);
     }
@@ -1063,7 +1067,10 @@ mod tests {
     #[test]
     fn extract_json_finds_object() {
         let input = r#"text {"key":"value"} more"#;
-        assert_eq!(common::utils::extract_json_object(input), Some(r#"{"key":"value"}"#));
+        assert_eq!(
+            common::utils::extract_json_object(input),
+            Some(r#"{"key":"value"}"#)
+        );
     }
 
     #[test]

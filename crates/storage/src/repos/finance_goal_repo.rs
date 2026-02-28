@@ -2,7 +2,12 @@
 
 use crate::rows::finance::{FinanceGoalPatch, FinanceGoalRow};
 
-crud_repo!(FinanceGoalRepo, "finance_goals", FinanceGoalRow, "finance_goal");
+crud_repo!(
+    FinanceGoalRepo,
+    "finance_goals",
+    FinanceGoalRow,
+    "finance_goal"
+);
 
 impl FinanceGoalRepo {
     // -----------------------------------------------------------------------
@@ -10,7 +15,10 @@ impl FinanceGoalRepo {
     // -----------------------------------------------------------------------
 
     /// Insert a new goal. Returns the inserted row.
-    pub async fn add(&self, row: &FinanceGoalRow) -> Result<FinanceGoalRow, crate::error::StorageError> {
+    pub async fn add(
+        &self,
+        row: &FinanceGoalRow,
+    ) -> Result<FinanceGoalRow, crate::error::StorageError> {
         let inserted = sqlx::query_as::<_, FinanceGoalRow>(
             r#"
             INSERT INTO finance_goals (
@@ -48,7 +56,10 @@ impl FinanceGoalRepo {
     }
 
     /// Update mutable fields on a goal.
-    pub async fn update(&self, patch: &FinanceGoalPatch) -> Result<FinanceGoalRow, crate::error::StorageError> {
+    pub async fn update(
+        &self,
+        patch: &FinanceGoalPatch,
+    ) -> Result<FinanceGoalRow, crate::error::StorageError> {
         let row = sqlx::query_as::<_, FinanceGoalRow>(
             r#"
             UPDATE finance_goals SET
@@ -80,7 +91,9 @@ impl FinanceGoalRepo {
         .bind(&patch.id)
         .fetch_optional(&self.pool)
         .await?
-        .ok_or_else(|| crate::error::StorageError::NotFound(format!("finance_goal {}", patch.id)))?;
+        .ok_or_else(|| {
+            crate::error::StorageError::NotFound(format!("finance_goal {}", patch.id))
+        })?;
 
         Ok(row)
     }

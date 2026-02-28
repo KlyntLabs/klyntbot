@@ -663,7 +663,6 @@ fn reaction_to_satisfaction(emoji: &str) -> Option<f32> {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

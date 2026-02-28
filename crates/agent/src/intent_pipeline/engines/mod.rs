@@ -69,10 +69,9 @@ impl std::fmt::Debug for EngineResult {
                 .field("iterations", iterations)
                 .field("tool_name", tool_name)
                 .finish(),
-            Self::Escalate { reason, .. } => f
-                .debug_struct("Escalate")
-                .field("reason", reason)
-                .finish(),
+            Self::Escalate { reason, .. } => {
+                f.debug_struct("Escalate").field("reason", reason).finish()
+            }
         }
     }
 }

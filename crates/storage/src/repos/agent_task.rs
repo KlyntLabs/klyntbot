@@ -1,7 +1,7 @@
 //! Repository for the `agent_tasks` table — subagent coordination task board.
 
-use crate::rows::agent_task::AgentTaskRow;
 use crate::error::OptionExt;
+use crate::rows::agent_task::AgentTaskRow;
 use crate::StorageError;
 use chrono::Utc;
 use sqlx::SqlitePool;

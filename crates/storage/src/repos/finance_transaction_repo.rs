@@ -89,13 +89,18 @@ impl FinanceTransactionRepo {
         .bind(&patch.id)
         .fetch_optional(&self.pool)
         .await?
-        .ok_or_else(|| crate::error::StorageError::NotFound(format!("finance_transaction {}", patch.id)))?;
+        .ok_or_else(|| {
+            crate::error::StorageError::NotFound(format!("finance_transaction {}", patch.id))
+        })?;
 
         Ok(row)
     }
 
     /// Delete a transaction. Returns the deleted row (for balance reversal), or `None` if not found.
-    pub async fn delete(&self, id: &str) -> Result<Option<FinanceTransactionRow>, crate::error::StorageError> {
+    pub async fn delete(
+        &self,
+        id: &str,
+    ) -> Result<Option<FinanceTransactionRow>, crate::error::StorageError> {
         let row = sqlx::query_as::<_, FinanceTransactionRow>(
             "DELETE FROM finance_transactions WHERE id = ? RETURNING *",
         )

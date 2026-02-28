@@ -198,10 +198,9 @@ pub async fn update_plan_status(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let plan = state.repos.plans.get(id).await.map_err(ApiError::from)?;
 
-    let from = plan
-        .status
-        .parse::<domain::PlanStatus>()
-        .map_err(|_| ApiError::unprocessable(format!("unknown current status: '{}'", plan.status)))?;
+    let from = plan.status.parse::<domain::PlanStatus>().map_err(|_| {
+        ApiError::unprocessable(format!("unknown current status: '{}'", plan.status))
+    })?;
     let to = req
         .status
         .parse::<domain::PlanStatus>()

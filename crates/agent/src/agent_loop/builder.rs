@@ -142,17 +142,19 @@ impl AgentLoopBuilder {
         let embedding_engine = Arc::new(tools::EmbeddingEngine::new());
 
         // ── Memory store (with optional embedding-based relevance filtering) ──
-        let memory_store =
-            if let (true, Some(vs)) = (config.conversation.embedding.enabled, self.vector_store.clone()) {
-                crate::memory::MemoryStore::with_embeddings(
-                    repos.memory_notes.clone(),
-                    vs,
-                    Arc::clone(&embedding_engine),
-                    config.conversation.search.semantic_threshold,
-                )
-            } else {
-                crate::memory::MemoryStore::new(repos.memory_notes.clone())
-            };
+        let memory_store = if let (true, Some(vs)) = (
+            config.conversation.embedding.enabled,
+            self.vector_store.clone(),
+        ) {
+            crate::memory::MemoryStore::with_embeddings(
+                repos.memory_notes.clone(),
+                vs,
+                Arc::clone(&embedding_engine),
+                config.conversation.search.semantic_threshold,
+            )
+        } else {
+            crate::memory::MemoryStore::new(repos.memory_notes.clone())
+        };
 
         let mut sources: Vec<Box<dyn ContextSource>> = vec![
             Box::new(IdentitySource::new(
@@ -293,17 +295,18 @@ impl AgentLoopBuilder {
 
         // ── Learning: outcome store ────────────────────────────
         let outcome_store = if config.learning.enabled {
-            Some(Arc::new(RwLock::new(
-                crate::learning::OutcomeStore::new(repos.outcomes.clone()),
-            )))
+            Some(Arc::new(RwLock::new(crate::learning::OutcomeStore::new(
+                repos.outcomes.clone(),
+            ))))
         } else {
             None
         };
 
         // ── Wire automatic memory retrieval (cross-channel LanceDB ANN) ─
-        let context_engine = if let (true, Some(vs)) =
-            (config.conversation.embedding.enabled, self.vector_store.clone())
-        {
+        let context_engine = if let (true, Some(vs)) = (
+            config.conversation.embedding.enabled,
+            self.vector_store.clone(),
+        ) {
             let conv_store_for_retriever = tools::ConversationEmbeddingStore::new(vs);
             // Compute per-day decay factor from configured half-life: factor = 0.5^(1/half_life)
             let decay_factor =
@@ -338,20 +341,18 @@ impl AgentLoopBuilder {
 
             // Inject calendar handler
             if let Some(ref adapter) = calendar_adapter {
-                let todo_cal_sync = Arc::new(
-                    crate::calendar_sync_adapter::TodoCalendarSyncAdapter::new(Arc::clone(
-                        adapter,
-                    )
-                        as Arc<dyn CalendarHandler>),
-                );
+                let todo_cal_sync =
+                    Arc::new(crate::calendar_sync_adapter::TodoCalendarSyncAdapter::new(
+                        Arc::clone(adapter) as Arc<dyn CalendarHandler>,
+                    ));
                 todo_tool = todo_tool.with_calendar_handler(
                     todo_cal_sync as Arc<dyn feature_todo::CalendarSyncHandler>,
                 );
             }
 
             // Set enrichment threshold from config
-            todo_tool = todo_tool
-                .with_enrichment_threshold(config.todo.enrichment.auto_apply_threshold);
+            todo_tool =
+                todo_tool.with_enrichment_threshold(config.todo.enrichment.auto_apply_threshold);
 
             // Enrichment engine
             if config.todo.enrichment.enabled {
@@ -370,7 +371,6 @@ impl AgentLoopBuilder {
 
             // Todo embedding (semantic search)
             if let (true, Some(vs)) = (config.todo.search.enabled, self.vector_store.clone()) {
-
                 let todo_embed_impl = Arc::new(
                     crate::todo_embedding_handler::TodoEmbeddingHandlerImpl::new(
                         Arc::clone(&embedding_engine),
@@ -424,19 +424,21 @@ impl AgentLoopBuilder {
             plan_handler as Arc<dyn tools::plan_tool::PlanHandler>,
         )));
         // ── Conversation embedding handler ────────────────────────────────
-        let conversation_embedding_handler =
-            if let (true, Some(vs)) = (config.conversation.embedding.enabled, self.vector_store.clone()) {
-                let conv_store = tools::ConversationEmbeddingStore::new(vs);
-                let handler = Arc::new(
+        let conversation_embedding_handler = if let (true, Some(vs)) = (
+            config.conversation.embedding.enabled,
+            self.vector_store.clone(),
+        ) {
+            let conv_store = tools::ConversationEmbeddingStore::new(vs);
+            let handler = Arc::new(
                 super::super::conversation_embedding_handler::ConversationEmbeddingHandlerImpl::new(
                     Arc::clone(&embedding_engine),
                     conv_store,
                 ),
             );
-                Some(handler as Arc<dyn tools::ConversationEmbeddingHandler>)
-            } else {
-                None
-            };
+            Some(handler as Arc<dyn tools::ConversationEmbeddingHandler>)
+        } else {
+            None
+        };
 
         // ── Memory tool ───────────────────────────────────────────────────
         if config.conversation.search.enabled {
@@ -476,7 +478,7 @@ impl AgentLoopBuilder {
                     config.finance.default_currency.clone(),
                 )
                 .with_finance_handler(
-                    Arc::clone(&finance_handler_impl) as Arc<dyn feature_finance::FinanceHandler>,
+                    Arc::clone(&finance_handler_impl) as Arc<dyn feature_finance::FinanceHandler>
                 );
 
                 tool_registry.register(finance_tool);
@@ -670,13 +672,17 @@ impl AgentLoopBuilder {
                 repos.plans.clone(),
                 provider.clone(),
                 config.agents.defaults.model.clone(),
-                config.orchestrator.default_plan_visibility.parse().unwrap_or_else(|_| {
-                    warn!(
-                        "Invalid plan visibility '{}', defaulting to transparent",
-                        config.orchestrator.default_plan_visibility
-                    );
-                    Default::default()
-                }),
+                config
+                    .orchestrator
+                    .default_plan_visibility
+                    .parse()
+                    .unwrap_or_else(|_| {
+                        warn!(
+                            "Invalid plan visibility '{}', defaulting to transparent",
+                            config.orchestrator.default_plan_visibility
+                        );
+                        Default::default()
+                    }),
             ),
         );
 
@@ -736,20 +742,21 @@ impl AgentLoopBuilder {
         };
 
         // ── Memory maintenance service ────────────────────────────────────
-        let memory_maintenance_token = if let (Some(_), Some(vs)) = (&self.pool, self.vector_store.clone()) {
-            let token = CancellationToken::new();
-            let maintenance_service =
-                crate::memory_maintenance_service::MemoryMaintenanceService::new(
-                    vs,
-                    config.conversation.memory.max_age_days,
-                    config.conversation.memory.maintenance_interval_hours,
-                    token.clone(),
-                );
-            maintenance_service.spawn();
-            Some(token)
-        } else {
-            None
-        };
+        let memory_maintenance_token =
+            if let (Some(_), Some(vs)) = (&self.pool, self.vector_store.clone()) {
+                let token = CancellationToken::new();
+                let maintenance_service =
+                    crate::memory_maintenance_service::MemoryMaintenanceService::new(
+                        vs,
+                        config.conversation.memory.max_age_days,
+                        config.conversation.memory.maintenance_interval_hours,
+                        token.clone(),
+                    );
+                maintenance_service.spawn();
+                Some(token)
+            } else {
+                None
+            };
 
         // ── Plan cleanup service ──────────────────────────────────────────
         let plan_cleanup_token = if self.pool.is_some() {
@@ -795,7 +802,11 @@ impl AgentLoopBuilder {
 
 impl AgentLoop {
     /// Create a builder for constructing an `AgentLoop`.
-    pub fn builder(bus: Arc<MessageBus>, provider: DynProvider, config: Config) -> AgentLoopBuilder {
+    pub fn builder(
+        bus: Arc<MessageBus>,
+        provider: DynProvider,
+        config: Config,
+    ) -> AgentLoopBuilder {
         AgentLoopBuilder::new(bus, provider, config)
     }
 }

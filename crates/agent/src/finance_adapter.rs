@@ -65,7 +65,8 @@ impl FinanceHandler for FinanceHandlerImpl {
         let yesterday = chrono::Local::now().date_naive() - chrono::Duration::days(1);
         let spending = self
             .repos
-            .finance.transactions
+            .finance
+            .transactions
             .sum_by_category(yesterday, yesterday, "expense")
             .await
             .unwrap_or_default();
@@ -163,7 +164,8 @@ impl FinanceHandler for FinanceHandlerImpl {
                         let value_cents = (result.price * inv.quantity * 100.0).round() as i64;
                         let _ = self
                             .repos
-                            .finance.investments
+                            .finance
+                            .investments
                             .update_price(&inv.id, price_cents, value_cents)
                             .await;
                         details.push(format!(

@@ -142,5 +142,4 @@ mod tests {
         assert_eq!(parsed.max_focus_slots, cfg.max_focus_slots);
         assert_eq!(parsed.timezone, cfg.timezone);
     }
-
 }

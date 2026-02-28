@@ -27,8 +27,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
         if attr.path().is_ident("tool") {
             if let Meta::List(list) = &attr.meta {
                 let tokens = list.tokens.clone();
-                let parser =
-                    syn::punctuated::Punctuated::<Meta, syn::Token![,]>::parse_terminated;
+                let parser = syn::punctuated::Punctuated::<Meta, syn::Token![,]>::parse_terminated;
                 let parsed = syn::parse::Parser::parse2(parser, tokens)
                     .expect("Failed to parse #[tool(...)] attributes");
                 for meta in parsed {
@@ -48,8 +47,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
                         } else if nv.path.is_ident("params") {
                             if let syn::Expr::Lit(lit) = &nv.value {
                                 if let Lit::Str(s) = &lit.lit {
-                                    params_type =
-                                        Some(syn::Ident::new(&s.value(), s.span()));
+                                    params_type = Some(syn::Ident::new(&s.value(), s.span()));
                                 }
                             }
                         } else if nv.path.is_ident("permission") {

@@ -6,9 +6,9 @@
 //! - Boundary time calculations
 //! - Multiple reminder triggers
 
+use super::common::create_test_todo;
 use agent::reminders::ReminderEngine;
 use chrono::{Duration, Utc};
-use super::common::create_test_todo;
 use tools::todo_types::{TimeEntry, TimeEntrySource, Todo, TodoStatus};
 
 // ── Reminder Rule Edge Cases ──────────────────────────────────────

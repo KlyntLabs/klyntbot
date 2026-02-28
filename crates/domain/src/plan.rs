@@ -561,10 +561,22 @@ mod tests {
         assert_eq!(PlanVisibility::OnFailure.to_string(), "on_failure");
         assert_eq!(PlanVisibility::Transparent.to_string(), "transparent");
 
-        assert_eq!("silent".parse::<PlanVisibility>().unwrap(), PlanVisibility::Silent);
-        assert_eq!("on_failure".parse::<PlanVisibility>().unwrap(), PlanVisibility::OnFailure);
-        assert_eq!("transparent".parse::<PlanVisibility>().unwrap(), PlanVisibility::Transparent);
-        assert_eq!("unknown".parse::<PlanVisibility>().unwrap(), PlanVisibility::Transparent);
+        assert_eq!(
+            "silent".parse::<PlanVisibility>().unwrap(),
+            PlanVisibility::Silent
+        );
+        assert_eq!(
+            "on_failure".parse::<PlanVisibility>().unwrap(),
+            PlanVisibility::OnFailure
+        );
+        assert_eq!(
+            "transparent".parse::<PlanVisibility>().unwrap(),
+            PlanVisibility::Transparent
+        );
+        assert_eq!(
+            "unknown".parse::<PlanVisibility>().unwrap(),
+            PlanVisibility::Transparent
+        );
     }
 
     #[test]

@@ -104,5 +104,4 @@ mod tests {
         assert!(!sql.is_empty());
         assert!(sql.contains("CREATE TABLE IF NOT EXISTS todos"));
     }
-
 }

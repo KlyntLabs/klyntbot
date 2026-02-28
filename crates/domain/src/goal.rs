@@ -96,11 +96,10 @@ impl GoalStatus {
         if valid {
             Ok(())
         } else {
-            Err(GoalError::InvalidState(format!(
-                "Invalid state transition: {} → {}",
-                from, to
-            ))
-            .into())
+            Err(
+                GoalError::InvalidState(format!("Invalid state transition: {} → {}", from, to))
+                    .into(),
+            )
         }
     }
 }

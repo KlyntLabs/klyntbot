@@ -51,5 +51,4 @@ mod tests {
         assert_eq!(loaded_state.sync_token, original_state.sync_token);
         assert!(loaded_state.last_sync.is_some());
     }
-
 }

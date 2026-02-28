@@ -7,7 +7,7 @@
 use async_trait::async_trait;
 use chrono::Utc;
 use common::Result;
-use domain::goal::{self as conversions, GoalError, Goal, GoalProgress, GoalStatus};
+use domain::goal::{self as conversions, Goal, GoalError, GoalProgress, GoalStatus};
 use domain::PlanStatus;
 use providers::DynProvider;
 use tools::goal_tool::GoalHandler;

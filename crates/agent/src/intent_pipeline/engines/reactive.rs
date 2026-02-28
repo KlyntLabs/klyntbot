@@ -250,8 +250,8 @@ impl ExecutionEngine for ReactiveEngine {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::test_utils::*;
+    use super::*;
     use async_trait::async_trait;
     use serde_json::Value;
     use tokio::sync::RwLock;
@@ -283,10 +283,8 @@ mod tests {
 
     #[tokio::test]
     async fn reactive_completes_simple_tool_use() {
-        let provider = MockSequenceProvider::new(vec![
-            tool_call_response("ok_tool"),
-            text_response("Done!"),
-        ]);
+        let provider =
+            MockSequenceProvider::new(vec![tool_call_response("ok_tool"), text_response("Done!")]);
         let core = Arc::new(ExecutionCore::new(provider, registry_with_ok_tool()));
         let engine = ReactiveEngine::new(core, 10);
 

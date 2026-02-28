@@ -2,7 +2,12 @@
 
 use crate::rows::finance::{FinanceLiabilityPatch, FinanceLiabilityRow};
 
-crud_repo!(FinanceLiabilityRepo, "finance_liabilities", FinanceLiabilityRow, "finance_liability");
+crud_repo!(
+    FinanceLiabilityRepo,
+    "finance_liabilities",
+    FinanceLiabilityRow,
+    "finance_liability"
+);
 
 impl FinanceLiabilityRepo {
     // -----------------------------------------------------------------------
@@ -73,7 +78,9 @@ impl FinanceLiabilityRepo {
         .bind(&patch.id)
         .fetch_optional(&self.pool)
         .await?
-        .ok_or_else(|| crate::error::StorageError::NotFound(format!("finance_liability {}", patch.id)))?;
+        .ok_or_else(|| {
+            crate::error::StorageError::NotFound(format!("finance_liability {}", patch.id))
+        })?;
 
         Ok(row)
     }
@@ -98,7 +105,9 @@ impl FinanceLiabilityRepo {
 
     /// Sum remaining balances of all liabilities, grouped by currency.
     /// Returns `(currency, total_remaining)` pairs.
-    pub async fn total_remaining_by_currency(&self) -> Result<Vec<(String, i64)>, crate::error::StorageError> {
+    pub async fn total_remaining_by_currency(
+        &self,
+    ) -> Result<Vec<(String, i64)>, crate::error::StorageError> {
         let rows: Vec<(String, i64)> = sqlx::query_as(
             r#"
             SELECT currency, COALESCE(SUM(remaining), 0) AS total

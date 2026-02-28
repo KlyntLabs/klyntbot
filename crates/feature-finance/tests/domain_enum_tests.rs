@@ -25,7 +25,12 @@ mod account_type {
             (AccountType::Brokerage, "brokerage"),
         ];
         for (variant, expected) in cases {
-            assert_eq!(variant.as_str(), expected, "as_str failed for {:?}", variant);
+            assert_eq!(
+                variant.as_str(),
+                expected,
+                "as_str failed for {:?}",
+                variant
+            );
         }
     }
 
@@ -68,7 +73,12 @@ mod transaction_type {
             (TransactionType::Transfer, "transfer"),
         ];
         for (variant, expected) in cases {
-            assert_eq!(variant.as_str(), expected, "as_str failed for {:?}", variant);
+            assert_eq!(
+                variant.as_str(),
+                expected,
+                "as_str failed for {:?}",
+                variant
+            );
         }
     }
 
@@ -107,7 +117,12 @@ mod budget_period {
             (BudgetPeriod::Custom, "custom"),
         ];
         for (variant, expected) in cases {
-            assert_eq!(variant.as_str(), expected, "as_str failed for {:?}", variant);
+            assert_eq!(
+                variant.as_str(),
+                expected,
+                "as_str failed for {:?}",
+                variant
+            );
         }
     }
 
@@ -148,7 +163,12 @@ mod budget_method {
             (BudgetMethod::SixJar, "six_jar"),
         ];
         for (variant, expected) in cases {
-            assert_eq!(variant.as_str(), expected, "as_str failed for {:?}", variant);
+            assert_eq!(
+                variant.as_str(),
+                expected,
+                "as_str failed for {:?}",
+                variant
+            );
         }
     }
 
@@ -189,7 +209,12 @@ mod jar_type {
             (JarType::Charity, "charity"),
         ];
         for (variant, expected) in cases {
-            assert_eq!(variant.as_str(), expected, "as_str failed for {:?}", variant);
+            assert_eq!(
+                variant.as_str(),
+                expected,
+                "as_str failed for {:?}",
+                variant
+            );
         }
     }
 
@@ -237,7 +262,12 @@ mod asset_type {
             (AssetType::ExchangeRate, "exchange_rate"),
         ];
         for (variant, expected) in cases {
-            assert_eq!(variant.as_str(), expected, "as_str failed for {:?}", variant);
+            assert_eq!(
+                variant.as_str(),
+                expected,
+                "as_str failed for {:?}",
+                variant
+            );
         }
     }
 
@@ -288,7 +318,12 @@ mod investment_tx_type {
             (InvestmentTxType::Split, "split"),
         ];
         for (variant, expected) in cases {
-            assert_eq!(variant.as_str(), expected, "as_str failed for {:?}", variant);
+            assert_eq!(
+                variant.as_str(),
+                expected,
+                "as_str failed for {:?}",
+                variant
+            );
         }
     }
 
@@ -333,7 +368,12 @@ mod goal_type {
             (GoalType::Fire, "fire"),
         ];
         for (variant, expected) in cases {
-            assert_eq!(variant.as_str(), expected, "as_str failed for {:?}", variant);
+            assert_eq!(
+                variant.as_str(),
+                expected,
+                "as_str failed for {:?}",
+                variant
+            );
         }
     }
 
@@ -377,7 +417,12 @@ mod goal_status {
             (GoalStatus::Abandoned, "abandoned"),
         ];
         for (variant, expected) in cases {
-            assert_eq!(variant.as_str(), expected, "as_str failed for {:?}", variant);
+            assert_eq!(
+                variant.as_str(),
+                expected,
+                "as_str failed for {:?}",
+                variant
+            );
         }
     }
 
@@ -420,7 +465,12 @@ mod liability_type {
             (LiabilityType::Other, "other"),
         ];
         for (variant, expected) in cases {
-            assert_eq!(variant.as_str(), expected, "as_str failed for {:?}", variant);
+            assert_eq!(
+                variant.as_str(),
+                expected,
+                "as_str failed for {:?}",
+                variant
+            );
         }
     }
 

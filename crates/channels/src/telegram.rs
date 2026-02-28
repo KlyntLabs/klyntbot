@@ -339,10 +339,7 @@ impl TelegramChannel {
                 if let Some(ref transcriber) = self.transcriber {
                     match transcriber.transcribe(&path).await {
                         Ok(text) => {
-                            debug!(
-                                "Transcribed voice: {}...",
-                                truncate_chars(&text, 50, "")
-                            );
+                            debug!("Transcribed voice: {}...", truncate_chars(&text, 50, ""));
                             content_parts.push(format!("[transcription: {}]", text));
                         }
                         Err(e) => {
@@ -831,11 +828,15 @@ impl Channel for TelegramChannel {
 impl TelegramChannel {
     /// Wait for a callback_query response with a 5-minute timeout.
     async fn wait_for_callback(&self, chat_id: &str, question_id: &str) -> Result<String> {
-        self.interactions.wait_for_callback(chat_id, question_id).await
+        self.interactions
+            .wait_for_callback(chat_id, question_id)
+            .await
     }
 
     async fn wait_for_free_text(&self, chat_id: &str, question_id: &str) -> Result<String> {
-        self.interactions.wait_for_free_text(chat_id, question_id).await
+        self.interactions
+            .wait_for_free_text(chat_id, question_id)
+            .await
     }
 }
 

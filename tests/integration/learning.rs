@@ -11,8 +11,8 @@ use klyntbot::agent::confidence::prompt::confidence_prompt;
 use klyntbot::agent::confidence::ConfidenceEvaluator;
 use klyntbot::agent::learning::adaptive::AdaptiveThresholds;
 use klyntbot::agent::learning::analyzer::LearningAnalyzer;
-use klyntbot::agent::learning::recorder::OutcomeStore;
 use klyntbot::agent::learning::recorder::OutcomeRecorder;
+use klyntbot::agent::learning::recorder::OutcomeStore;
 use klyntbot::agent::learning::types::{AnalysisResult, EnrichmentStats};
 use klyntbot::agent::learning::{ExecutionMode, OutcomeRecord};
 use klyntbot::agent::learning_handler::LearningHandlerImpl;
@@ -265,8 +265,7 @@ async fn analyzer_produces_five_confidence_bands() {
         (bands[3].lower - 0.7).abs() < f32::EPSILON && (bands[3].upper - 0.85).abs() < f32::EPSILON
     );
     assert!(
-        (bands[4].lower - 0.85).abs() < f32::EPSILON
-            && (bands[4].upper - 1.0).abs() < f32::EPSILON
+        (bands[4].lower - 0.85).abs() < f32::EPSILON && (bands[4].upper - 1.0).abs() < f32::EPSILON
     );
 }
 

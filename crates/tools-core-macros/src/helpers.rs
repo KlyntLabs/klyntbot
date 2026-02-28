@@ -172,8 +172,7 @@ pub fn parse_param_attrs(attrs: &[syn::Attribute]) -> ParamAttrs {
         if attr.path().is_ident("param") {
             if let Meta::List(list) = &attr.meta {
                 let tokens = list.tokens.clone();
-                let parser =
-                    syn::punctuated::Punctuated::<Meta, syn::Token![,]>::parse_terminated;
+                let parser = syn::punctuated::Punctuated::<Meta, syn::Token![,]>::parse_terminated;
                 let parsed = syn::parse::Parser::parse2(parser, tokens)
                     .expect("Failed to parse #[param(...)] attributes");
                 for meta in parsed {

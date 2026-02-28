@@ -123,7 +123,12 @@ impl FinanceTool {
             });
         }
 
-        let liabilities = self.storage.liabilities.list_all().await.unwrap_or_default();
+        let liabilities = self
+            .storage
+            .liabilities
+            .list_all()
+            .await
+            .unwrap_or_default();
         let neg_remaining: Vec<_> = liabilities.iter().filter(|l| l.remaining < 0).collect();
         if !neg_remaining.is_empty() {
             issues.push(Issue {
@@ -137,7 +142,12 @@ impl FinanceTool {
             });
         }
 
-        let portfolios = self.storage.investments.list_portfolios().await.unwrap_or_default();
+        let portfolios = self
+            .storage
+            .investments
+            .list_portfolios()
+            .await
+            .unwrap_or_default();
         let mut empty_count = 0usize;
         for p in &portfolios {
             let filter = FinanceInvestmentFilter {

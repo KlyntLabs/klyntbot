@@ -52,10 +52,7 @@ impl LearningHandler for MockLearningHandler {
     }
 
     async fn analyze_now(&self) -> Result<LearningStatus> {
-        Ok(self
-            .status
-            .clone()
-            .unwrap_or_else(Self::default_status))
+        Ok(self.status.clone().unwrap_or_else(Self::default_status))
     }
 
     async fn get_threshold_history(&self, limit: usize) -> Result<Vec<ThresholdEntry>> {

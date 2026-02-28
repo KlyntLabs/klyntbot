@@ -17,7 +17,10 @@ use tools::todo_types::{Todo, TodoStatus};
 
 // Re-exports for convenience (not all test binaries use every mock)
 #[allow(unused_imports)]
-pub use mocks::{ErrorProvider, MockCalendarHandler, MockConversationEmbeddingHandler, MockEmbeddingHandler, MockLearningHandler, MockProvider};
+pub use mocks::{
+    ErrorProvider, MockCalendarHandler, MockConversationEmbeddingHandler, MockEmbeddingHandler,
+    MockLearningHandler, MockProvider,
+};
 
 // ─── Config & workspace ──────────────────────────────────────
 

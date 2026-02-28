@@ -39,7 +39,10 @@ pub fn strip_llm_fences(s: &str) -> &str {
         .strip_prefix("```json")
         .or_else(|| trimmed.strip_prefix("```"))
         .unwrap_or(trimmed);
-    stripped.trim_start_matches('\n').trim_end_matches("```").trim()
+    stripped
+        .trim_start_matches('\n')
+        .trim_end_matches("```")
+        .trim()
 }
 
 /// Truncate a `&str` at a UTF-8 char boundary so it fits within `max_bytes`.

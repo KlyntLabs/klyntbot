@@ -2,7 +2,12 @@
 
 use crate::rows::finance::{BudgetUsageRow, FinanceBudgetPatch, FinanceBudgetRow};
 
-crud_repo!(FinanceBudgetRepo, "finance_budgets", FinanceBudgetRow, "finance_budget");
+crud_repo!(
+    FinanceBudgetRepo,
+    "finance_budgets",
+    FinanceBudgetRow,
+    "finance_budget"
+);
 
 impl FinanceBudgetRepo {
     // -----------------------------------------------------------------------
@@ -10,7 +15,10 @@ impl FinanceBudgetRepo {
     // -----------------------------------------------------------------------
 
     /// Insert a new budget. Returns the inserted row.
-    pub async fn add(&self, row: &FinanceBudgetRow) -> Result<FinanceBudgetRow, crate::error::StorageError> {
+    pub async fn add(
+        &self,
+        row: &FinanceBudgetRow,
+    ) -> Result<FinanceBudgetRow, crate::error::StorageError> {
         let inserted = sqlx::query_as::<_, FinanceBudgetRow>(
             r#"
             INSERT INTO finance_budgets (
@@ -70,7 +78,9 @@ impl FinanceBudgetRepo {
         .bind(&patch.id)
         .fetch_optional(&self.pool)
         .await?
-        .ok_or_else(|| crate::error::StorageError::NotFound(format!("finance_budget {}", patch.id)))?;
+        .ok_or_else(|| {
+            crate::error::StorageError::NotFound(format!("finance_budget {}", patch.id))
+        })?;
 
         Ok(row)
     }
@@ -109,7 +119,10 @@ impl FinanceBudgetRepo {
 
     /// Return the budget row for `budget_id` with the `spent` amount calculated
     /// by summing matching expense transactions in the budget's current period.
-    pub async fn budget_usage(&self, budget_id: &str) -> Result<BudgetUsageRow, crate::error::StorageError> {
+    pub async fn budget_usage(
+        &self,
+        budget_id: &str,
+    ) -> Result<BudgetUsageRow, crate::error::StorageError> {
         let row = sqlx::query_as::<_, BudgetUsageRow>(
             r#"
             SELECT
@@ -157,7 +170,9 @@ impl FinanceBudgetRepo {
     }
 
     /// Return `BudgetUsageRow` for every active budget, ordered by creation date.
-    pub async fn all_budget_usage(&self) -> Result<Vec<BudgetUsageRow>, crate::error::StorageError> {
+    pub async fn all_budget_usage(
+        &self,
+    ) -> Result<Vec<BudgetUsageRow>, crate::error::StorageError> {
         let rows = sqlx::query_as::<_, BudgetUsageRow>(
             r#"
             SELECT

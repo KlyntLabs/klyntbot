@@ -9,7 +9,10 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use chrono::Utc;
-use common::{utils::{tool_def_name, truncate_chars}, Result};
+use common::{
+    utils::{tool_def_name, truncate_chars},
+    Result,
+};
 use domain::plan::save_plan;
 use domain::{PlanStatus, PlanVisibility, StepStatus, DEFAULT_MAX_STEP_ATTEMPTS};
 use providers::{DynProvider, Message, Usage};
@@ -245,7 +248,11 @@ impl PlannedEngine {
     }
 
     /// Execute plan steps sequentially with retry + backtracking.
-    async fn run_plan_steps(&self, plan: &mut domain::Plan, ctx: &RoutingContext) -> Result<String> {
+    async fn run_plan_steps(
+        &self,
+        plan: &mut domain::Plan,
+        ctx: &RoutingContext,
+    ) -> Result<String> {
         let step_count = plan.steps.len();
         let mut outputs: Vec<String> = Vec::with_capacity(step_count);
         let mut step_idx = plan.current_step_index;
@@ -427,7 +434,6 @@ impl PlannedEngine {
         let engine = super::reactive::ReactiveEngine::new(self.core.clone(), 50);
         engine.execute(messages, tools, params, ctx, event_tx).await
     }
-
 }
 
 #[async_trait]
@@ -472,11 +478,10 @@ fn extract_last_user_message(messages: &[Message]) -> String {
         .unwrap_or_else(|| "Complete the task".to_string())
 }
 
-
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::test_utils::*;
+    use super::*;
     use crate::intent_pipeline::router::CompletedStep;
 
     /// Build a mock provider with plan step JSON + text follow-up responses.

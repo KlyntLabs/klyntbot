@@ -9,9 +9,9 @@ use calendar::{
 use chrono::{Duration, Local, Utc};
 use common::Result;
 use config::{CalendarConfig, CalendarProviderConfig};
+use feature_todo::CalendarSyncHandler;
 use serde_json::{json, Value};
 use std::sync::Arc;
-use feature_todo::CalendarSyncHandler;
 use tools::{
     calendar_tool::CalendarHandler,
     todo_types::{Todo, TodoStatus},

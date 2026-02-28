@@ -6,8 +6,8 @@ use serde_json::Value;
 use tracing::{debug, warn};
 use url::Url;
 
-use tools_core::{RoutingContext, ToolParams};
 use common::{Result, ToolError};
+use tools_core::{RoutingContext, ToolParams};
 
 #[derive(Debug, ToolParams)]
 pub struct WebSearchParams {

@@ -2,7 +2,12 @@
 
 use crate::rows::finance::{FinanceAccountPatch, FinanceAccountRow};
 
-crud_repo!(FinanceAccountRepo, "finance_accounts", FinanceAccountRow, "finance_account");
+crud_repo!(
+    FinanceAccountRepo,
+    "finance_accounts",
+    FinanceAccountRow,
+    "finance_account"
+);
 
 impl FinanceAccountRepo {
     // -----------------------------------------------------------------------
@@ -10,7 +15,10 @@ impl FinanceAccountRepo {
     // -----------------------------------------------------------------------
 
     /// Insert a new account. Returns the inserted row.
-    pub async fn add(&self, row: &FinanceAccountRow) -> Result<FinanceAccountRow, crate::error::StorageError> {
+    pub async fn add(
+        &self,
+        row: &FinanceAccountRow,
+    ) -> Result<FinanceAccountRow, crate::error::StorageError> {
         let inserted = sqlx::query_as::<_, FinanceAccountRow>(
             r#"
             INSERT INTO finance_accounts (
@@ -69,7 +77,9 @@ impl FinanceAccountRepo {
         .bind(&patch.id)
         .fetch_optional(&self.pool)
         .await?
-        .ok_or_else(|| crate::error::StorageError::NotFound(format!("finance_account {}", patch.id)))?;
+        .ok_or_else(|| {
+            crate::error::StorageError::NotFound(format!("finance_account {}", patch.id))
+        })?;
 
         Ok(row)
     }
@@ -123,7 +133,9 @@ impl FinanceAccountRepo {
 
     /// Sum balances of non-archived accounts, grouped by currency.
     /// Returns a vec of `(currency, total_balance)` pairs.
-    pub async fn total_balance_by_currency(&self) -> Result<Vec<(String, i64)>, crate::error::StorageError> {
+    pub async fn total_balance_by_currency(
+        &self,
+    ) -> Result<Vec<(String, i64)>, crate::error::StorageError> {
         let rows: Vec<(String, i64)> = sqlx::query_as(
             r#"
             SELECT currency, COALESCE(SUM(balance), 0) AS total

@@ -1,11 +1,11 @@
 //! Serve command handler for gateway daemon mode
 
+use crate::heartbeat::HeartbeatService;
 use agent::AgentLoop;
 use anyhow::Result;
 use bus::MessageBus;
 use channels::ChannelManager;
 use dashboard::{AppState as DashboardState, DashboardServer};
-use crate::heartbeat::HeartbeatService;
 use scheduling::CronService;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;

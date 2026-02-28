@@ -82,7 +82,11 @@ impl FinanceTool {
 
         let mut result = Vec::new();
         for portfolio in &portfolios {
-            let summary = self.storage.investments.portfolio_summary(&portfolio.id).await?;
+            let summary = self
+                .storage
+                .investments
+                .portfolio_summary(&portfolio.id)
+                .await?;
             let total_return = summary.total_current_value - summary.total_cost_basis;
             let return_pct = if summary.total_cost_basis > 0 {
                 (total_return * 100) / summary.total_cost_basis
@@ -152,7 +156,10 @@ impl FinanceTool {
         let currency = p
             .optional_str("currency")?
             .unwrap_or(&self.default_currency);
-        let purchase_date = p.optional_str("purchase_date")?.map(parse_date).transpose()?;
+        let purchase_date = p
+            .optional_str("purchase_date")?
+            .map(parse_date)
+            .transpose()?;
         let notes = p.optional_str("notes")?;
 
         let now = Utc::now();
@@ -257,7 +264,12 @@ impl FinanceTool {
         };
 
         // Load existing investment for currency fallback and cost-basis computation
-        let inv = match self.storage.investments.get_investment(investment_id).await? {
+        let inv = match self
+            .storage
+            .investments
+            .get_investment(investment_id)
+            .await?
+        {
             Some(inv) => inv,
             None => {
                 return Ok(serde_json::to_string_pretty(&json!({

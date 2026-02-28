@@ -106,9 +106,7 @@ impl TodoRepo {
 
     /// Get a single todo by id, returning `StorageError::NotFound` if missing.
     pub async fn get_or_err(&self, id: &str) -> Result<TodoRow, StorageError> {
-        self.get(id)
-            .await?
-            .ok_or_not_found(&format!("todo {id}"))
+        self.get(id).await?.ok_or_not_found(&format!("todo {id}"))
     }
 
     /// Fetch todos by a list of IDs. Missing IDs are silently skipped.
@@ -806,9 +804,13 @@ impl TodoRepo {
     /// Build a context string of active todos for LLM context injection.
     #[allow(clippy::type_complexity)]
     pub async fn to_context_string(&self) -> Result<String, StorageError> {
-        let rows: Vec<(String, String, Option<i16>, Option<chrono::DateTime<chrono::Utc>>)> =
-            sqlx::query_as(
-                r#"
+        let rows: Vec<(
+            String,
+            String,
+            Option<i16>,
+            Option<chrono::DateTime<chrono::Utc>>,
+        )> = sqlx::query_as(
+            r#"
                 SELECT title, status, priority, focused_at FROM todos
                 WHERE status IN ('todo', 'doing')
                   AND is_template = FALSE
@@ -817,9 +819,9 @@ impl TodoRepo {
                     priority ASC NULLS LAST,
                     created_at
                 "#,
-            )
-            .fetch_all(&self.pool)
-            .await?;
+        )
+        .fetch_all(&self.pool)
+        .await?;
 
         if rows.is_empty() {
             return Ok("No active tasks.".to_string());

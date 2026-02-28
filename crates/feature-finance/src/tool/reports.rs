@@ -177,8 +177,12 @@ impl FinanceTool {
         let data: Vec<serde_json::Value> = if metric == "savings_rate" {
             // Fetch both income and spending time series concurrently.
             let (income_data, spend_data) = tokio::try_join!(
-                self.storage.transactions.sum_by_period("income", periods, "month"),
-                self.storage.transactions.sum_by_period("expense", periods, "month"),
+                self.storage
+                    .transactions
+                    .sum_by_period("income", periods, "month"),
+                self.storage
+                    .transactions
+                    .sum_by_period("expense", periods, "month"),
             )?;
 
             let income_map: std::collections::HashMap<String, i64> =

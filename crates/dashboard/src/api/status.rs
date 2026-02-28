@@ -38,14 +38,7 @@ pub async fn get_status(State(state): State<AppState>) -> Result<Json<StatusResp
                 .map(|s| s.total)
                 .unwrap_or(0)
         },
-        async {
-            state
-                .repos
-                .sessions
-                .count_sessions()
-                .await
-                .unwrap_or(0)
-        },
+        async { state.repos.sessions.count_sessions().await.unwrap_or(0) },
     );
 
     let config = state
