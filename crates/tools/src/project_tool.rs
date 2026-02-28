@@ -87,7 +87,7 @@ impl Tool for ProjectTool {
         })
     }
 
-    async fn execute(&self, args: Value, _ctx: &RoutingContext) -> Result<String> {
+    async fn execute(&self, args: Value, ctx: &RoutingContext) -> Result<String> {
         let p = ParamExtractor::new(&args);
         let action = p.required_str("action")?;
 
@@ -112,6 +112,21 @@ impl Tool for ProjectTool {
                 let row = storage::ProjectRow::from(&project);
                 let created_row = self.project_repo.create(&row).await?;
                 let created: Project = created_row.into();
+
+                if let Some(ref tx) = ctx.entity_tx {
+                    let _ = tx
+                        .send(common::EntityCard {
+                            entity_type: "project".to_string(),
+                            entity_id: created.id.clone(),
+                            title: created.name.clone(),
+                            subtitle: None,
+                            route: Some(format!("/projects/{}", created.id)),
+                            icon_hint: "project".to_string(),
+                            metadata: std::collections::HashMap::new(),
+                        })
+                        .await;
+                }
+
                 Ok(format!(
                     "Project created: {} (ID: {})",
                     created.name, created.id
