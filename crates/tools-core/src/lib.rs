@@ -13,7 +13,7 @@ pub mod registry;
 pub mod search;
 
 // Re-export proc macros
-pub use tools_core_macros::{tool_actions, ActionParams, DomainEnum, ToolParams};
+pub use tools_core_macros::{tool_actions, ActionParams, DomainEnum, Tool, ToolParams};
 
 use async_trait::async_trait;
 use serde_json::Value;
@@ -125,6 +125,17 @@ pub trait ToolParams: Sized {
 
     /// Parse parameters from a JSON value.
     fn from_args(args: Value) -> common::Result<Self>;
+}
+
+/// Typed tool execution — implement this for your tool's business logic,
+/// then use `#[derive(Tool)]` to generate the untyped `Tool` trait bridge.
+#[async_trait]
+pub trait ToolExecute: Send + Sync {
+    /// The typed parameter struct (must implement `ToolParams`).
+    type Params: ToolParams;
+
+    /// Execute the tool with typed parameters.
+    async fn execute(&self, params: Self::Params, ctx: &RoutingContext) -> common::Result<String>;
 }
 
 /// Trait for agent tools

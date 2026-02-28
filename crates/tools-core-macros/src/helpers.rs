@@ -155,24 +155,13 @@ pub fn get_doc_comment(attrs: &[syn::Attribute]) -> Option<String> {
 }
 
 /// Parse `#[param(...)]` attributes on a field.
+#[derive(Default)]
 pub struct ParamAttrs {
     pub is_required: bool,
     pub min_val: Option<i64>,
     pub max_val: Option<i64>,
     pub min_length: Option<u64>,
     pub max_length: Option<u64>,
-}
-
-impl Default for ParamAttrs {
-    fn default() -> Self {
-        Self {
-            is_required: false,
-            min_val: None,
-            max_val: None,
-            min_length: None,
-            max_length: None,
-        }
-    }
 }
 
 /// Parse `#[param(...)]` attributes from a field's attribute list.

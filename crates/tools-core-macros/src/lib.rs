@@ -3,6 +3,7 @@
 //! - `#[derive(DomainEnum)]` — generates from_str_loose, as_str, Display
 //! - `#[derive(ActionParams)]` — generates JSON Schema + from_value (inherent methods)
 //! - `#[derive(ToolParams)]` — generates `ToolParams` trait impl (json_schema + from_args)
+//! - `#[derive(Tool)]` — generates `Tool` trait impl from `#[tool()]` metadata + `ToolExecute`
 //! - `#[tool_actions]` — generates Tool::execute dispatch
 
 use proc_macro::TokenStream;
@@ -11,6 +12,7 @@ mod action_params;
 mod domain_enum;
 mod helpers;
 mod tool_actions;
+mod tool_derive;
 mod tool_params;
 
 #[proc_macro_derive(DomainEnum, attributes(aliases, canonical))]
@@ -26,6 +28,11 @@ pub fn derive_action_params(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(ToolParams, attributes(param))]
 pub fn derive_tool_params(input: TokenStream) -> TokenStream {
     tool_params::derive(input)
+}
+
+#[proc_macro_derive(Tool, attributes(tool))]
+pub fn derive_tool(input: TokenStream) -> TokenStream {
+    tool_derive::derive(input)
 }
 
 #[proc_macro_attribute]
