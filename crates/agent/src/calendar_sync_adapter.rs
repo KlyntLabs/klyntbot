@@ -11,6 +11,7 @@ use common::Result;
 use config::{CalendarConfig, CalendarProviderConfig};
 use serde_json::{json, Value};
 use std::sync::Arc;
+use feature_todo::CalendarSyncHandler;
 use tools::{
     calendar_tool::CalendarHandler,
     todo_types::{Todo, TodoStatus},
@@ -1047,6 +1048,40 @@ impl CalendarHandler for CalendarSyncAdapter {
             .collect();
 
         Ok(deduplicated)
+    }
+}
+
+// ===========================================================================
+// TodoCalendarSyncAdapter — bridges CalendarHandler → CalendarSyncHandler
+// ===========================================================================
+
+/// Wraps an `Arc<CalendarHandler>` to satisfy `feature-todo`'s narrower
+/// `CalendarSyncHandler` trait, discarding the `Value` returns.
+pub struct TodoCalendarSyncAdapter {
+    inner: Arc<dyn CalendarHandler>,
+}
+
+impl TodoCalendarSyncAdapter {
+    pub fn new(inner: Arc<dyn CalendarHandler>) -> Self {
+        Self { inner }
+    }
+}
+
+#[async_trait]
+impl CalendarSyncHandler for TodoCalendarSyncAdapter {
+    async fn sync_calendar(&self) -> Result<()> {
+        self.inner.sync_calendar().await.map(|_| ())
+    }
+
+    async fn push_task(&self, task_id: &str) -> Result<()> {
+        self.inner.push_single_task(task_id).await.map(|_| ())
+    }
+
+    async fn remove_event(&self, calendar_event_uid: &str) -> Result<()> {
+        self.inner
+            .remove_single_event(calendar_event_uid)
+            .await
+            .map(|_| ())
     }
 }
 

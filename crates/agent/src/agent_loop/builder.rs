@@ -372,7 +372,7 @@ impl AgentLoopBuilder {
             // Inject calendar handler
             if let Some(ref adapter) = calendar_adapter {
                 let todo_cal_sync = Arc::new(
-                    crate::todo_calendar_sync_adapter::TodoCalendarSyncAdapter::new(Arc::clone(
+                    crate::calendar_sync_adapter::TodoCalendarSyncAdapter::new(Arc::clone(
                         adapter,
                     )
                         as Arc<dyn CalendarHandler>),
