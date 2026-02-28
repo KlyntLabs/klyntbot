@@ -22,6 +22,12 @@ pub trait SpawnHandler: Send + Sync {
         origin_channel: String,
         origin_chat_id: String,
     ) -> String;
+
+    /// Cancel a running subagent by ID
+    async fn cancel(&self, agent_id: &str) -> common::Result<String>;
+
+    /// Get status of all subagents for a session
+    async fn status(&self, session_key: &str) -> common::Result<String>;
 }
 
 /// Tool to spawn subagents for background task execution.
@@ -67,9 +73,14 @@ impl Tool for SpawnTool {
         serde_json::json!({
             "type": "object",
             "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": ["spawn", "cancel", "status"],
+                    "description": "Action to perform. Default: spawn"
+                },
                 "task": {
                     "type": "string",
-                    "description": "The task for the subagent to complete"
+                    "description": "The task for the subagent to complete (required for spawn)"
                 },
                 "label": {
                     "type": "string",
@@ -77,8 +88,12 @@ impl Tool for SpawnTool {
                 },
                 "profile": {
                     "type": "string",
-                    "description": "Sub-agent specialization profile. Options: general (default, full access), research (web + read-only files), code (files + shell, no web), analyst (read-only files, pure reasoning)",
-                    "enum": ["general", "research", "code", "analyst"]
+                    "description": "Sub-agent specialization profile. Options: general (default, full access), research (web + read-only files), analyst (read-only files, pure reasoning)",
+                    "enum": ["general", "research", "analyst"]
+                },
+                "agent_id": {
+                    "type": "string",
+                    "description": "Agent ID to cancel (required for cancel action)"
                 }
             },
             "required": ["task"]
@@ -87,35 +102,46 @@ impl Tool for SpawnTool {
 
     async fn execute(&self, args: Value, ctx: &RoutingContext) -> Result<String> {
         let p = ParamExtractor::new(&args);
-        let task = p.required_str("task")?;
-        let label = p.optional_str("label")?.map(|s| s.to_string());
-        let profile = args
-            .get("profile")
-            .and_then(|v| v.as_str())
-            .unwrap_or("general")
-            .to_string();
-
-        debug!(
-            "Spawning subagent for task: {} (profile: {})",
-            task, profile
-        );
+        let action = p.str_or("action", "spawn")?;
 
         let handler = self
             .handler
             .as_ref()
             .ok_or_else(|| ToolError::ExecutionFailed("SpawnHandler not available".to_string()))?;
 
-        // Use routing context for result routing
-        let result = handler
-            .spawn(
-                task.to_string(),
-                label,
-                profile,
-                ctx.channel.as_str().to_string(),
-                ctx.chat_id.as_str().to_string(),
-            )
-            .await;
+        match action {
+            "cancel" => {
+                let agent_id = p.required_str("agent_id")?;
+                handler.cancel(agent_id).await
+            }
+            "status" => {
+                let session_key =
+                    format!("{}:{}", ctx.channel.as_str(), ctx.chat_id.as_str());
+                handler.status(&session_key).await
+            }
+            _ => {
+                // "spawn" action (default)
+                let task = p.required_str("task")?;
+                let label = p.optional_str("label")?.map(|s| s.to_string());
+                let profile = p.str_or("profile", "general")?.to_string();
 
-        Ok(result)
+                debug!(
+                    "Spawning subagent for task: {} (profile: {})",
+                    task, profile
+                );
+
+                let result = handler
+                    .spawn(
+                        task.to_string(),
+                        label,
+                        profile,
+                        ctx.channel.as_str().to_string(),
+                        ctx.chat_id.as_str().to_string(),
+                    )
+                    .await;
+
+                Ok(result)
+            }
+        }
     }
 }

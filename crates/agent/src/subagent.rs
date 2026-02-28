@@ -1,9 +1,11 @@
 //! Subagent manager for background task execution.
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
-use tokio::sync::{mpsc, Semaphore};
+use tokio::sync::{mpsc, Mutex, Semaphore};
+use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
@@ -65,6 +67,15 @@ impl SubagentProfile {
     }
 }
 
+/// Tracks a running subagent for cancel/status operations.
+struct SubagentHandle {
+    cancel_token: CancellationToken,
+    label: String,
+    #[allow(dead_code)]
+    profile: SubagentProfile,
+    spawned_at: std::time::Instant,
+}
+
 /// Configuration for subagent execution
 struct SubagentConfig {
     brave_api_key: Option<String>,
@@ -85,6 +96,7 @@ pub struct SubagentManager {
     task_timeout: u64,
     restrict_to_workspace: bool,
     semaphore: Arc<Semaphore>,
+    handles: Arc<Mutex<HashMap<String, SubagentHandle>>>,
 }
 
 /// Builder for SubagentManager
@@ -162,6 +174,7 @@ impl SubagentManagerBuilder {
             task_timeout: self.task_timeout,
             restrict_to_workspace: self.restrict_to_workspace,
             semaphore: Arc::new(Semaphore::new(self.max_concurrent_subagents)),
+            handles: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 }
@@ -191,9 +204,25 @@ impl SubagentManager {
         origin_chat_id: String,
     ) -> String {
         let subagent_id = Uuid::new_v4().to_string();
+        let short_id = subagent_id[..8].to_string();
         let label_text = label.unwrap_or_else(|| "background task".to_string());
+        let cancel_token = CancellationToken::new();
 
         debug!("Spawning subagent {} for task: {}", subagent_id, task);
+
+        // Store handle for cancel/status tracking
+        {
+            let mut handles = self.handles.lock().await;
+            handles.insert(
+                short_id.clone(),
+                SubagentHandle {
+                    cancel_token: cancel_token.clone(),
+                    label: label_text.clone(),
+                    profile,
+                    spawned_at: std::time::Instant::now(),
+                },
+            );
+        }
 
         let provider = Arc::clone(&self.provider);
         let workspace = self.workspace.clone();
@@ -210,10 +239,11 @@ impl SubagentManager {
         };
 
         let semaphore = Arc::clone(&self.semaphore);
+        let handles_ref = Arc::clone(&self.handles);
+        let short_id_clone = short_id.clone();
 
         tokio::spawn(async move {
             // Acquire permit before running — limits concurrent subagents.
-            // _permit is held for the duration of the task, then dropped automatically.
             let _permit = semaphore
                 .acquire_owned()
                 .await
@@ -221,8 +251,21 @@ impl SubagentManager {
 
             info!("Subagent {} started: {}", subagent_id_clone, label_clone);
 
-            let result =
-                run_subagent_task(&provider, &workspace, &model, &task, config, profile).await;
+            // Run task with cancellation support
+            let result = tokio::select! {
+                _ = cancel_token.cancelled() => {
+                    Err("Cancelled by user".into())
+                }
+                r = run_subagent_task(&provider, &workspace, &model, &task, config, profile) => {
+                    r
+                }
+            };
+
+            // Remove handle after completion
+            {
+                let mut handles = handles_ref.lock().await;
+                handles.remove(&short_id_clone);
+            }
 
             match result {
                 Ok((status, result_text)) => {
@@ -257,9 +300,43 @@ impl SubagentManager {
 
         format!(
             "Subagent spawned (ID: {}). Working on '{}' in the background...",
-            &subagent_id[..8],
-            label_text
+            short_id, label_text
         )
+    }
+
+    /// Cancel a running subagent by its short ID.
+    pub async fn cancel_subagent(&self, agent_id: &str) -> common::Result<String> {
+        let mut handles = self.handles.lock().await;
+        if let Some(handle) = handles.remove(agent_id) {
+            handle.cancel_token.cancel();
+            Ok(format!("Cancelled subagent '{}' ({})", handle.label, agent_id))
+        } else {
+            Err(common::ToolError::ExecutionFailed(format!(
+                "No running subagent with ID '{}'",
+                agent_id
+            ))
+            .into())
+        }
+    }
+
+    /// Get status of all running subagents.
+    pub async fn get_status(&self) -> common::Result<String> {
+        let handles = self.handles.lock().await;
+        if handles.is_empty() {
+            return Ok("No subagents currently running.".to_string());
+        }
+
+        let mut lines = vec!["Running subagents:".to_string()];
+        for (id, handle) in handles.iter() {
+            let elapsed = handle.spawned_at.elapsed();
+            lines.push(format!(
+                "  {} — '{}' (running for {}s)",
+                id,
+                handle.label,
+                elapsed.as_secs()
+            ));
+        }
+        Ok(lines.join("\n"))
     }
 }
 
@@ -277,6 +354,14 @@ impl SpawnHandler for SubagentManager {
         let profile = SubagentProfile::from_str(&profile).unwrap_or_default();
         self.spawn(task, label, profile, origin_channel, origin_chat_id)
             .await
+    }
+
+    async fn cancel(&self, agent_id: &str) -> common::Result<String> {
+        self.cancel_subagent(agent_id).await
+    }
+
+    async fn status(&self, _session_key: &str) -> common::Result<String> {
+        self.get_status().await
     }
 }
 

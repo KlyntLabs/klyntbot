@@ -3,6 +3,7 @@
 //! This crate provides the AgentLoop and related agent functionality.
 
 pub mod agent_loop;
+pub mod agent_task_handler;
 
 pub mod calendar_reconcile;
 pub mod calendar_sync_adapter;
@@ -62,4 +63,5 @@ pub use plan_handler::PlanHandlerImpl;
 pub use recurring_tasks::RecurringTaskSpawner;
 pub use reminders::{CalendarEvent, ReminderEngine};
 pub use skills::SkillManager;
+pub use agent_task_handler::AgentTaskHandlerImpl;
 pub use subagent::{SubagentManager, SubagentProfile};
