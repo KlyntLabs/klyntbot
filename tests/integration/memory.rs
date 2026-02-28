@@ -1,29 +1,6 @@
-//! Phase 4.1 integration tests — MemoryTool
+//! Integration tests for memory tool and context engine.
 //!
-//! Tests for the MemoryTool actions. Covers:
-//!
-//! ## Testable Contract Coverage
-//!
-//! | TC# | Description                              | Test(s)                                      |
-//! |-----|------------------------------------------|----------------------------------------------|
-//! | TC-5 | Semantic search finds similar            | test_tc5_semantic_search_finds_similar       |
-//! | TC-6 | RRF merges todo + conversation           | test_tc6_rrf_merges_todo_conversation        |
-//! | TC-9 | Search respects threshold                | test_tc9_search_respects_threshold           |
-//! | TC-10 | Purge deletes embeddings                | test_tc10_purge_deletes_embeddings           |
-//! | TC-11 | Status reports accurate counts          | test_tc11_status_reports_accurate_counts     |
-//! | TC-12 | Global memory works cross-channel       | test_tc12_cross_channel_search               |
-//! | TC-13 | MemoryTool registers in ToolRegistry    | test_tc13_memory_tool_registration           |
-//!
-//! ## Edge Cases
-//!
-//! | EC# | Scenario                                 | Test                                          |
-//! |-----|------------------------------------------|-----------------------------------------------|
-//! | EC-1 | Empty query                             | test_ec1_empty_query_returns_error            |
-//! | EC-3 | No embeddings exist                     | test_ec3_no_embeddings_returns_message        |
-//! | EC-4 | Partial embedding coverage              | test_ec4_partial_embeddings_noted             |
-//! | EC-5 | All results below threshold             | test_ec5_below_threshold_no_results           |
-//! | EC-15 | Hybrid with zero keyword results       | test_ec15_hybrid_zero_keyword                 |
-//! | EC-16 | Hybrid with zero semantic results      | test_ec16_hybrid_zero_semantic                |
+//! Merged from `memory_tool_integration.rs` and `memory_and_context_tests.rs`.
 
 use serde_json::json;
 use std::sync::Arc;
@@ -32,10 +9,18 @@ use tools::memory_tool::MemoryTool;
 use tools::RoutingContext;
 use tools::Tool;
 
-mod common;
+use super::common;
 use common::MockConversationEmbeddingHandler;
 
-// ─── Test Helpers ──────────────────────────────────────────────
+use klyntbot::agent::context_sources::{
+    BootstrapSource, ConfidenceSource, IdentitySource, MemorySource, SkillContentSource,
+    SkillSummarySource,
+};
+use klyntbot::agent::{MemoryStore, SkillManager};
+use klyntbot::context_engine::{ContextEngine, ContextSource, SourceContext};
+use tempfile::TempDir;
+
+// ── Memory Tool Helpers ───────────────────────────────────────
 
 /// Sample conversation messages for testing (role, session_key, content)
 const SAMPLE_MESSAGES: &[(&str, &str, &str)] = &[
@@ -104,16 +89,43 @@ fn ctx() -> RoutingContext {
     ctx_for_channel("telegram")
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Search Actions Tests (TC-5, TC-9, TC-12)
-// ═══════════════════════════════════════════════════════════════
+// ── Context Engine Helpers ────────────────────────────────────
+
+/// Helper: build a ContextEngine with all sources for testing.
+async fn test_context_engine(workspace: std::path::PathBuf) -> ContextEngine {
+    let mut skill_manager = SkillManager::new();
+    let _ = skill_manager.load(workspace.clone()).await;
+    let skill_manager = Arc::new(skill_manager);
+
+    let memory_store = MemoryStore::new(common::test_memory_note_repo().await);
+
+    let sources: Vec<Box<dyn ContextSource>> = vec![
+        Box::new(IdentitySource::new(workspace.clone(), "UTC".to_string())),
+        Box::new(BootstrapSource::new(workspace)),
+        Box::new(MemorySource::new(memory_store)),
+        Box::new(ConfidenceSource::new(0.7)),
+        Box::new(SkillSummarySource::new(Arc::clone(&skill_manager))),
+        Box::new(SkillContentSource::new(skill_manager)),
+    ];
+
+    ContextEngine::new().with_sources(sources)
+}
+
+fn test_source_ctx() -> SourceContext {
+    SourceContext {
+        channel: "test".to_string(),
+        chat_id: "chat123".to_string(),
+        message: None,
+    }
+}
+
+// ── Memory Tool Actions ─────────────────────────────────────
 
 #[tokio::test]
-async fn test_tc5_semantic_search_finds_similar() {
+async fn semantic_search_finds_similar_todos() {
     let (tool, handler) = create_test_memory_tool().await;
 
     // Embed sample messages
-
     embed_test_messages(&handler, SAMPLE_MESSAGES).await;
 
     // Execute search
@@ -145,7 +157,7 @@ async fn test_tc5_semantic_search_finds_similar() {
 }
 
 #[tokio::test]
-async fn test_tc9_search_respects_threshold() {
+async fn search_respects_threshold() {
     let (tool, handler) = create_test_memory_tool().await;
     embed_test_messages(&handler, SAMPLE_MESSAGES).await;
 
@@ -170,8 +182,6 @@ async fn test_tc9_search_respects_threshold() {
     let result_low = tool.execute(args_low, &ctx()).await.unwrap();
 
     // Verify threshold filtering works
-    // Low threshold should have more results (or same if all results are high quality)
-    // The key is that results respect the threshold parameter
     assert!(
         result_high.contains("conversation(s) matching")
             || result_high.contains("No conversations found")
@@ -180,7 +190,7 @@ async fn test_tc9_search_respects_threshold() {
 }
 
 #[tokio::test]
-async fn test_tc12_cross_channel_search() {
+async fn cross_channel_search() {
     let (tool, handler) = create_test_memory_tool().await;
 
     // Embed messages from different channels
@@ -221,17 +231,12 @@ async fn test_tc12_cross_channel_search() {
         .unwrap();
 
     // Verify results include both Telegram and Discord messages (global memory)
-    // The search should find the Discord message about "authentication token"
     assert!(result.contains("conversation(s) matching"));
     assert!(result.contains("authentication") || result.contains("token"));
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Unified Search Tests (TC-6, US-2)
-// ═══════════════════════════════════════════════════════════════
-
 #[tokio::test]
-async fn test_tc6_rrf_merges_todo_conversation() {
+async fn rrf_merges_todo_conversation() {
     let (tool, handler) = create_test_memory_tool().await;
     embed_test_messages(&handler, SAMPLE_MESSAGES).await;
 
@@ -255,12 +260,10 @@ async fn test_tc6_rrf_merges_todo_conversation() {
         "Should include [Conversation] prefix: {}",
         result
     );
-
-    // Note: Full RRF merge with todos deferred to Phase 4
 }
 
 #[tokio::test]
-async fn test_us2_unified_search_both_sources() {
+async fn unified_search_both_sources() {
     let (tool, handler) = create_test_memory_tool().await;
     embed_test_messages(&handler, SAMPLE_MESSAGES).await;
 
@@ -287,16 +290,10 @@ async fn test_us2_unified_search_both_sources() {
             result
         );
     }
-
-    // TODO: After Phase 4, verify both [Todo] and [Conversation] results
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Purge Action Tests (TC-10, US-5)
-// ═══════════════════════════════════════════════════════════════
-
 #[tokio::test]
-async fn test_tc10_purge_deletes_embeddings() {
+async fn purge_deletes_embeddings() {
     let (tool, handler) = create_test_memory_tool().await;
     embed_test_messages(&handler, SAMPLE_MESSAGES).await;
 
@@ -324,7 +321,7 @@ async fn test_tc10_purge_deletes_embeddings() {
 }
 
 #[tokio::test]
-async fn test_purge_by_date_range() {
+async fn purge_by_date_range() {
     let (tool, handler) = create_test_memory_tool().await;
 
     // Embed 3 messages (all will have current timestamp in test)
@@ -369,12 +366,8 @@ async fn test_purge_by_date_range() {
     );
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Status Action Tests (TC-11)
-// ═══════════════════════════════════════════════════════════════
-
 #[tokio::test]
-async fn test_tc11_status_reports_accurate_counts() {
+async fn status_reports_accurate_counts() {
     let (tool, handler) = create_test_memory_tool().await;
     embed_test_messages(&handler, SAMPLE_MESSAGES).await;
 
@@ -399,7 +392,7 @@ async fn test_tc11_status_reports_accurate_counts() {
 }
 
 #[tokio::test]
-async fn test_status_reports_channels_indexed() {
+async fn status_reports_channels_indexed() {
     let (tool, handler) = create_test_memory_tool().await;
 
     // Embed messages from 3 different channels
@@ -439,12 +432,8 @@ async fn test_status_reports_channels_indexed() {
     );
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Registration Tests (TC-13)
-// ═══════════════════════════════════════════════════════════════
-
 #[tokio::test]
-async fn test_tc13_memory_tool_registration() {
+async fn memory_tool_registration() {
     let (tool, _handler) = create_test_memory_tool().await;
 
     // Verify Tool trait implementation
@@ -486,12 +475,153 @@ async fn test_tc13_memory_tool_registration() {
     assert!(actions.contains(&json!("status")), "Should include status");
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Edge Case Tests
-// ═══════════════════════════════════════════════════════════════
+// ── Context Engine Sources ──────────────────────────────────
 
 #[tokio::test]
-async fn test_ec1_empty_query_returns_error() {
+async fn context_engine_init() {
+    let temp_dir = TempDir::new().unwrap();
+    let workspace = temp_dir.path().join("workspace");
+    std::fs::create_dir_all(&workspace).unwrap();
+
+    let engine = test_context_engine(workspace).await;
+    let prompt = engine.build_system_prompt("test", "chat123", None).await;
+
+    // Should contain identity section
+    assert!(prompt.contains("# Identity"));
+    assert!(prompt.contains("klyntbot"));
+}
+
+#[tokio::test]
+async fn context_engine_with_bootstrap_files() {
+    let temp_dir = TempDir::new().unwrap();
+    let workspace = temp_dir.path().join("workspace");
+    std::fs::create_dir_all(&workspace).unwrap();
+
+    // Create bootstrap files
+    std::fs::write(
+        workspace.join("AGENTS.md"),
+        "# Agent Configuration\n\nYou are helpful.",
+    )
+    .unwrap();
+    std::fs::write(
+        workspace.join("SOUL.md"),
+        "# Agent Soul\n\nBe friendly and professional.",
+    )
+    .unwrap();
+    std::fs::write(
+        workspace.join("IDENTITY.md"),
+        "# Identity\n\nI am klyntbot.",
+    )
+    .unwrap();
+    std::fs::write(
+        workspace.join("USER.md"),
+        "# User\n\nUser prefers concise responses.",
+    )
+    .unwrap();
+    std::fs::write(
+        workspace.join("TOOLS.md"),
+        "# Tools\n\nUse tools when needed.",
+    )
+    .unwrap();
+
+    let engine = test_context_engine(workspace).await;
+    let prompt = engine.build_system_prompt("test", "chat123", None).await;
+
+    // Should include bootstrap file content
+    assert!(prompt.contains("Agent Configuration"));
+    assert!(prompt.contains("Agent Soul"));
+    assert!(prompt.contains("Use tools when needed"));
+}
+
+#[tokio::test]
+async fn bootstrap_files_optional() {
+    let temp_dir = TempDir::new().unwrap();
+    let workspace = temp_dir.path().join("workspace");
+    std::fs::create_dir_all(&workspace).unwrap();
+
+    // No bootstrap files — should still work
+    let engine = test_context_engine(workspace).await;
+    let prompt = engine.build_system_prompt("test", "chat123", None).await;
+
+    // Should contain at minimum the identity section
+    assert!(prompt.contains("# Identity"));
+    assert!(!prompt.is_empty());
+}
+
+#[tokio::test]
+async fn context_with_channel_info() {
+    let temp_dir = TempDir::new().unwrap();
+    let workspace = temp_dir.path().join("workspace");
+    std::fs::create_dir_all(&workspace).unwrap();
+
+    let engine = test_context_engine(workspace).await;
+
+    // Build with different channels
+    let telegram_prompt = engine
+        .build_system_prompt("telegram", "chat123", None)
+        .await;
+    let discord_prompt = engine
+        .build_system_prompt("discord", "guild456", None)
+        .await;
+
+    // Both should contain their channel info
+    assert!(telegram_prompt.contains("telegram"));
+    assert!(discord_prompt.contains("discord"));
+}
+
+#[tokio::test]
+async fn identity_source_content() {
+    let temp_dir = TempDir::new().unwrap();
+    let workspace = temp_dir.path().join("workspace");
+    std::fs::create_dir_all(&workspace).unwrap();
+
+    let source = IdentitySource::new(workspace, "UTC".to_string());
+    let ctx = test_source_ctx();
+    let content = source.provide(&ctx).await.unwrap();
+
+    assert!(content.contains("# Identity"));
+    assert!(content.contains("Channel: test"));
+    assert!(content.contains("Chat ID: chat123"));
+    assert!(content.contains("message"));
+    assert!(content.contains("ask_user"));
+}
+
+#[tokio::test]
+async fn confidence_source_threshold() {
+    let source = ConfidenceSource::new(0.70);
+    let ctx = test_source_ctx();
+
+    let content = source.provide(&ctx).await.unwrap();
+    assert!(content.contains("0.70"));
+
+    // Update threshold
+    source.set_threshold(0.85);
+    let content = source.provide(&ctx).await.unwrap();
+    assert!(content.contains("0.85"));
+}
+
+#[tokio::test]
+async fn context_engine_source_ordering() {
+    let temp_dir = TempDir::new().unwrap();
+    let workspace = temp_dir.path().join("workspace");
+    std::fs::create_dir_all(&workspace).unwrap();
+
+    let engine = test_context_engine(workspace).await;
+    let prompt = engine.build_system_prompt("test", "chat123", None).await;
+
+    // Identity (priority 100) should appear before skills summary (priority 40)
+    let identity_pos = prompt.find("# Identity").unwrap();
+    let skills_pos = prompt.find("# Available Skills").unwrap();
+    assert!(
+        identity_pos < skills_pos,
+        "Identity should appear before skills"
+    );
+}
+
+// ── Edge Cases ──────────────────────────────────────────────
+
+#[tokio::test]
+async fn search_rejects_empty_query() {
     let (tool, _handler) = create_test_memory_tool().await;
 
     // Execute search with empty query
@@ -503,7 +633,6 @@ async fn test_ec1_empty_query_returns_error() {
     let result = tool.execute(args, &ctx()).await;
 
     // Should either error or return "No conversations found" message
-    // The tool should handle empty queries gracefully
     match result {
         Err(e) => {
             let err_msg = e.to_string();
@@ -520,7 +649,7 @@ async fn test_ec1_empty_query_returns_error() {
 }
 
 #[tokio::test]
-async fn test_ec3_no_embeddings_returns_message() {
+async fn no_embeddings_returns_message() {
     let (tool, _handler) = create_test_memory_tool().await;
     // Don't embed any messages - store is empty
 
@@ -540,11 +669,7 @@ async fn test_ec3_no_embeddings_returns_message() {
 }
 
 #[tokio::test]
-async fn test_ec4_partial_embeddings_noted() {
-    // Note: This test verifies that partial embeddings don't cause errors
-    // The current implementation doesn't explicitly note "partial coverage" in output
-    // but handles missing embeddings gracefully by searching available ones
-
+async fn partial_embeddings_noted() {
     let (tool, handler) = create_test_memory_tool().await;
 
     // Embed only 2 out of 5 sample messages
@@ -561,12 +686,11 @@ async fn test_ec4_partial_embeddings_noted() {
     let result = tool.execute(args, &ctx()).await.unwrap();
 
     // Should succeed and return results from available embeddings
-    // Not an error - just searches what's available
     assert!(result.contains("conversation") || result.contains("No conversations found"));
 }
 
 #[tokio::test]
-async fn test_ec5_below_threshold_no_results() {
+async fn below_threshold_no_results() {
     let (tool, handler) = create_test_memory_tool().await;
     embed_test_messages(&handler, SAMPLE_MESSAGES).await;
 
@@ -592,7 +716,7 @@ async fn test_ec5_below_threshold_no_results() {
 }
 
 #[tokio::test]
-async fn test_ec15_hybrid_zero_keyword() {
+async fn hybrid_zero_keyword() {
     let (tool, handler) = create_test_memory_tool().await;
 
     let messages = &[
@@ -628,7 +752,7 @@ async fn test_ec15_hybrid_zero_keyword() {
 }
 
 #[tokio::test]
-async fn test_ec16_hybrid_zero_semantic() {
+async fn hybrid_zero_semantic() {
     let handler = Arc::new(MockConversationEmbeddingHandler::unavailable());
 
     let tool = MemoryTool::new()
@@ -651,12 +775,8 @@ async fn test_ec16_hybrid_zero_semantic() {
     );
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Additional Validation Tests
-// ═══════════════════════════════════════════════════════════════
-
 #[tokio::test]
-async fn test_query_too_long_returns_error() {
+async fn query_too_long_returns_error() {
     let (tool, handler) = create_test_memory_tool().await;
     embed_test_messages(&handler, &SAMPLE_MESSAGES[0..2]).await;
 
@@ -673,7 +793,6 @@ async fn test_query_too_long_returns_error() {
     // Should either error or handle gracefully
     match result {
         Err(e) => {
-            // If validation exists, error should mention length
             assert!(
                 e.to_string().contains("too long")
                     || e.to_string().contains("length")
@@ -682,7 +801,6 @@ async fn test_query_too_long_returns_error() {
             );
         }
         Ok(msg) => {
-            // If no explicit validation, search should still work gracefully
             assert!(
                 msg.contains("conversation") || msg.contains("No conversations"),
                 "Should handle long query gracefully: {}",
@@ -693,7 +811,7 @@ async fn test_query_too_long_returns_error() {
 }
 
 #[tokio::test]
-async fn test_invalid_threshold_returns_error() {
+async fn invalid_threshold_returns_error() {
     let (tool, handler) = create_test_memory_tool().await;
     embed_test_messages(&handler, &SAMPLE_MESSAGES[0..2]).await;
 
@@ -716,7 +834,6 @@ async fn test_invalid_threshold_returns_error() {
             );
         }
         Ok(msg) => {
-            // If validation allows, search proceeds gracefully
             assert!(
                 msg.contains("No conversations") || msg.contains("conversation"),
                 "Should handle high threshold gracefully: {}",
@@ -750,7 +867,7 @@ async fn test_invalid_threshold_returns_error() {
 }
 
 #[tokio::test]
-async fn test_limit_parameter_respected() {
+async fn limit_parameter_respected() {
     let (tool, handler) = create_test_memory_tool().await;
 
     // Embed all 5 sample messages

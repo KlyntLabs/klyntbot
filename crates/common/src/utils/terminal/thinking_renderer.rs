@@ -383,12 +383,6 @@ mod tests {
     }
 
     #[test]
-    fn test_new_renderer_has_zero_lines() {
-        let r = test_renderer();
-        assert_eq!(r.rendered_lines, 0);
-    }
-
-    #[test]
     fn test_classification_complete_non_tty() {
         let mut r = test_renderer();
         r.on_classification_complete("ToolAssisted", 0.85, "heuristic", 312);

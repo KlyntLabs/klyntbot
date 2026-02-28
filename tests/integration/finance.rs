@@ -19,7 +19,7 @@ use feature_finance::FinanceTool;
 use serde_json::json;
 use tools::{RoutingContext, Tool};
 
-mod common;
+use super::common;
 
 // ---------------------------------------------------------------------------
 // Test helpers
@@ -54,12 +54,35 @@ fn extract_nested_field(response: &str, outer: &str, inner: &str) -> Option<Stri
 }
 
 // ---------------------------------------------------------------------------
-// F. Integration Tests
+// Tool metadata
+// ---------------------------------------------------------------------------
+
+/// Finance tool has the correct name.
+#[tokio::test]
+async fn tool_has_correct_name() {
+    let tool = make_finance_tool().await;
+    assert_eq!(tool.name(), "finance");
+}
+
+/// Finance tool parameters schema has required "action" field.
+#[tokio::test]
+async fn tool_parameters_has_action() {
+    let tool = make_finance_tool().await;
+    let params = tool.parameters();
+    let required = params["required"].as_array().expect("should have required");
+    assert!(
+        required.iter().any(|v| v.as_str() == Some("action")),
+        "parameters should require 'action'"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Dispatch
 // ---------------------------------------------------------------------------
 
 /// Finance tool dispatches correctly and creates an account end-to-end.
 #[tokio::test]
-async fn finance_tool_dispatch_via_registry() {
+async fn dispatch_creates_account() {
     let tool = make_finance_tool().await;
     let ctx = test_ctx();
 
@@ -91,6 +114,23 @@ async fn finance_tool_dispatch_via_registry() {
     let _ = tool
         .execute(json!({"action": "account_delete", "id": id}), &ctx)
         .await;
+}
+
+/// Unknown action returns error.
+#[tokio::test]
+async fn unknown_action_returns_error() {
+    let tool = make_finance_tool().await;
+    let ctx = test_ctx();
+
+    let result = tool.execute(json!({"action": "explode"}), &ctx).await;
+
+    assert!(result.is_err(), "unknown action should return Err");
+    let err_msg = format!("{}", result.unwrap_err());
+    assert!(
+        err_msg.contains("Unknown finance action: explode"),
+        "error should mention unknown action: {}",
+        err_msg
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -139,7 +179,7 @@ async fn account_add_then_list() {
 
 /// E2E: add account, add expense transaction -- balance is decremented.
 #[tokio::test]
-async fn tx_add_updates_account_balance() {
+async fn tx_updates_account_balance() {
     let tool = make_finance_tool().await;
     let ctx = test_ctx();
 
@@ -190,7 +230,7 @@ async fn tx_add_updates_account_balance() {
 
 /// E2E: budget shows correct usage percentage after expense in that category.
 #[tokio::test]
-async fn tx_add_with_budget_shows_impact() {
+async fn tx_with_budget_shows_impact() {
     let tool = make_finance_tool().await;
     let ctx = test_ctx();
 
@@ -615,7 +655,7 @@ async fn budget_list_shows_current_usage() {
 
 /// E2E: FIRE calculation with explicit annual_expenses.
 #[tokio::test]
-async fn goal_fire_with_explicit_expenses() {
+async fn fire_with_explicit_expenses() {
     let tool = make_finance_tool().await;
     let ctx = test_ctx();
 
@@ -782,48 +822,4 @@ async fn report_spending_shows_category_breakdown() {
     let _ = tool
         .execute(json!({"action": "account_delete", "id": account_id}), &ctx)
         .await;
-}
-
-// ---------------------------------------------------------------------------
-// Unknown action
-// ---------------------------------------------------------------------------
-
-/// Unknown action returns error.
-#[tokio::test]
-async fn unknown_action_returns_error() {
-    let tool = make_finance_tool().await;
-    let ctx = test_ctx();
-
-    let result = tool.execute(json!({"action": "explode"}), &ctx).await;
-
-    assert!(result.is_err(), "unknown action should return Err");
-    let err_msg = format!("{}", result.unwrap_err());
-    assert!(
-        err_msg.contains("Unknown finance action: explode"),
-        "error should mention unknown action: {}",
-        err_msg
-    );
-}
-
-// ---------------------------------------------------------------------------
-// FinanceTool basic functionality
-// ---------------------------------------------------------------------------
-
-/// Finance tool has the correct name.
-#[tokio::test]
-async fn finance_tool_has_correct_name() {
-    let tool = make_finance_tool().await;
-    assert_eq!(tool.name(), "finance");
-}
-
-/// Finance tool parameters schema has required "action" field.
-#[tokio::test]
-async fn finance_tool_parameters_has_action() {
-    let tool = make_finance_tool().await;
-    let params = tool.parameters();
-    let required = params["required"].as_array().expect("should have required");
-    assert!(
-        required.iter().any(|v| v.as_str() == Some("action")),
-        "parameters should require 'action'"
-    );
 }

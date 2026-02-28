@@ -1,35 +1,18 @@
-//! Phase 4.1 integration tests — Conversation Embedding Pipeline
+//! Integration tests for the conversation embedding pipeline.
 //!
-//! Tests for the conversation embedding system. Covers:
-//!
-//! ## Testable Contract Coverage
-//!
-//! | TC# | Description                              | Test(s)                                      |
-//! |-----|------------------------------------------|----------------------------------------------|
-//! | TC-1 | User/assistant messages embedded on save | test_tc1_user_assistant_messages_embedded_on_save |
-//! | TC-2 | System/tool messages NOT embedded        | test_tc2_system_tool_messages_not_embedded   |
-//! | TC-3 | Per-channel exclusion prevents embedding | test_tc3_channel_exclusion_prevents_embedding |
-//! | TC-4 | Global disable prevents all embedding    | test_tc4_global_disable_prevents_embedding   |
-//! | TC-7 | Embedding failure doesn't block response | test_tc7_embedding_failure_non_blocking      |
-//!
-//! ## Edge Cases
-//!
-//! | EC# | Scenario                                 | Test                                          |
-//! |-----|------------------------------------------|-----------------------------------------------|
-//! | EC-12 | Model fails to initialize              | test_ec12_model_unavailable                   |
+//! Tests cover embedding generation, role filtering, channel exclusion,
+//! global disable, error handling, and metadata correctness.
 
 use std::sync::Arc;
 use tools::conversation_embedding::ConversationEmbeddingHandler;
 
-mod common;
+use super::common;
 use common::MockConversationEmbeddingHandler;
 
-// ═══════════════════════════════════════════════════════════════
-// Embedding Generation Tests (TC-1, TC-2, TC-3, TC-4)
-// ═══════════════════════════════════════════════════════════════
+// ── Embedding Generation ──────────────────────────────────────
 
 #[tokio::test]
-async fn test_tc1_user_assistant_messages_embedded_on_save() {
+async fn user_assistant_messages_embedded_on_save() {
     let handler = Arc::new(MockConversationEmbeddingHandler::new());
 
     // Use Session directly (no DB needed — embedding tests don't require persistence)
@@ -94,7 +77,7 @@ async fn test_tc1_user_assistant_messages_embedded_on_save() {
 }
 
 #[tokio::test]
-async fn test_tc2_system_tool_messages_not_embedded() {
+async fn system_tool_messages_not_embedded() {
     let handler = Arc::new(MockConversationEmbeddingHandler::new());
 
     let mut session = session::Session::new("telegram:12345");
@@ -140,7 +123,7 @@ async fn test_tc2_system_tool_messages_not_embedded() {
 }
 
 #[tokio::test]
-async fn test_tc3_channel_exclusion_prevents_embedding() {
+async fn channel_exclusion_prevents_embedding() {
     let handler = Arc::new(MockConversationEmbeddingHandler::new());
 
     // Simulate config with excludeChannels: ["whatsapp"]
@@ -179,7 +162,7 @@ async fn test_tc3_channel_exclusion_prevents_embedding() {
 }
 
 #[tokio::test]
-async fn test_tc4_global_disable_prevents_embedding() {
+async fn global_disable_prevents_embedding() {
     let handler = Arc::new(MockConversationEmbeddingHandler::new());
 
     let mut session = session::Session::new("telegram:12345");
@@ -204,12 +187,10 @@ async fn test_tc4_global_disable_prevents_embedding() {
     );
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Error Handling & Resilience Tests (TC-7, EC-12)
-// ═══════════════════════════════════════════════════════════════
+// ── Error Handling & Resilience ───────────────────────────────
 
 #[tokio::test]
-async fn test_tc7_embedding_failure_non_blocking() {
+async fn embedding_failure_non_blocking() {
     // Use unavailable() mode to simulate embedding failure
     let handler = Arc::new(MockConversationEmbeddingHandler::unavailable());
 
@@ -251,12 +232,10 @@ async fn test_tc7_embedding_failure_non_blocking() {
     assert_eq!(calls.len(), 1, "Handler should track call even on failure");
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Storage & Persistence Tests
-// ═══════════════════════════════════════════════════════════════
+// ── Storage & Persistence ─────────────────────────────────────
 
 #[tokio::test]
-async fn test_role_prefix_included_in_embedding() {
+async fn role_prefix_included_in_embedding() {
     let handler = Arc::new(MockConversationEmbeddingHandler::new());
 
     handler
@@ -283,7 +262,7 @@ async fn test_role_prefix_included_in_embedding() {
 }
 
 #[tokio::test]
-async fn test_metadata_fields_populated() {
+async fn metadata_fields_populated() {
     let handler = Arc::new(MockConversationEmbeddingHandler::new());
 
     handler

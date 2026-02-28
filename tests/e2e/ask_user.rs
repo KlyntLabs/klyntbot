@@ -33,7 +33,7 @@ fn interactive_ctx() -> (RoutingContext, mpsc::Receiver<InteractionBundle>) {
 }
 
 #[tokio::test]
-async fn test_ask_user_single_select_question() {
+async fn ask_user_handles_single_select() {
     let tool = AskUserTool;
     let (ctx, mut interaction_rx) = interactive_ctx();
 
@@ -86,7 +86,7 @@ async fn test_ask_user_single_select_question() {
 }
 
 #[tokio::test]
-async fn test_ask_user_multi_question_form() {
+async fn ask_user_processes_form_response() {
     let tool = AskUserTool;
     let (ctx, mut interaction_rx) = interactive_ctx();
 
@@ -167,7 +167,7 @@ async fn test_ask_user_multi_question_form() {
 }
 
 #[tokio::test]
-async fn test_ask_user_cancellation() {
+async fn ask_user_handles_cancellation() {
     let tool = AskUserTool;
     let (ctx, mut interaction_rx) = interactive_ctx();
 
@@ -198,7 +198,7 @@ async fn test_ask_user_cancellation() {
 }
 
 #[tokio::test]
-async fn test_ask_user_non_tty_fallback() {
+async fn ask_user_falls_back_non_interactive() {
     let tool = AskUserTool;
     let ctx = non_interactive_ctx(); // No interaction_tx
 
@@ -228,7 +228,7 @@ async fn test_ask_user_non_tty_fallback() {
 }
 
 #[tokio::test]
-async fn test_ask_user_free_text_question() {
+async fn ask_user_handles_free_text() {
     let tool = AskUserTool;
     let (ctx, mut interaction_rx) = interactive_ctx();
 
@@ -265,7 +265,7 @@ async fn test_ask_user_free_text_question() {
 }
 
 #[tokio::test]
-async fn test_ask_user_skipped_answers() {
+async fn ask_user_handles_skipped_answers() {
     let tool = AskUserTool;
     let (ctx, mut interaction_rx) = interactive_ctx();
 
@@ -298,7 +298,7 @@ async fn test_ask_user_skipped_answers() {
 }
 
 #[tokio::test]
-async fn test_ask_user_empty_multi_select() {
+async fn ask_user_handles_empty_multi_select() {
     let tool = AskUserTool;
     let (ctx, mut interaction_rx) = interactive_ctx();
 
@@ -337,7 +337,7 @@ async fn test_ask_user_empty_multi_select() {
 }
 
 #[tokio::test]
-async fn test_ask_user_parameter_validation_missing_title() {
+async fn ask_user_defaults_missing_title() {
     let tool = AskUserTool;
     let ctx = non_interactive_ctx();
 
@@ -356,7 +356,7 @@ async fn test_ask_user_parameter_validation_missing_title() {
 }
 
 #[tokio::test]
-async fn test_ask_user_parameter_validation_empty_questions() {
+async fn ask_user_rejects_empty_questions() {
     let tool = AskUserTool;
     let ctx = non_interactive_ctx();
 
@@ -374,7 +374,7 @@ async fn test_ask_user_parameter_validation_empty_questions() {
 }
 
 #[tokio::test]
-async fn test_ask_user_parameter_validation_too_many_questions() {
+async fn ask_user_caps_excess_questions() {
     let tool = AskUserTool;
     let ctx = non_interactive_ctx();
 
@@ -399,7 +399,7 @@ async fn test_ask_user_parameter_validation_too_many_questions() {
 }
 
 #[tokio::test]
-async fn test_ask_user_parameter_validation_title_too_long() {
+async fn ask_user_truncates_long_title() {
     let tool = AskUserTool;
     let ctx = non_interactive_ctx();
 
@@ -420,7 +420,7 @@ async fn test_ask_user_parameter_validation_title_too_long() {
 }
 
 #[tokio::test]
-async fn test_ask_user_parameter_validation_options_min_count() {
+async fn ask_user_rejects_single_option() {
     let tool = AskUserTool;
     let ctx = non_interactive_ctx();
 
@@ -444,7 +444,7 @@ async fn test_ask_user_parameter_validation_options_min_count() {
 }
 
 #[tokio::test]
-async fn test_ask_user_response_channel_closed() {
+async fn ask_user_handles_response_channel_closed() {
     let tool = AskUserTool;
     let (ctx, mut interaction_rx) = interactive_ctx();
 
@@ -476,7 +476,7 @@ async fn test_ask_user_response_channel_closed() {
 }
 
 #[tokio::test]
-async fn test_ask_user_interaction_channel_closed() {
+async fn ask_user_handles_interaction_channel_closed() {
     let tool = AskUserTool;
     let (ctx, interaction_rx) = interactive_ctx();
 

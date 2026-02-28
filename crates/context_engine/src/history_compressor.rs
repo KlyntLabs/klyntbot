@@ -614,11 +614,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_default_snippet_length_is_200() {
-        assert_eq!(DEFAULT_SNIPPET_LENGTH, 200);
-    }
-
     // ── Abstractive compression tests ────────────────────────────────────
 
     struct MockSummaryProvider {

@@ -1,11 +1,11 @@
-//! Integration tests for skills system
+//! Integration tests for the skills system.
 
 use klyntbot::agent::SkillManager;
 use tempfile::TempDir;
 
 /// Test built-in skills loading
 #[tokio::test]
-async fn test_builtin_skills_loading() {
+async fn builtin_skills_loading() {
     let temp_dir = TempDir::new().unwrap();
     let workspace = temp_dir.path().join("workspace");
     std::fs::create_dir_all(&workspace).unwrap();
@@ -27,7 +27,7 @@ async fn test_builtin_skills_loading() {
 
 /// Test workspace skills override
 #[tokio::test]
-async fn test_workspace_skills_override() {
+async fn workspace_skills_override() {
     let temp_dir = TempDir::new().unwrap();
     let workspace = temp_dir.path().join("workspace");
     let skills_dir = workspace.join("skills");
@@ -65,7 +65,7 @@ Run with: `custom_test`
 
 /// Test skill metadata parsing
 #[tokio::test]
-async fn test_skill_metadata_parsing() {
+async fn skill_metadata_parsing() {
     let temp_dir = TempDir::new().unwrap();
     let workspace = temp_dir.path().join("workspace");
     let skills_dir = workspace.join("skills");
@@ -101,7 +101,7 @@ Testing metadata extraction.
 
 /// Test skill with minimal metadata
 #[tokio::test]
-async fn test_skill_minimal_metadata() {
+async fn skill_minimal_metadata() {
     let temp_dir = TempDir::new().unwrap();
     let workspace = temp_dir.path().join("workspace");
     let skills_dir = workspace.join("skills");
@@ -134,7 +134,7 @@ Just a minimal skill.
 
 /// Test requirement checking
 #[tokio::test]
-async fn test_skill_requirement_checking() {
+async fn skill_requirement_checking() {
     let temp_dir = TempDir::new().unwrap();
     let workspace = temp_dir.path().join("workspace");
     let skills_dir = workspace.join("skills");
@@ -170,7 +170,7 @@ This skill has requirements that can't be met.
 
 /// Test always-loaded skills
 #[tokio::test]
-async fn test_skill_always_loaded() {
+async fn skill_always_loaded() {
     let temp_dir = TempDir::new().unwrap();
     let workspace = temp_dir.path().join("workspace");
     let skills_dir = workspace.join("skills");
@@ -221,7 +221,7 @@ description: Regular skill
 
 /// Test skill XML summary generation
 #[tokio::test]
-async fn test_skill_summary_generation() {
+async fn skill_summary_generation() {
     let temp_dir = TempDir::new().unwrap();
     let workspace = temp_dir.path().join("workspace");
     let skills_dir = workspace.join("skills");
@@ -254,7 +254,7 @@ metadata: '{"klyntbot":{"triggers":["summary"]}}'
 
 /// Test skill content loading
 #[tokio::test]
-async fn test_skill_content_loading() {
+async fn skill_content_loading() {
     let temp_dir = TempDir::new().unwrap();
     let workspace = temp_dir.path().join("workspace");
     let skills_dir = workspace.join("skills");
@@ -290,7 +290,7 @@ More detailed information here.
 
 /// Test skill discovery in nested directories
 #[tokio::test]
-async fn test_skill_discovery_nested() {
+async fn skill_discovery_nested() {
     let temp_dir = TempDir::new().unwrap();
     let workspace = temp_dir.path().join("workspace");
     let skills_dir = workspace.join("skills");
@@ -319,7 +319,7 @@ async fn test_skill_discovery_nested() {
 
 /// Test skill loading with missing SKILL.md
 #[tokio::test]
-async fn test_skill_loading_missing_file() {
+async fn skill_loading_missing_file() {
     let temp_dir = TempDir::new().unwrap();
     let workspace = temp_dir.path().join("workspace");
     let skills_dir = workspace.join("skills");
@@ -349,7 +349,7 @@ async fn test_skill_loading_missing_file() {
 
 /// Test skill triggers
 #[tokio::test]
-async fn test_skill_triggers() {
+async fn skill_triggers() {
     let temp_dir = TempDir::new().unwrap();
     let workspace = temp_dir.path().join("workspace");
     let skills_dir = workspace.join("skills");
@@ -379,7 +379,7 @@ metadata: '{"klyntbot":{"triggers":["weather","forecast","temperature"]}}'
 
 /// Test get all skills
 #[tokio::test]
-async fn test_get_all_skills() {
+async fn get_all_skills() {
     let temp_dir = TempDir::new().unwrap();
     let workspace = temp_dir.path().join("workspace");
     let skills_dir = workspace.join("skills");
@@ -409,4 +409,128 @@ async fn test_get_all_skills() {
     assert!(all_skills.iter().any(|s| s.name == "skill_1"));
     assert!(all_skills.iter().any(|s| s.name == "skill_2"));
     assert!(all_skills.iter().any(|s| s.name == "skill_3"));
+}
+
+// -----------------------------------------------------------------
+// Skills availability attribute
+// -----------------------------------------------------------------
+
+#[tokio::test]
+async fn skills_availability_attribute() {
+    let temp_dir = TempDir::new().unwrap();
+    let workspace = temp_dir.path().join("workspace");
+    let skills_dir = workspace.join("skills");
+
+    // Create a skill with no requirements (should be available=true)
+    let available_skill_dir = skills_dir.join("available_test");
+    std::fs::create_dir_all(&available_skill_dir).unwrap();
+    let skill_file = available_skill_dir.join("SKILL.md");
+    let skill_content = r#"---
+description: An available test skill
+metadata: '{"klyntbot":{"triggers":["test"]}}'
+---
+
+# Available Test Skill
+"#;
+    std::fs::write(&skill_file, skill_content).unwrap();
+
+    // Create a skill with impossible requirements (should be available=false)
+    let unavailable_skill_dir = skills_dir.join("unavailable_test");
+    std::fs::create_dir_all(&unavailable_skill_dir).unwrap();
+    let unavailable_file = unavailable_skill_dir.join("SKILL.md");
+    let unavailable_content = r#"---
+description: An unavailable test skill
+metadata: '{"klyntbot":{"requires":{"bins":["nonexistent_binary_xyz_12345"]}}}'
+---
+
+# Unavailable Test Skill
+"#;
+    std::fs::write(&unavailable_file, unavailable_content).unwrap();
+
+    let mut manager = SkillManager::new();
+    manager.load(workspace).await.unwrap();
+
+    // Generate summary
+    let summary = manager.generate_summary();
+
+    // Verify available attribute is present in the XML
+    assert!(
+        summary.contains(r#"available="true""#) || summary.contains(r#"available="false""#),
+        "Summary should include available attribute"
+    );
+
+    // Specifically check for the skills we created
+    assert!(
+        summary.contains("available_test"),
+        "Should contain available_test skill"
+    );
+    assert!(
+        summary.contains("unavailable_test"),
+        "Should contain unavailable_test skill"
+    );
+}
+
+// -----------------------------------------------------------------
+// Tool registry
+// -----------------------------------------------------------------
+
+#[tokio::test]
+async fn tool_registry_registers_and_executes() {
+    use klyntbot::tools::filesystem::ReadFileTool;
+    use klyntbot::tools::registry::ToolRegistry;
+    use klyntbot::tools::RoutingContext;
+    use tokio::fs;
+
+    let temp_dir = TempDir::new().unwrap();
+    let test_file = temp_dir.path().join("test.txt");
+    fs::write(&test_file, "Hello from file!").await.unwrap();
+
+    let mut registry = ToolRegistry::new();
+
+    // Register read tool
+    let read_tool = ReadFileTool::new(None);
+    registry.register(read_tool);
+
+    // Verify tool is registered
+    assert!(registry.has("read_file"));
+    assert_eq!(registry.len(), 1);
+
+    // Get tool definitions
+    let definitions = registry.get_definitions();
+    assert_eq!(definitions.len(), 1);
+    assert_eq!(definitions[0]["function"]["name"], "read_file");
+
+    // Execute tool
+    let params = serde_json::json!({
+        "path": test_file.to_str().unwrap()
+    });
+
+    let ctx = RoutingContext::new("cli".into(), "test".into());
+    let result = registry.execute("read_file", params, &ctx).await.unwrap();
+    assert_eq!(result, "Hello from file!");
+}
+
+#[tokio::test]
+async fn tool_registry_validates_parameters() {
+    use klyntbot::tools::filesystem::ReadFileTool;
+    use klyntbot::tools::registry::ToolRegistry;
+    use klyntbot::tools::RoutingContext;
+
+    let mut registry = ToolRegistry::new();
+    let read_tool = ReadFileTool::new(None);
+    registry.register(read_tool);
+
+    let ctx = RoutingContext::new("cli".into(), "test".into());
+
+    // Missing required parameter
+    let invalid_params = serde_json::json!({});
+    let result = registry.execute("read_file", invalid_params, &ctx).await;
+    assert!(result.is_err());
+
+    // Invalid parameter type
+    let invalid_params = serde_json::json!({
+        "path": 123 // Should be string
+    });
+    let result = registry.execute("read_file", invalid_params, &ctx).await;
+    assert!(result.is_err());
 }

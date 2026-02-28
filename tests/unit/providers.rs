@@ -1,12 +1,17 @@
-//! Integration tests for LLM providers
+//! Unit tests for LLM provider types, registry lookups, and serialization.
 
+use klyntbot::config::schema::{ProviderConfig, Secret};
 use klyntbot::providers::registry::ProviderRegistry;
 use klyntbot::providers::types::*;
+use std::collections::HashMap;
 
-/// Test provider registry model resolution
+// -----------------------------------------------------------------
+// Provider registry model resolution
+// -----------------------------------------------------------------
+
 #[test]
-fn test_provider_registry_model_resolution() {
-    // Test Anthropic model detection
+fn registry_model_resolution() {
+    // Anthropic model detection
     let claude_spec = ProviderRegistry::find_by_model("claude-opus-4");
     assert!(claude_spec.is_some());
     assert_eq!(claude_spec.unwrap().name, "anthropic");
@@ -15,7 +20,7 @@ fn test_provider_registry_model_resolution() {
     assert!(claude_spec2.is_some());
     assert_eq!(claude_spec2.unwrap().name, "anthropic");
 
-    // Test OpenAI model detection
+    // OpenAI model detection
     let gpt_spec = ProviderRegistry::find_by_model("gpt-4");
     assert!(gpt_spec.is_some());
     assert_eq!(gpt_spec.unwrap().name, "openai");
@@ -24,24 +29,23 @@ fn test_provider_registry_model_resolution() {
     assert!(gpt_spec2.is_some());
     assert_eq!(gpt_spec2.unwrap().name, "openai");
 
-    // Test DeepSeek model detection
+    // DeepSeek model detection
     let deepseek_spec = ProviderRegistry::find_by_model("deepseek-chat");
     assert!(deepseek_spec.is_some());
     assert_eq!(deepseek_spec.unwrap().name, "deepseek");
 
-    // Test Gemini model detection
+    // Gemini model detection
     let gemini_spec = ProviderRegistry::find_by_model("gemini-pro");
     assert!(gemini_spec.is_some());
     assert_eq!(gemini_spec.unwrap().name, "gemini");
 
-    // Test unknown model
+    // Unknown model
     let unknown_spec = ProviderRegistry::find_by_model("unknown-model-xyz");
     assert!(unknown_spec.is_none());
 }
 
-/// Test provider registry by name lookup
 #[test]
-fn test_provider_registry_by_name() {
+fn registry_by_name() {
     let anthropic = ProviderRegistry::find_by_name("anthropic");
     assert!(anthropic.is_some());
     assert!(anthropic.unwrap().label().contains("Anthropic"));
@@ -58,33 +62,38 @@ fn test_provider_registry_by_name() {
     assert!(nonexistent.is_none());
 }
 
-/// Test gateway detection (OpenRouter, AiHubMix)
+// -----------------------------------------------------------------
+// Gateway detection (OpenRouter, AiHubMix)
+// -----------------------------------------------------------------
+
 #[test]
-fn test_provider_registry_gateway_detection() {
-    // Test OpenRouter key prefix detection
+fn registry_gateway_detection() {
+    // OpenRouter key prefix detection
     let openrouter_key = "sk-or-v1-xxxxxxxxxxxxx";
     let gateway = ProviderRegistry::find_gateway(None, Some(openrouter_key), None);
     assert!(gateway.is_some());
     assert_eq!(gateway.unwrap().name, "openrouter");
 
-    // Test AiHubMix base URL detection
+    // AiHubMix base URL detection
     let gateway2 =
         ProviderRegistry::find_gateway(None, Some("any-key"), Some("https://aihubmix.com/v1"));
     assert!(gateway2.is_some());
-    // AiHubMix might be registered as its own provider or as openrouter-compatible
     let name = gateway2.unwrap().name;
     assert!(name == "aihubmix" || name == "openrouter");
 
-    // Test explicit name matching
+    // Explicit name matching
     let explicit = ProviderRegistry::find_gateway(Some("openrouter"), Some("any-key"), None);
     assert!(explicit.is_some());
     assert_eq!(explicit.unwrap().name, "openrouter");
 }
 
-/// Test message construction helpers
+// -----------------------------------------------------------------
+// Message construction helpers
+// -----------------------------------------------------------------
+
 #[test]
-fn test_message_construction() {
-    // Test system message
+fn message_construction() {
+    // System message
     let sys_msg = Message::system("You are a helpful assistant");
     match sys_msg {
         Message::System { content } => {
@@ -93,7 +102,7 @@ fn test_message_construction() {
         _ => panic!("Expected System message"),
     }
 
-    // Test user message
+    // User message
     let user_msg = Message::user("Hello!");
     match user_msg {
         Message::User { content } => match content {
@@ -103,7 +112,7 @@ fn test_message_construction() {
         _ => panic!("Expected User message"),
     }
 
-    // Test assistant message
+    // Assistant message
     let asst_msg = Message::assistant("Hi there!");
     match asst_msg {
         Message::Assistant {
@@ -118,7 +127,7 @@ fn test_message_construction() {
         _ => panic!("Expected Assistant message"),
     }
 
-    // Test tool result message
+    // Tool result message
     let tool_msg = Message::tool("call_123", "read_file", "File contents");
     match tool_msg {
         Message::Tool {
@@ -134,9 +143,12 @@ fn test_message_construction() {
     }
 }
 
-/// Test multipart message with image
+// -----------------------------------------------------------------
+// Multipart message with image
+// -----------------------------------------------------------------
+
 #[test]
-fn test_multipart_message_with_image() {
+fn multipart_message_with_image() {
     let parts = vec![
         ContentPart::Text {
             text: "What's in this image?".to_string(),
@@ -170,9 +182,12 @@ fn test_multipart_message_with_image() {
     }
 }
 
-/// Test ToolCall serialization and deserialization
+// -----------------------------------------------------------------
+// ToolCall serialization
+// -----------------------------------------------------------------
+
 #[test]
-fn test_tool_call_serialization() {
+fn tool_call_serialization() {
     let tool_call = ToolCall {
         id: "call_abc123".to_string(),
         name: "read_file".to_string(),
@@ -181,13 +196,11 @@ fn test_tool_call_serialization() {
         }),
     };
 
-    // Serialize to JSON
     let json = serde_json::to_string(&tool_call).unwrap();
     assert!(json.contains("call_abc123"));
     assert!(json.contains("read_file"));
     assert!(json.contains("/path/to/file.txt"));
 
-    // Deserialize back
     let deserialized: ToolCall = serde_json::from_str(&json).unwrap();
     assert_eq!(deserialized.id, "call_abc123");
     assert_eq!(deserialized.name, "read_file");
@@ -197,9 +210,12 @@ fn test_tool_call_serialization() {
     );
 }
 
-/// Test Usage struct
+// -----------------------------------------------------------------
+// Usage struct
+// -----------------------------------------------------------------
+
 #[test]
-fn test_usage_struct() {
+fn usage_struct() {
     let usage = Usage {
         prompt_tokens: 100,
         completion_tokens: 50,
@@ -212,16 +228,18 @@ fn test_usage_struct() {
     assert_eq!(usage.completion_tokens, 50);
     assert_eq!(usage.total_tokens, 150);
 
-    // Test default
     let default_usage = Usage::default();
     assert_eq!(default_usage.prompt_tokens, 0);
     assert_eq!(default_usage.completion_tokens, 0);
     assert_eq!(default_usage.total_tokens, 0);
 }
 
-/// Test LlmResponse serialization
+// -----------------------------------------------------------------
+// LlmResponse serialization
+// -----------------------------------------------------------------
+
 #[test]
-fn test_llm_response_serialization() {
+fn llm_response_serialization() {
     let response = LlmResponse {
         content: Some("Hello! How can I help?".to_string()),
         tool_calls: vec![],
@@ -236,12 +254,10 @@ fn test_llm_response_serialization() {
         reasoning_content: None,
     };
 
-    // Serialize to JSON
     let json = serde_json::to_string(&response).unwrap();
     assert!(json.contains("Hello! How can I help?"));
     assert!(json.contains("stop"));
 
-    // Deserialize back
     let deserialized: LlmResponse = serde_json::from_str(&json).unwrap();
     assert_eq!(
         deserialized.content,
@@ -251,9 +267,8 @@ fn test_llm_response_serialization() {
     assert_eq!(deserialized.usage.total_tokens, 70);
 }
 
-/// Test LlmResponse with tool calls
 #[test]
-fn test_llm_response_with_tool_calls() {
+fn llm_response_with_tool_calls() {
     let response = LlmResponse {
         content: None,
         tool_calls: vec![
@@ -280,9 +295,8 @@ fn test_llm_response_with_tool_calls() {
     assert_eq!(response.finish_reason, "tool_calls");
 }
 
-/// Test reasoning content (for thinking models like DeepSeek-R1)
 #[test]
-fn test_llm_response_with_reasoning() {
+fn llm_response_with_reasoning() {
     let response = LlmResponse {
         content: Some("The answer is 42".to_string()),
         tool_calls: vec![],
@@ -300,4 +314,39 @@ fn test_llm_response_with_reasoning() {
         .as_ref()
         .unwrap()
         .contains("Let me think"));
+}
+
+// -----------------------------------------------------------------
+// ProviderConfig extra_headers serialization
+// -----------------------------------------------------------------
+
+#[test]
+fn provider_extra_headers_serde() {
+    let mut headers = HashMap::new();
+    headers.insert("X-Custom-Header".to_string(), "custom-value".to_string());
+    headers.insert("Authorization".to_string(), "Bearer token".to_string());
+
+    let config = ProviderConfig {
+        api_key: Secret::new("test-key".to_string()),
+        api_base: None,
+        extra_headers: Some(headers.clone()),
+        ..Default::default()
+    };
+
+    // Serialize
+    let json = serde_json::to_value(&config).unwrap();
+    assert_eq!(json["apiKey"], "test-key");
+    assert_eq!(json["extraHeaders"]["X-Custom-Header"], "custom-value");
+    assert_eq!(json["extraHeaders"]["Authorization"], "Bearer token");
+
+    // Deserialize
+    let loaded: ProviderConfig = serde_json::from_value(json).unwrap();
+    assert_eq!(loaded.api_key.expose(), "test-key");
+    assert!(loaded.extra_headers.is_some());
+    let loaded_headers = loaded.extra_headers.unwrap();
+    assert_eq!(
+        loaded_headers.get("X-Custom-Header").unwrap(),
+        "custom-value"
+    );
+    assert_eq!(loaded_headers.get("Authorization").unwrap(), "Bearer token");
 }

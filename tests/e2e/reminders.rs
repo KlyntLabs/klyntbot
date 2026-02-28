@@ -6,17 +6,15 @@
 //! - Boundary time calculations
 //! - Multiple reminder triggers
 
-mod common;
-
 use agent::reminders::ReminderEngine;
 use chrono::{Duration, Utc};
-use common::create_test_todo;
+use super::common::create_test_todo;
 use tools::todo_types::{TimeEntry, TimeEntrySource, Todo, TodoStatus};
 
 // ── Reminder Rule Edge Cases ──────────────────────────────────────
 
 #[tokio::test]
-async fn test_due_date_exactly_2_hours() {
+async fn due_date_exactly_2_hours_triggers() {
     // Boundary: exactly 2 hours should trigger
     let due_in_2h = Utc::now() + Duration::hours(2);
     let todo = Todo {
@@ -29,7 +27,7 @@ async fn test_due_date_exactly_2_hours() {
 }
 
 #[tokio::test]
-async fn test_due_date_just_over_2_hours() {
+async fn due_date_just_over_2_hours_skips() {
     // Boundary: 2 hours + 1 second should NOT trigger
     let due_in_2h_plus = Utc::now() + Duration::hours(2) + Duration::seconds(1);
     let todo = Todo {
@@ -42,7 +40,7 @@ async fn test_due_date_just_over_2_hours() {
 }
 
 #[tokio::test]
-async fn test_due_date_exactly_at_now() {
+async fn due_date_exactly_now_skips() {
     // Edge case: due exactly now (0 duration remaining)
     let due_now = Utc::now();
     let todo = Todo {
@@ -58,7 +56,7 @@ async fn test_due_date_exactly_at_now() {
 }
 
 #[tokio::test]
-async fn test_due_date_1_second_in_future() {
+async fn due_date_1_second_future_triggers() {
     // Edge case: due in 1 second (very short time remaining)
     let due_soon = Utc::now() + Duration::seconds(1);
     let todo = Todo {
@@ -74,7 +72,7 @@ async fn test_due_date_1_second_in_future() {
 }
 
 #[tokio::test]
-async fn test_focused_deadline_exactly_1_hour() {
+async fn focus_deadline_exactly_1_hour_triggers() {
     // Boundary: exactly 1 hour should trigger
     let now = Utc::now();
     let todo = Todo {
@@ -88,7 +86,7 @@ async fn test_focused_deadline_exactly_1_hour() {
 }
 
 #[tokio::test]
-async fn test_focused_deadline_just_over_1_hour() {
+async fn focus_deadline_just_over_1_hour_skips() {
     // Boundary: 1 hour + 1 second should NOT trigger
     let now = Utc::now();
     let todo = Todo {
@@ -102,7 +100,7 @@ async fn test_focused_deadline_just_over_1_hour() {
 }
 
 #[tokio::test]
-async fn test_overdue_exactly_24_hours_since_last_nag() {
+async fn overdue_exactly_24_hours_since_nag_triggers() {
     // Boundary: exactly 24 hours since last nag should trigger
     let now = Utc::now();
     let todo = Todo {
@@ -116,7 +114,7 @@ async fn test_overdue_exactly_24_hours_since_last_nag() {
 }
 
 #[tokio::test]
-async fn test_overdue_just_under_24_hours_since_last_nag() {
+async fn overdue_just_under_24_hours_since_nag_skips() {
     // Boundary: 23h 59m since last nag should NOT trigger
     let now = Utc::now();
     let todo = Todo {
@@ -130,7 +128,7 @@ async fn test_overdue_just_under_24_hours_since_last_nag() {
 }
 
 #[tokio::test]
-async fn test_calendar_event_exactly_30_minutes() {
+async fn calendar_event_exactly_30_minutes_triggers() {
     // Boundary: exactly 30 minutes should trigger
     use agent::reminders::CalendarEvent as ReminderCalendarEvent;
 
@@ -146,7 +144,7 @@ async fn test_calendar_event_exactly_30_minutes() {
 }
 
 #[tokio::test]
-async fn test_calendar_event_just_over_30_minutes() {
+async fn calendar_event_just_over_30_minutes_skips() {
     // Boundary: 30 min + 1 sec should NOT trigger
     use agent::reminders::CalendarEvent as ReminderCalendarEvent;
 
@@ -164,7 +162,7 @@ async fn test_calendar_event_just_over_30_minutes() {
 // ── Time Tracking Edge Cases ──────────────────────────────────────
 
 #[test]
-fn test_time_entry_with_zero_duration() {
+fn time_entry_zero_duration_accepted() {
     // Edge case: time entry that started and ended at same instant
     let now = Utc::now();
     let entry = TimeEntry {
@@ -181,7 +179,7 @@ fn test_time_entry_with_zero_duration() {
 }
 
 #[test]
-fn test_time_entry_with_negative_duration() {
+fn time_entry_negative_duration_allowed() {
     // Edge case: time entry with end before start (invalid but structurally possible)
     let now = Utc::now();
     let entry = TimeEntry {
@@ -197,7 +195,7 @@ fn test_time_entry_with_negative_duration() {
 }
 
 #[test]
-fn test_time_entry_running_without_end() {
+fn time_entry_running_without_end() {
     // Normal case: time entry still running (no end time)
     let entry = TimeEntry {
         id: "running-1".to_string(),
@@ -213,7 +211,7 @@ fn test_time_entry_running_without_end() {
 }
 
 #[test]
-fn test_time_entry_with_very_long_duration() {
+fn time_entry_multi_day_duration() {
     // Edge case: time entry spanning multiple days
     let start = Utc::now() - Duration::days(5);
     let end = Utc::now();
@@ -232,7 +230,7 @@ fn test_time_entry_with_very_long_duration() {
 }
 
 #[test]
-fn test_time_entry_with_very_long_note() {
+fn time_entry_long_note_preserved() {
     // Edge case: time entry with very long note
     let long_note = "Note: ".to_string() + &"x".repeat(1000);
     let entry = TimeEntry {
@@ -248,7 +246,7 @@ fn test_time_entry_with_very_long_note() {
 }
 
 #[test]
-fn test_time_entry_with_empty_note() {
+fn time_entry_empty_note_preserved() {
     // Edge case: time entry with empty string note
     let entry = TimeEntry {
         id: "entry-1".to_string(),
@@ -263,7 +261,7 @@ fn test_time_entry_with_empty_note() {
 }
 
 #[test]
-fn test_time_entry_id_uniqueness() {
+fn time_entry_ids_unique() {
     // Verify different time entries have unique IDs
     let entry1 = TimeEntry {
         id: "entry-1".to_string(),
@@ -289,7 +287,7 @@ fn test_time_entry_id_uniqueness() {
 // ── Reminder Deduplication Edge Cases ──────────────────────────────
 
 #[tokio::test]
-async fn test_multiple_reminder_conditions_same_task() {
+async fn multiple_reminder_conditions_fire_simultaneously() {
     // Edge case: task triggers multiple reminder rules simultaneously
     let now = Utc::now();
     let todo = Todo {
@@ -308,7 +306,7 @@ async fn test_multiple_reminder_conditions_same_task() {
 }
 
 #[tokio::test]
-async fn test_last_reminded_blocks_all_rules() {
+async fn last_reminded_blocks_all_rules() {
     // Edge case: last_reminded_at blocks both due date and focus reminders
     let now = Utc::now();
     let mut todo = Todo {
@@ -341,7 +339,7 @@ async fn test_last_reminded_blocks_all_rules() {
 }
 
 #[tokio::test]
-async fn test_calendar_event_reminder_deduplication() {
+async fn calendar_event_already_reminded_skips() {
     use agent::reminders::CalendarEvent as ReminderCalendarEvent;
 
     // Edge case: event already reminded, should not remind again
@@ -359,7 +357,7 @@ async fn test_calendar_event_reminder_deduplication() {
 // ── Priority and Status Edge Cases ──────────────────────────────────
 
 #[tokio::test]
-async fn test_reminder_for_done_task() {
+async fn done_task_still_fires_reminder() {
     // Edge case: completed task with due date (should reminders still fire?)
     let now = Utc::now();
     let todo = Todo {
@@ -381,7 +379,7 @@ async fn test_reminder_for_done_task() {
 }
 
 #[tokio::test]
-async fn test_reminder_for_archived_task() {
+async fn archived_task_still_fires_reminder() {
     // Edge case: archived task with due date
     let now = Utc::now();
     let todo = Todo {
@@ -398,7 +396,7 @@ async fn test_reminder_for_archived_task() {
 }
 
 #[tokio::test]
-async fn test_no_due_date_no_reminder() {
+async fn no_due_date_skips_reminder() {
     // Edge case: task without due date should never trigger due date reminder
     let todo = create_test_todo("No due date");
 
@@ -407,7 +405,7 @@ async fn test_no_due_date_no_reminder() {
 }
 
 #[tokio::test]
-async fn test_no_focus_no_reminder() {
+async fn unfocused_task_skips_focus_reminder() {
     // Edge case: unfocused task should not trigger focus reminder
     let todo = create_test_todo("Not focused");
 
@@ -416,7 +414,7 @@ async fn test_no_focus_no_reminder() {
 }
 
 #[tokio::test]
-async fn test_focused_but_no_deadline() {
+async fn focused_without_deadline_skips_reminder() {
     // Edge case: focused task without deadline
     let now = Utc::now();
     let todo = Todo {
@@ -435,7 +433,7 @@ async fn test_focused_but_no_deadline() {
 // ── Time Calculation Edge Cases ──────────────────────────────────
 
 #[tokio::test]
-async fn test_overdue_by_many_days() {
+async fn overdue_by_many_days_nags() {
     // Edge case: task overdue by many days
     let now = Utc::now();
     let todo = Todo {
@@ -448,7 +446,7 @@ async fn test_overdue_by_many_days() {
 }
 
 #[tokio::test]
-async fn test_due_far_in_future() {
+async fn due_far_in_future_skips_reminder() {
     // Edge case: task due far in future
     let now = Utc::now();
     let todo = Todo {
@@ -461,7 +459,7 @@ async fn test_due_far_in_future() {
 }
 
 #[tokio::test]
-async fn test_focus_expired_many_times() {
+async fn focus_expired_count_tracks_correctly() {
     // Edge case: task that expired focus many times
     let todo = Todo {
         focus_expired_count: 100,

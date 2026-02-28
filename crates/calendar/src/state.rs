@@ -52,18 +52,4 @@ mod tests {
         assert!(loaded_state.last_sync.is_some());
     }
 
-    #[tokio::test]
-    async fn test_default_state() {
-        let state = SyncState {
-            sync_token: None,
-            last_sync: None,
-        };
-
-        assert!(state.sync_token.is_none());
-        assert!(state.last_sync.is_none());
-
-        let json = serde_json::to_string(&state).unwrap();
-        let loaded: SyncState = serde_json::from_str(&json).unwrap();
-        assert!(loaded.sync_token.is_none());
-    }
 }

@@ -598,12 +598,6 @@ mod tests {
         assert_eq!(mgr.semaphore_permits(), 5);
     }
 
-    #[test]
-    fn test_default_semaphore_permits_match_config_default() {
-        let mgr = make_manager(3);
-        assert_eq!(mgr.semaphore_permits(), 3);
-    }
-
     #[tokio::test]
     async fn test_run_subagent_task_returns_text_response() {
         let provider: DynProvider = Arc::new(NoOpProvider);

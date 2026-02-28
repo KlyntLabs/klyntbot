@@ -1,13 +1,11 @@
 //! End-to-end integration tests for the Intent Pipeline.
 //!
 //! Smoke-tests the happy paths through the full pipeline:
-//! IntentAnalyzer → ContextEngine → ExecutionRouter → ResponseValidator → CostTracker
-
-mod common;
+//! IntentAnalyzer -> ContextEngine -> ExecutionRouter -> ResponseValidator -> CostTracker
 
 use std::sync::Arc;
 
-use common::MockProvider;
+use super::common::MockProvider;
 use klyntbot::agent::execution::ExecutionCore;
 use klyntbot::agent::intent_pipeline::analyzer::IntentAnalyzer;
 use klyntbot::agent::intent_pipeline::engines::direct::DirectEngine;
@@ -22,7 +20,7 @@ use klyntbot::tools::registry::ToolRegistry;
 use tokio::sync::RwLock;
 
 fn routing_ctx() -> klyntbot::tools::RoutingContext {
-    common::test_routing_ctx()
+    super::common::test_routing_ctx()
 }
 
 /// Build a pipeline backed by the given provider.
@@ -36,7 +34,7 @@ async fn make_pipeline(provider: Arc<dyn LlmProvider>) -> IntentPipeline {
 
     let analyzer = IntentAnalyzer::new(provider, "mock", &OrchestratorConfig::default());
 
-    let pool = common::test_pool().await;
+    let pool = super::common::test_pool().await;
     let usage_repo = klyntbot::storage::UsageRepo::new(pool.inner().clone());
     let cost_tracker = Arc::new(CostTracker::from_repo(usage_repo));
 
@@ -49,10 +47,10 @@ async fn make_pipeline(provider: Arc<dyn LlmProvider>) -> IntentPipeline {
     )
 }
 
-// ── Test 1: Direct Response happy path ──
+// ── Direct Response happy path ──
 
 #[tokio::test]
-async fn test_e2e_direct_response_path() {
+async fn direct_greeting_responds() {
     let provider = Arc::new(MockProvider::new("Hello! How can I help you?"));
     let pipeline = make_pipeline(provider).await;
 
@@ -71,10 +69,10 @@ async fn test_e2e_direct_response_path() {
     assert!(result.validation.is_valid);
 }
 
-// ── Test 2: Tool-assisted happy path ──
+// ── Tool-assisted happy path ──
 
 #[tokio::test]
-async fn test_e2e_tool_assisted_path() {
+async fn reactive_executes_tool_call() {
     let provider = Arc::new(MockProvider::new("Here are your 3 active tasks: ..."));
     let pipeline = make_pipeline(provider).await;
 
@@ -100,10 +98,10 @@ async fn test_e2e_tool_assisted_path() {
     assert_eq!(result.escalations, 0);
 }
 
-// ── Test 3: Autonomous task path ──
+// ── Autonomous task path ──
 
 #[tokio::test]
-async fn test_e2e_autonomous_task_path() {
+async fn autonomous_task_completes() {
     let provider = Arc::new(MockProvider::new(
         "Here's a Python script that processes CSV files:\n```python\nimport csv\n```",
     ));
@@ -126,10 +124,10 @@ async fn test_e2e_autonomous_task_path() {
     assert!(result.validation.is_valid);
 }
 
-// ── Test 5: Context budget is respected (large history doesn't crash) ──
+// ── Context budget is respected (large history doesn't crash) ──
 
 #[tokio::test]
-async fn test_e2e_context_budget_respected() {
+async fn context_budget_handles_large_history() {
     let provider = Arc::new(MockProvider::new("Budget response"));
     let pipeline = make_pipeline(provider).await;
 
@@ -158,10 +156,10 @@ async fn test_e2e_context_budget_respected() {
     assert!(!result.content.is_empty());
 }
 
-// ── Test 6: Greeting is routed via Direct mode ──
+// ── Greeting is routed via Direct mode ──
 
 #[tokio::test]
-async fn intent_pipeline_routes_greeting_directly() {
+async fn greeting_routes_directly() {
     let provider = Arc::new(MockProvider::new("Hi! How can I help you today?"));
     let pipeline = make_pipeline(provider).await;
 
@@ -176,10 +174,10 @@ async fn intent_pipeline_routes_greeting_directly() {
     assert_eq!(result.content, "Hi! How can I help you today?");
 }
 
-// ── Test 7: Search query is routed via Reactive mode ──
+// ── Search query is routed via Reactive mode ──
 
 #[tokio::test]
-async fn intent_pipeline_routes_search_as_reactive() {
+async fn search_routes_as_reactive() {
     let provider = Arc::new(MockProvider::new("Found 5 tasks about databases."));
     let pipeline = make_pipeline(provider).await;
 
@@ -202,10 +200,10 @@ async fn intent_pipeline_routes_search_as_reactive() {
     assert_eq!(result.content, "Found 5 tasks about databases.");
 }
 
-// ── Test 8: Plan keywords trigger Planned classification ──
+// ── Plan keywords trigger Planned classification ──
 
 #[tokio::test]
-async fn intent_pipeline_auto_plans_complex_request() {
+async fn complex_request_triggers_planned() {
     let provider = Arc::new(MockProvider::new(
         "I'll create a plan for reorganizing the codebase.",
     ));
@@ -233,10 +231,10 @@ async fn intent_pipeline_auto_plans_complex_request() {
     assert!(result.validation.is_valid);
 }
 
-// ── Test 9: Reactive engine escalates when overwhelmed ──
+// ── Reactive engine escalates when overwhelmed ──
 
 #[tokio::test]
-async fn intent_pipeline_escalates_reactive_to_planned() {
+async fn reactive_escalates_to_planned() {
     let provider = Arc::new(MockProvider::with_tool_call(
         "web_search",
         serde_json::json!({"query": "test"}),

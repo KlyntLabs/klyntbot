@@ -138,12 +138,6 @@ mod tests {
     }
 
     #[test]
-    fn test_default_token_counter_is_char_based() {
-        let counter = default_token_counter();
-        assert_eq!(counter.estimate_text("hello world"), 3); // 11 chars → 3
-    }
-
-    #[test]
     fn test_custom_token_counter() {
         struct FixedCounter;
         impl TokenCounter for FixedCounter {

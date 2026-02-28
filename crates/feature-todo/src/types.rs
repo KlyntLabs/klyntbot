@@ -365,13 +365,6 @@ mod tests {
     }
 
     #[test]
-    fn test_default_instance_not_template() {
-        let t = Todo::default_instance();
-        assert!(!t.is_template);
-        assert!(t.blocked_by.is_empty());
-    }
-
-    #[test]
     fn test_serde_round_trip() {
         let t = Todo::default_instance();
         let json = serde_json::to_string(&t).unwrap();

@@ -4,7 +4,7 @@
 //!   cd tests/fixtures/hello_plugin && ./build.sh
 //!
 //! Run with:
-//!   cargo nextest run --features plugin-integration --test plugin_integration_tests
+//!   cargo nextest run --features plugin-integration --test plugins
 
 #[cfg(feature = "plugin-integration")]
 mod plugin_integration {
@@ -25,8 +25,10 @@ mod plugin_integration {
         RoutingContext::new(ChannelName::new("cli"), "test".into())
     }
 
+    // ── Plugin Execution ────────────────────────────────────────
+
     #[tokio::test]
-    async fn test_hello_plugin_executes() {
+    async fn hello_plugin_executes() {
         let wasm_path = fixtures_dir().join("plugin.wasm");
         assert!(
             wasm_path.exists(),
@@ -53,8 +55,10 @@ mod plugin_integration {
         assert!(result.contains("klyntbot"));
     }
 
+    // ── Manifest Parsing ────────────────────────────────────────
+
     #[test]
-    fn test_hello_plugin_manifest_parses() {
+    fn manifest_parses_correctly() {
         let manifest_path = fixtures_dir().join("klyntbot.plugin.json");
         let manifest = PluginManifest::from_file(&manifest_path).unwrap();
         assert_eq!(manifest.id, "hello-plugin");
@@ -64,19 +68,18 @@ mod plugin_integration {
     }
 
     #[test]
-    fn test_plugin_permission_level_standard_no_network() {
+    fn permission_level_standard_no_network() {
         let manifest_path = fixtures_dir().join("klyntbot.plugin.json");
         let manifest = PluginManifest::from_file(&manifest_path).unwrap();
-        // hello_plugin has no permissions — Standard level
         assert!(!manifest.has_permission(&PluginPermission::Network));
         assert!(!manifest.has_permission(&PluginPermission::Agent));
         assert!(manifest.permissions.is_empty());
     }
 
-    /// Full PluginManager loading path: scan → load → register tools → execute.
-    /// Simulates what AgentLoopBuilder does at startup.
+    // ── Plugin Manager ──────────────────────────────────────────
+
     #[tokio::test]
-    async fn test_plugin_manager_full_loading_path() {
+    async fn manager_full_loading_path() {
         use config::schema::PluginsConfig;
         use plugin_runtime::PluginManager;
 
@@ -87,7 +90,6 @@ mod plugin_integration {
             "Build the hello plugin first: cd tests/fixtures/hello_plugin && ./build.sh"
         );
 
-        // Create a temp plugins directory mimicking ~/.klyntbot/plugins/
         let tmp = tempfile::TempDir::new().unwrap();
         let plugin_dir = tmp.path().join("hello-plugin");
         std::fs::create_dir_all(&plugin_dir).unwrap();
@@ -98,7 +100,6 @@ mod plugin_integration {
         )
         .unwrap();
 
-        // Load via PluginManager (same path as AgentLoopBuilder)
         let pool = storage::StoragePool::connect_in_memory().await.unwrap();
         let config = PluginsConfig::default();
         let manager =
@@ -107,27 +108,23 @@ mod plugin_integration {
         assert_eq!(manager.packages().len(), 1);
         assert_eq!(manager.packages()[0].name(), "hello-plugin");
 
-        // Extract tools (same as builder does with register_dyn)
         let packages = manager.into_packages();
         let tools = packages[0].tools();
         assert_eq!(tools.len(), 1);
         assert_eq!(tools[0].name(), "hello_tool");
 
-        // Execute the tool
         let args = serde_json::json!({"name": "integration-test"});
         let result = tools[0].execute(args, &routing_ctx()).await.unwrap();
         assert!(result.contains("hello from wasm"));
         assert!(result.contains("integration-test"));
     }
 
-    /// Verify PluginManager scan discovers the correct number of plugins.
     #[test]
-    fn test_plugin_manager_scan_manifests() {
+    fn manager_scan_discovers_manifests() {
         use plugin_runtime::PluginManager;
 
         let tmp = tempfile::TempDir::new().unwrap();
 
-        // Create two plugin directories
         for id in &["plugin-a", "plugin-b"] {
             let dir = tmp.path().join(id);
             std::fs::create_dir_all(&dir).unwrap();
@@ -149,16 +146,14 @@ mod plugin_integration {
         assert_eq!(results.len(), 2);
     }
 
-    /// CLI install → list → remove flow using PluginManager scan.
     #[test]
-    fn test_cli_install_list_remove_flow() {
+    fn cli_install_list_remove_flow() {
         use plugin_runtime::PluginManager;
 
         let tmp = tempfile::TempDir::new().unwrap();
         let plugins_dir = tmp.path();
         let fixtures = fixtures_dir();
 
-        // Simulate "plugin install" — copy files
         let dest = plugins_dir.join("hello-plugin");
         std::fs::create_dir_all(&dest).unwrap();
         std::fs::copy(fixtures.join("plugin.wasm"), dest.join("plugin.wasm")).unwrap();
@@ -168,22 +163,19 @@ mod plugin_integration {
         )
         .unwrap();
 
-        // Simulate "plugin list" — scan manifests
         let manifests = PluginManager::scan_manifests(plugins_dir).unwrap();
         assert_eq!(manifests.len(), 1);
         assert_eq!(manifests[0].0.id, "hello-plugin");
 
-        // Simulate "plugin remove" — delete directory
         std::fs::remove_dir_all(&dest).unwrap();
         let after_remove = PluginManager::scan_manifests(plugins_dir).unwrap();
         assert!(after_remove.is_empty());
     }
 }
 
-// Compile-time stub: always compiles, skipped without the feature
 #[cfg(not(feature = "plugin-integration"))]
 #[test]
-fn plugin_integration_tests_require_feature_flag() {
+fn plugin_tests_require_feature_flag() {
     println!(
         "Skipped: run with --features plugin-integration after building the hello plugin.\n\
          See: tests/fixtures/hello_plugin/build.sh"
