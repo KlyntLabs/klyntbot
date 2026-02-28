@@ -1,7 +1,6 @@
 //! Slack channel using Socket Mode WebSocket.
 
 use async_trait::async_trait;
-use dashmap::DashMap;
 use futures_util::SinkExt;
 use regex::Regex;
 use reqwest::Client;
@@ -10,10 +9,11 @@ use serde_json::{json, Value};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{oneshot, Mutex, RwLock};
+use tokio::sync::{Mutex, RwLock};
 use tokio_tungstenite::tungstenite::Message as WsMessage;
 use tracing::{debug, info, warn};
 
+use crate::shared::InteractionTracker;
 use crate::ws_manager::{HeartbeatStrategy, WebSocketManager, WsConfig, WsHandler, WsSink};
 use crate::{check_allowlist, Channel};
 use bus::{InboundMessage, MessageBus, MessageKind, OutboundMessage};
@@ -25,14 +25,6 @@ use config::SlackConfig;
 
 const SLACK_API_BASE: &str = "https://slack.com/api";
 
-/// State for a pending Slack interaction callback.
-enum PendingCallback {
-    /// Waiting for a button/select action.
-    Single(oneshot::Sender<String>),
-    /// Waiting for free text reply from user.
-    FreeText(oneshot::Sender<String>),
-}
-
 /// Slack channel implementation using Socket Mode
 pub struct SlackChannel {
     config: SlackConfig,
@@ -40,8 +32,7 @@ pub struct SlackChannel {
     bot_user_id: Arc<RwLock<Option<String>>>,
     running: Arc<AtomicBool>,
     bus: Mutex<Option<Arc<MessageBus>>>,
-    /// Pending interaction callbacks keyed by `"{channel_id}:{question_id}"`.
-    pending_interactions: Arc<DashMap<String, PendingCallback>>,
+    interactions: InteractionTracker,
 }
 
 #[derive(Debug, Deserialize)]
@@ -80,7 +71,7 @@ impl SlackChannel {
             bot_user_id: Arc::new(RwLock::new(None)),
             running: Arc::new(AtomicBool::new(false)),
             bus: Mutex::new(None),
-            pending_interactions: Arc::new(DashMap::new()),
+            interactions: InteractionTracker::new(),
         })
     }
 
@@ -275,28 +266,10 @@ impl SlackChannel {
         };
 
         // Intercept free-text replies for pending interactions
-        // Look for any pending FreeText interaction on this channel
-        let mut intercepted = false;
-        let keys_to_check: Vec<String> = self
-            .pending_interactions
-            .iter()
-            .filter(|entry| entry.key().starts_with(&format!("{}:", chat_id)))
-            .map(|entry| entry.key().clone())
-            .collect();
-        for key in keys_to_check {
-            if let Some((_, pending)) = self.pending_interactions.remove(&key) {
-                if let PendingCallback::FreeText(tx) = pending {
-                    let _ = tx.send(cleaned_text.clone());
-                    intercepted = true;
-                    break;
-                } else {
-                    // Put it back — was a Single callback, not free text
-                    self.pending_interactions.insert(key, pending);
-                }
+        if let Some(key) = self.interactions.find_free_text_key(chat_id) {
+            if self.interactions.resolve_free_text(&key, cleaned_text.clone()) {
+                return Ok(());
             }
-        }
-        if intercepted {
-            return Ok(());
         }
 
         // Add :eyes: reaction (best-effort)
@@ -464,39 +437,7 @@ impl SlackChannel {
                 (key, value)
             };
 
-            if let Some((_, PendingCallback::Single(tx))) = self.pending_interactions.remove(&key) {
-                let _ = tx.send(value);
-            }
-        }
-    }
-
-    /// Wait for a button/select callback with timeout.
-    async fn wait_for_callback(&self, key: &str) -> Option<String> {
-        let (tx, rx) = oneshot::channel();
-        self.pending_interactions
-            .insert(key.to_string(), PendingCallback::Single(tx));
-
-        match tokio::time::timeout(Duration::from_secs(300), rx).await {
-            Ok(Ok(value)) => Some(value),
-            _ => {
-                self.pending_interactions.remove(key);
-                None
-            }
-        }
-    }
-
-    /// Wait for a free text reply with timeout.
-    async fn wait_for_free_text(&self, key: &str) -> Option<String> {
-        let (tx, rx) = oneshot::channel();
-        self.pending_interactions
-            .insert(key.to_string(), PendingCallback::FreeText(tx));
-
-        match tokio::time::timeout(Duration::from_secs(300), rx).await {
-            Ok(Ok(value)) => Some(value),
-            _ => {
-                self.pending_interactions.remove(key);
-                None
-            }
+            self.interactions.resolve_single(&key, value);
         }
     }
 
@@ -709,18 +650,10 @@ impl Channel for SlackChannel {
                     self.send_message_with_blocks(chat_id, &question.text, &blocks)
                         .await?;
 
-                    let key = format!("{}:{}", chat_id, question.id);
-                    match self.wait_for_callback(&key).await {
-                        Some(value) => Answer {
-                            question_id: question.id.clone(),
-                            value: AnswerValue::Selected { value },
-                        },
-                        None => {
-                            return Err(common::ToolError::ExecutionFailed(
-                                "Slack interaction timed out (5 min)".into(),
-                            )
-                            .into())
-                        }
+                    let value = self.interactions.wait_for_callback(chat_id, &question.id).await?;
+                    Answer {
+                        question_id: question.id.clone(),
+                        value: AnswerValue::Selected { value },
                     }
                 }
                 AnswerType::YesNo { .. } => {
@@ -728,20 +661,12 @@ impl Channel for SlackChannel {
                     self.send_message_with_blocks(chat_id, &question.text, &blocks)
                         .await?;
 
-                    let key = format!("{}:{}", chat_id, question.id);
-                    match self.wait_for_callback(&key).await {
-                        Some(value) => Answer {
-                            question_id: question.id.clone(),
-                            value: AnswerValue::YesNo {
-                                answer: value == "yes",
-                            },
+                    let value = self.interactions.wait_for_callback(chat_id, &question.id).await?;
+                    Answer {
+                        question_id: question.id.clone(),
+                        value: AnswerValue::YesNo {
+                            answer: value == "yes",
                         },
-                        None => {
-                            return Err(common::ToolError::ExecutionFailed(
-                                "Slack interaction timed out (5 min)".into(),
-                            )
-                            .into())
-                        }
                     }
                 }
                 AnswerType::MultiSelect { options } => {
@@ -751,20 +676,12 @@ impl Channel for SlackChannel {
                     self.send_message_with_blocks(chat_id, &question.text, &blocks)
                         .await?;
 
-                    let key = format!("{}:{}", chat_id, question.id);
-                    match self.wait_for_callback(&key).await {
-                        Some(value) => Answer {
-                            question_id: question.id.clone(),
-                            value: AnswerValue::MultiSelected {
-                                values: vec![value],
-                            },
+                    let value = self.interactions.wait_for_callback(chat_id, &question.id).await?;
+                    Answer {
+                        question_id: question.id.clone(),
+                        value: AnswerValue::MultiSelected {
+                            values: vec![value],
                         },
-                        None => {
-                            return Err(common::ToolError::ExecutionFailed(
-                                "Slack interaction timed out (5 min)".into(),
-                            )
-                            .into())
-                        }
                     }
                 }
                 AnswerType::FreeText { placeholder } => {
@@ -776,18 +693,10 @@ impl Channel for SlackChannel {
 
                     self.send_message(chat_id, &prompt, None).await?;
 
-                    let key = format!("{}:{}", chat_id, question.id);
-                    match self.wait_for_free_text(&key).await {
-                        Some(content) => Answer {
-                            question_id: question.id.clone(),
-                            value: AnswerValue::Text { content },
-                        },
-                        None => {
-                            return Err(common::ToolError::ExecutionFailed(
-                                "Slack free text timed out (5 min)".into(),
-                            )
-                            .into())
-                        }
+                    let content = self.interactions.wait_for_free_text(chat_id, &question.id).await?;
+                    Answer {
+                        question_id: question.id.clone(),
+                        value: AnswerValue::Text { content },
                     }
                 }
             };

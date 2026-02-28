@@ -1,7 +1,6 @@
 //! Discord channel using raw WebSocket Gateway (no serenity).
 
 use async_trait::async_trait;
-use dashmap::DashMap;
 use futures_util::SinkExt;
 use reqwest::Client;
 use serde_json::{json, Value};
@@ -10,12 +9,13 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{oneshot, Mutex, RwLock};
+use tokio::sync::{Mutex, RwLock};
 use tokio::task::JoinHandle;
 use tokio::time::sleep;
 use tokio_tungstenite::tungstenite::Message as WsMessage;
 use tracing::{debug, error, info, warn};
 
+use crate::shared::{InteractionTracker, TypingManager};
 use crate::ws_manager::{HeartbeatStrategy, WebSocketManager, WsConfig, WsHandler, WsSink};
 use crate::{check_allowlist, Channel};
 use bus::{InboundMessage, MessageBus, MessageKind, OutboundMessage};
@@ -28,25 +28,16 @@ use config::DiscordConfig;
 const DISCORD_API_BASE: &str = "https://discord.com/api/v10";
 const MAX_ATTACHMENT_BYTES: usize = 20 * 1024 * 1024; // 20MB
 
-/// State for a pending Discord interaction callback.
-enum PendingCallback {
-    /// Waiting for a single button press (single_select, yes_no).
-    Single(oneshot::Sender<String>),
-    /// Waiting for free text reply from user.
-    FreeText(oneshot::Sender<String>),
-}
-
 /// Discord channel implementation
 pub struct DiscordChannel {
     config: DiscordConfig,
     client: Client,
     seq: Arc<RwLock<Option<i64>>>,
     running: Arc<AtomicBool>,
-    typing_tasks: Arc<RwLock<HashMap<String, JoinHandle<()>>>>,
+    typing: TypingManager,
     bus: Mutex<Option<Arc<MessageBus>>>,
     heartbeat_task: Mutex<Option<JoinHandle<()>>>,
-    /// Pending interaction callbacks keyed by `"{channel_id}:{question_id}"`.
-    pending_interactions: Arc<DashMap<String, PendingCallback>>,
+    interactions: InteractionTracker,
 }
 
 impl DiscordChannel {
@@ -62,10 +53,10 @@ impl DiscordChannel {
             client,
             seq: Arc::new(RwLock::new(None)),
             running: Arc::new(AtomicBool::new(false)),
-            typing_tasks: Arc::new(RwLock::new(HashMap::new())),
+            typing: TypingManager::new(),
             bus: Mutex::new(None),
             heartbeat_task: Mutex::new(None),
-            pending_interactions: Arc::new(DashMap::new()),
+            interactions: InteractionTracker::new(),
         })
     }
 
@@ -151,39 +142,36 @@ impl DiscordChannel {
 
     /// Start typing indicator for a channel
     async fn start_typing(&self, channel_id: String) {
-        self.stop_typing(&channel_id).await;
-
         let client = self.client.clone();
         let token = self.config.token.expose().clone();
-        let running = self.running.clone();
         let channel_id_clone = channel_id.clone();
 
-        let task = tokio::spawn(async move {
-            let url = format!("{}/channels/{}/typing", DISCORD_API_BASE, channel_id_clone);
-            let headers = reqwest::header::HeaderMap::from_iter([(
-                reqwest::header::AUTHORIZATION,
-                format!("Bot {}", token).parse().unwrap(),
-            )]);
-
-            while running.load(Ordering::SeqCst) {
-                if let Err(e) = client.post(&url).headers(headers.clone()).send().await {
-                    warn!(
-                        "Failed to send typing indicator to Discord channel {}: {}",
-                        channel_id_clone, e
-                    );
+        // Discord typing expires after ~10s, so resend every 8s
+        self.typing
+            .start(&channel_id, Duration::from_secs(8), move || {
+                let client = client.clone();
+                let token = token.clone();
+                let channel_id = channel_id_clone.clone();
+                async move {
+                    let url = format!("{}/channels/{}/typing", DISCORD_API_BASE, channel_id);
+                    let headers = reqwest::header::HeaderMap::from_iter([(
+                        reqwest::header::AUTHORIZATION,
+                        format!("Bot {}", token).parse().unwrap(),
+                    )]);
+                    if let Err(e) = client.post(&url).headers(headers).send().await {
+                        warn!(
+                            "Failed to send typing indicator to Discord channel {}: {}",
+                            channel_id, e
+                        );
+                    }
                 }
-                sleep(Duration::from_secs(8)).await;
-            }
-        });
-
-        self.typing_tasks.write().await.insert(channel_id, task);
+            })
+            .await;
     }
 
     /// Stop typing indicator for a channel
     async fn stop_typing(&self, channel_id: &str) {
-        if let Some(task) = self.typing_tasks.write().await.remove(channel_id) {
-            task.abort();
-        }
+        self.typing.stop(channel_id).await;
     }
 
     /// Handle MESSAGE_CREATE event
@@ -207,28 +195,15 @@ impl DiscordChannel {
 
         // Check if this is a pending free_text interaction response
         if !channel_id.is_empty() {
-            let key_prefix = format!("{}:", channel_id);
-            let pending_key = self
-                .pending_interactions
-                .iter()
-                .find(|entry| {
-                    entry.key().starts_with(&key_prefix)
-                        && matches!(entry.value(), PendingCallback::FreeText(_))
-                })
-                .map(|entry| entry.key().clone());
-
-            if let Some(key) = pending_key {
+            if let Some(key) = self.interactions.find_free_text_key(channel_id) {
                 let content = payload
                     .get("content")
                     .and_then(|v| v.as_str())
                     .unwrap_or("");
-                if !content.is_empty() {
-                    if let Some((_, PendingCallback::FreeText(tx))) =
-                        self.pending_interactions.remove(&key)
-                    {
-                        let _ = tx.send(content.to_string());
-                        return Ok(());
-                    }
+                if !content.is_empty()
+                    && self.interactions.resolve_free_text(&key, content.to_string())
+                {
+                    return Ok(());
                 }
             }
         }
@@ -487,11 +462,7 @@ impl DiscordChannel {
                 if select_parts.len() == 3 && select_parts[0] == "askuser" {
                     let key = format!("{}:{}", select_parts[1], select_parts[2]);
                     if let Some(value) = values.first().and_then(|v| v.as_str()) {
-                        if let Some((_, PendingCallback::Single(tx))) =
-                            self.pending_interactions.remove(&key)
-                        {
-                            let _ = tx.send(value.to_string());
-                        }
+                        self.interactions.resolve_single(&key, value.to_string());
                     }
                 }
             }
@@ -503,51 +474,19 @@ impl DiscordChannel {
         let value = parts[3];
         let key = format!("{}:{}", channel_id, question_id);
 
-        if let Some((_, PendingCallback::Single(tx))) = self.pending_interactions.remove(&key) {
-            let _ = tx.send(value.to_string());
-        }
+        self.interactions.resolve_single(&key, value.to_string());
 
         Ok(())
     }
 
     /// Wait for an interaction callback with a 5-minute timeout.
     async fn wait_for_callback(&self, channel_id: &str, question_id: &str) -> Result<String> {
-        let (tx, rx) = oneshot::channel();
-        let key = format!("{}:{}", channel_id, question_id);
-        self.pending_interactions
-            .insert(key.clone(), PendingCallback::Single(tx));
-
-        match tokio::time::timeout(Duration::from_secs(300), rx).await {
-            Ok(Ok(value)) => Ok(value),
-            Ok(Err(_)) => {
-                self.pending_interactions.remove(&key);
-                Err(ChannelError::SendFailed("Interaction cancelled".into()).into())
-            }
-            Err(_) => {
-                self.pending_interactions.remove(&key);
-                Err(ChannelError::SendFailed("Interaction timed out (5 min)".into()).into())
-            }
-        }
+        self.interactions.wait_for_callback(channel_id, question_id).await
     }
 
     /// Wait for a free text message with a 5-minute timeout.
     async fn wait_for_free_text(&self, channel_id: &str, question_id: &str) -> Result<String> {
-        let (tx, rx) = oneshot::channel();
-        let key = format!("{}:{}", channel_id, question_id);
-        self.pending_interactions
-            .insert(key.clone(), PendingCallback::FreeText(tx));
-
-        match tokio::time::timeout(Duration::from_secs(300), rx).await {
-            Ok(Ok(value)) => Ok(value),
-            Ok(Err(_)) => {
-                self.pending_interactions.remove(&key);
-                Err(ChannelError::SendFailed("Interaction cancelled".into()).into())
-            }
-            Err(_) => {
-                self.pending_interactions.remove(&key);
-                Err(ChannelError::SendFailed("Interaction timed out (5 min)".into()).into())
-            }
-        }
+        self.interactions.wait_for_free_text(channel_id, question_id).await
     }
 
     /// Send a message via REST API
@@ -757,24 +696,11 @@ impl Channel for DiscordChannel {
 
         super::reconnect_loop("Discord", &self.running, || manager.run(&config, self)).await;
 
-        // Cleanup typing tasks
-        let tasks: Vec<_> = self.typing_tasks.write().await.drain().collect();
-        for (_, task) in tasks {
-            task.abort();
-        }
-
         Ok(())
     }
 
     async fn stop(&self) -> Result<()> {
         self.running.store(false, Ordering::SeqCst);
-
-        // Stop all typing tasks
-        let tasks: Vec<_> = self.typing_tasks.write().await.drain().collect();
-        for (_, task) in tasks {
-            task.abort();
-        }
-
         Ok(())
     }
 

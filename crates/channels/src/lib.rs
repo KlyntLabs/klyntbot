@@ -18,6 +18,7 @@ pub mod email;
 pub mod formatter;
 pub mod manager;
 pub mod qq;
+pub mod shared;
 pub mod slack;
 pub mod telegram;
 pub mod utils;

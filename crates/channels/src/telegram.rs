@@ -3,19 +3,17 @@
 //! Lightweight implementation without teloxide - just reqwest HTTP calls.
 
 use async_trait::async_trait;
-use dashmap::DashMap;
 use reqwest::Client;
 use serde::Deserialize;
 use serde_json::{json, Value};
-use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{oneshot, RwLock};
 use tokio::time::sleep;
 use tracing::{debug, error, info, warn};
 
 use crate::formatter::ChannelFormatter;
+use crate::shared::{InteractionTracker, TypingManager};
 use crate::{check_allowlist, Channel};
 use bus::{InboundMessage, MessageBus, MessageKind, OutboundMessage};
 use common::{
@@ -25,14 +23,6 @@ use common::{
 use config::schema::TelegramConfig;
 use providers::TranscriptionProvider;
 
-/// State for a pending interaction callback.
-enum PendingCallback {
-    /// Waiting for a single button press (single_select, yes_no).
-    Single(oneshot::Sender<String>),
-    /// Waiting for free text reply from user.
-    FreeText(oneshot::Sender<String>),
-}
-
 /// Telegram channel implementation
 pub struct TelegramChannel {
     config: TelegramConfig,
@@ -40,9 +30,8 @@ pub struct TelegramChannel {
     api_base: String,
     transcriber: Option<TranscriptionProvider>,
     running: Arc<AtomicBool>,
-    typing_tasks: Arc<RwLock<HashMap<String, tokio::task::JoinHandle<()>>>>,
-    /// Pending interaction callbacks keyed by `"{chat_id}:{question_id}"`.
-    pending_interactions: Arc<DashMap<String, PendingCallback>>,
+    typing: TypingManager,
+    interactions: InteractionTracker,
 }
 
 impl TelegramChannel {
@@ -80,8 +69,8 @@ impl TelegramChannel {
             api_base,
             transcriber,
             running: Arc::new(AtomicBool::new(false)),
-            typing_tasks: Arc::new(RwLock::new(HashMap::new())),
-            pending_interactions: Arc::new(DashMap::new()),
+            typing: TypingManager::new(),
+            interactions: InteractionTracker::new(),
         })
     }
 
@@ -271,22 +260,10 @@ impl TelegramChannel {
             .and_then(|c| c.get("id"))
             .and_then(|v| v.as_i64())
         {
-            let chat_key_prefix = format!("{}:", chat_id);
-            let pending_key = self
-                .pending_interactions
-                .iter()
-                .find(|entry| {
-                    entry.key().starts_with(&chat_key_prefix)
-                        && matches!(entry.value(), PendingCallback::FreeText(_))
-                })
-                .map(|entry| entry.key().clone());
-
-            if let Some(key) = pending_key {
+            let chat_id_str = chat_id.to_string();
+            if let Some(key) = self.interactions.find_free_text_key(&chat_id_str) {
                 if let Some(text) = message.get("text").and_then(|v| v.as_str()) {
-                    if let Some((_, PendingCallback::FreeText(tx))) =
-                        self.pending_interactions.remove(&key)
-                    {
-                        let _ = tx.send(text.to_string());
+                    if self.interactions.resolve_free_text(&key, text.to_string()) {
                         return Ok(());
                     }
                 }
@@ -557,52 +534,38 @@ impl TelegramChannel {
 
     /// Start continuous typing indicator for a chat
     async fn start_typing(&self, chat_id: &str) {
-        // Stop any existing typing task for this chat
-        self.stop_typing(chat_id).await;
-
-        let chat_id_str = chat_id.to_string();
+        let chat_id_i64: i64 = match chat_id.parse() {
+            Ok(id) => id,
+            Err(_) => return,
+        };
         let api_base = self.api_base.clone();
         let client = self.client.clone();
 
-        // Spawn a task that continuously sends typing actions
-        let task = tokio::spawn(async move {
-            let chat_id_i64: i64 = match chat_id_str.parse() {
-                Ok(id) => id,
-                Err(_) => return,
-            };
-
-            loop {
-                let params = json!({
-                    "chat_id": chat_id_i64,
-                    "action": "typing"
-                });
-
-                let url = format!("{}/sendChatAction", api_base);
-                if let Err(e) = client.post(&url).json(&params).send().await {
-                    tracing::warn!(
-                        "Failed to send typing indicator to Telegram chat {}: {}",
-                        chat_id_i64,
-                        e
-                    );
+        // Telegram typing expires after ~5s, so resend every 4s
+        self.typing
+            .start(chat_id, Duration::from_secs(4), move || {
+                let client = client.clone();
+                let api_base = api_base.clone();
+                async move {
+                    let params = json!({
+                        "chat_id": chat_id_i64,
+                        "action": "typing"
+                    });
+                    let url = format!("{}/sendChatAction", api_base);
+                    if let Err(e) = client.post(&url).json(&params).send().await {
+                        warn!(
+                            "Failed to send typing indicator to Telegram chat {}: {}",
+                            chat_id_i64, e
+                        );
+                    }
                 }
-
-                // Send typing action every 4 seconds (Telegram typing lasts ~5s)
-                sleep(Duration::from_secs(4)).await;
-            }
-        });
-
-        // Store the task so we can cancel it later
-        self.typing_tasks
-            .write()
-            .await
-            .insert(chat_id.to_string(), task);
+            })
+            .await;
     }
 
     /// Stop typing indicator for a chat
     async fn stop_typing(&self, chat_id: &str) {
-        if let Some(task) = self.typing_tasks.write().await.remove(chat_id) {
-            task.abort();
-        }
+        self.typing.stop(chat_id).await;
     }
 
     /// Handle a callback_query from an inline keyboard button press.
@@ -632,9 +595,7 @@ impl TelegramChannel {
         let key = format!("{}:{}", chat_id, question_id);
 
         // Resolve the pending interaction
-        if let Some((_, PendingCallback::Single(tx))) = self.pending_interactions.remove(&key) {
-            let _ = tx.send(value.to_string());
-        }
+        self.interactions.resolve_single(&key, value.to_string());
 
         // Edit the original message to show the selection (remove keyboard)
         if let Some(msg) = callback.get("message") {
@@ -692,14 +653,6 @@ impl Channel for TelegramChannel {
 
     async fn stop(&self) -> Result<()> {
         self.running.store(false, Ordering::SeqCst);
-
-        // Stop all typing indicators
-        let mut typing_tasks = self.typing_tasks.write().await;
-        for (chat_id, task) in typing_tasks.drain() {
-            debug!("Stopping typing indicator for chat {}", chat_id);
-            task.abort();
-        }
-
         Ok(())
     }
 
@@ -878,42 +831,11 @@ impl Channel for TelegramChannel {
 impl TelegramChannel {
     /// Wait for a callback_query response with a 5-minute timeout.
     async fn wait_for_callback(&self, chat_id: &str, question_id: &str) -> Result<String> {
-        let (tx, rx) = oneshot::channel();
-        let key = format!("{}:{}", chat_id, question_id);
-        self.pending_interactions
-            .insert(key.clone(), PendingCallback::Single(tx));
-
-        match tokio::time::timeout(Duration::from_secs(300), rx).await {
-            Ok(Ok(value)) => Ok(value),
-            Ok(Err(_)) => {
-                self.pending_interactions.remove(&key);
-                Err(ChannelError::SendFailed("Interaction cancelled".into()).into())
-            }
-            Err(_) => {
-                self.pending_interactions.remove(&key);
-                Err(ChannelError::SendFailed("Interaction timed out (5 min)".into()).into())
-            }
-        }
+        self.interactions.wait_for_callback(chat_id, question_id).await
     }
 
-    /// Wait for a free text message with a 5-minute timeout.
     async fn wait_for_free_text(&self, chat_id: &str, question_id: &str) -> Result<String> {
-        let (tx, rx) = oneshot::channel();
-        let key = format!("{}:{}", chat_id, question_id);
-        self.pending_interactions
-            .insert(key.clone(), PendingCallback::FreeText(tx));
-
-        match tokio::time::timeout(Duration::from_secs(300), rx).await {
-            Ok(Ok(value)) => Ok(value),
-            Ok(Err(_)) => {
-                self.pending_interactions.remove(&key);
-                Err(ChannelError::SendFailed("Interaction cancelled".into()).into())
-            }
-            Err(_) => {
-                self.pending_interactions.remove(&key);
-                Err(ChannelError::SendFailed("Interaction timed out (5 min)".into()).into())
-            }
-        }
+        self.interactions.wait_for_free_text(chat_id, question_id).await
     }
 }
 
