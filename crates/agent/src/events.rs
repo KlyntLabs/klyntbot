@@ -80,4 +80,7 @@ pub enum AgentEvent {
         plan_id: uuid::Uuid,
         summary: String,
     },
+
+    /// An entity was created by a tool (task, project, goal, etc.).
+    EntityCreated(common::EntityCard),
 }
