@@ -3,7 +3,9 @@
 //! Returns `Option<IntentAnalysis>` with full `ComplexitySignals` instead of
 //! the old `ExecutionStrategy`. Defers to LLM classifier when ambiguous.
 
-use super::types::{AnalysisSource, ComplexitySignals, ExecutionMode, FailureRisk, IntentAnalysis};
+use super::types::{
+    AnalysisSource, ComplexitySignals, ExecutionMode, FailureRisk, IntentAnalysis, ToolGroup,
+};
 
 /// Attempt to classify a message using keyword/pattern heuristics.
 ///
@@ -15,12 +17,20 @@ pub fn analyze_heuristic(message: &str) -> Option<IntentAnalysis> {
 
     // 1. Greeting pattern — fast path, zero complexity
     if is_greeting(&msg) {
-        return Some(direct_analysis("Greeting detected", 0.95));
+        return Some(direct_analysis(
+            "Greeting detected",
+            0.95,
+            vec![ToolGroup::None],
+        ));
     }
 
     // 2. Very short non-keyword messages → Direct
     if msg.len() < 20 && word_count <= 4 && !has_any_action_keyword(&msg) {
-        return Some(direct_analysis("Short message, no action keywords", 0.85));
+        return Some(direct_analysis(
+            "Short message, no action keywords",
+            0.85,
+            vec![ToolGroup::None],
+        ));
     }
 
     // 3. Task management patterns → Reactive (CRUD, low iteration budget)
@@ -38,6 +48,7 @@ pub fn analyze_heuristic(message: &str) -> Option<IntentAnalysis> {
                 requires_state_tracking: false,
                 requires_retries: false,
             },
+            vec![ToolGroup::TaskManagement, ToolGroup::Search],
         ));
     }
 
@@ -47,7 +58,11 @@ pub fn analyze_heuristic(message: &str) -> Option<IntentAnalysis> {
         if has_action_keyword(&msg) {
             return None; // "what is the best way to implement X" → ambiguous
         }
-        return Some(direct_analysis("Question/explanation pattern", 0.90));
+        return Some(direct_analysis(
+            "Question/explanation pattern",
+            0.90,
+            vec![ToolGroup::None],
+        ));
     }
 
     // 5. Explicit plan keywords → Planned (before action keywords, since
@@ -63,6 +78,7 @@ pub fn analyze_heuristic(message: &str) -> Option<IntentAnalysis> {
             confidence: 0.85,
             source: AnalysisSource::Heuristic,
             reasoning: "Explicit planning language detected".to_string(),
+            tool_groups: vec![ToolGroup::Full],
         });
     }
 
@@ -77,11 +93,13 @@ pub fn analyze_heuristic(message: &str) -> Option<IntentAnalysis> {
 
     // Simple tool-assisted patterns (search, list, show)
     if has_tool_keyword(&msg) && score <= 1 {
+        let groups = infer_tool_groups(&msg);
         return Some(reactive_analysis(
             5,
             "Simple tool-assisted operation",
             0.85,
             signals,
+            groups,
         ));
     }
 
@@ -92,6 +110,7 @@ pub fn analyze_heuristic(message: &str) -> Option<IntentAnalysis> {
             "Code/action keyword detected",
             0.80,
             signals,
+            vec![ToolGroup::Full],
         ));
     }
 
@@ -106,6 +125,7 @@ pub fn analyze_heuristic(message: &str) -> Option<IntentAnalysis> {
             confidence: 0.75,
             source: AnalysisSource::Heuristic,
             reasoning: "High complexity score from heuristic analysis".to_string(),
+            tool_groups: vec![ToolGroup::Full],
         });
     }
 
@@ -324,7 +344,11 @@ fn analyze_complexity(msg: &str) -> ComplexitySignals {
 // Analysis constructors
 // ---------------------------------------------------------------------------
 
-fn direct_analysis(reasoning: &str, confidence: f32) -> IntentAnalysis {
+fn direct_analysis(
+    reasoning: &str,
+    confidence: f32,
+    tool_groups: Vec<ToolGroup>,
+) -> IntentAnalysis {
     IntentAnalysis {
         mode: ExecutionMode::Direct,
         signals: ComplexitySignals {
@@ -337,6 +361,7 @@ fn direct_analysis(reasoning: &str, confidence: f32) -> IntentAnalysis {
         confidence,
         source: AnalysisSource::Heuristic,
         reasoning: reasoning.to_string(),
+        tool_groups,
     }
 }
 
@@ -345,6 +370,7 @@ fn reactive_analysis(
     reasoning: &str,
     confidence: f32,
     signals: ComplexitySignals,
+    tool_groups: Vec<ToolGroup>,
 ) -> IntentAnalysis {
     IntentAnalysis {
         mode: ExecutionMode::Reactive { max_iterations },
@@ -352,7 +378,61 @@ fn reactive_analysis(
         confidence,
         source: AnalysisSource::Heuristic,
         reasoning: reasoning.to_string(),
+        tool_groups,
     }
+}
+
+/// Infer relevant tool groups from message keywords.
+fn infer_tool_groups(msg: &str) -> Vec<ToolGroup> {
+    let mut groups = Vec::new();
+
+    // Calendar keywords
+    if msg.contains("calendar")
+        || msg.contains("schedule")
+        || msg.contains("event")
+        || msg.contains("appointment")
+        || msg.contains("meeting")
+    {
+        groups.push(ToolGroup::Calendar);
+    }
+
+    // Finance keywords
+    if msg.contains("finance")
+        || msg.contains("budget")
+        || msg.contains("expense")
+        || msg.contains("investment")
+        || msg.contains("money")
+        || msg.contains("spending")
+    {
+        groups.push(ToolGroup::Finance);
+    }
+
+    // Task/todo keywords
+    if msg.contains("task")
+        || msg.contains("todo")
+        || msg.contains("goal")
+        || msg.contains("plan")
+    {
+        groups.push(ToolGroup::TaskManagement);
+    }
+
+    // Search/file keywords
+    if msg.contains("search")
+        || msg.contains("find")
+        || msg.contains("look up")
+        || msg.contains("fetch")
+        || msg.contains("read")
+    {
+        groups.push(ToolGroup::Search);
+    }
+
+    // Default to Search + Communication if nothing specific detected
+    if groups.is_empty() {
+        groups.push(ToolGroup::Search);
+        groups.push(ToolGroup::Communication);
+    }
+
+    groups
 }
 
 // ---------------------------------------------------------------------------
@@ -463,6 +543,27 @@ mod tests {
     fn heuristic_source_is_always_heuristic() {
         let result = analyze_heuristic("hello").unwrap();
         assert_eq!(result.source, AnalysisSource::Heuristic);
+    }
+
+    // --- Tool group tests ---
+
+    #[test]
+    fn greeting_gets_no_tools() {
+        let result = analyze_heuristic("hello").unwrap();
+        assert!(result.tool_groups.contains(&ToolGroup::None));
+    }
+
+    #[test]
+    fn task_crud_gets_task_management_and_search() {
+        let result = analyze_heuristic("create a task to buy groceries").unwrap();
+        assert!(result.tool_groups.contains(&ToolGroup::TaskManagement));
+        assert!(result.tool_groups.contains(&ToolGroup::Search));
+    }
+
+    #[test]
+    fn complex_planned_gets_full_tools() {
+        let result = analyze_heuristic("create a plan for the database refactor").unwrap();
+        assert!(result.tool_groups.contains(&ToolGroup::Full));
     }
 
     #[test]

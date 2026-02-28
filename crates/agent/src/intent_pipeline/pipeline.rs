@@ -105,10 +105,11 @@ impl IntentPipeline {
     ///
     /// 1. Classify intent (heuristics → LLM classifier)
     /// 2. Assemble context with budget allocation
-    /// 3. Execute with appropriate engine (with automatic escalation)
-    /// 4. Validate response
-    /// 5. Record usage
-    /// 6. Record strategy outcome
+    /// 3. Filter tools based on intent classification
+    /// 4. Execute with appropriate engine (with automatic escalation)
+    /// 5. Validate response
+    /// 6. Record usage
+    /// 7. Record strategy outcome
     #[allow(clippy::too_many_arguments)]
     pub async fn process_message(
         &self,
@@ -174,7 +175,30 @@ impl IntentPipeline {
                 .await;
         }
 
-        // Step 3: Execute via router (with automatic escalation)
+        // Step 3: Filter tools based on intent classification
+        let filtered_tools = if let Some(allowed) = analysis.allowed_tool_names() {
+            tool_definitions
+                .iter()
+                .filter(|t| {
+                    t.get("function")
+                        .and_then(|f| f.get("name"))
+                        .and_then(|n| n.as_str())
+                        .map(|name| allowed.contains(name))
+                        .unwrap_or(true) // Keep tools with unknown format
+                })
+                .cloned()
+                .collect::<Vec<_>>()
+        } else {
+            tool_definitions.to_vec()
+        };
+
+        debug!(
+            "IntentPipeline: filtered {} → {} tools",
+            tool_definitions.len(),
+            filtered_tools.len()
+        );
+
+        // Step 4: Execute via router (with automatic escalation)
         if let Some(ref tx) = event_tx {
             let max_iter = match &analysis.mode {
                 super::types::ExecutionMode::Reactive { max_iterations } => {
@@ -192,12 +216,14 @@ impl IntentPipeline {
         }
 
         let params = ExecutionParams::new(&self.config.execution_model);
+
+        // On escalation the router may need all tools, so keep the full set available
         let router_result = self
             .router
             .execute(
                 analysis.mode.clone(),
                 assembled.messages,
-                tool_definitions,
+                &filtered_tools,
                 &params,
                 ctx,
                 event_tx,
@@ -211,7 +237,7 @@ impl IntentPipeline {
             );
         }
 
-        // Step 4: Validate
+        // Step 5: Validate
         let validation = self.validator.validate(&router_result.content);
         if !validation.is_valid {
             warn!(
@@ -223,10 +249,10 @@ impl IntentPipeline {
         let final_content = validation.filtered_content.clone();
         let mode_name = router_result.final_mode.clone();
 
-        // Step 5: Record usage (best-effort)
+        // Step 6: Record usage (best-effort)
         self.record_usage(&router_result, &mode_name, ctx).await;
 
-        // Step 6: Record strategy outcome (best-effort)
+        // Step 7: Record strategy outcome (best-effort)
         self.record_strategy(&analysis, &router_result, &validation, ctx, pipeline_start)
             .await;
 
