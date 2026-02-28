@@ -1,3 +1,8 @@
+//! `#[derive(ToolParams)]` — generates `ToolParams` trait implementation.
+//!
+//! Like `ActionParams` but generates a trait impl (enabling generic code)
+//! and uses `common::Result` instead of `Result<Self, String>`.
+
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, Data, DeriveInput, Fields};
@@ -17,9 +22,9 @@ pub fn derive(input: TokenStream) -> TokenStream {
             Fields::Unit => {
                 return TokenStream::from(gen_empty_impl(name));
             }
-            _ => panic!("ActionParams only supports named fields or unit structs"),
+            _ => panic!("ToolParams only supports named fields or unit structs"),
         },
-        _ => panic!("ActionParams can only be derived for structs"),
+        _ => panic!("ToolParams can only be derived for structs"),
     };
 
     let mut schema_properties = Vec::new();
@@ -55,8 +60,8 @@ pub fn derive(input: TokenStream) -> TokenStream {
     }
 
     let expanded = quote! {
-        impl #name {
-            pub fn json_schema() -> ::serde_json::Value {
+        impl ::tools_core::ToolParams for #name {
+            fn json_schema() -> ::serde_json::Value {
                 let mut properties = ::serde_json::Map::new();
                 #(#schema_properties)*
 
@@ -74,10 +79,13 @@ pub fn derive(input: TokenStream) -> TokenStream {
                 schema
             }
 
-            pub fn from_value(args: &::serde_json::Value) -> ::core::result::Result<Self, ::std::string::String> {
-                Ok(Self {
-                    #(#from_value_fields)*
-                })
+            fn from_args(args: ::serde_json::Value) -> ::common::Result<Self> {
+                let args = &args;
+                (|| -> ::core::result::Result<Self, ::std::string::String> {
+                    Ok(Self {
+                        #(#from_value_fields)*
+                    })
+                })().map_err(|e| ::common::KlyntbotError::Tool(::common::ToolError::InvalidParams(e)))
             }
         }
     };
@@ -87,15 +95,15 @@ pub fn derive(input: TokenStream) -> TokenStream {
 
 fn gen_empty_impl(name: &syn::Ident) -> proc_macro2::TokenStream {
     quote! {
-        impl #name {
-            pub fn json_schema() -> ::serde_json::Value {
+        impl ::tools_core::ToolParams for #name {
+            fn json_schema() -> ::serde_json::Value {
                 ::serde_json::json!({
                     "type": "object",
                     "properties": {}
                 })
             }
 
-            pub fn from_value(_args: &::serde_json::Value) -> ::core::result::Result<Self, ::std::string::String> {
+            fn from_args(_args: ::serde_json::Value) -> ::common::Result<Self> {
                 Ok(Self {})
             }
         }

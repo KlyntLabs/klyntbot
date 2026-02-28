@@ -13,7 +13,7 @@ pub mod registry;
 pub mod search;
 
 // Re-export proc macros
-pub use tools_core_macros::{tool_actions, ActionParams, DomainEnum};
+pub use tools_core_macros::{tool_actions, ActionParams, DomainEnum, ToolParams};
 
 use async_trait::async_trait;
 use serde_json::Value;
@@ -113,6 +113,18 @@ impl RoutingContext {
             interaction_channel: None,
         }
     }
+}
+
+/// Typed tool parameters — generates JSON schema and parses from `serde_json::Value`.
+///
+/// Derive with `#[derive(ToolParams)]`. Fields use `#[param(required)]` for required
+/// params, and doc comments become schema descriptions.
+pub trait ToolParams: Sized {
+    /// Generate JSON Schema for these parameters.
+    fn json_schema() -> Value;
+
+    /// Parse parameters from a JSON value.
+    fn from_args(args: Value) -> common::Result<Self>;
 }
 
 /// Trait for agent tools
