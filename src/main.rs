@@ -4,7 +4,6 @@ use cli::{Cli, Commands};
 
 // Import CLI handlers
 mod cli_handlers {
-    pub use cli::chat::handle_chat;
     pub use cli::serve::handle_serve;
     pub use cli::status::{handle_brief_status, handle_status};
 }
@@ -14,21 +13,13 @@ async fn main() {
     let cli = Cli::parse();
 
     // Initialize tracing based on command context
-    // Chat mode suppresses INFO logs for a clean REPL experience
     let log_level = match &cli.command {
         Some(Commands::Serve { verbose: true, .. }) => "debug",
-        Some(Commands::Chat { .. }) => "warn",
         _ => "info",
     };
     init_tracing(log_level);
 
     let result = match cli.command {
-        Some(Commands::Chat {
-            message,
-            session,
-            verbose,
-        }) => cli_handlers::handle_chat(message, session, verbose).await,
-
         Some(Commands::Serve { port, .. }) => cli_handlers::handle_serve(port).await,
 
         Some(Commands::Init { packs, reset }) => handle_init(packs, reset).await,

@@ -19,20 +19,6 @@ pub struct Cli {
 
 #[derive(Subcommand, Debug)]
 pub enum Commands {
-    /// Chat with the AI assistant (interactive or single message)
-    Chat {
-        /// Message to send (omit for interactive mode)
-        message: Option<String>,
-
-        /// Session ID for conversation continuity
-        #[arg(short, long, default_value = "cli:default")]
-        session: String,
-
-        /// Show detailed thinking trace (tool args, token counts, timing)
-        #[arg(short = 'V', long)]
-        verbose: bool,
-    },
-
     /// Start the gateway daemon to enable channel integrations
     Serve {
         /// Port for the gateway service

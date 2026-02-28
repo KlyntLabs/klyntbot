@@ -38,7 +38,7 @@ Layer 2: providers, session, scheduling, calendar, context_engine — LLM HTTP c
 Layer 3: tools           — Tool trait + 12 implementations (file I/O ×4, web ×2, message, spawn, cron, todo, project, calendar)
 Layer 4: channels, heartbeat — Chat platform integrations (Telegram, Discord, WhatsApp, Slack, Email, QQ)
 Layer 5: agent           — Agent loop, context builder, memory store, skill manager, subagent manager, calendar handler adapter, reminder engine, intent pipeline (analyzer + router + engines), execution core
-Layer 6: cli             — Clap-derived CLI with 4 commands: chat, serve, init, status
+Layer 6: cli             — Clap-derived CLI with 4 commands: serve, init, status, plugin
 Layer 7: klyntbot        — Re-export facade (src/lib.rs) + binary entry point (src/main.rs)
 ```
 
@@ -85,11 +85,7 @@ Dependencies flow strictly upward. No circular dependencies — enforced by Carg
 
 ## CLI Subcommands
 
-The CLI has 4 commands. All task management, project management, and other operations are handled through chat (natural language via tools).
-
 ```bash
-klyntbot chat "message"          # One-shot chat (or omit message for REPL)
-klyntbot chat --session my-sess  # Resume a named session
 klyntbot serve --port 8080       # Start gateway daemon (channels, cron, heartbeat)
 klyntbot init                    # 2-phase setup wizard (core setup + pack selection)
 klyntbot init --packs            # Jump directly to pack selection
@@ -97,7 +93,7 @@ klyntbot init --reset            # Reset config to defaults before running wizar
 klyntbot status [--verbose]      # Show agent/config status
 ```
 
-Task management, project management, calendar sync, cron jobs, skills, and all other features are accessible through natural language in `klyntbot chat` or via channel integrations.
+Task management, project management, calendar sync, cron jobs, skills, and all other features are accessible through channel integrations (Telegram, Discord, etc.) or the dashboard.
 
 ## Environment Variables
 

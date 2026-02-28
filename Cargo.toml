@@ -81,7 +81,6 @@ uuid = { version = "1.20.0", features = ["v4", "serde"] }
 dirs = "6.0.0"
 cron = "0.15.0"
 clap = { version = "4.5.57", features = ["derive"] }
-rustyline = "17.0.2"
 base64 = "0.22.1"
 regex = "1.11.2"
 shellexpand = "3.1.0"

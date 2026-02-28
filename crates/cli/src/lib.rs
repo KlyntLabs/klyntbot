@@ -1,10 +1,8 @@
-//! Klyntbot CLI - CLI commands and REPL
+//! Klyntbot CLI - CLI commands
 //!
-//! This crate provides the command-line interface and interactive REPL.
+//! This crate provides the command-line interface.
 
-pub mod chat;
 pub mod commands;
-pub mod interactive;
 pub mod plugin_cmd;
 pub mod serve;
 pub mod status;
