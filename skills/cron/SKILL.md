@@ -38,3 +38,10 @@ cron(action="remove", job_id="abc123")
 | every hour | every_seconds: 3600 |
 | every day at 8am | cron_expr: "0 8 * * *" |
 | weekdays at 5pm | cron_expr: "0 17 * * 1-5" |
+
+## Deep Dive
+
+For advanced scheduling topics, load these references with `read_file` when needed:
+
+- **Cron handler architecture**: See `crates/tools/src/cron.rs` for the CronHandler trait and tool implementation
+- **Scheduling internals**: See `crates/scheduling/src/lib.rs` for the cron engine and job persistence
