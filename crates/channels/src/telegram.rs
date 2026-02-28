@@ -3,6 +3,7 @@
 //! Lightweight implementation without teloxide - just reqwest HTTP calls.
 
 use async_trait::async_trait;
+use dashmap::DashMap;
 use reqwest::Client;
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -10,16 +11,26 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::RwLock;
+use tokio::sync::{oneshot, RwLock};
 use tokio::time::sleep;
 use tracing::{debug, error, info, warn};
 
 use crate::formatter::ChannelFormatter;
 use crate::{check_allowlist, Channel};
 use bus::{InboundMessage, MessageBus, MessageKind, OutboundMessage};
-use common::{ChannelError, Result};
+use common::{
+    Answer, AnswerType, AnswerValue, ChannelError, FormResponse, InteractionRequest, Result,
+};
 use config::schema::TelegramConfig;
 use providers::TranscriptionProvider;
+
+/// State for a pending interaction callback.
+enum PendingCallback {
+    /// Waiting for a single button press (single_select, yes_no).
+    Single(oneshot::Sender<String>),
+    /// Waiting for free text reply from user.
+    FreeText(oneshot::Sender<String>),
+}
 
 /// Telegram channel implementation
 pub struct TelegramChannel {
@@ -29,6 +40,8 @@ pub struct TelegramChannel {
     transcriber: Option<TranscriptionProvider>,
     running: Arc<AtomicBool>,
     typing_tasks: Arc<RwLock<HashMap<String, tokio::task::JoinHandle<()>>>>,
+    /// Pending interaction callbacks keyed by `"{chat_id}:{question_id}"`.
+    pending_interactions: Arc<DashMap<String, PendingCallback>>,
 }
 
 impl TelegramChannel {
@@ -67,6 +80,7 @@ impl TelegramChannel {
             transcriber,
             running: Arc::new(AtomicBool::new(false)),
             typing_tasks: Arc::new(RwLock::new(HashMap::new())),
+            pending_interactions: Arc::new(DashMap::new()),
         })
     }
 
@@ -142,7 +156,7 @@ impl TelegramChannel {
             let params = json!({
                 "offset": offset,
                 "timeout": 30,
-                "allowed_updates": ["message", "message_reaction"]
+                "allowed_updates": ["message", "message_reaction", "callback_query"]
             });
 
             match self.api_call("getUpdates", params).await {
@@ -235,6 +249,11 @@ impl TelegramChannel {
 
     /// Handle a single update
     async fn handle_update(&self, update: &Value, bus: &MessageBus) -> Result<()> {
+        // Handle callback_query updates (from InlineKeyboard buttons)
+        if let Some(callback) = update.get("callback_query") {
+            return self.handle_callback_query(callback).await;
+        }
+
         // Handle reaction updates
         if let Some(reaction) = update.get("message_reaction") {
             return self.handle_reaction_update(reaction, bus).await;
@@ -244,6 +263,23 @@ impl TelegramChannel {
             Some(m) => m,
             None => return Ok(()), // Not a message update
         };
+
+        // Check if this is a pending free_text interaction response
+        if let Some(chat_id) = message.get("chat").and_then(|c| c.get("id")).and_then(|v| v.as_i64()) {
+            let chat_key_prefix = format!("{}:", chat_id);
+            let pending_key = self.pending_interactions.iter()
+                .find(|entry| entry.key().starts_with(&chat_key_prefix) && matches!(entry.value(), PendingCallback::FreeText(_)))
+                .map(|entry| entry.key().clone());
+
+            if let Some(key) = pending_key {
+                if let Some(text) = message.get("text").and_then(|v| v.as_str()) {
+                    if let Some((_, PendingCallback::FreeText(tx))) = self.pending_interactions.remove(&key) {
+                        let _ = tx.send(text.to_string());
+                        return Ok(());
+                    }
+                }
+            }
+        }
 
         // Extract user and chat info
         let user = message.get("from").ok_or_else(|| {
@@ -557,6 +593,69 @@ impl TelegramChannel {
         }
     }
 
+    /// Handle a callback_query from an inline keyboard button press.
+    async fn handle_callback_query(&self, callback: &Value) -> Result<()> {
+        let callback_id = callback
+            .get("id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+
+        let data = callback
+            .get("data")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+
+        // Answer the callback to dismiss the loading spinner
+        let _ = self
+            .api_call(
+                "answerCallbackQuery",
+                json!({ "callback_query_id": callback_id }),
+            )
+            .await;
+
+        // Parse callback_data format: "askuser:{chat_id}:{question_id}:{value}"
+        let parts: Vec<&str> = data.splitn(4, ':').collect();
+        if parts.len() < 4 || parts[0] != "askuser" {
+            debug!("Ignoring callback with unexpected data format: {}", data);
+            return Ok(());
+        }
+
+        let chat_id = parts[1];
+        let question_id = parts[2];
+        let value = parts[3];
+        let key = format!("{}:{}", chat_id, question_id);
+
+        // Resolve the pending interaction
+        if let Some((_, PendingCallback::Single(tx))) = self.pending_interactions.remove(&key) {
+            let _ = tx.send(value.to_string());
+        }
+
+        // Edit the original message to show the selection (remove keyboard)
+        if let Some(msg) = callback.get("message") {
+            if let (Some(msg_chat_id), Some(msg_id)) = (
+                msg.get("chat").and_then(|c| c.get("id")).and_then(|v| v.as_i64()),
+                msg.get("message_id").and_then(|v| v.as_i64()),
+            ) {
+                let original_text = msg
+                    .get("text")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Question");
+                let _ = self
+                    .api_call(
+                        "editMessageText",
+                        json!({
+                            "chat_id": msg_chat_id,
+                            "message_id": msg_id,
+                            "text": format!("{}\n\n✓ Selected: {}", original_text, value),
+                        }),
+                    )
+                    .await;
+            }
+        }
+
+        Ok(())
+    }
+
     /// Set bot commands menu
     async fn set_bot_commands(&self) -> Result<()> {
         let params = json!({
@@ -652,6 +751,221 @@ impl Channel for TelegramChannel {
         self.start_typing(chat_id).await;
         Ok(())
     }
+
+    fn supports_interaction(&self) -> bool {
+        true
+    }
+
+    async fn send_interaction(
+        &self,
+        chat_id: &str,
+        request: &InteractionRequest,
+    ) -> Result<FormResponse> {
+        let chat_id_i64: i64 = chat_id
+            .parse()
+            .map_err(|_| ChannelError::SendFailed("Invalid chat_id for interaction".into()))?;
+
+        let mut answers = Vec::new();
+
+        for question in &request.questions {
+            let answer = match &question.answer_type {
+                AnswerType::SingleSelect { options } => {
+                    let keyboard = build_single_select_keyboard(
+                        chat_id,
+                        &question.id,
+                        options,
+                    );
+                    self.api_call(
+                        "sendMessage",
+                        json!({
+                            "chat_id": chat_id_i64,
+                            "text": format!("<b>{}</b>\n{}", request.title, question.text),
+                            "parse_mode": "HTML",
+                            "reply_markup": keyboard,
+                        }),
+                    )
+                    .await?;
+
+                    let value = self
+                        .wait_for_callback(chat_id, &question.id)
+                        .await?;
+                    Answer {
+                        question_id: question.id.clone(),
+                        value: AnswerValue::Selected { value },
+                    }
+                }
+                AnswerType::YesNo { .. } => {
+                    let keyboard = build_yes_no_keyboard(chat_id, &question.id);
+                    self.api_call(
+                        "sendMessage",
+                        json!({
+                            "chat_id": chat_id_i64,
+                            "text": format!("<b>{}</b>\n{}", request.title, question.text),
+                            "parse_mode": "HTML",
+                            "reply_markup": keyboard,
+                        }),
+                    )
+                    .await?;
+
+                    let value = self
+                        .wait_for_callback(chat_id, &question.id)
+                        .await?;
+                    Answer {
+                        question_id: question.id.clone(),
+                        value: AnswerValue::YesNo {
+                            answer: value == "yes",
+                        },
+                    }
+                }
+                AnswerType::MultiSelect { options } => {
+                    // For multi_select, present as single_select buttons
+                    // (simplified: user selects one at a time, "Done" to finish)
+                    let keyboard = build_single_select_keyboard(
+                        chat_id,
+                        &question.id,
+                        options,
+                    );
+                    self.api_call(
+                        "sendMessage",
+                        json!({
+                            "chat_id": chat_id_i64,
+                            "text": format!("<b>{}</b>\n{}\n<i>(Select one option)</i>", request.title, question.text),
+                            "parse_mode": "HTML",
+                            "reply_markup": keyboard,
+                        }),
+                    )
+                    .await?;
+
+                    let value = self
+                        .wait_for_callback(chat_id, &question.id)
+                        .await?;
+                    Answer {
+                        question_id: question.id.clone(),
+                        value: AnswerValue::MultiSelected {
+                            values: vec![value],
+                        },
+                    }
+                }
+                AnswerType::FreeText { placeholder } => {
+                    let prompt = if let Some(ph) = placeholder {
+                        format!(
+                            "<b>{}</b>\n{}\n<i>({})</i>",
+                            request.title, question.text, ph
+                        )
+                    } else {
+                        format!("<b>{}</b>\n{}", request.title, question.text)
+                    };
+
+                    self.api_call(
+                        "sendMessage",
+                        json!({
+                            "chat_id": chat_id_i64,
+                            "text": prompt,
+                            "parse_mode": "HTML",
+                        }),
+                    )
+                    .await?;
+
+                    let content = self
+                        .wait_for_free_text(chat_id, &question.id)
+                        .await?;
+                    Answer {
+                        question_id: question.id.clone(),
+                        value: AnswerValue::Text { content },
+                    }
+                }
+            };
+
+            answers.push(answer);
+        }
+
+        Ok(FormResponse::Completed(answers))
+    }
+}
+
+impl TelegramChannel {
+    /// Wait for a callback_query response with a 5-minute timeout.
+    async fn wait_for_callback(&self, chat_id: &str, question_id: &str) -> Result<String> {
+        let (tx, rx) = oneshot::channel();
+        let key = format!("{}:{}", chat_id, question_id);
+        self.pending_interactions
+            .insert(key.clone(), PendingCallback::Single(tx));
+
+        match tokio::time::timeout(Duration::from_secs(300), rx).await {
+            Ok(Ok(value)) => Ok(value),
+            Ok(Err(_)) => {
+                self.pending_interactions.remove(&key);
+                Err(ChannelError::SendFailed("Interaction cancelled".into()).into())
+            }
+            Err(_) => {
+                self.pending_interactions.remove(&key);
+                Err(ChannelError::SendFailed("Interaction timed out (5 min)".into()).into())
+            }
+        }
+    }
+
+    /// Wait for a free text message with a 5-minute timeout.
+    async fn wait_for_free_text(&self, chat_id: &str, question_id: &str) -> Result<String> {
+        let (tx, rx) = oneshot::channel();
+        let key = format!("{}:{}", chat_id, question_id);
+        self.pending_interactions
+            .insert(key.clone(), PendingCallback::FreeText(tx));
+
+        match tokio::time::timeout(Duration::from_secs(300), rx).await {
+            Ok(Ok(value)) => Ok(value),
+            Ok(Err(_)) => {
+                self.pending_interactions.remove(&key);
+                Err(ChannelError::SendFailed("Interaction cancelled".into()).into())
+            }
+            Err(_) => {
+                self.pending_interactions.remove(&key);
+                Err(ChannelError::SendFailed("Interaction timed out (5 min)".into()).into())
+            }
+        }
+    }
+}
+
+/// Build an InlineKeyboardMarkup for single_select options.
+/// Buttons arranged in rows of 2, with callback_data `"askuser:{chat_id}:{question_id}:{value}"`.
+fn build_single_select_keyboard(
+    chat_id: &str,
+    question_id: &str,
+    options: &[common::AnswerOption],
+) -> Value {
+    let buttons: Vec<Value> = options
+        .iter()
+        .map(|opt| {
+            json!({
+                "text": opt.label,
+                "callback_data": format!("askuser:{}:{}:{}", chat_id, question_id, opt.value),
+            })
+        })
+        .collect();
+
+    // Arrange in rows of 2
+    let rows: Vec<Value> = buttons
+        .chunks(2)
+        .map(|chunk| Value::Array(chunk.to_vec()))
+        .collect();
+
+    json!({ "inline_keyboard": rows })
+}
+
+/// Build an InlineKeyboardMarkup for yes/no question.
+/// Single row with Yes and No buttons.
+fn build_yes_no_keyboard(chat_id: &str, question_id: &str) -> Value {
+    json!({
+        "inline_keyboard": [[
+            {
+                "text": "✅ Yes",
+                "callback_data": format!("askuser:{}:{}:yes", chat_id, question_id),
+            },
+            {
+                "text": "❌ No",
+                "callback_data": format!("askuser:{}:{}:no", chat_id, question_id),
+            },
+        ]]
+    })
 }
 
 /// Telegram API response
@@ -664,8 +978,10 @@ struct TelegramResponse {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::formatter::{ChannelFormatter, TelegramFormatter};
     use crate::utils;
+    use common::AnswerOption;
 
     #[test]
     fn test_markdown_to_html_code_blocks() {
@@ -737,6 +1053,94 @@ mod tests {
         assert!(chunks.len() > 1);
         for chunk in &chunks {
             assert!(chunk.len() <= limit);
+        }
+    }
+
+    // --- Interaction keyboard tests ---
+
+    #[test]
+    fn test_single_select_keyboard_3_options() {
+        let options = vec![
+            AnswerOption {
+                value: "high".into(),
+                label: "High".into(),
+                description: None,
+            },
+            AnswerOption {
+                value: "medium".into(),
+                label: "Medium".into(),
+                description: None,
+            },
+            AnswerOption {
+                value: "low".into(),
+                label: "Low".into(),
+                description: None,
+            },
+        ];
+
+        let keyboard = build_single_select_keyboard("123", "priority", &options);
+        let rows = keyboard["inline_keyboard"].as_array().unwrap();
+
+        // 3 options → 2 rows (2 + 1)
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].as_array().unwrap().len(), 2);
+        assert_eq!(rows[1].as_array().unwrap().len(), 1);
+
+        // Check callback_data format
+        let first_btn = &rows[0][0];
+        assert_eq!(first_btn["text"], "High");
+        assert_eq!(
+            first_btn["callback_data"],
+            "askuser:123:priority:high"
+        );
+    }
+
+    #[test]
+    fn test_yes_no_keyboard() {
+        let keyboard = build_yes_no_keyboard("456", "confirm");
+        let rows = keyboard["inline_keyboard"].as_array().unwrap();
+
+        // 1 row with 2 buttons
+        assert_eq!(rows.len(), 1);
+        let buttons = rows[0].as_array().unwrap();
+        assert_eq!(buttons.len(), 2);
+
+        assert!(buttons[0]["text"].as_str().unwrap().contains("Yes"));
+        assert_eq!(
+            buttons[0]["callback_data"],
+            "askuser:456:confirm:yes"
+        );
+        assert!(buttons[1]["text"].as_str().unwrap().contains("No"));
+        assert_eq!(
+            buttons[1]["callback_data"],
+            "askuser:456:confirm:no"
+        );
+    }
+
+    #[test]
+    fn test_callback_data_format() {
+        let options = vec![
+            AnswerOption {
+                value: "oauth2".into(),
+                label: "OAuth 2.0".into(),
+                description: Some("Industry standard".into()),
+            },
+            AnswerOption {
+                value: "jwt".into(),
+                label: "JWT".into(),
+                description: None,
+            },
+        ];
+
+        let keyboard = build_single_select_keyboard("789", "auth_method", &options);
+        let rows = keyboard["inline_keyboard"].as_array().unwrap();
+
+        // Verify all callback_data follows the expected format
+        for row in rows {
+            for btn in row.as_array().unwrap() {
+                let data = btn["callback_data"].as_str().unwrap();
+                assert!(data.starts_with("askuser:789:auth_method:"));
+            }
         }
     }
 
