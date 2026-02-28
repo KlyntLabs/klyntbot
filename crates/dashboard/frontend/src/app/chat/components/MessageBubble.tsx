@@ -4,6 +4,7 @@ import type { ChatMessage } from '../../../lib/types';
 import type { ConnectionStatus } from '../../../lib/ws';
 import { renderMarkdown, formatTime } from '../utils';
 import { InlineToolCalls } from './InlineToolCalls';
+import { EntityCard } from './EntityCard';
 
 /** Connection status indicator component */
 export function StatusDot({ status }: { status: ConnectionStatus }) {
@@ -84,6 +85,13 @@ export function MessageBubble({ msg }: { msg: ChatMessage }) {
                 className="inline-block w-[2px] h-[14px] ml-0.5 align-text-bottom animate-pulse"
                 style={{ backgroundColor: 'var(--codex-accent)' }}
               />
+            )}
+            {msg.entityCards && msg.entityCards.length > 0 && (
+              <div className="flex flex-col gap-2 mt-3">
+                {msg.entityCards.map((card) => (
+                  <EntityCard key={card.entityId} card={card} />
+                ))}
+              </div>
             )}
             <div className="flex items-center gap-2 mt-2">
               <div

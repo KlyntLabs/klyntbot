@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import type { EntityCardData } from '../../../lib/types';
 
-const ICON_MAP: Record<string, React.ComponentType<{ className?: string; strokeWidth?: number }>> = {
+const ICON_MAP: Record<string, React.ComponentType<{ className?: string; strokeWidth?: number; style?: React.CSSProperties }>> = {
   task: CheckSquare,
   project: FolderKanban,
   target: Target,
