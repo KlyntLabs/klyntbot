@@ -4,10 +4,10 @@
 //! Public API:
 //! - [`PlanStepDraft`] — lightweight draft before DB persistence
 //! - [`generate_plan_steps`] — call an LLM and parse the result
-//! - [`drafts_to_plan_steps`] — convert drafts to full [`plan::PlanStep`] records
+//! - [`drafts_to_plan_steps`] — convert drafts to full [`domain::PlanStep`] records
 
 use common::Result;
-use plan::{PlanStep, StepStatus, DEFAULT_MAX_STEP_ATTEMPTS};
+use domain::{PlanStep, StepStatus, DEFAULT_MAX_STEP_ATTEMPTS};
 use providers::{ChatParams, DynProvider, Message};
 use tracing::warn;
 use uuid::Uuid;

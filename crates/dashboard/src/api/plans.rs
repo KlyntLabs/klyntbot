@@ -200,14 +200,14 @@ pub async fn update_plan_status(
 
     let from = plan
         .status
-        .parse::<plan::PlanStatus>()
+        .parse::<domain::PlanStatus>()
         .map_err(|_| ApiError::unprocessable(format!("unknown current status: '{}'", plan.status)))?;
     let to = req
         .status
-        .parse::<plan::PlanStatus>()
+        .parse::<domain::PlanStatus>()
         .map_err(|_| ApiError::unprocessable(format!("invalid status: '{}'", req.status)))?;
 
-    plan::PlanStatus::validate_transition(&from, &to).map_err(|_| {
+    domain::PlanStatus::validate_transition(&from, &to).map_err(|_| {
         ApiError::conflict(format!(
             "Invalid status transition: '{}' → '{}'",
             plan.status, req.status

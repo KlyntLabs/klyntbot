@@ -3,7 +3,7 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Duration, Utc};
 use context_engine::source::{ContextSource, SourceContext};
-use goal::GoalStatus;
+use domain::GoalStatus;
 use tokio::sync::Mutex;
 
 /// Default TTL for cached goal context (seconds).

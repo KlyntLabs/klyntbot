@@ -6,7 +6,7 @@
 //! - [`regenerate_from`] — regenerate plan steps from a failure point
 
 use common::{utils::truncate_at_boundary, Result};
-use plan::{Plan, PlanStep, StepStatus, DEFAULT_MAX_STEP_ATTEMPTS};
+use domain::{Plan, PlanStep, StepStatus, DEFAULT_MAX_STEP_ATTEMPTS};
 use providers::{
     types::{ChatParams, Message},
     DynProvider,
@@ -354,7 +354,7 @@ mod tests {
     use super::*;
     use async_trait::async_trait;
     use chrono::Utc;
-    use plan::{PlanStatus, PlanStep, StepStatus};
+    use domain::{PlanStatus, PlanStep, StepStatus};
     use providers::types::{
         ChatParams, LlmProvider, LlmResponse, ToolCall as ProviderToolCall, Usage,
     };
@@ -393,7 +393,7 @@ mod tests {
             current_step_index: 0,
             iteration_limit: 50,
             backtrack_history: vec![],
-            visibility: plan::PlanVisibility::default(),
+            visibility: domain::PlanVisibility::default(),
             task_id: None,
             created_at: now,
             updated_at: now,

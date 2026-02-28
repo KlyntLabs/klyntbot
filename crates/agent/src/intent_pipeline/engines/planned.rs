@@ -10,7 +10,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use chrono::Utc;
 use common::{utils::{tool_def_name, truncate_chars}, Result};
-use plan::{conversions::save_plan, PlanStatus, PlanVisibility, StepStatus, DEFAULT_MAX_STEP_ATTEMPTS};
+use domain::plan::save_plan;
+use domain::{PlanStatus, PlanVisibility, StepStatus, DEFAULT_MAX_STEP_ATTEMPTS};
 use providers::{DynProvider, Message, Usage};
 use tools::RoutingContext;
 use tracing::{debug, info, warn};
@@ -100,11 +101,11 @@ impl PlannedEngine {
         }
 
         // Build completed steps from prior work
-        let completed_steps: Vec<plan::PlanStep> = escalation
+        let completed_steps: Vec<domain::PlanStep> = escalation
             .completed_work
             .iter()
             .enumerate()
-            .map(|(i, step)| plan::PlanStep {
+            .map(|(i, step)| domain::PlanStep {
                 id: Uuid::new_v4(),
                 index: i,
                 description: step.description.clone(),
@@ -202,12 +203,12 @@ impl PlannedEngine {
     fn build_plan(
         &self,
         description: &str,
-        steps: Vec<plan::PlanStep>,
+        steps: Vec<domain::PlanStep>,
         ctx: &RoutingContext,
         visibility_override: Option<PlanVisibility>,
-    ) -> plan::Plan {
+    ) -> domain::Plan {
         let now = Utc::now();
-        plan::Plan {
+        domain::Plan {
             id: Uuid::new_v4(),
             session_key: format!("{}:{}", ctx.channel, ctx.chat_id),
             goal_id: None,
@@ -227,7 +228,7 @@ impl PlannedEngine {
     }
 
     /// Persist the plan and transition to Executing.
-    async fn save_and_start_plan(&self, mut plan: plan::Plan) -> Result<plan::Plan> {
+    async fn save_and_start_plan(&self, mut plan: domain::Plan) -> Result<domain::Plan> {
         if let Err(e) = save_plan(&self.plan_repo, &plan).await {
             warn!("PlannedEngine: failed to persist plan: {}", e);
             return Err(e);
@@ -248,7 +249,7 @@ impl PlannedEngine {
     }
 
     /// Execute plan steps sequentially with retry + backtracking.
-    async fn run_plan_steps(&self, plan: &mut plan::Plan, ctx: &RoutingContext) -> Result<String> {
+    async fn run_plan_steps(&self, plan: &mut domain::Plan, ctx: &RoutingContext) -> Result<String> {
         let step_count = plan.steps.len();
         let mut outputs: Vec<String> = Vec::with_capacity(step_count);
         let mut step_idx = plan.current_step_index;
@@ -305,7 +306,7 @@ impl PlannedEngine {
                         reason
                     );
 
-                    plan.backtrack_history.push(plan::BacktrackEntry {
+                    plan.backtrack_history.push(domain::BacktrackEntry {
                         step_index: step_idx,
                         attempt: attempt_count,
                         failure_reason: reason.clone(),

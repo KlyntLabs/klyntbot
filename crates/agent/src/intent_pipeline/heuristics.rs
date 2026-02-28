@@ -71,7 +71,7 @@ pub fn analyze_heuristic(message: &str) -> Option<IntentAnalysis> {
         let signals = analyze_complexity(&msg);
         return Some(IntentAnalysis {
             mode: ExecutionMode::Planned {
-                visibility: plan::PlanVisibility::default(),
+                visibility: domain::PlanVisibility::default(),
                 max_steps: 15,
             },
             signals,
@@ -118,7 +118,7 @@ pub fn analyze_heuristic(message: &str) -> Option<IntentAnalysis> {
     if score >= 4 {
         return Some(IntentAnalysis {
             mode: ExecutionMode::Planned {
-                visibility: plan::PlanVisibility::default(),
+                visibility: domain::PlanVisibility::default(),
                 max_steps: 10,
             },
             signals,

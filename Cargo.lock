@@ -31,12 +31,11 @@ dependencies = [
  "config",
  "context_engine",
  "dirs",
+ "domain",
  "feature-finance",
  "feature-todo",
  "futures-util",
- "goal",
  "mime_guess",
- "plan",
  "plugin-runtime",
  "providers",
  "scheduling",
@@ -1258,11 +1257,10 @@ dependencies = [
  "crossterm",
  "dashboard",
  "dirs",
- "goal",
+ "domain",
  "heartbeat",
  "lettre",
  "native-tls",
- "plan",
  "plugin-runtime",
  "providers",
  "reqwest 0.13.2",
@@ -1912,10 +1910,10 @@ dependencies = [
  "chrono",
  "common",
  "config",
+ "domain",
  "futures-util",
  "include_dir",
  "mime_guess",
- "plan",
  "reqwest 0.13.2",
  "scheduling",
  "serde",
@@ -2710,6 +2708,19 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.114",
+]
+
+[[package]]
+name = "domain"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "common",
+ "serde",
+ "serde_json",
+ "storage",
+ "thiserror 2.0.18",
+ "uuid",
 ]
 
 [[package]]
@@ -3628,19 +3639,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "goal"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "common",
- "serde",
- "serde_json",
- "storage",
- "thiserror 2.0.18",
- "uuid",
-]
-
-[[package]]
 name = "h2"
 version = "0.4.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4524,12 +4522,11 @@ dependencies = [
  "common",
  "config",
  "context_engine",
+ "domain",
  "extism",
  "feature-finance",
  "feature-todo",
- "goal",
  "heartbeat",
- "plan",
  "plugin-runtime",
  "providers",
  "scheduling",
@@ -6282,19 +6279,6 @@ name = "pkg-config"
 version = "0.3.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7edddbd0b52d732b21ad9a5fab5c704c14cd949e5e9a1ec5929a24fded1b904c"
-
-[[package]]
-name = "plan"
-version = "0.2.0"
-dependencies = [
- "chrono",
- "common",
- "serde",
- "serde_json",
- "storage",
- "thiserror 2.0.18",
- "uuid",
-]
 
 [[package]]
 name = "plugin-runtime"
@@ -8955,12 +8939,11 @@ dependencies = [
  "chrono",
  "common",
  "config",
+ "domain",
  "fastembed",
  "feature-todo",
  "globset",
- "goal",
  "html2text",
- "plan",
  "regex",
  "reqwest 0.13.2",
  "scraper",

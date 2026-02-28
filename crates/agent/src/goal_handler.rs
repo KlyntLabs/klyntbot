@@ -7,9 +7,8 @@
 use async_trait::async_trait;
 use chrono::Utc;
 use common::Result;
-use goal::GoalError;
-use goal::{conversions, Goal, GoalProgress, GoalStatus};
-use plan::PlanStatus;
+use domain::goal::{self as conversions, GoalError, Goal, GoalProgress, GoalStatus};
+use domain::PlanStatus;
 use providers::DynProvider;
 use tools::goal_tool::GoalHandler;
 use tracing::warn;
@@ -154,7 +153,7 @@ impl GoalHandler for GoalHandlerImpl {
         let steps = drafts_to_plan_steps(&drafts, 0);
         let step_count = steps.len();
 
-        let plan = plan::Plan {
+        let plan = domain::Plan {
             id: plan_id,
             session_key: format!("goal:{}", goal_id),
             goal_id: Some(*goal_id),
@@ -165,14 +164,14 @@ impl GoalHandler for GoalHandlerImpl {
             current_step_index: 0,
             iteration_limit: 50,
             backtrack_history: vec![],
-            visibility: plan::PlanVisibility::default(),
+            visibility: domain::PlanVisibility::default(),
             task_id: None,
             created_at: now,
             updated_at: now,
             completed_at: None,
         };
 
-        if let Err(e) = plan::conversions::save_plan(plan_repo, &plan).await {
+        if let Err(e) = domain::plan::save_plan(plan_repo, &plan).await {
             warn!("decompose_goal: failed to save plan: {}", e);
             return Ok(format!(
                 "Generated {} steps but could not persist plan: {}",

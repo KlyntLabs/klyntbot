@@ -3,7 +3,7 @@
 use async_trait::async_trait;
 use chrono::Utc;
 use common::Result;
-use goal::{Goal, GoalProgress, GoalStatus};
+use domain::goal::{Goal, GoalProgress, GoalStatus};
 use serde_json::Value;
 use std::sync::Arc;
 use uuid::Uuid;
@@ -293,7 +293,7 @@ impl Tool for GoalTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use goal::GoalProgress;
+    use domain::goal::GoalProgress;
     use std::sync::Mutex;
 
     /// Mock GoalHandler for testing all actions.

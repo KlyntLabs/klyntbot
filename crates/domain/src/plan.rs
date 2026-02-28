@@ -1,15 +1,46 @@
-//! Plan types for structured multi-step execution.
+//! Plan domain types, errors, and SQL conversion helpers.
+
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use std::fmt;
+use std::str::FromStr;
+use thiserror::Error;
+use uuid::Uuid;
 
 /// Default maximum attempts per plan step before the step is marked failed.
 pub const DEFAULT_MAX_STEP_ATTEMPTS: u8 = 3;
 
-use crate::PlanError;
-use chrono::{DateTime, Utc};
-use common::Result;
-use serde::{Deserialize, Serialize};
-use std::fmt;
-use std::str::FromStr;
-use uuid::Uuid;
+// ── Error ──────────────────────────────────────────────────────────
+
+/// Plan-specific errors
+#[derive(Error, Debug)]
+pub enum PlanError {
+    #[error("Plan not found: {0}")]
+    NotFound(String),
+
+    #[error("Plan generation failed: {0}")]
+    GenerationFailed(String),
+
+    #[error("Invalid plan state: {0}")]
+    InvalidState(String),
+
+    #[error("Execution stalled at step {step_index}: {reason}")]
+    ExecutionStalled { step_index: usize, reason: String },
+
+    #[error("Backtrack limit reached at step {0}")]
+    BacktrackLimitReached(usize),
+
+    #[error("Plan store error: {0}")]
+    StoreFailed(String),
+}
+
+impl From<PlanError> for common::KlyntbotError {
+    fn from(e: PlanError) -> Self {
+        common::KlyntbotError::Plan(e.to_string())
+    }
+}
+
+// ── Types ──────────────────────────────────────────────────────────
 
 /// Controls whether auto-generated plans appear in the UI.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -82,13 +113,13 @@ impl PlanStatus {
     /// Validate if a transition from one status to another is allowed.
     ///
     /// Valid transitions:
-    /// - Draft → Approved, Abandoned
-    /// - Approved → Executing, Abandoned
-    /// - Executing → Completed, Failed, Abandoned
-    /// - Completed → (final state, no transitions allowed)
-    /// - Failed → (final state, no transitions allowed)
-    /// - Abandoned → (final state, no transitions allowed)
-    pub fn validate_transition(from: &PlanStatus, to: &PlanStatus) -> Result<()> {
+    /// - Draft -> Approved, Abandoned
+    /// - Approved -> Executing, Abandoned
+    /// - Executing -> Completed, Failed, Abandoned
+    /// - Completed -> (final state, no transitions allowed)
+    /// - Failed -> (final state, no transitions allowed)
+    /// - Abandoned -> (final state, no transitions allowed)
+    pub fn validate_transition(from: &PlanStatus, to: &PlanStatus) -> common::Result<()> {
         // Allow no-op transitions (same state)
         if from == to {
             return Ok(());
@@ -206,22 +237,130 @@ pub struct BacktrackEntry {
     pub timestamp: DateTime<Utc>,
 }
 
+// ── Conversions ────────────────────────────────────────────────────
+
+/// Convert a Plan domain type to a PlanRow for SQL persistence.
+pub fn plan_to_row(plan: &Plan) -> common::Result<storage::PlanRow> {
+    Ok(storage::PlanRow {
+        id: plan.id,
+        session_key: plan.session_key.clone(),
+        goal_id: plan.goal_id,
+        title: plan.title.clone(),
+        description: plan.description.clone(),
+        status: plan.status.to_string(),
+        current_step_index: plan.current_step_index as i32,
+        iteration_limit: plan.iteration_limit as i32,
+        backtrack_history: serde_json::to_value(&plan.backtrack_history)
+            .map_err(|e| common::KlyntbotError::Plan(format!("backtrack_history: {e}")))?,
+        visibility: plan.visibility.to_string(),
+        task_id: plan.task_id.clone(),
+        created_at: plan.created_at,
+        updated_at: plan.updated_at,
+        completed_at: plan.completed_at,
+    })
+}
+
+/// Convert a PlanStep to a PlanStepRow for SQL persistence.
+pub fn step_to_row(step: &PlanStep, plan_id: Uuid) -> storage::PlanStepRow {
+    storage::PlanStepRow {
+        id: step.id,
+        plan_id,
+        step_index: step.index as i32,
+        description: step.description.clone(),
+        reasoning: step.reasoning.clone(),
+        expected_tools: step.expected_tools.clone(),
+        status: step.status.to_string(),
+        attempt_count: step.attempt_count as i16,
+        max_attempts: step.max_attempts as i16,
+        result: step.result.clone(),
+        started_at: step.started_at,
+        completed_at: step.completed_at,
+    }
+}
+
+/// Convert a PlanRow + PlanStepRows back to a Plan domain type.
+pub fn row_to_plan(row: storage::PlanRow, step_rows: Vec<storage::PlanStepRow>) -> Plan {
+    let steps: Vec<PlanStep> = step_rows
+        .into_iter()
+        .map(|sr| PlanStep {
+            id: sr.id,
+            index: sr.step_index as usize,
+            description: sr.description,
+            reasoning: sr.reasoning,
+            expected_tools: sr.expected_tools,
+            status: sr.status.parse().unwrap_or_default(),
+            attempt_count: sr.attempt_count as u8,
+            max_attempts: sr.max_attempts as u8,
+            result: sr.result,
+            started_at: sr.started_at,
+            completed_at: sr.completed_at,
+        })
+        .collect();
+
+    Plan {
+        id: row.id,
+        session_key: row.session_key,
+        goal_id: row.goal_id,
+        title: row.title,
+        description: row.description,
+        status: row.status.parse().unwrap_or_default(),
+        steps,
+        current_step_index: row.current_step_index as usize,
+        iteration_limit: row.iteration_limit as usize,
+        backtrack_history: serde_json::from_value::<Vec<BacktrackEntry>>(row.backtrack_history)
+            .unwrap_or_default(),
+        visibility: row.visibility.parse().unwrap_or_default(),
+        task_id: row.task_id,
+        created_at: row.created_at,
+        updated_at: row.updated_at,
+        completed_at: row.completed_at,
+    }
+}
+
+/// Load a Plan from the repo by ID (including its steps). Returns None if not found.
+pub async fn load_plan(repo: &storage::PlanRepo, id: &Uuid) -> common::Result<Option<Plan>> {
+    match repo.get(*id).await {
+        Ok(row) => {
+            let steps = repo.get_steps(*id).await?;
+            Ok(Some(row_to_plan(row, steps)))
+        }
+        Err(storage::StorageError::NotFound(_)) => Ok(None),
+        Err(e) => Err(e.into()),
+    }
+}
+
+/// Save (upsert) a Plan + all its steps to the repo.
+pub async fn save_plan(repo: &storage::PlanRepo, plan: &Plan) -> common::Result<()> {
+    let row = plan_to_row(plan)?;
+    repo.upsert(&row).await?;
+
+    for step in &plan.steps {
+        let step_row = step_to_row(step, plan.id);
+        repo.upsert_step(&step_row).await?;
+    }
+
+    Ok(())
+}
+
+/// Get the most recent active plan for a session.
+/// Returns Draft, Approved, or Executing plans only.
+pub async fn get_active_plan(
+    repo: &storage::PlanRepo,
+    session_key: &str,
+) -> common::Result<Option<Plan>> {
+    let Some(row) = repo.get_active(session_key).await? else {
+        return Ok(None);
+    };
+    let steps = repo.get_steps(row.id).await?;
+    Ok(Some(row_to_plan(row, steps)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_plan_creation_defaults() {
-        // Given: no plan exists
-        // When: a new Plan is created with minimal fields
-        // Then:
-        //   - status defaults to Draft
-        //   - current_step_index is 0
-        //   - backtrack_history is empty
-        //   - iteration_limit defaults to 50
-        //   - created_at and updated_at are set
-        // Maps to: US-1 (AC-1.2)
-
         let now = Utc::now();
         let plan = Plan {
             id: Uuid::new_v4(),
@@ -251,11 +390,6 @@ mod tests {
 
     #[test]
     fn test_plan_status_transitions_valid() {
-        // Given: a Plan with status Draft
-        // When: status transitions through: Draft → Approved → Executing → Completed
-        // Then: all transitions succeed without error
-        // Maps to: US-1 (AC-1.2)
-
         let mut status = PlanStatus::Draft;
         assert_eq!(status, PlanStatus::Draft);
 
@@ -271,14 +405,6 @@ mod tests {
 
     #[test]
     fn test_step_status_transitions() {
-        // Given: a PlanStep with status Pending
-        // When: status transitions: Pending → Executing → Completed
-        // Then: each transition is valid
-        // And When: a step transitions: Pending → Executing → Failed
-        // Then: the Failed status is set correctly
-        // Maps to: US-1 (AC-1.3)
-
-        // Test Pending → Executing → Completed
         let mut status = StepStatus::Pending;
         assert_eq!(status, StepStatus::Pending);
 
@@ -288,18 +414,12 @@ mod tests {
         status = StepStatus::Completed;
         assert_eq!(status, StepStatus::Completed);
 
-        // Test Pending → Executing → Failed
         let status_failed = StepStatus::Failed;
         assert_eq!(status_failed, StepStatus::Failed);
     }
 
     #[test]
     fn test_plan_serde_roundtrip() {
-        // Given: a Plan with all fields populated (steps, backtrack_history, linked goal)
-        // When: the Plan is serialized to JSON and deserialized
-        // Then: the deserialized Plan matches the original exactly
-        // Maps to: US-1 (AC-1.1)
-
         let now = Utc::now();
         let goal_id = Uuid::new_v4();
         let step = PlanStep {
@@ -341,7 +461,6 @@ mod tests {
             completed_at: None,
         };
 
-        // Serialize and deserialize
         let json = serde_json::to_string(&plan).unwrap();
         let deserialized: Plan = serde_json::from_str(&json).unwrap();
 
@@ -361,7 +480,6 @@ mod tests {
 
     #[test]
     fn test_valid_status_transitions() {
-        // Test all valid transitions succeed
         assert!(PlanStatus::validate_transition(&PlanStatus::Draft, &PlanStatus::Approved).is_ok());
         assert!(
             PlanStatus::validate_transition(&PlanStatus::Draft, &PlanStatus::Abandoned).is_ok()
@@ -391,7 +509,6 @@ mod tests {
 
     #[test]
     fn test_invalid_status_transitions_from_terminal_states() {
-        // Terminal states: Completed, Failed, Abandoned — cannot transition to any other state
         let terminal = [
             PlanStatus::Completed,
             PlanStatus::Failed,
@@ -409,7 +526,7 @@ mod tests {
         for from in &terminal {
             for to in &all {
                 if from == to {
-                    continue; // no-op transitions are allowed
+                    continue;
                 }
                 assert!(
                     PlanStatus::validate_transition(from, to).is_err(),
@@ -423,7 +540,6 @@ mod tests {
 
     #[test]
     fn test_invalid_status_transitions_skipping_states() {
-        // Cannot skip states in the normal flow
         assert!(
             PlanStatus::validate_transition(&PlanStatus::Draft, &PlanStatus::Executing).is_err()
         );

@@ -2,7 +2,7 @@
 
 use async_trait::async_trait;
 use common::Result;
-use plan::Plan;
+use domain::Plan;
 use serde_json::Value;
 use std::sync::Arc;
 use uuid::Uuid;

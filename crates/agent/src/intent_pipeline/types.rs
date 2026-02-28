@@ -1,7 +1,7 @@
 //! Core types for the intent pipeline: execution modes, complexity signals, intent analysis.
 
 use context_engine::ExecutionStrategy;
-use plan::PlanVisibility;
+use domain::PlanVisibility;
 use serde::{Deserialize, Serialize};
 
 /// The three execution modes the pipeline can select.

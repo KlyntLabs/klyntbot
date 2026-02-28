@@ -11,9 +11,8 @@ pub use channels;
 pub use common;
 pub use config;
 pub use context_engine;
-pub use goal;
+pub use domain;
 pub use heartbeat;
-pub use plan;
 pub use providers;
 pub use scheduling;
 pub use session;
@@ -34,7 +33,7 @@ pub use common::{
 };
 pub use config::Config;
 pub use heartbeat::HeartbeatService;
-pub use plan::{Plan, PlanStatus};
+pub use domain::{Plan, PlanStatus};
 pub use providers::{
     create_provider, create_provider_with_failover, DynProvider, LlmProvider, LlmResponse, Message,
     ProviderRegistry,

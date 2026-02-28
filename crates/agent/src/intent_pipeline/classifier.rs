@@ -115,7 +115,7 @@ impl IntentClassifier {
         let mode = match mode_str {
             "direct" => ExecutionMode::Direct,
             "planned" => ExecutionMode::Planned {
-                visibility: plan::PlanVisibility::default(),
+                visibility: domain::PlanVisibility::default(),
                 max_steps: signals.estimated_tool_calls.max(5),
             },
             _ => ExecutionMode::Reactive {

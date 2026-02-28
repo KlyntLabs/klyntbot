@@ -9,8 +9,7 @@ members = [
     "crates/session",
     "crates/scheduling",
     "crates/calendar",
-    "crates/goal",
-    "crates/plan",
+    "crates/domain",
     "crates/tools",
     "crates/channels",
     "crates/heartbeat",
@@ -42,8 +41,7 @@ providers = { path = "crates/providers" }
 session = { path = "crates/session" }
 scheduling = { path = "crates/scheduling" }
 calendar = { path = "crates/calendar" }
-goal = { path = "crates/goal" }
-plan = { path = "crates/plan" }
+domain = { path = "crates/domain" }
 tools = { path = "crates/tools" }
 channels = { path = "crates/channels" }
 heartbeat = { path = "crates/heartbeat" }
@@ -141,8 +139,7 @@ providers.workspace = true
 session.workspace = true
 scheduling.workspace = true
 calendar.workspace = true
-goal.workspace = true
-plan.workspace = true
+domain.workspace = true
 tools.workspace = true
 channels.workspace = true
 heartbeat.workspace = true

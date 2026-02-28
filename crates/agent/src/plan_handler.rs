@@ -7,8 +7,8 @@
 use async_trait::async_trait;
 use chrono::Utc;
 use common::Result;
-use plan::PlanError;
-use plan::{conversions, Plan, PlanStatus};
+use domain::plan::{self as conversions, PlanError};
+use domain::{Plan, PlanStatus};
 use providers::DynProvider;
 use tools::plan_tool::PlanHandler;
 use tracing::warn;
@@ -61,7 +61,7 @@ impl PlanHandler for PlanHandlerImpl {
             current_step_index: 0,
             iteration_limit: 50,
             backtrack_history: vec![],
-            visibility: plan::PlanVisibility::default(),
+            visibility: domain::PlanVisibility::default(),
             task_id: None,
             created_at: now,
             updated_at: now,
