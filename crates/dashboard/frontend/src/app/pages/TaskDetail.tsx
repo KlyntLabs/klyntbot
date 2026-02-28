@@ -25,6 +25,7 @@ import { useApi } from '../../lib/hooks/useApi';
 import { apiFetch } from '../../lib/api';
 import type { Task, TaskAttachment, TaskTimeEntry, Project, TaskDependencies } from '../../lib/types';
 import { RECURRENCE_PRESETS, rruleToLabel } from '../../lib/rrule';
+import { getPriorityColor, formatShortDate, formatMinutes } from '../../lib/utils';
 
 export default function TaskDetail() {
   const { id } = useParams();
@@ -102,16 +103,6 @@ export default function TaskDetail() {
 
   const project = task?.projectId ? projectMap.get(task.projectId) : undefined;
 
-  const getPriorityColor = (priority: number | null) => {
-    switch (priority) {
-      case 1: return '#e55050';
-      case 2: return '#d4a017';
-      case 3: return '#e5c07b';
-      case 4: return '#666';
-      default: return '#666';
-    }
-  };
-
   const getStatusIcon = (status: string) => {
     switch (status.toLowerCase()) {
       case 'done':
@@ -132,9 +123,6 @@ export default function TaskDetail() {
     }
   };
 
-  const formatDate = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-
   const formatDateTime = (isoStr: string) => {
     const date = new Date(isoStr);
     const datePart = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -142,13 +130,7 @@ export default function TaskDetail() {
     return `${datePart} ${timePart}`;
   };
 
-  const formatDuration = (secs: number) => {
-    const mins = Math.floor(secs / 60);
-    if (mins < 60) return `${mins}m`;
-    const hours = Math.floor(mins / 60);
-    const remainMins = mins % 60;
-    return remainMins > 0 ? `${hours}h ${remainMins}m` : `${hours}h`;
-  };
+  const formatDuration = (secs: number) => formatMinutes(Math.floor(secs / 60));
 
   const formatTimerDisplay = (secs: number) => {
     const h = Math.floor(secs / 3600);
@@ -950,12 +932,12 @@ export default function TaskDetail() {
 
               <div className="flex justify-between text-[12px] pt-2 border-t" style={{ borderColor: 'var(--codex-border)' }}>
                 <span style={{ color: 'var(--codex-fg-subtle)' }}>Created</span>
-                <span style={{ color: 'var(--codex-fg)' }}>{formatDate(task.createdAt)}</span>
+                <span style={{ color: 'var(--codex-fg)' }}>{formatShortDate(task.createdAt)}</span>
               </div>
 
               <div className="flex justify-between text-[12px]">
                 <span style={{ color: 'var(--codex-fg-subtle)' }}>Updated</span>
-                <span style={{ color: 'var(--codex-fg)' }}>{formatDate(task.updatedAt)}</span>
+                <span style={{ color: 'var(--codex-fg)' }}>{formatShortDate(task.updatedAt)}</span>
               </div>
             </div>
           </div>

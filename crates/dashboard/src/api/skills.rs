@@ -119,13 +119,11 @@ pub async fn get_skill(
         .get(&name)
         .ok_or_else(|| ApiError::not_found(format!("skill '{name}' not found")))?;
 
-    let enabled = {
+    let enabled = if is_builtin(skill) {
         let config = state.config.read().unwrap_or_else(|e| e.into_inner());
-        if is_builtin(skill) {
-            config.packs.enabled_skills.iter().any(|n| n == &skill.name)
-        } else {
-            true
-        }
+        config.packs.enabled_skills.contains(&skill.name)
+    } else {
+        true
     };
 
     Ok(Json(to_response(skill, enabled)))
@@ -182,17 +180,21 @@ pub async fn update_skill(
     // Handle enabled toggle for built-in skills
     let mut final_enabled = if builtin {
         let config = state.config.read().unwrap_or_else(|e| e.into_inner());
-        config.packs.enabled_skills.iter().any(|n| n == &skill.name)
+        config.packs.enabled_skills.contains(&skill.name)
     } else {
         true
     };
 
     if let Some(enabled) = req.enabled {
         if builtin {
-            // Update config.packs.enabledSkills
-            let current = config::load()
-                .await
-                .map_err(|e| ApiError::internal(e.to_string()))?;
+            // Update config.packs.enabledSkills using in-memory config
+            let current = {
+                state
+                    .config
+                    .read()
+                    .map_err(|e| ApiError::internal(e.to_string()))?
+                    .clone()
+            };
 
             let mut config_value =
                 serde_json::to_value(&current).map_err(|e| ApiError::internal(e.to_string()))?;

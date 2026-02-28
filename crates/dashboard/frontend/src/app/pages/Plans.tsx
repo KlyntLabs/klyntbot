@@ -8,39 +8,16 @@ import { useNavigate } from 'react-router';
 import { useApi } from '../../lib/hooks/useApi';
 import { apiFetch } from '../../lib/api';
 import type { Plan } from '../../lib/types';
+import {
+  formatTimeAgoLong,
+  getPlanStatusColor,
+  isPlanActive,
+  inputStyle,
+  focusHandler,
+  blurHandler,
+} from '../../lib/utils';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-function formatRelativeTime(iso: string): string {
-  const date = new Date(iso);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffSecs = Math.floor(diffMs / 1000);
-  const diffMins = Math.floor(diffSecs / 60);
-  const diffHours = Math.floor(diffMins / 60);
-  const diffDays = Math.floor(diffHours / 24);
-
-  if (diffDays > 0) return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
-  if (diffHours > 0) return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
-  if (diffMins > 0) return `${diffMins} min${diffMins === 1 ? '' : 's'} ago`;
-  return 'just now';
-}
-
-function getStatusColor(status: string): string {
-  switch (status.toLowerCase()) {
-    case 'executing': return 'var(--codex-accent)';
-    case 'approved': return 'var(--codex-accent)';
-    case 'draft': return '#fbbf24';
-    case 'failed': return '#ef4444';
-    case 'abandoned': return 'var(--codex-fg-subtle)';
-    default: return 'var(--codex-fg-subtle)';
-  }
-}
-
-function isActiveStatus(status: string): boolean {
-  const s = status.toLowerCase();
-  return s === 'executing' || s === 'approved';
-}
 
 function getVisibilityColor(visibility: string): string {
   switch (visibility) {
@@ -123,19 +100,6 @@ export default function Plans() {
     setNewDescription('');
     setNewIterationLimit('20');
   }, []);
-
-  // ── Shared styles ────────────────────────────────────────────────────────
-
-  const inputStyle = {
-    backgroundColor: 'var(--codex-bg)',
-    color: 'var(--codex-fg)',
-    border: '1px solid var(--codex-border)',
-  };
-
-  const focusHandler = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-    e.currentTarget.style.borderColor = 'var(--codex-accent)';
-  const blurHandler = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-    e.currentTarget.style.borderColor = 'var(--codex-border)';
 
   // ── Loading / Error states ───────────────────────────────────────────────
 
@@ -372,8 +336,8 @@ export default function Plans() {
                         {plan.title}
                       </h3>
                       <span className="px-2 py-0.5 rounded text-[10px] uppercase tracking-wide" style={{
-                        backgroundColor: isActiveStatus(plan.status) ? 'var(--codex-accent-dim)' : 'var(--codex-bg)',
-                        color: getStatusColor(plan.status),
+                        backgroundColor: isPlanActive(plan.status) ? 'var(--codex-accent-dim)' : 'var(--codex-bg)',
+                        color: getPlanStatusColor(plan.status),
                         border: '1px solid var(--codex-border)',
                       }}>
                         {plan.status}
@@ -406,14 +370,14 @@ export default function Plans() {
                     <div className="flex items-center gap-4 mt-3 text-[12px]" style={{ color: 'var(--codex-fg-subtle)' }}>
                       <div className="flex items-center gap-2">
                         <Clock className="w-3.5 h-3.5" strokeWidth={1.5} />
-                        {formatRelativeTime(plan.createdAt)}
+                        {formatTimeAgoLong(plan.createdAt)}
                       </div>
                       <span style={{ fontFamily: 'var(--font-mono)' }}>
                         Limit: {plan.iterationLimit}
                       </span>
                       {plan.completedAt && (
                         <span>
-                          Completed {formatRelativeTime(plan.completedAt)}
+                          Completed {formatTimeAgoLong(plan.completedAt)}
                         </span>
                       )}
                     </div>

@@ -23,6 +23,14 @@ import { useApi } from '../../lib/hooks/useApi';
 import { apiFetch } from '../../lib/api';
 import type { Task, TaskSummary, Project } from '../../lib/types';
 import { RECURRENCE_PRESETS, rruleToLabel } from '../../lib/rrule';
+import {
+  getPriorityColor,
+  formatMinutes,
+  formatShortDate,
+  inputStyle,
+  focusHandler,
+  blurHandler,
+} from '../../lib/utils';
 
 export default function Tasks() {
   const navigate = useNavigate();
@@ -69,30 +77,10 @@ export default function Tasks() {
     return map;
   }, [projects]);
 
-  const getPriorityColor = (priority: number | null) => {
-    switch (priority) {
-      case 1: return '#e55050';
-      case 2: return '#d4a017';
-      case 3: return '#e5c07b';
-      case 4: return '#666';
-      default: return '#666';
-    }
-  };
-
-  const formatTime = (minutes: number) => {
-    if (minutes < 60) return `${minutes}m`;
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
-  };
-
-  const formatTrackedTime = (seconds: number) => formatTime(Math.floor(seconds / 60));
+  const formatTrackedTime = (seconds: number) => formatMinutes(Math.floor(seconds / 60));
 
   const today = new Date().toISOString().split('T')[0];
   const isOverdue = (dueDate: string | null) => dueDate ? dueDate < today : false;
-
-  const formatDate = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
   const getStatusIcon = (status: string) => {
     switch (status.toLowerCase()) {
@@ -243,17 +231,6 @@ export default function Tasks() {
       setData(prev => prev?.map(t => t.id === task.id ? { ...t, status: task.status } : t));
     }
   }, [setData, setSummary]);
-
-  const inputStyle = {
-    backgroundColor: 'var(--codex-bg)',
-    color: 'var(--codex-fg)',
-    border: '1px solid var(--codex-border)',
-  };
-
-  const focusHandler = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-    e.currentTarget.style.borderColor = 'var(--codex-accent)';
-  const blurHandler = (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-    e.currentTarget.style.borderColor = 'var(--codex-border)';
 
   if (loading && !tasks) {
     return (
@@ -737,12 +714,12 @@ export default function Tasks() {
                               )}
                               {task.dueDate && (
                                 <div className="flex items-center gap-1.5 text-[12px]" style={{ color: isOverdue(task.dueDate) ? '#e55050' : 'var(--codex-fg-subtle)' }}>
-                                  <Clock className="w-3.5 h-3.5" strokeWidth={1.5} />{formatDate(task.dueDate)}
+                                  <Clock className="w-3.5 h-3.5" strokeWidth={1.5} />{formatShortDate(task.dueDate)}
                                 </div>
                               )}
                               {task.estimatedMinutes != null && (
                                 <div className="flex items-center gap-1.5 text-[12px]" style={{ color: 'var(--codex-fg-subtle)' }}>
-                                  <Timer className="w-3.5 h-3.5" strokeWidth={1.5} />~{formatTime(task.estimatedMinutes)}
+                                  <Timer className="w-3.5 h-3.5" strokeWidth={1.5} />~{formatMinutes(task.estimatedMinutes)}
                                 </div>
                               )}
                               {project && (

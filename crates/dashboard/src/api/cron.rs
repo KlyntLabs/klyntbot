@@ -5,7 +5,7 @@ use axum::http::StatusCode;
 use axum::Json;
 use serde::Deserialize;
 
-use crate::api::deleted_or_not_found;
+use crate::api::{deleted_or_not_found, new_id};
 use crate::error::ApiError;
 use crate::state::AppState;
 
@@ -42,7 +42,7 @@ pub async fn create_cron(
 
     let now_ms = chrono::Utc::now().timestamp_millis();
     let row = storage::rows::cron::CronJobRow {
-        id: uuid::Uuid::new_v4().to_string(),
+        id: new_id(),
         name: req.name,
         enabled: true,
         schedule: req.schedule,

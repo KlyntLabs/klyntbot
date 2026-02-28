@@ -13,38 +13,16 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useApi } from '../../lib/hooks/useApi';
 import { apiFetch } from '../../lib/api';
 import type { Project } from '../../lib/types';
-
-const PROJECT_COLORS: Record<string, string> = {
-  red: '#ef4444',
-  orange: '#f97316',
-  yellow: '#eab308',
-  green: '#22c55e',
-  blue: '#3b82f6',
-  purple: '#8b5cf6',
-  gray: '#6b7280',
-};
+import {
+  PROJECT_COLORS,
+  resolveProjectColor,
+  formatTimeAgo,
+  inputStyle,
+  focusHandler,
+  blurHandler,
+} from '../../lib/utils';
 
 const STATUS_OPTIONS = ['active', 'paused', 'completed', 'archived'];
-
-function resolveColor(color: string): string {
-  return PROJECT_COLORS[color.toLowerCase()] ?? color;
-}
-
-function formatRelativeDate(dateStr: string): string {
-  const date = new Date(dateStr);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffSecs = Math.floor(diffMs / 1000);
-  const diffMins = Math.floor(diffSecs / 60);
-  const diffHours = Math.floor(diffMins / 60);
-  const diffDays = Math.floor(diffHours / 24);
-
-  if (diffSecs < 60) return 'just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
 
 function statusLabel(status: string): string {
   return status.charAt(0).toUpperCase() + status.slice(1);
@@ -163,19 +141,6 @@ export default function Projects() {
     },
     [projects, setData],
   );
-
-  const inputStyle = {
-    backgroundColor: 'var(--codex-bg)',
-    color: 'var(--codex-fg)',
-    border: '1px solid var(--codex-border)',
-  };
-
-  const focusHandler = (
-    e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
-  ) => (e.currentTarget.style.borderColor = 'var(--codex-accent)');
-  const blurHandler = (
-    e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>,
-  ) => (e.currentTarget.style.borderColor = 'var(--codex-border)');
 
   if (loading && !projects) {
     return (
@@ -528,7 +493,7 @@ export default function Projects() {
                       style={{
                         width: 12,
                         height: 12,
-                        backgroundColor: resolveColor(project.color),
+                        backgroundColor: resolveProjectColor(project.color),
                       }}
                     />
                     <div className="flex-1 min-w-0">
@@ -588,7 +553,7 @@ export default function Projects() {
                         className="text-[11px]"
                         style={{ color: 'var(--codex-fg-subtle)' }}
                       >
-                        Updated {formatRelativeDate(project.updatedAt)}
+                        Updated {formatTimeAgo(project.updatedAt)}
                       </div>
                     </div>
 

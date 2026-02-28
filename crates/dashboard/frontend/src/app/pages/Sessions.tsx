@@ -5,6 +5,7 @@ import { useApi } from '../../lib/hooks/useApi';
 import { apiFetch } from '../../lib/api';
 import type { SessionListItem } from '../../lib/types';
 import { formatDuration } from '../chat/utils';
+import { formatTimeAgo } from '../../lib/utils';
 
 type SortMode = 'recent' | 'oldest' | 'messages';
 
@@ -47,20 +48,6 @@ export default function Sessions() {
     },
     [refetch],
   );
-
-  const formatDate = (iso: string) => {
-    const d = new Date(iso);
-    const now = new Date();
-    const diffMs = now.getTime() - d.getTime();
-    const diffMin = Math.floor(diffMs / 60000);
-    if (diffMin < 60) return `${diffMin}m ago`;
-    const diffHours = Math.floor(diffMin / 60);
-    if (diffHours < 24) return `${diffHours}h ago`;
-    const diffDays = Math.floor(diffHours / 24);
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return d.toLocaleDateString();
-  };
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -163,12 +150,12 @@ export default function Sessions() {
 
             {/* Created date */}
             <span className="text-[11px] flex-1" style={{ color: 'var(--codex-fg-subtle)' }}>
-              {formatDate(session.createdAt)}
+              {formatTimeAgo(session.createdAt)}
             </span>
 
             {/* Last active */}
             <span className="text-[11px]" style={{ color: 'var(--codex-fg-subtle)' }}>
-              Active {formatDate(session.updatedAt)}
+              Active {formatTimeAgo(session.updatedAt)}
             </span>
 
             {/* Delete */}

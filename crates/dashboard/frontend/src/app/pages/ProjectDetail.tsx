@@ -13,16 +13,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useApi } from '../../lib/hooks/useApi';
 import { apiFetch } from '../../lib/api';
 import type { Project, ProjectWithStats, Task } from '../../lib/types';
-
-const PROJECT_COLORS: Record<string, string> = {
-  red: '#ef4444',
-  orange: '#f97316',
-  yellow: '#eab308',
-  green: '#22c55e',
-  blue: '#3b82f6',
-  purple: '#8b5cf6',
-  gray: '#6b7280',
-};
+import { PROJECT_COLORS, getPriorityColor, formatShortDate } from '../../lib/utils';
 
 const COLOR_NAMES = Object.keys(PROJECT_COLORS);
 
@@ -73,28 +64,6 @@ export default function ProjectDetail() {
       setDescValue(projectData.project.description ?? '');
     }
   }, [projectData]);
-
-  const formatDate = (dateStr: string) =>
-    new Date(dateStr).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-
-  const getPriorityColor = (priority: number | null) => {
-    switch (priority) {
-      case 1:
-        return '#e55050';
-      case 2:
-        return '#d4a017';
-      case 3:
-        return '#e5c07b';
-      case 4:
-        return '#666';
-      default:
-        return '#666';
-    }
-  };
 
   const getTaskStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -651,7 +620,7 @@ export default function ProjectDetail() {
                   Created
                 </span>
                 <span style={{ color: 'var(--codex-fg)' }}>
-                  {formatDate(project.createdAt)}
+                  {formatShortDate(project.createdAt)}
                 </span>
               </div>
 
@@ -660,7 +629,7 @@ export default function ProjectDetail() {
                   Updated
                 </span>
                 <span style={{ color: 'var(--codex-fg)' }}>
-                  {formatDate(project.updatedAt)}
+                  {formatShortDate(project.updatedAt)}
                 </span>
               </div>
             </div>

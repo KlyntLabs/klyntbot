@@ -40,19 +40,12 @@ pub async fn get_session(
     State(state): State<AppState>,
     Path(key): Path<String>,
 ) -> Result<Json<SessionWithMessages>, ApiError> {
-    let session = state
-        .repos
-        .sessions
-        .get_session(&key)
-        .await
-        .map_err(ApiError::from)?;
-
-    let messages = state
-        .repos
-        .sessions
-        .get_messages(&key)
-        .await
-        .map_err(ApiError::from)?;
+    let (session, messages) = tokio::join!(
+        state.repos.sessions.get_session(&key),
+        state.repos.sessions.get_messages(&key),
+    );
+    let session = session.map_err(ApiError::from)?;
+    let messages = messages.map_err(ApiError::from)?;
 
     Ok(Json(SessionWithMessages { session, messages }))
 }

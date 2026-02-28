@@ -18,6 +18,11 @@ use axum::http::StatusCode;
 
 use crate::error::ApiError;
 
+/// Generate a new UUID v4 string for row IDs.
+pub fn new_id() -> String {
+    uuid::Uuid::new_v4().to_string()
+}
+
 /// Parse a comma-separated query param into a `Vec<String>`, trimming whitespace
 /// and discarding empty segments. Used by list endpoints for tag filtering.
 pub fn parse_comma_tags(s: &str) -> Vec<String> {

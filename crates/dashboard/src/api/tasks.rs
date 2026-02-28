@@ -7,7 +7,7 @@ use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use storage::{TodoFilter, TodoPatch, TodoRow};
 
-use crate::api::{deleted_or_not_found, parse_comma_tags};
+use crate::api::{deleted_or_not_found, new_id, parse_comma_tags};
 use crate::error::ApiError;
 use crate::state::AppState;
 
@@ -138,7 +138,7 @@ pub async fn create_task(
 
     let now = Utc::now();
     let row = TodoRow {
-        id: uuid::Uuid::new_v4().to_string(),
+        id: new_id(),
         title: req.title.trim().to_string(),
         description: req.description,
         priority: req.priority,
@@ -200,8 +200,16 @@ pub async fn patch_task(
 ) -> Result<Json<TodoRow>, ApiError> {
     validate_patch(&req)?;
 
+    // Confirm the task exists first so we get a clean 404.
+    state
+        .repos
+        .todos
+        .get_or_err(&id)
+        .await
+        .map_err(ApiError::from)?;
+
     let patch = TodoPatch {
-        id: id.clone(),
+        id,
         title: req.title,
         description: req.description,
         priority: req.priority,
@@ -215,14 +223,6 @@ pub async fn patch_task(
         // Normalise empty string → None so the FE can clear the rule with "".
         recurrence_rule: req.recurrence_rule.map(|v| v.filter(|s| !s.is_empty())),
     };
-
-    // Confirm the task exists first so we get a clean 404.
-    state
-        .repos
-        .todos
-        .get_or_err(&id)
-        .await
-        .map_err(ApiError::from)?;
 
     let updated = state
         .repos
@@ -417,25 +417,15 @@ pub async fn get_task_dependencies(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<DependenciesResponse>, ApiError> {
-    state
-        .repos
-        .todos
-        .get_or_err(&id)
-        .await
-        .map_err(ApiError::from)?;
-
-    let blocked_by = state
-        .repos
-        .todos
-        .get_blockers(&id)
-        .await
-        .map_err(ApiError::from)?;
-    let blocks = state
-        .repos
-        .todos
-        .get_blocking(&id)
-        .await
-        .map_err(ApiError::from)?;
+    // Verify task exists and fetch both dependency directions concurrently.
+    let (exists, blocked_by, blocks) = tokio::join!(
+        state.repos.todos.get_or_err(&id),
+        state.repos.todos.get_blockers(&id),
+        state.repos.todos.get_blocking(&id),
+    );
+    exists.map_err(ApiError::from)?;
+    let blocked_by = blocked_by.map_err(ApiError::from)?;
+    let blocks = blocks.map_err(ApiError::from)?;
 
     Ok(Json(DependenciesResponse { blocked_by, blocks }))
 }

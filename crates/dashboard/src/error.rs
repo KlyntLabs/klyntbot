@@ -41,6 +41,13 @@ impl ApiError {
             message: msg.into(),
         }
     }
+
+    pub fn conflict(msg: impl Into<String>) -> Self {
+        Self {
+            status: 409,
+            message: msg.into(),
+        }
+    }
 }
 
 impl IntoResponse for ApiError {
@@ -61,10 +68,7 @@ impl From<common::KlyntbotError> for ApiError {
     fn from(e: common::KlyntbotError) -> Self {
         match &e {
             common::KlyntbotError::StorageNotFound(msg) => Self::not_found(msg.clone()),
-            common::KlyntbotError::StorageConflict(msg) => Self {
-                status: 409,
-                message: msg.clone(),
-            },
+            common::KlyntbotError::StorageConflict(msg) => Self::conflict(msg.clone()),
             // Storage errors don't leak internal details
             common::KlyntbotError::Storage(_) => Self::internal("Storage error"),
             common::KlyntbotError::Config(_) => Self {

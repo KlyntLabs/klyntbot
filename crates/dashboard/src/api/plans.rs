@@ -134,13 +134,9 @@ pub async fn get_plan(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<PlanWithSteps>, ApiError> {
-    let plan = state.repos.plans.get(id).await.map_err(ApiError::from)?;
-    let steps = state
-        .repos
-        .plans
-        .get_steps(id)
-        .await
-        .map_err(ApiError::from)?;
+    let (plan, steps) = tokio::join!(state.repos.plans.get(id), state.repos.plans.get_steps(id));
+    let plan = plan.map_err(ApiError::from)?;
+    let steps = steps.map_err(ApiError::from)?;
     Ok(Json(PlanWithSteps { plan, steps }))
 }
 
@@ -185,15 +181,11 @@ pub async fn get_plan_steps(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Vec<PlanStepRow>>, ApiError> {
-    // Confirm the plan exists — get() returns NotFound if absent.
-    state.repos.plans.get(id).await.map_err(ApiError::from)?;
-
-    let steps = state
-        .repos
-        .plans
-        .get_steps(id)
-        .await
-        .map_err(ApiError::from)?;
+    // Verify plan exists (get returns NotFound if absent), then fetch steps concurrently.
+    let (plan_check, steps) =
+        tokio::join!(state.repos.plans.get(id), state.repos.plans.get_steps(id));
+    plan_check.map_err(ApiError::from)?;
+    let steps = steps.map_err(ApiError::from)?;
     Ok(Json(steps))
 }
 
@@ -206,15 +198,20 @@ pub async fn update_plan_status(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let plan = state.repos.plans.get(id).await.map_err(ApiError::from)?;
 
-    let from = plan.status.parse::<plan::PlanStatus>().unwrap_or_default();
-    let to = req.status.parse::<plan::PlanStatus>().unwrap_or_default();
+    let from = plan
+        .status
+        .parse::<plan::PlanStatus>()
+        .map_err(|_| ApiError::unprocessable(format!("unknown current status: '{}'", plan.status)))?;
+    let to = req
+        .status
+        .parse::<plan::PlanStatus>()
+        .map_err(|_| ApiError::unprocessable(format!("invalid status: '{}'", req.status)))?;
 
-    plan::PlanStatus::validate_transition(&from, &to).map_err(|_| ApiError {
-        status: 409,
-        message: format!(
+    plan::PlanStatus::validate_transition(&from, &to).map_err(|_| {
+        ApiError::conflict(format!(
             "Invalid status transition: '{}' → '{}'",
             plan.status, req.status
-        ),
+        ))
     })?;
 
     state

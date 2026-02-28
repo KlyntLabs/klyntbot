@@ -20,39 +20,14 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useApi } from '../../lib/hooks/useApi';
 import { apiFetch } from '../../lib/api';
 import type { PlanWithSteps, PlanStep } from '../../lib/types';
+import {
+  formatTimeAgoLong,
+  formatShortDate,
+  getPlanStatusColor,
+  isPlanActive,
+} from '../../lib/utils';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-function formatRelativeTime(iso: string): string {
-  const date = new Date(iso);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffSecs = Math.floor(diffMs / 1000);
-  const diffMins = Math.floor(diffSecs / 60);
-  const diffHours = Math.floor(diffMins / 60);
-  const diffDays = Math.floor(diffHours / 24);
-
-  if (diffDays > 0) return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
-  if (diffHours > 0) return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
-  if (diffMins > 0) return `${diffMins} min${diffMins === 1 ? '' : 's'} ago`;
-  return 'just now';
-}
-
-function getStatusColor(status: string): string {
-  switch (status.toLowerCase()) {
-    case 'executing': return 'var(--codex-accent)';
-    case 'approved': return 'var(--codex-accent)';
-    case 'draft': return '#fbbf24';
-    case 'failed': return '#ef4444';
-    case 'abandoned': return 'var(--codex-fg-subtle)';
-    default: return 'var(--codex-fg-subtle)';
-  }
-}
-
-function isActiveStatus(status: string): boolean {
-  const s = status.toLowerCase();
-  return s === 'executing' || s === 'approved';
-}
 
 function getStepStatusColor(status: string): string {
   switch (status.toLowerCase()) {
@@ -99,9 +74,6 @@ function formatElapsed(createdAt: string, completedAt: string | null): string {
   return formatDuration(createdAt, end.toISOString());
 }
 
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
 
 // ── Component ────────────────────────────────────────────────────────────────
 
@@ -330,9 +302,9 @@ export default function PlanDetail() {
 
             {/* Status badge */}
             <span className="px-3 py-1.5 rounded text-[12px]" style={{
-              backgroundColor: getStatusColor(plan.status) + '20',
-              color: getStatusColor(plan.status),
-              border: `1px solid ${getStatusColor(plan.status)}40`
+              backgroundColor: getPlanStatusColor(plan.status) + '20',
+              color: getPlanStatusColor(plan.status),
+              border: `1px solid ${getPlanStatusColor(plan.status)}40`
             }}>
               {plan.status}
             </span>
@@ -757,8 +729,8 @@ export default function PlanDetail() {
               <div className="flex justify-between items-center text-[12px]">
                 <span style={{ color: 'var(--codex-fg-subtle)' }}>Status</span>
                 <span className="px-2 py-0.5 rounded text-[11px]" style={{
-                  backgroundColor: getStatusColor(plan.status) + '20',
-                  color: getStatusColor(plan.status),
+                  backgroundColor: getPlanStatusColor(plan.status) + '20',
+                  color: getPlanStatusColor(plan.status),
                 }}>
                   {plan.status}
                 </span>
@@ -867,18 +839,18 @@ export default function PlanDetail() {
 
               <div className="flex justify-between text-[12px] pt-2 border-t" style={{ borderColor: 'var(--codex-border)' }}>
                 <span style={{ color: 'var(--codex-fg-subtle)' }}>Created</span>
-                <span style={{ color: 'var(--codex-fg)' }}>{formatDate(plan.createdAt)}</span>
+                <span style={{ color: 'var(--codex-fg)' }}>{formatShortDate(plan.createdAt)}</span>
               </div>
 
               <div className="flex justify-between text-[12px]">
                 <span style={{ color: 'var(--codex-fg-subtle)' }}>Updated</span>
-                <span style={{ color: 'var(--codex-fg)' }}>{formatRelativeTime(plan.updatedAt)}</span>
+                <span style={{ color: 'var(--codex-fg)' }}>{formatTimeAgoLong(plan.updatedAt)}</span>
               </div>
 
               {plan.completedAt && (
                 <div className="flex justify-between text-[12px]">
                   <span style={{ color: 'var(--codex-fg-subtle)' }}>Completed</span>
-                  <span style={{ color: 'var(--codex-fg)' }}>{formatDate(plan.completedAt)}</span>
+                  <span style={{ color: 'var(--codex-fg)' }}>{formatShortDate(plan.completedAt)}</span>
                 </div>
               )}
             </div>
@@ -899,7 +871,7 @@ export default function PlanDetail() {
                   <span style={{ color: 'var(--codex-fg-subtle)' }}>
                     {completedSteps} of {totalSteps} steps
                   </span>
-                  <span style={{ color: isActiveStatus(plan.status) ? 'var(--codex-accent)' : 'var(--codex-fg-subtle)' }}>
+                  <span style={{ color: isPlanActive(plan.status) ? 'var(--codex-accent)' : 'var(--codex-fg-subtle)' }}>
                     {progress}%
                   </span>
                 </div>
@@ -922,7 +894,7 @@ export default function PlanDetail() {
               <div className="flex justify-between text-[12px]">
                 <span style={{ color: 'var(--codex-fg-subtle)' }}>Elapsed</span>
                 <span style={{
-                  color: isActiveStatus(plan.status) ? 'var(--codex-accent)' : 'var(--codex-fg)',
+                  color: isPlanActive(plan.status) ? 'var(--codex-accent)' : 'var(--codex-fg)',
                   fontFamily: 'var(--font-mono)',
                 }}>
                   {formatElapsed(plan.createdAt, plan.completedAt)}

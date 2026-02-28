@@ -13,7 +13,7 @@ use storage::rows::finance::{
     FinanceTransactionPatch, FinanceTransactionRow,
 };
 
-use crate::api::deleted_or_not_found;
+use crate::api::{deleted_or_not_found, new_id};
 use crate::error::ApiError;
 use crate::state::AppState;
 
@@ -62,7 +62,7 @@ pub async fn create_account(
 ) -> Result<Json<FinanceAccountRow>, ApiError> {
     let now = Utc::now();
     let row = FinanceAccountRow {
-        id: uuid::Uuid::new_v4().to_string(),
+        id: new_id(),
         name: req.name,
         account_type: req.account_type,
         currency: req.currency,
@@ -186,7 +186,7 @@ pub async fn create_transaction(
 ) -> Result<Json<FinanceTransactionRow>, ApiError> {
     let now = Utc::now();
     let row = FinanceTransactionRow {
-        id: uuid::Uuid::new_v4().to_string(),
+        id: new_id(),
         account_id: req.account_id,
         tx_type: req.tx_type,
         amount: req.amount,
@@ -312,7 +312,7 @@ pub async fn create_budget(
 ) -> Result<Json<FinanceBudgetRow>, ApiError> {
     let now = Utc::now();
     let row = FinanceBudgetRow {
-        id: uuid::Uuid::new_v4().to_string(),
+        id: new_id(),
         name: req.name,
         amount: req.amount,
         currency: req.currency,
@@ -435,7 +435,7 @@ pub async fn create_investment(
 ) -> Result<Json<FinanceInvestmentRow>, ApiError> {
     let now = Utc::now();
     let row = FinanceInvestmentRow {
-        id: uuid::Uuid::new_v4().to_string(),
+        id: new_id(),
         portfolio_id: req.portfolio_id,
         asset_type: req.asset_type,
         symbol: req.symbol,
@@ -548,7 +548,7 @@ pub async fn create_goal(
 ) -> Result<Json<FinanceGoalRow>, ApiError> {
     let now = Utc::now();
     let row = FinanceGoalRow {
-        id: uuid::Uuid::new_v4().to_string(),
+        id: new_id(),
         name: req.name,
         goal_type: req.goal_type,
         target_amount: req.target_amount,
@@ -660,7 +660,7 @@ pub async fn create_liability(
     let now = Utc::now();
     let principal = req.principal;
     let row = FinanceLiabilityRow {
-        id: uuid::Uuid::new_v4().to_string(),
+        id: new_id(),
         name: req.name,
         liability_type: req.liability_type,
         principal,

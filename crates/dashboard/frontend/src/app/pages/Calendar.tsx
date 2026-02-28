@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router';
 import { useApi } from '../../lib/hooks/useApi';
 import { apiFetch } from '../../lib/api';
 import type { CalendarEvent as ApiCalendarEvent, Task, CalendarSyncStatus, Project } from '../../lib/types';
+import { getPriorityColor } from '../../lib/utils';
 
 type ViewMode = 'day' | 'week' | 'month';
 
@@ -463,13 +464,6 @@ export default function Calendar() {
         </div>
       </div>
     );
-  };
-
-  const getPriorityColor = (priority: number) => {
-    if (priority === 1) return '#e55050';
-    if (priority === 2) return '#d4a017';
-    if (priority === 3) return '#10a37f';
-    return '#666';
   };
 
   return (
