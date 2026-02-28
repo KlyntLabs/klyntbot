@@ -114,7 +114,7 @@ impl ExecutionRouter {
 
         // Phase 2: Handle escalation chain
         let mut current_result = initial_result;
-        let mut current_mode = mode_name(&mode);
+        let mut current_mode = mode.short_name();
 
         loop {
             match current_result {
@@ -206,16 +206,30 @@ impl ExecutionRouter {
                                 });
                             }
                         }
-                        _ => {
-                            // Planned or unknown — no further escalation
+                        "planned" => {
+                            // Planned — no further escalation possible
+                            warn!("ExecutionRouter: cannot escalate beyond planned mode");
+                            return Ok(RouterResult {
+                                content: format!(
+                                    "Task could not be completed in planned mode. Reason: {}",
+                                    reason
+                                ),
+                                final_mode: current_mode.to_string(),
+                                escalation_count,
+                                usage: escalation_usage,
+                                iterations: 0,
+                                tool_name: None,
+                            });
+                        }
+                        unknown => {
                             warn!(
-                                "ExecutionRouter: cannot escalate beyond {} mode",
-                                current_mode
+                                "ExecutionRouter: unknown mode '{}', cannot escalate",
+                                unknown
                             );
                             return Ok(RouterResult {
                                 content: format!(
                                     "Task could not be completed in {} mode. Reason: {}",
-                                    current_mode, reason
+                                    unknown, reason
                                 ),
                                 final_mode: current_mode.to_string(),
                                 escalation_count,
@@ -228,14 +242,6 @@ impl ExecutionRouter {
                 }
             }
         }
-    }
-}
-
-fn mode_name(mode: &ExecutionMode) -> &'static str {
-    match mode {
-        ExecutionMode::Direct => "direct",
-        ExecutionMode::Reactive { .. } => "reactive",
-        ExecutionMode::Planned { .. } => "planned",
     }
 }
 

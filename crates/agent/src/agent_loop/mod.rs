@@ -382,7 +382,8 @@ impl AgentLoop {
             .conversation
             .embedding
             .exclude_roles
-            .contains(&role.to_string())
+            .iter()
+            .any(|r| r == role)
         {
             return false;
         }
@@ -394,7 +395,8 @@ impl AgentLoop {
                 .conversation
                 .embedding
                 .exclude_channels
-                .contains(&channel.to_string())
+                .iter()
+                .any(|c| c == channel)
             {
                 return false;
             }
@@ -512,29 +514,38 @@ impl AgentLoop {
     /// Process a message directly (for CLI mode).
     ///
     /// Returns the agent's response text directly instead of publishing to the bus.
-    pub async fn process_direct(&self, content: String, session_key: String) -> Result<String> {
+    /// Shared session setup: log preview, add message to session, embed, return history.
+    async fn setup_session(
+        &self,
+        content: &str,
+        session_key: &str,
+        label: &str,
+    ) -> Result<Vec<session::SessionMessage>> {
         let preview = if content.len() > 80 {
-            format!("{}...", truncate_safe(&content, 80))
+            format!("{}...", truncate_safe(content, 80))
         } else {
-            content.clone()
+            content.to_string()
         };
-        debug!("Processing direct message: {}", preview);
+        debug!("Processing {} message: {}", label, preview);
 
-        // Get or create session and collect data under per-session lock
-        let session_arc = self.session_manager.get_or_create(&session_key).await?;
+        let session_arc = self.session_manager.get_or_create(session_key).await?;
         let (history, embed_msg_id) = {
             let mut session = session_arc.lock().await;
-            session.add_message("user", &content);
+            session.add_message("user", content);
             let msg_id = session.messages.last().map(|m| m.id.clone());
             let history = session.get_history(self.history_limit).to_vec();
             (history, msg_id)
-            // per-session lock released here
         };
 
-        // Async conversation embedding hook for user message (CLI)
         if let Some(msg_id) = embed_msg_id {
-            self.spawn_embed_message(&session_key, "user", &content, &msg_id);
+            self.spawn_embed_message(session_key, "user", content, &msg_id);
         }
+
+        Ok(history)
+    }
+
+    pub async fn process_direct(&self, content: String, session_key: String) -> Result<String> {
+        let history = self.setup_session(&content, &session_key, "direct").await?;
 
         // Run through pipeline
         let routing_ctx = RoutingContext::new("cli".into(), session_key.clone().into());
@@ -560,28 +571,9 @@ impl AgentLoop {
         content: String,
         session_key: String,
     ) -> Result<StreamingHandle> {
-        let preview = if content.len() > 80 {
-            format!("{}...", truncate_safe(&content, 80))
-        } else {
-            content.clone()
-        };
-        debug!("Processing streaming direct message: {}", preview);
-
-        // Get or create session and build messages before spawning
-        let session_arc = self.session_manager.get_or_create(&session_key).await?;
-        let (history, embed_msg_id) = {
-            let mut session = session_arc.lock().await;
-            session.add_message("user", &content);
-            let msg_id = session.messages.last().map(|m| m.id.clone());
-            let history = session.get_history(self.history_limit).to_vec();
-            (history, msg_id)
-            // per-session lock released here
-        };
-
-        // Async conversation embedding hook for user message (CLI streaming)
-        if let Some(msg_id) = embed_msg_id {
-            self.spawn_embed_message(&session_key, "user", &content, &msg_id);
-        }
+        let history = self
+            .setup_session(&content, &session_key, "streaming direct")
+            .await?;
 
         // Create event channel and interaction channel
         let (event_tx, event_rx) = mpsc::channel(64);

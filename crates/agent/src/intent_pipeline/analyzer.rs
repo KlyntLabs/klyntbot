@@ -3,10 +3,11 @@
 //! Stage 1: Fast heuristic check (0ms). If confidence exceeds threshold, return immediately.
 //! Stage 2: LLM classifier for ambiguous messages. Falls back to Reactive on error.
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use config::OrchestratorConfig;
 use providers::{ChatParams, DynProvider};
+use tokio::sync::Mutex;
 use tracing::{debug, warn};
 
 use super::classifier::IntentClassifier;
@@ -14,12 +15,17 @@ use super::format_strategy_context;
 use super::heuristics::analyze_heuristic;
 use super::types::{AnalysisSource, ExecutionMode, IntentAnalysis};
 
+/// TTL for cached strategy context (seconds).
+const STRATEGY_CACHE_TTL_SECS: u64 = 60;
+
 /// Two-stage intent analyzer: heuristics → LLM classifier.
 pub struct IntentAnalyzer {
     classifier: IntentClassifier,
     classifier_params: ChatParams,
     strategy_repo: Option<storage::StrategyRepo>,
     config: OrchestratorConfig,
+    /// Cached strategy context to avoid hitting DB on every ambiguous message.
+    strategy_cache: Mutex<Option<(Instant, Option<String>)>>,
 }
 
 impl IntentAnalyzer {
@@ -30,6 +36,7 @@ impl IntentAnalyzer {
             classifier_params: ChatParams::new(model),
             strategy_repo: None,
             config: config.clone(),
+            strategy_cache: Mutex::new(None),
         }
     }
 
@@ -92,9 +99,19 @@ impl IntentAnalyzer {
 
     async fn build_strategy_context(&self) -> Option<String> {
         let repo = self.strategy_repo.as_ref()?;
-        let since = chrono::Utc::now() - chrono::Duration::days(30);
 
-        match repo.get_strategy_summaries(since).await {
+        // Check TTL cache first
+        {
+            let cache = self.strategy_cache.lock().await;
+            if let Some((cached_at, ref value)) = *cache {
+                if cached_at.elapsed() < Duration::from_secs(STRATEGY_CACHE_TTL_SECS) {
+                    return value.clone();
+                }
+            }
+        }
+
+        let since = chrono::Utc::now() - chrono::Duration::days(30);
+        let result = match repo.get_strategy_summaries(since).await {
             Ok(summaries) if !summaries.is_empty() => {
                 let ctx = format_strategy_context(&summaries);
                 debug!("Strategy feedback context: {} strategies", summaries.len());
@@ -105,7 +122,11 @@ impl IntentAnalyzer {
                 warn!("Failed to load strategy summaries: {}", e);
                 None
             }
-        }
+        };
+
+        // Cache the result
+        *self.strategy_cache.lock().await = Some((Instant::now(), result.clone()));
+        result
     }
 }
 

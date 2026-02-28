@@ -4,7 +4,9 @@ use feature_todo::{EnrichmentSuggestion, Todo};
 
 /// Keyword groups mapped to priority levels.
 /// Priority scale: 1 = highest, 4 = lowest.
-const HIGH_PRIORITY_KEYWORDS: &[&str] = &[
+/// Keywords that indicate urgency/high priority.
+/// Also used by `scheduling.rs` for due-date urgency detection.
+pub const HIGH_PRIORITY_KEYWORDS: &[&str] = &[
     "urgent",
     "critical",
     "blocker",
@@ -105,7 +107,9 @@ pub fn infer_priority(task: &Todo) -> Option<EnrichmentSuggestion<u8>> {
     })
 }
 
-fn build_searchable_text(task: &Todo) -> String {
+/// Build lowercase-ready searchable text from a task's title, description, and tags.
+/// Shared across enrichment modules so keyword matching is consistent.
+pub fn build_searchable_text(task: &Todo) -> String {
     let mut text = task.title.clone();
     if let Some(ref desc) = task.description {
         text.push(' ');

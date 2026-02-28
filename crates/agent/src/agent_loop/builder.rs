@@ -133,15 +133,13 @@ impl AgentLoopBuilder {
         let workspace = config.workspace_path();
 
         // Ensure workspace directory exists so fs tools work correctly
-        if !workspace.exists() {
-            tokio::fs::create_dir_all(&workspace).await.map_err(|e| {
-                common::KlyntbotError::Config(common::ConfigError::Invalid(format!(
-                    "Failed to create workspace directory {}: {}",
-                    workspace.display(),
-                    e
-                )))
-            })?;
-        }
+        tokio::fs::create_dir_all(&workspace).await.map_err(|e| {
+            common::KlyntbotError::Config(common::ConfigError::Invalid(format!(
+                "Failed to create workspace directory {}: {}",
+                workspace.display(),
+                e
+            )))
+        })?;
 
         // ── Create repos from pool (real or in-memory fallback) ──────────
         // Storage-dependent features (todo, finance, sessions) are disabled via
@@ -755,7 +753,7 @@ impl AgentLoopBuilder {
         let pipeline = Arc::new(
             crate::intent_pipeline::IntentPipeline::new(
                 analyzer,
-                context_engine::ContextEngine::new(),
+                Arc::clone(&context_engine),
                 router,
                 cost_tracker,
                 pipeline_config,

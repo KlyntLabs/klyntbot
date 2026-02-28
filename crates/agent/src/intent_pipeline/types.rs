@@ -18,6 +18,26 @@ pub enum ExecutionMode {
     },
 }
 
+impl ExecutionMode {
+    /// Short lowercase name for logging/strategy records.
+    pub fn short_name(&self) -> &'static str {
+        match self {
+            Self::Direct => "direct",
+            Self::Reactive { .. } => "reactive",
+            Self::Planned { .. } => "planned",
+        }
+    }
+
+    /// Maximum iterations/steps for this mode.
+    pub fn max_iterations(&self) -> u32 {
+        match self {
+            Self::Direct => 1,
+            Self::Reactive { max_iterations } => *max_iterations,
+            Self::Planned { max_steps, .. } => *max_steps as u32,
+        }
+    }
+}
+
 impl std::fmt::Display for ExecutionMode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

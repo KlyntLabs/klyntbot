@@ -11,7 +11,7 @@ use common::ChannelName;
 /// Maximum message length per channel.
 const TELEGRAM_MAX_CHARS: usize = 4096;
 const DISCORD_MAX_CHARS: usize = 2000;
-const WHATSAPP_MAX_CHARS: usize = 4096;
+const WHATSAPP_MAX_CHARS: usize = 4000;
 
 /// Format content for a specific channel's constraints.
 pub fn format_for_channel(content: &str, channel: &ChannelName) -> String {

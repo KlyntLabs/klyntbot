@@ -3,16 +3,13 @@
 use chrono::{Duration, Utc};
 use feature_todo::{EnrichmentSuggestion, Todo};
 
+use super::priority::{build_searchable_text, HIGH_PRIORITY_KEYWORDS};
+
 /// Suggest a due date based on task content and inferred urgency.
 pub fn suggest_due_date(
     task: &Todo,
 ) -> Option<EnrichmentSuggestion<chrono::DateTime<chrono::Utc>>> {
-    let text = format!(
-        "{} {}",
-        task.title,
-        task.description.as_deref().unwrap_or_default()
-    )
-    .to_lowercase();
+    let text = build_searchable_text(task).to_lowercase();
 
     let now = Utc::now();
 
@@ -84,16 +81,7 @@ pub fn suggest_due_date(
 }
 
 fn contains_urgency(text: &str) -> bool {
-    const URGENCY_KEYWORDS: &[&str] = &[
-        "urgent",
-        "asap",
-        "critical",
-        "blocker",
-        "emergency",
-        "hotfix",
-        "p0",
-    ];
-    URGENCY_KEYWORDS.iter().any(|kw| text.contains(kw))
+    HIGH_PRIORITY_KEYWORDS.iter().any(|kw| text.contains(kw))
 }
 
 #[cfg(test)]

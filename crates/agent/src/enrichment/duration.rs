@@ -2,6 +2,8 @@
 
 use feature_todo::{EnrichmentSuggestion, Todo};
 
+use super::priority::build_searchable_text;
+
 /// Keyword-to-duration mappings (minutes).
 const QUICK_KEYWORDS: &[&str] = &["typo", "rename", "tweak", "bump", "toggle", "minor"];
 const SMALL_KEYWORDS: &[&str] = &["fix", "patch", "update", "adjust", "lint", "format"];
@@ -26,12 +28,7 @@ const LARGE_KEYWORDS: &[&str] = &[
 
 /// Predict duration from task content.
 pub fn predict_duration(task: &Todo) -> Option<EnrichmentSuggestion<u32>> {
-    let text = format!(
-        "{} {}",
-        task.title,
-        task.description.as_deref().unwrap_or_default()
-    )
-    .to_lowercase();
+    let text = build_searchable_text(task).to_lowercase();
 
     if contains_any(&text, QUICK_KEYWORDS) {
         return Some(EnrichmentSuggestion {

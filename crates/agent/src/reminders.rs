@@ -99,8 +99,13 @@ impl ReminderEngine {
     ) -> Result<()> {
         use tools::todo_types::Todo;
 
-        // Get all active todos via SQL
-        let rows = repo.list(&storage::TodoFilter::default()).await?;
+        // Get only non-template, non-done todos for reminder checking
+        let filter = storage::TodoFilter {
+            status: None, // include todo + doing (exclude done via post-filter below)
+            templates_only: false,
+            ..Default::default()
+        };
+        let rows = repo.list(&filter).await?;
 
         let todos: Vec<Todo> = rows.into_iter().map(Todo::from).collect();
 

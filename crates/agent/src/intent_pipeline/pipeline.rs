@@ -3,6 +3,7 @@
 //! Replaces `AgentPipeline` (Orchestrator + EngineDispatch) with a unified flow:
 //! IntentAnalyzer → ContextEngine → ExecutionRouter → ResponseValidator → CostTracker
 
+use std::borrow::Cow;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -68,7 +69,7 @@ impl Default for PipelineConfig {
 /// + ResponseValidator + CostTracker into a single `process_message()` call.
 pub struct IntentPipeline {
     analyzer: IntentAnalyzer,
-    context_engine: ContextEngine,
+    context_engine: Arc<ContextEngine>,
     router: ExecutionRouter,
     validator: ResponseValidator,
     cost_tracker: Arc<CostTracker>,
@@ -79,7 +80,7 @@ pub struct IntentPipeline {
 impl IntentPipeline {
     pub fn new(
         analyzer: IntentAnalyzer,
-        context_engine: ContextEngine,
+        context_engine: Arc<ContextEngine>,
         router: ExecutionRouter,
         cost_tracker: Arc<CostTracker>,
         config: PipelineConfig,
@@ -176,21 +177,24 @@ impl IntentPipeline {
         }
 
         // Step 3: Filter tools based on intent classification
-        let filtered_tools = if let Some(allowed) = analysis.allowed_tool_names() {
-            tool_definitions
-                .iter()
-                .filter(|t| {
-                    t.get("function")
-                        .and_then(|f| f.get("name"))
-                        .and_then(|n| n.as_str())
-                        .map(|name| allowed.contains(name))
-                        .unwrap_or(true) // Keep tools with unknown format
-                })
-                .cloned()
-                .collect::<Vec<_>>()
-        } else {
-            tool_definitions.to_vec()
-        };
+        let filtered_tools: Cow<'_, [serde_json::Value]> =
+            if let Some(allowed) = analysis.allowed_tool_names() {
+                Cow::Owned(
+                    tool_definitions
+                        .iter()
+                        .filter(|t| {
+                            t.get("function")
+                                .and_then(|f| f.get("name"))
+                                .and_then(|n| n.as_str())
+                                .map(|name| allowed.contains(name))
+                                .unwrap_or(true) // Keep tools with unknown format
+                        })
+                        .cloned()
+                        .collect(),
+                )
+            } else {
+                Cow::Borrowed(tool_definitions)
+            };
 
         debug!(
             "IntentPipeline: filtered {} → {} tools",
@@ -200,17 +204,10 @@ impl IntentPipeline {
 
         // Step 4: Execute via router (with automatic escalation)
         if let Some(ref tx) = event_tx {
-            let max_iter = match &analysis.mode {
-                super::types::ExecutionMode::Reactive { max_iterations } => {
-                    *max_iterations as usize
-                }
-                super::types::ExecutionMode::Planned { max_steps, .. } => *max_steps as usize,
-                super::types::ExecutionMode::Direct => 1,
-            };
             let _ = tx
                 .send(AgentEvent::ExecutionStarted {
                     engine: analysis.mode.to_string(),
-                    max_iterations: max_iter,
+                    max_iterations: analysis.mode.max_iterations() as usize,
                 })
                 .await;
         }
@@ -293,11 +290,7 @@ impl IntentPipeline {
             return;
         };
 
-        let max_iterations = match &analysis.mode {
-            super::types::ExecutionMode::Reactive { max_iterations } => *max_iterations as i32,
-            super::types::ExecutionMode::Planned { max_steps, .. } => *max_steps as i32,
-            super::types::ExecutionMode::Direct => 1,
-        };
+        let elapsed_ms = start.elapsed().as_millis() as i64;
 
         let record = storage::StrategyRecordRow {
             id: uuid::Uuid::new_v4(),
@@ -307,17 +300,14 @@ impl IntentPipeline {
             actual_strategy: result.final_mode.clone(),
             escalation_count: result.escalation_count as i32,
             iterations_used: result.iterations as i32,
-            max_iterations,
+            max_iterations: analysis.mode.max_iterations() as i32,
             success: validation.is_valid,
             user_satisfaction: None,
-            response_time_ms: start.elapsed().as_millis() as i64,
+            response_time_ms: elapsed_ms,
             chat_id: Some(ctx.chat_id.to_string()),
             tool_name: result.tool_name.clone(),
             tool_success: result.tool_name.as_ref().map(|_| validation.is_valid),
-            tool_duration_ms: result
-                .tool_name
-                .as_ref()
-                .map(|_| start.elapsed().as_millis() as i64),
+            tool_duration_ms: result.tool_name.as_ref().map(|_| elapsed_ms),
         };
 
         if let Err(e) = strategy_repo.create(&record).await {
@@ -420,7 +410,7 @@ mod tests {
 
         IntentPipeline::new(
             analyzer,
-            ContextEngine::new(),
+            Arc::new(ContextEngine::new()),
             router,
             cost_tracker,
             PipelineConfig::default(),
@@ -509,7 +499,7 @@ mod tests {
 
         let pipeline = IntentPipeline::new(
             analyzer,
-            ContextEngine::new(),
+            Arc::new(ContextEngine::new()),
             router,
             cost_tracker,
             PipelineConfig::default(),

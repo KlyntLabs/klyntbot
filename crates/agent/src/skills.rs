@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::OnceLock;
 use tokio::fs;
 use tracing::{debug, warn};
 
@@ -79,6 +80,8 @@ pub struct Skill {
 /// Skill manager
 pub struct SkillManager {
     skills: HashMap<String, Skill>,
+    /// Cached XML summary (computed once after loading).
+    summary_cache: OnceLock<String>,
 }
 
 impl SkillManager {
@@ -86,6 +89,7 @@ impl SkillManager {
     pub fn new() -> Self {
         Self {
             skills: HashMap::new(),
+            summary_cache: OnceLock::new(),
         }
     }
 
@@ -252,33 +256,35 @@ impl SkillManager {
         })
     }
 
-    /// Generate XML skills summary for system prompt
-    pub fn generate_summary(&self) -> String {
-        let mut summary = String::from("<skills>\n");
+    /// Generate XML skills summary for system prompt (cached after first call).
+    pub fn generate_summary(&self) -> &str {
+        self.summary_cache.get_or_init(|| {
+            let mut summary = String::from("<skills>\n");
 
-        for skill in self.skills.values() {
-            summary.push_str(&format!(
-                "  <skill name=\"{}\" available=\"{}\">\n",
-                skill.name, skill.available
-            ));
-            summary.push_str(&format!(
-                "    <description>{}</description>\n",
-                skill.description
-            ));
-            summary.push_str(&format!("    <path>{}</path>\n", skill.path.display()));
-
-            if !skill.triggers.is_empty() {
+            for skill in self.skills.values() {
                 summary.push_str(&format!(
-                    "    <triggers>{}</triggers>\n",
-                    skill.triggers.join(", ")
+                    "  <skill name=\"{}\" available=\"{}\">\n",
+                    skill.name, skill.available
                 ));
+                summary.push_str(&format!(
+                    "    <description>{}</description>\n",
+                    skill.description
+                ));
+                summary.push_str(&format!("    <path>{}</path>\n", skill.path.display()));
+
+                if !skill.triggers.is_empty() {
+                    summary.push_str(&format!(
+                        "    <triggers>{}</triggers>\n",
+                        skill.triggers.join(", ")
+                    ));
+                }
+
+                summary.push_str("  </skill>\n");
             }
 
-            summary.push_str("  </skill>\n");
-        }
-
-        summary.push_str("</skills>");
-        summary
+            summary.push_str("</skills>");
+            summary
+        })
     }
 
     /// Get skills that should always be loaded
