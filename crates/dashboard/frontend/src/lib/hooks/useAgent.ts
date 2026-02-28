@@ -418,6 +418,7 @@ export function useAgent(): UseAgentResult {
       setIsStreaming(false);
       streamingMessageIdRef.current = null;
       accumulatedContentRef.current = '';
+      entityCardsRef.current = [];
     } catch (err) {
       setMessages((prev) => [
         ...prev,
