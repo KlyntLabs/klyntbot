@@ -3,6 +3,7 @@
 //! This crate provides the AgentLoop and related agent functionality.
 
 pub mod agent_loop;
+pub mod agent_task_handler;
 
 pub mod calendar_reconcile;
 pub mod calendar_sync_adapter;

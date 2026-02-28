@@ -199,6 +199,7 @@ impl AgentLoopBuilder {
                 .web_max_results(config.tools.web.max_results)
                 .restrict_to_workspace(config.tools.restrict_to_workspace)
                 .max_concurrent_subagents(config.agents.defaults.max_concurrent_subagents)
+                .agent_task_repo(repos.agent_tasks.clone())
                 .build(),
         );
 

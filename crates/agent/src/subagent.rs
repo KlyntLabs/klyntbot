@@ -12,7 +12,9 @@ use uuid::Uuid;
 use async_trait::async_trait;
 use bus::InboundMessage;
 use providers::{DynProvider, Message};
+use storage::AgentTaskRepo;
 use tools::{
+    agent_task_tool::AgentTaskTool,
     filesystem::{register_fs_read_tools, register_fs_tools},
     glob_tool::GlobTool,
     grep::GrepTool,
@@ -85,6 +87,9 @@ struct SubagentConfig {
     /// Timeout in seconds for the subagent task.
     task_timeout: u64,
     restrict_to_workspace: bool,
+    agent_task_repo: AgentTaskRepo,
+    session_key: String,
+    agent_id: String,
 }
 
 /// Subagent manager for spawning background tasks
@@ -99,6 +104,7 @@ pub struct SubagentManager {
     restrict_to_workspace: bool,
     semaphore: Arc<Semaphore>,
     handles: Arc<Mutex<HashMap<String, SubagentHandle>>>,
+    agent_task_repo: AgentTaskRepo,
 }
 
 /// Builder for SubagentManager
@@ -112,6 +118,7 @@ pub struct SubagentManagerBuilder {
     task_timeout: u64,
     restrict_to_workspace: bool,
     max_concurrent_subagents: usize,
+    agent_task_repo: Option<AgentTaskRepo>,
 }
 
 impl SubagentManagerBuilder {
@@ -127,6 +134,7 @@ impl SubagentManagerBuilder {
             task_timeout: 60,
             restrict_to_workspace: true,
             max_concurrent_subagents: 3,
+            agent_task_repo: None,
         }
     }
 
@@ -165,6 +173,11 @@ impl SubagentManagerBuilder {
         self
     }
 
+    pub fn agent_task_repo(mut self, repo: AgentTaskRepo) -> Self {
+        self.agent_task_repo = Some(repo);
+        self
+    }
+
     pub fn build(self) -> SubagentManager {
         SubagentManager {
             provider: self.provider,
@@ -177,6 +190,7 @@ impl SubagentManagerBuilder {
             restrict_to_workspace: self.restrict_to_workspace,
             semaphore: Arc::new(Semaphore::new(self.max_concurrent_subagents)),
             handles: Arc::new(Mutex::new(HashMap::new())),
+            agent_task_repo: self.agent_task_repo.expect("agent_task_repo is required"),
         }
     }
 }
@@ -238,6 +252,9 @@ impl SubagentManager {
             web_max_results: self.web_max_results,
             task_timeout: self.task_timeout,
             restrict_to_workspace: self.restrict_to_workspace,
+            agent_task_repo: self.agent_task_repo.clone(),
+            session_key: origin_key.clone(),
+            agent_id: short_id.clone(),
         };
 
         let semaphore = Arc::clone(&self.semaphore);
@@ -425,6 +442,16 @@ async fn run_subagent_task(
         }
     }
 
+    // All profiles get the agent task tool for task board coordination
+    let task_handler = Arc::new(crate::agent_task_handler::AgentTaskHandlerImpl::new(
+        config.agent_task_repo,
+    ));
+    tools.register(AgentTaskTool::new(
+        task_handler,
+        config.session_key,
+        config.agent_id,
+    ));
+
     let tool_defs = tools.get_definitions();
 
     // Build execution engine
@@ -492,11 +519,19 @@ fn build_subagent_prompt(
 
 ## What You Can Do
 {}
+- Manage tasks on the shared task board (agent_task tool: list, claim, complete, fail)
 
 ## What You Cannot Do
 - Send messages directly to users (no message tool available)
 - Spawn other subagents
 - Access the main agent's conversation history
+
+## Task Board
+Use the `agent_task` tool to coordinate with other subagents:
+- `list` — see all tasks for this session
+- `claim` — take ownership of an unclaimed task
+- `complete` — mark a task done with your results
+- `fail` — report that a task failed
 
 ## Workspace
 Your workspace is at: {}
@@ -583,29 +618,37 @@ mod tests {
         }
     }
 
-    fn make_manager(permits: usize) -> SubagentManager {
+    async fn make_manager(permits: usize) -> SubagentManager {
         let (tx, _rx) = mpsc::channel(8);
         let provider: DynProvider = Arc::new(NoOpProvider);
+        let pool = storage::StoragePool::connect_in_memory().await.unwrap();
+        let repo = storage::AgentTaskRepo::new(pool.inner().clone());
         SubagentManager::builder(provider, std::path::PathBuf::from("/tmp"))
             .inbound_sender(tx)
             .max_concurrent_subagents(permits)
+            .agent_task_repo(repo)
             .build()
     }
 
-    #[test]
-    fn test_subagent_manager_has_semaphore() {
-        let mgr = make_manager(5);
+    #[tokio::test]
+    async fn test_subagent_manager_has_semaphore() {
+        let mgr = make_manager(5).await;
         assert_eq!(mgr.semaphore_permits(), 5);
     }
 
     #[tokio::test]
     async fn test_run_subagent_task_returns_text_response() {
         let provider: DynProvider = Arc::new(NoOpProvider);
+        let pool = storage::StoragePool::connect_in_memory().await.unwrap();
+        let repo = storage::AgentTaskRepo::new(pool.inner().clone());
         let config = SubagentConfig {
             brave_api_key: None,
             web_max_results: 5,
             task_timeout: 60,
             restrict_to_workspace: false,
+            agent_task_repo: repo,
+            session_key: "test:session".to_string(),
+            agent_id: "agent-1".to_string(),
         };
         let result = run_subagent_task(
             &provider,

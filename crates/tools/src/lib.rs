@@ -17,6 +17,7 @@ pub use tools_core::{
 };
 
 // ── Core tool implementations ────────────────────────────────────────────────
+pub mod agent_task_tool;
 pub mod ask_user;
 pub mod browser;
 pub mod cron_tool;
@@ -53,6 +54,9 @@ pub mod registry;
 pub use params::ParamExtractor;
 
 // ── Re-exports for convenient access by consumers ────────────────────────────
+
+// Agent task
+pub use agent_task_tool::{AgentTaskHandler, AgentTaskTool};
 
 // Calendar
 pub use calendar_tool::{CalendarHandler, CalendarTool};
