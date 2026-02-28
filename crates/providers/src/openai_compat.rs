@@ -171,6 +171,52 @@ impl OpenAiCompatProvider {
         })
     }
 
+    /// Build the common request body shared by `chat()` and `chat_stream()`.
+    fn build_request_body(
+        &self,
+        messages: &[Message],
+        tools: Option<&[Value]>,
+        params: &ChatParams,
+        stream: bool,
+    ) -> Value {
+        let overrides = ProviderRegistry::get_model_overrides(&params.model);
+
+        let mut body = json!({
+            "model": params.model,
+            "messages": messages,
+        });
+
+        if stream {
+            body["stream"] = json!(true);
+        }
+
+        if let Some(temp) = params.temperature {
+            body["temperature"] = json!(temp);
+        } else if let Some(temp) = overrides.get("temperature").and_then(|v| v.as_f64()) {
+            body["temperature"] = json!(temp);
+        }
+        if let Some(max_tokens) = params.max_tokens {
+            body["max_tokens"] = json!(max_tokens);
+        } else if let Some(mt) = overrides.get("max_tokens").and_then(|v| v.as_u64()) {
+            body["max_tokens"] = json!(mt);
+        }
+
+        if let Some(tools) = tools {
+            if !tools.is_empty() {
+                body["tools"] = json!(tools);
+                body["tool_choice"] = json!("auto");
+            }
+        }
+
+        if let Some(ref format) = params.response_format {
+            if !matches!(format, ResponseFormat::Text) {
+                body["response_format"] = Self::serialize_response_format(format);
+            }
+        }
+
+        body
+    }
+
     /// Parse SSE event data
     fn parse_sse_chunk(data: &str) -> Result<Option<LlmStreamChunk>> {
         // Handle [DONE] marker
@@ -239,42 +285,7 @@ impl LlmProvider for OpenAiCompatProvider {
         params: &ChatParams,
     ) -> Result<LlmResponse> {
         let url = format!("{}/chat/completions", self.api_base);
-
-        // Apply model-specific overrides as defaults (user params take precedence)
-        let overrides = ProviderRegistry::get_model_overrides(&params.model);
-
-        // Build request body
-        let mut body = json!({
-            "model": params.model,
-            "messages": messages,
-        });
-
-        // Add optional parameters (user-provided take precedence over overrides)
-        if let Some(temp) = params.temperature {
-            body["temperature"] = json!(temp);
-        } else if let Some(temp) = overrides.get("temperature").and_then(|v| v.as_f64()) {
-            body["temperature"] = json!(temp);
-        }
-        if let Some(max_tokens) = params.max_tokens {
-            body["max_tokens"] = json!(max_tokens);
-        } else if let Some(mt) = overrides.get("max_tokens").and_then(|v| v.as_u64()) {
-            body["max_tokens"] = json!(mt);
-        }
-
-        // Add tools if provided
-        if let Some(tools) = tools {
-            if !tools.is_empty() {
-                body["tools"] = json!(tools);
-                body["tool_choice"] = json!("auto");
-            }
-        }
-
-        // Add response format for structured output
-        if let Some(ref format) = params.response_format {
-            if !matches!(format, ResponseFormat::Text) {
-                body["response_format"] = Self::serialize_response_format(format);
-            }
-        }
+        let body = self.build_request_body(messages, tools, params, false);
 
         debug!(
             "Calling LLM: model={}, messages={}",
@@ -331,42 +342,7 @@ impl LlmProvider for OpenAiCompatProvider {
         params: &ChatParams,
     ) -> Result<LlmStream> {
         let url = format!("{}/chat/completions", self.api_base);
-
-        // Apply model-specific overrides as defaults (user params take precedence)
-        let overrides = ProviderRegistry::get_model_overrides(&params.model);
-
-        // Build request body with stream: true
-        let mut body = json!({
-            "model": params.model,
-            "messages": messages,
-            "stream": true,
-        });
-
-        // Add optional parameters (user-provided take precedence over overrides)
-        if let Some(temp) = params.temperature {
-            body["temperature"] = json!(temp);
-        } else if let Some(temp) = overrides.get("temperature").and_then(|v| v.as_f64()) {
-            body["temperature"] = json!(temp);
-        }
-        if let Some(max_tokens) = params.max_tokens {
-            body["max_tokens"] = json!(max_tokens);
-        } else if let Some(mt) = overrides.get("max_tokens").and_then(|v| v.as_u64()) {
-            body["max_tokens"] = json!(mt);
-        }
-
-        if let Some(tools) = tools {
-            if !tools.is_empty() {
-                body["tools"] = json!(tools);
-                body["tool_choice"] = json!("auto");
-            }
-        }
-
-        // Add response format for structured output
-        if let Some(ref format) = params.response_format {
-            if !matches!(format, ResponseFormat::Text) {
-                body["response_format"] = Self::serialize_response_format(format);
-            }
-        }
+        let body = self.build_request_body(messages, tools, params, true);
 
         debug!(
             "Calling LLM (streaming): model={}, messages={}",

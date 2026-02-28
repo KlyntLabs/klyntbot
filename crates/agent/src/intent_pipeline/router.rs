@@ -72,13 +72,14 @@ impl ExecutionRouter {
         use super::engines::ExecutionEngine;
 
         let mut escalation_count = 0u32;
+        let initial_mode_name = mode.short_name();
 
-        // Phase 1: Execute with initial mode
-        let initial_result = match &mode {
+        // Phase 1: Execute with initial mode (move messages — not used after this)
+        let initial_result = match mode {
             ExecutionMode::Direct => {
                 debug!("ExecutionRouter: starting with Direct mode");
                 self.direct
-                    .execute(messages.clone(), tools, params, ctx, event_tx.clone())
+                    .execute(messages, tools, params, ctx, event_tx.clone())
                     .await?
             }
             ExecutionMode::Reactive { max_iterations } => {
@@ -87,15 +88,15 @@ impl ExecutionRouter {
                     max_iterations
                 );
                 self.reactive
-                    .execute(messages.clone(), tools, params, ctx, event_tx.clone())
+                    .execute(messages, tools, params, ctx, event_tx.clone())
                     .await?
             }
-            ExecutionMode::Planned { visibility, .. } => {
+            ExecutionMode::Planned { ref visibility, .. } => {
                 debug!("ExecutionRouter: starting with Planned mode");
                 if let Some(ref planned) = self.planned {
                     planned
                         .execute_with_visibility(
-                            messages.clone(),
+                            messages,
                             tools,
                             params,
                             ctx,
@@ -106,7 +107,7 @@ impl ExecutionRouter {
                 } else {
                     warn!("ExecutionRouter: Planned mode requested but no PlannedEngine configured, falling back to Reactive");
                     self.reactive
-                        .execute(messages.clone(), tools, params, ctx, event_tx.clone())
+                        .execute(messages, tools, params, ctx, event_tx.clone())
                         .await?
                 }
             }
@@ -114,7 +115,7 @@ impl ExecutionRouter {
 
         // Phase 2: Handle escalation chain
         let mut current_result = initial_result;
-        let mut current_mode = mode.short_name();
+        let mut current_mode = initial_mode_name;
 
         loop {
             match current_result {

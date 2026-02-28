@@ -2,6 +2,7 @@
 
 use chrono::Utc;
 use common::{Result, ToolError};
+use futures_util::future::try_join_all;
 use std::collections::HashMap;
 use tools_core::ParamExtractor;
 use tracing::{debug, info};
@@ -116,10 +117,8 @@ impl TodoTool {
 
     pub(crate) async fn handle_tree(&self) -> Result<String> {
         let rows = self.repo.list(&TodoFilter::default()).await?;
-        let mut todos: Vec<Todo> = Vec::with_capacity(rows.len());
-        for row in rows {
-            todos.push(self.load_full_todo(row).await?);
-        }
+        let todos: Vec<Todo> =
+            try_join_all(rows.into_iter().map(|row| self.load_full_todo(row))).await?;
 
         let roots: Vec<_> = todos.iter().filter(|t| t.parent_id.is_none()).collect();
 
@@ -196,10 +195,8 @@ impl TodoTool {
         };
 
         let rows = self.repo.list(&TodoFilter::default()).await?;
-        let mut todos: Vec<Todo> = Vec::with_capacity(rows.len());
-        for row in rows {
-            todos.push(self.load_full_todo(row).await?);
-        }
+        let todos: Vec<Todo> =
+            try_join_all(rows.into_iter().map(|row| self.load_full_todo(row))).await?;
 
         let todos: Vec<_> = if let Some(ref proj_id) = project_id_filter {
             todos
@@ -304,18 +301,23 @@ impl TodoTool {
         debug!("Total tasks in store: {}", all_tasks.len());
 
         let now = Utc::now();
-        let mut eligible = Vec::new();
+        let candidates: Vec<_> = all_tasks
+            .into_iter()
+            .filter(|t| t.status == TodoStatus::Todo && !t.is_template && t.focused_at.is_none())
+            .collect();
 
-        for task in all_tasks {
-            if task.status != TodoStatus::Todo || task.is_template || task.focused_at.is_some() {
-                continue;
-            }
-            let blockers = self.repo.incomplete_blockers(&task.id).await?;
-            if !blockers.is_empty() {
-                continue;
-            }
-            eligible.push(task);
-        }
+        // Batch-check blockers concurrently instead of N sequential queries
+        let blocker_results: Vec<Vec<_>> = try_join_all(
+            candidates.iter().map(|t| self.repo.incomplete_blockers(&t.id)),
+        )
+        .await?;
+
+        let eligible: Vec<_> = candidates
+            .into_iter()
+            .zip(blocker_results)
+            .filter(|(_, blockers)| blockers.is_empty())
+            .map(|(task, _)| task)
+            .collect();
 
         let mut scored: Vec<(Todo, f64)> = eligible
             .into_iter()

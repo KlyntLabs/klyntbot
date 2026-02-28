@@ -1,7 +1,8 @@
-//! Domain types for the feature-todo crate.
+//! Domain types for the todo system.
 //!
-//! These mirror `tools::todo_types` but are self-contained within this crate,
-//! avoiding a dependency on the `tools` crate.
+//! Canonical definitions of `Todo`, `TodoStatus`, `Attachment`, `TimeEntry`,
+//! and their conversions from/to storage row types. Re-exported by
+//! `tools::todo_types` for use across the workspace.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -265,37 +266,6 @@ impl From<&Todo> for TodoRow {
             recurrence_parent_id: todo.recurrence_parent_id.clone(),
             is_template: todo.is_template,
             next_instance_date: todo.next_instance_date,
-        }
-    }
-}
-
-impl Todo {
-    /// Convert to a `storage::TodoRow` for direct persistence via `storage::TodoRepo`.
-    pub fn to_storage_row(&self) -> storage::TodoRow {
-        storage::TodoRow {
-            id: self.id.clone(),
-            title: self.title.clone(),
-            description: self.description.clone(),
-            priority: self.priority.map(|p| p as i16),
-            due_date: self.due_date,
-            tags: self.tags.clone(),
-            status: self.status.as_str().to_string(),
-            focused_at: self.focused_at,
-            focus_deadline: self.focus_deadline,
-            focus_expired_count: self.focus_expired_count as i32,
-            created_at: self.created_at,
-            updated_at: self.updated_at,
-            completed_at: self.completed_at,
-            parent_id: self.parent_id.clone(),
-            project_id: self.project_id.clone(),
-            total_tracked_secs: self.total_tracked_secs as i64,
-            estimated_minutes: self.estimated_minutes.map(|m| m as i32),
-            calendar_event_uid: self.calendar_event_uid.clone(),
-            last_reminded_at: self.last_reminded_at,
-            recurrence_rule: self.recurrence_rule.clone(),
-            recurrence_parent_id: self.recurrence_parent_id.clone(),
-            is_template: self.is_template,
-            next_instance_date: self.next_instance_date,
         }
     }
 }

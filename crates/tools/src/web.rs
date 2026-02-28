@@ -273,14 +273,15 @@ impl Tool for WebFetchTool {
     }
 }
 
-fn truncate_output(text: &str, max_chars: usize) -> String {
-    if text.len() <= max_chars {
+fn truncate_output(text: &str, max_bytes: usize) -> String {
+    if text.len() <= max_bytes {
         text.to_string()
     } else {
+        let truncated = common::utils::truncate_at_boundary(text, max_bytes);
         format!(
-            "{}... (truncated, {} more chars)",
-            &text[..max_chars],
-            text.len() - max_chars
+            "{}... (truncated, {} more bytes)",
+            truncated,
+            text.len() - truncated.len()
         )
     }
 }

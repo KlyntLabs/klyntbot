@@ -453,7 +453,7 @@ impl AgentLoop {
     }
 
     /// Get tool definitions and names from the registry.
-    async fn get_tool_info(&self) -> (Vec<serde_json::Value>, Vec<String>) {
+    async fn get_tool_info(&self) -> (std::sync::Arc<Vec<serde_json::Value>>, Vec<String>) {
         let tool_registry = self.tool_registry.read().await;
         let tool_defs = tool_registry.get_definitions();
         let tool_names = tool_registry.tool_names();
@@ -635,7 +635,7 @@ impl AgentLoop {
     }
 
     /// Get all tool definitions from the registry (for /api/status).
-    pub async fn list_tools(&self) -> Vec<serde_json::Value> {
+    pub async fn list_tools(&self) -> std::sync::Arc<Vec<serde_json::Value>> {
         self.tool_registry.read().await.get_definitions()
     }
 

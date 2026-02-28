@@ -246,8 +246,6 @@ pub async fn get_subtasks(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<Vec<TodoRow>>, ApiError> {
-    // get_children returns empty if parent doesn't exist — verify it exists.
-    state.repos.todos.get_or_err(&id).await.map_err(ApiError::from)?;
     let children = state
         .repos
         .todos
@@ -263,13 +261,6 @@ pub async fn get_attachments(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<Vec<storage::TodoAttachmentRow>>, ApiError> {
-    state
-        .repos
-        .todos
-        .get_or_err(&id)
-        .await
-        .map_err(ApiError::from)?;
-
     let attachments = state
         .repos
         .todos
@@ -285,13 +276,6 @@ pub async fn get_time_entries(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<Vec<storage::TodoTimeEntryRow>>, ApiError> {
-    state
-        .repos
-        .todos
-        .get_or_err(&id)
-        .await
-        .map_err(ApiError::from)?;
-
     let entries = state
         .repos
         .todos
@@ -447,13 +431,6 @@ pub async fn remove_task_dependency(
     State(state): State<AppState>,
     Path((id, blocker_id)): Path<(String, String)>,
 ) -> Result<StatusCode, ApiError> {
-    state
-        .repos
-        .todos
-        .get_or_err(&id)
-        .await
-        .map_err(ApiError::from)?;
-
     let removed = state
         .repos
         .todos

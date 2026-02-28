@@ -11,7 +11,7 @@ use common::{Result, ToolError};
 /// Registry for agent tools
 pub struct ToolRegistry {
     tools: HashMap<String, DynTool>,
-    cached_definitions: Mutex<Option<Vec<Value>>>,
+    cached_definitions: Mutex<Option<Arc<Vec<Value>>>>,
     permissions: Option<ToolPermissions>,
 }
 
@@ -64,17 +64,19 @@ impl ToolRegistry {
 
     /// Get all tool definitions in OpenAI function-calling format.
     /// Uses interior mutability so only a shared reference is needed.
-    pub fn get_definitions(&self) -> Vec<Value> {
+    /// Returns `Arc<Vec<Value>>` so cache hits are an atomic increment, not a deep clone.
+    pub fn get_definitions(&self) -> Arc<Vec<Value>> {
         let mut cache = self.cached_definitions.lock().expect("cache lock poisoned");
         if let Some(defs) = cache.as_ref() {
-            return defs.clone();
+            return Arc::clone(defs);
         }
 
         // First time: build and cache all tool schemas
         let definitions: Vec<Value> = self.tools.values().map(|tool| tool.to_schema()).collect();
         debug!("Cached {} tool definitions", definitions.len());
-        *cache = Some(definitions.clone());
-        definitions
+        let arc = Arc::new(definitions);
+        *cache = Some(Arc::clone(&arc));
+        arc
     }
 
     /// Execute a tool by name with given parameters and routing context

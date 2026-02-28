@@ -350,6 +350,72 @@ impl AnthropicNativeProvider {
         }
     }
 
+    /// Build the common request body shared by `chat()` and `chat_stream()`.
+    fn build_request_body(
+        &self,
+        messages: &[Message],
+        tools: Option<&[Value]>,
+        params: &ChatParams,
+        stream: bool,
+    ) -> Value {
+        let overrides = ProviderRegistry::get_model_overrides(&params.model);
+
+        let mut body = json!({
+            "model": params.model,
+            "messages": self.convert_messages(messages),
+            "max_tokens": params.max_tokens.unwrap_or(4096),
+        });
+
+        if stream {
+            body["stream"] = json!(true);
+        }
+
+        // System prompt — conditionally apply cache_control for prompt caching
+        if let Some(system_prompt) = Self::extract_system_prompt(messages) {
+            if self.cache_system_prompt {
+                body["system"] = json!([{
+                    "type": "text",
+                    "text": system_prompt,
+                    "cache_control": {"type": "ephemeral"}
+                }]);
+            } else {
+                body["system"] = json!(system_prompt);
+            }
+        }
+
+        if let Some(temp) = params.temperature {
+            body["temperature"] = json!(temp);
+        } else if let Some(temp) = overrides.get("temperature").and_then(|v| v.as_f64()) {
+            body["temperature"] = json!(temp);
+        }
+
+        // Extended thinking — inject thinking block and remove temperature
+        if let Some(ref et) = self.extended_thinking {
+            if et.enabled {
+                body["thinking"] = json!({
+                    "type": "enabled",
+                    "budget_tokens": et.budget_tokens
+                });
+                body.as_object_mut().unwrap().remove("temperature");
+            }
+        }
+
+        // Convert and collect tools (mutable for response_format injection)
+        let mut anthropic_tools: Vec<Value> =
+            tools.map(|t| self.convert_tools(t)).unwrap_or_default();
+
+        if !anthropic_tools.is_empty() {
+            body["tools"] = json!(&anthropic_tools);
+        }
+
+        // Apply structured output format (may inject synthetic tool + tool_choice)
+        if let Some(ref format) = params.response_format {
+            Self::apply_response_format(&mut body, format, &mut anthropic_tools);
+        }
+
+        body
+    }
+
     /// Parse Anthropic Messages API response into LlmResponse.
     fn parse_response(&self, body: Value) -> Result<LlmResponse> {
         let mut text_content = String::new();
@@ -435,60 +501,7 @@ impl LlmProvider for AnthropicNativeProvider {
         params: &ChatParams,
     ) -> Result<LlmResponse> {
         let url = format!("{}/v1/messages", self.base_url);
-
-        // Apply model-specific overrides as defaults (user params take precedence)
-        let overrides = ProviderRegistry::get_model_overrides(&params.model);
-
-        // Build request body
-        let mut body = json!({
-            "model": params.model,
-            "messages": self.convert_messages(messages),
-            "max_tokens": params.max_tokens.unwrap_or(4096),
-        });
-
-        // System prompt — conditionally apply cache_control for prompt caching
-        if let Some(system_prompt) = Self::extract_system_prompt(messages) {
-            if self.cache_system_prompt {
-                body["system"] = json!([{
-                    "type": "text",
-                    "text": system_prompt,
-                    "cache_control": {"type": "ephemeral"}
-                }]);
-            } else {
-                body["system"] = json!(system_prompt);
-            }
-        }
-
-        if let Some(temp) = params.temperature {
-            body["temperature"] = json!(temp);
-        } else if let Some(temp) = overrides.get("temperature").and_then(|v| v.as_f64()) {
-            body["temperature"] = json!(temp);
-        }
-
-        // Extended thinking — inject thinking block and remove temperature
-        if let Some(ref et) = self.extended_thinking {
-            if et.enabled {
-                body["thinking"] = json!({
-                    "type": "enabled",
-                    "budget_tokens": et.budget_tokens
-                });
-                // Anthropic requires temperature=1 (or absent) when thinking is enabled
-                body.as_object_mut().unwrap().remove("temperature");
-            }
-        }
-
-        // Convert and collect tools (mutable for response_format injection)
-        let mut anthropic_tools: Vec<Value> =
-            tools.map(|t| self.convert_tools(t)).unwrap_or_default();
-
-        if !anthropic_tools.is_empty() {
-            body["tools"] = json!(&anthropic_tools);
-        }
-
-        // Apply structured output format (may inject synthetic tool + tool_choice)
-        if let Some(ref format) = params.response_format {
-            Self::apply_response_format(&mut body, format, &mut anthropic_tools);
-        }
+        let body = self.build_request_body(messages, tools, params, false);
 
         debug!(
             "Calling Anthropic native: model={}, messages={}, thinking={}",
@@ -536,61 +549,7 @@ impl LlmProvider for AnthropicNativeProvider {
         params: &ChatParams,
     ) -> Result<LlmStream> {
         let url = format!("{}/v1/messages", self.base_url);
-
-        // Apply model-specific overrides as defaults (user params take precedence)
-        let overrides = ProviderRegistry::get_model_overrides(&params.model);
-
-        // Build request body with stream: true
-        let mut body = json!({
-            "model": params.model,
-            "messages": self.convert_messages(messages),
-            "max_tokens": params.max_tokens.unwrap_or(4096),
-            "stream": true,
-        });
-
-        // System prompt — conditionally apply cache_control for prompt caching
-        if let Some(system_prompt) = Self::extract_system_prompt(messages) {
-            if self.cache_system_prompt {
-                body["system"] = json!([{
-                    "type": "text",
-                    "text": system_prompt,
-                    "cache_control": {"type": "ephemeral"}
-                }]);
-            } else {
-                body["system"] = json!(system_prompt);
-            }
-        }
-
-        if let Some(temp) = params.temperature {
-            body["temperature"] = json!(temp);
-        } else if let Some(temp) = overrides.get("temperature").and_then(|v| v.as_f64()) {
-            body["temperature"] = json!(temp);
-        }
-
-        // Extended thinking — inject thinking block and remove temperature
-        if let Some(ref et) = self.extended_thinking {
-            if et.enabled {
-                body["thinking"] = json!({
-                    "type": "enabled",
-                    "budget_tokens": et.budget_tokens
-                });
-                // Anthropic requires temperature=1 (or absent) when thinking is enabled
-                body.as_object_mut().unwrap().remove("temperature");
-            }
-        }
-
-        // Convert and collect tools (mutable for response_format injection)
-        let mut anthropic_tools: Vec<Value> =
-            tools.map(|t| self.convert_tools(t)).unwrap_or_default();
-
-        if !anthropic_tools.is_empty() {
-            body["tools"] = json!(&anthropic_tools);
-        }
-
-        // Apply structured output format (may inject synthetic tool + tool_choice)
-        if let Some(ref format) = params.response_format {
-            Self::apply_response_format(&mut body, format, &mut anthropic_tools);
-        }
+        let body = self.build_request_body(messages, tools, params, true);
 
         debug!(
             "Calling Anthropic native (streaming): model={}, messages={}, thinking={}",
