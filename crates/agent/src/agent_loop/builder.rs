@@ -175,16 +175,17 @@ impl AgentLoopBuilder {
         let embedding_engine = Arc::new(tools::EmbeddingEngine::new());
 
         // ── Memory store (with optional embedding-based relevance filtering) ──
-        let memory_store = if config.conversation.embedding.enabled && self.vector_store.is_some() {
-            crate::memory::MemoryStore::with_embeddings(
-                repos.memory_notes.clone(),
-                self.vector_store.clone().unwrap(),
-                Arc::clone(&embedding_engine),
-                config.conversation.search.semantic_threshold,
-            )
-        } else {
-            crate::memory::MemoryStore::new(repos.memory_notes.clone())
-        };
+        let memory_store =
+            if let (true, Some(vs)) = (config.conversation.embedding.enabled, self.vector_store.clone()) {
+                crate::memory::MemoryStore::with_embeddings(
+                    repos.memory_notes.clone(),
+                    vs,
+                    Arc::clone(&embedding_engine),
+                    config.conversation.search.semantic_threshold,
+                )
+            } else {
+                crate::memory::MemoryStore::new(repos.memory_notes.clone())
+            };
 
         let mut sources: Vec<Box<dyn ContextSource>> = vec![
             Box::new(IdentitySource::new(
@@ -288,9 +289,7 @@ impl AgentLoopBuilder {
                 None
             };
 
-        // Clone repos for shared use
-        let todo_repo_for_memory = repos.todos.clone();
-        let todo_repo_shared = repos.todos.clone();
+        // Shared references — SqlitePool is Clone+Send+Sync via Arc internally
 
         // ── Notification dispatcher ───────────────────────────────────────
         let notification_dispatcher = if !config.todo.notifications.targets.is_empty() {
@@ -306,7 +305,7 @@ impl AgentLoopBuilder {
         let calendar_adapter = if config.calendar.is_any_enabled() {
             let adapter = Arc::new(
                 CalendarSyncAdapter::new(
-                    todo_repo_shared.clone(),
+                    repos.todos.clone(),
                     repos.calendar_sync.clone(),
                     repos.calendar_event_cache.clone(),
                     &config.calendar,
@@ -335,10 +334,10 @@ impl AgentLoopBuilder {
         };
 
         // ── Wire automatic memory retrieval (cross-channel LanceDB ANN) ─
-        let context_engine = if config.conversation.embedding.enabled && self.vector_store.is_some()
+        let context_engine = if let (true, Some(vs)) =
+            (config.conversation.embedding.enabled, self.vector_store.clone())
         {
-            let conv_store_for_retriever =
-                tools::ConversationEmbeddingStore::new(self.vector_store.clone().unwrap());
+            let conv_store_for_retriever = tools::ConversationEmbeddingStore::new(vs);
             // Compute per-day decay factor from configured half-life: factor = 0.5^(1/half_life)
             let decay_factor =
                 0.5_f64.powf(1.0 / config.conversation.memory.decay_half_life_days as f64);
@@ -383,6 +382,10 @@ impl AgentLoopBuilder {
                 );
             }
 
+            // Set enrichment threshold from config
+            todo_tool = todo_tool
+                .with_enrichment_threshold(config.todo.enrichment.auto_apply_threshold);
+
             // Enrichment engine
             if config.todo.enrichment.enabled {
                 let mut enrichment_engine =
@@ -399,8 +402,7 @@ impl AgentLoopBuilder {
             }
 
             // Todo embedding (semantic search)
-            if config.todo.search.enabled && self.vector_store.is_some() {
-                let vs = self.vector_store.clone().unwrap();
+            if let (true, Some(vs)) = (config.todo.search.enabled, self.vector_store.clone()) {
 
                 let todo_embed_impl = Arc::new(
                     crate::todo_embedding_handler::TodoEmbeddingHandlerImpl::new(
@@ -456,9 +458,8 @@ impl AgentLoopBuilder {
         )));
         // ── Conversation embedding handler ────────────────────────────────
         let conversation_embedding_handler =
-            if config.conversation.embedding.enabled && self.vector_store.is_some() {
-                let conv_store =
-                    tools::ConversationEmbeddingStore::new(self.vector_store.clone().unwrap());
+            if let (true, Some(vs)) = (config.conversation.embedding.enabled, self.vector_store.clone()) {
+                let conv_store = tools::ConversationEmbeddingStore::new(vs);
                 let handler = Arc::new(
                 super::super::conversation_embedding_handler::ConversationEmbeddingHandlerImpl::new(
                     Arc::clone(&embedding_engine),
@@ -475,7 +476,7 @@ impl AgentLoopBuilder {
             if let Some(ref handler) = conversation_embedding_handler {
                 let mut memory_tool = tools::MemoryTool::new()
                     .with_conversation_handler(Arc::clone(handler))
-                    .with_todo_repo(todo_repo_for_memory)
+                    .with_todo_repo(repos.todos.clone())
                     .with_threshold(config.conversation.search.semantic_threshold)
                     .with_rrf_k(config.todo.search.rrf_k);
 
@@ -603,7 +604,7 @@ impl AgentLoopBuilder {
                 .as_ref()
                 .map(|adapter| Arc::clone(adapter) as Arc<dyn CalendarHandler>);
             let mut engine = super::super::ReminderEngine::new(
-                todo_repo_shared.clone(),
+                repos.todos.clone(),
                 calendar_handler_opt,
                 Arc::clone(dispatcher),
                 std::time::Duration::from_secs(300),
@@ -616,7 +617,7 @@ impl AgentLoopBuilder {
 
         // ── Recurring task spawner ────────────────────────────────────────
         let mut recurring_spawner = super::super::RecurringTaskSpawner::new(
-            todo_repo_shared.clone(),
+            repos.todos.clone(),
             config.timezone.clone(),
             std::time::Duration::from_secs(60),
         );
@@ -702,7 +703,13 @@ impl AgentLoopBuilder {
                 repos.plans.clone(),
                 provider.clone(),
                 config.agents.defaults.model.clone(),
-                config.orchestrator.default_plan_visibility.parse().unwrap_or_default(),
+                config.orchestrator.default_plan_visibility.parse().unwrap_or_else(|_| {
+                    warn!(
+                        "Invalid plan visibility '{}', defaulting to transparent",
+                        config.orchestrator.default_plan_visibility
+                    );
+                    Default::default()
+                }),
             ),
         );
 
@@ -762,11 +769,11 @@ impl AgentLoopBuilder {
         };
 
         // ── Memory maintenance service ────────────────────────────────────
-        let memory_maintenance_token = if self.pool.is_some() && self.vector_store.is_some() {
+        let memory_maintenance_token = if let (Some(_), Some(vs)) = (&self.pool, self.vector_store.clone()) {
             let token = CancellationToken::new();
             let maintenance_service =
                 crate::memory_maintenance_service::MemoryMaintenanceService::new(
-                    self.vector_store.clone().unwrap(),
+                    vs,
                     config.conversation.memory.max_age_days,
                     config.conversation.memory.maintenance_interval_hours,
                     token.clone(),

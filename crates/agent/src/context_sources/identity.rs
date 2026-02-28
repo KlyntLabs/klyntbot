@@ -61,7 +61,7 @@ impl ContextSource for IdentitySource {
         // so the LLM should produce text responses, not call the `message` tool.
         // For bus-driven channels (Telegram, Discord, etc.), the LLM must use
         // the `message` tool to route responses to the correct channel/chat.
-        let messaging_instruction = if ctx.channel == "cli" {
+        let messaging_instruction = if ctx.channel == common::CLI_CHANNEL {
             "- Respond directly with text — do NOT use the `message` tool (your text response is streamed to the user automatically)\n\
              - Only use the `message` tool if you need to send to a different channel"
         } else {

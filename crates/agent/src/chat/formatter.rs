@@ -6,6 +6,7 @@
 //! - WhatsApp: strip markdown, use emojis for emphasis
 //! - Default/CLI: pass through unchanged
 
+use common::utils::truncate_at_boundary;
 use common::ChannelName;
 
 /// Maximum message length per channel.
@@ -25,18 +26,18 @@ pub fn format_for_channel(content: &str, channel: &ChannelName) -> String {
 
 fn format_telegram(content: &str) -> String {
     // Telegram supports markdown — preserve it, just truncate if needed
-    truncate_at_boundary(content, TELEGRAM_MAX_CHARS)
+    truncate_with_ellipsis(content, TELEGRAM_MAX_CHARS)
 }
 
 fn format_discord(content: &str) -> String {
     // Discord supports markdown and code blocks — preserve them
-    truncate_at_boundary(content, DISCORD_MAX_CHARS)
+    truncate_with_ellipsis(content, DISCORD_MAX_CHARS)
 }
 
 fn format_whatsapp(content: &str) -> String {
     // WhatsApp: strip markdown formatting, use emojis for emphasis
     let stripped = strip_markdown(content);
-    truncate_at_boundary(&stripped, WHATSAPP_MAX_CHARS)
+    truncate_with_ellipsis(&stripped, WHATSAPP_MAX_CHARS)
 }
 
 /// Strip basic markdown formatting characters.
@@ -77,35 +78,24 @@ fn strip_markdown(content: &str) -> String {
 }
 
 /// Truncate content at a word boundary, appending "..." if truncated.
-/// Uses char boundaries to avoid panicking on multi-byte UTF-8 characters.
-fn truncate_at_boundary(content: &str, max_chars: usize) -> String {
-    if content.len() <= max_chars {
+/// Delegates UTF-8 boundary safety to `common::utils::truncate_at_boundary`.
+fn truncate_with_ellipsis(content: &str, max_bytes: usize) -> String {
+    if content.len() <= max_bytes {
         return content.to_string();
     }
 
     // Leave room for "..."
-    let limit = max_chars.saturating_sub(3);
+    let limit = max_bytes.saturating_sub(3);
 
-    // Find a valid UTF-8 boundary at or before `limit`
-    let safe_limit = floor_char_boundary(content, limit);
-    let truncated = &content[..safe_limit];
+    // Get a UTF-8-safe slice via the common utility
+    let safe_slice = truncate_at_boundary(content, limit);
 
-    // Find last whitespace for clean break
-    let cut_point = truncated.rfind(char::is_whitespace).unwrap_or(safe_limit);
+    // Find last whitespace for a clean word break
+    let cut_point = safe_slice
+        .rfind(char::is_whitespace)
+        .unwrap_or(safe_slice.len());
 
     format!("{}...", &content[..cut_point])
-}
-
-/// Find the largest byte index <= `index` that is a valid char boundary.
-fn floor_char_boundary(s: &str, index: usize) -> usize {
-    if index >= s.len() {
-        return s.len();
-    }
-    let mut i = index;
-    while i > 0 && !s.is_char_boundary(i) {
-        i -= 1;
-    }
-    i
 }
 
 #[cfg(test)]
@@ -164,13 +154,13 @@ mod tests {
     #[test]
     fn test_truncate_short_content() {
         let content = "short";
-        assert_eq!(truncate_at_boundary(content, 100), "short");
+        assert_eq!(truncate_with_ellipsis(content, 100), "short");
     }
 
     #[test]
     fn test_truncate_at_word_boundary() {
         let content = "hello world this is a test";
-        let result = truncate_at_boundary(content, 16);
+        let result = truncate_with_ellipsis(content, 16);
         // Should cut before "this" and add "..."
         assert!(result.ends_with("..."));
         assert!(result.len() <= 16);

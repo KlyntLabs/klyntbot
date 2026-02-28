@@ -20,7 +20,8 @@ use crate::ws_manager::{HeartbeatStrategy, WebSocketManager, WsConfig, WsHandler
 use crate::{check_allowlist, Channel};
 use bus::{InboundMessage, MessageBus, MessageKind, OutboundMessage};
 use common::{
-    Answer, AnswerType, AnswerValue, ChannelError, FormResponse, InteractionRequest, Result,
+    utils::truncate_chars, Answer, AnswerType, AnswerValue, ChannelError, FormResponse,
+    InteractionRequest, Result,
 };
 use config::DiscordConfig;
 
@@ -343,7 +344,7 @@ impl DiscordChannel {
         debug!(
             "Discord message from {}: {}...",
             sender_id,
-            &final_content.chars().take(50).collect::<String>()
+            truncate_chars(&final_content, 50, "")
         );
 
         // Start typing indicator

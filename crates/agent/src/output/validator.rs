@@ -5,6 +5,8 @@
 //! - Detects leaked system prompt patterns
 //! - Flags low-quality or empty responses
 
+use common::utils::truncate_at_boundary;
+
 /// Validates LLM responses for safety and quality.
 pub struct ResponseValidator {
     /// Maximum response length in approximate characters (tokens * 4).
@@ -72,17 +74,12 @@ impl ResponseValidator {
             warnings.push(ValidationWarning::LengthTruncated {
                 original_chars: filtered.len(),
             });
-            // Find a valid UTF-8 boundary at or before the limit
-            let safe_limit = {
-                let mut i = self.max_response_chars;
-                while i > 0 && !filtered.is_char_boundary(i) {
-                    i -= 1;
-                }
-                i
-            };
+            // Get a UTF-8-safe slice via the common utility
+            let safe_slice = truncate_at_boundary(&filtered, self.max_response_chars);
             // Truncate at a word boundary if possible
-            let truncated = &filtered[..safe_limit];
-            let cut_point = truncated.rfind(char::is_whitespace).unwrap_or(safe_limit);
+            let cut_point = safe_slice
+                .rfind(char::is_whitespace)
+                .unwrap_or(safe_slice.len());
             filtered = format!("{}…", &filtered[..cut_point]);
         }
 

@@ -10,7 +10,7 @@ use common::{Result, ToolError};
 use tools_core::ParamExtractor;
 use tools_core::RoutingContext;
 
-use super::FinanceTool;
+use super::{parse_date, FinanceTool};
 
 // ── Private helpers ──────────────────────────────────────────────────────────
 
@@ -107,8 +107,7 @@ impl FinanceTool {
         let mut rows = self
             .transactions
             .sum_by_category(date_from, date_to, "expense")
-            .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+            .await?;
 
         if let Some(cat) = category {
             rows.retain(|(c, _)| c == cat);
@@ -142,8 +141,7 @@ impl FinanceTool {
         let mut rows = self
             .transactions
             .sum_by_category(date_from, date_to, "income")
-            .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+            .await?;
 
         if let Some(cat) = category {
             rows.retain(|(c, _)| c == cat);
@@ -179,8 +177,7 @@ impl FinanceTool {
             let (income_data, spend_data) = tokio::try_join!(
                 self.transactions.sum_by_period("income", periods, "month"),
                 self.transactions.sum_by_period("expense", periods, "month"),
-            )
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+            )?;
 
             let income_map: std::collections::HashMap<String, i64> =
                 income_data.into_iter().collect();
@@ -230,8 +227,7 @@ impl FinanceTool {
             let period_data = self
                 .transactions
                 .sum_by_period(tx_type, periods, "month")
-                .await
-                .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+                .await?;
 
             let values: Vec<i64> = period_data.iter().map(|(_, v)| *v).collect();
 
@@ -262,8 +258,7 @@ impl FinanceTool {
             self.accounts.total_balance_by_currency(),
             self.investments.total_value_by_currency(),
             self.liabilities.total_remaining_by_currency(),
-        )
-        .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+        )?;
 
         let accounts_total: i64 = account_balances.iter().map(|(_, v)| v).sum();
         let investments_total: i64 = investment_values.iter().map(|(_, v)| v).sum();
@@ -325,10 +320,8 @@ impl FinanceTool {
         let date_to_str = p.optional_str("date_to")?;
 
         if let (Some(from), Some(to)) = (date_from_str, date_to_str) {
-            let date_from = NaiveDate::parse_from_str(from, "%Y-%m-%d")
-                .map_err(|e| ToolError::InvalidParams(format!("Invalid date_from: {e}")))?;
-            let date_to = NaiveDate::parse_from_str(to, "%Y-%m-%d")
-                .map_err(|e| ToolError::InvalidParams(format!("Invalid date_to: {e}")))?;
+            let date_from = parse_date(from)?;
+            let date_to = parse_date(to)?;
             let label = format!("{date_from} to {date_to}");
             return Ok((date_from, date_to, label));
         }

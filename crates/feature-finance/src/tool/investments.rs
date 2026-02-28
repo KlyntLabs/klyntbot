@@ -3,7 +3,7 @@
 //! Handles: portfolio_create, portfolio_list, investment_add, investment_update,
 //! investment_tx, investment_summary, price_fetch, price_refresh.
 
-use chrono::{Local, NaiveDate, Utc};
+use chrono::{Local, Utc};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -16,7 +16,7 @@ use storage::rows::finance::{
 use tools_core::ParamExtractor;
 use tools_core::RoutingContext;
 
-use super::FinanceTool;
+use super::{parse_date, FinanceTool};
 
 impl FinanceTool {
     pub(crate) async fn handle_investment(
@@ -152,13 +152,7 @@ impl FinanceTool {
         let currency = p
             .optional_str("currency")?
             .unwrap_or(&self.default_currency);
-        let purchase_date = match p.optional_str("purchase_date")? {
-            Some(s) => Some(
-                NaiveDate::parse_from_str(s, "%Y-%m-%d")
-                    .map_err(|_| ToolError::InvalidParams(format!("Invalid purchase_date: {s}")))?,
-            ),
-            None => None,
-        };
+        let purchase_date = p.optional_str("purchase_date")?.map(parse_date).transpose()?;
         let notes = p.optional_str("notes")?;
 
         let now = Utc::now();
@@ -258,8 +252,7 @@ impl FinanceTool {
 
         let today = Local::now().date_naive();
         let tx_date = match p.optional_str("date")? {
-            Some(s) => NaiveDate::parse_from_str(s, "%Y-%m-%d")
-                .map_err(|_| ToolError::InvalidParams(format!("Invalid date: {s}")))?,
+            Some(s) => parse_date(s)?,
             None => today,
         };
 

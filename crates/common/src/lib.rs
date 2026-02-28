@@ -17,4 +17,7 @@ pub use error::{
 pub use prompts::{
     Answer, AnswerOption, AnswerType, AnswerValue, FormResponse, InteractionRequest, Question,
 };
-pub use types::{ChannelName, ChatId, MessageRole, SessionKey};
+pub use types::{
+    ChannelName, ChatId, MessageRole, SessionKey, CLI_CHANNEL, SYSTEM_CHANNEL,
+    TELEGRAM_RESET_SENDER,
+};

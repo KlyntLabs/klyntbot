@@ -18,7 +18,8 @@ use crate::ws_manager::{HeartbeatStrategy, WebSocketManager, WsConfig, WsHandler
 use crate::{check_allowlist, Channel};
 use bus::{InboundMessage, MessageBus, MessageKind, OutboundMessage};
 use common::{
-    Answer, AnswerType, AnswerValue, ChannelError, FormResponse, InteractionRequest, Result,
+    utils::truncate_chars, Answer, AnswerType, AnswerValue, ChannelError, FormResponse,
+    InteractionRequest, Result,
 };
 use config::SlackConfig;
 
@@ -244,7 +245,7 @@ impl SlackChannel {
             sender_id,
             chat_id,
             channel_type,
-            &text.chars().take(80).collect::<String>()
+            truncate_chars(text, 80, "")
         );
 
         // Check allowlist

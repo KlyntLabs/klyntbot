@@ -73,11 +73,7 @@ impl FinanceTool {
             updated_at: now,
         };
 
-        let inserted = self
-            .accounts
-            .add(&row)
-            .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+        let inserted = self.accounts.add(&row).await?;
 
         let account = FinanceAccount::from(inserted);
 
@@ -117,15 +113,9 @@ impl FinanceTool {
         let currency = p.optional_str("currency")?;
 
         let rows = if let Some(c) = currency {
-            self.accounts
-                .list_by_currency(c)
-                .await
-                .map_err(|e| ToolError::ExecutionFailed(format!("list_by_currency: {}", e)))?
+            self.accounts.list_by_currency(c).await?
         } else {
-            self.accounts
-                .list(include_archived)
-                .await
-                .map_err(|e| ToolError::ExecutionFailed(format!("list: {}", e)))?
+            self.accounts.list(include_archived).await?
         };
 
         if rows.is_empty() {
@@ -134,11 +124,7 @@ impl FinanceTool {
 
         let accounts: Vec<FinanceAccount> = rows.into_iter().map(FinanceAccount::from).collect();
 
-        let total_by_currency = self
-            .accounts
-            .total_balance_by_currency()
-            .await
-            .map_err(|e| ToolError::ExecutionFailed(format!("total_balance_by_currency: {}", e)))?;
+        let total_by_currency = self.accounts.total_balance_by_currency().await?;
 
         let total_map: serde_json::Map<String, serde_json::Value> = total_by_currency
             .into_iter()
@@ -220,11 +206,7 @@ impl FinanceTool {
     async fn account_delete(&self, p: &ParamExtractor<'_>) -> Result<String> {
         let id = p.required_str("id")?;
 
-        let exists = self
-            .accounts
-            .get(id)
-            .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+        let exists = self.accounts.get(id).await?;
 
         if exists.is_none() {
             return Err(ToolError::ExecutionFailed(format!("Account {} not found", id)).into());
@@ -235,17 +217,9 @@ impl FinanceTool {
             limit: Some(i64::MAX),
             ..Default::default()
         };
-        let tx_count = self
-            .transactions
-            .list(&tx_filter)
-            .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?
-            .len();
+        let tx_count = self.transactions.list(&tx_filter).await?.len();
 
-        self.accounts
-            .delete(id)
-            .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+        self.accounts.delete(id).await?;
 
         let msg = if tx_count == 0 {
             "Account deleted. No transactions removed.".to_string()

@@ -14,7 +14,7 @@ use storage::StorageError;
 use tools_core::ParamExtractor;
 use tools_core::RoutingContext;
 
-use super::FinanceTool;
+use super::{parse_date, FinanceTool};
 
 impl FinanceTool {
     pub(crate) async fn handle_transaction(
@@ -45,7 +45,7 @@ impl FinanceTool {
                     .accounts
                     .list(false)
                     .await
-                    .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+?;
                 accounts.first().map(|a| a.id.clone()).ok_or_else(|| {
                     ToolError::InvalidParams(
                         serde_json::to_string(&json!({
@@ -77,9 +77,7 @@ impl FinanceTool {
         }
 
         let tx_date = match p.optional_str("tx_date")? {
-            Some(s) => NaiveDate::parse_from_str(s, "%Y-%m-%d").map_err(|_| {
-                ToolError::InvalidParams(format!("Invalid date format: {}. Use YYYY-MM-DD", s))
-            })?,
+            Some(s) => parse_date(s)?,
             None => Local::now().date_naive(),
         };
 
@@ -110,7 +108,7 @@ impl FinanceTool {
             .accounts
             .get(account_id)
             .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?
+?
             .ok_or_else(|| {
                 ToolError::ExecutionFailed(format!("Account {} not found", account_id))
             })?;
@@ -143,7 +141,7 @@ impl FinanceTool {
             .transactions
             .add(&row)
             .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+?;
 
         // Adjust account balance.
         let balance_delta = match tx_type {
@@ -156,7 +154,7 @@ impl FinanceTool {
             .accounts
             .adjust_balance(account_id, balance_delta)
             .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+?;
 
         let tx = FinanceTransaction::from(inserted);
 
@@ -245,7 +243,7 @@ impl FinanceTool {
             .accounts
             .get(account_id)
             .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?
+?
             .ok_or_else(|| {
                 ToolError::ExecutionFailed(format!("Account {} not found", account_id))
             })?;
@@ -254,7 +252,7 @@ impl FinanceTool {
             .accounts
             .get(dest_id)
             .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?
+?
             .ok_or_else(|| ToolError::ExecutionFailed(format!("Account {} not found", dest_id)))?;
 
         if src_row.currency != dst_row.currency {
@@ -308,25 +306,25 @@ impl FinanceTool {
             .transactions
             .add(&from_row)
             .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+?;
 
         let to_inserted = self
             .transactions
             .add(&to_row)
             .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+?;
 
         let from_updated = self
             .accounts
             .adjust_balance(account_id, -amount)
             .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+?;
 
         let to_updated = self
             .accounts
             .adjust_balance(dest_id, amount)
             .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+?;
 
         let result = json!({
             "transfer_id": transfer_id,
@@ -371,21 +369,8 @@ impl FinanceTool {
             None => None,
         };
 
-        let date_from = match date_from_str {
-            Some(s) => Some(
-                NaiveDate::parse_from_str(s, "%Y-%m-%d")
-                    .map_err(|_| ToolError::InvalidParams(format!("Invalid date: {}", s)))?,
-            ),
-            None => None,
-        };
-
-        let date_to = match date_to_str {
-            Some(s) => Some(
-                NaiveDate::parse_from_str(s, "%Y-%m-%d")
-                    .map_err(|_| ToolError::InvalidParams(format!("Invalid date: {}", s)))?,
-            ),
-            None => None,
-        };
+        let date_from = date_from_str.map(parse_date).transpose()?;
+        let date_to = date_to_str.map(parse_date).transpose()?;
 
         let filter = FinanceTransactionFilter {
             account_id: account_id.map(|s| s.to_string()),
@@ -401,7 +386,7 @@ impl FinanceTool {
             .transactions
             .list(&filter)
             .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+?;
 
         if rows.is_empty() {
             return Ok("No transactions found matching your filters.".to_string());
@@ -447,20 +432,14 @@ impl FinanceTool {
             return Err(ToolError::InvalidParams("No fields to update".to_string()).into());
         }
 
-        let tx_date = match date_str {
-            Some(s) => Some(
-                NaiveDate::parse_from_str(s, "%Y-%m-%d")
-                    .map_err(|_| ToolError::InvalidParams(format!("Invalid date: {}", s)))?,
-            ),
-            None => None,
-        };
+        let tx_date = date_str.map(parse_date).transpose()?;
 
         // Fetch existing transaction (needed for balance adjustment and existence check).
         let old_tx = self
             .transactions
             .get(id)
             .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?
+?
             .ok_or_else(|| ToolError::ExecutionFailed(format!("Transaction {} not found", id)))?;
 
         let patch = FinanceTransactionPatch {
@@ -500,7 +479,7 @@ impl FinanceTool {
                 self.accounts
                     .adjust_balance(&old_tx.account_id, delta)
                     .await
-                    .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+?;
                 balance_adjustment = Some(delta);
             }
         }
@@ -535,7 +514,7 @@ impl FinanceTool {
             .transactions
             .delete(id)
             .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?
+?
             .ok_or_else(|| ToolError::ExecutionFailed(format!("Transaction {} not found", id)))?;
 
         let tx_type = TransactionType::from_str_loose(&deleted_row.tx_type).unwrap_or_default();
@@ -552,14 +531,14 @@ impl FinanceTool {
                 .accounts
                 .adjust_balance(&deleted_row.account_id, deleted_delta)
                 .await
-                .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+    ?;
 
             // Find and remove the paired transfer row (the other side).
             let paired_rows = self
                 .transactions
                 .get_by_transfer_id(transfer_id)
                 .await
-                .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+    ?;
 
             let mut from_balance = updated_deleted_acct.balance;
             let mut to_balance = updated_deleted_acct.balance;
@@ -568,7 +547,7 @@ impl FinanceTool {
                 self.transactions
                     .delete(&paired_row.id)
                     .await
-                    .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+?;
 
                 let paired_type =
                     TransactionType::from_str_loose(&paired_row.tx_type).unwrap_or_default();
@@ -581,7 +560,7 @@ impl FinanceTool {
                     .accounts
                     .adjust_balance(&paired_row.account_id, paired_delta)
                     .await
-                    .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+?;
 
                 // Identify from/to: expense side is from, income side is to.
                 if paired_type == TransactionType::Expense {
@@ -614,7 +593,7 @@ impl FinanceTool {
             .accounts
             .adjust_balance(&deleted_row.account_id, balance_delta)
             .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+?;
 
         let result = json!({
             "deleted": true,
@@ -644,21 +623,8 @@ impl FinanceTool {
             .into());
         }
 
-        let date_from = match date_from_str {
-            Some(s) => Some(
-                NaiveDate::parse_from_str(s, "%Y-%m-%d")
-                    .map_err(|_| ToolError::InvalidParams(format!("Invalid date: {}", s)))?,
-            ),
-            None => None,
-        };
-
-        let date_to = match date_to_str {
-            Some(s) => Some(
-                NaiveDate::parse_from_str(s, "%Y-%m-%d")
-                    .map_err(|_| ToolError::InvalidParams(format!("Invalid date: {}", s)))?,
-            ),
-            None => None,
-        };
+        let date_from = date_from_str.map(parse_date).transpose()?;
+        let date_to = date_to_str.map(parse_date).transpose()?;
 
         let filter = FinanceTransactionFilter {
             query: query.map(|s| s.to_string()),
@@ -674,7 +640,7 @@ impl FinanceTool {
             .transactions
             .list(&filter)
             .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+?;
 
         if rows.is_empty() {
             return Ok("No transactions found matching your search.".to_string());
@@ -708,7 +674,7 @@ impl FinanceTool {
                     .accounts
                     .list(false)
                     .await
-                    .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+?;
                 accounts.first().map(|a| a.id.clone()).ok_or_else(|| {
                     ToolError::InvalidParams(
                         serde_json::to_string(&json!({
@@ -764,7 +730,7 @@ impl FinanceTool {
             .accounts
             .get(account_id)
             .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?
+?
             .ok_or_else(|| {
                 ToolError::ExecutionFailed(format!("Account {} not found", account_id))
             })?;
@@ -794,7 +760,7 @@ impl FinanceTool {
             .transactions
             .add(&row)
             .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+?;
 
         let result = json!({
             "tx_template": {

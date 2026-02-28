@@ -168,14 +168,6 @@ pub async fn patch_project(
 ) -> Result<Json<ProjectRow>, ApiError> {
     validate_patch(&req)?;
 
-    // Verify it exists before patching.
-    state
-        .repos
-        .projects
-        .get_or_err(&id)
-        .await
-        .map_err(ApiError::from)?;
-
     let patch = ProjectPatch {
         id: id.clone(),
         name: req.name,

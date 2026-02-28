@@ -246,7 +246,7 @@ impl AgentLoop {
         }
 
         // Handle system messages (subagent results)
-        if msg.channel.as_str() == "system" {
+        if msg.channel.as_str() == common::SYSTEM_CHANNEL {
             return self.process_system_message(msg).await;
         }
 
@@ -310,7 +310,7 @@ impl AgentLoop {
         info!("Processing system message from {}", msg.sender_id);
 
         // Handle session reset messages
-        if msg.sender_id == "telegram_reset" {
+        if msg.sender_id == common::TELEGRAM_RESET_SENDER {
             let key = msg.chat_id.as_str();
             if let Err(e) = self.session_manager.reset_session(key).await {
                 warn!("Failed to reset session {}: {}", key, e);

@@ -200,14 +200,6 @@ pub async fn patch_task(
 ) -> Result<Json<TodoRow>, ApiError> {
     validate_patch(&req)?;
 
-    // Confirm the task exists first so we get a clean 404.
-    state
-        .repos
-        .todos
-        .get_or_err(&id)
-        .await
-        .map_err(ApiError::from)?;
-
     let patch = TodoPatch {
         id,
         title: req.title,
@@ -254,14 +246,8 @@ pub async fn get_subtasks(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<Vec<TodoRow>>, ApiError> {
-    // Verify parent exists.
-    state
-        .repos
-        .todos
-        .get_or_err(&id)
-        .await
-        .map_err(ApiError::from)?;
-
+    // get_children returns empty if parent doesn't exist — verify it exists.
+    state.repos.todos.get_or_err(&id).await.map_err(ApiError::from)?;
     let children = state
         .repos
         .todos
@@ -437,18 +423,13 @@ pub async fn add_task_dependency(
     Path(id): Path<String>,
     Json(req): Json<AddDependencyRequest>,
 ) -> Result<StatusCode, ApiError> {
-    state
-        .repos
-        .todos
-        .get_or_err(&id)
-        .await
-        .map_err(ApiError::from)?;
-    state
-        .repos
-        .todos
-        .get_or_err(&req.blocker_id)
-        .await
-        .map_err(ApiError::from)?;
+    // Verify both task and blocker exist concurrently.
+    let (task, blocker) = tokio::join!(
+        state.repos.todos.get_or_err(&id),
+        state.repos.todos.get_or_err(&req.blocker_id),
+    );
+    task.map_err(ApiError::from)?;
+    blocker.map_err(ApiError::from)?;
 
     state
         .repos

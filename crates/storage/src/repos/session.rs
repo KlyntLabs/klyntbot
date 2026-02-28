@@ -66,6 +66,14 @@ impl SessionRepo {
         Ok(rows)
     }
 
+    /// Count total sessions.
+    pub async fn count_sessions(&self) -> Result<i64, StorageError> {
+        let row: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM sessions")
+            .fetch_one(&self.pool)
+            .await?;
+        Ok(row.0)
+    }
+
     /// Add a message to a session.
     ///
     /// Uses a CTE to touch `sessions.updated_at` and insert the message
@@ -132,23 +140,27 @@ impl SessionRepo {
             .execute(&self.pool)
             .await?;
 
+        // Batch insert all messages in a single statement using QueryBuilder.
+        // SQLite supports up to 999 bind parameters; each row uses 8 binds,
+        // so we chunk into batches of 124 rows (992 binds) to stay under the limit.
         let mut inserted = 0u64;
-        for i in 0..ids.len() {
-            let result = sqlx::query(
-                "INSERT OR IGNORE INTO session_messages
-                     (id, session_key, role, content, timestamp, request_id, tool_calls, metadata)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-            )
-            .bind(ids[i])
-            .bind(session_key)
-            .bind(&roles[i])
-            .bind(&contents[i])
-            .bind(timestamps[i])
-            .bind(request_ids[i].as_deref())
-            .bind(&tool_calls_list[i])
-            .bind(&metadata_list[i])
-            .execute(&self.pool)
-            .await?;
+        for chunk_start in (0..ids.len()).step_by(124) {
+            let chunk_end = (chunk_start + 124).min(ids.len());
+            let mut qb = sqlx::QueryBuilder::new(
+                "INSERT OR IGNORE INTO session_messages \
+                 (id, session_key, role, content, timestamp, request_id, tool_calls, metadata) ",
+            );
+            qb.push_values(chunk_start..chunk_end, |mut b, i| {
+                b.push_bind(ids[i])
+                    .push_bind(session_key)
+                    .push_bind(&roles[i])
+                    .push_bind(&contents[i])
+                    .push_bind(timestamps[i])
+                    .push_bind(request_ids[i].as_deref())
+                    .push_bind(&tool_calls_list[i])
+                    .push_bind(&metadata_list[i]);
+            });
+            let result = qb.build().execute(&self.pool).await?;
             inserted += result.rows_affected();
         }
 

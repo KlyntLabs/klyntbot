@@ -28,12 +28,9 @@ impl FinanceTool {
 
     async fn settings_get(&self) -> Result<String> {
         let finance_json = if let Some(cp) = &self.config_persistence {
-            cp.load_section("finance")
-                .await
-                .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?
+            cp.load_section("finance").await?
         } else {
-            serde_json::to_value(crate::config::FinanceConfig::default())
-                .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?
+            serde_json::to_value(crate::config::FinanceConfig::default())?
         };
 
         Ok(serde_json::to_string_pretty(&finance_json).unwrap())
@@ -62,12 +59,9 @@ impl FinanceTool {
         }
 
         let mut finance_json = if let Some(cp) = &self.config_persistence {
-            cp.load_section("finance")
-                .await
-                .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?
+            cp.load_section("finance").await?
         } else {
-            serde_json::to_value(crate::config::FinanceConfig::default())
-                .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?
+            serde_json::to_value(crate::config::FinanceConfig::default())?
         };
 
         let obj = finance_json.as_object_mut().ok_or_else(|| {
@@ -137,9 +131,7 @@ impl FinanceTool {
         }
 
         if let Some(cp) = &self.config_persistence {
-            cp.save_section("finance", finance_json)
-                .await
-                .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+            cp.save_section("finance", finance_json).await?;
         }
 
         let result = json!({

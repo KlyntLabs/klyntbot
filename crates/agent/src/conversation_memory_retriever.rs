@@ -51,20 +51,12 @@ impl ConversationMemoryRetriever {
 #[async_trait]
 impl MemoryRetriever for ConversationMemoryRetriever {
     async fn retrieve(&self, query: &str, limit: usize) -> Vec<MemoryEntry> {
-        // 1. Embed query (CPU-bound, use blocking thread pool)
-        let embedding = {
-            let engine = Arc::clone(&self.engine);
-            let q = query.to_string();
-            match tokio::task::spawn_blocking(move || engine.embed(&q)).await {
-                Ok(Ok(emb)) => emb,
-                Ok(Err(e)) => {
-                    warn!("MemoryRetriever: embedding failed: {}", e);
-                    return Vec::new();
-                }
-                Err(e) => {
-                    warn!("MemoryRetriever: spawn_blocking failed: {}", e);
-                    return Vec::new();
-                }
+        // 1. Embed query (CPU-bound — embed_async uses spawn_blocking internally)
+        let embedding = match self.engine.clone().embed_async(query.to_string()).await {
+            Ok(emb) => emb,
+            Err(e) => {
+                warn!("MemoryRetriever: embedding failed: {}", e);
+                return Vec::new();
             }
         };
 

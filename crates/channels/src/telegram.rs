@@ -19,7 +19,8 @@ use crate::formatter::ChannelFormatter;
 use crate::{check_allowlist, Channel};
 use bus::{InboundMessage, MessageBus, MessageKind, OutboundMessage};
 use common::{
-    Answer, AnswerType, AnswerValue, ChannelError, FormResponse, InteractionRequest, Result,
+    utils::truncate_chars, Answer, AnswerType, AnswerValue, ChannelError, FormResponse,
+    InteractionRequest, Result,
 };
 use config::schema::TelegramConfig;
 use providers::TranscriptionProvider;
@@ -363,7 +364,7 @@ impl TelegramChannel {
                         Ok(text) => {
                             debug!(
                                 "Transcribed voice: {}...",
-                                &text.chars().take(50).collect::<String>()
+                                truncate_chars(&text, 50, "")
                             );
                             content_parts.push(format!("[transcription: {}]", text));
                         }
@@ -402,7 +403,7 @@ impl TelegramChannel {
         debug!(
             "Telegram message from {}: {}...",
             sender_id,
-            &content.chars().take(50).collect::<String>()
+            truncate_chars(&content, 50, "")
         );
 
         // Publish to bus
@@ -517,8 +518,8 @@ impl TelegramChannel {
                 // Clear session by publishing a reset message to the bus
                 let session_key = format!("telegram:{}", chat_id);
                 let reset_msg = InboundMessage::new(
-                    "system",
-                    "telegram_reset",
+                    common::SYSTEM_CHANNEL,
+                    common::TELEGRAM_RESET_SENDER,
                     session_key.as_str(),
                     "__RESET_SESSION__",
                 );

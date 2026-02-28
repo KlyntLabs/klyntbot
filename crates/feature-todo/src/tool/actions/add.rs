@@ -36,9 +36,7 @@ impl TodoTool {
         if let Some(handler) = &self.enrichment_handler {
             match handler.enrich_task(&created).await {
                 Ok(Some(suggestions)) => {
-                    let threshold = 0.7;
-                    let update_title = None;
-                    let update_desc = None;
+                    let threshold = self.enrichment_threshold;
                     let mut update_priority: Option<Option<i16>> = None;
                     let mut update_due: Option<Option<chrono::DateTime<Utc>>> = None;
                     let mut update_est: Option<Option<i32>> = None;
@@ -66,8 +64,8 @@ impl TodoTool {
                     if !applied.is_empty() {
                         let patch = TodoPatch {
                             id: created.id.clone(),
-                            title: update_title,
-                            description: update_desc,
+                            title: None,
+                            description: None,
                             priority: update_priority,
                             due_date: update_due,
                             tags: None,

@@ -1,5 +1,7 @@
 //! Message splitting utilities for per-channel length limits.
 
+use common::utils::truncate_at_boundary;
+
 /// Per-channel message length limits.
 pub fn max_length(channel: &str) -> usize {
     match channel {
@@ -46,24 +48,9 @@ pub fn split_message(text: &str, limit: usize) -> Vec<String> {
     chunks
 }
 
-/// Find the nearest char boundary at or before `limit`.
-/// Prevents panic when slicing multi-byte UTF-8 strings.
-fn safe_byte_limit(text: &str, limit: usize) -> usize {
-    if limit >= text.len() {
-        return text.len();
-    }
-    // Scan backward from limit to find a char boundary
-    let mut pos = limit;
-    while pos > 0 && !text.is_char_boundary(pos) {
-        pos -= 1;
-    }
-    pos
-}
-
 /// Find the best split point within the limit.
 fn find_split_point(text: &str, limit: usize) -> usize {
-    let safe_limit = safe_byte_limit(text, limit);
-    let search = &text[..safe_limit];
+    let search = truncate_at_boundary(text, limit);
 
     // 1. Try paragraph break (double newline)
     if let Some(pos) = search.rfind("\n\n") {
@@ -96,7 +83,7 @@ fn find_split_point(text: &str, limit: usize) -> usize {
     }
 
     // 5. Hard split at safe char boundary
-    safe_limit
+    search.len()
 }
 
 #[cfg(test)]

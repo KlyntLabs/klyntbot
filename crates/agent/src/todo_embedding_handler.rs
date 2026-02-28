@@ -40,16 +40,10 @@ impl EmbeddingHandler for TodoEmbeddingHandlerImpl {
     async fn embed_todo(&self, todo: &Todo) -> Result<()> {
         let text = Self::compose_text(todo);
         let todo_id = todo.id.clone();
-        let engine = self.engine.clone();
 
         debug!(todo_id = %todo_id, "Generating embedding for todo");
 
-        // CPU-bound — run in blocking thread pool
-        let embedding = tokio::task::spawn_blocking(move || engine.embed(&text))
-            .await
-            .map_err(|e| {
-                common::ToolError::ExecutionFailed(format!("Embedding task panicked: {}", e))
-            })??;
+        let embedding = self.engine.clone().embed_async(text).await?;
 
         let model_name = "paraphrase-multilingual-MiniLM-L12-v2";
         self.store
@@ -66,17 +60,8 @@ impl EmbeddingHandler for TodoEmbeddingHandlerImpl {
     }
 
     async fn embed_query(&self, query: &str) -> Result<Vec<f32>> {
-        let query = query.to_string();
-        let engine = self.engine.clone();
-
         debug!(query_len = query.len(), "Generating query embedding");
 
-        let embedding = tokio::task::spawn_blocking(move || engine.embed(&query))
-            .await
-            .map_err(|e| {
-                common::ToolError::ExecutionFailed(format!("Embedding task panicked: {}", e))
-            })??;
-
-        Ok(embedding)
+        self.engine.clone().embed_async(query.to_string()).await
     }
 }

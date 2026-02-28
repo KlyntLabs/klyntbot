@@ -28,6 +28,8 @@ pub struct TodoTool {
     pub(crate) semantic_threshold: f64,
     pub(crate) rrf_k: u32,
     pub(crate) feedback_handler: Option<Arc<dyn EnrichmentFeedbackHandler>>,
+    /// Confidence threshold for auto-applying enrichment suggestions (0.0–1.0).
+    pub(crate) enrichment_threshold: f64,
 }
 
 impl TodoTool {
@@ -50,6 +52,7 @@ impl TodoTool {
             semantic_threshold: 0.5,
             rrf_k: 60,
             feedback_handler: None,
+            enrichment_threshold: 0.70,
         }
     }
 
@@ -81,6 +84,12 @@ impl TodoTool {
     pub fn with_search_config(mut self, threshold: f64, rrf_k: u32) -> Self {
         self.semantic_threshold = threshold;
         self.rrf_k = rrf_k;
+        self
+    }
+
+    /// Set the enrichment auto-apply confidence threshold.
+    pub fn with_enrichment_threshold(mut self, threshold: f64) -> Self {
+        self.enrichment_threshold = threshold;
         self
     }
 

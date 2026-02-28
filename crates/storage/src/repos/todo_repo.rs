@@ -804,36 +804,38 @@ impl TodoRepo {
     }
 
     /// Build a context string of active todos for LLM context injection.
+    #[allow(clippy::type_complexity)]
     pub async fn to_context_string(&self) -> Result<String, StorageError> {
-        let rows = sqlx::query_as::<_, TodoRow>(
-            r#"
-            SELECT * FROM todos
-            WHERE status IN ('todo', 'doing')
-              AND is_template = FALSE
-            ORDER BY
-                CASE WHEN focused_at IS NOT NULL THEN 0 ELSE 1 END,
-                priority ASC NULLS LAST,
-                created_at
-            "#,
-        )
-        .fetch_all(&self.pool)
-        .await?;
+        let rows: Vec<(String, String, Option<i16>, Option<chrono::DateTime<chrono::Utc>>)> =
+            sqlx::query_as(
+                r#"
+                SELECT title, status, priority, focused_at FROM todos
+                WHERE status IN ('todo', 'doing')
+                  AND is_template = FALSE
+                ORDER BY
+                    CASE WHEN focused_at IS NOT NULL THEN 0 ELSE 1 END,
+                    priority ASC NULLS LAST,
+                    created_at
+                "#,
+            )
+            .fetch_all(&self.pool)
+            .await?;
 
         if rows.is_empty() {
             return Ok("No active tasks.".to_string());
         }
 
         let mut out = String::from("Active tasks:\n");
-        for row in &rows {
-            let focus_marker = if row.focused_at.is_some() {
+        for (title, status, priority, focused_at) in &rows {
+            let focus_marker = if focused_at.is_some() {
                 " [FOCUSED]"
             } else {
                 ""
             };
-            let priority_str = row.priority.map(|p| format!(" P{p}")).unwrap_or_default();
+            let priority_str = priority.map(|p| format!(" P{p}")).unwrap_or_default();
             out.push_str(&format!(
                 "- [{}]{}{} {}\n",
-                row.status, focus_marker, priority_str, row.title
+                status, focus_marker, priority_str, title
             ));
         }
         Ok(out)

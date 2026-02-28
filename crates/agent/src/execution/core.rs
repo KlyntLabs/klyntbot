@@ -183,24 +183,23 @@ impl ExecutionCore {
             );
 
             // ── Duplicate tool call prevention ─────────────────────
-            // Build signature keys for each tool call: "name|hash(args)"
-            // Uses hash-based comparison instead of serialization to avoid
-            // allocating a String per tool call.
-            let current_keys: Vec<String> = response
-                .tool_calls
-                .iter()
-                .map(|tc| {
-                    let args_hash = hash_json_value(&tc.arguments);
-                    format!("{}|{:x}", tc.name, args_hash)
-                })
-                .collect();
-
-            // If tracking is enabled, check whether ALL calls are repeats
-            let all_duplicates = match &seen_tool_calls {
-                Some(seen) => {
-                    !current_keys.is_empty() && current_keys.iter().all(|k| seen.contains(k))
-                }
-                None => false,
+            // Only build signature keys when dedup tracking is enabled.
+            let (current_keys, all_duplicates) = if seen_tool_calls.is_some() {
+                let keys: Vec<String> = response
+                    .tool_calls
+                    .iter()
+                    .map(|tc| {
+                        let args_hash = hash_json_value(&tc.arguments);
+                        format!("{}|{:x}", tc.name, args_hash)
+                    })
+                    .collect();
+                let all_dup = !keys.is_empty()
+                    && keys
+                        .iter()
+                        .all(|k| seen_tool_calls.as_ref().unwrap().contains(k));
+                (Some(keys), all_dup)
+            } else {
+                (None, false)
             };
 
             if all_duplicates {
@@ -245,8 +244,10 @@ impl ExecutionCore {
 
             // Register current calls for future duplicate detection
             if let Some(seen) = seen_tool_calls {
-                for key in current_keys {
-                    seen.insert(key);
+                if let Some(keys) = current_keys {
+                    for key in keys {
+                        seen.insert(key);
+                    }
                 }
             }
 

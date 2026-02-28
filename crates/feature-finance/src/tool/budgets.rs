@@ -2,7 +2,7 @@
 //!
 //! Handles: budget_create, budget_list, budget_status, budget_update, budget_delete.
 
-use chrono::{Local, NaiveDate, Utc};
+use chrono::{Local, Utc};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -12,7 +12,7 @@ use storage::rows::finance::{FinanceBudgetPatch, FinanceBudgetRow, FinanceTransa
 use tools_core::ParamExtractor;
 use tools_core::RoutingContext;
 
-use super::FinanceTool;
+use super::{parse_date, FinanceTool};
 
 impl FinanceTool {
     pub(crate) async fn handle_budget(
@@ -70,17 +70,10 @@ impl FinanceTool {
 
         let today = Local::now().date_naive();
         let start_date = match p.optional_str("start_date")? {
-            Some(s) => NaiveDate::parse_from_str(s, "%Y-%m-%d")
-                .map_err(|_| ToolError::InvalidParams(format!("Invalid start_date: {s}")))?,
+            Some(s) => parse_date(s)?,
             None => today,
         };
-        let end_date = match p.optional_str("end_date")? {
-            Some(s) => Some(
-                NaiveDate::parse_from_str(s, "%Y-%m-%d")
-                    .map_err(|_| ToolError::InvalidParams(format!("Invalid end_date: {s}")))?,
-            ),
-            None => None,
-        };
+        let end_date = p.optional_str("end_date")?.map(parse_date).transpose()?;
 
         if let Some(ed) = end_date {
             if ed < start_date {
@@ -250,11 +243,7 @@ impl FinanceTool {
 
     /// Show a summary status for every active budget.
     async fn budget_status_all(&self) -> Result<String> {
-        let usages = self
-            .budgets
-            .all_budget_usage()
-            .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+        let usages = self.budgets.all_budget_usage().await?;
         if usages.is_empty() {
             return Ok(r#"{"budgets":[],"message":"No active budgets found."}"#.to_string());
         }

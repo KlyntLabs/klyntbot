@@ -42,9 +42,8 @@ pub async fn get_status(State(state): State<AppState>) -> Result<Json<StatusResp
             state
                 .repos
                 .sessions
-                .list_sessions()
+                .count_sessions()
                 .await
-                .map(|s| s.len() as i64)
                 .unwrap_or(0)
         },
     );

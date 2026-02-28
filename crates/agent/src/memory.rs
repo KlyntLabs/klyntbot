@@ -46,12 +46,10 @@ impl MemoryStore {
     /// Falls back to `get_memory_context()` if embeddings are unavailable.
     pub async fn get_relevant_memory(&self, query: &str, limit: usize) -> String {
         if let (Some(engine), Some(vs)) = (&self.embedding_engine, &self.embedding_store) {
-            // Embed query (CPU-bound, run in blocking thread)
-            let engine = Arc::clone(engine);
-            let query_text = query.to_string();
-            let embed_result = tokio::task::spawn_blocking(move || engine.embed(&query_text)).await;
+            // Embed query (CPU-bound — embed_async uses spawn_blocking internally)
+            let embed_result = Arc::clone(engine).embed_async(query.to_string()).await;
 
-            if let Ok(Ok(query_vec)) = embed_result {
+            if let Ok(query_vec) = embed_result {
                 match vs
                     .search_similar(
                         "memory_note_embeddings",
@@ -210,10 +208,8 @@ impl MemoryStore {
             let key = key.to_string();
             let content = content.to_string();
             tokio::spawn(async move {
-                let embed_result =
-                    tokio::task::spawn_blocking(move || engine.embed(&content)).await;
-                match embed_result {
-                    Ok(Ok(vec)) => {
+                match engine.embed_async(content).await {
+                    Ok(vec) => {
                         if let Err(e) = vs
                             .upsert_embedding("memory_note_embeddings", &key, &vec, &[])
                             .await
@@ -221,11 +217,8 @@ impl MemoryStore {
                             warn!("Failed to upsert memory note embedding: {}", e);
                         }
                     }
-                    Ok(Err(e)) => {
-                        warn!("Failed to embed memory note: {}", e);
-                    }
                     Err(e) => {
-                        warn!("Embedding task panicked: {}", e);
+                        warn!("Failed to embed memory note: {}", e);
                     }
                 }
             });

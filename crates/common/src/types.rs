@@ -8,6 +8,11 @@ use std::fmt;
 
 use crate::KlyntbotError;
 
+// ── Well-known channel / sender constants ─────────────────────────────────
+pub const SYSTEM_CHANNEL: &str = "system";
+pub const CLI_CHANNEL: &str = "cli";
+pub const TELEGRAM_RESET_SENDER: &str = "telegram_reset";
+
 /// Channel name (e.g., "telegram", "discord")
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ChannelName(String);

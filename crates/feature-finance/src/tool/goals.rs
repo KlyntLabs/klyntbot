@@ -15,7 +15,7 @@ use storage::StorageError;
 use tools_core::ParamExtractor;
 use tools_core::RoutingContext;
 
-use super::FinanceTool;
+use super::{parse_date, FinanceTool};
 
 impl FinanceTool {
     pub(crate) async fn handle_goal(
@@ -54,13 +54,7 @@ impl FinanceTool {
             .optional_str("currency")?
             .unwrap_or(&self.default_currency);
         let current_amount = p.i64_or("current_amount", 0)?;
-        let deadline = p
-            .optional_str("deadline")?
-            .map(|s| {
-                NaiveDate::parse_from_str(s, "%Y-%m-%d")
-                    .map_err(|e| ToolError::InvalidParams(format!("Invalid deadline: {e}")))
-            })
-            .transpose()?;
+        let deadline = p.optional_str("deadline")?.map(parse_date).transpose()?;
 
         if let Some(ref d) = deadline {
             let today = Utc::now().date_naive();
@@ -99,7 +93,7 @@ impl FinanceTool {
             .goals
             .add(&row)
             .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+?;
 
         let goal = FinanceGoal::from(inserted);
         let progress_pct = if goal.target_amount > 0 {
@@ -133,7 +127,7 @@ impl FinanceTool {
             .goals
             .list_active()
             .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+?;
 
         if rows.is_empty() {
             return Ok("No active goals.".to_string());
@@ -173,13 +167,7 @@ impl FinanceTool {
         let target_amount = p.optional_i64("target_amount")?;
         let monthly_contribution = p.optional_i64("monthly_contribution")?;
         let expected_return_rate = p.optional_f64("expected_return_rate")?;
-        let deadline = p
-            .optional_str("deadline")?
-            .map(|s| {
-                NaiveDate::parse_from_str(s, "%Y-%m-%d")
-                    .map_err(|e| ToolError::InvalidParams(format!("Invalid deadline: {e}")))
-            })
-            .transpose()?;
+        let deadline = p.optional_str("deadline")?.map(parse_date).transpose()?;
         let status = p
             .optional_str("status")?
             .map(|s| {
@@ -263,7 +251,7 @@ impl FinanceTool {
                     .transactions
                     .sum_by_category(date_from, today, "expense")
                     .await
-                    .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+        ?;
                 cats.iter().map(|(_, total)| total).sum()
             }
         };
@@ -279,7 +267,7 @@ impl FinanceTool {
             .accounts
             .total_balance_by_currency()
             .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?
+?
             .iter()
             .map(|(_, v)| v)
             .sum();
@@ -287,7 +275,7 @@ impl FinanceTool {
             .investments
             .total_value_by_currency()
             .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?
+?
             .iter()
             .map(|(_, v)| v)
             .sum();
@@ -295,7 +283,7 @@ impl FinanceTool {
             .liabilities
             .total_remaining_by_currency()
             .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?
+?
             .iter()
             .map(|(_, v)| v)
             .sum();
@@ -422,13 +410,7 @@ impl FinanceTool {
             .unwrap_or(&self.default_currency);
         let interest_rate = p.optional_f64("interest_rate")?;
         let monthly_payment = p.optional_i64("monthly_payment")?;
-        let due_date = p
-            .optional_str("due_date")?
-            .map(|s| {
-                NaiveDate::parse_from_str(s, "%Y-%m-%d")
-                    .map_err(|e| ToolError::InvalidParams(format!("Invalid due_date: {e}")))
-            })
-            .transpose()?;
+        let due_date = p.optional_str("due_date")?.map(parse_date).transpose()?;
         let notes = p.optional_str("notes")?;
 
         let now = Utc::now();
@@ -453,7 +435,7 @@ impl FinanceTool {
             .liabilities
             .add(&row)
             .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+?;
 
         let l = FinanceLiability::from(inserted);
         let result = json!({
@@ -478,13 +460,13 @@ impl FinanceTool {
             .liabilities
             .list_all()
             .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+?;
 
         let totals = self
             .liabilities
             .total_remaining_by_currency()
             .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+?;
 
         let liabilities: Vec<serde_json::Value> = rows
             .into_iter()
@@ -570,17 +552,17 @@ impl FinanceTool {
             .accounts
             .total_balance_by_currency()
             .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+?;
         let investments = self
             .investments
             .total_value_by_currency()
             .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+?;
         let liabilities = self
             .liabilities
             .total_remaining_by_currency()
             .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+?;
 
         let mut currencies: std::collections::BTreeMap<String, [i64; 3]> =
             std::collections::BTreeMap::new();
