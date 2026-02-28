@@ -178,6 +178,24 @@ impl Tool for CronTool {
 
                 let job = handler.add_job(params).await?;
 
+                if let Some(ref tx) = ctx.entity_tx {
+                    let next_run = job
+                        .next_run_at_ms
+                        .map(format_timestamp_ms)
+                        .unwrap_or_else(|| "pending".to_string());
+                    let _ = tx
+                        .send(common::EntityCard {
+                            entity_type: "cron".to_string(),
+                            entity_id: job.id.clone(),
+                            title: job.name.clone(),
+                            subtitle: Some(format!("Next: {}", next_run)),
+                            route: Some("/cron".to_string()),
+                            icon_hint: "clock".to_string(),
+                            metadata: std::collections::HashMap::new(),
+                        })
+                        .await;
+                }
+
                 Ok(format!(
                     "Scheduled job '{}' (ID: {}). Next run: {}",
                     job.name,
