@@ -2,7 +2,7 @@
 
 use chrono::Utc;
 use common::{Result, ToolError};
-use tools_core::ParamExtractor;
+use tools_core::{ParamExtractor, RoutingContext};
 use tracing::warn;
 
 use super::super::TodoTool;
@@ -10,7 +10,11 @@ use crate::types::Todo;
 use storage::TodoPatch;
 
 impl TodoTool {
-    pub(crate) async fn handle_add(&self, p: &ParamExtractor<'_>) -> Result<String> {
+    pub(crate) async fn handle_add(
+        &self,
+        p: &ParamExtractor<'_>,
+        ctx: &RoutingContext,
+    ) -> Result<String> {
         let title = p.required_str("title")?;
 
         let mut todo = Todo::default_instance();
@@ -97,6 +101,35 @@ impl TodoTool {
         }
 
         self.push_task_to_calendar(&created.id).await;
+
+        // Emit entity card for inline display
+        if let Some(ref tx) = ctx.entity_tx {
+            let subtitle = {
+                let mut parts = Vec::new();
+                if let Some(p) = created.priority {
+                    parts.push(format!("P{}", p));
+                }
+                if let Some(ref d) = created.due_date {
+                    parts.push(format!("Due {}", d.format("%b %d")));
+                }
+                if parts.is_empty() {
+                    None
+                } else {
+                    Some(parts.join(" · "))
+                }
+            };
+            let _ = tx
+                .send(common::EntityCard {
+                    entity_type: "task".to_string(),
+                    entity_id: created.id.clone(),
+                    title: created.title.clone(),
+                    subtitle,
+                    route: Some(format!("/tasks/{}", created.id)),
+                    icon_hint: "task".to_string(),
+                    metadata: std::collections::HashMap::new(),
+                })
+                .await;
+        }
 
         Ok(format!(
             "Task created: {} (ID: {}){}",

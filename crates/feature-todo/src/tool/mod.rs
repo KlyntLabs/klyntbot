@@ -255,12 +255,12 @@ impl Tool for TodoTool {
         })
     }
 
-    async fn execute(&self, args: Value, _ctx: &RoutingContext) -> Result<String> {
+    async fn execute(&self, args: Value, ctx: &RoutingContext) -> Result<String> {
         let p = ParamExtractor::new(&args);
         let action = p.required_str("action")?;
 
         match action {
-            "add" => self.handle_add(&p).await,
+            "add" => self.handle_add(&p, ctx).await,
             "list" => self.handle_list(&p).await,
             "update" => self.handle_update(&p).await,
             "complete" => self.handle_complete(&p).await,
