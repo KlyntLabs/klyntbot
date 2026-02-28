@@ -89,10 +89,7 @@ impl FinanceTool {
             updated_at: now,
         };
 
-        let inserted = self
-            .goals
-            .add(&row)
-            .await
+        let inserted = self.storage.goals.add(&row).await
 ?;
 
         let goal = FinanceGoal::from(inserted);
@@ -123,10 +120,7 @@ impl FinanceTool {
     }
 
     async fn goal_list(&self) -> Result<String> {
-        let rows = self
-            .goals
-            .list_active()
-            .await
+        let rows = self.storage.goals.list_active().await
 ?;
 
         if rows.is_empty() {
@@ -198,7 +192,7 @@ impl FinanceTool {
             status: status.map(|s| s.as_str().to_string()),
         };
 
-        let row = self.goals.update(&patch).await.map_err(|e| match e {
+        let row = self.storage.goals.update(&patch).await.map_err(|e| match e {
             StorageError::NotFound(_) => ToolError::ExecutionFailed(format!("Goal {id} not found")),
             other => ToolError::ExecutionFailed(other.to_string()),
         })?;
@@ -248,6 +242,7 @@ impl FinanceTool {
                     NaiveDate::from_ymd_opt(today.year() - 1, today.month(), today.day())
                         .unwrap_or_else(|| today - chrono::Duration::days(365));
                 let cats = self
+                    .storage
                     .transactions
                     .sum_by_category(date_from, today, "expense")
                     .await
@@ -264,6 +259,7 @@ impl FinanceTool {
         }
 
         let accounts_total: i64 = self
+            .storage
             .accounts
             .total_balance_by_currency()
             .await
@@ -272,6 +268,7 @@ impl FinanceTool {
             .map(|(_, v)| v)
             .sum();
         let investments_total: i64 = self
+            .storage
             .investments
             .total_value_by_currency()
             .await
@@ -280,6 +277,7 @@ impl FinanceTool {
             .map(|(_, v)| v)
             .sum();
         let liabilities_total: i64 = self
+            .storage
             .liabilities
             .total_remaining_by_currency()
             .await
@@ -431,10 +429,7 @@ impl FinanceTool {
             updated_at: now,
         };
 
-        let inserted = self
-            .liabilities
-            .add(&row)
-            .await
+        let inserted = self.storage.liabilities.add(&row).await
 ?;
 
         let l = FinanceLiability::from(inserted);
@@ -456,16 +451,10 @@ impl FinanceTool {
     }
 
     async fn liability_list(&self) -> Result<String> {
-        let rows = self
-            .liabilities
-            .list_all()
-            .await
+        let rows = self.storage.liabilities.list_all().await
 ?;
 
-        let totals = self
-            .liabilities
-            .total_remaining_by_currency()
-            .await
+        let totals = self.storage.liabilities.total_remaining_by_currency().await
 ?;
 
         let liabilities: Vec<serde_json::Value> = rows
@@ -522,7 +511,7 @@ impl FinanceTool {
             notes: notes.map(|s| Some(s.to_string())),
         };
 
-        let row = self.liabilities.update(&patch).await.map_err(|e| match e {
+        let row = self.storage.liabilities.update(&patch).await.map_err(|e| match e {
             StorageError::NotFound(_) => {
                 ToolError::ExecutionFailed(format!("Liability {id} not found"))
             }
@@ -548,20 +537,11 @@ impl FinanceTool {
     }
 
     async fn net_worth(&self, _p: &ParamExtractor<'_>) -> Result<String> {
-        let accounts = self
-            .accounts
-            .total_balance_by_currency()
-            .await
+        let accounts = self.storage.accounts.total_balance_by_currency().await
 ?;
-        let investments = self
-            .investments
-            .total_value_by_currency()
-            .await
+        let investments = self.storage.investments.total_value_by_currency().await
 ?;
-        let liabilities = self
-            .liabilities
-            .total_remaining_by_currency()
-            .await
+        let liabilities = self.storage.liabilities.total_remaining_by_currency().await
 ?;
 
         let mut currencies: std::collections::BTreeMap<String, [i64; 3]> =

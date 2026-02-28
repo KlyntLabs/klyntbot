@@ -489,31 +489,31 @@ impl AgentLoopBuilder {
         }
 
         // ── Finance tool (requires real pool) ─────────────────────────────
-        if config.finance.enabled && self.pool.is_some() {
-            let price_service =
-                feature_finance::PriceService::new(config.finance.price_refresh.cache_ttl_minutes);
+        if let Some(pool) = &self.pool {
+            if config.finance.enabled {
+                let price_service = feature_finance::PriceService::new(
+                    config.finance.price_refresh.cache_ttl_minutes,
+                );
 
-            let finance_handler_impl = Arc::new(crate::finance_adapter::FinanceHandlerImpl::new(
-                repos.clone(),
-                price_service.clone(),
-                config.finance.clone(),
-            ));
+                let finance_handler_impl =
+                    Arc::new(crate::finance_adapter::FinanceHandlerImpl::new(
+                        repos.clone(),
+                        price_service.clone(),
+                        config.finance.clone(),
+                    ));
 
-            let finance_tool = feature_finance::FinanceTool::new(
-                repos.finance_accounts.clone(),
-                repos.finance_transactions.clone(),
-                repos.finance_budgets.clone(),
-                repos.finance_investments.clone(),
-                repos.finance_goals.clone(),
-                repos.finance_liabilities.clone(),
-                price_service,
-                config.finance.default_currency.clone(),
-            )
-            .with_finance_handler(
-                Arc::clone(&finance_handler_impl) as Arc<dyn feature_finance::FinanceHandler>
-            );
+                let finance_storage = storage::FinanceStorage::from_pool(pool);
+                let finance_tool = feature_finance::FinanceTool::new(
+                    finance_storage,
+                    price_service,
+                    config.finance.default_currency.clone(),
+                )
+                .with_finance_handler(
+                    Arc::clone(&finance_handler_impl) as Arc<dyn feature_finance::FinanceHandler>,
+                );
 
-            tool_registry.register(finance_tool);
+                tool_registry.register(finance_tool);
+            }
         }
 
         // ── Plugin tools (WASM) ───────────────────────────────────────────

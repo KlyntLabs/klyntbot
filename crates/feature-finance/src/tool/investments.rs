@@ -66,7 +66,7 @@ impl FinanceTool {
             updated_at: now,
         };
 
-        let inserted = self.investments.add_portfolio(&row).await?;
+        let inserted = self.storage.investments.add_portfolio(&row).await?;
 
         let resp = json!({
             "id": inserted.id,
@@ -78,11 +78,11 @@ impl FinanceTool {
     }
 
     async fn portfolio_list(&self, _p: &ParamExtractor<'_>) -> Result<String> {
-        let portfolios = self.investments.list_portfolios().await?;
+        let portfolios = self.storage.investments.list_portfolios().await?;
 
         let mut result = Vec::new();
         for portfolio in &portfolios {
-            let summary = self.investments.portfolio_summary(&portfolio.id).await?;
+            let summary = self.storage.investments.portfolio_summary(&portfolio.id).await?;
             let total_return = summary.total_current_value - summary.total_cost_basis;
             let return_pct = if summary.total_cost_basis > 0 {
                 (total_return * 100) / summary.total_cost_basis
@@ -110,7 +110,7 @@ impl FinanceTool {
         let portfolio_id = p.required_str("portfolio_id")?;
 
         // Verify portfolio exists
-        let portfolio_exists = self.investments.get_portfolio(portfolio_id).await?;
+        let portfolio_exists = self.storage.investments.get_portfolio(portfolio_id).await?;
         if portfolio_exists.is_none() {
             return Ok(serde_json::to_string_pretty(&json!({
                 "error": "portfolio_not_found",
@@ -175,7 +175,7 @@ impl FinanceTool {
             updated_at: now,
         };
 
-        let inserted = self.investments.add_investment(&row).await?;
+        let inserted = self.storage.investments.add_investment(&row).await?;
 
         let investment = json!({
             "id": inserted.id,
@@ -210,7 +210,7 @@ impl FinanceTool {
             notes: notes.map(|s| Some(s.to_string())),
         };
 
-        let updated = self.investments.update_investment(&patch).await?;
+        let updated = self.storage.investments.update_investment(&patch).await?;
 
         let investment = json!({
             "id": updated.id,
@@ -257,7 +257,7 @@ impl FinanceTool {
         };
 
         // Load existing investment for currency fallback and cost-basis computation
-        let inv = match self.investments.get_investment(investment_id).await? {
+        let inv = match self.storage.investments.get_investment(investment_id).await? {
             Some(inv) => inv,
             None => {
                 return Ok(serde_json::to_string_pretty(&json!({
@@ -305,11 +305,11 @@ impl FinanceTool {
             created_at: now,
         };
 
-        let inserted_tx = self.investments.add_investment_tx(&tx_row).await?;
+        let inserted_tx = self.storage.investments.add_investment_tx(&tx_row).await?;
 
         // Compute and apply the parent-investment patch based on tx_type
         let patch = self.compute_investment_patch(&inv, tx_type, quantity, total_amount)?;
-        let updated_inv = self.investments.update_investment(&patch).await?;
+        let updated_inv = self.storage.investments.update_investment(&patch).await?;
 
         let investment_tx = json!({
             "id": inserted_tx.id,
@@ -413,7 +413,7 @@ impl FinanceTool {
 
         // Verify portfolio exists if specified
         if let Some(pid) = portfolio_id {
-            let portfolio_exists = self.investments.get_portfolio(pid).await?;
+            let portfolio_exists = self.storage.investments.get_portfolio(pid).await?;
             if portfolio_exists.is_none() {
                 return Err(
                     ToolError::ExecutionFailed(format!("Portfolio not found: {pid}")).into(),
@@ -425,7 +425,7 @@ impl FinanceTool {
             portfolio_id: portfolio_id.map(|s| s.to_string()),
             ..Default::default()
         };
-        let investments = self.investments.list_investments(&filter).await?;
+        let investments = self.storage.investments.list_investments(&filter).await?;
 
         let total_cost_basis: i64 = investments.iter().map(|i| i.cost_basis).sum();
         // Use current_value if set; fall back to cost_basis so the summary is always populated
@@ -524,7 +524,7 @@ impl FinanceTool {
             .map_err(|e| ToolError::ExecutionFailed(format!("Price fetch failed: {e}")))?;
 
         // Update all investments whose symbol matches (case-insensitive)
-        let all = self.investments.list_with_symbols().await?;
+        let all = self.storage.investments.list_with_symbols().await?;
         let matching: Vec<_> = all
             .iter()
             .filter(|i| {
@@ -541,6 +541,7 @@ impl FinanceTool {
         for inv in &matching {
             let current_value = (price_result.price * inv.quantity * 100.0).round() as i64;
             if self
+                .storage
                 .investments
                 .update_price(&inv.id, price_int, current_value)
                 .await
@@ -561,7 +562,7 @@ impl FinanceTool {
     }
 
     async fn price_refresh(&self, _p: &ParamExtractor<'_>) -> Result<String> {
-        let investments = self.investments.list_with_symbols().await?;
+        let investments = self.storage.investments.list_with_symbols().await?;
 
         let mut updated = 0usize;
         let mut failed = 0usize;
@@ -579,6 +580,7 @@ impl FinanceTool {
                     let price_int = (price_result.price * 100.0).round() as i64;
                     let current_value = (price_result.price * inv.quantity * 100.0).round() as i64;
                     match self
+                        .storage
                         .investments
                         .update_price(&inv.id, price_int, current_value)
                         .await

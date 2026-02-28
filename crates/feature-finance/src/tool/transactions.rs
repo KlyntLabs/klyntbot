@@ -42,6 +42,7 @@ impl FinanceTool {
             None => {
                 // Auto-select the first active account when none specified.
                 let accounts = self
+                    .storage
                     .accounts
                     .list(false)
                     .await
@@ -105,6 +106,7 @@ impl FinanceTool {
 
         // Get account to verify it exists and obtain its currency.
         let account_row = self
+            .storage
             .accounts
             .get(account_id)
             .await
@@ -137,10 +139,7 @@ impl FinanceTool {
             updated_at: now,
         };
 
-        let inserted = self
-            .transactions
-            .add(&row)
-            .await
+        let inserted = self.storage.transactions.add(&row).await
 ?;
 
         // Adjust account balance.
@@ -151,6 +150,7 @@ impl FinanceTool {
         };
 
         let updated_account = self
+            .storage
             .accounts
             .adjust_balance(account_id, balance_delta)
             .await
@@ -163,8 +163,8 @@ impl FinanceTool {
         let mut nudge = String::new();
         if tx_type == TransactionType::Expense {
             if let Some(ref cat) = category {
-                if let Ok(Some(budget)) = self.budgets.get_by_category(cat).await {
-                    if let Ok(usage) = self.budgets.budget_usage(&budget.id).await {
+                if let Ok(Some(budget)) = self.storage.budgets.get_by_category(cat).await {
+                    if let Ok(usage) = self.storage.budgets.budget_usage(&budget.id).await {
                         let percentage = if usage.amount > 0 {
                             (usage.spent * 100) / usage.amount
                         } else {
@@ -240,6 +240,7 @@ impl FinanceTool {
         }
 
         let src_row = self
+            .storage
             .accounts
             .get(account_id)
             .await
@@ -249,6 +250,7 @@ impl FinanceTool {
             })?;
 
         let dst_row = self
+            .storage
             .accounts
             .get(dest_id)
             .await
@@ -302,25 +304,21 @@ impl FinanceTool {
             updated_at: now,
         };
 
-        let from_inserted = self
-            .transactions
-            .add(&from_row)
-            .await
+        let from_inserted = self.storage.transactions.add(&from_row).await
 ?;
 
-        let to_inserted = self
-            .transactions
-            .add(&to_row)
-            .await
+        let to_inserted = self.storage.transactions.add(&to_row).await
 ?;
 
         let from_updated = self
+            .storage
             .accounts
             .adjust_balance(account_id, -amount)
             .await
 ?;
 
         let to_updated = self
+            .storage
             .accounts
             .adjust_balance(dest_id, amount)
             .await
@@ -382,10 +380,7 @@ impl FinanceTool {
             ..Default::default()
         };
 
-        let rows = self
-            .transactions
-            .list(&filter)
-            .await
+        let rows = self.storage.transactions.list(&filter).await
 ?;
 
         if rows.is_empty() {
@@ -435,10 +430,7 @@ impl FinanceTool {
         let tx_date = date_str.map(parse_date).transpose()?;
 
         // Fetch existing transaction (needed for balance adjustment and existence check).
-        let old_tx = self
-            .transactions
-            .get(id)
-            .await
+        let old_tx = self.storage.transactions.get(id).await
 ?
             .ok_or_else(|| ToolError::ExecutionFailed(format!("Transaction {} not found", id)))?;
 
@@ -452,10 +444,7 @@ impl FinanceTool {
             tx_date,
         };
 
-        let updated_tx = self
-            .transactions
-            .update(&patch)
-            .await
+        let updated_tx = self.storage.transactions.update(&patch).await
             .map_err(|e| match e {
                 StorageError::NotFound(_) => {
                     ToolError::ExecutionFailed(format!("Transaction {} not found", id))
@@ -476,7 +465,7 @@ impl FinanceTool {
                 TransactionType::Transfer => 0,
             };
             if delta != 0 {
-                self.accounts
+                self.storage.accounts
                     .adjust_balance(&old_tx.account_id, delta)
                     .await
 ?;
@@ -510,10 +499,7 @@ impl FinanceTool {
     async fn tx_delete(&self, p: &ParamExtractor<'_>) -> Result<String> {
         let id = p.required_str("id")?;
 
-        let deleted_row = self
-            .transactions
-            .delete(id)
-            .await
+        let deleted_row = self.storage.transactions.delete(id).await
 ?
             .ok_or_else(|| ToolError::ExecutionFailed(format!("Transaction {} not found", id)))?;
 
@@ -528,6 +514,7 @@ impl FinanceTool {
                 TransactionType::Transfer => 0,
             };
             let updated_deleted_acct = self
+                .storage
                 .accounts
                 .adjust_balance(&deleted_row.account_id, deleted_delta)
                 .await
@@ -535,6 +522,7 @@ impl FinanceTool {
 
             // Find and remove the paired transfer row (the other side).
             let paired_rows = self
+                .storage
                 .transactions
                 .get_by_transfer_id(transfer_id)
                 .await
@@ -544,7 +532,7 @@ impl FinanceTool {
             let mut to_balance = updated_deleted_acct.balance;
 
             for paired_row in &paired_rows {
-                self.transactions
+                self.storage.transactions
                     .delete(&paired_row.id)
                     .await
 ?;
@@ -557,6 +545,7 @@ impl FinanceTool {
                     TransactionType::Transfer => 0,
                 };
                 let updated_paired_acct = self
+                    .storage
                     .accounts
                     .adjust_balance(&paired_row.account_id, paired_delta)
                     .await
@@ -590,6 +579,7 @@ impl FinanceTool {
         };
 
         let updated_account = self
+            .storage
             .accounts
             .adjust_balance(&deleted_row.account_id, balance_delta)
             .await
@@ -636,10 +626,7 @@ impl FinanceTool {
             ..Default::default()
         };
 
-        let rows = self
-            .transactions
-            .list(&filter)
-            .await
+        let rows = self.storage.transactions.list(&filter).await
 ?;
 
         if rows.is_empty() {
@@ -671,6 +658,7 @@ impl FinanceTool {
             Some(id) => id.to_string(),
             None => {
                 let accounts = self
+                    .storage
                     .accounts
                     .list(false)
                     .await
@@ -727,6 +715,7 @@ impl FinanceTool {
 
         // Verify account exists and get its currency.
         let account_row = self
+            .storage
             .accounts
             .get(account_id)
             .await
@@ -756,10 +745,7 @@ impl FinanceTool {
             updated_at: now,
         };
 
-        let inserted = self
-            .transactions
-            .add(&row)
-            .await
+        let inserted = self.storage.transactions.add(&row).await
 ?;
 
         let result = json!({

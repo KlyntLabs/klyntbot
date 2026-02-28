@@ -105,7 +105,7 @@ impl FinanceTool {
             updated_at: now,
         };
 
-        let inserted = self.budgets.add(&row).await?;
+        let inserted = self.storage.budgets.add(&row).await?;
 
         let resp = json!({
             "id": inserted.id,
@@ -121,7 +121,7 @@ impl FinanceTool {
 
     async fn budget_list(&self, p: &ParamExtractor<'_>) -> Result<String> {
         let period_filter = p.optional_str("period")?;
-        let usages = self.budgets.all_budget_usage().await?;
+        let usages = self.storage.budgets.all_budget_usage().await?;
 
         let budgets: Vec<_> = usages
             .iter()
@@ -161,7 +161,7 @@ impl FinanceTool {
             Some(id) => id.to_string(),
             None => return self.budget_status_all().await,
         };
-        let usage = self.budgets.budget_usage(&id).await?;
+        let usage = self.storage.budgets.budget_usage(&id).await?;
 
         let remaining = usage.amount - usage.spent;
         let percentage = if usage.amount > 0 {
@@ -177,7 +177,7 @@ impl FinanceTool {
             limit: Some(20),
             ..Default::default()
         };
-        let txs = self.transactions.list(&filter).await?;
+        let txs = self.storage.transactions.list(&filter).await?;
 
         // Compute subcategory breakdown from fetched transactions
         let mut subcategory_map: std::collections::HashMap<String, i64> =
@@ -243,7 +243,7 @@ impl FinanceTool {
 
     /// Show a summary status for every active budget.
     async fn budget_status_all(&self) -> Result<String> {
-        let usages = self.budgets.all_budget_usage().await?;
+        let usages = self.storage.budgets.all_budget_usage().await?;
         if usages.is_empty() {
             return Ok(r#"{"budgets":[],"message":"No active budgets found."}"#.to_string());
         }
@@ -289,7 +289,7 @@ impl FinanceTool {
             is_active,
         };
 
-        let updated = self.budgets.update(&patch).await?;
+        let updated = self.storage.budgets.update(&patch).await?;
 
         let budget = json!({
             "id": updated.id,
@@ -308,7 +308,7 @@ impl FinanceTool {
 
     async fn budget_delete(&self, p: &ParamExtractor<'_>) -> Result<String> {
         let id = p.required_str("id")?;
-        self.budgets.delete(id).await?;
+        self.storage.budgets.delete(id).await?;
         let resp = json!({"deleted": true});
         Ok(serde_json::to_string_pretty(&resp).unwrap())
     }

@@ -37,7 +37,7 @@ impl FinanceTool {
     pub(crate) async fn finance_health_check(&self, _ctx: &RoutingContext) -> Result<String> {
         let mut issues: Vec<Issue> = Vec::new();
 
-        let accounts = self.accounts.list(false).await.unwrap_or_default();
+        let accounts = self.storage.accounts.list(false).await.unwrap_or_default();
         if accounts.is_empty() {
             issues.push(Issue {
                 check: "no_accounts",
@@ -62,6 +62,7 @@ impl FinanceTool {
         }
 
         let investments = self
+            .storage
             .investments
             .list_with_symbols()
             .await
@@ -83,7 +84,7 @@ impl FinanceTool {
             });
         }
 
-        let budgets = self.budgets.list_active().await.unwrap_or_default();
+        let budgets = self.storage.budgets.list_active().await.unwrap_or_default();
         let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
         let mut dup_count = 0usize;
         for b in &budgets {
@@ -104,7 +105,7 @@ impl FinanceTool {
             });
         }
 
-        let goals = self.goals.list_active().await.unwrap_or_default();
+        let goals = self.storage.goals.list_active().await.unwrap_or_default();
         let today = Local::now().date_naive();
         let overdue_goals: Vec<_> = goals
             .iter()
@@ -122,7 +123,7 @@ impl FinanceTool {
             });
         }
 
-        let liabilities = self.liabilities.list_all().await.unwrap_or_default();
+        let liabilities = self.storage.liabilities.list_all().await.unwrap_or_default();
         let neg_remaining: Vec<_> = liabilities.iter().filter(|l| l.remaining < 0).collect();
         if !neg_remaining.is_empty() {
             issues.push(Issue {
@@ -136,7 +137,7 @@ impl FinanceTool {
             });
         }
 
-        let portfolios = self.investments.list_portfolios().await.unwrap_or_default();
+        let portfolios = self.storage.investments.list_portfolios().await.unwrap_or_default();
         let mut empty_count = 0usize;
         for p in &portfolios {
             let filter = FinanceInvestmentFilter {
@@ -144,6 +145,7 @@ impl FinanceTool {
                 ..Default::default()
             };
             let holdings = self
+                .storage
                 .investments
                 .list_investments(&filter)
                 .await

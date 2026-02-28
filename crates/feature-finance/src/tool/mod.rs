@@ -32,12 +32,7 @@ use crate::price_service::PriceService;
 /// investments, goals, liabilities, and financial reports.
 // Fields are `pub(crate)` so sub-module implementations can access them directly.
 pub struct FinanceTool {
-    pub(crate) accounts: storage::FinanceAccountRepo,
-    pub(crate) transactions: storage::FinanceTransactionRepo,
-    pub(crate) budgets: storage::FinanceBudgetRepo,
-    pub(crate) investments: storage::FinanceInvestmentRepo,
-    pub(crate) goals: storage::FinanceGoalRepo,
-    pub(crate) liabilities: storage::FinanceLiabilityRepo,
+    pub(crate) storage: storage::FinanceStorage,
     pub(crate) price_service: PriceService,
     pub(crate) finance_handler: Option<Arc<dyn FinanceHandler>>,
     pub(crate) default_currency: String,
@@ -45,25 +40,14 @@ pub struct FinanceTool {
 }
 
 impl FinanceTool {
-    /// Construct a new `FinanceTool` with all required repos and services.
-    #[allow(clippy::too_many_arguments)]
+    /// Construct a new `FinanceTool` from a `FinanceStorage` aggregate.
     pub fn new(
-        accounts: storage::FinanceAccountRepo,
-        transactions: storage::FinanceTransactionRepo,
-        budgets: storage::FinanceBudgetRepo,
-        investments: storage::FinanceInvestmentRepo,
-        goals: storage::FinanceGoalRepo,
-        liabilities: storage::FinanceLiabilityRepo,
+        storage: storage::FinanceStorage,
         price_service: PriceService,
         default_currency: String,
     ) -> Self {
         Self {
-            accounts,
-            transactions,
-            budgets,
-            investments,
-            goals,
-            liabilities,
+            storage,
             price_service,
             finance_handler: None,
             default_currency,
@@ -84,20 +68,12 @@ impl FinanceTool {
     }
 
     /// Convenience constructor: build a `FinanceTool` from a `StoragePool`.
-    ///
-    /// Useful for tests (via `StoragePool::connect_lazy`) and for feature
-    /// package bootstrap code that already holds a pool.
     pub fn from_storage_pool(
         pool: &storage::StoragePool,
         default_currency: impl Into<String>,
     ) -> Self {
         Self::new(
-            storage::FinanceAccountRepo::new(pool.inner().clone()),
-            storage::FinanceTransactionRepo::new(pool.inner().clone()),
-            storage::FinanceBudgetRepo::new(pool.inner().clone()),
-            storage::FinanceInvestmentRepo::new(pool.inner().clone()),
-            storage::FinanceGoalRepo::new(pool.inner().clone()),
-            storage::FinanceLiabilityRepo::new(pool.inner().clone()),
+            storage::FinanceStorage::from_pool(pool.inner()),
             crate::price_service::PriceService::new(15),
             default_currency.into(),
         )

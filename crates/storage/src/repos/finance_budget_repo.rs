@@ -1,27 +1,16 @@
 //! Repository for the `finance_budgets` table, including the budget-usage join query.
 
-use sqlx::SqlitePool;
-
-use crate::error::StorageError;
 use crate::rows::finance::{BudgetUsageRow, FinanceBudgetPatch, FinanceBudgetRow};
 
-/// Repository for budget CRUD, active-budget listing, and usage aggregation.
-#[derive(Debug, Clone)]
-pub struct FinanceBudgetRepo {
-    pool: SqlitePool,
-}
+crud_repo!(FinanceBudgetRepo, "finance_budgets", FinanceBudgetRow, "finance_budget");
 
 impl FinanceBudgetRepo {
-    pub fn new(pool: SqlitePool) -> Self {
-        Self { pool }
-    }
-
     // -----------------------------------------------------------------------
-    // CRUD
+    // CRUD (add + update are hand-written)
     // -----------------------------------------------------------------------
 
     /// Insert a new budget. Returns the inserted row.
-    pub async fn add(&self, row: &FinanceBudgetRow) -> Result<FinanceBudgetRow, StorageError> {
+    pub async fn add(&self, row: &FinanceBudgetRow) -> Result<FinanceBudgetRow, crate::error::StorageError> {
         let inserted = sqlx::query_as::<_, FinanceBudgetRow>(
             r#"
             INSERT INTO finance_budgets (
@@ -56,21 +45,11 @@ impl FinanceBudgetRepo {
         Ok(inserted)
     }
 
-    /// Get a single budget by id. Returns `None` if not found.
-    pub async fn get(&self, id: &str) -> Result<Option<FinanceBudgetRow>, StorageError> {
-        let row =
-            sqlx::query_as::<_, FinanceBudgetRow>("SELECT * FROM finance_budgets WHERE id = ?")
-                .bind(id)
-                .fetch_optional(&self.pool)
-                .await?;
-        Ok(row)
-    }
-
     /// Update mutable fields on a budget.
     pub async fn update(
         &self,
         patch: &FinanceBudgetPatch,
-    ) -> Result<FinanceBudgetRow, StorageError> {
+    ) -> Result<FinanceBudgetRow, crate::error::StorageError> {
         let row = sqlx::query_as::<_, FinanceBudgetRow>(
             r#"
             UPDATE finance_budgets SET
@@ -91,18 +70,9 @@ impl FinanceBudgetRepo {
         .bind(&patch.id)
         .fetch_optional(&self.pool)
         .await?
-        .ok_or_else(|| StorageError::NotFound(format!("finance_budget {}", patch.id)))?;
+        .ok_or_else(|| crate::error::StorageError::NotFound(format!("finance_budget {}", patch.id)))?;
 
         Ok(row)
-    }
-
-    /// Delete a budget. Returns `true` if the row existed and was deleted.
-    pub async fn delete(&self, id: &str) -> Result<bool, StorageError> {
-        let result = sqlx::query("DELETE FROM finance_budgets WHERE id = ?")
-            .bind(id)
-            .execute(&self.pool)
-            .await?;
-        Ok(result.rows_affected() > 0)
     }
 
     // -----------------------------------------------------------------------
@@ -110,7 +80,7 @@ impl FinanceBudgetRepo {
     // -----------------------------------------------------------------------
 
     /// Return all active budgets (`is_active = TRUE`), ordered by creation date.
-    pub async fn list_active(&self) -> Result<Vec<FinanceBudgetRow>, StorageError> {
+    pub async fn list_active(&self) -> Result<Vec<FinanceBudgetRow>, crate::error::StorageError> {
         let rows = sqlx::query_as::<_, FinanceBudgetRow>(
             "SELECT * FROM finance_budgets WHERE is_active = TRUE ORDER BY created_at",
         )
@@ -123,7 +93,7 @@ impl FinanceBudgetRepo {
     pub async fn get_by_category(
         &self,
         category: &str,
-    ) -> Result<Option<FinanceBudgetRow>, StorageError> {
+    ) -> Result<Option<FinanceBudgetRow>, crate::error::StorageError> {
         let row = sqlx::query_as::<_, FinanceBudgetRow>(
             "SELECT * FROM finance_budgets WHERE category = ? AND is_active = TRUE LIMIT 1",
         )
@@ -139,18 +109,7 @@ impl FinanceBudgetRepo {
 
     /// Return the budget row for `budget_id` with the `spent` amount calculated
     /// by summing matching expense transactions in the budget's current period.
-    ///
-    /// Period boundaries are derived from `b.period` + `date('now')`:
-    /// - `monthly` → first to last day of the current calendar month
-    /// - `weekly`  → Monday to Sunday of the current ISO week
-    /// - `yearly`  → first to last day of the current calendar year
-    /// - `custom`  → `b.start_date` to `b.end_date` (or today if no end_date)
-    ///
-    /// If `b.category IS NULL` the budget is a total budget and all expense
-    /// categories are summed.
-    ///
-    /// Returns `StorageError::NotFound` when `budget_id` does not exist.
-    pub async fn budget_usage(&self, budget_id: &str) -> Result<BudgetUsageRow, StorageError> {
+    pub async fn budget_usage(&self, budget_id: &str) -> Result<BudgetUsageRow, crate::error::StorageError> {
         let row = sqlx::query_as::<_, BudgetUsageRow>(
             r#"
             SELECT
@@ -192,13 +151,13 @@ impl FinanceBudgetRepo {
         .bind(budget_id)
         .fetch_optional(&self.pool)
         .await?
-        .ok_or_else(|| StorageError::NotFound(format!("finance_budget {budget_id}")))?;
+        .ok_or_else(|| crate::error::StorageError::NotFound(format!("finance_budget {budget_id}")))?;
 
         Ok(row)
     }
 
     /// Return `BudgetUsageRow` for every active budget, ordered by creation date.
-    pub async fn all_budget_usage(&self) -> Result<Vec<BudgetUsageRow>, StorageError> {
+    pub async fn all_budget_usage(&self) -> Result<Vec<BudgetUsageRow>, crate::error::StorageError> {
         let rows = sqlx::query_as::<_, BudgetUsageRow>(
             r#"
             SELECT

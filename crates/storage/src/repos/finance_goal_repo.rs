@@ -1,27 +1,16 @@
 //! Repository for the `finance_goals` table.
 
-use sqlx::SqlitePool;
-
-use crate::error::StorageError;
 use crate::rows::finance::{FinanceGoalPatch, FinanceGoalRow};
 
-/// Repository for financial goal CRUD, status filtering, and progress updates.
-#[derive(Debug, Clone)]
-pub struct FinanceGoalRepo {
-    pool: SqlitePool,
-}
+crud_repo!(FinanceGoalRepo, "finance_goals", FinanceGoalRow, "finance_goal");
 
 impl FinanceGoalRepo {
-    pub fn new(pool: SqlitePool) -> Self {
-        Self { pool }
-    }
-
     // -----------------------------------------------------------------------
-    // CRUD
+    // CRUD (add + update are hand-written)
     // -----------------------------------------------------------------------
 
     /// Insert a new goal. Returns the inserted row.
-    pub async fn add(&self, row: &FinanceGoalRow) -> Result<FinanceGoalRow, StorageError> {
+    pub async fn add(&self, row: &FinanceGoalRow) -> Result<FinanceGoalRow, crate::error::StorageError> {
         let inserted = sqlx::query_as::<_, FinanceGoalRow>(
             r#"
             INSERT INTO finance_goals (
@@ -58,17 +47,8 @@ impl FinanceGoalRepo {
         Ok(inserted)
     }
 
-    /// Get a single goal by id. Returns `None` if not found.
-    pub async fn get(&self, id: &str) -> Result<Option<FinanceGoalRow>, StorageError> {
-        let row = sqlx::query_as::<_, FinanceGoalRow>("SELECT * FROM finance_goals WHERE id = ?")
-            .bind(id)
-            .fetch_optional(&self.pool)
-            .await?;
-        Ok(row)
-    }
-
     /// Update mutable fields on a goal.
-    pub async fn update(&self, patch: &FinanceGoalPatch) -> Result<FinanceGoalRow, StorageError> {
+    pub async fn update(&self, patch: &FinanceGoalPatch) -> Result<FinanceGoalRow, crate::error::StorageError> {
         let row = sqlx::query_as::<_, FinanceGoalRow>(
             r#"
             UPDATE finance_goals SET
@@ -100,18 +80,9 @@ impl FinanceGoalRepo {
         .bind(&patch.id)
         .fetch_optional(&self.pool)
         .await?
-        .ok_or_else(|| StorageError::NotFound(format!("finance_goal {}", patch.id)))?;
+        .ok_or_else(|| crate::error::StorageError::NotFound(format!("finance_goal {}", patch.id)))?;
 
         Ok(row)
-    }
-
-    /// Delete a goal. Returns `true` if the row existed and was deleted.
-    pub async fn delete(&self, id: &str) -> Result<bool, StorageError> {
-        let result = sqlx::query("DELETE FROM finance_goals WHERE id = ?")
-            .bind(id)
-            .execute(&self.pool)
-            .await?;
-        Ok(result.rows_affected() > 0)
     }
 
     // -----------------------------------------------------------------------
@@ -119,7 +90,7 @@ impl FinanceGoalRepo {
     // -----------------------------------------------------------------------
 
     /// Return all goals with `status = 'active'`, ordered by creation date.
-    pub async fn list_active(&self) -> Result<Vec<FinanceGoalRow>, StorageError> {
+    pub async fn list_active(&self) -> Result<Vec<FinanceGoalRow>, crate::error::StorageError> {
         let rows = sqlx::query_as::<_, FinanceGoalRow>(
             "SELECT * FROM finance_goals WHERE status = 'active' ORDER BY created_at",
         )
@@ -137,7 +108,7 @@ impl FinanceGoalRepo {
         &self,
         id: &str,
         current_amount: i64,
-    ) -> Result<FinanceGoalRow, StorageError> {
+    ) -> Result<FinanceGoalRow, crate::error::StorageError> {
         let row = sqlx::query_as::<_, FinanceGoalRow>(
             r#"
             UPDATE finance_goals
@@ -150,7 +121,7 @@ impl FinanceGoalRepo {
         .bind(id)
         .fetch_optional(&self.pool)
         .await?
-        .ok_or_else(|| StorageError::NotFound(format!("finance_goal {id}")))?;
+        .ok_or_else(|| crate::error::StorageError::NotFound(format!("finance_goal {id}")))?;
         Ok(row)
     }
 }

@@ -73,7 +73,7 @@ impl FinanceTool {
             updated_at: now,
         };
 
-        let inserted = self.accounts.add(&row).await?;
+        let inserted = self.storage.accounts.add(&row).await?;
 
         let account = FinanceAccount::from(inserted);
 
@@ -113,9 +113,9 @@ impl FinanceTool {
         let currency = p.optional_str("currency")?;
 
         let rows = if let Some(c) = currency {
-            self.accounts.list_by_currency(c).await?
+            self.storage.accounts.list_by_currency(c).await?
         } else {
-            self.accounts.list(include_archived).await?
+            self.storage.accounts.list(include_archived).await?
         };
 
         if rows.is_empty() {
@@ -124,7 +124,7 @@ impl FinanceTool {
 
         let accounts: Vec<FinanceAccount> = rows.into_iter().map(FinanceAccount::from).collect();
 
-        let total_by_currency = self.accounts.total_balance_by_currency().await?;
+        let total_by_currency = self.storage.accounts.total_balance_by_currency().await?;
 
         let total_map: serde_json::Map<String, serde_json::Value> = total_by_currency
             .into_iter()
@@ -181,7 +181,7 @@ impl FinanceTool {
             is_archived,
         };
 
-        let row = self.accounts.update(&patch).await.map_err(|e| match e {
+        let row = self.storage.accounts.update(&patch).await.map_err(|e| match e {
             StorageError::NotFound(_) => {
                 ToolError::ExecutionFailed(format!("Account {} not found", id))
             }
@@ -206,7 +206,7 @@ impl FinanceTool {
     async fn account_delete(&self, p: &ParamExtractor<'_>) -> Result<String> {
         let id = p.required_str("id")?;
 
-        let exists = self.accounts.get(id).await?;
+        let exists = self.storage.accounts.get(id).await?;
 
         if exists.is_none() {
             return Err(ToolError::ExecutionFailed(format!("Account {} not found", id)).into());
@@ -217,9 +217,9 @@ impl FinanceTool {
             limit: Some(i64::MAX),
             ..Default::default()
         };
-        let tx_count = self.transactions.list(&tx_filter).await?.len();
+        let tx_count = self.storage.transactions.list(&tx_filter).await?.len();
 
-        self.accounts.delete(id).await?;
+        self.storage.accounts.delete(id).await?;
 
         let msg = if tx_count == 0 {
             "Account deleted. No transactions removed.".to_string()

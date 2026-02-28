@@ -1,33 +1,24 @@
 //! Repository for the `finance_transactions` table.
 
 use chrono::NaiveDate;
-use sqlx::SqlitePool;
 
-use crate::error::StorageError;
 use crate::rows::finance::{
     FinanceTransactionFilter, FinanceTransactionPatch, FinanceTransactionRow,
 };
 
-/// Repository for transaction CRUD, QueryBuilder filtering, transfer lookups, and aggregation.
-#[derive(Debug, Clone)]
-pub struct FinanceTransactionRepo {
-    pool: SqlitePool,
-}
+// Uses @no_delete because delete returns Option<Row> instead of bool.
+crud_repo!(@no_delete FinanceTransactionRepo, "finance_transactions", FinanceTransactionRow, "finance_transaction");
 
 impl FinanceTransactionRepo {
-    pub fn new(pool: SqlitePool) -> Self {
-        Self { pool }
-    }
-
     // -----------------------------------------------------------------------
-    // CRUD
+    // CRUD (add, update, delete are hand-written)
     // -----------------------------------------------------------------------
 
     /// Insert a new transaction. Returns the inserted row.
     pub async fn add(
         &self,
         row: &FinanceTransactionRow,
-    ) -> Result<FinanceTransactionRow, StorageError> {
+    ) -> Result<FinanceTransactionRow, crate::error::StorageError> {
         let inserted = sqlx::query_as::<_, FinanceTransactionRow>(
             r#"
             INSERT INTO finance_transactions (
@@ -65,23 +56,12 @@ impl FinanceTransactionRepo {
         Ok(inserted)
     }
 
-    /// Get a single transaction by id. Returns `None` if not found.
-    pub async fn get(&self, id: &str) -> Result<Option<FinanceTransactionRow>, StorageError> {
-        let row = sqlx::query_as::<_, FinanceTransactionRow>(
-            "SELECT * FROM finance_transactions WHERE id = ?",
-        )
-        .bind(id)
-        .fetch_optional(&self.pool)
-        .await?;
-        Ok(row)
-    }
-
     /// Update mutable fields on a transaction.
     /// Balance adjustment is the responsibility of the caller (tool layer).
     pub async fn update(
         &self,
         patch: &FinanceTransactionPatch,
-    ) -> Result<FinanceTransactionRow, StorageError> {
+    ) -> Result<FinanceTransactionRow, crate::error::StorageError> {
         let row = sqlx::query_as::<_, FinanceTransactionRow>(
             r#"
             UPDATE finance_transactions SET
@@ -109,13 +89,13 @@ impl FinanceTransactionRepo {
         .bind(&patch.id)
         .fetch_optional(&self.pool)
         .await?
-        .ok_or_else(|| StorageError::NotFound(format!("finance_transaction {}", patch.id)))?;
+        .ok_or_else(|| crate::error::StorageError::NotFound(format!("finance_transaction {}", patch.id)))?;
 
         Ok(row)
     }
 
     /// Delete a transaction. Returns the deleted row (for balance reversal), or `None` if not found.
-    pub async fn delete(&self, id: &str) -> Result<Option<FinanceTransactionRow>, StorageError> {
+    pub async fn delete(&self, id: &str) -> Result<Option<FinanceTransactionRow>, crate::error::StorageError> {
         let row = sqlx::query_as::<_, FinanceTransactionRow>(
             "DELETE FROM finance_transactions WHERE id = ? RETURNING *",
         )
@@ -133,7 +113,7 @@ impl FinanceTransactionRepo {
     pub async fn list(
         &self,
         filter: &FinanceTransactionFilter,
-    ) -> Result<Vec<FinanceTransactionRow>, StorageError> {
+    ) -> Result<Vec<FinanceTransactionRow>, crate::error::StorageError> {
         let limit = filter.limit.unwrap_or(20).min(100);
 
         let mut qb = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
@@ -209,7 +189,7 @@ impl FinanceTransactionRepo {
     pub async fn get_by_transfer_id(
         &self,
         transfer_id: &str,
-    ) -> Result<Vec<FinanceTransactionRow>, StorageError> {
+    ) -> Result<Vec<FinanceTransactionRow>, crate::error::StorageError> {
         let rows = sqlx::query_as::<_, FinanceTransactionRow>(
             "SELECT * FROM finance_transactions WHERE transfer_id = ? ORDER BY tx_type",
         )
@@ -230,7 +210,7 @@ impl FinanceTransactionRepo {
         date_from: NaiveDate,
         date_to: NaiveDate,
         tx_type: &str,
-    ) -> Result<Vec<(String, i64)>, StorageError> {
+    ) -> Result<Vec<(String, i64)>, crate::error::StorageError> {
         let rows: Vec<(String, i64)> = sqlx::query_as(
             r#"
             SELECT COALESCE(category, 'uncategorized') AS cat, COALESCE(SUM(amount), 0) AS total
@@ -258,8 +238,7 @@ impl FinanceTransactionRepo {
         tx_type: &str,
         n_periods: i32,
         _period_type: &str,
-    ) -> Result<Vec<(String, i64)>, StorageError> {
-        // Cutoff = start of current month minus (n_periods - 1) months.
+    ) -> Result<Vec<(String, i64)>, crate::error::StorageError> {
         let rows: Vec<(String, i64)> = sqlx::query_as(
             r#"
             SELECT
@@ -284,7 +263,7 @@ impl FinanceTransactionRepo {
     pub async fn category_history(
         &self,
         limit: i64,
-    ) -> Result<Vec<(String, String, i64)>, StorageError> {
+    ) -> Result<Vec<(String, String, i64)>, crate::error::StorageError> {
         let rows: Vec<(String, String, i64)> = sqlx::query_as(
             r#"
             SELECT counterparty, category, COUNT(*) AS cnt

@@ -4,7 +4,11 @@
 //! for `sqlx::FromRow` deserialization, and a `Repos` aggregate for
 //! convenient access to all repositories.
 
+#[macro_use]
+mod macros;
+
 pub mod error;
+pub mod finance_storage;
 pub mod pool;
 pub mod repos;
 pub mod rows;
@@ -32,7 +36,8 @@ pub use repos::SessionRepo;
 pub use repos::UsageRepo;
 pub use repos::{OverallStats, StrategyRepo, ToolStatsRow};
 
-// Re-export finance repo types.
+// Re-export finance types.
+pub use finance_storage::FinanceStorage;
 pub use repos::FinanceAccountRepo;
 pub use repos::FinanceBudgetRepo;
 pub use repos::FinanceGoalRepo;

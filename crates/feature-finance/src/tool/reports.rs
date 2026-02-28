@@ -105,6 +105,7 @@ impl FinanceTool {
         let category = p.optional_str("category")?;
 
         let mut rows = self
+            .storage
             .transactions
             .sum_by_category(date_from, date_to, "expense")
             .await?;
@@ -139,6 +140,7 @@ impl FinanceTool {
         let category = p.optional_str("category")?;
 
         let mut rows = self
+            .storage
             .transactions
             .sum_by_category(date_from, date_to, "income")
             .await?;
@@ -175,8 +177,8 @@ impl FinanceTool {
         let data: Vec<serde_json::Value> = if metric == "savings_rate" {
             // Fetch both income and spending time series concurrently.
             let (income_data, spend_data) = tokio::try_join!(
-                self.transactions.sum_by_period("income", periods, "month"),
-                self.transactions.sum_by_period("expense", periods, "month"),
+                self.storage.transactions.sum_by_period("income", periods, "month"),
+                self.storage.transactions.sum_by_period("expense", periods, "month"),
             )?;
 
             let income_map: std::collections::HashMap<String, i64> =
@@ -225,6 +227,7 @@ impl FinanceTool {
             };
 
             let period_data = self
+                .storage
                 .transactions
                 .sum_by_period(tx_type, periods, "month")
                 .await?;
@@ -255,9 +258,9 @@ impl FinanceTool {
         let today = Local::now().date_naive();
 
         let (account_balances, investment_values, liability_totals) = tokio::try_join!(
-            self.accounts.total_balance_by_currency(),
-            self.investments.total_value_by_currency(),
-            self.liabilities.total_remaining_by_currency(),
+            self.storage.accounts.total_balance_by_currency(),
+            self.storage.investments.total_value_by_currency(),
+            self.storage.liabilities.total_remaining_by_currency(),
         )?;
 
         let accounts_total: i64 = account_balances.iter().map(|(_, v)| v).sum();

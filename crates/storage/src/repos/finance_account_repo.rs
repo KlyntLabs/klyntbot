@@ -1,27 +1,16 @@
 //! Repository for the `finance_accounts` table.
 
-use sqlx::SqlitePool;
-
-use crate::error::StorageError;
 use crate::rows::finance::{FinanceAccountPatch, FinanceAccountRow};
 
-/// Repository for finance account CRUD, listing, and balance operations.
-#[derive(Debug, Clone)]
-pub struct FinanceAccountRepo {
-    pool: SqlitePool,
-}
+crud_repo!(FinanceAccountRepo, "finance_accounts", FinanceAccountRow, "finance_account");
 
 impl FinanceAccountRepo {
-    pub fn new(pool: SqlitePool) -> Self {
-        Self { pool }
-    }
-
     // -----------------------------------------------------------------------
-    // CRUD
+    // CRUD (add + update are hand-written — too much per-repo variation)
     // -----------------------------------------------------------------------
 
     /// Insert a new account. Returns the inserted row.
-    pub async fn add(&self, row: &FinanceAccountRow) -> Result<FinanceAccountRow, StorageError> {
+    pub async fn add(&self, row: &FinanceAccountRow) -> Result<FinanceAccountRow, crate::error::StorageError> {
         let inserted = sqlx::query_as::<_, FinanceAccountRow>(
             r#"
             INSERT INTO finance_accounts (
@@ -50,28 +39,11 @@ impl FinanceAccountRepo {
         Ok(inserted)
     }
 
-    /// Get a single account by id. Returns `None` if not found.
-    pub async fn get(&self, id: &str) -> Result<Option<FinanceAccountRow>, StorageError> {
-        let row =
-            sqlx::query_as::<_, FinanceAccountRow>("SELECT * FROM finance_accounts WHERE id = ?")
-                .bind(id)
-                .fetch_optional(&self.pool)
-                .await?;
-        Ok(row)
-    }
-
-    /// Get a single account by id, returning `StorageError::NotFound` if missing.
-    pub async fn get_or_err(&self, id: &str) -> Result<FinanceAccountRow, StorageError> {
-        self.get(id)
-            .await?
-            .ok_or_else(|| StorageError::NotFound(format!("finance_account {id}")))
-    }
-
     /// Update mutable fields on an account. Only non-`None` fields are changed.
     pub async fn update(
         &self,
         patch: &FinanceAccountPatch,
-    ) -> Result<FinanceAccountRow, StorageError> {
+    ) -> Result<FinanceAccountRow, crate::error::StorageError> {
         let now = chrono::Utc::now();
         let row = sqlx::query_as::<_, FinanceAccountRow>(
             r#"
@@ -97,19 +69,9 @@ impl FinanceAccountRepo {
         .bind(&patch.id)
         .fetch_optional(&self.pool)
         .await?
-        .ok_or_else(|| StorageError::NotFound(format!("finance_account {}", patch.id)))?;
+        .ok_or_else(|| crate::error::StorageError::NotFound(format!("finance_account {}", patch.id)))?;
 
         Ok(row)
-    }
-
-    /// Delete an account. Returns `true` if the row existed and was deleted.
-    /// Cascade deletes all transactions for this account.
-    pub async fn delete(&self, id: &str) -> Result<bool, StorageError> {
-        let result = sqlx::query("DELETE FROM finance_accounts WHERE id = ?")
-            .bind(id)
-            .execute(&self.pool)
-            .await?;
-        Ok(result.rows_affected() > 0)
     }
 
     // -----------------------------------------------------------------------
@@ -120,7 +82,7 @@ impl FinanceAccountRepo {
     pub async fn list(
         &self,
         include_archived: bool,
-    ) -> Result<Vec<FinanceAccountRow>, StorageError> {
+    ) -> Result<Vec<FinanceAccountRow>, crate::error::StorageError> {
         let rows = if include_archived {
             sqlx::query_as::<_, FinanceAccountRow>(
                 "SELECT * FROM finance_accounts ORDER BY created_at",
@@ -141,7 +103,7 @@ impl FinanceAccountRepo {
     pub async fn list_by_currency(
         &self,
         currency: &str,
-    ) -> Result<Vec<FinanceAccountRow>, StorageError> {
+    ) -> Result<Vec<FinanceAccountRow>, crate::error::StorageError> {
         let rows = sqlx::query_as::<_, FinanceAccountRow>(
             r#"
             SELECT * FROM finance_accounts
@@ -161,7 +123,7 @@ impl FinanceAccountRepo {
 
     /// Sum balances of non-archived accounts, grouped by currency.
     /// Returns a vec of `(currency, total_balance)` pairs.
-    pub async fn total_balance_by_currency(&self) -> Result<Vec<(String, i64)>, StorageError> {
+    pub async fn total_balance_by_currency(&self) -> Result<Vec<(String, i64)>, crate::error::StorageError> {
         let rows: Vec<(String, i64)> = sqlx::query_as(
             r#"
             SELECT currency, COALESCE(SUM(balance), 0) AS total
@@ -185,7 +147,7 @@ impl FinanceAccountRepo {
         &self,
         id: &str,
         delta: i64,
-    ) -> Result<FinanceAccountRow, StorageError> {
+    ) -> Result<FinanceAccountRow, crate::error::StorageError> {
         let now = chrono::Utc::now();
         let row = sqlx::query_as::<_, FinanceAccountRow>(
             r#"
@@ -200,7 +162,7 @@ impl FinanceAccountRepo {
         .bind(id)
         .fetch_optional(&self.pool)
         .await?
-        .ok_or_else(|| StorageError::NotFound(format!("finance_account {id}")))?;
+        .ok_or_else(|| crate::error::StorageError::NotFound(format!("finance_account {id}")))?;
         Ok(row)
     }
 }

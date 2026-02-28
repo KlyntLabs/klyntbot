@@ -1,30 +1,19 @@
 //! Repository for the `finance_liabilities` table.
 
-use sqlx::SqlitePool;
-
-use crate::error::StorageError;
 use crate::rows::finance::{FinanceLiabilityPatch, FinanceLiabilityRow};
 
-/// Repository for liability CRUD, listing, and balance aggregation.
-#[derive(Debug, Clone)]
-pub struct FinanceLiabilityRepo {
-    pool: SqlitePool,
-}
+crud_repo!(FinanceLiabilityRepo, "finance_liabilities", FinanceLiabilityRow, "finance_liability");
 
 impl FinanceLiabilityRepo {
-    pub fn new(pool: SqlitePool) -> Self {
-        Self { pool }
-    }
-
     // -----------------------------------------------------------------------
-    // CRUD
+    // CRUD (add + update are hand-written)
     // -----------------------------------------------------------------------
 
     /// Insert a new liability. Returns the inserted row.
     pub async fn add(
         &self,
         row: &FinanceLiabilityRow,
-    ) -> Result<FinanceLiabilityRow, StorageError> {
+    ) -> Result<FinanceLiabilityRow, crate::error::StorageError> {
         let inserted = sqlx::query_as::<_, FinanceLiabilityRow>(
             r#"
             INSERT INTO finance_liabilities (
@@ -57,22 +46,11 @@ impl FinanceLiabilityRepo {
         Ok(inserted)
     }
 
-    /// Get a single liability by id. Returns `None` if not found.
-    pub async fn get(&self, id: &str) -> Result<Option<FinanceLiabilityRow>, StorageError> {
-        let row = sqlx::query_as::<_, FinanceLiabilityRow>(
-            "SELECT * FROM finance_liabilities WHERE id = ?",
-        )
-        .bind(id)
-        .fetch_optional(&self.pool)
-        .await?;
-        Ok(row)
-    }
-
     /// Update mutable fields on a liability.
     pub async fn update(
         &self,
         patch: &FinanceLiabilityPatch,
-    ) -> Result<FinanceLiabilityRow, StorageError> {
+    ) -> Result<FinanceLiabilityRow, crate::error::StorageError> {
         let row = sqlx::query_as::<_, FinanceLiabilityRow>(
             r#"
             UPDATE finance_liabilities SET
@@ -95,18 +73,9 @@ impl FinanceLiabilityRepo {
         .bind(&patch.id)
         .fetch_optional(&self.pool)
         .await?
-        .ok_or_else(|| StorageError::NotFound(format!("finance_liability {}", patch.id)))?;
+        .ok_or_else(|| crate::error::StorageError::NotFound(format!("finance_liability {}", patch.id)))?;
 
         Ok(row)
-    }
-
-    /// Delete a liability. Returns `true` if the row existed and was deleted.
-    pub async fn delete(&self, id: &str) -> Result<bool, StorageError> {
-        let result = sqlx::query("DELETE FROM finance_liabilities WHERE id = ?")
-            .bind(id)
-            .execute(&self.pool)
-            .await?;
-        Ok(result.rows_affected() > 0)
     }
 
     // -----------------------------------------------------------------------
@@ -114,7 +83,7 @@ impl FinanceLiabilityRepo {
     // -----------------------------------------------------------------------
 
     /// List all liabilities, ordered by creation date.
-    pub async fn list_all(&self) -> Result<Vec<FinanceLiabilityRow>, StorageError> {
+    pub async fn list_all(&self) -> Result<Vec<FinanceLiabilityRow>, crate::error::StorageError> {
         let rows = sqlx::query_as::<_, FinanceLiabilityRow>(
             "SELECT * FROM finance_liabilities ORDER BY created_at",
         )
@@ -129,7 +98,7 @@ impl FinanceLiabilityRepo {
 
     /// Sum remaining balances of all liabilities, grouped by currency.
     /// Returns `(currency, total_remaining)` pairs.
-    pub async fn total_remaining_by_currency(&self) -> Result<Vec<(String, i64)>, StorageError> {
+    pub async fn total_remaining_by_currency(&self) -> Result<Vec<(String, i64)>, crate::error::StorageError> {
         let rows: Vec<(String, i64)> = sqlx::query_as(
             r#"
             SELECT currency, COALESCE(SUM(remaining), 0) AS total
