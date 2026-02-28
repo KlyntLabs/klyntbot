@@ -48,7 +48,7 @@ pub async fn list_accounts(
 ) -> Result<Json<Vec<FinanceAccountRow>>, ApiError> {
     let rows = state
         .repos
-        .finance_accounts
+        .finance.accounts
         .list(false)
         .await
         .map_err(ApiError::from)?;
@@ -75,7 +75,7 @@ pub async fn create_account(
     };
     let created = state
         .repos
-        .finance_accounts
+        .finance.accounts
         .add(&row)
         .await
         .map_err(ApiError::from)?;
@@ -89,7 +89,7 @@ pub async fn get_account(
 ) -> Result<Json<FinanceAccountRow>, ApiError> {
     let row = state
         .repos
-        .finance_accounts
+        .finance.accounts
         .get(&id)
         .await
         .map_err(ApiError::from)?
@@ -113,7 +113,7 @@ pub async fn patch_account(
     };
     let updated = state
         .repos
-        .finance_accounts
+        .finance.accounts
         .update(&patch)
         .await
         .map_err(ApiError::from)?;
@@ -127,7 +127,7 @@ pub async fn delete_account(
 ) -> Result<StatusCode, ApiError> {
     let deleted = state
         .repos
-        .finance_accounts
+        .finance.accounts
         .delete(&id)
         .await
         .map_err(ApiError::from)?;
@@ -172,7 +172,7 @@ pub async fn list_transactions(
 ) -> Result<Json<Vec<FinanceTransactionRow>>, ApiError> {
     let rows = state
         .repos
-        .finance_transactions
+        .finance.transactions
         .list(&FinanceTransactionFilter::default())
         .await
         .map_err(ApiError::from)?;
@@ -204,7 +204,7 @@ pub async fn create_transaction(
     };
     let created = state
         .repos
-        .finance_transactions
+        .finance.transactions
         .add(&row)
         .await
         .map_err(ApiError::from)?;
@@ -218,7 +218,7 @@ pub async fn get_transaction(
 ) -> Result<Json<FinanceTransactionRow>, ApiError> {
     let row = state
         .repos
-        .finance_transactions
+        .finance.transactions
         .get(&id)
         .await
         .map_err(ApiError::from)?
@@ -243,7 +243,7 @@ pub async fn patch_transaction(
     };
     let updated = state
         .repos
-        .finance_transactions
+        .finance.transactions
         .update(&patch)
         .await
         .map_err(ApiError::from)?;
@@ -257,7 +257,7 @@ pub async fn delete_transaction(
 ) -> Result<StatusCode, ApiError> {
     let deleted = state
         .repos
-        .finance_transactions
+        .finance.transactions
         .delete(&id)
         .await
         .map_err(ApiError::from)?;
@@ -298,7 +298,7 @@ pub async fn list_budgets(
 ) -> Result<Json<Vec<FinanceBudgetRow>>, ApiError> {
     let rows = state
         .repos
-        .finance_budgets
+        .finance.budgets
         .list_active()
         .await
         .map_err(ApiError::from)?;
@@ -329,7 +329,7 @@ pub async fn create_budget(
     };
     let created = state
         .repos
-        .finance_budgets
+        .finance.budgets
         .add(&row)
         .await
         .map_err(ApiError::from)?;
@@ -351,7 +351,7 @@ pub async fn patch_budget(
     };
     let updated = state
         .repos
-        .finance_budgets
+        .finance.budgets
         .update(&patch)
         .await
         .map_err(ApiError::from)?;
@@ -365,7 +365,7 @@ pub async fn delete_budget(
 ) -> Result<StatusCode, ApiError> {
     let deleted = state
         .repos
-        .finance_budgets
+        .finance.budgets
         .delete(&id)
         .await
         .map_err(ApiError::from)?;
@@ -378,7 +378,7 @@ pub async fn get_budget_usage(
 ) -> Result<Json<Vec<BudgetUsageRow>>, ApiError> {
     let rows = state
         .repos
-        .finance_budgets
+        .finance.budgets
         .all_budget_usage()
         .await
         .map_err(ApiError::from)?;
@@ -421,7 +421,7 @@ pub async fn list_investments(
 ) -> Result<Json<Vec<FinanceInvestmentRow>>, ApiError> {
     let rows = state
         .repos
-        .finance_investments
+        .finance.investments
         .list_investments(&FinanceInvestmentFilter::default())
         .await
         .map_err(ApiError::from)?;
@@ -452,7 +452,7 @@ pub async fn create_investment(
     };
     let created = state
         .repos
-        .finance_investments
+        .finance.investments
         .add_investment(&row)
         .await
         .map_err(ApiError::from)?;
@@ -475,7 +475,7 @@ pub async fn patch_investment(
     };
     let updated = state
         .repos
-        .finance_investments
+        .finance.investments
         .update_investment(&patch)
         .await
         .map_err(ApiError::from)?;
@@ -489,7 +489,7 @@ pub async fn delete_investment(
 ) -> Result<StatusCode, ApiError> {
     let deleted = state
         .repos
-        .finance_investments
+        .finance.investments
         .delete_investment(&id)
         .await
         .map_err(ApiError::from)?;
@@ -534,7 +534,7 @@ pub async fn list_goals(
 ) -> Result<Json<Vec<FinanceGoalRow>>, ApiError> {
     let rows = state
         .repos
-        .finance_goals
+        .finance.goals
         .list_active()
         .await
         .map_err(ApiError::from)?;
@@ -565,7 +565,7 @@ pub async fn create_goal(
     };
     let created = state
         .repos
-        .finance_goals
+        .finance.goals
         .add(&row)
         .await
         .map_err(ApiError::from)?;
@@ -591,7 +591,7 @@ pub async fn patch_goal(
     };
     let updated = state
         .repos
-        .finance_goals
+        .finance.goals
         .update(&patch)
         .await
         .map_err(ApiError::from)?;
@@ -605,7 +605,7 @@ pub async fn delete_goal(
 ) -> Result<StatusCode, ApiError> {
     let deleted = state
         .repos
-        .finance_goals
+        .finance.goals
         .delete(&id)
         .await
         .map_err(ApiError::from)?;
@@ -645,7 +645,7 @@ pub async fn list_liabilities(
 ) -> Result<Json<Vec<FinanceLiabilityRow>>, ApiError> {
     let rows = state
         .repos
-        .finance_liabilities
+        .finance.liabilities
         .list_all()
         .await
         .map_err(ApiError::from)?;
@@ -675,7 +675,7 @@ pub async fn create_liability(
     };
     let created = state
         .repos
-        .finance_liabilities
+        .finance.liabilities
         .add(&row)
         .await
         .map_err(ApiError::from)?;
@@ -697,7 +697,7 @@ pub async fn patch_liability(
     };
     let updated = state
         .repos
-        .finance_liabilities
+        .finance.liabilities
         .update(&patch)
         .await
         .map_err(ApiError::from)?;
@@ -711,7 +711,7 @@ pub async fn delete_liability(
 ) -> Result<StatusCode, ApiError> {
     let deleted = state
         .repos
-        .finance_liabilities
+        .finance.liabilities
         .delete(&id)
         .await
         .map_err(ApiError::from)?;

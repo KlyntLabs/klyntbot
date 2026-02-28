@@ -37,7 +37,7 @@ impl FinanceHandler for FinanceHandlerImpl {
         let mut sections = Vec::new();
 
         // Section 1: Budget status
-        let usages = self.repos.finance_budgets.all_budget_usage().await?;
+        let usages = self.repos.finance.budgets.all_budget_usage().await?;
         if !usages.is_empty() {
             let mut budget_lines = vec!["### Budget Status".to_string()];
             for u in &usages {
@@ -65,7 +65,7 @@ impl FinanceHandler for FinanceHandlerImpl {
         let yesterday = chrono::Local::now().date_naive() - chrono::Duration::days(1);
         let spending = self
             .repos
-            .finance_transactions
+            .finance.transactions
             .sum_by_category(yesterday, yesterday, "expense")
             .await
             .unwrap_or_default();
@@ -79,7 +79,7 @@ impl FinanceHandler for FinanceHandlerImpl {
         }
 
         // Section 3: Goals approaching deadline (within 7 days)
-        let goals = self.repos.finance_goals.list_active().await?;
+        let goals = self.repos.finance.goals.list_active().await?;
         let today = chrono::Local::now().date_naive();
         let approaching: Vec<_> = goals
             .iter()
@@ -122,7 +122,7 @@ impl FinanceHandler for FinanceHandlerImpl {
     }
 
     async fn check_budgets(&self) -> Result<Vec<BudgetAlert>> {
-        let usages = self.repos.finance_budgets.all_budget_usage().await?;
+        let usages = self.repos.finance.budgets.all_budget_usage().await?;
         let threshold = self.config.budgeting.alert_threshold as f64;
         let mut alerts = Vec::new();
 
@@ -147,7 +147,7 @@ impl FinanceHandler for FinanceHandlerImpl {
     }
 
     async fn refresh_prices(&self) -> Result<PriceUpdateSummary> {
-        let investments = self.repos.finance_investments.list_with_symbols().await?;
+        let investments = self.repos.finance.investments.list_with_symbols().await?;
         let mut updated = 0usize;
         let mut failed = 0usize;
         let mut details = Vec::new();
@@ -163,7 +163,7 @@ impl FinanceHandler for FinanceHandlerImpl {
                         let value_cents = (result.price * inv.quantity * 100.0).round() as i64;
                         let _ = self
                             .repos
-                            .finance_investments
+                            .finance.investments
                             .update_price(&inv.id, price_cents, value_cents)
                             .await;
                         details.push(format!(
@@ -194,13 +194,13 @@ impl FinanceHandler for FinanceHandlerImpl {
         let mut issues = Vec::new();
 
         // Check for empty accounts
-        let accounts = self.repos.finance_accounts.list(false).await?;
+        let accounts = self.repos.finance.accounts.list(false).await?;
         if accounts.is_empty() {
             issues.push("No finance accounts configured.".to_string());
         }
 
         // Check stale investment prices
-        let investments = self.repos.finance_investments.list_with_symbols().await?;
+        let investments = self.repos.finance.investments.list_with_symbols().await?;
         let stale_threshold = chrono::Local::now() - chrono::Duration::hours(24);
         let stale_count = investments
             .iter()
@@ -214,7 +214,7 @@ impl FinanceHandler for FinanceHandlerImpl {
         }
 
         // Check overdue goals
-        let goals = self.repos.finance_goals.list_active().await?;
+        let goals = self.repos.finance.goals.list_active().await?;
         let today = chrono::Local::now().date_naive();
         let overdue = goals
             .iter()
@@ -228,7 +228,7 @@ impl FinanceHandler for FinanceHandlerImpl {
         }
 
         // Check negative liability remaining
-        let liabilities = self.repos.finance_liabilities.list_all().await?;
+        let liabilities = self.repos.finance.liabilities.list_all().await?;
         let neg = liabilities.iter().filter(|l| l.remaining < 0).count();
         if neg > 0 {
             issues.push(format!(

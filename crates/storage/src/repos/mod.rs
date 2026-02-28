@@ -68,13 +68,7 @@ pub struct Repos {
     pub memory_notes: MemoryNoteRepo,
     pub learning_state: LearningStateRepo,
     pub decision_log: DecisionLogRepo,
-    // Finance repos
-    pub finance_accounts: FinanceAccountRepo,
-    pub finance_transactions: FinanceTransactionRepo,
-    pub finance_budgets: FinanceBudgetRepo,
-    pub finance_investments: FinanceInvestmentRepo,
-    pub finance_goals: FinanceGoalRepo,
-    pub finance_liabilities: FinanceLiabilityRepo,
+    pub finance: crate::FinanceStorage,
 }
 
 impl Repos {
@@ -97,12 +91,7 @@ impl Repos {
             memory_notes: MemoryNoteRepo::new(db.clone()),
             learning_state: LearningStateRepo::new(db.clone()),
             decision_log: DecisionLogRepo::new(db.clone()),
-            finance_accounts: FinanceAccountRepo::new(db.clone()),
-            finance_transactions: FinanceTransactionRepo::new(db.clone()),
-            finance_budgets: FinanceBudgetRepo::new(db.clone()),
-            finance_investments: FinanceInvestmentRepo::new(db.clone()),
-            finance_goals: FinanceGoalRepo::new(db.clone()),
-            finance_liabilities: FinanceLiabilityRepo::new(db.clone()),
+            finance: crate::FinanceStorage::from_pool(&db),
             pool: db,
         }
     }
