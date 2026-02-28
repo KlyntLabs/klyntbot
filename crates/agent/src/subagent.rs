@@ -14,6 +14,8 @@ use bus::InboundMessage;
 use providers::{DynProvider, Message};
 use tools::{
     filesystem::{register_fs_read_tools, register_fs_tools},
+    glob_tool::GlobTool,
+    grep::GrepTool,
     registry::ToolRegistry,
     spawn::SpawnHandler,
     web::{WebFetchTool, WebSearchTool},
@@ -394,6 +396,10 @@ async fn run_subagent_task(
         None
     };
 
+    // All profiles get search tools (read-only)
+    tools.register(GrepTool::new(allowed_dir.clone()));
+    tools.register(GlobTool::new(allowed_dir.clone()));
+
     match profile {
         SubagentProfile::General => {
             register_fs_tools(&mut tools, allowed_dir);
@@ -459,12 +465,12 @@ fn build_subagent_prompt(
 ) -> String {
     let tool_description = match profile {
         SubagentProfile::General => {
-            "- Read and write files in the workspace\n- Search the web and fetch web pages"
+            "- Read and write files in the workspace\n- Search file contents (grep) and find files by pattern (glob)\n- Search the web and fetch web pages"
         }
         SubagentProfile::Research => {
-            "- Read files in the workspace (read-only)\n- Search the web and fetch web pages"
+            "- Read files in the workspace (read-only)\n- Search file contents (grep) and find files by pattern (glob)\n- Search the web and fetch web pages"
         }
-        SubagentProfile::Analyst => "- Read files in the workspace (read-only)",
+        SubagentProfile::Analyst => "- Read files in the workspace (read-only)\n- Search file contents (grep) and find files by pattern (glob)",
     };
 
     format!(
