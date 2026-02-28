@@ -3,7 +3,6 @@
 //! This crate provides the AgentLoop and related agent functionality.
 
 pub mod agent_loop;
-pub mod agent_task_handler;
 
 pub mod calendar_reconcile;
 pub mod calendar_sync_adapter;
@@ -40,7 +39,6 @@ pub mod todo_calendar_sync_adapter;
 pub mod todo_embedding_handler;
 
 pub use agent_loop::{AgentLoop, StreamingHandle};
-pub use agent_task_handler::AgentTaskHandlerImpl;
 pub use calendar_reconcile::{reconcile_calendar_events, ReconcileAction, ReconcileReport};
 pub use calendar_sync_adapter::CalendarSyncAdapter;
 pub use confidence::{ConfidenceAssessment, ConfidenceEvaluator, DecisionAction, DecisionLogger};
