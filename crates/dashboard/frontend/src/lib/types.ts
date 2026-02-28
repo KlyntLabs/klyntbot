@@ -396,6 +396,17 @@ export interface ToolEndEvent extends AgentEvent {
   result?: string;
 }
 
+export interface EntityCreatedEvent extends AgentEvent {
+  type: 'entityCreated';
+  entityType: string;
+  entityId: string;
+  title: string;
+  subtitle?: string;
+  route?: string;
+  iconHint: string;
+  metadata?: Record<string, unknown>;
+}
+
 export interface InteractionRequestEvent extends AgentEvent {
   type: 'interaction.request';
   requestId: string;
@@ -446,6 +457,19 @@ export interface ChatMessage {
   isStreaming?: boolean;
   /** Tool calls executed during this response (set on completion). */
   toolCalls?: MessageToolCall[];
+  /** Entity cards for entities created during this response. */
+  entityCards?: EntityCardData[];
+}
+
+/** Entity card data from an entityCreated WebSocket event. */
+export interface EntityCardData {
+  entityType: string;
+  entityId: string;
+  title: string;
+  subtitle?: string;
+  route?: string;
+  iconHint: string;
+  metadata?: Record<string, unknown>;
 }
 
 // ── Tool Activity (chat sidebar) ─────────────────────────────────────────────

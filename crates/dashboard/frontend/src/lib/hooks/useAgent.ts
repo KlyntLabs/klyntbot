@@ -10,7 +10,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { AgentSocket, type ConnectionStatus } from '../ws';
-import type { ChatMessage } from '../types';
+import type { ChatMessage, EntityCardData } from '../types';
 import { apiFetch } from '../api';
 import type { SessionWithMessages, InteractionQuestion } from '../types';
 
@@ -77,6 +77,8 @@ export function useAgent(): UseAgentResult {
   const isStreamingRef = useRef(false);
   // Ref to capture tool calls before thinking state is cleared
   const thinkingRef = useRef<ThinkingState | null>(null);
+  // Ref to accumulate entity cards during streaming
+  const entityCardsRef = useRef<EntityCardData[]>([]);
 
   useEffect(() => {
     const socket = new AgentSocket();
@@ -241,11 +243,15 @@ export function useAgent(): UseAgentResult {
             ? completedToolCalls
             : undefined;
 
+          const entityCards = entityCardsRef.current.length > 0
+            ? entityCardsRef.current
+            : undefined;
+
           if (id) {
             setMessages((prev) =>
               prev.map((msg) =>
                 msg.id === id
-                  ? { ...msg, content: finalContent, isStreaming: false, toolCalls }
+                  ? { ...msg, content: finalContent, isStreaming: false, toolCalls, entityCards }
                   : msg,
               ),
             );
@@ -259,6 +265,7 @@ export function useAgent(): UseAgentResult {
                 timestamp: new Date(),
                 isStreaming: false,
                 toolCalls,
+                entityCards,
               },
             ]);
           }
@@ -270,12 +277,14 @@ export function useAgent(): UseAgentResult {
           setIsStreaming(false);
           thinkingRef.current = null;
           setThinking(null);
+          entityCardsRef.current = [];
           break;
         }
 
         case 'error': {
           streamingMessageIdRef.current = null;
           accumulatedContentRef.current = '';
+          entityCardsRef.current = [];
           isStreamingRef.current = false;
           setIsStreaming(false);
           setThinking(null);
@@ -297,6 +306,20 @@ export function useAgent(): UseAgentResult {
             title: event.title as string,
             questions: event.questions as InteractionQuestion[],
           });
+          break;
+        }
+
+        case 'entityCreated': {
+          const card: EntityCardData = {
+            entityType: event.entityType as string,
+            entityId: event.entityId as string,
+            title: event.title as string,
+            subtitle: event.subtitle as string | undefined,
+            route: event.route as string | undefined,
+            iconHint: event.iconHint as string,
+            metadata: event.metadata as Record<string, unknown> | undefined,
+          };
+          entityCardsRef.current = [...entityCardsRef.current, card];
           break;
         }
 
@@ -362,6 +385,7 @@ export function useAgent(): UseAgentResult {
     }
 
     accumulatedContentRef.current = '';
+    entityCardsRef.current = [];
     isStreamingRef.current = false;
     setIsStreaming(false);
     setThinking(null);
@@ -416,6 +440,7 @@ export function useAgent(): UseAgentResult {
     setIsStreaming(false);
     streamingMessageIdRef.current = null;
     accumulatedContentRef.current = '';
+    entityCardsRef.current = [];
   }, []);
 
   const deleteSession = useCallback(async (key: string) => {
