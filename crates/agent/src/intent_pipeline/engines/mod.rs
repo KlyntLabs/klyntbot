@@ -13,6 +13,8 @@ use crate::execution::{ExecutionParams, ReasoningTrace};
 pub mod direct;
 pub mod planned;
 pub mod reactive;
+#[cfg(test)]
+pub(crate) mod test_utils;
 
 /// Result from an execution engine.
 pub enum EngineResult {
@@ -30,6 +32,49 @@ pub enum EngineResult {
         carried_context: EscalationContext,
         usage: Usage,
     },
+}
+
+impl EngineResult {
+    /// Construct a `Complete` result with no traces or tool name.
+    ///
+    /// Used by Direct and Planned engines which don't track reasoning traces.
+    pub fn complete(content: String, usage: Usage, iterations: u32) -> Self {
+        Self::Complete {
+            content,
+            usage,
+            iterations,
+            traces: vec![],
+            tool_name: None,
+        }
+    }
+
+    /// Construct an empty `Complete` result.
+    pub fn empty(usage: Usage, iterations: u32) -> Self {
+        Self::complete(String::new(), usage, iterations)
+    }
+}
+
+// Derive Debug to enable assertions in tests.
+impl std::fmt::Debug for EngineResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Complete {
+                content,
+                iterations,
+                tool_name,
+                ..
+            } => f
+                .debug_struct("Complete")
+                .field("content_len", &content.len())
+                .field("iterations", iterations)
+                .field("tool_name", tool_name)
+                .finish(),
+            Self::Escalate { reason, .. } => f
+                .debug_struct("Escalate")
+                .field("reason", reason)
+                .finish(),
+        }
+    }
 }
 
 /// Unified trait for all execution engines.

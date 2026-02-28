@@ -43,13 +43,9 @@ impl ExecutionEngine for DirectEngine {
 
         match outcome {
             CycleOutcome::FinalResponse { content }
-            | CycleOutcome::FabricatedResponse { content } => Ok(EngineResult::Complete {
-                content,
-                usage,
-                iterations: 1,
-                traces: vec![],
-                tool_name: None,
-            }),
+            | CycleOutcome::FabricatedResponse { content } => {
+                Ok(EngineResult::complete(content, usage, 1))
+            }
             CycleOutcome::ToolsExecuted { .. } => {
                 // LLM wanted tools despite being given none — escalate
                 Ok(EngineResult::Escalate {
@@ -62,13 +58,7 @@ impl ExecutionEngine for DirectEngine {
                     usage,
                 })
             }
-            CycleOutcome::EmptyResponse => Ok(EngineResult::Complete {
-                content: String::new(),
-                usage,
-                iterations: 1,
-                traces: vec![],
-                tool_name: None,
-            }),
+            CycleOutcome::EmptyResponse => Ok(EngineResult::empty(usage, 1)),
         }
     }
 
@@ -80,117 +70,21 @@ impl ExecutionEngine for DirectEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use async_trait::async_trait;
-    use providers::{ChatParams, LlmProvider, LlmResponse, ToolCall, Usage};
-    use serde_json::Value;
-    use std::sync::Mutex;
-    use tokio::sync::RwLock;
-    use tools::registry::ToolRegistry;
+    use super::super::test_utils::*;
 
-    // ── Mock provider ────────────────────────────────────────────
-
-    struct MockDirectProvider {
-        responses: Mutex<Vec<LlmResponse>>,
+    fn make_engine(provider: providers::DynProvider) -> DirectEngine {
+        DirectEngine::new(make_core(provider))
     }
-
-    impl MockDirectProvider {
-        fn text(text: &str) -> Arc<Self> {
-            Arc::new(Self {
-                responses: Mutex::new(vec![LlmResponse {
-                    content: Some(text.to_string()),
-                    tool_calls: vec![],
-                    finish_reason: "stop".to_string(),
-                    usage: Usage::default(),
-                    reasoning_content: None,
-                }]),
-            })
-        }
-
-        fn with_tool_call() -> Arc<Self> {
-            Arc::new(Self {
-                responses: Mutex::new(vec![LlmResponse {
-                    content: None,
-                    tool_calls: vec![ToolCall {
-                        id: "call_1".to_string(),
-                        name: "web_search".to_string(),
-                        arguments: serde_json::json!({"q": "test"}),
-                    }],
-                    finish_reason: "tool_calls".to_string(),
-                    usage: Usage::default(),
-                    reasoning_content: None,
-                }]),
-            })
-        }
-
-        fn empty() -> Arc<Self> {
-            Arc::new(Self {
-                responses: Mutex::new(vec![LlmResponse {
-                    content: None,
-                    tool_calls: vec![],
-                    finish_reason: "stop".to_string(),
-                    usage: Usage::default(),
-                    reasoning_content: None,
-                }]),
-            })
-        }
-    }
-
-    #[async_trait]
-    impl LlmProvider for MockDirectProvider {
-        async fn chat(
-            &self,
-            _messages: &[Message],
-            _tools: Option<&[Value]>,
-            _params: &ChatParams,
-        ) -> Result<LlmResponse> {
-            let mut responses = self.responses.lock().unwrap();
-            if responses.is_empty() {
-                Ok(LlmResponse {
-                    content: Some("default".to_string()),
-                    tool_calls: vec![],
-                    finish_reason: "stop".to_string(),
-                    usage: Usage::default(),
-                    reasoning_content: None,
-                })
-            } else {
-                Ok(responses.remove(0))
-            }
-        }
-
-        fn default_model(&self) -> &str {
-            "mock"
-        }
-        fn name(&self) -> &str {
-            "mock"
-        }
-    }
-
-    // ── Helpers ──────────────────────────────────────────────────
-
-    fn make_engine(provider: Arc<MockDirectProvider>) -> DirectEngine {
-        let registry = Arc::new(RwLock::new(ToolRegistry::new()));
-        let core = Arc::new(ExecutionCore::new(
-            provider as providers::DynProvider,
-            registry,
-        ));
-        DirectEngine::new(core)
-    }
-
-    fn routing_ctx() -> RoutingContext {
-        RoutingContext::new("test".into(), "test".into())
-    }
-
-    // ── Tests ────────────────────────────────────────────────────
 
     #[tokio::test]
     async fn direct_returns_response() {
-        let engine = make_engine(MockDirectProvider::text("Hello! How can I help?"));
+        let engine = make_engine(MockSequenceProvider::text("Hello! How can I help?"));
 
         let result = engine
             .execute(
                 vec![Message::user("hi")],
                 &[],
-                &ExecutionParams::new("mock"),
+                &default_params(),
                 &routing_ctx(),
                 None,
             )
@@ -212,13 +106,13 @@ mod tests {
 
     #[tokio::test]
     async fn escalates_when_tool_calls_present() {
-        let engine = make_engine(MockDirectProvider::with_tool_call());
+        let engine = make_engine(MockSequenceProvider::with_tool_call("web_search"));
 
         let result = engine
             .execute(
                 vec![Message::user("search for Rust docs")],
                 &[],
-                &ExecutionParams::new("mock"),
+                &default_params(),
                 &routing_ctx(),
                 None,
             )
@@ -240,13 +134,13 @@ mod tests {
 
     #[tokio::test]
     async fn empty_response_handled() {
-        let engine = make_engine(MockDirectProvider::empty());
+        let engine = make_engine(MockSequenceProvider::empty());
 
         let result = engine
             .execute(
                 vec![Message::user("...")],
                 &[],
-                &ExecutionParams::new("mock"),
+                &default_params(),
                 &routing_ctx(),
                 None,
             )
@@ -263,12 +157,7 @@ mod tests {
 
     #[test]
     fn mode_returns_direct() {
-        let registry = Arc::new(RwLock::new(ToolRegistry::new()));
-        let core = Arc::new(ExecutionCore::new(
-            MockDirectProvider::text("") as providers::DynProvider,
-            registry,
-        ));
-        let engine = DirectEngine::new(core);
+        let engine = DirectEngine::new(make_core(MockSequenceProvider::text("")));
         assert_eq!(engine.mode(), "direct");
     }
 }

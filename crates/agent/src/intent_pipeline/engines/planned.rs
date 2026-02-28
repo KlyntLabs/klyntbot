@@ -136,13 +136,11 @@ impl PlannedEngine {
             .synthesize_response(&plan.description, &raw_output)
             .await;
 
-        Ok(EngineResult::Complete {
+        Ok(EngineResult::complete(
             content,
-            usage: Usage::default(),
-            iterations: plan.steps.len() as u32,
-            traces: vec![],
-            tool_name: None,
-        })
+            Usage::default(),
+            plan.steps.len() as u32,
+        ))
     }
 
     // ── Private helpers ──────────────────────────────────────────
@@ -185,13 +183,11 @@ impl PlannedEngine {
             .synthesize_response(&plan.description, &raw_output)
             .await;
 
-        Ok(EngineResult::Complete {
+        Ok(EngineResult::complete(
             content,
-            usage: Usage::default(),
-            iterations: plan.steps.len() as u32,
-            traces: vec![],
-            tool_name: None,
-        })
+            Usage::default(),
+            plan.steps.len() as u32,
+        ))
     }
 
     /// Build a Plan domain object in Approved state.
@@ -480,125 +476,25 @@ fn extract_last_user_message(messages: &[Message]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::test_utils::*;
     use crate::intent_pipeline::router::CompletedStep;
-    use async_trait::async_trait;
-    use providers::{ChatParams, LlmProvider, LlmResponse, Usage};
-    use serde_json::Value;
-    use std::sync::Mutex;
-    use tokio::sync::RwLock;
-    use tools::registry::ToolRegistry;
 
-    // ── Mock provider that returns step JSON then text responses ──
-
-    struct PlanningProvider {
-        responses: Mutex<Vec<LlmResponse>>,
+    /// Build a mock provider with plan step JSON + text follow-up responses.
+    fn planning_provider(step_json: &str) -> Arc<MockSequenceProvider> {
+        MockSequenceProvider::new(vec![
+            text_response(step_json),
+            text_response("Step 1 done"),
+            text_response("Step 2 done"),
+            text_response("Step 3 done"),
+        ])
     }
 
-    impl PlanningProvider {
-        /// First call returns plan steps JSON, subsequent calls return text.
-        fn with_steps(step_json: &str) -> Arc<Self> {
-            Arc::new(Self {
-                responses: Mutex::new(vec![
-                    // Plan generation call
-                    LlmResponse {
-                        content: Some(step_json.to_string()),
-                        tool_calls: vec![],
-                        finish_reason: "stop".to_string(),
-                        usage: Usage::default(),
-                        reasoning_content: None,
-                    },
-                    // Step execution calls — return text responses
-                    LlmResponse {
-                        content: Some("Step 1 done".to_string()),
-                        tool_calls: vec![],
-                        finish_reason: "stop".to_string(),
-                        usage: Usage::default(),
-                        reasoning_content: None,
-                    },
-                    LlmResponse {
-                        content: Some("Step 2 done".to_string()),
-                        tool_calls: vec![],
-                        finish_reason: "stop".to_string(),
-                        usage: Usage::default(),
-                        reasoning_content: None,
-                    },
-                    LlmResponse {
-                        content: Some("Step 3 done".to_string()),
-                        tool_calls: vec![],
-                        finish_reason: "stop".to_string(),
-                        usage: Usage::default(),
-                        reasoning_content: None,
-                    },
-                ]),
-            })
-        }
-
-        /// Returns empty plan (no steps) — triggers reactive fallback.
-        fn empty_plan() -> Arc<Self> {
-            Arc::new(Self {
-                responses: Mutex::new(vec![
-                    LlmResponse {
-                        content: Some("I cannot generate steps.".to_string()),
-                        tool_calls: vec![],
-                        finish_reason: "stop".to_string(),
-                        usage: Usage::default(),
-                        reasoning_content: None,
-                    },
-                    // Fallback reactive response
-                    LlmResponse {
-                        content: Some("Handled reactively".to_string()),
-                        tool_calls: vec![],
-                        finish_reason: "stop".to_string(),
-                        usage: Usage::default(),
-                        reasoning_content: None,
-                    },
-                ]),
-            })
-        }
-    }
-
-    #[async_trait]
-    impl LlmProvider for PlanningProvider {
-        async fn chat(
-            &self,
-            _messages: &[Message],
-            _tools: Option<&[Value]>,
-            _params: &ChatParams,
-        ) -> Result<LlmResponse> {
-            let mut responses = self.responses.lock().unwrap();
-            if responses.is_empty() {
-                Ok(LlmResponse {
-                    content: Some("fallback".to_string()),
-                    tool_calls: vec![],
-                    finish_reason: "stop".to_string(),
-                    usage: Usage::default(),
-                    reasoning_content: None,
-                })
-            } else {
-                Ok(responses.remove(0))
-            }
-        }
-
-        fn default_model(&self) -> &str {
-            "mock"
-        }
-        fn name(&self) -> &str {
-            "mock"
-        }
-    }
-
-    // ── Helpers ──────────────────────────────────────────────────
-
-    fn make_registry() -> Arc<RwLock<ToolRegistry>> {
-        Arc::new(RwLock::new(ToolRegistry::new()))
-    }
-
-    fn routing_ctx() -> RoutingContext {
-        RoutingContext::new("test".into(), "test".into())
-    }
-
-    fn default_params() -> ExecutionParams {
-        ExecutionParams::new("mock")
+    /// Build a mock provider that returns invalid plan JSON, triggering reactive fallback.
+    fn empty_plan_provider() -> Arc<MockSequenceProvider> {
+        MockSequenceProvider::new(vec![
+            text_response("I cannot generate steps."),
+            text_response("Handled reactively"),
+        ])
     }
 
     fn step_json() -> &'static str {
@@ -612,7 +508,7 @@ mod tests {
 
     #[tokio::test]
     async fn planned_generates_and_executes() {
-        let provider = PlanningProvider::with_steps(step_json());
+        let provider = planning_provider(step_json());
         let pool = storage::StoragePool::connect_in_memory().await.unwrap();
         let plan_repo = storage::PlanRepo::new(pool.inner().clone());
 
@@ -652,7 +548,7 @@ mod tests {
 
     #[tokio::test]
     async fn planned_accepts_escalation_context() {
-        let provider = PlanningProvider::with_steps(step_json());
+        let provider = planning_provider(step_json());
         let pool = storage::StoragePool::connect_in_memory().await.unwrap();
         let plan_repo = storage::PlanRepo::new(pool.inner().clone());
 
@@ -700,7 +596,7 @@ mod tests {
 
     #[tokio::test]
     async fn planned_falls_back_on_empty_steps() {
-        let provider = PlanningProvider::empty_plan();
+        let provider = empty_plan_provider();
         let pool = storage::StoragePool::connect_in_memory().await.unwrap();
         let plan_repo = storage::PlanRepo::new(pool.inner().clone());
 
@@ -743,9 +639,8 @@ mod tests {
 
     #[test]
     fn mode_returns_planned() {
-        let provider: DynProvider = PlanningProvider::with_steps("[]");
-        let registry = make_registry();
-        let core = Arc::new(ExecutionCore::new(provider.clone(), registry));
+        let provider: DynProvider = MockSequenceProvider::new(vec![]);
+        let core = Arc::new(ExecutionCore::new(provider.clone(), make_registry()));
         // We can't create PlanRepo without a pool in a sync test,
         // but we can test mode() since it doesn't touch the repo
         // Use a dummy by constructing manually

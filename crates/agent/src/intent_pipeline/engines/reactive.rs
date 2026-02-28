@@ -251,55 +251,11 @@ impl ExecutionEngine for ReactiveEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::test_utils::*;
     use async_trait::async_trait;
-    use providers::{ChatParams, LlmProvider, LlmResponse, ToolCall, Usage};
     use serde_json::Value;
-    use std::sync::Mutex;
-    use std::time::Duration;
     use tokio::sync::RwLock;
     use tools::{registry::ToolRegistry, Tool};
-
-    struct SequenceProvider {
-        responses: Mutex<Vec<LlmResponse>>,
-    }
-
-    impl SequenceProvider {
-        fn new(responses: Vec<LlmResponse>) -> Arc<Self> {
-            Arc::new(Self {
-                responses: Mutex::new(responses),
-            })
-        }
-    }
-
-    #[async_trait]
-    impl LlmProvider for SequenceProvider {
-        async fn chat(
-            &self,
-            _messages: &[Message],
-            _tools: Option<&[Value]>,
-            _params: &ChatParams,
-        ) -> Result<LlmResponse> {
-            let mut responses = self.responses.lock().unwrap();
-            if responses.is_empty() {
-                Ok(LlmResponse {
-                    content: Some("fallback response".to_string()),
-                    tool_calls: vec![],
-                    finish_reason: "stop".to_string(),
-                    usage: Usage::default(),
-                    reasoning_content: None,
-                })
-            } else {
-                Ok(responses.remove(0))
-            }
-        }
-
-        fn default_model(&self) -> &str {
-            "mock"
-        }
-        fn name(&self) -> &str {
-            "mock"
-        }
-    }
 
     struct OkTool;
 
@@ -319,51 +275,19 @@ mod tests {
         }
     }
 
-    fn make_tool_call_response(tool_name: &str) -> LlmResponse {
-        LlmResponse {
-            content: None,
-            tool_calls: vec![ToolCall {
-                id: "call_1".to_string(),
-                name: tool_name.to_string(),
-                arguments: serde_json::json!({}),
-            }],
-            finish_reason: "tool_calls".to_string(),
-            usage: Usage::default(),
-            reasoning_content: None,
-        }
-    }
-
-    fn make_text_response(text: &str) -> LlmResponse {
-        LlmResponse {
-            content: Some(text.to_string()),
-            tool_calls: vec![],
-            finish_reason: "stop".to_string(),
-            usage: Usage::default(),
-            reasoning_content: None,
-        }
-    }
-
-    fn make_registry() -> Arc<RwLock<ToolRegistry>> {
+    fn registry_with_ok_tool() -> Arc<RwLock<ToolRegistry>> {
         let mut reg = ToolRegistry::new();
         reg.register(OkTool);
         Arc::new(RwLock::new(reg))
     }
 
-    fn routing_ctx() -> RoutingContext {
-        RoutingContext::new("test".into(), "test".into())
-    }
-
-    fn default_params() -> ExecutionParams {
-        ExecutionParams::new("mock").with_timeout(Duration::from_secs(5))
-    }
-
     #[tokio::test]
     async fn reactive_completes_simple_tool_use() {
-        let provider = SequenceProvider::new(vec![
-            make_tool_call_response("ok_tool"),
-            make_text_response("Done!"),
+        let provider = MockSequenceProvider::new(vec![
+            tool_call_response("ok_tool"),
+            text_response("Done!"),
         ]);
-        let core = Arc::new(ExecutionCore::new(provider, make_registry()));
+        let core = Arc::new(ExecutionCore::new(provider, registry_with_ok_tool()));
         let engine = ReactiveEngine::new(core, 10);
 
         let result = engine
@@ -393,11 +317,9 @@ mod tests {
     #[tokio::test]
     async fn reactive_escalates_on_complexity() {
         // With max_iterations=5, escalation at ceil(4.0) = 4
-        let responses: Vec<LlmResponse> = (0..10)
-            .map(|_| make_tool_call_response("ok_tool"))
-            .collect();
-        let provider = SequenceProvider::new(responses);
-        let core = Arc::new(ExecutionCore::new(provider, make_registry()));
+        let responses: Vec<_> = (0..10).map(|_| tool_call_response("ok_tool")).collect();
+        let provider = MockSequenceProvider::new(responses);
+        let core = Arc::new(ExecutionCore::new(provider, registry_with_ok_tool()));
         let engine = ReactiveEngine::new(core, 5);
 
         let result = engine
@@ -426,13 +348,12 @@ mod tests {
 
     #[tokio::test]
     async fn completed_work_tracks_successful_tools() {
-        // 2 tool calls then final response
-        let provider = SequenceProvider::new(vec![
-            make_tool_call_response("ok_tool"),
-            make_tool_call_response("ok_tool"),
-            make_text_response("All done"),
+        let provider = MockSequenceProvider::new(vec![
+            tool_call_response("ok_tool"),
+            tool_call_response("ok_tool"),
+            text_response("All done"),
         ]);
-        let core = Arc::new(ExecutionCore::new(provider, make_registry()));
+        let core = Arc::new(ExecutionCore::new(provider, registry_with_ok_tool()));
         let engine = ReactiveEngine::new(core, 10);
 
         let result = engine
@@ -446,7 +367,6 @@ mod tests {
             .await
             .unwrap();
 
-        // The engine completed, but we can verify the traces show tool execution
         match result {
             EngineResult::Complete { traces, .. } => {
                 assert_eq!(traces.len(), 3); // 2 tools + final
@@ -459,12 +379,7 @@ mod tests {
 
     #[test]
     fn mode_returns_reactive() {
-        let registry = Arc::new(RwLock::new(ToolRegistry::new()));
-        let core = Arc::new(ExecutionCore::new(
-            SequenceProvider::new(vec![]) as providers::DynProvider,
-            registry,
-        ));
-        let engine = ReactiveEngine::new(core, 10);
+        let engine = ReactiveEngine::new(make_core(MockSequenceProvider::new(vec![])), 10);
         assert_eq!(engine.mode(), "reactive");
     }
 }
