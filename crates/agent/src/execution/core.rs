@@ -257,6 +257,11 @@ impl ExecutionCore {
             // Execute all tools in parallel, each with a timeout.
             // ToolStart/ToolEnd events are emitted inside each future so
             // the spinner updates in real-time as tools run.
+
+            // Create entity card channel for this batch of tool calls
+            let (entity_tx, mut entity_rx) =
+                tokio::sync::mpsc::channel::<common::EntityCard>(16);
+
             let futures: Vec<_> = response
                 .tool_calls
                 .iter()
@@ -264,7 +269,8 @@ impl ExecutionCore {
                     let registry = self.tool_registry.clone();
                     let name = tc.name.clone();
                     let args = tc.arguments.clone();
-                    let ctx = routing_ctx.clone();
+                    let mut ctx = routing_ctx.clone();
+                    ctx.entity_tx = Some(entity_tx.clone());
                     let id = tc.id.clone();
                     let timeout_dur = params.tool_timeout;
                     let tx = event_tx.cloned();
@@ -334,7 +340,18 @@ impl ExecutionCore {
                 })
                 .collect();
 
+            drop(entity_tx);
+
             let results = join_all(futures).await;
+
+            // Emit EntityCreated events for any entities tools created
+            if let Some(tx) = event_tx {
+                while let Ok(card) = entity_rx.try_recv() {
+                    let _ = tx
+                        .send(crate::events::AgentEvent::EntityCreated(card))
+                        .await;
+                }
+            }
 
             // Append tool result messages
             for r in &results {
