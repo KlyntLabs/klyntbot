@@ -279,14 +279,28 @@ async fn on_client_text(
                                 );
                                 Some(serde_json::Value::Object(m))
                             };
-                            let _ = repos
+                            match repos
                                 .sessions
                                 .update_last_assistant_metadata(
                                     &sk,
                                     tc.as_ref(),
                                     metadata.as_ref(),
                                 )
-                                .await;
+                                .await
+                            {
+                                Ok(updated) => {
+                                    tracing::debug!(
+                                        "Metadata persist for {}: updated={}",
+                                        sk, updated
+                                    );
+                                }
+                                Err(e) => {
+                                    tracing::warn!(
+                                        "Metadata persist FAILED for {}: {}",
+                                        sk, e
+                                    );
+                                }
+                            }
                         }
 
                         // Notify main loop that streaming is complete.
