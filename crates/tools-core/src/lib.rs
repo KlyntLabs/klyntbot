@@ -56,6 +56,9 @@ pub struct RoutingContext {
     /// (CLI or dashboard WebSocket), so the `message` tool should return
     /// content inline rather than publishing to the bus.
     pub is_direct_mode: bool,
+    /// Channel for tools to emit entity cards (e.g., after creating a task).
+    /// The execution layer drains this and emits AgentEvent::EntityCreated.
+    pub entity_tx: Option<mpsc::Sender<common::EntityCard>>,
 }
 
 impl RoutingContext {
@@ -66,6 +69,7 @@ impl RoutingContext {
             chat_id,
             interaction_tx: None,
             is_direct_mode: false,
+            entity_tx: None,
         }
     }
 
@@ -80,6 +84,7 @@ impl RoutingContext {
             chat_id,
             interaction_tx: Some(interaction_tx),
             is_direct_mode: true,
+            entity_tx: None,
         }
     }
 }
