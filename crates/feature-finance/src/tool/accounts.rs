@@ -19,10 +19,10 @@ impl FinanceTool {
         &self,
         action: &str,
         p: &ParamExtractor<'_>,
-        _ctx: &RoutingContext,
+        ctx: &RoutingContext,
     ) -> Result<String> {
         match action {
-            "account_add" => self.account_add(p).await,
+            "account_add" => self.account_add(p, ctx).await,
             "account_list" => self.account_list(p).await,
             "account_update" => self.account_update(p).await,
             "account_delete" => self.account_delete(p).await,
@@ -32,7 +32,7 @@ impl FinanceTool {
         }
     }
 
-    async fn account_add(&self, p: &ParamExtractor<'_>) -> Result<String> {
+    async fn account_add(&self, p: &ParamExtractor<'_>, ctx: &RoutingContext) -> Result<String> {
         let name = p.required_str("name")?;
         if name.is_empty() {
             return Err(ToolError::InvalidParams("Account name is required".to_string()).into());
@@ -80,6 +80,25 @@ impl FinanceTool {
             .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
 
         let account = FinanceAccount::from(inserted);
+
+        if let Some(ref tx) = ctx.entity_tx {
+            let _ = tx
+                .send(common::EntityCard {
+                    entity_type: "finance_account".to_string(),
+                    entity_id: account.id.clone(),
+                    title: account.name.clone(),
+                    subtitle: Some(format!(
+                        "{} · {}",
+                        account.account_type.as_str(),
+                        account.currency
+                    )),
+                    route: Some("/finance".to_string()),
+                    icon_hint: "dollar".to_string(),
+                    metadata: std::collections::HashMap::new(),
+                })
+                .await;
+        }
+
         let result = json!({
             "id": account.id,
             "name": account.name,
