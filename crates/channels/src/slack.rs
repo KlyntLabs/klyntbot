@@ -463,10 +463,8 @@ impl SlackChannel {
                 (key, value)
             };
 
-            if let Some((_, pending)) = self.pending_interactions.remove(&key) {
-                if let PendingCallback::Single(tx) = pending {
-                    let _ = tx.send(value);
-                }
+            if let Some((_, PendingCallback::Single(tx))) = self.pending_interactions.remove(&key) {
+                let _ = tx.send(value);
             }
         }
     }

@@ -21,9 +21,8 @@
 use std::sync::Arc;
 use tools::conversation_embedding::ConversationEmbeddingHandler;
 
-#[path = "mock_conversation_embedding_handler.rs"]
-mod mock_conversation_embedding_handler;
-use mock_conversation_embedding_handler::MockConversationEmbeddingHandler;
+mod common;
+use common::MockConversationEmbeddingHandler;
 
 // ═══════════════════════════════════════════════════════════════
 // Embedding Generation Tests (TC-1, TC-2, TC-3, TC-4)

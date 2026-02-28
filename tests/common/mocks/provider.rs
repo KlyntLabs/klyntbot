@@ -14,7 +14,6 @@ pub struct MockProvider {
 
 impl MockProvider {
     /// Create a new mock provider with a simple text response
-    #[allow(dead_code)]
     pub fn new(response: &str) -> Self {
         Self::with_responses(vec![LlmResponse {
             content: Some(response.to_string()),
@@ -34,7 +33,6 @@ impl MockProvider {
     }
 
     /// Create a mock provider that returns a tool call
-    #[allow(dead_code)]
     pub fn with_tool_call(tool_name: &str, tool_args: serde_json::Value) -> Self {
         Self::with_responses(vec![LlmResponse {
             content: None,
@@ -50,17 +48,8 @@ impl MockProvider {
     }
 
     /// Get the number of times the provider was called
-    #[allow(dead_code)]
     pub fn call_count(&self) -> usize {
         *self.call_count.lock().unwrap()
-    }
-
-    /// Get the last messages sent to the provider
-    #[allow(dead_code)]
-    pub fn last_messages(&self) -> Option<Vec<Message>> {
-        // In a real implementation, we'd store the messages
-        // For now, this is a placeholder
-        None
     }
 }
 
@@ -90,13 +79,11 @@ impl LlmProvider for MockProvider {
 }
 
 /// Mock provider that always returns an error
-#[allow(dead_code)]
 pub struct ErrorProvider {
     error_message: String,
 }
 
 impl ErrorProvider {
-    #[allow(dead_code)]
     pub fn new(error_message: &str) -> Self {
         Self {
             error_message: error_message.to_string(),

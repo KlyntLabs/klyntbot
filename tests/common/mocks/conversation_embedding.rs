@@ -2,14 +2,10 @@
 //!
 //! Provides a controllable mock following the 3-mode pattern from Sprint 5.
 //! Avoids loading the 420MB fastembed model in tests.
-//!
-//! ## Mock Modes
-//!   1. `new()` — available, returns deterministic embeddings based on text hash
-//!   2. `unavailable()` — simulates model not loaded / download failure
 
+use super::embedding_utils::{cosine_similarity, deterministic_embedding};
 use async_trait::async_trait;
 use chrono::Utc;
-use common::Result;
 use std::collections::HashMap;
 use std::sync::Mutex;
 use tools::conversation_embedding::{
@@ -17,13 +13,8 @@ use tools::conversation_embedding::{
     PurgeFilter,
 };
 
-#[path = "test_utils/embedding.rs"]
-mod embedding_utils;
-use embedding_utils::{cosine_similarity, deterministic_embedding};
-
 /// Record of an embed_message call for test assertions
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct EmbedCallRecord {
     pub session_key: String,
     pub role: String,
@@ -71,25 +62,21 @@ impl MockConversationEmbeddingHandler {
     }
 
     /// Generate a deterministic 384-dim embedding from text.
-    /// Delegates to `test_utils::embedding::deterministic_embedding`.
     pub fn deterministic_embedding(text: &str) -> Vec<f32> {
         deterministic_embedding(text)
     }
 
     /// Get the number of embed_message calls made.
-    #[allow(dead_code)]
     pub fn embed_message_call_count(&self) -> usize {
         self.embed_message_calls.lock().unwrap().len()
     }
 
     /// Get the number of search calls made.
-    #[allow(dead_code)]
     pub fn search_call_count(&self) -> usize {
         self.search_calls.lock().unwrap().len()
     }
 
     /// Get the embed_message call records for detailed assertions.
-    #[allow(dead_code)]
     pub fn embed_message_calls(&self) -> Vec<EmbedCallRecord> {
         self.embed_message_calls.lock().unwrap().clone()
     }
@@ -103,8 +90,7 @@ impl ConversationEmbeddingHandler for MockConversationEmbeddingHandler {
         role: &str,
         content: &str,
         message_id: &str,
-    ) -> Result<()> {
-        // Track the call
+    ) -> ::common::Result<()> {
         self.embed_message_calls
             .lock()
             .unwrap()
@@ -116,15 +102,12 @@ impl ConversationEmbeddingHandler for MockConversationEmbeddingHandler {
             });
 
         if !self.available {
-            // Unavailable mode: return Ok(()) to simulate best-effort embedding
             return Ok(());
         }
 
-        // Compose text with role prefix (same as real impl)
         let text = format!("{}: {}", role, content);
         let embedding = Self::deterministic_embedding(&text);
 
-        // Store in-memory
         self.embeddings
             .lock()
             .unwrap()
@@ -138,18 +121,16 @@ impl ConversationEmbeddingHandler for MockConversationEmbeddingHandler {
         query: &str,
         limit: usize,
         threshold: f64,
-    ) -> Result<Vec<(ConversationEmbeddingRecord, f64)>> {
-        // Track the call
+    ) -> ::common::Result<Vec<(ConversationEmbeddingRecord, f64)>> {
         self.search_calls.lock().unwrap().push(query.to_string());
 
         if !self.available {
-            return Err(common::ToolError::ExecutionFailed(
+            return Err(::common::ToolError::ExecutionFailed(
                 "Mock conversation embedding handler unavailable".to_string(),
             )
             .into());
         }
 
-        // Search in-memory embeddings
         let embeddings = self.embeddings.lock().unwrap();
         let query_embedding = Self::deterministic_embedding(query);
 
@@ -178,13 +159,14 @@ impl ConversationEmbeddingHandler for MockConversationEmbeddingHandler {
         Ok(results)
     }
 
-    async fn purge(&self, _filter: PurgeFilter) -> Result<usize> {
-        let count = self.embeddings.lock().unwrap().len();
-        self.embeddings.lock().unwrap().clear();
+    async fn purge(&self, _filter: PurgeFilter) -> ::common::Result<usize> {
+        let mut guard = self.embeddings.lock().unwrap();
+        let count = guard.len();
+        guard.clear();
         Ok(count)
     }
 
-    async fn status(&self) -> Result<ConversationEmbeddingStatus> {
+    async fn status(&self) -> ::common::Result<ConversationEmbeddingStatus> {
         let calls = self.embed_message_calls.lock().unwrap();
         let mut channels: Vec<String> = calls
             .iter()

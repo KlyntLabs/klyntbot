@@ -13,13 +13,17 @@ use context_engine::source::{ContextSource, SourceContext};
 pub struct IdentitySource {
     workspace: PathBuf,
     timezone: String,
+    /// Pre-parsed timezone — avoids re-parsing on every `provide()` call.
+    parsed_tz: Option<chrono_tz::Tz>,
 }
 
 impl IdentitySource {
     pub fn new(workspace: PathBuf, timezone: String) -> Self {
+        let parsed_tz = timezone.parse::<chrono_tz::Tz>().ok();
         Self {
             workspace,
             timezone,
+            parsed_tz,
         }
     }
 }
@@ -37,7 +41,7 @@ impl ContextSource for IdentitySource {
     async fn provide(&self, ctx: &SourceContext) -> Option<String> {
         let now = Utc::now();
 
-        let date_str = if let Ok(tz) = self.timezone.parse::<chrono_tz::Tz>() {
+        let date_str = if let Some(tz) = self.parsed_tz {
             let local = now.with_timezone(&tz);
             let utc_offset = common::utils::date::timezone_utc_offset(&self.timezone);
             format!(

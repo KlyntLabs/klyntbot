@@ -6,7 +6,7 @@ use std::sync::Arc;
 use tempfile::TempDir;
 
 mod common;
-use common::mock_provider::{ErrorProvider, MockProvider};
+use common::{ErrorProvider, MockProvider};
 
 /// Helper: build an AgentLoop with default test configuration.
 async fn build_test_agent(
@@ -27,22 +27,12 @@ async fn build_test_agent(
 #[tokio::test]
 async fn test_agent_loop_basic_processing() {
     let temp_dir = TempDir::new().unwrap();
-    std::env::set_var("HOME", temp_dir.path());
-
     let bus = Arc::new(MessageBus::new(10));
     let provider = Arc::new(MockProvider::new("Hello! How can I help you?"));
-
-    let mut config = Config::default();
-    config.agents.defaults.workspace = temp_dir
-        .path()
-        .join("workspace")
-        .to_str()
-        .unwrap()
-        .to_string();
+    let config = common::test_config(&temp_dir);
 
     let agent_loop = build_test_agent(bus, provider.clone(), config).await;
 
-    // Process a direct message
     let response = agent_loop
         .process_direct("Hi there!".to_string(), "test:session1".to_string())
         .await
@@ -56,9 +46,6 @@ async fn test_agent_loop_basic_processing() {
 #[tokio::test]
 async fn test_agent_loop_with_tool_execution() {
     let temp_dir = TempDir::new().unwrap();
-    std::env::set_var("HOME", temp_dir.path());
-
-    // Create a test file for the read_file tool
     let workspace = temp_dir.path().join("workspace");
     std::fs::create_dir_all(&workspace).unwrap();
     let test_file = workspace.join("test.txt");
@@ -66,36 +53,15 @@ async fn test_agent_loop_with_tool_execution() {
 
     let bus = Arc::new(MessageBus::new(10));
 
-    // First response: tool call to read_file
-    // Second response: final answer with file contents
-    let tool_call_response = klyntbot::providers::types::LlmResponse {
-        content: None,
-        tool_calls: vec![klyntbot::providers::types::ToolCall {
-            id: "call_1".to_string(),
-            name: "read_file".to_string(),
-            arguments: serde_json::json!({
-                "path": test_file.to_str().unwrap()
-            }),
-        }],
-        finish_reason: "tool_calls".to_string(),
-        usage: klyntbot::providers::types::Usage::default(),
-        reasoning_content: None,
-    };
-
-    let final_response = klyntbot::providers::types::LlmResponse {
-        content: Some("The file contains: File contents here".to_string()),
-        tool_calls: vec![],
-        finish_reason: "stop".to_string(),
-        usage: klyntbot::providers::types::Usage::default(),
-        reasoning_content: None,
-    };
-
     let provider = Arc::new(MockProvider::with_responses(vec![
-        tool_call_response,
-        final_response,
+        common::tool_call_response(
+            "read_file",
+            serde_json::json!({ "path": test_file.to_str().unwrap() }),
+        ),
+        common::text_response("The file contains: File contents here"),
     ]));
 
-    let mut config = Config::default();
+    let mut config = common::test_config(&temp_dir);
     config.agents.defaults.workspace = workspace.to_str().unwrap().to_string();
 
     let agent_loop = build_test_agent(bus, provider.clone(), config).await;
@@ -106,7 +72,6 @@ async fn test_agent_loop_with_tool_execution() {
         .unwrap();
 
     assert!(response.contains("File contents here"));
-    // Should have called the provider twice (once for tool call, once for final response)
     assert_eq!(provider.call_count(), 2);
 }
 
@@ -114,90 +79,44 @@ async fn test_agent_loop_with_tool_execution() {
 #[tokio::test]
 async fn test_agent_loop_max_iterations() {
     let temp_dir = TempDir::new().unwrap();
-    std::env::set_var("HOME", temp_dir.path());
-
     let bus = Arc::new(MessageBus::new(10));
 
-    // Create a provider that always returns tool calls (infinite loop scenario)
-    let looping_response = klyntbot::providers::types::LlmResponse {
-        content: None,
-        tool_calls: vec![klyntbot::providers::types::ToolCall {
-            id: "call_loop".to_string(),
-            name: "nonexistent_tool".to_string(),
-            arguments: serde_json::json!({}),
-        }],
-        finish_reason: "tool_calls".to_string(),
-        usage: klyntbot::providers::types::Usage::default(),
-        reasoning_content: None,
-    };
+    let provider = Arc::new(MockProvider::with_responses(vec![
+        common::tool_call_response("nonexistent_tool", serde_json::json!({})),
+    ]));
 
-    let provider = Arc::new(MockProvider::with_responses(vec![looping_response]));
-
-    let mut config = Config::default();
-    config.agents.defaults.workspace = temp_dir
-        .path()
-        .join("workspace")
-        .to_str()
-        .unwrap()
-        .to_string();
+    let mut config = common::test_config(&temp_dir);
     config.agents.defaults.max_tool_iterations = 3;
 
     let agent_loop = build_test_agent(bus, provider.clone(), config).await;
 
-    // This should hit max iterations and return an error or stop
     let result = agent_loop
         .process_direct("Start loop".to_string(), "test:session3".to_string())
         .await;
 
-    // The agent loop should handle max iterations gracefully
-    // Either return an error or a response indicating max iterations reached
-    assert!(result.is_ok() || result.is_err());
+    // The agent loop should handle max iterations gracefully —
+    // either return a stop message or an error.
+    assert!(
+        result.is_ok() || result.unwrap_err().to_string().contains("iteration"),
+        "max iterations should terminate gracefully"
+    );
 }
 
 /// Test error handling during tool execution
 #[tokio::test]
 async fn test_agent_loop_tool_error_handling() {
     let temp_dir = TempDir::new().unwrap();
-    std::env::set_var("HOME", temp_dir.path());
-
     let bus = Arc::new(MessageBus::new(10));
 
-    // Tool call that will fail (trying to read non-existent file)
-    let tool_call_response = klyntbot::providers::types::LlmResponse {
-        content: None,
-        tool_calls: vec![klyntbot::providers::types::ToolCall {
-            id: "call_error".to_string(),
-            name: "read_file".to_string(),
-            arguments: serde_json::json!({
-                "path": "/nonexistent/file.txt"
-            }),
-        }],
-        finish_reason: "tool_calls".to_string(),
-        usage: klyntbot::providers::types::Usage::default(),
-        reasoning_content: None,
-    };
-
-    // Recovery response after tool error
-    let recovery_response = klyntbot::providers::types::LlmResponse {
-        content: Some("I couldn't read that file. It doesn't exist.".to_string()),
-        tool_calls: vec![],
-        finish_reason: "stop".to_string(),
-        usage: klyntbot::providers::types::Usage::default(),
-        reasoning_content: None,
-    };
-
     let provider = Arc::new(MockProvider::with_responses(vec![
-        tool_call_response,
-        recovery_response,
+        common::tool_call_response(
+            "read_file",
+            serde_json::json!({ "path": "/nonexistent/file.txt" }),
+        ),
+        common::text_response("I couldn't read that file. It doesn't exist."),
     ]));
 
-    let mut config = Config::default();
-    config.agents.defaults.workspace = temp_dir
-        .path()
-        .join("workspace")
-        .to_str()
-        .unwrap()
-        .to_string();
+    let config = common::test_config(&temp_dir);
 
     let agent_loop = build_test_agent(bus, provider.clone(), config).await;
 
@@ -209,7 +128,6 @@ async fn test_agent_loop_tool_error_handling() {
         .await
         .unwrap();
 
-    // Should handle the error gracefully
     assert!(response.contains("couldn't") || response.contains("error"));
 }
 
@@ -217,43 +135,25 @@ async fn test_agent_loop_tool_error_handling() {
 #[tokio::test]
 async fn test_agent_loop_session_persistence() {
     let temp_dir = TempDir::new().unwrap();
-    std::env::set_var("HOME", temp_dir.path());
 
-    let provider = Arc::new(MockProvider::with_responses(vec![
-        klyntbot::providers::types::LlmResponse {
-            content: Some("I remember you said hello!".to_string()),
-            tool_calls: vec![],
-            finish_reason: "stop".to_string(),
-            usage: klyntbot::providers::types::Usage::default(),
-            reasoning_content: None,
-        },
-    ]));
+    let provider = Arc::new(MockProvider::with_responses(vec![common::text_response(
+        "I remember you said hello!",
+    )]));
 
-    let mut config = Config::default();
-    config.agents.defaults.workspace = temp_dir
-        .path()
-        .join("workspace")
-        .to_str()
-        .unwrap()
-        .to_string();
+    let config = common::test_config(&temp_dir);
 
-    // First agent loop
     {
         let bus = Arc::new(MessageBus::new(10));
         let agent_loop = build_test_agent(bus, provider.clone(), config.clone()).await;
-
-        // First message
         let _ = agent_loop
             .process_direct("Hello!".to_string(), "test:session5".to_string())
             .await
             .unwrap();
     }
 
-    // Create a new agent loop with a new bus (simulating restart)
     let bus2 = Arc::new(MessageBus::new(10));
     let agent_loop2 = build_test_agent(bus2, provider.clone(), config).await;
 
-    // Second message - should have access to session history
     let response = agent_loop2
         .process_direct("What did I say?".to_string(), "test:session5".to_string())
         .await
@@ -266,18 +166,9 @@ async fn test_agent_loop_session_persistence() {
 #[tokio::test]
 async fn test_streaming_emits_done() {
     let temp_dir = TempDir::new().unwrap();
-    std::env::set_var("HOME", temp_dir.path());
-
     let bus = Arc::new(MessageBus::new(10));
     let provider = Arc::new(MockProvider::new("streaming response"));
-
-    let mut config = Config::default();
-    config.agents.defaults.workspace = temp_dir
-        .path()
-        .join("workspace")
-        .to_str()
-        .unwrap()
-        .to_string();
+    let config = common::test_config(&temp_dir);
 
     let agent_loop = Arc::new(build_test_agent(bus, provider, config).await);
 
@@ -289,7 +180,6 @@ async fn test_streaming_emits_done() {
     let mut event_rx = streaming_handle.event_rx;
     let handle = streaming_handle.handle;
 
-    // Collect all events
     let mut got_content = false;
     let mut got_done = false;
     let mut done_content = String::new();
@@ -317,18 +207,9 @@ async fn test_streaming_emits_done() {
 #[tokio::test]
 async fn test_streaming_emits_error_on_failure() {
     let temp_dir = TempDir::new().unwrap();
-    std::env::set_var("HOME", temp_dir.path());
-
     let bus = Arc::new(MessageBus::new(10));
     let provider = Arc::new(ErrorProvider::new("provider crashed"));
-
-    let mut config = Config::default();
-    config.agents.defaults.workspace = temp_dir
-        .path()
-        .join("workspace")
-        .to_str()
-        .unwrap()
-        .to_string();
+    let config = common::test_config(&temp_dir);
 
     let agent_loop = Arc::new(build_test_agent(bus, provider, config).await);
 
@@ -340,7 +221,6 @@ async fn test_streaming_emits_error_on_failure() {
     let mut event_rx = streaming_handle.event_rx;
     let handle = streaming_handle.handle;
 
-    // Collect events — expect an Error event
     let mut got_error = false;
     while let Some(event) = event_rx.recv().await {
         match event {

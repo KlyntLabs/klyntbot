@@ -6,19 +6,15 @@
 //!   2. `unavailable()` — simulates model not loaded / download failure
 //!   3. `with_embeddings(map)` — returns pre-loaded embeddings for specific IDs
 
+use super::embedding_utils::deterministic_embedding;
 use async_trait::async_trait;
 use chrono::Utc;
-use common::Result;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tokio::sync::RwLock;
 use tools::embedding_engine::EmbeddingHandler;
 use tools::embedding_store::{EmbeddingRecord, EmbeddingStore};
 use tools::todo_types::Todo;
-
-#[path = "test_utils/embedding.rs"]
-mod embedding_utils;
-use embedding_utils::deterministic_embedding;
 
 /// Mock embedding handler for testing semantic search without the real model.
 pub struct MockEmbeddingHandler {
@@ -52,7 +48,6 @@ impl MockEmbeddingHandler {
     }
 
     /// Create an available mock backed by an EmbeddingStore (persists embeddings).
-    #[allow(dead_code)]
     pub fn with_store(store: Arc<RwLock<EmbeddingStore>>) -> Self {
         Self {
             embeddings: Mutex::new(HashMap::new()),
@@ -64,7 +59,6 @@ impl MockEmbeddingHandler {
     }
 
     /// Create a mock that reports as unavailable (simulates model download failure).
-    #[allow(dead_code)]
     pub fn unavailable() -> Self {
         Self {
             embeddings: Mutex::new(HashMap::new()),
@@ -76,7 +70,6 @@ impl MockEmbeddingHandler {
     }
 
     /// Create a mock with pre-loaded embeddings for specific todo IDs.
-    #[allow(dead_code)]
     pub fn with_embeddings(map: HashMap<String, Vec<f32>>) -> Self {
         Self {
             embeddings: Mutex::new(map),
@@ -88,19 +81,16 @@ impl MockEmbeddingHandler {
     }
 
     /// Generate a deterministic 384-dim embedding from text.
-    /// Delegates to `test_utils::embedding::deterministic_embedding`.
     pub fn deterministic_embedding(text: &str) -> Vec<f32> {
         deterministic_embedding(text)
     }
 
     /// Get the number of embed_todo calls made.
-    #[allow(dead_code)]
     pub fn embed_todo_call_count(&self) -> usize {
         self.embed_todo_calls.lock().unwrap().len()
     }
 
     /// Get the number of embed_query calls made.
-    #[allow(dead_code)]
     pub fn embed_query_call_count(&self) -> usize {
         self.embed_query_calls.lock().unwrap().len()
     }
@@ -108,14 +98,13 @@ impl MockEmbeddingHandler {
 
 #[async_trait]
 impl EmbeddingHandler for MockEmbeddingHandler {
-    async fn embed_todo(&self, todo: &Todo) -> Result<Option<EmbeddingRecord>> {
+    async fn embed_todo(&self, todo: &Todo) -> ::common::Result<Option<EmbeddingRecord>> {
         self.embed_todo_calls.lock().unwrap().push(todo.id.clone());
 
         if !self.available {
             return Ok(None);
         }
 
-        // Compose text the same way the real engine does: title + description + tags
         let text = format!(
             "{} {} {}",
             todo.title,
@@ -124,7 +113,6 @@ impl EmbeddingHandler for MockEmbeddingHandler {
         );
         let embedding = Self::deterministic_embedding(&text);
 
-        // Store for later retrieval (in-memory)
         self.embeddings
             .lock()
             .unwrap()
@@ -137,7 +125,6 @@ impl EmbeddingHandler for MockEmbeddingHandler {
             embedded_at: Utc::now(),
         };
 
-        // Persist to EmbeddingStore if available (mirrors real EmbeddingEngineImpl)
         if let Some(ref store) = self.store {
             let mut store = store.write().await;
             store.upsert(record.clone()).await?;
@@ -146,14 +133,14 @@ impl EmbeddingHandler for MockEmbeddingHandler {
         Ok(Some(record))
     }
 
-    async fn embed_query(&self, query: &str) -> Result<Vec<f32>> {
+    async fn embed_query(&self, query: &str) -> ::common::Result<Vec<f32>> {
         self.embed_query_calls
             .lock()
             .unwrap()
             .push(query.to_string());
 
         if !self.available {
-            return Err(common::ToolError::ExecutionFailed(
+            return Err(::common::ToolError::ExecutionFailed(
                 "Mock embedding handler unavailable".to_string(),
             )
             .into());

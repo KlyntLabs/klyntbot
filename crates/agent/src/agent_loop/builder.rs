@@ -21,7 +21,6 @@ use tools::{
     goal_tool::{GoalHandler, GoalTool},
     learning_tool::{LearningHandler, LearningTool},
     message::MessageTool,
-    plan_tool::PlanCompletionHandler,
     registry::ToolRegistry,
     spawn::SpawnTool,
     web::{WebFetchTool, WebSearchTool},
@@ -455,16 +454,6 @@ impl AgentLoopBuilder {
         tool_registry.register(tools::plan_tool::PlanTool::new(Some(
             plan_handler as Arc<dyn tools::plan_tool::PlanHandler>,
         )));
-        let stored_plan_repo = Some(repos.plans.clone());
-
-        // Plan completion handler (updates linked goal)
-        let plan_completion_handler: Option<Arc<dyn PlanCompletionHandler>> = Some(Arc::new(
-            super::super::plan_completion_handler::PlanCompletionHandlerImpl::new(
-                repos.goals.clone(),
-            ),
-        )
-            as Arc<dyn PlanCompletionHandler>);
-
         // ── Conversation embedding handler ────────────────────────────────
         let conversation_embedding_handler =
             if config.conversation.embedding.enabled && self.vector_store.is_some() {
@@ -699,12 +688,6 @@ impl AgentLoopBuilder {
             Arc::clone(&tool_registry),
         ));
 
-        let plan_execution_core = if stored_plan_repo.is_some() {
-            Some(Arc::clone(&execution_core))
-        } else {
-            None
-        };
-
         // Build IntentPipeline (replaces AgentPipeline + Orchestrator + EngineDispatch)
         let direct_engine =
             crate::intent_pipeline::engines::direct::DirectEngine::new(Arc::clone(&execution_core));
@@ -713,15 +696,15 @@ impl AgentLoopBuilder {
             config.agents.defaults.max_tool_iterations,
         );
 
-        let planned_engine = stored_plan_repo.as_ref().map(|repo| {
+        let planned_engine = Some(
             crate::intent_pipeline::engines::planned::PlannedEngine::new(
                 Arc::clone(&execution_core),
-                repo.clone(),
+                repos.plans.clone(),
                 provider.clone(),
                 config.agents.defaults.model.clone(),
                 config.orchestrator.default_plan_visibility.parse().unwrap_or_default(),
-            )
-        });
+            ),
+        );
 
         let router = crate::intent_pipeline::router::ExecutionRouter::new(
             direct_engine,
@@ -813,12 +796,10 @@ impl AgentLoopBuilder {
             bus,
             inbound_rx: Some(inbound_rx),
             skill_manager: Arc::clone(&skill_manager),
-            provider,
             config,
             context_engine,
             session_manager,
             tool_registry,
-            confidence_evaluator,
             running: Arc::new(AtomicBool::new(false)),
             last_active_channel: self.notification_handle,
             reminder_engine,
@@ -826,11 +807,8 @@ impl AgentLoopBuilder {
             _notification_dispatcher: notification_dispatcher,
             _calendar_adapter: calendar_adapter,
             conversation_embedding_handler,
-            plan_execution_core,
-            plan_repo: stored_plan_repo,
             plan_executing: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             learning_service,
-            plan_completion_handler,
             pipeline,
             strategy_repo: Some(repos.strategies.clone()),
             history_limit,

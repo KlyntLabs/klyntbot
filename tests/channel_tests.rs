@@ -134,10 +134,10 @@ async fn test_outbound_dispatch_routing() {
 /// Test concurrent message handling
 #[tokio::test]
 async fn test_concurrent_message_handling() {
-    let bus = MessageBus::new(100);
-    let bus = Arc::new(bus);
+    let bus = Arc::new(MessageBus::new(100));
+    let mut inbound_rx = bus.take_inbound_rx().unwrap();
 
-    // Send multiple messages concurrently
+    // Send 10 messages concurrently
     let handles: Vec<_> = (0..10)
         .map(|i| {
             let bus_clone = bus.clone();
@@ -149,42 +149,25 @@ async fn test_concurrent_message_handling() {
         })
         .collect();
 
-    // Wait for all sends to complete
     for handle in handles {
         handle.await.unwrap();
     }
 
-    // Get a new bus instance with receiver for consumption
-    let bus_for_rx = MessageBus::new(100);
-    let inbound_rx = bus_for_rx.take_inbound_rx().unwrap();
-
-    // Move messages from original bus to new one
-    // Note: This test has a design issue - we can't easily move messages between buses
-    // Let's restructure the test
-    drop(bus); // Drop the Arc
-    drop(inbound_rx); // Drop receiver
-
-    // Restart with proper setup
-    let bus = MessageBus::new(100);
-
-    // Send messages
-    for i in 0..10 {
-        let msg = InboundMessage::new("test_channel", "user", "chat", format!("Message {}", i));
-        bus.publish_inbound(msg).await.unwrap();
-    }
-
-    // Get receiver
-    let mut inbound_rx = bus.take_inbound_rx().unwrap();
-
-    // Consume all messages
-    let mut received_messages = Vec::new();
+    // Collect all received messages
+    let mut received = Vec::new();
     for _ in 0..10 {
         let msg = inbound_rx.recv().await.unwrap();
-        received_messages.push(msg.content);
+        received.push(msg.content);
     }
 
-    // All messages should be received
-    assert_eq!(received_messages.len(), 10);
+    assert_eq!(received.len(), 10);
+    // All 10 messages should be present (order may vary due to concurrency)
+    for i in 0..10 {
+        assert!(
+            received.contains(&format!("Message {}", i)),
+            "Missing Message {i}"
+        );
+    }
 }
 
 /// Test message metadata preservation

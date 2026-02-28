@@ -10,54 +10,17 @@
 //! - Event deleted from provider → calendar_event_uid cleared
 //! - Multiple changes in single sync batch
 
-#[allow(dead_code)] // Used by ignored tests that will be implemented later
-mod mock_calendar_handler;
+mod common;
 
 use agent::calendar_reconcile::reconcile_calendar_events;
 use calendar::{CalendarEvent, EventSource};
 use chrono::{TimeZone, Utc};
+use common::create_test_todo;
 use tools::todo_types::{Todo, TodoStatus};
 
-// ─── Test helpers ──────────────────────────────────────────────
-
-fn create_test_todo(title: &str) -> Todo {
-    Todo {
-        id: Todo::generate_id(),
-        title: title.to_string(),
-        description: None,
-        priority: None,
-        due_date: None,
-        tags: vec![],
-        status: TodoStatus::Todo,
-        focused_at: None,
-        focus_deadline: None,
-        focus_expired_count: 0,
-        created_at: Utc::now(),
-        updated_at: Utc::now(),
-        completed_at: None,
-        parent_id: None,
-        project_id: None,
-        attachments: Vec::new(),
-        time_entries: Vec::new(),
-        total_tracked_secs: 0,
-        estimated_minutes: None,
-        calendar_event_uid: None,
-        last_reminded_at: None,
-        recurrence_rule: None,
-        recurrence_parent_id: None,
-        is_template: false,
-        next_instance_date: None,
-        blocked_by: Vec::new(),
-        blocks: Vec::new(),
-    }
-}
-
-/// Connect to an ephemeral SQLite database for testing.
+/// Create a migrated in-memory TodoRepo for testing.
 async fn test_todo_repo() -> Option<storage::TodoRepo> {
-    let dir = tempfile::tempdir().ok()?;
-    let pool = storage::StoragePool::connect(dir.path()).await.ok()?;
-    let _ = dir.keep(); // prevent cleanup; acceptable in test context
-    Some(storage::Repos::from_pool(&pool).todos)
+    Some(common::test_todo_repo().await)
 }
 
 /// Generate a unique event UID to prevent parallel test contamination.

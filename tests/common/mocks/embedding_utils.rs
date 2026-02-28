@@ -11,12 +11,10 @@ use tools::EMBEDDING_DIM;
 /// produces identical vectors. The result is normalized to a unit vector.
 pub fn deterministic_embedding(text: &str) -> Vec<f32> {
     let mut vec = vec![0.0f32; EMBEDDING_DIM];
-    // Simple deterministic fill: use byte values spread across dims
     for (i, byte) in text.bytes().enumerate() {
         let idx = i % EMBEDDING_DIM;
         vec[idx] += (byte as f32) / 255.0;
     }
-    // Normalize to unit vector
     let norm: f32 = vec.iter().map(|x| x * x).sum::<f32>().sqrt();
     if norm > 0.0 {
         for v in &mut vec {
@@ -27,7 +25,6 @@ pub fn deterministic_embedding(text: &str) -> Vec<f32> {
 }
 
 /// Compute cosine similarity between two vectors.
-#[allow(dead_code)]
 pub fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
     let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
     let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();

@@ -1,6 +1,7 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 
+use futures_util::future::join_all;
 use sha2::{Digest, Sha256};
 
 use providers::Message;
@@ -10,6 +11,8 @@ use crate::memory_retriever::MemoryRetriever;
 use crate::source::{ContextSource, SourceContext};
 use crate::summary_provider::SummaryProvider;
 use crate::token_counter::{default_token_counter, TokenCounter};
+use common::utils::tool_def_name;
+
 use crate::{
     BudgetAllocator, BudgetConfig, BudgetReport, CompressorConfig, HistoryCompressor, Priority,
 };
@@ -63,8 +66,8 @@ const DEFAULT_CACHE_CAPACITY: usize = 8;
 /// Bounded cache for assembled contexts, keyed by a hash of the request inputs.
 struct ContextCache {
     entries: HashMap<String, AssembledContext>,
-    /// Insertion order for eviction (oldest first).
-    order: Vec<String>,
+    /// Insertion order for eviction (oldest first). VecDeque for O(1) pop_front.
+    order: VecDeque<String>,
     capacity: usize,
     /// Generation counter — incremented on invalidation.
     generation: u64,
@@ -76,7 +79,7 @@ impl ContextCache {
     fn new(capacity: usize) -> Self {
         Self {
             entries: HashMap::with_capacity(capacity),
-            order: Vec::with_capacity(capacity),
+            order: VecDeque::with_capacity(capacity),
             capacity,
             generation: 0,
             entry_generations: HashMap::with_capacity(capacity),
@@ -94,15 +97,14 @@ impl ContextCache {
 
     fn insert(&mut self, key: String, value: AssembledContext) {
         if self.entries.len() >= self.capacity && !self.entries.contains_key(&key) {
-            // Evict oldest
-            if let Some(oldest_key) = self.order.first().cloned() {
+            // Evict oldest — O(1) with VecDeque
+            if let Some(oldest_key) = self.order.pop_front() {
                 self.entries.remove(&oldest_key);
                 self.entry_generations.remove(&oldest_key);
-                self.order.remove(0);
             }
         }
         if !self.order.contains(&key) {
-            self.order.push(key.clone());
+            self.order.push_back(key.clone());
         }
         self.entries.insert(key.clone(), value);
         self.entry_generations.insert(key, self.generation);
@@ -229,14 +231,13 @@ impl ContextEngine {
             message: message.map(|s| s.to_string()),
         };
 
-        let mut sections = Vec::with_capacity(self.sources.len());
-        for source in &self.sources {
-            if let Some(section) = source.provide(&ctx).await {
-                if !section.trim().is_empty() {
-                    sections.push(section);
-                }
-            }
-        }
+        let futures: Vec<_> = self.sources.iter().map(|s| s.provide(&ctx)).collect();
+        let results = join_all(futures).await;
+        let sections: Vec<_> = results
+            .into_iter()
+            .flatten()
+            .filter(|s| !s.trim().is_empty())
+            .collect();
 
         sections.join("\n\n---\n\n")
     }
@@ -295,14 +296,8 @@ impl ContextEngine {
         hasher.update([strategy_byte]);
         // Hash tool definition count + first tool name (lightweight proxy)
         hasher.update(request.tool_definitions.len().to_le_bytes());
-        if let Some(first) = request.tool_definitions.first() {
-            if let Some(name) = first
-                .get("function")
-                .and_then(|f| f.get("name"))
-                .and_then(|n| n.as_str())
-            {
-                hasher.update(name.as_bytes());
-            }
+        if let Some(name) = request.tool_definitions.first().and_then(tool_def_name) {
+            hasher.update(name.as_bytes());
         }
         // Hash context window
         hasher.update(request.context_window.to_le_bytes());

@@ -86,7 +86,7 @@ impl IntentClassifier {
     }
 
     fn parse_classification_json(content: &str) -> IntentAnalysis {
-        let json_str = match extract_json_object(content) {
+        let json_str = match common::utils::extract_json_object(content) {
             Some(s) => s,
             None => return IntentAnalysis::fallback(),
         };
@@ -184,16 +184,6 @@ fn map_tool_names_to_groups(tool_names: &[String]) -> Vec<ToolGroup> {
     }
 }
 
-/// Extract the first JSON object from a string (finds first `{` to last `}`).
-fn extract_json_object(content: &str) -> Option<&str> {
-    let start = content.find('{')?;
-    let end = content.rfind('}')?;
-    if end > start {
-        Some(&content[start..=end])
-    } else {
-        None
-    }
-}
 
 #[cfg(test)]
 mod tests {
@@ -326,12 +316,12 @@ mod tests {
     #[test]
     fn extract_json_finds_object() {
         let input = r#"text {"key":"value"} more"#;
-        assert_eq!(extract_json_object(input), Some(r#"{"key":"value"}"#));
+        assert_eq!(common::utils::extract_json_object(input), Some(r#"{"key":"value"}"#));
     }
 
     #[test]
     fn extract_json_handles_no_json() {
-        assert_eq!(extract_json_object("no json here"), None);
+        assert_eq!(common::utils::extract_json_object("no json here"), None);
     }
 
     #[test]

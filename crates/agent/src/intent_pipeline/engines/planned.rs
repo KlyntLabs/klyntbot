@@ -9,8 +9,8 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use chrono::Utc;
-use common::Result;
-use plan::{conversions::save_plan, PlanStatus, PlanVisibility, StepStatus};
+use common::{utils::{tool_def_name, truncate_chars}, Result};
+use plan::{conversions::save_plan, PlanStatus, PlanVisibility, StepStatus, DEFAULT_MAX_STEP_ATTEMPTS};
 use providers::{DynProvider, Message, Usage};
 use tools::RoutingContext;
 use tracing::{debug, info, warn};
@@ -80,8 +80,7 @@ impl PlannedEngine {
             })
             .collect();
 
-        let tool_names = self.extract_tool_names(tools);
-        let tool_refs: Vec<&str> = tool_names.iter().map(|s| s.as_str()).collect();
+        let tool_refs: Vec<&str> = tools.iter().filter_map(tool_def_name).collect();
 
         let drafts = generate_plan_steps(
             &self.provider,
@@ -113,7 +112,7 @@ impl PlannedEngine {
                 expected_tools: vec![step.tool_name.clone()],
                 status: StepStatus::Completed,
                 attempt_count: 1,
-                max_attempts: 3,
+                max_attempts: DEFAULT_MAX_STEP_ATTEMPTS,
                 result: Some(step.result.clone()),
                 started_at: Some(Utc::now()),
                 completed_at: Some(Utc::now()),
@@ -159,8 +158,7 @@ impl PlannedEngine {
     ) -> Result<EngineResult> {
         let description = extract_last_user_message(&messages);
 
-        let tool_names = self.extract_tool_names(tools);
-        let tool_refs: Vec<&str> = tool_names.iter().map(|s| s.as_str()).collect();
+        let tool_refs: Vec<&str> = tools.iter().filter_map(tool_def_name).collect();
 
         let drafts =
             generate_plan_steps(&self.provider, &self.model, &description, &[], &tool_refs)
@@ -213,7 +211,7 @@ impl PlannedEngine {
             id: Uuid::new_v4(),
             session_key: format!("{}:{}", ctx.channel, ctx.chat_id),
             goal_id: None,
-            title: truncate(description, 100),
+            title: truncate_chars(description, 100, "..."),
             description: description.to_string(),
             status: PlanStatus::Approved,
             steps,
@@ -433,18 +431,6 @@ impl PlannedEngine {
         engine.execute(messages, tools, params, ctx, event_tx).await
     }
 
-    /// Extract tool names from JSON tool definitions.
-    fn extract_tool_names(&self, tools: &[serde_json::Value]) -> Vec<String> {
-        tools
-            .iter()
-            .filter_map(|t| {
-                t.get("function")
-                    .and_then(|f| f.get("name"))
-                    .and_then(|n| n.as_str())
-                    .map(String::from)
-            })
-            .collect()
-    }
 }
 
 #[async_trait]
@@ -489,14 +475,6 @@ fn extract_last_user_message(messages: &[Message]) -> String {
         .unwrap_or_else(|| "Complete the task".to_string())
 }
 
-/// Truncate a string at a character boundary so it fits in `max_chars`.
-fn truncate(s: &str, max_chars: usize) -> String {
-    if s.chars().count() <= max_chars {
-        s.to_string()
-    } else {
-        s.chars().take(max_chars).collect::<String>() + "..."
-    }
-}
 
 #[cfg(test)]
 mod tests {

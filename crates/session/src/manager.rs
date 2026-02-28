@@ -9,7 +9,7 @@ use tokio::sync::Mutex as TokioMutex;
 use tracing::{debug, warn};
 use uuid::Uuid;
 
-use common::Result;
+use common::{KlyntbotError, Result};
 
 /// Generate a unique message ID (UUID v4)
 fn generate_message_id() -> String {
@@ -247,7 +247,7 @@ impl SessionManager {
             }
             Err(storage::StorageError::NotFound(_)) => {
                 let metadata = serde_json::Value::Object(serde_json::Map::new());
-                self.sql_repo.create_session(&key, &metadata).await?;
+                self.sql_repo.upsert_session(&key, &metadata).await?;
                 debug!("Creating new session in SQL: {}", key);
                 Session::new(key.clone())
             }
@@ -267,9 +267,10 @@ impl SessionManager {
     /// (ON CONFLICT DO NOTHING for idempotency) instead of N individual inserts.
     pub async fn save(&self, session: &Session) -> Result<()> {
         // Upsert session metadata
-        let metadata = serde_json::to_value(&session.metadata).unwrap_or_default();
+        let metadata = serde_json::to_value(&session.metadata)
+            .map_err(|e| KlyntbotError::Storage(format!("session metadata: {e}")))?;
         self.sql_repo
-            .create_session(&session.key, &metadata)
+            .upsert_session(&session.key, &metadata)
             .await?;
 
         // Build batch arrays from session messages

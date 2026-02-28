@@ -6,8 +6,8 @@ use crate::types::{BacktrackEntry, Plan, PlanStep};
 use uuid::Uuid;
 
 /// Convert a Plan domain type to a PlanRow for SQL persistence.
-pub fn plan_to_row(plan: &Plan) -> storage::PlanRow {
-    storage::PlanRow {
+pub fn plan_to_row(plan: &Plan) -> common::Result<storage::PlanRow> {
+    Ok(storage::PlanRow {
         id: plan.id,
         session_key: plan.session_key.clone(),
         goal_id: plan.goal_id,
@@ -16,13 +16,14 @@ pub fn plan_to_row(plan: &Plan) -> storage::PlanRow {
         status: plan.status.to_string(),
         current_step_index: plan.current_step_index as i32,
         iteration_limit: plan.iteration_limit as i32,
-        backtrack_history: serde_json::to_value(&plan.backtrack_history).unwrap_or_default(),
+        backtrack_history: serde_json::to_value(&plan.backtrack_history)
+            .map_err(|e| common::KlyntbotError::Plan(format!("backtrack_history: {e}")))?,
         visibility: plan.visibility.to_string(),
         task_id: plan.task_id.clone(),
         created_at: plan.created_at,
         updated_at: plan.updated_at,
         completed_at: plan.completed_at,
-    }
+    })
 }
 
 /// Convert a PlanStep to a PlanStepRow for SQL persistence.
@@ -96,7 +97,7 @@ pub async fn load_plan(repo: &storage::PlanRepo, id: &Uuid) -> common::Result<Op
 
 /// Save (upsert) a Plan + all its steps to the repo.
 pub async fn save_plan(repo: &storage::PlanRepo, plan: &Plan) -> common::Result<()> {
-    let row = plan_to_row(plan);
+    let row = plan_to_row(plan)?;
     repo.upsert(&row).await?;
 
     for step in &plan.steps {

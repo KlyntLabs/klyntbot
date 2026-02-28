@@ -14,14 +14,13 @@ use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, info, warn};
 
 use bus::{InboundMessage, MessageBus, OutboundMessage};
-use common::Result;
+use common::{utils::truncate_at_boundary, Result};
 use config::Config;
-use providers::{DynProvider, Message};
+use providers::Message;
 use session::SessionManager;
 use tokio::sync::mpsc;
-use tools::{plan_tool::PlanCompletionHandler, RoutingContext};
+use tools::RoutingContext;
 
-use super::confidence::ConfidenceEvaluator;
 use super::{AgentEvent, CalendarSyncAdapter, SkillManager};
 
 /// A request to execute an approved plan via the execution queue.
@@ -55,12 +54,10 @@ pub struct AgentLoop {
     pub(crate) bus: Arc<MessageBus>,
     pub(crate) inbound_rx: Option<mpsc::Receiver<InboundMessage>>,
     pub(crate) skill_manager: Arc<SkillManager>,
-    pub(crate) provider: DynProvider,
     pub(crate) config: Config,
     pub(crate) context_engine: Arc<context_engine::ContextEngine>,
     pub(crate) session_manager: SessionManager,
     pub(crate) tool_registry: Arc<RwLock<tools::registry::ToolRegistry>>,
-    pub(crate) confidence_evaluator: Option<ConfidenceEvaluator>,
     pub(crate) running: Arc<AtomicBool>,
     pub(crate) last_active_channel: Option<LastActiveChannel>,
     pub(crate) reminder_engine: Option<Arc<RwLock<super::ReminderEngine>>>,
@@ -71,16 +68,10 @@ pub struct AgentLoop {
     pub(crate) _calendar_adapter: Option<Arc<CalendarSyncAdapter>>,
     /// Conversation embedding handler for semantic memory (Phase 4.1)
     pub(crate) conversation_embedding_handler: Option<Arc<dyn tools::ConversationEmbeddingHandler>>,
-    /// Execution core for multi-cycle plan step execution
-    pub(crate) plan_execution_core: Option<Arc<crate::execution::ExecutionCore>>,
-    /// Plan repo for direct plan state management during execution
-    pub(crate) plan_repo: Option<storage::PlanRepo>,
     /// Tracks if a plan is currently executing
     pub(crate) plan_executing: Arc<std::sync::atomic::AtomicBool>,
     /// Background learning service for adaptive threshold updates (None if learning disabled)
     pub(crate) learning_service: Option<Arc<RwLock<crate::learning::LearningService>>>,
-    /// Handler called after plan execution finishes (updates linked goal metrics)
-    pub(crate) plan_completion_handler: Option<Arc<dyn PlanCompletionHandler>>,
     /// Intent pipeline: classify → assemble → route → validate → record.
     pub(crate) pipeline: Arc<crate::intent_pipeline::IntentPipeline>,
     /// Strategy repo for updating satisfaction scores from reactions.
@@ -265,7 +256,7 @@ impl AgentLoop {
         }
 
         let preview = if msg.content.len() > 80 {
-            format!("{}...", truncate_safe(&msg.content, 80))
+            format!("{}...", truncate_at_boundary(&msg.content, 80))
         } else {
             msg.content.clone()
         };
@@ -522,7 +513,7 @@ impl AgentLoop {
         label: &str,
     ) -> Result<Vec<session::SessionMessage>> {
         let preview = if content.len() > 80 {
-            format!("{}...", truncate_safe(content, 80))
+            format!("{}...", truncate_at_boundary(content, 80))
         } else {
             content.to_string()
         };
@@ -672,20 +663,6 @@ fn reaction_to_satisfaction(emoji: &str) -> Option<f32> {
     }
 }
 
-/// Safely truncate a string to approximately `max_bytes` without splitting
-/// multi-byte UTF-8 characters. Returns the original string if already short enough.
-fn truncate_safe(s: &str, max_bytes: usize) -> &str {
-    if s.len() <= max_bytes {
-        return s;
-    }
-    let end = s
-        .char_indices()
-        .map(|(i, _)| i)
-        .take_while(|&i| i <= max_bytes)
-        .last()
-        .unwrap_or(0);
-    &s[..end]
-}
 
 #[cfg(test)]
 mod tests {

@@ -166,7 +166,6 @@ async-trait.workspace = true
 sqlx.workspace = true
 serde_json.workspace = true
 chrono.workspace = true
-criterion = { version = "0.5", features = ["async_tokio"] }
 tokio.workspace = true
 uuid.workspace = true
 assert_cmd = "2.1.2"
@@ -175,14 +174,6 @@ feature-finance.workspace = true
 plugin-runtime.workspace = true
 tools-core.workspace = true
 extism.workspace = true
-
-[[bench]]
-name = "core_benchmarks"
-harness = false
-
-[[bench]]
-name = "search_benchmarks"
-harness = false
 
 [profile.release]
 opt-level = 3

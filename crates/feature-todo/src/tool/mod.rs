@@ -141,15 +141,16 @@ impl TodoTool {
         let id = row.id.clone();
         let mut todo = Todo::from(row);
 
-        let att_rows = self.repo.list_attachments(&id).await?;
+        let (att_rows, te_rows, blockers, blocking) = tokio::try_join!(
+            self.repo.list_attachments(&id),
+            self.repo.list_time_entries(&id),
+            self.repo.get_blockers(&id),
+            self.repo.get_blocking(&id),
+        )?;
+
         todo.attachments = att_rows.into_iter().map(Attachment::from).collect();
-
-        let te_rows = self.repo.list_time_entries(&id).await?;
         todo.time_entries = te_rows.into_iter().map(TimeEntry::from).collect();
-
-        let blockers = self.repo.get_blockers(&id).await?;
         todo.blocked_by = blockers.into_iter().map(|r| r.id).collect();
-        let blocking = self.repo.get_blocking(&id).await?;
         todo.blocks = blocking.into_iter().map(|r| r.id).collect();
 
         Ok(todo)

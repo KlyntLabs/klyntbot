@@ -17,8 +17,8 @@ impl SessionRepo {
         Self { pool }
     }
 
-    /// Create a new session (upsert — ignores conflict on existing key).
-    pub async fn create_session(
+    /// Upsert a session — inserts on first call, updates `updated_at` on conflict.
+    pub async fn upsert_session(
         &self,
         key: &str,
         metadata: &serde_json::Value,

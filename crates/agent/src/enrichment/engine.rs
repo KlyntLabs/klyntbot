@@ -103,31 +103,11 @@ Return only valid JSON, no markdown fences."#;
     }
 }
 
-/// Strip markdown code fences from LLM output (best-effort).
-fn extract_json(content: &str) -> String {
-    let trimmed = content.trim();
-    if let Some(stripped) = trimmed.strip_prefix("```json") {
-        stripped
-            .trim_start_matches('\n')
-            .trim_end_matches("```")
-            .trim()
-            .to_string()
-    } else if let Some(stripped) = trimmed.strip_prefix("```") {
-        stripped
-            .trim_start_matches('\n')
-            .trim_end_matches("```")
-            .trim()
-            .to_string()
-    } else {
-        trimmed.to_string()
-    }
-}
-
 /// Parse the LLM JSON response into an `EnrichmentResult`.
 /// Only fills fields that are not already set on the task.
 fn parse_llm_enrichment_response(content: &str, task: &Todo) -> Option<EnrichmentResult> {
-    let json_str = extract_json(content);
-    let parsed: LlmEnrichmentResponse = match serde_json::from_str(&json_str) {
+    let json_str = common::utils::strip_llm_fences(content);
+    let parsed: LlmEnrichmentResponse = match serde_json::from_str(json_str) {
         Ok(r) => r,
         Err(e) => {
             warn!("Failed to parse LLM enrichment JSON: {}", e);

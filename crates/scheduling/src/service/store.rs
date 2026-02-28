@@ -1,5 +1,6 @@
 //! Persistence layer for the cron store (SQL-only via CronRepo).
 
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use tokio::sync::RwLock;
@@ -42,7 +43,7 @@ impl CronService {
         repo: &CronRepo,
     ) -> Result<()> {
         let store = store.read().await;
-        let current_ids: Vec<String> = store.jobs.iter().map(|j| j.id.clone()).collect();
+        let current_ids: HashSet<&str> = store.jobs.iter().map(|j| j.id.as_str()).collect();
 
         // Upsert all current jobs
         for job in &store.jobs {
@@ -58,7 +59,7 @@ impl CronService {
             .await
             .map_err(|e| CronError::ExecutionFailed(e.to_string()))?;
         for row in all_rows {
-            if !current_ids.contains(&row.id) {
+            if !current_ids.contains(row.id.as_str()) {
                 let _ = repo.delete(&row.id).await;
             }
         }

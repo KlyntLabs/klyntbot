@@ -261,33 +261,21 @@ impl TodoRepo {
             .replace('_', "\\_");
         let pattern = format!("%{escaped}%");
 
-        let rows = if let Some(lim) = limit {
-            sqlx::query_as::<_, TodoRow>(
-                r#"
-                SELECT * FROM todos
-                WHERE is_template = FALSE
-                  AND (title LIKE ?1 ESCAPE '\' OR description LIKE ?1 ESCAPE '\')
-                ORDER BY created_at DESC
-                LIMIT ?2
-                "#,
-            )
-            .bind(&pattern)
-            .bind(lim)
-            .fetch_all(&self.pool)
-            .await?
-        } else {
-            sqlx::query_as::<_, TodoRow>(
-                r#"
-                SELECT * FROM todos
-                WHERE is_template = FALSE
-                  AND (title LIKE ?1 ESCAPE '\' OR description LIKE ?1 ESCAPE '\')
-                ORDER BY created_at DESC
-                "#,
-            )
-            .bind(&pattern)
-            .fetch_all(&self.pool)
-            .await?
-        };
+        // Use i64::MAX when no limit is specified so a single query handles both cases.
+        let effective_limit = limit.unwrap_or(i64::MAX);
+        let rows = sqlx::query_as::<_, TodoRow>(
+            r#"
+            SELECT * FROM todos
+            WHERE is_template = FALSE
+              AND (title LIKE ?1 ESCAPE '\' OR description LIKE ?1 ESCAPE '\')
+            ORDER BY created_at DESC
+            LIMIT ?2
+            "#,
+        )
+        .bind(&pattern)
+        .bind(effective_limit)
+        .fetch_all(&self.pool)
+        .await?;
         Ok(rows)
     }
 

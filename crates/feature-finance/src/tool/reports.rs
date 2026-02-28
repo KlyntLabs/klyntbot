@@ -175,18 +175,12 @@ impl FinanceTool {
         let periods = p.i64_or("periods", 6)?.clamp(1, 120) as i32;
 
         let data: Vec<serde_json::Value> = if metric == "savings_rate" {
-            // Fetch both income and spending time series then compute rate per period.
-            let income_data = self
-                .transactions
-                .sum_by_period("income", periods, "month")
-                .await
-                .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
-
-            let spend_data = self
-                .transactions
-                .sum_by_period("expense", periods, "month")
-                .await
-                .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+            // Fetch both income and spending time series concurrently.
+            let (income_data, spend_data) = tokio::try_join!(
+                self.transactions.sum_by_period("income", periods, "month"),
+                self.transactions.sum_by_period("expense", periods, "month"),
+            )
+            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
 
             let income_map: std::collections::HashMap<String, i64> =
                 income_data.into_iter().collect();
@@ -264,23 +258,12 @@ impl FinanceTool {
     async fn report_net_worth_history(&self, _p: &ParamExtractor<'_>) -> Result<String> {
         let today = Local::now().date_naive();
 
-        let account_balances = self
-            .accounts
-            .total_balance_by_currency()
-            .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
-
-        let investment_values = self
-            .investments
-            .total_value_by_currency()
-            .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
-
-        let liability_totals = self
-            .liabilities
-            .total_remaining_by_currency()
-            .await
-            .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+        let (account_balances, investment_values, liability_totals) = tokio::try_join!(
+            self.accounts.total_balance_by_currency(),
+            self.investments.total_value_by_currency(),
+            self.liabilities.total_remaining_by_currency(),
+        )
+        .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
 
         let accounts_total: i64 = account_balances.iter().map(|(_, v)| v).sum();
         let investments_total: i64 = investment_values.iter().map(|(_, v)| v).sum();

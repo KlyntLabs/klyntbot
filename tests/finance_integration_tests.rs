@@ -12,27 +12,22 @@
 //! - Settings persistence to disk
 //! - Report generation
 //!
-//! Tests use an ephemeral SQLite pool (via `StoragePool::connect(tempdir)`) — no external database required.
+//! Tests use an in-memory SQLite pool — no external database required.
 
-use common::{ChannelName, ChatId};
+use ::common::{ChannelName, ChatId};
 use feature_finance::FinanceTool;
 use serde_json::json;
 use tools::{RoutingContext, Tool};
 
-#[path = "mock_provider.rs"]
-mod mock_provider;
+mod common;
 
 // ---------------------------------------------------------------------------
 // Test helpers
 // ---------------------------------------------------------------------------
 
-/// Create a FinanceTool backed by an ephemeral SQLite pool.
+/// Create a FinanceTool backed by an in-memory SQLite pool.
 async fn make_finance_tool() -> FinanceTool {
-    let dir = tempfile::TempDir::new().expect("temp dir");
-    let pool = storage::StoragePool::connect(dir.path())
-        .await
-        .expect("SQLite test pool");
-    std::mem::forget(dir); // keep dir alive for pool lifetime
+    let pool = common::test_pool().await;
     FinanceTool::from_storage_pool(&pool, "VND")
 }
 

@@ -32,9 +32,8 @@ use tools::memory_tool::MemoryTool;
 use tools::RoutingContext;
 use tools::Tool;
 
-#[path = "mock_conversation_embedding_handler.rs"]
-mod mock_conversation_embedding_handler;
-use mock_conversation_embedding_handler::MockConversationEmbeddingHandler;
+mod common;
+use common::MockConversationEmbeddingHandler;
 
 // ─── Test Helpers ──────────────────────────────────────────────
 
@@ -95,8 +94,8 @@ async fn embed_test_messages(
 /// Create a RoutingContext for a specific channel.
 fn ctx_for_channel(channel: &str) -> RoutingContext {
     RoutingContext::new(
-        common::ChannelName::new(channel),
-        common::ChatId::new("test"),
+        ::common::ChannelName::new(channel),
+        ::common::ChatId::new("test"),
     )
 }
 

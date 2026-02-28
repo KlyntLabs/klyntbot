@@ -7,7 +7,7 @@ use std::borrow::Cow;
 use std::sync::Arc;
 use std::time::Instant;
 
-use common::Result;
+use common::{utils::tool_def_name, Result};
 use context_engine::{ContextEngine, ContextRequest};
 use providers::Message;
 use tools::RoutingContext;
@@ -183,9 +183,7 @@ impl IntentPipeline {
                     tool_definitions
                         .iter()
                         .filter(|t| {
-                            t.get("function")
-                                .and_then(|f| f.get("name"))
-                                .and_then(|n| n.as_str())
+                            tool_def_name(t)
                                 .map(|name| allowed.contains(name))
                                 .unwrap_or(true) // Keep tools with unknown format
                         })

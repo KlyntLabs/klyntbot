@@ -118,21 +118,6 @@ fn test_config_integration() {
     assert_eq!(loaded.agents.defaults.model, config.agents.defaults.model);
 }
 
-/// Test config directory structure initialization
-#[test]
-fn test_config_init() {
-    use tempfile::TempDir;
-    let temp_dir = TempDir::new().unwrap();
-
-    // Override home directory for testing
-    std::env::set_var("HOME", temp_dir.path());
-
-    // Note: This test would need modification to loader::init()
-    // to support custom directories. For now, we just verify
-    // the function exists and returns Ok
-    // loader::init().unwrap();
-}
-
 /// Test multiple sessions created independently
 #[test]
 fn test_multiple_sessions_parallel() {
@@ -175,27 +160,6 @@ async fn test_bus_message_ordering() {
         let received = inbound_rx.recv().await.unwrap();
         assert_eq!(received.content, format!("Message {}", i));
     }
-}
-
-/// Test config with environment variable overrides
-#[test]
-fn test_config_env_override() {
-    // Set environment variables
-    std::env::set_var("KLYNTBOT_AGENTS__DEFAULTS__MODEL", "custom-model");
-    std::env::set_var("KLYNTBOT_PROVIDERS__ANTHROPIC__API_KEY", "test-key-123");
-
-    // Load config (would load from env vars in real usage)
-    // Note: This test demonstrates the expected behavior
-    let config = Config::default();
-
-    // In actual usage, load_with_env_overrides() would apply these
-    // For testing, we verify the default config structure is correct
-    assert!(config.providers.anthropic.api_key.is_empty());
-    assert_eq!(config.agents.defaults.model, "anthropic/claude-opus-4-5");
-
-    // Clean up
-    std::env::remove_var("KLYNTBOT_AGENTS__DEFAULTS__MODEL");
-    std::env::remove_var("KLYNTBOT_PROVIDERS__ANTHROPIC__API_KEY");
 }
 
 /// Test session history truncation

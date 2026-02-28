@@ -23,7 +23,6 @@ use klyntbot::agent::learning::recorder::OutcomeRecorder;
 use klyntbot::agent::learning::types::{AnalysisResult, EnrichmentStats};
 use klyntbot::agent::learning::{ExecutionMode, OutcomeRecord};
 use klyntbot::agent::LearningService;
-use klyntbot::config::Config;
 use klyntbot::{AgentLoop, MessageBus};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -31,69 +30,8 @@ use std::time::Duration;
 use tempfile::TempDir;
 use tokio::sync::RwLock;
 
-#[path = "mock_provider.rs"]
-mod mock_provider;
-use mock_provider::MockProvider;
-
-// ─────────────────────────────────────────────────────────────
-// Helpers (allow dead_code — helpers are used by todo!() tests during roll-out)
-// ─────────────────────────────────────────────────────────────
-
-/// Create an agent loop with learning enabled, isolated to a temp directory.
-/// Uses an in-memory SQLite pool (via StoragePool::connect_in_memory()).
-#[allow(dead_code)]
-async fn create_agent_with_learning(provider: Arc<MockProvider>) -> (AgentLoop, TempDir) {
-    let temp_dir = TempDir::new().unwrap();
-    std::env::set_var("HOME", temp_dir.path());
-
-    let mut config = Config::default();
-    config.agents.defaults.workspace = temp_dir
-        .path()
-        .join("workspace")
-        .to_str()
-        .unwrap()
-        .to_string();
-    config.learning.enabled = true;
-    config.learning.analysis_interval_secs = 9999; // disable background analysis
-    config.learning.min_outcomes_for_adaptation = 5; // low for unit tests
-
-    let bus = Arc::new(MessageBus::new(10));
-    let agent = AgentLoop::builder()
-        .with_bus(bus)
-        .with_provider(provider)
-        .with_config(config)
-        .build()
-        .await
-        .unwrap();
-    (agent, temp_dir)
-}
-
-/// Build a tool-call LLM response.
-#[allow(dead_code)]
-fn tool_call_response(tool_name: &str) -> klyntbot::providers::types::LlmResponse {
-    klyntbot::providers::types::LlmResponse {
-        content: None,
-        tool_calls: vec![klyntbot::providers::types::ToolCall {
-            id: "call_1".to_string(),
-            name: tool_name.to_string(),
-            arguments: serde_json::json!({}),
-        }],
-        finish_reason: "tool_calls".to_string(),
-        usage: klyntbot::providers::types::Usage::default(),
-        reasoning_content: None,
-    }
-}
-
-#[allow(dead_code)]
-fn text_response(text: &str) -> klyntbot::providers::types::LlmResponse {
-    klyntbot::providers::types::LlmResponse {
-        content: Some(text.to_string()),
-        tool_calls: vec![],
-        finish_reason: "stop".to_string(),
-        usage: klyntbot::providers::types::Usage::default(),
-        reasoning_content: None,
-    }
-}
+mod common;
+use common::MockProvider;
 
 // ─────────────────────────────────────────────────────────────
 // AC: Per-tool-call tracking + duration (Decision #1)
@@ -607,16 +545,8 @@ async fn test_ac_confidence_prompt_has_no_hardcoded_threshold() {
 #[tokio::test]
 async fn test_ac_learning_disabled_no_recording() {
     let temp_dir = TempDir::new().unwrap();
-    std::env::set_var("HOME", temp_dir.path());
-
     let provider = Arc::new(MockProvider::new("Hello!"));
-    let mut config = Config::default();
-    config.agents.defaults.workspace = temp_dir
-        .path()
-        .join("workspace")
-        .to_str()
-        .unwrap()
-        .to_string();
+    let mut config = common::test_config(&temp_dir);
     config.learning.enabled = false;
 
     let bus = Arc::new(MessageBus::new(10));
@@ -808,22 +738,6 @@ async fn test_ac_enrichment_acceptance_rate_computed_correctly() {
 // ─────────────────────────────────────────────────────────────
 // Test fixtures
 // ─────────────────────────────────────────────────────────────
-
-#[allow(dead_code)]
-fn make_outcome(id: &str, tool: &str, success: bool) -> OutcomeRecord {
-    OutcomeRecord {
-        id: id.to_string(),
-        session_key: "test:abc".to_string(),
-        tool_name: tool.to_string(),
-        success,
-        error_category: None,
-        duration_ms: 50,
-        confidence_score: Some(0.8),
-        confidence_dimensions: None,
-        execution_mode: ExecutionMode::Chat,
-        created_at: chrono::Utc::now(),
-    }
-}
 
 fn make_feedback(
     task_id: &str,

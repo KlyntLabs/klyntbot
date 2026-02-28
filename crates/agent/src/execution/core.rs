@@ -8,7 +8,7 @@ use std::time::Instant;
 use futures_util::future::join_all;
 use tokio::sync::RwLock;
 
-use common::Result;
+use common::{utils::tool_def_name, Result};
 use providers::{tool_calls_to_messages, DynProvider, Message};
 use tools::{registry::ToolRegistry, RoutingContext};
 use tracing::debug;
@@ -369,14 +369,7 @@ impl ExecutionCore {
         if let Some(content) = response.content {
             if !content.trim().is_empty() {
                 // Extract tool names from the tool definitions for fabrication check
-                let tool_names: Vec<&str> = tools
-                    .iter()
-                    .filter_map(|t| {
-                        t.get("function")
-                            .and_then(|f| f.get("name"))
-                            .and_then(|n| n.as_str())
-                    })
-                    .collect();
+                let tool_names: Vec<&str> = tools.iter().filter_map(tool_def_name).collect();
 
                 if !tool_names.is_empty() && is_fabricated_tool_response(&content, &tool_names) {
                     debug!(

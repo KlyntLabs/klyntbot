@@ -12,7 +12,7 @@ use async_trait::async_trait;
 use chrono::Utc;
 use tracing::debug;
 
-use common::Result;
+use common::{utils::tool_def_name, Result};
 use providers::Message;
 use tools::RoutingContext;
 
@@ -112,14 +112,7 @@ impl ExecutionEngine for ReactiveEngine {
                     }
 
                     force_retried = true;
-                    let tool_list: Vec<&str> = tools
-                        .iter()
-                        .filter_map(|t| {
-                            t.get("function")
-                                .and_then(|f| f.get("name"))
-                                .and_then(|n| n.as_str())
-                        })
-                        .collect();
+                    let tool_list: Vec<&str> = tools.iter().filter_map(tool_def_name).collect();
 
                     messages.push(Message::user(format!(
                         "You returned a text response instead of calling a tool. \

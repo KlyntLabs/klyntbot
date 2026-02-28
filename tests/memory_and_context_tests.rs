@@ -1,5 +1,7 @@
 //! Integration tests for memory system and context engine (sources)
 
+mod common;
+
 use klyntbot::agent::context_sources::{
     BootstrapSource, ConfidenceSource, IdentitySource, MemorySource, SkillContentSource,
     SkillSummarySource,
@@ -9,23 +11,13 @@ use klyntbot::context_engine::{ContextEngine, ContextSource, SourceContext};
 use std::sync::Arc;
 use tempfile::TempDir;
 
-/// Helper: create a MemoryNoteRepo backed by an in-memory SQLite pool.
-///
-/// Uses in-memory SQLite (no filesystem I/O) since these tests never query the DB.
-async fn test_memory_note_repo() -> klyntbot::storage::MemoryNoteRepo {
-    let pool = sqlx::SqlitePool::connect(":memory:")
-        .await
-        .expect("in-memory SQLite");
-    klyntbot::storage::MemoryNoteRepo::new(pool)
-}
-
 /// Helper: build a ContextEngine with all sources for testing.
 async fn test_context_engine(workspace: std::path::PathBuf) -> ContextEngine {
     let mut skill_manager = SkillManager::new();
     let _ = skill_manager.load(workspace.clone()).await;
     let skill_manager = Arc::new(skill_manager);
 
-    let memory_store = MemoryStore::new(test_memory_note_repo().await);
+    let memory_store = MemoryStore::new(common::test_memory_note_repo().await);
 
     let sources: Vec<Box<dyn ContextSource>> = vec![
         Box::new(IdentitySource::new(workspace.clone(), "UTC".to_string())),
@@ -105,39 +97,6 @@ async fn test_context_engine_with_bootstrap_files() {
     assert!(prompt.contains("Use tools when needed"));
 }
 
-/// Test memory file creation and reading
-#[tokio::test]
-async fn test_memory_store() {
-    let temp_dir = TempDir::new().unwrap();
-    let workspace = temp_dir.path().join("workspace");
-    let memory_dir = workspace.join("memory");
-    std::fs::create_dir_all(&memory_dir).unwrap();
-
-    let memory_file = memory_dir.join("MEMORY.md");
-    let memory_content = r#"# Long-term Memory
-
-## User Preferences
-- Prefers Python over JavaScript
-- Likes detailed explanations
-"#;
-    std::fs::write(&memory_file, memory_content).unwrap();
-
-    let _memory_store = MemoryStore::new(test_memory_note_repo().await);
-
-    assert!(memory_file.exists());
-}
-
-/// Test workspace path structure
-#[test]
-fn test_workspace_path_structure() {
-    let temp_dir = TempDir::new().unwrap();
-    let workspace = temp_dir.path().join("workspace");
-    std::fs::create_dir_all(&workspace).unwrap();
-
-    assert!(workspace.exists());
-    assert!(workspace.is_dir());
-}
-
 /// Test bootstrap files are optional
 #[tokio::test]
 async fn test_bootstrap_files_optional() {
@@ -152,34 +111,6 @@ async fn test_bootstrap_files_optional() {
     // Should contain at minimum the identity section
     assert!(prompt.contains("# Identity"));
     assert!(!prompt.is_empty());
-}
-
-/// Test memory directory structure
-#[test]
-fn test_memory_directory_structure() {
-    let temp_dir = TempDir::new().unwrap();
-    let workspace = temp_dir.path().join("workspace");
-    let memory_dir = workspace.join("memory");
-    std::fs::create_dir_all(&memory_dir).unwrap();
-
-    assert!(memory_dir.exists());
-    assert!(memory_dir.is_dir());
-
-    let memory_file = memory_dir.join("MEMORY.md");
-    std::fs::write(&memory_file, "# Memory\n\nTest content").unwrap();
-    assert!(memory_file.exists());
-    assert!(memory_file.is_file());
-}
-
-/// Test memory store initialization
-#[tokio::test]
-async fn test_memory_store_initialization() {
-    let temp_dir = TempDir::new().unwrap();
-    let workspace = temp_dir.path().join("workspace");
-    std::fs::create_dir_all(&workspace).unwrap();
-
-    let _memory_store = MemoryStore::new(test_memory_note_repo().await);
-    assert!(workspace.exists());
 }
 
 /// Test context with channel and chat ID

@@ -3,10 +3,11 @@
 //! Smoke-tests the happy paths through the full pipeline:
 //! IntentAnalyzer → ContextEngine → ExecutionRouter → ResponseValidator → CostTracker
 
-mod mock_provider;
+mod common;
 
 use std::sync::Arc;
 
+use common::MockProvider;
 use klyntbot::agent::execution::ExecutionCore;
 use klyntbot::agent::intent_pipeline::analyzer::IntentAnalyzer;
 use klyntbot::agent::intent_pipeline::engines::direct::DirectEngine;
@@ -18,11 +19,10 @@ use klyntbot::config::OrchestratorConfig;
 use klyntbot::context_engine::ContextEngine;
 use klyntbot::providers::types::*;
 use klyntbot::tools::registry::ToolRegistry;
-use mock_provider::MockProvider;
 use tokio::sync::RwLock;
 
 fn routing_ctx() -> klyntbot::tools::RoutingContext {
-    klyntbot::tools::RoutingContext::new("e2e-test".into(), "e2e-test".into())
+    common::test_routing_ctx()
 }
 
 /// Build a pipeline backed by the given provider.
@@ -36,15 +36,13 @@ async fn make_pipeline(provider: Arc<dyn LlmProvider>) -> IntentPipeline {
 
     let analyzer = IntentAnalyzer::new(provider, "mock", &OrchestratorConfig::default());
 
-    let pool = sqlx::SqlitePool::connect(":memory:")
-        .await
-        .expect("in-memory SQLite pool");
-    let usage_repo = klyntbot::storage::UsageRepo::new(pool);
+    let pool = common::test_pool().await;
+    let usage_repo = klyntbot::storage::UsageRepo::new(pool.inner().clone());
     let cost_tracker = Arc::new(CostTracker::from_repo(usage_repo));
 
     IntentPipeline::new(
         analyzer,
-        ContextEngine::new(),
+        Arc::new(ContextEngine::new()),
         router,
         cost_tracker,
         PipelineConfig::default(),
@@ -55,7 +53,6 @@ async fn make_pipeline(provider: Arc<dyn LlmProvider>) -> IntentPipeline {
 
 #[tokio::test]
 async fn test_e2e_direct_response_path() {
-    // "hello" → heuristic classifies as Direct → single LLM call → response
     let provider = Arc::new(MockProvider::new("Hello! How can I help you?"));
     let pipeline = make_pipeline(provider).await;
 
@@ -78,8 +75,6 @@ async fn test_e2e_direct_response_path() {
 
 #[tokio::test]
 async fn test_e2e_tool_assisted_path() {
-    // "show my tasks" → heuristic classifies as Reactive → ReactiveEngine
-    // Mock provider returns a text response (no actual tool calls needed)
     let provider = Arc::new(MockProvider::new("Here are your 3 active tasks: ..."));
     let pipeline = make_pipeline(provider).await;
 
@@ -109,7 +104,6 @@ async fn test_e2e_tool_assisted_path() {
 
 #[tokio::test]
 async fn test_e2e_autonomous_task_path() {
-    // "write me a script that processes CSV files" → Reactive via heuristic
     let provider = Arc::new(MockProvider::new(
         "Here's a Python script that processes CSV files:\n```python\nimport csv\n```",
     ));
@@ -129,11 +123,8 @@ async fn test_e2e_autonomous_task_path() {
         .unwrap();
 
     assert!(!result.content.is_empty());
-    // Mock resolves as reactive (text response, no tool calls)
     assert!(result.validation.is_valid);
 }
-
-// Test 4 (usage.jsonl disk check) removed — CostTracker now records to SQL, not JSONL.
 
 // ── Test 5: Context budget is respected (large history doesn't crash) ──
 
@@ -142,7 +133,6 @@ async fn test_e2e_context_budget_respected() {
     let provider = Arc::new(MockProvider::new("Budget response"));
     let pipeline = make_pipeline(provider).await;
 
-    // Create a history with many messages to test budget allocation
     let mut history = Vec::new();
     for i in 0..50 {
         history.push(Message::user(format!(
@@ -165,13 +155,8 @@ async fn test_e2e_context_budget_respected() {
         .await
         .unwrap();
 
-    // Should succeed without panicking, even with large history
     assert!(!result.content.is_empty());
 }
-
-// ═════════════════════════════════════════════════════════════════════════════
-// Plan-specified integration tests (Task 19)
-// ═════════════════════════════════════════════════════════════════════════════
 
 // ── Test 6: Greeting is routed via Direct mode ──
 
@@ -221,8 +206,6 @@ async fn intent_pipeline_routes_search_as_reactive() {
 
 #[tokio::test]
 async fn intent_pipeline_auto_plans_complex_request() {
-    // "create a plan..." triggers has_plan_keyword → Planned mode via heuristics.
-    // No PlannedEngine configured in test setup → router falls back to Reactive.
     let provider = Arc::new(MockProvider::new(
         "I'll create a plan for reorganizing the codebase.",
     ));
@@ -241,14 +224,11 @@ async fn intent_pipeline_auto_plans_complex_request() {
         .await
         .unwrap();
 
-    // Heuristic should detect plan keywords → classify as Planned
     assert!(
         format!("{:?}", result.classification.mode).contains("Planned"),
         "Expected Planned classification, got: {:?}",
         result.classification.mode
     );
-    // Router reports "planned" as final_mode (initial mode), even though it
-    // internally fell back to reactive since PlannedEngine is not configured.
     assert_eq!(result.mode_used, "planned");
     assert!(result.validation.is_valid);
 }
@@ -257,9 +237,6 @@ async fn intent_pipeline_auto_plans_complex_request() {
 
 #[tokio::test]
 async fn intent_pipeline_escalates_reactive_to_planned() {
-    // Provider always returns tool calls → Reactive engine exhausts iterations
-    // (escalation threshold = ceil(10 * 0.8) = 8) → signals Escalate.
-    // No PlannedEngine configured → router returns "needs planning" message.
     let provider = Arc::new(MockProvider::with_tool_call(
         "web_search",
         serde_json::json!({"query": "test"}),
@@ -279,13 +256,11 @@ async fn intent_pipeline_escalates_reactive_to_planned() {
         .await
         .unwrap();
 
-    // Should have escalated (Reactive → Planned, but no PlannedEngine)
     assert!(
         result.escalations >= 1,
         "Expected escalation, got {} escalations",
         result.escalations
     );
-    // Content should indicate planning not configured
     assert!(
         result.content.contains("planning")
             || result.content.contains("not configured")

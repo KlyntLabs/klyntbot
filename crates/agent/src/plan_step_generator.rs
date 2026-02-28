@@ -7,7 +7,7 @@
 //! - [`drafts_to_plan_steps`] — convert drafts to full [`plan::PlanStep`] records
 
 use common::Result;
-use plan::{PlanStep, StepStatus};
+use plan::{PlanStep, StepStatus, DEFAULT_MAX_STEP_ATTEMPTS};
 use providers::{ChatParams, DynProvider, Message};
 use tracing::warn;
 use uuid::Uuid;
@@ -101,7 +101,7 @@ pub fn drafts_to_plan_steps(drafts: &[PlanStepDraft], start_index: usize) -> Vec
             expected_tools: d.expected_tools.clone(),
             status: StepStatus::Pending,
             attempt_count: 0,
-            max_attempts: 3,
+            max_attempts: DEFAULT_MAX_STEP_ATTEMPTS,
             result: None,
             started_at: None,
             completed_at: None,
@@ -112,8 +112,8 @@ pub fn drafts_to_plan_steps(drafts: &[PlanStepDraft], start_index: usize) -> Vec
 // ── Private helpers ──────────────────────────────────────────────────────────
 
 /// Parse a JSON array of step objects from raw LLM output.
-fn parse_step_drafts(content: &str) -> Vec<PlanStepDraft> {
-    let trimmed = extract_json_array(content);
+pub fn parse_step_drafts(content: &str) -> Vec<PlanStepDraft> {
+    let trimmed = common::utils::extract_json_array(content);
     let raw: Vec<serde_json::Value> = match serde_json::from_str(trimmed) {
         Ok(v) => v,
         Err(e) => {
@@ -159,15 +159,6 @@ fn parse_step_drafts(content: &str) -> Vec<PlanStepDraft> {
         .collect()
 }
 
-/// Extract a JSON array substring by finding the first `[` and last `]`.
-fn extract_json_array(s: &str) -> &str {
-    if let (Some(start), Some(end)) = (s.find('['), s.rfind(']')) {
-        if start < end {
-            return &s[start..=end];
-        }
-    }
-    s
-}
 
 // ── Tests ────────────────────────────────────────────────────────────────────
 

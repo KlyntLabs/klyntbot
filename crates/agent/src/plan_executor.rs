@@ -5,9 +5,8 @@
 //! - [`build_step_context`] — build a context window for the current step
 //! - [`regenerate_from`] — regenerate plan steps from a failure point
 
-use common::Result;
-use plan::PlanError;
-use plan::{Plan, PlanStep, StepStatus};
+use common::{utils::truncate_at_boundary, Result};
+use plan::{Plan, PlanStep, StepStatus, DEFAULT_MAX_STEP_ATTEMPTS};
 use providers::{
     types::{ChatParams, Message},
     DynProvider,
@@ -16,6 +15,7 @@ use tools::RoutingContext;
 use uuid::Uuid;
 
 use crate::execution::{CycleOutcome, ExecutionCore, ExecutionParams};
+use crate::plan_step_generator::{drafts_to_plan_steps, parse_step_drafts};
 
 /// Maximum number of full backtracking events before the plan is marked Failed.
 /// Per-step retries (attempt_count) are separate from this limit.
@@ -215,15 +215,7 @@ pub fn build_step_context(plan: &Plan, current_index: usize) -> String {
         for step in &completed_steps {
             if let Some(ref result) = step.result {
                 let truncated = if result.len() > 500 {
-                    // Find a safe char boundary at or before byte 500 to avoid
-                    // splitting multi-byte UTF-8 characters.
-                    let end = result
-                        .char_indices()
-                        .map(|(i, _)| i)
-                        .take_while(|&i| i <= 500)
-                        .last()
-                        .unwrap_or(0);
-                    format!("{}...(truncated)", &result[..end])
+                    format!("{}...(truncated)", truncate_at_boundary(result, 500))
                 } else {
                     result.clone()
                 };
@@ -316,7 +308,7 @@ pub async fn regenerate_from(
 
     let content = response.content.unwrap_or_default();
 
-    let steps = parse_steps_from_json(&content, failure_index).unwrap_or_default();
+    let steps = drafts_to_plan_steps(&parse_step_drafts(&content), failure_index);
 
     if steps.is_empty() {
         let failed_desc = plan
@@ -332,7 +324,7 @@ pub async fn regenerate_from(
             expected_tools: vec![],
             status: StepStatus::Pending,
             attempt_count: 0,
-            max_attempts: 3,
+            max_attempts: DEFAULT_MAX_STEP_ATTEMPTS,
             result: None,
             started_at: None,
             completed_at: None,
@@ -356,68 +348,6 @@ fn summarize_completed_steps(plan: &Plan, up_to: usize) -> String {
         .join("\n")
 }
 
-/// Parse a JSON array of step objects returned by the LLM into PlanStep values.
-fn parse_steps_from_json(json_str: &str, start_index: usize) -> Result<Vec<PlanStep>> {
-    let trimmed = extract_json_array(json_str);
-
-    let raw: Vec<serde_json::Value> = serde_json::from_str(trimmed).map_err(|e| {
-        PlanError::GenerationFailed(format!(
-            "Regeneration response was not valid JSON: {e}\nResponse: {json_str}"
-        ))
-    })?;
-
-    let steps = raw
-        .iter()
-        .enumerate()
-        .map(|(i, v)| {
-            let description = v
-                .get("description")
-                .and_then(|d| d.as_str())
-                .unwrap_or("")
-                .to_string();
-            let reasoning = v
-                .get("reasoning")
-                .and_then(|r| r.as_str())
-                .unwrap_or("")
-                .to_string();
-            let expected_tools = v
-                .get("expectedTools")
-                .and_then(|t| t.as_array())
-                .map(|arr| {
-                    arr.iter()
-                        .filter_map(|t| t.as_str().map(String::from))
-                        .collect()
-                })
-                .unwrap_or_default();
-
-            PlanStep {
-                id: Uuid::new_v4(),
-                index: start_index + i,
-                description,
-                reasoning,
-                expected_tools,
-                status: StepStatus::Pending,
-                attempt_count: 0,
-                max_attempts: 3,
-                result: None,
-                started_at: None,
-                completed_at: None,
-            }
-        })
-        .collect();
-
-    Ok(steps)
-}
-
-/// Extract a JSON array substring from LLM output that may contain prose or markdown.
-fn extract_json_array(s: &str) -> &str {
-    if let (Some(start), Some(end)) = (s.find('['), s.rfind(']')) {
-        if start < end {
-            return &s[start..=end];
-        }
-    }
-    s
-}
 
 #[cfg(test)]
 mod tests {
