@@ -101,7 +101,7 @@ impl Tool for GoalTool {
         })
     }
 
-    async fn execute(&self, args: Value, _ctx: &RoutingContext) -> Result<String> {
+    async fn execute(&self, args: Value, ctx: &RoutingContext) -> Result<String> {
         let handler = self
             .handler
             .as_ref()
@@ -145,6 +145,21 @@ impl Tool for GoalTool {
 
                 goal.validate_priority()?;
                 let id = handler.create_goal(goal).await?;
+
+                if let Some(ref tx) = ctx.entity_tx {
+                    let _ = tx
+                        .send(common::EntityCard {
+                            entity_type: "goal".to_string(),
+                            entity_id: id.to_string(),
+                            title: title.to_string(),
+                            subtitle: Some(format!("Priority {}", priority)),
+                            route: Some("/plans".to_string()),
+                            icon_hint: "target".to_string(),
+                            metadata: std::collections::HashMap::new(),
+                        })
+                        .await;
+                }
+
                 Ok(format!("Created goal '{}' (id: {})", title, id))
             }
 
