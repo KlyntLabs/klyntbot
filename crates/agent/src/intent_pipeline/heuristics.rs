@@ -408,10 +408,7 @@ fn infer_tool_groups(msg: &str) -> Vec<ToolGroup> {
     }
 
     // Task/todo keywords
-    if msg.contains("task")
-        || msg.contains("todo")
-        || msg.contains("goal")
-        || msg.contains("plan")
+    if msg.contains("task") || msg.contains("todo") || msg.contains("goal") || msg.contains("plan")
     {
         groups.push(ToolGroup::TaskManagement);
     }

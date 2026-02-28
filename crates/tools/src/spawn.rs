@@ -115,8 +115,7 @@ impl Tool for SpawnTool {
                 handler.cancel(agent_id).await
             }
             "status" => {
-                let session_key =
-                    format!("{}:{}", ctx.channel.as_str(), ctx.chat_id.as_str());
+                let session_key = format!("{}:{}", ctx.channel.as_str(), ctx.chat_id.as_str());
                 handler.status(&session_key).await
             }
             _ => {

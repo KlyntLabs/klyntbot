@@ -10,11 +10,11 @@ pub mod types;
 pub mod utils;
 
 // Re-export commonly used types
+pub use entity_card::EntityCard;
 pub use error::{
     ChannelError, ConfigError, KlyntbotError, ProviderError, Result, SessionError, ToolError,
 };
 pub use prompts::{
     Answer, AnswerOption, AnswerType, AnswerValue, FormResponse, InteractionRequest, Question,
 };
-pub use entity_card::EntityCard;
 pub use types::{ChannelName, ChatId, MessageRole, SessionKey};

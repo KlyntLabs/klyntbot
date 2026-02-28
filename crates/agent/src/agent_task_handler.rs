@@ -28,12 +28,8 @@ impl AgentTaskHandler for AgentTaskHandlerImpl {
 
         let mut lines = vec![format!("Task board ({} tasks):", tasks.len())];
         for t in &tasks {
-            let owner = t
-                .owner_agent_id
-                .as_deref()
-                .unwrap_or("unassigned");
-            let blocked: Vec<String> =
-                serde_json::from_str(&t.blocked_by).unwrap_or_default();
+            let owner = t.owner_agent_id.as_deref().unwrap_or("unassigned");
+            let blocked: Vec<String> = serde_json::from_str(&t.blocked_by).unwrap_or_default();
             let blocked_str = if blocked.is_empty() {
                 String::new()
             } else {
@@ -76,11 +72,7 @@ impl AgentTaskHandler for AgentTaskHandlerImpl {
             .repo
             .update_status(task_id, "completed", Some(result), None)
             .await?;
-        Ok(format!(
-            "Completed task '{}': {}",
-            task.description,
-            result
-        ))
+        Ok(format!("Completed task '{}': {}", task.description, result))
     }
 
     async fn fail_task(&self, task_id: &str, error: &str) -> common::Result<String> {
@@ -88,9 +80,6 @@ impl AgentTaskHandler for AgentTaskHandlerImpl {
             .repo
             .update_status(task_id, "failed", None, Some(error))
             .await?;
-        Ok(format!(
-            "Failed task '{}': {}",
-            task.description, error
-        ))
+        Ok(format!("Failed task '{}': {}", task.description, error))
     }
 }

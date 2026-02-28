@@ -428,7 +428,10 @@ impl SlackChannel {
         };
 
         for action in actions {
-            let action_id = action.get("action_id").and_then(|v| v.as_str()).unwrap_or("");
+            let action_id = action
+                .get("action_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("");
 
             if !action_id.starts_with("askuser:") {
                 continue;
@@ -722,8 +725,7 @@ impl Channel for SlackChannel {
                     }
                 }
                 AnswerType::YesNo { .. } => {
-                    let blocks =
-                        build_slack_yes_no_blocks(chat_id, &question.id, &question.text);
+                    let blocks = build_slack_yes_no_blocks(chat_id, &question.id, &question.text);
                     self.send_message_with_blocks(chat_id, &question.text, &blocks)
                         .await?;
 
@@ -1107,10 +1109,7 @@ mod tests {
 
         // Section block
         assert_eq!(blocks[0]["type"], "section");
-        assert_eq!(
-            blocks[0]["text"]["text"].as_str().unwrap(),
-            "Pick priority"
-        );
+        assert_eq!(blocks[0]["text"]["text"].as_str().unwrap(), "Pick priority");
 
         // Actions block with 3 buttons
         assert_eq!(blocks[1]["type"], "actions");

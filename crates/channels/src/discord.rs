@@ -448,10 +448,7 @@ impl DiscordChannel {
     /// Handle INTERACTION_CREATE event (button clicks, select menu selections).
     async fn handle_interaction_create(&self, payload: &Value) -> Result<()> {
         let interaction_id = payload.get("id").and_then(|v| v.as_str()).unwrap_or("");
-        let interaction_token = payload
-            .get("token")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+        let interaction_token = payload.get("token").and_then(|v| v.as_str()).unwrap_or("");
 
         // Acknowledge the interaction (type 6 = DEFERRED_UPDATE_MESSAGE)
         let ack_url = format!(
@@ -837,8 +834,7 @@ impl Channel for DiscordChannel {
                     }
                 }
                 AnswerType::YesNo { .. } => {
-                    let components =
-                        build_discord_yes_no_components(chat_id, &question.id);
+                    let components = build_discord_yes_no_components(chat_id, &question.id);
                     self.send_message_with_components(
                         chat_id,
                         &format!("**{}**\n{}", request.title, question.text),
@@ -1259,10 +1255,7 @@ mod tests {
 
         let menu = &inner[0];
         assert_eq!(menu["type"], 3); // StringSelect
-        assert_eq!(
-            menu["custom_id"].as_str().unwrap(),
-            "askuser:chan2:choice"
-        );
+        assert_eq!(menu["custom_id"].as_str().unwrap(), "askuser:chan2:choice");
 
         let menu_opts = menu["options"].as_array().unwrap();
         assert_eq!(menu_opts.len(), 6);

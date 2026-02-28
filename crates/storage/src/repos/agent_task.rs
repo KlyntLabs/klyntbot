@@ -39,11 +39,7 @@ impl AgentTaskRepo {
         .map_err(StorageError::from)
     }
 
-    pub async fn claim(
-        &self,
-        task_id: &str,
-        agent_id: &str,
-    ) -> Result<AgentTaskRow, StorageError> {
+    pub async fn claim(&self, task_id: &str, agent_id: &str) -> Result<AgentTaskRow, StorageError> {
         sqlx::query_as::<_, AgentTaskRow>(
             "UPDATE agent_tasks
              SET owner_agent_id = ?1, status = 'claimed',
@@ -114,17 +110,13 @@ impl AgentTaskRepo {
                 if t.status != "pending" || t.owner_agent_id.is_some() {
                     return false;
                 }
-                let blocked: Vec<String> =
-                    serde_json::from_str(&t.blocked_by).unwrap_or_default();
+                let blocked: Vec<String> = serde_json::from_str(&t.blocked_by).unwrap_or_default();
                 blocked.iter().all(|id| completed_ids.contains(id))
             })
             .collect())
     }
 
-    pub async fn delete_by_session(
-        &self,
-        session_key: &str,
-    ) -> Result<u64, StorageError> {
+    pub async fn delete_by_session(&self, session_key: &str) -> Result<u64, StorageError> {
         let result = sqlx::query("DELETE FROM agent_tasks WHERE session_key = ?1")
             .bind(session_key)
             .execute(&self.pool)
@@ -154,7 +146,10 @@ mod tests {
     #[tokio::test]
     async fn test_create_and_get() {
         let repo = setup().await;
-        let task = repo.create("sess:1", "Do research", &[] as &[String]).await.unwrap();
+        let task = repo
+            .create("sess:1", "Do research", &[] as &[String])
+            .await
+            .unwrap();
         assert_eq!(task.status, "pending");
         assert_eq!(task.description, "Do research");
         assert!(task.owner_agent_id.is_none());
@@ -166,7 +161,10 @@ mod tests {
     #[tokio::test]
     async fn test_claim() {
         let repo = setup().await;
-        let task = repo.create("sess:1", "Research", &[] as &[String]).await.unwrap();
+        let task = repo
+            .create("sess:1", "Research", &[] as &[String])
+            .await
+            .unwrap();
 
         let claimed = repo.claim(&task.id, "agent-abc").await.unwrap();
         assert_eq!(claimed.status, "claimed");
@@ -180,7 +178,10 @@ mod tests {
     #[tokio::test]
     async fn test_update_status_complete() {
         let repo = setup().await;
-        let task = repo.create("sess:1", "Work", &[] as &[String]).await.unwrap();
+        let task = repo
+            .create("sess:1", "Work", &[] as &[String])
+            .await
+            .unwrap();
         repo.claim(&task.id, "agent-1").await.unwrap();
 
         let updated = repo
@@ -194,12 +195,18 @@ mod tests {
     #[tokio::test]
     async fn test_list_available_respects_blocking() {
         let repo = setup().await;
-        let t1 = repo.create("sess:1", "First", &[] as &[String]).await.unwrap();
+        let t1 = repo
+            .create("sess:1", "First", &[] as &[String])
+            .await
+            .unwrap();
         let _t2 = repo
             .create("sess:1", "Second (blocked)", std::slice::from_ref(&t1.id))
             .await
             .unwrap();
-        let t3 = repo.create("sess:1", "Third (free)", &[] as &[String]).await.unwrap();
+        let t3 = repo
+            .create("sess:1", "Third (free)", &[] as &[String])
+            .await
+            .unwrap();
 
         let available = repo.list_available("sess:1").await.unwrap();
         assert_eq!(available.len(), 2); // t1 and t3 are available

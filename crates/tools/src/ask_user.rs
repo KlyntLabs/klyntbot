@@ -110,9 +110,7 @@ impl Tool for AskUserTool {
 
         // Path 1: CLI/dashboard interactive mode (oneshot channel)
         if let Some(interaction_tx) = &ctx.interaction_tx {
-            return self
-                .execute_via_cli(interaction_tx, request)
-                .await;
+            return self.execute_via_cli(interaction_tx, request).await;
         }
 
         // Path 2: Platform-native channel interaction (Telegram buttons, Discord selects, etc.)

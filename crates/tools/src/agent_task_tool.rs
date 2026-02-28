@@ -32,11 +32,7 @@ pub struct AgentTaskTool {
 }
 
 impl AgentTaskTool {
-    pub fn new(
-        handler: Arc<dyn AgentTaskHandler>,
-        session_key: String,
-        agent_id: String,
-    ) -> Self {
+    pub fn new(handler: Arc<dyn AgentTaskHandler>, session_key: String, agent_id: String) -> Self {
         Self {
             handler,
             session_key,

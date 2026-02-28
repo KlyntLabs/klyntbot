@@ -64,8 +64,7 @@ impl Tool for GlobTool {
         } else if let Some(ref dir) = self.base.allowed_dir() {
             dir.clone()
         } else {
-            std::env::current_dir()
-                .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?
+            std::env::current_dir().map_err(|e| ToolError::ExecutionFailed(e.to_string()))?
         };
 
         let glob = Glob::new(pattern_str)

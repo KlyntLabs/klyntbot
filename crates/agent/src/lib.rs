@@ -40,6 +40,7 @@ pub mod todo_calendar_sync_adapter;
 pub mod todo_embedding_handler;
 
 pub use agent_loop::{AgentLoop, StreamingHandle};
+pub use agent_task_handler::AgentTaskHandlerImpl;
 pub use calendar_reconcile::{reconcile_calendar_events, ReconcileAction, ReconcileReport};
 pub use calendar_sync_adapter::CalendarSyncAdapter;
 pub use confidence::{ConfidenceAssessment, ConfidenceEvaluator, DecisionAction, DecisionLogger};
@@ -63,5 +64,4 @@ pub use plan_handler::PlanHandlerImpl;
 pub use recurring_tasks::RecurringTaskSpawner;
 pub use reminders::{CalendarEvent, ReminderEngine};
 pub use skills::SkillManager;
-pub use agent_task_handler::AgentTaskHandlerImpl;
 pub use subagent::{SubagentManager, SubagentProfile};

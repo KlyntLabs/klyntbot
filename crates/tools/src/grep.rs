@@ -86,8 +86,7 @@ impl Tool for GrepTool {
         } else if let Some(ref dir) = self.base.allowed_dir() {
             dir.clone()
         } else {
-            std::env::current_dir()
-                .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?
+            std::env::current_dir().map_err(|e| ToolError::ExecutionFailed(e.to_string()))?
         };
 
         let glob_matcher: Option<GlobMatcher> = if let Some(glob_str) = p.optional_str("glob")? {

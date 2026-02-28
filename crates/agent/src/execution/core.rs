@@ -259,8 +259,7 @@ impl ExecutionCore {
             // the spinner updates in real-time as tools run.
 
             // Create entity card channel for this batch of tool calls
-            let (entity_tx, mut entity_rx) =
-                tokio::sync::mpsc::channel::<common::EntityCard>(16);
+            let (entity_tx, mut entity_rx) = tokio::sync::mpsc::channel::<common::EntityCard>(16);
 
             let futures: Vec<_> = response
                 .tool_calls

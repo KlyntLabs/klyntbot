@@ -311,7 +311,10 @@ impl SubagentManager {
         let mut handles = self.handles.lock().await;
         if let Some(handle) = handles.remove(agent_id) {
             handle.cancel_token.cancel();
-            Ok(format!("Cancelled subagent '{}' ({})", handle.label, agent_id))
+            Ok(format!(
+                "Cancelled subagent '{}' ({})",
+                handle.label, agent_id
+            ))
         } else {
             Err(common::ToolError::ExecutionFailed(format!(
                 "No running subagent with ID '{}'",

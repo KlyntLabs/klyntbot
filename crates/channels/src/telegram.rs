@@ -265,15 +265,26 @@ impl TelegramChannel {
         };
 
         // Check if this is a pending free_text interaction response
-        if let Some(chat_id) = message.get("chat").and_then(|c| c.get("id")).and_then(|v| v.as_i64()) {
+        if let Some(chat_id) = message
+            .get("chat")
+            .and_then(|c| c.get("id"))
+            .and_then(|v| v.as_i64())
+        {
             let chat_key_prefix = format!("{}:", chat_id);
-            let pending_key = self.pending_interactions.iter()
-                .find(|entry| entry.key().starts_with(&chat_key_prefix) && matches!(entry.value(), PendingCallback::FreeText(_)))
+            let pending_key = self
+                .pending_interactions
+                .iter()
+                .find(|entry| {
+                    entry.key().starts_with(&chat_key_prefix)
+                        && matches!(entry.value(), PendingCallback::FreeText(_))
+                })
                 .map(|entry| entry.key().clone());
 
             if let Some(key) = pending_key {
                 if let Some(text) = message.get("text").and_then(|v| v.as_str()) {
-                    if let Some((_, PendingCallback::FreeText(tx))) = self.pending_interactions.remove(&key) {
+                    if let Some((_, PendingCallback::FreeText(tx))) =
+                        self.pending_interactions.remove(&key)
+                    {
                         let _ = tx.send(text.to_string());
                         return Ok(());
                     }
@@ -595,15 +606,9 @@ impl TelegramChannel {
 
     /// Handle a callback_query from an inline keyboard button press.
     async fn handle_callback_query(&self, callback: &Value) -> Result<()> {
-        let callback_id = callback
-            .get("id")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+        let callback_id = callback.get("id").and_then(|v| v.as_str()).unwrap_or("");
 
-        let data = callback
-            .get("data")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+        let data = callback.get("data").and_then(|v| v.as_str()).unwrap_or("");
 
         // Answer the callback to dismiss the loading spinner
         let _ = self
@@ -633,7 +638,9 @@ impl TelegramChannel {
         // Edit the original message to show the selection (remove keyboard)
         if let Some(msg) = callback.get("message") {
             if let (Some(msg_chat_id), Some(msg_id)) = (
-                msg.get("chat").and_then(|c| c.get("id")).and_then(|v| v.as_i64()),
+                msg.get("chat")
+                    .and_then(|c| c.get("id"))
+                    .and_then(|v| v.as_i64()),
                 msg.get("message_id").and_then(|v| v.as_i64()),
             ) {
                 let original_text = msg
@@ -770,11 +777,7 @@ impl Channel for TelegramChannel {
         for question in &request.questions {
             let answer = match &question.answer_type {
                 AnswerType::SingleSelect { options } => {
-                    let keyboard = build_single_select_keyboard(
-                        chat_id,
-                        &question.id,
-                        options,
-                    );
+                    let keyboard = build_single_select_keyboard(chat_id, &question.id, options);
                     self.api_call(
                         "sendMessage",
                         json!({
@@ -786,9 +789,7 @@ impl Channel for TelegramChannel {
                     )
                     .await?;
 
-                    let value = self
-                        .wait_for_callback(chat_id, &question.id)
-                        .await?;
+                    let value = self.wait_for_callback(chat_id, &question.id).await?;
                     Answer {
                         question_id: question.id.clone(),
                         value: AnswerValue::Selected { value },
@@ -807,9 +808,7 @@ impl Channel for TelegramChannel {
                     )
                     .await?;
 
-                    let value = self
-                        .wait_for_callback(chat_id, &question.id)
-                        .await?;
+                    let value = self.wait_for_callback(chat_id, &question.id).await?;
                     Answer {
                         question_id: question.id.clone(),
                         value: AnswerValue::YesNo {
@@ -820,11 +819,7 @@ impl Channel for TelegramChannel {
                 AnswerType::MultiSelect { options } => {
                     // For multi_select, present as single_select buttons
                     // (simplified: user selects one at a time, "Done" to finish)
-                    let keyboard = build_single_select_keyboard(
-                        chat_id,
-                        &question.id,
-                        options,
-                    );
+                    let keyboard = build_single_select_keyboard(chat_id, &question.id, options);
                     self.api_call(
                         "sendMessage",
                         json!({
@@ -836,9 +831,7 @@ impl Channel for TelegramChannel {
                     )
                     .await?;
 
-                    let value = self
-                        .wait_for_callback(chat_id, &question.id)
-                        .await?;
+                    let value = self.wait_for_callback(chat_id, &question.id).await?;
                     Answer {
                         question_id: question.id.clone(),
                         value: AnswerValue::MultiSelected {
@@ -866,9 +859,7 @@ impl Channel for TelegramChannel {
                     )
                     .await?;
 
-                    let content = self
-                        .wait_for_free_text(chat_id, &question.id)
-                        .await?;
+                    let content = self.wait_for_free_text(chat_id, &question.id).await?;
                     Answer {
                         question_id: question.id.clone(),
                         value: AnswerValue::Text { content },
@@ -1089,10 +1080,7 @@ mod tests {
         // Check callback_data format
         let first_btn = &rows[0][0];
         assert_eq!(first_btn["text"], "High");
-        assert_eq!(
-            first_btn["callback_data"],
-            "askuser:123:priority:high"
-        );
+        assert_eq!(first_btn["callback_data"], "askuser:123:priority:high");
     }
 
     #[test]
@@ -1106,15 +1094,9 @@ mod tests {
         assert_eq!(buttons.len(), 2);
 
         assert!(buttons[0]["text"].as_str().unwrap().contains("Yes"));
-        assert_eq!(
-            buttons[0]["callback_data"],
-            "askuser:456:confirm:yes"
-        );
+        assert_eq!(buttons[0]["callback_data"], "askuser:456:confirm:yes");
         assert!(buttons[1]["text"].as_str().unwrap().contains("No"));
-        assert_eq!(
-            buttons[1]["callback_data"],
-            "askuser:456:confirm:no"
-        );
+        assert_eq!(buttons[1]["callback_data"], "askuser:456:confirm:no");
     }
 
     #[test]
