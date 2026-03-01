@@ -1,4 +1,5 @@
 import { createHashRouter, RouterProvider } from "react-router";
+import { MainApp } from "./components/views/MainApp";
 
 function Placeholder({ name }: { name: string }) {
   return (
@@ -9,7 +10,7 @@ function Placeholder({ name }: { name: string }) {
 }
 
 const router = createHashRouter([
-  { path: "/", element: <Placeholder name="Tasks" /> },
+  { path: "/", element: <MainApp /> },
   { path: "/chat", element: <Placeholder name="Chat" /> },
   { path: "/project/:id", element: <Placeholder name="Project Detail" /> },
   { path: "/launcher", element: <Placeholder name="Launcher" /> },
