@@ -1,27 +1,27 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router';
 import {
-  Search, Plus, MessageSquare, Calendar, Target, TrendingUp, Settings, Sparkles,
+  Search, Plus, MessageSquare, Calendar, Target, TrendingUp, Settings,
+  Sparkles, Command, ArrowLeft,
 } from 'lucide-react';
 import { KlyntLogo } from '../ui/KlyntLogo';
 import { mockLauncherItems } from '../../data/mockData';
 
 const iconMap: Record<string, typeof Search> = {
-  Plus, Search, MessageSquare, Calendar, Target, TrendingUp, Settings,
+  Plus, Search, MessageSquare, Calendar, Target, TrendingUp, Settings, Sparkles,
 };
 
 export function Launcher() {
+  const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
 
-  const filteredItems = useMemo(() => {
-    if (!query) return mockLauncherItems;
-    const q = query.toLowerCase();
-    return mockLauncherItems.filter(
-      item => item.title.toLowerCase().includes(q) || item.subtitle.toLowerCase().includes(q),
-    );
-  }, [query]);
-
-  const isAiQuery = query.startsWith('/') || query.startsWith('?');
+  const filteredItems = useMemo(() =>
+    mockLauncherItems.filter(item =>
+      item.title.toLowerCase().includes(query.toLowerCase()) ||
+      item.subtitle.toLowerCase().includes(query.toLowerCase()),
+    ),
+  [query]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown') {
@@ -34,93 +34,133 @@ export function Launcher() {
   };
 
   return (
-    <div className="h-screen w-screen bg-[rgba(0,0,0,0.85)] flex items-start justify-center pt-[20vh]">
-      <div className="w-[560px] bg-[#1A1A19] rounded-2xl border border-[rgba(255,255,255,0.08)] shadow-2xl overflow-hidden">
-        {/* Search Input */}
-        <div className="flex items-center gap-3 px-5 py-4 border-b border-[rgba(255,255,255,0.08)]">
-          <div className="w-6 h-6 rounded-md bg-white flex items-center justify-center p-0.5">
-            <KlyntLogo className="w-full h-full" />
+    <div className="min-h-screen bg-[#0E0E0D] flex items-start justify-center pt-32 p-4">
+      {/* Back Button */}
+      <button
+        onClick={() => navigate('/')}
+        className="fixed top-4 left-4 flex items-center gap-2 px-3 py-2 bg-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.06)] rounded-md text-[#8B949E] hover:text-[#C9D1D9] transition-colors"
+      >
+        <ArrowLeft className="w-4 h-4" strokeWidth={1.5} />
+        <span className="text-[13px] font-light">Back to Main</span>
+      </button>
+
+      {/* Launcher Window */}
+      <div className="w-full max-w-[700px] bg-[#0E0E0D] backdrop-blur-2xl rounded-xl border border-[rgba(255,255,255,0.08)] shadow-2xl overflow-hidden">
+        {/* Header */}
+        <div className="px-5 pt-5 pb-3">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-7 h-7 rounded-lg bg-white flex items-center justify-center p-1">
+              <KlyntLogo className="w-full h-full" />
+            </div>
+            <h1 className="text-[15px] font-normal text-[#E6EDF3]">Klynt Launcher</h1>
           </div>
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => {
-              setQuery(e.target.value);
-              setSelectedIndex(0);
-            }}
-            onKeyDown={handleKeyDown}
-            placeholder="Search commands, tasks, or ask AI..."
-            className="flex-1 bg-transparent text-[14px] text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none font-light"
-            autoFocus
-          />
-          {query && (
-            <button
-              onClick={() => setQuery('')}
-              className="text-[#8B949E] hover:text-[#C9D1D9] text-[12px] font-light transition-colors"
-            >
-              Clear
-            </button>
-          )}
+          <p className="text-[11px] text-[#8B949E] font-light">AI assistant & quick actions</p>
         </div>
 
-        {/* AI Query Banner */}
-        {isAiQuery && (
-          <div className="flex items-center gap-2 px-5 py-3 bg-[rgba(249,115,22,0.06)] border-b border-[rgba(249,115,22,0.1)]">
-            <Sparkles className="w-3.5 h-3.5 text-[#F97316]" strokeWidth={1.5} />
-            <span className="text-[12px] text-[#F97316] font-light">AI will process your query</span>
-            <span className="text-[11px] text-[#8B949E] font-light ml-auto">Enter to send</span>
+        {/* Search Bar */}
+        <div className="px-5 pb-4">
+          <div className="flex items-center gap-3 bg-[rgba(255,255,255,0.04)] rounded-xl px-4 py-3">
+            <Sparkles className="w-[18px] h-[18px] text-[#F97316]" strokeWidth={1.5} />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setSelectedIndex(0);
+              }}
+              onKeyDown={handleKeyDown}
+              placeholder="Ask Klynt anything or type a command..."
+              autoFocus
+              className="flex-1 bg-transparent text-[#E6EDF3] text-[13px] placeholder:text-[#8B949E] outline-none font-light"
+            />
+            <div className="flex items-center gap-1.5">
+              <span className="px-1.5 py-0.5 bg-[rgba(255,255,255,0.06)] rounded text-[11px] text-[#8B949E] font-light">AI</span>
+              <span className="px-1.5 py-0.5 bg-[rgba(255,255,255,0.06)] rounded text-[11px] text-[#8B949E] font-light">Tab</span>
+            </div>
           </div>
-        )}
+        </div>
 
         {/* Results */}
-        <div className="max-h-[360px] overflow-y-auto py-2">
-          {filteredItems.length === 0 ? (
-            <div className="px-5 py-8 text-center">
-              <p className="text-[13px] text-[#8B949E] font-light">No results found</p>
-              <p className="text-[11px] text-[#6E7681] font-light mt-1">Try a different search or ask AI with /</p>
+        <div className="max-h-[500px] overflow-y-auto px-5 pb-4">
+          {query.trim() || filteredItems.length > 0 ? (
+            <div className="space-y-1">
+              {/* AI Query Option */}
+              {query.trim() && (
+                <button
+                  className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all ${
+                    0 === selectedIndex ? 'bg-[rgba(255,255,255,0.08)]' : 'hover:bg-[rgba(255,255,255,0.04)]'
+                  }`}
+                  onMouseEnter={() => setSelectedIndex(0)}
+                >
+                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${
+                    0 === selectedIndex ? 'bg-[#F97316] text-white' : 'bg-[rgba(255,255,255,0.04)] text-[#F97316]'
+                  }`}>
+                    <Sparkles className="w-[18px] h-[18px]" strokeWidth={1.5} />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <h3 className="text-[#E6EDF3] text-[13px] font-light">Ask Klynt AI: {query}</h3>
+                    <p className="text-[11px] text-[#8B949E] font-light">Get AI-powered response</p>
+                  </div>
+                </button>
+              )}
+
+              {/* Commands */}
+              {filteredItems.map((item, index) => {
+                const Icon = iconMap[item.icon] ?? Search;
+                const actualIndex = query.trim() ? index + 1 : index;
+                const isSelected = actualIndex === selectedIndex;
+                return (
+                  <button
+                    key={item.id}
+                    className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all ${
+                      isSelected ? 'bg-[rgba(255,255,255,0.08)]' : 'hover:bg-[rgba(255,255,255,0.04)]'
+                    }`}
+                    onMouseEnter={() => setSelectedIndex(actualIndex)}
+                  >
+                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${
+                      isSelected ? 'bg-[#F97316] text-white' : 'bg-[rgba(255,255,255,0.04)] text-[#8B949E]'
+                    }`}>
+                      <Icon className="w-[18px] h-[18px]" strokeWidth={1.5} />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <h3 className="text-[#E6EDF3] text-[13px] font-light">{item.title}</h3>
+                      <p className="text-[11px] text-[#8B949E] font-light">{item.subtitle}</p>
+                    </div>
+                    <div className="flex items-center gap-1 text-[11px] text-[#8B949E] font-light">
+                      {item.shortcut}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           ) : (
-            filteredItems.map((item, idx) => {
-              const Icon = iconMap[item.icon] ?? Search;
-              const isSelected = idx === selectedIndex;
-              return (
-                <button
-                  key={item.id}
-                  onMouseEnter={() => setSelectedIndex(idx)}
-                  className={`w-full flex items-center gap-3 px-5 py-2.5 text-left transition-colors ${
-                    isSelected ? 'bg-[rgba(255,255,255,0.06)]' : 'hover:bg-[rgba(255,255,255,0.03)]'
-                  }`}
-                >
-                  <div className="w-8 h-8 rounded-lg bg-[rgba(255,255,255,0.04)] flex items-center justify-center">
-                    <Icon className="w-4 h-4 text-[#8B949E]" strokeWidth={1.5} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] font-light text-[#C9D1D9]">{item.title}</p>
-                    <p className="text-[11px] font-light text-[#8B949E] truncate">{item.subtitle}</p>
-                  </div>
-                  <span className="text-[11px] text-[#6E7681] font-light font-mono">{item.shortcut}</span>
-                </button>
-              );
-            })
+            <div className="px-5 py-10 text-center text-[#8B949E] text-[13px] font-light">
+              No results found
+            </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-5 py-3 border-t border-[rgba(255,255,255,0.08)]">
-          <div className="flex items-center gap-4">
-            <span className="text-[10px] text-[#6E7681] font-light">
-              <kbd className="px-1.5 py-0.5 bg-[rgba(255,255,255,0.06)] rounded text-[10px]">↑↓</kbd> navigate
-            </span>
-            <span className="text-[10px] text-[#6E7681] font-light">
-              <kbd className="px-1.5 py-0.5 bg-[rgba(255,255,255,0.06)] rounded text-[10px]">↵</kbd> select
-            </span>
-            <span className="text-[10px] text-[#6E7681] font-light">
-              <kbd className="px-1.5 py-0.5 bg-[rgba(255,255,255,0.06)] rounded text-[10px]">esc</kbd> close
-            </span>
+        <div className="px-5 py-3 bg-[rgba(0,0,0,0.2)]">
+          <div className="flex items-center justify-between text-[11px] text-[#8B949E]">
+            <div className="flex items-center gap-4">
+              <span className="flex items-center gap-1.5 font-light">
+                <kbd className="px-1.5 py-0.5 bg-[rgba(255,255,255,0.06)] rounded">↵</kbd>
+                Open
+              </span>
+              <span className="flex items-center gap-1.5 font-light">
+                <kbd className="px-1.5 py-0.5 bg-[rgba(255,255,255,0.06)] rounded">&#8984;</kbd>
+                <kbd className="px-1.5 py-0.5 bg-[rgba(255,255,255,0.06)] rounded">↵</kbd>
+                Open in Background
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="flex items-center gap-1.5 font-light">
+                <Command className="w-3 h-3" strokeWidth={1.5} />
+                Commands
+              </span>
+            </div>
           </div>
-          <span className="text-[10px] text-[#6E7681] font-light">
-            <kbd className="px-1.5 py-0.5 bg-[rgba(255,255,255,0.06)] rounded text-[10px]">/</kbd> AI mode
-          </span>
         </div>
       </div>
     </div>
