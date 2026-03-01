@@ -1,20 +1,16 @@
 import { createHashRouter, RouterProvider } from "react-router";
 import { MainApp } from "./components/views/MainApp";
-
-function Placeholder({ name }: { name: string }) {
-  return (
-    <div className="h-screen w-screen bg-background text-foreground flex items-center justify-center">
-      <p className="text-muted-foreground text-sm font-light">{name} — coming soon</p>
-    </div>
-  );
-}
+import { Chat } from "./components/views/Chat";
+import { ProjectDetail } from "./components/views/ProjectDetail";
+import { Launcher } from "./components/views/Launcher";
+import { SystemTray } from "./components/views/SystemTray";
 
 const router = createHashRouter([
   { path: "/", element: <MainApp /> },
-  { path: "/chat", element: <Placeholder name="Chat" /> },
-  { path: "/project/:id", element: <Placeholder name="Project Detail" /> },
-  { path: "/launcher", element: <Placeholder name="Launcher" /> },
-  { path: "/tray", element: <Placeholder name="System Tray" /> },
+  { path: "/chat", element: <Chat /> },
+  { path: "/project/:id", element: <ProjectDetail /> },
+  { path: "/launcher", element: <Launcher /> },
+  { path: "/tray", element: <SystemTray /> },
 ]);
 
 export default function App() {
