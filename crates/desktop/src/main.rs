@@ -2,14 +2,12 @@
 
 mod app_core;
 mod commands;
-mod events;
-mod state;
 
-use state::ManagedState;
+use app_core::AppCore;
 
 fn main() {
     tauri::Builder::default()
-        .manage(ManagedState::new())
+        .manage(AppCore::new())
         .invoke_handler(tauri::generate_handler![
             commands::tasks::task_list,
             commands::tasks::project_list,

@@ -1,14 +1,14 @@
-import { createBrowserRouter, RouterProvider } from "react-router";
+import { createHashRouter, RouterProvider } from "react-router";
 
 function Placeholder({ name }: { name: string }) {
   return (
-    <div className="h-screen w-screen bg-[#0E0E0D] text-[#E6EDF3] flex items-center justify-center">
-      <p className="text-[#8B949E] text-sm font-light">{name} — coming soon</p>
+    <div className="h-screen w-screen bg-background text-foreground flex items-center justify-center">
+      <p className="text-muted-foreground text-sm font-light">{name} — coming soon</p>
     </div>
   );
 }
 
-const router = createBrowserRouter([
+const router = createHashRouter([
   { path: "/", element: <Placeholder name="Tasks" /> },
   { path: "/chat", element: <Placeholder name="Chat" /> },
   { path: "/project/:id", element: <Placeholder name="Project Detail" /> },
