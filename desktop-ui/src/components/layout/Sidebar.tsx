@@ -30,7 +30,7 @@ export function Sidebar({ active, onNavigate }: SidebarProps) {
   const bottomItems = items.filter(i => i.bottom);
 
   return (
-    <div className="w-14 bg-[#0E0E0D] backdrop-blur-xl border-r border-[rgba(255,255,255,0.08)] flex flex-col items-center gap-1 pb-3">
+    <div className="w-14 bg-background backdrop-blur-xl border-r border-border flex flex-col items-center gap-1 pb-3">
       {/* Logo */}
       <div className="h-14 flex items-center px-2">
         <button
@@ -51,8 +51,8 @@ export function Sidebar({ active, onNavigate }: SidebarProps) {
             onClick={() => handleClick(item)}
             className={`w-9 h-9 rounded-md flex items-center justify-center transition-colors ${
               isActive
-                ? 'bg-[rgba(255,255,255,0.08)] text-[#F97316]'
-                : 'text-[#8B949E] hover:bg-[rgba(255,255,255,0.04)] hover:text-[#C9D1D9]'
+                ? 'bg-surface-highest text-brand'
+                : 'text-muted hover:bg-surface-base hover:text-secondary'
             }`}
           >
             <Icon className="w-[18px] h-[18px]" strokeWidth={1.5} />
@@ -72,8 +72,8 @@ export function Sidebar({ active, onNavigate }: SidebarProps) {
             onClick={() => handleClick(item)}
             className={`w-9 h-9 rounded-md flex items-center justify-center transition-colors ${
               isActive
-                ? 'bg-[rgba(255,255,255,0.08)] text-[#F97316]'
-                : 'text-[#8B949E] hover:bg-[rgba(255,255,255,0.04)] hover:text-[#C9D1D9]'
+                ? 'bg-surface-highest text-brand'
+                : 'text-muted hover:bg-surface-base hover:text-secondary'
             }`}
           >
             <Icon className="w-[18px] h-[18px]" strokeWidth={1.5} />
