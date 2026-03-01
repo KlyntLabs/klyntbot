@@ -113,7 +113,7 @@ export function Chat() {
   };
 
   return (
-    <div className="h-screen w-screen bg-[#0E0E0D] text-[#E6EDF3] flex overflow-hidden">
+    <div className="h-screen w-screen bg-background text-primary flex overflow-hidden">
       <Sidebar
         active={activeSidebar}
         onNavigate={(item) => {
@@ -123,18 +123,18 @@ export function Chat() {
       />
 
       {/* Left Sidebar — Thread List */}
-      <div className="w-[250px] bg-[#0E0E0D] border-r border-[rgba(255,255,255,0.08)] flex flex-col">
+      <div className="w-[250px] bg-background border-r border-border flex flex-col">
         {/* Quick Links */}
         <div className="px-4 py-3 space-y-1">
-          <button className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-[rgba(255,255,255,0.04)] transition-colors text-[12px] font-light text-[#8B949E] hover:text-[#C9D1D9]">
+          <button className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-surface-base transition-colors text-[12px] font-light text-muted hover:text-secondary">
             <Plus className="w-[13px] h-[13px]" strokeWidth={1.5} />
             New thread
           </button>
-          <button className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-[rgba(255,255,255,0.04)] transition-colors text-[12px] font-light text-[#8B949E] hover:text-[#C9D1D9]">
+          <button className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-surface-base transition-colors text-[12px] font-light text-muted hover:text-secondary">
             <RotateCcw className="w-[13px] h-[13px]" strokeWidth={1.5} />
             Automations
           </button>
-          <button className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-[rgba(255,255,255,0.04)] transition-colors text-[12px] font-light text-[#8B949E] hover:text-[#C9D1D9]">
+          <button className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-surface-base transition-colors text-[12px] font-light text-muted hover:text-secondary">
             <Settings className="w-[13px] h-[13px]" strokeWidth={1.5} />
             Skills and Apps
           </button>
@@ -147,7 +147,7 @@ export function Chat() {
               <div key={project.id}>
                 <button
                   onClick={() => toggleProject(project.id)}
-                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-[rgba(255,255,255,0.04)] transition-colors text-[12px] font-light text-[#8B949E] hover:text-[#C9D1D9]"
+                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-surface-base transition-colors text-[12px] font-light text-muted hover:text-secondary"
                 >
                   <FolderOpen className="w-3.5 h-3.5" strokeWidth={1.5} />
                   <span className="flex-1 text-left">{project.name}</span>
@@ -166,8 +166,8 @@ export function Chat() {
                         onClick={() => setSelectedThread(thread.id)}
                         className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-[12px] font-light ${
                           selectedThread === thread.id
-                            ? 'bg-[rgba(255,255,255,0.08)] text-[#E6EDF3]'
-                            : 'text-[#8B949E] hover:bg-[rgba(255,255,255,0.04)] hover:text-[#C9D1D9]'
+                            ? 'bg-surface-highest text-primary'
+                            : 'text-muted hover:bg-surface-base hover:text-secondary'
                         }`}
                       >
                         <MessageSquare className="w-3 h-3" strokeWidth={1.5} />
@@ -194,14 +194,14 @@ export function Chat() {
                 className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 {message.role === 'user' ? (
-                  <div className="max-w-[85%] rounded-2xl px-5 py-3.5 bg-[rgba(255,255,255,0.06)] backdrop-blur-sm">
-                    <p className="text-[13px] font-light whitespace-pre-wrap leading-relaxed text-[#E6EDF3]">
+                  <div className="max-w-[85%] rounded-2xl px-5 py-3.5 bg-surface-raised backdrop-blur-sm">
+                    <p className="text-[13px] font-light whitespace-pre-wrap leading-relaxed text-primary">
                       {message.content}
                     </p>
                   </div>
                 ) : (
                   <div className="max-w-[85%]">
-                    <p className="text-[13px] font-light whitespace-pre-wrap leading-relaxed text-[#C9D1D9]">
+                    <p className="text-[13px] font-light whitespace-pre-wrap leading-relaxed text-secondary">
                       {message.content}
                     </p>
                   </div>
@@ -211,9 +211,9 @@ export function Chat() {
             {isStreaming && (
               <div className="flex justify-start">
                 <div className="flex gap-1">
-                  <div className="w-1.5 h-1.5 bg-[#8B949E] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <div className="w-1.5 h-1.5 bg-[#8B949E] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <div className="w-1.5 h-1.5 bg-[#8B949E] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                  <div className="w-1.5 h-1.5 bg-muted rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <div className="w-1.5 h-1.5 bg-muted rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <div className="w-1.5 h-1.5 bg-muted rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                 </div>
               </div>
             )}
@@ -224,8 +224,8 @@ export function Chat() {
         {/* Input Area */}
         <div className="p-6">
           <div className="max-w-3xl mx-auto">
-            <div className="bg-[rgba(255,255,255,0.04)] rounded-2xl flex items-center px-2 gap-2">
-              <button className="w-8 h-8 flex items-center justify-center text-[#8B949E] hover:text-[#C9D1D9] transition-colors shrink-0">
+            <div className="bg-surface-base rounded-2xl flex items-center px-2 gap-2">
+              <button className="w-8 h-8 flex items-center justify-center text-muted hover:text-secondary transition-colors shrink-0">
                 <Plus className="w-4 h-4" strokeWidth={1.5} />
               </button>
               <textarea
@@ -239,34 +239,34 @@ export function Chat() {
                 }}
                 placeholder="Ask Klynt anything, @ to add files, / for commands"
                 rows={1}
-                className="flex-1 bg-transparent py-3.5 text-[13px] text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none font-light resize-none"
+                className="flex-1 bg-transparent py-3.5 text-[13px] text-primary placeholder:text-muted focus:outline-none font-light resize-none"
                 style={{ maxHeight: '200px' }}
               />
-              <button className="w-8 h-8 flex items-center justify-center text-[#8B949E] hover:text-[#C9D1D9] transition-colors shrink-0">
+              <button className="w-8 h-8 flex items-center justify-center text-muted hover:text-secondary transition-colors shrink-0">
                 <Mic className="w-4 h-4" strokeWidth={1.5} />
               </button>
               <button
                 onClick={handleSend}
                 disabled={!input.trim()}
-                className="w-9 h-9 rounded-full bg-[#F97316] hover:bg-[#F97316]/90 disabled:bg-[rgba(255,255,255,0.04)] disabled:text-[#8B949E] flex items-center justify-center transition-colors shrink-0"
+                className="w-9 h-9 rounded-full bg-brand hover:bg-brand/90 disabled:bg-surface-base disabled:text-muted flex items-center justify-center transition-colors shrink-0"
               >
                 <Send className="w-4 h-4" strokeWidth={2} />
               </button>
             </div>
             <div className="flex items-center justify-between mt-2">
               <div className="flex items-center gap-2">
-                <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.06)] transition-colors text-[11px] font-light text-[#8B949E]">
+                <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-base hover:bg-surface-raised transition-colors text-[11px] font-light text-muted">
                   <Server className="w-3.5 h-3.5" strokeWidth={1.5} />
                   <span>Local</span>
                   <ChevronDown className="w-3 h-3" strokeWidth={1.5} />
                 </button>
-                <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.06)] transition-colors text-[11px] font-light text-[#8B949E]">
+                <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-base hover:bg-surface-raised transition-colors text-[11px] font-light text-muted">
                   <Shield className="w-3.5 h-3.5" strokeWidth={1.5} />
                   <span>Default permissions</span>
                   <ChevronDown className="w-3 h-3" strokeWidth={1.5} />
                 </button>
               </div>
-              <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.06)] transition-colors text-[11px] font-light text-[#8B949E]">
+              <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-base hover:bg-surface-raised transition-colors text-[11px] font-light text-muted">
                 <FolderOpen className="w-3.5 h-3.5" strokeWidth={1.5} />
                 <span>KlyntBot</span>
                 <ChevronDown className="w-3 h-3" strokeWidth={1.5} />
