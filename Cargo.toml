@@ -21,7 +21,6 @@ members = [
     "crates/feature-finance",
     "crates/feature-todo",
     "crates/plugin-runtime",
-    "crates/dashboard",
 ]
 
 [workspace.package]
@@ -33,7 +32,6 @@ license = "MIT"
 [workspace.dependencies]
 # Internal workspace crates
 common = { path = "crates/common" }
-dashboard = { path = "crates/dashboard" }
 config = { path = "crates/config" }
 bus = { path = "crates/bus" }
 providers = { path = "crates/providers" }

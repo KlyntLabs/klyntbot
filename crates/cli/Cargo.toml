@@ -17,7 +17,6 @@ storage.workspace = true
 session.workspace = true
 tools.workspace = true
 domain.workspace = true
-dashboard.workspace = true
 plugin-runtime.workspace = true
 clap = { workspace = true }
 tokio = { workspace = true }
