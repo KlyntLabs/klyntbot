@@ -825,6 +825,8 @@ async fn strategy_record_round_trips_with_satisfaction_backfill() {
         tool_name: None,
         tool_success: None,
         tool_duration_ms: None,
+        complexity_signals: serde_json::Value::Null,
+        execution_mode: None,
     };
     repos.strategies.create(&record).await.unwrap();
 
@@ -842,48 +844,6 @@ async fn strategy_record_round_trips_with_satisfaction_backfill() {
     assert_eq!(fetched.predicted_strategy, "DirectResponse");
     assert_eq!(fetched.actual_strategy, "ToolAssisted");
     assert_eq!(fetched.iterations_used, 3);
-}
-
-#[tokio::test]
-async fn goal_plan_completion_metrics_end_to_end() {
-    let pool = klyntbot::StoragePool::connect_in_memory().await.unwrap();
-    let repos = klyntbot::Repos::from_pool(&pool);
-
-    let goal_id = uuid::Uuid::new_v4();
-    let row = klyntbot::storage::GoalRow {
-        id: goal_id,
-        title: "Ship v1.0".to_string(),
-        description: "Release the first version".to_string(),
-        status: "Active".to_string(),
-        priority: 1,
-        target_date: None,
-        created_at: Utc::now(),
-        updated_at: Utc::now(),
-        plans_completed: 0,
-        plans_failed: 0,
-        avg_duration_ms: None,
-        last_plan_at: None,
-    };
-    repos.goals.create(&row).await.unwrap();
-
-    repos
-        .goals
-        .increment_completed(goal_id, 60_000)
-        .await
-        .unwrap();
-    repos
-        .goals
-        .increment_completed(goal_id, 120_000)
-        .await
-        .unwrap();
-    repos.goals.increment_failed(goal_id).await.unwrap();
-
-    let g = repos.goals.get(goal_id).await.unwrap();
-    assert_eq!(g.plans_completed, 2);
-    assert_eq!(g.plans_failed, 1);
-    assert_eq!(g.avg_duration_ms, Some(90_000));
-    assert!(g.last_plan_at.is_some(), "Expected last_plan_at to be set");
-    assert_eq!(g.title, "Ship v1.0");
 }
 
 #[tokio::test]
@@ -907,6 +867,8 @@ async fn handler_reads_strategy_records_with_tool_stats() {
         tool_name: Some("todo".to_string()),
         tool_success: Some(true),
         tool_duration_ms: Some(45),
+        complexity_signals: serde_json::Value::Null,
+        execution_mode: None,
     };
     repos.strategies.create(&row).await.unwrap();
 
@@ -970,6 +932,8 @@ async fn handler_impl_returns_status_with_outcomes() {
         tool_name: Some("todo".to_string()),
         tool_success: Some(true),
         tool_duration_ms: Some(25),
+        complexity_signals: serde_json::Value::Null,
+        execution_mode: None,
     };
     repo.create(&row).await.unwrap();
 
@@ -1023,6 +987,8 @@ async fn handler_impl_analyze_now_with_multi_tool_aggregation() {
             tool_name: Some("todo".to_string()),
             tool_success: Some(true),
             tool_duration_ms: Some(30),
+            complexity_signals: serde_json::Value::Null,
+            execution_mode: None,
         };
         repo.create(&row).await.unwrap();
     }
@@ -1042,6 +1008,8 @@ async fn handler_impl_analyze_now_with_multi_tool_aggregation() {
         tool_name: Some("shell".to_string()),
         tool_success: Some(false),
         tool_duration_ms: Some(5000),
+        complexity_signals: serde_json::Value::Null,
+        execution_mode: None,
     };
     repo.create(&shell_row).await.unwrap();
 

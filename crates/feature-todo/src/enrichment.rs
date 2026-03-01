@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::types::Todo;
+use crate::types::Action;
 use common::Result;
 
 /// A single enrichment suggestion with a confidence score and reasoning.
@@ -41,7 +41,7 @@ impl EnrichmentResult {
 pub trait EnrichmentHandler: Send + Sync {
     /// Analyse a task and return enrichment suggestions.
     /// Returns `Ok(None)` when enrichment is disabled or not applicable.
-    async fn enrich_task(&self, task: &Todo) -> Result<Option<EnrichmentResult>>;
+    async fn enrich_task(&self, task: &Action) -> Result<Option<EnrichmentResult>>;
 }
 
 /// Feedback entry for recording enrichment outcomes.

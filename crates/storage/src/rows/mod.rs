@@ -1,16 +1,17 @@
 //! Row structs for `sqlx::FromRow` deserialization.
 
+pub mod action;
 pub mod agent_task;
+pub mod area;
 pub mod calendar;
 pub mod cron;
 pub mod finance;
-pub mod goal;
+pub mod key_result;
 pub mod learning;
 pub mod memory;
-pub mod plan;
+pub mod objective;
 pub mod project;
 pub mod session;
-pub mod todo;
 pub mod usage;
 
 #[cfg(test)]

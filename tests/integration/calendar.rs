@@ -12,9 +12,11 @@ use tools::todo_types::{Todo, TodoStatus};
 
 // ── Helpers ────────────────────────────────────────────────────
 
-/// Create a migrated in-memory TodoRepo for testing.
-async fn test_todo_repo() -> Option<storage::TodoRepo> {
-    Some(super::common::test_todo_repo().await)
+/// Create a migrated in-memory ActionRepo for testing, with the default test area pre-created.
+async fn test_action_repo() -> Option<storage::ActionRepo> {
+    let pool = super::common::test_pool().await;
+    super::common::ensure_test_area(&pool).await;
+    Some(storage::ActionRepo::new(pool.inner().clone()))
 }
 
 /// Generate a unique event UID to prevent parallel test contamination.
@@ -60,7 +62,7 @@ fn conflict_event_pair() -> (CalendarEvent, CalendarEvent) {
 
 #[tokio::test]
 async fn reconcile_updates_todo_on_time_change() {
-    let Some(repo) = test_todo_repo().await else {
+    let Some(repo) = test_action_repo().await else {
         return;
     };
 
@@ -70,7 +72,7 @@ async fn reconcile_updates_todo_on_time_change() {
     todo.due_date = Some(original_due);
     todo.calendar_event_uid = Some(event_uid.clone());
     let todo_id = todo.id.clone();
-    let row: storage::TodoRow = (&todo).into();
+    let row: storage::ActionRow = (&todo).into();
     repo.add(&row).await.unwrap();
 
     let new_time = Utc.with_ymd_and_hms(2026, 2, 20, 16, 0, 0).unwrap();
@@ -91,7 +93,7 @@ async fn reconcile_updates_todo_on_time_change() {
 
 #[tokio::test]
 async fn reconcile_marks_todo_done_on_completed_event() {
-    let Some(repo) = test_todo_repo().await else {
+    let Some(repo) = test_action_repo().await else {
         return;
     };
 
@@ -101,7 +103,7 @@ async fn reconcile_marks_todo_done_on_completed_event() {
     todo.calendar_event_uid = Some(event_uid.clone());
     todo.due_date = Some(Utc::now());
     let todo_id = todo.id.clone();
-    let row: storage::TodoRow = (&todo).into();
+    let row: storage::ActionRow = (&todo).into();
     repo.add(&row).await.unwrap();
 
     let events = vec![create_test_event(
@@ -125,7 +127,7 @@ async fn reconcile_marks_todo_done_on_completed_event() {
 
 #[tokio::test]
 async fn reconcile_clears_uid_on_cancelled_event() {
-    let Some(repo) = test_todo_repo().await else {
+    let Some(repo) = test_action_repo().await else {
         return;
     };
 
@@ -133,7 +135,7 @@ async fn reconcile_clears_uid_on_cancelled_event() {
     let mut todo = create_test_todo("Cancelled meeting");
     todo.calendar_event_uid = Some(event_uid.clone());
     let todo_id = todo.id.clone();
-    let row: storage::TodoRow = (&todo).into();
+    let row: storage::ActionRow = (&todo).into();
     repo.add(&row).await.unwrap();
 
     let events = vec![create_test_event(
@@ -160,7 +162,7 @@ async fn reconcile_clears_uid_on_cancelled_event() {
 
 #[tokio::test]
 async fn reconcile_clears_uid_on_deleted_event() {
-    let Some(repo) = test_todo_repo().await else {
+    let Some(repo) = test_action_repo().await else {
         return;
     };
 
@@ -168,7 +170,7 @@ async fn reconcile_clears_uid_on_deleted_event() {
     let mut todo = create_test_todo("Deleted event");
     todo.calendar_event_uid = Some(event_uid.clone());
     let todo_id = todo.id.clone();
-    let row: storage::TodoRow = (&todo).into();
+    let row: storage::ActionRow = (&todo).into();
     repo.add(&row).await.unwrap();
 
     let events: Vec<CalendarEvent> = vec![];
@@ -189,7 +191,7 @@ async fn reconcile_clears_uid_on_deleted_event() {
 
 #[tokio::test]
 async fn reconcile_handles_multiple_changes_in_batch() {
-    let Some(repo) = test_todo_repo().await else {
+    let Some(repo) = test_action_repo().await else {
         return;
     };
 
@@ -210,7 +212,7 @@ async fn reconcile_handles_multiple_changes_in_batch() {
     todo1.calendar_event_uid = Some(uid1.clone());
     todo1.due_date = Some(original_time);
     ids.push(todo1.id.clone());
-    repo.add(&storage::TodoRow::from(&todo1)).await.unwrap();
+    repo.add(&storage::ActionRow::from(&todo1)).await.unwrap();
 
     // Todo 2: Completed
     let mut todo2 = create_test_todo("Todo 2");
@@ -218,26 +220,26 @@ async fn reconcile_handles_multiple_changes_in_batch() {
     todo2.status = TodoStatus::Todo;
     todo2.due_date = Some(unchanged_time);
     ids.push(todo2.id.clone());
-    repo.add(&storage::TodoRow::from(&todo2)).await.unwrap();
+    repo.add(&storage::ActionRow::from(&todo2)).await.unwrap();
 
     // Todo 3: Cancelled
     let mut todo3 = create_test_todo("Todo 3");
     todo3.calendar_event_uid = Some(uid3.clone());
     ids.push(todo3.id.clone());
-    repo.add(&storage::TodoRow::from(&todo3)).await.unwrap();
+    repo.add(&storage::ActionRow::from(&todo3)).await.unwrap();
 
     // Todo 4: Unchanged
     let mut todo4 = create_test_todo("Todo 4");
     todo4.calendar_event_uid = Some(uid4.clone());
     todo4.due_date = Some(unchanged_time);
     ids.push(todo4.id.clone());
-    repo.add(&storage::TodoRow::from(&todo4)).await.unwrap();
+    repo.add(&storage::ActionRow::from(&todo4)).await.unwrap();
 
     // Todo 5: Event deleted
     let mut todo5 = create_test_todo("Todo 5");
     todo5.calendar_event_uid = Some(uid5.clone());
     ids.push(todo5.id.clone());
-    repo.add(&storage::TodoRow::from(&todo5)).await.unwrap();
+    repo.add(&storage::ActionRow::from(&todo5)).await.unwrap();
 
     let events = vec![
         create_test_event(&uid1, new_time, None),

@@ -4,23 +4,23 @@
 use feature_todo::{config::TodoConfig, TodoFeature};
 
 #[test]
-fn test_migration_sql_contains_todos_table() {
+fn test_migration_sql_contains_action_tables() {
     let sql = TodoFeature::migration_sql();
     assert!(
-        sql.contains("CREATE TABLE IF NOT EXISTS todos"),
-        "Migration SQL should create todos table"
+        sql.contains("CREATE TABLE IF NOT EXISTS actions"),
+        "Migration SQL should create actions table"
     );
     assert!(
-        sql.contains("CREATE TABLE IF NOT EXISTS todo_attachments"),
-        "Migration SQL should create todo_attachments table"
+        sql.contains("CREATE TABLE IF NOT EXISTS action_attachments"),
+        "Migration SQL should create action_attachments table"
     );
     assert!(
-        sql.contains("CREATE TABLE IF NOT EXISTS todo_time_entries"),
-        "Migration SQL should create todo_time_entries table"
+        sql.contains("CREATE TABLE IF NOT EXISTS action_time_entries"),
+        "Migration SQL should create action_time_entries table"
     );
     assert!(
-        sql.contains("CREATE TABLE IF NOT EXISTS todo_dependencies"),
-        "Migration SQL should create todo_dependencies table"
+        sql.contains("CREATE TABLE IF NOT EXISTS action_dependencies"),
+        "Migration SQL should create action_dependencies table"
     );
 }
 

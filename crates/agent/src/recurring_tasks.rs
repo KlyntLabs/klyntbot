@@ -15,7 +15,7 @@ use tools::todo_types::Todo;
 
 /// Background spawner for recurring task instances.
 pub struct RecurringTaskSpawner {
-    todo_repo: storage::TodoRepo,
+    todo_repo: storage::ActionRepo,
     timezone: String,
     check_interval: StdDuration,
     task_handle: Option<JoinHandle<()>>,
@@ -25,7 +25,7 @@ pub struct RecurringTaskSpawner {
 impl RecurringTaskSpawner {
     /// Create a new RecurringTaskSpawner backed by a SQL TodoRepo.
     pub fn new(
-        todo_repo: storage::TodoRepo,
+        todo_repo: storage::ActionRepo,
         timezone: String,
         check_interval: StdDuration,
     ) -> Self {
@@ -77,7 +77,7 @@ impl RecurringTaskSpawner {
     }
 
     /// Check all templates and spawn instances that are due via SQL.
-    async fn check_and_spawn(repo: &storage::TodoRepo, _timezone: &str) -> common::Result<()> {
+    async fn check_and_spawn(repo: &storage::ActionRepo, _timezone: &str) -> common::Result<()> {
         let template_rows = repo.list_templates().await?;
         let now = chrono::Utc::now();
 
@@ -97,6 +97,7 @@ impl RecurringTaskSpawner {
             let mut instance = Todo::default_instance();
             instance.title = tpl_row.title.clone();
             instance.description = tpl_row.description.clone();
+            instance.area_id = tpl_row.area_id.clone();
             instance.priority = tpl_row.priority.map(|p| p as u8);
             instance.tags = tpl_row.tags.clone();
             instance.project_id = tpl_row.project_id.clone();
@@ -104,12 +105,12 @@ impl RecurringTaskSpawner {
             instance.due_date = tpl_row.next_instance_date;
 
             let instance_id = instance.id.clone();
-            let instance_row: storage::TodoRow = (&instance).into();
+            let instance_row: storage::ActionRow = (&instance).into();
             repo.add(&instance_row).await?;
 
             // Advance next_instance_date via update patch
             let next = rrule_utils::next_occurrence(&rule, now)?;
-            let patch = storage::TodoPatch {
+            let patch = storage::ActionPatch {
                 id: tpl_row.id.clone(),
                 next_instance_date: Some(next),
                 ..Default::default()
@@ -138,17 +139,34 @@ mod tests {
     use chrono::{Duration, Utc};
     use tools::todo_types::TodoStatus;
 
-    /// Connect to an ephemeral SQLite database for testing.
-    async fn test_todo_repo() -> Option<storage::TodoRepo> {
+    const TEST_AREA_ID: &str = "area-test";
+
+    /// Connect to an ephemeral SQLite database for testing, seeding a default area.
+    async fn test_todo_repo() -> Option<storage::ActionRepo> {
         let dir = tempfile::tempdir().ok()?;
         let pool = storage::StoragePool::connect(dir.path()).await.ok()?;
         let _ = dir.keep(); // prevent cleanup; acceptable in test context
-        Some(storage::Repos::from_pool(&pool).todos)
+        let repos = storage::Repos::from_pool(&pool);
+        // Seed an area so FK on actions.area_id is satisfied.
+        let area = storage::AreaRow {
+            id: TEST_AREA_ID.to_string(),
+            name: "Test".to_string(),
+            description: None,
+            color: "#000".to_string(),
+            icon: None,
+            position: 0,
+            status: "active".to_string(),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+        repos.areas.create(&area).await.ok()?;
+        Some(repos.actions)
     }
 
     fn create_template(title: &str, rule: &str, next: chrono::DateTime<Utc>) -> Todo {
         let mut todo = Todo::default_instance();
         todo.title = title.to_string();
+        todo.area_id = TEST_AREA_ID.to_string();
         todo.is_template = true;
         todo.recurrence_rule = Some(rule.to_string());
         todo.next_instance_date = Some(next);
@@ -171,7 +189,7 @@ mod tests {
             .await
             .unwrap();
 
-        let filter = storage::TodoFilter {
+        let filter = storage::ActionFilter {
             templates_only: false,
             ..Default::default()
         };
@@ -211,7 +229,7 @@ mod tests {
             .await
             .unwrap();
 
-        let filter = storage::TodoFilter::default();
+        let filter = storage::ActionFilter::default();
         let all: Vec<Todo> = repo
             .list(&filter)
             .await
@@ -236,18 +254,19 @@ mod tests {
 
         let mut todo = Todo::default_instance();
         todo.title = "No rule".to_string();
+        todo.area_id = TEST_AREA_ID.to_string();
         todo.is_template = true;
         todo.next_instance_date = Some(Utc::now() - Duration::hours(1));
         let todo_id = todo.id.clone();
 
-        let row: storage::TodoRow = (&todo).into();
+        let row: storage::ActionRow = (&todo).into();
         repo.add(&row).await.unwrap();
 
         RecurringTaskSpawner::check_and_spawn(&repo, "UTC")
             .await
             .unwrap();
 
-        let filter = storage::TodoFilter::default();
+        let filter = storage::ActionFilter::default();
         let all: Vec<Todo> = repo
             .list(&filter)
             .await

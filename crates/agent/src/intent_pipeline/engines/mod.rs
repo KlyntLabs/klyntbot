@@ -1,6 +1,6 @@
 //! Execution engines for the intent pipeline.
 //!
-//! Each engine handles one `ExecutionMode`: Direct, Reactive, or Planned.
+//! Each engine handles one `ExecutionMode`: Direct or Reactive.
 //! All implement the `ExecutionEngine` trait with a unified `EngineResult`.
 
 use async_trait::async_trait;
@@ -11,7 +11,6 @@ use super::router::EscalationContext;
 use crate::execution::{ExecutionParams, ReasoningTrace};
 
 pub mod direct;
-pub mod planned;
 pub mod reactive;
 #[cfg(test)]
 pub(crate) mod test_utils;

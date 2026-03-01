@@ -87,7 +87,7 @@ pub fn determine_action(event: &CalendarEvent, todo: &Todo) -> ReconcileAction {
 /// Takes events directly (already fetched during sync) to avoid duplicate fetching.
 /// Returns a report summarizing changes made.
 pub async fn reconcile_calendar_events(
-    todo_repo: &storage::TodoRepo,
+    todo_repo: &storage::ActionRepo,
     events: Vec<CalendarEvent>,
 ) -> Result<ReconcileReport> {
     let mut report = ReconcileReport {
@@ -100,7 +100,7 @@ pub async fn reconcile_calendar_events(
         events.into_iter().map(|e| (e.uid.clone(), e)).collect();
 
     // Get all todos with calendar links
-    let rows = match todo_repo.list(&storage::TodoFilter::default()).await {
+    let rows = match todo_repo.list(&storage::ActionFilter::default()).await {
         Ok(rows) => rows,
         Err(e) => {
             report.errors.push(format!("Failed to list todos: {}", e));
@@ -131,7 +131,7 @@ pub async fn reconcile_calendar_events(
         // Apply action
         let result = match action {
             ReconcileAction::UpdateDueDate { new_due, .. } => {
-                let patch = storage::TodoPatch {
+                let patch = storage::ActionPatch {
                     id: todo.id.clone(),
                     due_date: Some(Some(new_due)),
                     ..Default::default()
@@ -145,7 +145,7 @@ pub async fn reconcile_calendar_events(
                     .map_err(common::KlyntbotError::from)
             }
             ReconcileAction::CompleteTodo { .. } => {
-                let patch = storage::TodoPatch {
+                let patch = storage::ActionPatch {
                     id: todo.id.clone(),
                     status: Some("done".to_string()),
                     ..Default::default()
@@ -159,7 +159,7 @@ pub async fn reconcile_calendar_events(
                     .map_err(common::KlyntbotError::from)
             }
             ReconcileAction::ClearCalendarLink { .. } => {
-                let patch = storage::TodoPatch {
+                let patch = storage::ActionPatch {
                     id: todo.id.clone(),
                     calendar_event_uid: Some(None),
                     ..Default::default()
@@ -196,6 +196,8 @@ mod tests {
             id: id.to_string(),
             title: "Test Todo".to_string(),
             description: None,
+            area_id: String::new(),
+            key_result_id: None,
             priority: None,
             due_date,
             tags: vec![],

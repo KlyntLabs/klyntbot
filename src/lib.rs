@@ -20,8 +20,8 @@ pub use tools;
 
 // Re-export commonly used types for convenience
 pub use agent::{
-    AgentEvent, AgentLoop, ConfidenceSource, FinanceHandlerImpl, MemoryStore,
-    PlanCompletionHandlerImpl, SkillManager, StreamingHandle, SubagentManager,
+    AgentEvent, AgentLoop, ConfidenceSource, FinanceHandlerImpl, MemoryStore, ProgressHandlerImpl,
+    SkillManager, StreamingHandle, SubagentManager,
 };
 pub use bus::{InboundMessage, MessageBus, OutboundMessage};
 pub use channels::{Channel, ChannelManager, DynChannel};
@@ -31,7 +31,7 @@ pub use common::{
     InteractionRequest, MessageRole, Question, Result, SessionKey,
 };
 pub use config::Config;
-pub use domain::{Plan, PlanStatus};
+pub use domain::{Area, AreaStatus, KeyResult, Objective, Project};
 pub use providers::{
     create_provider, create_provider_with_failover, DynProvider, LlmProvider, LlmResponse, Message,
     ProviderRegistry,

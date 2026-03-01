@@ -46,8 +46,9 @@ impl StrategyRepo {
                                            actual_strategy, escalation_count, iterations_used,
                                            max_iterations, success, user_satisfaction,
                                            response_time_ms, chat_id,
-                                           tool_name, tool_success, tool_duration_ms)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
+                                           tool_name, tool_success, tool_duration_ms,
+                                           complexity_signals, execution_mode)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)
              RETURNING *",
         )
         .bind(row.id)
@@ -65,6 +66,8 @@ impl StrategyRepo {
         .bind(&row.tool_name)
         .bind(row.tool_success)
         .bind(row.tool_duration_ms)
+        .bind(&row.complexity_signals)
+        .bind(&row.execution_mode)
         .fetch_one(&self.pool)
         .await?;
         Ok(result)
@@ -267,6 +270,8 @@ mod tests {
             tool_name: None,
             tool_success: None,
             tool_duration_ms: None,
+            complexity_signals: serde_json::Value::Null,
+            execution_mode: None,
         };
 
         let created = repo.create(&row).await.unwrap();
@@ -297,6 +302,8 @@ mod tests {
             tool_name: None,
             tool_success: None,
             tool_duration_ms: None,
+            complexity_signals: serde_json::Value::Null,
+            execution_mode: None,
         };
 
         let created = repo.create(&row).await.unwrap();
@@ -327,6 +334,8 @@ mod tests {
             tool_name: None,
             tool_success: None,
             tool_duration_ms: None,
+            complexity_signals: serde_json::Value::Null,
+            execution_mode: None,
         };
         repo.create(&row).await.unwrap();
 
@@ -380,6 +389,8 @@ mod tests {
             tool_name: None,
             tool_success: None,
             tool_duration_ms: None,
+            complexity_signals: serde_json::Value::Null,
+            execution_mode: None,
         };
         let newer = StrategyRecordRow {
             id: uuid::Uuid::new_v4(),
@@ -397,6 +408,8 @@ mod tests {
             tool_name: None,
             tool_success: None,
             tool_duration_ms: None,
+            complexity_signals: serde_json::Value::Null,
+            execution_mode: None,
         };
 
         repo.create(&older).await.unwrap();
@@ -440,6 +453,8 @@ mod tests {
             tool_name: None,
             tool_success: None,
             tool_duration_ms: None,
+            complexity_signals: serde_json::Value::Null,
+            execution_mode: None,
         };
         repo.create(&row).await.unwrap();
         assert_eq!(repo.count_all().await.unwrap(), 1);
@@ -475,6 +490,8 @@ mod tests {
                 tool_name: None,
                 tool_success: None,
                 tool_duration_ms: None,
+                complexity_signals: serde_json::Value::Null,
+                execution_mode: None,
             };
             repo.create(&row).await.unwrap();
         }
@@ -513,6 +530,8 @@ mod tests {
                 tool_name: Some(tool.to_string()),
                 tool_success: Some(success),
                 tool_duration_ms: Some(50),
+                complexity_signals: serde_json::Value::Null,
+                execution_mode: None,
             };
             repo.create(&row).await.unwrap();
         }

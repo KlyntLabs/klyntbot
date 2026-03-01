@@ -1,4 +1,4 @@
-//! TodoTool — feature-todo's primary Tool implementation.
+//! TaskTool — feature-todo's primary Tool implementation (formerly TodoTool).
 
 mod actions;
 
@@ -9,14 +9,17 @@ use std::sync::Arc;
 use crate::calendar_sync::CalendarSyncHandler;
 use crate::embedding::EmbeddingHandler;
 use crate::enrichment::{EnrichmentFeedbackHandler, EnrichmentHandler};
-use crate::types::{Attachment, TimeEntry, Todo};
+use crate::types::{Action, Attachment, TimeEntry};
 use common::{Result, ToolError};
-use storage::TodoRepo;
+use storage::ActionRepo;
 use tools_core::{ParamExtractor, RoutingContext, Tool};
 
-/// TodoTool: full todo management with optional enrichment, embedding, and calendar sync.
-pub struct TodoTool {
-    pub(crate) repo: TodoRepo,
+// Type alias for backward compat
+pub type TodoTool = TaskTool;
+
+/// TaskTool: full action/task management with optional enrichment, embedding, and calendar sync.
+pub struct TaskTool {
+    pub(crate) repo: ActionRepo,
     pub(crate) max_focus_slots: usize,
     pub(crate) focus_deadline_hours: u64,
     pub(crate) timezone: String,
@@ -28,14 +31,16 @@ pub struct TodoTool {
     pub(crate) semantic_threshold: f64,
     pub(crate) rrf_k: u32,
     pub(crate) feedback_handler: Option<Arc<dyn EnrichmentFeedbackHandler>>,
-    /// Confidence threshold for auto-applying enrichment suggestions (0.0–1.0).
+    /// Confidence threshold for auto-applying enrichment suggestions (0.0-1.0).
     pub(crate) enrichment_threshold: f64,
+    /// Optional progress handler for cascading KR progress on complete.
+    pub(crate) progress_handler: Option<Arc<dyn crate::progress::ProgressHandler>>,
 }
 
-impl TodoTool {
-    /// Create a new TodoTool.
+impl TaskTool {
+    /// Create a new TaskTool.
     pub fn new(
-        repo: TodoRepo,
+        repo: ActionRepo,
         max_focus_slots: usize,
         focus_deadline_hours: u64,
         timezone: String,
@@ -53,6 +58,7 @@ impl TodoTool {
             rrf_k: 60,
             feedback_handler: None,
             enrichment_threshold: 0.70,
+            progress_handler: None,
         }
     }
 
@@ -90,6 +96,15 @@ impl TodoTool {
     /// Set the enrichment auto-apply confidence threshold.
     pub fn with_enrichment_threshold(mut self, threshold: f64) -> Self {
         self.enrichment_threshold = threshold;
+        self
+    }
+
+    /// Attach a progress handler for cascading KR progress on action complete.
+    pub fn with_progress_handler(
+        mut self,
+        handler: Arc<dyn crate::progress::ProgressHandler>,
+    ) -> Self {
+        self.progress_handler = Some(handler);
         self
     }
 
@@ -137,18 +152,18 @@ impl TodoTool {
         (duration.num_seconds().max(0) as f64) / 86400.0
     }
 
-    pub(crate) fn calculate_score(task: &Todo, now: chrono::DateTime<chrono::Utc>) -> f64 {
+    pub(crate) fn calculate_score(task: &Action, now: chrono::DateTime<chrono::Utc>) -> f64 {
         let urgency = Self::calculate_urgency(task.due_date, now) as f64;
         let priority_wt = Self::priority_weight(task.priority) as f64;
         let age_days = Self::calculate_age_days(task.created_at, now);
         (urgency * priority_wt) + (age_days * 0.1)
     }
 
-    // ─── Full todo loading ─────────────────────────────────────────
+    // ─── Full action loading ─────────────────────────────────────────
 
-    pub(crate) async fn load_full_todo(&self, row: storage::TodoRow) -> Result<Todo> {
+    pub(crate) async fn load_full_action(&self, row: storage::ActionRow) -> Result<Action> {
         let id = row.id.clone();
-        let mut todo = Todo::from(row);
+        let mut action = Action::from(row);
 
         let (att_rows, te_rows, blockers, blocking) = tokio::try_join!(
             self.repo.list_attachments(&id),
@@ -157,30 +172,30 @@ impl TodoTool {
             self.repo.get_blocking(&id),
         )?;
 
-        todo.attachments = att_rows.into_iter().map(Attachment::from).collect();
-        todo.time_entries = te_rows.into_iter().map(TimeEntry::from).collect();
-        todo.blocked_by = blockers.into_iter().map(|r| r.id).collect();
-        todo.blocks = blocking.into_iter().map(|r| r.id).collect();
+        action.attachments = att_rows.into_iter().map(Attachment::from).collect();
+        action.time_entries = te_rows.into_iter().map(TimeEntry::from).collect();
+        action.blocked_by = blockers.into_iter().map(|r| r.id).collect();
+        action.blocks = blocking.into_iter().map(|r| r.id).collect();
 
-        Ok(todo)
+        Ok(action)
     }
 
-    pub(crate) async fn get_full_todo(&self, id: &str) -> Result<Option<Todo>> {
+    pub(crate) async fn get_full_action(&self, id: &str) -> Result<Option<Action>> {
         match self.repo.get(id).await? {
-            Some(row) => Ok(Some(self.load_full_todo(row).await?)),
+            Some(row) => Ok(Some(self.load_full_action(row).await?)),
             None => Ok(None),
         }
     }
 }
 
 #[async_trait]
-impl Tool for TodoTool {
+impl Tool for TaskTool {
     fn name(&self) -> &str {
-        "todo"
+        "task"
     }
 
     fn description(&self) -> &str {
-        "Manage tasks and todos. Actions: add, list, update, complete, delete, show, summary, focus, unfocus, add_subtask, move, attach, detach, log_time, tree, search, search_semantic, search_hybrid, report, add_dependency, remove_dependency, recur, list_recurring, delete_recurring, enrich, plan."
+        "Manage tasks/actions. Actions: add, list, update, complete, delete, show, summary, focus, unfocus, add_subtask, move, attach, detach, log_time, tree, search, search_semantic, search_hybrid, report, add_dependency, remove_dependency, recur, list_recurring, delete_recurring, enrich, plan."
     }
 
     fn parameters(&self) -> Value {
@@ -194,14 +209,15 @@ impl Tool for TodoTool {
                         "focus", "unfocus", "add_subtask", "move", "attach", "detach",
                         "log_time", "tree", "search", "search_semantic", "search_hybrid",
                         "report", "add_dependency", "remove_dependency",
-                        "recur", "list_recurring", "delete_recurring", "enrich", "plan",
-                        "execute"
+                        "recur", "list_recurring", "delete_recurring", "enrich", "plan"
                     ],
                     "description": "Action to perform"
                 },
                 "id": { "type": "string", "description": "Task ID" },
                 "title": { "type": "string", "description": "Task title" },
                 "description": { "type": "string", "description": "Task description" },
+                "area_id": { "type": "string", "description": "Area ID (required for add)" },
+                "key_result_id": { "type": "string", "description": "Key result ID (optional, links task to OKR)" },
                 "priority": {
                     "type": "integer",
                     "minimum": 1,
@@ -259,6 +275,10 @@ impl Tool for TodoTool {
                 "count": {
                     "type": "integer",
                     "description": "Number of tasks to include in plan (default: 3)"
+                },
+                "unassigned": {
+                    "type": "boolean",
+                    "description": "Filter for tasks not assigned to any project or area (list)"
                 }
             },
             "required": ["action"]
@@ -296,7 +316,6 @@ impl Tool for TodoTool {
             "list_recurring" => self.handle_list_recurring().await,
             "delete_recurring" => self.handle_delete_recurring(&p).await,
             "plan" => self.handle_plan(&p).await,
-            "execute" => self.handle_execute(&p).await,
             _ => Err(ToolError::InvalidParams(format!("Unknown action: {}", action)).into()),
         }
     }
@@ -312,7 +331,7 @@ mod tests {
     fn test_urgency_overdue() {
         let now = Utc::now();
         assert_eq!(
-            TodoTool::calculate_urgency(Some(now - Duration::days(2)), now),
+            TaskTool::calculate_urgency(Some(now - Duration::days(2)), now),
             10
         );
     }
@@ -320,14 +339,14 @@ mod tests {
     #[test]
     fn test_urgency_today() {
         let now = Utc::now();
-        assert_eq!(TodoTool::calculate_urgency(Some(now), now), 5);
+        assert_eq!(TaskTool::calculate_urgency(Some(now), now), 5);
     }
 
     #[test]
     fn test_urgency_tomorrow() {
         let now = Utc::now();
         assert_eq!(
-            TodoTool::calculate_urgency(Some(now + Duration::days(1)), now),
+            TaskTool::calculate_urgency(Some(now + Duration::days(1)), now),
             3
         );
     }
@@ -336,7 +355,7 @@ mod tests {
     fn test_urgency_future() {
         let now = Utc::now();
         assert_eq!(
-            TodoTool::calculate_urgency(Some(now + Duration::days(7)), now),
+            TaskTool::calculate_urgency(Some(now + Duration::days(7)), now),
             1
         );
     }
@@ -344,28 +363,28 @@ mod tests {
     #[test]
     fn test_urgency_no_due_date() {
         let now = Utc::now();
-        assert_eq!(TodoTool::calculate_urgency(None, now), 1);
+        assert_eq!(TaskTool::calculate_urgency(None, now), 1);
     }
 
     #[test]
     fn test_priority_weight_p1() {
-        assert_eq!(TodoTool::priority_weight(Some(1)), 5);
+        assert_eq!(TaskTool::priority_weight(Some(1)), 5);
     }
 
     #[test]
     fn test_priority_weight_none() {
-        assert_eq!(TodoTool::priority_weight(None), 3);
+        assert_eq!(TaskTool::priority_weight(None), 3);
     }
 
     #[test]
     fn test_score_formula() {
         let now = Utc::now();
-        let mut task = Todo::default_instance();
+        let mut task = Action::default_instance();
         task.priority = Some(1);
         task.due_date = Some(now - Duration::days(2));
         task.created_at = now - Duration::days(5);
-        let score = TodoTool::calculate_score(&task, now);
-        // urgency=10, priority_wt=5, age=5 → 10*5 + 5*0.1 = 50.5
+        let score = TaskTool::calculate_score(&task, now);
+        // urgency=10, priority_wt=5, age=5 -> 10*5 + 5*0.1 = 50.5
         assert!(
             (score - 50.5).abs() < 0.01,
             "Score should be ~50.5, got {}",

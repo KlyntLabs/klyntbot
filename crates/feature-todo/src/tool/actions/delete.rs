@@ -3,9 +3,9 @@
 use common::{Result, ToolError};
 use tools_core::ParamExtractor;
 
-use super::super::TodoTool;
+use super::super::TaskTool;
 
-impl TodoTool {
+impl TaskTool {
     pub(crate) async fn handle_delete(&self, p: &ParamExtractor<'_>) -> Result<String> {
         let id = p.required_str("id")?;
 

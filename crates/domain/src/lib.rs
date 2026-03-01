@@ -1,11 +1,11 @@
-//! Domain crate — goal and plan types, errors, and conversions.
+//! Domain crate — PARA + OKR types for klyntbot.
 
-pub mod goal;
-pub mod plan;
+pub mod area;
+pub mod key_result;
+pub mod objective;
+pub mod project;
 
-// Re-export key types at crate root for convenience
-pub use goal::{Goal, GoalError, GoalProgress, GoalStatus};
-pub use plan::{
-    BacktrackEntry, Plan, PlanError, PlanStatus, PlanStep, PlanVisibility, StepStatus,
-    DEFAULT_MAX_STEP_ATTEMPTS,
-};
+pub use area::{Area, AreaColor, AreaPatch, AreaStatus};
+pub use key_result::{KeyResult, KeyResultPatch, KeyResultStatus, TrackingMode};
+pub use objective::{Objective, ObjectivePatch, ObjectiveStatus};
+pub use project::{Project, ProjectColor, ProjectFilter, ProjectPatch, ProjectStatus};

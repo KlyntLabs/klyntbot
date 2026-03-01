@@ -40,6 +40,8 @@ pub struct StrategyRecordRow {
     pub tool_name: Option<String>,
     pub tool_success: Option<bool>,
     pub tool_duration_ms: Option<i64>,
+    pub complexity_signals: serde_json::Value,
+    pub execution_mode: Option<String>,
 }
 
 /// Row struct for the `enrichment_feedback` table.

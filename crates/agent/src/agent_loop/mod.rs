@@ -23,17 +23,6 @@ use tools::RoutingContext;
 
 use super::{AgentEvent, CalendarSyncAdapter, SkillManager};
 
-/// A request to execute an approved plan via the execution queue.
-///
-/// Sent through the plan queue mpsc channel to the dedicated worker task,
-/// which calls `run_plan_execution()` for each request in order.
-pub struct PlanExecutionRequest {
-    /// The ID of the plan to execute (must be in Approved state).
-    pub plan_id: uuid::Uuid,
-    /// Routing context for channel/session routing during execution.
-    pub routing_ctx: tools::RoutingContext,
-}
-
 /// Handle for consuming streaming agent output.
 pub struct StreamingHandle {
     /// Agent events (content chunks, tool status).
@@ -68,8 +57,6 @@ pub struct AgentLoop {
     pub(crate) _calendar_adapter: Option<Arc<CalendarSyncAdapter>>,
     /// Conversation embedding handler for semantic memory (Phase 4.1)
     pub(crate) conversation_embedding_handler: Option<Arc<dyn tools::ConversationEmbeddingHandler>>,
-    /// Tracks if a plan is currently executing
-    pub(crate) plan_executing: Arc<std::sync::atomic::AtomicBool>,
     /// Background learning service for adaptive threshold updates (None if learning disabled)
     pub(crate) learning_service: Option<Arc<RwLock<crate::learning::LearningService>>>,
     /// Intent pipeline: classify → assemble → route → validate → record.
@@ -82,18 +69,9 @@ pub struct AgentLoop {
     pub(crate) _session_cleanup_token: Option<CancellationToken>,
     /// Cancellation token for the memory maintenance background service.
     pub(crate) _memory_maintenance_token: Option<CancellationToken>,
-    /// Cancellation token for the plan visibility cleanup background service.
-    pub(crate) _plan_cleanup_token: Option<CancellationToken>,
 }
 
 impl AgentLoop {
-    /// Check if a plan is currently executing.
-    /// Returns true if plan mode is active, false for normal chat mode.
-    /// This determines the iteration limit: 50 for plans, 20 for chat.
-    pub fn is_plan_executing(&self) -> bool {
-        self.plan_executing.load(Ordering::SeqCst)
-    }
-
     /// Handle emoji reactions by mapping to satisfaction scores.
     /// Updates the most recent strategy_record for this chat. No response sent.
     async fn handle_reaction(&self, msg: &bus::InboundMessage) -> common::Result<()> {
@@ -228,8 +206,6 @@ impl AgentLoop {
 
         Ok(())
     }
-
-    // run_plan_execution() is in plan_runner.rs
 
     /// Process a single inbound message
     #[tracing::instrument(skip(self, msg), fields(channel = %msg.channel, sender = %msg.sender_id))]

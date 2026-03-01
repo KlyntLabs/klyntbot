@@ -9,6 +9,7 @@ use crate::rows::project::ProjectRow;
 /// Filter criteria for listing projects.
 #[derive(Debug, Default, Clone)]
 pub struct ProjectFilter {
+    pub area_id: Option<String>,
     pub status: Option<String>,
     pub tags: Option<Vec<String>>,
     pub limit: Option<i64>,
@@ -44,12 +45,13 @@ impl ProjectRepo {
     pub async fn create(&self, row: &ProjectRow) -> Result<ProjectRow, StorageError> {
         let inserted = sqlx::query_as::<_, ProjectRow>(
             r#"
-            INSERT INTO projects (id, name, description, color, tags, status, created_at, updated_at)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+            INSERT INTO projects (id, area_id, name, description, color, tags, status, created_at, updated_at)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
             RETURNING *
             "#,
         )
         .bind(&row.id)
+        .bind(&row.area_id)
         .bind(&row.name)
         .bind(&row.description)
         .bind(&row.color)
@@ -83,17 +85,19 @@ impl ProjectRepo {
         let row = sqlx::query_as::<_, ProjectRow>(
             r#"
             UPDATE projects SET
-                name        = COALESCE(?2, name),
-                description = CASE WHEN ?3 THEN ?4 ELSE description END,
-                color       = COALESCE(?5, color),
-                tags        = COALESCE(?6, tags),
-                status      = COALESCE(?7, status),
+                area_id     = COALESCE(?2, area_id),
+                name        = COALESCE(?3, name),
+                description = CASE WHEN ?4 THEN ?5 ELSE description END,
+                color       = COALESCE(?6, color),
+                tags        = COALESCE(?7, tags),
+                status      = COALESCE(?8, status),
                 updated_at  = datetime('now')
             WHERE id = ?1
             RETURNING *
             "#,
         )
         .bind(&patch.id)
+        .bind(&patch.area_id)
         .bind(&patch.name)
         .bind(patch.description.is_some())
         .bind(
@@ -113,7 +117,7 @@ impl ProjectRepo {
         Ok(row)
     }
 
-    /// Delete a project. Todos with this project_id will have it set to NULL (FK ON DELETE SET NULL).
+    /// Delete a project. Actions with this project_id will have it set to NULL (FK ON DELETE SET NULL).
     pub async fn delete(&self, id: &str) -> Result<bool, StorageError> {
         let result = sqlx::query("DELETE FROM projects WHERE id = ?1")
             .bind(id)
@@ -138,26 +142,27 @@ impl ProjectRepo {
 
     /// List projects matching the given filter criteria.
     pub async fn list(&self, filter: &ProjectFilter) -> Result<Vec<ProjectRow>, StorageError> {
-        let mut qb = sqlx::QueryBuilder::<sqlx::Sqlite>::new("SELECT * FROM projects");
-        let mut has_where = false;
+        let mut qb =
+            sqlx::QueryBuilder::<sqlx::Sqlite>::new("SELECT * FROM projects WHERE 1=1");
+
+        if let Some(ref area_id) = filter.area_id {
+            qb.push(" AND area_id = ");
+            qb.push_bind(area_id);
+        }
 
         if let Some(ref status) = filter.status {
-            qb.push(" WHERE status = ");
+            qb.push(" AND status = ");
             qb.push_bind(status);
-            has_where = true;
         }
 
         if let Some(ref tags) = filter.tags {
             for tag in tags {
-                qb.push(if has_where { " AND " } else { " WHERE " });
-                has_where = true;
-                qb.push("EXISTS (SELECT 1 FROM json_each(tags) WHERE value = ");
+                qb.push(" AND EXISTS (SELECT 1 FROM json_each(tags) WHERE value = ");
                 qb.push_bind(tag);
                 qb.push(")");
             }
         }
 
-        let _ = has_where;
         qb.push(" ORDER BY created_at DESC");
 
         if let Some(limit) = filter.limit {
@@ -189,7 +194,7 @@ impl ProjectRepo {
         let rows: Vec<(String, i64)> = sqlx::query_as(
             r#"
             SELECT status, COUNT(*) as count
-            FROM todos
+            FROM actions
             WHERE project_id = ?1 AND is_template = FALSE
             GROUP BY status
             "#,
@@ -234,6 +239,7 @@ impl ProjectRepo {
 #[derive(Debug, Default, Clone)]
 pub struct ProjectPatch {
     pub id: String,
+    pub area_id: Option<String>,
     pub name: Option<String>,
     pub description: Option<Option<String>>,
     pub color: Option<String>,

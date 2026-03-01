@@ -134,6 +134,8 @@ mod tests {
             tool_name: Some("todo".to_string()),
             tool_success: Some(true),
             tool_duration_ms: Some(50),
+            complexity_signals: serde_json::Value::Null,
+            execution_mode: None,
         };
         repo.create(&row).await.unwrap();
 

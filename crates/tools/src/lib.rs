@@ -2,7 +2,7 @@
 //!
 //! This crate provides:
 //! - Core tool implementations: filesystem (x4), web (x2), message, spawn, cron
-//! - Domain tool interfaces: calendar, goal, plan, learning, memory, project
+//! - Domain tool interfaces: calendar, learning, memory, project, area, okr
 //! - Embedding infrastructure: engine (fastembed), store (LanceDB)
 //! - Tool registry and permissions
 //!
@@ -29,14 +29,13 @@ pub mod spawn;
 pub mod web;
 
 // ── Domain tool interfaces (handler traits + tool impls) ─────────────────────
+pub mod area_tool;
 pub mod calendar_tool;
-pub mod goal_tool;
 pub mod learning_tool;
 pub mod memory_tool;
-pub mod plan_response;
-pub mod plan_tool;
+pub mod okr_tool;
+pub mod progress_handler;
 pub mod project_tool;
-pub mod project_types;
 
 // ── Embedding infrastructure ─────────────────────────────────────────────────
 pub mod conversation_embedding;
@@ -58,6 +57,9 @@ pub use params::ParamExtractor;
 // Agent task
 pub use agent_task_tool::{AgentTaskHandler, AgentTaskTool};
 
+// Area
+pub use area_tool::AreaTool;
+
 // Calendar
 pub use calendar_tool::{CalendarHandler, CalendarTool};
 
@@ -71,22 +73,22 @@ pub use conversation_embedding::{
 pub use embedding_engine::{EmbeddingEngine, EmbeddingEngineImpl, EmbeddingHandler, EMBEDDING_DIM};
 pub use embedding_store::{EmbeddingRecord, EmbeddingStore};
 
-// Goal
-pub use goal_tool::{GoalHandler, GoalTool};
-
 // Learning
 pub use learning_tool::{
     LearningHandler, LearningStatus, LearningTool, ThresholdEntry, ToolSummary,
 };
 
-// Plan
-pub use plan_tool::{PlanCompletionHandler, PlanHandler, PlanTool};
-
 // Memory
 pub use memory_tool::MemoryTool;
 
+// OKR
+pub use okr_tool::OkrTool;
+
 // Permissions
 pub use permissions::{PermissionLevel, ToolPermissions};
+
+// Progress handler
+pub use progress_handler::ProgressHandler;
 
 // Search utilities
 pub use search_utils::{rrf_merge, SearchResult};

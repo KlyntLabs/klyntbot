@@ -14,13 +14,15 @@ use context_engine::ContextSource;
 use providers::DynProvider;
 use session::SessionManager;
 use tools::{
+    area_tool::AreaTool,
     browser::BrowserTool,
     calendar_tool::{CalendarHandler, CalendarTool},
     cron_tool::CronTool,
     filesystem::register_fs_tools,
-    goal_tool::{GoalHandler, GoalTool},
     learning_tool::{LearningHandler, LearningTool},
     message::MessageTool,
+    okr_tool::OkrTool,
+    project_tool::ProjectTool,
     registry::ToolRegistry,
     spawn::SpawnTool,
     web::{WebFetchTool, WebSearchTool},
@@ -29,8 +31,8 @@ use tools_core::FeaturePackage;
 
 use super::super::confidence::ConfidenceEvaluator;
 use super::super::context_sources::{
-    BootstrapSource, ConfidenceSource, GoalSource, IdentitySource, MemorySource,
-    SkillContentSource, SkillSummarySource, TodoSource,
+    BootstrapSource, ConfidenceSource, IdentitySource, MemorySource, SkillContentSource,
+    SkillSummarySource, TodoSource,
 };
 use super::super::{CalendarSyncAdapter, CronHandlerAdapter, SkillManager, SubagentManager};
 use super::{AgentLoop, LastActiveChannel};
@@ -163,8 +165,7 @@ impl AgentLoopBuilder {
             )),
             Box::new(BootstrapSource::new(workspace.clone())),
             Box::new(MemorySource::new(memory_store)),
-            Box::new(TodoSource::new(repos.todos.clone())),
-            Box::new(GoalSource::new(repos.goals.clone())),
+            Box::new(TodoSource::new(repos.actions.clone())),
             Box::new(confidence_source),
             Box::new(SkillSummarySource::new(Arc::clone(&skill_manager))),
             Box::new(SkillContentSource::new(Arc::clone(&skill_manager))),
@@ -275,7 +276,7 @@ impl AgentLoopBuilder {
         let calendar_adapter = if config.calendar.is_any_enabled() {
             let adapter = Arc::new(
                 CalendarSyncAdapter::new(
-                    repos.todos.clone(),
+                    repos.actions.clone(),
                     repos.calendar_sync.clone(),
                     repos.calendar_event_cache.clone(),
                     &config.calendar,
@@ -332,8 +333,8 @@ impl AgentLoopBuilder {
         // ── Feature-todo tool (requires real pool) ────────────────────────
         if self.pool.is_some() {
             let pool_ref = storage_pool.inner();
-            let feature_todo_repo = feature_todo::TodoRepo::new(pool_ref.clone());
-            let mut todo_tool = feature_todo::TodoTool::new(
+            let feature_todo_repo = feature_todo::ActionRepo::new(pool_ref.clone());
+            let mut todo_tool = feature_todo::TaskTool::new(
                 feature_todo_repo,
                 config.todo.focus.max_slots,
                 config.todo.focus.deadline_hours,
@@ -400,30 +401,42 @@ impl AgentLoopBuilder {
                 todo_embedding_handler = None;
             }
 
+            // Inject progress handler for KR→Objective cascade
+            let progress_handler: Arc<dyn tools_core::ProgressHandler> =
+                Arc::new(super::super::progress_handler::ProgressHandlerImpl::new(
+                    repos.key_results.clone(),
+                    repos.objectives.clone(),
+                    repos.actions.clone(),
+                ));
+            todo_tool = todo_tool
+                .with_progress_handler(Arc::clone(&progress_handler));
+
             tool_registry.register(todo_tool);
+
+            // ── OKR tool (needs same progress handler) ────────────────────
+            tool_registry.register(
+                OkrTool::new(repos.objectives.clone(), repos.key_results.clone())
+                    .with_progress_handler(Arc::clone(&progress_handler)),
+            );
         } else {
             // No pool available (e.g., test environment)
             todo_embedding_handler = None;
+
+            // OKR tool without progress handler
+            tool_registry.register(OkrTool::new(
+                repos.objectives.clone(),
+                repos.key_results.clone(),
+            ));
         }
 
-        // ── Goal tool ─────────────────────────────────────────────────────
-        {
-            let goal_handler = Arc::new(
-                super::super::GoalHandlerImpl::new(repos.goals.clone())
-                    .with_plan_repo(repos.plans.clone())
-                    .with_provider(provider.clone(), config.agents.defaults.model.clone()),
-            );
-            tool_registry.register(GoalTool::new(Some(goal_handler as Arc<dyn GoalHandler>)));
-        }
+        // ── Area tool ───────────────────────────────────────────────────
+        tool_registry.register(AreaTool::new(repos.areas.clone()));
 
-        // ── Plan tool ─────────────────────────────────────────────────────
-        let plan_handler = Arc::new(
-            super::super::PlanHandlerImpl::new(repos.plans.clone())
-                .with_provider(provider.clone(), config.agents.defaults.model.clone()),
-        );
-        tool_registry.register(tools::plan_tool::PlanTool::new(Some(
-            plan_handler as Arc<dyn tools::plan_tool::PlanHandler>,
-        )));
+        // ── Project tool ────────────────────────────────────────────────
+        tool_registry.register(ProjectTool::new(
+            repos.projects.clone(),
+            repos.actions.clone(),
+        ));
         // ── Conversation embedding handler ────────────────────────────────
         let conversation_embedding_handler = if let (true, Some(vs)) = (
             config.conversation.embedding.enabled,
@@ -446,7 +459,7 @@ impl AgentLoopBuilder {
             if let Some(ref handler) = conversation_embedding_handler {
                 let mut memory_tool = tools::MemoryTool::new()
                     .with_conversation_handler(Arc::clone(handler))
-                    .with_todo_repo(repos.todos.clone())
+                    .with_todo_repo(repos.actions.clone())
                     .with_threshold(config.conversation.search.semantic_threshold)
                     .with_rrf_k(config.todo.search.rrf_k);
 
@@ -574,7 +587,7 @@ impl AgentLoopBuilder {
                 .as_ref()
                 .map(|adapter| Arc::clone(adapter) as Arc<dyn CalendarHandler>);
             let mut engine = super::super::ReminderEngine::new(
-                repos.todos.clone(),
+                repos.actions.clone(),
                 calendar_handler_opt,
                 Arc::clone(dispatcher),
                 std::time::Duration::from_secs(300),
@@ -587,7 +600,7 @@ impl AgentLoopBuilder {
 
         // ── Recurring task spawner ────────────────────────────────────────
         let mut recurring_spawner = super::super::RecurringTaskSpawner::new(
-            repos.todos.clone(),
+            repos.actions.clone(),
             config.timezone.clone(),
             std::time::Duration::from_secs(60),
         );
@@ -667,30 +680,9 @@ impl AgentLoopBuilder {
             config.agents.defaults.max_tool_iterations,
         );
 
-        let planned_engine = Some(
-            crate::intent_pipeline::engines::planned::PlannedEngine::new(
-                Arc::clone(&execution_core),
-                repos.plans.clone(),
-                provider.clone(),
-                config.agents.defaults.model.clone(),
-                config
-                    .orchestrator
-                    .default_plan_visibility
-                    .parse()
-                    .unwrap_or_else(|_| {
-                        warn!(
-                            "Invalid plan visibility '{}', defaulting to transparent",
-                            config.orchestrator.default_plan_visibility
-                        );
-                        Default::default()
-                    }),
-            ),
-        );
-
         let router = crate::intent_pipeline::router::ExecutionRouter::new(
             direct_engine,
             reactive_engine,
-            planned_engine,
             config.orchestrator.max_escalations,
         );
 
@@ -759,19 +751,6 @@ impl AgentLoopBuilder {
                 None
             };
 
-        // ── Plan cleanup service ──────────────────────────────────────────
-        let plan_cleanup_token = if self.pool.is_some() {
-            let token = CancellationToken::new();
-            let cleanup_service = crate::intent_pipeline::visibility::PlanCleanupService::new(
-                repos.plans.clone(),
-                token.clone(),
-            );
-            cleanup_service.spawn();
-            Some(token)
-        } else {
-            None
-        };
-
         // ── Assemble AgentLoop ────────────────────────────────────────────
         let history_limit = config.conversation.session.history_limit;
         Ok(AgentLoop {
@@ -789,14 +768,12 @@ impl AgentLoopBuilder {
             _notification_dispatcher: notification_dispatcher,
             _calendar_adapter: calendar_adapter,
             conversation_embedding_handler,
-            plan_executing: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             learning_service,
             pipeline,
             strategy_repo: Some(repos.strategies.clone()),
             history_limit,
             _session_cleanup_token: session_cleanup_token,
             _memory_maintenance_token: memory_maintenance_token,
-            _plan_cleanup_token: plan_cleanup_token,
         })
     }
 }

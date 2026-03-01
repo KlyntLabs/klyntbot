@@ -5,31 +5,34 @@ use common::{Result, ToolError};
 use tools_core::{ParamExtractor, RoutingContext};
 use tracing::warn;
 
-use super::super::TodoTool;
-use crate::types::Todo;
-use storage::TodoPatch;
+use super::super::TaskTool;
+use crate::types::Action;
+use storage::ActionPatch;
 
-impl TodoTool {
+impl TaskTool {
     pub(crate) async fn handle_add(
         &self,
         p: &ParamExtractor<'_>,
         ctx: &RoutingContext,
     ) -> Result<String> {
         let title = p.required_str("title")?;
+        let area_id = p.required_str("area_id")?;
 
-        let mut todo = Todo::default_instance();
-        todo.title = title.to_string();
-        todo.description = p.optional_str("description")?.map(String::from);
-        todo.priority = p.optional_u64("priority")?.map(|v| v as u8);
-        todo.due_date = p
+        let mut action = Action::default_instance();
+        action.title = title.to_string();
+        action.area_id = area_id.to_string();
+        action.key_result_id = p.optional_str("key_result_id")?.map(String::from);
+        action.description = p.optional_str("description")?.map(String::from);
+        action.priority = p.optional_u64("priority")?.map(|v| v as u8);
+        action.due_date = p
             .optional_str("due_date")?
             .and_then(|s| common::utils::date::parse_datetime(s, &self.timezone));
-        todo.tags = p.string_array_or_empty("tags")?;
-        todo.project_id = p.optional_str("project_id")?.map(String::from);
+        action.tags = p.string_array_or_empty("tags")?;
+        action.project_id = p.optional_str("project_id")?.map(String::from);
 
-        let row = storage::TodoRow::from(&todo);
+        let row = storage::ActionRow::from(&action);
         let created_row = self.repo.add(&row).await?;
-        let created = Todo::from(created_row);
+        let created = Action::from(created_row);
 
         // Auto-enrich if handler is available
         let mut enriched_info = String::new();
@@ -62,7 +65,7 @@ impl TodoTool {
                     }
 
                     if !applied.is_empty() {
-                        let patch = TodoPatch {
+                        let patch = ActionPatch {
                             id: created.id.clone(),
                             title: None,
                             description: None,
@@ -75,6 +78,8 @@ impl TodoTool {
                             last_reminded_at: None,
                             estimated_minutes: update_est,
                             recurrence_rule: None,
+                            area_id: None,
+                            key_result_id: None,
                         };
                         if self.repo.update(&patch).await.is_ok() {
                             enriched_info = format!(" (enriched: {})", applied.join(", "));
@@ -92,7 +97,7 @@ impl TodoTool {
         if let Some(ref emb) = self.embedding_handler {
             if let Err(e) = emb.embed_todo(&created).await {
                 warn!(
-                    "Failed to generate embedding for todo {}: {}",
+                    "Failed to generate embedding for action {}: {}",
                     created.id, e
                 );
             }
@@ -139,27 +144,30 @@ impl TodoTool {
         let title = p.required_str("title")?;
         let parent_id = p.required_str("parent_id")?;
 
-        // Verify parent exists
-        if self.repo.get(parent_id).await?.is_none() {
-            return Err(
-                ToolError::InvalidParams(format!("Parent task not found: {}", parent_id)).into(),
-            );
-        }
+        // Verify parent exists and inherit area_id
+        let parent = self.repo.get(parent_id).await?.ok_or_else(|| {
+            ToolError::InvalidParams(format!("Parent task not found: {}", parent_id))
+        })?;
 
-        let mut todo = Todo::default_instance();
-        todo.title = title.to_string();
-        todo.description = p.optional_str("description")?.map(String::from);
-        todo.priority = p.optional_u64("priority")?.map(|v| v as u8);
-        todo.due_date = p
+        let mut action = Action::default_instance();
+        action.title = title.to_string();
+        action.area_id = parent.area_id.clone();
+        action.key_result_id = parent.key_result_id.clone();
+        action.description = p.optional_str("description")?.map(String::from);
+        action.priority = p.optional_u64("priority")?.map(|v| v as u8);
+        action.due_date = p
             .optional_str("due_date")?
             .and_then(|s| common::utils::date::parse_datetime(s, &self.timezone));
-        todo.tags = p.string_array_or_empty("tags")?;
-        todo.parent_id = Some(parent_id.to_string());
-        todo.project_id = p.optional_str("project_id")?.map(String::from);
+        action.tags = p.string_array_or_empty("tags")?;
+        action.parent_id = Some(parent_id.to_string());
+        action.project_id = p
+            .optional_str("project_id")?
+            .map(String::from)
+            .or_else(|| parent.project_id.clone());
 
-        let row = storage::TodoRow::from(&todo);
+        let row = storage::ActionRow::from(&action);
         let created_row = self.repo.add(&row).await?;
-        let created = Todo::from(created_row);
+        let created = Action::from(created_row);
 
         Ok(format!(
             "Subtask created: {} (ID: {}, parent: {})",
@@ -170,6 +178,7 @@ impl TodoTool {
     pub(crate) async fn handle_recur(&self, p: &ParamExtractor<'_>) -> Result<String> {
         let title = p.required_str("title")?;
         let rule_str = p.required_str("rule")?;
+        let area_id = p.required_str("area_id")?;
 
         // Validate the RRULE
         crate::rrule_utils::validate_rrule(rule_str)?;
@@ -178,8 +187,10 @@ impl TodoTool {
         let now = Utc::now();
         let next_instance_date = crate::rrule_utils::next_occurrence(rule_str, now)?;
 
-        let mut template = Todo::default_instance();
+        let mut template = Action::default_instance();
         template.title = title.to_string();
+        template.area_id = area_id.to_string();
+        template.key_result_id = p.optional_str("key_result_id")?.map(String::from);
         template.description = p.optional_str("description")?.map(String::from);
         template.priority = p.optional_u64("priority")?.map(|v| v as u8);
         template.tags = p.string_array_or_empty("tags")?;
@@ -188,9 +199,9 @@ impl TodoTool {
         template.is_template = true;
         template.next_instance_date = next_instance_date;
 
-        let row = storage::TodoRow::from(&template);
+        let row = storage::ActionRow::from(&template);
         let created_row = self.repo.add_template(&row).await?;
-        let created = Todo::from(created_row);
+        let created = Action::from(created_row);
 
         let human = crate::rrule_utils::humanize_rrule(rule_str);
         let next_str = created

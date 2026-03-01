@@ -1,19 +1,24 @@
-//! Repository for the `todos` table and its join tables
-//! (`todo_attachments`, `todo_time_entries`, `todo_dependencies`).
+//! Repository for the `actions` table and its join tables
+//! (`action_attachments`, `action_time_entries`, `action_dependencies`).
 
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use sqlx::SqlitePool;
 
 use crate::error::{OptionExt, StorageError};
-use crate::rows::todo::{TodoAttachmentRow, TodoDependencyRow, TodoRow, TodoTimeEntryRow};
+use crate::rows::action::{
+    ActionAttachmentRow, ActionDependencyRow, ActionRow, ActionTimeEntryRow,
+};
 
-/// Filter criteria for listing todos.
+/// Filter criteria for listing actions.
 #[derive(Debug, Default, Clone)]
-pub struct TodoFilter {
+pub struct ActionFilter {
     pub status: Option<String>,
     pub tags: Option<Vec<String>>,
+    pub area_id: Option<String>,
     pub project_id: Option<String>,
+    pub key_result_id: Option<String>,
+    pub unassigned: bool,
     pub priority_min: Option<i16>,
     pub limit: Option<i64>,
     pub templates_only: bool,
@@ -22,20 +27,20 @@ pub struct TodoFilter {
 /// Aggregate counts by status.
 #[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct TodoSummary {
+pub struct ActionSummary {
     pub todo: i64,
     pub doing: i64,
     pub done: i64,
     pub total: i64,
 }
 
-/// Repository for todo CRUD, hierarchy, focus, dependencies, attachments, and time tracking.
+/// Repository for action CRUD, hierarchy, focus, dependencies, attachments, and time tracking.
 #[derive(Debug, Clone)]
-pub struct TodoRepo {
+pub struct ActionRepo {
     pool: SqlitePool,
 }
 
-impl TodoRepo {
+impl ActionRepo {
     pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
     }
@@ -44,24 +49,26 @@ impl TodoRepo {
     // CRUD
     // -----------------------------------------------------------------------
 
-    /// Insert a new todo. Returns the inserted row.
-    pub async fn add(&self, row: &TodoRow) -> Result<TodoRow, StorageError> {
-        let inserted = sqlx::query_as::<_, TodoRow>(
+    /// Insert a new action. Returns the inserted row.
+    pub async fn add(&self, row: &ActionRow) -> Result<ActionRow, StorageError> {
+        let inserted = sqlx::query_as::<_, ActionRow>(
             r#"
-            INSERT INTO todos (
-                id, title, description, priority, due_date, tags, status,
+            INSERT INTO actions (
+                id, title, description, area_id, project_id, key_result_id,
+                parent_id, priority, due_date, tags, status,
                 focused_at, focus_deadline, focus_expired_count,
                 created_at, updated_at, completed_at,
-                parent_id, project_id, total_tracked_secs, estimated_minutes,
+                total_tracked_secs, estimated_minutes,
                 calendar_event_uid, last_reminded_at,
                 recurrence_rule, recurrence_parent_id, is_template, next_instance_date
             ) VALUES (
-                ?1, ?2, ?3, ?4, ?5, ?6, ?7,
-                ?8, ?9, ?10,
-                ?11, ?12, ?13,
-                ?14, ?15, ?16, ?17,
+                ?1, ?2, ?3, ?4, ?5, ?6,
+                ?7, ?8, ?9, ?10, ?11,
+                ?12, ?13, ?14,
+                ?15, ?16, ?17,
                 ?18, ?19,
-                ?20, ?21, ?22, ?23
+                ?20, ?21,
+                ?22, ?23, ?24, ?25
             )
             RETURNING *
             "#,
@@ -69,6 +76,10 @@ impl TodoRepo {
         .bind(&row.id)
         .bind(&row.title)
         .bind(&row.description)
+        .bind(&row.area_id)
+        .bind(&row.project_id)
+        .bind(&row.key_result_id)
+        .bind(&row.parent_id)
         .bind(row.priority)
         .bind(row.due_date)
         .bind(sqlx::types::Json(&row.tags))
@@ -79,8 +90,6 @@ impl TodoRepo {
         .bind(row.created_at)
         .bind(row.updated_at)
         .bind(row.completed_at)
-        .bind(&row.parent_id)
-        .bind(&row.project_id)
         .bind(row.total_tracked_secs)
         .bind(row.estimated_minutes)
         .bind(&row.calendar_event_uid)
@@ -95,40 +104,43 @@ impl TodoRepo {
         Ok(inserted)
     }
 
-    /// Get a single todo by id. Returns `None` if not found.
-    pub async fn get(&self, id: &str) -> Result<Option<TodoRow>, StorageError> {
-        let row = sqlx::query_as::<_, TodoRow>("SELECT * FROM todos WHERE id = ?1")
+    /// Get a single action by id. Returns `None` if not found.
+    pub async fn get(&self, id: &str) -> Result<Option<ActionRow>, StorageError> {
+        let row = sqlx::query_as::<_, ActionRow>("SELECT * FROM actions WHERE id = ?1")
             .bind(id)
             .fetch_optional(&self.pool)
             .await?;
         Ok(row)
     }
 
-    /// Get a single todo by id, returning `StorageError::NotFound` if missing.
-    pub async fn get_or_err(&self, id: &str) -> Result<TodoRow, StorageError> {
-        self.get(id).await?.ok_or_not_found(&format!("todo {id}"))
+    /// Get a single action by id, returning `StorageError::NotFound` if missing.
+    pub async fn get_or_err(&self, id: &str) -> Result<ActionRow, StorageError> {
+        self.get(id).await?.ok_or_not_found(&format!("action {id}"))
     }
 
-    /// Fetch todos by a list of IDs. Missing IDs are silently skipped.
-    pub async fn get_by_ids(&self, ids: &[String]) -> Result<Vec<TodoRow>, StorageError> {
+    /// Fetch actions by a list of IDs. Missing IDs are silently skipped.
+    pub async fn get_by_ids(&self, ids: &[String]) -> Result<Vec<ActionRow>, StorageError> {
         if ids.is_empty() {
             return Ok(Vec::new());
         }
-        let mut qb = sqlx::QueryBuilder::<sqlx::Sqlite>::new("SELECT * FROM todos WHERE id IN (");
+        let mut qb = sqlx::QueryBuilder::<sqlx::Sqlite>::new("SELECT * FROM actions WHERE id IN (");
         let mut sep = qb.separated(", ");
         for id in ids {
             sep.push_bind(id);
         }
         qb.push(")");
-        let rows = qb.build_query_as::<TodoRow>().fetch_all(&self.pool).await?;
+        let rows = qb
+            .build_query_as::<ActionRow>()
+            .fetch_all(&self.pool)
+            .await?;
         Ok(rows)
     }
 
-    /// Update mutable fields on a todo. Only non-None fields are overwritten.
-    pub async fn update(&self, patch: &TodoPatch) -> Result<TodoRow, StorageError> {
-        let row = sqlx::query_as::<_, TodoRow>(
+    /// Update mutable fields on an action. Only non-None fields are overwritten.
+    pub async fn update(&self, patch: &ActionPatch) -> Result<ActionRow, StorageError> {
+        let row = sqlx::query_as::<_, ActionRow>(
             r#"
-            UPDATE todos SET
+            UPDATE actions SET
                 title              = COALESCE(?2, title),
                 description        = CASE WHEN ?3 THEN ?4 ELSE description END,
                 priority           = CASE WHEN ?5 THEN ?6 ELSE priority END,
@@ -145,6 +157,8 @@ impl TodoRepo {
                 last_reminded_at   = CASE WHEN ?15 THEN ?16 ELSE last_reminded_at END,
                 estimated_minutes  = CASE WHEN ?17 THEN ?18 ELSE estimated_minutes END,
                 recurrence_rule    = CASE WHEN ?19 THEN ?20 ELSE recurrence_rule END,
+                area_id            = COALESCE(?21, area_id),
+                key_result_id      = CASE WHEN ?22 THEN ?23 ELSE key_result_id END,
                 updated_at         = datetime('now')
             WHERE id = ?1
             RETURNING *
@@ -170,16 +184,19 @@ impl TodoRepo {
         .bind(patch.estimated_minutes.unwrap_or_default())
         .bind(patch.recurrence_rule.is_some())
         .bind(patch.recurrence_rule.as_ref().and_then(|v| v.as_deref()))
+        .bind(&patch.area_id)
+        .bind(patch.key_result_id.is_some())
+        .bind(patch.key_result_id.as_ref().and_then(|v| v.as_deref()))
         .fetch_optional(&self.pool)
         .await?
-        .ok_or_not_found(&format!("todo {}", patch.id))?;
+        .ok_or_not_found(&format!("action {}", patch.id))?;
 
         Ok(row)
     }
 
-    /// Delete a todo and all its cascade dependents (attachments, time entries, deps).
+    /// Delete an action and all its cascade dependents.
     pub async fn delete(&self, id: &str) -> Result<bool, StorageError> {
-        let result = sqlx::query("DELETE FROM todos WHERE id = ?1")
+        let result = sqlx::query("DELETE FROM actions WHERE id = ?1")
             .bind(id)
             .execute(&self.pool)
             .await?;
@@ -190,9 +207,9 @@ impl TodoRepo {
     // Listing / Filtering
     // -----------------------------------------------------------------------
 
-    /// List todos matching the given filter criteria.
-    pub async fn list(&self, filter: &TodoFilter) -> Result<Vec<TodoRow>, StorageError> {
-        let mut qb = sqlx::QueryBuilder::<sqlx::Sqlite>::new("SELECT * FROM todos WHERE ");
+    /// List actions matching the given filter criteria.
+    pub async fn list(&self, filter: &ActionFilter) -> Result<Vec<ActionRow>, StorageError> {
+        let mut qb = sqlx::QueryBuilder::<sqlx::Sqlite>::new("SELECT * FROM actions WHERE ");
 
         if filter.templates_only {
             qb.push("is_template = TRUE");
@@ -213,9 +230,23 @@ impl TodoRepo {
             }
         }
 
+        if let Some(ref area_id) = filter.area_id {
+            qb.push(" AND area_id = ");
+            qb.push_bind(area_id);
+        }
+
         if let Some(ref project_id) = filter.project_id {
             qb.push(" AND project_id = ");
             qb.push_bind(project_id);
+        }
+
+        if let Some(ref kr_id) = filter.key_result_id {
+            qb.push(" AND key_result_id = ");
+            qb.push_bind(kr_id);
+        }
+
+        if filter.unassigned {
+            qb.push(" AND project_id IS NULL");
         }
 
         if let Some(pmin) = filter.priority_min {
@@ -230,40 +261,37 @@ impl TodoRepo {
             qb.push_bind(limit);
         }
 
-        let rows = qb.build_query_as::<TodoRow>().fetch_all(&self.pool).await?;
+        let rows = qb
+            .build_query_as::<ActionRow>()
+            .fetch_all(&self.pool)
+            .await?;
         Ok(rows)
     }
 
     /// List all templates (is_template = true).
-    pub async fn list_templates(&self) -> Result<Vec<TodoRow>, StorageError> {
-        self.list(&TodoFilter {
+    pub async fn list_templates(&self) -> Result<Vec<ActionRow>, StorageError> {
+        self.list(&ActionFilter {
             templates_only: true,
             ..Default::default()
         })
         .await
     }
 
-    /// Search todos by keyword in title or description (case-insensitive).
-    ///
-    /// LIKE special characters (`%`, `_`, `\`) are escaped so the query is
-    /// treated as a literal substring match.
+    /// Search actions by keyword in title or description (case-insensitive).
     pub async fn search_by_keyword(
         &self,
         query: &str,
         limit: Option<i64>,
-    ) -> Result<Vec<TodoRow>, StorageError> {
-        // Escape LIKE special characters so the query is a literal substring
+    ) -> Result<Vec<ActionRow>, StorageError> {
         let escaped = query
             .replace('\\', "\\\\")
             .replace('%', "\\%")
             .replace('_', "\\_");
         let pattern = format!("%{escaped}%");
-
-        // Use i64::MAX when no limit is specified so a single query handles both cases.
         let effective_limit = limit.unwrap_or(i64::MAX);
-        let rows = sqlx::query_as::<_, TodoRow>(
+        let rows = sqlx::query_as::<_, ActionRow>(
             r#"
-            SELECT * FROM todos
+            SELECT * FROM actions
             WHERE is_template = FALSE
               AND (title LIKE ?1 ESCAPE '\' OR description LIKE ?1 ESCAPE '\')
             ORDER BY created_at DESC
@@ -281,21 +309,20 @@ impl TodoRepo {
     // Focus Slots
     // -----------------------------------------------------------------------
 
-    /// Focus a todo. Returns true if the focus was set, false if at max_slots.
+    /// Focus an action. Returns true if the focus was set, false if at max_slots.
     pub async fn focus(
         &self,
         id: &str,
         max_slots: i64,
         deadline: Option<DateTime<Utc>>,
     ) -> Result<bool, StorageError> {
-        // Atomically check slot count and set focused_at in one statement.
         let result = sqlx::query(
             r#"
-            UPDATE todos
+            UPDATE actions
             SET focused_at = datetime('now'), focus_deadline = ?3, updated_at = datetime('now')
             WHERE id = ?1
               AND focused_at IS NULL
-              AND (SELECT COUNT(*) FROM todos WHERE focused_at IS NOT NULL) < ?2
+              AND (SELECT COUNT(*) FROM actions WHERE focused_at IS NOT NULL) < ?2
             "#,
         )
         .bind(id)
@@ -307,10 +334,10 @@ impl TodoRepo {
         Ok(result.rows_affected() > 0)
     }
 
-    /// Unfocus a todo.
+    /// Unfocus an action.
     pub async fn unfocus(&self, id: &str) -> Result<bool, StorageError> {
         let result = sqlx::query(
-            "UPDATE todos SET focused_at = NULL, focus_deadline = NULL, updated_at = datetime('now') WHERE id = ?1",
+            "UPDATE actions SET focused_at = NULL, focus_deadline = NULL, updated_at = datetime('now') WHERE id = ?1",
         )
         .bind(id)
         .execute(&self.pool)
@@ -318,10 +345,10 @@ impl TodoRepo {
         Ok(result.rows_affected() > 0)
     }
 
-    /// List currently focused todos.
-    pub async fn list_focused(&self) -> Result<Vec<TodoRow>, StorageError> {
-        let rows = sqlx::query_as::<_, TodoRow>(
-            "SELECT * FROM todos WHERE focused_at IS NOT NULL ORDER BY focused_at",
+    /// List currently focused actions.
+    pub async fn list_focused(&self) -> Result<Vec<ActionRow>, StorageError> {
+        let rows = sqlx::query_as::<_, ActionRow>(
+            "SELECT * FROM actions WHERE focused_at IS NOT NULL ORDER BY focused_at",
         )
         .fetch_all(&self.pool)
         .await?;
@@ -329,35 +356,32 @@ impl TodoRepo {
     }
 
     // -----------------------------------------------------------------------
-    // Dependencies (edge table: todo_dependencies)
+    // Dependencies (edge table: action_dependencies)
     // -----------------------------------------------------------------------
 
-    /// Add a dependency edge (task_id is blocked by blocker_id).
-    /// Returns `StorageError::Conflict` if this would create a cycle.
+    /// Add a dependency edge (action_id is blocked by blocker_id).
     pub async fn add_dependency(
         &self,
-        task_id: &str,
+        action_id: &str,
         blocker_id: &str,
     ) -> Result<(), StorageError> {
-        // First check for cycles using a recursive CTE.
-        let would_cycle = self.would_create_cycle(task_id, blocker_id).await?;
+        let would_cycle = self.would_create_cycle(action_id, blocker_id).await?;
         if would_cycle {
             return Err(StorageError::Conflict(format!(
-                "Adding dependency {task_id} -> {blocker_id} would create a cycle"
+                "Adding dependency {action_id} -> {blocker_id} would create a cycle"
             )));
         }
 
-        sqlx::query("INSERT INTO todo_dependencies (task_id, blocker_id) VALUES (?1, ?2)")
-            .bind(task_id)
+        sqlx::query("INSERT INTO action_dependencies (action_id, blocker_id) VALUES (?1, ?2)")
+            .bind(action_id)
             .bind(blocker_id)
             .execute(&self.pool)
             .await
             .map_err(|e| {
-                // The CHECK constraint (task_id != blocker_id) will fire as a DB error.
                 if let sqlx::Error::Database(ref db_err) = e {
                     if db_err.constraint().is_some() {
                         return StorageError::Conflict(format!(
-                            "Cannot add dependency: {task_id} -> {blocker_id}"
+                            "Cannot add dependency: {action_id} -> {blocker_id}"
                         ));
                     }
                 }
@@ -370,54 +394,57 @@ impl TodoRepo {
     /// Remove a dependency edge.
     pub async fn remove_dependency(
         &self,
-        task_id: &str,
+        action_id: &str,
         blocker_id: &str,
     ) -> Result<bool, StorageError> {
         let result =
-            sqlx::query("DELETE FROM todo_dependencies WHERE task_id = ?1 AND blocker_id = ?2")
-                .bind(task_id)
+            sqlx::query("DELETE FROM action_dependencies WHERE action_id = ?1 AND blocker_id = ?2")
+                .bind(action_id)
                 .bind(blocker_id)
                 .execute(&self.pool)
                 .await?;
         Ok(result.rows_affected() > 0)
     }
 
-    /// Get all blockers for a task (todos that must be done before this task).
-    pub async fn get_blockers(&self, task_id: &str) -> Result<Vec<TodoRow>, StorageError> {
-        let rows = sqlx::query_as::<_, TodoRow>(
+    /// Get all blockers for an action.
+    pub async fn get_blockers(&self, action_id: &str) -> Result<Vec<ActionRow>, StorageError> {
+        let rows = sqlx::query_as::<_, ActionRow>(
             r#"
-            SELECT t.* FROM todos t
-            INNER JOIN todo_dependencies d ON d.blocker_id = t.id
-            WHERE d.task_id = ?1
+            SELECT t.* FROM actions t
+            INNER JOIN action_dependencies d ON d.blocker_id = t.id
+            WHERE d.action_id = ?1
             "#,
         )
-        .bind(task_id)
+        .bind(action_id)
         .fetch_all(&self.pool)
         .await?;
         Ok(rows)
     }
 
-    /// Get incomplete blockers for a task (status != 'done').
-    pub async fn incomplete_blockers(&self, task_id: &str) -> Result<Vec<TodoRow>, StorageError> {
-        let rows = sqlx::query_as::<_, TodoRow>(
+    /// Get incomplete blockers for an action (status != 'done').
+    pub async fn incomplete_blockers(
+        &self,
+        action_id: &str,
+    ) -> Result<Vec<ActionRow>, StorageError> {
+        let rows = sqlx::query_as::<_, ActionRow>(
             r#"
-            SELECT t.* FROM todos t
-            INNER JOIN todo_dependencies d ON d.blocker_id = t.id
-            WHERE d.task_id = ?1 AND t.status != 'done'
+            SELECT t.* FROM actions t
+            INNER JOIN action_dependencies d ON d.blocker_id = t.id
+            WHERE d.action_id = ?1 AND t.status != 'done'
             "#,
         )
-        .bind(task_id)
+        .bind(action_id)
         .fetch_all(&self.pool)
         .await?;
         Ok(rows)
     }
 
-    /// Get tasks blocked by this task.
-    pub async fn get_blocking(&self, blocker_id: &str) -> Result<Vec<TodoRow>, StorageError> {
-        let rows = sqlx::query_as::<_, TodoRow>(
+    /// Get actions blocked by this action.
+    pub async fn get_blocking(&self, blocker_id: &str) -> Result<Vec<ActionRow>, StorageError> {
+        let rows = sqlx::query_as::<_, ActionRow>(
             r#"
-            SELECT t.* FROM todos t
-            INNER JOIN todo_dependencies d ON d.task_id = t.id
+            SELECT t.* FROM actions t
+            INNER JOIN action_dependencies d ON d.action_id = t.id
             WHERE d.blocker_id = ?1
             "#,
         )
@@ -427,27 +454,23 @@ impl TodoRepo {
         Ok(rows)
     }
 
-    /// Check if adding task_id -> blocker_id would create a cycle.
-    /// Uses a recursive CTE to walk existing edges from blocker_id forward.
     async fn would_create_cycle(
         &self,
-        task_id: &str,
+        action_id: &str,
         blocker_id: &str,
     ) -> Result<bool, StorageError> {
-        // Walk from blocker_id following blocker_id -> task_id edges.
-        // If we reach task_id, a cycle exists.
         let row: Option<(bool,)> = sqlx::query_as(
             r#"
             WITH RECURSIVE reachable AS (
-                SELECT blocker_id AS node FROM todo_dependencies WHERE task_id = ?2
+                SELECT blocker_id AS node FROM action_dependencies WHERE action_id = ?2
                 UNION
-                SELECT d.blocker_id FROM todo_dependencies d
-                INNER JOIN reachable r ON d.task_id = r.node
+                SELECT d.blocker_id FROM action_dependencies d
+                INNER JOIN reachable r ON d.action_id = r.node
             )
             SELECT EXISTS(SELECT 1 FROM reachable WHERE node = ?1)
             "#,
         )
-        .bind(task_id)
+        .bind(action_id)
         .bind(blocker_id)
         .fetch_optional(&self.pool)
         .await?;
@@ -455,43 +478,43 @@ impl TodoRepo {
         Ok(row.map(|r| r.0).unwrap_or(false))
     }
 
-    /// Get all dependency edges for a task.
+    /// Get all dependency edges for an action.
     pub async fn get_dependencies(
         &self,
-        task_id: &str,
-    ) -> Result<Vec<TodoDependencyRow>, StorageError> {
-        let rows = sqlx::query_as::<_, TodoDependencyRow>(
-            "SELECT * FROM todo_dependencies WHERE task_id = ?1",
+        action_id: &str,
+    ) -> Result<Vec<ActionDependencyRow>, StorageError> {
+        let rows = sqlx::query_as::<_, ActionDependencyRow>(
+            "SELECT * FROM action_dependencies WHERE action_id = ?1",
         )
-        .bind(task_id)
+        .bind(action_id)
         .fetch_all(&self.pool)
         .await?;
         Ok(rows)
     }
 
     // -----------------------------------------------------------------------
-    // Attachments (join table: todo_attachments)
+    // Attachments (join table: action_attachments)
     // -----------------------------------------------------------------------
 
-    /// Add an attachment to a todo.
+    /// Add an attachment to an action.
     pub async fn add_attachment(
         &self,
-        todo_id: &str,
+        action_id: &str,
         attachment_type: &str,
         value: &str,
         title: Option<&str>,
         tags: &[String],
-    ) -> Result<TodoAttachmentRow, StorageError> {
+    ) -> Result<ActionAttachmentRow, StorageError> {
         let id = uuid::Uuid::new_v4();
-        let row = sqlx::query_as::<_, TodoAttachmentRow>(
+        let row = sqlx::query_as::<_, ActionAttachmentRow>(
             r#"
-            INSERT INTO todo_attachments (id, todo_id, attachment_type, value, title, tags)
+            INSERT INTO action_attachments (id, action_id, attachment_type, value, title, tags)
             VALUES (?1, ?2, ?3, ?4, ?5, ?6)
             RETURNING *
             "#,
         )
         .bind(id)
-        .bind(todo_id)
+        .bind(action_id)
         .bind(attachment_type)
         .bind(value)
         .bind(title)
@@ -504,55 +527,55 @@ impl TodoRepo {
     /// Remove an attachment by its UUID.
     pub async fn remove_attachment(
         &self,
-        todo_id: &str,
+        action_id: &str,
         attachment_id: uuid::Uuid,
     ) -> Result<bool, StorageError> {
-        let result = sqlx::query("DELETE FROM todo_attachments WHERE id = ?1 AND todo_id = ?2")
+        let result = sqlx::query("DELETE FROM action_attachments WHERE id = ?1 AND action_id = ?2")
             .bind(attachment_id)
-            .bind(todo_id)
+            .bind(action_id)
             .execute(&self.pool)
             .await?;
         Ok(result.rows_affected() > 0)
     }
 
-    /// List all attachments for a todo.
+    /// List all attachments for an action.
     pub async fn list_attachments(
         &self,
-        todo_id: &str,
-    ) -> Result<Vec<TodoAttachmentRow>, StorageError> {
-        let rows = sqlx::query_as::<_, TodoAttachmentRow>(
-            "SELECT * FROM todo_attachments WHERE todo_id = ?1 ORDER BY created_at",
+        action_id: &str,
+    ) -> Result<Vec<ActionAttachmentRow>, StorageError> {
+        let rows = sqlx::query_as::<_, ActionAttachmentRow>(
+            "SELECT * FROM action_attachments WHERE action_id = ?1 ORDER BY created_at",
         )
-        .bind(todo_id)
+        .bind(action_id)
         .fetch_all(&self.pool)
         .await?;
         Ok(rows)
     }
 
     // -----------------------------------------------------------------------
-    // Time Entries (join table: todo_time_entries)
+    // Time Entries (join table: action_time_entries)
     // -----------------------------------------------------------------------
 
     /// Add a time entry.
     pub async fn add_time_entry(
         &self,
-        todo_id: &str,
+        action_id: &str,
         source: &str,
         started_at: DateTime<Utc>,
         duration_secs: Option<i64>,
         note: Option<&str>,
-    ) -> Result<TodoTimeEntryRow, StorageError> {
+    ) -> Result<ActionTimeEntryRow, StorageError> {
         let ended_at = duration_secs.map(|d| started_at + chrono::Duration::seconds(d));
         let id = uuid::Uuid::new_v4();
-        let row = sqlx::query_as::<_, TodoTimeEntryRow>(
+        let row = sqlx::query_as::<_, ActionTimeEntryRow>(
             r#"
-            INSERT INTO todo_time_entries (id, todo_id, source, started_at, ended_at, duration_secs, note)
+            INSERT INTO action_time_entries (id, action_id, source, started_at, ended_at, duration_secs, note)
             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
             RETURNING *
             "#,
         )
         .bind(id)
-        .bind(todo_id)
+        .bind(action_id)
         .bind(source)
         .bind(started_at)
         .bind(ended_at)
@@ -561,12 +584,11 @@ impl TodoRepo {
         .fetch_one(&self.pool)
         .await?;
 
-        // Update total_tracked_secs on the todo.
         if let Some(secs) = duration_secs {
             sqlx::query(
-                "UPDATE todos SET total_tracked_secs = total_tracked_secs + ?2, updated_at = datetime('now') WHERE id = ?1",
+                "UPDATE actions SET total_tracked_secs = total_tracked_secs + ?2, updated_at = datetime('now') WHERE id = ?1",
             )
-            .bind(todo_id)
+            .bind(action_id)
             .bind(secs)
             .execute(&self.pool)
             .await?;
@@ -575,35 +597,34 @@ impl TodoRepo {
         Ok(row)
     }
 
-    /// Close an open time entry (set ended_at and compute duration).
+    /// Close an open time entry.
     pub async fn close_time_entry(
         &self,
-        todo_id: &str,
+        action_id: &str,
         entry_id: uuid::Uuid,
-    ) -> Result<TodoTimeEntryRow, StorageError> {
-        let row = sqlx::query_as::<_, TodoTimeEntryRow>(
+    ) -> Result<ActionTimeEntryRow, StorageError> {
+        let row = sqlx::query_as::<_, ActionTimeEntryRow>(
             r#"
-            UPDATE todo_time_entries
+            UPDATE action_time_entries
             SET ended_at = datetime('now'),
                 duration_secs = (unixepoch('now') - unixepoch(started_at))
-            WHERE id = ?1 AND todo_id = ?2 AND ended_at IS NULL
+            WHERE id = ?1 AND action_id = ?2 AND ended_at IS NULL
             RETURNING *
             "#,
         )
         .bind(entry_id)
-        .bind(todo_id)
+        .bind(action_id)
         .fetch_optional(&self.pool)
         .await?
         .ok_or_else(|| {
-            StorageError::NotFound(format!("open time entry {entry_id} for todo {todo_id}"))
+            StorageError::NotFound(format!("open time entry {entry_id} for action {action_id}"))
         })?;
 
-        // Update total_tracked_secs.
         if let Some(secs) = row.duration_secs {
             sqlx::query(
-                "UPDATE todos SET total_tracked_secs = total_tracked_secs + ?2, updated_at = datetime('now') WHERE id = ?1",
+                "UPDATE actions SET total_tracked_secs = total_tracked_secs + ?2, updated_at = datetime('now') WHERE id = ?1",
             )
-            .bind(todo_id)
+            .bind(action_id)
             .bind(secs)
             .execute(&self.pool)
             .await?;
@@ -612,15 +633,15 @@ impl TodoRepo {
         Ok(row)
     }
 
-    /// List time entries for a todo.
+    /// List time entries for an action.
     pub async fn list_time_entries(
         &self,
-        todo_id: &str,
-    ) -> Result<Vec<TodoTimeEntryRow>, StorageError> {
-        let rows = sqlx::query_as::<_, TodoTimeEntryRow>(
-            "SELECT * FROM todo_time_entries WHERE todo_id = ?1 ORDER BY started_at",
+        action_id: &str,
+    ) -> Result<Vec<ActionTimeEntryRow>, StorageError> {
+        let rows = sqlx::query_as::<_, ActionTimeEntryRow>(
+            "SELECT * FROM action_time_entries WHERE action_id = ?1 ORDER BY started_at",
         )
-        .bind(todo_id)
+        .bind(action_id)
         .fetch_all(&self.pool)
         .await?;
         Ok(rows)
@@ -630,10 +651,10 @@ impl TodoRepo {
     // Hierarchy
     // -----------------------------------------------------------------------
 
-    /// Get immediate children of a todo.
-    pub async fn get_children(&self, parent_id: &str) -> Result<Vec<TodoRow>, StorageError> {
-        let rows = sqlx::query_as::<_, TodoRow>(
-            "SELECT * FROM todos WHERE parent_id = ?1 ORDER BY created_at",
+    /// Get immediate children of an action.
+    pub async fn get_children(&self, parent_id: &str) -> Result<Vec<ActionRow>, StorageError> {
+        let rows = sqlx::query_as::<_, ActionRow>(
+            "SELECT * FROM actions WHERE parent_id = ?1 ORDER BY created_at",
         )
         .bind(parent_id)
         .fetch_all(&self.pool)
@@ -641,23 +662,23 @@ impl TodoRepo {
         Ok(rows)
     }
 
-    /// Count immediate children of a todo without loading full rows.
+    /// Count immediate children.
     pub async fn count_children(&self, parent_id: &str) -> Result<i64, StorageError> {
-        let row: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM todos WHERE parent_id = ?1")
+        let row: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM actions WHERE parent_id = ?1")
             .bind(parent_id)
             .fetch_one(&self.pool)
             .await?;
         Ok(row.0)
     }
 
-    /// Get full subtree of a todo (recursive CTE).
-    pub async fn get_subtree(&self, root_id: &str) -> Result<Vec<TodoRow>, StorageError> {
-        let rows = sqlx::query_as::<_, TodoRow>(
+    /// Get full subtree of an action (recursive CTE).
+    pub async fn get_subtree(&self, root_id: &str) -> Result<Vec<ActionRow>, StorageError> {
+        let rows = sqlx::query_as::<_, ActionRow>(
             r#"
             WITH RECURSIVE subtree AS (
-                SELECT * FROM todos WHERE id = ?1
+                SELECT * FROM actions WHERE id = ?1
                 UNION ALL
-                SELECT t.* FROM todos t
+                SELECT t.* FROM actions t
                 INNER JOIN subtree s ON t.parent_id = s.id
             )
             SELECT * FROM subtree ORDER BY created_at
@@ -669,25 +690,24 @@ impl TodoRepo {
         Ok(rows)
     }
 
-    /// Move a todo to a new parent and/or project.
-    pub async fn move_todo(
+    /// Move an action to a new parent and/or project.
+    pub async fn move_action(
         &self,
         id: &str,
         new_parent_id: Option<&str>,
         new_project_id: Option<&str>,
-    ) -> Result<TodoRow, StorageError> {
-        // Check for parent cycle if setting a parent.
+    ) -> Result<ActionRow, StorageError> {
         if let Some(parent_id) = new_parent_id {
             if self.would_create_parent_cycle(id, parent_id).await? {
                 return Err(StorageError::Conflict(format!(
-                    "Setting parent {parent_id} for todo {id} would create a cycle"
+                    "Setting parent {parent_id} for action {id} would create a cycle"
                 )));
             }
         }
 
-        let row = sqlx::query_as::<_, TodoRow>(
+        let row = sqlx::query_as::<_, ActionRow>(
             r#"
-            UPDATE todos
+            UPDATE actions
             SET parent_id = ?2, project_id = ?3, updated_at = datetime('now')
             WHERE id = ?1
             RETURNING *
@@ -698,24 +718,26 @@ impl TodoRepo {
         .bind(new_project_id)
         .fetch_optional(&self.pool)
         .await?
-        .ok_or_not_found(&format!("todo {id}"))?;
+        .ok_or_not_found(&format!("action {id}"))?;
 
         Ok(row)
     }
 
-    /// Check if setting parent_id would create a cycle in the parent hierarchy.
     async fn would_create_parent_cycle(
         &self,
         child_id: &str,
         new_parent_id: &str,
     ) -> Result<bool, StorageError> {
-        // Walk up the parent chain from new_parent_id. If we encounter child_id, cycle exists.
+        if child_id == new_parent_id {
+            return Ok(true);
+        }
+
         let row: Option<(bool,)> = sqlx::query_as(
             r#"
             WITH RECURSIVE ancestors AS (
-                SELECT parent_id FROM todos WHERE id = ?2
+                SELECT parent_id FROM actions WHERE id = ?2
                 UNION ALL
-                SELECT t.parent_id FROM todos t
+                SELECT t.parent_id FROM actions t
                 INNER JOIN ancestors a ON t.id = a.parent_id
                 WHERE a.parent_id IS NOT NULL
             )
@@ -727,25 +749,20 @@ impl TodoRepo {
         .fetch_optional(&self.pool)
         .await?;
 
-        // Also check if the new_parent IS the child itself.
-        if child_id == new_parent_id {
-            return Ok(true);
-        }
-
         Ok(row.map(|r| r.0).unwrap_or(false))
     }
 
-    /// Mark a todo and all its children as "done" recursively.
+    /// Mark an action and all children as "done" recursively.
     pub async fn cascade_complete(&self, root_id: &str) -> Result<u64, StorageError> {
         let result = sqlx::query(
             r#"
             WITH RECURSIVE subtree AS (
-                SELECT id FROM todos WHERE id = ?1
+                SELECT id FROM actions WHERE id = ?1
                 UNION ALL
-                SELECT t.id FROM todos t
+                SELECT t.id FROM actions t
                 INNER JOIN subtree s ON t.parent_id = s.id
             )
-            UPDATE todos SET status = 'done', completed_at = datetime('now'), updated_at = datetime('now')
+            UPDATE actions SET status = 'done', completed_at = datetime('now'), updated_at = datetime('now')
             WHERE id IN (SELECT id FROM subtree) AND status != 'done'
             "#,
         )
@@ -759,12 +776,12 @@ impl TodoRepo {
     // Aggregation
     // -----------------------------------------------------------------------
 
-    /// Count todos by status.
-    pub async fn summary(&self) -> Result<TodoSummary, StorageError> {
+    /// Count actions by status.
+    pub async fn summary(&self) -> Result<ActionSummary, StorageError> {
         let rows: Vec<(String, i64)> = sqlx::query_as(
             r#"
             SELECT status, COUNT(*) as count
-            FROM todos
+            FROM actions
             WHERE is_template = FALSE
             GROUP BY status
             "#,
@@ -772,7 +789,7 @@ impl TodoRepo {
         .fetch_all(&self.pool)
         .await?;
 
-        let mut summary = TodoSummary::default();
+        let mut summary = ActionSummary::default();
         for (status, count) in &rows {
             match status.as_str() {
                 "todo" => summary.todo = *count,
@@ -785,11 +802,11 @@ impl TodoRepo {
         Ok(summary)
     }
 
-    /// Get overdue todos (due_date < now, status not done).
-    pub async fn overdue(&self) -> Result<Vec<TodoRow>, StorageError> {
-        let rows = sqlx::query_as::<_, TodoRow>(
+    /// Get overdue actions.
+    pub async fn overdue(&self) -> Result<Vec<ActionRow>, StorageError> {
+        let rows = sqlx::query_as::<_, ActionRow>(
             r#"
-            SELECT * FROM todos
+            SELECT * FROM actions
             WHERE due_date < datetime('now')
               AND status != 'done'
               AND is_template = FALSE
@@ -801,7 +818,7 @@ impl TodoRepo {
         Ok(rows)
     }
 
-    /// Build a context string of active todos for LLM context injection.
+    /// Build a context string of active actions for LLM context injection.
     #[allow(clippy::type_complexity)]
     pub async fn to_context_string(&self) -> Result<String, StorageError> {
         let rows: Vec<(
@@ -811,7 +828,7 @@ impl TodoRepo {
             Option<chrono::DateTime<chrono::Utc>>,
         )> = sqlx::query_as(
             r#"
-                SELECT title, status, priority, focused_at FROM todos
+                SELECT title, status, priority, focused_at FROM actions
                 WHERE status IN ('todo', 'doing')
                   AND is_template = FALSE
                 ORDER BY
@@ -848,18 +865,35 @@ impl TodoRepo {
     // -----------------------------------------------------------------------
 
     /// Add a recurring template.
-    pub async fn add_template(&self, row: &TodoRow) -> Result<TodoRow, StorageError> {
-        // Delegate to add() — the row should have is_template=true already.
+    pub async fn add_template(&self, row: &ActionRow) -> Result<ActionRow, StorageError> {
         self.add(row).await
     }
 
     /// Delete a recurring template.
     pub async fn delete_template(&self, id: &str) -> Result<bool, StorageError> {
-        let result = sqlx::query("DELETE FROM todos WHERE id = ?1 AND is_template = TRUE")
+        let result = sqlx::query("DELETE FROM actions WHERE id = ?1 AND is_template = TRUE")
             .bind(id)
             .execute(&self.pool)
             .await?;
         Ok(result.rows_affected() > 0)
+    }
+
+    // -----------------------------------------------------------------------
+    // KR-related helpers
+    // -----------------------------------------------------------------------
+
+    /// Count total and completed actions for a key result.
+    /// Returns `(total, completed)`.
+    pub async fn count_by_kr(&self, kr_id: &str) -> Result<(i64, i64), StorageError> {
+        let row: (i64, i64) = sqlx::query_as(
+            "SELECT COUNT(*), SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) \
+             FROM actions WHERE key_result_id = ?1 AND is_template = FALSE",
+        )
+        .bind(kr_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok((row.0, row.1))
     }
 }
 
@@ -867,7 +901,6 @@ impl TodoRepo {
 mod tests {
     #[test]
     fn test_get_by_ids_empty_input_short_circuits() {
-        // Verify the empty-slice fast-path logic (no DB required).
         let ids: Vec<String> = vec![];
         assert!(
             ids.is_empty(),
@@ -878,7 +911,7 @@ mod tests {
 
 /// Patch struct for partial updates.
 #[derive(Debug, Default, Clone)]
-pub struct TodoPatch {
+pub struct ActionPatch {
     pub id: String,
     pub title: Option<String>,
     pub description: Option<Option<String>>,
@@ -891,4 +924,6 @@ pub struct TodoPatch {
     pub last_reminded_at: Option<Option<DateTime<Utc>>>,
     pub estimated_minutes: Option<Option<i32>>,
     pub recurrence_rule: Option<Option<String>>,
+    pub area_id: Option<String>,
+    pub key_result_id: Option<Option<String>>,
 }

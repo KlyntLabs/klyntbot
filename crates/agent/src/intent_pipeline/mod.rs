@@ -9,7 +9,6 @@ pub mod engines;
 pub mod pipeline;
 pub mod router;
 pub mod types;
-pub mod visibility;
 
 pub use pipeline::IntentPipeline;
 pub use types::{AnalysisSource, ComplexitySignals, ExecutionMode, FailureRisk, IntentAnalysis};

@@ -5,15 +5,15 @@ use common::{Result, ToolError};
 use tools_core::ParamExtractor;
 use tracing::warn;
 
-use super::super::TodoTool;
-use crate::types::{AttachmentType, Todo};
-use storage::TodoPatch;
+use super::super::TaskTool;
+use crate::types::{Action, AttachmentType};
+use storage::ActionPatch;
 
-impl TodoTool {
+impl TaskTool {
     pub(crate) async fn handle_update(&self, p: &ParamExtractor<'_>) -> Result<String> {
         let id = p.required_str("id")?;
 
-        let patch = TodoPatch {
+        let patch = ActionPatch {
             id: id.to_string(),
             title: p.optional_str("title")?.map(String::from),
             description: p.optional_str("description")?.map(|s| Some(s.to_string())),
@@ -36,21 +36,28 @@ impl TodoTool {
             next_instance_date: None,
             estimated_minutes: p.optional_u64("estimated_minutes")?.map(|v| Some(v as i32)),
             recurrence_rule: None,
+            area_id: p.optional_str("area_id")?.map(String::from),
+            key_result_id: p
+                .optional_str("key_result_id")?
+                .map(|s| Some(s.to_string())),
         };
 
         match self.repo.update(&patch).await {
             Ok(row) => {
-                let todo = Todo::from(row);
+                let action = Action::from(row);
 
                 // Auto-embed updated task (best-effort)
                 if let Some(ref emb) = self.embedding_handler {
-                    if let Err(e) = emb.embed_todo(&todo).await {
-                        warn!("Failed to regenerate embedding for todo {}: {}", todo.id, e);
+                    if let Err(e) = emb.embed_todo(&action).await {
+                        warn!(
+                            "Failed to regenerate embedding for action {}: {}",
+                            action.id, e
+                        );
                     }
                 }
 
                 self.push_task_to_calendar(id).await;
-                Ok(format!("Updated task: {}", todo.title))
+                Ok(format!("Updated task: {}", action.title))
             }
             Err(storage::StorageError::NotFound(msg)) => {
                 Err(ToolError::ExecutionFailed(format!("Task not found: {}", msg)).into())
@@ -85,11 +92,18 @@ impl TodoTool {
             }
         }
 
+        // Capture key_result_id before update for progress cascade
+        let key_result_id = self
+            .repo
+            .get(id)
+            .await?
+            .and_then(|r| r.key_result_id.clone());
+
         // Collect tasks this will unblock
         let blocking_rows = self.repo.get_blocking(id).await?;
         let blocks_ids: Vec<String> = blocking_rows.iter().map(|r| r.id.clone()).collect();
 
-        let patch = TodoPatch {
+        let patch = ActionPatch {
             id: id.to_string(),
             status: Some("done".to_string()),
             ..Default::default()
@@ -97,15 +111,15 @@ impl TodoTool {
 
         let result = match self.repo.update(&patch).await {
             Ok(row) => {
-                let todo = Todo::from(row);
+                let action = Action::from(row);
                 let completed_count = self.repo.cascade_complete(id).await?;
 
                 let mut msg = if completed_count == 0 {
-                    format!("Completed: {}", todo.title)
+                    format!("Completed: {}", action.title)
                 } else {
                     format!(
                         "Completed: {} ({} subtasks also completed)",
-                        todo.title, completed_count
+                        action.title, completed_count
                     )
                 };
 
@@ -129,6 +143,15 @@ impl TodoTool {
                     }
                 }
 
+                // Cascade progress to KR if action is linked
+                if let Some(ref kr_id) = key_result_id {
+                    if let Some(ref handler) = self.progress_handler {
+                        if let Err(e) = handler.recalculate_kr_progress(kr_id).await {
+                            warn!("Failed to cascade progress for KR {}: {}", kr_id, e);
+                        }
+                    }
+                }
+
                 Ok(msg)
             }
             Err(storage::StorageError::NotFound(msg)) => {
@@ -148,7 +171,7 @@ impl TodoTool {
         let id = p.required_str("id")?;
 
         let task = self
-            .get_full_todo(id)
+            .get_full_action(id)
             .await?
             .ok_or_else(|| ToolError::ExecutionFailed(format!("Task not found: {}", id)))?;
 
@@ -169,7 +192,7 @@ impl TodoTool {
                 id
             )),
             Some(result) => {
-                let mut patch = TodoPatch {
+                let mut patch = ActionPatch {
                     id: id.to_string(),
                     ..Default::default()
                 };
@@ -290,12 +313,12 @@ impl TodoTool {
 
         let result = match self
             .repo
-            .move_todo(id, new_parent_id.as_deref(), new_project_id.as_deref())
+            .move_action(id, new_parent_id.as_deref(), new_project_id.as_deref())
             .await
         {
             Ok(row) => {
-                let todo = Todo::from(row);
-                let mut parts = vec![format!("Moved task: {}", todo.title)];
+                let action = Action::from(row);
+                let mut parts = vec![format!("Moved task: {}", action.title)];
                 if new_parent_id.is_some() {
                     parts.push(format!("new parent: {:?}", new_parent_id));
                 }

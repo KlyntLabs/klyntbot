@@ -26,7 +26,7 @@ pub struct CalendarEvent {
 
 /// ReminderEngine - checks for todos and calendar events that need reminders
 pub struct ReminderEngine {
-    todo_repo: storage::TodoRepo,
+    todo_repo: storage::ActionRepo,
     calendar_handler: Option<Arc<dyn CalendarHandler>>,
     dispatcher: Arc<NotificationDispatcher>,
     check_interval: StdDuration,
@@ -37,7 +37,7 @@ pub struct ReminderEngine {
 impl ReminderEngine {
     /// Create a new ReminderEngine backed by a SQL TodoRepo.
     pub fn new(
-        todo_repo: storage::TodoRepo,
+        todo_repo: storage::ActionRepo,
         calendar_handler: Option<Arc<dyn CalendarHandler>>,
         dispatcher: Arc<NotificationDispatcher>,
         check_interval: StdDuration,
@@ -93,14 +93,14 @@ impl ReminderEngine {
 
     /// Check all reminder rules and send notifications via SQL TodoRepo.
     async fn check_and_send_reminders(
-        repo: &storage::TodoRepo,
+        repo: &storage::ActionRepo,
         calendar_handler: Option<&Arc<dyn CalendarHandler>>,
         dispatcher: &Arc<NotificationDispatcher>,
     ) -> Result<()> {
         use tools::todo_types::Todo;
 
         // Get only non-template, non-done todos for reminder checking
-        let filter = storage::TodoFilter {
+        let filter = storage::ActionFilter {
             status: None, // include todo + doing (exclude done via post-filter below)
             templates_only: false,
             ..Default::default()
@@ -130,7 +130,7 @@ impl ReminderEngine {
                     .await?;
 
                 // Update last_reminded_at via SQL
-                let patch = storage::TodoPatch {
+                let patch = storage::ActionPatch {
                     id: todo.id.clone(),
                     last_reminded_at: Some(Some(Utc::now())),
                     ..Default::default()
@@ -304,6 +304,8 @@ mod tests {
             id: format!("test-{}", &uuid::Uuid::new_v4().to_string()[..8]),
             title: title.to_string(),
             description: None,
+            area_id: String::new(),
+            key_result_id: None,
             priority: None,
             due_date,
             tags: vec![],

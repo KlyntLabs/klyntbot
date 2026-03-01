@@ -1,7 +1,7 @@
 //! ExecutionRouter — maps `ExecutionMode` to the appropriate engine and
 //! handles escalation between engines.
 //!
-//! Escalation chain: Direct → Reactive → Planned
+//! Escalation chain: Direct → Reactive
 //! Each escalation carries full context via `EscalationContext` so no work
 //! is repeated.
 
@@ -11,7 +11,6 @@ use tools::RoutingContext;
 use tracing::{debug, warn};
 
 use super::engines::direct::DirectEngine;
-use super::engines::planned::PlannedEngine;
 use super::engines::reactive::ReactiveEngine;
 use super::engines::EngineResult;
 use super::types::ExecutionMode;
@@ -62,21 +61,14 @@ pub struct RouterResult {
 pub struct ExecutionRouter {
     direct: DirectEngine,
     reactive: ReactiveEngine,
-    planned: Option<PlannedEngine>,
     max_escalations: u32,
 }
 
 impl ExecutionRouter {
-    pub fn new(
-        direct: DirectEngine,
-        reactive: ReactiveEngine,
-        planned: Option<PlannedEngine>,
-        max_escalations: u32,
-    ) -> Self {
+    pub fn new(direct: DirectEngine, reactive: ReactiveEngine, max_escalations: u32) -> Self {
         Self {
             direct,
             reactive,
-            planned,
             max_escalations,
         }
     }
@@ -113,26 +105,6 @@ impl ExecutionRouter {
                 self.reactive
                     .execute(messages, tools, params, ctx, event_tx.clone())
                     .await?
-            }
-            ExecutionMode::Planned { ref visibility, .. } => {
-                debug!("ExecutionRouter: starting with Planned mode");
-                if let Some(ref planned) = self.planned {
-                    planned
-                        .execute_with_visibility(
-                            messages,
-                            tools,
-                            params,
-                            ctx,
-                            event_tx.clone(),
-                            visibility.clone(),
-                        )
-                        .await?
-                } else {
-                    warn!("ExecutionRouter: Planned mode requested but no PlannedEngine configured, falling back to Reactive");
-                    self.reactive
-                        .execute(messages, tools, params, ctx, event_tx.clone())
-                        .await?
-                }
             }
         };
 
@@ -204,56 +176,16 @@ impl ExecutionRouter {
                                 )
                                 .await?;
                         }
-                        "reactive" => {
-                            // Reactive → Planned (with prior work)
-                            if let Some(ref planned) = self.planned {
-                                current_mode = "planned";
-                                current_result = planned
-                                    .execute_with_prior_work(
-                                        carried_context,
-                                        tools,
-                                        params,
-                                        ctx,
-                                        event_tx.clone(),
-                                    )
-                                    .await?;
-                            } else {
-                                // No planned engine — return what we have
-                                warn!("ExecutionRouter: Reactive escalated but no PlannedEngine configured");
-                                return Ok(RouterResult {
-                                    content: format!("Task needs planning but planning is not configured. Reason: {}", reason),
-                                    final_mode: "reactive".to_string(),
-                                    escalation_count,
-                                    usage: escalation_usage,
-                                    iterations: 0,
-                                    tool_name: None,
-                                });
-                            }
-                        }
-                        "planned" => {
-                            // Planned — no further escalation possible
-                            warn!("ExecutionRouter: cannot escalate beyond planned mode");
-                            return Ok(RouterResult {
-                                content: format!(
-                                    "Task could not be completed in planned mode. Reason: {}",
-                                    reason
-                                ),
-                                final_mode: current_mode.to_string(),
-                                escalation_count,
-                                usage: escalation_usage,
-                                iterations: 0,
-                                tool_name: None,
-                            });
-                        }
-                        unknown => {
+                        _ => {
+                            // Reactive — no further escalation possible
                             warn!(
-                                "ExecutionRouter: unknown mode '{}', cannot escalate",
-                                unknown
+                                "ExecutionRouter: cannot escalate beyond {} mode",
+                                current_mode
                             );
                             return Ok(RouterResult {
                                 content: format!(
                                     "Task could not be completed in {} mode. Reason: {}",
-                                    unknown, reason
+                                    current_mode, reason
                                 ),
                                 final_mode: current_mode.to_string(),
                                 escalation_count,
@@ -373,7 +305,7 @@ mod tests {
         let core = Arc::new(ExecutionCore::new(provider, registry));
         let direct = DirectEngine::new(core.clone());
         let reactive = ReactiveEngine::new(core, 10);
-        ExecutionRouter::new(direct, reactive, None, 2)
+        ExecutionRouter::new(direct, reactive, 2)
     }
 
     // ── Tests ────────────────────────────────────────────────────
@@ -544,7 +476,7 @@ mod tests {
         let direct = DirectEngine::new(core.clone());
         // Use max_iterations=5 so escalation happens at iteration 4
         let reactive = ReactiveEngine::new(core, 5);
-        let router = ExecutionRouter::new(direct, reactive, None, 1);
+        let router = ExecutionRouter::new(direct, reactive, 1);
 
         let result = router
             .execute(
@@ -558,17 +490,15 @@ mod tests {
             .await
             .unwrap();
 
-        // Should have escalated once (Direct → Reactive) then Reactive escalated
-        // but hit the max_escalations=1 limit
+        // Should have escalated once (Direct → Reactive) then Reactive can't escalate further
         assert!(
             result.escalation_count <= 2,
             "escalation count should be bounded"
         );
         assert!(
             result.content.contains("exceeded")
-                || result.content.contains("not configured")
-                || result.content.contains("needs planning"),
-            "should indicate limit or no planned engine: {}",
+                || result.content.contains("could not be completed"),
+            "should indicate limit reached: {}",
             result.content
         );
     }

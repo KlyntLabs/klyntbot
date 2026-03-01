@@ -3,9 +3,9 @@
 use common::Result;
 use tools_core::ParamExtractor;
 
-use super::super::TodoTool;
+use super::super::TaskTool;
 
-impl TodoTool {
+impl TaskTool {
     pub(crate) async fn handle_add_dependency(&self, p: &ParamExtractor<'_>) -> Result<String> {
         let task_id = p.required_str("task_id")?;
         let blocked_by = p.required_str("blocked_by")?;

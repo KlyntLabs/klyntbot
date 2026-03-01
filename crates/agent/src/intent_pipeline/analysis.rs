@@ -81,21 +81,16 @@ pub fn analyze_heuristic(message: &str) -> Option<IntentAnalysis> {
         ));
     }
 
-    // 5. Explicit plan keywords → Planned (before action keywords, since
-    //    "create a plan" contains "create" which is also an action keyword)
+    // 5. Explicit plan keywords → Reactive with high iteration budget
     if has_plan_keyword(&msg) {
         let signals = analyze_complexity(&msg);
-        return Some(IntentAnalysis {
-            mode: ExecutionMode::Planned {
-                visibility: domain::PlanVisibility::default(),
-                max_steps: 15,
-            },
+        return Some(reactive_analysis(
+            20,
+            "Explicit planning language detected — using high iteration budget",
+            0.85,
             signals,
-            confidence: 0.85,
-            source: AnalysisSource::Heuristic,
-            reasoning: "Explicit planning language detected".to_string(),
-            tool_groups: vec![ToolGroup::Full],
-        });
+            vec![ToolGroup::Full],
+        ));
     }
 
     // 6. Structural complexity analysis for remaining messages
@@ -130,19 +125,15 @@ pub fn analyze_heuristic(message: &str) -> Option<IntentAnalysis> {
         ));
     }
 
-    // High complexity with clear autonomous signals → Planned
+    // High complexity with clear autonomous signals → Reactive with high budget
     if score >= 4 {
-        return Some(IntentAnalysis {
-            mode: ExecutionMode::Planned {
-                visibility: domain::PlanVisibility::default(),
-                max_steps: 10,
-            },
+        return Some(reactive_analysis(
+            20,
+            "High complexity score from heuristic analysis",
+            0.75,
             signals,
-            confidence: 0.75,
-            source: AnalysisSource::Heuristic,
-            reasoning: "High complexity score from heuristic analysis".to_string(),
-            tool_groups: vec![ToolGroup::Full],
-        });
+            vec![ToolGroup::Full],
+        ));
     }
 
     // Not enough signal — defer to LLM
@@ -455,7 +446,7 @@ const CLASSIFICATION_PROMPT: &str = r#"Classify this user message and assess its
 
 Respond ONLY with valid JSON:
 {
-  "mode": "direct" | "reactive" | "planned",
+  "mode": "direct" | "reactive",
   "estimated_tool_calls": <0-10>,
   "has_sequential_deps": <true|false>,
   "failure_risk": "low" | "medium" | "high",
@@ -468,8 +459,7 @@ Respond ONLY with valid JSON:
 
 Mode guide:
 - "direct": Greetings, factual Q&A, explanations — no tools needed
-- "reactive": Single-shot tasks needing tools — search, CRUD, lookups
-- "planned": Multi-step tasks with dependencies, state tracking, or high failure risk
+- "reactive": Tasks needing tools — search, CRUD, lookups, multi-step workflows
 
 For "relevant_tools": list ONLY the tools from the available set that are needed.
 Use an empty array for "direct" mode (no tools needed).
@@ -552,10 +542,6 @@ impl IntentClassifier {
 
         let mode = match mode_str {
             "direct" => ExecutionMode::Direct,
-            "planned" => ExecutionMode::Planned {
-                visibility: domain::PlanVisibility::default(),
-                max_steps: signals.estimated_tool_calls.max(5),
-            },
             _ => ExecutionMode::Reactive {
                 max_iterations: (signals.estimated_tool_calls as u32).max(5),
             },
@@ -926,12 +912,12 @@ mod tests {
     }
 
     #[test]
-    fn explicit_plan_keyword_is_planned() {
+    fn explicit_plan_keyword_is_reactive() {
         let result = analyze_heuristic("create a plan for the database refactor");
         assert!(result.is_some());
         assert!(matches!(
             result.unwrap().mode,
-            ExecutionMode::Planned { .. }
+            ExecutionMode::Reactive { max_iterations: 20 }
         ));
     }
 
@@ -955,7 +941,7 @@ mod tests {
     }
 
     #[test]
-    fn complex_planned_gets_full_tools() {
+    fn complex_reactive_gets_full_tools() {
         let result = analyze_heuristic("create a plan for the database refactor").unwrap();
         assert!(result.tool_groups.contains(&ToolGroup::Full));
     }
@@ -991,7 +977,7 @@ mod tests {
 
     #[tokio::test]
     async fn parses_structured_classification() {
-        let response = r#"{"mode":"planned","estimated_tool_calls":5,"has_sequential_deps":true,"failure_risk":"high","requires_state_tracking":true,"requires_retries":false,"confidence":0.9,"reasoning":"Multi-step booking"}"#;
+        let response = r#"{"mode":"reactive","estimated_tool_calls":5,"has_sequential_deps":true,"failure_risk":"high","requires_state_tracking":true,"requires_retries":false,"confidence":0.9,"reasoning":"Multi-step booking"}"#;
         let classifier = IntentClassifier::new(mock_provider(response), Duration::from_secs(2));
         let result = classifier
             .classify(
@@ -1002,7 +988,10 @@ mod tests {
             )
             .await
             .unwrap();
-        assert!(matches!(result.mode, ExecutionMode::Planned { .. }));
+        assert!(matches!(
+            result.mode,
+            ExecutionMode::Reactive { max_iterations: 5 }
+        ));
         assert_eq!(result.signals.estimated_tool_calls, 5);
         assert!(result.signals.has_sequential_deps);
         assert_eq!(result.signals.failure_risk, FailureRisk::High);
@@ -1122,7 +1111,7 @@ mod tests {
 
     #[tokio::test]
     async fn low_confidence_llm_falls_back_to_reactive() {
-        let response = r#"{"mode":"planned","estimated_tool_calls":1,"has_sequential_deps":false,"failure_risk":"low","requires_state_tracking":false,"requires_retries":false,"confidence":0.3,"reasoning":"Unsure"}"#;
+        let response = r#"{"mode":"reactive","estimated_tool_calls":1,"has_sequential_deps":false,"failure_risk":"low","requires_state_tracking":false,"requires_retries":false,"confidence":0.3,"reasoning":"Unsure"}"#;
         let analyzer = IntentAnalyzer::new(
             Arc::new(MockClassifierProvider::new(response)),
             "model",

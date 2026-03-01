@@ -7,13 +7,13 @@ use std::collections::HashMap;
 use tools_core::ParamExtractor;
 use tracing::{debug, info};
 
-use super::super::TodoTool;
-use crate::types::{TimeEntrySource, Todo, TodoStatus};
-use storage::TodoFilter;
+use super::super::TaskTool;
+use crate::types::{Action, ActionStatus, TimeEntrySource};
+use storage::ActionFilter;
 
-impl TodoTool {
+impl TaskTool {
     pub(crate) async fn handle_list(&self, p: &ParamExtractor<'_>) -> Result<String> {
-        let filter = TodoFilter {
+        let filter = ActionFilter {
             status: p
                 .optional_str("status")?
                 .and_then(|s| match s.to_lowercase().as_str() {
@@ -27,29 +27,32 @@ impl TodoTool {
             tags: p.optional_str("tag")?.map(|t| vec![t.to_string()]),
             limit: p.optional_u64("limit")?.map(|l| l as i64),
             project_id: p.optional_str("project_id")?.map(String::from),
+            area_id: p.optional_str("area_id")?.map(String::from),
+            key_result_id: p.optional_str("key_result_id")?.map(String::from),
+            unassigned: p.optional_bool("unassigned")?.unwrap_or(false),
             templates_only: false,
         };
 
         let rows = self.repo.list(&filter).await?;
-        let todos: Vec<Todo> = rows.into_iter().map(Todo::from).collect();
+        let actions: Vec<Action> = rows.into_iter().map(Action::from).collect();
 
-        if todos.is_empty() {
+        if actions.is_empty() {
             return Ok("No tasks found.".to_string());
         }
 
-        let mut output = format!("{} task(s):\n", todos.len());
-        for todo in todos {
-            let priority_str = todo
+        let mut output = format!("{} task(s):\n", actions.len());
+        for action in actions {
+            let priority_str = action
                 .priority
                 .map(|p| format!("P{}", p))
                 .unwrap_or_else(|| "P3".to_string());
             output.push_str(&format!(
                 "\n- [{}] {} ({}, {:?}, {})",
-                todo.id,
-                todo.title,
+                action.id,
+                action.title,
                 priority_str,
-                todo.status,
-                todo.tags.join(", ")
+                action.status,
+                action.tags.join(", ")
             ));
         }
         Ok(output)
@@ -58,41 +61,45 @@ impl TodoTool {
     pub(crate) async fn handle_show(&self, p: &ParamExtractor<'_>) -> Result<String> {
         let id = p.required_str("id")?;
 
-        match self.get_full_todo(id).await? {
-            Some(todo) => {
-                let mut output = format!("Task: {}\n", todo.title);
-                output.push_str(&format!("ID: {}\n", todo.id));
-                output.push_str(&format!("Status: {:?}\n", todo.status));
-                let priority_str = todo
+        match self.get_full_action(id).await? {
+            Some(action) => {
+                let mut output = format!("Task: {}\n", action.title);
+                output.push_str(&format!("ID: {}\n", action.id));
+                output.push_str(&format!("Status: {:?}\n", action.status));
+                let priority_str = action
                     .priority
                     .map(|p| format!("P{}", p))
                     .unwrap_or_else(|| "P3".to_string());
                 output.push_str(&format!("Priority: {}\n", priority_str));
-                if let Some(desc) = &todo.description {
+                output.push_str(&format!("Area: {}\n", action.area_id));
+                if let Some(ref kr_id) = action.key_result_id {
+                    output.push_str(&format!("Key Result: {}\n", kr_id));
+                }
+                if let Some(desc) = &action.description {
                     output.push_str(&format!("Description: {}\n", desc));
                 }
-                if !todo.tags.is_empty() {
-                    output.push_str(&format!("Tags: {}\n", todo.tags.join(", ")));
+                if !action.tags.is_empty() {
+                    output.push_str(&format!("Tags: {}\n", action.tags.join(", ")));
                 }
-                if let Some(due) = &todo.due_date {
+                if let Some(due) = &action.due_date {
                     output.push_str(&format!("Due: {}\n", due.format("%Y-%m-%d")));
                 }
-                if let Some(ref parent_id) = todo.parent_id {
+                if let Some(ref parent_id) = action.parent_id {
                     output.push_str(&format!("Parent: {}\n", parent_id));
                 }
-                if let Some(ref project_id) = todo.project_id {
+                if let Some(ref project_id) = action.project_id {
                     output.push_str(&format!("Project: {}\n", project_id));
                 }
-                if !todo.blocked_by.is_empty() {
-                    output.push_str(&format!("Blocked by: {}\n", todo.blocked_by.join(", ")));
+                if !action.blocked_by.is_empty() {
+                    output.push_str(&format!("Blocked by: {}\n", action.blocked_by.join(", ")));
                 }
-                if !todo.attachments.is_empty() {
-                    output.push_str(&format!("Attachments: {}\n", todo.attachments.len()));
+                if !action.attachments.is_empty() {
+                    output.push_str(&format!("Attachments: {}\n", action.attachments.len()));
                 }
-                if todo.total_tracked_secs > 0 {
+                if action.total_tracked_secs > 0 {
                     output.push_str(&format!(
                         "Time tracked: {:.1}h\n",
-                        todo.total_tracked_secs as f64 / 3600.0
+                        action.total_tracked_secs as f64 / 3600.0
                     ));
                 }
                 Ok(output)
@@ -116,32 +123,37 @@ impl TodoTool {
     }
 
     pub(crate) async fn handle_tree(&self) -> Result<String> {
-        let rows = self.repo.list(&TodoFilter::default()).await?;
-        let todos: Vec<Todo> =
-            try_join_all(rows.into_iter().map(|row| self.load_full_todo(row))).await?;
+        let rows = self.repo.list(&ActionFilter::default()).await?;
+        let actions: Vec<Action> =
+            try_join_all(rows.into_iter().map(|row| self.load_full_action(row))).await?;
 
-        let roots: Vec<_> = todos.iter().filter(|t| t.parent_id.is_none()).collect();
+        let roots: Vec<_> = actions.iter().filter(|t| t.parent_id.is_none()).collect();
 
         if roots.is_empty() {
             return Ok("No tasks found.".to_string());
         }
 
-        fn render_tree(todo: &Todo, all_todos: &[Todo], prefix: &str, is_last: bool) -> String {
+        fn render_tree(
+            action: &Action,
+            all_actions: &[Action],
+            prefix: &str,
+            is_last: bool,
+        ) -> String {
             let mut output = String::new();
             let connector = if is_last { "└─ " } else { "├─ " };
-            let priority_str = todo
+            let priority_str = action
                 .priority
                 .map(|p| format!("P{}", p))
                 .unwrap_or_else(|| "P3".to_string());
             output.push_str(&format!(
                 "{}{}{} [{}] ({}, {:?})\n",
-                prefix, connector, todo.title, todo.id, priority_str, todo.status
+                prefix, connector, action.title, action.id, priority_str, action.status
             ));
 
             let detail_prefix = format!("{}{}  ", prefix, if is_last { " " } else { "│" });
-            if !todo.blocked_by.is_empty() {
-                for dep_id in &todo.blocked_by {
-                    let dep_title = all_todos
+            if !action.blocked_by.is_empty() {
+                for dep_id in &action.blocked_by {
+                    let dep_title = all_actions
                         .iter()
                         .find(|t| t.id == *dep_id)
                         .map(|t| t.title.as_str())
@@ -153,15 +165,15 @@ impl TodoTool {
                 }
             }
 
-            let children: Vec<_> = all_todos
+            let children: Vec<_> = all_actions
                 .iter()
-                .filter(|t| t.parent_id.as_ref() == Some(&todo.id))
+                .filter(|t| t.parent_id.as_ref() == Some(&action.id))
                 .collect();
             for (i, child) in children.iter().enumerate() {
                 let is_last_child = i == children.len() - 1;
                 output.push_str(&render_tree(
                     child,
-                    all_todos,
+                    all_actions,
                     &detail_prefix,
                     is_last_child,
                 ));
@@ -172,7 +184,7 @@ impl TodoTool {
         let mut output = String::from("Task Tree:\n\n");
         for (i, root) in roots.iter().enumerate() {
             let is_last = i == roots.len() - 1;
-            output.push_str(&render_tree(root, &todos, "", is_last));
+            output.push_str(&render_tree(root, &actions, "", is_last));
         }
 
         Ok(output)
@@ -194,26 +206,21 @@ impl TodoTool {
             }
         };
 
-        let rows = self.repo.list(&TodoFilter::default()).await?;
-        let todos: Vec<Todo> =
-            try_join_all(rows.into_iter().map(|row| self.load_full_todo(row))).await?;
-
-        let todos: Vec<_> = if let Some(ref proj_id) = project_id_filter {
-            todos
-                .into_iter()
-                .filter(|t| t.project_id.as_ref() == Some(proj_id))
-                .collect()
-        } else {
-            todos
+        let filter = ActionFilter {
+            project_id: project_id_filter.clone(),
+            ..ActionFilter::default()
         };
+        let rows = self.repo.list(&filter).await?;
+        let actions: Vec<Action> =
+            try_join_all(rows.into_iter().map(|row| self.load_full_action(row))).await?;
 
-        let mut projects: HashMap<String, Vec<&Todo>> = HashMap::new();
-        for todo in &todos {
-            let project_key = todo
+        let mut projects: HashMap<String, Vec<&Action>> = HashMap::new();
+        for action in &actions {
+            let project_key = action
                 .project_id
                 .clone()
                 .unwrap_or_else(|| "(no project)".to_string());
-            projects.entry(project_key).or_default().push(todo);
+            projects.entry(project_key).or_default().push(action);
         }
 
         let mut completed_total = 0usize;
@@ -223,23 +230,23 @@ impl TodoTool {
         let mut focus_secs = 0u64;
         let mut overdue_count = 0usize;
 
-        let mut output = String::from("=== Todo Report ===\n\n");
+        let mut output = String::from("=== Task Report ===\n\n");
         output.push_str(&format!("Period: Last {} days\n\n", period_days));
         output.push_str("## By Project:\n\n");
 
-        for (project_key, project_todos) in &projects {
-            let completed = project_todos
+        for (project_key, project_actions) in &projects {
+            let completed = project_actions
                 .iter()
                 .filter(|t| {
-                    t.status == TodoStatus::Done
+                    t.status == ActionStatus::Done
                         && t.completed_at.map(|dt| dt >= period_start).unwrap_or(false)
                 })
                 .count();
-            let created = project_todos
+            let created = project_actions
                 .iter()
                 .filter(|t| t.created_at >= period_start)
                 .count();
-            let time_tracked: u64 = project_todos
+            let time_tracked: u64 = project_actions
                 .iter()
                 .flat_map(|t| &t.time_entries)
                 .filter_map(|e| e.duration_secs)
@@ -259,8 +266,8 @@ impl TodoTool {
             output.push('\n');
         }
 
-        for todo in &todos {
-            for entry in &todo.time_entries {
+        for action in &actions {
+            for entry in &action.time_entries {
                 if entry.source == TimeEntrySource::Focus && entry.started_at >= period_start {
                     focus_sessions += 1;
                     if let Some(d) = entry.duration_secs {
@@ -268,8 +275,8 @@ impl TodoTool {
                     }
                 }
             }
-            if let Some(due) = todo.due_date {
-                if due < now && todo.status != TodoStatus::Done {
+            if let Some(due) = action.due_date {
+                if due < now && action.status != ActionStatus::Done {
                     overdue_count += 1;
                 }
             }
@@ -296,14 +303,14 @@ impl TodoTool {
         let count = p.optional_u64("count")?.unwrap_or(3).min(10) as usize;
         info!("Generating daily plan (top {} tasks)", count);
 
-        let rows = self.repo.list(&TodoFilter::default()).await?;
-        let all_tasks: Vec<Todo> = rows.into_iter().map(Todo::from).collect();
+        let rows = self.repo.list(&ActionFilter::default()).await?;
+        let all_tasks: Vec<Action> = rows.into_iter().map(Action::from).collect();
         debug!("Total tasks in store: {}", all_tasks.len());
 
         let now = Utc::now();
         let candidates: Vec<_> = all_tasks
             .into_iter()
-            .filter(|t| t.status == TodoStatus::Todo && !t.is_template && t.focused_at.is_none())
+            .filter(|t| t.status == ActionStatus::Todo && !t.is_template && t.focused_at.is_none())
             .collect();
 
         // Batch-check blockers concurrently instead of N sequential queries
@@ -321,7 +328,7 @@ impl TodoTool {
             .map(|(task, _)| task)
             .collect();
 
-        let mut scored: Vec<(Todo, f64)> = eligible
+        let mut scored: Vec<(Action, f64)> = eligible
             .into_iter()
             .map(|task| {
                 let score = Self::calculate_score(&task, now);
@@ -387,7 +394,7 @@ impl TodoTool {
 
     pub(crate) async fn handle_list_recurring(&self) -> Result<String> {
         let rows = self.repo.list_templates().await?;
-        let templates: Vec<Todo> = rows.into_iter().map(Todo::from).collect();
+        let templates: Vec<Action> = rows.into_iter().map(Action::from).collect();
 
         if templates.is_empty() {
             return Ok("No recurring task templates found.".to_string());

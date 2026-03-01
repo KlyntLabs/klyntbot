@@ -306,6 +306,8 @@ impl IntentPipeline {
             tool_name: result.tool_name.clone(),
             tool_success: result.tool_name.as_ref().map(|_| validation.is_valid),
             tool_duration_ms: result.tool_name.as_ref().map(|_| elapsed_ms),
+            complexity_signals: serde_json::Value::Null,
+            execution_mode: Some(result.final_mode.clone()),
         };
 
         if let Err(e) = strategy_repo.create(&record).await {
@@ -395,7 +397,7 @@ mod tests {
 
         let direct = DirectEngine::new(Arc::clone(&core));
         let reactive = ReactiveEngine::new(Arc::clone(&core), 10);
-        let router = ExecutionRouter::new(direct, reactive, None, 3);
+        let router = ExecutionRouter::new(direct, reactive, 3);
 
         let analyzer =
             IntentAnalyzer::new(provider.clone(), "mock", &OrchestratorConfig::default());
@@ -489,7 +491,7 @@ mod tests {
 
         let direct = DirectEngine::new(Arc::clone(&core));
         let reactive = ReactiveEngine::new(Arc::clone(&core), 10);
-        let router = ExecutionRouter::new(direct, reactive, None, 3);
+        let router = ExecutionRouter::new(direct, reactive, 3);
 
         let analyzer =
             IntentAnalyzer::new(provider.clone(), "mock", &OrchestratorConfig::default());

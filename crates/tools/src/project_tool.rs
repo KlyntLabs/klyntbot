@@ -1,6 +1,7 @@
 //! ProjectTool - Tool interface for project system
 //!
 //! Provides 6 actions for project management through the Tool trait.
+//! Projects belong to areas (area_id is required for create).
 
 use async_trait::async_trait;
 use chrono::Utc;
@@ -8,22 +9,19 @@ use serde_json::Value;
 
 use super::{RoutingContext, Tool};
 use crate::params::ParamExtractor;
-use crate::project_types::{Project, ProjectColor, ProjectFilter, ProjectPatch, ProjectStatus};
-use crate::todo_types::TodoFilter;
 use common::{Result, ToolError};
 
 /// ProjectTool for managing projects and project-task relationships
 pub struct ProjectTool {
     project_repo: storage::ProjectRepo,
-    todo_repo: storage::TodoRepo,
+    action_repo: storage::ActionRepo,
 }
 
 impl ProjectTool {
-    /// Create a new ProjectTool
-    pub fn new(project_repo: storage::ProjectRepo, todo_repo: storage::TodoRepo) -> Self {
+    pub fn new(project_repo: storage::ProjectRepo, action_repo: storage::ActionRepo) -> Self {
         Self {
             project_repo,
-            todo_repo,
+            action_repo,
         }
     }
 }
@@ -51,6 +49,10 @@ impl Tool for ProjectTool {
                     "type": "string",
                     "description": "Project ID (for show/update/archive/tasks)"
                 },
+                "area_id": {
+                    "type": "string",
+                    "description": "Area ID (required for create, optional for list/update)"
+                },
                 "name": {
                     "type": "string",
                     "description": "Project name (for create/update)"
@@ -72,7 +74,7 @@ impl Tool for ProjectTool {
                 "status": {
                     "type": "string",
                     "enum": ["active", "paused", "completed", "archived"],
-                    "description": "Status (for update)"
+                    "description": "Status filter (for list) or new status (for update)"
                 },
                 "tag": {
                     "type": "string",
@@ -94,24 +96,23 @@ impl Tool for ProjectTool {
         match action {
             "create" => {
                 let name = p.required_str("name")?;
+                let area_id = p.required_str("area_id")?;
+                let id = domain::Project::generate_id();
+                let now = Utc::now();
 
-                let project = Project {
-                    id: Project::generate_id(),
+                let row = storage::rows::project::ProjectRow {
+                    id: id.clone(),
+                    area_id: area_id.to_string(),
                     name: name.to_string(),
                     description: p.optional_str("description")?.map(String::from),
-                    color: p
-                        .optional_str("color")?
-                        .and_then(parse_color)
-                        .unwrap_or_default(),
+                    color: p.optional_str("color")?.unwrap_or("orange").to_string(),
                     tags: p.string_array_or_empty("tags")?,
-                    status: ProjectStatus::Active,
-                    created_at: Utc::now(),
-                    updated_at: Utc::now(),
+                    status: "active".to_string(),
+                    created_at: now,
+                    updated_at: now,
                 };
 
-                let row = storage::ProjectRow::from(&project);
-                let created_row = self.project_repo.create(&row).await?;
-                let created: Project = created_row.into();
+                let created = self.project_repo.create(&row).await?;
 
                 if let Some(ref tx) = ctx.entity_tx {
                     let _ = tx
@@ -134,33 +135,30 @@ impl Tool for ProjectTool {
             }
 
             "list" => {
-                let filter = ProjectFilter {
-                    status: p.optional_str("status")?.and_then(parse_status),
-                    tag: p.optional_str("tag")?.map(String::from),
-                    limit: p.optional_u64("limit")?.map(|v| v as usize),
+                let filter = storage::ProjectFilter {
+                    area_id: p.optional_str("area_id")?.map(String::from),
+                    status: p.optional_str("status")?.map(String::from),
+                    tags: p.optional_str("tag")?.map(|t| vec![t.to_string()]),
+                    limit: p.optional_u64("limit")?.map(|v| v as i64),
                 };
 
-                let rows = self.project_repo.list(&filter.to_storage_filter()).await?;
-                let projects: Vec<Project> = rows.into_iter().map(Project::from).collect();
+                let rows = self.project_repo.list(&filter).await?;
 
-                if projects.is_empty() {
-                    return Ok("No projects found".to_string());
+                if rows.is_empty() {
+                    return Ok("No projects found.".to_string());
                 }
 
-                let mut output = String::new();
-                output.push_str(&format!("Projects ({}):\n\n", projects.len()));
-                for p in projects {
+                let mut output = format!("Projects ({}):\n\n", rows.len());
+                for proj in &rows {
                     output.push_str(&format!(
                         "• {} [{}] (ID: {})\n",
-                        p.name,
-                        format_status(&p.status),
-                        p.id
+                        proj.name, proj.status, proj.id
                     ));
-                    if let Some(desc) = &p.description {
+                    if let Some(ref desc) = proj.description {
                         output.push_str(&format!("  {}\n", desc));
                     }
-                    if !p.tags.is_empty() {
-                        output.push_str(&format!("  Tags: {}\n", p.tags.join(", ")));
+                    if !proj.tags.is_empty() {
+                        output.push_str(&format!("  Tags: {}\n", proj.tags.join(", ")));
                     }
                 }
 
@@ -169,32 +167,36 @@ impl Tool for ProjectTool {
 
             "show" => {
                 let id = p.required_str("id")?;
-
-                let project: Project = self
+                let proj = self
                     .project_repo
                     .get(id)
                     .await?
-                    .map(Project::from)
                     .ok_or_else(|| ToolError::InvalidParams("Project not found".to_string()))?;
 
-                let mut output = String::new();
-                output.push_str(&format!("Project: {}\n", project.name));
-                output.push_str(&format!("ID: {}\n", project.id));
-                output.push_str(&format!("Status: {}\n", format_status(&project.status)));
-                output.push_str(&format!("Color: {:?}\n", project.color));
-                if let Some(desc) = &project.description {
+                let mut output = format!("Project: {}\n", proj.name);
+                output.push_str(&format!("ID: {}\n", proj.id));
+                output.push_str(&format!("Area: {}\n", proj.area_id));
+                output.push_str(&format!("Status: {}\n", proj.status));
+                output.push_str(&format!("Color: {}\n", proj.color));
+                if let Some(ref desc) = proj.description {
                     output.push_str(&format!("Description: {}\n", desc));
                 }
-                if !project.tags.is_empty() {
-                    output.push_str(&format!("Tags: {}\n", project.tags.join(", ")));
+                if !proj.tags.is_empty() {
+                    output.push_str(&format!("Tags: {}\n", proj.tags.join(", ")));
                 }
-                output.push_str(&format!("Created: {}\n", project.created_at));
-                output.push_str(&format!("Updated: {}\n", project.updated_at));
+                output.push_str(&format!("Created: {}\n", proj.created_at));
+                output.push_str(&format!("Updated: {}\n", proj.updated_at));
 
-                // Use aggregated task counts from the repo (efficient single query)
                 let stats = self.project_repo.get_with_stats(id).await?;
-                let task_count = stats.map(|s| s.task_count_total).unwrap_or(0);
-                output.push_str(&format!("\nTasks: {}\n", task_count));
+                if let Some(s) = stats {
+                    output.push_str(&format!(
+                        "\nTasks: {} total ({} todo, {} doing, {} done)\n",
+                        s.task_count_total,
+                        s.task_count_todo,
+                        s.task_count_doing,
+                        s.task_count_done
+                    ));
+                }
 
                 Ok(output)
             }
@@ -202,22 +204,21 @@ impl Tool for ProjectTool {
             "update" => {
                 let id = p.required_str("id")?;
 
-                let patch = ProjectPatch {
+                let patch = storage::ProjectPatch {
+                    id: id.to_string(),
+                    area_id: p.optional_str("area_id")?.map(String::from),
                     name: p.optional_str("name")?.map(String::from),
                     description: p.optional_str("description")?.map(|s| Some(s.to_string())),
-                    color: p.optional_str("color")?.and_then(parse_color),
+                    color: p.optional_str("color")?.map(String::from),
                     tags: if args.get("tags").is_some() {
                         Some(p.string_array_or_empty("tags")?)
                     } else {
                         None
                     },
-                    status: p.optional_str("status")?.and_then(parse_status),
+                    status: p.optional_str("status")?.map(String::from),
                 };
 
-                let storage_patch = patch.to_storage_patch(id);
-                let updated_row = self.project_repo.update(&storage_patch).await?;
-                let updated: Project = updated_row.into();
-
+                let updated = self.project_repo.update(&patch).await?;
                 Ok(format!(
                     "Project updated: {} (ID: {})",
                     updated.name, updated.id
@@ -226,52 +227,39 @@ impl Tool for ProjectTool {
 
             "archive" => {
                 let id = p.required_str("id")?;
-
-                let updated_row = self.project_repo.archive(id).await?;
-                let updated: Project = updated_row.into();
-
+                let updated = self.project_repo.archive(id).await?;
                 Ok(format!("Project archived: {}", updated.name))
             }
 
             "tasks" => {
                 let id = p.required_str("id")?;
 
-                // Verify project exists
-                let project: Project = self
+                let proj = self
                     .project_repo
                     .get(id)
                     .await?
-                    .map(Project::from)
                     .ok_or_else(|| ToolError::InvalidParams("Project not found".to_string()))?;
 
-                // Get tasks for this project using a filtered query
-                let filter = TodoFilter {
-                    project_id: Some(project.id.clone()),
-                    limit: p.optional_u64("limit")?.map(|v| v as usize),
+                let filter = storage::ActionFilter {
+                    project_id: Some(proj.id.clone()),
+                    limit: p.optional_u64("limit")?.map(|v| v as i64),
                     ..Default::default()
                 };
-                let rows = self.todo_repo.list(&filter.to_storage_filter()).await?;
-                let tasks: Vec<crate::todo_types::Todo> = rows
-                    .into_iter()
-                    .map(crate::todo_types::Todo::from)
-                    .collect();
+                let rows = self.action_repo.list(&filter).await?;
 
-                if tasks.is_empty() {
-                    return Ok(format!("No tasks in project '{}'", project.name));
+                if rows.is_empty() {
+                    return Ok(format!("No tasks in project '{}'", proj.name));
                 }
 
-                let mut output = String::new();
-                output.push_str(&format!(
-                    "Tasks in '{}' ({}):\n\n",
-                    project.name,
-                    tasks.len()
-                ));
-                for task in tasks {
+                let mut output = format!("Tasks in '{}' ({}):\n\n", proj.name, rows.len());
+                for task in &rows {
+                    let priority_str = task
+                        .priority
+                        .map(|p| format!(" P{}", p))
+                        .unwrap_or_default();
                     output.push_str(&format!(
-                        "• {} [{}] (ID: {})\n",
-                        task.title,
-                        task.status.display_name(),
-                        task.id
+                        "• {} [{}]{} (ID: {})\n",
+                        task.title, task.status, priority_str, task.id
                     ));
                 }
 
@@ -283,58 +271,17 @@ impl Tool for ProjectTool {
     }
 }
 
-/// Parse color string to enum
-fn parse_color(s: &str) -> Option<ProjectColor> {
-    match s.to_lowercase().as_str() {
-        "red" => Some(ProjectColor::Red),
-        "orange" => Some(ProjectColor::Orange),
-        "yellow" => Some(ProjectColor::Yellow),
-        "green" => Some(ProjectColor::Green),
-        "blue" => Some(ProjectColor::Blue),
-        "purple" => Some(ProjectColor::Purple),
-        "gray" => Some(ProjectColor::Gray),
-        _ => None,
-    }
-}
-
-/// Parse status string to enum
-fn parse_status(s: &str) -> Option<ProjectStatus> {
-    match s.to_lowercase().as_str() {
-        "active" => Some(ProjectStatus::Active),
-        "paused" => Some(ProjectStatus::Paused),
-        "completed" => Some(ProjectStatus::Completed),
-        "archived" => Some(ProjectStatus::Archived),
-        _ => None,
-    }
-}
-
-/// Format status for display
-fn format_status(status: &ProjectStatus) -> &'static str {
-    match status {
-        ProjectStatus::Active => "Active",
-        ProjectStatus::Paused => "Paused",
-        ProjectStatus::Completed => "Completed",
-        ProjectStatus::Archived => "Archived",
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_parse_color() {
-        assert_eq!(parse_color("blue"), Some(ProjectColor::Blue));
-        assert_eq!(parse_color("PURPLE"), Some(ProjectColor::Purple));
-        assert_eq!(parse_color("invalid"), None);
+    #[tokio::test]
+    async fn test_project_tool_name() {
+        let pool = sqlx::SqlitePool::connect_lazy("sqlite::memory:").unwrap();
+        let tool = ProjectTool::new(
+            storage::ProjectRepo::new(pool.clone()),
+            storage::ActionRepo::new(pool),
+        );
+        assert_eq!(tool.name(), "project");
     }
-
-    #[test]
-    fn test_parse_status() {
-        assert_eq!(parse_status("active"), Some(ProjectStatus::Active));
-        assert_eq!(parse_status("PAUSED"), Some(ProjectStatus::Paused));
-        assert_eq!(parse_status("invalid"), None);
-    }
-
-    // Integration tests requiring a PgPool are in tests/storage_integration_test.rs
 }

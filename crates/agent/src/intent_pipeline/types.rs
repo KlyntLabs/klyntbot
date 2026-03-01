@@ -1,21 +1,15 @@
 //! Core types for the intent pipeline: execution modes, complexity signals, intent analysis.
 
 use context_engine::ExecutionStrategy;
-use domain::PlanVisibility;
 use serde::{Deserialize, Serialize};
 
-/// The three execution modes the pipeline can select.
+/// The two execution modes the pipeline can select.
 #[derive(Debug, Clone, PartialEq)]
 pub enum ExecutionMode {
     /// Single LLM call, no tools. Greetings, factual Q&A.
     Direct,
     /// ReAct loop with tools. Single-shot tasks, searches, CRUD.
     Reactive { max_iterations: u32 },
-    /// Multi-step plan with structured execution.
-    Planned {
-        visibility: PlanVisibility,
-        max_steps: u8,
-    },
 }
 
 impl ExecutionMode {
@@ -24,7 +18,6 @@ impl ExecutionMode {
         match self {
             Self::Direct => "direct",
             Self::Reactive { .. } => "reactive",
-            Self::Planned { .. } => "planned",
         }
     }
 
@@ -33,7 +26,6 @@ impl ExecutionMode {
         match self {
             Self::Direct => 1,
             Self::Reactive { max_iterations } => *max_iterations,
-            Self::Planned { max_steps, .. } => *max_steps as u32,
         }
     }
 }
@@ -44,9 +36,6 @@ impl std::fmt::Display for ExecutionMode {
             Self::Direct => write!(f, "Direct"),
             Self::Reactive { max_iterations } => {
                 write!(f, "Reactive(max={})", max_iterations)
-            }
-            Self::Planned { max_steps, .. } => {
-                write!(f, "Planned(steps={})", max_steps)
             }
         }
     }
@@ -63,9 +52,6 @@ impl From<&ExecutionMode> for ExecutionStrategy {
             ExecutionMode::Reactive { max_iterations } => ExecutionStrategy::ToolAssisted {
                 max_iterations: *max_iterations,
             },
-            ExecutionMode::Planned { .. } => {
-                ExecutionStrategy::AutonomousTask { max_iterations: 50 }
-            }
         }
     }
 }
@@ -158,7 +144,7 @@ impl ToolGroup {
     pub fn tool_names(&self) -> &'static [&'static str] {
         match self {
             Self::None => &[],
-            Self::TaskManagement => &["todo", "goal", "plan"],
+            Self::TaskManagement => &["task", "area", "project", "okr"],
             Self::Search => &[
                 "grep",
                 "glob",
@@ -168,7 +154,7 @@ impl ToolGroup {
                 "web_fetch",
                 "memory",
             ],
-            Self::Calendar => &["calendar", "todo"],
+            Self::Calendar => &["calendar", "task"],
             Self::Finance => &["finance"],
             Self::Communication => &["message", "ask_user"],
             Self::Automation => &["cron", "spawn"],
@@ -246,7 +232,7 @@ mod tests {
     }
 
     #[test]
-    fn high_complexity_triggers_planned() {
+    fn high_complexity_scores_7() {
         let signals = ComplexitySignals {
             estimated_tool_calls: 4,
             has_sequential_deps: true,
@@ -320,9 +306,10 @@ mod tests {
     #[test]
     fn tool_group_task_management_has_expected_tools() {
         let names = ToolGroup::TaskManagement.tool_names();
-        assert!(names.contains(&"todo"));
-        assert!(names.contains(&"goal"));
-        assert!(names.contains(&"plan"));
+        assert!(names.contains(&"task"));
+        assert!(names.contains(&"area"));
+        assert!(names.contains(&"project"));
+        assert!(names.contains(&"okr"));
     }
 
     #[test]
@@ -338,7 +325,7 @@ mod tests {
             ..IntentAnalysis::fallback()
         };
         let allowed = analysis.allowed_tool_names().unwrap();
-        assert!(allowed.contains("todo"));
+        assert!(allowed.contains("task"));
         assert!(allowed.contains("grep"));
         assert!(allowed.contains("ask_user")); // always included
         assert!(!allowed.contains("finance"));

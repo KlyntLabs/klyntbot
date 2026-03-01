@@ -1,24 +1,30 @@
-//! Domain types for the todo system.
+//! Domain types for the action system (formerly "todo").
 //!
-//! Canonical definitions of `Todo`, `TodoStatus`, `Attachment`, `TimeEntry`,
+//! Canonical definitions of `Action`, `ActionStatus`, `Attachment`, `TimeEntry`,
 //! and their conversions from/to storage row types. Re-exported by
 //! `tools::todo_types` for use across the workspace.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use storage::{TodoAttachmentRow, TodoRow, TodoTimeEntryRow};
+use storage::{ActionAttachmentRow, ActionRow, ActionTimeEntryRow};
 
-/// A task/todo item with focus tracking.
+// ── Type aliases for backward compatibility ──────────────────────────────────
+pub type Todo = Action;
+pub type TodoStatus = ActionStatus;
+
+/// An action item (task) with focus tracking.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Todo {
+pub struct Action {
     pub id: String,
     pub title: String,
     pub description: Option<String>,
+    pub area_id: String,
+    pub key_result_id: Option<String>,
     pub priority: Option<u8>,
     pub due_date: Option<DateTime<Utc>>,
     pub tags: Vec<String>,
-    pub status: TodoStatus,
+    pub status: ActionStatus,
     pub focused_at: Option<DateTime<Utc>>,
     pub focus_deadline: Option<DateTime<Utc>>,
     pub focus_expired_count: u32,
@@ -55,7 +61,7 @@ pub struct Todo {
     pub blocks: Vec<String>,
 }
 
-impl Todo {
+impl Action {
     /// Generate an 8-char short ID from a UUID.
     pub fn generate_id() -> String {
         uuid::Uuid::new_v4().to_string()[..8].to_string()
@@ -68,10 +74,12 @@ impl Todo {
             id: Self::generate_id(),
             title: String::new(),
             description: None,
+            area_id: String::new(),
+            key_result_id: None,
             priority: None,
             due_date: None,
             tags: Vec::new(),
-            status: TodoStatus::Todo,
+            status: ActionStatus::Todo,
             focused_at: None,
             focus_deadline: None,
             focus_expired_count: 0,
@@ -99,14 +107,14 @@ impl Todo {
 /// Task status lifecycle.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "lowercase")]
-pub enum TodoStatus {
+pub enum ActionStatus {
     Todo,
     Doing,
     Done,
     Archived,
 }
 
-impl TodoStatus {
+impl ActionStatus {
     pub fn from_str_loose(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "todo" => Some(Self::Todo),
@@ -136,13 +144,13 @@ impl TodoStatus {
     }
 }
 
-impl std::fmt::Display for TodoStatus {
+impl std::fmt::Display for ActionStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.as_str())
     }
 }
 
-/// Attachment to a todo (file, URL, or note).
+/// Attachment to an action (file, URL, or note).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Attachment {
     pub id: String,
@@ -183,7 +191,7 @@ impl AttachmentType {
     }
 }
 
-/// Time tracking entry for a todo.
+/// Time tracking entry for an action.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TimeEntry {
     pub id: String,
@@ -204,18 +212,20 @@ pub enum TimeEntrySource {
     Manual,
 }
 
-// ── Row ↔ Domain Conversions ──────────────────────────────────────────────────
+// ── Row <-> Domain Conversions ──────────────────────────────────────────────
 
-impl From<TodoRow> for Todo {
-    fn from(row: TodoRow) -> Self {
+impl From<ActionRow> for Action {
+    fn from(row: ActionRow) -> Self {
         Self {
             id: row.id,
             title: row.title,
             description: row.description,
+            area_id: row.area_id,
+            key_result_id: row.key_result_id,
             priority: row.priority.map(|p| p as u8),
             due_date: row.due_date,
             tags: row.tags,
-            status: TodoStatus::from_str_loose(&row.status).unwrap_or(TodoStatus::Todo),
+            status: ActionStatus::from_str_loose(&row.status).unwrap_or(ActionStatus::Todo),
             focused_at: row.focused_at,
             focus_deadline: row.focus_deadline,
             focus_expired_count: row.focus_expired_count as u32,
@@ -240,38 +250,40 @@ impl From<TodoRow> for Todo {
     }
 }
 
-impl From<&Todo> for TodoRow {
-    fn from(todo: &Todo) -> Self {
+impl From<&Action> for ActionRow {
+    fn from(action: &Action) -> Self {
         Self {
-            id: todo.id.clone(),
-            title: todo.title.clone(),
-            description: todo.description.clone(),
-            priority: todo.priority.map(|p| p as i16),
-            due_date: todo.due_date,
-            tags: todo.tags.clone(),
-            status: todo.status.as_str().to_string(),
-            focused_at: todo.focused_at,
-            focus_deadline: todo.focus_deadline,
-            focus_expired_count: todo.focus_expired_count as i32,
-            created_at: todo.created_at,
-            updated_at: todo.updated_at,
-            completed_at: todo.completed_at,
-            parent_id: todo.parent_id.clone(),
-            project_id: todo.project_id.clone(),
-            total_tracked_secs: todo.total_tracked_secs as i64,
-            estimated_minutes: todo.estimated_minutes.map(|m| m as i32),
-            calendar_event_uid: todo.calendar_event_uid.clone(),
-            last_reminded_at: todo.last_reminded_at,
-            recurrence_rule: todo.recurrence_rule.clone(),
-            recurrence_parent_id: todo.recurrence_parent_id.clone(),
-            is_template: todo.is_template,
-            next_instance_date: todo.next_instance_date,
+            id: action.id.clone(),
+            title: action.title.clone(),
+            description: action.description.clone(),
+            area_id: action.area_id.clone(),
+            key_result_id: action.key_result_id.clone(),
+            priority: action.priority.map(|p| p as i16),
+            due_date: action.due_date,
+            tags: action.tags.clone(),
+            status: action.status.as_str().to_string(),
+            focused_at: action.focused_at,
+            focus_deadline: action.focus_deadline,
+            focus_expired_count: action.focus_expired_count as i32,
+            created_at: action.created_at,
+            updated_at: action.updated_at,
+            completed_at: action.completed_at,
+            parent_id: action.parent_id.clone(),
+            project_id: action.project_id.clone(),
+            total_tracked_secs: action.total_tracked_secs as i64,
+            estimated_minutes: action.estimated_minutes.map(|m| m as i32),
+            calendar_event_uid: action.calendar_event_uid.clone(),
+            last_reminded_at: action.last_reminded_at,
+            recurrence_rule: action.recurrence_rule.clone(),
+            recurrence_parent_id: action.recurrence_parent_id.clone(),
+            is_template: action.is_template,
+            next_instance_date: action.next_instance_date,
         }
     }
 }
 
-impl From<TodoAttachmentRow> for Attachment {
-    fn from(row: TodoAttachmentRow) -> Self {
+impl From<ActionAttachmentRow> for Attachment {
+    fn from(row: ActionAttachmentRow) -> Self {
         Self {
             id: row.id.to_string(),
             attachment_type: match row.attachment_type.as_str() {
@@ -287,8 +299,8 @@ impl From<TodoAttachmentRow> for Attachment {
     }
 }
 
-impl From<TodoTimeEntryRow> for TimeEntry {
-    fn from(row: TodoTimeEntryRow) -> Self {
+impl From<ActionTimeEntryRow> for TimeEntry {
+    fn from(row: ActionTimeEntryRow) -> Self {
         Self {
             id: row.id.to_string(),
             started_at: row.started_at,
@@ -304,7 +316,7 @@ impl From<TodoTimeEntryRow> for TimeEntry {
 }
 
 /// Searchable implementation for integration with tools-core RRF search.
-impl tools_core::Searchable for Todo {
+impl tools_core::Searchable for Action {
     fn search_id(&self) -> &str {
         &self.id
     }
@@ -316,30 +328,44 @@ mod tests {
 
     #[test]
     fn test_generate_id_length() {
-        let id = Todo::generate_id();
+        let id = Action::generate_id();
         assert_eq!(id.len(), 8);
     }
 
     #[test]
     fn test_generate_id_uniqueness() {
         use std::collections::HashSet;
-        let ids: HashSet<String> = (0..50).map(|_| Todo::generate_id()).collect();
+        let ids: HashSet<String> = (0..50).map(|_| Action::generate_id()).collect();
         assert_eq!(ids.len(), 50);
     }
 
     #[test]
-    fn test_todo_status_round_trip() {
-        assert_eq!(TodoStatus::from_str_loose("todo"), Some(TodoStatus::Todo));
-        assert_eq!(TodoStatus::from_str_loose("DONE"), Some(TodoStatus::Done));
-        assert_eq!(TodoStatus::from_str_loose("unknown"), None);
+    fn test_action_status_round_trip() {
+        assert_eq!(
+            ActionStatus::from_str_loose("todo"),
+            Some(ActionStatus::Todo)
+        );
+        assert_eq!(
+            ActionStatus::from_str_loose("DONE"),
+            Some(ActionStatus::Done)
+        );
+        assert_eq!(ActionStatus::from_str_loose("unknown"), None);
     }
 
     #[test]
     fn test_serde_round_trip() {
-        let t = Todo::default_instance();
+        let mut t = Action::default_instance();
+        t.area_id = "area-1".to_string();
         let json = serde_json::to_string(&t).unwrap();
-        let parsed: Todo = serde_json::from_str(&json).unwrap();
+        let parsed: Action = serde_json::from_str(&json).unwrap();
         assert_eq!(t.id, parsed.id);
         assert!(!parsed.is_template);
+    }
+
+    // Backward compat aliases
+    #[test]
+    fn test_type_aliases() {
+        let _: Todo = Action::default_instance();
+        let _: TodoStatus = ActionStatus::Todo;
     }
 }

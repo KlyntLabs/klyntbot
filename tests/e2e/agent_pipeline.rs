@@ -30,7 +30,7 @@ async fn make_pipeline(provider: Arc<dyn LlmProvider>) -> IntentPipeline {
 
     let direct = DirectEngine::new(Arc::clone(&core));
     let reactive = ReactiveEngine::new(Arc::clone(&core), 10);
-    let router = ExecutionRouter::new(direct, reactive, None, 3);
+    let router = ExecutionRouter::new(direct, reactive, 3);
 
     let analyzer = IntentAnalyzer::new(provider, "mock", &OrchestratorConfig::default());
 
@@ -203,10 +203,8 @@ async fn search_routes_as_reactive() {
 // ── Plan keywords trigger Planned classification ──
 
 #[tokio::test]
-async fn complex_request_triggers_planned() {
-    let provider = Arc::new(MockProvider::new(
-        "I'll create a plan for reorganizing the codebase.",
-    ));
+async fn complex_request_triggers_reactive() {
+    let provider = Arc::new(MockProvider::new("I'll help reorganize the codebase."));
     let pipeline = make_pipeline(provider).await;
 
     let result = pipeline
@@ -223,47 +221,10 @@ async fn complex_request_triggers_planned() {
         .unwrap();
 
     assert!(
-        format!("{:?}", result.classification.mode).contains("Planned"),
-        "Expected Planned classification, got: {:?}",
+        format!("{:?}", result.classification.mode).contains("Reactive"),
+        "Expected Reactive classification, got: {:?}",
         result.classification.mode
     );
-    assert_eq!(result.mode_used, "planned");
+    assert_eq!(result.mode_used, "reactive");
     assert!(result.validation.is_valid);
-}
-
-// ── Reactive engine escalates when overwhelmed ──
-
-#[tokio::test]
-async fn reactive_escalates_to_planned() {
-    let provider = Arc::new(MockProvider::with_tool_call(
-        "web_search",
-        serde_json::json!({"query": "test"}),
-    ));
-    let pipeline = make_pipeline(provider).await;
-
-    let result = pipeline
-        .process_message(
-            "search for tasks about databases",
-            vec![],
-            &[],
-            &[],
-            &routing_ctx(),
-            None,
-            None,
-        )
-        .await
-        .unwrap();
-
-    assert!(
-        result.escalations >= 1,
-        "Expected escalation, got {} escalations",
-        result.escalations
-    );
-    assert!(
-        result.content.contains("planning")
-            || result.content.contains("not configured")
-            || result.content.contains("exceeded"),
-        "Expected escalation message, got: {}",
-        result.content
-    );
 }

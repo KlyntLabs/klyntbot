@@ -5,7 +5,6 @@
 
 pub mod bootstrap;
 pub mod confidence;
-pub mod goal;
 pub mod identity;
 pub mod memory;
 pub mod skills;
@@ -13,7 +12,6 @@ pub mod todo;
 
 pub use bootstrap::BootstrapSource;
 pub use confidence::ConfidenceSource;
-pub use goal::GoalSource;
 pub use identity::IdentitySource;
 pub use memory::MemorySource;
 pub use skills::{SkillContentSource, SkillSummarySource};

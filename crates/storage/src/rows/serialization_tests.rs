@@ -8,9 +8,13 @@ mod tests {
     use chrono::{NaiveDate, Utc};
     use uuid::Uuid;
 
+    use crate::repos::action_repo::ActionSummary;
     use crate::repos::project_repo::ProjectWithStats;
     use crate::repos::strategy::{OverallStats, ToolStatsRow};
-    use crate::repos::todo_repo::TodoSummary;
+    use crate::rows::action::{
+        ActionAttachmentRow, ActionDependencyRow, ActionRow, ActionTimeEntryRow,
+    };
+    use crate::rows::area::AreaRow;
     use crate::rows::calendar::{CalendarEventCacheRow, CalendarSyncStateRow};
     use crate::rows::cron::CronJobRow;
     use crate::rows::finance::{
@@ -18,16 +22,15 @@ mod tests {
         FinanceInvestmentTxRow, FinanceLiabilityRow, FinancePortfolioRow, FinanceTransactionRow,
         PortfolioSummaryRow,
     };
-    use crate::rows::goal::{GoalProjectLinkRow, GoalRow};
+    use crate::rows::key_result::KeyResultRow;
     use crate::rows::learning::{
         DecisionLogRow, EnrichmentFeedbackRow, LearningStateRow, OutcomeRow, StrategyRecordRow,
         StrategySummaryRow,
     };
     use crate::rows::memory::MemoryNoteRow;
-    use crate::rows::plan::{PlanRow, PlanStepRow};
+    use crate::rows::objective::ObjectiveRow;
     use crate::rows::project::ProjectRow;
     use crate::rows::session::{SessionListRow, SessionMessageRow, SessionRow};
-    use crate::rows::todo::{TodoAttachmentRow, TodoDependencyRow, TodoRow, TodoTimeEntryRow};
     use crate::rows::usage::UsageRecordRow;
 
     // ── Helpers ──────────────────────────────────────────────────────────────
@@ -48,11 +51,15 @@ mod tests {
         }
     }
 
-    fn sample_todo_row() -> TodoRow {
-        TodoRow {
+    fn sample_action_row() -> ActionRow {
+        ActionRow {
             id: "task-1".to_string(),
             title: "Test task".to_string(),
             description: None,
+            area_id: "area-1".to_string(),
+            project_id: None,
+            key_result_id: None,
+            parent_id: None,
             priority: Some(2),
             due_date: None,
             tags: vec![],
@@ -63,8 +70,6 @@ mod tests {
             created_at: Utc::now(),
             updated_at: Utc::now(),
             completed_at: None,
-            parent_id: None,
-            project_id: None,
             total_tracked_secs: 0,
             estimated_minutes: None,
             calendar_event_uid: None,
@@ -79,6 +84,7 @@ mod tests {
     fn sample_project_row() -> ProjectRow {
         ProjectRow {
             id: "proj-1".to_string(),
+            area_id: "area-1".to_string(),
             name: "Test project".to_string(),
             description: None,
             color: "#ff0000".to_string(),
@@ -92,19 +98,36 @@ mod tests {
     // ── Comprehensive camelCase check ────────────────────────────────────────
 
     /// Verifies every row type serializes to camelCase JSON (no underscored keys).
-    /// Covers all 30+ row/summary types used by the dashboard REST API.
     #[test]
     fn all_row_types_serialize_to_camel_case() {
         let now = Utc::now();
         let today = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
 
         let rows: Vec<(&str, serde_json::Value)> = vec![
-            ("TodoRow", serde_json::to_value(sample_todo_row()).unwrap()),
             (
-                "TodoAttachmentRow",
-                serde_json::to_value(&TodoAttachmentRow {
+                "AreaRow",
+                serde_json::to_value(&AreaRow {
+                    id: "area-1".to_string(),
+                    name: "Work".to_string(),
+                    description: None,
+                    color: "blue".to_string(),
+                    icon: None,
+                    position: 0,
+                    status: "active".to_string(),
+                    created_at: now,
+                    updated_at: now,
+                })
+                .unwrap(),
+            ),
+            (
+                "ActionRow",
+                serde_json::to_value(sample_action_row()).unwrap(),
+            ),
+            (
+                "ActionAttachmentRow",
+                serde_json::to_value(&ActionAttachmentRow {
                     id: Uuid::new_v4(),
-                    todo_id: "t".to_string(),
+                    action_id: "t".to_string(),
                     attachment_type: "url".to_string(),
                     value: "v".to_string(),
                     title: None,
@@ -114,10 +137,10 @@ mod tests {
                 .unwrap(),
             ),
             (
-                "TodoTimeEntryRow",
-                serde_json::to_value(&TodoTimeEntryRow {
+                "ActionTimeEntryRow",
+                serde_json::to_value(&ActionTimeEntryRow {
                     id: Uuid::new_v4(),
-                    todo_id: "t".to_string(),
+                    action_id: "t".to_string(),
                     source: "manual".to_string(),
                     started_at: now,
                     ended_at: None,
@@ -127,9 +150,9 @@ mod tests {
                 .unwrap(),
             ),
             (
-                "TodoDependencyRow",
-                serde_json::to_value(&TodoDependencyRow {
-                    task_id: "t1".to_string(),
+                "ActionDependencyRow",
+                serde_json::to_value(&ActionDependencyRow {
+                    action_id: "t1".to_string(),
                     blocker_id: "t2".to_string(),
                 })
                 .unwrap(),
@@ -139,19 +162,16 @@ mod tests {
                 serde_json::to_value(sample_project_row()).unwrap(),
             ),
             (
-                "PlanRow",
-                serde_json::to_value(&PlanRow {
-                    id: Uuid::new_v4(),
-                    session_key: "s".to_string(),
-                    goal_id: None,
-                    title: "t".to_string(),
-                    description: "d".to_string(),
-                    status: "draft".to_string(),
-                    current_step_index: 0,
-                    iteration_limit: 5,
-                    backtrack_history: serde_json::json!([]),
-                    visibility: "transparent".to_string(),
-                    task_id: None,
+                "ObjectiveRow",
+                serde_json::to_value(&ObjectiveRow {
+                    id: "obj-1".to_string(),
+                    project_id: "proj-1".to_string(),
+                    title: "Test".to_string(),
+                    description: None,
+                    status: "active".to_string(),
+                    priority: None,
+                    due_date: None,
+                    progress: 0.0,
                     created_at: now,
                     updated_at: now,
                     completed_at: None,
@@ -159,19 +179,21 @@ mod tests {
                 .unwrap(),
             ),
             (
-                "PlanStepRow",
-                serde_json::to_value(&PlanStepRow {
-                    id: Uuid::new_v4(),
-                    plan_id: Uuid::new_v4(),
-                    step_index: 0,
-                    description: "d".to_string(),
-                    reasoning: "r".to_string(),
-                    expected_tools: vec![],
-                    status: "pending".to_string(),
-                    attempt_count: 0,
-                    max_attempts: 3,
-                    result: None,
-                    started_at: None,
+                "KeyResultRow",
+                serde_json::to_value(&KeyResultRow {
+                    id: "kr-1".to_string(),
+                    objective_id: "obj-1".to_string(),
+                    title: "Test".to_string(),
+                    description: None,
+                    status: "active".to_string(),
+                    tracking_mode: "action".to_string(),
+                    target_value: None,
+                    current_value: 0.0,
+                    unit: None,
+                    progress: 0.0,
+                    due_date: None,
+                    created_at: now,
+                    updated_at: now,
                     completed_at: None,
                 })
                 .unwrap(),
@@ -448,32 +470,6 @@ mod tests {
                 .unwrap(),
             ),
             (
-                "GoalRow",
-                serde_json::to_value(&GoalRow {
-                    id: Uuid::new_v4(),
-                    title: "t".to_string(),
-                    description: "d".to_string(),
-                    status: "active".to_string(),
-                    priority: 2,
-                    target_date: None,
-                    created_at: now,
-                    updated_at: now,
-                    plans_completed: 0,
-                    plans_failed: 0,
-                    avg_duration_ms: None,
-                    last_plan_at: None,
-                })
-                .unwrap(),
-            ),
-            (
-                "GoalProjectLinkRow",
-                serde_json::to_value(&GoalProjectLinkRow {
-                    goal_id: Uuid::new_v4(),
-                    project_id: "p".to_string(),
-                })
-                .unwrap(),
-            ),
-            (
                 "OutcomeRow",
                 serde_json::to_value(&OutcomeRow {
                     id: "o".to_string(),
@@ -507,6 +503,8 @@ mod tests {
                     tool_name: None,
                     tool_success: None,
                     tool_duration_ms: None,
+                    complexity_signals: serde_json::json!({}),
+                    execution_mode: None,
                 })
                 .unwrap(),
             ),
@@ -568,8 +566,8 @@ mod tests {
                 .unwrap(),
             ),
             (
-                "TodoSummary",
-                serde_json::to_value(&TodoSummary {
+                "ActionSummary",
+                serde_json::to_value(&ActionSummary {
                     todo: 5,
                     doing: 2,
                     done: 10,

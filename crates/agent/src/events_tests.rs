@@ -226,48 +226,9 @@ mod tests {
         assert_eq!(v["action"], "respond");
     }
 
-    // ── PlanStepCompleted ─────────────────────────────────────────────────────
-
-    #[test]
-    fn plan_step_completed_serializes_camel_case() {
-        // AC-3.7: PlanStepCompleted { plan_id, step_index, result }
-        // plan_id → "planId", step_index → "stepIndex"
-        let id = uuid::Uuid::new_v4();
-        let event = AgentEvent::PlanStepCompleted {
-            plan_id: id,
-            step_index: 2,
-            result: "done".to_string(),
-        };
-        let v = serialize(&event);
-        assert_eq!(v["type"], "planStepCompleted");
-        assert_eq!(v["planId"], id.to_string());
-        assert_eq!(v["stepIndex"], 2);
-        assert!(v.get("plan_id").is_none());
-        assert!(v.get("step_index").is_none());
-    }
-
-    // ── PlanCompleted ─────────────────────────────────────────────────────────
-
-    #[test]
-    fn plan_completed_serializes_camel_case() {
-        // AC-3.7: PlanCompleted { plan_id, summary }
-        // plan_id → "planId"
-        let id = uuid::Uuid::new_v4();
-        let event = AgentEvent::PlanCompleted {
-            plan_id: id,
-            summary: "all steps done".to_string(),
-        };
-        let v = serialize(&event);
-        assert_eq!(v["type"], "planCompleted");
-        assert_eq!(v["planId"], id.to_string());
-        assert_eq!(v["summary"], "all steps done");
-        assert!(v.get("plan_id").is_none());
-    }
-
     // ── Cross-cutting ─────────────────────────────────────────────────────────
 
     fn all_variants() -> Vec<AgentEvent> {
-        let id = uuid::Uuid::new_v4();
         vec![
             AgentEvent::ContentChunk {
                 data: "chunk".to_string(),
@@ -310,15 +271,6 @@ mod tests {
             },
             AgentEvent::Error {
                 message: "err".to_string(),
-            },
-            AgentEvent::PlanStepCompleted {
-                plan_id: id,
-                step_index: 0,
-                result: "ok".to_string(),
-            },
-            AgentEvent::PlanCompleted {
-                plan_id: id,
-                summary: "done".to_string(),
             },
         ]
     }

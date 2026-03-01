@@ -12,7 +12,7 @@ use crate::conversation_embedding::{
     ConversationEmbeddingHandler, ConversationEmbeddingRecord, PurgeFilter,
 };
 use crate::embedding_engine::EmbeddingHandler;
-use crate::todo_types::Todo;
+use crate::todo_types::Action;
 use crate::{RoutingContext, Tool};
 use common::Result;
 
@@ -23,7 +23,7 @@ pub struct MemoryTool {
     /// RRF k parameter for hybrid search (from config)
     rrf_k: u32,
     /// Todo repo for unified search (SQL-backed)
-    todo_repo: Option<storage::TodoRepo>,
+    todo_repo: Option<storage::ActionRepo>,
     /// Embedding handler for todo semantic search
     todo_embedding_handler: Option<Arc<dyn EmbeddingHandler>>,
     /// LanceDB vector store for todo semantic search
@@ -65,7 +65,7 @@ impl MemoryTool {
     }
 
     /// Inject todo repo for unified search.
-    pub fn with_todo_repo(mut self, repo: storage::TodoRepo) -> Self {
+    pub fn with_todo_repo(mut self, repo: storage::ActionRepo) -> Self {
         self.todo_repo = Some(repo);
         self
     }
@@ -240,10 +240,10 @@ impl MemoryTool {
             handler.search(query, limit * 2, threshold).await?;
 
         // 2. Search todos (keyword + semantic if available)
-        let todo_results: Vec<(Todo, f64)> = if let Some(todo_repo) = &self.todo_repo {
+        let todo_results: Vec<(Action, f64)> = if let Some(todo_repo) = &self.todo_repo {
             // Keyword search via SQL ILIKE (escapes special chars)
             let keyword_rows = todo_repo.search_by_keyword(query, None).await?;
-            let keyword_todos: Vec<Todo> = keyword_rows.into_iter().map(Todo::from).collect();
+            let keyword_todos: Vec<Action> = keyword_rows.into_iter().map(Action::from).collect();
 
             // Semantic search via LanceDB (if available)
             let semantic_todos: Vec<(String, f64)> = if let (Some(emb), Some(vs)) =
@@ -275,7 +275,7 @@ impl MemoryTool {
                 for (id, _) in &semantic_todos {
                     if !todos_by_id.contains_key(id) {
                         if let Ok(Some(row)) = todo_repo.get(id).await {
-                            let todo = Todo::from(row);
+                            let todo = Action::from(row);
                             todos_by_id.insert(
                                 id.clone(),
                                 crate::search_utils::SearchResult::Todo(Box::new(todo)),

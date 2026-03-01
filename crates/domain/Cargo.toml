@@ -7,7 +7,6 @@ license.workspace = true
 
 [dependencies]
 common.workspace = true
-storage.workspace = true
 thiserror.workspace = true
 uuid.workspace = true
 chrono.workspace = true

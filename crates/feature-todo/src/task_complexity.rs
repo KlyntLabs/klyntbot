@@ -4,7 +4,7 @@
 //! and priority. The `is_plan_worthy()` method checks if the score exceeds a
 //! configurable threshold.
 
-use storage::TodoRepo;
+use storage::ActionRepo;
 
 /// Complexity signals derived from a task's structure and metadata.
 #[derive(Debug, Clone)]
@@ -45,7 +45,7 @@ impl TaskComplexitySignals {
 }
 
 /// Query a task's structural complexity from the database.
-pub async fn evaluate_task_complexity(repo: &TodoRepo, task_id: &str) -> TaskComplexitySignals {
+pub async fn evaluate_task_complexity(repo: &ActionRepo, task_id: &str) -> TaskComplexitySignals {
     // Count direct subtasks
     let subtask_count = repo.count_children(task_id).await.unwrap_or(0) as u16;
 
@@ -79,7 +79,7 @@ pub async fn evaluate_task_complexity(repo: &TodoRepo, task_id: &str) -> TaskCom
 }
 
 /// Recursively compute dependency depth with a max-depth guard.
-async fn compute_dependency_depth(repo: &TodoRepo, task_id: &str, current: u8, max: u8) -> u8 {
+async fn compute_dependency_depth(repo: &ActionRepo, task_id: &str, current: u8, max: u8) -> u8 {
     if current >= max {
         return current;
     }

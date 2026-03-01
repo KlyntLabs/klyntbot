@@ -2623,7 +2623,6 @@ dependencies = [
  "common",
  "serde",
  "serde_json",
- "storage",
  "thiserror 2.0.18",
  "uuid",
 ]
@@ -8807,6 +8806,7 @@ dependencies = [
  "serde",
  "serde_json",
  "shellexpand",
+ "sqlx",
  "storage",
  "tempfile",
  "tokio",

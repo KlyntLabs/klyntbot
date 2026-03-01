@@ -40,3 +40,4 @@ globset = "0.4"
 [dev-dependencies]
 tempfile.workspace = true
 tokio = { workspace = true, features = ["macros", "test-util"] }
+sqlx = { workspace = true }

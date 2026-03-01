@@ -152,6 +152,8 @@ pub fn create_test_todo(title: &str) -> Todo {
         id: Todo::generate_id(),
         title: title.to_string(),
         description: None,
+        area_id: "test-area".to_string(),
+        key_result_id: None,
         priority: None,
         due_date: None,
         tags: vec![],
@@ -195,8 +197,33 @@ pub async fn test_repos() -> klyntbot::storage::Repos {
     klyntbot::storage::Repos::from_pool(&test_pool().await)
 }
 
-pub async fn test_todo_repo() -> klyntbot::storage::TodoRepo {
-    klyntbot::storage::TodoRepo::new(test_pool().await.inner().clone())
+pub async fn test_action_repo() -> klyntbot::storage::ActionRepo {
+    klyntbot::storage::ActionRepo::new(test_pool().await.inner().clone())
+}
+
+/// Create an AreaRepo backed by an in-memory pool.
+pub async fn test_area_repo() -> klyntbot::storage::AreaRepo {
+    klyntbot::storage::AreaRepo::new(test_pool().await.inner().clone())
+}
+
+/// Ensure the default test area ("test-area") exists in the given pool.
+///
+/// This must be called before inserting any ActionRows that reference "test-area".
+pub async fn ensure_test_area(pool: &klyntbot::storage::StoragePool) {
+    let area_repo = klyntbot::storage::AreaRepo::new(pool.inner().clone());
+    let area = klyntbot::storage::AreaRow {
+        id: "test-area".to_string(),
+        name: "Test Area".to_string(),
+        description: None,
+        color: "#000000".to_string(),
+        icon: None,
+        position: 0,
+        status: "active".to_string(),
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+    };
+    // Ignore error if already exists
+    let _ = area_repo.create(&area).await;
 }
 
 pub async fn test_outcome_repo() -> klyntbot::storage::OutcomeRepo {

@@ -22,7 +22,7 @@ use tracing::warn;
 /// with multiple CalDAV providers.
 pub struct CalendarSyncAdapter {
     providers: Vec<(String, Box<dyn CalendarProvider>)>,
-    todo_repo: storage::TodoRepo,
+    todo_repo: storage::ActionRepo,
     calendar_sync_repo: storage::CalendarSyncRepo,
     event_cache_repo: storage::CalendarEventCacheRepo,
     auto_sync_due_dates: bool,
@@ -34,7 +34,7 @@ pub struct CalendarSyncAdapter {
 impl CalendarSyncAdapter {
     /// Create a new CalendarSyncAdapter from the calendar config.
     pub async fn new(
-        todo_repo: storage::TodoRepo,
+        todo_repo: storage::ActionRepo,
         calendar_sync_repo: storage::CalendarSyncRepo,
         event_cache_repo: storage::CalendarEventCacheRepo,
         config: &CalendarConfig,
@@ -145,10 +145,13 @@ impl CalendarSyncAdapter {
 
         // Clear calendar_event_uid for todos that had events deleted from all providers
         if self.auto_sync_due_dates {
-            let rows = self.todo_repo.list(&storage::TodoFilter::default()).await?;
+            let rows = self
+                .todo_repo
+                .list(&storage::ActionFilter::default())
+                .await?;
             for row in rows {
                 if row.due_date.is_none() && row.calendar_event_uid.is_some() {
-                    let patch = storage::TodoPatch {
+                    let patch = storage::ActionPatch {
                         id: row.id.clone(),
                         calendar_event_uid: Some(None),
                         ..Default::default()
@@ -297,7 +300,10 @@ impl CalendarSyncAdapter {
 
         // Push local changes to this provider
         if self.auto_sync_due_dates {
-            let rows = self.todo_repo.list(&storage::TodoFilter::default()).await?;
+            let rows = self
+                .todo_repo
+                .list(&storage::ActionFilter::default())
+                .await?;
             let todos: Vec<Todo> = rows.into_iter().map(Todo::from).collect();
 
             for todo in todos {
@@ -307,7 +313,7 @@ impl CalendarSyncAdapter {
                         match provider.put_event(&event).await {
                             Ok(_etag) => {
                                 if todo.calendar_event_uid.is_none() {
-                                    let patch = storage::TodoPatch {
+                                    let patch = storage::ActionPatch {
                                         id: todo.id.clone(),
                                         calendar_event_uid: Some(Some(event.uid.clone())),
                                         ..Default::default()
@@ -368,7 +374,7 @@ impl CalendarSyncAdapter {
 
     /// Find a todo by its calendar event UID via SQL.
     async fn find_todo_by_calendar_uid(&self, uid: &str) -> Option<Todo> {
-        let filter = storage::TodoFilter::default();
+        let filter = storage::ActionFilter::default();
         if let Ok(rows) = self.todo_repo.list(&filter).await {
             rows.into_iter()
                 .map(Todo::from)
@@ -380,7 +386,7 @@ impl CalendarSyncAdapter {
 
     /// Update a todo from a calendar event via SQL.
     async fn update_todo_from_event(&self, todo_id: &str, event: &CalendarEvent) -> Result<()> {
-        let patch = storage::TodoPatch {
+        let patch = storage::ActionPatch {
             id: todo_id.to_string(),
             title: Some(event.summary.clone()),
             description: Some(event.description.clone()),
@@ -398,6 +404,8 @@ impl CalendarSyncAdapter {
             id: Todo::generate_id(),
             title: event.summary.clone(),
             description: event.description.clone(),
+            area_id: String::new(),
+            key_result_id: None,
             priority: None,
             due_date: Some(event.start),
             tags: vec![],
@@ -424,7 +432,7 @@ impl CalendarSyncAdapter {
             blocks: Vec::new(),
         };
 
-        let row: storage::TodoRow = (&todo).into();
+        let row: storage::ActionRow = (&todo).into();
         self.todo_repo.add(&row).await?;
         Ok(())
     }
@@ -527,7 +535,7 @@ impl CalendarSyncAdapter {
                 }
                 // Set calendar_event_uid if not already set
                 if todo.calendar_event_uid.is_none() {
-                    let patch = storage::TodoPatch {
+                    let patch = storage::ActionPatch {
                         id: task_id.to_string(),
                         calendar_event_uid: Some(Some(event.uid.clone())),
                         ..Default::default()
@@ -546,7 +554,7 @@ impl CalendarSyncAdapter {
             // No due_date but has calendar UID — remove from providers
             self.remove_single_event_internal(uid).await?;
             // Clear the UID on the todo
-            let patch = storage::TodoPatch {
+            let patch = storage::ActionPatch {
                 id: task_id.to_string(),
                 calendar_event_uid: Some(None),
                 ..Default::default()
@@ -692,7 +700,10 @@ impl CalendarSyncAdapter {
 
     /// Push all tasks with due dates to all providers (no pulling).
     async fn push_all_tasks_internal(&self) -> Result<Value> {
-        let rows = self.todo_repo.list(&storage::TodoFilter::default()).await?;
+        let rows = self
+            .todo_repo
+            .list(&storage::ActionFilter::default())
+            .await?;
         let todos: Vec<Todo> = rows.into_iter().map(Todo::from).collect();
 
         let mut total_pushed = 0u64;
@@ -709,7 +720,7 @@ impl CalendarSyncAdapter {
                         match provider.put_event(&event).await {
                             Ok(_etag) => {
                                 if todo.calendar_event_uid.is_none() {
-                                    let patch = storage::TodoPatch {
+                                    let patch = storage::ActionPatch {
                                         id: todo.id.clone(),
                                         calendar_event_uid: Some(Some(event.uid.clone())),
                                         ..Default::default()
@@ -763,7 +774,7 @@ impl CalendarSyncAdapter {
         // Clear calendar_event_uid for todos that lost their due_date
         for todo in &todos {
             if todo.due_date.is_none() && todo.calendar_event_uid.is_some() {
-                let patch = storage::TodoPatch {
+                let patch = storage::ActionPatch {
                     id: todo.id.clone(),
                     calendar_event_uid: Some(None),
                     ..Default::default()
@@ -943,7 +954,10 @@ impl CalendarHandler for CalendarSyncAdapter {
 
     /// Get sync status for all providers.
     async fn get_status(&self) -> Result<Value> {
-        let rows = self.todo_repo.list(&storage::TodoFilter::default()).await?;
+        let rows = self
+            .todo_repo
+            .list(&storage::ActionFilter::default())
+            .await?;
         let synced_count = rows
             .iter()
             .filter(|r| r.calendar_event_uid.is_some())
@@ -1092,7 +1106,7 @@ mod tests {
 
     /// Connect to an ephemeral SQLite database for testing.
     async fn test_repos() -> Option<(
-        storage::TodoRepo,
+        storage::ActionRepo,
         storage::CalendarSyncRepo,
         storage::CalendarEventCacheRepo,
     )> {
@@ -1100,7 +1114,11 @@ mod tests {
         let pool = storage::StoragePool::connect(dir.path()).await.ok()?;
         let _ = dir.keep(); // prevent cleanup; acceptable in test context
         let repos = storage::Repos::from_pool(&pool);
-        Some((repos.todos, repos.calendar_sync, repos.calendar_event_cache))
+        Some((
+            repos.actions,
+            repos.calendar_sync,
+            repos.calendar_event_cache,
+        ))
     }
 
     fn test_calendar_config() -> CalendarConfig {
@@ -1169,6 +1187,8 @@ mod tests {
             id: "test-123".to_string(),
             title: "Test Task".to_string(),
             description: Some("Task description".to_string()),
+            area_id: String::new(),
+            key_result_id: None,
             priority: Some(1),
             due_date: Some(due_date),
             tags: vec![],
@@ -1233,6 +1253,8 @@ mod tests {
             id: "test-todo".to_string(),
             title: "Test Task".to_string(),
             description: None,
+            area_id: String::new(),
+            key_result_id: None,
             priority: Some(1),
             due_date: Some(due_date),
             tags: vec![],
@@ -1303,6 +1325,8 @@ mod tests {
             id: "test-456".to_string(),
             title: "No Due Date Task".to_string(),
             description: None,
+            area_id: String::new(),
+            key_result_id: None,
             priority: None,
             due_date: None,
             tags: vec![],

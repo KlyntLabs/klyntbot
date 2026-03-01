@@ -1,7 +1,7 @@
-//! Todo system types
+//! Action system types (formerly Todo types)
 //!
 //! Re-exports core domain types from `feature-todo` and provides
-//! tool-layer abstractions (`TodoFilter`, `TodoSummary`, `TodoPatch`)
+//! tool-layer abstractions (`ActionToolFilter`, `ActionToolPatch`)
 //! with typed conversions to storage-layer equivalents.
 
 use chrono::{DateTime, Utc};
@@ -9,16 +9,15 @@ use std::collections::HashMap;
 
 // ── Re-exports from feature-todo (canonical definitions) ────────────────────
 pub use feature_todo::types::{
-    Attachment, AttachmentType, TimeEntry, TimeEntrySource, Todo, TodoStatus,
+    Action, ActionStatus, Attachment, AttachmentType, TimeEntry, TimeEntrySource, Todo, TodoStatus,
 };
 
 /// Generate a short 8-character ID from a random UUID.
-/// Used by both `Todo` and `Project` for ID generation.
 pub fn generate_short_id() -> String {
     uuid::Uuid::new_v4().to_string()[..8].to_string()
 }
 
-/// Partial update for existing todos
+/// Partial update for existing actions (tool-layer abstraction).
 #[derive(Debug, Clone, Default)]
 pub struct TodoPatch {
     pub title: Option<String>,
@@ -30,22 +29,26 @@ pub struct TodoPatch {
     pub last_reminded_at: Option<Option<DateTime<Utc>>>,
     pub calendar_event_uid: Option<Option<String>>,
     pub estimated_minutes: Option<Option<u32>>,
+    pub area_id: Option<String>,
+    pub key_result_id: Option<Option<String>>,
 }
 
-/// Filter criteria for listing todos
+/// Filter criteria for listing actions (tool-layer abstraction).
 #[derive(Debug, Clone, Default)]
 pub struct TodoFilter {
     pub status: Option<TodoStatus>,
     pub priority_min: Option<u8>,
     pub tag: Option<String>,
     pub limit: Option<usize>,
+    pub area_id: Option<String>,
     pub project_id: Option<String>,
+    pub key_result_id: Option<String>,
     pub parent_id: Option<String>,
-    // Template filtering (default false — templates hidden from normal lists)
+    pub unassigned: bool,
     pub include_templates: bool,
 }
 
-/// Summary statistics for todo collection
+/// Summary statistics for action collection.
 #[derive(Debug, Clone)]
 pub struct TodoSummary {
     pub total: usize,
@@ -54,10 +57,10 @@ pub struct TodoSummary {
     pub upcoming_week: Vec<String>,
 }
 
-/// Convert a domain `TodoPatch` into a storage `TodoPatch`.
+/// Convert a domain `TodoPatch` into a storage `ActionPatch`.
 impl TodoPatch {
-    pub fn to_storage_patch(&self, id: &str) -> storage::TodoPatch {
-        storage::TodoPatch {
+    pub fn to_storage_patch(&self, id: &str) -> storage::ActionPatch {
+        storage::ActionPatch {
             id: id.to_string(),
             title: self.title.clone(),
             description: self.description.clone(),
@@ -66,24 +69,26 @@ impl TodoPatch {
             tags: self.tags.clone(),
             status: self.status.map(|s| s.as_str().to_string()),
             calendar_event_uid: self.calendar_event_uid.clone(),
-            // next_instance_date is intentionally omitted from domain TodoPatch —
-            // it is an internal field managed exclusively by RecurringTaskSpawner
-            // via storage::TodoPatch directly. Tool-layer callers cannot set it.
             next_instance_date: None,
             estimated_minutes: self.estimated_minutes.map(|opt| opt.map(|m| m as i32)),
             last_reminded_at: self.last_reminded_at,
             recurrence_rule: None,
+            area_id: self.area_id.clone(),
+            key_result_id: self.key_result_id.clone(),
         }
     }
 }
 
-/// Convert a domain `TodoFilter` into a storage `TodoFilter`.
+/// Convert a domain `TodoFilter` into a storage `ActionFilter`.
 impl TodoFilter {
-    pub fn to_storage_filter(&self) -> storage::TodoFilter {
-        storage::TodoFilter {
+    pub fn to_storage_filter(&self) -> storage::ActionFilter {
+        storage::ActionFilter {
             status: self.status.map(|s| s.as_str().to_string()),
             tags: self.tag.as_ref().map(|t| vec![t.clone()]),
+            area_id: self.area_id.clone(),
             project_id: self.project_id.clone(),
+            key_result_id: self.key_result_id.clone(),
+            unassigned: self.unassigned,
             priority_min: self.priority_min.map(|p| p as i16),
             limit: self.limit.map(|l| l as i64),
             templates_only: self.include_templates,
@@ -124,10 +129,11 @@ mod tests {
     }
 
     #[test]
-    fn test_backward_compat_serde_without_new_fields() {
+    fn test_serde_with_area_id() {
         let json = r#"{
             "id": "abc12345",
             "title": "Old task",
+            "area_id": "work",
             "description": null,
             "priority": null,
             "due_date": null,
@@ -142,6 +148,7 @@ mod tests {
         }"#;
         let todo: Todo = serde_json::from_str(json).unwrap();
         assert_eq!(todo.id, "abc12345");
+        assert_eq!(todo.area_id, "work");
         assert!(!todo.is_template);
         assert!(todo.recurrence_rule.is_none());
         assert!(todo.recurrence_parent_id.is_none());
@@ -155,6 +162,7 @@ mod tests {
     #[test]
     fn test_new_fields_serde_round_trip() {
         let mut todo = Todo::default_instance();
+        todo.area_id = "work".to_string();
         todo.is_template = true;
         todo.recurrence_rule = Some("FREQ=DAILY;BYHOUR=9".to_string());
         todo.blocked_by = vec!["task1".to_string(), "task2".to_string()];

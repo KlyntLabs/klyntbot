@@ -4,10 +4,10 @@ use common::{Result, ToolError};
 use tools_core::ParamExtractor;
 use tracing::{debug, info};
 
-use super::super::TodoTool;
-use crate::types::Todo;
+use super::super::TaskTool;
+use crate::types::Action;
 
-impl TodoTool {
+impl TaskTool {
     pub(crate) async fn handle_search(&self, p: &ParamExtractor<'_>) -> Result<String> {
         let query = p.required_str("query")?;
         let limit = p.optional_u64("limit")?;
@@ -16,7 +16,7 @@ impl TodoTool {
             .repo
             .search_by_keyword(query, limit.map(|l| l as i64))
             .await?;
-        let results: Vec<Todo> = rows.into_iter().map(Todo::from).collect();
+        let results: Vec<Action> = rows.into_iter().map(Action::from).collect();
 
         if results.is_empty() {
             return Ok(format!("No tasks found matching '{}'", query));
@@ -103,7 +103,7 @@ impl TodoTool {
 
         for (id, sim) in &scored {
             if let Ok(Some(row)) = self.repo.get(id).await {
-                let todo = Todo::from(row);
+                let todo = Action::from(row);
                 let priority_str = todo
                     .priority
                     .map(|p| format!("P{}", p))
@@ -142,7 +142,7 @@ impl TodoTool {
         }
 
         let keyword_rows = self.repo.search_by_keyword(query, None).await?;
-        let keyword_results: Vec<Todo> = keyword_rows.into_iter().map(Todo::from).collect();
+        let keyword_results: Vec<Action> = keyword_rows.into_iter().map(Action::from).collect();
         let keyword_count = keyword_results.len();
 
         // Run semantic search if available

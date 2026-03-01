@@ -65,22 +65,6 @@ pub enum AgentEvent {
     /// An error occurred during processing.
     Error { message: String },
 
-    /// A single plan step completed successfully.
-    PlanStepCompleted {
-        #[serde(rename = "planId")]
-        plan_id: uuid::Uuid,
-        #[serde(rename = "stepIndex")]
-        step_index: usize,
-        result: String,
-    },
-
-    /// A plan execution finished (completed or failed).
-    PlanCompleted {
-        #[serde(rename = "planId")]
-        plan_id: uuid::Uuid,
-        summary: String,
-    },
-
-    /// An entity was created by a tool (task, project, goal, etc.).
+    /// An entity was created by a tool (task, project, area, etc.).
     EntityCreated(common::EntityCard),
 }

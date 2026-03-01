@@ -6,14 +6,14 @@
 use async_trait::async_trait;
 use common::Result;
 
-use crate::types::Todo;
+use crate::types::Action;
 
 /// Trait for embedding handlers.
 /// Implemented by EmbeddingEngine in the agent crate (Layer 5).
 #[async_trait]
 pub trait EmbeddingHandler: Send + Sync {
     /// Generate and store an embedding for a todo item (best-effort).
-    async fn embed_todo(&self, todo: &Todo) -> Result<()>;
+    async fn embed_todo(&self, todo: &Action) -> Result<()>;
 
     /// Embed a query string and return the embedding vector.
     /// Used for semantic search.
@@ -29,7 +29,7 @@ mod tests {
 
     #[async_trait]
     impl EmbeddingHandler for NoOpEmbedder {
-        async fn embed_todo(&self, _todo: &Todo) -> Result<()> {
+        async fn embed_todo(&self, _todo: &Action) -> Result<()> {
             Ok(())
         }
 
@@ -41,7 +41,8 @@ mod tests {
     #[tokio::test]
     async fn test_trait_is_object_safe() {
         let handler: Arc<dyn EmbeddingHandler> = Arc::new(NoOpEmbedder);
-        let todo = Todo::default_instance();
+        let mut todo = Action::default_instance();
+        todo.area_id = "test".to_string();
         handler.embed_todo(&todo).await.unwrap();
         let vec = handler.embed_query("test").await.unwrap();
         assert_eq!(vec.len(), 384);

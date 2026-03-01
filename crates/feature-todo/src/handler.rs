@@ -5,9 +5,9 @@ use std::sync::Arc;
 use tracing::warn;
 
 use crate::enrichment::{EnrichmentFeedbackEntry, EnrichmentFeedbackHandler, EnrichmentResult};
-use crate::tool::TodoTool;
+use crate::tool::TaskTool;
 
-impl TodoTool {
+impl TaskTool {
     /// Push a single task to calendar (best-effort).
     pub(crate) async fn push_task_to_calendar(&self, task_id: &str) {
         if let Some(handler) = &self.calendar_handler {

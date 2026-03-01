@@ -38,6 +38,16 @@ pub struct InteractionBundle {
     pub response_tx: oneshot::Sender<FormResponse>,
 }
 
+/// Trait for cascading progress updates (KR → Objective).
+///
+/// Defined in `tools-core` (Layer 1) so both `tools` (OkrTool) and `feature-todo`
+/// (TaskTool) can consume it without circular deps. Implemented in `agent` (Layer 5).
+#[async_trait]
+pub trait ProgressHandler: Send + Sync {
+    /// Recalculate progress for a key result and cascade to its parent objective.
+    async fn recalculate_kr_progress(&self, key_result_id: &str) -> Result<()>;
+}
+
 /// Trait for channels that support structured interactions (buttons, menus, etc.).
 ///
 /// Defined in `tools-core` (Layer 3) to avoid circular deps with `channels` (Layer 4).

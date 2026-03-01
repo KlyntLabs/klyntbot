@@ -65,10 +65,11 @@ fn test_todo_serde_round_trip() {
 
 #[test]
 fn test_todo_serde_backward_compat() {
-    // Old JSON without extended fields should deserialize with defaults
+    // JSON with required area_id field and optional fields defaulting
     let json = r#"{
         "id": "abc12345",
         "title": "Old task",
+        "area_id": "work",
         "description": null,
         "priority": null,
         "due_date": null,
@@ -84,6 +85,7 @@ fn test_todo_serde_backward_compat() {
 
     let todo: Todo = serde_json::from_str(json).unwrap();
     assert_eq!(todo.id, "abc12345");
+    assert_eq!(todo.area_id, "work");
     assert!(!todo.is_template);
     assert!(todo.recurrence_rule.is_none());
     assert!(todo.blocked_by.is_empty());

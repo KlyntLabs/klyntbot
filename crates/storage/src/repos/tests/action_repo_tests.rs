@@ -1,33 +1,59 @@
-//! Unit tests for TodoRepo — the most complex repository.
+//! Unit tests for ActionRepo — the most complex repository.
 //!
 //! Covers CRUD, join tables (attachments, time_entries, dependencies),
 //! focus slot management, cycle detection, cascade operations, and filtering.
 //!
-//! Tests use an ephemeral SQLite pool via `test_todo_repo()` (StoragePool::connect on a TempDir).
+//! Tests use an ephemeral SQLite pool via `test_action_repo()` (StoragePool::connect on a TempDir).
 
 #[cfg(test)]
 mod tests {
     use chrono::{DateTime, Utc};
 
-    use crate::repos::todo_repo::{TodoPatch, TodoRepo};
-    use crate::rows::todo::TodoRow;
+    use crate::repos::action_repo::{ActionPatch, ActionRepo};
+    use crate::repos::area::AreaRepo;
+    use crate::rows::action::ActionRow;
+    use crate::rows::area::AreaRow;
     use crate::StoragePool;
 
     /// Connect to an ephemeral SQLite database for testing.
-    async fn test_todo_repo() -> Option<TodoRepo> {
+    async fn test_action_repo() -> Option<(ActionRepo, AreaRepo)> {
         let dir = tempfile::tempdir().ok()?;
         let pool = StoragePool::connect(dir.path()).await.ok()?;
         let _ = dir.keep(); // prevent cleanup; acceptable in test context
-        Some(crate::Repos::from_pool(&pool).todos)
+        let repos = crate::Repos::from_pool(&pool);
+        Some((repos.actions, repos.areas))
     }
 
-    /// Helper: create a minimal TodoRow for testing.
-    fn sample_todo(id: &str, title: &str) -> TodoRow {
+    /// Create a default area for tests (actions require area_id NOT NULL).
+    async fn ensure_area(area_repo: &AreaRepo) -> String {
+        let area_id = "test-area".to_string();
+        let _ = area_repo
+            .create(&AreaRow {
+                id: area_id.clone(),
+                name: format!("Test Area {}", &uuid::Uuid::new_v4().to_string()[..4]),
+                description: None,
+                color: "blue".to_string(),
+                icon: None,
+                position: 0,
+                status: "active".to_string(),
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
+            })
+            .await;
+        area_id
+    }
+
+    /// Helper: create a minimal ActionRow for testing.
+    fn sample_action(id: &str, title: &str, area_id: &str) -> ActionRow {
         let now = Utc::now();
-        TodoRow {
+        ActionRow {
             id: id.to_string(),
             title: title.to_string(),
             description: None,
+            area_id: area_id.to_string(),
+            project_id: None,
+            key_result_id: None,
+            parent_id: None,
             priority: None,
             due_date: None,
             tags: vec![],
@@ -38,8 +64,6 @@ mod tests {
             created_at: now,
             updated_at: now,
             completed_at: None,
-            parent_id: None,
-            project_id: None,
             total_tracked_secs: 0,
             estimated_minutes: None,
             calendar_event_uid: None,
@@ -59,11 +83,12 @@ mod tests {
 
     #[tokio::test]
     async fn add_and_get() {
-        let Some(repo) = test_todo_repo().await else {
+        let Some((repo, area_repo)) = test_action_repo().await else {
             return;
         };
+        let area_id = ensure_area(&area_repo).await;
         let id = unique_id("ag");
-        let row = sample_todo(&id, "Buy milk");
+        let row = sample_action(&id, "Buy milk", &area_id);
         let inserted = repo.add(&row).await.unwrap();
         assert_eq!(inserted.title, "Buy milk");
 
@@ -76,14 +101,15 @@ mod tests {
 
     #[tokio::test]
     async fn update_fields() {
-        let Some(repo) = test_todo_repo().await else {
+        let Some((repo, area_repo)) = test_action_repo().await else {
             return;
         };
+        let area_id = ensure_area(&area_repo).await;
         let id = unique_id("uf");
-        let row = sample_todo(&id, "Buy milk");
+        let row = sample_action(&id, "Buy milk", &area_id);
         repo.add(&row).await.unwrap();
 
-        let patch = TodoPatch {
+        let patch = ActionPatch {
             id: id.clone(),
             title: Some("Buy oat milk".to_string()),
             priority: Some(Some(1)),
@@ -98,30 +124,34 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn delete_removes_todo() {
-        let Some(repo) = test_todo_repo().await else {
+    async fn delete_removes_action() {
+        let Some((repo, area_repo)) = test_action_repo().await else {
             return;
         };
+        let area_id = ensure_area(&area_repo).await;
         let id = unique_id("dr");
-        repo.add(&sample_todo(&id, "Deletable")).await.unwrap();
+        repo.add(&sample_action(&id, "Deletable", &area_id))
+            .await
+            .unwrap();
         assert!(repo.delete(&id).await.unwrap());
         assert!(repo.get(&id).await.unwrap().is_none());
     }
 
-    // ----- New fields (G-01): calendar_event_uid, next_instance_date, last_reminded_at -----
+    // ----- New fields: calendar_event_uid, next_instance_date, last_reminded_at -----
 
     #[tokio::test]
     async fn update_calendar_event_uid_set_and_clear() {
-        let Some(repo) = test_todo_repo().await else {
+        let Some((repo, area_repo)) = test_action_repo().await else {
             return;
         };
+        let area_id = ensure_area(&area_repo).await;
         let id = unique_id("ceuid");
-        repo.add(&sample_todo(&id, "Calendar linked"))
+        repo.add(&sample_action(&id, "Calendar linked", &area_id))
             .await
             .unwrap();
 
         // Set calendar_event_uid
-        let patch = TodoPatch {
+        let patch = ActionPatch {
             id: id.clone(),
             calendar_event_uid: Some(Some("abc-123@calendar".to_string())),
             ..Default::default()
@@ -133,7 +163,7 @@ mod tests {
         );
 
         // Clear calendar_event_uid with Some(None)
-        let patch = TodoPatch {
+        let patch = ActionPatch {
             id: id.clone(),
             calendar_event_uid: Some(None),
             ..Default::default()
@@ -150,18 +180,19 @@ mod tests {
 
     #[tokio::test]
     async fn update_next_instance_date_set_and_clear() {
-        let Some(repo) = test_todo_repo().await else {
+        let Some((repo, area_repo)) = test_action_repo().await else {
             return;
         };
+        let area_id = ensure_area(&area_repo).await;
         let id = unique_id("nid");
-        repo.add(&sample_todo(&id, "Recurring template"))
+        repo.add(&sample_action(&id, "Recurring template", &area_id))
             .await
             .unwrap();
 
         let next_date: DateTime<Utc> = "2026-03-01T09:00:00Z".parse().unwrap();
 
         // Set next_instance_date
-        let patch = TodoPatch {
+        let patch = ActionPatch {
             id: id.clone(),
             next_instance_date: Some(Some(next_date)),
             ..Default::default()
@@ -170,7 +201,7 @@ mod tests {
         assert_eq!(updated.next_instance_date, Some(next_date));
 
         // Clear next_instance_date with Some(None)
-        let patch = TodoPatch {
+        let patch = ActionPatch {
             id: id.clone(),
             next_instance_date: Some(None),
             ..Default::default()
@@ -187,16 +218,19 @@ mod tests {
 
     #[tokio::test]
     async fn update_last_reminded_at_set_and_clear() {
-        let Some(repo) = test_todo_repo().await else {
+        let Some((repo, area_repo)) = test_action_repo().await else {
             return;
         };
+        let area_id = ensure_area(&area_repo).await;
         let id = unique_id("lra");
-        repo.add(&sample_todo(&id, "Reminder task")).await.unwrap();
+        repo.add(&sample_action(&id, "Reminder task", &area_id))
+            .await
+            .unwrap();
 
         let now = Utc::now();
 
         // Set last_reminded_at
-        let patch = TodoPatch {
+        let patch = ActionPatch {
             id: id.clone(),
             last_reminded_at: Some(Some(now)),
             ..Default::default()
@@ -208,7 +242,7 @@ mod tests {
         );
 
         // Clear last_reminded_at with Some(None)
-        let patch = TodoPatch {
+        let patch = ActionPatch {
             id: id.clone(),
             last_reminded_at: Some(None),
             ..Default::default()
@@ -225,16 +259,17 @@ mod tests {
 
     #[tokio::test]
     async fn update_new_fields_leaves_others_unchanged() {
-        let Some(repo) = test_todo_repo().await else {
+        let Some((repo, area_repo)) = test_action_repo().await else {
             return;
         };
+        let area_id = ensure_area(&area_repo).await;
         let id = unique_id("nfu");
-        repo.add(&sample_todo(&id, "Unchanged fields"))
+        repo.add(&sample_action(&id, "Unchanged fields", &area_id))
             .await
             .unwrap();
 
         // Set title and priority first
-        let patch = TodoPatch {
+        let patch = ActionPatch {
             id: id.clone(),
             title: Some("Important task".to_string()),
             priority: Some(Some(2)),
@@ -243,7 +278,7 @@ mod tests {
         repo.update(&patch).await.unwrap();
 
         // Now set only calendar_event_uid — title and priority should be preserved
-        let patch = TodoPatch {
+        let patch = ActionPatch {
             id: id.clone(),
             calendar_event_uid: Some(Some("uid-xyz".to_string())),
             ..Default::default()
@@ -261,20 +296,23 @@ mod tests {
 
     #[tokio::test]
     async fn list_filters_by_status() {
-        let Some(repo) = test_todo_repo().await else {
+        let Some((repo, area_repo)) = test_action_repo().await else {
             return;
         };
+        let area_id = ensure_area(&area_repo).await;
         let ids: Vec<String> = (0..3).map(|i| unique_id(&format!("lfs{i}"))).collect();
-        repo.add(&sample_todo(&ids[0], "Todo task")).await.unwrap();
-        let mut doing = sample_todo(&ids[1], "Doing task");
+        repo.add(&sample_action(&ids[0], "Todo task", &area_id))
+            .await
+            .unwrap();
+        let mut doing = sample_action(&ids[1], "Doing task", &area_id);
         doing.status = "doing".to_string();
         repo.add(&doing).await.unwrap();
-        let mut done = sample_todo(&ids[2], "Done task");
+        let mut done = sample_action(&ids[2], "Done task", &area_id);
         done.status = "done".to_string();
         done.completed_at = Some(Utc::now());
         repo.add(&done).await.unwrap();
 
-        let filter = crate::repos::todo_repo::TodoFilter {
+        let filter = crate::repos::action_repo::ActionFilter {
             status: Some("doing".to_string()),
             ..Default::default()
         };
@@ -292,19 +330,20 @@ mod tests {
 
     #[tokio::test]
     async fn list_filters_by_tags_gin() {
-        let Some(repo) = test_todo_repo().await else {
+        let Some((repo, area_repo)) = test_action_repo().await else {
             return;
         };
+        let area_id = ensure_area(&area_repo).await;
         let id1 = unique_id("tg1");
         let id2 = unique_id("tg2");
-        let mut row1 = sample_todo(&id1, "Backend task");
+        let mut row1 = sample_action(&id1, "Backend task", &area_id);
         row1.tags = vec!["rust".to_string(), "backend".to_string()];
         repo.add(&row1).await.unwrap();
-        let mut row2 = sample_todo(&id2, "Frontend task");
+        let mut row2 = sample_action(&id2, "Frontend task", &area_id);
         row2.tags = vec!["rust".to_string(), "frontend".to_string()];
         repo.add(&row2).await.unwrap();
 
-        let filter = crate::repos::todo_repo::TodoFilter {
+        let filter = crate::repos::action_repo::ActionFilter {
             tags: Some(vec!["backend".to_string()]),
             ..Default::default()
         };
@@ -319,17 +358,18 @@ mod tests {
 
     #[tokio::test]
     async fn list_filters_by_priority() {
-        let Some(repo) = test_todo_repo().await else {
+        let Some((repo, area_repo)) = test_action_repo().await else {
             return;
         };
+        let area_id = ensure_area(&area_repo).await;
         let ids: Vec<String> = (0..3).map(|i| unique_id(&format!("lfp{i}"))).collect();
         for (i, priority) in [1i16, 2, 3].iter().enumerate() {
-            let mut row = sample_todo(&ids[i], &format!("P{priority}"));
+            let mut row = sample_action(&ids[i], &format!("P{priority}"), &area_id);
             row.priority = Some(*priority);
             repo.add(&row).await.unwrap();
         }
 
-        let filter = crate::repos::todo_repo::TodoFilter {
+        let filter = crate::repos::action_repo::ActionFilter {
             priority_min: Some(2),
             ..Default::default()
         };
@@ -345,15 +385,16 @@ mod tests {
 
     #[tokio::test]
     async fn list_templates_only() {
-        let Some(repo) = test_todo_repo().await else {
+        let Some((repo, area_repo)) = test_action_repo().await else {
             return;
         };
+        let area_id = ensure_area(&area_repo).await;
         let id_regular = unique_id("ltr");
         let id_template = unique_id("ltt");
-        repo.add(&sample_todo(&id_regular, "Regular"))
+        repo.add(&sample_action(&id_regular, "Regular", &area_id))
             .await
             .unwrap();
-        let mut tpl = sample_todo(&id_template, "Template");
+        let mut tpl = sample_action(&id_template, "Template", &area_id);
         tpl.is_template = true;
         repo.add(&tpl).await.unwrap();
 
@@ -370,13 +411,16 @@ mod tests {
 
     #[tokio::test]
     async fn focus_sets_timestamp() {
-        let Some(repo) = test_todo_repo().await else {
+        let Some((repo, area_repo)) = test_action_repo().await else {
             return;
         };
+        let area_id = ensure_area(&area_repo).await;
         let id = unique_id("fst");
-        repo.add(&sample_todo(&id, "Focus me")).await.unwrap();
+        repo.add(&sample_action(&id, "Focus me", &area_id))
+            .await
+            .unwrap();
         let deadline = Utc::now() + chrono::Duration::hours(24);
-        // Use a large slot limit so parallel tests with their own focused todos don't interfere.
+        // Use a large slot limit so parallel tests with their own focused actions don't interfere.
         assert!(repo.focus(&id, 1000, Some(deadline)).await.unwrap());
         let row = repo.get(&id).await.unwrap().unwrap();
         assert!(row.focused_at.is_some());
@@ -388,11 +432,14 @@ mod tests {
 
     #[tokio::test]
     async fn unfocus_clears_timestamp() {
-        let Some(repo) = test_todo_repo().await else {
+        let Some((repo, area_repo)) = test_action_repo().await else {
             return;
         };
+        let area_id = ensure_area(&area_repo).await;
         let id = unique_id("uft");
-        repo.add(&sample_todo(&id, "Unfocus me")).await.unwrap();
+        repo.add(&sample_action(&id, "Unfocus me", &area_id))
+            .await
+            .unwrap();
         repo.focus(&id, 1000, None).await.unwrap();
         assert!(repo.unfocus(&id).await.unwrap());
         let row = repo.get(&id).await.unwrap().unwrap();
@@ -404,19 +451,22 @@ mod tests {
 
     #[tokio::test]
     async fn focus_respects_slot_limit() {
-        let Some(repo) = test_todo_repo().await else {
+        let Some((repo, area_repo)) = test_action_repo().await else {
             return;
         };
-        // Account for existing focused todos from parallel tests by basing the slot limit
+        let area_id = ensure_area(&area_repo).await;
+        // Account for existing focused actions from parallel tests by basing the slot limit
         // on the current count: limit = existing + 3, so filling 3 more saturates it.
         let existing_focused = repo.list_focused().await.unwrap().len() as i64;
         let slot_limit = existing_focused + 3;
 
         let ids: Vec<String> = (0..4).map(|i| unique_id(&format!("fsl{i}"))).collect();
         for id in &ids {
-            repo.add(&sample_todo(id, "Slot task")).await.unwrap();
+            repo.add(&sample_action(id, "Slot task", &area_id))
+                .await
+                .unwrap();
         }
-        // Fill 3 new slots on top of existing focused todos
+        // Fill 3 new slots on top of existing focused actions
         for id in &ids[..3] {
             assert!(repo.focus(id, slot_limit, None).await.unwrap());
         }
@@ -434,13 +484,18 @@ mod tests {
 
     #[tokio::test]
     async fn add_dependency_creates_edge() {
-        let Some(repo) = test_todo_repo().await else {
+        let Some((repo, area_repo)) = test_action_repo().await else {
             return;
         };
+        let area_id = ensure_area(&area_repo).await;
         let a = unique_id("dep-a");
         let b = unique_id("dep-b");
-        repo.add(&sample_todo(&a, "Task A")).await.unwrap();
-        repo.add(&sample_todo(&b, "Task B")).await.unwrap();
+        repo.add(&sample_action(&a, "Task A", &area_id))
+            .await
+            .unwrap();
+        repo.add(&sample_action(&b, "Task B", &area_id))
+            .await
+            .unwrap();
         repo.add_dependency(&a, &b).await.unwrap();
 
         let blockers = repo.get_blockers(&a).await.unwrap();
@@ -454,13 +509,18 @@ mod tests {
 
     #[tokio::test]
     async fn remove_dependency_deletes_edge() {
-        let Some(repo) = test_todo_repo().await else {
+        let Some((repo, area_repo)) = test_action_repo().await else {
             return;
         };
+        let area_id = ensure_area(&area_repo).await;
         let a = unique_id("rdep-a");
         let b = unique_id("rdep-b");
-        repo.add(&sample_todo(&a, "Task A")).await.unwrap();
-        repo.add(&sample_todo(&b, "Task B")).await.unwrap();
+        repo.add(&sample_action(&a, "Task A", &area_id))
+            .await
+            .unwrap();
+        repo.add(&sample_action(&b, "Task B", &area_id))
+            .await
+            .unwrap();
         repo.add_dependency(&a, &b).await.unwrap();
         assert!(repo.remove_dependency(&a, &b).await.unwrap());
         let blockers = repo.get_blockers(&a).await.unwrap();
@@ -473,15 +533,16 @@ mod tests {
 
     #[tokio::test]
     async fn cycle_detection_rejects_circular_deps() {
-        let Some(repo) = test_todo_repo().await else {
+        let Some((repo, area_repo)) = test_action_repo().await else {
             return;
         };
+        let area_id = ensure_area(&area_repo).await;
         let a = unique_id("cyc-a");
         let b = unique_id("cyc-b");
         let c = unique_id("cyc-c");
-        repo.add(&sample_todo(&a, "A")).await.unwrap();
-        repo.add(&sample_todo(&b, "B")).await.unwrap();
-        repo.add(&sample_todo(&c, "C")).await.unwrap();
+        repo.add(&sample_action(&a, "A", &area_id)).await.unwrap();
+        repo.add(&sample_action(&b, "B", &area_id)).await.unwrap();
+        repo.add(&sample_action(&c, "C", &area_id)).await.unwrap();
         repo.add_dependency(&a, &b).await.unwrap();
         repo.add_dependency(&b, &c).await.unwrap();
         // C -> A would create a cycle
@@ -498,11 +559,14 @@ mod tests {
 
     #[tokio::test]
     async fn self_dependency_rejected() {
-        let Some(repo) = test_todo_repo().await else {
+        let Some((repo, area_repo)) = test_action_repo().await else {
             return;
         };
+        let area_id = ensure_area(&area_repo).await;
         let a = unique_id("self-dep");
-        repo.add(&sample_todo(&a, "Self ref")).await.unwrap();
+        repo.add(&sample_action(&a, "Self ref", &area_id))
+            .await
+            .unwrap();
         let result = repo.add_dependency(&a, &a).await;
         assert!(result.is_err());
 
@@ -511,19 +575,24 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn incomplete_blockers_returns_blocking_todos() {
-        let Some(repo) = test_todo_repo().await else {
+    async fn incomplete_blockers_returns_blocking_actions() {
+        let Some((repo, area_repo)) = test_action_repo().await else {
             return;
         };
+        let area_id = ensure_area(&area_repo).await;
         let a = unique_id("ib-a");
         let b = unique_id("ib-b");
         let c = unique_id("ib-c");
-        repo.add(&sample_todo(&a, "Blocked")).await.unwrap();
-        let mut done_row = sample_todo(&b, "Done blocker");
+        repo.add(&sample_action(&a, "Blocked", &area_id))
+            .await
+            .unwrap();
+        let mut done_row = sample_action(&b, "Done blocker", &area_id);
         done_row.status = "done".to_string();
         done_row.completed_at = Some(Utc::now());
         repo.add(&done_row).await.unwrap();
-        repo.add(&sample_todo(&c, "Active blocker")).await.unwrap();
+        repo.add(&sample_action(&c, "Active blocker", &area_id))
+            .await
+            .unwrap();
         repo.add_dependency(&a, &b).await.unwrap();
         repo.add_dependency(&a, &c).await.unwrap();
 
@@ -543,18 +612,19 @@ mod tests {
 
     #[tokio::test]
     async fn add_attachment_inserts_row() {
-        let Some(repo) = test_todo_repo().await else {
+        let Some((repo, area_repo)) = test_action_repo().await else {
             return;
         };
+        let area_id = ensure_area(&area_repo).await;
         let id = unique_id("att");
-        repo.add(&sample_todo(&id, "With attachment"))
+        repo.add(&sample_action(&id, "With attachment", &area_id))
             .await
             .unwrap();
         let att = repo
             .add_attachment(&id, "file", "/path/to/report.pdf", Some("Report"), &[])
             .await
             .unwrap();
-        assert_eq!(att.todo_id, id);
+        assert_eq!(att.action_id, id);
         assert_eq!(att.attachment_type, "file");
 
         // Cleanup
@@ -563,11 +633,14 @@ mod tests {
 
     #[tokio::test]
     async fn remove_attachment_deletes_row() {
-        let Some(repo) = test_todo_repo().await else {
+        let Some((repo, area_repo)) = test_action_repo().await else {
             return;
         };
+        let area_id = ensure_area(&area_repo).await;
         let id = unique_id("ratt");
-        repo.add(&sample_todo(&id, "Remove att")).await.unwrap();
+        repo.add(&sample_action(&id, "Remove att", &area_id))
+            .await
+            .unwrap();
         let att = repo
             .add_attachment(&id, "url", "https://example.com", None, &[])
             .await
@@ -581,12 +654,15 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn delete_todo_cascades_attachments() {
-        let Some(repo) = test_todo_repo().await else {
+    async fn delete_action_cascades_attachments() {
+        let Some((repo, area_repo)) = test_action_repo().await else {
             return;
         };
+        let area_id = ensure_area(&area_repo).await;
         let id = unique_id("cascatt");
-        repo.add(&sample_todo(&id, "Cascade att")).await.unwrap();
+        repo.add(&sample_action(&id, "Cascade att", &area_id))
+            .await
+            .unwrap();
         for i in 0..3 {
             repo.add_attachment(&id, "note", &format!("Note {i}"), None, &[])
                 .await
@@ -602,16 +678,19 @@ mod tests {
 
     #[tokio::test]
     async fn add_time_entry_inserts_row() {
-        let Some(repo) = test_todo_repo().await else {
+        let Some((repo, area_repo)) = test_action_repo().await else {
             return;
         };
+        let area_id = ensure_area(&area_repo).await;
         let id = unique_id("te");
-        repo.add(&sample_todo(&id, "Track time")).await.unwrap();
+        repo.add(&sample_action(&id, "Track time", &area_id))
+            .await
+            .unwrap();
         let entry = repo
             .add_time_entry(&id, "manual", Utc::now(), Some(1800), None)
             .await
             .unwrap();
-        assert_eq!(entry.todo_id, id);
+        assert_eq!(entry.action_id, id);
         assert_eq!(entry.duration_secs, Some(1800));
 
         // Cleanup
@@ -620,11 +699,12 @@ mod tests {
 
     #[tokio::test]
     async fn close_time_entry_sets_ended_at() {
-        let Some(repo) = test_todo_repo().await else {
+        let Some((repo, area_repo)) = test_action_repo().await else {
             return;
         };
+        let area_id = ensure_area(&area_repo).await;
         let id = unique_id("cte");
-        repo.add(&sample_todo(&id, "Close time entry"))
+        repo.add(&sample_action(&id, "Close time entry", &area_id))
             .await
             .unwrap();
         let entry = repo
@@ -644,20 +724,25 @@ mod tests {
     // ----- Hierarchy -----
 
     #[tokio::test]
-    async fn move_todo_updates_parent_and_project() {
-        let Some(repo) = test_todo_repo().await else {
+    async fn move_action_updates_parent_and_project() {
+        let Some((repo, area_repo)) = test_action_repo().await else {
             return;
         };
+        let area_id = ensure_area(&area_repo).await;
         let parent = unique_id("mv-p");
         let child = unique_id("mv-c");
-        repo.add(&sample_todo(&parent, "Parent")).await.unwrap();
-        repo.add(&sample_todo(&child, "Child")).await.unwrap();
+        repo.add(&sample_action(&parent, "Parent", &area_id))
+            .await
+            .unwrap();
+        repo.add(&sample_action(&child, "Child", &area_id))
+            .await
+            .unwrap();
 
-        let moved = repo.move_todo(&child, Some(&parent), None).await.unwrap();
+        let moved = repo.move_action(&child, Some(&parent), None).await.unwrap();
         assert_eq!(moved.parent_id.as_deref(), Some(parent.as_str()));
 
         // Move to no parent
-        let moved = repo.move_todo(&child, None, None).await.unwrap();
+        let moved = repo.move_action(&child, None, None).await.unwrap();
         assert!(moved.parent_id.is_none());
 
         // Cleanup
@@ -667,37 +752,45 @@ mod tests {
 
     #[tokio::test]
     async fn parent_cycle_detection() {
-        let Some(repo) = test_todo_repo().await else {
+        let Some((repo, area_repo)) = test_action_repo().await else {
             return;
         };
+        let area_id = ensure_area(&area_repo).await;
         let a = unique_id("pcyc-a");
         let b = unique_id("pcyc-b");
-        repo.add(&sample_todo(&a, "A")).await.unwrap();
-        repo.add(&sample_todo(&b, "B")).await.unwrap();
-        repo.move_todo(&b, Some(&a), None).await.unwrap();
+        repo.add(&sample_action(&a, "A", &area_id)).await.unwrap();
+        repo.add(&sample_action(&b, "B", &area_id)).await.unwrap();
+        repo.move_action(&b, Some(&a), None).await.unwrap();
         // Setting A's parent to B would create a cycle
-        let result = repo.move_todo(&a, Some(&b), None).await;
+        let result = repo.move_action(&a, Some(&b), None).await;
         assert!(result.is_err());
 
         // Cleanup
-        let _ = repo.move_todo(&b, None, None).await;
+        let _ = repo.move_action(&b, None, None).await;
         let _ = repo.delete(&a).await;
         let _ = repo.delete(&b).await;
     }
 
     #[tokio::test]
     async fn cascade_complete_children() {
-        let Some(repo) = test_todo_repo().await else {
+        let Some((repo, area_repo)) = test_action_repo().await else {
             return;
         };
+        let area_id = ensure_area(&area_repo).await;
         let p = unique_id("casc-p");
         let c1 = unique_id("casc-c1");
         let c2 = unique_id("casc-c2");
-        repo.add(&sample_todo(&p, "Parent")).await.unwrap();
-        repo.add(&sample_todo(&c1, "Child 1")).await.unwrap();
-        repo.add(&sample_todo(&c2, "Child 2")).await.unwrap();
-        repo.move_todo(&c1, Some(&p), None).await.unwrap();
-        repo.move_todo(&c2, Some(&p), None).await.unwrap();
+        repo.add(&sample_action(&p, "Parent", &area_id))
+            .await
+            .unwrap();
+        repo.add(&sample_action(&c1, "Child 1", &area_id))
+            .await
+            .unwrap();
+        repo.add(&sample_action(&c2, "Child 2", &area_id))
+            .await
+            .unwrap();
+        repo.move_action(&c1, Some(&p), None).await.unwrap();
+        repo.move_action(&c2, Some(&p), None).await.unwrap();
 
         let completed = repo.cascade_complete(&p).await.unwrap();
         assert_eq!(completed, 3);
@@ -715,7 +808,7 @@ mod tests {
 
     #[tokio::test]
     async fn summary_counts_by_status() {
-        let Some(repo) = test_todo_repo().await else {
+        let Some((repo, _area_repo)) = test_action_repo().await else {
             return;
         };
         // Just verify summary doesn't error — actual counts depend on DB state
@@ -723,12 +816,15 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn context_string_includes_active_todos() {
-        let Some(repo) = test_todo_repo().await else {
+    async fn context_string_includes_active_actions() {
+        let Some((repo, area_repo)) = test_action_repo().await else {
             return;
         };
+        let area_id = ensure_area(&area_repo).await;
         let id = unique_id("ctx");
-        repo.add(&sample_todo(&id, "Context task")).await.unwrap();
+        repo.add(&sample_action(&id, "Context task", &area_id))
+            .await
+            .unwrap();
         let ctx = repo.to_context_string().await.unwrap();
         assert!(ctx.contains("Context task"));
 

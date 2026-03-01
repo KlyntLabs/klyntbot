@@ -11,7 +11,7 @@ const TODO_CACHE_TTL_SECS: i64 = 60;
 
 /// Provides active tasks summary with TTL caching.
 pub struct TodoSource {
-    repo: storage::TodoRepo,
+    repo: storage::ActionRepo,
     cache: Mutex<Option<CachedValue>>,
 }
 
@@ -21,7 +21,7 @@ struct CachedValue {
 }
 
 impl TodoSource {
-    pub fn new(repo: storage::TodoRepo) -> Self {
+    pub fn new(repo: storage::ActionRepo) -> Self {
         Self {
             repo,
             cache: Mutex::new(None),
