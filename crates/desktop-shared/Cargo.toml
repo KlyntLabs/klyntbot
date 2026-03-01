@@ -1,0 +1,7 @@
+[package]
+name = "desktop-shared"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+serde = { workspace = true }
