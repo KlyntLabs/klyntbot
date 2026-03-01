@@ -28,43 +28,47 @@ cargo build --no-default-features    # Build without email channel
 
 Klyntbot is a Rust personal AI agent — a single binary that connects to 6+ chat platforms, calls LLMs, manages tasks/projects, syncs with Apple Calendar, and manages persistent memory. It is **not** a code execution platform — users have dedicated tools (Claude Code, Cursor, Codex) for that. All persistent state is stored in SQLite (relational data) + LanceDB (vector embeddings).
 
-### Workspace layout (19 crates in 9 dependency layers)
+### Workspace layout (19 crates in 8 dependency layers)
 
 ```
-Layer 0: common            — Error types (KlyntbotError with 12 variants), MessageRole, ChannelName, ChatId, SessionKey
-Layer 1: config, bus       — Config schema (camelCase JSON serde), async message bus (tokio::mpsc)
-Layer 1.5: storage         — SQLite pool (sqlx + SqlitePool), auto-migrations, repository pattern (*Repo structs)
-Layer 2: providers, session, scheduling, calendar, context_engine, domain
-                           — LLM HTTP client, session persistence, cron service, CalDAV sync, token budget allocator, plan/goal domain types
-Layer 2.5: tools-core, tools-core-macros
-                           — Tool trait, FeaturePackage trait, ToolRegistry, derive macros (#[derive(Tool)], #[derive(ToolParams)])
-Layer 3: tools             — ~15 tool implementations (filesystem ×4, web ×2, message, spawn, cron, calendar, plan, project, goal, memory, learning, browser, ask_user, agent_task)
-Layer 3.5: feature-todo, feature-finance
-                           — Self-contained feature packages (own tools, migrations, config, handler traits)
-Layer 4: channels          — Chat platform integrations (Telegram, Discord, WhatsApp, Slack, Email, QQ)
-Layer 4.5: plugin-runtime  — WASM plugin sandbox (loads .wasm from ~/.klyntbot/plugins/)
-Layer 5: agent             — Agent loop, context builder, memory store, skill manager, subagent manager, intent pipeline, execution core
-Layer 6: cli               — Clap-derived CLI with 4 commands: serve, init, status, plugin
-Layer 7: klyntbot          — Re-export facade (src/lib.rs) + binary entry point (src/main.rs)
+Layer 0: common              — Error types (KlyntbotError, 15 variants), MessageRole, ChannelName, ChatId, SessionKey
+Layer 1: config, bus, tools-core, tools-core-macros
+                             — Config schema (camelCase JSON serde), async message bus (tokio::mpsc),
+                               Tool trait, FeaturePackage trait, ToolRegistry, derive macros (#[derive(Tool)], #[derive(ToolParams)])
+Layer 2: storage, domain     — SQLite pool (sqlx + SqlitePool), auto-migrations, repository pattern (*Repo structs),
+                               plan/goal domain types
+Layer 3: providers, session, scheduling, calendar, context_engine
+                             — LLM HTTP clients, session persistence, cron service, CalDAV sync, token budget allocator
+Layer 4: tools, feature-todo, feature-finance, plugin-runtime
+                             — 20+ tool implementations (filesystem ×4, web ×2, grep, glob, message, spawn, cron, calendar,
+                               plan, project, goal, memory, learning, browser, ask_user, agent_task),
+                               self-contained feature packages (own tools, migrations, config, handler traits),
+                               WASM plugin sandbox
+Layer 5: channels, agent     — Chat platform integrations (Telegram, Discord, WhatsApp, Slack, Email, QQ),
+                               agent loop, intent pipeline, execution core, memory store, skill manager, subagent manager
+Layer 6: cli                 — Clap-derived CLI with 4 commands: serve, init, status, plugin
+Layer 7: klyntbot            — Re-export facade (src/lib.rs) + binary entry point (src/main.rs)
 ```
+
+One additional crate (`plugin-sdk`) is excluded from the workspace.
 
 Dependencies flow strictly upward. No circular dependencies — enforced by Cargo.
 
 **Storage stack (SQLite + LanceDB):**
-- `storage` crate at Layer 1.5: `StoragePool` wraps `SqlitePool`, auto-runs migrations, exposes repository pattern (`*Repo` structs)
-- All relational data in SQLite (`{data_dir}/data.db`): todos, projects, sessions, goals, plans, cron jobs, usage, strategies, outcomes
+- `storage` crate (Layer 2): `StoragePool` wraps `SqlitePool`, auto-runs migrations, exposes repository pattern (`*Repo` structs)
+- All relational data in SQLite (`{data_dir}/data.db`): todos, projects, sessions, goals, plans, cron jobs, usage, strategies, outcomes, learning state, memory notes, calendar cache, finance data (accounts, transactions, budgets, investments), agent tasks
 - Vector embeddings in LanceDB (`{data_dir}/lancedb/`): todo embeddings, conversation embeddings — replaces pgvector
 - `Repos` aggregate struct for convenient access: `Repos::from_pool(&pool)`
-- `StoragePool::connect(data_dir)` creates/opens `data.db`, enables WAL + foreign keys, runs migrations
+- `StoragePool::connect(data_dir)` creates/opens `data.db`, enables WAL + foreign keys, runs migrations. Feature crates register additional migrations via `FeatureMigration`
 - `StoragePool::connect_in_memory()` for tests — runs migrations on an in-memory SQLite pool
 - Data directory defaults to `~/.klyntbot`, configurable via `data_dir` in config
 
 ### Key patterns
 
 - **Repository pattern**: All persistent state goes through `*Repo` structs in the `storage` crate. Repos hold a `SqlitePool` (which is `Clone + Send + Sync` internally via `Arc`), eliminating the need for `Arc<RwLock<Store>>` wrappers. The `Repos` aggregate provides convenient access: `Repos::from_pool(&pool)`.
-- **Derive-based tools**: Tools are defined via `#[derive(tools_core::Tool)]` and `#[derive(ToolParams)]` macros from `tools-core-macros`. These generate `Tool` trait impls, parameter extraction, and JSON schema. New tools should use this pattern — see `crates/tools/src/filesystem.rs` for examples.
+- **Derive-based tools**: Tools are defined via `#[derive(tools_core::Tool)]` and `#[derive(ToolParams)]` macros from `tools-core-macros`. These generate `Tool` trait impls, parameter extraction, and JSON schema. Multi-action tools use `#[tool_actions]` attribute macro with `#[derive(ActionParams)]` per-action params. New tools should use this pattern — see `crates/tools/src/filesystem.rs` for examples.
 - **Feature packages**: Self-contained features (`feature-todo`, `feature-finance`) implement the `FeaturePackage` trait (in `tools-core`), which bundles tools, migrations, config validation, and health checks. Registered at agent startup. Add new features by creating a `feature-*` crate implementing `FeaturePackage`.
-- **Dependency inversion**: Handler traits (`SpawnHandler`, `CronHandler` in `tools`; `CalendarHandler` in `tools`; `EnrichmentHandler`, `EmbeddingHandler` in `feature-todo`; `FinanceHandler` in `feature-finance`) are defined in lower layers but implemented in `agent` (Layer 5). Injected as `Arc<dyn Trait>` at construction.
+- **Dependency inversion**: Handler traits (`SpawnHandler`, `CronHandler`, `CalendarHandler` in `tools`; `EnrichmentHandler`, `EmbeddingHandler` in `feature-todo`; `FinanceHandler` in `feature-finance`; `GoalHandler`, `PlanHandler`, `LearningHandler` in `tools`) are defined in lower layers but implemented in `agent` (Layer 5). Injected as `Arc<dyn Trait>` at construction.
 - **Re-export facade**: `src/lib.rs` re-exports all public types from workspace crates. Integration tests and external consumers use `klyntbot::AgentLoop`, `klyntbot::Config`, `klyntbot::StoragePool`, etc.
 - **Provider auto-detection**: The provider registry matches model name keywords to route to the correct LLM provider. No external routing library.
 - **Config schema**: All config structs use `#[serde(rename_all = "camelCase")]`. Config file is `~/.klyntbot/config.json`. API keys are wrapped in `Secret<String>` (redacted in Debug/Display, access via `.expose()`).
@@ -76,14 +80,20 @@ Dependencies flow strictly upward. No circular dependencies — enforced by Carg
 |-------|-----------|---------|
 | `Tool`, `ToolExecute`, `ToolParams` | `tools-core` | Core tool framework — usually derived via `#[derive(Tool)]` / `#[derive(ToolParams)]` |
 | `FeaturePackage` | `tools-core` | Self-contained feature registration (tools, migrations, config, health) |
+| `InteractionChannel` | `tools-core` | Platform-native UI (Telegram buttons, Discord selects) — avoids circular deps with channels |
 | `LlmProvider` | `providers` | `async fn chat()`, `async fn chat_stream()`, `fn name()`, `fn default_model()`, etc. |
 | `Channel` | `channels` | `async fn start()`, `async fn stop()`, `async fn send()`, `fn name()`, `fn is_allowed()` |
 | `SpawnHandler` | `tools` | Dependency inversion for subagent spawning |
 | `CronHandler` | `tools` | Dependency inversion for cron job management |
 | `CalendarHandler` | `tools` | Dependency inversion for calendar sync |
+| `GoalHandler` | `tools` | Dependency inversion for goal management + LLM plan generation |
+| `PlanHandler` | `tools` | Dependency inversion for plan management + LLM step generation |
+| `LearningHandler` | `tools` | Dependency inversion for adaptive threshold management |
 | `EnrichmentHandler` | `feature-todo` | Dependency inversion for AI-powered task enrichment |
 | `EmbeddingHandler` | `feature-todo` | Dependency inversion for todo embedding generation |
 | `FinanceHandler` | `feature-finance` | Dependency inversion for finance price lookups |
+| `IntentPipeline` | `agent` | Full pipeline: IntentAnalyzer -> ContextEngine -> ExecutionRouter -> ResponseValidator -> CostTracker |
+| `ExecutionEngine` | `agent` | Unified async trait for Direct, Reactive, and Planned engines |
 
 ### Conventions
 
@@ -119,7 +129,7 @@ No external database required. Data is stored in `~/.klyntbot/data.db` (SQLite) 
 
 ## Enrichment & Semantic Search
 
-**Enrichment** (`feature-todo` crate): Auto-infers priority, duration, and due dates from task title keywords. Config: `todo.enrichment.enabled` (default: `true`), `todo.enrichment.autoApplyThreshold` (default: `0.70`). Implementation in `crates/feature-todo/src/enrichment.rs`.
+**Enrichment** (`feature-todo` crate): Auto-infers priority, duration, and due dates from task title keywords. Optionally enhanced with LLM-based inference when `use_llm` is enabled. Config: `todo.enrichment.enabled` (default: `true`), `todo.enrichment.autoApplyThreshold` (default: `0.70`). Implementation in `crates/feature-todo/src/enrichment.rs`.
 
 **Semantic search** (`feature-todo` crate): Uses fastembed (paraphrase-multilingual-MiniLM-L12-v2, 384d) + LanceDB for ANN similarity search. Three modes: `search` (keyword SQL), `search-semantic` (cosine similarity), `search-hybrid` (RRF merge). Config: `todo.search.enabled`, `todo.search.semanticThreshold` (default: `0.5`). Embeddings stored in `{data_dir}/lancedb/`.
 
@@ -134,7 +144,7 @@ Feature packs bundle config + skills into selectable groups chosen during `klynt
 
 ## Skills
 
-Built-in skills live in `skills/` as `SKILL.md` files (browser, cron, daily-planning, finance, skill-creator, summarize, todo, weather, weekly-report). The `SkillManager` in the agent crate discovers and loads them at runtime. Skills are filtered by enabled packs — only skills from selected packs are available.
+Built-in skills live in `skills/` as `SKILL.md` files (browser, cron, daily-planning, finance, skill-creator, summarize, todo, weather, weekly-report). Nine skills are bundled at compile time via `include_str!`. Workspace skills loaded from `~/.klyntbot/skills/*/SKILL.md` override built-in skills with the same name. YAML frontmatter provides metadata: `description`, `version`, `always` (always load full content), `triggers` (activation keywords), `requires_bins` and `requires_env` (prerequisite checks). Skills are filtered by enabled packs.
 
 ## Gotchas & Common Pitfalls
 
@@ -146,7 +156,7 @@ Built-in skills live in `skills/` as `SKILL.md` files (browser, cron, daily-plan
 - **Dependency inversion gotcha**: When adding new tools that need agent context (spawn/cron handlers), inject via `Arc<dyn Trait>` at construction to avoid circular deps.
 - **SqlitePool is Clone+Send+Sync**: Unlike the old `Arc<RwLock<Store>>` pattern, `SqlitePool` (and therefore all `*Repo` structs) can be freely cloned and shared across tasks without locking. Connection pooling is handled internally by sqlx.
 
-## Intent Pipeline (Phase 5 — v0.4.0)
+## Intent Pipeline
 
 ### Architecture
 
@@ -160,22 +170,26 @@ IntentAnalyzer → ContextEngine → ExecutionRouter → ResponseValidator → C
 
 | Module | Purpose |
 |--------|---------|
-| `types.rs` | `ExecutionMode` (Direct/Reactive/Planned), `ComplexitySignals`, `IntentAnalysis` |
-| `analysis.rs` | `IntentAnalyzer` (two-stage: heuristic keywords → LLM classifier), `IntentClassifier` |
+| `types.rs` | `ExecutionMode` (Direct/Reactive/Planned), `ComplexitySignals`, `IntentAnalysis`, `ToolGroup` |
+| `analysis.rs` | `IntentAnalyzer` (two-stage: heuristic keywords -> LLM `IntentClassifier`). Strategy history from `StrategyRepo` feeds classifier context. |
 | `engines/` | `ExecutionEngine` trait + `DirectEngine`, `ReactiveEngine`, `PlannedEngine` |
-| `router.rs` | Maps mode to engine, handles escalation chain (Direct → Reactive → Planned) |
-| `pipeline.rs` | `IntentPipeline` struct — wires everything into `process_message()` |
-| `visibility.rs` | Background cleanup service for stale silent/on_failure plans |
+| `router.rs` | `ExecutionRouter` — maps mode to engine, handles escalation chain (Direct -> Reactive -> Planned) with `EscalationContext` |
+| `pipeline.rs` | `IntentPipeline` struct — wires everything into `process_message()` (classify -> context -> filter tools -> route -> validate -> record) |
+| `visibility.rs` | `PlanCleanupService` — background cleanup for stale silent/on_failure plans |
 
 ### Execution Modes
 
 - **Direct**: Single LLM call, no tools. For greetings, simple questions, acknowledgments.
-- **Reactive**: ReAct loop with tool calls. For task CRUD, search, calendar ops.
-- **Planned**: Multi-step plan generation and execution. For complex multi-tool workflows.
+- **Reactive { max_iterations }**: ReAct loop with tool calls. For task CRUD, search, calendar ops. Escalates at 80% of max_iterations.
+- **Planned { visibility, max_steps }**: Multi-step plan generation and execution. For complex multi-tool workflows. Falls back to ReactiveEngine(50) if plan generation fails.
 
 ### Escalation Chain
 
-When an engine signals it cannot handle a request (`EngineResult::Escalate`), the router automatically escalates: Direct → Reactive → Planned. Max escalations are configurable via `config.orchestrator.max_escalations` (default: 3).
+When an engine signals it cannot handle a request (`EngineResult::Escalate`), the router automatically escalates: Direct -> Reactive -> Planned. `EscalationContext` carries messages + completed tool work across transitions. Max escalations are configurable via `config.orchestrator.max_escalations` (default: 3).
+
+### ExecutionCore
+
+Shared by all engines. `run_cycle()` performs one LLM-tool round: call `provider.chat()`, execute tool calls in parallel via `join_all` with per-tool timeout, detect fabricated responses (LLM faking tool results in text), and track duplicate tool calls via `HashSet<String>`.
 
 ### Configuration
 
@@ -201,6 +215,6 @@ Plan types live in `domain` crate (`crates/domain/src/plan.rs`). Execution logic
 
 **Visibility** (`PlanVisibility`): `transparent` (default, always shown), `on_failure` (shown only on failure, auto-cleaned after 7 days), `silent` (never shown, auto-cleaned after 24h). `PlanCleanupService` runs hourly.
 
-**Execution flow**: `PlanTool` → `PlanHandler::execute_plan()` → `AgentLoop::run_plan_execution()` → per-step `PlanExecutor::execute_step()`. Each step: build context window (current + next 3), LLM call → tool execution → result capture. On step failure: up to 3 retries, then backtracking via `regenerate_from()`. Max 3 backtrack events before plan fails.
+**Execution flow**: `PlanTool` -> `PlanHandler::execute_plan()` -> `AgentLoop::run_plan_execution()` -> per-step `plan_executor::run_step()` (up to 5 LLM-tool cycles per step). On step failure: up to 3 retries, then backtracking via `plan_executor::regenerate_from()`. Max 3 backtrack events before plan fails. `PlannedEngine` synthesizes a human-readable summary from step outputs after completion.
 
 **Key files**: `agent/plan_executor.rs`, `agent/plan_handler.rs`, `agent/plan_step_generator.rs`, `domain/src/plan.rs`.

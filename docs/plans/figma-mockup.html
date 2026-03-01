@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1460, initial-scale=1.0">
+<script src="https://mcp.figma.com/mcp/html-to-design/capture.js" async></script>
+<title>Klyntbot Desktop — Chat</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg-primary: #1A1B2E;
+    --bg-sidebar: #151623;
+    --bg-card: #232438;
+    --bg-input: #2A2B40;
+    --bg-hover: #2E2F4A;
+    --accent: #F97316;
+    --accent-dim: #EA6A0E;
+    --accent-green: #22C55E;
+    --accent-green-dim: #16A34A;
+    --accent-violet: #8B5CF6;
+    --accent-violet-dim: #7C3AED;
+    --text-primary: #E8E8F0;
+    --text-secondary: #8888A0;
+    --text-muted: #555566;
+    --border: #2E2F4A;
+    --success: #22C55E;
+    --warning: #F97316;
+    --error: #EF4444;
+    --radius-card: 12px;
+    --radius-input: 8px;
+    --radius-palette: 16px;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', 'Helvetica Neue', sans-serif;
+    background: #0D0D0D;
+    color: var(--text-primary);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    padding: 40px;
+  }
+
+  /* ─── macOS Window Frame ─── */
+  .window {
+    width: 1400px;
+    height: 860px;
+    background: var(--bg-primary);
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.06);
+  }
+
+  .titlebar {
+    height: 52px;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    background: var(--bg-sidebar);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .traffic-lights {
+    display: flex;
+    gap: 8px;
+    margin-right: 16px;
+  }
+
+  .traffic-light {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+  }
+
+  .tl-close { background: #FF5F57; }
+  .tl-minimize { background: #FFBD2E; }
+  .tl-maximize { background: #28C840; }
+
+  .titlebar-toggle {
+    width: 28px;
+    height: 28px;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+
+  .titlebar-toggle svg { width: 14px; height: 14px; fill: var(--text-secondary); }
+
+  .titlebar-center {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+  }
+
+  .new-chat-btn {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-input);
+    color: var(--text-primary);
+    font-size: 13px;
+    padding: 6px 16px;
+    cursor: pointer;
+    font-weight: 500;
+  }
+
+  .titlebar-right {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .titlebar-icon-btn {
+    width: 28px;
+    height: 28px;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+
+  /* ─── Main Layout ─── */
+  .main {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+  }
+
+  /* ─── Sidebar ─── */
+  .sidebar {
+    width: 220px;
+    background: var(--bg-sidebar);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+  }
+
+  .sidebar-search {
+    padding: 12px;
+  }
+
+  .sidebar-search input {
+    width: 100%;
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-input);
+    color: var(--text-primary);
+    font-size: 13px;
+    padding: 8px 12px;
+    outline: none;
+  }
+
+  .sidebar-search input::placeholder { color: var(--text-muted); }
+
+  .sidebar-section {
+    padding: 0 12px;
+  }
+
+  .sidebar-section-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 8px 0 6px;
+  }
+
+  .chat-item {
+    padding: 10px 12px;
+    border-radius: var(--radius-input);
+    cursor: pointer;
+    margin-bottom: 2px;
+  }
+
+  .chat-item:hover { background: var(--bg-hover); }
+
+  .chat-item.active {
+    background: var(--accent);
+    border-left: 3px solid #fff;
+  }
+
+  .chat-item-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .chat-item-subtitle {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .chat-item.active .chat-item-subtitle { color: rgba(255,255,255,0.7); }
+
+  /* ─── Content Area ─── */
+  .content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+
+  /* ─── Feature Toggles ─── */
+  .feature-toggles {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    padding: 16px 0 0;
+  }
+
+  .feature-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 4px 12px;
+    border-radius: 20px;
+    background: none;
+    border: none;
+  }
+
+  .feature-toggle:hover { color: var(--text-primary); background: var(--bg-hover); }
+
+  .toggle-icon {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 1.5px solid var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+  }
+
+  /* ─── Hero / Empty State ─── */
+  .hero {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+  }
+
+  .hero-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.5px;
+  }
+
+  .hero-subtitle {
+    font-size: 14px;
+    color: var(--text-secondary);
+  }
+
+  .tool-icons {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+  }
+
+  .tool-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    cursor: pointer;
+    transition: transform 0.15s;
+    position: relative;
+  }
+
+  .tool-icon:hover { transform: scale(1.1); }
+
+  .tool-icon.tasks { background: linear-gradient(135deg, #6C5CE7, #a855f7); }
+  .tool-icon.calendar { background: linear-gradient(135deg, #E74C3C, #f97316); }
+  .tool-icon.goals { background: linear-gradient(135deg, #2ECC71, #22d3ee); }
+  .tool-icon.memory { background: linear-gradient(135deg, #F39C12, #eab308); }
+  .tool-icon.web { background: linear-gradient(135deg, #3498db, #6366f1); }
+  .tool-icon.files { background: linear-gradient(135deg, #8e44ad, #ec4899); }
+
+  .tool-labels {
+    display: flex;
+    gap: 12px;
+    margin-top: 4px;
+  }
+
+  .tool-label {
+    width: 44px;
+    text-align: center;
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+
+  .learn-link {
+    margin-top: 16px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-input);
+    padding: 8px 16px;
+    cursor: pointer;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .learn-link:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+  /* ─── Input Bar ─── */
+  .input-area {
+    padding: 16px 24px 20px;
+  }
+
+  .input-bar {
+    background: var(--bg-input);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .input-bar:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(108, 92, 231, 0.15);
+  }
+
+  .input-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .input-icon::after {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    border: 1.5px solid white;
+  }
+
+  .input-field {
+    flex: 1;
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    font-size: 14px;
+    outline: none;
+  }
+
+  .input-field::placeholder { color: var(--text-muted); }
+
+  .input-bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 4px 0;
+  }
+
+  .model-selector {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .provider-pill {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+
+  .provider-pill:hover { color: var(--text-primary); border-color: var(--accent); }
+
+  .provider-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+
+  .model-separator {
+    color: var(--text-muted);
+    font-size: 12px;
+    margin: 0 2px;
+  }
+
+  .model-pill {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
+  }
+
+  .model-pill:hover { color: var(--text-primary); background: var(--bg-hover); }
+
+  .input-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .action-text {
+    font-size: 12px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+  }
+
+  .action-text:hover { color: var(--text-secondary); }
+
+  .kbd {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-size: 11px;
+    font-family: -apple-system, sans-serif;
+    color: var(--text-muted);
+  }
+
+  /* ─── Command Palette (separate frame) ─── */
+  .palette-frame {
+    margin-top: 60px;
+    width: 660px;
+  }
+
+  .palette-label {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    text-align: center;
+  }
+
+  .palette {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-palette);
+    box-shadow: 0 24px 80px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.06);
+    overflow: hidden;
+  }
+
+  .palette-input-row {
+    padding: 16px 20px 8px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .palette-input {
+    flex: 1;
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    font-size: 15px;
+    outline: none;
+  }
+
+  .palette-input::placeholder { color: var(--text-muted); }
+
+  .palette-send {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 6px;
+    padding: 5px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .palette-bottom {
+    padding: 6px 20px 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .palette-expand {
+    font-size: 12px;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .palette-expand:hover { color: var(--accent); }
+
+  /* ─── Palette Expanded State ─── */
+  .palette-expanded {
+    margin-top: 40px;
+    width: 660px;
+  }
+
+  .palette-messages {
+    padding: 16px 20px;
+    border-top: 1px solid var(--border);
+  }
+
+  .palette-msg {
+    margin-bottom: 12px;
+  }
+
+  .palette-msg-user {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+  }
+
+  .palette-msg-user span { color: var(--text-primary); }
+
+  .palette-tool-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-input);
+    padding: 12px 14px;
+  }
+
+  .palette-tool-header {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .palette-tool-header .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--success);
+  }
+
+  .palette-event {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 0;
+    font-size: 13px;
+  }
+
+  .palette-event-time {
+    color: var(--accent);
+    font-weight: 500;
+    width: 50px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .palette-event-title { color: var(--text-primary); }
+
+  /* ─── Page Layout for Figma Capture ─── */
+  .page-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+
+  .section-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-muted);
+    margin: 60px 0 20px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+</style>
+</head>
+<body>
+<div class="page-wrapper">
+
+  <!-- ══════ FULL APP — EMPTY STATE ══════ -->
+  <div class="window">
+    <!-- Titlebar -->
+    <div class="titlebar">
+      <div class="traffic-lights">
+        <div class="traffic-light tl-close"></div>
+        <div class="traffic-light tl-minimize"></div>
+        <div class="traffic-light tl-maximize"></div>
+      </div>
+      <div class="titlebar-toggle">
+        <svg viewBox="0 0 16 16"><rect x="1" y="3" width="6" height="10" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="9" y="3" width="6" height="10" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+      </div>
+
+      <div class="titlebar-center">
+        <button class="new-chat-btn">New Chat</button>
+      </div>
+
+      <div class="titlebar-right">
+        <button class="titlebar-icon-btn">+</button>
+        <button class="titlebar-icon-btn" style="font-size: 14px;">⌄</button>
+      </div>
+    </div>
+
+    <div class="main">
+      <!-- Sidebar -->
+      <div class="sidebar">
+        <div class="sidebar-search">
+          <input type="text" placeholder="Search Chats..." />
+        </div>
+
+        <div class="sidebar-section">
+          <div class="sidebar-section-title">Today</div>
+
+          <div class="chat-item active">
+            <div class="chat-item-title">New Chat</div>
+            <div class="chat-item-subtitle">Ask Klyntbot anything...</div>
+          </div>
+
+          <div class="chat-item">
+            <div class="chat-item-title">Fix auth token refresh</div>
+            <div class="chat-item-subtitle">Created task with high priority</div>
+          </div>
+
+          <div class="chat-item">
+            <div class="chat-item-title">Weekly planning session</div>
+            <div class="chat-item-subtitle">5 steps completed successfully</div>
+          </div>
+        </div>
+
+        <div class="sidebar-section" style="margin-top: 8px;">
+          <div class="sidebar-section-title">Yesterday</div>
+
+          <div class="chat-item">
+            <div class="chat-item-title">Budget review Q1</div>
+            <div class="chat-item-subtitle">Tracked 3 transactions</div>
+          </div>
+
+          <div class="chat-item">
+            <div class="chat-item-title">Calendar sync setup</div>
+            <div class="chat-item-subtitle">Connected Apple Calendar</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Content -->
+      <div class="content">
+        <!-- Feature Toggles -->
+        <div class="feature-toggles">
+          <button class="feature-toggle">
+            <span class="toggle-icon">◎</span>
+            Vision
+          </button>
+          <button class="feature-toggle">
+            <span class="toggle-icon">⊕</span>
+            Web Search
+          </button>
+        </div>
+
+        <!-- Hero -->
+        <div class="hero">
+          <div class="hero-title">Ask Anything</div>
+          <div class="hero-subtitle">Type @ to use a Klyntbot tool</div>
+
+          <div class="tool-icons">
+            <div class="tool-icon tasks">📋</div>
+            <div class="tool-icon calendar">📅</div>
+            <div class="tool-icon goals">🎯</div>
+            <div class="tool-icon memory">🧠</div>
+            <div class="tool-icon web">🌐</div>
+            <div class="tool-icon files">📁</div>
+          </div>
+          <div class="tool-labels">
+            <div class="tool-label">Tasks</div>
+            <div class="tool-label">Calendar</div>
+            <div class="tool-label">Goals</div>
+            <div class="tool-label">Memory</div>
+            <div class="tool-label">Web</div>
+            <div class="tool-label">Files</div>
+          </div>
+
+          <a class="learn-link" href="#">
+            Learn about Klyntbot AI
+            <span style="font-size: 11px;">↗</span>
+          </a>
+        </div>
+
+        <!-- Input Bar -->
+        <div class="input-area">
+          <div class="input-bar">
+            <div class="input-icon"></div>
+            <input class="input-field" type="text" placeholder="Ask Klyntbot anything..." />
+          </div>
+          <div class="input-bottom">
+            <div class="model-selector">
+              <div class="provider-pill">
+                <div class="provider-dot"></div>
+                Anthropic ▾
+              </div>
+              <span class="model-separator">›</span>
+              <div class="model-pill">claude-opus-4-5 ▾</div>
+            </div>
+            <div class="input-actions">
+              <span class="action-text">Submit <span class="kbd">⌘↵</span></span>
+              <span class="action-text">Actions <span class="kbd">⌘K</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════ COMMAND PALETTE — DEFAULT ══════ -->
+  <div class="section-label">Command Palette — Default</div>
+  <div class="palette-frame">
+    <div class="palette">
+      <div class="palette-input-row">
+        <div class="input-icon"></div>
+        <input class="palette-input" type="text" placeholder="Ask Klyntbot anything..." />
+        <button class="palette-send">⌘↵ Send</button>
+      </div>
+      <div class="palette-bottom">
+        <div class="model-selector">
+          <div class="provider-pill">
+            <div class="provider-dot"></div>
+            Anthropic ▾
+          </div>
+          <span class="model-separator">›</span>
+          <div class="model-pill">claude-opus-4-5 ▾</div>
+        </div>
+        <div class="palette-expand">↗ Expand</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════ COMMAND PALETTE — EXPANDED WITH RESPONSE ══════ -->
+  <div class="section-label">Command Palette — With Response</div>
+  <div class="palette-expanded">
+    <div class="palette">
+      <!-- Messages -->
+      <div class="palette-messages">
+        <div class="palette-msg">
+          <div class="palette-msg-user"><span>You:</span> What's on my calendar today?</div>
+        </div>
+
+        <div class="palette-tool-card">
+          <div class="palette-tool-header">
+            <span class="dot"></span>
+            Calendar
+          </div>
+          <div class="palette-event">
+            <span class="palette-event-time">10:00</span>
+            <span class="palette-event-title">Team standup</span>
+          </div>
+          <div class="palette-event">
+            <span class="palette-event-time">14:00</span>
+            <span class="palette-event-title">Design review</span>
+          </div>
+          <div class="palette-event">
+            <span class="palette-event-time">16:30</span>
+            <span class="palette-event-title">1:1 with Alex</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Input -->
+      <div style="border-top: 1px solid var(--border);">
+        <div class="palette-input-row">
+          <div class="input-icon"></div>
+          <input class="palette-input" type="text" placeholder="Ask a follow-up..." />
+          <button class="palette-send">⌘↵ Send</button>
+        </div>
+        <div class="palette-bottom">
+          <div class="model-selector">
+            <div class="provider-pill">
+              <div class="provider-dot"></div>
+              Anthropic ▾
+            </div>
+            <span class="model-separator">›</span>
+            <div class="model-pill">claude-opus-4-5 ▾</div>
+          </div>
+          <div class="palette-expand">↗ Expand</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
