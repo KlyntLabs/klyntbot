@@ -5,6 +5,8 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+export const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
+
 export const taskGridCols = (showArea: boolean) =>
   showArea
     ? 'grid-cols-[40px_1fr_180px_100px_80px_100px_120px_140px]'

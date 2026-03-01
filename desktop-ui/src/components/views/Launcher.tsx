@@ -1,10 +1,12 @@
-import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Search, Plus, MessageSquare, Calendar, Target, TrendingUp, Settings,
-  Sparkles, Command, ArrowLeft,
+  Sparkles, Command,
 } from 'lucide-react';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { KlyntLogo } from '../ui/KlyntLogo';
+import { isTauri } from '../../lib/utils';
+import { useTransparentBackground } from '../../hooks/useTransparentBackground';
 import { mockLauncherItems } from '../../data/mockData';
 
 const iconMap: Record<string, typeof Search> = {
@@ -12,16 +14,30 @@ const iconMap: Record<string, typeof Search> = {
 };
 
 export function Launcher() {
-  const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
 
-  const filteredItems = useMemo(() =>
-    mockLauncherItems.filter(item =>
-      item.title.toLowerCase().includes(query.toLowerCase()) ||
-      item.subtitle.toLowerCase().includes(query.toLowerCase()),
-    ),
-  [query]);
+  useTransparentBackground();
+
+  const filteredItems = useMemo(() => {
+    const q = query.toLowerCase();
+    return mockLauncherItems.filter(item =>
+      item.title.toLowerCase().includes(q) ||
+      item.subtitle.toLowerCase().includes(q),
+    );
+  }, [query]);
+
+  // Escape key hides the launcher window
+  useEffect(() => {
+    if (!isTauri) return;
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        getCurrentWindow().hide();
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, []);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'ArrowDown') {
@@ -34,18 +50,8 @@ export function Launcher() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-start justify-center pt-32 p-4">
-      {/* Back Button */}
-      <button
-        onClick={() => navigate('/')}
-        className="fixed top-4 left-4 flex items-center gap-2 px-3 py-2 bg-surface-base hover:bg-surface-raised rounded-md text-muted hover:text-secondary transition-colors"
-      >
-        <ArrowLeft className="w-4 h-4" strokeWidth={1.5} />
-        <span className="text-[13px] font-light">Back to Main</span>
-      </button>
-
-      {/* Launcher Window */}
-      <div className="w-full max-w-[700px] bg-background backdrop-blur-2xl rounded-xl border border-border shadow-2xl overflow-hidden">
+    <div className="w-screen text-primary flex justify-center pt-4 px-4">
+      <div className="w-full max-w-[660px] rounded-2xl overflow-hidden bg-surface-floating shadow-2xl shadow-black/50 border border-border-subtle">
         {/* Header */}
         <div className="px-5 pt-5 pb-3">
           <div className="flex items-center gap-2 mb-1">
@@ -74,14 +80,14 @@ export function Launcher() {
               className="flex-1 bg-transparent text-primary text-[13px] placeholder:text-muted outline-none font-light"
             />
             <div className="flex items-center gap-1.5">
-              <span className="px-1.5 py-0.5 bg-surface-raised rounded text-[11px] text-muted font-light">AI</span>
-              <span className="px-1.5 py-0.5 bg-surface-raised rounded text-[11px] text-muted font-light">Tab</span>
+              <span className="px-1.5 py-0.5 bg-surface-highest rounded text-[11px] text-muted font-light">AI</span>
+              <span className="px-1.5 py-0.5 bg-surface-highest rounded text-[11px] text-muted font-light">Tab</span>
             </div>
           </div>
         </div>
 
         {/* Results */}
-        <div className="max-h-[500px] overflow-y-auto px-5 pb-4">
+        <div className="max-h-[320px] overflow-y-auto px-5 pb-4">
           {query.trim() || filteredItems.length > 0 ? (
             <div className="space-y-1">
               {/* AI Query Option */}
@@ -141,17 +147,16 @@ export function Launcher() {
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-3 bg-overlay-heavy">
+        <div className="px-5 py-3 border-t border-border-subtle">
           <div className="flex items-center justify-between text-[11px] text-muted">
             <div className="flex items-center gap-4">
               <span className="flex items-center gap-1.5 font-light">
-                <kbd className="px-1.5 py-0.5 bg-surface-raised rounded">↵</kbd>
+                <kbd className="px-1.5 py-0.5 bg-surface-highest rounded">↵</kbd>
                 Open
               </span>
               <span className="flex items-center gap-1.5 font-light">
-                <kbd className="px-1.5 py-0.5 bg-surface-raised rounded">&#8984;</kbd>
-                <kbd className="px-1.5 py-0.5 bg-surface-raised rounded">↵</kbd>
-                Open in Background
+                <kbd className="px-1.5 py-0.5 bg-surface-highest rounded">Esc</kbd>
+                Close
               </span>
             </div>
             <div className="flex items-center gap-2">

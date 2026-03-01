@@ -42,6 +42,10 @@
   /* ── Overlay ───────────────────────────────── */
   --overlay:       rgba(0, 0, 0, 0.15);
   --overlay-heavy: rgba(0, 0, 0, 0.2);
+
+  /* ── Floating window backgrounds ─────────── */
+  --surface-floating: #1a1a1f;
+  --surface-glass:    rgba(0, 0, 0, 0.4);
 }
 
 @theme inline {
@@ -54,6 +58,8 @@
   --color-surface-base:    var(--surface-base);
   --color-surface-raised:  var(--surface-raised);
   --color-surface-highest: var(--surface-highest);
+  --color-surface-floating: var(--surface-floating);
+  --color-surface-glass:    var(--surface-glass);
 
   /* Text hierarchy */
   --color-primary:   var(--text-primary);

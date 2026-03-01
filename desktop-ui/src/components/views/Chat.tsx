@@ -8,6 +8,7 @@ import { Sidebar } from '../layout/Sidebar';
 import { useSetToggle } from '../../hooks/useSetToggle';
 import { useQuery } from '../../hooks/useQuery';
 import { useMutation } from '../../hooks/useMutation';
+import { isTauri } from '../../lib/utils';
 import type { ChatMessage, ChatThread, SidebarItem } from '../../lib/types';
 
 // Local mock threads grouped by project (used as fallback in browser dev)
@@ -65,8 +66,6 @@ const mockMessages: ChatMessage[] = [
     content: "Perfect! I'll create a schedule focusing on your Work area tasks. Here's a suggested breakdown:\n\n**Monday-Tuesday:**\n- Morning: P1 tasks (high urgency items)\n- Afternoon: Team collaboration and meetings\n\n**Wednesday-Thursday:**\n- Deep work blocks for complex projects\n- Review and update OKRs\n\n**Friday:**\n- Wrap up pending items\n- Plan for next week\n\nWould you like me to add these to your calendar?",
   },
 ];
-
-const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
 
 function formatRelativeTime(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();

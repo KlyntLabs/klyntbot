@@ -1,8 +1,9 @@
 {
   "identifier": "default",
   "description": "Default capabilities for Klynt desktop",
-  "windows": ["main"],
+  "windows": ["main", "tray", "launcher"],
   "permissions": [
-    "core:default"
+    "core:default",
+    "global-shortcut:default"
   ]
 }

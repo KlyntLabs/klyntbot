@@ -2,11 +2,11 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Send } from 'lucide-react';
 import { useQuery } from '../../hooks/useQuery';
 import { useMutation } from '../../hooks/useMutation';
+import { isTauri } from '../../lib/utils';
 import { mockChatMessages } from '../../data/mockData';
 import type { ChatMessage } from '../../lib/types';
 
 const SESSION_KEY = 'desktop-panel';
-const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
 
 interface ChatPanelProps {
   isOpen: boolean;

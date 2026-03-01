@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { ipc } from './useIpc';
+import { isTauri } from '../lib/utils';
 
 interface MutationResult<T, P> {
   mutate: (params: P) => Promise<T | undefined>;
@@ -16,8 +17,6 @@ export function useMutation<T = void, P = Record<string, unknown>>(
 ): MutationResult<T, P> {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
 
   const mutate = useCallback(
     async (params: P): Promise<T | undefined> => {
@@ -36,7 +35,7 @@ export function useMutation<T = void, P = Record<string, unknown>>(
         setLoading(false);
       }
     },
-    [cmd, isTauri],
+    [cmd],
   );
 
   return { mutate, loading, error };

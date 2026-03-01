@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ipc } from './useIpc';
+import { isTauri } from '../lib/utils';
 
 interface QueryResult<T> {
   data: T;
@@ -7,8 +8,6 @@ interface QueryResult<T> {
   error: string | null;
   refetch: () => void;
 }
-
-const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
 
 /**
  * Fetches data from a Tauri command. Falls back to `fallback` in browser dev mode.

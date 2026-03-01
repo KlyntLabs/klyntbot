@@ -18,8 +18,39 @@
         "resizable": true,
         "decorations": true,
         "transparent": false
+      },
+      {
+        "label": "launcher",
+        "url": "/#/launcher",
+        "title": "",
+        "width": 700,
+        "height": 600,
+        "resizable": false,
+        "decorations": false,
+        "visible": false,
+        "transparent": true,
+        "shadow": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "center": true
+      },
+      {
+        "label": "tray",
+        "url": "/#/tray",
+        "title": "",
+        "width": 320,
+        "height": 390,
+        "resizable": false,
+        "decorations": false,
+        "visible": false,
+        "transparent": true,
+        "shadow": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "focus": false
       }
     ],
+    "macOSPrivateApi": true,
     "security": {
       "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: https://asset.localhost; connect-src ipc: http://ipc.localhost"
     }

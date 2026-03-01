@@ -9,7 +9,8 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 desktop-shared = { workspace = true }
 storage = { workspace = true }
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["macos-private-api", "tray-icon", "image-png"] }
+tauri-plugin-global-shortcut = "2"
 tokio = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true }

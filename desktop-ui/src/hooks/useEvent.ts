@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-
-const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
+import { isTauri } from '../lib/utils';
 
 /**
  * Subscribe to a Tauri event, auto-cleanup on unmount.

@@ -3,6 +3,7 @@ import { Play, Pause, Plus, MessageSquare, Calendar, Settings } from 'lucide-rea
 import { KlyntLogo } from '../ui/KlyntLogo';
 import { Progress } from '../ui/Progress';
 import { useQuery } from '../../hooks/useQuery';
+import { useTransparentBackground } from '../../hooks/useTransparentBackground';
 import { mockCalendarEvents, mockTasks } from '../../data/mockData';
 import type { CalendarEvent, AgentStatus as AgentStatusType } from '../../lib/types';
 
@@ -53,6 +54,8 @@ export function SystemTray() {
     paused: 'var(--color-muted)',
   };
 
+  useTransparentBackground();
+
   const quickActions = [
     { icon: Plus, label: 'New Task' },
     { icon: MessageSquare, label: 'Chat' },
@@ -61,8 +64,8 @@ export function SystemTray() {
   ];
 
   return (
-    <div className="h-screen w-screen bg-background text-primary flex items-start justify-center">
-      <div className="w-[320px] rounded-2xl border border-border overflow-hidden bg-background shadow-2xl">
+    <div className="h-screen w-screen text-primary">
+      <div className="h-full w-full overflow-hidden rounded-[14px] bg-surface-glass">
         {/* Header */}
         <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
           <div className="w-7 h-7 rounded-md bg-white flex items-center justify-center p-0.5">

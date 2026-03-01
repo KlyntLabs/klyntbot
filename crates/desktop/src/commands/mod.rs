@@ -3,6 +3,7 @@ pub mod calendar;
 pub mod chat;
 pub mod status;
 pub mod tasks;
+pub mod window;
 
 use desktop_shared::events::{EntityUpdatedPayload, ENTITY_UPDATED};
 use desktop_shared::types::EntityKind;
