@@ -831,4 +831,40 @@ mod tests {
         // Cleanup
         let _ = repo.delete(&id).await;
     }
+
+    #[tokio::test]
+    async fn list_filters_by_due_date_range() {
+        let Some((repo, area_repo)) = test_action_repo().await else { return };
+        let area_id = ensure_area(&area_repo).await;
+
+        // Task due today
+        let mut today_task = sample_action(&unique_id("t"), "Due today", &area_id);
+        today_task.due_date = Some(Utc::now());
+        repo.add(&today_task).await.unwrap();
+
+        // Task due tomorrow
+        let mut tomorrow_task = sample_action(&unique_id("t"), "Due tomorrow", &area_id);
+        tomorrow_task.due_date = Some(Utc::now() + chrono::Duration::days(1));
+        repo.add(&tomorrow_task).await.unwrap();
+
+        // Task with no due date
+        let no_date_task = sample_action(&unique_id("t"), "No date", &area_id);
+        repo.add(&no_date_task).await.unwrap();
+
+        use crate::repos::action_repo::ActionFilter;
+
+        // Filter: due_after = start of today, due_before = start of tomorrow
+        let now = Utc::now();
+        let start_of_today = now.date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc();
+        let start_of_tomorrow = start_of_today + chrono::Duration::days(1);
+
+        let filter = ActionFilter {
+            due_after: Some(start_of_today),
+            due_before: Some(start_of_tomorrow),
+            ..Default::default()
+        };
+        let results = repo.list(&filter).await.unwrap();
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].title, "Due today");
+    }
 }

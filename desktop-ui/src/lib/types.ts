@@ -12,6 +12,17 @@ export interface Task {
   description?: string;
 }
 
+export interface TodayTask {
+  id: string;
+  title: string;
+  priority: string | null;
+  status: string;
+  completed: boolean;
+  isOverdue: boolean;
+  isDueToday: boolean;
+  dueDisplay: string | null;
+}
+
 export interface Project {
   id: string;
   name: string;

@@ -39,6 +39,12 @@ export function MainApp() {
     refetchProjects();
   });
 
+  // Listen for open-chat events from the tray
+  useEvent<{ text: string }>('open-chat', () => {
+    setIsChatOpen(true);
+    setActiveSidebar('Chat');
+  });
+
   const filteredTasks = useMemo(() =>
     activeTab === 'All' ? tasks : tasks.filter(task => task.areaId === activeTab.toLowerCase()),
   [activeTab, tasks]);

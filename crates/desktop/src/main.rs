@@ -6,7 +6,6 @@ mod commands;
 use app_core::AppCore;
 use commands::window::{WINDOW_LAUNCHER, WINDOW_TRAY};
 use tauri::image::Image;
-use tauri::window::{Effect, EffectState, EffectsBuilder};
 use tauri::{Manager, PhysicalPosition};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri_plugin_global_shortcut::{Code, Modifiers, ShortcutState};
@@ -90,15 +89,8 @@ fn main() {
                 })
                 .build(app)?;
 
-            // Apply glassmorphism to tray window
-            let popover_effects = EffectsBuilder::new()
-                .effect(Effect::Popover)
-                .state(EffectState::Active)
-                .radius(14.0)
-                .build();
-
+            // Tray window — transparent + dismiss-on-blur (CSS handles the card styling)
             if let Some(tray_window) = app.get_webview_window(WINDOW_TRAY) {
-                let _ = tray_window.set_effects(Some(popover_effects));
                 dismiss_on_blur(&tray_window);
             }
 
@@ -110,6 +102,7 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            commands::tasks::today_tasks,
             commands::tasks::task_list,
             commands::tasks::project_list,
             commands::tasks::objective_list,

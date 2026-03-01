@@ -30,6 +30,21 @@ pub struct TaskCreateParams {
     pub tags: Option<Vec<String>>,
 }
 
+// ── Today Task (tray view) ──────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TodayTaskResponse {
+    pub id: String,
+    pub title: String,
+    pub priority: Option<String>,
+    pub status: String,
+    pub completed: bool,
+    pub is_overdue: bool,
+    pub is_due_today: bool,
+    pub due_display: Option<String>,
+}
+
 // ── Project ─────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -39,7 +39,7 @@
         "url": "/#/tray",
         "title": "",
         "width": 320,
-        "height": 390,
+        "height": 600,
         "resizable": false,
         "decorations": false,
         "visible": false,

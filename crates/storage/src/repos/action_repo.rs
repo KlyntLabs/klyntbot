@@ -20,6 +20,8 @@ pub struct ActionFilter {
     pub key_result_id: Option<String>,
     pub unassigned: bool,
     pub priority_min: Option<i16>,
+    pub due_after: Option<DateTime<Utc>>,
+    pub due_before: Option<DateTime<Utc>>,
     pub limit: Option<i64>,
     pub templates_only: bool,
 }
@@ -252,6 +254,16 @@ impl ActionRepo {
         if let Some(pmin) = filter.priority_min {
             qb.push(" AND priority >= ");
             qb.push_bind(pmin);
+        }
+
+        if let Some(ref after) = filter.due_after {
+            qb.push(" AND due_date >= ");
+            qb.push_bind(after);
+        }
+
+        if let Some(ref before) = filter.due_before {
+            qb.push(" AND due_date < ");
+            qb.push_bind(before);
         }
 
         qb.push(" ORDER BY created_at DESC");

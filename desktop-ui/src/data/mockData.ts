@@ -1,4 +1,4 @@
-import type { Task, Project, Objective, CalendarEvent, ChatMessage, LauncherItem } from '../lib/types';
+import type { Task, Project, Objective, CalendarEvent, ChatMessage, LauncherItem, TodayTask } from '../lib/types';
 
 export const mockProjects: Project[] = [
   { id: '1', name: 'Product Launch', color: '#F97316', areaId: 'work', taskCount: 4, completedCount: 1, objectiveIds: ['1', '2', '3'] },
@@ -274,6 +274,14 @@ export const mockObjectives: Objective[] = [
   // CryptoGuard (2 objectives)
   { id: '9', title: 'Launch Web3 Features', progress: 47, projectId: '6' },
   { id: '10', title: 'Ensure Platform Security', progress: 29, projectId: '6' },
+];
+
+export const mockTodayTasks: TodayTask[] = [
+  { id: '1', title: 'Design landing page mockups', priority: 'P1', status: 'doing', completed: false, isOverdue: false, isDueToday: false, dueDisplay: 'Mar 3' },
+  { id: '8', title: 'Launch social media ads', priority: 'P1', status: 'doing', completed: false, isOverdue: true, isDueToday: false, dueDisplay: 'Overdue 1d' },
+  { id: '6', title: 'Optimize images for mobile', priority: 'P2', status: 'doing', completed: false, isOverdue: false, isDueToday: true, dueDisplay: 'Due 4:00 PM' },
+  { id: '17', title: 'Buy groceries', priority: 'P4', status: 'todo', completed: false, isOverdue: false, isDueToday: true, dueDisplay: 'Due 6:00 PM' },
+  { id: '12', title: 'Write integration tests', priority: 'P2', status: 'doing', completed: false, isOverdue: false, isDueToday: false, dueDisplay: 'Mar 4' },
 ];
 
 export const mockCalendarEvents: CalendarEvent[] = [

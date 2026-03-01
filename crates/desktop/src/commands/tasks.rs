@@ -1,5 +1,7 @@
+use chrono::{DateTime, Utc};
 use desktop_shared::commands::{
     KeyResultResponse, ObjectiveResponse, ProjectResponse, TaskCreateParams, TaskResponse,
+    TodayTaskResponse,
 };
 use desktop_shared::types::EntityKind;
 use storage::{
@@ -28,6 +30,41 @@ pub fn action_to_task(row: &ActionRow) -> TaskResponse {
         area_id: row.area_id.clone(),
         objective_id: row.key_result_id.clone(),
         description: row.description.clone(),
+    }
+}
+
+fn action_to_today_task(row: &ActionRow, now: DateTime<Utc>) -> TodayTaskResponse {
+    let is_overdue = row.due_date.is_some_and(|d| d < now) && row.status != "done";
+    let is_due_today =
+        !is_overdue && row.due_date.is_some_and(|d| d.date_naive() == now.date_naive());
+
+    let due_display = if is_overdue {
+        row.due_date.map(|d| {
+            let days = (now - d).num_days();
+            if days == 0 {
+                "Overdue".to_string()
+            } else if days == 1 {
+                "Overdue 1d".to_string()
+            } else {
+                format!("Overdue {days}d")
+            }
+        })
+    } else if is_due_today {
+        row.due_date
+            .map(|d| format!("Due {}", d.format("%-I:%M %p")))
+    } else {
+        row.due_date.map(|d| d.format("%b %-d").to_string())
+    };
+
+    TodayTaskResponse {
+        id: row.id.clone(),
+        title: row.title.clone(),
+        priority: priority_label(row.priority),
+        status: row.status.clone(),
+        completed: row.status == "done",
+        is_overdue,
+        is_due_today,
+        due_display,
     }
 }
 
@@ -272,4 +309,56 @@ pub async fn task_create(
     super::emit_entity_updated(&app, EntityKind::Task, &id);
 
     Ok(action_to_task(&created))
+}
+
+#[tauri::command]
+pub async fn today_tasks(state: State<'_, AppCore>) -> Result<Vec<TodayTaskResponse>, String> {
+    let now = chrono::Utc::now();
+    let start_of_today = now
+        .date_naive()
+        .and_hms_opt(0, 0, 0)
+        .unwrap()
+        .and_utc();
+    let start_of_tomorrow = start_of_today + chrono::Duration::days(1);
+
+    // Run all three queries concurrently — SqlitePool is safe for parallel reads
+    let doing_filter = ActionFilter {
+        status: Some("doing".to_string()),
+        ..Default::default()
+    };
+    let due_today_filter = ActionFilter {
+        due_after: Some(start_of_today),
+        due_before: Some(start_of_tomorrow),
+        ..Default::default()
+    };
+    let (doing, due_today, overdue) = tokio::try_join!(
+        state.repos.actions.list(&doing_filter),
+        state.repos.actions.list(&due_today_filter),
+        state.repos.actions.overdue(),
+    )
+    .map_err(|e| e.to_string())?;
+
+    // Merge + deduplicate by ID
+    let mut seen = std::collections::HashSet::new();
+    let mut all_rows: Vec<ActionRow> = Vec::new();
+    for row in overdue.into_iter().chain(doing).chain(due_today) {
+        if row.status != "done" && row.status != "archived" && seen.insert(row.id.clone()) {
+            all_rows.push(row);
+        }
+    }
+
+    // Sort: overdue first, then by priority (P1 first), then by due_date
+    all_rows.sort_by(|a, b| {
+        let a_overdue = a.due_date.is_some_and(|d| d < now) as u8;
+        let b_overdue = b.due_date.is_some_and(|d| d < now) as u8;
+        b_overdue
+            .cmp(&a_overdue)
+            .then(a.priority.unwrap_or(99).cmp(&b.priority.unwrap_or(99)))
+            .then(a.due_date.cmp(&b.due_date))
+    });
+
+    Ok(all_rows
+        .iter()
+        .map(|row| action_to_today_task(row, now))
+        .collect())
 }
