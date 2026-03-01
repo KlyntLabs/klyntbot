@@ -1,7 +1,12 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Send } from 'lucide-react';
+import { useQuery } from '../../hooks/useQuery';
+import { useMutation } from '../../hooks/useMutation';
 import { mockChatMessages } from '../../data/mockData';
 import type { ChatMessage } from '../../lib/types';
+
+const SESSION_KEY = 'desktop-panel';
+const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
 
 interface ChatPanelProps {
   isOpen: boolean;
@@ -9,7 +14,16 @@ interface ChatPanelProps {
 }
 
 export function ChatPanel({ isOpen, onClose }: ChatPanelProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>(mockChatMessages);
+  const { data: ipcMessages } = useQuery<ChatMessage[]>(
+    'chat_messages',
+    isTauri ? { session_key: SESSION_KEY } : undefined,
+    [],
+  );
+  const [localMessages, setLocalMessages] = useState<ChatMessage[]>(mockChatMessages);
+  const messages = isTauri ? ipcMessages : localMessages;
+
+  const sendMessage = useMutation<ChatMessage, { content: string; session_key: string }>('chat_send');
+
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -23,7 +37,7 @@ export function ChatPanel({ isOpen, onClose }: ChatPanelProps) {
     return () => clearTimeout(timerRef.current);
   }, []);
 
-  const handleSend = () => {
+  const handleSend = useCallback(async () => {
     if (!input.trim()) return;
 
     const userMessage: ChatMessage = {
@@ -32,21 +46,28 @@ export function ChatPanel({ isOpen, onClose }: ChatPanelProps) {
       content: input,
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    if (isTauri) {
+      await sendMessage.mutate({ content: input, session_key: SESSION_KEY });
+    } else {
+      setLocalMessages(prev => [...prev, userMessage]);
+    }
     setInput('');
     setIsStreaming(true);
 
-    // Simulate streaming response
-    timerRef.current = setTimeout(() => {
-      const aiMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: 'I can help you with that! Let me analyze your tasks and provide recommendations...',
-      };
-      setMessages(prev => [...prev, aiMessage]);
+    if (!isTauri) {
+      timerRef.current = setTimeout(() => {
+        const aiMessage: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: 'I can help you with that! Let me analyze your tasks and provide recommendations...',
+        };
+        setLocalMessages(prev => [...prev, aiMessage]);
+        setIsStreaming(false);
+      }, 1000);
+    } else {
       setIsStreaming(false);
-    }, 1000);
-  };
+    }
+  }, [input, sendMessage]);
 
   if (!isOpen) return null;
 

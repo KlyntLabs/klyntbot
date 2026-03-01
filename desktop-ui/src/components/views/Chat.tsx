@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import {
   Send, ChevronDown, Plus, Settings, FolderOpen, MessageSquare,
@@ -6,19 +6,15 @@ import {
 } from 'lucide-react';
 import { Sidebar } from '../layout/Sidebar';
 import { useSetToggle } from '../../hooks/useSetToggle';
-import type { ChatMessage, SidebarItem } from '../../lib/types';
+import { useQuery } from '../../hooks/useQuery';
+import { useMutation } from '../../hooks/useMutation';
+import type { ChatMessage, ChatThread, SidebarItem } from '../../lib/types';
 
-interface Thread {
-  id: string;
-  name: string;
-  timestamp: string;
-  projectId: string;
-}
-
+// Local mock threads grouped by project (used as fallback in browser dev)
 interface ChatProject {
   id: string;
   name: string;
-  threads: Thread[];
+  threads: { id: string; name: string; timestamp: string; projectId: string }[];
 }
 
 const mockChatProjects: ChatProject[] = [
@@ -70,16 +66,48 @@ const mockMessages: ChatMessage[] = [
   },
 ];
 
+const isTauri = typeof window !== 'undefined' && '__TAURI__' in window;
+
+function formatRelativeTime(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const days = Math.floor(diff / 86400000);
+  if (days < 7) return `${days}d`;
+  if (days < 30) return `${Math.floor(days / 7)}w`;
+  return `${Math.floor(days / 30)}m`;
+}
+
 export function Chat() {
   const navigate = useNavigate();
   const [activeSidebar, setActiveSidebar] = useState<SidebarItem>('Chat');
-  const [messages, setMessages] = useState<ChatMessage[]>(mockMessages);
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
-  const [selectedThread, setSelectedThread] = useState<string>('t1');
+  const [selectedThread, setSelectedThread] = useState<string>(isTauri ? '' : 't1');
   const [expandedProjects, toggleProject] = useSetToggle(['1', '2', '3']);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // IPC: fetch threads from backend, fallback to mock
+  const { data: threads } = useQuery<ChatThread[]>('chat_threads', undefined, []);
+
+  // IPC: fetch messages for selected thread
+  const { data: ipcMessages } = useQuery<ChatMessage[]>(
+    'chat_messages',
+    selectedThread && isTauri ? { session_key: selectedThread } : undefined,
+    [],
+  );
+
+  // In browser dev mode, use local mock messages; in Tauri mode, use IPC messages
+  const [localMessages, setLocalMessages] = useState<ChatMessage[]>(mockMessages);
+  const messages = isTauri ? ipcMessages : localMessages;
+
+  // Select first thread when threads load from IPC
+  useEffect(() => {
+    if (isTauri && threads.length > 0 && !selectedThread) {
+      setSelectedThread(threads[0].sessionKey);
+    }
+  }, [threads, selectedThread]);
+
+  const sendMessage = useMutation<ChatMessage, { content: string; session_key: string }>('chat_send');
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -89,7 +117,18 @@ export function Chat() {
     return () => clearTimeout(timerRef.current);
   }, []);
 
-  const handleSend = () => {
+  // Group threads by projectId for sidebar display
+  const threadsByProject = useMemo(() => {
+    const groups: Record<string, { name: string; threads: ChatThread[] }> = {};
+    for (const t of threads) {
+      const key = t.projectId ?? '_general';
+      if (!groups[key]) groups[key] = { name: key === '_general' ? 'General' : key, threads: [] };
+      groups[key].threads.push(t);
+    }
+    return groups;
+  }, [threads]);
+
+  const handleSend = useCallback(async () => {
     if (!input.trim()) return;
 
     const userMessage: ChatMessage = {
@@ -97,19 +136,112 @@ export function Chat() {
       role: 'user',
       content: input,
     };
-    setMessages(prev => [...prev, userMessage]);
+
+    if (isTauri) {
+      const sessionKey = selectedThread || 'desktop-chat';
+      await sendMessage.mutate({ content: input, session_key: sessionKey });
+      if (!selectedThread) setSelectedThread(sessionKey);
+    } else {
+      setLocalMessages(prev => [...prev, userMessage]);
+    }
     setInput('');
     setIsStreaming(true);
 
-    timerRef.current = setTimeout(() => {
-      const aiMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: 'I can help you with that! Let me analyze your tasks and provide recommendations...',
-      };
-      setMessages(prev => [...prev, aiMessage]);
+    // Simulate AI response in browser dev mode
+    if (!isTauri) {
+      timerRef.current = setTimeout(() => {
+        const aiMessage: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: 'I can help you with that! Let me analyze your tasks and provide recommendations...',
+        };
+        setLocalMessages(prev => [...prev, aiMessage]);
+        setIsStreaming(false);
+      }, 1000);
+    } else {
+      // In Tauri mode, streaming will be handled by useEvent('agent:content_chunk') later
       setIsStreaming(false);
-    }, 1000);
+    }
+  }, [input, selectedThread, sendMessage]);
+
+  // Render thread sidebar: use IPC threads in Tauri mode, mock projects in browser dev
+  const renderThreadSidebar = () => {
+    if (isTauri && threads.length > 0) {
+      return Object.entries(threadsByProject).map(([projectId, group]) => (
+        <div key={projectId}>
+          <button
+            onClick={() => toggleProject(projectId)}
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-surface-base transition-colors text-[12px] font-light text-muted hover:text-secondary"
+          >
+            <FolderOpen className="w-3.5 h-3.5" strokeWidth={1.5} />
+            <span className="flex-1 text-left">{group.name}</span>
+            <ChevronDown
+              className={`w-3.5 h-3.5 transition-transform ${
+                expandedProjects.has(projectId) ? 'rotate-0' : '-rotate-90'
+              }`}
+              strokeWidth={1.5}
+            />
+          </button>
+          {expandedProjects.has(projectId) && (
+            <div className="mt-1 ml-3 space-y-1">
+              {group.threads.map(thread => (
+                <button
+                  key={thread.sessionKey}
+                  onClick={() => setSelectedThread(thread.sessionKey)}
+                  className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-[12px] font-light ${
+                    selectedThread === thread.sessionKey
+                      ? 'bg-surface-highest text-primary'
+                      : 'text-muted hover:bg-surface-base hover:text-secondary'
+                  }`}
+                >
+                  <MessageSquare className="w-3 h-3" strokeWidth={1.5} />
+                  <span className="flex-1 text-left truncate">{thread.title}</span>
+                  <span className="text-[11px]">{formatRelativeTime(thread.updatedAt)}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      ));
+    }
+
+    // Browser dev fallback: mock projects
+    return mockChatProjects.map(project => (
+      <div key={project.id}>
+        <button
+          onClick={() => toggleProject(project.id)}
+          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-surface-base transition-colors text-[12px] font-light text-muted hover:text-secondary"
+        >
+          <FolderOpen className="w-3.5 h-3.5" strokeWidth={1.5} />
+          <span className="flex-1 text-left">{project.name}</span>
+          <ChevronDown
+            className={`w-3.5 h-3.5 transition-transform ${
+              expandedProjects.has(project.id) ? 'rotate-0' : '-rotate-90'
+            }`}
+            strokeWidth={1.5}
+          />
+        </button>
+        {expandedProjects.has(project.id) && (
+          <div className="mt-1 ml-3 space-y-1">
+            {project.threads.map(thread => (
+              <button
+                key={thread.id}
+                onClick={() => setSelectedThread(thread.id)}
+                className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-[12px] font-light ${
+                  selectedThread === thread.id
+                    ? 'bg-surface-highest text-primary'
+                    : 'text-muted hover:bg-surface-base hover:text-secondary'
+                }`}
+              >
+                <MessageSquare className="w-3 h-3" strokeWidth={1.5} />
+                <span className="flex-1 text-left truncate">{thread.name}</span>
+                <span className="text-[11px]">{thread.timestamp}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    ));
   };
 
   return (
@@ -143,42 +275,7 @@ export function Chat() {
         {/* Thread List */}
         <div className="flex-1 overflow-y-auto px-3 pb-3">
           <div className="space-y-4">
-            {mockChatProjects.map(project => (
-              <div key={project.id}>
-                <button
-                  onClick={() => toggleProject(project.id)}
-                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-surface-base transition-colors text-[12px] font-light text-muted hover:text-secondary"
-                >
-                  <FolderOpen className="w-3.5 h-3.5" strokeWidth={1.5} />
-                  <span className="flex-1 text-left">{project.name}</span>
-                  <ChevronDown
-                    className={`w-3.5 h-3.5 transition-transform ${
-                      expandedProjects.has(project.id) ? 'rotate-0' : '-rotate-90'
-                    }`}
-                    strokeWidth={1.5}
-                  />
-                </button>
-                {expandedProjects.has(project.id) && (
-                  <div className="mt-1 ml-3 space-y-1">
-                    {project.threads.map(thread => (
-                      <button
-                        key={thread.id}
-                        onClick={() => setSelectedThread(thread.id)}
-                        className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-[12px] font-light ${
-                          selectedThread === thread.id
-                            ? 'bg-surface-highest text-primary'
-                            : 'text-muted hover:bg-surface-base hover:text-secondary'
-                        }`}
-                      >
-                        <MessageSquare className="w-3 h-3" strokeWidth={1.5} />
-                        <span className="flex-1 text-left truncate">{thread.name}</span>
-                        <span className="text-[11px]">{thread.timestamp}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
+            {renderThreadSidebar()}
           </div>
         </div>
       </div>

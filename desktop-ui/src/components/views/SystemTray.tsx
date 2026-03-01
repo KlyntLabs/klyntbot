@@ -2,24 +2,44 @@ import { useState, useEffect } from 'react';
 import { Play, Pause, Plus, MessageSquare, Calendar, Settings } from 'lucide-react';
 import { KlyntLogo } from '../ui/KlyntLogo';
 import { Progress } from '../ui/Progress';
+import { useQuery } from '../../hooks/useQuery';
 import { mockCalendarEvents, mockTasks } from '../../data/mockData';
+import type { CalendarEvent, AgentStatus as AgentStatusType } from '../../lib/types';
 
-type AgentStatus = 'active' | 'idle' | 'paused';
+type DisplayStatus = 'active' | 'idle' | 'paused';
 
 export function SystemTray() {
-  const [agentStatus, setAgentStatus] = useState<AgentStatus>('active');
+  const { data: agentStatusData } = useQuery<AgentStatusType>(
+    'agent_status',
+    undefined,
+    { status: 'active', activeTaskCount: 3, focusTask: mockTasks.find(t => t.status === 'doing' && !t.completed) ?? null },
+  );
+  const { data: calendarEvents } = useQuery<CalendarEvent[]>(
+    'calendar_events',
+    { limit: 5 },
+    mockCalendarEvents,
+  );
+
+  const [displayStatus, setDisplayStatus] = useState<DisplayStatus>('active');
   const [focusElapsed, setFocusElapsed] = useState(1260); // 21 min in seconds
 
-  const focusTask = mockTasks.find(t => t.status === 'Doing' && !t.completed);
+  // Sync display status from IPC agent status
+  useEffect(() => {
+    if (agentStatusData.status === 'active' || agentStatusData.status === 'idle') {
+      setDisplayStatus(agentStatusData.status as DisplayStatus);
+    }
+  }, [agentStatusData.status]);
+
+  const focusTask = agentStatusData.focusTask;
   const focusDuration = 45 * 60; // 45 min focus session
 
   useEffect(() => {
-    if (agentStatus !== 'active') return;
+    if (displayStatus !== 'active') return;
     const interval = setInterval(() => {
       setFocusElapsed(prev => Math.min(prev + 1, focusDuration));
     }, 1000);
     return () => clearInterval(interval);
-  }, [agentStatus, focusDuration]);
+  }, [displayStatus, focusDuration]);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -27,7 +47,7 @@ export function SystemTray() {
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
-  const statusColors: Record<AgentStatus, string> = {
+  const statusColors: Record<DisplayStatus, string> = {
     active: 'var(--color-success)',
     idle: 'var(--color-brand)',
     paused: 'var(--color-muted)',
@@ -51,15 +71,15 @@ export function SystemTray() {
           <div className="flex-1">
             <p className="text-[13px] font-light text-primary">Klynt Agent</p>
             <div className="flex items-center gap-1.5">
-              <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: statusColors[agentStatus] }} />
-              <span className="text-[11px] text-muted font-light capitalize">{agentStatus}</span>
+              <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: statusColors[displayStatus] }} />
+              <span className="text-[11px] text-muted font-light capitalize">{displayStatus}</span>
             </div>
           </div>
           <button
-            onClick={() => setAgentStatus(prev => prev === 'active' ? 'paused' : 'active')}
+            onClick={() => setDisplayStatus(prev => prev === 'active' ? 'paused' : 'active')}
             className="w-7 h-7 rounded-md bg-surface-base hover:bg-surface-highest flex items-center justify-center transition-colors"
           >
-            {agentStatus === 'active' ? (
+            {displayStatus === 'active' ? (
               <Pause className="w-3.5 h-3.5 text-muted" strokeWidth={1.5} />
             ) : (
               <Play className="w-3.5 h-3.5 text-success" strokeWidth={1.5} />
@@ -87,13 +107,13 @@ export function SystemTray() {
         <div className="px-4 py-3 border-b border-border">
           <span className="text-[11px] text-muted font-light uppercase tracking-wider">Today</span>
           <div className="mt-2 space-y-2">
-            {mockCalendarEvents.map(event => (
+            {calendarEvents.map(event => (
               <div key={event.id} className="flex items-center gap-2.5">
                 <div className="w-1 h-6 rounded-full" style={{ backgroundColor: event.color }} />
                 <div className="flex-1 min-w-0">
                   <p className="text-[12px] font-light text-secondary truncate">{event.title}</p>
                 </div>
-                <span className="text-[11px] text-muted font-light flex-shrink-0">{event.time}</span>
+                <span className="text-[11px] text-muted font-light flex-shrink-0">{new Date(event.startAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
               </div>
             ))}
           </div>

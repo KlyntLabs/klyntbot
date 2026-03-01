@@ -1,12 +1,15 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { MessageSquare } from 'lucide-react';
 import { Sidebar } from '../layout/Sidebar';
 import { Toolbar } from '../tasks/Toolbar';
 import { TaskTable } from '../tasks/TaskTable';
 import { ChatPanel } from '../chat/ChatPanel';
 import { useSetToggle } from '../../hooks/useSetToggle';
+import { useQuery } from '../../hooks/useQuery';
+import { useMutation } from '../../hooks/useMutation';
+import { useEvent } from '../../hooks/useEvent';
 import { mockProjects, mockTasks, mockObjectives } from '../../data/mockData';
-import type { Tab, SidebarItem, ViewMode } from '../../lib/types';
+import type { Task, Project, Objective, Tab, SidebarItem, ViewMode } from '../../lib/types';
 
 export function MainApp() {
   const [activeTab, setActiveTab] = useState<Tab>('All');
@@ -14,13 +17,31 @@ export function MainApp() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [collapsedProjects, toggleProject] = useSetToggle();
+
+  const { data: tasks, refetch: refetchTasks } = useQuery<Task[]>('task_list', undefined, mockTasks);
+  const { data: projects, refetch: refetchProjects } = useQuery<Project[]>('project_list', undefined, mockProjects);
+  const { data: objectives } = useQuery<Objective[]>('objective_list', undefined, mockObjectives);
+
+  const toggleComplete = useMutation<Task, { id: string }>('task_toggle_complete');
+
   const [completedTasks, toggleTask] = useSetToggle(
-    mockTasks.filter(t => t.completed).map(t => t.id)
+    tasks.filter(t => t.completed).map(t => t.id)
   );
 
+  const handleToggleTask = useCallback(async (taskId: string) => {
+    toggleTask(taskId);
+    await toggleComplete.mutate({ id: taskId });
+  }, [toggleTask, toggleComplete]);
+
+  // Auto-refresh when entities change (e.g. after task_toggle_complete emits event)
+  useEvent<{ entityKind: string; id: string }>('entity:updated', () => {
+    refetchTasks();
+    refetchProjects();
+  });
+
   const filteredTasks = useMemo(() =>
-    activeTab === 'All' ? mockTasks : mockTasks.filter(task => task.area === activeTab),
-  [activeTab]);
+    activeTab === 'All' ? tasks : tasks.filter(task => task.areaId === activeTab.toLowerCase()),
+  [activeTab, tasks]);
 
   return (
     <div className="h-screen w-screen bg-background text-primary flex overflow-hidden">
@@ -68,12 +89,12 @@ export function MainApp() {
           <Toolbar viewMode={viewMode} onViewModeChange={setViewMode} />
           <TaskTable
             tasks={filteredTasks}
-            projects={mockProjects}
-            objectives={mockObjectives}
+            projects={projects}
+            objectives={objectives}
             activeTab={activeTab}
             completedTasks={completedTasks}
             collapsedProjects={collapsedProjects}
-            onToggleTask={toggleTask}
+            onToggleTask={handleToggleTask}
             onToggleProject={toggleProject}
           />
         </div>

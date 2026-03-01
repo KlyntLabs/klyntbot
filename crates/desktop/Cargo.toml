@@ -8,6 +8,12 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 desktop-shared = { workspace = true }
+storage = { workspace = true }
 tauri = { version = "2", features = [] }
+tokio = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+dirs = { workspace = true }
+tracing = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

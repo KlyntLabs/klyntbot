@@ -29,8 +29,9 @@ export function TaskTable({
 
   const tasksByProject = useMemo(() =>
     tasks.reduce((acc, task) => {
-      if (!acc[task.projectId]) acc[task.projectId] = [];
-      acc[task.projectId].push(task);
+      const key = task.projectId ?? '_unassigned';
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(task);
       return acc;
     }, {} as Record<string, Task[]>),
   [tasks]);

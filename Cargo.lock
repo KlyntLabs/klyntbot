@@ -2746,17 +2746,24 @@ dependencies = [
 name = "desktop"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "desktop-shared",
+ "dirs",
  "serde",
  "serde_json",
+ "storage",
  "tauri",
  "tauri-build",
+ "tokio",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]
 name = "desktop-shared"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "serde",
 ]
 

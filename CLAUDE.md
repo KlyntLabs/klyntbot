@@ -24,6 +24,20 @@ cargo build --no-default-features    # Build without email channel
 
 **No external database required**: All tests use ephemeral SQLite pools (`StoragePool::connect(tempdir)` or `StoragePool::connect_in_memory()`).
 
+## Desktop UI (desktop-ui/)
+
+```bash
+cd desktop-ui && bun run dev            # Start Vite dev server (port 1420)
+cd desktop-ui && bun run build          # Production build
+cd desktop-ui && bun install            # Install dependencies
+```
+
+**Always use `bun` (not `npm`) for the desktop-ui frontend.**
+
+**Tailwind v4 (CSS-driven, no config file):** Theme tokens defined in `src/styles/theme.css` via CSS variables + `@theme inline`. No `tailwind.config.js` — all customization is in CSS.
+
+**Color token system:** Flat, dark-mode-only tokens in `:root`. Surface staircase (`surface-lowest` through `surface-highest`), text hierarchy (`text-primary/secondary/muted/dim`), brand (`brand`, `brand-hover`), semantic (`success`, `destructive`, `info`, `purple`). Never hardcode hex/rgba in components — always use the token utilities (e.g., `bg-surface-base`, `text-muted`, `border-border`).
+
 ## Architecture
 
 Klyntbot is a Rust personal AI agent — a single binary that connects to 6+ chat platforms, calls LLMs, manages tasks/projects, syncs with Apple Calendar, and manages persistent memory. It is **not** a code execution platform — users have dedicated tools (Claude Code, Cursor, Codex) for that. All persistent state is stored in SQLite (relational data) + LanceDB (vector embeddings).
