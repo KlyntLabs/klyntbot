@@ -292,7 +292,6 @@ mod tests {
             enrichment: TodoEnrichmentConfig::default(),
             search: TodoSearchConfig::default(),
             daily_planning: DailyPlanningConfig::default(),
-            ..Default::default()
         };
 
         let json = serde_json::to_string(&config).unwrap();

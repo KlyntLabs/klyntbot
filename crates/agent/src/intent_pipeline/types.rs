@@ -123,7 +123,7 @@ pub enum AnalysisSource {
 pub enum ToolGroup {
     /// No tools needed (greetings, factual Q&A).
     None,
-    /// Task/todo/goal/plan management.
+    /// Task/area/project/OKR management.
     TaskManagement,
     /// File search and web retrieval.
     Search,

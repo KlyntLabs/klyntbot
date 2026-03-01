@@ -1,7 +1,7 @@
 //! LearningHandlerImpl — Implements LearningHandler trait for agent crate (Layer 5).
 //!
 //! Reads from StrategyRepo (strategy_records table) to produce learning insights.
-//! Follows the dependency inversion pattern used by GoalHandlerImpl.
+//! Follows the dependency inversion pattern used by other handler impls.
 
 use async_trait::async_trait;
 use common::Result;

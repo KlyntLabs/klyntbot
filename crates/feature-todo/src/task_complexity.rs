@@ -1,8 +1,8 @@
-//! TaskComplexitySignals — Evaluate whether a task warrants plan-based execution.
+//! TaskComplexitySignals — Evaluate task complexity for execution decisions.
 //!
 //! Scores task complexity based on dependencies, subtasks, estimated duration,
-//! and priority. The `is_plan_worthy()` method checks if the score exceeds a
-//! configurable threshold.
+//! and priority. The `exceeds_complexity_threshold()` method checks if the score
+//! meets or exceeds a configurable threshold.
 
 use storage::ActionRepo;
 
@@ -39,7 +39,7 @@ impl TaskComplexitySignals {
     }
 
     /// Returns `true` if the complexity score meets or exceeds the threshold.
-    pub fn is_plan_worthy(&self, threshold: u8) -> bool {
+    pub fn exceeds_complexity_threshold(&self, threshold: u8) -> bool {
         self.complexity_score() >= threshold
     }
 }
@@ -108,7 +108,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn simple_task_not_plan_worthy() {
+    fn simple_task_below_threshold() {
         let signals = TaskComplexitySignals {
             has_dependencies: false,
             subtask_count: 0,
@@ -116,12 +116,12 @@ mod tests {
             estimated_minutes: Some(15),
             priority: 3,
         };
-        assert!(!signals.is_plan_worthy(3));
+        assert!(!signals.exceeds_complexity_threshold(3));
         assert_eq!(signals.complexity_score(), 0);
     }
 
     #[test]
-    fn complex_task_is_plan_worthy() {
+    fn complex_task_exceeds_complexity_threshold() {
         let signals = TaskComplexitySignals {
             has_dependencies: true,
             subtask_count: 5,
@@ -129,7 +129,7 @@ mod tests {
             estimated_minutes: Some(120),
             priority: 1,
         };
-        assert!(signals.is_plan_worthy(3));
+        assert!(signals.exceeds_complexity_threshold(3));
         // has_deps(2) + subtasks>=3(1) + depth>=2(1) + est>=60(1) + priority<=2(1) = 6
         assert_eq!(signals.complexity_score(), 6);
     }
@@ -157,7 +157,7 @@ mod tests {
         };
         // est>=60(1) + priority<=2(1) = 2
         assert_eq!(signals.complexity_score(), 2);
-        assert!(!signals.is_plan_worthy(3));
+        assert!(!signals.exceeds_complexity_threshold(3));
     }
 
     #[test]
@@ -171,7 +171,7 @@ mod tests {
         };
         // has_deps(2) + subtasks>=3(1) = 3
         assert_eq!(signals.complexity_score(), 3);
-        assert!(signals.is_plan_worthy(3));
-        assert!(!signals.is_plan_worthy(4));
+        assert!(signals.exceeds_complexity_threshold(3));
+        assert!(!signals.exceeds_complexity_threshold(4));
     }
 }

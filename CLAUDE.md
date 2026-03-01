@@ -50,12 +50,12 @@ Layer 1: config, bus, tools-core, tools-core-macros
                              — Config schema (camelCase JSON serde), async message bus (tokio::mpsc),
                                Tool trait, FeaturePackage trait, ToolRegistry, derive macros (#[derive(Tool)], #[derive(ToolParams)])
 Layer 2: storage, domain     — SQLite pool (sqlx + SqlitePool), auto-migrations, repository pattern (*Repo structs),
-                               plan/goal domain types
+                               OKR + PARA domain types (Area, Objective, KeyResult, Project)
 Layer 3: providers, session, scheduling, calendar, context_engine
                              — LLM HTTP clients, session persistence, cron service, CalDAV sync, token budget allocator
 Layer 4: tools, feature-todo, feature-finance, plugin-runtime
                              — 20+ tool implementations (filesystem ×4, web ×2, grep, glob, message, spawn, cron, calendar,
-                               plan, project, goal, memory, learning, browser, ask_user, agent_task),
+                               project, okr, area, memory, learning, browser, ask_user, agent_task),
                                self-contained feature packages (own tools, migrations, config, handler traits),
                                WASM plugin sandbox
 Layer 5: channels, agent     — Chat platform integrations (Telegram, Discord, WhatsApp, Slack, Email, QQ),
@@ -70,7 +70,7 @@ Dependencies flow strictly upward. No circular dependencies — enforced by Carg
 
 **Storage stack (SQLite + LanceDB):**
 - `storage` crate (Layer 2): `StoragePool` wraps `SqlitePool`, auto-runs migrations, exposes repository pattern (`*Repo` structs)
-- All relational data in SQLite (`{data_dir}/data.db`): todos, projects, sessions, goals, plans, cron jobs, usage, strategies, outcomes, learning state, memory notes, calendar cache, finance data (accounts, transactions, budgets, investments), agent tasks
+- All relational data in SQLite (`{data_dir}/data.db`): actions, areas, projects, objectives, key_results, sessions, cron jobs, usage, strategies, outcomes, learning state, memory notes, calendar cache, finance data (accounts, transactions, budgets, investments), agent tasks
 - Vector embeddings in LanceDB (`{data_dir}/lancedb/`): todo embeddings, conversation embeddings — replaces pgvector
 - `Repos` aggregate struct for convenient access: `Repos::from_pool(&pool)`
 - `StoragePool::connect(data_dir)` creates/opens `data.db`, enables WAL + foreign keys, runs migrations. Feature crates register additional migrations via `FeatureMigration`
@@ -82,7 +82,7 @@ Dependencies flow strictly upward. No circular dependencies — enforced by Carg
 - **Repository pattern**: All persistent state goes through `*Repo` structs in the `storage` crate. Repos hold a `SqlitePool` (which is `Clone + Send + Sync` internally via `Arc`), eliminating the need for `Arc<RwLock<Store>>` wrappers. The `Repos` aggregate provides convenient access: `Repos::from_pool(&pool)`.
 - **Derive-based tools**: Tools are defined via `#[derive(tools_core::Tool)]` and `#[derive(ToolParams)]` macros from `tools-core-macros`. These generate `Tool` trait impls, parameter extraction, and JSON schema. Multi-action tools use `#[tool_actions]` attribute macro with `#[derive(ActionParams)]` per-action params. New tools should use this pattern — see `crates/tools/src/filesystem.rs` for examples.
 - **Feature packages**: Self-contained features (`feature-todo`, `feature-finance`) implement the `FeaturePackage` trait (in `tools-core`), which bundles tools, migrations, config validation, and health checks. Registered at agent startup. Add new features by creating a `feature-*` crate implementing `FeaturePackage`.
-- **Dependency inversion**: Handler traits (`SpawnHandler`, `CronHandler`, `CalendarHandler` in `tools`; `EnrichmentHandler`, `EmbeddingHandler` in `feature-todo`; `FinanceHandler` in `feature-finance`; `GoalHandler`, `PlanHandler`, `LearningHandler` in `tools`) are defined in lower layers but implemented in `agent` (Layer 5). Injected as `Arc<dyn Trait>` at construction.
+- **Dependency inversion**: Handler traits (`SpawnHandler`, `CronHandler`, `CalendarHandler`, `LearningHandler` in `tools`; `EnrichmentHandler`, `EmbeddingHandler` in `feature-todo`; `FinanceHandler` in `feature-finance`) are defined in lower layers but implemented in `agent` (Layer 5). Injected as `Arc<dyn Trait>` at construction.
 - **Re-export facade**: `src/lib.rs` re-exports all public types from workspace crates. Integration tests and external consumers use `klyntbot::AgentLoop`, `klyntbot::Config`, `klyntbot::StoragePool`, etc.
 - **Provider auto-detection**: The provider registry matches model name keywords to route to the correct LLM provider. No external routing library.
 - **Config schema**: All config structs use `#[serde(rename_all = "camelCase")]`. Config file is `~/.klyntbot/config.json`. API keys are wrapped in `Secret<String>` (redacted in Debug/Display, access via `.expose()`).
@@ -100,14 +100,12 @@ Dependencies flow strictly upward. No circular dependencies — enforced by Carg
 | `SpawnHandler` | `tools` | Dependency inversion for subagent spawning |
 | `CronHandler` | `tools` | Dependency inversion for cron job management |
 | `CalendarHandler` | `tools` | Dependency inversion for calendar sync |
-| `GoalHandler` | `tools` | Dependency inversion for goal management + LLM plan generation |
-| `PlanHandler` | `tools` | Dependency inversion for plan management + LLM step generation |
 | `LearningHandler` | `tools` | Dependency inversion for adaptive threshold management |
 | `EnrichmentHandler` | `feature-todo` | Dependency inversion for AI-powered task enrichment |
 | `EmbeddingHandler` | `feature-todo` | Dependency inversion for todo embedding generation |
 | `FinanceHandler` | `feature-finance` | Dependency inversion for finance price lookups |
 | `IntentPipeline` | `agent` | Full pipeline: IntentAnalyzer -> ContextEngine -> ExecutionRouter -> ResponseValidator -> CostTracker |
-| `ExecutionEngine` | `agent` | Unified async trait for Direct, Reactive, and Planned engines |
+| `ExecutionEngine` | `agent` | Unified async trait for Direct and Reactive engines |
 
 ### Conventions
 
@@ -184,22 +182,20 @@ IntentAnalyzer → ContextEngine → ExecutionRouter → ResponseValidator → C
 
 | Module | Purpose |
 |--------|---------|
-| `types.rs` | `ExecutionMode` (Direct/Reactive/Planned), `ComplexitySignals`, `IntentAnalysis`, `ToolGroup` |
+| `types.rs` | `ExecutionMode` (Direct/Reactive), `ComplexitySignals`, `IntentAnalysis`, `ToolGroup` |
 | `analysis.rs` | `IntentAnalyzer` (two-stage: heuristic keywords -> LLM `IntentClassifier`). Strategy history from `StrategyRepo` feeds classifier context. |
-| `engines/` | `ExecutionEngine` trait + `DirectEngine`, `ReactiveEngine`, `PlannedEngine` |
-| `router.rs` | `ExecutionRouter` — maps mode to engine, handles escalation chain (Direct -> Reactive -> Planned) with `EscalationContext` |
+| `engines/` | `ExecutionEngine` trait + `DirectEngine`, `ReactiveEngine` |
+| `router.rs` | `ExecutionRouter` — maps mode to engine, handles escalation chain (Direct -> Reactive) with `EscalationContext` |
 | `pipeline.rs` | `IntentPipeline` struct — wires everything into `process_message()` (classify -> context -> filter tools -> route -> validate -> record) |
-| `visibility.rs` | `PlanCleanupService` — background cleanup for stale silent/on_failure plans |
 
 ### Execution Modes
 
 - **Direct**: Single LLM call, no tools. For greetings, simple questions, acknowledgments.
-- **Reactive { max_iterations }**: ReAct loop with tool calls. For task CRUD, search, calendar ops. Escalates at 80% of max_iterations.
-- **Planned { visibility, max_steps }**: Multi-step plan generation and execution. For complex multi-tool workflows. Falls back to ReactiveEngine(50) if plan generation fails.
+- **Reactive { max_iterations }**: ReAct loop with tool calls. For task CRUD, search, calendar ops, and complex multi-step workflows. Escalates at 80% of max_iterations.
 
 ### Escalation Chain
 
-When an engine signals it cannot handle a request (`EngineResult::Escalate`), the router automatically escalates: Direct -> Reactive -> Planned. `EscalationContext` carries messages + completed tool work across transitions. Max escalations are configurable via `config.orchestrator.max_escalations` (default: 3).
+When an engine signals it cannot handle a request (`EngineResult::Escalate`), the router automatically escalates: Direct -> Reactive. `EscalationContext` carries messages + completed tool work across transitions. Max escalations are configurable via `config.orchestrator.max_escalations` (default: 1).
 
 ### ExecutionCore
 
@@ -219,16 +215,4 @@ Shared by all engines. `run_cycle()` performs one LLM-tool round: call `provider
 
 ### Task Complexity Bridge
 
-`feature-todo` crate provides `TaskComplexitySignals` to evaluate whether a task warrants plan-based execution. The `execute` action on `TodoTool` checks complexity (dependencies, subtasks, duration, priority) and either starts the task directly or suggests creating a plan.
-
-## Planning Engine
-
-Plan types live in `domain` crate (`crates/domain/src/plan.rs`). Execution logic in `agent` crate.
-
-**Lifecycle** (enforced by `PlanStatus::validate_transition`): `Draft → Approved → Executing → Completed|Failed`. Any state → `Abandoned`. Terminal states are final.
-
-**Visibility** (`PlanVisibility`): `transparent` (default, always shown), `on_failure` (shown only on failure, auto-cleaned after 7 days), `silent` (never shown, auto-cleaned after 24h). `PlanCleanupService` runs hourly.
-
-**Execution flow**: `PlanTool` -> `PlanHandler::execute_plan()` -> `AgentLoop::run_plan_execution()` -> per-step `plan_executor::run_step()` (up to 5 LLM-tool cycles per step). On step failure: up to 3 retries, then backtracking via `plan_executor::regenerate_from()`. Max 3 backtrack events before plan fails. `PlannedEngine` synthesizes a human-readable summary from step outputs after completion.
-
-**Key files**: `agent/plan_executor.rs`, `agent/plan_handler.rs`, `agent/plan_step_generator.rs`, `domain/src/plan.rs`.
+`feature-todo` crate provides `TaskComplexitySignals` to evaluate task complexity based on dependencies, subtasks, duration, and priority. The `exceeds_complexity_threshold()` method checks if a task's complexity score meets a threshold. Used by intent analysis to adjust iteration budgets for complex task operations.

@@ -18,15 +18,7 @@ pub struct OrchestratorConfig {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub llm_classifier_model: Option<String>,
 
-    /// Default visibility for auto-generated plans ("silent", "on_failure", "transparent")
-    #[serde(default = "default_visibility")]
-    pub default_plan_visibility: String,
-
-    /// Complexity score threshold at which a request triggers planned execution (0-7)
-    #[serde(default = "default_complexity_threshold")]
-    pub plan_complexity_threshold: u8,
-
-    /// Maximum number of escalations per request (e.g., Reactive → Planned)
+    /// Maximum number of escalations per request (Direct → Reactive)
     #[serde(default = "default_max_escalations")]
     pub max_escalations: u32,
 }
@@ -36,12 +28,6 @@ fn default_heuristic_threshold() -> f32 {
 }
 fn default_classifier_timeout() -> u64 {
     2000
-}
-fn default_visibility() -> String {
-    "on_failure".to_string()
-}
-fn default_complexity_threshold() -> u8 {
-    3
 }
 fn default_max_escalations() -> u32 {
     1
@@ -53,8 +39,6 @@ impl Default for OrchestratorConfig {
             heuristic_confidence_threshold: default_heuristic_threshold(),
             llm_classifier_timeout: default_classifier_timeout(),
             llm_classifier_model: None,
-            default_plan_visibility: default_visibility(),
-            plan_complexity_threshold: default_complexity_threshold(),
             max_escalations: default_max_escalations(),
         }
     }
@@ -70,8 +54,6 @@ mod tests {
         assert!((config.heuristic_confidence_threshold - 0.85).abs() < f32::EPSILON);
         assert_eq!(config.llm_classifier_timeout, 2000);
         assert_eq!(config.llm_classifier_model, None);
-        assert_eq!(config.default_plan_visibility, "on_failure");
-        assert_eq!(config.plan_complexity_threshold, 3);
         assert_eq!(config.max_escalations, 1);
     }
 
@@ -81,8 +63,6 @@ mod tests {
             heuristic_confidence_threshold: 0.9,
             llm_classifier_timeout: 5000,
             llm_classifier_model: Some("fast-model".to_string()),
-            default_plan_visibility: "silent".to_string(),
-            plan_complexity_threshold: 5,
             max_escalations: 2,
         };
         let json = serde_json::to_string(&config).unwrap();
@@ -90,7 +70,6 @@ mod tests {
         assert!((loaded.heuristic_confidence_threshold - 0.9).abs() < f32::EPSILON);
         assert_eq!(loaded.llm_classifier_timeout, 5000);
         assert_eq!(loaded.llm_classifier_model.as_deref(), Some("fast-model"));
-        assert_eq!(loaded.plan_complexity_threshold, 5);
         assert_eq!(loaded.max_escalations, 2);
     }
 
@@ -100,8 +79,6 @@ mod tests {
         let json = serde_json::to_string(&config).unwrap();
         assert!(json.contains("heuristicConfidenceThreshold"));
         assert!(json.contains("llmClassifierTimeout"));
-        assert!(json.contains("defaultPlanVisibility"));
-        assert!(json.contains("planComplexityThreshold"));
         assert!(json.contains("maxEscalations"));
     }
 }

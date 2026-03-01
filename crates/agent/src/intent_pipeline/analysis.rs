@@ -81,12 +81,12 @@ pub fn analyze_heuristic(message: &str) -> Option<IntentAnalysis> {
         ));
     }
 
-    // 5. Explicit plan keywords → Reactive with high iteration budget
-    if has_plan_keyword(&msg) {
+    // 5. Complex workflow keywords → Reactive with high iteration budget
+    if has_complex_workflow_keyword(&msg) {
         let signals = analyze_complexity(&msg);
         return Some(reactive_analysis(
             20,
-            "Explicit planning language detected — using high iteration budget",
+            "Complex workflow language detected — using high iteration budget",
             0.85,
             signals,
             vec![ToolGroup::Full],
@@ -232,11 +232,11 @@ fn has_action_keyword(msg: &str) -> bool {
 }
 
 fn has_any_action_keyword(msg: &str) -> bool {
-    has_tool_keyword(msg) || has_action_keyword(msg) || has_plan_keyword(msg)
+    has_tool_keyword(msg) || has_action_keyword(msg) || has_complex_workflow_keyword(msg)
 }
 
-fn has_plan_keyword(msg: &str) -> bool {
-    const PLAN: &[&str] = &[
+fn has_complex_workflow_keyword(msg: &str) -> bool {
+    const COMPLEX_WORKFLOW: &[&str] = &[
         "create a plan",
         "plan and implement",
         "plan to",
@@ -244,7 +244,7 @@ fn has_plan_keyword(msg: &str) -> bool {
         "design and build",
         "architect and",
     ];
-    PLAN.iter().any(|k| msg.contains(k))
+    COMPLEX_WORKFLOW.iter().any(|k| msg.contains(k))
 }
 
 /// Count indicators of tool usage in the message.
@@ -418,8 +418,8 @@ fn infer_tool_groups(msg: &str) -> Vec<ToolGroup> {
     if is_task_management(msg)
         || msg.contains("task")
         || msg.contains("todo")
-        || msg.contains("goal")
-        || msg.contains("plan")
+        || msg.contains("objective")
+        || msg.contains("project")
     {
         groups.push(ToolGroup::TaskManagement);
     }
@@ -912,7 +912,7 @@ mod tests {
     }
 
     #[test]
-    fn explicit_plan_keyword_is_reactive() {
+    fn complex_workflow_keyword_is_reactive() {
         let result = analyze_heuristic("create a plan for the database refactor");
         assert!(result.is_some());
         assert!(matches!(
