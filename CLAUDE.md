@@ -28,18 +28,24 @@ cargo build --no-default-features    # Build without email channel
 
 Klyntbot is a Rust personal AI agent — a single binary that connects to 6+ chat platforms, calls LLMs, manages tasks/projects, syncs with Apple Calendar, and manages persistent memory. It is **not** a code execution platform — users have dedicated tools (Claude Code, Cursor, Codex) for that. All persistent state is stored in SQLite (relational data) + LanceDB (vector embeddings).
 
-### Workspace layout (15 crates in 9 dependency layers)
+### Workspace layout (19 crates in 9 dependency layers)
 
 ```
-Layer 0: common          — Error types (KlyntbotError with 12 variants including CalendarError, Storage), MessageRole, ChannelName, ChatId, SessionKey
-Layer 1: config, bus     — Config schema (camelCase JSON serde + CalendarConfig, ProjectConfig), async message bus (tokio::mpsc)
-Layer 1.5: storage       — SQLite connection pool (sqlx + SqlitePool), auto-migrations, row structs, repository pattern (TodoRepo, ProjectRepo, VectorStore, etc.)
-Layer 2: providers, session, scheduling, calendar, context_engine — LLM HTTP client, session persistence, cron service, CalDAV client + sync engine, token budget allocator + context assembler
-Layer 3: tools           — Tool trait + 12 implementations (file I/O ×4, web ×2, message, spawn, cron, todo, project, calendar)
-Layer 4: channels, heartbeat — Chat platform integrations (Telegram, Discord, WhatsApp, Slack, Email, QQ)
-Layer 5: agent           — Agent loop, context builder, memory store, skill manager, subagent manager, calendar handler adapter, reminder engine, intent pipeline (analyzer + router + engines), execution core
-Layer 6: cli             — Clap-derived CLI with 4 commands: serve, init, status, plugin
-Layer 7: klyntbot        — Re-export facade (src/lib.rs) + binary entry point (src/main.rs)
+Layer 0: common            — Error types (KlyntbotError with 12 variants), MessageRole, ChannelName, ChatId, SessionKey
+Layer 1: config, bus       — Config schema (camelCase JSON serde), async message bus (tokio::mpsc)
+Layer 1.5: storage         — SQLite pool (sqlx + SqlitePool), auto-migrations, repository pattern (*Repo structs)
+Layer 2: providers, session, scheduling, calendar, context_engine, domain
+                           — LLM HTTP client, session persistence, cron service, CalDAV sync, token budget allocator, plan/goal domain types
+Layer 2.5: tools-core, tools-core-macros
+                           — Tool trait, FeaturePackage trait, ToolRegistry, derive macros (#[derive(Tool)], #[derive(ToolParams)])
+Layer 3: tools             — ~15 tool implementations (filesystem ×4, web ×2, message, spawn, cron, calendar, plan, project, goal, memory, learning, browser, ask_user, agent_task)
+Layer 3.5: feature-todo, feature-finance
+                           — Self-contained feature packages (own tools, migrations, config, handler traits)
+Layer 4: channels          — Chat platform integrations (Telegram, Discord, WhatsApp, Slack, Email, QQ)
+Layer 4.5: plugin-runtime  — WASM plugin sandbox (loads .wasm from ~/.klyntbot/plugins/)
+Layer 5: agent             — Agent loop, context builder, memory store, skill manager, subagent manager, intent pipeline, execution core
+Layer 6: cli               — Clap-derived CLI with 4 commands: serve, init, status, plugin
+Layer 7: klyntbot          — Re-export facade (src/lib.rs) + binary entry point (src/main.rs)
 ```
 
 Dependencies flow strictly upward. No circular dependencies — enforced by Cargo.
@@ -56,8 +62,10 @@ Dependencies flow strictly upward. No circular dependencies — enforced by Carg
 ### Key patterns
 
 - **Repository pattern**: All persistent state goes through `*Repo` structs in the `storage` crate. Repos hold a `SqlitePool` (which is `Clone + Send + Sync` internally via `Arc`), eliminating the need for `Arc<RwLock<Store>>` wrappers. The `Repos` aggregate provides convenient access: `Repos::from_pool(&pool)`.
-- **Dependency inversion**: `SpawnHandler` and `CronHandler` traits are defined in `tools` (Layer 3) but implemented in `agent` (Layer 5). Injected as `Arc<dyn Trait>` at construction. This breaks what would otherwise be circular deps between tools and agent.
-- **Re-export facade**: `src/lib.rs` re-exports all public types from workspace crates including `storage`. Integration tests and external consumers use `klyntbot::AgentLoop`, `klyntbot::Config`, `klyntbot::StoragePool`, etc.
+- **Derive-based tools**: Tools are defined via `#[derive(tools_core::Tool)]` and `#[derive(ToolParams)]` macros from `tools-core-macros`. These generate `Tool` trait impls, parameter extraction, and JSON schema. New tools should use this pattern — see `crates/tools/src/filesystem.rs` for examples.
+- **Feature packages**: Self-contained features (`feature-todo`, `feature-finance`) implement the `FeaturePackage` trait (in `tools-core`), which bundles tools, migrations, config validation, and health checks. Registered at agent startup. Add new features by creating a `feature-*` crate implementing `FeaturePackage`.
+- **Dependency inversion**: Handler traits (`SpawnHandler`, `CronHandler` in `tools`; `CalendarHandler` in `tools`; `EnrichmentHandler`, `EmbeddingHandler` in `feature-todo`; `FinanceHandler` in `feature-finance`) are defined in lower layers but implemented in `agent` (Layer 5). Injected as `Arc<dyn Trait>` at construction.
+- **Re-export facade**: `src/lib.rs` re-exports all public types from workspace crates. Integration tests and external consumers use `klyntbot::AgentLoop`, `klyntbot::Config`, `klyntbot::StoragePool`, etc.
 - **Provider auto-detection**: The provider registry matches model name keywords to route to the correct LLM provider. No external routing library.
 - **Config schema**: All config structs use `#[serde(rename_all = "camelCase")]`. Config file is `~/.klyntbot/config.json`. API keys are wrapped in `Secret<String>` (redacted in Debug/Display, access via `.expose()`).
 - **Feature-gated email**: The `email` feature (on by default) gates IMAP/SMTP dependencies in the `channels` crate.
@@ -66,14 +74,16 @@ Dependencies flow strictly upward. No circular dependencies — enforced by Carg
 
 | Trait | Defined in | Purpose |
 |-------|-----------|---------|
-| `Tool` | `tools` | `fn name()`, `fn description()`, `fn parameters() -> Value`, `async fn execute()` |
-| `LlmProvider` | `providers` | `async fn chat()`, `async fn chat_stream()`, `fn name()`, `fn default_model()`, `fn capabilities()`, `fn context_window()`, `async fn count_tokens()` |
+| `Tool`, `ToolExecute`, `ToolParams` | `tools-core` | Core tool framework — usually derived via `#[derive(Tool)]` / `#[derive(ToolParams)]` |
+| `FeaturePackage` | `tools-core` | Self-contained feature registration (tools, migrations, config, health) |
+| `LlmProvider` | `providers` | `async fn chat()`, `async fn chat_stream()`, `fn name()`, `fn default_model()`, etc. |
 | `Channel` | `channels` | `async fn start()`, `async fn stop()`, `async fn send()`, `fn name()`, `fn is_allowed()` |
 | `SpawnHandler` | `tools` | Dependency inversion for subagent spawning |
 | `CronHandler` | `tools` | Dependency inversion for cron job management |
-| `CalendarHandler` | `tools` | Dependency inversion for calendar sync (NEW: `async fn sync_now()`, `async fn get_status()`, `async fn list_events()`, etc.) |
-| `EnrichmentHandler` | `tools` | Dependency inversion for AI-powered task enrichment (NEW: `async fn enrich_task()`) |
-| `IntentPipeline` | `agent` | Full execution pipeline: IntentAnalyzer → ContextEngine → ExecutionRouter → ResponseValidator → CostTracker (`async fn process_message()`) |
+| `CalendarHandler` | `tools` | Dependency inversion for calendar sync |
+| `EnrichmentHandler` | `feature-todo` | Dependency inversion for AI-powered task enrichment |
+| `EmbeddingHandler` | `feature-todo` | Dependency inversion for todo embedding generation |
+| `FinanceHandler` | `feature-finance` | Dependency inversion for finance price lookups |
 
 ### Conventions
 
@@ -107,127 +117,24 @@ KLYNTBOT_TOOLS__RESTRICT_TO_WORKSPACE=true
 
 No external database required. Data is stored in `~/.klyntbot/data.db` (SQLite) and `~/.klyntbot/lancedb/` (vectors) by default. Override with `data_dir` in config.
 
-## Enrichment Configuration
+## Enrichment & Semantic Search
 
-The enrichment engine auto-infers missing task fields using keyword analysis:
+**Enrichment** (`feature-todo` crate): Auto-infers priority, duration, and due dates from task title keywords. Config: `todo.enrichment.enabled` (default: `true`), `todo.enrichment.autoApplyThreshold` (default: `0.70`). Implementation in `crates/feature-todo/src/enrichment.rs`.
 
-**Config schema** (`~/.klyntbot/config.json`):
-```json
-{
-  "todo": {
-    "enrichment": {
-      "enabled": true,
-      "autoApplyThreshold": 0.70
-    }
-  }
-}
-```
-
-**Fields:**
-- `enabled`: Enable/disable enrichment engine (default: `true`)
-- `autoApplyThreshold`: Confidence threshold for auto-applying suggestions (0.0-1.0, default: `0.70`)
-
-**How it works:**
-1. **Priority inference**: Detects keywords like "urgent", "critical", "fix", "feature", "cleanup"
-   - High priority (1): urgent, critical, blocker, hotfix, emergency, asap
-   - Medium-high (2): important, bug, fix, broken, regression
-   - Medium (3): feature, enhance, improvement, update, refactor
-   - Low (4): nice to have, cleanup, chore, documentation, typo
-
-2. **Duration prediction**: Estimates task duration based on keywords
-   - Quick (15 min): typo, rename, tweak, bump, toggle
-   - Small (30 min): fix, patch, update, adjust, lint
-   - Medium (60 min): feature, implement, add, create, build
-   - Large (120 min): refactor, overhaul, rewrite, redesign, architecture
-
-3. **Due date suggestion**: Suggests deadline based on priority and keywords
-   - Urgent tasks → today
-   - Important tasks → this week
-   - Normal tasks → no suggestion (manual assignment)
-
-**Usage via chat:**
-Enrichment runs automatically on task creation if enabled. Ask the agent to "enrich task <id>" for manual enrichment. For example, creating a task titled "URGENT: Fix production auth bug" auto-sets priority to 1 and estimates 30 min duration.
-
-**Troubleshooting:**
-- **Enrichment not working?** Check `config.todo.enrichment.enabled` is `true`
-- **Suggestions not applied?** Lower `autoApplyThreshold` (default 0.70)
-- **Wrong suggestions?** Adjust task title keywords or set fields manually
-
-## Semantic Search
-
-Semantic search uses local embeddings (fastembed, paraphrase-multilingual-MiniLM-L12-v2, 384 dimensions) for meaning-based task retrieval. Finds related concepts, not just keywords (e.g., "login bug" finds "authentication issue").
-
-**Setup** (`klyntbot init` Step 6):
-- Option 1: Enable & download model now (~420MB, ~60 sec with progress bar)
-- Option 2: Disable semantic search (saves disk space)
-
-**Config schema** (`~/.klyntbot/config.json`):
-```json
-{
-  "todo": {
-    "search": {
-      "enabled": true,
-      "semanticThreshold": 0.5,
-      "embeddingModel": "paraphrase-multilingual-MiniLM-L12-v2",
-      "rrfK": 60
-    }
-  }
-}
-```
-
-**Fields:**
-- `enabled`: Enable/disable semantic search (default: `true`)
-- `semanticThreshold`: Minimum cosine similarity for results (0.0-1.0, default: `0.5`)
-- `embeddingModel`: Model name stored in embedding records (default: `paraphrase-multilingual-MiniLM-L12-v2`)
-- `rrfK`: Reciprocal Rank Fusion k parameter for hybrid search (default: `60`)
-
-**Search modes** (available via TodoTool in chat):
-- `search` — keyword matching (title + description substring via SQL)
-- `search-semantic` — LanceDB ANN cosine similarity on embeddings
-- `search-hybrid` — merges keyword + semantic via Reciprocal Rank Fusion (RRF)
-
-**How it works:**
-1. Embeddings auto-generate when tasks are created or updated (best-effort, non-blocking)
-2. Embeddings persist in LanceDB (`~/.klyntbot/lancedb/`)
-3. Semantic search uses LanceDB approximate nearest neighbor (ANN) for fast cosine similarity
-4. Hybrid search runs both keyword and semantic, merges via RRF
-
-**Troubleshooting:**
-- **First search is slow?** Model downloads ~420MB on first use. Subsequent searches are fast.
-- **No results?** Lower the threshold (e.g., 0.3) or use hybrid search for broader matching.
-- **Semantic search unavailable?** Falls back with a clear error suggesting keyword search.
+**Semantic search** (`feature-todo` crate): Uses fastembed (paraphrase-multilingual-MiniLM-L12-v2, 384d) + LanceDB for ANN similarity search. Three modes: `search` (keyword SQL), `search-semantic` (cosine similarity), `search-hybrid` (RRF merge). Config: `todo.search.enabled`, `todo.search.semanticThreshold` (default: `0.5`). Embeddings stored in `{data_dir}/lancedb/`.
 
 ## Feature Packs
 
-Feature packs bundle related config settings and skills into selectable groups. Users choose packs during `klyntbot init` (Phase 2: Pack Selection).
+Feature packs bundle config + skills into selectable groups chosen during `klyntbot init`.
 
-**Pack tiers:**
-- **Core** (always enabled): task-management
-- **Recommended** (pre-checked): productivity, ai-intelligence
-- **Optional** (unchecked by default): finance, weather, skill-creator
-
-**Config schema** (`~/.klyntbot/config.json`):
-```json
-{
-  "packs": {
-    "enabled": ["task-management", "productivity", "ai-intelligence"],
-    "enabledSkills": ["todo", "daily-planning", "cron", "summarize"]
-  }
-}
-```
-
-**How it works:**
-1. `PackRegistry` in `crates/cli/src/wizard/packs/registry.rs` defines 7 packs with tier, skills, and descriptions
-2. `pack_selection::apply_pack_config()` maps pack IDs to config section mutations (e.g., ai-intelligence enables `conversation.embedding`, `learning`)
-3. `config.packs.enabled_skills` is computed by the wizard and saved to config
-4. At agent startup, `SkillManager::filter_by_skills()` restricts built-in skills to those from enabled packs
-5. Workspace-loaded skills (from `~/.klyntbot/skills/`) are always kept regardless of pack selection
-
-**Adding a new pack:** Add a `Pack` entry to `PACKS` in `registry.rs`, then add config mutations to `apply_pack_config()` in `pack_selection.rs`.
+- **Core** (always): task-management. **Recommended**: productivity, ai-intelligence. **Optional**: finance, weather, skill-creator.
+- Config: `packs.enabled` and `packs.enabledSkills` arrays in config.json.
+- Registry: `crates/cli/src/wizard/packs/registry.rs`. Config mutations: `pack_selection.rs`.
+- At startup, `SkillManager::filter_by_skills()` restricts built-in skills to enabled packs. Workspace skills (`~/.klyntbot/skills/`) are always kept.
 
 ## Skills
 
-Built-in skills live in `skills/` as `SKILL.md` files (summarize, skill-creator, weather, cron, todo, daily-planning). The `SkillManager` in the agent crate discovers and loads them at runtime. Skills are filtered by enabled packs — only skills from selected packs are available.
+Built-in skills live in `skills/` as `SKILL.md` files (browser, cron, daily-planning, finance, skill-creator, summarize, todo, weather, weekly-report). The `SkillManager` in the agent crate discovers and loads them at runtime. Skills are filtered by enabled packs — only skills from selected packs are available.
 
 ## Gotchas & Common Pitfalls
 
@@ -254,9 +161,7 @@ IntentAnalyzer → ContextEngine → ExecutionRouter → ResponseValidator → C
 | Module | Purpose |
 |--------|---------|
 | `types.rs` | `ExecutionMode` (Direct/Reactive/Planned), `ComplexitySignals`, `IntentAnalysis` |
-| `heuristics.rs` | Zero-cost keyword classification (greetings, CRUD, complex tasks) |
-| `classifier.rs` | LLM-based classifier for ambiguous messages |
-| `analyzer.rs` | Two-stage analysis: heuristics → LLM classifier |
+| `analysis.rs` | `IntentAnalyzer` (two-stage: heuristic keywords → LLM classifier), `IntentClassifier` |
 | `engines/` | `ExecutionEngine` trait + `DirectEngine`, `ReactiveEngine`, `PlannedEngine` |
 | `router.rs` | Maps mode to engine, handles escalation chain (Direct → Reactive → Planned) |
 | `pipeline.rs` | `IntentPipeline` struct — wires everything into `process_message()` |
@@ -288,56 +193,14 @@ When an engine signals it cannot handle a request (`EngineResult::Escalate`), th
 
 `feature-todo` crate provides `TaskComplexitySignals` to evaluate whether a task warrants plan-based execution. The `execute` action on `TodoTool` checks complexity (dependencies, subtasks, duration, priority) and either starts the task directly or suggests creating a plan.
 
-## Planning Engine (Phase 4 — v0.3.0)
+## Planning Engine
 
-### Plan Lifecycle
+Plan types live in `domain` crate (`crates/domain/src/plan.rs`). Execution logic in `agent` crate.
 
-Plans follow this state machine (enforced by `PlanStatus::validate_transition`):
+**Lifecycle** (enforced by `PlanStatus::validate_transition`): `Draft → Approved → Executing → Completed|Failed`. Any state → `Abandoned`. Terminal states are final.
 
-```
-Draft → Approved → Executing → Completed
-                ↘               ↘
-             Abandoned         Failed
-```
+**Visibility** (`PlanVisibility`): `transparent` (default, always shown), `on_failure` (shown only on failure, auto-cleaned after 7 days), `silent` (never shown, auto-cleaned after 24h). `PlanCleanupService` runs hourly.
 
-Any state can transition to `Abandoned`. From `Completed`, `Failed`, or `Abandoned` — no further transitions are allowed.
+**Execution flow**: `PlanTool` → `PlanHandler::execute_plan()` → `AgentLoop::run_plan_execution()` → per-step `PlanExecutor::execute_step()`. Each step: build context window (current + next 3), LLM call → tool execution → result capture. On step failure: up to 3 retries, then backtracking via `regenerate_from()`. Max 3 backtrack events before plan fails.
 
-### Plan Visibility
-
-Plans have a `visibility` field (`PlanVisibility` enum):
-- **transparent** (default): Always visible in dashboard and API responses.
-- **on_failure**: Only surfaced to the user if the plan fails. Completed plans auto-cleaned after 7 days.
-- **silent**: Never shown to the user. Auto-cleaned 24 hours after reaching terminal state.
-
-A `PlanCleanupService` runs hourly to delete stale plans based on visibility rules.
-
-### Creating and Executing Plans
-
-Plans are managed through chat via the `PlanTool`. Ask the agent to create, approve, execute, or check plan status in natural language.
-
-### How Plan Execution Works
-
-1. `PlanTool` action `"execute"` calls `PlanHandler::execute_plan()` → transitions to `Executing`
-2. `AgentLoop::run_plan_execution()` in `agent/agent_loop.rs` drives the step-by-step loop
-3. For each step: `PlanExecutor::execute_step()` in `agent/plan_executor.rs`:
-   - Builds a system prompt from the plan context window (current + next 3 steps)
-   - Calls the LLM provider to generate tool calls
-   - Executes tool calls via `ToolRegistry` (Arc<dyn Tool> cloned before lock release)
-   - Falls back to LLM text response when no tool calls are generated
-4. Step state (status, timestamps, results, attempt_count) is updated by `run_plan_execution()` after each `execute_step()` call
-5. On step failure: up to `MAX_BACKTRACK_ATTEMPTS` (3) backtracking events via `PlanExecutor::regenerate_from()`
-6. After all steps complete: plan transitions to `Completed` with `completed_at` timestamp
-
-### Backtracking
-
-When a step exceeds `max_attempts` (default: 3 retries per step):
-1. A `BacktrackEntry` is recorded in `plan.backtrack_history`
-2. `regenerate_from()` prompts the LLM for replacement steps from the failure point
-3. If LLM returns invalid JSON, a single "Retry: <step>" fallback step is inserted
-4. After `MAX_BACKTRACK_ATTEMPTS` (3) full backtrack events, the plan is marked `Failed`
-
-### Known Limitations
-
-- **Single-cycle execution**: `execute_step()` makes one LLM call per step. The LLM generates tool calls with arguments from step context (description, previous results, plan goal). A multi-cycle ReAct loop is available via `PlannedEngine` in the intent pipeline.
-- **Iteration limit enforcement**: `iteration_limit` field persists but is checked in `run_plan_execution()` — exceeded limits mark the plan as `Failed`.
-- **No real-time progress**: Plan progress is only visible between executions; there's no streaming progress update.
+**Key files**: `agent/plan_executor.rs`, `agent/plan_handler.rs`, `agent/plan_step_generator.rs`, `domain/src/plan.rs`.
