@@ -28,9 +28,9 @@ export function SystemTray() {
   };
 
   const statusColors: Record<AgentStatus, string> = {
-    active: '#22C55E',
-    idle: '#F97316',
-    paused: '#8B949E',
+    active: 'var(--color-success)',
+    idle: 'var(--color-brand)',
+    paused: 'var(--color-muted)',
   };
 
   const quickActions = [
@@ -41,59 +41,59 @@ export function SystemTray() {
   ];
 
   return (
-    <div className="h-screen w-screen bg-[#1A1A19] text-[#E6EDF3] flex items-start justify-center">
-      <div className="w-[320px] rounded-2xl border border-[rgba(255,255,255,0.08)] overflow-hidden bg-[#1A1A19] shadow-2xl">
+    <div className="h-screen w-screen bg-background text-primary flex items-start justify-center">
+      <div className="w-[320px] rounded-2xl border border-border overflow-hidden bg-background shadow-2xl">
         {/* Header */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-[rgba(255,255,255,0.08)]">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
           <div className="w-7 h-7 rounded-md bg-white flex items-center justify-center p-0.5">
             <KlyntLogo className="w-full h-full" />
           </div>
           <div className="flex-1">
-            <p className="text-[13px] font-light text-[#E6EDF3]">Klynt Agent</p>
+            <p className="text-[13px] font-light text-primary">Klynt Agent</p>
             <div className="flex items-center gap-1.5">
               <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: statusColors[agentStatus] }} />
-              <span className="text-[11px] text-[#8B949E] font-light capitalize">{agentStatus}</span>
+              <span className="text-[11px] text-muted font-light capitalize">{agentStatus}</span>
             </div>
           </div>
           <button
             onClick={() => setAgentStatus(prev => prev === 'active' ? 'paused' : 'active')}
-            className="w-7 h-7 rounded-md bg-[rgba(255,255,255,0.04)] hover:bg-[rgba(255,255,255,0.08)] flex items-center justify-center transition-colors"
+            className="w-7 h-7 rounded-md bg-surface-base hover:bg-surface-highest flex items-center justify-center transition-colors"
           >
             {agentStatus === 'active' ? (
-              <Pause className="w-3.5 h-3.5 text-[#8B949E]" strokeWidth={1.5} />
+              <Pause className="w-3.5 h-3.5 text-muted" strokeWidth={1.5} />
             ) : (
-              <Play className="w-3.5 h-3.5 text-[#22C55E]" strokeWidth={1.5} />
+              <Play className="w-3.5 h-3.5 text-success" strokeWidth={1.5} />
             )}
           </button>
         </div>
 
         {/* Focus Task */}
         {focusTask && (
-          <div className="px-4 py-3 border-b border-[rgba(255,255,255,0.08)]">
+          <div className="px-4 py-3 border-b border-border">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-[11px] text-[#8B949E] font-light uppercase tracking-wider">Focus</span>
-              <span className="text-[12px] text-[#F97316] font-light font-mono">{formatTime(focusElapsed)}</span>
+              <span className="text-[11px] text-muted font-light uppercase tracking-wider">Focus</span>
+              <span className="text-[12px] text-brand font-light font-mono">{formatTime(focusElapsed)}</span>
             </div>
-            <p className="text-[13px] font-light text-[#C9D1D9] mb-2 truncate">{focusTask.title}</p>
+            <p className="text-[13px] font-light text-secondary mb-2 truncate">{focusTask.title}</p>
             <Progress value={Math.round((focusElapsed / focusDuration) * 100)} />
             <div className="flex items-center justify-between mt-1.5">
-              <span className="text-[10px] text-[#8B949E] font-light">{Math.round((focusElapsed / focusDuration) * 100)}% of session</span>
-              <span className="text-[10px] text-[#8B949E] font-light">{formatTime(focusDuration - focusElapsed)} remaining</span>
+              <span className="text-[10px] text-muted font-light">{Math.round((focusElapsed / focusDuration) * 100)}% of session</span>
+              <span className="text-[10px] text-muted font-light">{formatTime(focusDuration - focusElapsed)} remaining</span>
             </div>
           </div>
         )}
 
         {/* Calendar Events */}
-        <div className="px-4 py-3 border-b border-[rgba(255,255,255,0.08)]">
-          <span className="text-[11px] text-[#8B949E] font-light uppercase tracking-wider">Today</span>
+        <div className="px-4 py-3 border-b border-border">
+          <span className="text-[11px] text-muted font-light uppercase tracking-wider">Today</span>
           <div className="mt-2 space-y-2">
             {mockCalendarEvents.map(event => (
               <div key={event.id} className="flex items-center gap-2.5">
                 <div className="w-1 h-6 rounded-full" style={{ backgroundColor: event.color }} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-[12px] font-light text-[#C9D1D9] truncate">{event.title}</p>
+                  <p className="text-[12px] font-light text-secondary truncate">{event.title}</p>
                 </div>
-                <span className="text-[11px] text-[#8B949E] font-light flex-shrink-0">{event.time}</span>
+                <span className="text-[11px] text-muted font-light flex-shrink-0">{event.time}</span>
               </div>
             ))}
           </div>
@@ -106,12 +106,12 @@ export function SystemTray() {
             return (
               <button
                 key={action.label}
-                className="flex flex-col items-center gap-1.5 py-2.5 rounded-lg hover:bg-[rgba(255,255,255,0.04)] transition-colors"
+                className="flex flex-col items-center gap-1.5 py-2.5 rounded-lg hover:bg-surface-base transition-colors"
               >
-                <div className="w-8 h-8 rounded-lg bg-[rgba(255,255,255,0.04)] flex items-center justify-center">
-                  <Icon className="w-4 h-4 text-[#8B949E]" strokeWidth={1.5} />
+                <div className="w-8 h-8 rounded-lg bg-surface-base flex items-center justify-center">
+                  <Icon className="w-4 h-4 text-muted" strokeWidth={1.5} />
                 </div>
-                <span className="text-[10px] text-[#8B949E] font-light">{action.label}</span>
+                <span className="text-[10px] text-muted font-light">{action.label}</span>
               </button>
             );
           })}
