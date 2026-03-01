@@ -23,7 +23,7 @@ export function MainApp() {
   [activeTab]);
 
   return (
-    <div className="h-screen w-screen bg-[#0E0E0D] text-[#E6EDF3] flex overflow-hidden">
+    <div className="h-screen w-screen bg-background text-primary flex overflow-hidden">
       <Sidebar
         active={activeSidebar}
         onNavigate={(item) => {
@@ -35,7 +35,7 @@ export function MainApp() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Header Tabs */}
-        <div className="h-14 bg-[#0E0E0D] flex items-center px-2">
+        <div className="h-14 bg-background flex items-center px-2">
           <div className="flex-1 flex items-center gap-2">
             {(['All', 'Work', 'Personal'] as Tab[]).map(tab => (
               <button
@@ -43,8 +43,8 @@ export function MainApp() {
                 onClick={() => setActiveTab(tab)}
                 className={`flex-1 py-2 rounded-md text-[13px] font-light transition-colors ${
                   activeTab === tab
-                    ? 'bg-[rgba(255,255,255,0.08)] text-white'
-                    : 'bg-[rgba(255,255,255,0.03)] text-[#8B949E] hover:bg-[rgba(255,255,255,0.05)] hover:text-[#C9D1D9]'
+                    ? 'bg-surface-highest text-white'
+                    : 'bg-surface-low text-muted hover:bg-surface-base hover:text-secondary'
                 }`}
               >
                 {tab}
@@ -57,7 +57,7 @@ export function MainApp() {
               setIsChatOpen(nextOpen);
               setActiveSidebar(nextOpen ? 'Chat' : 'Tasks');
             }}
-            className="w-9 h-9 rounded-md flex items-center justify-center transition-colors bg-[rgba(255,255,255,0.03)] text-[#8B949E] hover:bg-[rgba(255,255,255,0.05)] hover:text-[#C9D1D9] ml-2"
+            className="w-9 h-9 rounded-md flex items-center justify-center transition-colors bg-surface-low text-muted hover:bg-surface-base hover:text-secondary ml-2"
           >
             <MessageSquare className="w-[18px] h-[18px]" strokeWidth={1.5} />
           </button>
