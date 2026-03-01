@@ -14,8 +14,8 @@ export function Checkbox({ checked, onCheckedChange, className }: CheckboxProps)
       checked={checked}
       onCheckedChange={onCheckedChange}
       className={cn(
-        'h-4 w-4 rounded border border-[#30363D] flex items-center justify-center',
-        'data-[state=checked]:bg-[#F97316] data-[state=checked]:border-[#F97316]',
+        'h-4 w-4 rounded border border-border-subtle flex items-center justify-center',
+        'data-[state=checked]:bg-brand data-[state=checked]:border-brand',
         className
       )}
     >

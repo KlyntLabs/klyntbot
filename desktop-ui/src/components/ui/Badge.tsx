@@ -10,17 +10,17 @@ const colorMaps: Record<string, Record<string, string>> = {
     P4: 'bg-blue-500/10 text-blue-400/80',
   },
   status: {
-    Todo: 'bg-[rgba(139,148,158,0.1)] text-[#8B949E]',
-    Doing: 'bg-[rgba(249,115,22,0.1)] text-[#F97316]',
-    Done: 'bg-[rgba(34,197,94,0.1)] text-[#22C55E]',
+    todo: 'bg-muted/10 text-muted',
+    doing: 'bg-brand/10 text-brand',
+    done: 'bg-success/10 text-success',
   },
   area: {
-    Work: 'bg-[rgba(59,130,246,0.1)] text-[#3B82F6]',
-    Personal: 'bg-[rgba(139,92,246,0.1)] text-[#8B5CF6]',
+    work: 'bg-info/10 text-info',
+    personal: 'bg-purple/10 text-purple',
   },
 };
 
-const defaultColor = 'bg-[rgba(255,255,255,0.04)] text-[#8B949E]';
+const defaultColor = 'bg-surface-base text-muted';
 
 interface BadgeProps {
   variant: BadgeVariant;
