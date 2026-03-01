@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { ArrowLeft, ChevronDown, ChevronRight, Target } from 'lucide-react';
 import { Sidebar } from '../layout/Sidebar';
@@ -6,24 +6,55 @@ import { Badge } from '../ui/Badge';
 import { Checkbox } from '../ui/Checkbox';
 import { Progress } from '../ui/Progress';
 import { useSetToggle } from '../../hooks/useSetToggle';
+import { useQuery } from '../../hooks/useQuery';
+import { useMutation } from '../../hooks/useMutation';
+import { useEvent } from '../../hooks/useEvent';
 import { mockProjects, mockTasks, mockObjectives } from '../../data/mockData';
-import type { SidebarItem } from '../../lib/types';
+import type { Task, Project, Objective, SidebarItem } from '../../lib/types';
 
 export function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [activeSidebar, setActiveSidebar] = useState<SidebarItem>('Tasks');
   const [expandedOkrs, toggleOkr] = useSetToggle();
-  const [completedTasks, toggleTask] = useSetToggle(
-    mockTasks.filter(t => t.completed).map(t => t.id)
+
+  const mockProjectTasks = useMemo(() => mockTasks.filter(t => t.projectId === id), [id]);
+  const mockProjectObjectives = useMemo(
+    () => {
+      const proj = mockProjects.find(p => p.id === id);
+      return mockObjectives.filter(o => proj?.objectiveIds?.includes(o.id));
+    },
+    [id],
   );
 
-  const project = useMemo(() => mockProjects.find(p => p.id === id), [id]);
-  const tasks = useMemo(() => mockTasks.filter(t => t.project === id), [id]);
-  const objectives = useMemo(
-    () => mockObjectives.filter(o => project?.objectiveIds?.includes(o.id)),
-    [id, project],
+  const { data: allProjects } = useQuery<Project[]>('project_list', undefined, mockProjects);
+  const { data: tasks, refetch: refetchTasks } = useQuery<Task[]>(
+    'task_list',
+    id ? { project_id: id } : undefined,
+    mockProjectTasks,
   );
+  const { data: objectives } = useQuery<Objective[]>(
+    'objective_list',
+    id ? { project_id: id } : undefined,
+    mockProjectObjectives,
+  );
+
+  const toggleComplete = useMutation<Task, { id: string }>('task_toggle_complete');
+
+  const [completedTasks, toggleTask] = useSetToggle(
+    tasks.filter(t => t.completed).map(t => t.id)
+  );
+
+  const handleToggleTask = useCallback(async (taskId: string) => {
+    toggleTask(taskId);
+    await toggleComplete.mutate({ id: taskId });
+  }, [toggleTask, toggleComplete]);
+
+  useEvent<{ entityKind: string; id: string }>('entity:updated', () => {
+    refetchTasks();
+  });
+
+  const project = useMemo(() => allProjects.find(p => p.id === id), [id, allProjects]);
 
   if (!project) {
     return (
@@ -34,7 +65,7 @@ export function ProjectDetail() {
   }
 
   const completedCount = tasks.filter(t => completedTasks.has(t.id)).length;
-  const doingCount = tasks.filter(t => t.status === 'Doing').length;
+  const doingCount = tasks.filter(t => t.status === 'doing').length;
   const avgProgress = objectives.length > 0
     ? Math.round(objectives.reduce((sum, o) => sum + o.progress, 0) / objectives.length)
     : 0;
@@ -152,10 +183,10 @@ export function ProjectDetail() {
                 return (
                   <div
                     key={task.id}
-                    className="grid grid-cols-[40px_1fr_80px_100px_120px_140px] gap-4 px-6 py-3 hover:bg-surface-base transition-colors border-b border-surface-base last:border-b-0"
+                    className="grid grid-cols-[40px_1fr_80px_100px_120px_140px] gap-4 px-6 py-3 hover:bg-surface-base transition-colors border-b border-border-subtle last:border-b-0"
                   >
                     <div className="flex items-center">
-                      <Checkbox checked={isCompleted} onCheckedChange={() => toggleTask(task.id)} />
+                      <Checkbox checked={isCompleted} onCheckedChange={() => handleToggleTask(task.id)} />
                     </div>
                     <div className="flex items-center gap-1.5">
                       {task.objectiveId && (
@@ -166,7 +197,7 @@ export function ProjectDetail() {
                       </span>
                     </div>
                     <div className="flex items-center">
-                      <Badge variant="priority" value={task.priority} />
+                      <Badge variant="priority" value={task.priority ?? ''} />
                     </div>
                     <div className="flex items-center">
                       <Badge variant="status" value={task.status} />

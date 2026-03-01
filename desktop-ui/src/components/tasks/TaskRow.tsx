@@ -15,7 +15,7 @@ interface TaskRowProps {
 export function TaskRow({ task, project, isCompleted, showArea, onToggle }: TaskRowProps) {
   return (
     <div
-      className={`grid ${taskGridCols(showArea)} gap-4 px-6 py-3 hover:bg-surface-base transition-colors border-b border-surface-base last:border-b-0`}
+      className={`grid ${taskGridCols(showArea)} gap-4 px-6 py-3 hover:bg-surface-base transition-colors border-b border-border-subtle last:border-b-0`}
     >
       {/* Checkbox */}
       <div className="flex items-center">
@@ -56,7 +56,7 @@ export function TaskRow({ task, project, isCompleted, showArea, onToggle }: Task
 
       {/* Priority */}
       <div className="flex items-center">
-        <Badge variant="priority" value={task.priority} />
+        <Badge variant="priority" value={task.priority ?? ''} />
       </div>
 
       {/* Status */}

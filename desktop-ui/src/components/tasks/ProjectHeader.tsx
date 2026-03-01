@@ -15,7 +15,7 @@ export function ProjectHeader({ project, tasks, objectives, isCollapsed, onToggl
 
   return (
     <div
-      className="w-full flex items-center gap-3 px-6 py-3 bg-overlay hover:bg-overlay-heavy transition-colors text-left border-b border-surface-base"
+      className="w-full flex items-center gap-3 px-6 py-3 bg-overlay hover:bg-overlay-heavy transition-colors text-left border-b border-border-subtle"
     >
       <button
         onClick={onToggle}
