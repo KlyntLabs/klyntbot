@@ -29,8 +29,8 @@ export function TaskTable({
 
   const tasksByProject = useMemo(() =>
     tasks.reduce((acc, task) => {
-      if (!acc[task.project]) acc[task.project] = [];
-      acc[task.project].push(task);
+      if (!acc[task.projectId]) acc[task.projectId] = [];
+      acc[task.projectId].push(task);
       return acc;
     }, {} as Record<string, Task[]>),
   [tasks]);
@@ -45,9 +45,9 @@ export function TaskTable({
 
   return (
     <div className="mb-10">
-      <div className="bg-[rgba(255,255,255,0.03)] backdrop-blur-sm rounded-xl overflow-hidden">
+      <div className="bg-surface-low backdrop-blur-sm rounded-xl overflow-hidden">
         {/* Table Header */}
-        <div className={`grid ${taskGridCols(showArea)} gap-4 border-b border-[rgba(255,255,255,0.08)] text-[11px] text-[#8B949E] font-light px-6 py-3`}>
+        <div className={`grid ${taskGridCols(showArea)} gap-4 border-b border-border text-[11px] text-muted font-light px-6 py-3`}>
           <div></div>
           <div>Task</div>
           <div>Project</div>

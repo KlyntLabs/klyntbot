@@ -15,7 +15,7 @@ interface TaskRowProps {
 export function TaskRow({ task, project, isCompleted, showArea, onToggle }: TaskRowProps) {
   return (
     <div
-      className={`grid ${taskGridCols(showArea)} gap-4 px-6 py-3 hover:bg-[rgba(255,255,255,0.04)] transition-colors border-b border-[rgba(255,255,255,0.04)] last:border-b-0`}
+      className={`grid ${taskGridCols(showArea)} gap-4 px-6 py-3 hover:bg-surface-base transition-colors border-b border-surface-base last:border-b-0`}
     >
       {/* Checkbox */}
       <div className="flex items-center">
@@ -25,11 +25,11 @@ export function TaskRow({ task, project, isCompleted, showArea, onToggle }: Task
       {/* Task Title */}
       <div className="flex items-center gap-1.5">
         {task.objectiveId && (
-          <Target className="w-[10px] h-[10px] text-[#F97316] flex-shrink-0" strokeWidth={1.5} />
+          <Target className="w-[10px] h-[10px] text-brand flex-shrink-0" strokeWidth={1.5} />
         )}
         <span
           className={`text-[13px] font-light truncate ${
-            isCompleted ? 'text-[#8B949E] line-through' : 'text-[#C9D1D9]'
+            isCompleted ? 'text-muted line-through' : 'text-secondary'
           }`}
         >
           {task.title}
@@ -38,19 +38,19 @@ export function TaskRow({ task, project, isCompleted, showArea, onToggle }: Task
 
       {/* Project Badge */}
       <div className="flex items-center">
-        <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-[rgba(255,255,255,0.04)]">
+        <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-surface-base">
           <div
             className="w-1.5 h-1.5 rounded-full"
             style={{ backgroundColor: project.color }}
           />
-          <span className="text-[11px] font-light text-[#8B949E]">{project.name}</span>
+          <span className="text-[11px] font-light text-muted">{project.name}</span>
         </div>
       </div>
 
       {/* Area Badge - Only when showing all */}
       {showArea && (
         <div className="flex items-center">
-          <Badge variant="area" value={task.area} />
+          <Badge variant="area" value={task.areaId} />
         </div>
       )}
 
@@ -66,7 +66,7 @@ export function TaskRow({ task, project, isCompleted, showArea, onToggle }: Task
 
       {/* Due Date */}
       <div className="flex items-center">
-        <span className="text-[12px] text-[#8B949E] font-light">{task.dueDate}</span>
+        <span className="text-[12px] text-muted font-light">{task.dueDate}</span>
       </div>
 
       {/* Tags */}

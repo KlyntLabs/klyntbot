@@ -8,7 +8,7 @@ interface ToolbarProps {
 
 function FilterButton({ label }: { label: string }) {
   return (
-    <button className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[rgba(255,255,255,0.03)] hover:bg-[rgba(255,255,255,0.05)] text-[#8B949E] hover:text-[#C9D1D9] transition-colors">
+    <button className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-surface-low hover:bg-surface-base text-muted hover:text-secondary transition-colors">
       <span className="text-[11px] font-light">{label}</span>
       <ChevronDown className="w-[12px] h-[12px]" strokeWidth={1.5} />
     </button>
@@ -20,7 +20,7 @@ export function Toolbar({ viewMode, onViewModeChange }: ToolbarProps) {
     <div className="flex items-center justify-between mb-3.5">
       {/* Left: Filters */}
       <div className="flex items-center gap-2">
-        <button className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-[rgba(255,255,255,0.03)] hover:bg-[rgba(255,255,255,0.05)] text-[#8B949E] hover:text-[#C9D1D9] transition-colors">
+        <button className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-surface-low hover:bg-surface-base text-muted hover:text-secondary transition-colors">
           <Filter className="w-[14px] h-[14px]" strokeWidth={1.5} />
           <span className="text-[12px] font-light">Filter</span>
         </button>
@@ -33,7 +33,7 @@ export function Toolbar({ viewMode, onViewModeChange }: ToolbarProps) {
 
       {/* Right: View toggles + Add task */}
       <div className="flex items-center gap-2">
-        <div className="flex items-center bg-[rgba(255,255,255,0.03)] rounded-md p-0.5">
+        <div className="flex items-center bg-surface-low rounded-md p-0.5">
           {([
             { mode: 'table' as const, icon: List },
             { mode: 'board' as const, icon: LayoutGrid },
@@ -44,8 +44,8 @@ export function Toolbar({ viewMode, onViewModeChange }: ToolbarProps) {
               onClick={() => onViewModeChange(mode)}
               className={`p-1.5 rounded transition-colors ${
                 viewMode === mode
-                  ? 'bg-[rgba(255,255,255,0.08)] text-[#F97316]'
-                  : 'text-[#8B949E] hover:text-[#C9D1D9]'
+                  ? 'bg-surface-highest text-brand'
+                  : 'text-muted hover:text-secondary'
               }`}
             >
               <Icon className="w-[14px] h-[14px]" strokeWidth={1.5} />
@@ -53,7 +53,7 @@ export function Toolbar({ viewMode, onViewModeChange }: ToolbarProps) {
           ))}
         </div>
 
-        <button className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-[#F97316] hover:bg-[#ea6a0f] text-white transition-colors">
+        <button className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-brand hover:bg-brand-hover text-white transition-colors">
           <Plus className="w-[14px] h-[14px]" strokeWidth={1.5} />
           <span className="text-[12px] font-light">Add task</span>
         </button>
