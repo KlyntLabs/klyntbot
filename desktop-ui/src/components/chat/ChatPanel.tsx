@@ -8,15 +8,20 @@ interface ChatPanelProps {
   onClose: () => void;
 }
 
-export function ChatPanel({ isOpen, onClose: _onClose }: ChatPanelProps) {
+export function ChatPanel({ isOpen, onClose }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>(mockChatMessages);
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  useEffect(() => {
+    return () => clearTimeout(timerRef.current);
+  }, []);
 
   const handleSend = () => {
     if (!input.trim()) return;
@@ -32,7 +37,7 @@ export function ChatPanel({ isOpen, onClose: _onClose }: ChatPanelProps) {
     setIsStreaming(true);
 
     // Simulate streaming response
-    setTimeout(() => {
+    timerRef.current = setTimeout(() => {
       const aiMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         role: 'assistant',
@@ -47,6 +52,17 @@ export function ChatPanel({ isOpen, onClose: _onClose }: ChatPanelProps) {
 
   return (
     <div className="w-96 bg-[#0E0E0D] border-l border-[rgba(255,255,255,0.08)] flex flex-col">
+      {/* Header */}
+      <div className="h-14 flex items-center justify-between px-5 border-b border-[rgba(255,255,255,0.08)]">
+        <span className="text-[13px] font-light text-[#C9D1D9]">Chat</span>
+        <button
+          onClick={onClose}
+          className="text-[#8B949E] hover:text-[#C9D1D9] transition-colors text-[18px] leading-none"
+        >
+          &times;
+        </button>
+      </div>
+
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-5 space-y-4">
         {messages.map(message => (

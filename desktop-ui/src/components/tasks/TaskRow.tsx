@@ -1,20 +1,21 @@
 import { Target } from 'lucide-react';
 import { Checkbox } from '../ui/Checkbox';
 import { Badge } from '../ui/Badge';
-import type { Task, Project, Tab } from '../../lib/types';
+import { taskGridCols } from '../../lib/utils';
+import type { Task, Project } from '../../lib/types';
 
 interface TaskRowProps {
   task: Task;
   project: Project;
   isCompleted: boolean;
-  activeTab: Tab;
+  showArea: boolean;
   onToggle: () => void;
 }
 
-export function TaskRow({ task, project, isCompleted, activeTab, onToggle }: TaskRowProps) {
+export function TaskRow({ task, project, isCompleted, showArea, onToggle }: TaskRowProps) {
   return (
     <div
-      className={`grid ${activeTab === 'All' ? 'grid-cols-[40px_1fr_180px_100px_80px_100px_120px_140px]' : 'grid-cols-[40px_1fr_180px_80px_100px_120px_140px]'} gap-4 px-6 py-3 hover:bg-[rgba(255,255,255,0.04)] transition-colors border-b border-[rgba(255,255,255,0.04)] last:border-b-0`}
+      className={`grid ${taskGridCols(showArea)} gap-4 px-6 py-3 hover:bg-[rgba(255,255,255,0.04)] transition-colors border-b border-[rgba(255,255,255,0.04)] last:border-b-0`}
     >
       {/* Checkbox */}
       <div className="flex items-center">
@@ -46,8 +47,8 @@ export function TaskRow({ task, project, isCompleted, activeTab, onToggle }: Tas
         </div>
       </div>
 
-      {/* Area Badge - Only when All tab */}
-      {activeTab === 'All' && (
+      {/* Area Badge - Only when showing all */}
+      {showArea && (
         <div className="flex items-center">
           <Badge variant="area" value={task.area} />
         </div>

@@ -1,5 +1,7 @@
+import { useMemo } from 'react';
 import { ProjectHeader } from './ProjectHeader';
 import { TaskRow } from './TaskRow';
+import { taskGridCols } from '../../lib/utils';
 import type { Task, Project, Objective, Tab } from '../../lib/types';
 
 interface TaskTableProps {
@@ -23,22 +25,33 @@ export function TaskTable({
   onToggleTask,
   onToggleProject,
 }: TaskTableProps) {
-  // Group tasks by project
-  const tasksByProject = tasks.reduce((acc, task) => {
-    if (!acc[task.project]) acc[task.project] = [];
-    acc[task.project].push(task);
-    return acc;
-  }, {} as Record<string, Task[]>);
+  const showArea = activeTab === 'All';
+
+  const tasksByProject = useMemo(() =>
+    tasks.reduce((acc, task) => {
+      if (!acc[task.project]) acc[task.project] = [];
+      acc[task.project].push(task);
+      return acc;
+    }, {} as Record<string, Task[]>),
+  [tasks]);
+
+  const projectMap = useMemo(() =>
+    new Map(projects.map(p => [p.id, p])),
+  [projects]);
+
+  const objectiveMap = useMemo(() =>
+    new Map(objectives.map(o => [o.id, o])),
+  [objectives]);
 
   return (
     <div className="mb-10">
       <div className="bg-[rgba(255,255,255,0.03)] backdrop-blur-sm rounded-xl overflow-hidden">
         {/* Table Header */}
-        <div className={`grid ${activeTab === 'All' ? 'grid-cols-[40px_1fr_180px_100px_80px_100px_120px_140px]' : 'grid-cols-[40px_1fr_180px_80px_100px_120px_140px]'} gap-4 border-b border-[rgba(255,255,255,0.08)] text-[11px] text-[#8B949E] font-light px-6 py-3`}>
+        <div className={`grid ${taskGridCols(showArea)} gap-4 border-b border-[rgba(255,255,255,0.08)] text-[11px] text-[#8B949E] font-light px-6 py-3`}>
           <div></div>
           <div>Task</div>
           <div>Project</div>
-          {activeTab === 'All' && <div>Area</div>}
+          {showArea && <div>Area</div>}
           <div>Priority</div>
           <div>Status</div>
           <div>Due Date</div>
@@ -47,12 +60,15 @@ export function TaskTable({
 
         {/* Table Body - Grouped by Project */}
         {Object.entries(tasksByProject).map(([projectId, projectTasks]) => {
-          const project = projects.find(p => p.id === projectId);
+          const project = projectMap.get(projectId);
           if (!project) return null;
 
           const isCollapsed = collapsedProjects.has(projectId);
           const projectObjectives = project.objectiveIds
-            ? objectives.filter(obj => project.objectiveIds?.includes(obj.id))
+            ? project.objectiveIds.flatMap(id => {
+                const obj = objectiveMap.get(id);
+                return obj ? [obj] : [];
+              })
             : [];
 
           return (
@@ -70,7 +86,7 @@ export function TaskTable({
                   task={task}
                   project={project}
                   isCompleted={completedTasks.has(task.id)}
-                  activeTab={activeTab}
+                  showArea={showArea}
                   onToggle={() => onToggleTask(task.id)}
                 />
               ))}

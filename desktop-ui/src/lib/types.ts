@@ -7,7 +7,7 @@ export interface Task {
   dueDate: string;
   tags: string[];
   project: string;
-  area: 'All' | 'Work' | 'Personal';
+  area: Area;
   objectiveId?: string;
 }
 
@@ -58,6 +58,7 @@ export interface LauncherItem {
   shortcut: string;
 }
 
-export type Tab = 'All' | 'Work' | 'Personal';
+export type Area = 'Work' | 'Personal';
+export type Tab = 'All' | Area;
 export type SidebarItem = 'Chat' | 'Tasks' | 'OKR' | 'Calendar' | 'Settings';
 export type ViewMode = 'table' | 'board' | 'tree';

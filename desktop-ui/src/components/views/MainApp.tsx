@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { MessageSquare } from 'lucide-react';
 import { Sidebar } from '../layout/Sidebar';
 import { Toolbar } from '../tasks/Toolbar';
 import { TaskTable } from '../tasks/TaskTable';
 import { ChatPanel } from '../chat/ChatPanel';
+import { useSetToggle } from '../../hooks/useSetToggle';
 import { mockProjects, mockTasks, mockObjectives } from '../../data/mockData';
 import type { Tab, SidebarItem, ViewMode } from '../../lib/types';
 
@@ -12,32 +13,14 @@ export function MainApp() {
   const [activeSidebar, setActiveSidebar] = useState<SidebarItem>('Tasks');
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('table');
-  const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
-  const [completedTasks, setCompletedTasks] = useState<Set<string>>(
-    new Set(mockTasks.filter(t => t.completed).map(t => t.id))
+  const [collapsedProjects, toggleProject] = useSetToggle();
+  const [completedTasks, toggleTask] = useSetToggle(
+    mockTasks.filter(t => t.completed).map(t => t.id)
   );
 
-  const filteredTasks = activeTab === 'All'
-    ? mockTasks
-    : mockTasks.filter(task => task.area === activeTab);
-
-  const toggleTask = (taskId: string) => {
-    setCompletedTasks(prev => {
-      const next = new Set(prev);
-      if (next.has(taskId)) next.delete(taskId);
-      else next.add(taskId);
-      return next;
-    });
-  };
-
-  const toggleProject = (projectId: string) => {
-    setCollapsedProjects(prev => {
-      const next = new Set(prev);
-      if (next.has(projectId)) next.delete(projectId);
-      else next.add(projectId);
-      return next;
-    });
-  };
+  const filteredTasks = useMemo(() =>
+    activeTab === 'All' ? mockTasks : mockTasks.filter(task => task.area === activeTab),
+  [activeTab]);
 
   return (
     <div className="h-screen w-screen bg-[#0E0E0D] text-[#E6EDF3] flex overflow-hidden">
@@ -70,8 +53,9 @@ export function MainApp() {
           </div>
           <button
             onClick={() => {
-              setIsChatOpen(prev => !prev);
-              setActiveSidebar(isChatOpen ? 'Tasks' : 'Chat');
+              const nextOpen = !isChatOpen;
+              setIsChatOpen(nextOpen);
+              setActiveSidebar(nextOpen ? 'Chat' : 'Tasks');
             }}
             className="w-9 h-9 rounded-md flex items-center justify-center transition-colors bg-[rgba(255,255,255,0.03)] text-[#8B949E] hover:bg-[rgba(255,255,255,0.05)] hover:text-[#C9D1D9] ml-2"
           >

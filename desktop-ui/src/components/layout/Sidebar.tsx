@@ -8,11 +8,12 @@ interface SidebarProps {
   onNavigate?: (item: SidebarItem) => void;
 }
 
-const items: { key: SidebarItem; icon: typeof MessageSquare; path?: string }[] = [
+const items: { key: SidebarItem; icon: typeof MessageSquare; path?: string; bottom?: boolean }[] = [
   { key: 'Chat', icon: MessageSquare, path: '/chat' },
   { key: 'Tasks', icon: CheckSquare, path: '/' },
   { key: 'OKR', icon: Target },
   { key: 'Calendar', icon: Calendar },
+  { key: 'Settings', icon: Settings, bottom: true },
 ];
 
 export function Sidebar({ active, onNavigate }: SidebarProps) {
@@ -24,6 +25,9 @@ export function Sidebar({ active, onNavigate }: SidebarProps) {
     }
     onNavigate?.(item.key);
   };
+
+  const topItems = items.filter(i => !i.bottom);
+  const bottomItems = items.filter(i => i.bottom);
 
   return (
     <div className="w-14 bg-[#0E0E0D] backdrop-blur-xl border-r border-[rgba(255,255,255,0.08)] flex flex-col items-center gap-1 pb-3">
@@ -38,7 +42,7 @@ export function Sidebar({ active, onNavigate }: SidebarProps) {
       </div>
 
       {/* Nav Items */}
-      {items.map(item => {
+      {topItems.map(item => {
         const Icon = item.icon;
         const isActive = active === item.key;
         return (
@@ -58,17 +62,24 @@ export function Sidebar({ active, onNavigate }: SidebarProps) {
 
       <div className="flex-1" />
 
-      {/* Settings */}
-      <button
-        onClick={() => onNavigate?.('Settings')}
-        className={`w-9 h-9 rounded-md flex items-center justify-center transition-colors ${
-          active === 'Settings'
-            ? 'bg-[rgba(255,255,255,0.08)] text-[#F97316]'
-            : 'text-[#8B949E] hover:bg-[rgba(255,255,255,0.04)] hover:text-[#C9D1D9]'
-        }`}
-      >
-        <Settings className="w-[18px] h-[18px]" strokeWidth={1.5} />
-      </button>
+      {/* Bottom Items */}
+      {bottomItems.map(item => {
+        const Icon = item.icon;
+        const isActive = active === item.key;
+        return (
+          <button
+            key={item.key}
+            onClick={() => handleClick(item)}
+            className={`w-9 h-9 rounded-md flex items-center justify-center transition-colors ${
+              isActive
+                ? 'bg-[rgba(255,255,255,0.08)] text-[#F97316]'
+                : 'text-[#8B949E] hover:bg-[rgba(255,255,255,0.04)] hover:text-[#C9D1D9]'
+            }`}
+          >
+            <Icon className="w-[18px] h-[18px]" strokeWidth={1.5} />
+          </button>
+        );
+      })}
     </div>
   );
 }

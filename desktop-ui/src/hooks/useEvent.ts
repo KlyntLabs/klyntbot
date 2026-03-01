@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 
 /**
@@ -7,15 +7,21 @@ import { listen, type UnlistenFn } from '@tauri-apps/api/event';
  * Not called yet — will be used for streaming chat responses.
  */
 export function useEvent<T>(event: string, handler: (payload: T) => void) {
+  const handlerRef = useRef(handler);
+  handlerRef.current = handler;
+
   useEffect(() => {
+    let cancelled = false;
     let unlisten: UnlistenFn | undefined;
 
-    listen<T>(event, (e) => handler(e.payload)).then((fn) => {
-      unlisten = fn;
+    listen<T>(event, (e) => handlerRef.current(e.payload)).then((fn) => {
+      if (cancelled) fn();
+      else unlisten = fn;
     });
 
     return () => {
+      cancelled = true;
       unlisten?.();
     };
-  }, [event, handler]);
+  }, [event]);
 }
