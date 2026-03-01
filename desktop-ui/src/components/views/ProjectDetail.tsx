@@ -27,8 +27,8 @@ export function ProjectDetail() {
 
   if (!project) {
     return (
-      <div className="h-screen w-screen bg-[#0E0E0D] text-[#E6EDF3] flex items-center justify-center">
-        <p className="text-[#8B949E] text-sm font-light">Project not found</p>
+      <div className="h-screen w-screen bg-background text-primary flex items-center justify-center">
+        <p className="text-muted text-sm font-light">Project not found</p>
       </div>
     );
   }
@@ -47,7 +47,7 @@ export function ProjectDetail() {
   ];
 
   return (
-    <div className="h-screen w-screen bg-[#0E0E0D] text-[#E6EDF3] flex overflow-hidden">
+    <div className="h-screen w-screen bg-background text-primary flex overflow-hidden">
       <Sidebar
         active={activeSidebar}
         onNavigate={(item) => {
@@ -59,16 +59,16 @@ export function ProjectDetail() {
 
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Breadcrumb Header */}
-        <div className="h-14 flex items-center px-6 gap-3 border-b border-[rgba(255,255,255,0.08)]">
+        <div className="h-14 flex items-center px-6 gap-3 border-b border-border">
           <button
             onClick={() => navigate('/')}
-            className="text-[#8B949E] hover:text-[#C9D1D9] transition-colors"
+            className="text-muted hover:text-secondary transition-colors"
           >
             <ArrowLeft className="w-4 h-4" strokeWidth={1.5} />
           </button>
           <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: project.color }} />
-          <span className="text-[14px] font-light text-[#E6EDF3]">{project.name}</span>
-          <span className="text-[12px] text-[#8B949E] font-light">{tasks.length} tasks</span>
+          <span className="text-[14px] font-light text-primary">{project.name}</span>
+          <span className="text-[12px] text-muted font-light">{tasks.length} tasks</span>
         </div>
 
         {/* Scrollable Content */}
@@ -76,10 +76,10 @@ export function ProjectDetail() {
           {/* Stats Row */}
           <div className="grid grid-cols-4 gap-3">
             {stats.map(stat => (
-              <div key={stat.label} className="bg-[rgba(255,255,255,0.03)] rounded-xl p-4">
-                <p className="text-[11px] text-[#8B949E] font-light mb-1">{stat.label}</p>
-                <p className="text-[22px] font-light text-[#E6EDF3]">{stat.value}</p>
-                <p className="text-[11px] text-[#8B949E] font-light mt-0.5">{stat.sub}</p>
+              <div key={stat.label} className="bg-surface-low rounded-xl p-4">
+                <p className="text-[11px] text-muted font-light mb-1">{stat.label}</p>
+                <p className="text-[22px] font-light text-primary">{stat.value}</p>
+                <p className="text-[11px] text-muted font-light mt-0.5">{stat.sub}</p>
               </div>
             ))}
           </div>
@@ -87,24 +87,24 @@ export function ProjectDetail() {
           {/* OKR Section */}
           {objectives.length > 0 && (
             <div>
-              <h3 className="text-[12px] font-light text-[#8B949E] uppercase tracking-wider mb-3">Objectives & Key Results</h3>
+              <h3 className="text-[12px] font-light text-muted uppercase tracking-wider mb-3">Objectives & Key Results</h3>
               <div className="space-y-2">
                 {objectives.map(objective => {
                   const isExpanded = expandedOkrs.has(objective.id);
                   return (
-                    <div key={objective.id} className="bg-[rgba(255,255,255,0.03)] rounded-xl overflow-hidden">
+                    <div key={objective.id} className="bg-surface-low rounded-xl overflow-hidden">
                       <button
                         onClick={() => toggleOkr(objective.id)}
-                        className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-[rgba(255,255,255,0.02)] transition-colors text-left"
+                        className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-surface-lowest transition-colors text-left"
                       >
                         {isExpanded ? (
-                          <ChevronDown className="w-3.5 h-3.5 text-[#8B949E] flex-shrink-0" strokeWidth={1.5} />
+                          <ChevronDown className="w-3.5 h-3.5 text-muted flex-shrink-0" strokeWidth={1.5} />
                         ) : (
-                          <ChevronRight className="w-3.5 h-3.5 text-[#8B949E] flex-shrink-0" strokeWidth={1.5} />
+                          <ChevronRight className="w-3.5 h-3.5 text-muted flex-shrink-0" strokeWidth={1.5} />
                         )}
-                        <Target className="w-3.5 h-3.5 text-[#F97316] flex-shrink-0" strokeWidth={1.5} />
-                        <span className="text-[13px] font-light text-[#C9D1D9] flex-1">{objective.title}</span>
-                        <span className="text-[12px] text-[#8B949E] font-light mr-3">{objective.progress}%</span>
+                        <Target className="w-3.5 h-3.5 text-brand flex-shrink-0" strokeWidth={1.5} />
+                        <span className="text-[13px] font-light text-secondary flex-1">{objective.title}</span>
+                        <span className="text-[12px] text-muted font-light mr-3">{objective.progress}%</span>
                         <div className="w-24">
                           <Progress value={objective.progress} />
                         </div>
@@ -113,14 +113,14 @@ export function ProjectDetail() {
                         <div className="px-4 pb-3 space-y-2 ml-10">
                           {objective.keyResults.map(kr => (
                             <div key={kr.id} className="flex items-center gap-3">
-                              <span className="text-[12px] font-light text-[#8B949E] flex-1">{kr.title}</span>
-                              <span className="text-[11px] text-[#6E7681] font-light">
+                              <span className="text-[12px] font-light text-muted flex-1">{kr.title}</span>
+                              <span className="text-[11px] text-dim font-light">
                                 {kr.current}{kr.unit === '$' ? '' : ` ${kr.unit}`} / {kr.target}{kr.unit === '$' ? '' : ` ${kr.unit}`}
                               </span>
                               <div className="w-20">
                                 <Progress value={kr.progress} />
                               </div>
-                              <span className="text-[11px] text-[#8B949E] font-light w-8 text-right">{kr.progress}%</span>
+                              <span className="text-[11px] text-muted font-light w-8 text-right">{kr.progress}%</span>
                             </div>
                           ))}
                         </div>
@@ -134,10 +134,10 @@ export function ProjectDetail() {
 
           {/* Task Table */}
           <div>
-            <h3 className="text-[12px] font-light text-[#8B949E] uppercase tracking-wider mb-3">Tasks</h3>
-            <div className="bg-[rgba(255,255,255,0.03)] rounded-xl overflow-hidden">
+            <h3 className="text-[12px] font-light text-muted uppercase tracking-wider mb-3">Tasks</h3>
+            <div className="bg-surface-low rounded-xl overflow-hidden">
               {/* Table Header */}
-              <div className="grid grid-cols-[40px_1fr_80px_100px_120px_140px] gap-4 border-b border-[rgba(255,255,255,0.08)] text-[11px] text-[#8B949E] font-light px-6 py-3">
+              <div className="grid grid-cols-[40px_1fr_80px_100px_120px_140px] gap-4 border-b border-border text-[11px] text-muted font-light px-6 py-3">
                 <div></div>
                 <div>Task</div>
                 <div>Priority</div>
@@ -152,16 +152,16 @@ export function ProjectDetail() {
                 return (
                   <div
                     key={task.id}
-                    className="grid grid-cols-[40px_1fr_80px_100px_120px_140px] gap-4 px-6 py-3 hover:bg-[rgba(255,255,255,0.04)] transition-colors border-b border-[rgba(255,255,255,0.04)] last:border-b-0"
+                    className="grid grid-cols-[40px_1fr_80px_100px_120px_140px] gap-4 px-6 py-3 hover:bg-surface-base transition-colors border-b border-surface-base last:border-b-0"
                   >
                     <div className="flex items-center">
                       <Checkbox checked={isCompleted} onCheckedChange={() => toggleTask(task.id)} />
                     </div>
                     <div className="flex items-center gap-1.5">
                       {task.objectiveId && (
-                        <Target className="w-[10px] h-[10px] text-[#F97316] flex-shrink-0" strokeWidth={1.5} />
+                        <Target className="w-[10px] h-[10px] text-brand flex-shrink-0" strokeWidth={1.5} />
                       )}
-                      <span className={`text-[13px] font-light truncate ${isCompleted ? 'text-[#8B949E] line-through' : 'text-[#C9D1D9]'}`}>
+                      <span className={`text-[13px] font-light truncate ${isCompleted ? 'text-muted line-through' : 'text-secondary'}`}>
                         {task.title}
                       </span>
                     </div>
@@ -172,7 +172,7 @@ export function ProjectDetail() {
                       <Badge variant="status" value={task.status} />
                     </div>
                     <div className="flex items-center">
-                      <span className="text-[12px] text-[#8B949E] font-light">{task.dueDate}</span>
+                      <span className="text-[12px] text-muted font-light">{task.dueDate}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       {task.tags.map(tag => (
