@@ -51,13 +51,13 @@ export function ChatPanel({ isOpen, onClose }: ChatPanelProps) {
   if (!isOpen) return null;
 
   return (
-    <div className="w-96 bg-[#0E0E0D] border-l border-[rgba(255,255,255,0.08)] flex flex-col">
+    <div className="w-96 bg-background border-l border-border flex flex-col">
       {/* Header */}
-      <div className="h-14 flex items-center justify-between px-5 border-b border-[rgba(255,255,255,0.08)]">
-        <span className="text-[13px] font-light text-[#C9D1D9]">Chat</span>
+      <div className="h-14 flex items-center justify-between px-5 border-b border-border">
+        <span className="text-[13px] font-light text-secondary">Chat</span>
         <button
           onClick={onClose}
-          className="text-[#8B949E] hover:text-[#C9D1D9] transition-colors text-[18px] leading-none"
+          className="text-muted hover:text-secondary transition-colors text-[18px] leading-none"
         >
           &times;
         </button>
@@ -73,8 +73,8 @@ export function ChatPanel({ isOpen, onClose }: ChatPanelProps) {
             <div
               className={`max-w-[85%] rounded-xl px-4 py-3 ${
                 message.role === 'user'
-                  ? 'bg-[#F97316] text-white'
-                  : 'bg-[rgba(255,255,255,0.04)] text-[#C9D1D9]'
+                  ? 'bg-brand text-white'
+                  : 'bg-surface-base text-secondary'
               }`}
             >
               <p className="text-[13px] font-light whitespace-pre-wrap leading-relaxed">{message.content}</p>
@@ -83,11 +83,11 @@ export function ChatPanel({ isOpen, onClose }: ChatPanelProps) {
         ))}
         {isStreaming && (
           <div className="flex justify-start">
-            <div className="bg-[rgba(255,255,255,0.04)] rounded-xl px-4 py-3">
+            <div className="bg-surface-base rounded-xl px-4 py-3">
               <div className="flex gap-1">
-                <div className="w-1.5 h-1.5 bg-[#8B949E] rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <div className="w-1.5 h-1.5 bg-[#8B949E] rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <div className="w-1.5 h-1.5 bg-[#8B949E] rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                <div className="w-1.5 h-1.5 bg-muted rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <div className="w-1.5 h-1.5 bg-muted rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <div className="w-1.5 h-1.5 bg-muted rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
               </div>
             </div>
           </div>
@@ -96,7 +96,7 @@ export function ChatPanel({ isOpen, onClose }: ChatPanelProps) {
       </div>
 
       {/* Input */}
-      <div className="p-5 border-t border-[rgba(255,255,255,0.08)]">
+      <div className="p-5 border-t border-border">
         <div className="flex gap-2">
           <input
             type="text"
@@ -104,12 +104,12 @@ export function ChatPanel({ isOpen, onClose }: ChatPanelProps) {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
             placeholder="Ask me anything..."
-            className="flex-1 bg-[rgba(255,255,255,0.04)] rounded-xl px-4 py-2.5 text-[13px] text-[#E6EDF3] placeholder:text-[#8B949E] focus:outline-none focus:bg-[rgba(255,255,255,0.06)] font-light"
+            className="flex-1 bg-surface-base rounded-xl px-4 py-2.5 text-[13px] text-primary placeholder:text-muted focus:outline-none focus:bg-surface-raised font-light"
           />
           <button
             onClick={handleSend}
             disabled={!input.trim()}
-            className="w-10 h-10 rounded-xl bg-[#F97316] hover:bg-[#F97316]/90 disabled:bg-[rgba(255,255,255,0.04)] disabled:text-[#8B949E] flex items-center justify-center transition-colors"
+            className="w-10 h-10 rounded-xl bg-brand hover:bg-brand/90 disabled:bg-surface-base disabled:text-muted flex items-center justify-center transition-colors"
           >
             <Send className="w-4 h-4" strokeWidth={2} />
           </button>
