@@ -22,6 +22,7 @@ members = [
     "crates/feature-todo",
     "crates/plugin-runtime",
     "crates/desktop-shared",
+    "crates/desktop",
 ]
 
 [workspace.package]
@@ -52,6 +53,7 @@ feature-finance = { path = "crates/feature-finance" }
 feature-todo = { path = "crates/feature-todo" }
 plugin-runtime = { path = "crates/plugin-runtime" }
 desktop-shared = { path = "crates/desktop-shared" }
+desktop = { path = "crates/desktop" }
 extism = "1"
 
 # Proc-macro dependencies

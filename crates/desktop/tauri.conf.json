@@ -1,0 +1,35 @@
+{
+  "productName": "Klynt",
+  "version": "0.1.0",
+  "identifier": "com.klynt.app",
+  "build": {
+    "beforeDevCommand": "npm run dev --prefix ../../desktop-ui",
+    "beforeBuildCommand": "npm run build --prefix ../../desktop-ui",
+    "devUrl": "http://localhost:1420",
+    "frontendDist": "../../desktop-ui/dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Klynt",
+        "width": 1200,
+        "height": 800,
+        "resizable": true,
+        "decorations": true,
+        "transparent": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png"
+    ]
+  }
+}
