@@ -122,8 +122,9 @@ pub async fn chat_send(
     session_key: String,
     context: Option<SessionContextInput>,
 ) -> Result<ChatMessageResponse, String> {
-    // 1. Ensure session exists
-    let metadata = serde_json::json!({ "title": "Desktop Chat" });
+    // 1. Ensure session exists (title derived from first message, truncated to 60 chars)
+    let title: String = content.chars().take(60).collect::<String>().trim().to_string();
+    let metadata = serde_json::json!({ "title": title });
     state
         .repos
         .sessions
@@ -285,6 +286,43 @@ pub async fn chat_pin_thread(state: State<'_, AppCore>, session_key: String) -> 
         .repos
         .session_context
         .pin(&session_key)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn chat_rename_thread(
+    state: State<'_, AppCore>,
+    session_key: String,
+    title: String,
+) -> Result<(), String> {
+    let title = title.trim().to_string();
+    if title.is_empty() {
+        return Err("title cannot be empty".to_string());
+    }
+    state
+        .repos
+        .sessions
+        .rename_session(&session_key, &title)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn chat_delete_thread(
+    state: State<'_, AppCore>,
+    session_key: String,
+) -> Result<(), String> {
+    // Cancel any in-flight stream before deleting to avoid dangling writes
+    if let Some((_, token)) = state.active_streams.remove(&session_key) {
+        token.cancel();
+    }
+    state
+        .repos
+        .sessions
+        .delete_session(&session_key)
         .await
         .map_err(|e| e.to_string())?;
     Ok(())

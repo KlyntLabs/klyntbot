@@ -1,14 +1,16 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router';
 import {
   Send, ChevronDown, Plus, Settings, FolderOpen, MessageSquare,
   RotateCcw, Mic, Shield, Server, Wallet, Globe,
+  Pencil, Trash2, X, Check,
 } from 'lucide-react';
 import { Sidebar } from '../layout/Sidebar';
 import { MessageList } from '../chat/MessageList';
 import { useSetToggle } from '../../hooks/useSetToggle';
 import { useQuery } from '../../hooks/useQuery';
 import { useChatSession } from '../../hooks/useChatSession';
+import { ipc } from '../../hooks/useIpc';
 import type { ChatThread, SidebarItem } from '../../lib/types';
 
 // Known feature prefixes → display config
@@ -18,11 +20,15 @@ const FEATURE_GROUPS: Record<string, { label: string; icon: typeof Wallet }> = {
 
 function formatRelativeTime(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
-  const days = Math.floor(diff / 86400000);
-  if (days < 1) return 'now';
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'now';
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
   if (days < 7) return `${days}d`;
   if (days < 30) return `${Math.floor(days / 7)}w`;
-  return `${Math.floor(days / 30)}m`;
+  return `${Math.floor(days / 30)}mo`;
 }
 
 /** Extract the feature prefix from an entity_kind like "finance.budgets" → "finance" */
@@ -50,21 +56,25 @@ export function Chat() {
   const navigate = useNavigate();
   const [activeSidebar, setActiveSidebar] = useState<SidebarItem>('Chat');
   const [selectedThread, setSelectedThread] = useState(() => `chat:${crypto.randomUUID()}`);
-  const [expandedGroups, toggleGroup] = useSetToggle();
+  const [expandedGroups, toggleGroup] = useSetToggle(['_general']);
 
   // IPC data
-  const { data: threads } = useQuery<ChatThread[]>('chat_threads', undefined, []);
+  const { data: threads, refetch: refetchThreads } = useQuery<ChatThread[]>('chat_threads', undefined, []);
 
   // Chat session (messages, streaming, input, send)
-  const chat = useChatSession(selectedThread);
+  // Refetch thread list when the agent finishes (new thread appears in sidebar)
+  const chat = useChatSession(selectedThread, refetchThreads);
 
-  // Auto-select first thread on load (only if current key has no messages yet)
-  const hasExistingThread = threads.some((t) => t.sessionKey === selectedThread);
+  // Auto-select first thread only on initial page load.
+  // Once this fires, further thread selection is user-driven.
+  const didAutoSelect = useRef(false);
   useEffect(() => {
-    if (threads.length > 0 && !hasExistingThread) {
+    if (didAutoSelect.current) return;
+    if (threads.length > 0) {
       setSelectedThread(threads[0].sessionKey);
+      didAutoSelect.current = true;
     }
-  }, [threads, hasExistingThread]);
+  }, [threads]);
 
   // Group threads into PARA hierarchy, features, and general
   const grouped = useMemo<GroupedThreads>(() => {
@@ -130,22 +140,108 @@ export function Chat() {
     setSelectedThread(key);
   }, []);
 
+  // ── Thread actions (rename / delete) ─────────────────────────────────
+  const [contextMenu, setContextMenu] = useState<{ thread: ChatThread; x: number; y: number } | null>(null);
+  const [renaming, setRenaming] = useState<{ sessionKey: string; value: string } | null>(null);
+  const renameRef = useRef<HTMLInputElement>(null);
+
+  // Close context menu on outside mousedown or Escape
+  useEffect(() => {
+    if (!contextMenu) return;
+    const closeOnClick = () => setContextMenu(null);
+    const closeOnKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setContextMenu(null); };
+    document.addEventListener('mousedown', closeOnClick);
+    document.addEventListener('keydown', closeOnKey);
+    return () => {
+      document.removeEventListener('mousedown', closeOnClick);
+      document.removeEventListener('keydown', closeOnKey);
+    };
+  }, [contextMenu]);
+
+  // Focus rename input when it appears
+  useEffect(() => {
+    if (renaming) renameRef.current?.focus();
+  }, [renaming]);
+
+  const openContextMenu = useCallback((e: React.MouseEvent, thread: ChatThread) => {
+    e.preventDefault();
+    setContextMenu({ thread, x: e.clientX, y: e.clientY });
+  }, []);
+
+  const startRename = useCallback((thread: ChatThread) => {
+    setContextMenu(null);
+    setRenaming({ sessionKey: thread.sessionKey, value: thread.title });
+  }, []);
+
+  const confirmRename = useCallback(async () => {
+    if (!renaming || !renaming.value.trim()) return;
+    try {
+      await ipc('chat_rename_thread', { sessionKey: renaming.sessionKey, title: renaming.value.trim() });
+      refetchThreads();
+    } catch { /* IPC error — thread list stays as-is */ }
+    setRenaming(null);
+  }, [renaming, refetchThreads]);
+
+  const cancelRename = useCallback(() => {
+    setRenaming(null);
+  }, []);
+
+  const deleteThread = useCallback(async (sessionKey: string) => {
+    setContextMenu(null);
+    try {
+      await ipc('chat_delete_thread', { sessionKey });
+      if (selectedThread === sessionKey) {
+        setSelectedThread(`chat:${crypto.randomUUID()}`);
+      }
+      refetchThreads();
+    } catch { /* IPC error — thread list stays as-is */ }
+  }, [selectedThread, refetchThreads]);
+
   // Shared thread button renderer
-  const renderThread = (thread: ChatThread) => (
-    <button
-      key={thread.sessionKey}
-      onClick={() => selectThread(thread.sessionKey)}
-      className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-[12px] font-light ${
-        selectedThread === thread.sessionKey
-          ? 'bg-surface-highest text-primary'
-          : 'text-muted hover:bg-surface-base hover:text-secondary'
-      }`}
-    >
-      <MessageSquare className="w-3 h-3 shrink-0" strokeWidth={1.5} />
-      <span className="flex-1 text-left truncate">{thread.title}</span>
-      <span className="text-[11px] shrink-0">{formatRelativeTime(thread.updatedAt)}</span>
-    </button>
-  );
+  const renderThread = (thread: ChatThread) => {
+    const isActive = selectedThread === thread.sessionKey;
+    const isRenaming = renaming?.sessionKey === thread.sessionKey;
+
+    if (isRenaming) {
+      return (
+        <div key={thread.sessionKey} className="flex items-center gap-1 px-2 py-1">
+          <input
+            ref={renameRef}
+            value={renaming.value}
+            onChange={(e) => setRenaming({ ...renaming, value: e.target.value })}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') confirmRename();
+              if (e.key === 'Escape') cancelRename();
+            }}
+            className="flex-1 min-w-0 bg-surface-highest text-primary text-[12px] font-light px-2 py-1 rounded border border-border focus:outline-none focus:border-brand"
+          />
+          <button onClick={confirmRename} className="text-success hover:text-success/80 shrink-0">
+            <Check className="w-3.5 h-3.5" strokeWidth={2} />
+          </button>
+          <button onClick={cancelRename} className="text-muted hover:text-secondary shrink-0">
+            <X className="w-3.5 h-3.5" strokeWidth={2} />
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <button
+        key={thread.sessionKey}
+        onClick={() => selectThread(thread.sessionKey)}
+        onContextMenu={(e) => openContextMenu(e, thread)}
+        className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-[12px] font-light ${
+          isActive
+            ? 'bg-surface-highest text-primary'
+            : 'text-muted hover:bg-surface-base hover:text-secondary'
+        }`}
+      >
+        <MessageSquare className="w-3 h-3 shrink-0" strokeWidth={1.5} />
+        <span className="flex-1 text-left truncate">{thread.title}</span>
+        <span className="text-[11px] shrink-0">{formatRelativeTime(thread.updatedAt)}</span>
+      </button>
+    );
+  };
 
   // Collapsible group header
   const renderGroupHeader = (key: string, label: string, Icon: typeof FolderOpen) => (
@@ -261,6 +357,30 @@ export function Chat() {
           </div>
         </div>
       </div>
+
+      {/* Right-click context menu (positioned at cursor) */}
+      {contextMenu && (
+        <div
+          onMouseDown={(e) => e.stopPropagation()}
+          className="fixed z-50 bg-surface-raised border border-border rounded-lg shadow-lg py-1 min-w-[140px]"
+          style={{ left: contextMenu.x, top: contextMenu.y }}
+        >
+          <button
+            onClick={() => startRename(contextMenu.thread)}
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] font-light text-secondary hover:bg-surface-base transition-colors"
+          >
+            <Pencil className="w-3 h-3" strokeWidth={1.5} />
+            Rename
+          </button>
+          <button
+            onClick={() => deleteThread(contextMenu.thread.sessionKey)}
+            className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] font-light text-destructive hover:bg-surface-base transition-colors"
+          >
+            <Trash2 className="w-3 h-3" strokeWidth={1.5} />
+            Delete
+          </button>
+        </div>
+      )}
 
       {/* Right Panel — Conversation */}
       <div className="flex-1 flex flex-col">

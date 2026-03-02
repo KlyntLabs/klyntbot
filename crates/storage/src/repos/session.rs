@@ -236,6 +236,23 @@ impl SessionRepo {
         Ok(result.rows_affected())
     }
 
+    /// Rename a session by updating the title in its metadata JSON.
+    pub async fn rename_session(&self, key: &str, new_title: &str) -> Result<bool, StorageError> {
+        let now = Utc::now();
+        let result = sqlx::query(
+            "UPDATE sessions
+             SET metadata = json_set(metadata, '$.title', ?2),
+                 updated_at = ?3
+             WHERE key = ?1",
+        )
+        .bind(key)
+        .bind(new_title)
+        .bind(now)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected() > 0)
+    }
+
     /// Delete a session and all its messages (CASCADE).
     pub async fn delete_session(&self, key: &str) -> Result<bool, StorageError> {
         let result = sqlx::query("DELETE FROM sessions WHERE key = ?1")

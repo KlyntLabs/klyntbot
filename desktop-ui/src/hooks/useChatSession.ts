@@ -19,8 +19,11 @@ interface ChatSession {
 /**
  * Encapsulates chat session state: message fetching, optimistic pending message,
  * streaming, and send logic. Used by SidebarChat and Chat.
+ *
+ * @param onDone Optional callback fired when the agent finishes — use for
+ *               refreshing thread lists or other side-effects.
  */
-export function useChatSession(sessionKey: string): ChatSession {
+export function useChatSession(sessionKey: string, onDone?: () => void): ChatSession {
   const { data: messages, refetch } = useQuery<ChatMessage[]>(
     'chat_messages',
     sessionKey ? { sessionKey } : null,
@@ -32,6 +35,7 @@ export function useChatSession(sessionKey: string): ChatSession {
   const stream = useAgentStream(sessionKey, () => {
     setPendingUserMsg(null);
     refetch();
+    onDone?.();
   });
 
   const displayMessages = useMemo(() => {
