@@ -1,4 +1,5 @@
 import { useRef, useEffect } from 'react';
+import { MarkdownContent } from './MarkdownContent';
 import type { ChatMessage } from '../../lib/types';
 
 interface MessageListProps {
@@ -37,9 +38,7 @@ export function MessageList({
             </div>
           ) : (
             <div className="max-w-[85%]">
-              <p className="text-[13px] font-light whitespace-pre-wrap leading-relaxed text-secondary">
-                {msg.content}
-              </p>
+              <MarkdownContent content={msg.content} />
             </div>
           )}
         </div>
@@ -59,10 +58,8 @@ export function MessageList({
       {isStreaming && streamingContent && (
         <div className="flex justify-start">
           <div className="max-w-[85%]">
-            <p className="text-[13px] font-light whitespace-pre-wrap leading-relaxed text-secondary">
-              {streamingContent}
-              <span className="inline-block w-1.5 h-4 bg-muted/50 ml-0.5 animate-pulse align-text-bottom" />
-            </p>
+            <MarkdownContent content={streamingContent} />
+            <span className="inline-block w-1.5 h-4 bg-muted/50 ml-0.5 animate-pulse align-text-bottom" />
           </div>
         </div>
       )}

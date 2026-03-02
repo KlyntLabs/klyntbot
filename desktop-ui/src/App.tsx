@@ -1,4 +1,4 @@
-import { createHashRouter, RouterProvider } from "react-router";
+import { createHashRouter, Navigate, RouterProvider } from "react-router";
 import { MainApp } from "./components/views/MainApp";
 import { Chat } from "./components/views/Chat";
 import { ProjectDetail } from "./components/views/ProjectDetail";
@@ -29,6 +29,7 @@ const router = createHashRouter([
   { path: "/finance/liabilities", element: <FinanceLiabilities /> },
   { path: "/launcher", element: <Launcher /> },
   { path: "/tray", element: <SystemTray /> },
+  { path: "*", element: <Navigate to="/" replace /> },
 ]);
 
 export default function App() {

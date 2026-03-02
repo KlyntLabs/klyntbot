@@ -6,6 +6,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use futures_util::future::join_all;
+use futures_util::StreamExt;
 use tokio::sync::RwLock;
 
 use common::{utils::tool_def_name, Result};
@@ -132,6 +133,109 @@ fn is_fabricated_tool_response(text: &str, tool_names: &[&str]) -> bool {
     (has_structured_result && (has_fake_id || has_multiple_fields)) || has_search_with_list
 }
 
+/// Accumulated tool-call fragments from streaming deltas.
+struct PartialToolCall {
+    id: String,
+    name: String,
+    args: String,
+}
+
+/// Call the provider with streaming, emitting `ContentChunk` events per-token.
+///
+/// Consumes the stream and returns an `LlmResponse` equivalent to `provider.chat()`,
+/// but with real-time content chunks sent to the UI as they arrive.
+///
+/// NOTE: `usage` is returned as `Usage::default()` because `LlmStreamChunk` does
+/// not yet carry token counts. Cost tracking for streaming calls is a known gap.
+async fn call_provider_streaming(
+    provider: &dyn providers::LlmProvider,
+    messages: &[Message],
+    tools: &[serde_json::Value],
+    params: &providers::ChatParams,
+    event_tx: &tokio::sync::mpsc::Sender<crate::events::AgentEvent>,
+) -> Result<providers::LlmResponse> {
+    let mut stream = provider
+        .chat_stream(messages, Some(tools), params)
+        .await?;
+
+    let mut content = String::new();
+    let mut partials: Vec<PartialToolCall> = Vec::with_capacity(4);
+    let mut finish_reason = String::new();
+    let mut reasoning = String::new();
+
+    while let Some(result) = stream.next().await {
+        let chunk = result?;
+
+        // Consume content — avoids cloning on every token chunk.
+        if let Some(text) = chunk.content {
+            if !text.is_empty() {
+                content.push_str(&text);
+                let _ = event_tx
+                    .send(crate::events::AgentEvent::ContentChunk { data: text })
+                    .await;
+            }
+        }
+
+        if let Some(r) = chunk.reasoning_content {
+            reasoning.push_str(&r);
+        }
+
+        if let Some(delta) = chunk.tool_call_delta {
+            while partials.len() <= delta.index {
+                partials.push(PartialToolCall {
+                    id: String::new(),
+                    name: String::new(),
+                    args: String::new(),
+                });
+            }
+            let partial = &mut partials[delta.index];
+            if let Some(id) = delta.id {
+                partial.id = id;
+            }
+            if let Some(name) = delta.name {
+                partial.name.push_str(&name);
+            }
+            if let Some(args) = delta.arguments {
+                partial.args.push_str(&args);
+            }
+        }
+
+        if let Some(reason) = chunk.finish_reason {
+            finish_reason = reason;
+        }
+    }
+
+    let tool_calls: Vec<providers::ToolCall> = partials
+        .into_iter()
+        .filter(|p| !p.id.is_empty() && !p.name.is_empty())
+        .map(|p| {
+            let arguments = serde_json::from_str(&p.args)
+                .unwrap_or(serde_json::Value::Object(Default::default()));
+            providers::ToolCall {
+                id: p.id,
+                name: p.name,
+                arguments,
+            }
+        })
+        .collect();
+
+    Ok(providers::LlmResponse {
+        content: if content.is_empty() {
+            None
+        } else {
+            Some(content)
+        },
+        tool_calls,
+        finish_reason,
+        usage: Usage::default(),
+        reasoning_content: if reasoning.is_empty() {
+            None
+        } else {
+            Some(reasoning)
+        },
+    })
+}
+
 /// Drives a single LLM-tool execution cycle.
 ///
 /// Given a provider and tool registry, `run_cycle` sends messages to the LLM,
@@ -164,10 +268,18 @@ impl ExecutionCore {
         event_tx: Option<&tokio::sync::mpsc::Sender<crate::events::AgentEvent>>,
         seen_tool_calls: Option<&mut HashSet<String>>,
     ) -> Result<(CycleOutcome, Usage)> {
-        let response = self
-            .provider
-            .chat(messages, Some(tools), &params.chat_params)
-            .await?;
+        // When an event channel is available, stream tokens so the UI updates
+        // in real-time. Non-streaming providers already have a default
+        // `chat_stream()` impl that wraps `chat()` into a single-chunk stream,
+        // so this works uniformly for all providers.
+        let response = if let Some(tx) = event_tx {
+            call_provider_streaming(&*self.provider, messages, tools, &params.chat_params, tx)
+                .await?
+        } else {
+            self.provider
+                .chat(messages, Some(tools), &params.chat_params)
+                .await?
+        };
 
         let usage = response.usage.clone();
 

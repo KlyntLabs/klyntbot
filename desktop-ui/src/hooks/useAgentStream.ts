@@ -16,6 +16,8 @@ interface AgentStream {
   error: string | null;
   /** Call before sending a message to enter streaming mode. */
   startStreaming: () => void;
+  /** Abort streaming and show an error. */
+  failStreaming: (message: string) => void;
 }
 
 /**
@@ -62,6 +64,13 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
     }
   }, []);
 
+  const failStreaming = useCallback((message: string) => {
+    setStreamingContent('');
+    setIsStreaming(false);
+    setActiveTools([]);
+    setError(message);
+  }, []);
+
   useEvent<ContentChunkPayload>('agent:content_chunk', (payload) => {
     if (!sessionKeyRef.current || payload.sessionKey !== sessionKeyRef.current) return;
     setStreamingContent((prev) => prev + payload.data);
@@ -91,5 +100,5 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
     setIsStreaming(false);
   });
 
-  return { streamingContent, isStreaming, activeTools, error, startStreaming };
+  return { streamingContent, isStreaming, activeTools, error, startStreaming, failStreaming };
 }

@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router';
 import { MessageSquare } from 'lucide-react';
 import { Sidebar } from '../layout/Sidebar';
@@ -18,6 +18,7 @@ export function MainApp() {
   const [activeTab, setActiveTab] = useState<Tab>('All');
   const [activeSidebar, setActiveSidebar] = useState<SidebarItem>('Tasks');
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const prevSidebarRef = useRef<SidebarItem>('Tasks');
   const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [collapsedProjects, toggleProject] = useSetToggle();
 
@@ -76,6 +77,10 @@ export function MainApp() {
 
   const showArea = activeTab === 'All';
 
+  // Content view is independent of chat state — if chat is open, show the view
+  // that was active before chat opened.
+  const contentView = activeSidebar === 'Chat' ? prevSidebarRef.current : activeSidebar;
+
   return (
     <div className="h-screen w-screen bg-background text-primary flex overflow-hidden">
       <Sidebar
@@ -109,8 +114,11 @@ export function MainApp() {
           <button
             onClick={() => {
               const nextOpen = !isChatOpen;
+              if (nextOpen) {
+                prevSidebarRef.current = activeSidebar;
+              }
               setIsChatOpen(nextOpen);
-              setActiveSidebar(nextOpen ? 'Chat' : 'Tasks');
+              setActiveSidebar(nextOpen ? 'Chat' : prevSidebarRef.current);
             }}
             className="w-9 h-9 rounded-md flex items-center justify-center transition-colors bg-surface-low text-muted hover:bg-surface-base hover:text-secondary ml-2"
           >
@@ -120,7 +128,7 @@ export function MainApp() {
 
         {/* Scrollable Content */}
         <div className="flex-1 overflow-y-auto p-2">
-          {activeSidebar === 'OKR' ? (
+          {contentView === 'OKR' ? (
             <OkrView />
           ) : (
           <>

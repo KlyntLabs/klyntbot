@@ -1,7 +1,8 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useQuery } from './useQuery';
-import { useMutation } from './useMutation';
 import { useAgentStream } from './useAgentStream';
+import { ipc } from './useIpc';
+import { isTauri } from '../lib/utils';
 import type { ChatMessage } from '../lib/types';
 
 interface ChatSession {
@@ -22,11 +23,9 @@ interface ChatSession {
 export function useChatSession(sessionKey: string): ChatSession {
   const { data: messages, refetch } = useQuery<ChatMessage[]>(
     'chat_messages',
-    sessionKey ? { session_key: sessionKey } : null,
+    sessionKey ? { sessionKey } : null,
     [],
   );
-  const sendMessage = useMutation<ChatMessage, Record<string, unknown>>('chat_send');
-
   const [input, setInput] = useState('');
   const [pendingUserMsg, setPendingUserMsg] = useState<string | null>(null);
 
@@ -50,12 +49,19 @@ export function useChatSession(sessionKey: string): ChatSession {
 
     setPendingUserMsg(text);
     stream.startStreaming();
-    await sendMessage.mutate({
-      content: text,
-      session_key: sessionKey,
-      ...extraPayload,
-    });
-  }, [input, sessionKey, stream, sendMessage]);
+
+    if (!isTauri) return;
+
+    try {
+      await ipc<ChatMessage>('chat_send', {
+        content: text,
+        sessionKey,
+        ...extraPayload,
+      });
+    } catch (e) {
+      stream.failStreaming(String(e));
+    }
+  }, [input, sessionKey, stream]);
 
   return {
     messages: displayMessages,

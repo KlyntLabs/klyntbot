@@ -566,12 +566,8 @@ impl AgentLoop {
                 .await
             {
                 Ok(response) => {
-                    // Emit the full response for the CLI renderer
-                    let _ = event_tx
-                        .send(AgentEvent::ContentChunk {
-                            data: response.clone(),
-                        })
-                        .await;
+                    // ContentChunk events are emitted per-token inside run_cycle
+                    // (via call_provider_streaming), so we only emit Done here.
                     let _ = event_tx
                         .send(AgentEvent::Done {
                             content: response.clone(),

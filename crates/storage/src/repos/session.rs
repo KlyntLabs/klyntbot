@@ -74,10 +74,10 @@ impl SessionRepo {
         Ok(row.0)
     }
 
-    /// Add a message to a session.
+    /// Add a message to a session and touch its `updated_at` timestamp.
     ///
     /// Uses a CTE to touch `sessions.updated_at` and insert the message
-    /// in a single round-trip instead of two separate queries.
+    /// in a single atomic statement — no partial writes on crash.
     #[allow(clippy::too_many_arguments)]
     pub async fn add_message(
         &self,

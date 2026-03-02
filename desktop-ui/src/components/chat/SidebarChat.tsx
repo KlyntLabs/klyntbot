@@ -37,7 +37,7 @@ export function SidebarChat({ isOpen, onClose }: SidebarChatProps) {
   }, [chat, pageContext]);
 
   const handlePin = useCallback(async () => {
-    await pinThread.mutate({ session_key: sessionKey });
+    await pinThread.mutate({ sessionKey });
   }, [sessionKey, pinThread]);
 
   if (!isOpen) return null;

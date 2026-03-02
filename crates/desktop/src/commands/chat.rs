@@ -149,19 +149,12 @@ pub async fn chat_send(
             .map_err(|e| e.to_string())?;
     }
 
-    // 3. Store user message
+    // 3. Call agent with streaming (agent loop stores user + assistant messages)
     let msg_id = uuid::Uuid::new_v4();
-    let msg = state
-        .repos
-        .sessions
-        .add_message(&session_key, msg_id, "user", &content, None, None, None)
-        .await
-        .map_err(|e| e.to_string())?;
-
-    // 4. Call agent with streaming
+    let now = chrono::Utc::now();
     let streaming_handle = state
         .agent
-        .process_direct_streaming(content, session_key.clone())
+        .process_direct_streaming(content.clone(), session_key.clone())
         .await
         .map_err(|e| format!("agent error: {e}"))?;
 
@@ -279,10 +272,10 @@ pub async fn chat_send(
 
     // 7. Return user message immediately (streaming handles the AI response)
     Ok(ChatMessageResponse {
-        id: msg.id.to_string(),
-        role: msg.role,
-        content: msg.content,
-        timestamp: msg.timestamp,
+        id: msg_id.to_string(),
+        role: common::MessageRole::User.to_string(),
+        content,
+        timestamp: now,
     })
 }
 
