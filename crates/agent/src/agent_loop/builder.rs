@@ -31,7 +31,7 @@ use tools_core::FeaturePackage;
 
 use super::super::confidence::ConfidenceEvaluator;
 use super::super::context_sources::{
-    BootstrapSource, ConfidenceSource, IdentitySource, MemorySource, PageContextSource,
+    AreaSource, BootstrapSource, ConfidenceSource, IdentitySource, MemorySource, PageContextSource,
     PersonaContextSource, SkillContentSource, SkillSummarySource, TodoSource,
 };
 use super::super::{CalendarSyncAdapter, CronHandlerAdapter, SkillManager, SubagentManager};
@@ -171,6 +171,7 @@ impl AgentLoopBuilder {
             )),
             Box::new(BootstrapSource::new(workspace.clone())),
             Box::new(MemorySource::new(memory_store)),
+            Box::new(AreaSource::new(repos.areas.clone())),
             Box::new(TodoSource::new(repos.actions.clone())),
             Box::new(confidence_source),
             Box::new(SkillSummarySource::new(Arc::clone(&skill_manager))),

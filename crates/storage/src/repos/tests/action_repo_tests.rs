@@ -820,13 +820,32 @@ mod tests {
         let Some((repo, area_repo)) = test_action_repo().await else {
             return;
         };
-        let area_id = ensure_area(&area_repo).await;
+        // Create area with a known name
+        let area_id = "ctx-area".to_string();
+        let _ = area_repo
+            .create(&AreaRow {
+                id: area_id.clone(),
+                name: "Work".to_string(),
+                description: None,
+                color: "blue".to_string(),
+                icon: None,
+                position: 0,
+                status: "active".to_string(),
+                created_at: Utc::now(),
+                updated_at: Utc::now(),
+            })
+            .await;
+
         let id = unique_id("ctx");
         repo.add(&sample_action(&id, "Context task", &area_id))
             .await
             .unwrap();
         let ctx = repo.to_context_string().await.unwrap();
         assert!(ctx.contains("Context task"));
+        assert!(
+            ctx.contains("(Work)"),
+            "context string should include area name, got: {ctx}"
+        );
 
         // Cleanup
         let _ = repo.delete(&id).await;

@@ -841,15 +841,18 @@ impl ActionRepo {
             String,
             Option<i16>,
             Option<chrono::DateTime<chrono::Utc>>,
+            String,
         )> = sqlx::query_as(
             r#"
-                SELECT title, status, priority, focused_at FROM actions
-                WHERE status IN ('todo', 'doing')
-                  AND is_template = FALSE
+                SELECT a.title, a.status, a.priority, a.focused_at, ar.name
+                FROM actions a
+                JOIN areas ar ON a.area_id = ar.id
+                WHERE a.status IN ('todo', 'doing')
+                  AND a.is_template = FALSE
                 ORDER BY
-                    CASE WHEN focused_at IS NOT NULL THEN 0 ELSE 1 END,
-                    priority ASC NULLS LAST,
-                    created_at
+                    CASE WHEN a.focused_at IS NOT NULL THEN 0 ELSE 1 END,
+                    a.priority ASC NULLS LAST,
+                    a.created_at
                 "#,
         )
         .fetch_all(&self.pool)
@@ -860,7 +863,7 @@ impl ActionRepo {
         }
 
         let mut out = String::from("Active tasks:\n");
-        for (title, status, priority, focused_at) in &rows {
+        for (title, status, priority, focused_at, area_name) in &rows {
             let focus_marker = if focused_at.is_some() {
                 " [FOCUSED]"
             } else {
@@ -868,8 +871,8 @@ impl ActionRepo {
             };
             let priority_str = priority.map(|p| format!(" P{p}")).unwrap_or_default();
             out.push_str(&format!(
-                "- [{}]{}{} {}\n",
-                status, focus_marker, priority_str, title
+                "- [{}]{}{} {} ({})\n",
+                status, focus_marker, priority_str, title, area_name
             ));
         }
         Ok(out)
