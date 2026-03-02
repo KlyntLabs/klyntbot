@@ -8,6 +8,7 @@ pub const AGENT_TOOL_START: &str = "agent:tool_start";
 pub const AGENT_TOOL_END: &str = "agent:tool_end";
 pub const AGENT_ERROR: &str = "agent:error";
 pub const AGENT_ENTITY_CREATED: &str = "agent:entity_created";
+pub const AGENT_INTERACTION_REQUEST: &str = "agent:interaction_request";
 pub const ENTITY_UPDATED: &str = "entity:updated";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -60,4 +61,12 @@ pub struct EntityCreatedPayload {
 pub struct EntityUpdatedPayload {
     pub entity_kind: EntityKind,
     pub id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InteractionRequestPayload {
+    pub session_key: String,
+    pub request_id: String,
+    pub request: common::InteractionRequest,
 }

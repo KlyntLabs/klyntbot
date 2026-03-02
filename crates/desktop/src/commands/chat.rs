@@ -104,7 +104,7 @@ pub async fn chat_messages(
 
     Ok(rows
         .iter()
-        .filter(|m| m.role == "user" || m.role == "assistant")
+        .filter(|m| m.role == "user" || m.role == "assistant" || m.role == "interaction")
         .map(|m| ChatMessageResponse {
             id: m.id.to_string(),
             role: m.role.clone(),
@@ -167,9 +167,11 @@ pub async fn chat_send(
     // 6. Spawn background task to relay AgentEvents → Tauri events
     let sk = session_key.clone();
     let active_streams = Arc::clone(&state.active_streams);
+    let pending_interactions = Arc::clone(&state.pending_interactions);
     let repos = state.repos.clone();
     let has_context = context.is_some();
     let mut event_rx = streaming_handle.event_rx;
+    let mut interaction_rx = streaming_handle.interaction_rx;
 
     tokio::spawn(async move {
         // Guard ensures active_streams cleanup even on panic
@@ -191,75 +193,91 @@ pub async fn chat_send(
         let mut tool_names: Vec<String> = Vec::new();
         let mut entity_cards: Vec<common::EntityCard> = Vec::new();
 
-        while let Some(event) = event_rx.recv().await {
-            match event {
-                AgentEvent::ContentChunk { data } => {
+        loop {
+            tokio::select! {
+                biased;
+                Some(bundle) = interaction_rx.recv() => {
+                    let request_id = uuid::Uuid::new_v4().to_string();
                     let _ = app.emit(
-                        AGENT_CONTENT_CHUNK,
-                        ContentChunkPayload {
+                        AGENT_INTERACTION_REQUEST,
+                        InteractionRequestPayload {
                             session_key: sk.clone(),
-                            data,
+                            request_id: request_id.clone(),
+                            request: bundle.request,
                         },
                     );
+                    pending_interactions.insert(sk.clone(), (request_id, bundle.response_tx));
                 }
-                AgentEvent::ToolStart { name, .. } => {
-                    tool_names.push(name.clone());
-                    let _ = app.emit(
-                        AGENT_TOOL_START,
-                        ToolStartPayload {
-                            session_key: sk.clone(),
-                            name,
-                        },
-                    );
-                }
-                AgentEvent::ToolEnd { name, success, .. } => {
-                    let _ = app.emit(
-                        AGENT_TOOL_END,
-                        ToolEndPayload {
-                            session_key: sk.clone(),
-                            name,
-                            success,
-                        },
-                    );
-                }
-                AgentEvent::EntityCreated(card) => {
-                    let _ = app.emit(
-                        AGENT_ENTITY_CREATED,
-                        EntityCreatedPayload {
-                            session_key: sk.clone(),
-                            entity_type: card.entity_type.clone(),
-                            entity_id: card.entity_id.clone(),
-                        },
-                    );
-                    // Also emit entity:updated for UI refetch (skip unknown kinds)
-                    if let Some(kind) = desktop_shared::types::EntityKind::parse(&card.entity_type)
-                    {
-                        super::emit_entity_updated(&app, kind, &card.entity_id);
+                Some(event) = event_rx.recv() => {
+                    match event {
+                        AgentEvent::ContentChunk { data } => {
+                            let _ = app.emit(
+                                AGENT_CONTENT_CHUNK,
+                                ContentChunkPayload {
+                                    session_key: sk.clone(),
+                                    data,
+                                },
+                            );
+                        }
+                        AgentEvent::ToolStart { name, .. } => {
+                            tool_names.push(name.clone());
+                            let _ = app.emit(
+                                AGENT_TOOL_START,
+                                ToolStartPayload {
+                                    session_key: sk.clone(),
+                                    name,
+                                },
+                            );
+                        }
+                        AgentEvent::ToolEnd { name, success, .. } => {
+                            let _ = app.emit(
+                                AGENT_TOOL_END,
+                                ToolEndPayload {
+                                    session_key: sk.clone(),
+                                    name,
+                                    success,
+                                },
+                            );
+                        }
+                        AgentEvent::EntityCreated(card) => {
+                            let _ = app.emit(
+                                AGENT_ENTITY_CREATED,
+                                EntityCreatedPayload {
+                                    session_key: sk.clone(),
+                                    entity_type: card.entity_type.clone(),
+                                    entity_id: card.entity_id.clone(),
+                                },
+                            );
+                            if let Some(kind) = desktop_shared::types::EntityKind::parse(&card.entity_type)
+                            {
+                                super::emit_entity_updated(&app, kind, &card.entity_id);
+                            }
+                            entity_cards.push(card);
+                        }
+                        AgentEvent::Done { content } => {
+                            let _ = app.emit(
+                                AGENT_DONE,
+                                DonePayload {
+                                    session_key: sk.clone(),
+                                    content,
+                                },
+                            );
+                            break;
+                        }
+                        AgentEvent::Error { message } => {
+                            let _ = app.emit(
+                                AGENT_ERROR,
+                                AgentErrorPayload {
+                                    session_key: sk.clone(),
+                                    message,
+                                },
+                            );
+                            break;
+                        }
+                        _ => {}
                     }
-                    entity_cards.push(card);
                 }
-                AgentEvent::Done { content } => {
-                    let _ = app.emit(
-                        AGENT_DONE,
-                        DonePayload {
-                            session_key: sk.clone(),
-                            content,
-                        },
-                    );
-                    break;
-                }
-                AgentEvent::Error { message } => {
-                    let _ = app.emit(
-                        AGENT_ERROR,
-                        AgentErrorPayload {
-                            session_key: sk.clone(),
-                            message,
-                        },
-                    );
-                    break;
-                }
-                // Other events (IterationStart, ClassificationComplete, etc.) are internal
-                _ => {}
+                else => break,
             }
         }
 
@@ -319,6 +337,10 @@ pub async fn chat_delete_thread(
     if let Some((_, token)) = state.active_streams.remove(&session_key) {
         token.cancel();
     }
+    // Cancel any pending interaction to avoid leaking the oneshot
+    if let Some((_, (_, tx))) = state.pending_interactions.remove(&session_key) {
+        let _ = tx.send(common::FormResponse::Cancelled);
+    }
     state
         .repos
         .sessions
@@ -329,9 +351,88 @@ pub async fn chat_delete_thread(
 }
 
 #[tauri::command]
+pub async fn chat_respond_interaction(
+    state: State<'_, AppCore>,
+    session_key: String,
+    request_id: String,
+    response: common::FormResponse,
+) -> Result<(), String> {
+    // 1. Find and remove the pending oneshot sender, validating request_id
+    let (_, (stored_id, sender)) = state
+        .pending_interactions
+        .remove(&session_key)
+        .ok_or_else(|| "no pending interaction for this session".to_string())?;
+    if stored_id != request_id {
+        return Err(format!(
+            "request_id mismatch: expected {stored_id}, got {request_id}"
+        ));
+    }
+
+    // 2. Build collapsed summary text for the interaction message
+    let summary = format_interaction_summary(&response);
+
+    // 3. Send the response through the oneshot to unblock the agent tool immediately
+    let _ = sender.send(response);
+
+    // 4. Persist as a synthetic "interaction" message (agent already unblocked)
+    let msg_id = uuid::Uuid::new_v4();
+    let metadata = serde_json::json!({
+        "type": "interaction_response",
+        "requestId": request_id,
+    });
+    if let Err(e) = state
+        .repos
+        .sessions
+        .add_message(
+            &session_key,
+            msg_id,
+            "interaction",
+            &summary,
+            None,
+            None,
+            Some(&metadata),
+        )
+        .await
+    {
+        tracing::warn!("failed to persist interaction message for {session_key}: {e}");
+    }
+
+    Ok(())
+}
+
+/// Build a human-readable summary line from a FormResponse.
+fn format_interaction_summary(response: &common::FormResponse) -> String {
+    match response {
+        common::FormResponse::Cancelled => "Cancelled interaction".to_string(),
+        common::FormResponse::Completed(answers) => {
+            let parts: Vec<String> = answers
+                .iter()
+                .map(|a| match &a.value {
+                    common::AnswerValue::Selected { value } => value.clone(),
+                    common::AnswerValue::MultiSelected { values } => values.join(", "),
+                    common::AnswerValue::YesNo { answer } => {
+                        if *answer { "Yes" } else { "No" }.to_string()
+                    }
+                    common::AnswerValue::Text { content } => {
+                        common::utils::truncate_chars(content, 57, "...")
+                    }
+                    common::AnswerValue::Skipped => "Skipped".to_string(),
+                })
+                .collect();
+            format!("You answered: {}", parts.join(" · "))
+        }
+    }
+}
+
+#[tauri::command]
 pub async fn chat_cancel(state: State<'_, AppCore>, session_key: String) -> Result<(), String> {
+    // Cancel stream
     if let Some((_, token)) = state.active_streams.remove(&session_key) {
         token.cancel();
+    }
+    // Cancel any pending interaction
+    if let Some((_, (_, tx))) = state.pending_interactions.remove(&session_key) {
+        let _ = tx.send(common::FormResponse::Cancelled);
     }
     Ok(())
 }

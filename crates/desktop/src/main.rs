@@ -141,6 +141,7 @@ fn main() {
             commands::chat::chat_pin_thread,
             commands::chat::chat_rename_thread,
             commands::chat::chat_delete_thread,
+            commands::chat::chat_respond_interaction,
             commands::chat::chat_cancel,
             // Finance
             commands::finance::finance_accounts,

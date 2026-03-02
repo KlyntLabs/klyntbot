@@ -10,7 +10,8 @@ use bus::MessageBus;
 use channels::ChannelManager;
 use scheduling::CronService;
 use storage::{Repos, StoragePool, VectorStore};
-use tokio::sync::{mpsc, Mutex, RwLock};
+use common::FormResponse;
+use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn};
 
@@ -28,6 +29,10 @@ pub struct AppCore {
     shutdown_token: CancellationToken,
     /// Active streaming cancellation tokens keyed by session_key.
     pub active_streams: Arc<dashmap::DashMap<String, CancellationToken>>,
+    /// Pending ask_user interaction oneshot senders keyed by session_key.
+    /// Value is (request_id, sender). Only one interaction can be pending per session
+    /// because the ask_user tool blocks the agent loop until answered.
+    pub pending_interactions: Arc<dashmap::DashMap<String, (String, oneshot::Sender<FormResponse>)>>,
 }
 
 impl AppCore {
@@ -134,6 +139,7 @@ impl AppCore {
             cron_service: cron_service.clone(),
             shutdown_token: shutdown_token.clone(),
             active_streams: Arc::new(dashmap::DashMap::new()),
+            pending_interactions: Arc::new(dashmap::DashMap::new()),
         };
 
         // Spawn background services immediately
