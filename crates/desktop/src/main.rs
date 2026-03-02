@@ -138,6 +138,7 @@ fn main() {
             commands::chat::chat_threads,
             commands::chat::chat_messages,
             commands::chat::chat_send,
+            commands::chat::chat_pin_thread,
             commands::chat::chat_cancel,
             // Calendar
             commands::calendar::calendar_events,

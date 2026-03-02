@@ -4,7 +4,7 @@ import { MessageSquare } from 'lucide-react';
 import { Sidebar } from '../layout/Sidebar';
 import { Toolbar } from '../tasks/Toolbar';
 import { TaskTable } from '../tasks/TaskTable';
-import { ChatPanel } from '../chat/ChatPanel';
+import { SidebarChat } from '../chat/SidebarChat';
 import { OkrView } from './OkrView';
 import { useSetToggle } from '../../hooks/useSetToggle';
 import { useQuery } from '../../hooks/useQuery';
@@ -172,8 +172,8 @@ export function MainApp() {
         </div>
       </div>
 
-      {/* Chat Panel */}
-      <ChatPanel isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
+      {/* Sidebar Chat */}
+      <SidebarChat isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
     </div>
   );
 }

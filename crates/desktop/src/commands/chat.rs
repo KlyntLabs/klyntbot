@@ -279,6 +279,20 @@ pub async fn chat_send(
 }
 
 #[tauri::command]
+pub async fn chat_pin_thread(
+    state: State<'_, AppCore>,
+    session_key: String,
+) -> Result<(), String> {
+    state
+        .repos
+        .session_context
+        .pin(&session_key)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
 pub async fn chat_cancel(
     state: State<'_, AppCore>,
     session_key: String,
