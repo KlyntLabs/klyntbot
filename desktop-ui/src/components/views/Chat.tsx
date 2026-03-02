@@ -397,7 +397,7 @@ export function Chat() {
             ) : (
               <MessageList
                 messages={chat.messages}
-                streamingContent={chat.streamingContent}
+                segments={chat.segments}
                 isStreaming={chat.isStreaming}
                 activeTools={chat.activeTools}
                 error={chat.error}

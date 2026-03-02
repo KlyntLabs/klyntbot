@@ -1,17 +1,17 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useQuery } from './useQuery';
 import { useAgentStream } from './useAgentStream';
 import { ipc } from './useIpc';
 import { isTauri } from '../lib/utils';
-import type { ChatMessage, InteractionRequest } from '../lib/types';
+import type { ActiveInteraction, ChatMessage, MessageSegment } from '../lib/types';
 
 interface ChatSession {
   messages: ChatMessage[];
-  streamingContent: string;
+  segments: MessageSegment[];
   isStreaming: boolean;
   activeTools: string[];
   error: string | null;
-  activeInteraction: { requestId: string; request: InteractionRequest } | null;
+  activeInteraction: ActiveInteraction | null;
   input: string;
   setInput: (value: string) => void;
   send: (extraPayload?: Record<string, unknown>) => Promise<void>;
@@ -40,12 +40,25 @@ export function useChatSession(sessionKey: string, onDone?: () => void): ChatSes
     onDone?.();
   });
 
-  const displayMessages = useMemo(() => {
-    const list = [...messages];
-    if (pendingUserMsg) {
-      list.push({ id: 'pending', role: 'user', content: pendingUserMsg });
+  // Clear streaming segments only when a NEW assistant message arrives from refetch.
+  // Tracks assistant count to avoid clearing before the refetch completes — the old
+  // approach fired on isStreaming→false before the new message existed, causing a flash.
+  const { isStreaming, clearSegments, segments } = stream;
+  const hasSegmentsRef = useRef(false);
+  hasSegmentsRef.current = segments.length > 0;
+  const assistantCountRef = useRef(0);
+
+  useEffect(() => {
+    const count = messages.filter(m => m.role === 'assistant').length;
+    if (!isStreaming && hasSegmentsRef.current && count > assistantCountRef.current) {
+      clearSegments();
     }
-    return list;
+    assistantCountRef.current = count;
+  }, [messages, isStreaming, clearSegments]);
+
+  const displayMessages = useMemo(() => {
+    if (!pendingUserMsg) return messages;
+    return [...messages, { id: 'pending', role: 'user' as const, content: pendingUserMsg }];
   }, [messages, pendingUserMsg]);
 
   const send = useCallback(async (extraPayload?: Record<string, unknown>) => {
@@ -71,7 +84,7 @@ export function useChatSession(sessionKey: string, onDone?: () => void): ChatSes
 
   return {
     messages: displayMessages,
-    streamingContent: stream.streamingContent,
+    segments: stream.segments,
     isStreaming: stream.isStreaming,
     activeTools: stream.activeTools,
     error: stream.error,

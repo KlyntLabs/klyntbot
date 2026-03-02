@@ -14,13 +14,16 @@ use common::{
     Result, ToolError,
 };
 
+/// Tool name constant, used by other crates for timeout overrides etc.
+pub const ASK_USER_TOOL_NAME: &str = "ask_user";
+
 /// Tool for asking structured questions to the user.
 pub struct AskUserTool;
 
 #[async_trait]
 impl Tool for AskUserTool {
     fn name(&self) -> &str {
-        "ask_user"
+        ASK_USER_TOOL_NAME
     }
 
     fn description(&self) -> &str {

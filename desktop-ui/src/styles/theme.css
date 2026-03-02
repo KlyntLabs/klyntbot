@@ -147,3 +147,24 @@
     line-height: 1.5;
   }
 }
+
+/* ── Streaming cursor ──────────────────────────
+   Placed inline at the end of the last element
+   inside a streaming text segment via ::after.  */
+.streaming-cursor > div > *:last-child::after {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 16px;
+  margin-left: 2px;
+  background: var(--text-muted);
+  opacity: 0.5;
+  border-radius: 1px;
+  vertical-align: text-bottom;
+  animation: cursor-blink 1s ease-in-out infinite;
+}
+
+@keyframes cursor-blink {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0; }
+}

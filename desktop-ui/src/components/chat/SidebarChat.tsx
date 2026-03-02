@@ -81,7 +81,7 @@ export function SidebarChat({ isOpen, onClose }: SidebarChatProps) {
         ) : (
           <MessageList
             messages={chat.messages}
-            streamingContent={chat.streamingContent}
+            segments={chat.segments}
             isStreaming={chat.isStreaming}
             activeTools={chat.activeTools}
             error={chat.error}

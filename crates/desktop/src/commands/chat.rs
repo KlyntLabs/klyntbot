@@ -6,7 +6,7 @@ use std::sync::Arc;
 use agent::AgentEvent;
 use common::EntityCard;
 use desktop_shared::commands::{ChatMessageResponse, ChatThreadResponse, SessionContextInput};
-use desktop_shared::events::*;
+use desktop_shared::events::{self, *};
 use storage::{ProjectFilter, Repos};
 use tauri::{Emitter, State};
 use tokio_util::sync::CancellationToken;
@@ -105,11 +105,19 @@ pub async fn chat_messages(
     Ok(rows
         .iter()
         .filter(|m| m.role == "user" || m.role == "assistant" || m.role == "interaction")
-        .map(|m| ChatMessageResponse {
-            id: m.id.to_string(),
-            role: m.role.clone(),
-            content: m.content.clone(),
-            timestamp: m.timestamp,
+        .map(|m| {
+            let segments: Option<Vec<events::MessageSegment>> = m
+                .metadata
+                .as_ref()
+                .and_then(|meta| meta.get("segments"))
+                .and_then(|v| serde_json::from_value(v.clone()).ok());
+            ChatMessageResponse {
+                id: m.id.to_string(),
+                role: m.role.clone(),
+                content: m.content.clone(),
+                timestamp: m.timestamp,
+                segments,
+            }
         })
         .collect())
 }
@@ -190,8 +198,21 @@ pub async fn chat_send(
         };
 
         // Collect signals for auto-detection
-        let mut tool_names: Vec<String> = Vec::new();
+        let mut tool_names: Vec<String> = Vec::with_capacity(4);
         let mut entity_cards: Vec<common::EntityCard> = Vec::new();
+
+        // Segment accumulation for structured message persistence
+        let mut segments: Vec<events::MessageSegment> = Vec::with_capacity(8);
+        let mut current_text = String::new();
+
+        // Flush accumulated text into a finalized text segment.
+        let flush_text = |text: &mut String, segs: &mut Vec<events::MessageSegment>| {
+            if !text.is_empty() {
+                segs.push(events::MessageSegment::Text {
+                    content: std::mem::take(text),
+                });
+            }
+        };
 
         loop {
             tokio::select! {
@@ -211,6 +232,7 @@ pub async fn chat_send(
                 Some(event) = event_rx.recv() => {
                     match event {
                         AgentEvent::ContentChunk { data } => {
+                            current_text.push_str(&data);
                             let _ = app.emit(
                                 AGENT_CONTENT_CHUNK,
                                 ContentChunkPayload {
@@ -220,6 +242,7 @@ pub async fn chat_send(
                             );
                         }
                         AgentEvent::ToolStart { name, .. } => {
+                            flush_text(&mut current_text, &mut segments);
                             tool_names.push(name.clone());
                             let _ = app.emit(
                                 AGENT_TOOL_START,
@@ -229,13 +252,21 @@ pub async fn chat_send(
                                 },
                             );
                         }
-                        AgentEvent::ToolEnd { name, success, .. } => {
+                        AgentEvent::ToolEnd { name, success, duration_ms, result } => {
+                            segments.push(events::MessageSegment::Tool {
+                                name: name.clone(),
+                                success,
+                                duration_ms,
+                                result: result.clone(),
+                            });
                             let _ = app.emit(
                                 AGENT_TOOL_END,
                                 ToolEndPayload {
                                     session_key: sk.clone(),
                                     name,
                                     success,
+                                    duration_ms,
+                                    result,
                                 },
                             );
                         }
@@ -255,6 +286,28 @@ pub async fn chat_send(
                             entity_cards.push(card);
                         }
                         AgentEvent::Done { content } => {
+                            flush_text(&mut current_text, &mut segments);
+                            // Persist segments to the assistant message metadata
+                            if !segments.is_empty() {
+                                let meta = serde_json::json!({ "segments": segments });
+                                match repos.sessions.update_last_assistant_metadata(
+                                    &sk, None, Some(&meta),
+                                ).await {
+                                    Ok(true) => {}
+                                    Ok(false) => {
+                                        // Message may not be committed yet — retry after a brief delay
+                                        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                                        match repos.sessions.update_last_assistant_metadata(
+                                            &sk, None, Some(&meta),
+                                        ).await {
+                                            Ok(false) => tracing::warn!("segment persist: no assistant message found for {sk}"),
+                                            Err(e) => tracing::warn!("segment persist retry failed for {sk}: {e}"),
+                                            _ => {}
+                                        }
+                                    }
+                                    Err(e) => tracing::warn!("segment persist failed for {sk}: {e}"),
+                                }
+                            }
                             let _ = app.emit(
                                 AGENT_DONE,
                                 DonePayload {
@@ -273,6 +326,26 @@ pub async fn chat_send(
                                 },
                             );
                             break;
+                        }
+                        AgentEvent::ClassificationComplete { strategy, confidence, .. } => {
+                            let _ = app.emit(
+                                AGENT_CLASSIFICATION_COMPLETE,
+                                ClassificationCompletePayload {
+                                    session_key: sk.clone(),
+                                    strategy,
+                                    confidence,
+                                },
+                            );
+                        }
+                        AgentEvent::ExecutionStarted { engine, max_iterations } => {
+                            let _ = app.emit(
+                                AGENT_EXECUTION_STARTED,
+                                ExecutionStartedPayload {
+                                    session_key: sk.clone(),
+                                    engine,
+                                    max_iterations,
+                                },
+                            );
                         }
                         _ => {}
                     }
@@ -295,6 +368,7 @@ pub async fn chat_send(
         role: common::MessageRole::User.to_string(),
         content,
         timestamp: now,
+        segments: None,
     })
 }
 

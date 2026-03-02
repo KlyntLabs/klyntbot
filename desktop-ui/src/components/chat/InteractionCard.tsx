@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Check, X } from 'lucide-react';
+import { cn } from '../../lib/utils';
 import { ipc } from '../../hooks/useIpc';
 import type { InteractionRequest, Question, AnswerValue, Answer } from '../../lib/types';
 
@@ -10,16 +11,27 @@ interface InteractionCardProps {
   onSubmitted: () => void;
 }
 
+function optionButtonClass(isSelected: boolean, isFocused: boolean) {
+  return cn(
+    'rounded-lg border text-[12px] font-light transition-colors',
+    isSelected
+      ? 'border-brand bg-brand/10 text-primary'
+      : isFocused
+        ? 'border-border bg-surface-raised text-primary'
+        : 'border-transparent bg-surface-raised/50 text-secondary hover:bg-surface-raised',
+  );
+}
+
 export function InteractionCard({ sessionKey, requestId, request, onSubmitted }: InteractionCardProps) {
   const [activeTab, setActiveTab] = useState(0);
-  const [answers, setAnswers] = useState<Map<string, AnswerValue>>(() => {
-    const map = new Map<string, AnswerValue>();
+  const [answers, setAnswers] = useState<Record<string, AnswerValue>>(() => {
+    const init: Record<string, AnswerValue> = {};
     for (const q of request.questions) {
       if (q.answer_type.type === 'yes_no' && q.answer_type.default != null) {
-        map.set(q.id, { type: 'yes_no', answer: q.answer_type.default });
+        init[q.id] = { type: 'yes_no', answer: q.answer_type.default };
       }
     }
-    return map;
+    return init;
   });
   const [focusIndex, setFocusIndex] = useState(0);
   const [submitting, setSubmitting] = useState(false);
@@ -37,29 +49,32 @@ export function InteractionCard({ sessionKey, requestId, request, onSubmitted }:
   useEffect(() => { setFocusIndex(0); }, [activeTab]);
 
   const setAnswer = useCallback((questionId: string, value: AnswerValue) => {
-    setAnswers((prev) => new Map(prev).set(questionId, value));
+    setAnswers((prev) => ({ ...prev, [questionId]: value }));
   }, []);
 
   const handleSelect = useCallback((q: Question, index: number) => {
     if (q.answer_type.type === 'single_select') {
       setAnswer(q.id, { type: 'selected', value: q.answer_type.options[index].value });
     } else if (q.answer_type.type === 'multi_select') {
-      const current = answers.get(q.id);
-      const values = current?.type === 'multi_selected' ? [...current.values] : [];
       const val = q.answer_type.options[index].value;
-      const idx = values.indexOf(val);
-      if (idx >= 0) values.splice(idx, 1);
-      else values.push(val);
-      setAnswer(q.id, { type: 'multi_selected', values });
+      setAnswers((prev) => {
+        const current = prev[q.id];
+        const values = current?.type === 'multi_selected' ? [...current.values] : [];
+        const idx = values.indexOf(val);
+        if (idx >= 0) values.splice(idx, 1);
+        else values.push(val);
+        return { ...prev, [q.id]: { type: 'multi_selected', values } };
+      });
     }
-  }, [answers, setAnswer]);
+  }, [setAnswer]);
+
+  const isLastQuestion = activeTab === request.questions.length - 1;
 
   const handleSubmit = useCallback(async () => {
     setSubmitting(true);
-    // Build answer list with snake_case question_id to match Rust serde
     const answerList: Answer[] = request.questions.map((q) => ({
       question_id: q.id,
-      value: answers.get(q.id) ?? { type: 'skipped' as const },
+      value: answers[q.id] ?? { type: 'skipped' as const },
     }));
     try {
       await ipc('chat_respond_interaction', {
@@ -87,7 +102,24 @@ export function InteractionCard({ sessionKey, requestId, request, onSubmitted }:
     }
   }, [sessionKey, requestId, onSubmitted]);
 
+  // Ref so advance() always calls the latest handleSubmit (with fresh answers)
+  const handleSubmitRef = useRef(handleSubmit);
+  handleSubmitRef.current = handleSubmit;
+
+  const advance = useCallback(() => {
+    if (isLastQuestion) {
+      // setTimeout lets React flush state updates before submitting
+      setTimeout(() => handleSubmitRef.current(), 0);
+    } else {
+      setActiveTab((t) => t + 1);
+    }
+  }, [isLastQuestion]);
+
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    // Don't intercept most keys when typing in form inputs (allow Tab through for navigation)
+    const tag = (e.target as HTMLElement).tagName;
+    if ((tag === 'INPUT' || tag === 'TEXTAREA') && e.key !== 'Tab') return;
+
     switch (e.key) {
       case 'ArrowDown':
       case 'j':
@@ -102,23 +134,36 @@ export function InteractionCard({ sessionKey, requestId, request, onSubmitted }:
       case 'Enter':
       case ' ':
         e.preventDefault();
-        if (question.answer_type.type === 'single_select' || question.answer_type.type === 'multi_select') {
+        if (question.answer_type.type === 'single_select') {
           handleSelect(question, focusIndex);
+          advance();
+        } else if (question.answer_type.type === 'multi_select') {
+          if (e.key === 'Enter' && answers[question.id]) {
+            // Enter with existing selection → advance
+            advance();
+          } else {
+            handleSelect(question, focusIndex);
+          }
         } else if (question.answer_type.type === 'yes_no') {
           setAnswer(question.id, { type: 'yes_no', answer: focusIndex === 0 });
+          advance();
         }
         break;
       case 'Tab':
-        if (request.questions.length > 1) {
-          e.preventDefault();
-          setActiveTab((t) => e.shiftKey
-            ? (t - 1 + request.questions.length) % request.questions.length
-            : (t + 1) % request.questions.length
-          );
+        e.preventDefault();
+        if (e.shiftKey) {
+          // Shift+Tab → go back (stop at first question)
+          setActiveTab((t) => Math.max(t - 1, 0));
+        } else if (isLastQuestion) {
+          // Tab on last question → submit
+          advance();
+        } else {
+          // Tab → next question
+          setActiveTab((t) => t + 1);
         }
         break;
     }
-  }, [optionCount, question, focusIndex, handleSelect, setAnswer, request.questions]);
+  }, [optionCount, question, focusIndex, handleSelect, setAnswer, request.questions, advance, answers]);
 
   return (
     <div
@@ -160,23 +205,16 @@ export function InteractionCard({ sessionKey, requestId, request, onSubmitted }:
           {(question.answer_type.type === 'single_select' || question.answer_type.type === 'multi_select') && (
             <div className="space-y-1.5">
               {question.answer_type.options.map((opt, i) => {
-                const currentAnswer = answers.get(question.id);
+                const currentAnswer = answers[question.id];
                 const isSelected = question.answer_type.type === 'single_select'
                   ? currentAnswer?.type === 'selected' && currentAnswer.value === opt.value
                   : currentAnswer?.type === 'multi_selected' && currentAnswer.values.includes(opt.value);
-                const isFocused = focusIndex === i;
 
                 return (
                   <button
                     key={opt.value}
                     onClick={() => handleSelect(question, i)}
-                    className={`w-full text-left px-3 py-2 rounded-lg border transition-colors ${
-                      isSelected
-                        ? 'border-brand bg-brand/10 text-primary'
-                        : isFocused
-                          ? 'border-border bg-surface-raised text-primary'
-                          : 'border-transparent bg-surface-raised/50 text-secondary hover:bg-surface-raised'
-                    }`}
+                    className={cn('w-full text-left px-3 py-2', optionButtonClass(isSelected, focusIndex === i))}
                   >
                     <div className="text-[12px] font-light">{opt.label}</div>
                     {opt.description && (
@@ -193,21 +231,14 @@ export function InteractionCard({ sessionKey, requestId, request, onSubmitted }:
             <div className="flex gap-2">
               {['Yes', 'No'].map((label, i) => {
                 const val = i === 0;
-                const current = answers.get(question.id);
+                const current = answers[question.id];
                 const isSelected = current?.type === 'yes_no' && current.answer === val;
-                const isFocused = focusIndex === i;
 
                 return (
                   <button
                     key={label}
                     onClick={() => setAnswer(question.id, { type: 'yes_no', answer: val })}
-                    className={`flex-1 py-2 rounded-lg border text-[12px] font-light transition-colors ${
-                      isSelected
-                        ? 'border-brand bg-brand/10 text-primary'
-                        : isFocused
-                          ? 'border-border bg-surface-raised text-primary'
-                          : 'border-transparent bg-surface-raised/50 text-secondary hover:bg-surface-raised'
-                    }`}
+                    className={cn('flex-1 py-2', optionButtonClass(isSelected, focusIndex === i))}
                   >
                     {label}
                   </button>
@@ -217,15 +248,25 @@ export function InteractionCard({ sessionKey, requestId, request, onSubmitted }:
           )}
 
           {/* Free text */}
-          {question.answer_type.type === 'free_text' && (
-            <input
-              type="text"
-              value={(answers.get(question.id) as { type: 'text'; content: string } | undefined)?.content ?? ''}
-              onChange={(e) => setAnswer(question.id, { type: 'text', content: e.target.value })}
-              placeholder={question.answer_type.placeholder ?? ''}
-              className="w-full bg-surface-raised text-primary text-[12px] font-light px-3 py-2 rounded-lg border border-border focus:outline-none focus:border-brand"
-            />
-          )}
+          {question.answer_type.type === 'free_text' && (() => {
+            const v = answers[question.id];
+            const textContent = v?.type === 'text' ? v.content : '';
+            return (
+              <input
+                type="text"
+                value={textContent}
+                onChange={(e) => setAnswer(question.id, { type: 'text', content: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    advance();
+                  }
+                }}
+                placeholder={question.answer_type.placeholder ?? ''}
+                className="w-full bg-surface-raised text-primary text-[12px] font-light px-3 py-2 rounded-lg border border-border focus:outline-none focus:border-brand"
+              />
+            );
+          })()}
         </div>
 
         {/* Footer: Submit / Cancel */}

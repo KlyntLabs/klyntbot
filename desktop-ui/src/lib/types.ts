@@ -59,11 +59,16 @@ export interface CalendarEvent {
   color: string;
 }
 
+export type MessageSegment =
+  | { type: 'text'; content: string }
+  | { type: 'tool'; name: string; success: boolean; durationMs: number; result?: string };
+
 export interface ChatMessage {
   id: string;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'interaction';
   content: string;
   timestamp?: string;
+  segments?: MessageSegment[];
 }
 
 export interface ChatThread {
@@ -103,6 +108,8 @@ export interface ToolEndPayload {
   sessionKey: string;
   name: string;
   success: boolean;
+  durationMs: number;
+  result?: string;
 }
 
 export interface AgentDonePayload {
@@ -115,7 +122,24 @@ export interface AgentErrorPayload {
   message: string;
 }
 
+export interface ClassificationCompletePayload {
+  sessionKey: string;
+  strategy: string;
+  confidence: number;
+}
+
+export interface ExecutionStartedPayload {
+  sessionKey: string;
+  engine: string;
+  maxIterations: number;
+}
+
 // ── Interaction (ask_user) ─────────────────────────────────────────────
+
+export interface ActiveInteraction {
+  requestId: string;
+  request: InteractionRequest;
+}
 
 export interface InteractionRequestPayload {
   sessionKey: string;
