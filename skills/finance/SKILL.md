@@ -1,6 +1,8 @@
 ---
 name: finance
 description: Personal finance management — accounts, transactions, budgets, investments, goals, and reports.
+scope:
+  feature: finance
 metadata: '{"klyntbot":{"triggers":["finance","money","budget","spending","investment","savings","net worth","account","transaction","portfolio","goal","FIRE","net_worth","price","crypto"],"always":true}}'
 ---
 

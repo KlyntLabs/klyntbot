@@ -56,5 +56,5 @@ pub use persona::{PersonaChain, PersonaManager, PersonaScope};
 pub use progress_handler::ProgressHandlerImpl;
 pub use recurring_tasks::RecurringTaskSpawner;
 pub use reminders::{CalendarEvent, ReminderEngine};
-pub use skills::SkillManager;
+pub use skills::{SkillManager, SkillScope};
 pub use subagent::{SubagentManager, SubagentProfile};
