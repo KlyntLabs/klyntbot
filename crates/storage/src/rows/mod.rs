@@ -12,6 +12,7 @@ pub mod memory;
 pub mod objective;
 pub mod project;
 pub mod session;
+pub mod session_context;
 pub mod usage;
 
 #[cfg(test)]

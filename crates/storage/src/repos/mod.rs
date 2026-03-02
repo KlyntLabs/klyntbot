@@ -20,6 +20,7 @@ pub mod objective;
 pub mod outcome;
 pub mod project_repo;
 pub mod session;
+pub mod session_context;
 pub mod strategy;
 pub mod usage;
 
@@ -46,6 +47,7 @@ pub use objective::ObjectiveRepo;
 pub use outcome::OutcomeRepo;
 pub use project_repo::{ProjectFilter, ProjectPatch, ProjectRepo, ProjectWithStats};
 pub use session::SessionRepo;
+pub use session_context::SessionContextRepo;
 pub use strategy::{OverallStats, StrategyRepo, ToolStatsRow};
 pub use usage::UsageRepo;
 
@@ -71,6 +73,7 @@ pub struct Repos {
     pub memory_notes: MemoryNoteRepo,
     pub learning_state: LearningStateRepo,
     pub decision_log: DecisionLogRepo,
+    pub session_context: SessionContextRepo,
     pub finance: crate::FinanceStorage,
 }
 
@@ -95,6 +98,7 @@ impl Repos {
             memory_notes: MemoryNoteRepo::new(db.clone()),
             learning_state: LearningStateRepo::new(db.clone()),
             decision_log: DecisionLogRepo::new(db.clone()),
+            session_context: SessionContextRepo::new(db.clone()),
             finance: crate::FinanceStorage::from_pool(&db),
             pool: db,
         }
