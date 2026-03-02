@@ -117,7 +117,14 @@ pub struct ChatThreadResponse {
     pub title: String,
     pub message_count: i64,
     pub updated_at: DateTime<Utc>,
+    // Context fields from session_context join
+    pub context_type: Option<String>,
+    pub entity_kind: Option<String>,
+    pub entity_id: Option<String>,
+    pub area_id: Option<String>,
+    pub area_name: Option<String>,
     pub project_id: Option<String>,
+    pub project_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

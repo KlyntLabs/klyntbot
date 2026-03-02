@@ -71,7 +71,13 @@ export interface ChatThread {
   title: string;
   messageCount: number;
   updatedAt: string;
-  projectId: string | null;
+  contextType?: string;
+  entityKind?: string;
+  entityId?: string;
+  areaId?: string;
+  areaName?: string;
+  projectId?: string;
+  projectName?: string;
 }
 
 export interface SessionContext {

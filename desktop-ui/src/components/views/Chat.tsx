@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import {
   Send, ChevronDown, Plus, Settings, FolderOpen, MessageSquare,
-  RotateCcw, Mic, Shield, Server,
+  RotateCcw, Mic, Shield, Server, Wallet, Globe,
 } from 'lucide-react';
 import { Sidebar } from '../layout/Sidebar';
 import { MessageList } from '../chat/MessageList';
@@ -11,6 +11,11 @@ import { useQuery } from '../../hooks/useQuery';
 import { useMutation } from '../../hooks/useMutation';
 import { useAgentStream } from '../../hooks/useAgentStream';
 import type { ChatMessage, ChatThread, SidebarItem } from '../../lib/types';
+
+// Known feature prefixes → display config
+const FEATURE_GROUPS: Record<string, { label: string; icon: typeof Wallet }> = {
+  finance: { label: 'Finance', icon: Wallet },
+};
 
 function formatRelativeTime(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -21,12 +26,33 @@ function formatRelativeTime(dateStr: string): string {
   return `${Math.floor(days / 30)}m`;
 }
 
+/** Extract the feature prefix from an entity_kind like "finance.budgets" → "finance" */
+function featurePrefix(entityKind?: string): string | null {
+  if (!entityKind) return null;
+  const dot = entityKind.indexOf('.');
+  const prefix = dot > 0 ? entityKind.slice(0, dot) : entityKind;
+  return FEATURE_GROUPS[prefix] ? prefix : null;
+}
+
+interface AreaGroup {
+  areaId: string;
+  areaName: string;
+  projectGroups: Map<string, { projectName: string; threads: ChatThread[] }>;
+  threads: ChatThread[]; // Area-level threads (no project)
+}
+
+interface GroupedThreads {
+  areas: AreaGroup[];
+  features: Map<string, ChatThread[]>;
+  general: ChatThread[];
+}
+
 export function Chat() {
   const navigate = useNavigate();
   const [activeSidebar, setActiveSidebar] = useState<SidebarItem>('Chat');
   const [input, setInput] = useState('');
   const [selectedThread, setSelectedThread] = useState('');
-  const [expandedProjects, toggleProject] = useSetToggle();
+  const [expandedGroups, toggleGroup] = useSetToggle();
   const [pendingUserMsg, setPendingUserMsg] = useState<string | null>(null);
 
   // IPC data
@@ -61,15 +87,56 @@ export function Chat() {
     return list;
   }, [messages, pendingUserMsg]);
 
-  // Group threads by projectId for sidebar
-  const threadsByProject = useMemo(() => {
-    const groups: Record<string, { name: string; threads: ChatThread[] }> = {};
+  // Group threads into PARA hierarchy, features, and general
+  const grouped = useMemo<GroupedThreads>(() => {
+    const areaMap = new Map<string, AreaGroup>();
+    const featureMap = new Map<string, ChatThread[]>();
+    const general: ChatThread[] = [];
+
     for (const t of threads) {
-      const key = t.projectId ?? '_general';
-      if (!groups[key]) groups[key] = { name: key === '_general' ? 'General' : key, threads: [] };
-      groups[key].threads.push(t);
+      // 1. Thread with area context → PARA hierarchy
+      if (t.areaId) {
+        let area = areaMap.get(t.areaId);
+        if (!area) {
+          area = {
+            areaId: t.areaId,
+            areaName: t.areaName || t.areaId,
+            projectGroups: new Map(),
+            threads: [],
+          };
+          areaMap.set(t.areaId, area);
+        }
+        if (t.projectId) {
+          let pg = area.projectGroups.get(t.projectId);
+          if (!pg) {
+            pg = { projectName: t.projectName || t.projectId, threads: [] };
+            area.projectGroups.set(t.projectId, pg);
+          }
+          pg.threads.push(t);
+        } else {
+          area.threads.push(t);
+        }
+        continue;
+      }
+
+      // 2. Feature thread (entity_kind matches a known feature, no area_id)
+      const fp = featurePrefix(t.entityKind);
+      if (fp) {
+        const list = featureMap.get(fp) || [];
+        list.push(t);
+        featureMap.set(fp, list);
+        continue;
+      }
+
+      // 3. General
+      general.push(t);
     }
-    return groups;
+
+    return {
+      areas: Array.from(areaMap.values()),
+      features: featureMap,
+      general,
+    };
   }, [threads]);
 
   const handleSend = useCallback(async () => {
@@ -89,6 +156,45 @@ export function Chat() {
     setSelectedThread(`chat:${crypto.randomUUID()}`);
     setPendingUserMsg(null);
   }, []);
+
+  const selectThread = useCallback((key: string) => {
+    setSelectedThread(key);
+    setPendingUserMsg(null);
+  }, []);
+
+  // Shared thread button renderer
+  const renderThread = (thread: ChatThread) => (
+    <button
+      key={thread.sessionKey}
+      onClick={() => selectThread(thread.sessionKey)}
+      className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-[12px] font-light ${
+        selectedThread === thread.sessionKey
+          ? 'bg-surface-highest text-primary'
+          : 'text-muted hover:bg-surface-base hover:text-secondary'
+      }`}
+    >
+      <MessageSquare className="w-3 h-3 shrink-0" strokeWidth={1.5} />
+      <span className="flex-1 text-left truncate">{thread.title}</span>
+      <span className="text-[11px] shrink-0">{formatRelativeTime(thread.updatedAt)}</span>
+    </button>
+  );
+
+  // Collapsible group header
+  const renderGroupHeader = (key: string, label: string, Icon: typeof FolderOpen) => (
+    <button
+      onClick={() => toggleGroup(key)}
+      className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-surface-base transition-colors text-[12px] font-light text-muted hover:text-secondary"
+    >
+      <Icon className="w-3.5 h-3.5" strokeWidth={1.5} />
+      <span className="flex-1 text-left">{label}</span>
+      <ChevronDown
+        className={`w-3.5 h-3.5 transition-transform ${
+          expandedGroups.has(key) ? 'rotate-0' : '-rotate-90'
+        }`}
+        strokeWidth={1.5}
+      />
+    </button>
+  );
 
   return (
     <div className="h-screen w-screen bg-background text-primary flex overflow-hidden">
@@ -123,46 +229,62 @@ export function Chat() {
 
         {/* Thread List */}
         <div className="flex-1 overflow-y-auto px-3 pb-3">
-          <div className="space-y-4">
-            {Object.entries(threadsByProject).map(([projectId, group]) => (
-              <div key={projectId}>
-                <button
-                  onClick={() => toggleProject(projectId)}
-                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-surface-base transition-colors text-[12px] font-light text-muted hover:text-secondary"
-                >
-                  <FolderOpen className="w-3.5 h-3.5" strokeWidth={1.5} />
-                  <span className="flex-1 text-left">{group.name}</span>
-                  <ChevronDown
-                    className={`w-3.5 h-3.5 transition-transform ${
-                      expandedProjects.has(projectId) ? 'rotate-0' : '-rotate-90'
-                    }`}
-                    strokeWidth={1.5}
-                  />
-                </button>
-                {expandedProjects.has(projectId) && (
-                  <div className="mt-1 ml-3 space-y-1">
-                    {group.threads.map((thread) => (
-                      <button
-                        key={thread.sessionKey}
-                        onClick={() => {
-                          setSelectedThread(thread.sessionKey);
-                          setPendingUserMsg(null);
-                        }}
-                        className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-[12px] font-light ${
-                          selectedThread === thread.sessionKey
-                            ? 'bg-surface-highest text-primary'
-                            : 'text-muted hover:bg-surface-base hover:text-secondary'
-                        }`}
-                      >
-                        <MessageSquare className="w-3 h-3" strokeWidth={1.5} />
-                        <span className="flex-1 text-left truncate">{thread.title}</span>
-                        <span className="text-[11px]">{formatRelativeTime(thread.updatedAt)}</span>
-                      </button>
+          <div className="space-y-3">
+            {/* PARA: Area groups */}
+            {grouped.areas.map((area) => (
+              <div key={area.areaId}>
+                {renderGroupHeader(`area:${area.areaId}`, area.areaName, FolderOpen)}
+                {expandedGroups.has(`area:${area.areaId}`) && (
+                  <div className="mt-1 ml-3 space-y-2">
+                    {/* Project sub-groups within area */}
+                    {Array.from(area.projectGroups.entries()).map(([pid, pg]) => (
+                      <div key={pid}>
+                        {renderGroupHeader(`proj:${pid}`, pg.projectName, FolderOpen)}
+                        {expandedGroups.has(`proj:${pid}`) && (
+                          <div className="mt-1 ml-3 space-y-1">
+                            {pg.threads.map(renderThread)}
+                          </div>
+                        )}
+                      </div>
                     ))}
+                    {/* Area-level threads (no project) */}
+                    {area.threads.length > 0 && (
+                      <div className="space-y-1">
+                        {area.threads.map(renderThread)}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
             ))}
+
+            {/* Feature groups */}
+            {Array.from(grouped.features.entries()).map(([prefix, fThreads]) => {
+              const cfg = FEATURE_GROUPS[prefix];
+              return (
+                <div key={`feat:${prefix}`}>
+                  {renderGroupHeader(`feat:${prefix}`, cfg.label, cfg.icon)}
+                  {expandedGroups.has(`feat:${prefix}`) && (
+                    <div className="mt-1 ml-3 space-y-1">
+                      {fThreads.map(renderThread)}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+
+            {/* General threads */}
+            {grouped.general.length > 0 && (
+              <div>
+                {renderGroupHeader('_general', 'General', Globe)}
+                {expandedGroups.has('_general') && (
+                  <div className="mt-1 ml-3 space-y-1">
+                    {grouped.general.map(renderThread)}
+                  </div>
+                )}
+              </div>
+            )}
+
             {threads.length === 0 && (
               <div className="text-center py-8 text-muted text-[12px] font-light">
                 No conversations yet

@@ -1,5 +1,6 @@
 //! Chat commands — wired to AgentLoop with streaming events.
 
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use agent::AgentEvent;
@@ -12,12 +13,42 @@ use crate::app_core::AppCore;
 
 #[tauri::command]
 pub async fn chat_threads(state: State<'_, AppCore>) -> Result<Vec<ChatThreadResponse>, String> {
-    let sessions = state
-        .repos
-        .sessions
-        .list_sessions()
-        .await
-        .map_err(|e| e.to_string())?;
+    let (sessions, visible_contexts) = tokio::join!(
+        state.repos.sessions.list_sessions(),
+        state.repos.session_context.list_visible(),
+    );
+    let sessions = sessions.map_err(|e| e.to_string())?;
+    let visible_contexts = visible_contexts.map_err(|e| e.to_string())?;
+
+    // Build context lookup by session_key
+    let ctx_map: HashMap<&str, _> = visible_contexts
+        .iter()
+        .map(|c| (c.session_key.as_str(), c))
+        .collect();
+
+    // Collect unique area/project IDs for name resolution
+    let area_ids: HashSet<&str> = visible_contexts
+        .iter()
+        .filter_map(|c| c.area_id.as_deref())
+        .collect();
+    let project_ids: HashSet<&str> = visible_contexts
+        .iter()
+        .filter_map(|c| c.project_id.as_deref())
+        .collect();
+
+    // Batch resolve names
+    let mut area_names: HashMap<String, String> = HashMap::new();
+    for aid in &area_ids {
+        if let Ok(Some(area)) = state.repos.areas.get(aid).await {
+            area_names.insert(aid.to_string(), area.name);
+        }
+    }
+    let mut project_names: HashMap<String, String> = HashMap::new();
+    for pid in &project_ids {
+        if let Ok(Some(proj)) = state.repos.projects.get(pid).await {
+            project_names.insert(pid.to_string(), proj.name);
+        }
+    }
 
     Ok(sessions
         .iter()
@@ -28,18 +59,33 @@ pub async fn chat_threads(state: State<'_, AppCore>) -> Result<Vec<ChatThreadRes
                 .and_then(|v| v.as_str())
                 .unwrap_or(&s.key)
                 .to_string();
-            let project_id = s
-                .metadata
-                .get("projectId")
-                .and_then(|v| v.as_str())
-                .map(String::from);
+            let ctx = ctx_map.get(s.key.as_str());
 
             ChatThreadResponse {
                 session_key: s.key.clone(),
                 title,
                 message_count: s.message_count,
                 updated_at: s.updated_at,
-                project_id,
+                context_type: ctx.map(|c| c.context_type.clone()),
+                entity_kind: ctx.and_then(|c| c.entity_kind.clone()),
+                entity_id: ctx.and_then(|c| c.entity_id.clone()),
+                area_id: ctx.and_then(|c| c.area_id.clone()),
+                area_name: ctx.and_then(|c| {
+                    c.area_id.as_deref().and_then(|id| area_names.get(id).cloned())
+                }),
+                project_id: ctx
+                    .and_then(|c| c.project_id.clone())
+                    .or_else(|| {
+                        s.metadata
+                            .get("projectId")
+                            .and_then(|v| v.as_str())
+                            .map(String::from)
+                    }),
+                project_name: ctx.and_then(|c| {
+                    c.project_id
+                        .as_deref()
+                        .and_then(|id| project_names.get(id).cloned())
+                }),
             }
         })
         .collect())
