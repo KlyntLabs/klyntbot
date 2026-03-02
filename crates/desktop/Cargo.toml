@@ -8,10 +8,23 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 desktop-shared = { workspace = true }
+agent = { workspace = true }
+bus = { workspace = true }
+channels = { workspace = true }
+common = { workspace = true }
+config = { workspace = true }
+dashmap = { workspace = true }
+context_engine = { workspace = true }
+providers = { workspace = true }
+scheduling = { workspace = true }
+session = { workspace = true }
 storage = { workspace = true }
+tools = { workspace = true }
+tools-core = { workspace = true }
 tauri = { version = "2", features = ["macos-private-api", "tray-icon", "image-png"] }
 tauri-plugin-global-shortcut = "2"
 tokio = { workspace = true }
+tokio-util = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true }
 dirs = { workspace = true }

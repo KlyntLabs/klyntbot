@@ -1,28 +1,468 @@
-use storage::{Repos, StoragePool};
+//! Central application state — embeds AgentLoop, Bus, Channels, Cron within Tauri.
+//!
+//! Mirrors the initialization sequence from `cli/src/serve.rs` but adapted for
+//! the Tauri desktop lifecycle.
+
+use std::sync::atomic::Ordering;
+use std::sync::Arc;
+
+use agent::{AgentLoop, PersonaManager};
+use bus::MessageBus;
+use channels::ChannelManager;
+use scheduling::CronService;
+use storage::{Repos, StoragePool, VectorStore};
+use tokio::sync::{mpsc, Mutex, RwLock};
+use tokio_util::sync::CancellationToken;
+use tracing::{error, info, warn};
 
 /// Central application state managed by Tauri.
-/// Holds Repos for database access. AgentLoop integration will be added later.
 pub struct AppCore {
     pub repos: Repos,
+    pub agent: Arc<AgentLoop>,
+    pub bus: Arc<MessageBus>,
+    pub persona_manager: Arc<RwLock<PersonaManager>>,
+    pub config: config::Config,
+
+    // Private — managed internally
+    channel_manager: Arc<Mutex<ChannelManager>>,
+    cron_service: Arc<CronService>,
+    shutdown_token: CancellationToken,
+    /// Active streaming cancellation tokens keyed by session_key.
+    pub active_streams: dashmap::DashMap<String, CancellationToken>,
 }
 
 impl AppCore {
+    /// Initialize the full agent stack.
+    ///
+    /// Mirrors the initialization order from `serve.rs`:
+    /// config → storage → bus → provider → cron → persona → agent → channels
     pub async fn init() -> Result<Self, String> {
-        let data_dir = dirs::home_dir()
-            .ok_or("could not determine home directory")?
-            .join(".klyntbot");
+        // 1. Load config
+        let mut config = config::load_with_env_overrides()
+            .await
+            .map_err(|e| format!("config load failed: {e}"))?;
+        info!(path = ?config::config_path(), "configuration loaded");
 
+        // 2. Connect storage
+        let data_dir = config.data_dir_path();
         std::fs::create_dir_all(&data_dir)
             .map_err(|e| format!("failed to create data dir: {e}"))?;
 
-        let pool = StoragePool::connect(&data_dir)
+        let storage_pool = StoragePool::connect(&data_dir)
             .await
-            .map_err(|e| format!("failed to connect to database: {e}"))?;
+            .map_err(|e| format!("storage connect failed: {e}"))?;
+        let repos = Repos::from_pool(&storage_pool);
+        let vector_store = VectorStore::connect(&data_dir).await.ok();
+        info!("storage connected");
 
-        let repos = Repos::from_pool(&pool);
+        // 3. Create LLM provider
+        let (provider, resolved_model) =
+            providers::create_provider(&config).map_err(|e| format!("provider init failed: {e}"))?;
+        config.agents.defaults.model = resolved_model;
+        info!(provider = %provider.name(), "provider ready");
 
-        tracing::info!(data_dir = %data_dir.display(), "desktop app core initialized");
+        // 4. Message bus
+        let bus = Arc::new(MessageBus::new(100));
 
-        Ok(Self { repos })
+        // 5. Cron service — set callbacks BEFORE wrapping in Arc
+        let mut cron_service = CronService::new(repos.cron.clone());
+        cron_service
+            .start()
+            .await
+            .map_err(|e| format!("cron start failed: {e}"))?;
+
+        let notification_dispatcher = Arc::new(agent::NotificationDispatcher::new(
+            bus.outbound_sender(),
+            config.todo.notifications.clone(),
+        ));
+
+        Self::register_cron_callbacks(
+            &mut cron_service,
+            &repos,
+            &notification_dispatcher,
+            &config,
+            &bus,
+        );
+
+        let cron_service = Arc::new(cron_service);
+        Self::ensure_cron_jobs(&cron_service, &config)
+            .await
+            .map_err(|e| format!("cron job registration failed: {e}"))?;
+        info!("cron service started");
+
+        // 6. Load personas
+        let personas_dir = data_dir.join("personas");
+        let mut persona_manager = PersonaManager::load(&personas_dir).await;
+        persona_manager.resolve_scopes(&repos).await;
+        let persona_manager = Arc::new(RwLock::new(persona_manager));
+        info!("persona manager loaded");
+
+        // 7. Build AgentLoop
+        let mut builder = AgentLoop::builder(bus.clone(), provider, config.clone())
+            .with_pool(storage_pool.inner().clone())
+            .with_cron_service(cron_service.clone())
+            .with_notification_handle(notification_dispatcher.last_active_handle());
+
+        if let Some(vs) = vector_store {
+            builder = builder.with_vector_store(vs);
+        }
+
+        let mut agent_loop_raw = builder
+            .build()
+            .await
+            .map_err(|e| format!("agent build failed: {e}"))?;
+        let inbound_rx = agent_loop_raw
+            .take_inbound_rx()
+            .expect("inbound receiver already taken");
+        let agent = Arc::new(agent_loop_raw);
+        info!("agent loop initialized");
+
+        // 8. Channel manager
+        let channel_manager = Arc::new(Mutex::new(
+            ChannelManager::new(Arc::new(config.clone()), bus.clone())
+                .map_err(|e| format!("channel manager init failed: {e}"))?,
+        ));
+
+        let shutdown_token = CancellationToken::new();
+
+        let core = Self {
+            repos,
+            agent: Arc::clone(&agent),
+            bus: bus.clone(),
+            persona_manager,
+            config: config.clone(),
+            channel_manager: channel_manager.clone(),
+            cron_service: cron_service.clone(),
+            shutdown_token: shutdown_token.clone(),
+            active_streams: dashmap::DashMap::new(),
+        };
+
+        // Spawn background services immediately
+        core.spawn_background(inbound_rx, channel_manager, &agent, &shutdown_token);
+
+        Ok(core)
     }
+
+    /// Spawn the agent loop and channel manager tasks.
+    fn spawn_background(
+        &self,
+        inbound_rx: mpsc::Receiver<bus::InboundMessage>,
+        channel_manager: Arc<Mutex<ChannelManager>>,
+        agent: &Arc<AgentLoop>,
+        shutdown_token: &CancellationToken,
+    ) {
+        let agent_clone = Arc::clone(agent);
+        let token = shutdown_token.clone();
+
+        tokio::spawn(async move {
+            tokio::select! {
+                result = agent_clone.run_with_rx(inbound_rx) => {
+                    if let Err(e) = result {
+                        error!("agent loop error: {}", e);
+                    }
+                }
+                _ = token.cancelled() => {
+                    info!("agent loop shutdown via token");
+                }
+            }
+        });
+
+        tokio::spawn(async move {
+            if let Err(e) = channel_manager.lock().await.start_all().await {
+                error!("channel manager error: {}", e);
+            }
+        });
+
+        info!("background services spawned");
+    }
+
+    /// Graceful shutdown.
+    pub async fn shutdown(&self) {
+        info!("shutting down app core");
+        self.agent.shutdown_flag().store(false, Ordering::SeqCst);
+        self.shutdown_token.cancel();
+        self.cron_service.stop().await;
+        info!("app core stopped");
+    }
+
+    /// Register cron callbacks (must be called before wrapping CronService in Arc).
+    fn register_cron_callbacks(
+        cron_service: &mut CronService,
+        repos: &Repos,
+        notification_dispatcher: &Arc<agent::NotificationDispatcher>,
+        config: &config::Config,
+        bus: &Arc<MessageBus>,
+    ) {
+        let todo_repo = repos.actions.clone();
+        let dispatcher = Arc::clone(notification_dispatcher);
+        let config_focus = config.todo.focus.clone();
+        let bus_for_cron = bus.clone();
+        let rt = tokio::runtime::Handle::current();
+
+        cron_service.set_callback(Arc::new(move |job: &scheduling::CronJob| {
+            let todo_repo = todo_repo.clone();
+            let dispatcher = Arc::clone(&dispatcher);
+            let config_focus = config_focus.clone();
+            let bus = Arc::clone(&bus_for_cron);
+            let job_name = job.name.clone();
+
+            tokio::task::block_in_place(|| {
+                rt.block_on(async move {
+                    match job_name.as_str() {
+                        "todo_focus_check" => {
+                            let focused: Vec<storage::ActionRow> =
+                                todo_repo.list_focused().await?;
+                            for task in &focused {
+                                if let Some(deadline) = task.focus_deadline {
+                                    let remaining = deadline - chrono::Utc::now();
+                                    let hours_left = remaining.num_hours();
+                                    if hours_left <= 1 && hours_left > 0 {
+                                        dispatcher
+                                            .notify(
+                                                "⏰ Focus Deadline: 1h left",
+                                                &format!(
+                                                    "\"{}\" — deadline approaching!",
+                                                    task.title
+                                                ),
+                                            )
+                                            .await
+                                            .ok();
+                                    } else if hours_left <= 3 && hours_left > 1 {
+                                        dispatcher
+                                            .notify(
+                                                "⏰ Focus Deadline: 3h left",
+                                                &format!(
+                                                    "\"{}\" — stay on track",
+                                                    task.title
+                                                ),
+                                            )
+                                            .await
+                                            .ok();
+                                    } else if hours_left <= 6 && hours_left > 3 {
+                                        dispatcher
+                                            .notify(
+                                                "⏰ Focus Deadline: 6h left",
+                                                &format!(
+                                                    "\"{}\" — keep going",
+                                                    task.title
+                                                ),
+                                            )
+                                            .await
+                                            .ok();
+                                    }
+                                }
+                            }
+                            Ok(Some(format!("Checked {} focused tasks", focused.len())))
+                        }
+                        "todo_daily_digest" => {
+                            let summary = todo_repo.summary().await?;
+                            let overdue: Vec<storage::ActionRow> = todo_repo.overdue().await?;
+                            let body = format!(
+                                "Total: {} | Todo: {} | Doing: {} | Done: {} | Overdue: {}",
+                                summary.total,
+                                summary.todo,
+                                summary.doing,
+                                summary.done,
+                                overdue.len()
+                            );
+                            dispatcher
+                                .notify("📋 Daily Task Digest", &body)
+                                .await
+                                .ok();
+                            Ok(Some("Daily digest sent".to_string()))
+                        }
+                        "todo_overdue_check" => {
+                            let focused: Vec<storage::ActionRow> =
+                                todo_repo.list_focused().await?;
+                            let now = chrono::Utc::now();
+                            let mut expired_count = 0u32;
+                            for task in &focused {
+                                if task.focus_deadline.map(|d| d < now).unwrap_or(false) {
+                                    let _ = todo_repo.unfocus(&task.id).await;
+                                    expired_count += 1;
+                                }
+                            }
+                            if expired_count > 0 {
+                                let body = format!(
+                                    "{} task(s) auto-unfocused due to {}h deadline",
+                                    expired_count, config_focus.deadline_hours
+                                );
+                                dispatcher
+                                    .notify("⏰ Focus Tasks Expired", &body)
+                                    .await
+                                    .ok();
+                            }
+                            Ok(Some("Overdue check complete".to_string()))
+                        }
+                        name if name.starts_with("__klyntbot_") => {
+                            let (channel, msg_text) = match name {
+                                "__klyntbot_weekly_report" => ("weekly_report", "Generate weekly progress report using the weekly-report skill"),
+                                "__klyntbot_calendar_sync" => ("calendar_sync", "Sync calendar events with configured providers"),
+                                "__klyntbot_daily_planning" => ("daily_planning", "/daily-planning"),
+                                "__klyntbot_finance_daily_review" => ("finance_daily_review", "Run finance daily review and send summary"),
+                                "__klyntbot_finance_budget_check" => ("finance_budget_check", "Check budget thresholds and send alerts"),
+                                "__klyntbot_finance_price_refresh" => ("finance_price_refresh", "Refresh investment prices"),
+                                "__klyntbot_finance_health_check" => ("finance_health_check", "Run finance data health check"),
+                                _ => return Ok(None),
+                            };
+                            let msg = bus::InboundMessage::new(
+                                "system",
+                                "cron",
+                                channel,
+                                msg_text.to_string(),
+                            );
+                            bus.publish_inbound(msg).await.map_err(|e| {
+                                common::KlyntbotError::Bus(format!(
+                                    "Failed to publish {name} message: {e}"
+                                ))
+                            })?;
+                            Ok(Some(format!("{name} triggered")))
+                        }
+                        _ => Ok(None),
+                    }
+                })
+            })
+        }));
+    }
+
+    /// Register default cron jobs (idempotent — skips existing).
+    async fn ensure_cron_jobs(
+        cron_service: &Arc<CronService>,
+        config: &config::Config,
+    ) -> Result<(), common::KlyntbotError> {
+        let existing: std::collections::HashSet<String> = cron_service
+            .list_jobs(true)
+            .await
+            .into_iter()
+            .map(|j| j.name)
+            .collect();
+
+        macro_rules! ensure_job {
+            ($name:expr, $schedule:expr, $msg:expr) => {
+                if !existing.contains($name) {
+                    cron_service
+                        .add_job($name, $schedule, $msg, false, None, None, false)
+                        .await?;
+                }
+            };
+        }
+
+        ensure_job!(
+            "todo_focus_check",
+            scheduling::CronSchedule::Every {
+                every_ms: 30 * 60 * 1000,
+            },
+            "Check focus task deadlines"
+        );
+        ensure_job!(
+            "todo_daily_digest",
+            scheduling::CronSchedule::Cron {
+                expr: "0 9 * * *".to_string(),
+                tz: None,
+            },
+            "Daily task summary"
+        );
+        ensure_job!(
+            "todo_overdue_check",
+            scheduling::CronSchedule::Every {
+                every_ms: 60 * 60 * 1000,
+            },
+            "Check for overdue focus tasks"
+        );
+        ensure_job!(
+            "__klyntbot_weekly_report",
+            scheduling::CronSchedule::Cron {
+                expr: "0 18 * * 0".to_string(),
+                tz: None,
+            },
+            "Generate weekly progress report"
+        );
+
+        // Calendar sync
+        if config.calendar.is_any_enabled() {
+            let interval = config.calendar.min_sync_interval_secs();
+            ensure_job!(
+                "__klyntbot_calendar_sync",
+                scheduling::CronSchedule::Every {
+                    every_ms: interval * 1000,
+                },
+                "Sync calendar events"
+            );
+        }
+
+        // Daily planning
+        if config.todo.daily_planning.enabled {
+            if let Some(cron_expr) = parse_time_to_cron(&config.todo.daily_planning.planning_time) {
+                ensure_job!(
+                    "__klyntbot_daily_planning",
+                    scheduling::CronSchedule::Cron {
+                        expr: cron_expr,
+                        tz: None,
+                    },
+                    "Generate daily planning notification"
+                );
+            }
+        }
+
+        // Finance cron jobs
+        if config.finance.enabled && config.finance.proactivity_level != "reactive" {
+            if let Some(cron_expr) =
+                parse_time_to_cron(&config.finance.scheduling.daily_review_time)
+            {
+                ensure_job!(
+                    "__klyntbot_finance_daily_review",
+                    scheduling::CronSchedule::Cron {
+                        expr: cron_expr,
+                        tz: None,
+                    },
+                    "Daily financial review"
+                );
+            }
+            ensure_job!(
+                "__klyntbot_finance_budget_check",
+                scheduling::CronSchedule::Every {
+                    every_ms: 6 * 60 * 60 * 1000,
+                },
+                "Check budget thresholds"
+            );
+            if config.finance.price_refresh.enabled {
+                ensure_job!(
+                    "__klyntbot_finance_price_refresh",
+                    scheduling::CronSchedule::Every {
+                        every_ms: config.finance.price_refresh.interval_hours as u64
+                            * 60
+                            * 60
+                            * 1000,
+                    },
+                    "Refresh investment prices"
+                );
+            }
+            ensure_job!(
+                "__klyntbot_finance_health_check",
+                scheduling::CronSchedule::Cron {
+                    expr: "0 0 * * *".to_string(),
+                    tz: None,
+                },
+                "Finance data health check"
+            );
+        }
+
+        Ok(())
+    }
+}
+
+/// Parse "HH:MM" to cron expression "M H * * *".
+fn parse_time_to_cron(time_str: &str) -> Option<String> {
+    let parts: Vec<&str> = time_str.split(':').collect();
+    if parts.len() != 2 {
+        warn!("invalid time format '{}', expected HH:MM", time_str);
+        return None;
+    }
+    let hour: u8 = parts[0].parse().ok()?;
+    let minute: u8 = parts[1].parse().ok()?;
+    if hour >= 24 || minute >= 60 {
+        warn!("invalid time '{}': hour 0-23, minute 0-59", time_str);
+        return None;
+    }
+    Some(format!("{} {} * * *", minute, hour))
 }
