@@ -1,6 +1,7 @@
 //! Page context source — injects entity details for scoped sessions.
 
 use async_trait::async_trait;
+use common::SessionKey;
 use context_engine::source::{ContextSource, SourceContext};
 use storage::repos::Repos;
 
@@ -27,8 +28,8 @@ impl ContextSource for PageContextSource {
     }
 
     async fn provide(&self, ctx: &SourceContext) -> Option<String> {
-        let session_key = format!("{}:{}", ctx.channel, ctx.chat_id);
-        let context = self.repos.session_context.get(&session_key).await.ok()??;
+        let session_key = SessionKey::from_parts(&ctx.channel, &ctx.chat_id);
+        let context = self.repos.session_context.get(session_key.as_str()).await.ok()??;
 
         let entity_kind = context.entity_kind.as_deref()?;
         let entity_id = context.entity_id.as_deref();
@@ -48,22 +49,18 @@ impl ContextSource for PageContextSource {
 
 impl PageContextSource {
     async fn project_context(&self, id: &str) -> Option<String> {
-        let project = self.repos.projects.get(id).await.ok()??;
-        let tasks = self
-            .repos
-            .actions
-            .list(&storage::repos::ActionFilter {
-                project_id: Some(id.to_string()),
-                ..Default::default()
-            })
-            .await
-            .unwrap_or_default();
-        let objectives = self
-            .repos
-            .objectives
-            .list(Some(id), None)
-            .await
-            .unwrap_or_default();
+        let filter = storage::repos::ActionFilter {
+            project_id: Some(id.to_string()),
+            ..Default::default()
+        };
+        let (project_res, tasks_res, objectives_res) = tokio::join!(
+            self.repos.projects.get(id),
+            self.repos.actions.list(&filter),
+            self.repos.objectives.list(Some(id), None),
+        );
+        let project = project_res.ok()??;
+        let tasks = tasks_res.unwrap_or_default();
+        let objectives = objectives_res.unwrap_or_default();
 
         let mut out = format!(
             "**Project:** {} (status: {})\n",
@@ -98,15 +95,9 @@ impl PageContextSource {
         let subtasks = self
             .repos
             .actions
-            .list(&storage::repos::ActionFilter {
-                project_id: task.project_id.clone(),
-                ..Default::default()
-            })
+            .get_children(id)
             .await
-            .unwrap_or_default()
-            .into_iter()
-            .filter(|a| a.parent_id.as_deref() == Some(id))
-            .collect::<Vec<_>>();
+            .unwrap_or_default();
 
         let mut out = format!(
             "**Task:** {} (status: {}, priority: {})\n",
@@ -169,8 +160,7 @@ impl PageContextSource {
     }
 
     async fn area_context(&self, id: &str) -> Option<String> {
-        let areas = self.repos.areas.list(None).await.ok()?;
-        let area = areas.iter().find(|a| a.id == id)?;
+        let area = self.repos.areas.get(id).await.ok()??;
         let projects = self
             .repos
             .projects

@@ -3,6 +3,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use common::SessionKey;
 use context_engine::source::{ContextSource, SourceContext};
 use storage::repos::SessionContextRepo;
 use tokio::sync::RwLock;
@@ -38,8 +39,8 @@ impl ContextSource for PersonaContextSource {
     }
 
     async fn provide(&self, ctx: &SourceContext) -> Option<String> {
-        let session_key = format!("{}:{}", ctx.channel, ctx.chat_id);
-        let context = self.session_context_repo.get(&session_key).await.ok()??;
+        let session_key = SessionKey::from_parts(&ctx.channel, &ctx.chat_id);
+        let context = self.session_context_repo.get(session_key.as_str()).await.ok()??;
 
         let mgr = self.persona_manager.read().await;
         let chain = mgr.for_session(&context);

@@ -112,36 +112,35 @@ impl PersonaManager {
 
     /// Resolve persona scopes against the database (area/project name → ID).
     pub async fn resolve_scopes(&mut self, repos: &storage::repos::Repos) {
+        let areas = repos.areas.list(None).await.unwrap_or_default();
+        let projects = repos
+            .projects
+            .list(&storage::repos::ProjectFilter::default())
+            .await
+            .unwrap_or_default();
+
         for persona in &self.personas {
             match &persona.scope {
                 PersonaScope::Area { name } => {
-                    if let Ok(areas) = repos.areas.list(None).await {
-                        if let Some(area) = areas.iter().find(|a| a.name == *name) {
-                            self.resolved_scopes.insert(
-                                persona.name.clone(),
-                                ResolvedScope {
-                                    area_id: Some(area.id.clone()),
-                                    project_id: None,
-                                },
-                            );
-                        }
+                    if let Some(area) = areas.iter().find(|a| a.name == *name) {
+                        self.resolved_scopes.insert(
+                            persona.name.clone(),
+                            ResolvedScope {
+                                area_id: Some(area.id.clone()),
+                                project_id: None,
+                            },
+                        );
                     }
                 }
                 PersonaScope::Project { name } => {
-                    if let Ok(projects) = repos
-                        .projects
-                        .list(&storage::repos::ProjectFilter::default())
-                        .await
-                    {
-                        if let Some(project) = projects.iter().find(|p| p.name == *name) {
-                            self.resolved_scopes.insert(
-                                persona.name.clone(),
-                                ResolvedScope {
-                                    area_id: Some(project.area_id.clone()),
-                                    project_id: Some(project.id.clone()),
-                                },
-                            );
-                        }
+                    if let Some(project) = projects.iter().find(|p| p.name == *name) {
+                        self.resolved_scopes.insert(
+                            persona.name.clone(),
+                            ResolvedScope {
+                                area_id: Some(project.area_id.clone()),
+                                project_id: Some(project.id.clone()),
+                            },
+                        );
                     }
                 }
                 PersonaScope::Global | PersonaScope::Feature { .. } => {}
@@ -228,12 +227,11 @@ impl PersonaManager {
                 }
             }
             PersonaScope::Feature { kind } => {
-                // Match if entity_kind starts with the feature kind
-                // e.g. "finance" matches "finance", "finance.budgets", "finance.investments"
-                context
-                    .entity_kind
-                    .as_deref()
-                    .is_some_and(|ek| ek == kind || ek.starts_with(&format!("{kind}.")))
+                context.entity_kind.as_deref().is_some_and(|ek| {
+                    ek == kind
+                        || (ek.starts_with(kind.as_str())
+                            && ek.as_bytes().get(kind.len()) == Some(&b'.'))
+                })
             }
         }
     }
@@ -244,18 +242,13 @@ impl PersonaManager {
 #[serde(default)]
 struct PersonaFrontmatter {
     name: Option<String>,
-    scope: Option<ScopeDef>,
+    scope: Option<HashMap<String, String>>,
     skills: Vec<String>,
     tone: Option<String>,
     #[serde(flatten)]
     extra: HashMap<String, serde_json::Value>,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
-enum ScopeDef {
-    Keyed(HashMap<String, String>),
-}
 
 async fn load_persona_file(path: &Path) -> Result<Persona, String> {
     let content = fs::read_to_string(path)
@@ -270,18 +263,22 @@ async fn load_persona_file(path: &Path) -> Result<Persona, String> {
     parse_persona(file_stem, &content)
 }
 
+fn global_persona(name: &str, instructions: &str) -> Persona {
+    Persona {
+        name: name.to_string(),
+        instructions: instructions.to_string(),
+        scope: PersonaScope::Global,
+        skills: Vec::new(),
+        tone: None,
+        metadata: HashMap::new(),
+    }
+}
+
 fn parse_persona(default_name: &str, content: &str) -> Result<Persona, String> {
     let lines: Vec<&str> = content.lines().collect();
 
     if lines.is_empty() || !lines[0].trim().starts_with("---") {
-        return Ok(Persona {
-            name: default_name.to_string(),
-            instructions: content.to_string(),
-            scope: PersonaScope::Global,
-            skills: Vec::new(),
-            tone: None,
-            metadata: HashMap::new(),
-        });
+        return Ok(global_persona(default_name, content));
     }
 
     // Find end of frontmatter
@@ -294,14 +291,7 @@ fn parse_persona(default_name: &str, content: &str) -> Result<Persona, String> {
     }
 
     if end_idx == 0 {
-        return Ok(Persona {
-            name: default_name.to_string(),
-            instructions: content.to_string(),
-            scope: PersonaScope::Global,
-            skills: Vec::new(),
-            tone: None,
-            metadata: HashMap::new(),
-        });
+        return Ok(global_persona(default_name, content));
     }
 
     let frontmatter_str = lines[1..end_idx].join("\n");
@@ -311,7 +301,7 @@ fn parse_persona(default_name: &str, content: &str) -> Result<Persona, String> {
     let instructions = lines[(end_idx + 1)..].join("\n");
 
     let scope = match fm.scope {
-        Some(ScopeDef::Keyed(map)) => {
+        Some(map) => {
             if let Some(area) = map.get("area") {
                 PersonaScope::Area {
                     name: area.clone(),
