@@ -79,6 +79,7 @@ impl TaskTool {
                             estimated_minutes: update_est,
                             recurrence_rule: None,
                             area_id: None,
+                            project_id: None,
                             key_result_id: None,
                         };
                         if self.repo.update(&patch).await.is_ok() {

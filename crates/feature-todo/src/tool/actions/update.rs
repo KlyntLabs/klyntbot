@@ -37,6 +37,7 @@ impl TaskTool {
             estimated_minutes: p.optional_u64("estimated_minutes")?.map(|v| Some(v as i32)),
             recurrence_rule: None,
             area_id: p.optional_str("area_id")?.map(String::from),
+            project_id: p.optional_str("project_id")?.map(|s| Some(s.to_string())),
             key_result_id: p
                 .optional_str("key_result_id")?
                 .map(|s| Some(s.to_string())),

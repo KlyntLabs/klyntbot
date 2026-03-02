@@ -160,7 +160,8 @@ impl ActionRepo {
                 estimated_minutes  = CASE WHEN ?17 THEN ?18 ELSE estimated_minutes END,
                 recurrence_rule    = CASE WHEN ?19 THEN ?20 ELSE recurrence_rule END,
                 area_id            = COALESCE(?21, area_id),
-                key_result_id      = CASE WHEN ?22 THEN ?23 ELSE key_result_id END,
+                project_id         = CASE WHEN ?22 THEN ?23 ELSE project_id END,
+                key_result_id      = CASE WHEN ?24 THEN ?25 ELSE key_result_id END,
                 updated_at         = datetime('now')
             WHERE id = ?1
             RETURNING *
@@ -187,6 +188,8 @@ impl ActionRepo {
         .bind(patch.recurrence_rule.is_some())
         .bind(patch.recurrence_rule.as_ref().and_then(|v| v.as_deref()))
         .bind(&patch.area_id)
+        .bind(patch.project_id.is_some())
+        .bind(patch.project_id.as_ref().and_then(|v| v.as_deref()))
         .bind(patch.key_result_id.is_some())
         .bind(patch.key_result_id.as_ref().and_then(|v| v.as_deref()))
         .fetch_optional(&self.pool)
@@ -937,5 +940,6 @@ pub struct ActionPatch {
     pub estimated_minutes: Option<Option<i32>>,
     pub recurrence_rule: Option<Option<String>>,
     pub area_id: Option<String>,
+    pub project_id: Option<Option<String>>,
     pub key_result_id: Option<Option<String>>,
 }

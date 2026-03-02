@@ -50,4 +50,6 @@ pub enum EntityKind {
     Task,
     Project,
     Objective,
+    Area,
+    KeyResult,
 }

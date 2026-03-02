@@ -4,6 +4,7 @@ import type { ViewMode } from '../../lib/types';
 interface ToolbarProps {
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
+  onAddTask?: () => void;
 }
 
 function FilterButton({ label }: { label: string }) {
@@ -15,7 +16,7 @@ function FilterButton({ label }: { label: string }) {
   );
 }
 
-export function Toolbar({ viewMode, onViewModeChange }: ToolbarProps) {
+export function Toolbar({ viewMode, onViewModeChange, onAddTask }: ToolbarProps) {
   return (
     <div className="flex items-center justify-between mb-3.5">
       {/* Left: Filters */}
@@ -53,7 +54,10 @@ export function Toolbar({ viewMode, onViewModeChange }: ToolbarProps) {
           ))}
         </div>
 
-        <button className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-brand hover:bg-brand-hover text-white transition-colors">
+        <button
+          onClick={onAddTask}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-brand hover:bg-brand-hover text-white transition-colors"
+        >
           <Plus className="w-[14px] h-[14px]" strokeWidth={1.5} />
           <span className="text-[12px] font-light">Add task</span>
         </button>

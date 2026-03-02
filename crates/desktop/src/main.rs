@@ -6,8 +6,8 @@ mod commands;
 use app_core::AppCore;
 use commands::window::{WINDOW_LAUNCHER, WINDOW_TRAY};
 use tauri::image::Image;
-use tauri::{Manager, PhysicalPosition};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::{Manager, PhysicalPosition};
 use tauri_plugin_global_shortcut::{Code, Modifiers, ShortcutState};
 
 /// Register a dismiss-on-blur handler that hides the window when it loses focus.
@@ -77,9 +77,8 @@ fn main() {
                                     let x = tray_pos.x + (tray_size.width / 2.0)
                                         - (win_size.width as f64 / 2.0);
                                     let y = tray_pos.y + tray_size.height;
-                                    let _ = window.set_position(
-                                        PhysicalPosition::new(x as i32, y as i32),
-                                    );
+                                    let _ = window
+                                        .set_position(PhysicalPosition::new(x as i32, y as i32));
                                 }
                                 let _ = window.show();
                                 let _ = window.set_focus();
@@ -102,19 +101,47 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            // Tasks
             commands::tasks::today_tasks,
             commands::tasks::task_list,
+            commands::tasks::task_create,
+            commands::tasks::task_update,
+            commands::tasks::task_delete,
+            commands::tasks::task_toggle_complete,
             commands::tasks::project_list,
             commands::tasks::objective_list,
-            commands::tasks::task_toggle_complete,
-            commands::tasks::task_create,
+            // Areas
             commands::areas::area_list,
-            commands::calendar::calendar_events,
+            commands::areas::area_create,
+            commands::areas::area_update,
+            commands::areas::area_delete,
+            commands::areas::area_reorder,
+            // Projects
+            commands::projects::project_create,
+            commands::projects::project_get,
+            commands::projects::project_update,
+            commands::projects::project_delete,
+            commands::projects::project_archive,
+            // Objectives
+            commands::objectives::objective_create,
+            commands::objectives::objective_get,
+            commands::objectives::objective_update,
+            commands::objectives::objective_delete,
+            // Key Results
+            commands::key_results::key_result_create,
+            commands::key_results::key_result_update,
+            commands::key_results::key_result_update_metric,
+            commands::key_results::key_result_delete,
+            // Chat
             commands::chat::chat_threads,
             commands::chat::chat_messages,
             commands::chat::chat_send,
             commands::chat::chat_cancel,
+            // Calendar
+            commands::calendar::calendar_events,
+            // Status
             commands::status::agent_status,
+            // Window
             commands::window::resize_window,
         ])
         .run(tauri::generate_context!())

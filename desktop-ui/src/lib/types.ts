@@ -36,6 +36,7 @@ export interface Project {
 export interface Objective {
   id: string;
   title: string;
+  status: string;
   progress: number;
   projectId: string;
   keyResults?: KeyResult[];
@@ -96,6 +97,177 @@ export interface LauncherItem {
   shortcut: string;
 }
 
+// ── Finance ─────────────────────────────────────────────────────────────
+
+export interface FinanceAccount {
+  id: string;
+  name: string;
+  accountType: string;
+  currency: string;
+  balance: number;
+  institution: string | null;
+  notes: string | null;
+  isArchived: boolean;
+}
+
+export interface FinanceTransaction {
+  id: string;
+  accountId: string;
+  txType: 'income' | 'expense' | 'transfer';
+  amount: number;
+  currency: string;
+  category: string | null;
+  subcategory: string | null;
+  counterparty: string | null;
+  notes: string | null;
+  txDate: string;
+  transferId: string | null;
+}
+
+export interface FinanceBudgetUsage {
+  id: string;
+  name: string;
+  amount: number;
+  currency: string;
+  period: string;
+  category: string | null;
+  method: string;
+  jarType: string | null;
+  isActive: boolean;
+  alertThreshold: number;
+  spent: number;
+}
+
+export interface FinancePortfolio {
+  id: string;
+  name: string;
+  description: string | null;
+  currency: string;
+  totalValue: number;
+  totalCostBasis: number;
+  holdingCount: number;
+}
+
+export interface FinanceInvestment {
+  id: string;
+  portfolioId: string;
+  assetType: string;
+  symbol: string | null;
+  name: string;
+  quantity: number;
+  costBasis: number;
+  currency: string;
+  currentPrice: number | null;
+  currentValue: number | null;
+}
+
+export interface FinanceGoal {
+  id: string;
+  name: string;
+  goalType: string;
+  targetAmount: number;
+  currentAmount: number;
+  currency: string;
+  status: string;
+  deadline: string | null;
+  monthlyContribution: number | null;
+}
+
+export interface FinanceLiability {
+  id: string;
+  name: string;
+  liabilityType: string;
+  principal: number;
+  remaining: number;
+  currency: string;
+  interestRate: number | null;
+  monthlyPayment: number | null;
+  dueDate: string | null;
+}
+
+export interface FinanceNetWorth {
+  totalsByCurrency: { currency: string; accounts: number; investments: number; liabilities: number; net: number }[];
+}
+
 export type Tab = 'All' | string;
-export type SidebarItem = 'Chat' | 'Tasks' | 'OKR' | 'Calendar' | 'Settings';
+export type SidebarItem = 'Chat' | 'Tasks' | 'OKR' | 'Calendar' | 'Finance' | 'Settings';
 export type ViewMode = 'table' | 'board' | 'tree';
+
+// ── Mutation Params ─────────────────────────────────────────────────────
+
+export interface TaskUpdateParams {
+  id: string;
+  title?: string;
+  description?: string | null;
+  priority?: number | null;
+  status?: string;
+  dueDate?: string | null;
+  projectId?: string | null;
+  areaId?: string;
+  tags?: string[];
+  keyResultId?: string | null;
+}
+
+export interface AreaCreateParams {
+  name: string;
+  color?: string;
+  icon?: string;
+}
+
+export interface AreaUpdateParams {
+  id: string;
+  name?: string;
+  color?: string;
+  icon?: string | null;
+}
+
+export interface ProjectCreateParams {
+  name: string;
+  areaId: string;
+  color?: string;
+  description?: string;
+  tags?: string[];
+}
+
+export interface ProjectUpdateParams {
+  id: string;
+  name?: string;
+  areaId?: string;
+  color?: string;
+  description?: string | null;
+  tags?: string[];
+  status?: string;
+}
+
+export interface ObjectiveCreateParams {
+  title: string;
+  projectId: string;
+  description?: string;
+  priority?: number;
+  dueDate?: string;
+}
+
+export interface ObjectiveUpdateParams {
+  id: string;
+  title?: string;
+  description?: string | null;
+  status?: string;
+  priority?: number | null;
+  dueDate?: string | null;
+}
+
+export interface KeyResultCreateParams {
+  objectiveId: string;
+  title: string;
+  targetValue?: number;
+  unit?: string;
+  trackingMode?: string;
+}
+
+export interface KeyResultUpdateParams {
+  id: string;
+  title?: string;
+  description?: string | null;
+  status?: string;
+  dueDate?: string | null;
+}

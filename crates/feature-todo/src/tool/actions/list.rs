@@ -30,6 +30,8 @@ impl TaskTool {
             area_id: p.optional_str("area_id")?.map(String::from),
             key_result_id: p.optional_str("key_result_id")?.map(String::from),
             unassigned: p.optional_bool("unassigned")?.unwrap_or(false),
+            due_after: None,
+            due_before: None,
             templates_only: false,
         };
 

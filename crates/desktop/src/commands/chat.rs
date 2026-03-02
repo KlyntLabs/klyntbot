@@ -4,9 +4,7 @@ use tauri::State;
 use crate::app_core::AppCore;
 
 #[tauri::command]
-pub async fn chat_threads(
-    state: State<'_, AppCore>,
-) -> Result<Vec<ChatThreadResponse>, String> {
+pub async fn chat_threads(state: State<'_, AppCore>) -> Result<Vec<ChatThreadResponse>, String> {
     let sessions = state
         .repos
         .sessions
@@ -53,11 +51,7 @@ pub async fn chat_messages(
             .get_recent_messages(&session_key, lim)
             .await
     } else {
-        state
-            .repos
-            .sessions
-            .get_messages(&session_key)
-            .await
+        state.repos.sessions.get_messages(&session_key).await
     }
     .map_err(|e| e.to_string())?;
 

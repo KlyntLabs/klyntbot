@@ -142,8 +142,7 @@ impl ProjectRepo {
 
     /// List projects matching the given filter criteria.
     pub async fn list(&self, filter: &ProjectFilter) -> Result<Vec<ProjectRow>, StorageError> {
-        let mut qb =
-            sqlx::QueryBuilder::<sqlx::Sqlite>::new("SELECT * FROM projects WHERE 1=1");
+        let mut qb = sqlx::QueryBuilder::<sqlx::Sqlite>::new("SELECT * FROM projects WHERE 1=1");
 
         if let Some(ref area_id) = filter.area_id {
             qb.push(" AND area_id = ");

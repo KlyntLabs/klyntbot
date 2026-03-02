@@ -1,8 +1,8 @@
 use desktop_shared::commands::AgentStatusResponse;
 use tauri::State;
 
-use crate::app_core::AppCore;
 use super::tasks::action_to_task;
+use crate::app_core::AppCore;
 
 #[tauri::command]
 pub async fn agent_status(state: State<'_, AppCore>) -> Result<AgentStatusResponse, String> {

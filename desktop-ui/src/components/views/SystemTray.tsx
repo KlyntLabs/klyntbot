@@ -10,7 +10,6 @@ import { useMutation } from '../../hooks/useMutation';
 import { useEvent } from '../../hooks/useEvent';
 import { useSetToggle } from '../../hooks/useSetToggle';
 import { useTransparentBackground } from '../../hooks/useTransparentBackground';
-import { mockCalendarEvents, mockTodayTasks } from '../../data/mockData';
 import { isTauri } from '../../lib/utils';
 import type { CalendarEvent, AgentStatus as AgentStatusType, TodayTask } from '../../lib/types';
 
@@ -34,12 +33,12 @@ export function SystemTray() {
   const { data: todayTasks, refetch: refetchTasks } = useQuery<TodayTask[]>(
     'today_tasks',
     undefined,
-    mockTodayTasks,
+    [],
   );
   const { data: calendarEvents } = useQuery<CalendarEvent[]>(
     'calendar_events',
     { limit: 5 },
-    mockCalendarEvents,
+    [],
   );
 
   const toggleComplete = useMutation<TodayTask, { id: string }>('task_toggle_complete');

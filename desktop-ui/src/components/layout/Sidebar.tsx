@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router';
-import { MessageSquare, CheckSquare, Target, Calendar, Settings } from 'lucide-react';
+import { MessageSquare, CheckSquare, Target, Calendar, Wallet, Settings } from 'lucide-react';
 import { KlyntLogo } from '../ui/KlyntLogo';
 import type { SidebarItem } from '../../lib/types';
 
@@ -13,6 +13,7 @@ const items: { key: SidebarItem; icon: typeof MessageSquare; path?: string; bott
   { key: 'Tasks', icon: CheckSquare, path: '/' },
   { key: 'OKR', icon: Target },
   { key: 'Calendar', icon: Calendar },
+  { key: 'Finance', icon: Wallet, path: '/finance' },
   { key: 'Settings', icon: Settings, bottom: true },
 ];
 

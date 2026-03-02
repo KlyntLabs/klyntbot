@@ -408,8 +408,7 @@ impl AgentLoopBuilder {
                     repos.objectives.clone(),
                     repos.actions.clone(),
                 ));
-            todo_tool = todo_tool
-                .with_progress_handler(Arc::clone(&progress_handler));
+            todo_tool = todo_tool.with_progress_handler(Arc::clone(&progress_handler));
 
             tool_registry.register(todo_tool);
 

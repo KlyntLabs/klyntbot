@@ -3,7 +3,6 @@ import { Send } from 'lucide-react';
 import { useQuery } from '../../hooks/useQuery';
 import { useMutation } from '../../hooks/useMutation';
 import { isTauri } from '../../lib/utils';
-import { mockChatMessages } from '../../data/mockData';
 import type { ChatMessage } from '../../lib/types';
 
 const SESSION_KEY = 'desktop-panel';
@@ -19,7 +18,7 @@ export function ChatPanel({ isOpen, onClose }: ChatPanelProps) {
     isTauri ? { session_key: SESSION_KEY } : undefined,
     [],
   );
-  const [localMessages, setLocalMessages] = useState<ChatMessage[]>(mockChatMessages);
+  const [localMessages, setLocalMessages] = useState<ChatMessage[]>([]);
   const messages = isTauri ? ipcMessages : localMessages;
 
   const sendMessage = useMutation<ChatMessage, { content: string; session_key: string }>('chat_send');

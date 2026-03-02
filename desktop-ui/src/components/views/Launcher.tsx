@@ -7,7 +7,17 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { KlyntLogo } from '../ui/KlyntLogo';
 import { isTauri } from '../../lib/utils';
 import { useTransparentBackground } from '../../hooks/useTransparentBackground';
-import { mockLauncherItems } from '../../data/mockData';
+import type { LauncherItem } from '../../lib/types';
+
+const launcherItems: LauncherItem[] = [
+  { id: '1', title: 'Create New Task', subtitle: 'Quick add a new task', icon: 'Plus', shortcut: '\u2318N' },
+  { id: '2', title: 'Search Tasks', subtitle: 'Find tasks across all projects', icon: 'Search', shortcut: '\u2318K' },
+  { id: '3', title: 'Open Chat', subtitle: 'Talk to AI assistant', icon: 'MessageSquare', shortcut: '\u2318/' },
+  { id: '4', title: 'View Calendar', subtitle: 'See upcoming events', icon: 'Calendar', shortcut: '\u2318C' },
+  { id: '5', title: "Today's Focus", subtitle: 'View daily priorities', icon: 'Target', shortcut: '\u2318T' },
+  { id: '6', title: 'Review OKRs', subtitle: 'Check goal progress', icon: 'TrendingUp', shortcut: '\u2318O' },
+  { id: '7', title: 'Settings', subtitle: 'App preferences', icon: 'Settings', shortcut: '\u2318,' },
+];
 
 const iconMap: Record<string, typeof Search> = {
   Plus, Search, MessageSquare, Calendar, Target, TrendingUp, Settings, Sparkles,
@@ -21,7 +31,7 @@ export function Launcher() {
 
   const filteredItems = useMemo(() => {
     const q = query.toLowerCase();
-    return mockLauncherItems.filter(item =>
+    return launcherItems.filter(item =>
       item.title.toLowerCase().includes(q) ||
       item.subtitle.toLowerCase().includes(q),
     );

@@ -11,9 +11,9 @@ use std::sync::Arc;
 
 use super::{RoutingContext, Tool};
 use crate::params::ParamExtractor;
-use tools_core::ProgressHandler;
 use common::{Result, ToolError};
 use storage::{KeyResultRepo, ObjectiveRepo};
+use tools_core::ProgressHandler;
 
 /// Tool for managing OKR objectives and key results.
 pub struct OkrTool {

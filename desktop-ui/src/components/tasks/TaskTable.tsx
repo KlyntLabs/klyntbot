@@ -13,6 +13,8 @@ interface TaskTableProps {
   collapsedProjects: Set<string>;
   onToggleTask: (taskId: string) => void;
   onToggleProject: (projectId: string) => void;
+  onUpdatePriority?: (taskId: string, priority: number | null) => void;
+  onRenameTask?: (taskId: string, title: string) => void;
 }
 
 export function TaskTable({
@@ -24,6 +26,8 @@ export function TaskTable({
   collapsedProjects,
   onToggleTask,
   onToggleProject,
+  onUpdatePriority,
+  onRenameTask,
 }: TaskTableProps) {
   const showArea = activeTab === 'All';
 
@@ -89,6 +93,8 @@ export function TaskTable({
                   isCompleted={completedTasks.has(task.id)}
                   showArea={showArea}
                   onToggle={() => onToggleTask(task.id)}
+                  onUpdatePriority={onUpdatePriority}
+                  onRename={onRenameTask}
                 />
               ))}
             </div>

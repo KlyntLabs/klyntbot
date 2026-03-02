@@ -834,7 +834,9 @@ mod tests {
 
     #[tokio::test]
     async fn list_filters_by_due_date_range() {
-        let Some((repo, area_repo)) = test_action_repo().await else { return };
+        let Some((repo, area_repo)) = test_action_repo().await else {
+            return;
+        };
         let area_id = ensure_area(&area_repo).await;
 
         // Task due today

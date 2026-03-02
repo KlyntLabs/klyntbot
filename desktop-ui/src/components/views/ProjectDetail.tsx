@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router';
-import { ArrowLeft, ChevronDown, ChevronRight, Target } from 'lucide-react';
+import { ArrowLeft, ChevronDown, ChevronRight, Target, Plus, Archive } from 'lucide-react';
 import { Sidebar } from '../layout/Sidebar';
 import { Badge } from '../ui/Badge';
 import { Checkbox } from '../ui/Checkbox';
@@ -9,8 +9,9 @@ import { useSetToggle } from '../../hooks/useSetToggle';
 import { useQuery } from '../../hooks/useQuery';
 import { useMutation } from '../../hooks/useMutation';
 import { useEvent } from '../../hooks/useEvent';
-import { mockProjects, mockTasks, mockObjectives } from '../../data/mockData';
-import type { Task, Project, Objective, SidebarItem } from '../../lib/types';
+import type { Task, Project, Objective, SidebarItem, ProjectUpdateParams, ObjectiveCreateParams } from '../../lib/types';
+
+const PROJECT_COLORS = ['#3b82f6', '#ef4444', '#f97316', '#eab308', '#22c55e', '#a855f7', '#6b7280'];
 
 export function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
@@ -18,43 +19,80 @@ export function ProjectDetail() {
   const [activeSidebar, setActiveSidebar] = useState<SidebarItem>('Tasks');
   const [expandedOkrs, toggleOkr] = useSetToggle();
 
-  const mockProjectTasks = useMemo(() => mockTasks.filter(t => t.projectId === id), [id]);
-  const mockProjectObjectives = useMemo(
-    () => {
-      const proj = mockProjects.find(p => p.id === id);
-      return mockObjectives.filter(o => proj?.objectiveIds?.includes(o.id));
-    },
-    [id],
-  );
-
-  const { data: allProjects } = useQuery<Project[]>('project_list', undefined, mockProjects);
+  const { data: allProjects, refetch: refetchProjects } = useQuery<Project[]>('project_list', undefined, []);
   const { data: tasks, refetch: refetchTasks } = useQuery<Task[]>(
     'task_list',
     id ? { project_id: id } : undefined,
-    mockProjectTasks,
+    [],
   );
-  const { data: objectives } = useQuery<Objective[]>(
+  const { data: objectives, refetch: refetchObjectives } = useQuery<Objective[]>(
     'objective_list',
     id ? { project_id: id } : undefined,
-    mockProjectObjectives,
+    [],
   );
 
   const toggleComplete = useMutation<Task, { id: string }>('task_toggle_complete');
+  const updateProject = useMutation<Project, ProjectUpdateParams>('project_update');
+  const archiveProject = useMutation<Project, { id: string }>('project_archive');
+  const createTask = useMutation<Task, { title: string; projectId: string }>('task_create');
+  const createObjective = useMutation<Objective, ObjectiveCreateParams>('objective_create');
 
   const [completedTasks, toggleTask] = useSetToggle(
     tasks.filter(t => t.completed).map(t => t.id)
   );
+
+  // Inline editing state
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [addingTask, setAddingTask] = useState(false);
+  const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [addingObjective, setAddingObjective] = useState(false);
+  const [newObjTitle, setNewObjTitle] = useState('');
+  const [confirmArchive, setConfirmArchive] = useState(false);
 
   const handleToggleTask = useCallback(async (taskId: string) => {
     toggleTask(taskId);
     await toggleComplete.mutate({ id: taskId });
   }, [toggleTask, toggleComplete]);
 
-  useEvent<{ entityKind: string; id: string }>('entity:updated', () => {
-    refetchTasks();
+  useEvent<{ entityKind: string; id: string }>('entity:updated', (payload) => {
+    const kind = payload?.entityKind;
+    if (!kind || kind === 'Task') refetchTasks();
+    if (!kind || kind === 'Project') refetchProjects();
+    if (!kind || kind === 'Objective' || kind === 'KeyResult') refetchObjectives();
   });
 
   const project = useMemo(() => allProjects.find(p => p.id === id), [id, allProjects]);
+
+  const handleUpdateProject = useCallback(async (params: Partial<ProjectUpdateParams>) => {
+    if (!id) return;
+    await updateProject.mutate({ id, ...params });
+  }, [id, updateProject]);
+
+  const handleArchive = useCallback(async () => {
+    if (!id) return;
+    if (!confirmArchive) {
+      setConfirmArchive(true);
+      return;
+    }
+    await archiveProject.mutate({ id });
+    navigate('/');
+  }, [id, confirmArchive, archiveProject, navigate]);
+
+  const handleAddTask = useCallback(async () => {
+    if (!id || !newTaskTitle.trim()) return;
+    await createTask.mutate({ title: newTaskTitle.trim(), projectId: id });
+    setNewTaskTitle('');
+    setAddingTask(false);
+  }, [id, newTaskTitle, createTask]);
+
+  const handleAddObjective = useCallback(async () => {
+    if (!id || !newObjTitle.trim()) return;
+    await createObjective.mutate({ title: newObjTitle.trim(), projectId: id });
+    setNewObjTitle('');
+    setAddingObjective(false);
+  }, [id, newObjTitle, createObjective]);
 
   if (!project) {
     return (
@@ -97,9 +135,73 @@ export function ProjectDetail() {
           >
             <ArrowLeft className="w-4 h-4" strokeWidth={1.5} />
           </button>
-          <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: project.color }} />
-          <span className="text-[14px] font-light text-primary">{project.name}</span>
+
+          {/* Color dot — clickable to open picker */}
+          <div className="relative">
+            <button
+              onClick={() => setShowColorPicker(!showColorPicker)}
+              className="w-2.5 h-2.5 rounded-full cursor-pointer hover:ring-2 hover:ring-brand/30 transition-all"
+              style={{ backgroundColor: project.color }}
+            />
+            {showColorPicker && (
+              <div className="absolute top-6 left-0 z-50 bg-surface-floating rounded-lg p-2 shadow-lg border border-border-subtle flex gap-1.5">
+                {PROJECT_COLORS.map(c => (
+                  <button
+                    key={c}
+                    onClick={() => { handleUpdateProject({ color: c }); setShowColorPicker(false); }}
+                    className={`w-5 h-5 rounded-full hover:ring-2 hover:ring-brand/30 transition-all ${project.color === c ? 'ring-2 ring-brand' : ''}`}
+                    style={{ backgroundColor: c }}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Project name — click to edit */}
+          {editingName ? (
+            <input
+              autoFocus
+              value={nameDraft}
+              onChange={e => setNameDraft(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  handleUpdateProject({ name: nameDraft });
+                  setEditingName(false);
+                }
+                if (e.key === 'Escape') setEditingName(false);
+              }}
+              onBlur={() => {
+                if (nameDraft !== project.name) handleUpdateProject({ name: nameDraft });
+                setEditingName(false);
+              }}
+              className="text-[14px] font-light text-primary bg-transparent border-b border-brand outline-none"
+            />
+          ) : (
+            <span
+              onClick={() => { setNameDraft(project.name); setEditingName(true); }}
+              className="text-[14px] font-light text-primary cursor-text hover:text-secondary transition-colors"
+            >
+              {project.name}
+            </span>
+          )}
+
           <span className="text-[12px] text-muted font-light">{tasks.length} tasks</span>
+
+          <div className="flex-1" />
+
+          {/* Archive button */}
+          <button
+            onClick={handleArchive}
+            onBlur={() => setConfirmArchive(false)}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-light transition-colors ${
+              confirmArchive
+                ? 'bg-destructive text-white'
+                : 'text-muted hover:text-secondary hover:bg-surface-low'
+            }`}
+          >
+            <Archive className="w-3.5 h-3.5" strokeWidth={1.5} />
+            {confirmArchive ? 'Click again' : 'Archive'}
+          </button>
         </div>
 
         {/* Scrollable Content */}
@@ -116,17 +218,27 @@ export function ProjectDetail() {
           </div>
 
           {/* OKR Section */}
-          {objectives.length > 0 && (
-            <div>
-              <h3 className="text-[12px] font-light text-muted uppercase tracking-wider mb-3">Objectives & Key Results</h3>
-              <div className="space-y-2">
-                {objectives.map(objective => {
-                  const isExpanded = expandedOkrs.has(objective.id);
-                  return (
-                    <div key={objective.id} className="bg-surface-low rounded-xl overflow-hidden">
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-[12px] font-light text-muted uppercase tracking-wider">Objectives & Key Results</h3>
+              <button
+                onClick={() => setAddingObjective(true)}
+                className="flex items-center gap-1 text-[12px] text-brand hover:text-brand-hover transition-colors font-light"
+              >
+                <Plus className="w-3.5 h-3.5" strokeWidth={1.5} />
+                New Objective
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              {objectives.map(objective => {
+                const isExpanded = expandedOkrs.has(objective.id);
+                return (
+                  <div key={objective.id} className="bg-surface-low rounded-xl overflow-hidden">
+                    <div className="flex items-center">
                       <button
                         onClick={() => toggleOkr(objective.id)}
-                        className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-surface-lowest transition-colors text-left"
+                        className="flex items-center gap-3 px-4 py-3.5 hover:bg-surface-lowest transition-colors text-left flex-1"
                       >
                         {isExpanded ? (
                           <ChevronDown className="w-3.5 h-3.5 text-muted flex-shrink-0" strokeWidth={1.5} />
@@ -140,32 +252,71 @@ export function ProjectDetail() {
                           <Progress value={objective.progress} />
                         </div>
                       </button>
-                      {isExpanded && objective.keyResults && (
-                        <div className="px-4 pb-3 space-y-2 ml-10">
-                          {objective.keyResults.map(kr => (
-                            <div key={kr.id} className="flex items-center gap-3">
-                              <span className="text-[12px] font-light text-muted flex-1">{kr.title}</span>
-                              <span className="text-[11px] text-dim font-light">
-                                {kr.current}{kr.unit === '$' ? '' : ` ${kr.unit}`} / {kr.target}{kr.unit === '$' ? '' : ` ${kr.unit}`}
-                              </span>
-                              <div className="w-20">
-                                <Progress value={kr.progress} />
-                              </div>
-                              <span className="text-[11px] text-muted font-light w-8 text-right">{kr.progress}%</span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                      <button
+                        onClick={() => navigate(`/objective/${objective.id}`)}
+                        className="px-3 py-3.5 text-[11px] text-muted hover:text-brand transition-colors font-light"
+                      >
+                        Open
+                      </button>
                     </div>
-                  );
-                })}
-              </div>
+                    {isExpanded && objective.keyResults && (
+                      <div className="px-4 pb-3 space-y-2 ml-10">
+                        {objective.keyResults.map(kr => (
+                          <div key={kr.id} className="flex items-center gap-3">
+                            <span className="text-[12px] font-light text-muted flex-1">{kr.title}</span>
+                            <span className="text-[11px] text-dim font-light">
+                              {kr.current}{kr.unit === '$' ? '' : ` ${kr.unit}`} / {kr.target}{kr.unit === '$' ? '' : ` ${kr.unit}`}
+                            </span>
+                            <div className="w-20">
+                              <Progress value={kr.progress} />
+                            </div>
+                            <span className="text-[11px] text-muted font-light w-8 text-right">{kr.progress}%</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {objectives.length === 0 && !addingObjective && (
+                <div className="text-center py-6">
+                  <p className="text-[13px] text-muted font-light">No objectives yet</p>
+                </div>
+              )}
+
+              {/* Add Objective inline row */}
+              {addingObjective && (
+                <div className="bg-surface-low rounded-xl px-4 py-3">
+                  <input
+                    autoFocus
+                    value={newObjTitle}
+                    onChange={e => setNewObjTitle(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') handleAddObjective();
+                      if (e.key === 'Escape') { setAddingObjective(false); setNewObjTitle(''); }
+                    }}
+                    onBlur={() => { if (!newObjTitle.trim()) { setAddingObjective(false); setNewObjTitle(''); } }}
+                    placeholder="Objective title..."
+                    className="w-full bg-transparent text-[13px] font-light text-primary outline-none placeholder:text-dim"
+                  />
+                </div>
+              )}
             </div>
-          )}
+          </div>
 
           {/* Task Table */}
           <div>
-            <h3 className="text-[12px] font-light text-muted uppercase tracking-wider mb-3">Tasks</h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-[12px] font-light text-muted uppercase tracking-wider">Tasks</h3>
+              <button
+                onClick={() => setAddingTask(true)}
+                className="flex items-center gap-1 text-[12px] text-brand hover:text-brand-hover transition-colors font-light"
+              >
+                <Plus className="w-3.5 h-3.5" strokeWidth={1.5} />
+                New Task
+              </button>
+            </div>
             <div className="bg-surface-low rounded-xl overflow-hidden">
               {/* Table Header */}
               <div className="grid grid-cols-[40px_1fr_80px_100px_120px_140px] gap-4 border-b border-border text-[11px] text-muted font-light px-6 py-3">
@@ -177,15 +328,38 @@ export function ProjectDetail() {
                 <div>Tags</div>
               </div>
 
+              {/* Add Task inline row */}
+              {addingTask && (
+                <div className="grid grid-cols-[40px_1fr_80px_100px_120px_140px] gap-4 px-6 py-3 border-b border-border-subtle">
+                  <div />
+                  <div className="flex items-center">
+                    <input
+                      autoFocus
+                      value={newTaskTitle}
+                      onChange={e => setNewTaskTitle(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') handleAddTask();
+                        if (e.key === 'Escape') { setAddingTask(false); setNewTaskTitle(''); }
+                      }}
+                      onBlur={() => { if (!newTaskTitle.trim()) { setAddingTask(false); setNewTaskTitle(''); } }}
+                      placeholder="Task title..."
+                      className="w-full bg-transparent text-[13px] font-light text-primary outline-none placeholder:text-dim"
+                    />
+                  </div>
+                  <div /><div /><div /><div />
+                </div>
+              )}
+
               {/* Task Rows */}
               {tasks.map(task => {
                 const isCompleted = completedTasks.has(task.id);
                 return (
                   <div
                     key={task.id}
-                    className="grid grid-cols-[40px_1fr_80px_100px_120px_140px] gap-4 px-6 py-3 hover:bg-surface-base transition-colors border-b border-border-subtle last:border-b-0"
+                    onClick={() => navigate(`/task/${task.id}`)}
+                    className="grid grid-cols-[40px_1fr_80px_100px_120px_140px] gap-4 px-6 py-3 hover:bg-surface-base transition-colors border-b border-border-subtle last:border-b-0 cursor-pointer"
                   >
-                    <div className="flex items-center">
+                    <div className="flex items-center" onClick={e => e.stopPropagation()}>
                       <Checkbox checked={isCompleted} onCheckedChange={() => handleToggleTask(task.id)} />
                     </div>
                     <div className="flex items-center gap-1.5">
@@ -213,6 +387,12 @@ export function ProjectDetail() {
                   </div>
                 );
               })}
+
+              {tasks.length === 0 && !addingTask && (
+                <div className="px-6 py-8 text-center">
+                  <p className="text-[13px] text-muted font-light">No tasks yet</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

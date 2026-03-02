@@ -66,6 +66,7 @@ pub struct ProjectResponse {
 pub struct ObjectiveResponse {
     pub id: String,
     pub title: String,
+    pub status: String,
     pub progress: f64,
     pub project_id: String,
     pub key_results: Option<Vec<KeyResultResponse>>,
@@ -136,4 +137,109 @@ pub struct AgentStatusResponse {
     pub status: String,
     pub active_task_count: i64,
     pub focus_task: Option<TaskResponse>,
+}
+
+// ── Task Update ────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskUpdateParams {
+    pub id: String,
+    pub title: Option<String>,
+    pub description: Option<Option<String>>,
+    pub priority: Option<Option<i16>>,
+    pub status: Option<String>,
+    pub due_date: Option<Option<String>>,
+    pub project_id: Option<Option<String>>,
+    pub area_id: Option<String>,
+    pub tags: Option<Vec<String>>,
+    pub key_result_id: Option<Option<String>>,
+}
+
+// ── Area Params ────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AreaCreateParams {
+    pub name: String,
+    pub color: Option<String>,
+    pub icon: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AreaUpdateParams {
+    pub id: String,
+    pub name: Option<String>,
+    pub color: Option<String>,
+    pub icon: Option<Option<String>>,
+}
+
+// ── Project Params ─────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectCreateParams {
+    pub name: String,
+    pub area_id: String,
+    pub color: Option<String>,
+    pub description: Option<String>,
+    pub tags: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectUpdateParams {
+    pub id: String,
+    pub name: Option<String>,
+    pub area_id: Option<String>,
+    pub color: Option<String>,
+    pub description: Option<Option<String>>,
+    pub tags: Option<Vec<String>>,
+    pub status: Option<String>,
+}
+
+// ── Objective Params ───────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ObjectiveCreateParams {
+    pub title: String,
+    pub project_id: String,
+    pub description: Option<String>,
+    pub priority: Option<i16>,
+    pub due_date: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ObjectiveUpdateParams {
+    pub id: String,
+    pub title: Option<String>,
+    pub description: Option<Option<String>>,
+    pub status: Option<String>,
+    pub priority: Option<Option<i16>>,
+    pub due_date: Option<Option<String>>,
+}
+
+// ── Key Result Params ──────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KeyResultCreateParams {
+    pub objective_id: String,
+    pub title: String,
+    pub target_value: Option<f64>,
+    pub unit: Option<String>,
+    pub tracking_mode: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KeyResultUpdateParams {
+    pub id: String,
+    pub title: Option<String>,
+    pub description: Option<Option<String>>,
+    pub status: Option<String>,
+    pub due_date: Option<Option<String>>,
 }

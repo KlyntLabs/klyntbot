@@ -74,6 +74,7 @@ impl TodoPatch {
             last_reminded_at: self.last_reminded_at,
             recurrence_rule: None,
             area_id: self.area_id.clone(),
+            project_id: None,
             key_result_id: self.key_result_id.clone(),
         }
     }
@@ -91,6 +92,8 @@ impl TodoFilter {
             unassigned: self.unassigned,
             priority_min: self.priority_min.map(|p| p as i16),
             limit: self.limit.map(|l| l as i64),
+            due_after: None,
+            due_before: None,
             templates_only: self.include_templates,
         }
     }
