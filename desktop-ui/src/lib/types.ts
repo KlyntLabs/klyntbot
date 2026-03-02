@@ -74,6 +74,41 @@ export interface ChatThread {
   projectId: string | null;
 }
 
+export interface SessionContext {
+  entityKind?: string;
+  entityId?: string;
+  contextType?: string;
+  isEphemeral?: boolean;
+}
+
+// ── Agent Streaming Events ──────────────────────────────────────────────
+
+export interface ContentChunkPayload {
+  sessionKey: string;
+  data: string;
+}
+
+export interface ToolStartPayload {
+  sessionKey: string;
+  name: string;
+}
+
+export interface ToolEndPayload {
+  sessionKey: string;
+  name: string;
+  success: boolean;
+}
+
+export interface AgentDonePayload {
+  sessionKey: string;
+  content: string;
+}
+
+export interface AgentErrorPayload {
+  sessionKey: string;
+  message: string;
+}
+
 export interface Area {
   id: string;
   name: string;

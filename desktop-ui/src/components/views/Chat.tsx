@@ -1,75 +1,21 @@
-import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router';
 import {
   Send, ChevronDown, Plus, Settings, FolderOpen, MessageSquare,
   RotateCcw, Mic, Shield, Server,
 } from 'lucide-react';
 import { Sidebar } from '../layout/Sidebar';
+import { MessageList } from '../chat/MessageList';
 import { useSetToggle } from '../../hooks/useSetToggle';
 import { useQuery } from '../../hooks/useQuery';
 import { useMutation } from '../../hooks/useMutation';
-import { isTauri } from '../../lib/utils';
+import { useAgentStream } from '../../hooks/useAgentStream';
 import type { ChatMessage, ChatThread, SidebarItem } from '../../lib/types';
-
-// Local mock threads grouped by project (used as fallback in browser dev)
-interface ChatProject {
-  id: string;
-  name: string;
-  threads: { id: string; name: string; timestamp: string; projectId: string }[];
-}
-
-const mockChatProjects: ChatProject[] = [
-  {
-    id: '1',
-    name: 'KlyntBot',
-    threads: [
-      { id: 't1', name: 'Task automation logic', timestamp: '1w', projectId: '1' },
-      { id: 't2', name: 'Integration with calendar', timestamp: '2w', projectId: '1' },
-    ],
-  },
-  {
-    id: '2',
-    name: 'klynt',
-    threads: [
-      { id: 't3', name: 'UI improvements', timestamp: '3w', projectId: '2' },
-      { id: 't4', name: 'Dark theme refinements', timestamp: '1m', projectId: '2' },
-    ],
-  },
-  {
-    id: '3',
-    name: 'CryptoGuard',
-    threads: [
-      { id: 't5', name: 'Security audit checklist', timestamp: '2m', projectId: '3' },
-    ],
-  },
-];
-
-const mockMessages: ChatMessage[] = [
-  {
-    id: '1',
-    role: 'user',
-    content: 'Can you help me prioritize my tasks for this week?',
-  },
-  {
-    id: '2',
-    role: 'assistant',
-    content: "I'd be happy to help you prioritize your tasks! Based on your current task list, I recommend focusing on:\n\n1. P1 tasks first - these are your highest priority items\n2. Review your OKR progress to ensure alignment\n3. Block time for deep work on complex projects\n\nWould you like me to create a detailed schedule for the week?",
-  },
-  {
-    id: '3',
-    role: 'user',
-    content: 'Yes, that would be great. Can you focus on the Work area tasks?',
-  },
-  {
-    id: '4',
-    role: 'assistant',
-    content: "Perfect! I'll create a schedule focusing on your Work area tasks. Here's a suggested breakdown:\n\n**Monday-Tuesday:**\n- Morning: P1 tasks (high urgency items)\n- Afternoon: Team collaboration and meetings\n\n**Wednesday-Thursday:**\n- Deep work blocks for complex projects\n- Review and update OKRs\n\n**Friday:**\n- Wrap up pending items\n- Plan for next week\n\nWould you like me to add these to your calendar?",
-  },
-];
 
 function formatRelativeTime(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const days = Math.floor(diff / 86400000);
+  if (days < 1) return 'now';
   if (days < 7) return `${days}d`;
   if (days < 30) return `${Math.floor(days / 7)}w`;
   return `${Math.floor(days / 30)}m`;
@@ -79,44 +25,43 @@ export function Chat() {
   const navigate = useNavigate();
   const [activeSidebar, setActiveSidebar] = useState<SidebarItem>('Chat');
   const [input, setInput] = useState('');
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [selectedThread, setSelectedThread] = useState<string>(isTauri ? '' : 't1');
-  const [expandedProjects, toggleProject] = useSetToggle(['1', '2', '3']);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const [selectedThread, setSelectedThread] = useState('');
+  const [expandedProjects, toggleProject] = useSetToggle();
+  const [pendingUserMsg, setPendingUserMsg] = useState<string | null>(null);
 
-  // IPC: fetch threads from backend, fallback to mock
+  // IPC data
   const { data: threads } = useQuery<ChatThread[]>('chat_threads', undefined, []);
-
-  // IPC: fetch messages for selected thread
-  const { data: ipcMessages } = useQuery<ChatMessage[]>(
+  const { data: messages, refetch: refetchMessages } = useQuery<ChatMessage[]>(
     'chat_messages',
-    selectedThread && isTauri ? { session_key: selectedThread } : undefined,
+    selectedThread ? { session_key: selectedThread } : null,
     [],
   );
 
-  // In browser dev mode, use local mock messages; in Tauri mode, use IPC messages
-  const [localMessages, setLocalMessages] = useState<ChatMessage[]>(mockMessages);
-  const messages = isTauri ? ipcMessages : localMessages;
+  const sendMessage = useMutation<ChatMessage, Record<string, unknown>>('chat_send');
 
-  // Select first thread when threads load from IPC
+  // Streaming
+  const stream = useAgentStream(selectedThread, () => {
+    setPendingUserMsg(null);
+    refetchMessages();
+  });
+
+  // Auto-select first thread on load
   useEffect(() => {
-    if (isTauri && threads.length > 0 && !selectedThread) {
+    if (threads.length > 0 && !selectedThread) {
       setSelectedThread(threads[0].sessionKey);
     }
   }, [threads, selectedThread]);
 
-  const sendMessage = useMutation<ChatMessage, { content: string; session_key: string }>('chat_send');
+  // Display: persisted messages + optimistic pending user message
+  const displayMessages = useMemo(() => {
+    const list = [...messages];
+    if (pendingUserMsg) {
+      list.push({ id: 'pending', role: 'user', content: pendingUserMsg });
+    }
+    return list;
+  }, [messages, pendingUserMsg]);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  useEffect(() => {
-    return () => clearTimeout(timerRef.current);
-  }, []);
-
-  // Group threads by projectId for sidebar display
+  // Group threads by projectId for sidebar
   const threadsByProject = useMemo(() => {
     const groups: Record<string, { name: string; threads: ChatThread[] }> = {};
     for (const t of threads) {
@@ -128,120 +73,22 @@ export function Chat() {
   }, [threads]);
 
   const handleSend = useCallback(async () => {
-    if (!input.trim()) return;
-
-    const userMessage: ChatMessage = {
-      id: Date.now().toString(),
-      role: 'user',
-      content: input,
-    };
-
-    if (isTauri) {
-      const sessionKey = selectedThread || 'desktop-chat';
-      await sendMessage.mutate({ content: input, session_key: sessionKey });
-      if (!selectedThread) setSelectedThread(sessionKey);
-    } else {
-      setLocalMessages(prev => [...prev, userMessage]);
-    }
+    if (!input.trim() || stream.isStreaming) return;
+    const text = input;
     setInput('');
-    setIsStreaming(true);
 
-    // Simulate AI response in browser dev mode
-    if (!isTauri) {
-      timerRef.current = setTimeout(() => {
-        const aiMessage: ChatMessage = {
-          id: (Date.now() + 1).toString(),
-          role: 'assistant',
-          content: 'I can help you with that! Let me analyze your tasks and provide recommendations...',
-        };
-        setLocalMessages(prev => [...prev, aiMessage]);
-        setIsStreaming(false);
-      }, 1000);
-    } else {
-      // In Tauri mode, streaming will be handled by useEvent('agent:content_chunk') later
-      setIsStreaming(false);
-    }
-  }, [input, selectedThread, sendMessage]);
+    const sessionKey = selectedThread || `chat:${crypto.randomUUID()}`;
+    if (!selectedThread) setSelectedThread(sessionKey);
 
-  // Render thread sidebar: use IPC threads in Tauri mode, mock projects in browser dev
-  const renderThreadSidebar = () => {
-    if (isTauri && threads.length > 0) {
-      return Object.entries(threadsByProject).map(([projectId, group]) => (
-        <div key={projectId}>
-          <button
-            onClick={() => toggleProject(projectId)}
-            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-surface-base transition-colors text-[12px] font-light text-muted hover:text-secondary"
-          >
-            <FolderOpen className="w-3.5 h-3.5" strokeWidth={1.5} />
-            <span className="flex-1 text-left">{group.name}</span>
-            <ChevronDown
-              className={`w-3.5 h-3.5 transition-transform ${
-                expandedProjects.has(projectId) ? 'rotate-0' : '-rotate-90'
-              }`}
-              strokeWidth={1.5}
-            />
-          </button>
-          {expandedProjects.has(projectId) && (
-            <div className="mt-1 ml-3 space-y-1">
-              {group.threads.map(thread => (
-                <button
-                  key={thread.sessionKey}
-                  onClick={() => setSelectedThread(thread.sessionKey)}
-                  className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-[12px] font-light ${
-                    selectedThread === thread.sessionKey
-                      ? 'bg-surface-highest text-primary'
-                      : 'text-muted hover:bg-surface-base hover:text-secondary'
-                  }`}
-                >
-                  <MessageSquare className="w-3 h-3" strokeWidth={1.5} />
-                  <span className="flex-1 text-left truncate">{thread.title}</span>
-                  <span className="text-[11px]">{formatRelativeTime(thread.updatedAt)}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      ));
-    }
+    setPendingUserMsg(text);
+    stream.startStreaming();
+    await sendMessage.mutate({ content: text, session_key: sessionKey });
+  }, [input, selectedThread, stream, sendMessage]);
 
-    // Browser dev fallback: mock projects
-    return mockChatProjects.map(project => (
-      <div key={project.id}>
-        <button
-          onClick={() => toggleProject(project.id)}
-          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-surface-base transition-colors text-[12px] font-light text-muted hover:text-secondary"
-        >
-          <FolderOpen className="w-3.5 h-3.5" strokeWidth={1.5} />
-          <span className="flex-1 text-left">{project.name}</span>
-          <ChevronDown
-            className={`w-3.5 h-3.5 transition-transform ${
-              expandedProjects.has(project.id) ? 'rotate-0' : '-rotate-90'
-            }`}
-            strokeWidth={1.5}
-          />
-        </button>
-        {expandedProjects.has(project.id) && (
-          <div className="mt-1 ml-3 space-y-1">
-            {project.threads.map(thread => (
-              <button
-                key={thread.id}
-                onClick={() => setSelectedThread(thread.id)}
-                className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-[12px] font-light ${
-                  selectedThread === thread.id
-                    ? 'bg-surface-highest text-primary'
-                    : 'text-muted hover:bg-surface-base hover:text-secondary'
-                }`}
-              >
-                <MessageSquare className="w-3 h-3" strokeWidth={1.5} />
-                <span className="flex-1 text-left truncate">{thread.name}</span>
-                <span className="text-[11px]">{thread.timestamp}</span>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-    ));
-  };
+  const handleNewThread = useCallback(() => {
+    setSelectedThread(`chat:${crypto.randomUUID()}`);
+    setPendingUserMsg(null);
+  }, []);
 
   return (
     <div className="h-screen w-screen bg-background text-primary flex overflow-hidden">
@@ -257,7 +104,10 @@ export function Chat() {
       <div className="w-[250px] bg-background border-r border-border flex flex-col">
         {/* Quick Links */}
         <div className="px-4 py-3 space-y-1">
-          <button className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-surface-base transition-colors text-[12px] font-light text-muted hover:text-secondary">
+          <button
+            onClick={handleNewThread}
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-surface-base transition-colors text-[12px] font-light text-muted hover:text-secondary"
+          >
             <Plus className="w-[13px] h-[13px]" strokeWidth={1.5} />
             New thread
           </button>
@@ -274,7 +124,50 @@ export function Chat() {
         {/* Thread List */}
         <div className="flex-1 overflow-y-auto px-3 pb-3">
           <div className="space-y-4">
-            {renderThreadSidebar()}
+            {Object.entries(threadsByProject).map(([projectId, group]) => (
+              <div key={projectId}>
+                <button
+                  onClick={() => toggleProject(projectId)}
+                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-surface-base transition-colors text-[12px] font-light text-muted hover:text-secondary"
+                >
+                  <FolderOpen className="w-3.5 h-3.5" strokeWidth={1.5} />
+                  <span className="flex-1 text-left">{group.name}</span>
+                  <ChevronDown
+                    className={`w-3.5 h-3.5 transition-transform ${
+                      expandedProjects.has(projectId) ? 'rotate-0' : '-rotate-90'
+                    }`}
+                    strokeWidth={1.5}
+                  />
+                </button>
+                {expandedProjects.has(projectId) && (
+                  <div className="mt-1 ml-3 space-y-1">
+                    {group.threads.map((thread) => (
+                      <button
+                        key={thread.sessionKey}
+                        onClick={() => {
+                          setSelectedThread(thread.sessionKey);
+                          setPendingUserMsg(null);
+                        }}
+                        className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-[12px] font-light ${
+                          selectedThread === thread.sessionKey
+                            ? 'bg-surface-highest text-primary'
+                            : 'text-muted hover:bg-surface-base hover:text-secondary'
+                        }`}
+                      >
+                        <MessageSquare className="w-3 h-3" strokeWidth={1.5} />
+                        <span className="flex-1 text-left truncate">{thread.title}</span>
+                        <span className="text-[11px]">{formatRelativeTime(thread.updatedAt)}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+            {threads.length === 0 && (
+              <div className="text-center py-8 text-muted text-[12px] font-light">
+                No conversations yet
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -283,37 +176,23 @@ export function Chat() {
       <div className="flex-1 flex flex-col">
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-3xl mx-auto space-y-6">
-            {messages.map(message => (
-              <div
-                key={message.id}
-                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                {message.role === 'user' ? (
-                  <div className="max-w-[85%] rounded-2xl px-5 py-3.5 bg-surface-raised backdrop-blur-sm">
-                    <p className="text-[13px] font-light whitespace-pre-wrap leading-relaxed text-primary">
-                      {message.content}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="max-w-[85%]">
-                    <p className="text-[13px] font-light whitespace-pre-wrap leading-relaxed text-secondary">
-                      {message.content}
-                    </p>
-                  </div>
-                )}
+          <div className="max-w-3xl mx-auto">
+            {displayMessages.length === 0 && !stream.isStreaming ? (
+              <div className="flex flex-col items-center justify-center py-20">
+                <p className="text-muted text-sm font-light">Start a conversation</p>
+                <p className="text-dim text-xs font-light mt-1">
+                  Ask Klynt anything about your tasks, projects, or schedule
+                </p>
               </div>
-            ))}
-            {isStreaming && (
-              <div className="flex justify-start">
-                <div className="flex gap-1">
-                  <div className="w-1.5 h-1.5 bg-muted rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <div className="w-1.5 h-1.5 bg-muted rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <div className="w-1.5 h-1.5 bg-muted rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                </div>
-              </div>
+            ) : (
+              <MessageList
+                messages={displayMessages}
+                streamingContent={stream.streamingContent}
+                isStreaming={stream.isStreaming}
+                activeTools={stream.activeTools}
+                error={stream.error}
+              />
             )}
-            <div ref={messagesEndRef} />
           </div>
         </div>
 
@@ -343,7 +222,7 @@ export function Chat() {
               </button>
               <button
                 onClick={handleSend}
-                disabled={!input.trim()}
+                disabled={!input.trim() || stream.isStreaming}
                 className="w-9 h-9 rounded-full bg-brand hover:bg-brand/90 disabled:bg-surface-base disabled:text-muted flex items-center justify-center transition-colors shrink-0"
               >
                 <Send className="w-4 h-4" strokeWidth={2} />
