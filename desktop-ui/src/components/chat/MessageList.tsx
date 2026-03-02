@@ -20,7 +20,7 @@ export function MessageList({
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length, streamingContent, isStreaming]);
+  }, [messages.length, isStreaming]);
 
   return (
     <div className="space-y-6">

@@ -8,9 +8,8 @@ import { Sidebar } from '../layout/Sidebar';
 import { MessageList } from '../chat/MessageList';
 import { useSetToggle } from '../../hooks/useSetToggle';
 import { useQuery } from '../../hooks/useQuery';
-import { useMutation } from '../../hooks/useMutation';
-import { useAgentStream } from '../../hooks/useAgentStream';
-import type { ChatMessage, ChatThread, SidebarItem } from '../../lib/types';
+import { useChatSession } from '../../hooks/useChatSession';
+import type { ChatThread, SidebarItem } from '../../lib/types';
 
 // Known feature prefixes → display config
 const FEATURE_GROUPS: Record<string, { label: string; icon: typeof Wallet }> = {
@@ -50,42 +49,22 @@ interface GroupedThreads {
 export function Chat() {
   const navigate = useNavigate();
   const [activeSidebar, setActiveSidebar] = useState<SidebarItem>('Chat');
-  const [input, setInput] = useState('');
-  const [selectedThread, setSelectedThread] = useState('');
+  const [selectedThread, setSelectedThread] = useState(() => `chat:${crypto.randomUUID()}`);
   const [expandedGroups, toggleGroup] = useSetToggle();
-  const [pendingUserMsg, setPendingUserMsg] = useState<string | null>(null);
 
   // IPC data
   const { data: threads } = useQuery<ChatThread[]>('chat_threads', undefined, []);
-  const { data: messages, refetch: refetchMessages } = useQuery<ChatMessage[]>(
-    'chat_messages',
-    selectedThread ? { session_key: selectedThread } : null,
-    [],
-  );
 
-  const sendMessage = useMutation<ChatMessage, Record<string, unknown>>('chat_send');
+  // Chat session (messages, streaming, input, send)
+  const chat = useChatSession(selectedThread);
 
-  // Streaming
-  const stream = useAgentStream(selectedThread, () => {
-    setPendingUserMsg(null);
-    refetchMessages();
-  });
-
-  // Auto-select first thread on load
+  // Auto-select first thread on load (only if current key has no messages yet)
+  const hasExistingThread = threads.some((t) => t.sessionKey === selectedThread);
   useEffect(() => {
-    if (threads.length > 0 && !selectedThread) {
+    if (threads.length > 0 && !hasExistingThread) {
       setSelectedThread(threads[0].sessionKey);
     }
-  }, [threads, selectedThread]);
-
-  // Display: persisted messages + optimistic pending user message
-  const displayMessages = useMemo(() => {
-    const list = [...messages];
-    if (pendingUserMsg) {
-      list.push({ id: 'pending', role: 'user', content: pendingUserMsg });
-    }
-    return list;
-  }, [messages, pendingUserMsg]);
+  }, [threads, hasExistingThread]);
 
   // Group threads into PARA hierarchy, features, and general
   const grouped = useMemo<GroupedThreads>(() => {
@@ -139,27 +118,16 @@ export function Chat() {
     };
   }, [threads]);
 
-  const handleSend = useCallback(async () => {
-    if (!input.trim() || stream.isStreaming) return;
-    const text = input;
-    setInput('');
-
-    const sessionKey = selectedThread || `chat:${crypto.randomUUID()}`;
-    if (!selectedThread) setSelectedThread(sessionKey);
-
-    setPendingUserMsg(text);
-    stream.startStreaming();
-    await sendMessage.mutate({ content: text, session_key: sessionKey });
-  }, [input, selectedThread, stream, sendMessage]);
+  const handleSend = useCallback(() => {
+    chat.send();
+  }, [chat]);
 
   const handleNewThread = useCallback(() => {
     setSelectedThread(`chat:${crypto.randomUUID()}`);
-    setPendingUserMsg(null);
   }, []);
 
   const selectThread = useCallback((key: string) => {
     setSelectedThread(key);
-    setPendingUserMsg(null);
   }, []);
 
   // Shared thread button renderer
@@ -299,7 +267,7 @@ export function Chat() {
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-6">
           <div className="max-w-3xl mx-auto">
-            {displayMessages.length === 0 && !stream.isStreaming ? (
+            {chat.messages.length === 0 && !chat.isStreaming ? (
               <div className="flex flex-col items-center justify-center py-20">
                 <p className="text-muted text-sm font-light">Start a conversation</p>
                 <p className="text-dim text-xs font-light mt-1">
@@ -308,11 +276,11 @@ export function Chat() {
               </div>
             ) : (
               <MessageList
-                messages={displayMessages}
-                streamingContent={stream.streamingContent}
-                isStreaming={stream.isStreaming}
-                activeTools={stream.activeTools}
-                error={stream.error}
+                messages={chat.messages}
+                streamingContent={chat.streamingContent}
+                isStreaming={chat.isStreaming}
+                activeTools={chat.activeTools}
+                error={chat.error}
               />
             )}
           </div>
@@ -326,8 +294,8 @@ export function Chat() {
                 <Plus className="w-4 h-4" strokeWidth={1.5} />
               </button>
               <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
+                value={chat.input}
+                onChange={(e) => chat.setInput(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
@@ -344,7 +312,7 @@ export function Chat() {
               </button>
               <button
                 onClick={handleSend}
-                disabled={!input.trim() || stream.isStreaming}
+                disabled={!chat.input.trim() || chat.isStreaming}
                 className="w-9 h-9 rounded-full bg-brand hover:bg-brand/90 disabled:bg-surface-base disabled:text-muted flex items-center justify-center transition-colors shrink-0"
               >
                 <Send className="w-4 h-4" strokeWidth={2} />

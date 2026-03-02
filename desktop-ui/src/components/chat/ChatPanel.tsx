@@ -1,10 +1,6 @@
-import { useState, useMemo, useCallback } from 'react';
 import { Send } from 'lucide-react';
 import { MessageList } from './MessageList';
-import { useQuery } from '../../hooks/useQuery';
-import { useMutation } from '../../hooks/useMutation';
-import { useAgentStream } from '../../hooks/useAgentStream';
-import type { ChatMessage } from '../../lib/types';
+import { useChatSession } from '../../hooks/useChatSession';
 
 const SESSION_KEY = 'desktop-panel';
 
@@ -14,38 +10,7 @@ interface ChatPanelProps {
 }
 
 export function ChatPanel({ isOpen, onClose }: ChatPanelProps) {
-  const { data: messages, refetch } = useQuery<ChatMessage[]>(
-    'chat_messages',
-    { session_key: SESSION_KEY },
-    [],
-  );
-  const sendMessage = useMutation<ChatMessage, Record<string, unknown>>('chat_send');
-
-  const [input, setInput] = useState('');
-  const [pendingUserMsg, setPendingUserMsg] = useState<string | null>(null);
-
-  const stream = useAgentStream(SESSION_KEY, () => {
-    setPendingUserMsg(null);
-    refetch();
-  });
-
-  const displayMessages = useMemo(() => {
-    const list = [...messages];
-    if (pendingUserMsg) {
-      list.push({ id: 'pending', role: 'user', content: pendingUserMsg });
-    }
-    return list;
-  }, [messages, pendingUserMsg]);
-
-  const handleSend = useCallback(async () => {
-    if (!input.trim() || stream.isStreaming) return;
-    const text = input;
-    setInput('');
-
-    setPendingUserMsg(text);
-    stream.startStreaming();
-    await sendMessage.mutate({ content: text, session_key: SESSION_KEY });
-  }, [input, stream, sendMessage]);
+  const chat = useChatSession(SESSION_KEY);
 
   if (!isOpen) return null;
 
@@ -65,11 +30,11 @@ export function ChatPanel({ isOpen, onClose }: ChatPanelProps) {
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-5">
         <MessageList
-          messages={displayMessages}
-          streamingContent={stream.streamingContent}
-          isStreaming={stream.isStreaming}
-          activeTools={stream.activeTools}
-          error={stream.error}
+          messages={chat.messages}
+          streamingContent={chat.streamingContent}
+          isStreaming={chat.isStreaming}
+          activeTools={chat.activeTools}
+          error={chat.error}
         />
       </div>
 
@@ -78,17 +43,17 @@ export function ChatPanel({ isOpen, onClose }: ChatPanelProps) {
         <div className="flex gap-2">
           <input
             type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
+            value={chat.input}
+            onChange={(e) => chat.setInput(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') handleSend();
+              if (e.key === 'Enter') chat.send();
             }}
             placeholder="Ask me anything..."
             className="flex-1 bg-surface-base rounded-xl px-4 py-2.5 text-[13px] text-primary placeholder:text-muted focus:outline-none focus:bg-surface-raised font-light"
           />
           <button
-            onClick={handleSend}
-            disabled={!input.trim() || stream.isStreaming}
+            onClick={() => chat.send()}
+            disabled={!chat.input.trim() || chat.isStreaming}
             className="w-10 h-10 rounded-xl bg-brand hover:bg-brand/90 disabled:bg-surface-base disabled:text-muted flex items-center justify-center transition-colors"
           >
             <Send className="w-4 h-4" strokeWidth={2} />

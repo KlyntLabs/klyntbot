@@ -1,11 +1,9 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useCallback } from 'react';
 import { Send, Pin, X } from 'lucide-react';
 import { MessageList } from './MessageList';
 import { usePageContext } from '../../hooks/usePageContext';
-import { useQuery } from '../../hooks/useQuery';
 import { useMutation } from '../../hooks/useMutation';
-import { useAgentStream } from '../../hooks/useAgentStream';
-import type { ChatMessage } from '../../lib/types';
+import { useChatSession } from '../../hooks/useChatSession';
 
 interface SidebarChatProps {
   isOpen: boolean;
@@ -29,43 +27,14 @@ export function SidebarChat({ isOpen, onClose }: SidebarChatProps) {
   const pageContext = usePageContext();
   const sessionKey = sessionKeyFor(pageContext?.entityKind, pageContext?.entityId);
 
-  const { data: messages, refetch } = useQuery<ChatMessage[]>(
-    'chat_messages',
-    { session_key: sessionKey },
-    [],
-  );
-  const sendMessage = useMutation<ChatMessage, Record<string, unknown>>('chat_send');
+  const chat = useChatSession(sessionKey);
   const pinThread = useMutation<void, Record<string, unknown>>('chat_pin_thread');
 
-  const [input, setInput] = useState('');
-  const [pendingUserMsg, setPendingUserMsg] = useState<string | null>(null);
-
-  const stream = useAgentStream(sessionKey, () => {
-    setPendingUserMsg(null);
-    refetch();
-  });
-
-  const displayMessages = useMemo(() => {
-    const list = [...messages];
-    if (pendingUserMsg) {
-      list.push({ id: 'pending', role: 'user', content: pendingUserMsg });
-    }
-    return list;
-  }, [messages, pendingUserMsg]);
-
-  const handleSend = useCallback(async () => {
-    if (!input.trim() || stream.isStreaming) return;
-    const text = input;
-    setInput('');
-
-    setPendingUserMsg(text);
-    stream.startStreaming();
-    await sendMessage.mutate({
-      content: text,
-      session_key: sessionKey,
-      context: pageContext ? { ...pageContext, isEphemeral: true } : undefined,
-    });
-  }, [input, sessionKey, pageContext, stream, sendMessage]);
+  const handleSend = useCallback(() => {
+    chat.send(
+      pageContext ? { context: { ...pageContext, isEphemeral: true } } : undefined,
+    );
+  }, [chat, pageContext]);
 
   const handlePin = useCallback(async () => {
     await pinThread.mutate({ session_key: sessionKey });
@@ -101,7 +70,7 @@ export function SidebarChat({ isOpen, onClose }: SidebarChatProps) {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-5">
-        {displayMessages.length === 0 && !stream.isStreaming ? (
+        {chat.messages.length === 0 && !chat.isStreaming ? (
           <div className="flex flex-col items-center justify-center py-12">
             <p className="text-muted text-[12px] font-light text-center">
               {pageContext
@@ -111,11 +80,11 @@ export function SidebarChat({ isOpen, onClose }: SidebarChatProps) {
           </div>
         ) : (
           <MessageList
-            messages={displayMessages}
-            streamingContent={stream.streamingContent}
-            isStreaming={stream.isStreaming}
-            activeTools={stream.activeTools}
-            error={stream.error}
+            messages={chat.messages}
+            streamingContent={chat.streamingContent}
+            isStreaming={chat.isStreaming}
+            activeTools={chat.activeTools}
+            error={chat.error}
           />
         )}
       </div>
@@ -125,8 +94,8 @@ export function SidebarChat({ isOpen, onClose }: SidebarChatProps) {
         <div className="flex gap-2">
           <input
             type="text"
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
+            value={chat.input}
+            onChange={(e) => chat.setInput(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') handleSend();
             }}
@@ -135,7 +104,7 @@ export function SidebarChat({ isOpen, onClose }: SidebarChatProps) {
           />
           <button
             onClick={handleSend}
-            disabled={!input.trim() || stream.isStreaming}
+            disabled={!chat.input.trim() || chat.isStreaming}
             className="w-10 h-10 rounded-xl bg-brand hover:bg-brand/90 disabled:bg-surface-base disabled:text-muted flex items-center justify-center transition-colors"
           >
             <Send className="w-4 h-4" strokeWidth={2} />

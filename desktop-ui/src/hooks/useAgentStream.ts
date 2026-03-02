@@ -86,6 +86,7 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
 
   useEvent<AgentErrorPayload>('agent:error', (payload) => {
     if (!sessionKeyRef.current || payload.sessionKey !== sessionKeyRef.current) return;
+    setStreamingContent('');
     setError(payload.message);
     setIsStreaming(false);
   });

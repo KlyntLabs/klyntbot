@@ -1,11 +1,12 @@
 //! Chat commands — wired to AgentLoop with streaming events.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use agent::AgentEvent;
 use desktop_shared::commands::{ChatMessageResponse, ChatThreadResponse, SessionContextInput};
 use desktop_shared::events::*;
+use storage::ProjectFilter;
 use tauri::{Emitter, State};
 use tokio_util::sync::CancellationToken;
 
@@ -13,12 +14,18 @@ use crate::app_core::AppCore;
 
 #[tauri::command]
 pub async fn chat_threads(state: State<'_, AppCore>) -> Result<Vec<ChatThreadResponse>, String> {
-    let (sessions, visible_contexts) = tokio::join!(
+    // Fetch sessions, contexts, and name lookups concurrently (4 queries total)
+    let default_filter = ProjectFilter::default();
+    let (sessions, visible_contexts, all_areas, all_projects) = tokio::join!(
         state.repos.sessions.list_sessions(),
         state.repos.session_context.list_visible(),
+        state.repos.areas.list(None),
+        state.repos.projects.list(&default_filter),
     );
     let sessions = sessions.map_err(|e| e.to_string())?;
     let visible_contexts = visible_contexts.map_err(|e| e.to_string())?;
+    let all_areas = all_areas.map_err(|e| e.to_string())?;
+    let all_projects = all_projects.map_err(|e| e.to_string())?;
 
     // Build context lookup by session_key
     let ctx_map: HashMap<&str, _> = visible_contexts
@@ -26,29 +33,15 @@ pub async fn chat_threads(state: State<'_, AppCore>) -> Result<Vec<ChatThreadRes
         .map(|c| (c.session_key.as_str(), c))
         .collect();
 
-    // Collect unique area/project IDs for name resolution
-    let area_ids: HashSet<&str> = visible_contexts
+    // Build name lookup maps from full lists
+    let area_names: HashMap<&str, &str> = all_areas
         .iter()
-        .filter_map(|c| c.area_id.as_deref())
+        .map(|a| (a.id.as_str(), a.name.as_str()))
         .collect();
-    let project_ids: HashSet<&str> = visible_contexts
+    let project_names: HashMap<&str, &str> = all_projects
         .iter()
-        .filter_map(|c| c.project_id.as_deref())
+        .map(|p| (p.id.as_str(), p.name.as_str()))
         .collect();
-
-    // Batch resolve names
-    let mut area_names: HashMap<String, String> = HashMap::new();
-    for aid in &area_ids {
-        if let Ok(Some(area)) = state.repos.areas.get(aid).await {
-            area_names.insert(aid.to_string(), area.name);
-        }
-    }
-    let mut project_names: HashMap<String, String> = HashMap::new();
-    for pid in &project_ids {
-        if let Ok(Some(proj)) = state.repos.projects.get(pid).await {
-            project_names.insert(pid.to_string(), proj.name);
-        }
-    }
 
     Ok(sessions
         .iter()
@@ -71,7 +64,7 @@ pub async fn chat_threads(state: State<'_, AppCore>) -> Result<Vec<ChatThreadRes
                 entity_id: ctx.and_then(|c| c.entity_id.clone()),
                 area_id: ctx.and_then(|c| c.area_id.clone()),
                 area_name: ctx.and_then(|c| {
-                    c.area_id.as_deref().and_then(|id| area_names.get(id).cloned())
+                    c.area_id.as_deref().and_then(|id| area_names.get(id).map(|s| s.to_string()))
                 }),
                 project_id: ctx
                     .and_then(|c| c.project_id.clone())
@@ -84,7 +77,7 @@ pub async fn chat_threads(state: State<'_, AppCore>) -> Result<Vec<ChatThreadRes
                 project_name: ctx.and_then(|c| {
                     c.project_id
                         .as_deref()
-                        .and_then(|id| project_names.get(id).cloned())
+                        .and_then(|id| project_names.get(id).map(|s| s.to_string()))
                 }),
             }
         })
