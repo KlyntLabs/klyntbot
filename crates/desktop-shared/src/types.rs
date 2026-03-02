@@ -53,3 +53,17 @@ pub enum EntityKind {
     Area,
     KeyResult,
 }
+
+impl EntityKind {
+    /// Parse from a string (case-insensitive). Defaults to Task for unknown kinds.
+    pub fn from_str(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "task" | "action" => Self::Task,
+            "project" => Self::Project,
+            "objective" => Self::Objective,
+            "area" => Self::Area,
+            "key_result" | "keyresult" => Self::KeyResult,
+            _ => Self::Task,
+        }
+    }
+}

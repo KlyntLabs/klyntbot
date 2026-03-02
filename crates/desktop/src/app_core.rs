@@ -28,7 +28,7 @@ pub struct AppCore {
     cron_service: Arc<CronService>,
     shutdown_token: CancellationToken,
     /// Active streaming cancellation tokens keyed by session_key.
-    pub active_streams: dashmap::DashMap<String, CancellationToken>,
+    pub active_streams: Arc<dashmap::DashMap<String, CancellationToken>>,
 }
 
 impl AppCore {
@@ -134,7 +134,7 @@ impl AppCore {
             channel_manager: channel_manager.clone(),
             cron_service: cron_service.clone(),
             shutdown_token: shutdown_token.clone(),
-            active_streams: dashmap::DashMap::new(),
+            active_streams: Arc::new(dashmap::DashMap::new()),
         };
 
         // Spawn background services immediately

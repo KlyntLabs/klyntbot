@@ -1,5 +1,11 @@
-use desktop_shared::commands::{ChatMessageResponse, ChatThreadResponse};
-use tauri::State;
+//! Chat commands — wired to AgentLoop with streaming events.
+
+use std::sync::Arc;
+
+use agent::AgentEvent;
+use desktop_shared::commands::{ChatMessageResponse, ChatThreadResponse, SessionContextInput};
+use desktop_shared::events::*;
+use tauri::{Emitter, State};
 
 use crate::app_core::AppCore;
 
@@ -69,11 +75,13 @@ pub async fn chat_messages(
 
 #[tauri::command]
 pub async fn chat_send(
+    app: tauri::AppHandle,
     state: State<'_, AppCore>,
     content: String,
     session_key: String,
+    context: Option<SessionContextInput>,
 ) -> Result<ChatMessageResponse, String> {
-    // Ensure session exists
+    // 1. Ensure session exists
     let metadata = serde_json::json!({ "title": "Desktop Chat" });
     state
         .repos
@@ -82,7 +90,25 @@ pub async fn chat_send(
         .await
         .map_err(|e| e.to_string())?;
 
-    // Store user message
+    // 2. Upsert session_context if provided
+    if let Some(ctx) = &context {
+        state
+            .repos
+            .session_context
+            .upsert(
+                &session_key,
+                ctx.context_type.as_deref().unwrap_or("general"),
+                ctx.entity_kind.as_deref(),
+                ctx.entity_id.as_deref(),
+                None, // area_id resolved later
+                None, // project_id resolved later
+                ctx.is_ephemeral.unwrap_or(false),
+            )
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+
+    // 3. Store user message
     let msg_id = uuid::Uuid::new_v4();
     let msg = state
         .repos
@@ -91,6 +117,101 @@ pub async fn chat_send(
         .await
         .map_err(|e| e.to_string())?;
 
+    // 4. Call agent with streaming
+    let streaming_handle = state
+        .agent
+        .process_direct_streaming(content, session_key.clone())
+        .await
+        .map_err(|e| format!("agent error: {e}"))?;
+
+    // 5. Track the cancel token
+    state
+        .active_streams
+        .insert(session_key.clone(), streaming_handle.cancel_token);
+
+    // 6. Spawn background task to relay AgentEvents → Tauri events
+    let sk = session_key.clone();
+    let active_streams = Arc::clone(&state.active_streams);
+    let mut event_rx = streaming_handle.event_rx;
+
+    tokio::spawn(async move {
+        while let Some(event) = event_rx.recv().await {
+            match event {
+                AgentEvent::ContentChunk { data } => {
+                    let _ = app.emit(
+                        AGENT_CONTENT_CHUNK,
+                        ContentChunkPayload {
+                            session_key: sk.clone(),
+                            data,
+                        },
+                    );
+                }
+                AgentEvent::ToolStart { name, .. } => {
+                    let _ = app.emit(
+                        AGENT_TOOL_START,
+                        ToolStartPayload {
+                            session_key: sk.clone(),
+                            name,
+                        },
+                    );
+                }
+                AgentEvent::ToolEnd {
+                    name, success, ..
+                } => {
+                    let _ = app.emit(
+                        AGENT_TOOL_END,
+                        ToolEndPayload {
+                            session_key: sk.clone(),
+                            name,
+                            success,
+                        },
+                    );
+                }
+                AgentEvent::EntityCreated(card) => {
+                    let _ = app.emit(
+                        AGENT_ENTITY_CREATED,
+                        EntityCreatedPayload {
+                            session_key: sk.clone(),
+                            entity_kind: card.entity_type.clone(),
+                            entity_id: card.entity_id.clone(),
+                        },
+                    );
+                    // Also emit entity:updated for UI refetch
+                    super::emit_entity_updated(
+                        &app,
+                        desktop_shared::types::EntityKind::from_str(&card.entity_type),
+                        &card.entity_id,
+                    );
+                }
+                AgentEvent::Done { content } => {
+                    let _ = app.emit(
+                        AGENT_DONE,
+                        DonePayload {
+                            session_key: sk.clone(),
+                            content,
+                        },
+                    );
+                    break;
+                }
+                AgentEvent::Error { message } => {
+                    let _ = app.emit(
+                        AGENT_ERROR,
+                        AgentErrorPayload {
+                            session_key: sk.clone(),
+                            message,
+                        },
+                    );
+                    break;
+                }
+                // Other events (IterationStart, ClassificationComplete, etc.) are internal
+                _ => {}
+            }
+        }
+
+        active_streams.remove(&sk);
+    });
+
+    // 7. Return user message immediately (streaming handles the AI response)
     Ok(ChatMessageResponse {
         id: msg.id.to_string(),
         role: msg.role,
@@ -100,7 +221,12 @@ pub async fn chat_send(
 }
 
 #[tauri::command]
-pub async fn chat_cancel(_session_key: String) -> Result<(), String> {
-    // TODO: cancel agent processing when AgentLoop is wired
+pub async fn chat_cancel(
+    state: State<'_, AppCore>,
+    session_key: String,
+) -> Result<(), String> {
+    if let Some((_, token)) = state.active_streams.remove(&session_key) {
+        token.cancel();
+    }
     Ok(())
 }

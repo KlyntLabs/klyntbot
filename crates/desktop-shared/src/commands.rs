@@ -129,6 +129,16 @@ pub struct ChatMessageResponse {
     pub timestamp: DateTime<Utc>,
 }
 
+/// Optional session context sent from the frontend alongside a chat message.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionContextInput {
+    pub entity_kind: Option<String>,
+    pub entity_id: Option<String>,
+    pub context_type: Option<String>,
+    pub is_ephemeral: Option<bool>,
+}
+
 // ── Agent Status ────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
