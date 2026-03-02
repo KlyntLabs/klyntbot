@@ -1,6 +1,8 @@
 import { useRef, useEffect } from 'react';
 import { MarkdownContent } from './MarkdownContent';
-import type { ChatMessage } from '../../lib/types';
+import { CollapsedInteraction } from './CollapsedInteraction';
+import { InteractionCard } from './InteractionCard';
+import type { ChatMessage, InteractionRequest } from '../../lib/types';
 
 interface MessageListProps {
   messages: ChatMessage[];
@@ -8,6 +10,9 @@ interface MessageListProps {
   isStreaming: boolean;
   activeTools: string[];
   error: string | null;
+  activeInteraction: { requestId: string; request: InteractionRequest } | null;
+  sessionKey: string;
+  onInteractionSubmitted: () => void;
 }
 
 export function MessageList({
@@ -16,6 +21,9 @@ export function MessageList({
   isStreaming,
   activeTools,
   error,
+  activeInteraction,
+  sessionKey,
+  onInteractionSubmitted,
 }: MessageListProps) {
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -36,6 +44,8 @@ export function MessageList({
                 {msg.content}
               </p>
             </div>
+          ) : msg.role === 'interaction' ? (
+            <CollapsedInteraction content={msg.content} />
           ) : (
             <div className="max-w-[85%]">
               <MarkdownContent content={msg.content} />
@@ -91,6 +101,16 @@ export function MessageList({
             <p className="text-[12px] font-light text-destructive">{error}</p>
           </div>
         </div>
+      )}
+
+      {/* Active interaction prompt */}
+      {activeInteraction && (
+        <InteractionCard
+          sessionKey={sessionKey}
+          requestId={activeInteraction.requestId}
+          request={activeInteraction.request}
+          onSubmitted={onInteractionSubmitted}
+        />
       )}
 
       <div ref={endRef} />

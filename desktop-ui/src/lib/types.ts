@@ -115,6 +115,54 @@ export interface AgentErrorPayload {
   message: string;
 }
 
+// ── Interaction (ask_user) ─────────────────────────────────────────────
+
+export interface InteractionRequestPayload {
+  sessionKey: string;
+  requestId: string;
+  request: InteractionRequest;
+}
+
+export interface InteractionRequest {
+  title: string;
+  questions: Question[];
+}
+
+export interface Question {
+  id: string;
+  title: string;
+  text: string;
+  answer_type: AnswerType;
+}
+
+export type AnswerType =
+  | { type: 'single_select'; options: AnswerOption[] }
+  | { type: 'multi_select'; options: AnswerOption[] }
+  | { type: 'yes_no'; default?: boolean }
+  | { type: 'free_text'; placeholder?: string };
+
+export interface AnswerOption {
+  value: string;
+  label: string;
+  description?: string;
+}
+
+export type AnswerValue =
+  | { type: 'selected'; value: string }
+  | { type: 'multi_selected'; values: string[] }
+  | { type: 'yes_no'; answer: boolean }
+  | { type: 'text'; content: string }
+  | { type: 'skipped' };
+
+export interface Answer {
+  question_id: string;
+  value: AnswerValue;
+}
+
+export type FormResponse =
+  | { Completed: Answer[] }
+  | 'Cancelled';
+
 export interface Area {
   id: string;
   name: string;

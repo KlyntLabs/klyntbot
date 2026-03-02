@@ -3,7 +3,7 @@ import { useQuery } from './useQuery';
 import { useAgentStream } from './useAgentStream';
 import { ipc } from './useIpc';
 import { isTauri } from '../lib/utils';
-import type { ChatMessage } from '../lib/types';
+import type { ChatMessage, InteractionRequest } from '../lib/types';
 
 interface ChatSession {
   messages: ChatMessage[];
@@ -11,9 +11,11 @@ interface ChatSession {
   isStreaming: boolean;
   activeTools: string[];
   error: string | null;
+  activeInteraction: { requestId: string; request: InteractionRequest } | null;
   input: string;
   setInput: (value: string) => void;
   send: (extraPayload?: Record<string, unknown>) => Promise<void>;
+  clearInteraction: () => void;
 }
 
 /**
@@ -73,8 +75,10 @@ export function useChatSession(sessionKey: string, onDone?: () => void): ChatSes
     isStreaming: stream.isStreaming,
     activeTools: stream.activeTools,
     error: stream.error,
+    activeInteraction: stream.activeInteraction,
     input,
     setInput,
     send,
+    clearInteraction: stream.clearInteraction,
   };
 }

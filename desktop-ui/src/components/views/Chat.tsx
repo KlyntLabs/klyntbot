@@ -401,6 +401,12 @@ export function Chat() {
                 isStreaming={chat.isStreaming}
                 activeTools={chat.activeTools}
                 error={chat.error}
+                activeInteraction={chat.activeInteraction}
+                sessionKey={selectedThread}
+                onInteractionSubmitted={() => {
+                  chat.clearInteraction();
+                  refetchThreads();
+                }}
               />
             )}
           </div>

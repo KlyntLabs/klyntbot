@@ -85,6 +85,9 @@ export function SidebarChat({ isOpen, onClose }: SidebarChatProps) {
             isStreaming={chat.isStreaming}
             activeTools={chat.activeTools}
             error={chat.error}
+            activeInteraction={chat.activeInteraction}
+            sessionKey={sessionKey}
+            onInteractionSubmitted={() => chat.clearInteraction()}
           />
         )}
       </div>

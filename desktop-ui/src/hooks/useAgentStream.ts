@@ -7,6 +7,8 @@ import type {
   ToolEndPayload,
   AgentDonePayload,
   AgentErrorPayload,
+  InteractionRequest,
+  InteractionRequestPayload,
 } from '../lib/types';
 
 interface AgentStream {
@@ -14,10 +16,13 @@ interface AgentStream {
   isStreaming: boolean;
   activeTools: string[];
   error: string | null;
+  activeInteraction: { requestId: string; request: InteractionRequest } | null;
   /** Call before sending a message to enter streaming mode. */
   startStreaming: () => void;
   /** Abort streaming and show an error. */
   failStreaming: (message: string) => void;
+  /** Clear the active interaction (after submit/cancel). */
+  clearInteraction: () => void;
 }
 
 /**
@@ -31,6 +36,10 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
   const [isStreaming, setIsStreaming] = useState(false);
   const [activeTools, setActiveTools] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [activeInteraction, setActiveInteraction] = useState<{
+    requestId: string;
+    request: InteractionRequest;
+  } | null>(null);
 
   const onDoneRef = useRef(onDone);
   onDoneRef.current = onDone;
@@ -43,6 +52,7 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
     setIsStreaming(false);
     setActiveTools([]);
     setError(null);
+    setActiveInteraction(null);
   }, [sessionKey]);
 
   const startStreaming = useCallback(() => {
@@ -86,8 +96,14 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
     setActiveTools((prev) => prev.filter((t) => t !== payload.name));
   });
 
+  useEvent<InteractionRequestPayload>('agent:interaction_request', (payload) => {
+    if (!sessionKeyRef.current || payload.sessionKey !== sessionKeyRef.current) return;
+    setActiveInteraction({ requestId: payload.requestId, request: payload.request });
+  });
+
   useEvent<AgentDonePayload>('agent:done', (payload) => {
     if (!sessionKeyRef.current || payload.sessionKey !== sessionKeyRef.current) return;
+    setActiveInteraction(null);
     setStreamingContent('');
     setIsStreaming(false);
     onDoneRef.current?.();
@@ -100,5 +116,7 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
     setIsStreaming(false);
   });
 
-  return { streamingContent, isStreaming, activeTools, error, startStreaming, failStreaming };
+  const clearInteraction = useCallback(() => setActiveInteraction(null), []);
+
+  return { streamingContent, isStreaming, activeTools, error, activeInteraction, startStreaming, failStreaming, clearInteraction };
 }
