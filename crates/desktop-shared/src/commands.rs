@@ -176,6 +176,18 @@ pub struct CurrencyNetWorth {
     pub net: i64,
 }
 
+impl CurrencyNetWorth {
+    pub fn zero(currency: String) -> Self {
+        Self {
+            currency,
+            accounts: 0,
+            investments: 0,
+            liabilities: 0,
+            net: 0,
+        }
+    }
+}
+
 // ── Agent Status ────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

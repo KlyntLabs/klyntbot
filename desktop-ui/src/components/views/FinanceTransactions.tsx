@@ -18,6 +18,7 @@ export function FinanceTransactions() {
   const refetchAll = () => { rA(); rT(); };
   useEvent<{ entityKind: string }>('entity:updated', refetchAll);
 
+  const accountMap = useMemo(() => new Map(accounts.map(a => [a.id, a])), [accounts]);
   const [filter, setFilter] = useState<TxFilter>('all');
   const [searchQ, setSearchQ] = useState('');
   const [acctFilter, setAcctFilter] = useState<string>('all');
@@ -140,7 +141,7 @@ export function FinanceTransactions() {
               <div className="p-6 text-center text-[11px] text-dim font-light">No transactions match your filters</div>
             ) : (
               filtered.map(tx => {
-                const acct = accounts.find(a => a.id === tx.accountId);
+                const acct = accountMap.get(tx.accountId);
                 const TxI = tx.txType === 'income' ? ArrowDownRight : tx.txType === 'expense' ? ArrowUpRight : ArrowLeftRight;
                 const col = tx.txType === 'income' ? 'text-success' : tx.txType === 'expense' ? 'text-destructive' : 'text-info';
                 const pre = tx.txType === 'income' ? '+' : tx.txType === 'expense' ? '-' : '';

@@ -5,11 +5,12 @@ use std::collections::HashMap;
 use desktop_shared::commands::{
     CurrencyNetWorth, FinanceNetWorthResponse, FinancePortfolioResponse,
 };
+use futures_util::future::try_join_all;
 use storage::rows::finance::{
     BudgetUsageRow, FinanceAccountRow, FinanceGoalRow, FinanceInvestmentRow, FinanceLiabilityRow,
     FinanceTransactionRow,
 };
-use storage::rows::finance::{FinanceInvestmentFilter, FinanceTransactionFilter};
+use storage::rows::finance::FinanceTransactionFilter;
 use tauri::State;
 
 use crate::app_core::AppCore;
@@ -68,17 +69,18 @@ pub async fn finance_portfolios(
         .await
         .map_err(|e| e.to_string())?;
 
-    let mut result = Vec::with_capacity(portfolios.len());
-    for p in &portfolios {
-        let summary = state
-            .repos
-            .finance
-            .investments
-            .portfolio_summary(&p.id)
-            .await
-            .map_err(|e| e.to_string())?;
+    let summaries = try_join_all(
+        portfolios
+            .iter()
+            .map(|p| state.repos.finance.investments.portfolio_summary(&p.id)),
+    )
+    .await
+    .map_err(|e| e.to_string())?;
 
-        result.push(FinancePortfolioResponse {
+    Ok(portfolios
+        .iter()
+        .zip(summaries)
+        .map(|(p, summary)| FinancePortfolioResponse {
             id: p.id.clone(),
             name: p.name.clone(),
             description: p.description.clone(),
@@ -86,21 +88,19 @@ pub async fn finance_portfolios(
             total_value: summary.total_current_value,
             total_cost_basis: summary.total_cost_basis,
             holding_count: summary.holding_count,
-        });
-    }
-    Ok(result)
+        })
+        .collect())
 }
 
 #[tauri::command]
 pub async fn finance_investments(
     state: State<'_, AppCore>,
 ) -> Result<Vec<FinanceInvestmentRow>, String> {
-    let filter = FinanceInvestmentFilter::default();
     state
         .repos
         .finance
         .investments
-        .list_investments(&filter)
+        .list_investments(&Default::default())
         .await
         .map_err(|e| e.to_string())
 }
@@ -133,64 +133,35 @@ pub async fn finance_liabilities(
 pub async fn finance_net_worth(
     state: State<'_, AppCore>,
 ) -> Result<FinanceNetWorthResponse, String> {
-    let inv_filter = FinanceInvestmentFilter::default();
-    let (accounts, investments, liabilities) = tokio::join!(
-        state.repos.finance.accounts.list(false),
-        state
-            .repos
-            .finance
-            .investments
-            .list_investments(&inv_filter),
-        state.repos.finance.liabilities.list_all(),
-    );
-    let accounts = accounts.map_err(|e| e.to_string())?;
-    let investments = investments.map_err(|e| e.to_string())?;
-    let liabilities = liabilities.map_err(|e| e.to_string())?;
+    let (account_totals, investment_totals, liability_totals) = tokio::try_join!(
+        state.repos.finance.accounts.total_balance_by_currency(),
+        state.repos.finance.investments.total_value_by_currency(),
+        state.repos.finance.liabilities.total_remaining_by_currency(),
+    )
+    .map_err(|e| e.to_string())?;
 
-    // Aggregate by currency
+    // Merge the three per-currency aggregates into CurrencyNetWorth entries
     let mut by_currency: HashMap<&str, CurrencyNetWorth> = HashMap::new();
 
-    for a in &accounts {
-        let entry = by_currency
-            .entry(&a.currency)
-            .or_insert_with(|| CurrencyNetWorth {
-                currency: a.currency.clone(),
-                accounts: 0,
-                investments: 0,
-                liabilities: 0,
-                net: 0,
-            });
-        entry.accounts += a.balance;
+    for (currency, total) in &account_totals {
+        by_currency
+            .entry(currency)
+            .or_insert_with(|| CurrencyNetWorth::zero(currency.clone()))
+            .accounts = *total;
+    }
+    for (currency, total) in &investment_totals {
+        by_currency
+            .entry(currency)
+            .or_insert_with(|| CurrencyNetWorth::zero(currency.clone()))
+            .investments = *total;
+    }
+    for (currency, total) in &liability_totals {
+        by_currency
+            .entry(currency)
+            .or_insert_with(|| CurrencyNetWorth::zero(currency.clone()))
+            .liabilities = *total;
     }
 
-    for i in &investments {
-        let value = i.current_value.unwrap_or(i.cost_basis);
-        let entry = by_currency
-            .entry(&i.currency)
-            .or_insert_with(|| CurrencyNetWorth {
-                currency: i.currency.clone(),
-                accounts: 0,
-                investments: 0,
-                liabilities: 0,
-                net: 0,
-            });
-        entry.investments += value;
-    }
-
-    for l in &liabilities {
-        let entry = by_currency
-            .entry(&l.currency)
-            .or_insert_with(|| CurrencyNetWorth {
-                currency: l.currency.clone(),
-                accounts: 0,
-                investments: 0,
-                liabilities: 0,
-                net: 0,
-            });
-        entry.liabilities += l.remaining;
-    }
-
-    // Compute net for each currency
     let totals_by_currency: Vec<CurrencyNetWorth> = by_currency
         .into_values()
         .map(|mut c| {

@@ -350,7 +350,9 @@ async fn auto_detect_context(
     if domains.len() != 1 {
         return Ok(()); // ambiguous or no tools → skip
     }
-    let domain = *domains.iter().next().unwrap();
+    let Some(&domain) = domains.iter().next() else {
+        return Ok(());
+    };
 
     // Pick the best entity card for this domain (first match)
     let card = entity_cards
@@ -416,6 +418,11 @@ async fn resolve_ancestry(
                 (None, None)
             }
         }
+        "area" => {
+            // The entity IS the area
+            (Some(id.to_string()), None)
+        }
+        // finance, calendar — no PARA ancestry
         _ => (None, None),
     }
 }

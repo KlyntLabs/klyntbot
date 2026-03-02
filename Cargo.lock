@@ -2756,6 +2756,7 @@ dependencies = [
  "dashmap",
  "desktop-shared",
  "dirs",
+ "futures-util",
  "providers",
  "scheduling",
  "serde",

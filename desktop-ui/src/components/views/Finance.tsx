@@ -63,6 +63,7 @@ export function Finance() {
   }, [investments, rates]);
   const totalInvest = useMemo(() => investSegs.reduce((s, a) => s + a.value, 0), [investSegs]);
 
+  const accountMap = useMemo(() => new Map(accounts.map(a => [a.id, a])), [accounts]);
   const active = useMemo(() => accounts.filter(a => !a.isArchived), [accounts]);
 
   return (
@@ -166,7 +167,7 @@ export function Finance() {
           <SectionLabel>Transactions</SectionLabel>
           <Card className="overflow-hidden flex-1">
             {transactions.map(tx => {
-              const acct = accounts.find(a => a.id === tx.accountId);
+              const acct = accountMap.get(tx.accountId);
               const TxI = tx.txType === 'income' ? ArrowDownRight : tx.txType === 'expense' ? ArrowUpRight : ArrowLeftRight;
               const col = tx.txType === 'income' ? 'text-success' : tx.txType === 'expense' ? 'text-destructive' : 'text-info';
               const pre = tx.txType === 'income' ? '+' : tx.txType === 'expense' ? '-' : '';
