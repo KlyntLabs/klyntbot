@@ -65,16 +65,16 @@ pub async fn chat_threads(state: State<'_, AppCore>) -> Result<Vec<ChatThreadRes
                 entity_id: ctx.and_then(|c| c.entity_id.clone()),
                 area_id: ctx.and_then(|c| c.area_id.clone()),
                 area_name: ctx.and_then(|c| {
-                    c.area_id.as_deref().and_then(|id| area_names.get(id).map(|s| s.to_string()))
+                    c.area_id
+                        .as_deref()
+                        .and_then(|id| area_names.get(id).map(|s| s.to_string()))
                 }),
-                project_id: ctx
-                    .and_then(|c| c.project_id.clone())
-                    .or_else(|| {
-                        s.metadata
-                            .get("projectId")
-                            .and_then(|v| v.as_str())
-                            .map(String::from)
-                    }),
+                project_id: ctx.and_then(|c| c.project_id.clone()).or_else(|| {
+                    s.metadata
+                        .get("projectId")
+                        .and_then(|v| v.as_str())
+                        .map(String::from)
+                }),
                 project_name: ctx.and_then(|c| {
                     c.project_id
                         .as_deref()
@@ -218,9 +218,7 @@ pub async fn chat_send(
                         },
                     );
                 }
-                AgentEvent::ToolEnd {
-                    name, success, ..
-                } => {
+                AgentEvent::ToolEnd { name, success, .. } => {
                     let _ = app.emit(
                         AGENT_TOOL_END,
                         ToolEndPayload {
@@ -240,7 +238,8 @@ pub async fn chat_send(
                         },
                     );
                     // Also emit entity:updated for UI refetch (skip unknown kinds)
-                    if let Some(kind) = desktop_shared::types::EntityKind::parse(&card.entity_type) {
+                    if let Some(kind) = desktop_shared::types::EntityKind::parse(&card.entity_type)
+                    {
                         super::emit_entity_updated(&app, kind, &card.entity_id);
                     }
                     entity_cards.push(card);
@@ -288,10 +287,7 @@ pub async fn chat_send(
 }
 
 #[tauri::command]
-pub async fn chat_pin_thread(
-    state: State<'_, AppCore>,
-    session_key: String,
-) -> Result<(), String> {
+pub async fn chat_pin_thread(state: State<'_, AppCore>, session_key: String) -> Result<(), String> {
     state
         .repos
         .session_context
@@ -302,10 +298,7 @@ pub async fn chat_pin_thread(
 }
 
 #[tauri::command]
-pub async fn chat_cancel(
-    state: State<'_, AppCore>,
-    session_key: String,
-) -> Result<(), String> {
+pub async fn chat_cancel(state: State<'_, AppCore>, session_key: String) -> Result<(), String> {
     if let Some((_, token)) = state.active_streams.remove(&session_key) {
         token.cancel();
     }

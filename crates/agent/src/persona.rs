@@ -226,13 +226,11 @@ impl PersonaManager {
                     false
                 }
             }
-            PersonaScope::Feature { kind } => {
-                context.entity_kind.as_deref().is_some_and(|ek| {
-                    ek == kind
-                        || (ek.starts_with(kind.as_str())
-                            && ek.as_bytes().get(kind.len()) == Some(&b'.'))
-                })
-            }
+            PersonaScope::Feature { kind } => context.entity_kind.as_deref().is_some_and(|ek| {
+                ek == kind
+                    || (ek.starts_with(kind.as_str())
+                        && ek.as_bytes().get(kind.len()) == Some(&b'.'))
+            }),
         }
     }
 }
@@ -248,7 +246,6 @@ struct PersonaFrontmatter {
     #[serde(flatten)]
     extra: HashMap<String, serde_json::Value>,
 }
-
 
 async fn load_persona_file(path: &Path) -> Result<Persona, String> {
     let content = fs::read_to_string(path)
@@ -303,9 +300,7 @@ fn parse_persona(default_name: &str, content: &str) -> Result<Persona, String> {
     let scope = match fm.scope {
         Some(map) => {
             if let Some(area) = map.get("area") {
-                PersonaScope::Area {
-                    name: area.clone(),
-                }
+                PersonaScope::Area { name: area.clone() }
             } else if let Some(project) = map.get("project") {
                 PersonaScope::Project {
                     name: project.clone(),
@@ -376,7 +371,12 @@ You are a financial advisor helping manage budgets and investments.
 "#;
         let persona = parse_persona("default", content).unwrap();
         assert_eq!(persona.name, "finance-expert");
-        assert_eq!(persona.scope, PersonaScope::Feature { kind: "finance".to_string() });
+        assert_eq!(
+            persona.scope,
+            PersonaScope::Feature {
+                kind: "finance".to_string()
+            }
+        );
         assert_eq!(persona.skills, vec!["finance", "summarize"]);
         assert_eq!(persona.tone.as_deref(), Some("professional"));
         assert!(persona.instructions.contains("financial advisor"));
@@ -418,7 +418,9 @@ Engineering area persona.
         let persona = parse_persona("eng", content).unwrap();
         assert_eq!(
             persona.scope,
-            PersonaScope::Area { name: "Engineering".to_string() }
+            PersonaScope::Area {
+                name: "Engineering".to_string()
+            }
         );
     }
 
@@ -436,7 +438,9 @@ CryptoGuard project persona.
         let persona = parse_persona("cg", content).unwrap();
         assert_eq!(
             persona.scope,
-            PersonaScope::Project { name: "CryptoGuard".to_string() }
+            PersonaScope::Project {
+                name: "CryptoGuard".to_string()
+            }
         );
         assert_eq!(persona.skills, vec!["todo"]);
     }
@@ -508,7 +512,9 @@ CryptoGuard project persona.
         let finance = Persona {
             name: "finance".to_string(),
             instructions: "Focus on finance.".to_string(),
-            scope: PersonaScope::Feature { kind: "finance".to_string() },
+            scope: PersonaScope::Feature {
+                kind: "finance".to_string(),
+            },
             skills: vec!["finance".to_string()],
             tone: Some("professional".to_string()),
             metadata: HashMap::new(),
@@ -548,7 +554,9 @@ CryptoGuard project persona.
         let area = Persona {
             name: "eng".to_string(),
             instructions: "Engineering.".to_string(),
-            scope: PersonaScope::Area { name: "Engineering".to_string() },
+            scope: PersonaScope::Area {
+                name: "Engineering".to_string(),
+            },
             skills: vec!["todo".to_string()],
             tone: Some("concise".to_string()),
             metadata: HashMap::new(),
@@ -556,7 +564,9 @@ CryptoGuard project persona.
         let project = Persona {
             name: "cg".to_string(),
             instructions: "CryptoGuard.".to_string(),
-            scope: PersonaScope::Project { name: "CryptoGuard".to_string() },
+            scope: PersonaScope::Project {
+                name: "CryptoGuard".to_string(),
+            },
             skills: vec!["finance".to_string()],
             tone: Some("technical".to_string()),
             metadata: HashMap::new(),
@@ -565,7 +575,10 @@ CryptoGuard project persona.
         let mut resolved = HashMap::new();
         resolved.insert(
             "eng".to_string(),
-            ResolvedScope { area_id: Some("a-1".to_string()), project_id: None },
+            ResolvedScope {
+                area_id: Some("a-1".to_string()),
+                project_id: None,
+            },
         );
         resolved.insert(
             "cg".to_string(),
@@ -580,7 +593,13 @@ CryptoGuard project persona.
             resolved_scopes: resolved,
         };
 
-        let ctx = make_context("test:4", Some("project"), Some("p-1"), Some("a-1"), Some("p-1"));
+        let ctx = make_context(
+            "test:4",
+            Some("project"),
+            Some("p-1"),
+            Some("a-1"),
+            Some("p-1"),
+        );
         let chain = mgr.for_session(&ctx);
 
         // All three should match, in order: global → area → project

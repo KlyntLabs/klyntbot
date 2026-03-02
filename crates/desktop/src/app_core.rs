@@ -55,8 +55,8 @@ impl AppCore {
         info!("storage connected");
 
         // 3. Create LLM provider
-        let (provider, resolved_model) =
-            providers::create_provider(&config).map_err(|e| format!("provider init failed: {e}"))?;
+        let (provider, resolved_model) = providers::create_provider(&config)
+            .map_err(|e| format!("provider init failed: {e}"))?;
         config.agents.defaults.model = resolved_model;
         info!(provider = %provider.name(), "provider ready");
 
@@ -209,8 +209,7 @@ impl AppCore {
                 rt.block_on(async move {
                     match job_name.as_str() {
                         "todo_focus_check" => {
-                            let focused: Vec<storage::ActionRow> =
-                                todo_repo.list_focused().await?;
+                            let focused: Vec<storage::ActionRow> = todo_repo.list_focused().await?;
                             for task in &focused {
                                 if let Some(deadline) = task.focus_deadline {
                                     let remaining = deadline - chrono::Utc::now();
@@ -230,10 +229,7 @@ impl AppCore {
                                         dispatcher
                                             .notify(
                                                 "⏰ Focus Deadline: 3h left",
-                                                &format!(
-                                                    "\"{}\" — stay on track",
-                                                    task.title
-                                                ),
+                                                &format!("\"{}\" — stay on track", task.title),
                                             )
                                             .await
                                             .ok();
@@ -241,10 +237,7 @@ impl AppCore {
                                         dispatcher
                                             .notify(
                                                 "⏰ Focus Deadline: 6h left",
-                                                &format!(
-                                                    "\"{}\" — keep going",
-                                                    task.title
-                                                ),
+                                                &format!("\"{}\" — keep going", task.title),
                                             )
                                             .await
                                             .ok();
@@ -264,15 +257,11 @@ impl AppCore {
                                 summary.done,
                                 overdue.len()
                             );
-                            dispatcher
-                                .notify("📋 Daily Task Digest", &body)
-                                .await
-                                .ok();
+                            dispatcher.notify("📋 Daily Task Digest", &body).await.ok();
                             Ok(Some("Daily digest sent".to_string()))
                         }
                         "todo_overdue_check" => {
-                            let focused: Vec<storage::ActionRow> =
-                                todo_repo.list_focused().await?;
+                            let focused: Vec<storage::ActionRow> = todo_repo.list_focused().await?;
                             let now = chrono::Utc::now();
                             let mut expired_count = 0u32;
                             for task in &focused {
@@ -295,13 +284,31 @@ impl AppCore {
                         }
                         name if name.starts_with("__klyntbot_") => {
                             let (channel, msg_text) = match name {
-                                "__klyntbot_weekly_report" => ("weekly_report", "Generate weekly progress report using the weekly-report skill"),
-                                "__klyntbot_calendar_sync" => ("calendar_sync", "Sync calendar events with configured providers"),
-                                "__klyntbot_daily_planning" => ("daily_planning", "/daily-planning"),
-                                "__klyntbot_finance_daily_review" => ("finance_daily_review", "Run finance daily review and send summary"),
-                                "__klyntbot_finance_budget_check" => ("finance_budget_check", "Check budget thresholds and send alerts"),
-                                "__klyntbot_finance_price_refresh" => ("finance_price_refresh", "Refresh investment prices"),
-                                "__klyntbot_finance_health_check" => ("finance_health_check", "Run finance data health check"),
+                                "__klyntbot_weekly_report" => (
+                                    "weekly_report",
+                                    "Generate weekly progress report using the weekly-report skill",
+                                ),
+                                "__klyntbot_calendar_sync" => (
+                                    "calendar_sync",
+                                    "Sync calendar events with configured providers",
+                                ),
+                                "__klyntbot_daily_planning" => {
+                                    ("daily_planning", "/daily-planning")
+                                }
+                                "__klyntbot_finance_daily_review" => (
+                                    "finance_daily_review",
+                                    "Run finance daily review and send summary",
+                                ),
+                                "__klyntbot_finance_budget_check" => (
+                                    "finance_budget_check",
+                                    "Check budget thresholds and send alerts",
+                                ),
+                                "__klyntbot_finance_price_refresh" => {
+                                    ("finance_price_refresh", "Refresh investment prices")
+                                }
+                                "__klyntbot_finance_health_check" => {
+                                    ("finance_health_check", "Run finance data health check")
+                                }
                                 _ => return Ok(None),
                             };
                             let msg = bus::InboundMessage::new(

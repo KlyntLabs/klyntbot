@@ -29,7 +29,12 @@ impl ContextSource for PageContextSource {
 
     async fn provide(&self, ctx: &SourceContext) -> Option<String> {
         let session_key = SessionKey::from_parts(&ctx.channel, &ctx.chat_id);
-        let context = self.repos.session_context.get(session_key.as_str()).await.ok()??;
+        let context = self
+            .repos
+            .session_context
+            .get(session_key.as_str())
+            .await
+            .ok()??;
 
         let entity_kind = context.entity_kind.as_deref()?;
         let entity_id = context.entity_id.as_deref();
@@ -150,7 +155,8 @@ impl PageContextSource {
                     kr.id,
                     kr.title,
                     kr.current_value,
-                    kr.target_value.map_or("?".to_string(), |v| format!("{v:.0}")),
+                    kr.target_value
+                        .map_or("?".to_string(), |v| format!("{v:.0}")),
                     progress
                 ));
             }
@@ -195,7 +201,13 @@ impl PageContextSource {
                 Some(out)
             }
             "investments" => {
-                let portfolios = self.repos.finance.investments.list_portfolios().await.ok()?;
+                let portfolios = self
+                    .repos
+                    .finance
+                    .investments
+                    .list_portfolios()
+                    .await
+                    .ok()?;
                 let mut out = format!("**Finance — Portfolios ({}):**\n", portfolios.len());
                 for p in &portfolios {
                     out.push_str(&format!("- {} ({})\n", p.name, p.currency));
@@ -203,13 +215,7 @@ impl PageContextSource {
                 Some(out)
             }
             _ => {
-                let accounts = self
-                    .repos
-                    .finance
-                    .accounts
-                    .list(false)
-                    .await
-                    .ok()?;
+                let accounts = self.repos.finance.accounts.list(false).await.ok()?;
                 let mut out = format!("**Finance — Accounts ({}):**\n", accounts.len());
                 for a in &accounts {
                     out.push_str(&format!("- {} ({}: {})\n", a.name, a.currency, a.balance));

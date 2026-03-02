@@ -58,10 +58,7 @@ impl SessionContextRepo {
     }
 
     /// Get session context by session key.
-    pub async fn get(
-        &self,
-        session_key: &str,
-    ) -> Result<Option<SessionContextRow>, StorageError> {
+    pub async fn get(&self, session_key: &str) -> Result<Option<SessionContextRow>, StorageError> {
         let row = sqlx::query_as::<_, SessionContextRow>(
             "SELECT * FROM session_context WHERE session_key = ?1",
         )
@@ -179,7 +176,10 @@ mod tests {
         let pool = StoragePool::connect(dir.path()).await.ok()?;
         let _ = dir.keep();
         let db = pool.inner().clone();
-        Some((SessionContextRepo::new(db.clone()), crate::repos::SessionRepo::new(db)))
+        Some((
+            SessionContextRepo::new(db.clone()),
+            crate::repos::SessionRepo::new(db),
+        ))
     }
 
     /// Helper: create a session so foreign key constraint is satisfied.
@@ -198,7 +198,15 @@ mod tests {
         create_session(&sessions, "test:ctx1").await;
 
         let row = repo
-            .upsert("test:ctx1", "project", Some("project"), Some("p-1"), Some("a-1"), None, false)
+            .upsert(
+                "test:ctx1",
+                "project",
+                Some("project"),
+                Some("p-1"),
+                Some("a-1"),
+                None,
+                false,
+            )
             .await
             .unwrap();
         assert_eq!(row.session_key, "test:ctx1");
@@ -224,7 +232,15 @@ mod tests {
             .await
             .unwrap();
         let updated = repo
-            .upsert("test:ctx2", "task", Some("task"), Some("t-1"), None, Some("p-1"), false)
+            .upsert(
+                "test:ctx2",
+                "task",
+                Some("task"),
+                Some("t-1"),
+                None,
+                Some("p-1"),
+                false,
+            )
             .await
             .unwrap();
         assert_eq!(updated.context_type, "task");
@@ -243,7 +259,14 @@ mod tests {
             .await
             .unwrap();
         let updated = repo
-            .update("test:ctx3", Some("project"), Some("project"), Some("p-1"), None, None)
+            .update(
+                "test:ctx3",
+                Some("project"),
+                Some("project"),
+                Some("p-1"),
+                None,
+                None,
+            )
             .await
             .unwrap()
             .unwrap();
@@ -275,15 +298,39 @@ mod tests {
         create_session(&sessions, "test:a2").await;
         create_session(&sessions, "test:b1").await;
 
-        repo.upsert("test:a1", "project", Some("project"), Some("p-1"), Some("area-1"), None, false)
-            .await
-            .unwrap();
-        repo.upsert("test:a2", "project", Some("project"), Some("p-2"), Some("area-1"), None, false)
-            .await
-            .unwrap();
-        repo.upsert("test:b1", "project", Some("project"), Some("p-3"), Some("area-2"), None, false)
-            .await
-            .unwrap();
+        repo.upsert(
+            "test:a1",
+            "project",
+            Some("project"),
+            Some("p-1"),
+            Some("area-1"),
+            None,
+            false,
+        )
+        .await
+        .unwrap();
+        repo.upsert(
+            "test:a2",
+            "project",
+            Some("project"),
+            Some("p-2"),
+            Some("area-1"),
+            None,
+            false,
+        )
+        .await
+        .unwrap();
+        repo.upsert(
+            "test:b1",
+            "project",
+            Some("project"),
+            Some("p-3"),
+            Some("area-2"),
+            None,
+            false,
+        )
+        .await
+        .unwrap();
 
         let area1 = repo.list_by_area("area-1").await.unwrap();
         assert_eq!(area1.len(), 2);
@@ -306,13 +353,29 @@ mod tests {
             .await
             .unwrap();
         // Ephemeral, not pinned → hidden
-        repo.upsert("test:v2", "task", Some("task"), Some("t-1"), None, None, true)
-            .await
-            .unwrap();
+        repo.upsert(
+            "test:v2",
+            "task",
+            Some("task"),
+            Some("t-1"),
+            None,
+            None,
+            true,
+        )
+        .await
+        .unwrap();
         // Ephemeral, pinned → visible
-        repo.upsert("test:v3", "task", Some("task"), Some("t-2"), None, None, true)
-            .await
-            .unwrap();
+        repo.upsert(
+            "test:v3",
+            "task",
+            Some("task"),
+            Some("t-2"),
+            None,
+            None,
+            true,
+        )
+        .await
+        .unwrap();
         repo.pin("test:v3").await.unwrap();
 
         let visible = repo.list_visible().await.unwrap();
@@ -339,11 +402,13 @@ mod tests {
             .unwrap();
 
         // Make e1 old by manually setting updated_at
-        sqlx::query("UPDATE session_context SET updated_at = '2020-01-01T00:00:00Z' WHERE session_key = ?1")
-            .bind("test:e1")
-            .execute(&repo.pool)
-            .await
-            .unwrap();
+        sqlx::query(
+            "UPDATE session_context SET updated_at = '2020-01-01T00:00:00Z' WHERE session_key = ?1",
+        )
+        .bind("test:e1")
+        .execute(&repo.pool)
+        .await
+        .unwrap();
 
         // Cleanup should only delete old ones
         let deleted = repo.cleanup_old_ephemeral(1).await.unwrap();
@@ -361,9 +426,17 @@ mod tests {
         };
         create_session(&sessions, "test:pin1").await;
 
-        repo.upsert("test:pin1", "task", Some("task"), Some("t-1"), None, None, true)
-            .await
-            .unwrap();
+        repo.upsert(
+            "test:pin1",
+            "task",
+            Some("task"),
+            Some("t-1"),
+            None,
+            None,
+            true,
+        )
+        .await
+        .unwrap();
         let row = repo.get("test:pin1").await.unwrap().unwrap();
         assert!(!row.is_pinned);
 

@@ -17,7 +17,7 @@ interface ChatSession {
 
 /**
  * Encapsulates chat session state: message fetching, optimistic pending message,
- * streaming, and send logic. Used by ChatPanel, SidebarChat, and Chat.
+ * streaming, and send logic. Used by SidebarChat and Chat.
  */
 export function useChatSession(sessionKey: string): ChatSession {
   const { data: messages, refetch } = useQuery<ChatMessage[]>(

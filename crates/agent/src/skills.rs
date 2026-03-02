@@ -475,8 +475,7 @@ fn scope_matches_context(scope: &SkillScope, ctx: &SessionContextRow) -> bool {
         }
         SkillScope::Feature { kind } => ctx.entity_kind.as_deref().is_some_and(|ek| {
             ek == kind
-                || (ek.starts_with(kind.as_str())
-                    && ek.as_bytes().get(kind.len()) == Some(&b'.'))
+                || (ek.starts_with(kind.as_str()) && ek.as_bytes().get(kind.len()) == Some(&b'.'))
         }),
     }
 }

@@ -40,7 +40,11 @@ impl ContextSource for PersonaContextSource {
 
     async fn provide(&self, ctx: &SourceContext) -> Option<String> {
         let session_key = SessionKey::from_parts(&ctx.channel, &ctx.chat_id);
-        let context = self.session_context_repo.get(session_key.as_str()).await.ok()??;
+        let context = self
+            .session_context_repo
+            .get(session_key.as_str())
+            .await
+            .ok()??;
 
         let mgr = self.persona_manager.read().await;
         let chain = mgr.for_session(&context);

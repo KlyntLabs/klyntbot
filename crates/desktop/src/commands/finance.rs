@@ -2,7 +2,9 @@
 
 use std::collections::HashMap;
 
-use desktop_shared::commands::{CurrencyNetWorth, FinanceNetWorthResponse, FinancePortfolioResponse};
+use desktop_shared::commands::{
+    CurrencyNetWorth, FinanceNetWorthResponse, FinancePortfolioResponse,
+};
 use storage::rows::finance::{
     BudgetUsageRow, FinanceAccountRow, FinanceGoalRow, FinanceInvestmentRow, FinanceLiabilityRow,
     FinanceTransactionRow,
@@ -13,9 +15,7 @@ use tauri::State;
 use crate::app_core::AppCore;
 
 #[tauri::command]
-pub async fn finance_accounts(
-    state: State<'_, AppCore>,
-) -> Result<Vec<FinanceAccountRow>, String> {
+pub async fn finance_accounts(state: State<'_, AppCore>) -> Result<Vec<FinanceAccountRow>, String> {
     state
         .repos
         .finance
@@ -136,7 +136,11 @@ pub async fn finance_net_worth(
     let inv_filter = FinanceInvestmentFilter::default();
     let (accounts, investments, liabilities) = tokio::join!(
         state.repos.finance.accounts.list(false),
-        state.repos.finance.investments.list_investments(&inv_filter),
+        state
+            .repos
+            .finance
+            .investments
+            .list_investments(&inv_filter),
         state.repos.finance.liabilities.list_all(),
     );
     let accounts = accounts.map_err(|e| e.to_string())?;
