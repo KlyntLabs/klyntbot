@@ -1,6 +1,7 @@
 pub mod areas;
 pub mod calendar;
 pub mod chat;
+pub mod finance;
 pub mod key_results;
 pub mod objectives;
 pub mod projects;

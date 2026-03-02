@@ -146,6 +146,36 @@ pub struct SessionContextInput {
     pub is_ephemeral: Option<bool>,
 }
 
+// ── Finance ─────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FinancePortfolioResponse {
+    pub id: String,
+    pub name: String,
+    pub description: Option<String>,
+    pub currency: String,
+    pub total_value: i64,
+    pub total_cost_basis: i64,
+    pub holding_count: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FinanceNetWorthResponse {
+    pub totals_by_currency: Vec<CurrencyNetWorth>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CurrencyNetWorth {
+    pub currency: String,
+    pub accounts: i64,
+    pub investments: i64,
+    pub liabilities: i64,
+    pub net: i64,
+}
+
 // ── Agent Status ────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

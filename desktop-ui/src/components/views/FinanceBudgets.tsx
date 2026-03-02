@@ -9,10 +9,8 @@ import { FinanceLayout } from '../finance/FinanceLayout';
 import { Card, SectionLabel } from '../finance/Card';
 import { Donut } from '../finance/Donut';
 import type { FinanceBudgetUsage } from '../../lib/types';
-import { mockBudgets } from '../../data/mockFinanceData';
-
 export function FinanceBudgets() {
-  const { data: budgets, refetch } = useQuery<FinanceBudgetUsage[]>('finance_budget_usage', undefined, mockBudgets);
+  const { data: budgets, refetch } = useQuery<FinanceBudgetUsage[]>('finance_budget_usage', undefined, []);
   useEvent<{ entityKind: string }>('entity:updated', refetch);
 
   const activeBudgets = budgets.filter(b => b.isActive);

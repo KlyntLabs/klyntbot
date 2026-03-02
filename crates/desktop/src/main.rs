@@ -140,6 +140,16 @@ fn main() {
             commands::chat::chat_send,
             commands::chat::chat_pin_thread,
             commands::chat::chat_cancel,
+            // Finance
+            commands::finance::finance_accounts,
+            commands::finance::finance_transactions,
+            commands::finance::finance_budget_usage,
+            commands::finance::finance_portfolios,
+            commands::finance::finance_investments,
+            commands::finance::finance_goals,
+            commands::finance::finance_liabilities,
+            commands::finance::finance_net_worth,
+            commands::finance::finance_exchange_rates,
             // Calendar
             commands::calendar::calendar_events,
             // Status

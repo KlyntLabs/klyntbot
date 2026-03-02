@@ -8,14 +8,12 @@ import { FinanceLayout } from '../finance/FinanceLayout';
 import { Card, SectionLabel } from '../finance/Card';
 import { Donut } from '../finance/Donut';
 import type { FinanceAccount, FinanceTransaction } from '../../lib/types';
-import { mockAccounts, mockTransactions, mockExchangeRates } from '../../data/mockFinanceData';
-
 type TxFilter = 'all' | 'income' | 'expense' | 'transfer';
 
 export function FinanceTransactions() {
-  const { data: accounts, refetch: rA } = useQuery<FinanceAccount[]>('finance_accounts', undefined, mockAccounts);
-  const { data: transactions, refetch: rT } = useQuery<FinanceTransaction[]>('finance_transactions', undefined, mockTransactions);
-  const { data: rates } = useQuery<Record<string, number>>('finance_exchange_rates', undefined, mockExchangeRates);
+  const { data: accounts, refetch: rA } = useQuery<FinanceAccount[]>('finance_accounts', undefined, []);
+  const { data: transactions, refetch: rT } = useQuery<FinanceTransaction[]>('finance_transactions', undefined, []);
+  const { data: rates } = useQuery<Record<string, number>>('finance_exchange_rates', undefined, {});
 
   const refetchAll = () => { rA(); rT(); };
   useEvent<{ entityKind: string }>('entity:updated', refetchAll);

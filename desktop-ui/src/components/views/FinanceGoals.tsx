@@ -8,10 +8,8 @@ import { FinanceLayout } from '../finance/FinanceLayout';
 import { Card, SectionLabel } from '../finance/Card';
 import { Donut } from '../finance/Donut';
 import type { FinanceGoal } from '../../lib/types';
-import { mockGoals } from '../../data/mockFinanceData';
-
 export function FinanceGoals() {
-  const { data: goals, refetch } = useQuery<FinanceGoal[]>('finance_goals', undefined, mockGoals);
+  const { data: goals, refetch } = useQuery<FinanceGoal[]>('finance_goals', undefined, []);
   useEvent<{ entityKind: string }>('entity:updated', refetch);
 
   const activeGoals = goals.filter(g => g.status === 'active');

@@ -7,11 +7,9 @@ import { FinanceLayout } from '../finance/FinanceLayout';
 import { Card, SectionLabel } from '../finance/Card';
 import { Donut } from '../finance/Donut';
 import type { FinanceLiability } from '../../lib/types';
-import { mockLiabilities, mockExchangeRates } from '../../data/mockFinanceData';
-
 export function FinanceLiabilities() {
-  const { data: liabilities, refetch } = useQuery<FinanceLiability[]>('finance_liabilities', undefined, mockLiabilities);
-  const { data: rates } = useQuery<Record<string, number>>('finance_exchange_rates', undefined, mockExchangeRates);
+  const { data: liabilities, refetch } = useQuery<FinanceLiability[]>('finance_liabilities', undefined, []);
+  const { data: rates } = useQuery<Record<string, number>>('finance_exchange_rates', undefined, {});
   useEvent<{ entityKind: string }>('entity:updated', refetch);
 
   const totalRemaining = useMemo(() => liabilities.reduce((s, l) => s + toVnd(l.remaining, l.currency, rates), 0), [liabilities, rates]);

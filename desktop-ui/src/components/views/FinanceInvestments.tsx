@@ -8,12 +8,10 @@ import { FinanceLayout } from '../finance/FinanceLayout';
 import { Card, SectionLabel } from '../finance/Card';
 import { Donut } from '../finance/Donut';
 import type { FinancePortfolio, FinanceInvestment } from '../../lib/types';
-import { mockPortfolios, mockInvestments, mockExchangeRates } from '../../data/mockFinanceData';
-
 export function FinanceInvestments() {
-  const { data: portfolios, refetch: rP } = useQuery<FinancePortfolio[]>('finance_portfolios', undefined, mockPortfolios);
-  const { data: investments, refetch: rI } = useQuery<FinanceInvestment[]>('finance_investments', undefined, mockInvestments);
-  const { data: rates } = useQuery<Record<string, number>>('finance_exchange_rates', undefined, mockExchangeRates);
+  const { data: portfolios, refetch: rP } = useQuery<FinancePortfolio[]>('finance_portfolios', undefined, []);
+  const { data: investments, refetch: rI } = useQuery<FinanceInvestment[]>('finance_investments', undefined, []);
+  const { data: rates } = useQuery<Record<string, number>>('finance_exchange_rates', undefined, {});
 
   const refetchAll = () => { rP(); rI(); };
   useEvent<{ entityKind: string }>('entity:updated', refetchAll);

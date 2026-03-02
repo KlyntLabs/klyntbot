@@ -27,30 +27,18 @@ import type {
   FinanceLiability,
   FinanceNetWorth,
 } from '../../lib/types';
-import {
-  mockAccounts,
-  mockTransactions,
-  mockBudgets,
-  mockPortfolios,
-  mockInvestments,
-  mockGoals,
-  mockLiabilities,
-  mockNetWorth,
-  mockExchangeRates,
-} from '../../data/mockFinanceData';
-
 export function Finance() {
   const navigate = useNavigate();
 
-  const { data: accounts, refetch: rA } = useQuery<FinanceAccount[]>('finance_accounts', undefined, mockAccounts);
-  const { data: transactions, refetch: rT } = useQuery<FinanceTransaction[]>('finance_transactions', { limit: 8 }, mockTransactions.slice(0, 8));
-  const { data: budgets, refetch: rB } = useQuery<FinanceBudgetUsage[]>('finance_budget_usage', undefined, mockBudgets);
-  const { data: portfolios, refetch: rP } = useQuery<FinancePortfolio[]>('finance_portfolios', undefined, mockPortfolios);
-  const { data: investments, refetch: rI } = useQuery<FinanceInvestment[]>('finance_investments', undefined, mockInvestments);
-  const { data: goals, refetch: rG } = useQuery<FinanceGoal[]>('finance_goals', undefined, mockGoals);
-  const { data: liabilities, refetch: rL } = useQuery<FinanceLiability[]>('finance_liabilities', undefined, mockLiabilities);
-  const { data: netWorth, refetch: rN } = useQuery<FinanceNetWorth>('finance_net_worth', undefined, mockNetWorth);
-  const { data: rates } = useQuery<Record<string, number>>('finance_exchange_rates', undefined, mockExchangeRates);
+  const { data: accounts, refetch: rA } = useQuery<FinanceAccount[]>('finance_accounts', undefined, []);
+  const { data: transactions, refetch: rT } = useQuery<FinanceTransaction[]>('finance_transactions', { limit: 8 }, []);
+  const { data: budgets, refetch: rB } = useQuery<FinanceBudgetUsage[]>('finance_budget_usage', undefined, []);
+  const { data: portfolios, refetch: rP } = useQuery<FinancePortfolio[]>('finance_portfolios', undefined, []);
+  const { data: investments, refetch: rI } = useQuery<FinanceInvestment[]>('finance_investments', undefined, []);
+  const { data: goals, refetch: rG } = useQuery<FinanceGoal[]>('finance_goals', undefined, []);
+  const { data: liabilities, refetch: rL } = useQuery<FinanceLiability[]>('finance_liabilities', undefined, []);
+  const { data: netWorth, refetch: rN } = useQuery<FinanceNetWorth>('finance_net_worth', undefined, { totalsByCurrency: [] });
+  const { data: rates } = useQuery<Record<string, number>>('finance_exchange_rates', undefined, {});
 
   const refetchAll = useCallback(() => { rA(); rT(); rB(); rP(); rI(); rG(); rL(); rN(); }, [rA, rT, rB, rP, rI, rG, rL, rN]);
   useEvent<{ entityKind: string }>('entity:updated', refetchAll);
