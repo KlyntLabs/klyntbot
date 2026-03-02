@@ -31,8 +31,8 @@ use tools_core::FeaturePackage;
 
 use super::super::confidence::ConfidenceEvaluator;
 use super::super::context_sources::{
-    BootstrapSource, ConfidenceSource, IdentitySource, MemorySource, SkillContentSource,
-    SkillSummarySource, TodoSource,
+    BootstrapSource, ConfidenceSource, IdentitySource, MemorySource, PageContextSource,
+    PersonaContextSource, SkillContentSource, SkillSummarySource, TodoSource,
 };
 use super::super::{CalendarSyncAdapter, CronHandlerAdapter, SkillManager, SubagentManager};
 use super::{AgentLoop, LastActiveChannel};
@@ -158,6 +158,12 @@ impl AgentLoopBuilder {
             crate::memory::MemoryStore::new(repos.memory_notes.clone())
         };
 
+        // Load persona manager for PersonaContextSource
+        let personas_dir = workspace.join("personas");
+        let persona_manager = Arc::new(tokio::sync::RwLock::new(
+            crate::persona::PersonaManager::load(&personas_dir).await,
+        ));
+
         let mut sources: Vec<Box<dyn ContextSource>> = vec![
             Box::new(IdentitySource::new(
                 workspace.clone(),
@@ -169,6 +175,11 @@ impl AgentLoopBuilder {
             Box::new(confidence_source),
             Box::new(SkillSummarySource::new(Arc::clone(&skill_manager))),
             Box::new(SkillContentSource::new(Arc::clone(&skill_manager))),
+            Box::new(PersonaContextSource::new(
+                Arc::clone(&persona_manager),
+                repos.session_context.clone(),
+            )),
+            Box::new(PageContextSource::new(repos.clone())),
         ];
 
         // Sort by priority (descending) — ensures correct ordering in prompt
@@ -705,16 +716,20 @@ impl AgentLoopBuilder {
             provider_name: provider.name().to_string(),
         };
 
-        let pipeline = Arc::new(
-            crate::intent_pipeline::IntentPipeline::new(
-                analyzer,
-                Arc::clone(&context_engine),
-                router,
-                cost_tracker,
-                pipeline_config,
-            )
-            .with_strategy_repo(repos.strategies.clone()),
-        );
+        let mut pipeline = crate::intent_pipeline::IntentPipeline::new(
+            analyzer,
+            Arc::clone(&context_engine),
+            router,
+            cost_tracker,
+            pipeline_config,
+        )
+        .with_strategy_repo(repos.strategies.clone());
+
+        if let Some(evaluator) = confidence_evaluator {
+            pipeline = pipeline.with_confidence_evaluator(Arc::new(evaluator));
+        }
+
+        let pipeline = Arc::new(pipeline);
 
         info!("Intent pipeline initialized");
 

@@ -49,19 +49,39 @@ impl ExecutionEngine for ReactiveEngine {
     ) -> Result<EngineResult> {
         let mut messages = messages;
         let mut scratchpad = Scratchpad::new();
-        let escalation_threshold = (self.max_iterations as f32 * 0.8).ceil() as u32;
+        // Use per-request max_iterations from params, fall back to engine default
+        let max_iterations = if params.max_iterations > 0 {
+            params.max_iterations
+        } else {
+            self.max_iterations
+        };
+        let escalation_threshold = (max_iterations as f32 * 0.8).ceil() as u32;
         let mut accumulated_usage = providers::Usage::default();
-        let mut force_retried = false;
+        let mut fabrication_retries = 0u32;
+        let max_fabrication_retries = params.max_fabrication_retries;
         let mut seen_tool_calls: HashSet<String> = HashSet::new();
         let mut last_tool_name: Option<String> = None;
         let mut completed_work: Vec<CompletedStep> = Vec::new();
 
-        for iteration in 1..=self.max_iterations {
+        for iteration in 1..=max_iterations {
+            // Check cancellation
+            if let Some(ref token) = params.cancel_token {
+                if token.is_cancelled() {
+                    return Ok(EngineResult::Complete {
+                        content: String::new(),
+                        usage: accumulated_usage,
+                        iterations: iteration - 1,
+                        traces: scratchpad.traces().to_vec(),
+                        tool_name: last_tool_name,
+                    });
+                }
+            }
+
             if let Some(ref tx) = event_tx {
                 let _ = tx
                     .send(crate::events::AgentEvent::IterationStart {
                         iteration: iteration as usize,
-                        max: self.max_iterations as usize,
+                        max: max_iterations as usize,
                     })
                     .await;
             }
@@ -100,8 +120,12 @@ impl ExecutionEngine for ReactiveEngine {
                 }
 
                 CycleOutcome::FabricatedResponse { content } => {
-                    if force_retried {
-                        debug!("ReactiveEngine: fabrication retry exhausted, returning as-is");
+                    fabrication_retries += 1;
+                    if fabrication_retries > max_fabrication_retries {
+                        debug!(
+                            "ReactiveEngine: fabrication retries exhausted ({}), returning as-is",
+                            max_fabrication_retries
+                        );
                         return Ok(EngineResult::Complete {
                             content,
                             usage: accumulated_usage,
@@ -110,8 +134,6 @@ impl ExecutionEngine for ReactiveEngine {
                             tool_name: last_tool_name,
                         });
                     }
-
-                    force_retried = true;
                     let tool_list: Vec<&str> = tools.iter().filter_map(tool_def_name).collect();
 
                     messages.push(Message::user(format!(
@@ -206,14 +228,14 @@ impl ExecutionEngine for ReactiveEngine {
                         return Ok(EngineResult::Escalate {
                             reason: format!(
                                 "Used {}% of max iterations ({}/{}), task may need planning",
-                                (iteration * 100) / self.max_iterations,
+                                (iteration * 100) / max_iterations,
                                 iteration,
-                                self.max_iterations
+                                max_iterations
                             ),
                             carried_context: EscalationContext {
                                 messages,
                                 completed_work,
-                                original_message: String::new(),
+                                original_message: params.original_message.clone(),
                             },
                             usage: accumulated_usage,
                         });
@@ -237,7 +259,7 @@ impl ExecutionEngine for ReactiveEngine {
         Ok(EngineResult::Complete {
             content: String::new(),
             usage: accumulated_usage,
-            iterations: self.max_iterations,
+            iterations: max_iterations,
             traces: scratchpad.traces().to_vec(),
             tool_name: last_tool_name,
         })
@@ -372,6 +394,76 @@ mod tests {
                 assert_eq!(traces[1].actual_action, "tools_executed");
             }
             EngineResult::Escalate { .. } => panic!("Expected Complete"),
+        }
+    }
+
+    #[tokio::test]
+    async fn respects_per_request_max_iterations() {
+        // max_iterations=3 in params, engine default is 10
+        let responses: Vec<_> = (0..10).map(|_| tool_call_response("ok_tool")).collect();
+        let provider = MockSequenceProvider::new(responses);
+        let core = Arc::new(ExecutionCore::new(provider, registry_with_ok_tool()));
+        let engine = ReactiveEngine::new(core, 10); // default 10
+
+        let params = default_params().with_max_iterations(3);
+        let result = engine
+            .execute(
+                vec![Message::user("short task")],
+                &[],
+                &params,
+                &routing_ctx(),
+                None,
+            )
+            .await
+            .unwrap();
+
+        match result {
+            EngineResult::Escalate { reason, .. } => {
+                assert!(
+                    reason.contains("3"),
+                    "reason should reference 3 iterations: {}",
+                    reason
+                );
+            }
+            EngineResult::Complete { iterations, .. } => {
+                assert!(iterations <= 3, "should not exceed 3 iterations");
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn checks_cancel_token() {
+        let token = tokio_util::sync::CancellationToken::new();
+        token.cancel(); // pre-cancel
+
+        let provider = MockSequenceProvider::new(vec![tool_call_response("ok_tool")]);
+        let core = Arc::new(ExecutionCore::new(provider, registry_with_ok_tool()));
+        let engine = ReactiveEngine::new(core, 10);
+
+        let params = default_params().with_cancel_token(token);
+        let result = engine
+            .execute(
+                vec![Message::user("test")],
+                &[],
+                &params,
+                &routing_ctx(),
+                None,
+            )
+            .await
+            .unwrap();
+
+        // Should return early due to cancellation
+        if let EngineResult::Complete {
+            content,
+            iterations,
+            ..
+        } = result
+        {
+            assert!(
+                content.is_empty() || content.contains("cancelled"),
+                "content should be empty or mention cancelled"
+            );
+            assert_eq!(iterations, 0, "should not have completed any iterations");
         }
     }
 

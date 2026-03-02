@@ -46,7 +46,7 @@ pub struct PipelineConfig {
     pub context_window: usize,
     /// Maximum response tokens for validation.
     pub max_response_tokens: usize,
-    /// Channel name for cost tracking.
+    /// Default channel name (overridden per-request by RoutingContext).
     pub channel: String,
     /// Provider name for cost tracking.
     pub provider_name: String,
@@ -75,6 +75,7 @@ pub struct IntentPipeline {
     cost_tracker: Arc<CostTracker>,
     config: PipelineConfig,
     strategy_repo: Option<storage::StrategyRepo>,
+    confidence_evaluator: Option<Arc<crate::confidence::ConfidenceEvaluator>>,
 }
 
 impl IntentPipeline {
@@ -93,12 +94,22 @@ impl IntentPipeline {
             cost_tracker,
             config,
             strategy_repo: None,
+            confidence_evaluator: None,
         }
     }
 
     /// Attach a strategy repository for recording execution outcomes.
     pub fn with_strategy_repo(mut self, repo: storage::StrategyRepo) -> Self {
         self.strategy_repo = Some(repo);
+        self
+    }
+
+    /// Attach a confidence evaluator for low-confidence clarification.
+    pub fn with_confidence_evaluator(
+        mut self,
+        evaluator: Arc<crate::confidence::ConfidenceEvaluator>,
+    ) -> Self {
+        self.confidence_evaluator = Some(evaluator);
         self
     }
 
@@ -121,6 +132,7 @@ impl IntentPipeline {
         ctx: &RoutingContext,
         system_prompt: Option<&str>,
         event_tx: Option<tokio::sync::mpsc::Sender<AgentEvent>>,
+        cancel_token: Option<tokio_util::sync::CancellationToken>,
     ) -> Result<PipelineResult> {
         let pipeline_start = Instant::now();
 
@@ -142,6 +154,34 @@ impl IntentPipeline {
                     duration_ms: classify_ms,
                 })
                 .await;
+        }
+
+        // Step 1.5: Confidence check — ask for clarification if confidence is too low
+        if let Some(ref evaluator) = self.confidence_evaluator {
+            let threshold = evaluator.threshold();
+            if analysis.confidence < threshold {
+                debug!(
+                    "IntentPipeline: low confidence ({:.2} < {:.2}), suggesting clarification",
+                    analysis.confidence, threshold
+                );
+                let content = format!(
+                    "I'm not entirely sure what you'd like me to do. Could you clarify? \
+                     I interpreted this as a {} request (confidence: {:.0}%).",
+                    analysis.mode.short_name(),
+                    analysis.confidence * 100.0
+                );
+                return Ok(PipelineResult {
+                    content,
+                    mode_used: "clarification".to_string(),
+                    classification: analysis,
+                    escalations: 0,
+                    validation: ValidationResult {
+                        is_valid: true,
+                        warnings: vec![],
+                        filtered_content: String::new(),
+                    },
+                });
+            }
         }
 
         // Step 2: Assemble context
@@ -210,7 +250,14 @@ impl IntentPipeline {
                 .await;
         }
 
-        let params = ExecutionParams::new(&self.config.execution_model);
+        let mut params = ExecutionParams::new(&self.config.execution_model)
+            .with_max_iterations(analysis.mode.max_iterations())
+            .with_original_message(message.to_string());
+
+        // Transfer cancel token if present
+        if let Some(token) = cancel_token {
+            params = params.with_cancel_token(token);
+        }
 
         // On escalation the router may need all tools, so keep the full set available
         let router_result = self
@@ -306,7 +353,7 @@ impl IntentPipeline {
             tool_name: result.tool_name.clone(),
             tool_success: result.tool_name.as_ref().map(|_| validation.is_valid),
             tool_duration_ms: result.tool_name.as_ref().map(|_| elapsed_ms),
-            complexity_signals: serde_json::Value::Null,
+            complexity_signals: serde_json::to_value(&analysis.signals).unwrap_or_default(),
             execution_mode: Some(result.final_mode.clone()),
         };
 
@@ -425,7 +472,7 @@ mod tests {
         let pipeline = make_pipeline(provider).await;
 
         let result = pipeline
-            .process_message("hello", vec![], &[], &[], &routing_ctx(), None, None)
+            .process_message("hello", vec![], &[], &[], &routing_ctx(), None, None, None)
             .await
             .unwrap();
 
@@ -449,6 +496,7 @@ mod tests {
                 &routing_ctx(),
                 None,
                 None,
+                None,
             )
             .await
             .unwrap();
@@ -469,7 +517,7 @@ mod tests {
         let pipeline = make_pipeline(provider).await;
 
         let result = pipeline
-            .process_message("hi", vec![], &[], &[], &routing_ctx(), None, None)
+            .process_message("hi", vec![], &[], &[], &routing_ctx(), None, None, None)
             .await
             .unwrap();
 
@@ -507,7 +555,7 @@ mod tests {
         .with_strategy_repo(repos.strategies.clone());
 
         let result = pipeline
-            .process_message("hello", vec![], &[], &[], &routing_ctx(), None, None)
+            .process_message("hello", vec![], &[], &[], &routing_ctx(), None, None, None)
             .await
             .unwrap();
 
@@ -542,6 +590,7 @@ mod tests {
                 &routing_ctx(),
                 None,
                 Some(event_tx),
+                None,
             )
             .await
             .unwrap();
@@ -556,5 +605,47 @@ mod tests {
             found_classification,
             "Expected ClassificationComplete event"
         );
+    }
+
+    #[tokio::test]
+    async fn pipeline_returns_clarification_on_low_confidence() {
+        let provider = MockPipelineProvider::new(vec![text_response("should not reach this")]);
+        let mut pipeline = make_pipeline(provider).await;
+
+        // Set a very high threshold so the heuristic classifier's confidence (typically 0.85)
+        // falls below it, triggering the clarification path
+        let evaluator = crate::confidence::ConfidenceEvaluator::new(0.99);
+        pipeline = pipeline.with_confidence_evaluator(Arc::new(evaluator));
+
+        let result = pipeline
+            .process_message("hello", vec![], &[], &[], &routing_ctx(), None, None, None)
+            .await
+            .unwrap();
+
+        assert_eq!(result.mode_used, "clarification");
+        assert!(
+            result.content.contains("clarify"),
+            "Should ask for clarification: {}",
+            result.content
+        );
+    }
+
+    #[tokio::test]
+    async fn pipeline_proceeds_when_confidence_above_threshold() {
+        let provider = MockPipelineProvider::new(vec![text_response("Hello!")]);
+        let mut pipeline = make_pipeline(provider).await;
+
+        // Set a low threshold so heuristic confidence passes
+        let evaluator = crate::confidence::ConfidenceEvaluator::new(0.1);
+        pipeline = pipeline.with_confidence_evaluator(Arc::new(evaluator));
+
+        let result = pipeline
+            .process_message("hello", vec![], &[], &[], &routing_ctx(), None, None, None)
+            .await
+            .unwrap();
+
+        // Should proceed normally, not return clarification
+        assert_ne!(result.mode_used, "clarification");
+        assert_eq!(result.content, "Hello!");
     }
 }

@@ -10,13 +10,17 @@ use futures_util::StreamExt;
 use tokio::sync::RwLock;
 
 use common::{utils::tool_def_name, Result};
+use context_engine::TokenCounter;
 use providers::{tool_calls_to_messages, DynProvider, Message};
-use tools::{registry::ToolRegistry, RoutingContext};
+use tools::{ask_user::ASK_USER_TOOL_NAME, registry::ToolRegistry, RoutingContext};
 use tracing::debug;
 
 use providers::Usage;
 
 use crate::execution::types::{CycleOutcome, ExecutionParams, ToolExecutionResult};
+
+/// Extended timeout for interactive tools that wait on user input.
+const INTERACTIVE_TOOL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(600);
 
 /// Hash a `serde_json::Value` without serializing to a string.
 ///
@@ -145,8 +149,8 @@ struct PartialToolCall {
 /// Consumes the stream and returns an `LlmResponse` equivalent to `provider.chat()`,
 /// but with real-time content chunks sent to the UI as they arrive.
 ///
-/// NOTE: `usage` is returned as `Usage::default()` because `LlmStreamChunk` does
-/// not yet carry token counts. Cost tracking for streaming calls is a known gap.
+/// Token usage is estimated from text length using a model-specific chars-per-token
+/// ratio, since `LlmStreamChunk` does not carry token counts.
 async fn call_provider_streaming(
     provider: &dyn providers::LlmProvider,
     messages: &[Message],
@@ -219,6 +223,39 @@ async fn call_provider_streaming(
         })
         .collect();
 
+    // Estimate token usage since streaming chunks don't carry counts.
+    // Reuses context_engine::CharTokenCounter (4 chars ≈ 1 token) to stay
+    // consistent with the rest of the token estimation pipeline.
+    let counter = context_engine::CharTokenCounter;
+    let estimated_input: u32 = messages
+        .iter()
+        .map(|m| match m {
+            Message::System { content } => counter.estimate_text(content),
+            Message::User { content } => match content {
+                providers::UserContent::Text(t) => counter.estimate_text(t),
+                providers::UserContent::MultiPart(parts) => parts
+                    .iter()
+                    .map(|p| match p {
+                        providers::ContentPart::Text { text } => counter.estimate_text(text),
+                        _ => 0,
+                    })
+                    .sum(),
+            },
+            Message::Assistant {
+                content,
+                reasoning_content,
+                ..
+            } => {
+                content.as_deref().map_or(0, |c| counter.estimate_text(c))
+                    + reasoning_content
+                        .as_deref()
+                        .map_or(0, |r| counter.estimate_text(r))
+            }
+            Message::Tool { content, .. } => counter.estimate_text(content),
+        })
+        .sum::<usize>() as u32;
+    let estimated_output = counter.estimate_text(&content) as u32;
+
     Ok(providers::LlmResponse {
         content: if content.is_empty() {
             None
@@ -227,7 +264,13 @@ async fn call_provider_streaming(
         },
         tool_calls,
         finish_reason,
-        usage: Usage::default(),
+        usage: Usage {
+            prompt_tokens: estimated_input,
+            completion_tokens: estimated_output,
+            total_tokens: estimated_input + estimated_output,
+            cache_read_tokens: 0,
+            cache_write_tokens: 0,
+        },
         reasoning_content: if reasoning.is_empty() {
             None
         } else {
@@ -384,7 +427,11 @@ impl ExecutionCore {
                     let mut ctx = routing_ctx.clone();
                     ctx.entity_tx = Some(entity_tx.clone());
                     let id = tc.id.clone();
-                    let timeout_dur = params.tool_timeout;
+                    let timeout_dur = if name == ASK_USER_TOOL_NAME {
+                        INTERACTIVE_TOOL_TIMEOUT
+                    } else {
+                        params.tool_timeout
+                    };
                     let tx = event_tx.cloned();
 
                     async move {

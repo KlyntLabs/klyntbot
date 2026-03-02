@@ -84,7 +84,8 @@ impl AgentLoop {
         };
 
         if let Some(ref strategy_repo) = self.strategy_repo {
-            let since = chrono::Utc::now() - chrono::Duration::minutes(5);
+            let window_minutes = self.config.orchestrator.satisfaction_window_minutes as i64;
+            let since = chrono::Utc::now() - chrono::Duration::minutes(window_minutes);
             match strategy_repo
                 .set_satisfaction_for_chat(msg.chat_id.as_str(), since, score)
                 .await
@@ -213,7 +214,18 @@ impl AgentLoop {
         // Validate message size
         if let Err(e) = msg.validate() {
             warn!("Message validation failed: {}", e);
-            return Ok(()); // silently drop oversized messages
+            let error_msg = OutboundMessage::new(
+                msg.channel.clone(),
+                msg.chat_id.clone(),
+                format!(
+                    "Message too large to process: {}. Please shorten and try again.",
+                    e
+                ),
+            );
+            if let Err(send_err) = self.bus.publish_outbound(error_msg).await {
+                warn!("Failed to send validation error: {}", send_err);
+            }
+            return Ok(());
         }
 
         // Handle reaction messages — update satisfaction, no LLM call
@@ -267,7 +279,7 @@ impl AgentLoop {
         // Run through pipeline
         let routing_ctx = RoutingContext::new(msg.channel.clone(), msg.chat_id.clone());
         let response_content = self
-            .run_pipeline(&msg.content, history, &routing_ctx, None)
+            .run_pipeline(&msg.content, history, &routing_ctx, None, None)
             .await?;
 
         // Save assistant response to session
@@ -322,7 +334,7 @@ impl AgentLoop {
         // Run through pipeline
         let routing_ctx = RoutingContext::new(origin_channel.into(), origin_chat_id.into());
         let response_content = self
-            .run_pipeline(&system_msg_content, history, &routing_ctx, None)
+            .run_pipeline(&system_msg_content, history, &routing_ctx, None, None)
             .await?;
 
         // Save assistant response to session
@@ -443,6 +455,7 @@ impl AgentLoop {
         history: Vec<session::SessionMessage>,
         routing_ctx: &RoutingContext,
         event_tx: Option<tokio::sync::mpsc::Sender<AgentEvent>>,
+        cancel_token: Option<CancellationToken>,
     ) -> Result<String> {
         let system_prompt = self
             .context_engine
@@ -467,6 +480,7 @@ impl AgentLoop {
                 routing_ctx,
                 Some(&system_prompt),
                 event_tx,
+                cancel_token,
             )
             .await?;
 
@@ -517,7 +531,7 @@ impl AgentLoop {
         // Run through pipeline
         let routing_ctx = RoutingContext::new("cli".into(), session_key.clone().into());
         let response_content = self
-            .run_pipeline(&content, history, &routing_ctx, None)
+            .run_pipeline(&content, history, &routing_ctx, None, None)
             .await?;
 
         // Save to session
@@ -554,6 +568,7 @@ impl AgentLoop {
         );
 
         let cancel_token = CancellationToken::new();
+        let cancel_clone = cancel_token.clone();
 
         // Clone Arcs for the spawned task
         let agent = Arc::clone(self);
@@ -562,7 +577,13 @@ impl AgentLoop {
         let handle = tokio::spawn(async move {
             let pipeline_event_tx = event_tx.clone();
             let result = match agent
-                .run_pipeline(&content, history, &routing_ctx, Some(pipeline_event_tx))
+                .run_pipeline(
+                    &content,
+                    history,
+                    &routing_ctx,
+                    Some(pipeline_event_tx),
+                    Some(cancel_clone),
+                )
                 .await
             {
                 Ok(response) => {

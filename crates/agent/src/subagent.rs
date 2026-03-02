@@ -51,6 +51,16 @@ impl FromStr for SubagentProfile {
     }
 }
 
+impl std::fmt::Display for SubagentProfile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::General => f.write_str("general"),
+            Self::Research => f.write_str("research"),
+            Self::Analyst => f.write_str("analyst"),
+        }
+    }
+}
+
 impl SubagentProfile {
     /// Maximum iteration count for this profile.
     pub fn max_iterations(&self) -> u32 {
@@ -75,7 +85,6 @@ impl SubagentProfile {
 struct SubagentHandle {
     cancel_token: CancellationToken,
     label: String,
-    #[allow(dead_code)]
     profile: SubagentProfile,
     spawned_at: std::time::Instant,
 }
@@ -352,9 +361,10 @@ impl SubagentManager {
         for (id, handle) in handles.iter() {
             let elapsed = handle.spawned_at.elapsed();
             lines.push(format!(
-                "  {} — '{}' (running for {}s)",
+                "  {} — '{}' [{}] (running for {}s)",
                 id,
                 handle.label,
+                handle.profile,
                 elapsed.as_secs()
             ));
         }

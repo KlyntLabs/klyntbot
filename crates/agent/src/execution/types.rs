@@ -9,6 +9,14 @@ use providers::{ChatParams, Usage};
 pub struct ExecutionParams {
     pub tool_timeout: Duration,
     pub chat_params: ChatParams,
+    /// Per-request max iterations (overrides engine default).
+    pub max_iterations: u32,
+    /// Max fabrication retries before returning fabricated content as-is.
+    pub max_fabrication_retries: u32,
+    /// Cancellation token for aborting the execution loop.
+    pub cancel_token: Option<tokio_util::sync::CancellationToken>,
+    /// The original user message that triggered this execution.
+    pub original_message: String,
 }
 
 impl ExecutionParams {
@@ -16,11 +24,35 @@ impl ExecutionParams {
         Self {
             tool_timeout: Duration::from_secs(30),
             chat_params: ChatParams::new(model),
+            max_iterations: 10,
+            max_fabrication_retries: 2,
+            cancel_token: None,
+            original_message: String::new(),
         }
     }
 
     pub fn with_timeout(mut self, dur: Duration) -> Self {
         self.tool_timeout = dur;
+        self
+    }
+
+    pub fn with_max_iterations(mut self, max: u32) -> Self {
+        self.max_iterations = max;
+        self
+    }
+
+    pub fn with_max_fabrication_retries(mut self, max: u32) -> Self {
+        self.max_fabrication_retries = max;
+        self
+    }
+
+    pub fn with_cancel_token(mut self, token: tokio_util::sync::CancellationToken) -> Self {
+        self.cancel_token = Some(token);
+        self
+    }
+
+    pub fn with_original_message(mut self, msg: String) -> Self {
+        self.original_message = msg;
         self
     }
 }
@@ -56,4 +88,36 @@ pub fn accumulate_usage(total: &mut Usage, cycle: &Usage) {
     total.total_tokens += cycle.total_tokens;
     total.cache_read_tokens += cycle.cache_read_tokens;
     total.cache_write_tokens += cycle.cache_write_tokens;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn execution_params_has_per_request_fields() {
+        let params = ExecutionParams::new("mock")
+            .with_max_iterations(5)
+            .with_max_fabrication_retries(3)
+            .with_original_message("hello".to_string());
+        assert_eq!(params.max_iterations, 5);
+        assert_eq!(params.max_fabrication_retries, 3);
+        assert_eq!(params.original_message, "hello");
+        assert!(params.cancel_token.is_none());
+    }
+
+    #[test]
+    fn execution_params_with_cancel_token() {
+        let token = tokio_util::sync::CancellationToken::new();
+        let params = ExecutionParams::new("mock").with_cancel_token(token.clone());
+        assert!(params.cancel_token.is_some());
+    }
+
+    #[test]
+    fn execution_params_defaults() {
+        let params = ExecutionParams::new("mock");
+        assert_eq!(params.max_iterations, 10);
+        assert_eq!(params.max_fabrication_retries, 2);
+        assert!(params.original_message.is_empty());
+    }
 }

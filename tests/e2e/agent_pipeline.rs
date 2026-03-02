@@ -55,7 +55,7 @@ async fn direct_greeting_responds() {
     let pipeline = make_pipeline(provider).await;
 
     let result = pipeline
-        .process_message("hello", vec![], &[], &[], &routing_ctx(), None, None)
+        .process_message("hello", vec![], &[], &[], &routing_ctx(), None, None, None)
         .await
         .unwrap();
 
@@ -83,6 +83,7 @@ async fn reactive_executes_tool_call() {
             &[],
             &[],
             &routing_ctx(),
+            None,
             None,
             None,
         )
@@ -114,6 +115,7 @@ async fn autonomous_task_completes() {
             &[],
             &[],
             &routing_ctx(),
+            None,
             None,
             None,
         )
@@ -149,6 +151,7 @@ async fn context_budget_handles_large_history() {
             &routing_ctx(),
             None,
             None,
+            None,
         )
         .await
         .unwrap();
@@ -164,7 +167,7 @@ async fn greeting_routes_directly() {
     let pipeline = make_pipeline(provider).await;
 
     let result = pipeline
-        .process_message("hey there", vec![], &[], &[], &routing_ctx(), None, None)
+        .process_message("hey there", vec![], &[], &[], &routing_ctx(), None, None, None)
         .await
         .unwrap();
 
@@ -188,6 +191,7 @@ async fn search_routes_as_reactive() {
             &[],
             &[],
             &routing_ctx(),
+            None,
             None,
             None,
         )
@@ -214,6 +218,7 @@ async fn complex_request_triggers_reactive() {
             &[],
             &[],
             &routing_ctx(),
+            None,
             None,
             None,
         )

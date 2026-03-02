@@ -53,7 +53,7 @@ impl ExecutionEngine for DirectEngine {
                     carried_context: EscalationContext {
                         messages,
                         completed_work: vec![],
-                        original_message: String::new(),
+                        original_message: params.original_message.clone(),
                     },
                     usage,
                 })

@@ -54,6 +54,49 @@ pub struct RouterResult {
     pub iterations: u32,
     /// Name of the last tool called. None if no tools called.
     pub tool_name: Option<String>,
+    /// Reasoning traces from engine execution.
+    pub traces: Vec<crate::execution::ReasoningTrace>,
+}
+
+/// Format completed work steps into a user-facing summary.
+///
+/// Returns an empty string if no work was completed, otherwise a formatted
+/// list prefixed with a header.
+fn format_work_summary(completed_work: &[CompletedStep]) -> String {
+    if completed_work.is_empty() {
+        return String::new();
+    }
+    let steps: Vec<String> = completed_work
+        .iter()
+        .map(|s| format!("- {}: {}", s.tool_name, s.description))
+        .collect();
+    format!(
+        "\n\nHere's what I was able to accomplish:\n{}",
+        steps.join("\n")
+    )
+}
+
+/// Build a graceful incomplete-task response with optional work summary.
+fn incomplete_result(
+    mode: &str,
+    escalation_count: u32,
+    usage: Usage,
+    completed_work: &[CompletedStep],
+) -> RouterResult {
+    RouterResult {
+        content: format!(
+            "I made progress on your request but wasn't able to fully \
+             complete it. The task may need to be broken into smaller \
+             steps.{}",
+            format_work_summary(completed_work)
+        ),
+        final_mode: mode.to_string(),
+        escalation_count,
+        usage,
+        iterations: 0,
+        tool_name: None,
+        traces: vec![],
+    }
 }
 
 /// Dispatches execution to the appropriate engine based on `ExecutionMode`,
@@ -119,7 +162,7 @@ impl ExecutionRouter {
                     usage,
                     iterations,
                     tool_name,
-                    ..
+                    traces,
                 } => {
                     return Ok(RouterResult {
                         content,
@@ -128,6 +171,7 @@ impl ExecutionRouter {
                         usage,
                         iterations,
                         tool_name,
+                        traces,
                     });
                 }
                 EngineResult::Escalate {
@@ -142,17 +186,12 @@ impl ExecutionRouter {
                             "ExecutionRouter: max escalations ({}) reached, returning last context",
                             self.max_escalations
                         );
-                        return Ok(RouterResult {
-                            content: format!(
-                                "Task exceeded maximum escalation limit ({}). Last reason: {}",
-                                self.max_escalations, reason
-                            ),
-                            final_mode: current_mode.to_string(),
+                        return Ok(incomplete_result(
+                            current_mode,
                             escalation_count,
-                            usage: escalation_usage,
-                            iterations: 0,
-                            tool_name: None,
-                        });
+                            escalation_usage,
+                            &carried_context.completed_work,
+                        ));
                     }
 
                     debug!(
@@ -177,22 +216,17 @@ impl ExecutionRouter {
                                 .await?;
                         }
                         _ => {
-                            // Reactive — no further escalation possible
+                            // Reactive — no further escalation possible.
                             warn!(
                                 "ExecutionRouter: cannot escalate beyond {} mode",
                                 current_mode
                             );
-                            return Ok(RouterResult {
-                                content: format!(
-                                    "Task could not be completed in {} mode. Reason: {}",
-                                    current_mode, reason
-                                ),
-                                final_mode: current_mode.to_string(),
+                            return Ok(incomplete_result(
+                                current_mode,
                                 escalation_count,
-                                usage: escalation_usage,
-                                iterations: 0,
-                                tool_name: None,
-                            });
+                                escalation_usage,
+                                &carried_context.completed_work,
+                            ));
                         }
                     }
                 }
@@ -478,12 +512,14 @@ mod tests {
         let reactive = ReactiveEngine::new(core, 5);
         let router = ExecutionRouter::new(direct, reactive, 1);
 
+        // Per-request params must match engine's intended max_iterations=5
+        let params = default_params().with_max_iterations(5);
         let result = router
             .execute(
                 ExecutionMode::Direct,
                 vec![Message::user("complex task")],
                 &[],
-                &default_params(),
+                &params,
                 &routing_ctx(),
                 None,
             )
@@ -497,8 +533,59 @@ mod tests {
         );
         assert!(
             result.content.contains("exceeded")
-                || result.content.contains("could not be completed"),
+                || result.content.contains("could not be completed")
+                || result.content.contains("progress"),
             "should indicate limit reached: {}",
+            result.content
+        );
+    }
+
+    #[tokio::test]
+    async fn graceful_degradation_message_is_user_friendly() {
+        // Provider always returns tool calls → Direct escalates, Reactive exhausts
+        let responses: Vec<_> = (0..20)
+            .map(|i| LlmResponse {
+                content: None,
+                tool_calls: vec![ToolCall {
+                    id: format!("c{}", i),
+                    name: format!("tool{}", i % 3),
+                    arguments: serde_json::json!({}),
+                }],
+                finish_reason: "tool_calls".to_string(),
+                usage: Usage::default(),
+                reasoning_content: None,
+            })
+            .collect();
+
+        let provider = SequenceProvider::new(responses);
+        let registry = make_registry();
+        let core = Arc::new(ExecutionCore::new(provider, registry));
+        let direct = DirectEngine::new(core.clone());
+        let reactive = ReactiveEngine::new(core, 5);
+        let router = ExecutionRouter::new(direct, reactive, 1);
+
+        let params = default_params().with_max_iterations(5);
+        let result = router
+            .execute(
+                ExecutionMode::Direct,
+                vec![Message::user("do complex thing")],
+                &[],
+                &params,
+                &routing_ctx(),
+                None,
+            )
+            .await
+            .unwrap();
+
+        // Should have a user-friendly message, not raw "Task could not be completed..."
+        assert!(
+            !result.content.contains("Task could not be completed"),
+            "Should have graceful message: {}",
+            result.content
+        );
+        assert!(
+            result.content.contains("progress"),
+            "Should mention progress: {}",
             result.content
         );
     }

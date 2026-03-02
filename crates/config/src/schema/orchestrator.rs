@@ -21,6 +21,14 @@ pub struct OrchestratorConfig {
     /// Maximum number of escalations per request (Direct → Reactive)
     #[serde(default = "default_max_escalations")]
     pub max_escalations: u32,
+
+    /// Maximum fabrication retries before accepting fabricated content (default: 2)
+    #[serde(default = "default_max_fabrication_retries")]
+    pub max_fabrication_retries: u32,
+
+    /// Reaction satisfaction window in minutes (default: 15)
+    #[serde(default = "default_satisfaction_window_minutes")]
+    pub satisfaction_window_minutes: u64,
 }
 
 fn default_heuristic_threshold() -> f32 {
@@ -32,6 +40,12 @@ fn default_classifier_timeout() -> u64 {
 fn default_max_escalations() -> u32 {
     1
 }
+fn default_max_fabrication_retries() -> u32 {
+    2
+}
+fn default_satisfaction_window_minutes() -> u64 {
+    15
+}
 
 impl Default for OrchestratorConfig {
     fn default() -> Self {
@@ -40,6 +54,8 @@ impl Default for OrchestratorConfig {
             llm_classifier_timeout: default_classifier_timeout(),
             llm_classifier_model: None,
             max_escalations: default_max_escalations(),
+            max_fabrication_retries: default_max_fabrication_retries(),
+            satisfaction_window_minutes: default_satisfaction_window_minutes(),
         }
     }
 }
@@ -55,6 +71,8 @@ mod tests {
         assert_eq!(config.llm_classifier_timeout, 2000);
         assert_eq!(config.llm_classifier_model, None);
         assert_eq!(config.max_escalations, 1);
+        assert_eq!(config.max_fabrication_retries, 2);
+        assert_eq!(config.satisfaction_window_minutes, 15);
     }
 
     #[test]
@@ -64,6 +82,8 @@ mod tests {
             llm_classifier_timeout: 5000,
             llm_classifier_model: Some("fast-model".to_string()),
             max_escalations: 2,
+            max_fabrication_retries: 5,
+            satisfaction_window_minutes: 30,
         };
         let json = serde_json::to_string(&config).unwrap();
         let loaded: OrchestratorConfig = serde_json::from_str(&json).unwrap();
@@ -71,6 +91,8 @@ mod tests {
         assert_eq!(loaded.llm_classifier_timeout, 5000);
         assert_eq!(loaded.llm_classifier_model.as_deref(), Some("fast-model"));
         assert_eq!(loaded.max_escalations, 2);
+        assert_eq!(loaded.max_fabrication_retries, 5);
+        assert_eq!(loaded.satisfaction_window_minutes, 30);
     }
 
     #[test]
