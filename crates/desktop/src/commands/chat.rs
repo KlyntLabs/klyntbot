@@ -6,6 +6,7 @@ use agent::AgentEvent;
 use desktop_shared::commands::{ChatMessageResponse, ChatThreadResponse, SessionContextInput};
 use desktop_shared::events::*;
 use tauri::{Emitter, State};
+use tokio_util::sync::CancellationToken;
 
 use crate::app_core::AppCore;
 
@@ -135,6 +136,21 @@ pub async fn chat_send(
     let mut event_rx = streaming_handle.event_rx;
 
     tokio::spawn(async move {
+        // Guard ensures active_streams cleanup even on panic
+        struct StreamGuard {
+            key: String,
+            streams: Arc<dashmap::DashMap<String, CancellationToken>>,
+        }
+        impl Drop for StreamGuard {
+            fn drop(&mut self) {
+                self.streams.remove(&self.key);
+            }
+        }
+        let _guard = StreamGuard {
+            key: sk.clone(),
+            streams: Arc::clone(&active_streams),
+        };
+
         while let Some(event) = event_rx.recv().await {
             match event {
                 AgentEvent::ContentChunk { data } => {
@@ -172,16 +188,14 @@ pub async fn chat_send(
                         AGENT_ENTITY_CREATED,
                         EntityCreatedPayload {
                             session_key: sk.clone(),
-                            entity_kind: card.entity_type.clone(),
+                            entity_type: card.entity_type.clone(),
                             entity_id: card.entity_id.clone(),
                         },
                     );
-                    // Also emit entity:updated for UI refetch
-                    super::emit_entity_updated(
-                        &app,
-                        desktop_shared::types::EntityKind::from_str(&card.entity_type),
-                        &card.entity_id,
-                    );
+                    // Also emit entity:updated for UI refetch (skip unknown kinds)
+                    if let Some(kind) = desktop_shared::types::EntityKind::parse(&card.entity_type) {
+                        super::emit_entity_updated(&app, kind, &card.entity_id);
+                    }
                 }
                 AgentEvent::Done { content } => {
                     let _ = app.emit(
@@ -207,8 +221,6 @@ pub async fn chat_send(
                 _ => {}
             }
         }
-
-        active_streams.remove(&sk);
     });
 
     // 7. Return user message immediately (streaming handles the AI response)

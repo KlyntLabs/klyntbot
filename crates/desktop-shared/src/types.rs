@@ -55,15 +55,15 @@ pub enum EntityKind {
 }
 
 impl EntityKind {
-    /// Parse from a string (case-insensitive). Defaults to Task for unknown kinds.
-    pub fn from_str(s: &str) -> Self {
+    /// Parse from a string (case-insensitive). Returns None for unknown kinds.
+    pub fn parse(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
-            "task" | "action" => Self::Task,
-            "project" => Self::Project,
-            "objective" => Self::Objective,
-            "area" => Self::Area,
-            "key_result" | "keyresult" => Self::KeyResult,
-            _ => Self::Task,
+            "task" | "action" => Some(Self::Task),
+            "project" => Some(Self::Project),
+            "objective" => Some(Self::Objective),
+            "area" => Some(Self::Area),
+            "key_result" | "keyresult" => Some(Self::KeyResult),
+            _ => None,
         }
     }
 }

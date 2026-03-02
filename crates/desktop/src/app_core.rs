@@ -3,7 +3,6 @@
 //! Mirrors the initialization sequence from `cli/src/serve.rs` but adapted for
 //! the Tauri desktop lifecycle.
 
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use agent::{AgentLoop, PersonaManager};
@@ -179,7 +178,7 @@ impl AppCore {
     /// Graceful shutdown.
     pub async fn shutdown(&self) {
         info!("shutting down app core");
-        self.agent.shutdown_flag().store(false, Ordering::SeqCst);
+        self.agent.stop().await;
         self.shutdown_token.cancel();
         self.cron_service.stop().await;
         info!("app core stopped");

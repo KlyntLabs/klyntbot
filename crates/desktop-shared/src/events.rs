@@ -50,7 +50,8 @@ pub struct AgentErrorPayload {
 #[serde(rename_all = "camelCase")]
 pub struct EntityCreatedPayload {
     pub session_key: String,
-    pub entity_kind: String,
+    /// Raw entity type string from the agent (may not map to a known EntityKind).
+    pub entity_type: String,
     pub entity_id: String,
 }
 
