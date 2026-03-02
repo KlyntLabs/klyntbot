@@ -1,12 +1,13 @@
 //! Chat commands — wired to AgentLoop with streaming events.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use agent::AgentEvent;
+use common::EntityCard;
 use desktop_shared::commands::{ChatMessageResponse, ChatThreadResponse, SessionContextInput};
 use desktop_shared::events::*;
-use storage::ProjectFilter;
+use storage::{ProjectFilter, Repos};
 use tauri::{Emitter, State};
 use tokio_util::sync::CancellationToken;
 
@@ -172,6 +173,8 @@ pub async fn chat_send(
     // 6. Spawn background task to relay AgentEvents → Tauri events
     let sk = session_key.clone();
     let active_streams = Arc::clone(&state.active_streams);
+    let repos = state.repos.clone();
+    let has_context = context.is_some();
     let mut event_rx = streaming_handle.event_rx;
 
     tokio::spawn(async move {
@@ -190,6 +193,10 @@ pub async fn chat_send(
             streams: Arc::clone(&active_streams),
         };
 
+        // Collect signals for auto-detection
+        let mut tool_names: Vec<String> = Vec::new();
+        let mut entity_cards: Vec<common::EntityCard> = Vec::new();
+
         while let Some(event) = event_rx.recv().await {
             match event {
                 AgentEvent::ContentChunk { data } => {
@@ -202,6 +209,7 @@ pub async fn chat_send(
                     );
                 }
                 AgentEvent::ToolStart { name, .. } => {
+                    tool_names.push(name.clone());
                     let _ = app.emit(
                         AGENT_TOOL_START,
                         ToolStartPayload {
@@ -235,6 +243,7 @@ pub async fn chat_send(
                     if let Some(kind) = desktop_shared::types::EntityKind::parse(&card.entity_type) {
                         super::emit_entity_updated(&app, kind, &card.entity_id);
                     }
+                    entity_cards.push(card);
                 }
                 AgentEvent::Done { content } => {
                     let _ = app.emit(
@@ -258,6 +267,13 @@ pub async fn chat_send(
                 }
                 // Other events (IterationStart, ClassificationComplete, etc.) are internal
                 _ => {}
+            }
+        }
+
+        // Auto-detect session context from tool usage (only if not already set)
+        if !has_context {
+            if let Err(e) = auto_detect_context(&repos, &sk, &tool_names, &entity_cards).await {
+                tracing::debug!("auto-detect context skipped for {sk}: {e}");
             }
         }
     });
@@ -294,4 +310,119 @@ pub async fn chat_cancel(
         token.cancel();
     }
     Ok(())
+}
+
+// ── Auto-detection helpers ──────────────────────────────────────────────
+
+/// Map a tool name to its domain category.
+fn tool_domain(tool_name: &str) -> Option<&'static str> {
+    match tool_name {
+        "todo" => Some("task"),
+        "project" => Some("project"),
+        "area" => Some("area"),
+        "okr" => Some("objective"),
+        "finance" => Some("finance"),
+        "calendar" => Some("calendar"),
+        _ => None,
+    }
+}
+
+/// Map an entity_type from EntityCard to a session context entity_kind.
+fn entity_kind_for(entity_type: &str) -> Option<&'static str> {
+    match entity_type {
+        "task" => Some("task"),
+        "project" => Some("project"),
+        "area" => Some("area"),
+        "objective" | "key_result" => Some("objective"),
+        s if s.starts_with("finance") => Some("finance"),
+        _ => None,
+    }
+}
+
+/// After streaming completes, infer session context from tool usage and entity
+/// creation events. Only sets context when a single domain dominates.
+async fn auto_detect_context(
+    repos: &Repos,
+    session_key: &str,
+    tool_names: &[String],
+    entity_cards: &[EntityCard],
+) -> Result<(), String> {
+    // Skip if session already has context
+    if let Ok(Some(_)) = repos.session_context.get(session_key).await {
+        return Ok(());
+    }
+
+    // Determine dominant domain from tool names
+    let domains: HashSet<&str> = tool_names.iter().filter_map(|n| tool_domain(n)).collect();
+    if domains.len() != 1 {
+        return Ok(()); // ambiguous or no tools → skip
+    }
+    let domain = *domains.iter().next().unwrap();
+
+    // Pick the best entity card for this domain (first match)
+    let card = entity_cards
+        .iter()
+        .find(|c| entity_kind_for(&c.entity_type) == Some(domain));
+
+    let entity_id = card.map(|c| c.entity_id.as_str());
+
+    // Resolve PARA ancestry
+    let (area_id, project_id) = resolve_ancestry(repos, domain, entity_id).await;
+
+    repos
+        .session_context
+        .upsert(
+            session_key,
+            "auto",
+            Some(domain),
+            entity_id,
+            area_id.as_deref(),
+            project_id.as_deref(),
+            false, // non-ephemeral — auto-detected sessions are persistent
+        )
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok(())
+}
+
+/// Look up area_id and project_id for a given entity.
+async fn resolve_ancestry(
+    repos: &Repos,
+    domain: &str,
+    entity_id: Option<&str>,
+) -> (Option<String>, Option<String>) {
+    let Some(id) = entity_id else {
+        return (None, None);
+    };
+
+    match domain {
+        "task" => {
+            if let Ok(Some(task)) = repos.actions.get(id).await {
+                (Some(task.area_id.clone()), task.project_id.clone())
+            } else {
+                (None, None)
+            }
+        }
+        "project" => {
+            if let Ok(Some(proj)) = repos.projects.get(id).await {
+                (Some(proj.area_id.clone()), Some(proj.id.clone()))
+            } else {
+                (None, None)
+            }
+        }
+        "objective" => {
+            if let Ok(Some(obj)) = repos.objectives.get(id).await {
+                // Objective → project → area
+                if let Ok(Some(proj)) = repos.projects.get(&obj.project_id).await {
+                    (Some(proj.area_id.clone()), Some(proj.id.clone()))
+                } else {
+                    (None, Some(obj.project_id.clone()))
+                }
+            } else {
+                (None, None)
+            }
+        }
+        _ => (None, None),
+    }
 }
