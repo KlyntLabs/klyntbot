@@ -10,6 +10,15 @@ import type {
   AgentErrorPayload,
   InteractionRequestPayload,
   MessageSegment,
+  TransparencyData,
+  ClassificationCompletePayload,
+  ExecutionStartedPayload,
+  IterationStartPayload,
+  UsageReportPayload,
+  MemoryAccessPayload,
+  SkillLoadedPayload,
+  LearningEventPayload,
+  SubagentSpawnedPayload,
 } from '../lib/types';
 
 interface AgentStream {
@@ -18,6 +27,7 @@ interface AgentStream {
   activeTools: string[];
   error: string | null;
   activeInteraction: ActiveInteraction | null;
+  transparency: TransparencyData | null;
   /** Call before sending a message to enter streaming mode. */
   startStreaming: () => void;
   /** Abort streaming and show an error. */
@@ -26,6 +36,8 @@ interface AgentStream {
   clearInteraction: () => void;
   /** Clear accumulated segments (after persisted messages arrive). */
   clearSegments: () => void;
+  /** Clear accumulated transparency data. */
+  clearTransparency: () => void;
 }
 
 /**
@@ -40,6 +52,7 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
   const [activeTools, setActiveTools] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [activeInteraction, setActiveInteraction] = useState<ActiveInteraction | null>(null);
+  const [transparency, setTransparency] = useState<TransparencyData | null>(null);
 
   const onDoneRef = useRef(onDone);
   onDoneRef.current = onDone;
@@ -81,6 +94,7 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
     setActiveTools([]);
     setError(null);
     setActiveInteraction(null);
+    setTransparency(null);
   }, [cancelRaf]);
 
   // Reset when session changes
@@ -143,6 +157,10 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
         result: payload.result,
       },
     ]);
+    setTransparency((prev) => ({
+      ...prev,
+      tools: [...(prev?.tools ?? []), { name: payload.name, success: payload.success, durationMs: payload.durationMs }],
+    }));
   });
 
   useEvent<InteractionRequestPayload>('agent:interaction_request', (payload) => {
@@ -166,6 +184,79 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
     setError(payload.message);
   });
 
+  useEvent<ClassificationCompletePayload>('agent:classification_complete', (payload) => {
+    if (!sessionKeyRef.current || payload.sessionKey !== sessionKeyRef.current) return;
+    setTransparency((prev) => ({
+      ...prev,
+      classification: { strategy: payload.strategy, confidence: payload.confidence, source: 'pipeline' },
+    }));
+  });
+
+  useEvent<ExecutionStartedPayload>('agent:execution_started', (payload) => {
+    if (!sessionKeyRef.current || payload.sessionKey !== sessionKeyRef.current) return;
+    setTransparency((prev) => ({
+      ...prev,
+      execution: { engine: payload.engine, iterations: 0, maxIterations: payload.maxIterations, escalations: 0 },
+    }));
+  });
+
+  useEvent<IterationStartPayload>('agent:iteration_start', (payload) => {
+    if (!sessionKeyRef.current || payload.sessionKey !== sessionKeyRef.current) return;
+    setTransparency((prev) => ({
+      ...prev,
+      execution: prev?.execution
+        ? { ...prev.execution, iterations: payload.iteration }
+        : { engine: 'unknown', iterations: payload.iteration, maxIterations: payload.maxIterations, escalations: 0 },
+    }));
+  });
+
+  useEvent<UsageReportPayload>('agent:usage_report', (payload) => {
+    if (!sessionKeyRef.current || payload.sessionKey !== sessionKeyRef.current) return;
+    setTransparency((prev) => ({
+      ...prev,
+      usage: {
+        promptTokens: payload.promptTokens,
+        completionTokens: payload.completionTokens,
+        cacheReadTokens: payload.cacheReadTokens,
+        cacheWriteTokens: payload.cacheWriteTokens,
+      },
+      cost: { estimatedUsd: payload.estimatedCostUsd, model: payload.model },
+      timing: { ...prev?.timing, totalMs: payload.responseTimeMs },
+    }));
+  });
+
+  useEvent<MemoryAccessPayload>('agent:memory_access', (payload) => {
+    if (!sessionKeyRef.current || payload.sessionKey !== sessionKeyRef.current) return;
+    setTransparency((prev) => ({
+      ...prev,
+      memoryAccesses: [...(prev?.memoryAccesses ?? []), { action: payload.action, query: payload.query, resultsCount: payload.resultsCount }],
+    }));
+  });
+
+  useEvent<SkillLoadedPayload>('agent:skill_loaded', (payload) => {
+    if (!sessionKeyRef.current || payload.sessionKey !== sessionKeyRef.current) return;
+    setTransparency((prev) => ({
+      ...prev,
+      skills: [...(prev?.skills ?? []), { name: payload.name, trigger: payload.trigger }],
+    }));
+  });
+
+  useEvent<LearningEventPayload>('agent:learning_event', (payload) => {
+    if (!sessionKeyRef.current || payload.sessionKey !== sessionKeyRef.current) return;
+    setTransparency((prev) => ({
+      ...prev,
+      learning: [...(prev?.learning ?? []), { eventType: payload.eventType, detail: payload.detail }],
+    }));
+  });
+
+  useEvent<SubagentSpawnedPayload>('agent:subagent_spawned', (payload) => {
+    if (!sessionKeyRef.current || payload.sessionKey !== sessionKeyRef.current) return;
+    setTransparency((prev) => ({
+      ...prev,
+      subagents: [...(prev?.subagents ?? []), { label: payload.label, profile: payload.profile }],
+    }));
+  });
+
   const clearInteraction = useCallback(() => setActiveInteraction(null), []);
   const clearSegments = useCallback(() => {
     streamTextRef.current = '';
@@ -173,8 +264,10 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
     setSegments([]);
   }, [cancelRaf]);
 
+  const clearTransparency = useCallback(() => setTransparency(null), []);
+
   // Cleanup rAF on unmount
   useEffect(() => cancelRaf, [cancelRaf]);
 
-  return { segments, isStreaming, activeTools, error, activeInteraction, startStreaming, failStreaming, clearInteraction, clearSegments };
+  return { segments, isStreaming, activeTools, error, activeInteraction, transparency, startStreaming, failStreaming, clearInteraction, clearSegments, clearTransparency };
 }

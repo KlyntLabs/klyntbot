@@ -264,7 +264,7 @@ impl IntentPipeline {
                 &filtered_tools,
                 &params,
                 ctx,
-                event_tx,
+                event_tx.clone(),
             )
             .await?;
 
@@ -280,8 +280,10 @@ impl IntentPipeline {
         let final_content = validation.filtered_content.clone();
         let mode_name = router_result.final_mode.clone();
 
-        // Step 6: Record usage (best-effort)
-        self.record_usage(&router_result, &mode_name, ctx).await;
+        // Step 6: Record usage (best-effort) + emit usage report
+        let pipeline_elapsed_ms = pipeline_start.elapsed().as_millis() as u64;
+        self.record_usage(&router_result, &mode_name, ctx, &event_tx, pipeline_elapsed_ms)
+            .await;
 
         // Step 7: Record strategy outcome (best-effort)
         self.record_strategy(&analysis, &router_result, &validation, ctx, pipeline_start)
@@ -295,7 +297,19 @@ impl IntentPipeline {
         })
     }
 
-    async fn record_usage(&self, result: &RouterResult, mode_name: &str, ctx: &RoutingContext) {
+    async fn record_usage(
+        &self,
+        result: &RouterResult,
+        mode_name: &str,
+        ctx: &RoutingContext,
+        event_tx: &Option<tokio::sync::mpsc::Sender<AgentEvent>>,
+        pipeline_elapsed_ms: u64,
+    ) {
+        let cost = crate::output::cost_tracker::estimate_cost(
+            &result.usage,
+            &self.config.execution_model,
+        );
+
         if let Err(e) = self
             .cost_tracker
             .record(
@@ -308,6 +322,21 @@ impl IntentPipeline {
             .await
         {
             warn!("IntentPipeline: failed to record usage: {}", e);
+        }
+
+        // Emit usage report to the streaming relay
+        if let Some(ref tx) = event_tx {
+            let _ = tx
+                .send(AgentEvent::UsageReport {
+                    prompt_tokens: result.usage.prompt_tokens,
+                    completion_tokens: result.usage.completion_tokens,
+                    cache_read_tokens: result.usage.cache_read_tokens,
+                    cache_write_tokens: result.usage.cache_write_tokens,
+                    estimated_cost_usd: cost,
+                    model: self.config.execution_model.clone(),
+                    response_time_ms: pipeline_elapsed_ms,
+                })
+                .await;
         }
     }
 

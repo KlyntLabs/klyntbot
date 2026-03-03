@@ -74,6 +74,7 @@ export interface ChatMessage {
   content: string;
   timestamp?: string;
   segments?: MessageSegment[];
+  transparency?: TransparencyData;
 }
 
 export interface ChatThread {
@@ -137,6 +138,65 @@ export interface ExecutionStartedPayload {
   sessionKey: string;
   engine: string;
   maxIterations: number;
+}
+
+// ── Transparency Events ───────────────────────────────────────────────
+
+export interface IterationStartPayload {
+  sessionKey: string;
+  iteration: number;
+  maxIterations: number;
+}
+
+export interface UsageReportPayload {
+  sessionKey: string;
+  promptTokens: number;
+  completionTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
+  estimatedCostUsd: number;
+  model: string;
+  responseTimeMs: number;
+}
+
+export interface MemoryAccessPayload {
+  sessionKey: string;
+  action: string;
+  query?: string;
+  resultsCount: number;
+}
+
+export interface SkillLoadedPayload {
+  sessionKey: string;
+  name: string;
+  trigger: string;
+}
+
+export interface LearningEventPayload {
+  sessionKey: string;
+  eventType: string;
+  detail: string;
+}
+
+export interface SubagentSpawnedPayload {
+  sessionKey: string;
+  label: string;
+  profile: string;
+}
+
+// ── Transparency Data (per-message) ───────────────────────────────────
+
+export interface TransparencyData {
+  usage?: { promptTokens: number; completionTokens: number; cacheReadTokens: number; cacheWriteTokens: number };
+  cost?: { estimatedUsd: number; model: string };
+  timing?: { totalMs: number; classificationMs?: number; contextAssemblyMs?: number };
+  tools?: { name: string; success: boolean; durationMs: number }[];
+  memoryAccesses?: { action: string; query?: string; resultsCount: number }[];
+  skills?: { name: string; trigger: string }[];
+  execution?: { engine: string; iterations: number; maxIterations: number; escalations: number };
+  classification?: { strategy: string; confidence: number; source: string };
+  subagents?: { label: string; profile: string }[];
+  learning?: { eventType: string; detail: string }[];
 }
 
 // ── Interaction (ask_user) ─────────────────────────────────────────────

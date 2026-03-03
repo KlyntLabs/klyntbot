@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-use crate::events::MessageSegment;
+use crate::events::{MessageSegment, TransparencyData};
 
 // ── Task ────────────────────────────────────────────────────────────────
 
@@ -138,6 +138,8 @@ pub struct ChatMessageResponse {
     pub timestamp: DateTime<Utc>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub segments: Option<Vec<MessageSegment>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transparency: Option<TransparencyData>,
 }
 
 /// Optional session context sent from the frontend alongside a chat message.

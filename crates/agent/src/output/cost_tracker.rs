@@ -211,7 +211,7 @@ fn substring_fallback(model: &str) -> ModelPricing {
     }
 }
 
-fn estimate_cost(usage: &Usage, model: &str) -> f64 {
+pub fn estimate_cost(usage: &Usage, model: &str) -> f64 {
     let pricing = model_pricing(model);
     let input_cost = (usage.prompt_tokens as f64 / 1_000_000.0) * pricing.input;
     let output_cost = (usage.completion_tokens as f64 / 1_000_000.0) * pricing.output;

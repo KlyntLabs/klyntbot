@@ -3,7 +3,9 @@ import { MarkdownContent } from './MarkdownContent';
 import { SegmentedMessage } from './SegmentedMessage';
 import { CollapsedInteraction } from './CollapsedInteraction';
 import { InteractionCard } from './InteractionCard';
-import type { ActiveInteraction, ChatMessage, MessageSegment } from '../../lib/types';
+import { TokenBadge } from './TokenBadge';
+import { TransparencyPanel } from './TransparencyPanel';
+import type { ActiveInteraction, ChatMessage, MessageSegment, TransparencyData } from '../../lib/types';
 
 interface MessageListProps {
   messages: ChatMessage[];
@@ -14,6 +16,8 @@ interface MessageListProps {
   activeInteraction: ActiveInteraction | null;
   sessionKey: string;
   onInteractionSubmitted: () => void;
+  showTransparency: boolean;
+  liveTransparency: TransparencyData | null;
 }
 
 export function MessageList({
@@ -25,6 +29,8 @@ export function MessageList({
   activeInteraction,
   sessionKey,
   onInteractionSubmitted,
+  showTransparency,
+  liveTransparency,
 }: MessageListProps) {
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -54,6 +60,12 @@ export function MessageList({
               ) : (
                 <MarkdownContent content={msg.content} />
               )}
+              {showTransparency && msg.transparency && (
+                <>
+                  <TokenBadge transparency={msg.transparency} />
+                  <TransparencyPanel transparency={msg.transparency} />
+                </>
+              )}
             </div>
           )}
         </div>
@@ -68,6 +80,12 @@ export function MessageList({
               activeTools={activeTools}
               isStreaming={isStreaming}
             />
+            {showTransparency && liveTransparency && (
+              <>
+                <TokenBadge transparency={liveTransparency} isStreaming={isStreaming} />
+                <TransparencyPanel transparency={liveTransparency} />
+              </>
+            )}
           </div>
         </div>
       )}

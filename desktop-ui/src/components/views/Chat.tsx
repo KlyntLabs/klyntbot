@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { Sidebar } from '../layout/Sidebar';
 import { MessageList } from '../chat/MessageList';
+import { TransparencyToggle } from '../chat/TransparencyToggle';
 import { useSetToggle } from '../../hooks/useSetToggle';
 import { useQuery } from '../../hooks/useQuery';
 import { useChatSession } from '../../hooks/useChatSession';
@@ -64,6 +65,17 @@ export function Chat() {
   // Chat session (messages, streaming, input, send)
   // Refetch thread list when the agent finishes (new thread appears in sidebar)
   const chat = useChatSession(selectedThread, refetchThreads);
+
+  const [showTransparency, setShowTransparency] = useState(() => {
+    try { return localStorage.getItem('chat:transparency') === 'true'; } catch { return false; }
+  });
+  const toggleTransparency = useCallback(() => {
+    setShowTransparency((prev) => {
+      const next = !prev;
+      try { localStorage.setItem('chat:transparency', String(next)); } catch {}
+      return next;
+    });
+  }, []);
 
   // Auto-select first thread only on initial page load.
   // Once this fires, further thread selection is user-driven.
@@ -384,6 +396,11 @@ export function Chat() {
 
       {/* Right Panel — Conversation */}
       <div className="flex-1 flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-end px-4 py-2 border-b border-border">
+          <TransparencyToggle enabled={showTransparency} onToggle={toggleTransparency} />
+        </div>
+
         {/* Messages */}
         <div className="flex-1 overflow-y-auto p-6">
           <div className="max-w-3xl mx-auto">
@@ -407,6 +424,8 @@ export function Chat() {
                   chat.clearInteraction();
                   refetchThreads();
                 }}
+                showTransparency={showTransparency}
+                liveTransparency={chat.transparency}
               />
             )}
           </div>

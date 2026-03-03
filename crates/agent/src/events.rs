@@ -67,4 +67,48 @@ pub enum AgentEvent {
 
     /// An entity was created by a tool (task, project, area, etc.).
     EntityCreated(common::EntityCard),
+
+    /// Token usage report after cost tracking.
+    UsageReport {
+        #[serde(rename = "promptTokens")]
+        prompt_tokens: u32,
+        #[serde(rename = "completionTokens")]
+        completion_tokens: u32,
+        #[serde(rename = "cacheReadTokens")]
+        cache_read_tokens: u32,
+        #[serde(rename = "cacheWriteTokens")]
+        cache_write_tokens: u32,
+        #[serde(rename = "estimatedCostUsd")]
+        estimated_cost_usd: f64,
+        model: String,
+        #[serde(rename = "responseTimeMs")]
+        response_time_ms: u64,
+    },
+
+    /// A memory search or operation was performed.
+    MemoryAccess {
+        action: String,
+        query: Option<String>,
+        #[serde(rename = "resultsCount")]
+        results_count: u32,
+    },
+
+    /// A skill was loaded into the system prompt.
+    SkillLoaded {
+        name: String,
+        trigger: String,
+    },
+
+    /// A learning event occurred (threshold adjustment, pattern detection).
+    LearningEvent {
+        #[serde(rename = "eventType")]
+        event_type: String,
+        detail: String,
+    },
+
+    /// A subagent was spawned.
+    SubagentSpawned {
+        label: String,
+        profile: String,
+    },
 }

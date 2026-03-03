@@ -112,12 +112,18 @@ pub async fn chat_messages(
                 .as_ref()
                 .and_then(|meta| meta.get("segments"))
                 .and_then(|v| serde_json::from_value(v.clone()).ok());
+            let transparency: Option<events::TransparencyData> = m
+                .metadata
+                .as_ref()
+                .and_then(|meta| meta.get("transparency"))
+                .and_then(|v| serde_json::from_value(v.clone()).ok());
             ChatMessageResponse {
                 id: m.id.to_string(),
                 role: m.role.clone(),
                 content: m.content.clone(),
                 timestamp: m.timestamp,
                 segments,
+                transparency,
             }
         })
         .collect())
@@ -211,6 +217,9 @@ pub async fn chat_send(
         let mut segments: Vec<events::MessageSegment> = Vec::with_capacity(8);
         let mut current_text = String::new();
 
+        // Transparency data accumulation
+        let mut transparency = desktop_shared::events::TransparencyData::default();
+
         // Flush accumulated text into a finalized text segment.
         let flush_text = |text: &mut String, segs: &mut Vec<events::MessageSegment>| {
             if !text.is_empty() {
@@ -265,6 +274,11 @@ pub async fn chat_send(
                                 duration_ms,
                                 result: result.clone(),
                             });
+                            transparency.tools.push(desktop_shared::events::TransparencyTool {
+                                name: name.clone(),
+                                success,
+                                duration_ms,
+                            });
                             let _ = app.emit(
                                 AGENT_TOOL_END,
                                 ToolEndPayload {
@@ -293,26 +307,34 @@ pub async fn chat_send(
                         }
                         AgentEvent::Done { content } => {
                             flush_text(&mut current_text, &mut segments);
-                            // Persist segments to the assistant message metadata
+                            // Persist segments + transparency to the assistant message metadata
+                            let mut meta = serde_json::Map::new();
                             if !segments.is_empty() {
-                                let meta = serde_json::json!({ "segments": segments });
-                                match repos.sessions.update_last_assistant_metadata(
-                                    &sk, None, Some(&meta),
-                                ).await {
-                                    Ok(true) => {}
-                                    Ok(false) => {
-                                        // Message may not be committed yet — retry after a brief delay
-                                        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-                                        match repos.sessions.update_last_assistant_metadata(
-                                            &sk, None, Some(&meta),
-                                        ).await {
-                                            Ok(false) => tracing::warn!("segment persist: no assistant message found for {sk}"),
-                                            Err(e) => tracing::warn!("segment persist retry failed for {sk}: {e}"),
-                                            _ => {}
-                                        }
+                                meta.insert(
+                                    "segments".to_string(),
+                                    serde_json::to_value(&segments).unwrap_or_default(),
+                                );
+                            }
+                            meta.insert(
+                                "transparency".to_string(),
+                                serde_json::to_value(&transparency).unwrap_or_default(),
+                            );
+                            let meta_value = serde_json::Value::Object(meta);
+                            match repos.sessions.update_last_assistant_metadata(
+                                &sk, None, Some(&meta_value),
+                            ).await {
+                                Ok(true) => {}
+                                Ok(false) => {
+                                    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                                    match repos.sessions.update_last_assistant_metadata(
+                                        &sk, None, Some(&meta_value),
+                                    ).await {
+                                        Ok(false) => tracing::warn!("metadata persist: no assistant message found for {sk}"),
+                                        Err(e) => tracing::warn!("metadata persist retry failed for {sk}: {e}"),
+                                        _ => {}
                                     }
-                                    Err(e) => tracing::warn!("segment persist failed for {sk}: {e}"),
                                 }
+                                Err(e) => tracing::warn!("metadata persist failed for {sk}: {e}"),
                             }
                             let _ = app.emit(
                                 AGENT_DONE,
@@ -333,7 +355,21 @@ pub async fn chat_send(
                             );
                             break;
                         }
-                        AgentEvent::ClassificationComplete { strategy, confidence, .. } => {
+                        AgentEvent::ClassificationComplete { strategy, confidence, source, duration_ms } => {
+                            transparency.classification = Some(desktop_shared::events::TransparencyClassification {
+                                strategy: strategy.clone(),
+                                confidence,
+                                source: source.clone(),
+                            });
+                            if let Some(ref mut timing) = transparency.timing {
+                                timing.classification_ms = Some(duration_ms);
+                            } else {
+                                transparency.timing = Some(desktop_shared::events::TransparencyTiming {
+                                    total_ms: 0,
+                                    classification_ms: Some(duration_ms),
+                                    context_assembly_ms: None,
+                                });
+                            }
                             let _ = app.emit(
                                 AGENT_CLASSIFICATION_COMPLETE,
                                 ClassificationCompletePayload {
@@ -344,6 +380,12 @@ pub async fn chat_send(
                             );
                         }
                         AgentEvent::ExecutionStarted { engine, max_iterations } => {
+                            transparency.execution = Some(desktop_shared::events::TransparencyExecution {
+                                engine: engine.clone(),
+                                iterations: 0,
+                                max_iterations: max_iterations as u32,
+                                escalations: 0,
+                            });
                             let _ = app.emit(
                                 AGENT_EXECUTION_STARTED,
                                 ExecutionStartedPayload {
@@ -353,7 +395,136 @@ pub async fn chat_send(
                                 },
                             );
                         }
-                        _ => {}
+                        AgentEvent::ContextAssembled { duration_ms, .. } => {
+                            if let Some(ref mut timing) = transparency.timing {
+                                timing.context_assembly_ms = Some(duration_ms);
+                            } else {
+                                transparency.timing = Some(desktop_shared::events::TransparencyTiming {
+                                    total_ms: 0,
+                                    classification_ms: None,
+                                    context_assembly_ms: Some(duration_ms),
+                                });
+                            }
+                        }
+                        AgentEvent::IterationStart { iteration, max } => {
+                            if let Some(ref mut exec) = transparency.execution {
+                                exec.iterations = iteration as u32;
+                            }
+                            let _ = app.emit(
+                                events::AGENT_ITERATION_START,
+                                events::IterationStartPayload {
+                                    session_key: sk.clone(),
+                                    iteration,
+                                    max_iterations: max,
+                                },
+                            );
+                        }
+                        AgentEvent::ConfidenceAssessed { score, action } => {
+                            let _ = app.emit(
+                                events::AGENT_CONFIDENCE_ASSESSED,
+                                events::ConfidenceAssessedPayload {
+                                    session_key: sk.clone(),
+                                    score,
+                                    action,
+                                },
+                            );
+                        }
+                        AgentEvent::UsageReport {
+                            prompt_tokens, completion_tokens,
+                            cache_read_tokens, cache_write_tokens,
+                            estimated_cost_usd, model, response_time_ms,
+                        } => {
+                            transparency.usage = Some(desktop_shared::events::TransparencyUsage {
+                                prompt_tokens,
+                                completion_tokens,
+                                cache_read_tokens,
+                                cache_write_tokens,
+                            });
+                            transparency.cost = Some(desktop_shared::events::TransparencyCost {
+                                estimated_usd: estimated_cost_usd,
+                                model: model.clone(),
+                            });
+                            if let Some(ref mut timing) = transparency.timing {
+                                timing.total_ms = response_time_ms;
+                            } else {
+                                transparency.timing = Some(desktop_shared::events::TransparencyTiming {
+                                    total_ms: response_time_ms,
+                                    classification_ms: None,
+                                    context_assembly_ms: None,
+                                });
+                            }
+                            let _ = app.emit(
+                                events::AGENT_USAGE_REPORT,
+                                events::UsageReportPayload {
+                                    session_key: sk.clone(),
+                                    prompt_tokens,
+                                    completion_tokens,
+                                    cache_read_tokens,
+                                    cache_write_tokens,
+                                    estimated_cost_usd,
+                                    model,
+                                    response_time_ms,
+                                },
+                            );
+                        }
+                        AgentEvent::MemoryAccess { action, query, results_count } => {
+                            transparency.memory_accesses.push(desktop_shared::events::TransparencyMemoryAccess {
+                                action: action.clone(),
+                                query: query.clone(),
+                                results_count,
+                            });
+                            let _ = app.emit(
+                                events::AGENT_MEMORY_ACCESS,
+                                events::MemoryAccessPayload {
+                                    session_key: sk.clone(),
+                                    action,
+                                    query,
+                                    results_count,
+                                },
+                            );
+                        }
+                        AgentEvent::SkillLoaded { name, trigger } => {
+                            transparency.skills.push(desktop_shared::events::TransparencySkill {
+                                name: name.clone(),
+                                trigger: trigger.clone(),
+                            });
+                            let _ = app.emit(
+                                events::AGENT_SKILL_LOADED,
+                                events::SkillLoadedPayload {
+                                    session_key: sk.clone(),
+                                    name,
+                                    trigger,
+                                },
+                            );
+                        }
+                        AgentEvent::LearningEvent { event_type, detail } => {
+                            transparency.learning.push(desktop_shared::events::TransparencyLearning {
+                                event_type: event_type.clone(),
+                                detail: detail.clone(),
+                            });
+                            let _ = app.emit(
+                                events::AGENT_LEARNING_EVENT,
+                                events::LearningEventPayload {
+                                    session_key: sk.clone(),
+                                    event_type,
+                                    detail,
+                                },
+                            );
+                        }
+                        AgentEvent::SubagentSpawned { label, profile } => {
+                            transparency.subagents.push(desktop_shared::events::TransparencySubagent {
+                                label: label.clone(),
+                                profile: profile.clone(),
+                            });
+                            let _ = app.emit(
+                                events::AGENT_SUBAGENT_SPAWNED,
+                                events::SubagentSpawnedPayload {
+                                    session_key: sk.clone(),
+                                    label,
+                                    profile,
+                                },
+                            );
+                        }
                     }
                 }
                 else => break,
@@ -375,6 +546,7 @@ pub async fn chat_send(
         content,
         timestamp: now,
         segments: None,
+        transparency: None,
     })
 }
 

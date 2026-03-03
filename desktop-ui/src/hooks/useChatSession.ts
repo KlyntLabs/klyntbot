@@ -3,11 +3,12 @@ import { useQuery } from './useQuery';
 import { useAgentStream } from './useAgentStream';
 import { ipc } from './useIpc';
 import { isTauri } from '../lib/utils';
-import type { ActiveInteraction, ChatMessage, MessageSegment } from '../lib/types';
+import type { ActiveInteraction, ChatMessage, MessageSegment, TransparencyData } from '../lib/types';
 
 interface ChatSession {
   messages: ChatMessage[];
   segments: MessageSegment[];
+  transparency: TransparencyData | null;
   isStreaming: boolean;
   activeTools: string[];
   error: string | null;
@@ -43,7 +44,7 @@ export function useChatSession(sessionKey: string, onDone?: () => void): ChatSes
   // Clear streaming segments only when a NEW assistant message arrives from refetch.
   // Tracks assistant count to avoid clearing before the refetch completes — the old
   // approach fired on isStreaming→false before the new message existed, causing a flash.
-  const { isStreaming, clearSegments, segments } = stream;
+  const { isStreaming, clearSegments, clearTransparency, segments } = stream;
   const hasSegmentsRef = useRef(false);
   hasSegmentsRef.current = segments.length > 0;
   const assistantCountRef = useRef(0);
@@ -52,9 +53,10 @@ export function useChatSession(sessionKey: string, onDone?: () => void): ChatSes
     const count = messages.filter(m => m.role === 'assistant').length;
     if (!isStreaming && hasSegmentsRef.current && count > assistantCountRef.current) {
       clearSegments();
+      clearTransparency();
     }
     assistantCountRef.current = count;
-  }, [messages, isStreaming, clearSegments]);
+  }, [messages, isStreaming, clearSegments, clearTransparency]);
 
   const displayMessages = useMemo(() => {
     if (!pendingUserMsg) return messages;
@@ -85,6 +87,7 @@ export function useChatSession(sessionKey: string, onDone?: () => void): ChatSes
   return {
     messages: displayMessages,
     segments: stream.segments,
+    transparency: stream.transparency,
     isStreaming: stream.isStreaming,
     activeTools: stream.activeTools,
     error: stream.error,
