@@ -63,8 +63,8 @@ impl ContextSource for SkillContentSource {
 
         let mut sections = Vec::with_capacity(always_loaded.len());
         for skill in always_loaded {
-            if let Some(content) = &skill.content {
-                sections.push(format!("# Skill: {}\n\n{}", skill.name, content));
+            if let Some(content) = skill.formatted_content() {
+                sections.push(content);
             }
         }
 

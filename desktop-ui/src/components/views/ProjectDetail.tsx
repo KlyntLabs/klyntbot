@@ -58,9 +58,9 @@ export function ProjectDetail() {
 
   useEvent<{ entityKind: string; id: string }>('entity:updated', (payload) => {
     const kind = payload?.entityKind;
-    if (!kind || kind === 'Task') refetchTasks();
-    if (!kind || kind === 'Project') refetchProjects();
-    if (!kind || kind === 'Objective' || kind === 'KeyResult') refetchObjectives();
+    if (!kind || kind === 'task') refetchTasks();
+    if (!kind || kind === 'project') refetchProjects();
+    if (!kind || kind === 'objective' || kind === 'keyResult') refetchObjectives();
   });
 
   const project = useMemo(() => allProjects.find(p => p.id === id), [id, allProjects]);

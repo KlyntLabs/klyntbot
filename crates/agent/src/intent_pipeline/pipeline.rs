@@ -32,8 +32,6 @@ pub struct PipelineResult {
     pub classification: IntentAnalysis,
     /// Validation warnings (if any).
     pub validation: ValidationResult,
-    /// Skills matched by trigger keywords for this message.
-    pub matched_skills: Vec<String>,
 }
 
 /// Configuration for the intent pipeline.
@@ -181,7 +179,6 @@ impl IntentPipeline {
                 return Ok(PipelineResult {
                     content,
                     mode_used: "clarification".to_string(),
-                    matched_skills: analysis.matched_skills.clone(),
                     classification: analysis,
                     validation: ValidationResult {
                         is_valid: true,
@@ -227,12 +224,11 @@ impl IntentPipeline {
         // Step 2.5: Inject matched skill content for non-always skills
         if let Some(ref sm) = self.skill_manager {
             for skill_name in &analysis.matched_skills {
-                if !sm.is_always_loaded(skill_name) {
-                    if let Some(content) = sm.get_skill_content(skill_name) {
-                        assembled.messages.push(Message::system(format!(
-                            "# Skill: {}\n\n{}",
-                            skill_name, content
-                        )));
+                if let Some(skill) = sm.get(skill_name) {
+                    if !skill.always {
+                        if let Some(content) = skill.formatted_content() {
+                            assembled.messages.push(Message::system(content));
+                        }
                     }
                 }
             }
@@ -323,7 +319,6 @@ impl IntentPipeline {
         Ok(PipelineResult {
             content: final_content,
             mode_used: mode_name,
-            matched_skills: analysis.matched_skills.clone(),
             classification: analysis,
             validation,
         })
@@ -696,7 +691,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn pipeline_result_has_matched_skills_field() {
+    async fn pipeline_result_carries_matched_skills_via_classification() {
         let provider = MockPipelineProvider::new(vec![text_response("Hi there!")]);
         let pipeline = make_pipeline(provider).await;
 
@@ -706,6 +701,6 @@ mod tests {
             .unwrap();
 
         // Without SkillManager, matched_skills should be empty
-        assert!(result.matched_skills.is_empty());
+        assert!(result.classification.matched_skills.is_empty());
     }
 }

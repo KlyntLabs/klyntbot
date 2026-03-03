@@ -61,8 +61,8 @@ export function MainApp() {
   // Auto-refresh when relevant entities change
   useEvent<{ entityKind: string; id: string }>('entity:updated', (payload) => {
     const kind = payload?.entityKind;
-    if (!kind || kind === 'Task' || kind === 'Area') refetchTasks();
-    if (!kind || kind === 'Project' || kind === 'Objective') refetchProjects();
+    if (!kind || kind === 'task' || kind === 'area') refetchTasks();
+    if (!kind || kind === 'project' || kind === 'objective') refetchProjects();
   });
 
   // Listen for open-chat events from the tray

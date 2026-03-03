@@ -486,17 +486,12 @@ impl AgentLoop {
 
         // Emit SkillLoaded events for MATCHED skills only
         if let Some(ref tx) = event_tx {
-            for skill_name in &result.matched_skills {
+            for skill_name in &result.classification.matched_skills {
                 if let Some(skill) = self.skill_manager.get(skill_name) {
-                    let trigger = if skill.always {
-                        "always".to_string()
-                    } else {
-                        skill.triggers.join(", ")
-                    };
                     let _ = tx
                         .send(AgentEvent::SkillLoaded {
                             name: skill_name.clone(),
-                            trigger,
+                            trigger: skill.trigger_label(),
                         })
                         .await;
                 }

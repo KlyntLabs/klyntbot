@@ -64,7 +64,7 @@ pub fn analyze_heuristic(message: &str) -> Option<IntentAnalysis> {
         let budget = compute_iteration_budget(&signals);
         return Some(reactive_analysis(
             budget,
-            "Task management CRUD operation",
+            "Task management operation",
             0.90,
             signals,
             vec![ToolGroup::TaskManagement, ToolGroup::Search],
@@ -170,6 +170,7 @@ fn is_greeting(msg: &str) -> bool {
 
 fn is_task_management(msg: &str) -> bool {
     const TASK_MGMT: &[&str] = &[
+        // CRUD patterns
         "create a task",
         "add a task",
         "add a todo",
@@ -178,6 +179,17 @@ fn is_task_management(msg: &str) -> bool {
         "new todo",
         "add task",
         "create todo",
+        // Query patterns
+        "what task",
+        "my task",
+        "show task",
+        "list task",
+        "check task",
+        "any task",
+        "task list",
+        "todo list",
+        "how many task",
+        "pending task",
     ];
     TASK_MGMT.iter().any(|k| msg.contains(k))
 }
@@ -870,6 +882,28 @@ mod tests {
             result.unwrap().mode,
             ExecutionMode::Reactive { .. }
         ));
+    }
+
+    #[test]
+    fn task_query_is_reactive() {
+        for query in &[
+            "what task do we have?",
+            "What tasks are pending?",
+            "show my tasks",
+            "list tasks for today",
+            "check tasks",
+            "any tasks related to auth?",
+            "todo list",
+        ] {
+            let result = analyze_heuristic(query);
+            assert!(
+                result.is_some()
+                    && matches!(result.as_ref().unwrap().mode, ExecutionMode::Reactive { .. }),
+                "Expected Reactive for '{}', got {:?}",
+                query,
+                result
+            );
+        }
     }
 
     #[test]

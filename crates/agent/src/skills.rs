@@ -95,6 +95,24 @@ pub struct Skill {
     pub available: bool,
 }
 
+impl Skill {
+    /// Human-readable trigger label for transparency events.
+    pub fn trigger_label(&self) -> String {
+        if self.always {
+            "always".to_string()
+        } else {
+            self.triggers.join(", ")
+        }
+    }
+
+    /// Formatted content section for context injection (e.g. `# Skill: todo\n\n...`).
+    pub fn formatted_content(&self) -> Option<String> {
+        self.content
+            .as_deref()
+            .map(|c| format!("# Skill: {}\n\n{}", self.name, c))
+    }
+}
+
 fn default_scope() -> SkillScope {
     SkillScope::Global
 }
@@ -230,7 +248,7 @@ impl SkillManager {
             .map(|arr| {
                 arr.iter()
                     .filter_map(|v| v.as_str())
-                    .map(|s| s.to_string())
+                    .map(|s| s.to_lowercase())
                     .collect::<Vec<String>>()
             })
             .unwrap_or_default();
@@ -360,26 +378,12 @@ impl SkillManager {
     /// events should only reflect actual trigger matches.
     pub fn match_skills(&self, message: &str) -> Vec<String> {
         let lower = message.to_lowercase();
-        let mut matched: Vec<String> = self
-            .skills
+        self.skills
             .values()
             .filter(|s| s.available && !s.triggers.is_empty())
-            .filter(|s| s.triggers.iter().any(|t| lower.contains(&t.to_lowercase())))
+            .filter(|s| s.triggers.iter().any(|t| lower.contains(t.as_str())))
             .map(|s| s.name.clone())
-            .collect();
-        matched.sort();
-        matched.dedup();
-        matched
-    }
-
-    /// Get a skill's full content by name.
-    pub fn get_skill_content(&self, name: &str) -> Option<&str> {
-        self.skills.get(name).and_then(|s| s.content.as_deref())
-    }
-
-    /// Check if a skill has always=true.
-    pub fn is_always_loaded(&self, name: &str) -> bool {
-        self.skills.get(name).map(|s| s.always).unwrap_or(false)
+            .collect()
     }
 
     /// Returns skills that match the current persona and session context.
@@ -832,19 +836,22 @@ mod tests {
     }
 
     #[test]
-    fn get_skill_content_returns_content() {
+    fn skill_formatted_content_returns_header() {
         let mut mgr = SkillManager::new();
         mgr.load_builtin_skills().unwrap();
-        let content = mgr.get_skill_content("todo");
-        assert!(content.is_some());
-        assert!(content.unwrap().contains("Todo Task Creation"));
+        let skill = mgr.get("todo").unwrap();
+        let content = skill.formatted_content().unwrap();
+        assert!(content.starts_with("# Skill: todo"));
+        assert!(content.contains("Todo Task Creation"));
     }
 
     #[test]
-    fn is_always_loaded_true_for_todo() {
+    fn skill_trigger_label_always_vs_triggers() {
         let mut mgr = SkillManager::new();
         mgr.load_builtin_skills().unwrap();
-        assert!(mgr.is_always_loaded("todo"));
-        assert!(!mgr.is_always_loaded("cron"));
+        let todo = mgr.get("todo").unwrap();
+        assert_eq!(todo.trigger_label(), "always");
+        let cron = mgr.get("cron").unwrap();
+        assert!(cron.trigger_label().contains("cron"));
     }
 }
