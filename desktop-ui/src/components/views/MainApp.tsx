@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { MessageSquare } from 'lucide-react';
 import { Sidebar } from '../layout/Sidebar';
@@ -8,10 +8,11 @@ import { KanbanBoard } from '../tasks/KanbanBoard';
 import { SidebarChat } from '../chat/SidebarChat';
 import { OkrView } from './OkrView';
 import { useSetToggle } from '../../hooks/useSetToggle';
+import { useSubtasks } from '../../hooks/useSubtasks';
 import { useQuery } from '../../hooks/useQuery';
 import { useMutation } from '../../hooks/useMutation';
 import { useEvent } from '../../hooks/useEvent';
-import type { Task, Project, Objective, Area, Tab, SidebarItem, ViewMode, TaskUpdateParams } from '../../lib/types';
+import type { Task, Project, Objective, Area, Tab, SidebarItem, ViewMode, TaskUpdateParams, TaskCreateParams } from '../../lib/types';
 
 export function MainApp() {
   const navigate = useNavigate();
@@ -21,6 +22,7 @@ export function MainApp() {
   const prevSidebarRef = useRef<SidebarItem>('Tasks');
   const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [collapsedProjects, toggleProject] = useSetToggle();
+  const { expandedTasks, childrenCache, generation, toggleExpand: toggleExpandTask, fetchChildren, invalidateCache } = useSubtasks();
 
   const { data: tasks, refetch: refetchTasks } = useQuery<Task[]>('task_list', undefined, []);
   const { data: projects, refetch: refetchProjects } = useQuery<Project[]>('project_list', undefined, []);
@@ -31,12 +33,22 @@ export function MainApp() {
   const projectMap = useMemo(() => new Map(projects.map(p => [p.id, p])), [projects]);
 
   const toggleComplete = useMutation<Task, { id: string }>('task_toggle_complete');
-  const updateTask = useMutation<Task, TaskUpdateParams>('task_update');
-  const createTask = useMutation<Task, { title: string }>('task_create');
+  const updateTask = useMutation<Task, TaskUpdateParams>('task_update', 'params');
+  const createTask = useMutation<Task, TaskCreateParams>('task_create', 'params');
 
   const [completedTasks, toggleTask] = useSetToggle(
     tasks.filter(t => t.completed).map(t => t.id)
   );
+
+  // Auto-fetch children for expanded tasks.
+  // Uses `generation` (bumped on invalidation) instead of `childrenCache`
+  // to avoid O(N²) re-fetches — each cache write would otherwise re-trigger
+  // the loop for all expanded tasks.
+  useEffect(() => {
+    for (const taskId of expandedTasks) {
+      fetchChildren(taskId);
+    }
+  }, [expandedTasks, generation, fetchChildren]);
 
   // Inline add task state
   const [addingTask, setAddingTask] = useState(false);
@@ -47,12 +59,8 @@ export function MainApp() {
     await toggleComplete.mutate({ id: taskId });
   }, [toggleTask, toggleComplete]);
 
-  const handleUpdatePriority = useCallback(async (taskId: string, priority: number | null) => {
-    await updateTask.mutate({ id: taskId, priority });
-  }, [updateTask]);
-
-  const handleRenameTask = useCallback(async (taskId: string, title: string) => {
-    await updateTask.mutate({ id: taskId, title });
+  const handleUpdateTask = useCallback(async (params: TaskUpdateParams) => {
+    await updateTask.mutate(params);
   }, [updateTask]);
 
   const handleAddTask = useCallback(async () => {
@@ -62,11 +70,15 @@ export function MainApp() {
     setAddingTask(false);
   }, [newTaskTitle, createTask]);
 
+  const handleCreateSubtask = useCallback(async (parentId: string, title: string) => {
+    await createTask.mutate({ title, parentId });
+  }, [createTask]);
+
   // Auto-refresh when relevant entities change
   useEvent<{ entityKind: string; id: string }>('entity:updated', (payload) => {
     const kind = payload?.entityKind;
-    if (!kind) { refetchTasks(); refetchProjects(); refetchAreas(); return; }
-    if (kind === 'task' || kind === 'area') refetchTasks();
+    if (!kind) { refetchTasks(); refetchProjects(); refetchAreas(); invalidateCache(); return; }
+    if (kind === 'task' || kind === 'area') { refetchTasks(); invalidateCache(); }
     if (kind === 'project' || kind === 'objective') refetchProjects();
     if (kind === 'area') refetchAreas();
   });
@@ -184,10 +196,13 @@ export function MainApp() {
               activeTab={activeTab}
               completedTasks={completedTasks}
               collapsedProjects={collapsedProjects}
+              expandedTasks={expandedTasks}
+              childrenCache={childrenCache}
               onToggleTask={handleToggleTask}
               onToggleProject={toggleProject}
-              onUpdatePriority={handleUpdatePriority}
-              onRenameTask={handleRenameTask}
+              onToggleExpandTask={toggleExpandTask}
+              onUpdate={handleUpdateTask}
+              onCreateSubtask={handleCreateSubtask}
             />
           )}
           {filteredTasks.length === 0 && !addingTask && (

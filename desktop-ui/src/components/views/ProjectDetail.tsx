@@ -4,6 +4,7 @@ import { ArrowLeft, ChevronDown, ChevronRight, Target, Plus, Archive } from 'luc
 import { Sidebar } from '../layout/Sidebar';
 import { Badge } from '../ui/Badge';
 import { Checkbox } from '../ui/Checkbox';
+import { formatDate } from '../../lib/dates';
 import { Progress } from '../ui/Progress';
 import { useSetToggle } from '../../hooks/useSetToggle';
 import { useQuery } from '../../hooks/useQuery';
@@ -32,10 +33,10 @@ export function ProjectDetail() {
   );
 
   const toggleComplete = useMutation<Task, { id: string }>('task_toggle_complete');
-  const updateProject = useMutation<Project, ProjectUpdateParams>('project_update');
+  const updateProject = useMutation<Project, ProjectUpdateParams>('project_update', 'params');
   const archiveProject = useMutation<Project, { id: string }>('project_archive');
-  const createTask = useMutation<Task, { title: string; projectId: string }>('task_create');
-  const createObjective = useMutation<Objective, ObjectiveCreateParams>('objective_create');
+  const createTask = useMutation<Task, { title: string; projectId: string }>('task_create', 'params');
+  const createObjective = useMutation<Objective, ObjectiveCreateParams>('objective_create', 'params');
 
   const [completedTasks, toggleTask] = useSetToggle(
     tasks.filter(t => t.completed).map(t => t.id)
@@ -144,7 +145,7 @@ export function ProjectDetail() {
               style={{ backgroundColor: project.color }}
             />
             {showColorPicker && (
-              <div className="absolute top-6 left-0 z-50 bg-surface-floating rounded-lg p-2 shadow-lg border border-border-subtle flex gap-1.5">
+              <div className="absolute top-6 left-0 z-50 glass-panel flex gap-1.5">
                 {PROJECT_COLORS.map(c => (
                   <button
                     key={c}
@@ -377,7 +378,7 @@ export function ProjectDetail() {
                       <Badge variant="status" value={task.status} />
                     </div>
                     <div className="flex items-center">
-                      <span className="text-[12px] text-muted font-light">{task.dueDate}</span>
+                      <span className="text-[12px] text-muted font-light">{task.dueDate ? formatDate(task.dueDate) : null}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       {task.tags.map(tag => (

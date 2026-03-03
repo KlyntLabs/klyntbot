@@ -2,7 +2,8 @@ import { useMemo } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { ProjectHeader } from './ProjectHeader';
 import { TaskRow } from './TaskRow';
-import type { Task, Project, Objective, Area, Tab } from '../../lib/types';
+import { AddSubtaskRow } from './AddSubtaskRow';
+import type { Task, Project, Objective, Area, Tab, TaskUpdateParams } from '../../lib/types';
 
 interface TaskTableProps {
   tasks: Task[];
@@ -12,10 +13,13 @@ interface TaskTableProps {
   activeTab: Tab;
   completedTasks: Set<string>;
   collapsedProjects: Set<string>;
+  expandedTasks: Set<string>;
+  childrenCache: Map<string, Task[]>;
   onToggleTask: (taskId: string) => void;
   onToggleProject: (projectId: string) => void;
-  onUpdatePriority?: (taskId: string, priority: number | null) => void;
-  onRenameTask?: (taskId: string, title: string) => void;
+  onToggleExpandTask: (taskId: string) => void;
+  onUpdate: (params: TaskUpdateParams) => void;
+  onCreateSubtask: (parentId: string, title: string) => void;
 }
 
 const UNASSIGNED = '_unassigned';
@@ -28,13 +32,20 @@ export function TaskTable({
   activeTab,
   completedTasks,
   collapsedProjects,
+  expandedTasks,
+  childrenCache,
   onToggleTask,
   onToggleProject,
-  onUpdatePriority,
-  onRenameTask,
+  onToggleExpandTask,
+  onUpdate,
+  onCreateSubtask,
 }: TaskTableProps) {
   const showArea = activeTab === 'All';
 
+  const projects = useMemo(() => Array.from(projectMap.values()), [projectMap]);
+  const areas = useMemo(() => Array.from(areaMap.values()), [areaMap]);
+
+  // Tasks are already root-only from the backend (root_only: true)
   const tasksByProject = useMemo(() =>
     tasks.reduce((acc, task) => {
       const key = task.projectId ?? UNASSIGNED;
@@ -59,8 +70,8 @@ export function TaskTable({
   }, [tasksByProject]);
 
   return (
-    <div className="mb-10 overflow-x-auto rounded-xl">
-      <table className="w-full bg-surface-low backdrop-blur-sm border-collapse">
+    <div className="mb-10 rounded-xl">
+      <table className="w-full bg-surface-low border-collapse">
         <thead>
           <tr className="border-b border-border text-[11px] text-muted font-light text-left">
             <th className="px-5 py-3 w-9 font-light" />
@@ -77,21 +88,39 @@ export function TaskTable({
           {sortedEntries.map(([projectId, projectTasks]) => {
             const project = projectMap.get(projectId);
 
+            const isCollapsed = collapsedProjects.has(projectId);
+
             // Unassigned tasks group
             if (projectId === UNASSIGNED) {
-              const isCollapsed = collapsedProjects.has(UNASSIGNED);
               return (
-                <UnassignedGroup
+                <TaskGroup
                   key={UNASSIGNED}
+                  header={
+                    <button
+                      onClick={() => onToggleProject(UNASSIGNED)}
+                      className="w-full flex items-center gap-3 px-5 py-3 bg-overlay hover:bg-overlay-heavy transition-colors text-left"
+                    >
+                      {isCollapsed ? (
+                        <ChevronRight className="w-[14px] h-[14px] text-muted flex-shrink-0" strokeWidth={1.5} />
+                      ) : (
+                        <ChevronDown className="w-[14px] h-[14px] text-muted flex-shrink-0" strokeWidth={1.5} />
+                      )}
+                      <span className="text-[12px] font-light text-muted">No Project</span>
+                      <span className="text-[11px] text-dim font-light">({projectTasks.length})</span>
+                    </button>
+                  }
                   tasks={projectTasks}
-                  areaMap={areaMap}
+                  childrenCache={childrenCache}
+                  projects={projects}
+                  areas={areas}
                   completedTasks={completedTasks}
+                  expandedTasks={expandedTasks}
                   showArea={showArea}
                   isCollapsed={isCollapsed}
-                  onToggle={() => onToggleProject(UNASSIGNED)}
                   onToggleTask={onToggleTask}
-                  onUpdatePriority={onUpdatePriority}
-                  onRenameTask={onRenameTask}
+                  onToggleExpandTask={onToggleExpandTask}
+                  onUpdate={onUpdate}
+                  onCreateSubtask={onCreateSubtask}
                 />
               );
             }
@@ -99,7 +128,6 @@ export function TaskTable({
             // Skip unknown projects
             if (!project) return null;
 
-            const isCollapsed = collapsedProjects.has(projectId);
             const projectObjectives = project.objectiveIds
               ? project.objectiveIds.flatMap(id => {
                   const obj = objectiveMap.get(id);
@@ -108,19 +136,29 @@ export function TaskTable({
               : [];
 
             return (
-              <ProjectGroup
+              <TaskGroup
                 key={projectId}
-                project={project}
+                header={
+                  <ProjectHeader
+                    project={project}
+                    tasks={projectTasks}
+                    objectives={projectObjectives}
+                    isCollapsed={isCollapsed}
+                    onToggle={() => onToggleProject(projectId)}
+                  />
+                }
                 tasks={projectTasks}
-                objectives={projectObjectives}
-                areaMap={areaMap}
+                childrenCache={childrenCache}
+                projects={projects}
+                areas={areas}
                 completedTasks={completedTasks}
+                expandedTasks={expandedTasks}
                 showArea={showArea}
                 isCollapsed={isCollapsed}
-                onToggle={() => onToggleProject(projectId)}
                 onToggleTask={onToggleTask}
-                onUpdatePriority={onUpdatePriority}
-                onRenameTask={onRenameTask}
+                onToggleExpandTask={onToggleExpandTask}
+                onUpdate={onUpdate}
+                onCreateSubtask={onCreateSubtask}
               />
             );
           })}
@@ -130,90 +168,111 @@ export function TaskTable({
   );
 }
 
-/** Project group: header row + task rows. */
-function ProjectGroup({
-  project, tasks, objectives, areaMap, completedTasks, showArea, isCollapsed,
-  onToggle, onToggleTask, onUpdatePriority, onRenameTask,
+/** Renders a task row plus its lazily-loaded subtasks if expanded. */
+function TaskWithSubtasks({
+  task, childrenCache, projects, areas, completedTasks, expandedTasks,
+  showArea, onToggleTask, onToggleExpandTask, onUpdate, onCreateSubtask,
 }: {
-  project: Project; tasks: Task[]; objectives: Objective[];
-  areaMap: Map<string, Area>; completedTasks: Set<string>;
-  showArea: boolean; isCollapsed: boolean;
-  onToggle: () => void; onToggleTask: (id: string) => void;
-  onUpdatePriority?: (id: string, p: number | null) => void;
-  onRenameTask?: (id: string, t: string) => void;
+  task: Task;
+  childrenCache: Map<string, Task[]>;
+  projects: Project[];
+  areas: Area[];
+  completedTasks: Set<string>;
+  expandedTasks: Set<string>;
+  showArea: boolean;
+  onToggleTask: (id: string) => void;
+  onToggleExpandTask: (id: string) => void;
+  onUpdate: (params: TaskUpdateParams) => void;
+  onCreateSubtask: (parentId: string, title: string) => void;
 }) {
-  const colCount = showArea ? 8 : 7;
+  const isExpanded = expandedTasks.has(task.id);
+  const subtasks = childrenCache.get(task.id);
+  const isLoading = isExpanded && !subtasks;
+
   return (
     <>
-      <tr className="border-b border-border-subtle">
-        <td colSpan={colCount} className="p-0">
-          <ProjectHeader
-            project={project}
-            tasks={tasks}
-            objectives={objectives}
-            isCollapsed={isCollapsed}
-            onToggle={onToggle}
-          />
-        </td>
-      </tr>
-      {!isCollapsed && tasks.map(task => (
+      <TaskRow
+        task={task}
+        depth={0}
+        isExpanded={isExpanded}
+        projects={projects}
+        areas={areas}
+        isCompleted={completedTasks.has(task.id)}
+        showArea={showArea}
+        onToggle={() => onToggleTask(task.id)}
+        onToggleExpand={() => onToggleExpandTask(task.id)}
+        onUpdate={onUpdate}
+      />
+      {isLoading && (
+        <tr className="border-b border-border-subtle">
+          <td className="px-5 py-2 w-9" />
+          <td colSpan={showArea ? 7 : 6} className="px-5 py-2">
+            <span className="text-[12px] text-dim font-light" style={{ paddingLeft: 24 }}>Loading...</span>
+          </td>
+        </tr>
+      )}
+      {isExpanded && subtasks && subtasks.map(sub => (
         <TaskRow
-          key={task.id}
-          task={task}
-          project={project}
-          area={areaMap.get(task.areaId)}
-          isCompleted={completedTasks.has(task.id)}
+          key={sub.id}
+          task={sub}
+          depth={1}
+          projects={projects}
+          areas={areas}
+          isCompleted={completedTasks.has(sub.id)}
           showArea={showArea}
-          onToggle={() => onToggleTask(task.id)}
-          onUpdatePriority={onUpdatePriority}
-          onRename={onRenameTask}
+          onToggle={() => onToggleTask(sub.id)}
+          onUpdate={onUpdate}
         />
       ))}
+      {isExpanded && subtasks && (
+        <AddSubtaskRow
+          parentId={task.id}
+          showArea={showArea}
+          onCreate={onCreateSubtask}
+        />
+      )}
     </>
   );
 }
 
-/** Unassigned tasks group: header row + task rows. */
-function UnassignedGroup({
-  tasks, areaMap, completedTasks, showArea, isCollapsed,
-  onToggle, onToggleTask, onUpdatePriority, onRenameTask,
+/** Generic task group: header row + task rows. */
+function TaskGroup({
+  header, tasks, childrenCache, projects, areas, completedTasks, expandedTasks,
+  showArea, isCollapsed,
+  onToggleTask, onToggleExpandTask, onUpdate, onCreateSubtask,
 }: {
-  tasks: Task[];
-  areaMap: Map<string, Area>; completedTasks: Set<string>;
+  header: React.ReactNode;
+  tasks: Task[]; childrenCache: Map<string, Task[]>;
+  projects: Project[]; areas: Area[];
+  completedTasks: Set<string>; expandedTasks: Set<string>;
   showArea: boolean; isCollapsed: boolean;
-  onToggle: () => void; onToggleTask: (id: string) => void;
-  onUpdatePriority?: (id: string, p: number | null) => void;
-  onRenameTask?: (id: string, t: string) => void;
+  onToggleTask: (id: string) => void;
+  onToggleExpandTask: (id: string) => void;
+  onUpdate: (params: TaskUpdateParams) => void;
+  onCreateSubtask: (parentId: string, title: string) => void;
 }) {
   const colCount = showArea ? 8 : 7;
   return (
     <>
       <tr className="border-b border-border-subtle">
         <td colSpan={colCount} className="p-0">
-          <button
-            onClick={onToggle}
-            className="w-full flex items-center gap-3 px-5 py-3 bg-overlay hover:bg-overlay-heavy transition-colors text-left"
-          >
-            {isCollapsed ? (
-              <ChevronRight className="w-[14px] h-[14px] text-muted flex-shrink-0" strokeWidth={1.5} />
-            ) : (
-              <ChevronDown className="w-[14px] h-[14px] text-muted flex-shrink-0" strokeWidth={1.5} />
-            )}
-            <span className="text-[12px] font-light text-muted">No Project</span>
-            <span className="text-[11px] text-dim font-light">({tasks.length})</span>
-          </button>
+          {header}
         </td>
       </tr>
       {!isCollapsed && tasks.map(task => (
-        <TaskRow
+        <TaskWithSubtasks
           key={task.id}
           task={task}
-          area={areaMap.get(task.areaId)}
-          isCompleted={completedTasks.has(task.id)}
+          childrenCache={childrenCache}
+          projects={projects}
+          areas={areas}
+          completedTasks={completedTasks}
+          expandedTasks={expandedTasks}
           showArea={showArea}
-          onToggle={() => onToggleTask(task.id)}
-          onUpdatePriority={onUpdatePriority}
-          onRename={onRenameTask}
+          onToggleTask={onToggleTask}
+          onToggleExpandTask={onToggleExpandTask}
+          onUpdate={onUpdate}
+          onCreateSubtask={onCreateSubtask}
         />
       ))}
     </>

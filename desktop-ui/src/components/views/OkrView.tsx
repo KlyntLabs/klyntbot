@@ -14,7 +14,7 @@ export function OkrView() {
 
   const { data: objectives, refetch } = useQuery<Objective[]>('objective_list', undefined, []);
   const { data: projects } = useQuery<Project[]>('project_list', undefined, []);
-  const createObjective = useMutation<Objective, ObjectiveCreateParams>('objective_create');
+  const createObjective = useMutation<Objective, ObjectiveCreateParams>('objective_create', 'params');
 
   const [expandedProjects, toggleProject] = useSetToggle(
     new Set(projects.map(p => p.id)),

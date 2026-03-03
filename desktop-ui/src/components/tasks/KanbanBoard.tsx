@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { Badge } from '../ui/Badge';
+import { formatDate } from '../../lib/dates';
 import type { Task, Project, Area } from '../../lib/types';
 
 interface KanbanBoardProps {
@@ -90,7 +91,7 @@ export function KanbanBoard({ tasks, projectMap, areaMap, completedTasks }: Kanb
 
                   {/* Due date */}
                   {task.dueDate && (
-                    <p className="text-[10px] text-dim font-light mt-2">{task.dueDate}</p>
+                    <p className="text-[10px] text-dim font-light mt-2">{formatDate(task.dueDate)}</p>
                   )}
                 </div>
               );

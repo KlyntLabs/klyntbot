@@ -18,7 +18,7 @@ const subNav = [
   { label: 'Liabilities', path: '/finance/liabilities' },
 ];
 
-export function FinanceLayout({ children, onRefresh }: FinanceLayoutProps) {
+export function FinanceLayout({ children }: FinanceLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [activeSidebar, setActiveSidebar] = useState<SidebarItem>('Finance');

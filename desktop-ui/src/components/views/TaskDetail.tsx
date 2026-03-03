@@ -16,7 +16,7 @@ export function TaskDetail() {
 
   const { data: tasks, refetch } = useQuery<Task[]>('task_list', undefined, []);
   const { data: projects } = useQuery<Project[]>('project_list', undefined, []);
-  const updateTask = useMutation<Task, TaskUpdateParams>('task_update');
+  const updateTask = useMutation<Task, TaskUpdateParams>('task_update', 'params');
   const deleteTask = useMutation<boolean, { id: string }>('task_delete');
 
   const [editingTitle, setEditingTitle] = useState(false);
@@ -61,8 +61,6 @@ export function TaskDetail() {
       </div>
     );
   }
-
-  const project = projects.find(p => p.id === task.projectId);
 
   return (
     <div className="h-screen w-screen bg-background text-primary flex flex-col overflow-hidden">

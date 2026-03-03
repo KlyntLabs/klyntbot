@@ -15,6 +15,9 @@ export interface Task {
   areaId: string;
   objectiveId?: string;
   description?: string;
+  parentId: string | null;
+  subtaskCount: number;
+  subtaskCompletedCount: number;
 }
 
 export interface TodayTask {
@@ -389,6 +392,16 @@ export interface TaskUpdateParams {
   areaId?: string;
   tags?: string[];
   keyResultId?: string | null;
+}
+
+export interface TaskCreateParams {
+  title: string;
+  areaId?: string;
+  projectId?: string;
+  priority?: number;
+  dueDate?: string;
+  tags?: string[];
+  parentId?: string;
 }
 
 export interface AreaCreateParams {

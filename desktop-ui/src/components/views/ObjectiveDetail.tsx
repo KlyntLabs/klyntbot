@@ -1,7 +1,6 @@
 import { useState, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router';
 import { ArrowLeft, Trash2, Plus } from 'lucide-react';
-import { Badge } from '../ui/Badge';
 import { Progress } from '../ui/Progress';
 import { useQuery } from '../../hooks/useQuery';
 import { useMutation } from '../../hooks/useMutation';
@@ -22,9 +21,9 @@ export function ObjectiveDetail() {
 
   const { data: objectives, refetch } = useQuery<Objective[]>('objective_list', undefined, []);
   const { data: projects } = useQuery<Project[]>('project_list', undefined, []);
-  const updateObjective = useMutation<Objective, ObjectiveUpdateParams>('objective_update');
+  const updateObjective = useMutation<Objective, ObjectiveUpdateParams>('objective_update', 'params');
   const deleteObjective = useMutation<boolean, { id: string }>('objective_delete');
-  const createKr = useMutation<KeyResult, KeyResultCreateParams>('key_result_create');
+  const createKr = useMutation<KeyResult, KeyResultCreateParams>('key_result_create', 'params');
   const updateKrMetric = useMutation<KeyResult, { id: string; currentValue: number }>('key_result_update_metric');
   const deleteKr = useMutation<boolean, { id: string }>('key_result_delete');
 

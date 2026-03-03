@@ -12,9 +12,14 @@ interface MutationResult<T, P> {
 /**
  * Wraps a Tauri command for write operations.
  * Returns `undefined` in browser dev mode.
+ *
+ * When `wrapKey` is provided, params are nested under that key before invoking.
+ * This is required for Tauri commands that accept a struct parameter (e.g.
+ * `fn task_update(params: TaskUpdateParams)` needs `{ params: { ... } }`).
  */
 export function useMutation<T = void, P = Record<string, unknown>>(
   cmd: string,
+  wrapKey?: string,
 ): MutationResult<T, P> {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
@@ -26,7 +31,10 @@ export function useMutation<T = void, P = Record<string, unknown>>(
       setLoading(true);
       setError(null);
       try {
-        const result = await ipc<T>(cmd, params as Record<string, unknown>);
+        const args = wrapKey
+          ? { [wrapKey]: params }
+          : (params as Record<string, unknown>);
+        const result = await ipc<T>(cmd, args);
         return result;
       } catch (e) {
         setError(parseApiError(e));
@@ -35,7 +43,7 @@ export function useMutation<T = void, P = Record<string, unknown>>(
         setLoading(false);
       }
     },
-    [cmd],
+    [cmd, wrapKey],
   );
 
   return { mutate, loading, error };

@@ -43,9 +43,13 @@
   --overlay:       rgba(0, 0, 0, 0.15);
   --overlay-heavy: rgba(0, 0, 0, 0.2);
 
-  /* ── Floating window backgrounds ─────────── */
+  /* ── Floating / glass ─────────────────────── */
   --surface-floating: #1a1a1f;
-  --surface-glass:    rgba(0, 0, 0, 0.4);
+  --surface-glass:    rgba(14, 12, 10, 0.72);
+  --glass-border:     rgba(255, 255, 255, 0.1);
+  --glass-shadow:     0 8px 32px rgba(0, 0, 0, 0.45);
+  --glass-padding:    6px;
+  --glass-radius-inner: calc(var(--radius-xl) - var(--glass-padding));
 }
 
 @theme inline {
@@ -145,6 +149,22 @@
     font-size: var(--text-base);
     font-weight: var(--font-weight-light);
     line-height: 1.5;
+  }
+}
+
+/* ── Glass panel ──────────────────────────────
+   Reusable glassmorphism for dropdowns, popups,
+   popovers, dialogs, and floating panels.
+   Uses @apply for backdrop-filter so Tailwind
+   composes filter functions correctly.            */
+@layer utilities {
+  .glass-panel {
+    @apply backdrop-blur-[80px] backdrop-saturate-150;
+    background: var(--surface-glass);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--glass-shadow);
+    padding: var(--glass-padding);
   }
 }
 
