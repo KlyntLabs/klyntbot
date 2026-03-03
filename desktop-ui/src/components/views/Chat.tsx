@@ -8,6 +8,7 @@ import {
 import { Sidebar } from '../layout/Sidebar';
 import { MessageList } from '../chat/MessageList';
 import { TransparencyToggle } from '../chat/TransparencyToggle';
+import { TransparencyPanel } from '../chat/TransparencyPanel';
 import { useSetToggle } from '../../hooks/useSetToggle';
 import { useQuery } from '../../hooks/useQuery';
 import { useChatSession } from '../../hooks/useChatSession';
@@ -76,6 +77,19 @@ export function Chat() {
       return next;
     });
   }, []);
+
+  // Derive the "current" transparency data for the right panel:
+  // live stream data while streaming, otherwise the last assistant message's data.
+  const lastAssistantTransparency = useMemo(() => {
+    for (let i = chat.messages.length - 1; i >= 0; i--) {
+      const m = chat.messages[i];
+      if (m.role === 'assistant' && m.transparency) return m.transparency;
+    }
+    return null;
+    // Only rescan when the message count changes (not on every array reference change)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chat.messages.length]);
+  const activeTransparency = (chat.isStreaming && chat.transparency) ? chat.transparency : lastAssistantTransparency;
 
   // Auto-select first thread only on initial page load.
   // Once this fires, further thread selection is user-driven.
@@ -394,96 +408,103 @@ export function Chat() {
         </div>
       )}
 
-      {/* Right Panel — Conversation */}
-      <div className="flex-1 flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-end px-4 py-2 border-b border-border">
-          <TransparencyToggle enabled={showTransparency} onToggle={toggleTransparency} />
-        </div>
+      {/* Right Panel — Conversation + Transparency */}
+      <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Header */}
+          <div className="flex items-center justify-end px-4 py-2 border-b border-border">
+            <TransparencyToggle enabled={showTransparency} onToggle={toggleTransparency} />
+          </div>
 
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-3xl mx-auto">
-            {chat.messages.length === 0 && !chat.isStreaming ? (
-              <div className="flex flex-col items-center justify-center py-20">
-                <p className="text-muted text-sm font-light">Start a conversation</p>
-                <p className="text-dim text-xs font-light mt-1">
-                  Ask Klynt anything about your tasks, projects, or schedule
-                </p>
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto p-6">
+            <div className="max-w-3xl mx-auto">
+              {chat.messages.length === 0 && !chat.isStreaming ? (
+                <div className="flex flex-col items-center justify-center py-20">
+                  <p className="text-muted text-sm font-light">Start a conversation</p>
+                  <p className="text-dim text-xs font-light mt-1">
+                    Ask Klynt anything about your tasks, projects, or schedule
+                  </p>
+                </div>
+              ) : (
+                <MessageList
+                  messages={chat.messages}
+                  segments={chat.segments}
+                  isStreaming={chat.isStreaming}
+                  activeTools={chat.activeTools}
+                  error={chat.error}
+                  activeInteraction={chat.activeInteraction}
+                  sessionKey={selectedThread}
+                  onInteractionSubmitted={() => {
+                    chat.clearInteraction();
+                    refetchThreads();
+                  }}
+                  showTransparency={showTransparency}
+                  liveTransparency={chat.transparency}
+                />
+              )}
+            </div>
+          </div>
+
+          {/* Input Area */}
+          <div className="p-6">
+            <div className="max-w-3xl mx-auto">
+              <div className="bg-surface-base rounded-2xl flex items-center px-2 gap-2">
+                <button className="w-8 h-8 flex items-center justify-center text-muted hover:text-secondary transition-colors shrink-0">
+                  <Plus className="w-4 h-4" strokeWidth={1.5} />
+                </button>
+                <textarea
+                  value={chat.input}
+                  onChange={(e) => chat.setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSend();
+                    }
+                  }}
+                  placeholder="Ask Klynt anything, @ to add files, / for commands"
+                  rows={1}
+                  className="flex-1 bg-transparent py-3.5 text-[13px] text-primary placeholder:text-muted focus:outline-none font-light resize-none"
+                  style={{ maxHeight: '200px' }}
+                />
+                <button className="w-8 h-8 flex items-center justify-center text-muted hover:text-secondary transition-colors shrink-0">
+                  <Mic className="w-4 h-4" strokeWidth={1.5} />
+                </button>
+                <button
+                  onClick={handleSend}
+                  disabled={!chat.input.trim() || chat.isStreaming}
+                  className="w-9 h-9 rounded-full bg-brand hover:bg-brand/90 disabled:bg-surface-base disabled:text-muted flex items-center justify-center transition-colors shrink-0"
+                >
+                  <Send className="w-4 h-4" strokeWidth={2} />
+                </button>
               </div>
-            ) : (
-              <MessageList
-                messages={chat.messages}
-                segments={chat.segments}
-                isStreaming={chat.isStreaming}
-                activeTools={chat.activeTools}
-                error={chat.error}
-                activeInteraction={chat.activeInteraction}
-                sessionKey={selectedThread}
-                onInteractionSubmitted={() => {
-                  chat.clearInteraction();
-                  refetchThreads();
-                }}
-                showTransparency={showTransparency}
-                liveTransparency={chat.transparency}
-              />
-            )}
+              <div className="flex items-center justify-between mt-2">
+                <div className="flex items-center gap-2">
+                  <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-base hover:bg-surface-raised transition-colors text-[11px] font-light text-muted">
+                    <Server className="w-3.5 h-3.5" strokeWidth={1.5} />
+                    <span>Local</span>
+                    <ChevronDown className="w-3 h-3" strokeWidth={1.5} />
+                  </button>
+                  <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-base hover:bg-surface-raised transition-colors text-[11px] font-light text-muted">
+                    <Shield className="w-3.5 h-3.5" strokeWidth={1.5} />
+                    <span>Default permissions</span>
+                    <ChevronDown className="w-3 h-3" strokeWidth={1.5} />
+                  </button>
+                </div>
+                <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-base hover:bg-surface-raised transition-colors text-[11px] font-light text-muted">
+                  <FolderOpen className="w-3.5 h-3.5" strokeWidth={1.5} />
+                  <span>KlyntBot</span>
+                  <ChevronDown className="w-3 h-3" strokeWidth={1.5} />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Input Area */}
-        <div className="p-6">
-          <div className="max-w-3xl mx-auto">
-            <div className="bg-surface-base rounded-2xl flex items-center px-2 gap-2">
-              <button className="w-8 h-8 flex items-center justify-center text-muted hover:text-secondary transition-colors shrink-0">
-                <Plus className="w-4 h-4" strokeWidth={1.5} />
-              </button>
-              <textarea
-                value={chat.input}
-                onChange={(e) => chat.setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSend();
-                  }
-                }}
-                placeholder="Ask Klynt anything, @ to add files, / for commands"
-                rows={1}
-                className="flex-1 bg-transparent py-3.5 text-[13px] text-primary placeholder:text-muted focus:outline-none font-light resize-none"
-                style={{ maxHeight: '200px' }}
-              />
-              <button className="w-8 h-8 flex items-center justify-center text-muted hover:text-secondary transition-colors shrink-0">
-                <Mic className="w-4 h-4" strokeWidth={1.5} />
-              </button>
-              <button
-                onClick={handleSend}
-                disabled={!chat.input.trim() || chat.isStreaming}
-                className="w-9 h-9 rounded-full bg-brand hover:bg-brand/90 disabled:bg-surface-base disabled:text-muted flex items-center justify-center transition-colors shrink-0"
-              >
-                <Send className="w-4 h-4" strokeWidth={2} />
-              </button>
-            </div>
-            <div className="flex items-center justify-between mt-2">
-              <div className="flex items-center gap-2">
-                <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-base hover:bg-surface-raised transition-colors text-[11px] font-light text-muted">
-                  <Server className="w-3.5 h-3.5" strokeWidth={1.5} />
-                  <span>Local</span>
-                  <ChevronDown className="w-3 h-3" strokeWidth={1.5} />
-                </button>
-                <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-base hover:bg-surface-raised transition-colors text-[11px] font-light text-muted">
-                  <Shield className="w-3.5 h-3.5" strokeWidth={1.5} />
-                  <span>Default permissions</span>
-                  <ChevronDown className="w-3 h-3" strokeWidth={1.5} />
-                </button>
-              </div>
-              <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-base hover:bg-surface-raised transition-colors text-[11px] font-light text-muted">
-                <FolderOpen className="w-3.5 h-3.5" strokeWidth={1.5} />
-                <span>KlyntBot</span>
-                <ChevronDown className="w-3 h-3" strokeWidth={1.5} />
-              </button>
-            </div>
-          </div>
-        </div>
+        {/* Transparency Sidebar */}
+        {showTransparency && activeTransparency && (
+          <TransparencyPanel transparency={activeTransparency} />
+        )}
       </div>
     </div>
   );

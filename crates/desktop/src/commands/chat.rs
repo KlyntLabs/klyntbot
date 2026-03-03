@@ -1,6 +1,6 @@
 //! Chat commands — wired to AgentLoop with streaming events.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 
 use agent::AgentEvent;
@@ -213,6 +213,11 @@ pub async fn chat_send(
         let mut tool_names: Vec<String> = Vec::with_capacity(4);
         let mut entity_cards: Vec<common::EntityCard> = Vec::new();
 
+        // Pending action names: ToolStart stashes the action extracted from args,
+        // ToolEnd pops it to build the qualified name (e.g. "task:list").
+        let mut pending_actions: HashMap<String, VecDeque<String>> = HashMap::new();
+        let mut tool_token_sum: u32 = 0;
+
         // Segment accumulation for structured message persistence
         let mut segments: Vec<events::MessageSegment> = Vec::with_capacity(8);
         let mut current_text = String::new();
@@ -256,37 +261,60 @@ pub async fn chat_send(
                                 },
                             );
                         }
-                        AgentEvent::ToolStart { name, .. } => {
+                        AgentEvent::ToolStart { name, args } => {
                             flush_text(&mut current_text, &mut segments);
                             tool_names.push(name.clone());
+                            let action = args.get("action").and_then(|v| v.as_str()).map(String::from);
+                            if let Some(ref a) = action {
+                                pending_actions.entry(name.clone()).or_default().push_back(a.clone());
+                            }
                             let _ = app.emit(
                                 AGENT_TOOL_START,
                                 ToolStartPayload {
                                     session_key: sk.clone(),
                                     name,
+                                    action,
                                 },
                             );
                         }
                         AgentEvent::ToolEnd { name, success, duration_ms, result } => {
+                            // Pop the stashed action from ToolStart (FIFO per tool name)
+                            let action = match pending_actions.entry(name.clone()) {
+                                std::collections::hash_map::Entry::Occupied(mut e) => {
+                                    let a = e.get_mut().pop_front();
+                                    if e.get().is_empty() { e.remove(); }
+                                    a
+                                }
+                                std::collections::hash_map::Entry::Vacant(_) => None,
+                            };
+                            // Estimate tokens from result length (~4 chars per token)
+                            let estimated_tokens = result.as_ref().map(|r| (r.len() as u32).saturating_add(3) / 4);
+                            if let Some(t) = estimated_tokens { tool_token_sum += t; }
                             segments.push(events::MessageSegment::Tool {
                                 name: name.clone(),
+                                action: action.clone(),
                                 success,
                                 duration_ms,
                                 result: result.clone(),
+                                estimated_tokens,
                             });
                             transparency.tools.push(desktop_shared::events::TransparencyTool {
                                 name: name.clone(),
+                                action: action.clone(),
                                 success,
                                 duration_ms,
+                                estimated_tokens,
                             });
                             let _ = app.emit(
                                 AGENT_TOOL_END,
                                 ToolEndPayload {
                                     session_key: sk.clone(),
                                     name,
+                                    action,
                                     success,
                                     duration_ms,
                                     result,
+                                    estimated_tokens,
                                 },
                             );
                         }
@@ -307,6 +335,9 @@ pub async fn chat_send(
                         }
                         AgentEvent::Done { content } => {
                             flush_text(&mut current_text, &mut segments);
+                            if tool_token_sum > 0 {
+                                transparency.tool_tokens_total = Some(tool_token_sum);
+                            }
                             // Persist segments + transparency to the assistant message metadata
                             let mut meta = serde_json::Map::new();
                             if !segments.is_empty() {

@@ -14,10 +14,14 @@ pub enum MessageSegment {
     #[serde(rename = "tool", rename_all = "camelCase")]
     Tool {
         name: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        action: Option<String>,
         success: bool,
         duration_ms: u64,
         #[serde(skip_serializing_if = "Option::is_none")]
         result: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        estimated_tokens: Option<u32>,
     },
 }
 
@@ -58,6 +62,8 @@ pub struct DonePayload {
 pub struct ToolStartPayload {
     pub session_key: String,
     pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub action: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -65,10 +71,14 @@ pub struct ToolStartPayload {
 pub struct ToolEndPayload {
     pub session_key: String,
     pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub action: Option<String>,
     pub success: bool,
     pub duration_ms: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub result: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub estimated_tokens: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -194,6 +204,8 @@ pub struct TransparencyData {
     pub timing: Option<TransparencyTiming>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub tools: Vec<TransparencyTool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_tokens_total: Option<u32>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub memory_accesses: Vec<TransparencyMemoryAccess>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
@@ -236,8 +248,12 @@ pub struct TransparencyTiming {
 #[serde(rename_all = "camelCase")]
 pub struct TransparencyTool {
     pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub action: Option<String>,
     pub success: bool,
     pub duration_ms: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub estimated_tokens: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

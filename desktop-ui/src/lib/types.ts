@@ -66,7 +66,7 @@ export interface CalendarEvent {
 
 export type MessageSegment =
   | { type: 'text'; content: string }
-  | { type: 'tool'; name: string; success: boolean; durationMs: number; result?: string };
+  | { type: 'tool'; name: string; action?: string; success: boolean; durationMs: number; result?: string; estimatedTokens?: number };
 
 export interface ChatMessage {
   id: string;
@@ -108,14 +108,17 @@ export interface ContentChunkPayload {
 export interface ToolStartPayload {
   sessionKey: string;
   name: string;
+  action?: string;
 }
 
 export interface ToolEndPayload {
   sessionKey: string;
   name: string;
+  action?: string;
   success: boolean;
   durationMs: number;
   result?: string;
+  estimatedTokens?: number;
 }
 
 export interface AgentDonePayload {
@@ -191,7 +194,8 @@ export interface TransparencyData {
   usage?: { promptTokens: number; completionTokens: number; cacheReadTokens: number; cacheWriteTokens: number };
   cost?: { estimatedUsd: number; model: string };
   timing?: { totalMs: number; classificationMs?: number; contextAssemblyMs?: number };
-  tools?: { name: string; success: boolean; durationMs: number }[];
+  tools?: { name: string; action?: string; success: boolean; durationMs: number; estimatedTokens?: number }[];
+  toolTokensTotal?: number;
   memoryAccesses?: { action: string; query?: string; resultsCount: number }[];
   skills?: { name: string; trigger: string }[];
   execution?: { engine: string; iterations: number; maxIterations: number; escalations: number };

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ChevronRight, Check, X } from 'lucide-react';
 import { MarkdownContent } from './MarkdownContent';
-import { formatDuration } from '../../lib/utils';
+import { formatDuration, formatTokens, qualifiedToolName } from '../../lib/utils';
 import type { MessageSegment } from '../../lib/types';
 
 interface SegmentedMessageProps {
@@ -29,7 +29,8 @@ function toolColor(name: string) {
 
 function CompletedToolSegment({ segment }: { segment: Extract<MessageSegment, { type: 'tool' }> }) {
   const [expanded, setExpanded] = useState(false);
-  const color = toolColor(segment.name);
+  const qualifiedName = qualifiedToolName(segment.name, segment.action);
+  const color = toolColor(qualifiedName);
 
   return (
     <div className="my-1.5">
@@ -46,13 +47,23 @@ function CompletedToolSegment({ segment }: { segment: Extract<MessageSegment, { 
         ) : (
           <X className="w-3 h-3 text-destructive" strokeWidth={2} />
         )}
-        <span>{segment.name}</span>
+        <span>{qualifiedName}</span>
         <span className="text-dim">{formatDuration(segment.durationMs)}</span>
       </button>
-      {expanded && segment.result && (
-        <pre className="mt-1 ml-5 p-2 text-[11px] font-light text-secondary bg-surface-base border border-border rounded-lg overflow-x-auto whitespace-pre-wrap break-words">
-          {segment.result}
-        </pre>
+      {expanded && (
+        <div className="mt-1 ml-5 space-y-1">
+          {segment.result && (
+            <pre className="p-2 text-[11px] font-light text-secondary bg-surface-base border border-border rounded-lg overflow-x-auto whitespace-pre-wrap break-words">
+              {segment.result}
+            </pre>
+          )}
+          <div className="flex items-center gap-2 text-[10px] font-light text-dim">
+            <span>{formatDuration(segment.durationMs)}</span>
+            {segment.estimatedTokens && (
+              <span>~{formatTokens(segment.estimatedTokens)} tokens</span>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

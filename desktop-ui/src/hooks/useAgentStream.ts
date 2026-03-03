@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useEvent } from './useEvent';
-import { isTauri } from '../lib/utils';
+import { isTauri, qualifiedToolName } from '../lib/utils';
 import type {
   ActiveInteraction,
   ContentChunkPayload,
@@ -140,14 +140,15 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
     // Flush text before the tool segment and reset for the next text segment
     flushText();
     streamTextRef.current = '';
-    setActiveTools((prev) => [...prev, payload.name]);
+    setActiveTools((prev) => [...prev, qualifiedToolName(payload.name, payload.action)]);
   });
 
   useEvent<ToolEndPayload>('agent:tool_end', (payload) => {
     if (!isOurSession(payload)) return;
+    const displayName = qualifiedToolName(payload.name, payload.action);
     // Remove only the first occurrence (handles concurrent calls of same tool)
     setActiveTools((prev) => {
-      const idx = prev.indexOf(payload.name);
+      const idx = prev.indexOf(displayName);
       if (idx === -1) return prev;
       return [...prev.slice(0, idx), ...prev.slice(idx + 1)];
     });
@@ -156,14 +157,25 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
       {
         type: 'tool',
         name: payload.name,
+        action: payload.action,
         success: payload.success,
         durationMs: payload.durationMs,
         result: payload.result,
+        estimatedTokens: payload.estimatedTokens,
       },
     ]);
     setTransparency((prev) => ({
       ...prev,
-      tools: [...(prev?.tools ?? []), { name: payload.name, success: payload.success, durationMs: payload.durationMs }],
+      tools: [
+        ...(prev?.tools ?? []),
+        {
+          name: payload.name,
+          action: payload.action,
+          success: payload.success,
+          durationMs: payload.durationMs,
+          estimatedTokens: payload.estimatedTokens,
+        },
+      ],
     }));
   });
 

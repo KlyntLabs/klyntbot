@@ -4,7 +4,6 @@ import { SegmentedMessage } from './SegmentedMessage';
 import { CollapsedInteraction } from './CollapsedInteraction';
 import { InteractionCard } from './InteractionCard';
 import { TokenBadge } from './TokenBadge';
-import { TransparencyPanel } from './TransparencyPanel';
 import type { ActiveInteraction, ChatMessage, MessageSegment, TransparencyData } from '../../lib/types';
 
 interface MessageListProps {
@@ -61,10 +60,7 @@ export function MessageList({
                 <MarkdownContent content={msg.content} />
               )}
               {showTransparency && msg.transparency && (
-                <>
-                  <TokenBadge transparency={msg.transparency} />
-                  <TransparencyPanel transparency={msg.transparency} />
-                </>
+                <TokenBadge transparency={msg.transparency} />
               )}
             </div>
           )}
@@ -81,10 +77,7 @@ export function MessageList({
               isStreaming={isStreaming}
             />
             {showTransparency && liveTransparency && (
-              <>
-                <TokenBadge transparency={liveTransparency} isStreaming={isStreaming} />
-                <TransparencyPanel transparency={liveTransparency} />
-              </>
+              <TokenBadge transparency={liveTransparency} isStreaming={isStreaming} />
             )}
           </div>
         </div>

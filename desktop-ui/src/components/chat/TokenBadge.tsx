@@ -1,18 +1,7 @@
 import { useState } from 'react';
 import { ChevronDown, Loader2 } from 'lucide-react';
-import { formatDuration } from '../../lib/utils';
+import { formatCost, formatDuration, formatTokens } from '../../lib/utils';
 import type { TransparencyData } from '../../lib/types';
-
-function formatTokens(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return String(n);
-}
-
-function formatCost(usd: number): string {
-  if (usd < 0.01) return `$${usd.toFixed(4)}`;
-  return `$${usd.toFixed(3)}`;
-}
 
 interface TokenBadgeProps {
   transparency: TransparencyData;
@@ -70,6 +59,12 @@ export function TokenBadge({ transparency, isStreaming }: TokenBadgeProps) {
             <div className="flex justify-between text-muted">
               <span>Cache write</span>
               <span className="text-secondary">{usage.cacheWriteTokens.toLocaleString()}</span>
+            </div>
+          )}
+          {transparency.toolTokensTotal && transparency.toolTokensTotal > 0 && (
+            <div className="flex justify-between text-muted">
+              <span>Tool I/O (est.)</span>
+              <span className="text-secondary">~{formatTokens(transparency.toolTokensTotal)}</span>
             </div>
           )}
           {cost && (

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import {
   ChevronDown, FileText, Package, Cpu, Brain, Database, Bot, BookOpen,
 } from 'lucide-react';
-import { formatDuration } from '../../lib/utils';
+import { formatDuration, formatTokens, qualifiedToolName } from '../../lib/utils';
 import type { TransparencyData } from '../../lib/types';
 
 interface CollapsibleBoxProps {
@@ -48,59 +48,75 @@ interface TransparencyPanelProps {
 }
 
 export function TransparencyPanel({ transparency }: TransparencyPanelProps) {
-  const { memoryAccesses, skills, execution, classification, subagents, learning, tools } = transparency;
-  const hasKlyntbot = (memoryAccesses && memoryAccesses.length > 0) || (tools && tools.length > 0);
-  const hasContext = skills && skills.length > 0;
-  const hasExecution = execution || classification || (subagents && subagents.length > 0) || (learning && learning.length > 0);
+  const { memoryAccesses, skills, execution, classification, subagents, learning, tools, toolTokensTotal } = transparency;
 
-  if (!hasKlyntbot && !hasContext && !hasExecution) return null;
+  const hasMemory = memoryAccesses && memoryAccesses.length > 0;
+  const hasSkills = skills && skills.length > 0;
+  const hasExecution = execution || classification;
+  const hasAgents = subagents && subagents.length > 0;
+  const hasLearning = learning && learning.length > 0;
+  const hasTools = tools && tools.length > 0;
+
+  if (!hasMemory && !hasSkills && !hasExecution && !hasAgents && !hasLearning && !hasTools) return null;
 
   return (
-    <div className="mt-2 space-y-1.5">
-      {/* Klyntbot Box */}
-      {hasKlyntbot && (
-        <CollapsibleBox title="klyntbot" icon={Brain}>
-          {memoryAccesses?.map((ma, i) => (
+    <div className="w-64 border-l border-border bg-background overflow-y-auto p-3 space-y-2 shrink-0">
+      <div className="text-[10px] font-medium text-dim uppercase tracking-wider px-1">Transparency</div>
+
+      {/* Tools summary */}
+      {hasTools && (
+        <CollapsibleBox title="Tools" icon={Cpu}>
+          {tools!.map((tool, i) => {
+            const qName = qualifiedToolName(tool.name, tool.action);
+            const parts = [formatDuration(tool.durationMs)];
+            if (tool.estimatedTokens) parts.push(`~${formatTokens(tool.estimatedTokens)} tok`);
+            return <Row key={`tool-${i}`} icon={Cpu} label={qName} detail={parts.join(' · ')} />;
+          })}
+          {toolTokensTotal && toolTokensTotal > 0 && (
+            <div className="pt-1 mt-1 border-t border-border flex justify-between text-dim">
+              <span>Total I/O (est.)</span>
+              <span>~{formatTokens(toolTokensTotal)}</span>
+            </div>
+          )}
+        </CollapsibleBox>
+      )}
+
+      {/* Memory */}
+      {hasMemory && (
+        <CollapsibleBox title="Memory" icon={Brain}>
+          {memoryAccesses!.map((ma, i) => (
             <Row
               key={`mem-${i}`}
               icon={FileText}
-              label={`memory: ${ma.query ?? ma.action}`}
+              label={ma.query ?? ma.action}
               detail={ma.resultsCount > 0 ? `${ma.resultsCount} hits` : undefined}
-            />
-          ))}
-          {tools?.map((tool, i) => (
-            <Row
-              key={`tool-${i}`}
-              icon={Cpu}
-              label={tool.name}
-              detail={formatDuration(tool.durationMs)}
             />
           ))}
         </CollapsibleBox>
       )}
 
-      {/* Context Box */}
-      {hasContext && (
-        <CollapsibleBox title="Context" icon={BookOpen}>
-          {skills?.map((skill, i) => (
+      {/* Skills */}
+      {hasSkills && (
+        <CollapsibleBox title="Skills" icon={BookOpen}>
+          {skills!.map((skill, i) => (
             <Row
               key={`skill-${i}`}
               icon={Package}
-              label={`skill: ${skill.name}`}
+              label={skill.name}
               detail={skill.trigger}
             />
           ))}
         </CollapsibleBox>
       )}
 
-      {/* Execution Detail */}
+      {/* Execution */}
       {hasExecution && (
-        <CollapsibleBox title="Execution" icon={Cpu} defaultOpen={false}>
+        <CollapsibleBox title="Execution" icon={Cpu}>
           {execution && (
             <Row
               icon={Cpu}
               label={`Engine: ${execution.engine}`}
-              detail={`${execution.iterations}/${execution.maxIterations} iterations`}
+              detail={`${execution.iterations}/${execution.maxIterations} itr`}
             />
           )}
           {classification && (
@@ -110,17 +126,31 @@ export function TransparencyPanel({ transparency }: TransparencyPanelProps) {
               detail={`${Math.round(classification.confidence * 100)}%`}
             />
           )}
-          {subagents?.map((sa, i) => (
-            <Row key={`sa-${i}`} icon={Bot} label={`Agent: ${sa.label}`} detail={sa.profile} />
-          ))}
-          {learning?.map((le, i) => (
-            <Row key={`le-${i}`} icon={Database} label={le.eventType} detail={le.detail} />
-          ))}
-          {(!subagents || subagents.length === 0) && (
-            <Row icon={Bot} label="Agents: none" />
+        </CollapsibleBox>
+      )}
+
+      {/* Agents — always visible when execution data exists */}
+      {hasExecution && (
+        <CollapsibleBox title="Agents" icon={Bot} defaultOpen={hasAgents}>
+          {hasAgents ? (
+            subagents!.map((sa, i) => (
+              <Row key={`sa-${i}`} icon={Bot} label={sa.label} detail={sa.profile} />
+            ))
+          ) : (
+            <span className="text-dim">none</span>
           )}
-          {(!learning || learning.length === 0) && (
-            <Row icon={Database} label="Learning: none" />
+        </CollapsibleBox>
+      )}
+
+      {/* Learning — always visible when execution data exists */}
+      {hasExecution && (
+        <CollapsibleBox title="Learning" icon={Database} defaultOpen={hasLearning}>
+          {hasLearning ? (
+            learning!.map((le, i) => (
+              <Row key={`le-${i}`} icon={Database} label={le.eventType} detail={le.detail} />
+            ))
+          ) : (
+            <span className="text-dim">none</span>
           )}
         </CollapsibleBox>
       )}
