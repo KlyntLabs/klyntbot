@@ -361,21 +361,14 @@ pub async fn chat_send(
                                 confidence,
                                 source: source.clone(),
                             });
-                            if let Some(ref mut timing) = transparency.timing {
-                                timing.classification_ms = Some(duration_ms);
-                            } else {
-                                transparency.timing = Some(desktop_shared::events::TransparencyTiming {
-                                    total_ms: 0,
-                                    classification_ms: Some(duration_ms),
-                                    context_assembly_ms: None,
-                                });
-                            }
+                            transparency.timing.get_or_insert_with(Default::default).classification_ms = Some(duration_ms);
                             let _ = app.emit(
                                 AGENT_CLASSIFICATION_COMPLETE,
                                 ClassificationCompletePayload {
                                     session_key: sk.clone(),
                                     strategy,
                                     confidence,
+                                    source,
                                 },
                             );
                         }
@@ -396,15 +389,7 @@ pub async fn chat_send(
                             );
                         }
                         AgentEvent::ContextAssembled { duration_ms, .. } => {
-                            if let Some(ref mut timing) = transparency.timing {
-                                timing.context_assembly_ms = Some(duration_ms);
-                            } else {
-                                transparency.timing = Some(desktop_shared::events::TransparencyTiming {
-                                    total_ms: 0,
-                                    classification_ms: None,
-                                    context_assembly_ms: Some(duration_ms),
-                                });
-                            }
+                            transparency.timing.get_or_insert_with(Default::default).context_assembly_ms = Some(duration_ms);
                         }
                         AgentEvent::IterationStart { iteration, max } => {
                             if let Some(ref mut exec) = transparency.execution {
@@ -444,15 +429,7 @@ pub async fn chat_send(
                                 estimated_usd: estimated_cost_usd,
                                 model: model.clone(),
                             });
-                            if let Some(ref mut timing) = transparency.timing {
-                                timing.total_ms = response_time_ms;
-                            } else {
-                                transparency.timing = Some(desktop_shared::events::TransparencyTiming {
-                                    total_ms: response_time_ms,
-                                    classification_ms: None,
-                                    context_assembly_ms: None,
-                                });
-                            }
+                            transparency.timing.get_or_insert_with(Default::default).total_ms = response_time_ms;
                             let _ = app.emit(
                                 events::AGENT_USAGE_REPORT,
                                 events::UsageReportPayload {

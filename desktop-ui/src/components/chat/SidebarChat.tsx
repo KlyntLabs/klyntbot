@@ -88,6 +88,8 @@ export function SidebarChat({ isOpen, onClose }: SidebarChatProps) {
             activeInteraction={chat.activeInteraction}
             sessionKey={sessionKey}
             onInteractionSubmitted={() => chat.clearInteraction()}
+            showTransparency={false}
+            liveTransparency={null}
           />
         )}
       </div>

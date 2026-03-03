@@ -102,6 +102,10 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
     resetStream();
   }, [sessionKey, resetStream]);
 
+  /** Guard: true if this payload belongs to our active session. */
+  const isOurSession = (payload: { sessionKey: string }) =>
+    sessionKeyRef.current !== '' && payload.sessionKey === sessionKeyRef.current;
+
   const startStreaming = useCallback(() => {
     resetStream();
     setIsStreaming(true);
@@ -124,7 +128,7 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
   }, [resetStream]);
 
   useEvent<ContentChunkPayload>('agent:content_chunk', (payload) => {
-    if (!sessionKeyRef.current || payload.sessionKey !== sessionKeyRef.current) return;
+    if (!isOurSession(payload)) return;
     streamTextRef.current += payload.data;
     if (!rafRef.current) {
       rafRef.current = requestAnimationFrame(flushText);
@@ -132,7 +136,7 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
   });
 
   useEvent<ToolStartPayload>('agent:tool_start', (payload) => {
-    if (!sessionKeyRef.current || payload.sessionKey !== sessionKeyRef.current) return;
+    if (!isOurSession(payload)) return;
     // Flush text before the tool segment and reset for the next text segment
     flushText();
     streamTextRef.current = '';
@@ -140,7 +144,7 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
   });
 
   useEvent<ToolEndPayload>('agent:tool_end', (payload) => {
-    if (!sessionKeyRef.current || payload.sessionKey !== sessionKeyRef.current) return;
+    if (!isOurSession(payload)) return;
     // Remove only the first occurrence (handles concurrent calls of same tool)
     setActiveTools((prev) => {
       const idx = prev.indexOf(payload.name);
@@ -164,12 +168,12 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
   });
 
   useEvent<InteractionRequestPayload>('agent:interaction_request', (payload) => {
-    if (!sessionKeyRef.current || payload.sessionKey !== sessionKeyRef.current) return;
+    if (!isOurSession(payload)) return;
     setActiveInteraction({ requestId: payload.requestId, request: payload.request });
   });
 
   useEvent<AgentDonePayload>('agent:done', (payload) => {
-    if (!sessionKeyRef.current || payload.sessionKey !== sessionKeyRef.current) return;
+    if (!isOurSession(payload)) return;
     setActiveInteraction(null);
     // Flush any trailing text and keep segments visible until persisted messages arrive
     flushText();
@@ -179,21 +183,21 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
   });
 
   useEvent<AgentErrorPayload>('agent:error', (payload) => {
-    if (!sessionKeyRef.current || payload.sessionKey !== sessionKeyRef.current) return;
+    if (!isOurSession(payload)) return;
     resetStream();
     setError(payload.message);
   });
 
   useEvent<ClassificationCompletePayload>('agent:classification_complete', (payload) => {
-    if (!sessionKeyRef.current || payload.sessionKey !== sessionKeyRef.current) return;
+    if (!isOurSession(payload)) return;
     setTransparency((prev) => ({
       ...prev,
-      classification: { strategy: payload.strategy, confidence: payload.confidence, source: 'pipeline' },
+      classification: { strategy: payload.strategy, confidence: payload.confidence, source: payload.source },
     }));
   });
 
   useEvent<ExecutionStartedPayload>('agent:execution_started', (payload) => {
-    if (!sessionKeyRef.current || payload.sessionKey !== sessionKeyRef.current) return;
+    if (!isOurSession(payload)) return;
     setTransparency((prev) => ({
       ...prev,
       execution: { engine: payload.engine, iterations: 0, maxIterations: payload.maxIterations, escalations: 0 },
@@ -201,7 +205,7 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
   });
 
   useEvent<IterationStartPayload>('agent:iteration_start', (payload) => {
-    if (!sessionKeyRef.current || payload.sessionKey !== sessionKeyRef.current) return;
+    if (!isOurSession(payload)) return;
     setTransparency((prev) => ({
       ...prev,
       execution: prev?.execution
@@ -211,7 +215,7 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
   });
 
   useEvent<UsageReportPayload>('agent:usage_report', (payload) => {
-    if (!sessionKeyRef.current || payload.sessionKey !== sessionKeyRef.current) return;
+    if (!isOurSession(payload)) return;
     setTransparency((prev) => ({
       ...prev,
       usage: {
@@ -226,7 +230,7 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
   });
 
   useEvent<MemoryAccessPayload>('agent:memory_access', (payload) => {
-    if (!sessionKeyRef.current || payload.sessionKey !== sessionKeyRef.current) return;
+    if (!isOurSession(payload)) return;
     setTransparency((prev) => ({
       ...prev,
       memoryAccesses: [...(prev?.memoryAccesses ?? []), { action: payload.action, query: payload.query, resultsCount: payload.resultsCount }],
@@ -234,7 +238,7 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
   });
 
   useEvent<SkillLoadedPayload>('agent:skill_loaded', (payload) => {
-    if (!sessionKeyRef.current || payload.sessionKey !== sessionKeyRef.current) return;
+    if (!isOurSession(payload)) return;
     setTransparency((prev) => ({
       ...prev,
       skills: [...(prev?.skills ?? []), { name: payload.name, trigger: payload.trigger }],
@@ -242,7 +246,7 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
   });
 
   useEvent<LearningEventPayload>('agent:learning_event', (payload) => {
-    if (!sessionKeyRef.current || payload.sessionKey !== sessionKeyRef.current) return;
+    if (!isOurSession(payload)) return;
     setTransparency((prev) => ({
       ...prev,
       learning: [...(prev?.learning ?? []), { eventType: payload.eventType, detail: payload.detail }],
@@ -250,7 +254,7 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
   });
 
   useEvent<SubagentSpawnedPayload>('agent:subagent_spawned', (payload) => {
-    if (!sessionKeyRef.current || payload.sessionKey !== sessionKeyRef.current) return;
+    if (!isOurSession(payload)) return;
     setTransparency((prev) => ({
       ...prev,
       subagents: [...(prev?.subagents ?? []), { label: payload.label, profile: payload.profile }],

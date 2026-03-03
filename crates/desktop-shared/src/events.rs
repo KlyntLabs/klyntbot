@@ -100,6 +100,7 @@ pub struct ClassificationCompletePayload {
     pub session_key: String,
     pub strategy: String,
     pub confidence: f32,
+    pub source: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -223,7 +224,7 @@ pub struct TransparencyCost {
     pub model: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TransparencyTiming {
     pub total_ms: u64,

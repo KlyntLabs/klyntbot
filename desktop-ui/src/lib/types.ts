@@ -132,6 +132,7 @@ export interface ClassificationCompletePayload {
   sessionKey: string;
   strategy: string;
   confidence: number;
+  source: string;
 }
 
 export interface ExecutionStartedPayload {
