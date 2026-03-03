@@ -10,7 +10,7 @@ const PRIORITIES = ['P1', 'P2', 'P3', 'P4', null] as const;
 
 interface TaskRowProps {
   task: Task;
-  project: Project;
+  project?: Project;
   isCompleted: boolean;
   showArea: boolean;
   onToggle: () => void;
@@ -87,13 +87,17 @@ export function TaskRow({ task, project, isCompleted, showArea, onToggle, onUpda
 
       {/* Project Badge */}
       <div className="flex items-center">
-        <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-surface-base">
-          <div
-            className="w-1.5 h-1.5 rounded-full"
-            style={{ backgroundColor: project.color }}
-          />
-          <span className="text-[11px] font-light text-muted">{project.name}</span>
-        </div>
+        {project ? (
+          <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-surface-base">
+            <div
+              className="w-1.5 h-1.5 rounded-full"
+              style={{ backgroundColor: project.color }}
+            />
+            <span className="text-[11px] font-light text-muted">{project.name}</span>
+          </div>
+        ) : (
+          <span className="text-[11px] font-light text-dim">&mdash;</span>
+        )}
       </div>
 
       {/* Area Badge - Only when showing all */}

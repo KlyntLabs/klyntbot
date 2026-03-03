@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import { ProjectHeader } from './ProjectHeader';
 import { TaskRow } from './TaskRow';
 import { taskGridCols } from '../../lib/utils';
@@ -17,6 +18,8 @@ interface TaskTableProps {
   onRenameTask?: (taskId: string, title: string) => void;
 }
 
+const UNASSIGNED = '_unassigned';
+
 export function TaskTable({
   tasks,
   projects,
@@ -33,7 +36,7 @@ export function TaskTable({
 
   const tasksByProject = useMemo(() =>
     tasks.reduce((acc, task) => {
-      const key = task.projectId ?? '_unassigned';
+      const key = task.projectId ?? UNASSIGNED;
       if (!acc[key]) acc[key] = [];
       acc[key].push(task);
       return acc;
@@ -47,6 +50,16 @@ export function TaskTable({
   const objectiveMap = useMemo(() =>
     new Map(objectives.map(o => [o.id, o])),
   [objectives]);
+
+  // Sort groups: assigned projects first, unassigned last
+  const sortedEntries = useMemo(() => {
+    const entries = Object.entries(tasksByProject);
+    return entries.sort(([a], [b]) => {
+      if (a === UNASSIGNED) return 1;
+      if (b === UNASSIGNED) return -1;
+      return 0;
+    });
+  }, [tasksByProject]);
 
   return (
     <div className="mb-10">
@@ -64,8 +77,42 @@ export function TaskTable({
         </div>
 
         {/* Table Body - Grouped by Project */}
-        {Object.entries(tasksByProject).map(([projectId, projectTasks]) => {
+        {sortedEntries.map(([projectId, projectTasks]) => {
           const project = projectMap.get(projectId);
+
+          // Unassigned tasks group
+          if (projectId === UNASSIGNED) {
+            const isCollapsed = collapsedProjects.has(UNASSIGNED);
+            return (
+              <div key={UNASSIGNED}>
+                <button
+                  onClick={() => onToggleProject(UNASSIGNED)}
+                  className="w-full flex items-center gap-3 px-6 py-3 bg-overlay hover:bg-overlay-heavy transition-colors text-left border-b border-border-subtle"
+                >
+                  {isCollapsed ? (
+                    <ChevronRight className="w-[14px] h-[14px] text-muted flex-shrink-0" strokeWidth={1.5} />
+                  ) : (
+                    <ChevronDown className="w-[14px] h-[14px] text-muted flex-shrink-0" strokeWidth={1.5} />
+                  )}
+                  <span className="text-[12px] font-light text-muted">No Project</span>
+                  <span className="text-[11px] text-dim font-light">({projectTasks.length})</span>
+                </button>
+                {!isCollapsed && projectTasks.map(task => (
+                  <TaskRow
+                    key={task.id}
+                    task={task}
+                    isCompleted={completedTasks.has(task.id)}
+                    showArea={showArea}
+                    onToggle={() => onToggleTask(task.id)}
+                    onUpdatePriority={onUpdatePriority}
+                    onRename={onRenameTask}
+                  />
+                ))}
+              </div>
+            );
+          }
+
+          // Skip unknown projects
           if (!project) return null;
 
           const isCollapsed = collapsedProjects.has(projectId);
