@@ -1,7 +1,7 @@
 ---
 name: daily-planning
 description: Get a curated morning plan with your top 3 most impactful tasks.
-metadata: '{"klyntbot":{"triggers":["daily plan","plan","morning plan","focus","what should I focus on"],"always":true}}'
+metadata: '{"klyntbot":{"triggers":["daily plan","plan my day","morning plan","focus","what should I focus on","today plan","plan for today"],"always":true}}'
 ---
 
 # Daily Planning

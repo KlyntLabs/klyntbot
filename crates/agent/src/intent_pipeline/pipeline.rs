@@ -32,6 +32,8 @@ pub struct PipelineResult {
     pub classification: IntentAnalysis,
     /// Validation warnings (if any).
     pub validation: ValidationResult,
+    /// Skills matched by trigger keywords for this message.
+    pub matched_skills: Vec<String>,
 }
 
 /// Configuration for the intent pipeline.
@@ -74,6 +76,7 @@ pub struct IntentPipeline {
     config: PipelineConfig,
     strategy_repo: Option<storage::StrategyRepo>,
     confidence_evaluator: Option<Arc<crate::confidence::ConfidenceEvaluator>>,
+    skill_manager: Option<Arc<crate::skills::SkillManager>>,
 }
 
 impl IntentPipeline {
@@ -93,6 +96,7 @@ impl IntentPipeline {
             config,
             strategy_repo: None,
             confidence_evaluator: None,
+            skill_manager: None,
         }
     }
 
@@ -108,6 +112,12 @@ impl IntentPipeline {
         evaluator: Arc<crate::confidence::ConfidenceEvaluator>,
     ) -> Self {
         self.confidence_evaluator = Some(evaluator);
+        self
+    }
+
+    /// Attach a skill manager for injecting matched skill content into context.
+    pub fn with_skill_manager(mut self, skill_manager: Arc<crate::skills::SkillManager>) -> Self {
+        self.skill_manager = Some(skill_manager);
         self
     }
 
@@ -171,6 +181,7 @@ impl IntentPipeline {
                 return Ok(PipelineResult {
                     content,
                     mode_used: "clarification".to_string(),
+                    matched_skills: analysis.matched_skills.clone(),
                     classification: analysis,
                     validation: ValidationResult {
                         is_valid: true,
@@ -194,7 +205,7 @@ impl IntentPipeline {
             context_window: self.config.context_window,
         };
         let assemble_start = Instant::now();
-        let assembled = self.context_engine.assemble(context_request).await;
+        let mut assembled = self.context_engine.assemble(context_request).await;
         let assemble_ms = assemble_start.elapsed().as_millis() as u64;
 
         debug!(
@@ -211,6 +222,20 @@ impl IntentPipeline {
                     duration_ms: assemble_ms,
                 })
                 .await;
+        }
+
+        // Step 2.5: Inject matched skill content for non-always skills
+        if let Some(ref sm) = self.skill_manager {
+            for skill_name in &analysis.matched_skills {
+                if !sm.is_always_loaded(skill_name) {
+                    if let Some(content) = sm.get_skill_content(skill_name) {
+                        assembled.messages.push(Message::system(format!(
+                            "# Skill: {}\n\n{}",
+                            skill_name, content
+                        )));
+                    }
+                }
+            }
         }
 
         // Step 3: Filter tools based on intent classification
@@ -282,8 +307,14 @@ impl IntentPipeline {
 
         // Step 6: Record usage (best-effort) + emit usage report
         let pipeline_elapsed_ms = pipeline_start.elapsed().as_millis() as u64;
-        self.record_usage(&router_result, &mode_name, ctx, &event_tx, pipeline_elapsed_ms)
-            .await;
+        self.record_usage(
+            &router_result,
+            &mode_name,
+            ctx,
+            &event_tx,
+            pipeline_elapsed_ms,
+        )
+        .await;
 
         // Step 7: Record strategy outcome (best-effort)
         self.record_strategy(&analysis, &router_result, &validation, ctx, pipeline_start)
@@ -292,6 +323,7 @@ impl IntentPipeline {
         Ok(PipelineResult {
             content: final_content,
             mode_used: mode_name,
+            matched_skills: analysis.matched_skills.clone(),
             classification: analysis,
             validation,
         })
@@ -305,10 +337,8 @@ impl IntentPipeline {
         event_tx: &Option<tokio::sync::mpsc::Sender<AgentEvent>>,
         pipeline_elapsed_ms: u64,
     ) {
-        let cost = crate::output::cost_tracker::estimate_cost(
-            &result.usage,
-            &self.config.execution_model,
-        );
+        let cost =
+            crate::output::cost_tracker::estimate_cost(&result.usage, &self.config.execution_model);
 
         if let Err(e) = self
             .cost_tracker
@@ -663,5 +693,19 @@ mod tests {
         // Should proceed normally, not return clarification
         assert_ne!(result.mode_used, "clarification");
         assert_eq!(result.content, "Hello!");
+    }
+
+    #[tokio::test]
+    async fn pipeline_result_has_matched_skills_field() {
+        let provider = MockPipelineProvider::new(vec![text_response("Hi there!")]);
+        let pipeline = make_pipeline(provider).await;
+
+        let result = pipeline
+            .process_message("hello", vec![], &[], &[], &routing_ctx(), None, None, None)
+            .await
+            .unwrap();
+
+        // Without SkillManager, matched_skills should be empty
+        assert!(result.matched_skills.is_empty());
     }
 }

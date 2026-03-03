@@ -134,7 +134,7 @@ impl SkillManager {
     }
 
     /// Load built-in skills from bundled content
-    fn load_builtin_skills(&mut self) -> Result<()> {
+    pub(crate) fn load_builtin_skills(&mut self) -> Result<()> {
         for (name, content) in BUILTIN_SKILLS {
             match self.parse_skill_content(
                 name,
@@ -348,6 +348,38 @@ impl SkillManager {
     /// Get all skills
     pub fn all(&self) -> Vec<&Skill> {
         self.skills.values().collect()
+    }
+
+    /// Match user message against skill trigger keywords.
+    ///
+    /// Returns skill names where at least one trigger keyword appears in the
+    /// message (case-insensitive substring match). Only considers available skills.
+    ///
+    /// Note: `always=true` does NOT cause automatic matching — it controls whether
+    /// the skill's full content is loaded via `SkillContentSource`. Transparency
+    /// events should only reflect actual trigger matches.
+    pub fn match_skills(&self, message: &str) -> Vec<String> {
+        let lower = message.to_lowercase();
+        let mut matched: Vec<String> = self
+            .skills
+            .values()
+            .filter(|s| s.available && !s.triggers.is_empty())
+            .filter(|s| s.triggers.iter().any(|t| lower.contains(&t.to_lowercase())))
+            .map(|s| s.name.clone())
+            .collect();
+        matched.sort();
+        matched.dedup();
+        matched
+    }
+
+    /// Get a skill's full content by name.
+    pub fn get_skill_content(&self, name: &str) -> Option<&str> {
+        self.skills.get(name).and_then(|s| s.content.as_deref())
+    }
+
+    /// Check if a skill has always=true.
+    pub fn is_always_loaded(&self, name: &str) -> bool {
+        self.skills.get(name).map(|s| s.always).unwrap_or(false)
     }
 
     /// Returns skills that match the current persona and session context.
@@ -744,5 +776,75 @@ mod tests {
                 kind: "finance".to_string()
             }
         );
+    }
+
+    #[test]
+    fn match_skills_finds_todo_for_task_message() {
+        let mut mgr = SkillManager::new();
+        mgr.load_builtin_skills().unwrap();
+        let matched = mgr.match_skills("what tasks do we have?");
+        let names: Vec<&str> = matched.iter().map(|s| s.as_str()).collect();
+        assert!(
+            names.contains(&"todo"),
+            "Expected 'todo' in matched: {:?}",
+            names
+        );
+    }
+
+    #[test]
+    fn match_skills_no_match_for_unrelated_message() {
+        let mut mgr = SkillManager::new();
+        mgr.load_builtin_skills().unwrap();
+        // "hello there" doesn't contain any skill triggers
+        let matched = mgr.match_skills("hello there");
+        assert!(
+            matched.is_empty(),
+            "No skills should match an unrelated message: {:?}",
+            matched
+        );
+    }
+
+    #[test]
+    fn match_skills_always_true_does_not_auto_match() {
+        let mut mgr = SkillManager::new();
+        mgr.load_builtin_skills().unwrap();
+        // todo has always=true but that shouldn't cause it to match every message
+        let matched = mgr.match_skills("what is the weather like?");
+        assert!(
+            !matched.contains(&"todo".to_string()),
+            "always=true should not auto-include in match_skills: {:?}",
+            matched
+        );
+    }
+
+    #[test]
+    fn match_skills_case_insensitive() {
+        let mut mgr = SkillManager::new();
+        mgr.load_builtin_skills().unwrap();
+        // "cron" skill has triggers but is NOT always=true, so this genuinely tests case-insensitivity
+        let matched = mgr.match_skills("Set up a CRON job");
+        let names: Vec<&str> = matched.iter().map(|s| s.as_str()).collect();
+        assert!(
+            names.contains(&"cron"),
+            "Case-insensitive matching should find 'cron' for 'CRON': {:?}",
+            names
+        );
+    }
+
+    #[test]
+    fn get_skill_content_returns_content() {
+        let mut mgr = SkillManager::new();
+        mgr.load_builtin_skills().unwrap();
+        let content = mgr.get_skill_content("todo");
+        assert!(content.is_some());
+        assert!(content.unwrap().contains("Todo Task Creation"));
+    }
+
+    #[test]
+    fn is_always_loaded_true_for_todo() {
+        let mut mgr = SkillManager::new();
+        mgr.load_builtin_skills().unwrap();
+        assert!(mgr.is_always_loaded("todo"));
+        assert!(!mgr.is_always_loaded("cron"));
     }
 }

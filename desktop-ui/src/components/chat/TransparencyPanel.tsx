@@ -57,7 +57,7 @@ export function TransparencyPanel({ transparency }: TransparencyPanelProps) {
   const hasLearning = learning && learning.length > 0;
   const hasTools = tools && tools.length > 0;
 
-  if (!hasMemory && !hasSkills && !hasExecution && !hasAgents && !hasLearning && !hasTools) return null;
+  if (!hasMemory && !hasExecution && !hasTools) return null;
 
   return (
     <div className="w-64 border-l border-border bg-background overflow-y-auto p-3 space-y-2 shrink-0">
@@ -95,17 +95,21 @@ export function TransparencyPanel({ transparency }: TransparencyPanelProps) {
         </CollapsibleBox>
       )}
 
-      {/* Skills */}
-      {hasSkills && (
-        <CollapsibleBox title="Skills" icon={BookOpen}>
-          {skills!.map((skill, i) => (
-            <Row
-              key={`skill-${i}`}
-              icon={Package}
-              label={skill.name}
-              detail={skill.trigger}
-            />
-          ))}
+      {/* Skills — always visible when execution data exists */}
+      {hasExecution && (
+        <CollapsibleBox title="Skills" icon={BookOpen} defaultOpen={hasSkills}>
+          {hasSkills ? (
+            skills!.map((skill, i) => (
+              <Row
+                key={`skill-${i}`}
+                icon={Package}
+                label={skill.name}
+                detail={skill.trigger}
+              />
+            ))
+          ) : (
+            <span className="text-dim">none</span>
+          )}
         </CollapsibleBox>
       )}
 

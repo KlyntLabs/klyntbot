@@ -1,7 +1,7 @@
 ---
 name: todo
 description: Task creation workflow — ask-first by default, with confidence scoring and enrichment modes.
-metadata: '{"klyntbot":{"triggers":["todo","task","focus"],"always":true}}'
+metadata: '{"klyntbot":{"triggers":["todo","task","tasks","focus","create a task","add a task","my tasks","task list","what tasks","check tasks","list tasks","todo list"],"always":true}}'
 ---
 
 # Todo Task Creation

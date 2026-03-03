@@ -1,6 +1,7 @@
 ---
 name: cron
 description: Schedule reminders and recurring tasks.
+metadata: '{"klyntbot":{"triggers":["cron","schedule","reminder","remind me","recurring","every day","every hour","every minute","set up recurring"]}}'
 ---
 
 # Cron

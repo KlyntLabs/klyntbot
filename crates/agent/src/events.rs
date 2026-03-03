@@ -94,10 +94,7 @@ pub enum AgentEvent {
     },
 
     /// A skill was loaded into the system prompt.
-    SkillLoaded {
-        name: String,
-        trigger: String,
-    },
+    SkillLoaded { name: String, trigger: String },
 
     /// A learning event occurred (threshold adjustment, pattern detection).
     LearningEvent {
@@ -107,8 +104,5 @@ pub enum AgentEvent {
     },
 
     /// A subagent was spawned.
-    SubagentSpawned {
-        label: String,
-        profile: String,
-    },
+    SubagentSpawned { label: String, profile: String },
 }

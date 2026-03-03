@@ -704,7 +704,8 @@ impl AgentLoopBuilder {
             &config.agents.defaults.model,
             &config.orchestrator,
         )
-        .with_strategy_repo(repos.strategies.clone());
+        .with_strategy_repo(repos.strategies.clone())
+        .with_skill_manager(Arc::clone(&skill_manager));
 
         let cost_tracker = Arc::new(crate::output::CostTracker::from_repo(
             storage::UsageRepo::new(storage_pool.inner().clone()),
@@ -726,7 +727,8 @@ impl AgentLoopBuilder {
             cost_tracker,
             pipeline_config,
         )
-        .with_strategy_repo(repos.strategies.clone());
+        .with_strategy_repo(repos.strategies.clone())
+        .with_skill_manager(Arc::clone(&skill_manager));
 
         if let Some(evaluator) = confidence_evaluator {
             pipeline = pipeline.with_confidence_evaluator(Arc::new(evaluator));

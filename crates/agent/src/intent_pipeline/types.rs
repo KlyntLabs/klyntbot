@@ -186,6 +186,9 @@ pub struct IntentAnalysis {
     /// Which tool groups are relevant for this intent.
     /// Empty or contains `ToolGroup::Full` means all tools are available.
     pub tool_groups: Vec<ToolGroup>,
+    /// Skill names matched by the skill manager for this intent.
+    /// Populated by the analyzer after skill matching; empty until then.
+    pub matched_skills: Vec<String>,
 }
 
 impl IntentAnalysis {
@@ -207,6 +210,7 @@ impl IntentAnalysis {
             source: AnalysisSource::Heuristic,
             reasoning: "Fallback — classification unavailable".to_string(),
             tool_groups: vec![ToolGroup::Full],
+            matched_skills: vec![],
         }
     }
 
@@ -344,6 +348,15 @@ mod tests {
         assert!(allowed.contains("grep"));
         assert!(allowed.contains("ask_user")); // always included
         assert!(!allowed.contains("finance"));
+    }
+
+    #[test]
+    fn fallback_analysis_has_empty_matched_skills() {
+        let analysis = IntentAnalysis::fallback();
+        assert!(
+            analysis.matched_skills.is_empty(),
+            "Fallback analysis should have empty matched_skills"
+        );
     }
 
     #[test]

@@ -466,26 +466,6 @@ impl AgentLoop {
             )
             .await;
 
-        // Emit SkillLoaded events for transparency
-        if let Some(ref tx) = event_tx {
-            for skill in self.skill_manager.all() {
-                if !skill.available {
-                    continue;
-                }
-                let trigger = if skill.always {
-                    "always".to_string()
-                } else {
-                    skill.triggers.join(", ")
-                };
-                let _ = tx
-                    .send(AgentEvent::SkillLoaded {
-                        name: skill.name.clone(),
-                        trigger,
-                    })
-                    .await;
-            }
-        }
-
         let history_messages = Self::convert_history(&history);
         let (tool_defs, tool_names) = self.get_tool_info().await;
         let tool_name_refs: Vec<&str> = tool_names.iter().map(|s| s.as_str()).collect();
@@ -499,10 +479,29 @@ impl AgentLoop {
                 &tool_name_refs,
                 routing_ctx,
                 Some(&system_prompt),
-                event_tx,
+                event_tx.clone(),
                 cancel_token,
             )
             .await?;
+
+        // Emit SkillLoaded events for MATCHED skills only
+        if let Some(ref tx) = event_tx {
+            for skill_name in &result.matched_skills {
+                if let Some(skill) = self.skill_manager.get(skill_name) {
+                    let trigger = if skill.always {
+                        "always".to_string()
+                    } else {
+                        skill.triggers.join(", ")
+                    };
+                    let _ = tx
+                        .send(AgentEvent::SkillLoaded {
+                            name: skill_name.clone(),
+                            trigger,
+                        })
+                        .await;
+                }
+            }
+        }
 
         info!("Pipeline: mode={}", result.mode_used);
 

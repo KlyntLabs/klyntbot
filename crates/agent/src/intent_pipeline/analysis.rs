@@ -7,6 +7,7 @@
 //! 2. `IntentClassifier` — lightweight LLM call for ambiguous messages
 //! 3. `IntentAnalyzer` — two-stage orchestrator (heuristics → LLM)
 
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use common::Result;
@@ -368,6 +369,7 @@ fn direct_analysis(
         source: AnalysisSource::Heuristic,
         reasoning: reasoning.to_string(),
         tool_groups,
+        matched_skills: vec![],
     }
 }
 
@@ -385,6 +387,7 @@ fn reactive_analysis(
         source: AnalysisSource::Heuristic,
         reasoning: reasoning.to_string(),
         tool_groups,
+        matched_skills: vec![],
     }
 }
 
@@ -574,6 +577,7 @@ impl IntentClassifier {
             source: AnalysisSource::LlmClassifier,
             reasoning,
             tool_groups,
+            matched_skills: vec![],
         }
     }
 }
@@ -619,6 +623,7 @@ pub struct IntentAnalyzer {
     classifier: IntentClassifier,
     classifier_params: ChatParams,
     strategy_repo: Option<storage::StrategyRepo>,
+    skill_manager: Option<Arc<crate::skills::SkillManager>>,
     config: OrchestratorConfig,
     /// Cached strategy context to avoid hitting DB on every ambiguous message.
     strategy_cache: Mutex<Option<(Instant, Option<String>)>>,
@@ -631,6 +636,7 @@ impl IntentAnalyzer {
             classifier: IntentClassifier::new(provider, timeout),
             classifier_params: ChatParams::new(model),
             strategy_repo: None,
+            skill_manager: None,
             config: config.clone(),
             strategy_cache: Mutex::new(None),
         }
@@ -641,11 +647,24 @@ impl IntentAnalyzer {
         self
     }
 
+    pub fn with_skill_manager(mut self, skill_manager: Arc<crate::skills::SkillManager>) -> Self {
+        self.skill_manager = Some(skill_manager);
+        self
+    }
+
     /// Analyze a user message and return the recommended execution mode.
     pub async fn analyze(&self, message: &str, tool_names: &[&str]) -> IntentAnalysis {
+        // Match skills first (zero-cost keyword scan)
+        let matched_skills = self
+            .skill_manager
+            .as_ref()
+            .map(|sm| sm.match_skills(message))
+            .unwrap_or_default();
+
         // Stage 1: Heuristics (0ms)
-        if let Some(analysis) = analyze_heuristic(message) {
+        if let Some(mut analysis) = analyze_heuristic(message) {
             if analysis.confidence >= self.config.heuristic_confidence_threshold {
+                analysis.matched_skills = matched_skills;
                 debug!(
                     mode = ?analysis.mode,
                     confidence = analysis.confidence,
@@ -672,7 +691,8 @@ impl IntentAnalyzer {
             )
             .await
         {
-            Ok(result) => {
+            Ok(mut result) => {
+                result.matched_skills = matched_skills;
                 if result.confidence < 0.5 {
                     debug!(
                         confidence = result.confidence,
@@ -690,7 +710,9 @@ impl IntentAnalyzer {
             }
             Err(e) => {
                 warn!("LLM classifier error: {}, using fallback", e);
-                IntentAnalysis::fallback()
+                let mut fallback = IntentAnalysis::fallback();
+                fallback.matched_skills = matched_skills;
+                fallback
             }
         }
     }
@@ -1184,5 +1206,42 @@ mod tests {
             requires_retries: false,
         };
         assert_eq!(compute_iteration_budget(&signals), 15);
+    }
+
+    // ── Skill matching in analyzer ────────────────────────────────
+
+    #[tokio::test]
+    async fn analyzer_populates_matched_skills_for_task_message() {
+        let mut skill_mgr = crate::skills::SkillManager::new();
+        skill_mgr.load_builtin_skills().unwrap();
+
+        let analyzer = IntentAnalyzer::new(
+            Arc::new(PanickingProvider),
+            "model",
+            &OrchestratorConfig::default(),
+        )
+        .with_skill_manager(Arc::new(skill_mgr));
+
+        let result = analyzer
+            .analyze("create a task to buy groceries", &[])
+            .await;
+        assert!(
+            result.matched_skills.contains(&"todo".to_string()),
+            "Expected 'todo' in matched_skills: {:?}",
+            result.matched_skills
+        );
+    }
+
+    #[tokio::test]
+    async fn analyzer_matched_skills_empty_without_skill_manager() {
+        let analyzer = IntentAnalyzer::new(
+            Arc::new(PanickingProvider),
+            "model",
+            &OrchestratorConfig::default(),
+        );
+        // No with_skill_manager() called
+
+        let result = analyzer.analyze("hello", &[]).await;
+        assert!(result.matched_skills.is_empty());
     }
 }
