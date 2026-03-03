@@ -12,6 +12,7 @@ pub use common;
 pub use config;
 pub use context_engine;
 pub use domain;
+pub use mcp;
 pub use providers;
 pub use scheduling;
 pub use session;

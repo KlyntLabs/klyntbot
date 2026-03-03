@@ -38,6 +38,14 @@ cd desktop-ui && bun install            # Install dependencies
 
 **Color token system:** Flat, dark-mode-only tokens in `:root`. Surface staircase (`surface-lowest` through `surface-highest`), text hierarchy (`text-primary/secondary/muted/dim`), brand (`brand`, `brand-hover`), semantic (`success`, `destructive`, `info`, `purple`). Never hardcode hex/rgba in components — always use the token utilities (e.g., `bg-surface-base`, `text-muted`, `border-border`).
 
+**Semantic CSS variables rule:** All visual values (colors, shadows, borders) in components must reference CSS variables from `theme.css` — never inline raw `rgba()`, `#hex`, or hardcoded values. For new visual patterns, add a CSS variable to `:root` first, register it in `@theme inline`, then reference via Tailwind utility. This ensures global consistency and single-point theming.
+
+**Glass panel utility:** `glass-panel` class (defined in `theme.css`) provides glassmorphism for all dropdowns, popups, popovers, and dialogs. Variables: `--surface-glass` (bg), `--glass-border`, `--glass-shadow`. Uses `@apply backdrop-blur-[80px] backdrop-saturate-150` for the blur effect.
+
+**`backdrop-filter` gotcha:** Never write raw `backdrop-filter: blur() saturate()` in custom CSS — the minifier strips the space between filter functions, producing invalid CSS. Always use Tailwind's `@apply backdrop-blur-* backdrop-saturate-*` which composes filters via internal CSS variables (`--tw-backdrop-blur`, etc.). Also: parent elements with `backdrop-blur-*` create compositing layers that block nested `backdrop-filter` from seeing through — remove blur from parent containers if child elements need their own glass effect.
+
+**`overflow` clips absolute popups:** Never use `overflow-x-auto` or `overflow: hidden` on containers that have absolutely-positioned dropdown children — it creates a scroll context that clips them. Either remove the overflow or use React portals.
+
 ## Architecture
 
 Klyntbot is a Rust personal AI agent — a single binary that connects to 6+ chat platforms, calls LLMs, manages tasks/projects, syncs with Apple Calendar, and manages persistent memory. It is **not** a code execution platform — users have dedicated tools (Claude Code, Cursor, Codex) for that. All persistent state is stored in SQLite (relational data) + LanceDB (vector embeddings).

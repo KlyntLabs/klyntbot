@@ -719,7 +719,10 @@ fn entity_kind_for_tool(tool_name: &str) -> Option<desktop_shared::types::Entity
 /// Returns `true` when the action is a write (create/update/delete/toggle/etc.)
 /// rather than a read-only query (list/get/search).
 fn is_mutating_action(action: Option<&str>) -> bool {
-    !matches!(action, Some("list" | "get" | "search" | "search-semantic" | "search-hybrid"))
+    !matches!(
+        action,
+        Some("list" | "get" | "search" | "search-semantic" | "search-hybrid")
+    )
 }
 
 // ── Auto-detection helpers ──────────────────────────────────────────────

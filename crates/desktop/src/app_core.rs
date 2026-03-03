@@ -185,7 +185,9 @@ impl AppCore {
     /// Graceful shutdown.
     pub async fn shutdown(&self) {
         info!("shutting down app core");
-        self.agent.stop().await;
+        if let Err(e) = self.agent.shutdown().await {
+            error!("agent shutdown error: {}", e);
+        }
         self.shutdown_token.cancel();
         self.cron_service.stop().await;
         info!("app core stopped");

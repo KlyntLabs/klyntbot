@@ -898,7 +898,10 @@ mod tests {
             let result = analyze_heuristic(query);
             assert!(
                 result.is_some()
-                    && matches!(result.as_ref().unwrap().mode, ExecutionMode::Reactive { .. }),
+                    && matches!(
+                        result.as_ref().unwrap().mode,
+                        ExecutionMode::Reactive { .. }
+                    ),
                 "Expected Reactive for '{}', got {:?}",
                 query,
                 result

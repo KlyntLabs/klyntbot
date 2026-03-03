@@ -69,6 +69,9 @@ pub struct AgentLoop {
     pub(crate) _session_cleanup_token: Option<CancellationToken>,
     /// Cancellation token for the memory maintenance background service.
     pub(crate) _memory_maintenance_token: Option<CancellationToken>,
+    /// MCP manager for external server connections (kept alive for the agent's lifetime).
+    /// Wrapped in Mutex so `shutdown(&self)` can take ownership for graceful disconnect.
+    pub(crate) mcp_manager: tokio::sync::Mutex<Option<mcp::McpManager>>,
 }
 
 impl AgentLoop {
@@ -203,6 +206,11 @@ impl AgentLoop {
         // Stop the memory maintenance service
         if let Some(token) = &self._memory_maintenance_token {
             token.cancel();
+        }
+
+        // Disconnect MCP servers (cleanly terminates child processes)
+        if let Some(manager) = self.mcp_manager.lock().await.take() {
+            manager.disconnect_all().await;
         }
 
         Ok(())

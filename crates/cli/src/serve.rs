@@ -583,6 +583,14 @@ pub async fn handle_serve(port: u16) -> Result<()> {
             println!("  + {}", name);
         }
     }
+
+    if config.mcp.has_active_servers() {
+        println!("\nMCP Servers:");
+        for server in config.mcp.servers.iter().filter(|s| s.enabled) {
+            println!("  + {}", server.name);
+        }
+    }
+
     println!("\nPress Ctrl+C to stop");
 
     // Wait for shutdown signal (Ctrl+C or SIGTERM)

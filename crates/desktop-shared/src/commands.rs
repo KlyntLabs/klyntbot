@@ -19,6 +19,9 @@ pub struct TaskResponse {
     pub area_id: String,
     pub objective_id: Option<String>,
     pub description: Option<String>,
+    pub parent_id: Option<String>,
+    pub subtask_count: u32,
+    pub subtask_completed_count: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -30,6 +33,7 @@ pub struct TaskCreateParams {
     pub priority: Option<i16>,
     pub due_date: Option<String>,
     pub tags: Option<Vec<String>>,
+    pub parent_id: Option<String>,
 }
 
 // ── Today Task (tray view) ──────────────────────────────────────────────

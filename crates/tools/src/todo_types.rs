@@ -95,6 +95,7 @@ impl TodoFilter {
             due_after: None,
             due_before: None,
             templates_only: self.include_templates,
+            root_only: false,
         }
     }
 }

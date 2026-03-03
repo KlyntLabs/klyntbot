@@ -21,6 +21,7 @@ members = [
     "crates/feature-finance",
     "crates/feature-todo",
     "crates/plugin-runtime",
+    "crates/mcp",
     "crates/desktop-shared",
     "crates/desktop",
 ]
@@ -55,6 +56,8 @@ plugin-runtime = { path = "crates/plugin-runtime" }
 desktop-shared = { path = "crates/desktop-shared" }
 desktop = { path = "crates/desktop" }
 extism = "1"
+mcp = { path = "crates/mcp" }
+rmcp = { version = "0.17", default-features = false }
 
 # Proc-macro dependencies
 syn = { version = "2", features = ["full", "extra-traits"] }
@@ -147,6 +150,7 @@ cli.workspace = true
 context_engine.workspace = true
 storage.workspace = true
 plugin-runtime.workspace = true
+mcp.workspace = true
 
 # Binary-specific dependencies
 clap.workspace = true

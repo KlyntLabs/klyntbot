@@ -888,4 +888,168 @@ mod tests {
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].title, "Due today");
     }
+
+    // ----- Helpers for hierarchy tests with parent_id -----
+
+    /// Helper: create a minimal ActionRow with a parent_id set.
+    fn sample_action_with_parent(
+        id: &str,
+        title: &str,
+        area_id: &str,
+        parent_id: &str,
+    ) -> ActionRow {
+        let mut row = sample_action(id, title, area_id);
+        row.parent_id = Some(parent_id.to_string());
+        row
+    }
+
+    // ----- count_children (total + completed) -----
+
+    #[tokio::test]
+    async fn count_children_returns_total_and_completed() {
+        let Some((repo, area_repo)) = test_action_repo().await else {
+            return;
+        };
+        let area_id = ensure_area(&area_repo).await;
+        let parent_id = unique_id("ccc-p");
+        let c1 = unique_id("ccc-c1");
+        let c2 = unique_id("ccc-c2");
+        let c3 = unique_id("ccc-c3");
+
+        repo.add(&sample_action(&parent_id, "Parent", &area_id))
+            .await
+            .unwrap();
+        // Two done children
+        let mut done1 = sample_action_with_parent(&c1, "Done child 1", &area_id, &parent_id);
+        done1.status = "done".to_string();
+        done1.completed_at = Some(Utc::now());
+        repo.add(&done1).await.unwrap();
+
+        let mut done2 = sample_action_with_parent(&c2, "Done child 2", &area_id, &parent_id);
+        done2.status = "done".to_string();
+        done2.completed_at = Some(Utc::now());
+        repo.add(&done2).await.unwrap();
+
+        // One todo child
+        repo.add(&sample_action_with_parent(
+            &c3,
+            "Todo child",
+            &area_id,
+            &parent_id,
+        ))
+        .await
+        .unwrap();
+
+        let (total, completed) = repo.count_children(&parent_id).await.unwrap();
+        assert_eq!(total, 3);
+        assert_eq!(completed, 2);
+
+        // Cleanup
+        let _ = repo.delete(&c1).await;
+        let _ = repo.delete(&c2).await;
+        let _ = repo.delete(&c3).await;
+        let _ = repo.delete(&parent_id).await;
+    }
+
+    #[tokio::test]
+    async fn count_children_returns_zero_completed_when_none_done() {
+        let Some((repo, area_repo)) = test_action_repo().await else {
+            return;
+        };
+        let area_id = ensure_area(&area_repo).await;
+        let parent_id = unique_id("ccz-p");
+        let c1 = unique_id("ccz-c1");
+
+        repo.add(&sample_action(&parent_id, "Parent", &area_id))
+            .await
+            .unwrap();
+        repo.add(&sample_action_with_parent(
+            &c1,
+            "Todo child",
+            &area_id,
+            &parent_id,
+        ))
+        .await
+        .unwrap();
+
+        let (total, completed) = repo.count_children(&parent_id).await.unwrap();
+        assert_eq!(total, 1);
+        assert_eq!(completed, 0);
+
+        // Cleanup
+        let _ = repo.delete(&c1).await;
+        let _ = repo.delete(&parent_id).await;
+    }
+
+    #[tokio::test]
+    async fn count_children_returns_zeros_for_no_children() {
+        let Some((repo, area_repo)) = test_action_repo().await else {
+            return;
+        };
+        let area_id = ensure_area(&area_repo).await;
+        let parent_id = unique_id("ccnc-p");
+
+        repo.add(&sample_action(&parent_id, "Childless parent", &area_id))
+            .await
+            .unwrap();
+
+        let (total, completed) = repo.count_children(&parent_id).await.unwrap();
+        assert_eq!(total, 0);
+        assert_eq!(completed, 0);
+
+        // Cleanup
+        let _ = repo.delete(&parent_id).await;
+    }
+
+    // ----- root_only filter -----
+
+    #[tokio::test]
+    async fn list_root_only_excludes_children() {
+        let Some((repo, area_repo)) = test_action_repo().await else {
+            return;
+        };
+        let area_id = ensure_area(&area_repo).await;
+        let parent_id = unique_id("ro-p");
+        let child_id = unique_id("ro-c");
+
+        repo.add(&sample_action(&parent_id, "Root task", &area_id))
+            .await
+            .unwrap();
+        repo.add(&sample_action_with_parent(
+            &child_id,
+            "Child task",
+            &area_id,
+            &parent_id,
+        ))
+        .await
+        .unwrap();
+
+        use crate::repos::action_repo::ActionFilter;
+
+        // Without root_only, both should appear
+        let all = repo.list(&ActionFilter::default()).await.unwrap();
+        let all_ids: Vec<&str> = all.iter().map(|r| r.id.as_str()).collect();
+        assert!(all_ids.contains(&parent_id.as_str()));
+        assert!(all_ids.contains(&child_id.as_str()));
+
+        // With root_only, only root task should appear
+        let filter = ActionFilter {
+            root_only: true,
+            ..Default::default()
+        };
+        let roots = repo.list(&filter).await.unwrap();
+        let root_ids: Vec<&str> = roots.iter().map(|r| r.id.as_str()).collect();
+        assert!(
+            root_ids.contains(&parent_id.as_str()),
+            "Root task should be included"
+        );
+        assert!(
+            !root_ids.contains(&child_id.as_str()),
+            "Child task should be excluded by root_only"
+        );
+
+        // Cleanup
+        let _ = repo.delete(&child_id).await;
+        let _ = repo.delete(&parent_id).await;
+    }
 }

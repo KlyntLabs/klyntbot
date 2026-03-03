@@ -16,19 +16,26 @@ fn priority_label(p: Option<i16>) -> Option<String> {
     p.map(|v| format!("P{v}"))
 }
 
-pub fn action_to_task(row: &ActionRow) -> TaskResponse {
+pub fn action_to_task(
+    row: &ActionRow,
+    subtask_count: u32,
+    subtask_completed_count: u32,
+) -> TaskResponse {
     TaskResponse {
         id: row.id.clone(),
         title: row.title.clone(),
         completed: row.status == "done",
         priority: priority_label(row.priority),
         status: row.status.clone(),
-        due_date: row.due_date.map(|d| d.format("%b %-d").to_string()),
+        due_date: row.due_date.map(|d| d.format("%Y-%m-%d").to_string()),
         tags: row.tags.clone(),
         project_id: row.project_id.clone(),
         area_id: row.area_id.clone(),
         objective_id: row.key_result_id.clone(),
         description: row.description.clone(),
+        parent_id: row.parent_id.clone(),
+        subtask_count,
+        subtask_completed_count,
     }
 }
 
@@ -94,6 +101,42 @@ pub(super) fn kr_to_response(row: &KeyResultRow) -> KeyResultResponse {
     }
 }
 
+// ── Helpers ─────────────────────────────────────────────────────────────
+
+/// Convert a list of ActionRows to TaskResponses, bulk-fetching subtask counts.
+pub(super) async fn rows_to_tasks(
+    repos: &storage::Repos,
+    rows: &[ActionRow],
+) -> Result<Vec<TaskResponse>, ApiError> {
+    let ids: Vec<String> = rows.iter().map(|r| r.id.clone()).collect();
+    let counts = repos
+        .actions
+        .count_children_bulk(&ids)
+        .await
+        .map_err(super::map_storage_err)?;
+
+    Ok(rows
+        .iter()
+        .map(|row| {
+            let (total, completed) = counts.get(&row.id).copied().unwrap_or((0, 0));
+            action_to_task(row, total as u32, completed as u32)
+        })
+        .collect())
+}
+
+/// Fetch subtask counts for a single row and convert to TaskResponse.
+pub(super) async fn row_to_task(
+    repos: &storage::Repos,
+    row: &ActionRow,
+) -> Result<TaskResponse, ApiError> {
+    let (total, completed) = repos
+        .actions
+        .count_children(&row.id)
+        .await
+        .map_err(super::map_storage_err)?;
+    Ok(action_to_task(row, total as u32, completed as u32))
+}
+
 // ── Commands ────────────────────────────────────────────────────────────
 
 #[tauri::command]
@@ -107,6 +150,7 @@ pub async fn task_list(
         area_id,
         project_id,
         status,
+        root_only: true,
         ..Default::default()
     };
     let rows = state
@@ -115,7 +159,8 @@ pub async fn task_list(
         .list(&filter)
         .await
         .map_err(super::map_storage_err)?;
-    Ok(rows.iter().map(action_to_task).collect())
+
+    rows_to_tasks(&state.repos, &rows).await
 }
 
 #[tauri::command]
@@ -135,10 +180,11 @@ pub async fn project_list(
         .await
         .map_err(super::map_storage_err)?;
 
-    let mut results = Vec::with_capacity(projects.len());
-    for p in &projects {
-        results.push(super::projects::build_project_response(&state, p).await?);
-    }
+    // Fetch all project metadata concurrently to avoid N+1
+    let response_futures = projects
+        .iter()
+        .map(|p| super::projects::build_project_response(&state, p));
+    let results = futures_util::future::try_join_all(response_futures).await?;
     Ok(results)
 }
 
@@ -154,23 +200,26 @@ pub async fn objective_list(
         .await
         .map_err(super::map_storage_err)?;
 
-    let mut results = Vec::with_capacity(objectives.len());
-    for o in &objectives {
-        let kr_rows = state
-            .repos
-            .key_results
-            .list(Some(&o.id))
-            .await
-            .map_err(super::map_storage_err)?;
+    // Fetch all key results concurrently to avoid N+1
+    let kr_futures = objectives
+        .iter()
+        .map(|o| state.repos.key_results.list(Some(&o.id)));
+    let all_krs = futures_util::future::try_join_all(kr_futures)
+        .await
+        .map_err(super::map_storage_err)?;
 
-        let krs = if kr_rows.is_empty() {
-            None
-        } else {
-            Some(kr_rows.iter().map(kr_to_response).collect())
-        };
-
-        results.push(objective_to_response(o, krs));
-    }
+    let results = objectives
+        .iter()
+        .zip(all_krs)
+        .map(|(o, kr_rows)| {
+            let krs = if kr_rows.is_empty() {
+                None
+            } else {
+                Some(kr_rows.iter().map(kr_to_response).collect())
+            };
+            objective_to_response(o, krs)
+        })
+        .collect();
     Ok(results)
 }
 
@@ -208,7 +257,7 @@ pub async fn task_toggle_complete(
 
     super::emit_entity_updated(&app, EntityKind::Task, &id);
 
-    Ok(action_to_task(&updated))
+    row_to_task(&state.repos, &updated).await
 }
 
 #[tauri::command]
@@ -220,14 +269,28 @@ pub async fn task_create(
     let id = uuid::Uuid::new_v4().to_string();
     let now = chrono::Utc::now();
 
+    let area_id = match (&params.area_id, &params.parent_id) {
+        (Some(aid), _) => aid.clone(),
+        (None, Some(pid)) => {
+            let parent = state
+                .repos
+                .actions
+                .get_or_err(pid)
+                .await
+                .map_err(super::map_storage_err)?;
+            parent.area_id
+        }
+        (None, None) => "default".to_string(),
+    };
+
     let row = ActionRow {
         id: id.clone(),
         title: params.title,
         description: None,
-        area_id: params.area_id.unwrap_or_else(|| "default".to_string()),
+        area_id,
         project_id: params.project_id,
         key_result_id: None,
-        parent_id: None,
+        parent_id: params.parent_id.clone(),
         priority: params.priority,
         due_date: params.due_date.and_then(|d| super::parse_date(&d)),
         tags: params.tags.unwrap_or_default(),
@@ -257,7 +320,8 @@ pub async fn task_create(
 
     super::emit_entity_updated(&app, EntityKind::Task, &id);
 
-    Ok(action_to_task(&created))
+    // Newly created task has no subtasks yet
+    Ok(action_to_task(&created, 0, 0))
 }
 
 #[tauri::command]
@@ -291,7 +355,7 @@ pub async fn task_update(
 
     super::emit_entity_updated(&app, EntityKind::Task, &params.id);
 
-    Ok(action_to_task(&updated))
+    row_to_task(&state.repos, &updated).await
 }
 
 #[tauri::command]
@@ -360,4 +424,19 @@ pub async fn today_tasks(state: State<'_, AppCore>) -> Result<Vec<TodayTaskRespo
         .iter()
         .map(|row| action_to_today_task(row, now))
         .collect())
+}
+
+#[tauri::command]
+pub async fn task_list_children(
+    state: State<'_, AppCore>,
+    parent_id: String,
+) -> Result<Vec<TaskResponse>, ApiError> {
+    let rows = state
+        .repos
+        .actions
+        .get_children(&parent_id)
+        .await
+        .map_err(super::map_storage_err)?;
+
+    rows_to_tasks(&state.repos, &rows).await
 }

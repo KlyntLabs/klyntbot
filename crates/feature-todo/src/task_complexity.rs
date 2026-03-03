@@ -47,7 +47,11 @@ impl TaskComplexitySignals {
 /// Query a task's structural complexity from the database.
 pub async fn evaluate_task_complexity(repo: &ActionRepo, task_id: &str) -> TaskComplexitySignals {
     // Count direct subtasks
-    let subtask_count = repo.count_children(task_id).await.unwrap_or(0) as u16;
+    let subtask_count = repo
+        .count_children(task_id)
+        .await
+        .map(|(total, _)| total)
+        .unwrap_or(0) as u16;
 
     // Check if this task has any blockers
     let deps = repo.get_dependencies(task_id).await.unwrap_or_default();

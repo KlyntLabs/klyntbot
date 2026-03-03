@@ -2,7 +2,6 @@ use desktop_shared::commands::AgentStatusResponse;
 use desktop_shared::errors::ApiError;
 use tauri::State;
 
-use super::tasks::action_to_task;
 use crate::app_core::AppCore;
 
 #[tauri::command]
@@ -21,7 +20,10 @@ pub async fn agent_status(state: State<'_, AppCore>) -> Result<AgentStatusRespon
         .await
         .map_err(super::map_storage_err)?;
 
-    let focus_task = focused.first().map(action_to_task);
+    let focus_task = match focused.first() {
+        Some(row) => Some(super::tasks::row_to_task(&state.repos, row).await?),
+        None => None,
+    };
 
     Ok(AgentStatusResponse {
         status: if focused.is_empty() {

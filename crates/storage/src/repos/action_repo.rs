@@ -19,6 +19,7 @@ pub struct ActionFilter {
     pub project_id: Option<String>,
     pub key_result_id: Option<String>,
     pub unassigned: bool,
+    pub root_only: bool,
     pub priority_min: Option<i16>,
     pub due_after: Option<DateTime<Utc>>,
     pub due_before: Option<DateTime<Utc>>,
@@ -252,6 +253,10 @@ impl ActionRepo {
 
         if filter.unassigned {
             qb.push(" AND project_id IS NULL");
+        }
+
+        if filter.root_only {
+            qb.push(" AND parent_id IS NULL");
         }
 
         if let Some(pmin) = filter.priority_min {
@@ -677,13 +682,43 @@ impl ActionRepo {
         Ok(rows)
     }
 
-    /// Count immediate children.
-    pub async fn count_children(&self, parent_id: &str) -> Result<i64, StorageError> {
-        let row: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM actions WHERE parent_id = ?1")
-            .bind(parent_id)
-            .fetch_one(&self.pool)
+    /// Count immediate children, returning (total, completed).
+    pub async fn count_children(&self, parent_id: &str) -> Result<(i64, i64), StorageError> {
+        let row: (i64, i64) = sqlx::query_as(
+            "SELECT COUNT(*), SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) FROM actions WHERE parent_id = ?1",
+        )
+        .bind(parent_id)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(row)
+    }
+
+    /// Bulk count immediate children for multiple parents, returning a map of id -> (total, completed).
+    pub async fn count_children_bulk(
+        &self,
+        parent_ids: &[String],
+    ) -> Result<std::collections::HashMap<String, (i64, i64)>, StorageError> {
+        if parent_ids.is_empty() {
+            return Ok(std::collections::HashMap::new());
+        }
+
+        let mut qb = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
+            "SELECT parent_id, COUNT(*), SUM(CASE WHEN status = 'done' THEN 1 ELSE 0 END) FROM actions WHERE parent_id IN (",
+        );
+        let mut sep = qb.separated(", ");
+        for id in parent_ids {
+            sep.push_bind(id);
+        }
+        qb.push(") GROUP BY parent_id");
+
+        let rows = qb
+            .build_query_as::<(String, i64, i64)>()
+            .fetch_all(&self.pool)
             .await?;
-        Ok(row.0)
+        Ok(rows
+            .into_iter()
+            .map(|(id, total, done)| (id, (total, done)))
+            .collect())
     }
 
     /// Get full subtree of an action (recursive CTE).

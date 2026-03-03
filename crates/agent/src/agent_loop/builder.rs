@@ -578,6 +578,26 @@ impl AgentLoopBuilder {
             }
         }
 
+        // ── MCP tools (Model Context Protocol) ──────────────────────────
+        let mcp_manager = if config.mcp.has_active_servers() {
+            let manager = mcp::McpManager::connect_all(&config.mcp).await;
+            let mcp_tools = manager.tools();
+            let tool_count = mcp_tools.len();
+            for tool in mcp_tools {
+                tool_registry.register_dyn(tool as tools_core::DynTool);
+            }
+            if tool_count > 0 {
+                info!(
+                    servers = manager.connected_count(),
+                    tools = tool_count,
+                    "MCP tools registered"
+                );
+            }
+            Some(manager)
+        } else {
+            None
+        };
+
         // ── Confidence evaluator ──────────────────────────────────────────
         let confidence_evaluator = if config.confidence.enabled {
             if config.confidence.tool_overrides.is_empty() {
@@ -793,6 +813,7 @@ impl AgentLoopBuilder {
             history_limit,
             _session_cleanup_token: session_cleanup_token,
             _memory_maintenance_token: memory_maintenance_token,
+            mcp_manager: tokio::sync::Mutex::new(mcp_manager),
         })
     }
 }

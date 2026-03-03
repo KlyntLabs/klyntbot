@@ -110,6 +110,7 @@ fn main() {
             commands::tasks::task_update,
             commands::tasks::task_delete,
             commands::tasks::task_toggle_complete,
+            commands::tasks::task_list_children,
             commands::tasks::project_list,
             commands::tasks::objective_list,
             // Areas

@@ -16,6 +16,7 @@ tools-core.workspace = true
 feature-todo.workspace = true
 feature-finance.workspace = true
 plugin-runtime.workspace = true
+mcp.workspace = true
 scheduling.workspace = true
 calendar.workspace = true
 domain.workspace = true
