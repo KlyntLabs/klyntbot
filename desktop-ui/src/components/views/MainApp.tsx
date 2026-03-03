@@ -4,14 +4,14 @@ import { MessageSquare } from 'lucide-react';
 import { Sidebar } from '../layout/Sidebar';
 import { Toolbar } from '../tasks/Toolbar';
 import { TaskTable } from '../tasks/TaskTable';
+import { KanbanBoard } from '../tasks/KanbanBoard';
 import { SidebarChat } from '../chat/SidebarChat';
 import { OkrView } from './OkrView';
 import { useSetToggle } from '../../hooks/useSetToggle';
 import { useQuery } from '../../hooks/useQuery';
 import { useMutation } from '../../hooks/useMutation';
 import { useEvent } from '../../hooks/useEvent';
-import { taskGridCols } from '../../lib/utils';
-import type { Task, Project, Objective, Tab, SidebarItem, ViewMode, TaskUpdateParams } from '../../lib/types';
+import type { Task, Project, Objective, Area, Tab, SidebarItem, ViewMode, TaskUpdateParams } from '../../lib/types';
 
 export function MainApp() {
   const navigate = useNavigate();
@@ -25,6 +25,10 @@ export function MainApp() {
   const { data: tasks, refetch: refetchTasks } = useQuery<Task[]>('task_list', undefined, []);
   const { data: projects, refetch: refetchProjects } = useQuery<Project[]>('project_list', undefined, []);
   const { data: objectives } = useQuery<Objective[]>('objective_list', undefined, []);
+  const { data: areas, refetch: refetchAreas } = useQuery<Area[]>('area_list', undefined, []);
+
+  const areaMap = useMemo(() => new Map(areas.map(a => [a.id, a])), [areas]);
+  const projectMap = useMemo(() => new Map(projects.map(p => [p.id, p])), [projects]);
 
   const toggleComplete = useMutation<Task, { id: string }>('task_toggle_complete');
   const updateTask = useMutation<Task, TaskUpdateParams>('task_update');
@@ -61,8 +65,10 @@ export function MainApp() {
   // Auto-refresh when relevant entities change
   useEvent<{ entityKind: string; id: string }>('entity:updated', (payload) => {
     const kind = payload?.entityKind;
-    if (!kind || kind === 'task' || kind === 'area') refetchTasks();
-    if (!kind || kind === 'project' || kind === 'objective') refetchProjects();
+    if (!kind) { refetchTasks(); refetchProjects(); refetchAreas(); return; }
+    if (kind === 'task' || kind === 'area') refetchTasks();
+    if (kind === 'project' || kind === 'objective') refetchProjects();
+    if (kind === 'area') refetchAreas();
   });
 
   // Listen for open-chat events from the tray
@@ -71,15 +77,25 @@ export function MainApp() {
     setActiveSidebar('Chat');
   });
 
-  const filteredTasks = useMemo(() =>
-    activeTab === 'All' ? tasks : tasks.filter(task => task.areaId === activeTab.toLowerCase()),
-  [activeTab, tasks]);
-
-  const showArea = activeTab === 'All';
+  const filteredTasks = useMemo(() => {
+    if (activeTab === 'All') return tasks;
+    const tabLower = activeTab.toLowerCase();
+    return tasks.filter(task => {
+      const area = areaMap.get(task.areaId);
+      return area?.name.toLowerCase() === tabLower;
+    });
+  }, [activeTab, tasks, areaMap]);
 
   // Content view is independent of chat state — if chat is open, show the view
   // that was active before chat opened.
   const contentView = activeSidebar === 'Chat' ? prevSidebarRef.current : activeSidebar;
+
+  // Derive sidebar chat context from the current view + tab
+  const sidebarViewContext = useMemo(() => {
+    const section = contentView.toLowerCase();
+    if (activeTab === 'All') return { entityKind: section };
+    return { entityKind: `${section}.${activeTab.toLowerCase()}` };
+  }, [contentView, activeTab]);
 
   return (
     <div className="h-screen w-screen bg-background text-primary flex overflow-hidden">
@@ -136,39 +152,44 @@ export function MainApp() {
 
           {/* Inline Add Task Row */}
           {addingTask && (
-            <div className="mb-2 bg-surface-low rounded-xl overflow-hidden">
-              <div className={`grid ${taskGridCols(showArea)} gap-4 px-6 py-3`}>
-                <div />
-                <div className="flex items-center">
-                  <input
-                    autoFocus
-                    value={newTaskTitle}
-                    onChange={e => setNewTaskTitle(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') handleAddTask();
-                      if (e.key === 'Escape') { setAddingTask(false); setNewTaskTitle(''); }
-                    }}
-                    onBlur={() => { if (!newTaskTitle.trim()) { setAddingTask(false); setNewTaskTitle(''); } }}
-                    placeholder="Task title... (Enter to save, Esc to cancel)"
-                    className="w-full bg-transparent text-[13px] font-light text-primary outline-none placeholder:text-dim"
-                  />
-                </div>
-              </div>
+            <div className="mb-2 bg-surface-low rounded-xl px-5 py-3">
+              <input
+                autoFocus
+                value={newTaskTitle}
+                onChange={e => setNewTaskTitle(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') handleAddTask();
+                  if (e.key === 'Escape') { setAddingTask(false); setNewTaskTitle(''); }
+                }}
+                onBlur={() => { if (!newTaskTitle.trim()) { setAddingTask(false); setNewTaskTitle(''); } }}
+                placeholder="Task title... (Enter to save, Esc to cancel)"
+                className="w-full bg-transparent text-[13px] font-light text-primary outline-none placeholder:text-dim"
+              />
             </div>
           )}
 
-          <TaskTable
-            tasks={filteredTasks}
-            projects={projects}
-            objectives={objectives}
-            activeTab={activeTab}
-            completedTasks={completedTasks}
-            collapsedProjects={collapsedProjects}
-            onToggleTask={handleToggleTask}
-            onToggleProject={toggleProject}
-            onUpdatePriority={handleUpdatePriority}
-            onRenameTask={handleRenameTask}
-          />
+          {viewMode === 'board' ? (
+            <KanbanBoard
+              tasks={filteredTasks}
+              projectMap={projectMap}
+              areaMap={areaMap}
+              completedTasks={completedTasks}
+            />
+          ) : (
+            <TaskTable
+              tasks={filteredTasks}
+              projectMap={projectMap}
+              objectives={objectives}
+              areaMap={areaMap}
+              activeTab={activeTab}
+              completedTasks={completedTasks}
+              collapsedProjects={collapsedProjects}
+              onToggleTask={handleToggleTask}
+              onToggleProject={toggleProject}
+              onUpdatePriority={handleUpdatePriority}
+              onRenameTask={handleRenameTask}
+            />
+          )}
           {filteredTasks.length === 0 && !addingTask && (
             <div className="flex flex-col items-center justify-center py-20 text-center">
               <p className="text-muted text-sm font-light">No tasks yet</p>
@@ -181,7 +202,7 @@ export function MainApp() {
       </div>
 
       {/* Sidebar Chat */}
-      <SidebarChat isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
+      <SidebarChat isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} viewContext={sidebarViewContext} />
     </div>
   );
 }

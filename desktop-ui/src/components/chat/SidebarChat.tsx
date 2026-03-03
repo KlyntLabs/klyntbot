@@ -8,6 +8,8 @@ import { useChatSession } from '../../hooks/useChatSession';
 interface SidebarChatProps {
   isOpen: boolean;
   onClose: () => void;
+  /** View-level context from the parent (e.g. active sidebar section + tab). */
+  viewContext?: { entityKind: string; entityId?: string };
 }
 
 /** Derive a stable session key from page context. */
@@ -23,9 +25,13 @@ function contextLabel(entityKind?: string): string {
   return parts.map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(' › ');
 }
 
-export function SidebarChat({ isOpen, onClose }: SidebarChatProps) {
-  const pageContext = usePageContext();
-  const sessionKey = sessionKeyFor(pageContext?.entityKind, pageContext?.entityId);
+export function SidebarChat({ isOpen, onClose, viewContext }: SidebarChatProps) {
+  const routeContext = usePageContext();
+  // Route context (entity detail pages) takes priority; fall back to view context
+  const pageContext = routeContext ?? viewContext ?? null;
+  // Use route context for session key (entity pages get their own session),
+  // but keep a single 'desktop-panel' session for the main view regardless of tab.
+  const sessionKey = routeContext ? sessionKeyFor(routeContext.entityKind, routeContext.entityId) : 'desktop-panel';
 
   const chat = useChatSession(sessionKey);
   const pinThread = useMutation<void, Record<string, unknown>>('chat_pin_thread');

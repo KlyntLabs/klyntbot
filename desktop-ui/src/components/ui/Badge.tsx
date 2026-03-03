@@ -10,13 +10,22 @@ const colorMaps: Record<string, Record<string, string>> = {
     P4: 'bg-blue-500/10 text-blue-400/80',
   },
   status: {
-    todo: 'bg-muted/10 text-muted',
+    todo: 'bg-info/10 text-info',
     doing: 'bg-brand/10 text-brand',
     done: 'bg-success/10 text-success',
   },
   area: {
     work: 'bg-info/10 text-info',
     personal: 'bg-purple/10 text-purple',
+  },
+};
+
+// Display labels for values that need formatting (e.g. "todo" → "To Do")
+const labelMaps: Record<string, Record<string, string>> = {
+  status: {
+    todo: 'To Do',
+    doing: 'In Progress',
+    done: 'Done',
   },
 };
 
@@ -29,11 +38,14 @@ interface BadgeProps {
 }
 
 export function Badge({ variant, value, className }: BadgeProps) {
-  const colorClass = colorMaps[variant]?.[value] ?? defaultColor;
+  const key = value.toLowerCase();
+  const map = colorMaps[variant];
+  const colorClass = map?.[value] ?? map?.[key] ?? defaultColor;
+  const label = labelMaps[variant]?.[key] ?? value;
 
   return (
     <span className={cn('px-2 py-0.5 text-[11px] font-light rounded', colorClass, className)}>
-      {value}
+      {label}
     </span>
   );
 }

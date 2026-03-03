@@ -305,6 +305,14 @@ pub async fn chat_send(
                                 duration_ms,
                                 estimated_tokens,
                             });
+                            // Emit entity:updated so the UI refreshes affected lists
+                            // (e.g. tasks page updates after a status change via chat).
+                            // Skip read-only actions to avoid needless refetches.
+                            if success && is_mutating_action(action.as_deref()) {
+                                if let Some(kind) = entity_kind_for_tool(&name) {
+                                    super::emit_entity_updated(&app, kind, "");
+                                }
+                            }
                             let _ = app.emit(
                                 AGENT_TOOL_END,
                                 ToolEndPayload {
@@ -699,6 +707,19 @@ pub async fn chat_cancel(state: State<'_, AppCore>, session_key: String) -> Resu
         let _ = tx.send(common::FormResponse::Cancelled);
     }
     Ok(())
+}
+
+// ── Entity-update helpers ────────────────────────────────────────────────
+
+/// Map a tool name to the EntityKind it modifies, derived from `tool_domain`.
+fn entity_kind_for_tool(tool_name: &str) -> Option<desktop_shared::types::EntityKind> {
+    tool_domain(tool_name).and_then(desktop_shared::types::EntityKind::parse)
+}
+
+/// Returns `true` when the action is a write (create/update/delete/toggle/etc.)
+/// rather than a read-only query (list/get/search).
+fn is_mutating_action(action: Option<&str>) -> bool {
+    !matches!(action, Some("list" | "get" | "search" | "search-semantic" | "search-hybrid"))
 }
 
 // ── Auto-detection helpers ──────────────────────────────────────────────

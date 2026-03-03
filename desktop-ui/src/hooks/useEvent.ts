@@ -5,6 +5,11 @@ import { isTauri } from '../lib/utils';
 /**
  * Subscribe to a Tauri event, auto-cleanup on unmount.
  * No-ops in browser dev mode where Tauri IPC is unavailable.
+ *
+ * The `cancelled` guard inside the handler callback prevents stale listeners
+ * from processing events during React StrictMode's double-mount cycle. Without
+ * it, the brief window where both the old and new Tauri listeners are active
+ * causes each event to be handled twice (duplicated text, tool calls, etc.).
  */
 export function useEvent<T>(event: string, handler: (payload: T) => void) {
   const handlerRef = useRef(handler);
@@ -16,7 +21,9 @@ export function useEvent<T>(event: string, handler: (payload: T) => void) {
     let cancelled = false;
     let unlisten: UnlistenFn | undefined;
 
-    listen<T>(event, (e) => handlerRef.current(e.payload)).then((fn) => {
+    listen<T>(event, (e) => {
+      if (!cancelled) handlerRef.current(e.payload);
+    }).then((fn) => {
       if (cancelled) fn();
       else unlisten = fn;
     });

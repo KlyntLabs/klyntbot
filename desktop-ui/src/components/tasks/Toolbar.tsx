@@ -1,4 +1,4 @@
-import { Filter, ChevronDown, Plus, LayoutGrid, List, GitBranch } from 'lucide-react';
+import { Filter, ChevronDown, Plus, Columns3, List, GitBranch } from 'lucide-react';
 import type { ViewMode } from '../../lib/types';
 
 interface ToolbarProps {
@@ -37,7 +37,7 @@ export function Toolbar({ viewMode, onViewModeChange, onAddTask }: ToolbarProps)
         <div className="flex items-center bg-surface-low rounded-md p-0.5">
           {([
             { mode: 'table' as const, icon: List },
-            { mode: 'board' as const, icon: LayoutGrid },
+            { mode: 'board' as const, icon: Columns3 },
             { mode: 'tree' as const, icon: GitBranch },
           ]).map(({ mode, icon: Icon }) => (
             <button
