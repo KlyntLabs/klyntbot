@@ -3,10 +3,11 @@
 use async_trait::async_trait;
 use reqwest::Client;
 use serde_json::Value;
+use std::time::Duration;
 use tracing::{debug, warn};
 use url::Url;
 
-use common::{Result, ToolError};
+use common::{utils::build_http_client_with_builder, Result, ToolError};
 use tools_core::{RoutingContext, ToolParams};
 
 #[derive(Debug, ToolParams)]
@@ -37,10 +38,10 @@ impl WebSearchTool {
     pub fn new(api_key: Option<String>, max_results: u8) -> Self {
         Self {
             api_key,
-            client: Client::builder()
-                .timeout(std::time::Duration::from_secs(30))
-                .build()
-                .unwrap(),
+            client: build_http_client_with_builder(|builder| {
+                builder.timeout(Duration::from_secs(30))
+            })
+            .unwrap(),
             max_results,
         }
     }
@@ -156,11 +157,12 @@ pub struct WebFetchTool {
 impl WebFetchTool {
     pub fn new() -> Self {
         Self {
-            client: Client::builder()
-                .timeout(std::time::Duration::from_secs(30))
-                .redirect(reqwest::redirect::Policy::limited(5))
-                .build()
-                .unwrap(),
+            client: build_http_client_with_builder(|builder| {
+                builder
+                    .timeout(Duration::from_secs(30))
+                    .redirect(reqwest::redirect::Policy::limited(5))
+            })
+            .unwrap(),
         }
     }
 }

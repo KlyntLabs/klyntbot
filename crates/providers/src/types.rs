@@ -412,10 +412,13 @@ impl Message {
         }
     }
 
-    /// Create an assistant message with tool calls
-    pub fn assistant_with_tools(tool_calls: Vec<ToolCallMessage>) -> Self {
+    /// Create an assistant message with tool calls and optional text content.
+    pub fn assistant_with_content_and_tools(
+        content: Option<String>,
+        tool_calls: Vec<ToolCallMessage>,
+    ) -> Self {
         Self::Assistant {
-            content: None,
+            content,
             tool_calls: Some(tool_calls),
             reasoning_content: None,
         }

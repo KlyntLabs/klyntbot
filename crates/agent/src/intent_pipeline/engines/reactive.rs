@@ -1,8 +1,8 @@
-//! ReactiveEngine — ReAct loop with mid-execution escalation.
+//! ReactiveEngine — ReAct loop that runs until the LLM produces a final text
+//! response, or synthesizes a summary at max iterations.
 //!
 //! Ported from `execution/react_plus.rs` with these changes:
 //! - Returns `EngineResult` instead of `ReactOutcome`
-//! - Tracks `completed_work` for escalation context preservation
 //! - Implements `ExecutionEngine` trait
 
 use std::collections::HashSet;
@@ -20,9 +20,8 @@ use super::{EngineResult, ExecutionEngine};
 use crate::execution::scratchpad::{ReasoningTrace, Scratchpad};
 use crate::execution::types::{accumulate_usage, CycleOutcome, ExecutionParams};
 use crate::execution::ExecutionCore;
-use crate::intent_pipeline::router::{CompletedStep, EscalationContext};
 
-/// ReactiveEngine — ReAct loop that escalates when complexity exceeds capacity.
+/// ReactiveEngine — ReAct loop that runs until completion or synthesizes at max iterations.
 pub struct ReactiveEngine {
     core: Arc<ExecutionCore>,
     max_iterations: u32,
@@ -55,13 +54,11 @@ impl ExecutionEngine for ReactiveEngine {
         } else {
             self.max_iterations
         };
-        let escalation_threshold = (max_iterations as f32 * 0.8).ceil() as u32;
         let mut accumulated_usage = providers::Usage::default();
         let mut fabrication_retries = 0u32;
         let max_fabrication_retries = params.max_fabrication_retries;
         let mut seen_tool_calls: HashSet<String> = HashSet::new();
         let mut last_tool_name: Option<String> = None;
-        let mut completed_work: Vec<CompletedStep> = Vec::new();
 
         for iteration in 1..=max_iterations {
             // Check cancellation
@@ -164,17 +161,6 @@ impl ExecutionEngine for ReactiveEngine {
                         last_tool_name = Some(name.clone());
                     }
 
-                    // Track completed work for potential escalation
-                    for r in &results {
-                        if r.success {
-                            completed_work.push(CompletedStep {
-                                description: format!("Called {} tool", r.tool_name),
-                                tool_name: r.tool_name.clone(),
-                                result: r.result.clone(),
-                            });
-                        }
-                    }
-
                     let had_failure = results.iter().any(|r| !r.success);
                     let failure_details: Vec<String> = results
                         .iter()
@@ -222,24 +208,6 @@ impl ExecutionEngine for ReactiveEngine {
                         reflection,
                         timestamp: Utc::now(),
                     });
-
-                    // Check escalation threshold
-                    if iteration >= escalation_threshold {
-                        return Ok(EngineResult::Escalate {
-                            reason: format!(
-                                "Used {}% of max iterations ({}/{}), task may need planning",
-                                (iteration * 100) / max_iterations,
-                                iteration,
-                                max_iterations
-                            ),
-                            carried_context: EscalationContext {
-                                messages,
-                                completed_work,
-                                original_message: params.original_message.clone(),
-                            },
-                            usage: accumulated_usage,
-                        });
-                    }
                 }
 
                 CycleOutcome::EmptyResponse => {
@@ -255,9 +223,39 @@ impl ExecutionEngine for ReactiveEngine {
             }
         }
 
-        // Max iterations reached without final response — complete with empty
+        // Max iterations reached — synthesize a response from completed work
+        debug!(
+            "ReactiveEngine: max iterations ({}) reached, synthesizing final response",
+            max_iterations
+        );
+
+        messages.push(Message::user(
+            "You've used all available iterations. Based on the work completed so far, \
+             provide a complete response to the user's original request. \
+             Summarize what you accomplished and any remaining steps.",
+        ));
+
+        // One final LLM call with no tools — forces text response
+        let (synthesis_outcome, synthesis_usage) = self
+            .core
+            .run_cycle(&mut messages, &[], params, ctx, event_tx.as_ref(), None)
+            .await?;
+        accumulate_usage(&mut accumulated_usage, &synthesis_usage);
+
+        let synthesis_content = match synthesis_outcome {
+            CycleOutcome::FinalResponse { content } => content,
+            CycleOutcome::FabricatedResponse { content } => content,
+            other => {
+                tracing::warn!(
+                    "ReactiveEngine: synthesis call produced {:?} instead of text",
+                    other
+                );
+                String::new()
+            }
+        };
+
         Ok(EngineResult::Complete {
-            content: String::new(),
+            content: synthesis_content,
             usage: accumulated_usage,
             iterations: max_iterations,
             traces: scratchpad.traces().to_vec(),
@@ -330,17 +328,19 @@ mod tests {
                 assert!(content.contains("Done"));
                 assert_eq!(iterations, 2);
             }
-            EngineResult::Escalate { .. } => panic!("Expected Complete, got Escalate"),
         }
     }
 
     #[tokio::test]
-    async fn reactive_escalates_on_complexity() {
-        // With max_iterations=5, escalation at ceil(4.0) = 4
-        let responses: Vec<_> = (0..10).map(|_| tool_call_response("ok_tool")).collect();
+    async fn reactive_synthesizes_at_max_iterations() {
+        // With max_iterations=3, after 3 tool iterations the engine should synthesize
+        let responses: Vec<_> = (0..5)
+            .map(|_| tool_call_response("ok_tool"))
+            .chain(std::iter::once(text_response("Here's what I did...")))
+            .collect();
         let provider = MockSequenceProvider::new(responses);
         let core = Arc::new(ExecutionCore::new(provider, registry_with_ok_tool()));
-        let engine = ReactiveEngine::new(core, 5);
+        let engine = ReactiveEngine::new(core, 3);
 
         let result = engine
             .execute(
@@ -354,15 +354,9 @@ mod tests {
             .unwrap();
 
         match result {
-            EngineResult::Escalate {
-                reason,
-                carried_context,
-                ..
-            } => {
-                assert!(reason.contains("80%"));
-                assert!(!carried_context.completed_work.is_empty());
+            EngineResult::Complete { content, .. } => {
+                assert!(!content.is_empty(), "Should have synthesized a response");
             }
-            EngineResult::Complete { .. } => panic!("Expected Escalate, got Complete"),
         }
     }
 
@@ -393,14 +387,15 @@ mod tests {
                 assert_eq!(traces[0].actual_action, "tools_executed");
                 assert_eq!(traces[1].actual_action, "tools_executed");
             }
-            EngineResult::Escalate { .. } => panic!("Expected Complete"),
         }
     }
 
     #[tokio::test]
     async fn respects_per_request_max_iterations() {
-        // max_iterations=3 in params, engine default is 10
-        let responses: Vec<_> = (0..10).map(|_| tool_call_response("ok_tool")).collect();
+        let responses: Vec<_> = (0..10)
+            .map(|_| tool_call_response("ok_tool"))
+            .chain(std::iter::once(text_response("synthesized")))
+            .collect();
         let provider = MockSequenceProvider::new(responses);
         let core = Arc::new(ExecutionCore::new(provider, registry_with_ok_tool()));
         let engine = ReactiveEngine::new(core, 10); // default 10
@@ -418,13 +413,6 @@ mod tests {
             .unwrap();
 
         match result {
-            EngineResult::Escalate { reason, .. } => {
-                assert!(
-                    reason.contains("3"),
-                    "reason should reference 3 iterations: {}",
-                    reason
-                );
-            }
             EngineResult::Complete { iterations, .. } => {
                 assert!(iterations <= 3, "should not exceed 3 iterations");
             }
@@ -453,18 +441,16 @@ mod tests {
             .unwrap();
 
         // Should return early due to cancellation
-        if let EngineResult::Complete {
+        let EngineResult::Complete {
             content,
             iterations,
             ..
-        } = result
-        {
-            assert!(
-                content.is_empty() || content.contains("cancelled"),
-                "content should be empty or mention cancelled"
-            );
-            assert_eq!(iterations, 0, "should not have completed any iterations");
-        }
+        } = result;
+        assert!(
+            content.is_empty() || content.contains("cancelled"),
+            "content should be empty or mention cancelled"
+        );
+        assert_eq!(iterations, 0, "should not have completed any iterations");
     }
 
     #[test]

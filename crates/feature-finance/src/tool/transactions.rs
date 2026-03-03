@@ -136,10 +136,13 @@ impl FinanceTool {
         let inserted = self.storage.transactions.add(&row).await?;
 
         // Adjust account balance.
+        // Note: Transfer is handled early and should never reach here (line 85-98)
         let balance_delta = match tx_type {
             TransactionType::Income => amount,
             TransactionType::Expense => -amount,
-            TransactionType::Transfer => unreachable!(),
+            TransactionType::Transfer => {
+                unreachable!("Transfer transactions should be handled by tx_add_transfer")
+            }
         };
 
         let updated_account = self

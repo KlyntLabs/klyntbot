@@ -298,9 +298,9 @@ impl MemoryTool {
 
                 merged
                     .into_iter()
-                    .map(|(result, score, _source)| match result {
-                        crate::search_utils::SearchResult::Todo(todo) => (*todo, score),
-                        _ => unreachable!("Expected Todo result"),
+                    .filter_map(|(result, score, _source)| match result {
+                        crate::search_utils::SearchResult::Todo(todo) => Some((*todo, score)),
+                        crate::search_utils::SearchResult::Conversation(_) => None,
                     })
                     .collect()
             } else {

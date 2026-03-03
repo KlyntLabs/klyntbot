@@ -17,8 +17,8 @@ use crate::shared::{InteractionTracker, TypingManager};
 use crate::{check_allowlist, Channel};
 use bus::{InboundMessage, MessageBus, MessageKind, OutboundMessage};
 use common::{
-    utils::truncate_chars, Answer, AnswerType, AnswerValue, ChannelError, FormResponse,
-    InteractionRequest, Result,
+    utils::{build_http_client_with_builder, truncate_chars},
+    Answer, AnswerType, AnswerValue, ChannelError, FormResponse, InteractionRequest, Result,
 };
 use config::schema::TelegramConfig;
 use providers::TranscriptionProvider;
@@ -37,24 +37,25 @@ pub struct TelegramChannel {
 impl TelegramChannel {
     /// Create a new Telegram channel
     pub fn new(config: TelegramConfig, groq_api_key: Option<String>) -> Result<Self> {
-        let mut client_builder = Client::builder().timeout(Duration::from_secs(30));
+        let proxy_url = config.proxy.clone();
+        let client = build_http_client_with_builder(|builder| {
+            let mut configured = builder.timeout(Duration::from_secs(30));
 
-        // Configure proxy if specified
-        if let Some(ref proxy_url) = config.proxy {
-            match reqwest::Proxy::all(proxy_url) {
-                Ok(proxy) => {
-                    info!("Telegram using proxy: {}", proxy_url);
-                    client_builder = client_builder.proxy(proxy);
-                }
-                Err(e) => {
-                    warn!("Failed to configure Telegram proxy: {}", e);
+            // Configure proxy if specified
+            if let Some(ref proxy_url) = proxy_url {
+                match reqwest::Proxy::all(proxy_url) {
+                    Ok(proxy) => {
+                        info!("Telegram using proxy: {}", proxy_url);
+                        configured = configured.proxy(proxy);
+                    }
+                    Err(e) => {
+                        warn!("Failed to configure Telegram proxy: {}", e);
+                    }
                 }
             }
-        }
 
-        let client = client_builder
-            .build()
-            .map_err(|e| ChannelError::ConnectionFailed(e.to_string()))?;
+            configured
+        })?;
 
         let api_base = format!("https://api.telegram.org/bot{}", config.token.expose());
 

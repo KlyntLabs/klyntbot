@@ -8,6 +8,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use crate::types::AssetType;
+use common::utils::build_http_client_with_builder;
 
 /// A cached price entry.
 #[derive(Debug, Clone)]
@@ -42,11 +43,12 @@ impl PriceService {
     /// Create a new `PriceService` with the given cache TTL in minutes.
     pub fn new(cache_ttl_minutes: u32) -> Self {
         Self {
-            client: reqwest::Client::builder()
-                .timeout(Duration::from_secs(10))
-                .user_agent("klyntbot/1.0")
-                .build()
-                .expect("failed to build reqwest client"),
+            client: build_http_client_with_builder(|builder| {
+                builder
+                    .timeout(Duration::from_secs(10))
+                    .user_agent("klyntbot/1.0")
+            })
+            .expect("failed to build reqwest client"),
             cache: Arc::new(DashMap::new()),
             cache_ttl: Duration::from_secs(u64::from(cache_ttl_minutes) * 60),
         }

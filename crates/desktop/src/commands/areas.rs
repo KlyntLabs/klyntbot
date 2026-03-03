@@ -1,16 +1,17 @@
 use desktop_shared::commands::{AreaCreateParams, AreaResponse, AreaUpdateParams};
+use desktop_shared::errors::ApiError;
 use desktop_shared::types::EntityKind;
 use storage::AreaRow;
 use tauri::State;
 
 use crate::app_core::AppCore;
 
-async fn build_area_response(state: &AppCore, row: &AreaRow) -> Result<AreaResponse, String> {
+async fn build_area_response(state: &AppCore, row: &AreaRow) -> Result<AreaResponse, ApiError> {
     let (project_count, task_count) = tokio::try_join!(
         state.repos.areas.count_projects(&row.id),
         state.repos.areas.count_actions(&row.id),
     )
-    .map_err(|e| e.to_string())?;
+    .map_err(super::map_storage_err)?;
 
     Ok(AreaResponse {
         id: row.id.clone(),
@@ -23,13 +24,13 @@ async fn build_area_response(state: &AppCore, row: &AreaRow) -> Result<AreaRespo
 }
 
 #[tauri::command]
-pub async fn area_list(state: State<'_, AppCore>) -> Result<Vec<AreaResponse>, String> {
+pub async fn area_list(state: State<'_, AppCore>) -> Result<Vec<AreaResponse>, ApiError> {
     let areas = state
         .repos
         .areas
         .list(Some("active"))
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(super::map_storage_err)?;
 
     let mut results = Vec::with_capacity(areas.len());
     for a in &areas {
@@ -43,7 +44,7 @@ pub async fn area_create(
     state: State<'_, AppCore>,
     app: tauri::AppHandle,
     params: AreaCreateParams,
-) -> Result<AreaResponse, String> {
+) -> Result<AreaResponse, ApiError> {
     let id = uuid::Uuid::new_v4().to_string();
     let now = chrono::Utc::now();
 
@@ -64,7 +65,7 @@ pub async fn area_create(
         .areas
         .create(&row)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(super::map_storage_err)?;
 
     super::emit_entity_updated(&app, EntityKind::Area, &id);
 
@@ -83,7 +84,7 @@ pub async fn area_update(
     state: State<'_, AppCore>,
     app: tauri::AppHandle,
     params: AreaUpdateParams,
-) -> Result<AreaResponse, String> {
+) -> Result<AreaResponse, ApiError> {
     let updated = state
         .repos
         .areas
@@ -96,7 +97,7 @@ pub async fn area_update(
             None,
         )
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(super::map_storage_err)?;
 
     super::emit_entity_updated(&app, EntityKind::Area, &params.id);
 
@@ -108,13 +109,13 @@ pub async fn area_delete(
     state: State<'_, AppCore>,
     app: tauri::AppHandle,
     id: String,
-) -> Result<bool, String> {
+) -> Result<bool, ApiError> {
     let deleted = state
         .repos
         .areas
         .delete(&id)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(super::map_storage_err)?;
 
     if deleted {
         super::emit_entity_updated(&app, EntityKind::Area, &id);
@@ -129,13 +130,13 @@ pub async fn area_reorder(
     app: tauri::AppHandle,
     id: String,
     position: i32,
-) -> Result<AreaResponse, String> {
+) -> Result<AreaResponse, ApiError> {
     let updated = state
         .repos
         .areas
         .reorder(&id, position)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(super::map_storage_err)?;
 
     super::emit_entity_updated(&app, EntityKind::Area, &id);
 

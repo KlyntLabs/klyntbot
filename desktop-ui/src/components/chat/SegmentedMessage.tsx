@@ -77,10 +77,10 @@ export function SegmentedMessage({ segments, activeTools, isStreaming }: Segment
     <div>
       {segments.map((seg, i) => {
         const isLastText = seg.type === 'text' && i === segments.length - 1;
-        // Tool segments are stable once pushed; use name+duration as key.
-        // Text segments update in-place (only the last one mutates), so a
-        // type-prefixed index is safe and avoids spurious remounts.
-        const key = seg.type === 'tool' ? `tool-${seg.name}-${seg.durationMs}` : `text-${i}`;
+        // Use index + name as key for tools (index guarantees uniqueness,
+        // name adds semantic stability). Text segments use type-prefixed index
+        // since only the last one mutates during streaming.
+        const key = seg.type === 'tool' ? `tool-${i}-${seg.name}` : `text-${i}`;
         return seg.type === 'text' ? (
           <div key={key} className={isStreaming && isLastText ? 'streaming-cursor' : ''}>
             <MarkdownContent content={seg.content} />

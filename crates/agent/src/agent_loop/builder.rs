@@ -117,7 +117,12 @@ impl AgentLoopBuilder {
         } else {
             storage::StoragePool::connect_in_memory()
                 .await
-                .unwrap_or_else(|e| panic!("Failed to create in-memory SQLite fallback: {e}"))
+                .map_err(|e| {
+                    common::KlyntbotError::Config(common::ConfigError::Invalid(format!(
+                        "Failed to create in-memory SQLite fallback: {}",
+                        e
+                    )))
+                })?
         };
         let repos = storage::Repos::from_pool(&storage_pool);
 
@@ -691,11 +696,8 @@ impl AgentLoopBuilder {
             config.agents.defaults.max_tool_iterations,
         );
 
-        let router = crate::intent_pipeline::router::ExecutionRouter::new(
-            direct_engine,
-            reactive_engine,
-            config.orchestrator.max_escalations,
-        );
+        let router =
+            crate::intent_pipeline::router::ExecutionRouter::new(direct_engine, reactive_engine);
 
         let analyzer = crate::intent_pipeline::analysis::IntentAnalyzer::new(
             provider.clone(),

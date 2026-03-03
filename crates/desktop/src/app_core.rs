@@ -8,9 +8,9 @@ use std::sync::Arc;
 use agent::{AgentLoop, PersonaManager};
 use bus::MessageBus;
 use channels::ChannelManager;
+use common::FormResponse;
 use scheduling::CronService;
 use storage::{Repos, StoragePool, VectorStore};
-use common::FormResponse;
 use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn};
@@ -32,7 +32,8 @@ pub struct AppCore {
     /// Pending ask_user interaction oneshot senders keyed by session_key.
     /// Value is (request_id, sender). Only one interaction can be pending per session
     /// because the ask_user tool blocks the agent loop until answered.
-    pub pending_interactions: Arc<dashmap::DashMap<String, (String, oneshot::Sender<FormResponse>)>>,
+    pub pending_interactions:
+        Arc<dashmap::DashMap<String, (String, oneshot::Sender<FormResponse>)>>,
 }
 
 impl AppCore {

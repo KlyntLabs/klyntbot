@@ -11,7 +11,7 @@ use serde_json::{json, Value};
 use std::time::Duration;
 use tracing::{debug, warn};
 
-use common::{KlyntbotError, ProviderError, Result};
+use common::{utils::build_http_client, KlyntbotError, ProviderError, Result};
 
 use crate::registry::ProviderRegistry;
 use crate::types::{
@@ -36,10 +36,7 @@ impl OpenAiCompatProvider {
         api_key: impl Into<String>,
         default_model: impl Into<String>,
     ) -> Result<Self> {
-        let client = Client::builder()
-            .timeout(Duration::from_secs(120))
-            .build()
-            .map_err(|e| ProviderError::Http(e.to_string()))?;
+        let client = build_http_client(Duration::from_secs(120))?;
 
         Ok(Self {
             client,
@@ -450,10 +447,7 @@ impl LlmProvider for OpenAiCompatProvider {
 
     async fn health_check(&self) -> Result<ProviderHealth> {
         let url = format!("{}/models", self.api_base);
-        let health_client = Client::builder()
-            .timeout(Duration::from_secs(5))
-            .build()
-            .map_err(|e| ProviderError::Http(e.to_string()))?;
+        let health_client = build_http_client(Duration::from_secs(5))?;
 
         let mut request = health_client
             .get(&url)

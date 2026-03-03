@@ -1,4 +1,5 @@
 use desktop_shared::commands::{KeyResultCreateParams, KeyResultResponse, KeyResultUpdateParams};
+use desktop_shared::errors::ApiError;
 use desktop_shared::types::EntityKind;
 use storage::KeyResultRow;
 use tauri::State;
@@ -11,7 +12,7 @@ pub async fn key_result_create(
     state: State<'_, AppCore>,
     app: tauri::AppHandle,
     params: KeyResultCreateParams,
-) -> Result<KeyResultResponse, String> {
+) -> Result<KeyResultResponse, ApiError> {
     let id = uuid::Uuid::new_v4().to_string();
     let now = chrono::Utc::now();
 
@@ -37,7 +38,7 @@ pub async fn key_result_create(
         .key_results
         .create(&row)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(super::map_storage_err)?;
 
     // Recalculate parent objective progress
     if let Err(e) = state
@@ -60,7 +61,7 @@ pub async fn key_result_update(
     state: State<'_, AppCore>,
     app: tauri::AppHandle,
     params: KeyResultUpdateParams,
-) -> Result<KeyResultResponse, String> {
+) -> Result<KeyResultResponse, ApiError> {
     let due_date = params
         .due_date
         .map(|opt| opt.and_then(|d| super::parse_date(&d)));
@@ -76,7 +77,7 @@ pub async fn key_result_update(
             due_date,
         )
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(super::map_storage_err)?;
 
     // Recalculate parent objective progress
     if let Err(e) = state
@@ -100,13 +101,13 @@ pub async fn key_result_update_metric(
     app: tauri::AppHandle,
     id: String,
     current_value: f64,
-) -> Result<KeyResultResponse, String> {
+) -> Result<KeyResultResponse, ApiError> {
     let updated = state
         .repos
         .key_results
         .update_metric(&id, current_value)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(super::map_storage_err)?;
 
     // Recalculate parent objective progress
     if let Err(e) = state
@@ -129,21 +130,21 @@ pub async fn key_result_delete(
     state: State<'_, AppCore>,
     app: tauri::AppHandle,
     id: String,
-) -> Result<bool, String> {
+) -> Result<bool, ApiError> {
     // Get the KR first to know the parent objective
     let kr = state
         .repos
         .key_results
         .get_or_err(&id)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(super::map_storage_err)?;
 
     let deleted = state
         .repos
         .key_results
         .delete(&id)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(super::map_storage_err)?;
 
     if deleted {
         // Recalculate parent objective progress

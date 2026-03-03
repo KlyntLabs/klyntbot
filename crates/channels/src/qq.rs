@@ -15,7 +15,7 @@ use tracing::{debug, info, warn};
 use crate::ws_manager::{HeartbeatStrategy, WebSocketManager, WsConfig, WsHandler, WsSink};
 use crate::{check_allowlist, Channel};
 use bus::{InboundMessage, MessageBus, OutboundMessage};
-use common::{ChannelError, Result};
+use common::{utils::build_http_client, ChannelError, Result};
 use config::QQConfig;
 
 const QQ_API_BASE: &str = "https://api.sgroup.qq.com";
@@ -67,10 +67,7 @@ struct Author {
 impl QQChannel {
     /// Create a new QQ channel
     pub fn new(config: QQConfig) -> Result<Self> {
-        let client = Client::builder()
-            .timeout(Duration::from_secs(30))
-            .build()
-            .map_err(|e| ChannelError::ConnectionFailed(e.to_string()))?;
+        let client = build_http_client(Duration::from_secs(30))?;
 
         Ok(Self {
             config,

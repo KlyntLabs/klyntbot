@@ -1,3 +1,8 @@
+export interface ApiError {
+  code: string;
+  message: string;
+}
+
 export interface Task {
   id: string;
   title: string;

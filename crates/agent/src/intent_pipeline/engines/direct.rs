@@ -1,7 +1,7 @@
 //! DirectEngine — handles Direct execution mode (single LLM call, no tools).
 //!
 //! Ported from `execution/direct.rs` but returns `EngineResult` instead of
-//! `DirectOutcome`. Escalates to Reactive if the LLM generates tool calls.
+//! `DirectOutcome`. Returns empty if the LLM generates tool calls (misclassification).
 
 use std::sync::Arc;
 
@@ -12,7 +12,6 @@ use tools::RoutingContext;
 
 use super::{EngineResult, ExecutionEngine};
 use crate::execution::{CycleOutcome, ExecutionCore, ExecutionParams};
-use crate::intent_pipeline::router::EscalationContext;
 
 /// Executes Direct mode: single LLM call with no tools.
 pub struct DirectEngine {
@@ -47,16 +46,9 @@ impl ExecutionEngine for DirectEngine {
                 Ok(EngineResult::complete(content, usage, 1))
             }
             CycleOutcome::ToolsExecuted { .. } => {
-                // LLM wanted tools despite being given none — escalate
-                Ok(EngineResult::Escalate {
-                    reason: "LLM requested tools in Direct mode".to_string(),
-                    carried_context: EscalationContext {
-                        messages,
-                        completed_work: vec![],
-                        original_message: params.original_message.clone(),
-                    },
-                    usage,
-                })
+                // LLM wanted tools despite Direct mode classification — misclassified.
+                tracing::warn!("DirectEngine: LLM issued tool calls in Direct mode; returning empty (should have been classified as Reactive)");
+                Ok(EngineResult::empty(usage, 1))
             }
             CycleOutcome::EmptyResponse => Ok(EngineResult::empty(usage, 1)),
         }
@@ -100,12 +92,11 @@ mod tests {
                 assert_eq!(content, "Hello! How can I help?");
                 assert_eq!(iterations, 1);
             }
-            EngineResult::Escalate { .. } => panic!("Expected Complete, got Escalate"),
         }
     }
 
     #[tokio::test]
-    async fn escalates_when_tool_calls_present() {
+    async fn returns_empty_when_tool_calls_in_direct_mode() {
         let engine = make_engine(MockSequenceProvider::with_tool_call("web_search"));
 
         let result = engine
@@ -120,15 +111,9 @@ mod tests {
             .unwrap();
 
         match result {
-            EngineResult::Escalate {
-                reason,
-                carried_context,
-                ..
-            } => {
-                assert!(reason.contains("Direct mode"));
-                assert!(!carried_context.messages.is_empty());
+            EngineResult::Complete { content, .. } => {
+                assert!(content.is_empty());
             }
-            EngineResult::Complete { .. } => panic!("Expected Escalate, got Complete"),
         }
     }
 
@@ -151,7 +136,6 @@ mod tests {
             EngineResult::Complete { content, .. } => {
                 assert!(content.is_empty());
             }
-            EngineResult::Escalate { .. } => panic!("Expected Complete, got Escalate"),
         }
     }
 

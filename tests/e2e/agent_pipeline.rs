@@ -30,7 +30,7 @@ async fn make_pipeline(provider: Arc<dyn LlmProvider>) -> IntentPipeline {
 
     let direct = DirectEngine::new(Arc::clone(&core));
     let reactive = ReactiveEngine::new(Arc::clone(&core), 10);
-    let router = ExecutionRouter::new(direct, reactive, 3);
+    let router = ExecutionRouter::new(direct, reactive);
 
     let analyzer = IntentAnalyzer::new(provider, "mock", &OrchestratorConfig::default());
 
@@ -65,7 +65,6 @@ async fn direct_greeting_responds() {
         "Expected direct, got: {}",
         result.mode_used
     );
-    assert_eq!(result.escalations, 0);
     assert!(result.validation.is_valid);
 }
 
@@ -96,7 +95,6 @@ async fn reactive_executes_tool_call() {
         "Expected reactive, got: {}",
         result.mode_used
     );
-    assert_eq!(result.escalations, 0);
 }
 
 // ── Autonomous task path ──
@@ -167,12 +165,20 @@ async fn greeting_routes_directly() {
     let pipeline = make_pipeline(provider).await;
 
     let result = pipeline
-        .process_message("hey there", vec![], &[], &[], &routing_ctx(), None, None, None)
+        .process_message(
+            "hey there",
+            vec![],
+            &[],
+            &[],
+            &routing_ctx(),
+            None,
+            None,
+            None,
+        )
         .await
         .unwrap();
 
     assert_eq!(result.mode_used, "direct");
-    assert_eq!(result.escalations, 0);
     assert!(result.validation.is_valid);
     assert_eq!(result.content, "Hi! How can I help you today?");
 }
@@ -199,7 +205,6 @@ async fn search_routes_as_reactive() {
         .unwrap();
 
     assert_eq!(result.mode_used, "reactive");
-    assert_eq!(result.escalations, 0);
     assert!(result.validation.is_valid);
     assert_eq!(result.content, "Found 5 tasks about databases.");
 }

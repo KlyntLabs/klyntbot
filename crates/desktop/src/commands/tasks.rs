@@ -3,6 +3,7 @@ use desktop_shared::commands::{
     KeyResultResponse, ObjectiveResponse, ProjectResponse, TaskCreateParams, TaskResponse,
     TaskUpdateParams, TodayTaskResponse,
 };
+use desktop_shared::errors::ApiError;
 use desktop_shared::types::EntityKind;
 use storage::{ActionFilter, ActionPatch, ActionRow, KeyResultRow, ObjectiveRow, ProjectFilter};
 use tauri::State;
@@ -101,7 +102,7 @@ pub async fn task_list(
     area_id: Option<String>,
     project_id: Option<String>,
     status: Option<String>,
-) -> Result<Vec<TaskResponse>, String> {
+) -> Result<Vec<TaskResponse>, ApiError> {
     let filter = ActionFilter {
         area_id,
         project_id,
@@ -113,7 +114,7 @@ pub async fn task_list(
         .actions
         .list(&filter)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(super::map_storage_err)?;
     Ok(rows.iter().map(action_to_task).collect())
 }
 
@@ -121,7 +122,7 @@ pub async fn task_list(
 pub async fn project_list(
     state: State<'_, AppCore>,
     area_id: Option<String>,
-) -> Result<Vec<ProjectResponse>, String> {
+) -> Result<Vec<ProjectResponse>, ApiError> {
     let filter = ProjectFilter {
         area_id,
         status: Some("active".to_string()),
@@ -132,7 +133,7 @@ pub async fn project_list(
         .projects
         .list(&filter)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(super::map_storage_err)?;
 
     let mut results = Vec::with_capacity(projects.len());
     for p in &projects {
@@ -145,13 +146,13 @@ pub async fn project_list(
 pub async fn objective_list(
     state: State<'_, AppCore>,
     project_id: Option<String>,
-) -> Result<Vec<ObjectiveResponse>, String> {
+) -> Result<Vec<ObjectiveResponse>, ApiError> {
     let objectives = state
         .repos
         .objectives
         .list(project_id.as_deref(), None)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(super::map_storage_err)?;
 
     let mut results = Vec::with_capacity(objectives.len());
     for o in &objectives {
@@ -160,7 +161,7 @@ pub async fn objective_list(
             .key_results
             .list(Some(&o.id))
             .await
-            .map_err(|e| e.to_string())?;
+            .map_err(super::map_storage_err)?;
 
         let krs = if kr_rows.is_empty() {
             None
@@ -178,13 +179,13 @@ pub async fn task_toggle_complete(
     state: State<'_, AppCore>,
     app: tauri::AppHandle,
     id: String,
-) -> Result<TaskResponse, String> {
+) -> Result<TaskResponse, ApiError> {
     let row = state
         .repos
         .actions
         .get_or_err(&id)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(super::map_storage_err)?;
 
     let new_status = if row.status == "done" {
         "todo".to_string()
@@ -203,7 +204,7 @@ pub async fn task_toggle_complete(
         .actions
         .update(&patch)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(super::map_storage_err)?;
 
     super::emit_entity_updated(&app, EntityKind::Task, &id);
 
@@ -215,7 +216,7 @@ pub async fn task_create(
     state: State<'_, AppCore>,
     app: tauri::AppHandle,
     params: TaskCreateParams,
-) -> Result<TaskResponse, String> {
+) -> Result<TaskResponse, ApiError> {
     let id = uuid::Uuid::new_v4().to_string();
     let now = chrono::Utc::now();
 
@@ -252,7 +253,7 @@ pub async fn task_create(
         .actions
         .add(&row)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(super::map_storage_err)?;
 
     super::emit_entity_updated(&app, EntityKind::Task, &id);
 
@@ -264,7 +265,7 @@ pub async fn task_update(
     state: State<'_, AppCore>,
     app: tauri::AppHandle,
     params: TaskUpdateParams,
-) -> Result<TaskResponse, String> {
+) -> Result<TaskResponse, ApiError> {
     let patch = ActionPatch {
         id: params.id.clone(),
         title: params.title,
@@ -286,7 +287,7 @@ pub async fn task_update(
         .actions
         .update(&patch)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(super::map_storage_err)?;
 
     super::emit_entity_updated(&app, EntityKind::Task, &params.id);
 
@@ -298,13 +299,13 @@ pub async fn task_delete(
     state: State<'_, AppCore>,
     app: tauri::AppHandle,
     id: String,
-) -> Result<bool, String> {
+) -> Result<bool, ApiError> {
     let deleted = state
         .repos
         .actions
         .delete(&id)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(super::map_storage_err)?;
 
     if deleted {
         super::emit_entity_updated(&app, EntityKind::Task, &id);
@@ -314,7 +315,7 @@ pub async fn task_delete(
 }
 
 #[tauri::command]
-pub async fn today_tasks(state: State<'_, AppCore>) -> Result<Vec<TodayTaskResponse>, String> {
+pub async fn today_tasks(state: State<'_, AppCore>) -> Result<Vec<TodayTaskResponse>, ApiError> {
     let now = chrono::Utc::now();
     let start_of_today = now.date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc();
     let start_of_tomorrow = start_of_today + chrono::Duration::days(1);
@@ -334,7 +335,7 @@ pub async fn today_tasks(state: State<'_, AppCore>) -> Result<Vec<TodayTaskRespo
         state.repos.actions.list(&due_today_filter),
         state.repos.actions.overdue(),
     )
-    .map_err(|e| e.to_string())?;
+    .map_err(super::map_storage_err)?;
 
     // Merge + deduplicate by ID
     let mut seen = std::collections::HashSet::new();

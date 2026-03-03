@@ -6,6 +6,7 @@ use std::sync::Arc;
 use agent::AgentEvent;
 use common::EntityCard;
 use desktop_shared::commands::{ChatMessageResponse, ChatThreadResponse, SessionContextInput};
+use desktop_shared::errors::ApiError;
 use desktop_shared::events::{self, *};
 use storage::{ProjectFilter, Repos};
 use tauri::{Emitter, State};
@@ -14,7 +15,7 @@ use tokio_util::sync::CancellationToken;
 use crate::app_core::AppCore;
 
 #[tauri::command]
-pub async fn chat_threads(state: State<'_, AppCore>) -> Result<Vec<ChatThreadResponse>, String> {
+pub async fn chat_threads(state: State<'_, AppCore>) -> Result<Vec<ChatThreadResponse>, ApiError> {
     // Fetch sessions, contexts, and name lookups concurrently (4 queries total)
     let default_filter = ProjectFilter::default();
     let (sessions, visible_contexts, all_areas, all_projects) = tokio::join!(
@@ -23,10 +24,10 @@ pub async fn chat_threads(state: State<'_, AppCore>) -> Result<Vec<ChatThreadRes
         state.repos.areas.list(None),
         state.repos.projects.list(&default_filter),
     );
-    let sessions = sessions.map_err(|e| e.to_string())?;
-    let visible_contexts = visible_contexts.map_err(|e| e.to_string())?;
-    let all_areas = all_areas.map_err(|e| e.to_string())?;
-    let all_projects = all_projects.map_err(|e| e.to_string())?;
+    let sessions = sessions.map_err(super::map_storage_err)?;
+    let visible_contexts = visible_contexts.map_err(super::map_storage_err)?;
+    let all_areas = all_areas.map_err(super::map_storage_err)?;
+    let all_projects = all_projects.map_err(super::map_storage_err)?;
 
     // Build context lookup by session_key
     let ctx_map: HashMap<&str, _> = visible_contexts
@@ -90,7 +91,7 @@ pub async fn chat_messages(
     state: State<'_, AppCore>,
     session_key: String,
     limit: Option<i64>,
-) -> Result<Vec<ChatMessageResponse>, String> {
+) -> Result<Vec<ChatMessageResponse>, ApiError> {
     let rows = if let Some(lim) = limit {
         state
             .repos
@@ -100,7 +101,7 @@ pub async fn chat_messages(
     } else {
         state.repos.sessions.get_messages(&session_key).await
     }
-    .map_err(|e| e.to_string())?;
+    .map_err(super::map_storage_err)?;
 
     Ok(rows
         .iter()
@@ -129,16 +130,21 @@ pub async fn chat_send(
     content: String,
     session_key: String,
     context: Option<SessionContextInput>,
-) -> Result<ChatMessageResponse, String> {
+) -> Result<ChatMessageResponse, ApiError> {
     // 1. Ensure session exists (title derived from first message, truncated to 60 chars)
-    let title: String = content.chars().take(60).collect::<String>().trim().to_string();
+    let title: String = content
+        .chars()
+        .take(60)
+        .collect::<String>()
+        .trim()
+        .to_string();
     let metadata = serde_json::json!({ "title": title });
     state
         .repos
         .sessions
         .upsert_session(&session_key, &metadata)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(super::map_storage_err)?;
 
     // 2. Upsert session_context if provided
     if let Some(ctx) = &context {
@@ -155,7 +161,7 @@ pub async fn chat_send(
                 ctx.is_ephemeral.unwrap_or(false),
             )
             .await
-            .map_err(|e| e.to_string())?;
+            .map_err(super::map_storage_err)?;
     }
 
     // 3. Call agent with streaming (agent loop stores user + assistant messages)
@@ -165,7 +171,7 @@ pub async fn chat_send(
         .agent
         .process_direct_streaming(content.clone(), session_key.clone())
         .await
-        .map_err(|e| format!("agent error: {e}"))?;
+        .map_err(ApiError::from)?;
 
     // 5. Track the cancel token
     state
@@ -373,13 +379,16 @@ pub async fn chat_send(
 }
 
 #[tauri::command]
-pub async fn chat_pin_thread(state: State<'_, AppCore>, session_key: String) -> Result<(), String> {
+pub async fn chat_pin_thread(
+    state: State<'_, AppCore>,
+    session_key: String,
+) -> Result<(), ApiError> {
     state
         .repos
         .session_context
         .pin(&session_key)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(super::map_storage_err)?;
     Ok(())
 }
 
@@ -388,17 +397,17 @@ pub async fn chat_rename_thread(
     state: State<'_, AppCore>,
     session_key: String,
     title: String,
-) -> Result<(), String> {
+) -> Result<(), ApiError> {
     let title = title.trim().to_string();
     if title.is_empty() {
-        return Err("title cannot be empty".to_string());
+        return Err(ApiError::new("INVALID_PARAMS", "title cannot be empty"));
     }
     state
         .repos
         .sessions
         .rename_session(&session_key, &title)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(super::map_storage_err)?;
     Ok(())
 }
 
@@ -406,7 +415,7 @@ pub async fn chat_rename_thread(
 pub async fn chat_delete_thread(
     state: State<'_, AppCore>,
     session_key: String,
-) -> Result<(), String> {
+) -> Result<(), ApiError> {
     // Cancel any in-flight stream before deleting to avoid dangling writes
     if let Some((_, token)) = state.active_streams.remove(&session_key) {
         token.cancel();
@@ -420,7 +429,7 @@ pub async fn chat_delete_thread(
         .sessions
         .delete_session(&session_key)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(super::map_storage_err)?;
     Ok(())
 }
 
@@ -430,15 +439,16 @@ pub async fn chat_respond_interaction(
     session_key: String,
     request_id: String,
     response: common::FormResponse,
-) -> Result<(), String> {
+) -> Result<(), ApiError> {
     // 1. Find and remove the pending oneshot sender, validating request_id
     let (_, (stored_id, sender)) = state
         .pending_interactions
         .remove(&session_key)
-        .ok_or_else(|| "no pending interaction for this session".to_string())?;
+        .ok_or_else(|| ApiError::new("NOT_FOUND", "no pending interaction for this session"))?;
     if stored_id != request_id {
-        return Err(format!(
-            "request_id mismatch: expected {stored_id}, got {request_id}"
+        return Err(ApiError::new(
+            "INVALID_PARAMS",
+            format!("request_id mismatch: expected {stored_id}, got {request_id}"),
         ));
     }
 
@@ -499,7 +509,7 @@ fn format_interaction_summary(response: &common::FormResponse) -> String {
 }
 
 #[tauri::command]
-pub async fn chat_cancel(state: State<'_, AppCore>, session_key: String) -> Result<(), String> {
+pub async fn chat_cancel(state: State<'_, AppCore>, session_key: String) -> Result<(), ApiError> {
     // Cancel stream
     if let Some((_, token)) = state.active_streams.remove(&session_key) {
         token.cancel();
@@ -545,7 +555,7 @@ async fn auto_detect_context(
     session_key: &str,
     tool_names: &[String],
     entity_cards: &[EntityCard],
-) -> Result<(), String> {
+) -> Result<(), ApiError> {
     // Skip if session already has context
     if let Ok(Some(_)) = repos.session_context.get(session_key).await {
         return Ok(());
@@ -582,7 +592,7 @@ async fn auto_detect_context(
             false, // non-ephemeral — auto-detected sessions are persistent
         )
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(super::map_storage_err)?;
 
     Ok(())
 }

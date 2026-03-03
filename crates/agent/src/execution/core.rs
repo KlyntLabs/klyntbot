@@ -158,9 +158,7 @@ async fn call_provider_streaming(
     params: &providers::ChatParams,
     event_tx: &tokio::sync::mpsc::Sender<crate::events::AgentEvent>,
 ) -> Result<providers::LlmResponse> {
-    let mut stream = provider
-        .chat_stream(messages, Some(tools), params)
-        .await?;
+    let mut stream = provider.chat_stream(messages, Some(tools), params).await?;
 
     let mut content = String::new();
     let mut partials: Vec<PartialToolCall> = Vec::with_capacity(4);
@@ -369,7 +367,10 @@ impl ExecutionCore {
 
                 // Append assistant message so the conversation stays coherent
                 let tool_call_msgs = tool_calls_to_messages(&response.tool_calls);
-                messages.push(Message::assistant_with_tools(tool_call_msgs));
+                messages.push(Message::assistant_with_content_and_tools(
+                    response.content.clone(),
+                    tool_call_msgs,
+                ));
 
                 // Append synthetic "already called" tool results
                 let mut results = Vec::new();
@@ -406,9 +407,12 @@ impl ExecutionCore {
                 }
             }
 
-            // Append assistant message with tool calls
+            // Append assistant message with tool calls (preserving any text content)
             let tool_call_msgs = tool_calls_to_messages(&response.tool_calls);
-            messages.push(Message::assistant_with_tools(tool_call_msgs));
+            messages.push(Message::assistant_with_content_and_tools(
+                response.content.clone(),
+                tool_call_msgs,
+            ));
 
             // Execute all tools in parallel, each with a timeout.
             // ToolStart/ToolEnd events are emitted inside each future so
@@ -949,5 +953,51 @@ mod tests {
         let null = serde_json::json!(null);
         let empty_obj = serde_json::json!({});
         assert_ne!(hash_json_value(&null), hash_json_value(&empty_obj));
+    }
+
+    #[tokio::test]
+    async fn test_content_preserved_with_tool_calls() {
+        // Provider returns BOTH content and tool calls
+        let provider = Arc::new(MockProvider {
+            responses: Mutex::new(vec![LlmResponse {
+                content: Some("Let me search for that...".to_string()),
+                tool_calls: vec![ToolCall {
+                    id: "call_1".to_string(),
+                    name: "echo".to_string(),
+                    arguments: serde_json::json!({}),
+                }],
+                finish_reason: "tool_calls".to_string(),
+                usage: Usage::default(),
+                reasoning_content: None,
+            }]),
+        });
+        let registry = make_registry_with(EchoTool);
+        let core = ExecutionCore::new(provider, registry);
+
+        let mut messages = vec![Message::user("search")];
+        let params = ExecutionParams::new("mock");
+        let tools = vec![];
+
+        let (outcome, _usage) = core
+            .run_cycle(&mut messages, &tools, &params, &routing_ctx(), None, None)
+            .await
+            .unwrap();
+
+        assert!(matches!(outcome, CycleOutcome::ToolsExecuted { .. }));
+
+        // The assistant message should contain BOTH content and tool calls
+        let assistant_msg = &messages[1]; // user + assistant
+        match assistant_msg {
+            Message::Assistant {
+                content,
+                tool_calls,
+                ..
+            } => {
+                assert!(content.is_some(), "Content should be preserved");
+                assert_eq!(content.as_deref(), Some("Let me search for that..."));
+                assert!(tool_calls.is_some(), "Tool calls should be present");
+            }
+            _ => panic!("Expected Assistant message"),
+        }
     }
 }

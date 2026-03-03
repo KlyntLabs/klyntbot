@@ -5,32 +5,35 @@ use std::collections::HashMap;
 use desktop_shared::commands::{
     CurrencyNetWorth, FinanceNetWorthResponse, FinancePortfolioResponse,
 };
+use desktop_shared::errors::ApiError;
 use futures_util::future::try_join_all;
+use storage::rows::finance::FinanceTransactionFilter;
 use storage::rows::finance::{
     BudgetUsageRow, FinanceAccountRow, FinanceGoalRow, FinanceInvestmentRow, FinanceLiabilityRow,
     FinanceTransactionRow,
 };
-use storage::rows::finance::FinanceTransactionFilter;
 use tauri::State;
 
 use crate::app_core::AppCore;
 
 #[tauri::command]
-pub async fn finance_accounts(state: State<'_, AppCore>) -> Result<Vec<FinanceAccountRow>, String> {
+pub async fn finance_accounts(
+    state: State<'_, AppCore>,
+) -> Result<Vec<FinanceAccountRow>, ApiError> {
     state
         .repos
         .finance
         .accounts
         .list(false)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(super::map_storage_err)
 }
 
 #[tauri::command]
 pub async fn finance_transactions(
     state: State<'_, AppCore>,
     limit: Option<i64>,
-) -> Result<Vec<FinanceTransactionRow>, String> {
+) -> Result<Vec<FinanceTransactionRow>, ApiError> {
     let filter = FinanceTransactionFilter {
         limit,
         ..Default::default()
@@ -41,33 +44,33 @@ pub async fn finance_transactions(
         .transactions
         .list(&filter)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(super::map_storage_err)
 }
 
 #[tauri::command]
 pub async fn finance_budget_usage(
     state: State<'_, AppCore>,
-) -> Result<Vec<BudgetUsageRow>, String> {
+) -> Result<Vec<BudgetUsageRow>, ApiError> {
     state
         .repos
         .finance
         .budgets
         .all_budget_usage()
         .await
-        .map_err(|e| e.to_string())
+        .map_err(super::map_storage_err)
 }
 
 #[tauri::command]
 pub async fn finance_portfolios(
     state: State<'_, AppCore>,
-) -> Result<Vec<FinancePortfolioResponse>, String> {
+) -> Result<Vec<FinancePortfolioResponse>, ApiError> {
     let portfolios = state
         .repos
         .finance
         .investments
         .list_portfolios()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(super::map_storage_err)?;
 
     let summaries = try_join_all(
         portfolios
@@ -75,7 +78,7 @@ pub async fn finance_portfolios(
             .map(|p| state.repos.finance.investments.portfolio_summary(&p.id)),
     )
     .await
-    .map_err(|e| e.to_string())?;
+    .map_err(super::map_storage_err)?;
 
     Ok(portfolios
         .iter()
@@ -95,50 +98,54 @@ pub async fn finance_portfolios(
 #[tauri::command]
 pub async fn finance_investments(
     state: State<'_, AppCore>,
-) -> Result<Vec<FinanceInvestmentRow>, String> {
+) -> Result<Vec<FinanceInvestmentRow>, ApiError> {
     state
         .repos
         .finance
         .investments
         .list_investments(&Default::default())
         .await
-        .map_err(|e| e.to_string())
+        .map_err(super::map_storage_err)
 }
 
 #[tauri::command]
-pub async fn finance_goals(state: State<'_, AppCore>) -> Result<Vec<FinanceGoalRow>, String> {
+pub async fn finance_goals(state: State<'_, AppCore>) -> Result<Vec<FinanceGoalRow>, ApiError> {
     state
         .repos
         .finance
         .goals
         .list_active()
         .await
-        .map_err(|e| e.to_string())
+        .map_err(super::map_storage_err)
 }
 
 #[tauri::command]
 pub async fn finance_liabilities(
     state: State<'_, AppCore>,
-) -> Result<Vec<FinanceLiabilityRow>, String> {
+) -> Result<Vec<FinanceLiabilityRow>, ApiError> {
     state
         .repos
         .finance
         .liabilities
         .list_all()
         .await
-        .map_err(|e| e.to_string())
+        .map_err(super::map_storage_err)
 }
 
 #[tauri::command]
 pub async fn finance_net_worth(
     state: State<'_, AppCore>,
-) -> Result<FinanceNetWorthResponse, String> {
+) -> Result<FinanceNetWorthResponse, ApiError> {
     let (account_totals, investment_totals, liability_totals) = tokio::try_join!(
         state.repos.finance.accounts.total_balance_by_currency(),
         state.repos.finance.investments.total_value_by_currency(),
-        state.repos.finance.liabilities.total_remaining_by_currency(),
+        state
+            .repos
+            .finance
+            .liabilities
+            .total_remaining_by_currency(),
     )
-    .map_err(|e| e.to_string())?;
+    .map_err(super::map_storage_err)?;
 
     // Merge the three per-currency aggregates into CurrencyNetWorth entries
     let mut by_currency: HashMap<&str, CurrencyNetWorth> = HashMap::new();
@@ -174,7 +181,7 @@ pub async fn finance_net_worth(
 }
 
 #[tauri::command]
-pub async fn finance_exchange_rates() -> Result<HashMap<String, f64>, String> {
+pub async fn finance_exchange_rates() -> Result<HashMap<String, f64>, ApiError> {
     // Exchange rates are not yet stored in the backend.
     // Return an empty map; the frontend handles the absence gracefully.
     Ok(HashMap::new())

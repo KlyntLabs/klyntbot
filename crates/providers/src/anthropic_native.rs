@@ -10,7 +10,7 @@ use serde_json::{json, Value};
 use std::time::Duration;
 use tracing::{debug, warn};
 
-use common::{KlyntbotError, ProviderError, Result};
+use common::{utils::build_http_client, KlyntbotError, ProviderError, Result};
 use config::{ExtendedThinkingConfig, Secret};
 
 use crate::registry::ProviderRegistry;
@@ -42,10 +42,8 @@ impl AnthropicNativeProvider {
         let api_version = std::env::var("ANTHROPIC_API_VERSION")
             .unwrap_or_else(|_| DEFAULT_ANTHROPIC_VERSION.to_string());
 
-        let client = Client::builder()
-            .timeout(Duration::from_secs(120))
-            .build()
-            .expect("failed to build HTTP client");
+        let client =
+            build_http_client(Duration::from_secs(120)).expect("failed to build HTTP client");
 
         Self {
             client,
@@ -715,10 +713,8 @@ impl LlmProvider for AnthropicNativeProvider {
 
     async fn health_check(&self) -> Result<ProviderHealth> {
         let url = format!("{}/v1/messages", self.base_url);
-        let health_client = Client::builder()
-            .timeout(Duration::from_secs(5))
-            .build()
-            .expect("failed to build health check client");
+        let health_client =
+            build_http_client(Duration::from_secs(5)).expect("failed to build health check client");
 
         // Send a minimal request — Anthropic doesn't have a /models endpoint,
         // so we POST a tiny messages request and check for a non-error response.

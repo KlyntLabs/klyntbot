@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { ipc } from './useIpc';
-import { isTauri } from '../lib/utils';
+import { isTauri, parseApiError } from '../lib/utils';
+import type { ApiError } from '../lib/types';
 
 interface QueryResult<T> {
   data: T;
   loading: boolean;
-  error: string | null;
+  error: ApiError | null;
   refetch: () => void;
 }
 
@@ -22,7 +23,7 @@ export function useQuery<T>(
 ): QueryResult<T> {
   const [data, setData] = useState<T>(fallback as T);
   const [loading, setLoading] = useState(isTauri && args !== null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
   const argsRef = useRef(args);
   argsRef.current = args;
   const fallbackRef = useRef(fallback);
@@ -36,7 +37,7 @@ export function useQuery<T>(
 
     ipc<T>(cmd, argsRef.current)
       .then(setData)
-      .catch((e) => setError(String(e)))
+      .catch((e) => setError(parseApiError(e)))
       .finally(() => setLoading(false));
   }, [cmd]);
 

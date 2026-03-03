@@ -1,4 +1,5 @@
 use desktop_shared::commands::{ProjectCreateParams, ProjectResponse, ProjectUpdateParams};
+use desktop_shared::errors::ApiError;
 use desktop_shared::types::EntityKind;
 use storage::{ProjectPatch, ProjectRow};
 use tauri::State;
@@ -29,12 +30,12 @@ pub(super) fn project_to_response(
 pub(super) async fn build_project_response(
     state: &AppCore,
     row: &ProjectRow,
-) -> Result<ProjectResponse, String> {
+) -> Result<ProjectResponse, ApiError> {
     let (counts, objectives) = tokio::try_join!(
         state.repos.projects.count_tasks_by_status(&row.id),
         state.repos.objectives.list(Some(&row.id), None),
     )
-    .map_err(|e| e.to_string())?;
+    .map_err(super::map_storage_err)?;
 
     let mut task_count: u32 = 0;
     let mut completed_count: u32 = 0;
@@ -60,7 +61,7 @@ pub async fn project_create(
     state: State<'_, AppCore>,
     app: tauri::AppHandle,
     params: ProjectCreateParams,
-) -> Result<ProjectResponse, String> {
+) -> Result<ProjectResponse, ApiError> {
     let id = uuid::Uuid::new_v4().to_string();
     let now = chrono::Utc::now();
 
@@ -81,7 +82,7 @@ pub async fn project_create(
         .projects
         .create(&row)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(super::map_storage_err)?;
 
     super::emit_entity_updated(&app, EntityKind::Project, &id);
 
@@ -89,13 +90,16 @@ pub async fn project_create(
 }
 
 #[tauri::command]
-pub async fn project_get(state: State<'_, AppCore>, id: String) -> Result<ProjectResponse, String> {
+pub async fn project_get(
+    state: State<'_, AppCore>,
+    id: String,
+) -> Result<ProjectResponse, ApiError> {
     let row = state
         .repos
         .projects
         .get_or_err(&id)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(super::map_storage_err)?;
 
     build_project_response(&state, &row).await
 }
@@ -105,7 +109,7 @@ pub async fn project_update(
     state: State<'_, AppCore>,
     app: tauri::AppHandle,
     params: ProjectUpdateParams,
-) -> Result<ProjectResponse, String> {
+) -> Result<ProjectResponse, ApiError> {
     let patch = ProjectPatch {
         id: params.id.clone(),
         name: params.name,
@@ -121,7 +125,7 @@ pub async fn project_update(
         .projects
         .update(&patch)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(super::map_storage_err)?;
 
     super::emit_entity_updated(&app, EntityKind::Project, &params.id);
 
@@ -133,13 +137,13 @@ pub async fn project_delete(
     state: State<'_, AppCore>,
     app: tauri::AppHandle,
     id: String,
-) -> Result<bool, String> {
+) -> Result<bool, ApiError> {
     let deleted = state
         .repos
         .projects
         .delete(&id)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(super::map_storage_err)?;
 
     if deleted {
         super::emit_entity_updated(&app, EntityKind::Project, &id);
@@ -153,13 +157,13 @@ pub async fn project_archive(
     state: State<'_, AppCore>,
     app: tauri::AppHandle,
     id: String,
-) -> Result<ProjectResponse, String> {
+) -> Result<ProjectResponse, ApiError> {
     let archived = state
         .repos
         .projects
         .archive(&id)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(super::map_storage_err)?;
 
     super::emit_entity_updated(&app, EntityKind::Project, &id);
 

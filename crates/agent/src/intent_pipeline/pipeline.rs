@@ -11,7 +11,7 @@ use common::{utils::tool_def_name, Result};
 use context_engine::{ContextEngine, ContextRequest};
 use providers::Message;
 use tools::RoutingContext;
-use tracing::{debug, info, warn};
+use tracing::{debug, warn};
 
 use super::analysis::IntentAnalyzer;
 use super::router::{ExecutionRouter, RouterResult};
@@ -30,8 +30,6 @@ pub struct PipelineResult {
     pub mode_used: String,
     /// Full intent analysis from the classifier.
     pub classification: IntentAnalysis,
-    /// Number of escalations during execution.
-    pub escalations: u32,
     /// Validation warnings (if any).
     pub validation: ValidationResult,
 }
@@ -174,7 +172,6 @@ impl IntentPipeline {
                     content,
                     mode_used: "clarification".to_string(),
                     classification: analysis,
-                    escalations: 0,
                     validation: ValidationResult {
                         is_valid: true,
                         warnings: vec![],
@@ -259,7 +256,6 @@ impl IntentPipeline {
             params = params.with_cancel_token(token);
         }
 
-        // On escalation the router may need all tools, so keep the full set available
         let router_result = self
             .router
             .execute(
@@ -271,13 +267,6 @@ impl IntentPipeline {
                 event_tx,
             )
             .await?;
-
-        if router_result.escalation_count > 0 {
-            info!(
-                "IntentPipeline: escalated {} time(s), final mode: {}",
-                router_result.escalation_count, router_result.final_mode
-            );
-        }
 
         // Step 5: Validate
         let validation = self.validator.validate(&router_result.content);
@@ -302,7 +291,6 @@ impl IntentPipeline {
             content: final_content,
             mode_used: mode_name,
             classification: analysis,
-            escalations: router_result.escalation_count,
             validation,
         })
     }
@@ -343,7 +331,7 @@ impl IntentPipeline {
             request_id: uuid::Uuid::new_v4().to_string(),
             predicted_strategy: analysis.mode.to_string(),
             actual_strategy: result.final_mode.clone(),
-            escalation_count: result.escalation_count as i32,
+            escalation_count: 0,
             iterations_used: result.iterations as i32,
             max_iterations: analysis.mode.max_iterations() as i32,
             success: validation.is_valid,
@@ -444,7 +432,7 @@ mod tests {
 
         let direct = DirectEngine::new(Arc::clone(&core));
         let reactive = ReactiveEngine::new(Arc::clone(&core), 10);
-        let router = ExecutionRouter::new(direct, reactive, 3);
+        let router = ExecutionRouter::new(direct, reactive);
 
         let analyzer =
             IntentAnalyzer::new(provider.clone(), "mock", &OrchestratorConfig::default());
@@ -479,7 +467,6 @@ mod tests {
         assert_eq!(result.classification.source, AnalysisSource::Heuristic);
         assert!(!result.content.is_empty());
         assert_eq!(result.content, "Hi there!");
-        assert_eq!(result.escalations, 0);
     }
 
     #[tokio::test]
@@ -539,7 +526,7 @@ mod tests {
 
         let direct = DirectEngine::new(Arc::clone(&core));
         let reactive = ReactiveEngine::new(Arc::clone(&core), 10);
-        let router = ExecutionRouter::new(direct, reactive, 3);
+        let router = ExecutionRouter::new(direct, reactive);
 
         let analyzer =
             IntentAnalyzer::new(provider.clone(), "mock", &OrchestratorConfig::default());

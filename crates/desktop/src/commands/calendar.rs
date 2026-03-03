@@ -1,4 +1,5 @@
 use desktop_shared::commands::CalendarEventResponse;
+use desktop_shared::errors::ApiError;
 use tauri::State;
 
 use crate::app_core::AppCore;
@@ -7,13 +8,13 @@ use crate::app_core::AppCore;
 pub async fn calendar_events(
     state: State<'_, AppCore>,
     limit: Option<i64>,
-) -> Result<Vec<CalendarEventResponse>, String> {
+) -> Result<Vec<CalendarEventResponse>, ApiError> {
     let rows = state
         .repos
         .calendar_event_cache
         .list_upcoming(limit.unwrap_or(10))
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(super::map_storage_err)?;
 
     Ok(rows
         .iter()

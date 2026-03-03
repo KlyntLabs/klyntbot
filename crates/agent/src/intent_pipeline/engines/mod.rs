@@ -7,7 +7,6 @@ use async_trait::async_trait;
 use providers::Usage;
 use tools::RoutingContext;
 
-use super::router::EscalationContext;
 use crate::execution::{ExecutionParams, ReasoningTrace};
 
 pub mod direct;
@@ -24,12 +23,6 @@ pub enum EngineResult {
         iterations: u32,
         traces: Vec<ReasoningTrace>,
         tool_name: Option<String>,
-    },
-    /// Engine needs to escalate to a more capable mode.
-    Escalate {
-        reason: String,
-        carried_context: EscalationContext,
-        usage: Usage,
     },
 }
 
@@ -68,9 +61,6 @@ impl std::fmt::Debug for EngineResult {
                 .field("iterations", iterations)
                 .field("tool_name", tool_name)
                 .finish(),
-            Self::Escalate { reason, .. } => {
-                f.debug_struct("Escalate").field("reason", reason).finish()
-            }
         }
     }
 }

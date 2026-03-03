@@ -1,11 +1,12 @@
 import { useState, useCallback } from 'react';
 import { ipc } from './useIpc';
-import { isTauri } from '../lib/utils';
+import { isTauri, parseApiError } from '../lib/utils';
+import type { ApiError } from '../lib/types';
 
 interface MutationResult<T, P> {
   mutate: (params: P) => Promise<T | undefined>;
   loading: boolean;
-  error: string | null;
+  error: ApiError | null;
 }
 
 /**
@@ -16,7 +17,7 @@ export function useMutation<T = void, P = Record<string, unknown>>(
   cmd: string,
 ): MutationResult<T, P> {
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
 
   const mutate = useCallback(
     async (params: P): Promise<T | undefined> => {
@@ -28,8 +29,7 @@ export function useMutation<T = void, P = Record<string, unknown>>(
         const result = await ipc<T>(cmd, params as Record<string, unknown>);
         return result;
       } catch (e) {
-        const msg = String(e);
-        setError(msg);
+        setError(parseApiError(e));
         return undefined;
       } finally {
         setLoading(false);

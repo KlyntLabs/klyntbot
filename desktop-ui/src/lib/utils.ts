@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import type { ApiError } from './types';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -11,6 +12,14 @@ export const taskGridCols = (showArea: boolean) =>
   showArea
     ? 'grid-cols-[40px_1fr_180px_100px_80px_100px_120px_140px]'
     : 'grid-cols-[40px_1fr_180px_80px_100px_120px_140px]';
+
+/** Narrow an unknown catch value to a structured ApiError. */
+export function parseApiError(e: unknown): ApiError {
+  if (typeof e === 'object' && e !== null && 'code' in e && 'message' in e) {
+    return e as ApiError;
+  }
+  return { code: 'UNKNOWN_ERROR', message: String(e) };
+}
 
 /** Format a millisecond duration as a human-readable string (e.g. "123ms", "1.2s"). */
 export function formatDuration(ms: number): string {

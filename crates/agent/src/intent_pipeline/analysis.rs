@@ -53,17 +53,19 @@ pub fn analyze_heuristic(message: &str) -> Option<IntentAnalysis> {
     //    Must be checked BEFORE plan/code keywords because task descriptions
     //    often contain code-like words that are just the task *description*.
     if is_task_management(&msg) {
+        let signals = ComplexitySignals {
+            estimated_tool_calls: count_tool_indicators(&msg).max(1),
+            has_sequential_deps: false,
+            failure_risk: FailureRisk::Low,
+            requires_state_tracking: false,
+            requires_retries: false,
+        };
+        let budget = compute_iteration_budget(&signals);
         return Some(reactive_analysis(
-            5,
+            budget,
             "Task management CRUD operation",
             0.90,
-            ComplexitySignals {
-                estimated_tool_calls: 1,
-                has_sequential_deps: false,
-                failure_risk: FailureRisk::Low,
-                requires_state_tracking: false,
-                requires_retries: false,
-            },
+            signals,
             vec![ToolGroup::TaskManagement, ToolGroup::Search],
         ));
     }
@@ -84,8 +86,9 @@ pub fn analyze_heuristic(message: &str) -> Option<IntentAnalysis> {
     // 5. Complex workflow keywords → Reactive with high iteration budget
     if has_complex_workflow_keyword(&msg) {
         let signals = analyze_complexity(&msg);
+        let budget = compute_iteration_budget(&signals);
         return Some(reactive_analysis(
-            20,
+            budget,
             "Complex workflow language detected — using high iteration budget",
             0.85,
             signals,
@@ -105,8 +108,9 @@ pub fn analyze_heuristic(message: &str) -> Option<IntentAnalysis> {
     // Simple tool-assisted patterns (search, list, show)
     if has_tool_keyword(&msg) && score <= 1 {
         let groups = infer_tool_groups(&msg);
+        let budget = compute_iteration_budget(&signals);
         return Some(reactive_analysis(
-            5,
+            budget,
             "Simple tool-assisted operation",
             0.85,
             signals,
@@ -116,8 +120,9 @@ pub fn analyze_heuristic(message: &str) -> Option<IntentAnalysis> {
 
     // Code/action keywords without complexity → Reactive
     if has_action_keyword(&msg) && score <= 2 {
+        let budget = compute_iteration_budget(&signals);
         return Some(reactive_analysis(
-            10,
+            budget,
             "Code/action keyword detected",
             0.80,
             signals,
@@ -127,8 +132,9 @@ pub fn analyze_heuristic(message: &str) -> Option<IntentAnalysis> {
 
     // High complexity with clear autonomous signals → Reactive with high budget
     if score >= 4 {
+        let budget = compute_iteration_budget(&signals);
         return Some(reactive_analysis(
-            20,
+            budget,
             "High complexity score from heuristic analysis",
             0.75,
             signals,
@@ -192,21 +198,7 @@ fn is_direct_question(msg: &str) -> bool {
 }
 
 fn has_tool_keyword(msg: &str) -> bool {
-    const TOOL: &[&str] = &[
-        "search",
-        "find",
-        "list",
-        "show",
-        "fetch",
-        "get",
-        "read",
-        "look up",
-        "check",
-        "show my tasks",
-        "my todo",
-        "list tasks",
-    ];
-    TOOL.iter().any(|k| msg.contains(k))
+    count_tool_indicators(msg) > 0
 }
 
 fn has_action_keyword(msg: &str) -> bool {
@@ -350,6 +342,13 @@ fn analyze_complexity(msg: &str) -> ComplexitySignals {
 // ---------------------------------------------------------------------------
 // Analysis constructors
 // ---------------------------------------------------------------------------
+
+/// Compute the iteration budget for a Reactive execution from complexity signals.
+///
+/// Delegates to [`ComplexitySignals::iteration_budget()`].
+pub fn compute_iteration_budget(signals: &ComplexitySignals) -> u32 {
+    signals.iteration_budget()
+}
 
 fn direct_analysis(
     reasoning: &str,
@@ -543,7 +542,7 @@ impl IntentClassifier {
         let mode = match mode_str {
             "direct" => ExecutionMode::Direct,
             _ => ExecutionMode::Reactive {
-                max_iterations: (signals.estimated_tool_calls as u32).max(5),
+                max_iterations: compute_iteration_budget(&signals),
             },
         };
 
@@ -680,7 +679,9 @@ impl IntentAnalyzer {
                         "LLM classifier low confidence, defaulting to Reactive"
                     );
                     return IntentAnalysis {
-                        mode: ExecutionMode::Reactive { max_iterations: 10 },
+                        mode: ExecutionMode::Reactive {
+                            max_iterations: compute_iteration_budget(&result.signals),
+                        },
                         source: AnalysisSource::LlmClassifier,
                         ..result
                     };
@@ -892,10 +893,7 @@ mod tests {
         let result = analyze_heuristic("create a task: implement the new auth system");
         assert!(result.is_some());
         let analysis = result.unwrap();
-        assert!(matches!(
-            analysis.mode,
-            ExecutionMode::Reactive { max_iterations: 5 }
-        ));
+        assert!(matches!(analysis.mode, ExecutionMode::Reactive { .. }));
     }
 
     #[test]
@@ -917,7 +915,7 @@ mod tests {
         assert!(result.is_some());
         assert!(matches!(
             result.unwrap().mode,
-            ExecutionMode::Reactive { max_iterations: 20 }
+            ExecutionMode::Reactive { .. }
         ));
     }
 
@@ -990,7 +988,7 @@ mod tests {
             .unwrap();
         assert!(matches!(
             result.mode,
-            ExecutionMode::Reactive { max_iterations: 5 }
+            ExecutionMode::Reactive { max_iterations: 20 }
         ));
         assert_eq!(result.signals.estimated_tool_calls, 5);
         assert!(result.signals.has_sequential_deps);
@@ -1020,7 +1018,7 @@ mod tests {
             .unwrap();
         assert!(matches!(
             result.mode,
-            ExecutionMode::Reactive { max_iterations: 5 }
+            ExecutionMode::Reactive { max_iterations: 15 }
         ));
     }
 
@@ -1036,7 +1034,7 @@ mod tests {
             .unwrap();
         assert!(matches!(
             result.mode,
-            ExecutionMode::Reactive { max_iterations: 10 }
+            ExecutionMode::Reactive { max_iterations: 15 }
         ));
         assert_eq!(result.source, AnalysisSource::Heuristic); // fallback uses Heuristic source
     }
@@ -1073,7 +1071,7 @@ mod tests {
         let result = IntentClassifier::parse_classification_json(json);
         assert!(matches!(
             result.mode,
-            ExecutionMode::Reactive { max_iterations: 8 }
+            ExecutionMode::Reactive { max_iterations: 29 }
         ));
     }
 
@@ -1120,7 +1118,7 @@ mod tests {
         let result = analyzer.analyze("I need help with something", &[]).await;
         assert!(matches!(
             result.mode,
-            ExecutionMode::Reactive { max_iterations: 10 }
+            ExecutionMode::Reactive { max_iterations: 15 }
         ));
     }
 
@@ -1136,5 +1134,55 @@ mod tests {
             .await;
         assert!(matches!(result.mode, ExecutionMode::Reactive { .. }));
         assert_eq!(result.source, AnalysisSource::Heuristic);
+    }
+
+    // ── Iteration budget tests ─────────────────────────────────
+
+    #[test]
+    fn compute_budget_single_tool_call() {
+        let signals = ComplexitySignals {
+            estimated_tool_calls: 1,
+            has_sequential_deps: false,
+            failure_risk: FailureRisk::Low,
+            requires_state_tracking: false,
+            requires_retries: false,
+        };
+        assert_eq!(compute_iteration_budget(&signals), 15);
+    }
+
+    #[test]
+    fn compute_budget_many_tool_calls() {
+        let signals = ComplexitySignals {
+            estimated_tool_calls: 8,
+            has_sequential_deps: false,
+            failure_risk: FailureRisk::Low,
+            requires_state_tracking: false,
+            requires_retries: false,
+        };
+        assert_eq!(compute_iteration_budget(&signals), 29);
+    }
+
+    #[test]
+    fn compute_budget_capped_at_30() {
+        let signals = ComplexitySignals {
+            estimated_tool_calls: 20,
+            has_sequential_deps: false,
+            failure_risk: FailureRisk::Low,
+            requires_state_tracking: false,
+            requires_retries: false,
+        };
+        assert_eq!(compute_iteration_budget(&signals), 30);
+    }
+
+    #[test]
+    fn compute_budget_zero_tool_calls_gets_floor() {
+        let signals = ComplexitySignals {
+            estimated_tool_calls: 0,
+            has_sequential_deps: false,
+            failure_risk: FailureRisk::Low,
+            requires_state_tracking: false,
+            requires_retries: false,
+        };
+        assert_eq!(compute_iteration_budget(&signals), 15);
     }
 }

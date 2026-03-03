@@ -104,6 +104,18 @@ impl ComplexitySignals {
         }
         score
     }
+
+    /// Compute a dynamic iteration budget for the reactive engine.
+    ///
+    /// Formula: `min(max(estimated_tool_calls * 3, 10) + 5, 30)`
+    /// - `* 3`: headroom per tool (call + reflection + planning)
+    /// - Floor of 10: even simple requests get enough room
+    /// - `+ 5` buffer: synthesis and unexpected detours
+    /// - Ceiling of 30: safety net against bad estimates
+    pub fn iteration_budget(&self) -> u32 {
+        let base = (self.estimated_tool_calls as u32 * 3).max(10);
+        (base + 5).min(30)
+    }
 }
 
 /// How the intent analysis was produced.
@@ -179,15 +191,18 @@ pub struct IntentAnalysis {
 impl IntentAnalysis {
     /// Fallback analysis when classification fails entirely.
     pub fn fallback() -> Self {
+        let signals = ComplexitySignals {
+            estimated_tool_calls: 1,
+            has_sequential_deps: false,
+            failure_risk: FailureRisk::Low,
+            requires_state_tracking: false,
+            requires_retries: false,
+        };
         Self {
-            mode: ExecutionMode::Reactive { max_iterations: 10 },
-            signals: ComplexitySignals {
-                estimated_tool_calls: 1,
-                has_sequential_deps: false,
-                failure_risk: FailureRisk::Low,
-                requires_state_tracking: false,
-                requires_retries: false,
+            mode: ExecutionMode::Reactive {
+                max_iterations: signals.iteration_budget(),
             },
+            signals,
             confidence: 0.5,
             source: AnalysisSource::Heuristic,
             reasoning: "Fallback — classification unavailable".to_string(),
@@ -286,7 +301,7 @@ mod tests {
         let analysis = IntentAnalysis::fallback();
         assert!(matches!(
             analysis.mode,
-            ExecutionMode::Reactive { max_iterations: 10 }
+            ExecutionMode::Reactive { max_iterations: 15 }
         ));
         assert_eq!(analysis.confidence, 0.5);
         assert!(analysis.tool_groups.contains(&ToolGroup::Full));

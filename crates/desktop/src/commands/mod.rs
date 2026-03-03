@@ -10,9 +10,20 @@ pub mod tasks;
 pub mod window;
 
 use chrono::{DateTime, Utc};
+use desktop_shared::errors::ApiError;
 use desktop_shared::events::{EntityUpdatedPayload, ENTITY_UPDATED};
 use desktop_shared::types::EntityKind;
 use tauri::Emitter;
+
+/// Convert a `StorageError` into an `ApiError`, preserving specific error codes
+/// for NotFound and Conflict variants.
+pub(crate) fn map_storage_err(e: storage::StorageError) -> ApiError {
+    match e {
+        storage::StorageError::NotFound(msg) => ApiError::new("NOT_FOUND", msg),
+        storage::StorageError::Conflict(msg) => ApiError::new("CONFLICT", msg),
+        other => ApiError::new("STORAGE_ERROR", other.to_string()),
+    }
+}
 
 /// Parse a "YYYY-MM-DD" string into a midnight UTC DateTime.
 pub fn parse_date(s: &str) -> Option<DateTime<Utc>> {

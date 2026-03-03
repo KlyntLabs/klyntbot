@@ -484,10 +484,7 @@ impl AgentLoop {
             )
             .await?;
 
-        info!(
-            "Pipeline: mode={}, escalations={}",
-            result.mode_used, result.escalations
-        );
+        info!("Pipeline: mode={}", result.mode_used);
 
         Ok(result.content)
     }
