@@ -28,6 +28,9 @@ use crate::output::validator::{ResponseValidator, ValidationResult};
 /// Default maximum delegation depth to prevent infinite loops.
 const MAX_DELEGATION_DEPTH: u32 = 2;
 
+/// The agent used as orchestrator for multi-agent requests.
+const ORCHESTRATOR_AGENT: &str = "general";
+
 const CLARIFICATION_MODE: &str = "clarification";
 
 /// Result of processing a message through the agent runtime.
@@ -243,15 +246,15 @@ impl AgentRuntime {
                 .await;
         }
 
-        // Step 3b: Orchestration override — route multi-agent intents to general
+        // Step 3b: Orchestration override — route multi-agent intents to orchestrator
         if analysis.needs_orchestration {
-            if let Some(general) = self.agent_manager.get("general") {
+            if let Some(general) = self.agent_manager.get(ORCHESTRATOR_AGENT) {
                 debug!(
-                    "Orchestration override: routing '{}' → general agent",
-                    agent_name
+                    "Orchestration override: routing '{}' → {} agent",
+                    agent_name, ORCHESTRATOR_AGENT
                 );
                 profile = general;
-                agent_name = "general".to_string();
+                agent_name = ORCHESTRATOR_AGENT.to_string();
 
                 // Update active profile
                 {
@@ -343,52 +346,17 @@ impl AgentRuntime {
         }
 
         // Step 7: Filter tools based on agent profile (replaces ToolGroup filtering)
-        let mut filtered_tools: Vec<serde_json::Value> =
-            if let Some(allowed) = profile.allowed_tool_names() {
-                tool_definitions
-                    .iter()
-                    .filter(|t| {
-                        tool_def_name(t)
-                            .map(|name| {
-                                // MCP tools bypass agent filtering
-                                name.starts_with("mcp_") || allowed.contains(name)
-                            })
-                            .unwrap_or(true)
-                    })
-                    .cloned()
-                    .collect()
-            } else {
-                tool_definitions.to_vec()
-            };
+        let mut filtered_tools = filter_tools_for_profile(tool_definitions, profile);
 
         // Step 7b: Add DelegationTool if agent can delegate and depth allows
-        let delegation_depth = ctx.delegation_depth;
-        if !profile.can_delegate_to.is_empty()
-            && delegation_depth < MAX_DELEGATION_DEPTH
-            && self.delegation_self_ref.get().is_some()
-        {
-            let handler = self.delegation_self_ref.get().unwrap().clone();
-            let delegation_tool = tools::DelegationTool::with_handler(handler)
-                .with_allowed_agents(profile.can_delegate_to.clone())
-                .with_depth(delegation_depth, MAX_DELEGATION_DEPTH);
-
-            // Add JSON schema to tool definitions for the LLM
-            let schema = serde_json::json!({
-                "type": "function",
-                "function": {
-                    "name": tools::Tool::name(&delegation_tool),
-                    "description": tools::Tool::description(&delegation_tool),
-                    "parameters": tools::Tool::parameters(&delegation_tool),
-                }
-            });
-            filtered_tools.push(schema);
-
-            // Register the delegation tool instance in the registry for execution
-            if let Some(ref registry) = self.tool_registry {
-                let mut reg = registry.write().await;
-                reg.register(delegation_tool);
-            }
-        }
+        inject_delegation_tool(
+            profile,
+            ctx.delegation_depth,
+            &self.delegation_self_ref,
+            &self.tool_registry,
+            &mut filtered_tools,
+        )
+        .await;
 
         debug!(
             "AgentRuntime: filtered {} → {} tools (agent: {})",
@@ -429,6 +397,9 @@ impl AgentRuntime {
                 event_tx.clone(),
             )
             .await?;
+
+        // Clear event_tx to prevent stale state across calls
+        *self.current_event_tx.write().await = None;
 
         // Step 9: Validate
         let mut validation = self.validator.validate(&router_result.content);
@@ -641,6 +612,56 @@ impl AgentRuntime {
     }
 }
 
+/// Filter tool definitions to only those allowed by the agent profile.
+/// MCP tools (prefixed `mcp_`) bypass agent filtering.
+fn filter_tools_for_profile(
+    tool_defs: &[serde_json::Value],
+    profile: &AgentProfile,
+) -> Vec<serde_json::Value> {
+    if let Some(allowed) = profile.allowed_tool_names() {
+        tool_defs
+            .iter()
+            .filter(|t| {
+                tool_def_name(t)
+                    .map(|name| name.starts_with("mcp_") || allowed.contains(name))
+                    .unwrap_or(true)
+            })
+            .cloned()
+            .collect()
+    } else {
+        tool_defs.to_vec()
+    }
+}
+
+/// Inject a DelegationTool into the tool list and registry if the agent can delegate
+/// and we haven't reached max depth. Returns true if the tool was injected.
+async fn inject_delegation_tool(
+    profile: &AgentProfile,
+    depth: u32,
+    delegation_self_ref: &std::sync::OnceLock<Arc<dyn tools::DelegationHandler>>,
+    tool_registry: &Option<Arc<RwLock<tools::registry::ToolRegistry>>>,
+    filtered_tools: &mut Vec<serde_json::Value>,
+) {
+    if profile.can_delegate_to.is_empty() || depth >= MAX_DELEGATION_DEPTH {
+        return;
+    }
+
+    let Some(handler) = delegation_self_ref.get() else {
+        return;
+    };
+
+    let delegation_tool = tools::DelegationTool::with_handler(handler.clone())
+        .with_allowed_agents(profile.can_delegate_to.clone())
+        .with_depth(depth, MAX_DELEGATION_DEPTH);
+
+    filtered_tools.push(tools::Tool::to_schema(&delegation_tool));
+
+    if let Some(ref registry) = tool_registry {
+        let mut reg = registry.write().await;
+        reg.register(delegation_tool);
+    }
+}
+
 #[async_trait::async_trait]
 impl tools::DelegationHandler for AgentRuntime {
     async fn delegate(
@@ -714,46 +735,17 @@ impl tools::DelegationHandler for AgentRuntime {
             vec![]
         };
 
-        let mut filtered_tools: Vec<serde_json::Value> =
-            if let Some(allowed) = profile.allowed_tool_names() {
-                tool_defs
-                    .iter()
-                    .filter(|t| {
-                        tool_def_name(t)
-                            .map(|name| name.starts_with("mcp_") || allowed.contains(name))
-                            .unwrap_or(true)
-                    })
-                    .cloned()
-                    .collect()
-            } else {
-                tool_defs
-            };
+        let mut filtered_tools = filter_tools_for_profile(&tool_defs, profile);
 
         // 5. Optionally add DelegationTool for chained delegation
-        if !profile.can_delegate_to.is_empty()
-            && depth < MAX_DELEGATION_DEPTH
-            && self.delegation_self_ref.get().is_some()
-        {
-            let handler = self.delegation_self_ref.get().unwrap().clone();
-            let delegation_tool = tools::DelegationTool::with_handler(handler)
-                .with_allowed_agents(profile.can_delegate_to.clone())
-                .with_depth(depth, MAX_DELEGATION_DEPTH);
-
-            let schema = serde_json::json!({
-                "type": "function",
-                "function": {
-                    "name": tools::Tool::name(&delegation_tool),
-                    "description": tools::Tool::description(&delegation_tool),
-                    "parameters": tools::Tool::parameters(&delegation_tool),
-                }
-            });
-            filtered_tools.push(schema);
-
-            if let Some(ref registry) = self.tool_registry {
-                let mut reg = registry.write().await;
-                reg.register(delegation_tool);
-            }
-        }
+        inject_delegation_tool(
+            profile,
+            depth,
+            &self.delegation_self_ref,
+            &self.tool_registry,
+            &mut filtered_tools,
+        )
+        .await;
 
         // 6. Execute via router with reduced budget
         let max_iters = profile.max_iterations.min(8);
@@ -766,7 +758,7 @@ impl tools::DelegationHandler for AgentRuntime {
 
         // Build delegated routing context with incremented depth
         let mut delegated_ctx = ctx.clone();
-        delegated_ctx.delegation_depth = depth;
+        delegated_ctx.delegation_depth = depth + 1;
 
         let result = self
             .router
@@ -884,8 +876,16 @@ mod tests {
     }
 
     async fn make_runtime(provider: Arc<dyn LlmProvider>) -> AgentRuntime {
+        let (runtime, _registry) = make_runtime_with_registry(provider).await;
+        runtime
+    }
+
+    /// Shared builder: returns the runtime and its tool registry for delegation wiring.
+    async fn make_runtime_with_registry(
+        provider: Arc<dyn LlmProvider>,
+    ) -> (AgentRuntime, Arc<RwLock<ToolRegistry>>) {
         let registry = Arc::new(RwLock::new(ToolRegistry::new()));
-        let core = Arc::new(ExecutionCore::new(provider.clone(), registry));
+        let core = Arc::new(ExecutionCore::new(provider.clone(), Arc::clone(&registry)));
 
         let direct = DirectEngine::new(Arc::clone(&core));
         let reactive = ReactiveEngine::new(Arc::clone(&core), 10);
@@ -902,7 +902,7 @@ mod tests {
 
         let active_profile = Arc::new(RwLock::new(None));
 
-        AgentRuntime::new(
+        let runtime = AgentRuntime::new(
             make_agent_manager(),
             analyzer,
             Arc::new(ContextEngine::new()),
@@ -910,7 +910,8 @@ mod tests {
             cost_tracker,
             PipelineConfig::default(),
             active_profile,
-        )
+        );
+        (runtime, registry)
     }
 
     #[tokio::test]
@@ -1006,73 +1007,24 @@ mod tests {
     async fn make_delegation_runtime(
         provider: Arc<dyn LlmProvider>,
     ) -> Arc<AgentRuntime> {
-        let registry = Arc::new(RwLock::new(ToolRegistry::new()));
-        let core = Arc::new(ExecutionCore::new(provider.clone(), Arc::clone(&registry)));
-
-        let direct = DirectEngine::new(Arc::clone(&core));
-        let reactive = ReactiveEngine::new(Arc::clone(&core), 10);
-        let router = ExecutionRouter::new(direct, reactive);
-
-        let analyzer =
-            IntentAnalyzer::new(provider.clone(), "mock", &OrchestratorConfig::default());
-
-        let pool = sqlx::SqlitePool::connect(":memory:")
-            .await
-            .expect("in-memory SQLite for tests");
-        let usage_repo = storage::UsageRepo::new(pool);
-        let cost_tracker = Arc::new(CostTracker::from_repo(usage_repo));
-
-        let active_profile = Arc::new(RwLock::new(None));
-
-        let runtime = AgentRuntime::new(
-            make_agent_manager(),
-            analyzer,
-            Arc::new(ContextEngine::new()),
-            router,
-            cost_tracker,
-            PipelineConfig::default(),
-            active_profile,
-        )
-        .with_tool_registry(Arc::clone(&registry));
-
-        let runtime = Arc::new(runtime);
+        let (runtime, registry) = make_runtime_with_registry(provider).await;
+        let runtime = Arc::new(runtime.with_tool_registry(registry));
         runtime.set_delegation_self_ref(Arc::clone(&runtime) as Arc<dyn tools::DelegationHandler>);
         runtime
     }
 
     #[tokio::test]
-    async fn test_orchestration_override_routes_to_general() {
-        // A multi-agent message (finance + task triggers with sequential language)
-        // should be routed to the general agent as orchestrator.
-        let provider = MockProvider::new(vec![text_response("Orchestrated response")]);
-        let runtime = make_delegation_runtime(provider).await;
+    async fn test_multi_agent_heuristic_defers_to_llm() {
+        // A message with both finance and task triggers + sequential language
+        // should cause the heuristic to return None (defer to LLM classifier).
+        use crate::intent_pipeline::analysis::analyze_heuristic;
 
-        let result = runtime
-            .process_message(
-                "first check my transactions then create a task for the missing ones",
-                vec![],
-                &[],
-                &[],
-                &routing_ctx(),
-                None,
-                None,
-                None,
-            )
-            .await
-            .unwrap();
-
-        // The heuristic detects multi-agent triggers (finance + task) with sequential language,
-        // defers to LLM classifier. LLM mock returns a text response so heuristic fallback
-        // runs. The key assertion: the general agent profile has can_delegate_to populated.
-        // Note: without a real LLM to set needs_orchestration=true, the heuristic defers
-        // to the LLM classifier which may not set it either with our mock. So we test the
-        // mechanism differently: verify the general agent gets the delegate tool injected.
+        let result =
+            analyze_heuristic("first check my transactions then create a task for the missing ones");
         assert!(
-            result.agent_name == "general"
-                || result.agent_name == "finance"
-                || result.agent_name == "task",
-            "Expected a valid agent, got: {}",
-            result.agent_name
+            result.is_none(),
+            "Expected heuristic to defer multi-agent message to LLM, got: {:?}",
+            result
         );
     }
 
