@@ -1,5 +1,7 @@
 pub mod config;
+pub mod focus;
 pub mod repos;
+pub mod tracker;
 pub mod types;
 
 use async_trait::async_trait;
@@ -7,6 +9,7 @@ use serde_json::Value;
 use tools_core::{DynTool, FeatureMigration, FeaturePackage, HealthStatus};
 
 pub use config::ProductivityConfig;
+pub use focus::FocusManager;
 pub use types::*;
 
 pub struct ProductivityFeature {

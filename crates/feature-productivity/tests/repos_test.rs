@@ -4,26 +4,17 @@ use feature_productivity::types::*;
 use sqlx::SqlitePool;
 
 async fn setup_pool() -> SqlitePool {
-    let pool = SqlitePool::connect("sqlite::memory:")
+    let pool = storage::StoragePool::connect_in_memory()
         .await
         .expect("in-memory pool");
-    sqlx::query("PRAGMA foreign_keys=ON;")
-        .execute(&pool)
-        .await
-        .unwrap();
-    // Run feature migration
-    let sql = feature_productivity::ProductivityFeature::migration_sql();
-    // Split on semicolons and execute each statement
-    for stmt in sql.split(';') {
-        let trimmed = stmt.trim();
-        if !trimmed.is_empty() {
-            sqlx::query(trimmed)
-                .execute(&pool)
-                .await
-                .unwrap_or_else(|e| panic!("migration failed on: {trimmed}\nerror: {e}"));
-        }
-    }
-    pool
+    let inner = pool.inner().clone();
+    storage::StoragePool::run_feature_migrations(
+        &inner,
+        &feature_productivity::ProductivityFeature::migrations_static(),
+    )
+    .await
+    .unwrap();
+    inner
 }
 
 #[tokio::test]

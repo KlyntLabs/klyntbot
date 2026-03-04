@@ -19,6 +19,13 @@ uuid = { workspace = true }
 sqlx.workspace = true
 tokio-util.workspace = true
 
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", features = ["NSWorkspace", "NSRunningApplication"] }
+objc2-foundation = { version = "0.3", features = ["NSString"] }
+core-graphics = "0.24"
+core-foundation = "0.10"
+
 [dev-dependencies]
 tempfile.workspace = true
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "test-util"] }
