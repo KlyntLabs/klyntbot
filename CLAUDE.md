@@ -166,6 +166,10 @@ Feature packs bundle config + skills into selectable groups chosen during `klynt
 
 Built-in skills live in `skills/` as `SKILL.md` files (browser, cron, daily-planning, finance, skill-creator, summarize, todo, weather, weekly-report). Nine skills are bundled at compile time via `include_str!`. Workspace skills loaded from `~/.klyntbot/skills/*/SKILL.md` override built-in skills with the same name. YAML frontmatter provides metadata: `description`, `version`, `always` (always load full content), `triggers` (activation keywords), `requires_bins` and `requires_env` (prerequisite checks). Skills are filtered by enabled packs.
 
+## Agent Profiles (Migration in Progress)
+
+The `agents/` directory contains agent profile definitions that will replace the old `skills/` directory. Each agent has an `AGENT.md` file with YAML frontmatter (name, tools, triggers, can_delegate_to, always_skills) and a `skills/` subfolder with simplified skill .md files. Six built-in agents: general, task, finance, calendar, automation, communication. Parsed by `AgentProfile` and managed by `AgentManager` in `crates/agent/src/agent_profile/`. Built-in agents are compiled via `include_str!` macros.
+
 ## Gotchas & Common Pitfalls
 
 - **No external DB required**: SQLite file is created automatically at `{data_dir}/data.db` on first run. LanceDB directory is created at `{data_dir}/lancedb/` when semantic search is first used.
