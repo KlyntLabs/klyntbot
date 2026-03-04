@@ -3467,6 +3467,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "feature-productivity"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "common",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "storage",
+ "tempfile",
+ "tokio",
+ "tokio-util",
+ "tools-core",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "feature-todo"
 version = "0.1.0"
 dependencies = [

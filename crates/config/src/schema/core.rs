@@ -16,6 +16,7 @@ use super::mcp::McpConfig;
 use super::orchestrator::OrchestratorConfig;
 use super::packs::PacksConfig;
 use super::plugins::PluginsConfig;
+use super::productivity::ProductivityConfig;
 use super::project::ProjectConfig;
 use super::providers::{ProviderManagerConfig, ProvidersConfig};
 use super::todo::TodoConfig;
@@ -115,6 +116,9 @@ pub struct Config {
 
     #[serde(default)]
     pub finance: FinanceConfig,
+
+    #[serde(default)]
+    pub productivity: ProductivityConfig,
 
     #[serde(default)]
     pub orchestrator: OrchestratorConfig,
