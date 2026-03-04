@@ -4,6 +4,7 @@
 
 pub mod agent_loop;
 pub mod agent_profile;
+pub mod agent_runtime;
 pub mod agent_task_handler;
 
 pub mod calendar_reconcile;

@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use super::{AgentProfile, AgentSkill};
 
@@ -58,15 +59,14 @@ const BUILTIN_AGENT_SKILLS: &[(&str, &str, &str)] = &[
 
 const GENERAL_AGENT_NAME: &str = "general";
 
+#[derive(Default)]
 pub struct AgentManager {
-    agents: HashMap<String, AgentProfile>,
+    agents: HashMap<String, Arc<AgentProfile>>,
 }
 
 impl AgentManager {
     pub fn new() -> Self {
-        Self {
-            agents: HashMap::new(),
-        }
+        Self::default()
     }
 
     /// Load built-in agents from compiled-in AGENT.md files.
@@ -83,7 +83,7 @@ impl AgentManager {
                 }
             }
 
-            self.agents.insert(name.to_string(), profile);
+            self.agents.insert(name.to_string(), Arc::new(profile));
         }
         Ok(())
     }
@@ -154,14 +154,14 @@ impl AgentManager {
                 }
             }
 
-            self.agents.insert(name, profile);
+            self.agents.insert(name, Arc::new(profile));
         }
         Ok(())
     }
 
     /// Match a user message to an agent profile.
     /// Returns the best-matching agent, or the general fallback.
-    pub fn match_agent(&self, message: &str) -> &AgentProfile {
+    pub fn match_agent(&self, message: &str) -> &Arc<AgentProfile> {
         let lower = message.to_lowercase();
 
         // Score each agent by number of trigger hits
@@ -193,17 +193,17 @@ impl AgentManager {
         }
     }
 
-    pub fn get(&self, name: &str) -> Option<&AgentProfile> {
+    pub fn get(&self, name: &str) -> Option<&Arc<AgentProfile>> {
         self.agents.get(name)
     }
 
-    pub fn get_general(&self) -> &AgentProfile {
+    pub fn get_general(&self) -> &Arc<AgentProfile> {
         self.agents
             .get(GENERAL_AGENT_NAME)
             .expect("General agent must exist")
     }
 
-    pub fn all_agents(&self) -> impl Iterator<Item = &AgentProfile> {
+    pub fn all_agents(&self) -> impl Iterator<Item = &Arc<AgentProfile>> {
         self.agents.values()
     }
 

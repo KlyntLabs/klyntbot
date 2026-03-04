@@ -141,6 +141,17 @@ impl AgentLoopBuilder {
 
         let skill_manager = Arc::new(skill_manager);
 
+        // ── Agent profiles (new system, runs alongside SkillManager during migration) ──
+        let mut agent_manager = crate::agent_profile::AgentManager::new();
+        agent_manager.load_builtin_agents()?;
+        if let Some(data_dir) = &config.data_dir {
+            agent_manager
+                .load_workspace_agents(std::path::Path::new(data_dir))
+                .await
+                .ok(); // non-fatal
+        }
+        let agent_manager = Arc::new(agent_manager);
+
         // ── Context sources ───────────────────────────────────────────────
         let confidence_source = ConfidenceSource::new(config.confidence.threshold);
         let confidence_threshold_handle = confidence_source.threshold_handle();
@@ -809,6 +820,7 @@ impl AgentLoopBuilder {
             _calendar_adapter: calendar_adapter,
             conversation_embedding_handler,
             learning_service,
+            agent_manager,
             pipeline,
             strategy_repo: Some(repos.strategies.clone()),
             history_limit,

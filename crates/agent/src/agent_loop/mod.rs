@@ -59,6 +59,8 @@ pub struct AgentLoop {
     pub(crate) conversation_embedding_handler: Option<Arc<dyn tools::ConversationEmbeddingHandler>>,
     /// Background learning service for adaptive threshold updates (None if learning disabled)
     pub(crate) learning_service: Option<Arc<RwLock<crate::learning::LearningService>>>,
+    /// Agent manager: profile loading and message-to-agent matching.
+    pub(crate) agent_manager: Arc<crate::agent_profile::AgentManager>,
     /// Intent pipeline: classify → assemble → route → validate → record.
     pub(crate) pipeline: Arc<crate::intent_pipeline::IntentPipeline>,
     /// Strategy repo for updating satisfaction scores from reactions.
