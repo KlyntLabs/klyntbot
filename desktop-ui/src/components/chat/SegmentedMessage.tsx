@@ -85,7 +85,7 @@ function CompletedToolSegment({ segment }: { segment: Extract<MessageSegment, { 
   );
 }
 
-function ActiveToolIndicator({ name }: { name: string }) {
+export function ActiveToolIndicator({ name }: { name: string }) {
   const color = toolColor(name);
 
   return (

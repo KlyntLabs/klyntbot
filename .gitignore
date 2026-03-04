@@ -1,5 +1,6 @@
 /target
 .worktrees/
+.claude/worktrees/
 .fastembed_cache/
 
 # Test fixture build artifacts

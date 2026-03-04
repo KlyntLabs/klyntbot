@@ -19,6 +19,7 @@ export function MainApp() {
   const [activeTab, setActiveTab] = useState<Tab>('All');
   const [activeSidebar, setActiveSidebar] = useState<SidebarItem>('Tasks');
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [openSessionKey, setOpenSessionKey] = useState<string | null>(null);
   const prevSidebarRef = useRef<SidebarItem>('Tasks');
   const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [collapsedProjects, toggleProject] = useSetToggle();
@@ -74,6 +75,8 @@ export function MainApp() {
     await createTask.mutate({ title, parentId });
   }, [createTask]);
 
+  const clearOpenSessionKey = useCallback(() => setOpenSessionKey(null), []);
+
   // Auto-refresh when relevant entities change
   useEvent<{ entityKind: string; id: string }>('entity:updated', (payload) => {
     const kind = payload?.entityKind;
@@ -83,10 +86,11 @@ export function MainApp() {
     if (kind === 'area') refetchAreas();
   });
 
-  // Listen for open-chat events from the tray
-  useEvent<{ text: string }>('open-chat', () => {
+  // Listen for open-chat events from the tray / launcher
+  useEvent<{ text?: string; sessionKey?: string }>('open-chat', (payload) => {
     setIsChatOpen(true);
     setActiveSidebar('Chat');
+    setOpenSessionKey(payload?.sessionKey ?? null);
   });
 
   const filteredTasks = useMemo(() => {
@@ -217,7 +221,13 @@ export function MainApp() {
       </div>
 
       {/* Sidebar Chat */}
-      <SidebarChat isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} viewContext={sidebarViewContext} />
+      <SidebarChat
+        isOpen={isChatOpen}
+        onClose={() => setIsChatOpen(false)}
+        viewContext={sidebarViewContext}
+        openSessionKey={openSessionKey}
+        onSessionKeyUsed={clearOpenSessionKey}
+      />
     </div>
   );
 }

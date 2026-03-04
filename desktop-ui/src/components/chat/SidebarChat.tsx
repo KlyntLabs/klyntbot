@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
 import { Send, Pin, X } from 'lucide-react';
 import { MessageList } from './MessageList';
 import { usePageContext } from '../../hooks/usePageContext';
@@ -10,6 +10,10 @@ interface SidebarChatProps {
   onClose: () => void;
   /** View-level context from the parent (e.g. active sidebar section + tab). */
   viewContext?: { entityKind: string; entityId?: string };
+  /** Session key passed from the launcher expand-to-main flow. */
+  openSessionKey?: string | null;
+  /** Callback to signal that the session key has been consumed. */
+  onSessionKeyUsed?: () => void;
 }
 
 /** Derive a stable session key from page context. */
@@ -25,13 +29,34 @@ function contextLabel(entityKind?: string): string {
   return parts.map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(' › ');
 }
 
-export function SidebarChat({ isOpen, onClose, viewContext }: SidebarChatProps) {
+export function SidebarChat({ isOpen, onClose, viewContext, openSessionKey, onSessionKeyUsed }: SidebarChatProps) {
   const routeContext = usePageContext();
   // Route context (entity detail pages) takes priority; fall back to view context
   const pageContext = routeContext ?? viewContext ?? null;
-  // Use route context for session key (entity pages get their own session),
-  // but keep a single 'desktop-panel' session for the main view regardless of tab.
-  const sessionKey = routeContext ? sessionKeyFor(routeContext.entityKind, routeContext.entityId) : 'desktop-panel';
+
+  // Override session key when the launcher expands a chat to main
+  const [overrideSessionKey, setOverrideSessionKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (openSessionKey) {
+      setOverrideSessionKey(openSessionKey);
+      onSessionKeyUsed?.();
+    }
+  }, [openSessionKey, onSessionKeyUsed]);
+
+  // Clear override when route context changes to a new value (user navigates)
+  const prevRouteRef = useRef(routeContext);
+  useEffect(() => {
+    const prev = prevRouteRef.current;
+    if (routeContext && (routeContext.entityKind !== prev?.entityKind || routeContext.entityId !== prev?.entityId)) {
+      setOverrideSessionKey(null);
+    }
+    prevRouteRef.current = routeContext;
+  }, [routeContext]);
+
+  // Use override session key if set, otherwise derive from route context
+  const sessionKey = overrideSessionKey
+    ?? (routeContext ? sessionKeyFor(routeContext.entityKind, routeContext.entityId) : 'desktop-panel');
 
   const chat = useChatSession(sessionKey);
   const pinThread = useMutation<void, Record<string, unknown>>('chat_pin_thread');
