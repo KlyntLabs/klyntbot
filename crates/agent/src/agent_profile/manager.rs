@@ -48,9 +48,11 @@ const BUILTIN_AGENT_SKILLS: &[(&str, &str, &str)] = &[
     include_agent_skill!("general", "weather"),
     include_agent_skill!("general", "skill-creator"),
     include_agent_skill!("task", "todo"),
-    include_agent_skill!("task", "planning"),
+    include_agent_skill!("task", "daily-planner"),
+    include_agent_skill!("task", "task-decompose"),
     include_agent_skill!("task", "project-management"),
-    include_agent_skill!("task", "weekly-report"),
+    include_agent_skill!("task", "weekly-review"),
+    include_agent_skill!("task", "retrospective"),
     include_agent_skill!("finance", "budgeting"),
     include_agent_skill!("finance", "spending-analysis"),
     include_agent_skill!("calendar", "scheduling"),
@@ -161,7 +163,7 @@ impl AgentManager {
     /// Match a user message to an agent profile.
     /// Returns the best-matching agent, or the general fallback.
     pub fn match_agent(&self, message: &str) -> &Arc<AgentProfile> {
-        let lower = message.to_lowercase();
+        let normalized = super::types::normalize_for_matching(message);
 
         // Score each agent by number of trigger hits
         let mut best: Option<(&str, usize)> = None;
@@ -172,7 +174,7 @@ impl AgentManager {
             let hits = profile
                 .triggers
                 .iter()
-                .filter(|t| lower.contains(t.as_str()))
+                .filter(|t| normalized.contains(t.as_str()))
                 .count();
             if hits > 0 {
                 if let Some((_, best_hits)) = best {

@@ -1,6 +1,6 @@
 ---
 name: todo
-description: Task creation workflow with confidence scoring and enrichment
+description: Task creation with smart defaults, confidence scoring, and multi-task capture
 always: true
 ---
 
@@ -55,6 +55,37 @@ Call `todo add` with all user-provided fields, `area_id`, and `confirmed: true`.
 - NEVER invent a description the user didn't provide
 - NEVER guess priority, due date, or tags
 - If in doubt, call todo add with ONLY the title and area_id
+
+## Smart Defaults (Learning-Based)
+
+When the system prompt includes behavioral patterns or agent adaptations, use them to pre-fill task fields:
+
+- **Area inference**: If the user's pattern shows "Work" tasks are created 80%+ on weekday mornings, default to Work during those times
+- **Priority inference**: If tasks in a project are historically P2, suggest P2 for new tasks in that project
+- **Tag inference**: If the user consistently tags coding tasks with "dev", suggest "dev" for similar tasks
+
+When applying a smart default, **always mention it**: "I've defaulted this to Work (your usual area at this time) — change?"
+
+Never silently apply defaults. The user must see what was inferred and have the chance to override.
+
+## Multi-Task Capture
+
+When a user provides multiple tasks in one message (e.g., "I need to fix the login bug, send the report to Sarah, and buy groceries"), extract each task individually:
+
+1. Parse the message for distinct actionable items
+2. Show the extracted list to the user for confirmation via `ask_user`
+3. Create each confirmed task separately with appropriate areas
+4. Summarize all created tasks at the end
+
+**Format for confirmation:**
+```
+I found 3 tasks in your message:
+1. Fix the login bug → Work
+2. Send the report to Sarah → Work
+3. Buy groceries → Personal
+
+Create all, or edit first?
+```
 
 ## Confidence Scoring
 

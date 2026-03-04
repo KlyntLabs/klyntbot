@@ -100,15 +100,18 @@ export function TransparencyPanel({ transparency }: TransparencyPanelProps) {
       {hasExecution && (
         <CollapsibleBox title="Skills" icon={BookOpen} defaultOpen={hasSkills}>
           {hasSkills ? (
-            skills!.map((skill, i) => (
-              <Row
-                key={`skill-${i}`}
-                icon={Package}
-                label={skill.name}
-                detail={skill.trigger === 'always' ? 'active' : skill.trigger}
-                active={skill.trigger === 'always'}
-              />
-            ))
+            skills!.map((skill, i) => {
+              const isActive = skill.trigger === 'always' || skill.trigger === 'activated';
+              return (
+                <Row
+                  key={`skill-${i}`}
+                  icon={Package}
+                  label={skill.name}
+                  detail={isActive ? 'active' : skill.trigger}
+                  active={isActive}
+                />
+              );
+            })
           ) : (
             <span className="text-dim">none</span>
           )}

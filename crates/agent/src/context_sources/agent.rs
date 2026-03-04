@@ -30,7 +30,7 @@ impl ContextSource for AgentContextSource {
         35
     }
 
-    async fn provide(&self, _ctx: &SourceContext) -> Option<String> {
+    async fn provide(&self, ctx: &SourceContext) -> Option<String> {
         let guard = self.active_profile.read().await;
         let profile = guard.as_ref()?;
 
@@ -47,6 +47,16 @@ impl ContextSource for AgentContextSource {
         // Always-loaded skill content
         for skill_content in profile.always_loaded_skill_content() {
             sections.push(skill_content);
+        }
+
+        // On-demand skills activated by message content
+        if let Some(ref message) = ctx.message {
+            for skill in profile.message_activated_skills(message) {
+                sections.push(format!(
+                    "# Skill: {} (activated)\n\n{}",
+                    skill.name, skill.content
+                ));
+            }
         }
 
         if sections.is_empty() {
@@ -73,6 +83,7 @@ mod tests {
                 description: "Task workflow".into(),
                 always: true,
                 content: "Create tasks using the task tool.".into(),
+                ..Default::default()
             }],
             ..Default::default()
         };

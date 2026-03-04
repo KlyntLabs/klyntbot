@@ -41,6 +41,7 @@ pub struct AgentSkill {
     pub name: String,
     pub description: String,
     pub always: bool,
+    pub triggers: Vec<String>,
     pub content: String,
 }
 
@@ -72,6 +73,8 @@ struct SkillFrontmatter {
     description: String,
     #[serde(default)]
     always: bool,
+    #[serde(default)]
+    triggers: Vec<String>,
 }
 
 impl AgentProfile {
@@ -106,22 +109,52 @@ impl AgentProfile {
     }
 
     /// Check if this agent's triggers match the given message.
+    /// Normalizes hyphens to spaces so "weekly-review" matches trigger "weekly review".
     pub fn matches_message(&self, message: &str) -> bool {
         if self.triggers.is_empty() {
             return false;
         }
-        let lower = message.to_lowercase();
+        let normalized = normalize_for_matching(message);
         self.triggers
             .iter()
-            .any(|trigger| lower.contains(trigger.as_str()))
+            .any(|trigger| normalized.contains(trigger.as_str()))
+    }
+
+    /// Whether a skill is always-loaded (via `always: true` or listed in `always_skills`).
+    pub fn is_always_loaded(&self, skill: &AgentSkill) -> bool {
+        skill.always || self.always_skills.contains(&skill.name)
     }
 
     /// Format the agent's always-loaded skills for system prompt injection.
     pub fn always_loaded_skill_content(&self) -> Vec<String> {
         self.skills
             .iter()
-            .filter(|s| self.always_skills.contains(&s.name) || s.always)
+            .filter(|s| self.is_always_loaded(s))
             .map(|s| format!("# Skill: {}\n\n{}", s.name, s.content))
+            .collect()
+    }
+
+    /// Returns on-demand skills whose triggers match the given message.
+    /// Used to dynamically inject relevant skill content into the system prompt.
+    pub fn message_activated_skills(&self, message: &str) -> Vec<&AgentSkill> {
+        let normalized = normalize_for_matching(message);
+        self.skills
+            .iter()
+            .filter(|s| {
+                // Skip always-loaded skills — they're already injected
+                if self.is_always_loaded(s) {
+                    return false;
+                }
+                // Match on skill-level triggers
+                if !s.triggers.is_empty() {
+                    return s
+                        .triggers
+                        .iter()
+                        .any(|t| normalized.contains(t.as_str()));
+                }
+                // Fallback: match on skill name (hyphen-normalized)
+                normalized.contains(&normalize_for_matching(&s.name))
+            })
             .collect()
     }
 }
@@ -136,9 +169,15 @@ impl AgentSkill {
             name: fm.name,
             description: fm.description,
             always: fm.always,
+            triggers: fm.triggers.into_iter().map(|t| t.to_lowercase()).collect(),
             content: body.trim().to_string(),
         })
     }
+}
+
+/// Normalize text for trigger matching: lowercase + hyphens→spaces.
+pub(crate) fn normalize_for_matching(text: &str) -> String {
+    text.to_lowercase().replace('-', " ")
 }
 
 fn split_frontmatter(content: &str) -> common::Result<(String, String)> {
@@ -258,5 +297,109 @@ Skill body content here.
         assert!(profile.matches_message("show me my tasks"));
         assert!(profile.matches_message("add to my todo list"));
         assert!(!profile.matches_message("what's the weather?"));
+    }
+
+    #[test]
+    fn test_trigger_matching_normalizes_hyphens() {
+        let profile = AgentProfile {
+            name: "task".into(),
+            triggers: vec!["weekly review".into(), "decompose".into()],
+            ..Default::default()
+        };
+        // Hyphenated form should match space-separated trigger
+        assert!(profile.matches_message("use weekly-review skills"));
+        // Normal space form should still work
+        assert!(profile.matches_message("show me my weekly review"));
+    }
+
+    #[test]
+    fn test_parse_skill_with_triggers() {
+        let content = r#"---
+name: weekly-review
+description: Weekly review workflow
+always: false
+triggers: [weekly review, review my week]
+---
+
+Review content here.
+"#;
+        let skill = AgentSkill::parse("weekly-review", content).unwrap();
+        assert_eq!(skill.name, "weekly-review");
+        assert!(!skill.always);
+        assert_eq!(skill.triggers, vec!["weekly review", "review my week"]);
+    }
+
+    #[test]
+    fn test_message_activated_skills() {
+        let profile = AgentProfile {
+            name: "task".into(),
+            always_skills: vec!["todo".into()],
+            skills: vec![
+                AgentSkill {
+                    name: "todo".into(),
+                    always: true,
+                    content: "Always loaded".into(),
+                    ..Default::default()
+                },
+                AgentSkill {
+                    name: "weekly-review".into(),
+                    always: false,
+                    triggers: vec!["weekly review".into(), "review my week".into()],
+                    content: "Review workflow".into(),
+                    ..Default::default()
+                },
+                AgentSkill {
+                    name: "retrospective".into(),
+                    always: false,
+                    triggers: vec!["retrospective".into(), "monthly review".into()],
+                    content: "Retro workflow".into(),
+                    ..Default::default()
+                },
+            ],
+            ..Default::default()
+        };
+
+        // Should activate weekly-review (via trigger match)
+        let activated = profile.message_activated_skills("show me my weekly review");
+        assert_eq!(activated.len(), 1);
+        assert_eq!(activated[0].name, "weekly-review");
+
+        // Should activate weekly-review even with hyphen
+        let activated = profile.message_activated_skills("use weekly-review skill");
+        assert_eq!(activated.len(), 1);
+        assert_eq!(activated[0].name, "weekly-review");
+
+        // Should NOT include always-loaded todo skill
+        let activated = profile.message_activated_skills("show me my todo list");
+        assert!(activated.is_empty());
+
+        // Should activate retrospective
+        let activated = profile.message_activated_skills("run my monthly review");
+        assert_eq!(activated.len(), 1);
+        assert_eq!(activated[0].name, "retrospective");
+    }
+
+    #[test]
+    fn test_message_activated_skills_fallback_to_name() {
+        let profile = AgentProfile {
+            name: "task".into(),
+            always_skills: vec![],
+            skills: vec![AgentSkill {
+                name: "task-decompose".into(),
+                always: false,
+                triggers: vec![], // No explicit triggers
+                content: "Decompose content".into(),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+
+        // Should match via name fallback (hyphen normalized)
+        let activated = profile.message_activated_skills("use task-decompose");
+        assert_eq!(activated.len(), 1);
+        assert_eq!(activated[0].name, "task-decompose");
+
+        let activated = profile.message_activated_skills("use task decompose");
+        assert_eq!(activated.len(), 1);
     }
 }

@@ -170,9 +170,16 @@ impl AgentRuntime {
                 .await;
 
             // Emit loaded skills for this agent
+            let activated: std::collections::HashSet<&str> = profile
+                .message_activated_skills(message)
+                .into_iter()
+                .map(|s| s.name.as_str())
+                .collect();
             for skill in &profile.skills {
-                let trigger = if skill.always || profile.always_skills.contains(&skill.name) {
+                let trigger = if profile.is_always_loaded(skill) {
                     "always".to_string()
+                } else if activated.contains(skill.name.as_str()) {
+                    "activated".to_string()
                 } else {
                     "on-demand".to_string()
                 };
