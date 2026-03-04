@@ -103,6 +103,9 @@ pub enum AgentEvent {
         detail: String,
     },
 
+    /// An agent profile was selected to handle the current message.
+    AgentSelected { name: String, description: String },
+
     /// A subagent was spawned.
     SubagentSpawned { label: String, profile: String },
 

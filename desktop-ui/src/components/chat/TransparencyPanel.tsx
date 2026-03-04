@@ -33,12 +33,12 @@ function CollapsibleBox({ title, icon: Icon, children, defaultOpen = true }: Col
   );
 }
 
-function Row({ icon: Icon, label, detail }: { icon: React.ElementType; label: string; detail?: string }) {
+function Row({ icon: Icon, label, detail, active }: { icon: React.ElementType; label: string; detail?: string; active?: boolean }) {
   return (
-    <div className="flex items-center gap-1.5 text-muted">
-      <Icon className="w-3 h-3 shrink-0" strokeWidth={1.5} />
-      <span className="text-secondary">{label}</span>
-      {detail && <span className="text-dim ml-auto">{detail}</span>}
+    <div className={`flex items-center gap-1.5 ${active ? 'text-secondary' : 'text-muted'}`}>
+      <Icon className={`w-3 h-3 shrink-0 ${active ? 'text-brand' : ''}`} strokeWidth={1.5} />
+      <span className={active ? 'text-primary font-medium' : 'text-secondary'}>{label}</span>
+      {detail && <span className={`ml-auto ${active ? 'text-brand text-[9px] font-medium uppercase' : 'text-dim'}`}>{detail}</span>}
     </div>
   );
 }
@@ -48,12 +48,13 @@ interface TransparencyPanelProps {
 }
 
 export function TransparencyPanel({ transparency }: TransparencyPanelProps) {
-  const { memoryAccesses, skills, execution, classification, subagents, learning, tools, toolTokensTotal } = transparency;
+  const { memoryAccesses, skills, execution, classification, agentSelected, subagents, learning, tools, toolTokensTotal } = transparency;
 
   const hasMemory = memoryAccesses && memoryAccesses.length > 0;
   const hasSkills = skills && skills.length > 0;
   const hasExecution = execution || classification;
-  const hasAgents = subagents && subagents.length > 0;
+  const hasAgent = !!agentSelected;
+  const hasSubagents = subagents && subagents.length > 0;
   const hasLearning = learning && learning.length > 0;
   const hasTools = tools && tools.length > 0;
 
@@ -104,7 +105,8 @@ export function TransparencyPanel({ transparency }: TransparencyPanelProps) {
                 key={`skill-${i}`}
                 icon={Package}
                 label={skill.name}
-                detail={skill.trigger}
+                detail={skill.trigger === 'always' ? 'active' : skill.trigger}
+                active={skill.trigger === 'always'}
               />
             ))
           ) : (
@@ -133,13 +135,27 @@ export function TransparencyPanel({ transparency }: TransparencyPanelProps) {
         </CollapsibleBox>
       )}
 
-      {/* Agents — always visible when execution data exists */}
+      {/* Agents — show selected agent + any delegated sub-agents */}
       {hasExecution && (
-        <CollapsibleBox title="Agents" icon={Bot} defaultOpen={hasAgents}>
-          {hasAgents ? (
-            subagents!.map((sa, i) => (
-              <Row key={`sa-${i}`} icon={Bot} label={sa.label} detail={sa.profile} />
-            ))
+        <CollapsibleBox title="Agents" icon={Bot} defaultOpen={hasAgent || hasSubagents}>
+          {hasAgent ? (
+            <>
+              <div className="flex items-start gap-1.5 text-muted">
+                <Bot className="w-3 h-3 shrink-0 mt-0.5 text-brand" strokeWidth={1.5} />
+                <div>
+                  <span className="text-secondary font-medium">{agentSelected!.name}</span>
+                  <div className="text-dim">{agentSelected!.description}</div>
+                </div>
+              </div>
+              {hasSubagents && (
+                <>
+                  <div className="pt-1 mt-1 border-t border-border text-dim text-[9px] uppercase tracking-wider">Delegated</div>
+                  {subagents!.map((sa, i) => (
+                    <Row key={`sa-${i}`} icon={Bot} label={sa.label} detail={sa.profile} />
+                  ))}
+                </>
+              )}
+            </>
           ) : (
             <span className="text-dim">none</span>
           )}

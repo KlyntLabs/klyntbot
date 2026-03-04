@@ -18,10 +18,10 @@ use crate::memory::MemoryStore;
 const LEARNING_CACHE_TTL_SECS: i64 = 60;
 
 /// Minimum confidence for user profile entries to appear in context.
-const PROFILE_MIN_CONFIDENCE: f64 = 0.5;
+pub(crate) const PROFILE_MIN_CONFIDENCE: f64 = 0.5;
 
 /// Minimum sample count for behavioral patterns to appear in context.
-const PATTERN_MIN_SAMPLES: i32 = 5;
+pub(crate) const PATTERN_MIN_SAMPLES: i32 = 5;
 
 struct CachedLearning {
     content: String,

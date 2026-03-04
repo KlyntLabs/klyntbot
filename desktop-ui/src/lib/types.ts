@@ -191,6 +191,12 @@ export interface SubagentSpawnedPayload {
   profile: string;
 }
 
+export interface AgentSelectedPayload {
+  sessionKey: string;
+  name: string;
+  description: string;
+}
+
 // ── Transparency Data (per-message) ───────────────────────────────────
 
 export interface TransparencyData {
@@ -203,6 +209,7 @@ export interface TransparencyData {
   skills?: { name: string; trigger: string }[];
   execution?: { engine: string; iterations: number; maxIterations: number; escalations: number };
   classification?: { strategy: string; confidence: number; source: string };
+  agentSelected?: { name: string; description: string };
   subagents?: { label: string; profile: string }[];
   learning?: { eventType: string; detail: string }[];
 }

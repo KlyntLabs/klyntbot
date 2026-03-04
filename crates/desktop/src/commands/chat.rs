@@ -527,6 +527,20 @@ pub async fn chat_send(
                                 },
                             );
                         }
+                        AgentEvent::AgentSelected { name, description } => {
+                            transparency.agent_selected = Some(desktop_shared::events::TransparencyAgentSelected {
+                                name: name.clone(),
+                                description: description.clone(),
+                            });
+                            let _ = app.emit(
+                                events::AGENT_SELECTED,
+                                events::AgentSelectedPayload {
+                                    session_key: sk.clone(),
+                                    name,
+                                    description,
+                                },
+                            );
+                        }
                         AgentEvent::SubagentSpawned { label, profile } => {
                             transparency.subagents.push(desktop_shared::events::TransparencySubagent {
                                 label: label.clone(),

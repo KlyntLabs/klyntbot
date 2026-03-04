@@ -793,6 +793,9 @@ impl AgentLoopBuilder {
             runtime = runtime.with_interaction_recorder(recorder);
         }
 
+        // Inject learning repos for transparency event summaries
+        runtime = runtime.with_learning_repos(&repos);
+
         let runtime = Arc::new(runtime);
 
         info!("Agent runtime initialized");

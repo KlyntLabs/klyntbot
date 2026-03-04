@@ -16,6 +16,7 @@ use tools::RoutingContext;
 use tracing::{debug, warn};
 
 use crate::agent_profile::{AgentManager, AgentProfile};
+use crate::context_sources::learning::{PATTERN_MIN_SAMPLES, PROFILE_MIN_CONFIDENCE};
 use crate::events::AgentEvent;
 use crate::execution::ExecutionParams;
 use crate::intent_pipeline::analysis::IntentAnalyzer;
@@ -61,6 +62,10 @@ pub struct AgentRuntime {
     active_profile: Arc<RwLock<Option<Arc<AgentProfile>>>>,
     /// Records interactions for behavioral pattern analysis.
     interaction_recorder: Option<crate::learning::InteractionRecorder>,
+    /// Learning repos for transparency event summaries (subset of storage::Repos).
+    learning_user_profile: Option<storage::UserProfileRepo>,
+    learning_patterns: Option<storage::BehavioralPatternRepo>,
+    learning_adaptations: Option<storage::AgentAdaptationRepo>,
 }
 
 impl AgentRuntime {
@@ -85,6 +90,9 @@ impl AgentRuntime {
             confidence_evaluator: None,
             active_profile,
             interaction_recorder: None,
+            learning_user_profile: None,
+            learning_patterns: None,
+            learning_adaptations: None,
         }
     }
 
@@ -106,6 +114,13 @@ impl AgentRuntime {
         recorder: crate::learning::InteractionRecorder,
     ) -> Self {
         self.interaction_recorder = Some(recorder);
+        self
+    }
+
+    pub fn with_learning_repos(mut self, repos: &storage::Repos) -> Self {
+        self.learning_user_profile = Some(repos.user_profile.clone());
+        self.learning_patterns = Some(repos.behavioral_patterns.clone());
+        self.learning_adaptations = Some(repos.agent_adaptations.clone());
         self
     }
 
@@ -144,6 +159,31 @@ impl AgentRuntime {
         let profile = self.agent_manager.match_agent(message);
         let agent_name = profile.name.clone();
         debug!("AgentRuntime: matched agent '{}'", agent_name);
+
+        // Emit agent selection + skill events for transparency
+        if let Some(ref tx) = event_tx {
+            let _ = tx
+                .send(AgentEvent::AgentSelected {
+                    name: profile.name.clone(),
+                    description: profile.description.clone(),
+                })
+                .await;
+
+            // Emit loaded skills for this agent
+            for skill in &profile.skills {
+                let trigger = if skill.always || profile.always_skills.contains(&skill.name) {
+                    "always".to_string()
+                } else {
+                    "on-demand".to_string()
+                };
+                let _ = tx
+                    .send(AgentEvent::SkillLoaded {
+                        name: skill.name.clone(),
+                        trigger,
+                    })
+                    .await;
+            }
+        }
 
         // Step 2: Set active profile for AgentContextSource
         {
@@ -237,6 +277,11 @@ impl AgentRuntime {
                     duration_ms: assemble_ms,
                 })
                 .await;
+        }
+
+        // Emit learning context summaries for transparency
+        if let Some(ref tx) = event_tx {
+            self.emit_learning_summary(tx, &agent_name).await;
         }
 
         // Step 7: Filter tools based on agent profile (replaces ToolGroup filtering)
@@ -343,6 +388,89 @@ impl AgentRuntime {
             validation,
             agent_name,
         })
+    }
+
+    /// Emit learning context summary events for transparency panel.
+    async fn emit_learning_summary(
+        &self,
+        tx: &tokio::sync::mpsc::Sender<AgentEvent>,
+        agent_name: &str,
+    ) {
+        let (Some(ref profile_repo), Some(ref pattern_repo), Some(ref adapt_repo)) =
+            (&self.learning_user_profile, &self.learning_patterns, &self.learning_adaptations)
+        else {
+            return;
+        };
+
+        // Run independent DB queries concurrently (matches LearningContextSource pattern)
+        let (profile_result, patterns_result, adaptations_result) = tokio::join!(
+            profile_repo.list_above_confidence(PROFILE_MIN_CONFIDENCE),
+            pattern_repo.list_reliable(PATTERN_MIN_SAMPLES),
+            adapt_repo.list_by_agent(agent_name),
+        );
+
+        // User profile facts
+        if let Ok(entries) = profile_result {
+            if !entries.is_empty() {
+                let mut categories: Vec<String> = entries
+                    .iter()
+                    .map(|e| e.category.clone())
+                    .collect::<std::collections::HashSet<_>>()
+                    .into_iter()
+                    .collect();
+                categories.sort();
+                let _ = tx
+                    .send(AgentEvent::LearningEvent {
+                        event_type: "user_profile".into(),
+                        detail: format!("{} facts ({})", entries.len(), categories.join(", ")),
+                    })
+                    .await;
+            }
+        }
+
+        // Behavioral patterns
+        if let Ok(patterns) = patterns_result {
+            if !patterns.is_empty() {
+                let keys: Vec<&str> = patterns
+                    .iter()
+                    .take(3)
+                    .map(|p| p.pattern_key.as_str())
+                    .collect();
+                let _ = tx
+                    .send(AgentEvent::LearningEvent {
+                        event_type: "patterns".into(),
+                        detail: format!("{} patterns ({})", patterns.len(), keys.join(", ")),
+                    })
+                    .await;
+            }
+        }
+
+        // Agent-specific adaptations
+        if let Ok(adaptations) = adaptations_result {
+            if !adaptations.is_empty() {
+                let _ = tx
+                    .send(AgentEvent::LearningEvent {
+                        event_type: "adaptations".into(),
+                        detail: format!(
+                            "{} preferences for {} agent",
+                            adaptations.len(),
+                            agent_name
+                        ),
+                    })
+                    .await;
+            }
+        }
+
+        // Confidence threshold (in-memory read, no DB hit)
+        if let Some(ref evaluator) = self.confidence_evaluator {
+            let threshold = evaluator.threshold();
+            let _ = tx
+                .send(AgentEvent::LearningEvent {
+                    event_type: "confidence".into(),
+                    detail: format!("threshold: {:.0}%", threshold * 100.0),
+                })
+                .await;
+        }
     }
 
     async fn record_usage(

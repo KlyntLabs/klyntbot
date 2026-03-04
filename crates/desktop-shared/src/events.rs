@@ -41,6 +41,7 @@ pub const AGENT_MEMORY_ACCESS: &str = "agent:memory_access";
 pub const AGENT_SKILL_LOADED: &str = "agent:skill_loaded";
 pub const AGENT_LEARNING_EVENT: &str = "agent:learning_event";
 pub const AGENT_SUBAGENT_SPAWNED: &str = "agent:subagent_spawned";
+pub const AGENT_SELECTED: &str = "agent:agent_selected";
 pub const ENTITY_UPDATED: &str = "entity:updated";
 pub const MCP_OAUTH_COMPLETE: &str = "mcp:oauth_complete";
 pub const MCP_OAUTH_ERROR: &str = "mcp:oauth_error";
@@ -222,6 +223,14 @@ pub struct SubagentSpawnedPayload {
     pub profile: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentSelectedPayload {
+    pub session_key: String,
+    pub name: String,
+    pub description: String,
+}
+
 /// Accumulated transparency data for an assistant message.
 /// Serialized into `SessionMessage.metadata.transparency`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -245,6 +254,8 @@ pub struct TransparencyData {
     pub execution: Option<TransparencyExecution>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub classification: Option<TransparencyClassification>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent_selected: Option<TransparencyAgentSelected>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub subagents: Vec<TransparencySubagent>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
@@ -317,6 +328,13 @@ pub struct TransparencyClassification {
     pub strategy: String,
     pub confidence: f32,
     pub source: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TransparencyAgentSelected {
+    pub name: String,
+    pub description: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

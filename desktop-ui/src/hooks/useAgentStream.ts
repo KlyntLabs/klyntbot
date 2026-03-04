@@ -19,6 +19,7 @@ import type {
   SkillLoadedPayload,
   LearningEventPayload,
   SubagentSpawnedPayload,
+  AgentSelectedPayload,
 } from '../lib/types';
 
 interface AgentStream {
@@ -262,6 +263,14 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
     setTransparency((prev) => ({
       ...prev,
       learning: [...(prev?.learning ?? []), { eventType: payload.eventType, detail: payload.detail }],
+    }));
+  });
+
+  useEvent<AgentSelectedPayload>('agent:agent_selected', (payload) => {
+    if (!isOurSession(payload)) return;
+    setTransparency((prev) => ({
+      ...prev,
+      agentSelected: { name: payload.name, description: payload.description },
     }));
   });
 
