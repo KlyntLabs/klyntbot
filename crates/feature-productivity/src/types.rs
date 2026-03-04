@@ -213,3 +213,16 @@ pub struct NudgeRecord {
     pub acknowledged: bool,
     pub created_at: DateTime<Utc>,
 }
+
+impl NudgeRecord {
+    pub fn new(nudge_type: NudgeType, message: String, created_at: DateTime<Utc>) -> Self {
+        Self {
+            id: None,
+            nudge_type,
+            message,
+            channel: None,
+            acknowledged: false,
+            created_at,
+        }
+    }
+}
