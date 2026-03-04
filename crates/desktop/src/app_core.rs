@@ -21,7 +21,7 @@ pub struct AppCore {
     pub agent: Arc<AgentLoop>,
     pub bus: Arc<MessageBus>,
     pub persona_manager: Arc<RwLock<PersonaManager>>,
-    pub config: config::Config,
+    pub config: RwLock<config::Config>,
 
     // Private — managed internally
     channel_manager: Arc<Mutex<ChannelManager>>,
@@ -135,7 +135,7 @@ impl AppCore {
             agent: Arc::clone(&agent),
             bus: bus.clone(),
             persona_manager,
-            config: config.clone(),
+            config: RwLock::new(config.clone()),
             channel_manager: channel_manager.clone(),
             cron_service: cron_service.clone(),
             shutdown_token: shutdown_token.clone(),

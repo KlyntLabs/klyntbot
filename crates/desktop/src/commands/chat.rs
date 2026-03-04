@@ -541,6 +541,27 @@ pub async fn chat_send(
                                 },
                             );
                         }
+                        AgentEvent::McpServerStatus { server_name, status, tool_count, error } => {
+                            let _ = app.emit(
+                                events::MCP_SERVER_STATUS,
+                                events::McpServerStatusPayload {
+                                    server_name,
+                                    status,
+                                    tool_count,
+                                    error,
+                                },
+                            );
+                        }
+                        AgentEvent::McpStartupComplete { ready, failed, skipped } => {
+                            let _ = app.emit(
+                                events::MCP_STARTUP_COMPLETE,
+                                events::McpStartupCompletePayload {
+                                    ready,
+                                    failed,
+                                    skipped,
+                                },
+                            );
+                        }
                     }
                 }
                 else => break,

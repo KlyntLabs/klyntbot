@@ -42,6 +42,37 @@ pub const AGENT_SKILL_LOADED: &str = "agent:skill_loaded";
 pub const AGENT_LEARNING_EVENT: &str = "agent:learning_event";
 pub const AGENT_SUBAGENT_SPAWNED: &str = "agent:subagent_spawned";
 pub const ENTITY_UPDATED: &str = "entity:updated";
+pub const MCP_OAUTH_COMPLETE: &str = "mcp:oauth_complete";
+pub const MCP_OAUTH_ERROR: &str = "mcp:oauth_error";
+pub const MCP_SERVER_STATUS: &str = "mcp:server_status";
+pub const MCP_STARTUP_COMPLETE: &str = "mcp:startup_complete";
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct McpOAuthCompletePayload {
+    pub server_name: String,
+    pub provider: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct McpServerStatusPayload {
+    pub server_name: String,
+    /// One of: "starting", "ready", "failed", "skipped"
+    pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub tool_count: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct McpStartupCompletePayload {
+    pub ready: usize,
+    pub failed: usize,
+    pub skipped: usize,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

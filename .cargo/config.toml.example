@@ -1,0 +1,21 @@
+# Compile-time OAuth credentials for official builds.
+# Copy to `.cargo/config.toml` and fill in values for local dev.
+# CI/CD sets these as environment variables directly (no file needed).
+#
+# These are PUBLIC client credentials (not API keys) — they identify
+# the OAuth app but cannot access user data without the redirect flow.
+# The redirect URI is locked to localhost:14321/callback.
+
+[env]
+KLYNT_BUILD_LINEAR_CLIENT_ID = ""
+KLYNT_BUILD_LINEAR_CLIENT_SECRET = ""
+KLYNT_BUILD_GITHUB_CLIENT_ID = ""
+KLYNT_BUILD_GITHUB_CLIENT_SECRET = ""
+KLYNT_BUILD_NOTION_CLIENT_ID = ""
+KLYNT_BUILD_NOTION_CLIENT_SECRET = ""
+KLYNT_BUILD_SLACK_CLIENT_ID = ""
+KLYNT_BUILD_SLACK_CLIENT_SECRET = ""
+KLYNT_BUILD_GOOGLE_DRIVE_CLIENT_ID = ""
+KLYNT_BUILD_GOOGLE_DRIVE_CLIENT_SECRET = ""
+KLYNT_BUILD_GOOGLE_CALENDAR_CLIENT_ID = ""
+KLYNT_BUILD_GOOGLE_CALENDAR_CLIENT_SECRET = ""

@@ -13,6 +13,14 @@ import { FinanceGoals } from "./components/views/FinanceGoals";
 import { FinanceLiabilities } from "./components/views/FinanceLiabilities";
 import { Launcher } from "./components/views/Launcher";
 import { SystemTray } from "./components/views/SystemTray";
+import { SettingsLayout } from "./components/settings/SettingsLayout";
+import { GeneralSettings } from "./components/settings/pages/GeneralSettings";
+import { ConfigurationSettings } from "./components/settings/pages/ConfigurationSettings";
+import { PersonalizationSettings } from "./components/settings/pages/PersonalizationSettings";
+import { McpServersSettings } from "./components/settings/pages/McpServersSettings";
+import { GitSettings } from "./components/settings/pages/GitSettings";
+import { EnvironmentsSettings } from "./components/settings/pages/EnvironmentsSettings";
+import { ArchivedSettings } from "./components/settings/pages/ArchivedSettings";
 
 const router = createHashRouter([
   { path: "/", element: <MainApp /> },
@@ -27,6 +35,14 @@ const router = createHashRouter([
   { path: "/finance/investments", element: <FinanceInvestments /> },
   { path: "/finance/goals", element: <FinanceGoals /> },
   { path: "/finance/liabilities", element: <FinanceLiabilities /> },
+  { path: "/settings", element: <Navigate to="/settings/general" replace /> },
+  { path: "/settings/general", element: <SettingsLayout><GeneralSettings /></SettingsLayout> },
+  { path: "/settings/configuration", element: <SettingsLayout><ConfigurationSettings /></SettingsLayout> },
+  { path: "/settings/personalization", element: <SettingsLayout><PersonalizationSettings /></SettingsLayout> },
+  { path: "/settings/mcp", element: <SettingsLayout><McpServersSettings /></SettingsLayout> },
+  { path: "/settings/git", element: <SettingsLayout><GitSettings /></SettingsLayout> },
+  { path: "/settings/environments", element: <SettingsLayout><EnvironmentsSettings /></SettingsLayout> },
+  { path: "/settings/archived", element: <SettingsLayout><ArchivedSettings /></SettingsLayout> },
   { path: "/launcher", element: <Launcher /> },
   { path: "/tray", element: <SystemTray /> },
   { path: "*", element: <Navigate to="/" replace /> },

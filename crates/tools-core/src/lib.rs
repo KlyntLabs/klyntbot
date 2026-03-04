@@ -169,6 +169,15 @@ pub trait Tool: Send + Sync {
         PermissionLevel::Standard
     }
 
+    /// Optional per-tool timeout override.
+    ///
+    /// When `Some(duration)`, the execution core uses this instead of the
+    /// default tool timeout. Used by MCP tools to respect per-server
+    /// `tool_timeout_sec` configuration.
+    fn custom_timeout(&self) -> Option<std::time::Duration> {
+        None
+    }
+
     /// Convert to OpenAI function schema format
     fn to_schema(&self) -> Value {
         serde_json::json!({

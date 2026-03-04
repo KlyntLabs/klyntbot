@@ -418,13 +418,26 @@ impl ExecutionCore {
             // ToolStart/ToolEnd events are emitted inside each future so
             // the spinner updates in real-time as tools run.
 
+            // Pre-resolve per-tool custom timeouts before spawning futures.
+            // This acquires the registry read lock once, avoiding holding it
+            // inside each async future.
+            let custom_timeouts: Vec<Option<std::time::Duration>> = {
+                let reg = self.tool_registry.read().await;
+                response
+                    .tool_calls
+                    .iter()
+                    .map(|tc| reg.get(&tc.name).and_then(|t| t.custom_timeout()))
+                    .collect()
+            };
+
             // Create entity card channel for this batch of tool calls
             let (entity_tx, mut entity_rx) = tokio::sync::mpsc::channel::<common::EntityCard>(16);
 
             let futures: Vec<_> = response
                 .tool_calls
                 .iter()
-                .map(|tc| {
+                .enumerate()
+                .map(|(i, tc)| {
                     let registry = self.tool_registry.clone();
                     let name = tc.name.clone();
                     let args = tc.arguments.clone();
@@ -434,7 +447,7 @@ impl ExecutionCore {
                     let timeout_dur = if name == ASK_USER_TOOL_NAME {
                         INTERACTIVE_TOOL_TIMEOUT
                     } else {
-                        params.tool_timeout
+                        custom_timeouts[i].unwrap_or(params.tool_timeout)
                     };
                     let tx = event_tx.cloned();
 

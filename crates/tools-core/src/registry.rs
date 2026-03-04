@@ -52,6 +52,21 @@ impl ToolRegistry {
         self.invalidate_cache();
     }
 
+    /// Unregister all tools whose name starts with the given prefix.
+    ///
+    /// Returns the number of tools removed. Used to cleanly remove all
+    /// tools from an MCP server (e.g., prefix `"mcp_linear_"`).
+    pub fn unregister_by_prefix(&mut self, prefix: &str) -> usize {
+        let before = self.tools.len();
+        self.tools.retain(|name, _| !name.starts_with(prefix));
+        let removed = before - self.tools.len();
+        if removed > 0 {
+            debug!("Unregistered {} tools with prefix '{}'", removed, prefix);
+            self.invalidate_cache();
+        }
+        removed
+    }
+
     /// Get a tool by name
     pub fn get(&self, name: &str) -> Option<DynTool> {
         self.tools.get(name).cloned()

@@ -14,6 +14,9 @@ tests/fixtures/hello_plugin/plugin.wasm
 *.tmp
 *.log
 
+# Build-time secrets (OAuth credentials for official builds)
+.cargo/config.toml
+
 # IDE/Editor
 .vscode/
 .idea/

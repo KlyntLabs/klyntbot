@@ -7,17 +7,20 @@
 use async_trait::async_trait;
 use serde_json::Value;
 use std::sync::Arc;
-use tracing::debug;
+use std::time::Duration;
+use tracing::{debug, warn};
 
 use common::Result;
 use tools_core::{PermissionLevel, RoutingContext, Tool};
+
+use super::sanitize;
 
 /// An MCP tool adapted to the klyntbot `Tool` trait.
 ///
 /// Holds a reference to the rmcp `Peer` handle for making JSON-RPC calls
 /// to the remote MCP server.
 pub struct McpTool {
-    /// Namespaced tool name: "mcp_{server}_{tool}"
+    /// Namespaced tool name: "mcp_{server}_{tool}" (sanitized)
     namespaced_name: String,
     /// Original MCP tool name (sent in `tools/call` requests)
     original_name: String,
@@ -29,6 +32,8 @@ pub struct McpTool {
     server_name: String,
     /// rmcp client peer handle for making tool calls
     peer: Arc<rmcp::service::Peer<rmcp::service::RoleClient>>,
+    /// Per-server tool call timeout
+    tool_timeout: Duration,
 }
 
 impl McpTool {
@@ -36,9 +41,10 @@ impl McpTool {
         server_name: &str,
         tool_def: &rmcp::model::Tool,
         peer: Arc<rmcp::service::Peer<rmcp::service::RoleClient>>,
+        tool_timeout: Duration,
     ) -> Self {
         let original_name = tool_def.name.to_string();
-        let namespaced_name = format!("mcp_{}_{}", server_name, original_name);
+        let namespaced_name = sanitize::build_tool_name(server_name, &original_name);
         let tool_description = tool_def
             .description
             .as_deref()
@@ -54,6 +60,7 @@ impl McpTool {
             input_schema,
             server_name: server_name.to_string(),
             peer,
+            tool_timeout,
         }
     }
 
@@ -91,13 +98,19 @@ impl Tool for McpTool {
         PermissionLevel::Elevated
     }
 
+    fn custom_timeout(&self) -> Option<Duration> {
+        Some(self.tool_timeout)
+    }
+
     async fn execute(&self, args: Value, _ctx: &RoutingContext) -> Result<String> {
         debug!(
             server = %self.server_name,
             tool = %self.original_name,
+            args = %args,
             "Calling MCP tool"
         );
 
+        let start = std::time::Instant::now();
         let result = self
             .peer
             .call_tool(rmcp::model::CallToolRequestParams {
@@ -108,11 +121,28 @@ impl Tool for McpTool {
             })
             .await
             .map_err(|e| {
+                let elapsed = start.elapsed();
+                warn!(
+                    server = %self.server_name,
+                    tool = %self.original_name,
+                    elapsed_ms = elapsed.as_millis() as u64,
+                    error = %e,
+                    "MCP tool call failed"
+                );
                 common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(format!(
                     "MCP tool call failed (server={}, tool={}): {e}",
                     self.server_name, self.original_name
                 )))
             })?;
+
+        debug!(
+            server = %self.server_name,
+            tool = %self.original_name,
+            elapsed_ms = start.elapsed().as_millis() as u64,
+            content_parts = result.content.len(),
+            is_error = result.is_error.unwrap_or(false),
+            "MCP tool call completed"
+        );
 
         // Extract text content in a single pass
         let text_parts: Vec<&str> = result
@@ -146,7 +176,7 @@ mod tests {
     #[test]
     fn test_mcp_tool_naming_convention() {
         // Verify the naming format produces "mcp_{server}_{tool}"
-        let name = format!("mcp_{}_{}", "linear", "list_issues");
+        let name = super::sanitize::build_tool_name("linear", "list_issues");
         assert!(name.starts_with("mcp_"));
         assert_eq!(name, "mcp_linear_list_issues");
         // Verify underscores separate the three parts

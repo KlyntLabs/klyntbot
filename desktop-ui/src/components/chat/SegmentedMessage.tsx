@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ChevronRight, Check, X } from 'lucide-react';
 import { MarkdownContent } from './MarkdownContent';
 import { formatDuration, formatTokens, qualifiedToolName } from '../../lib/utils';
@@ -27,10 +27,26 @@ function toolColor(name: string) {
   return TOOL_COLORS[Math.abs(hash) % TOOL_COLORS.length];
 }
 
+/** Try to pretty-print a JSON string; return as-is if not valid JSON. */
+function formatResult(raw: string): string {
+  const trimmed = raw.trimStart();
+  // Quick check: only attempt parse if it looks like JSON
+  if (trimmed[0] !== '{' && trimmed[0] !== '[') return raw;
+  try {
+    return JSON.stringify(JSON.parse(raw), null, 2);
+  } catch {
+    return raw;
+  }
+}
+
 function CompletedToolSegment({ segment }: { segment: Extract<MessageSegment, { type: 'tool' }> }) {
   const [expanded, setExpanded] = useState(false);
   const qualifiedName = qualifiedToolName(segment.name, segment.action);
   const color = toolColor(qualifiedName);
+  const formattedResult = useMemo(
+    () => segment.result ? formatResult(segment.result) : null,
+    [segment.result],
+  );
 
   return (
     <div className="my-1.5">
@@ -52,9 +68,9 @@ function CompletedToolSegment({ segment }: { segment: Extract<MessageSegment, { 
       </button>
       {expanded && (
         <div className="mt-1 ml-5 space-y-1">
-          {segment.result && (
+          {formattedResult && (
             <pre className="p-2 text-[11px] font-light text-secondary bg-surface-base border border-border rounded-lg overflow-x-auto whitespace-pre-wrap break-words">
-              {segment.result}
+              {formattedResult}
             </pre>
           )}
           <div className="flex items-center gap-2 text-[10px] font-light text-dim">

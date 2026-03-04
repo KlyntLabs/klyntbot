@@ -105,4 +105,25 @@ pub enum AgentEvent {
 
     /// A subagent was spawned.
     SubagentSpawned { label: String, profile: String },
+
+    /// An MCP server connection status changed during startup.
+    McpServerStatus {
+        #[serde(rename = "serverName")]
+        server_name: String,
+        /// One of: "starting", "ready", "failed", "skipped"
+        status: String,
+        /// Number of tools discovered (only for "ready" status).
+        #[serde(rename = "toolCount", skip_serializing_if = "Option::is_none")]
+        tool_count: Option<usize>,
+        /// Error message (only for "failed" status).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        error: Option<String>,
+    },
+
+    /// All MCP server connections have completed.
+    McpStartupComplete {
+        ready: usize,
+        failed: usize,
+        skipped: usize,
+    },
 }

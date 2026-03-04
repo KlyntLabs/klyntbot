@@ -11,5 +11,7 @@ pub mod server;
 // Re-export the types consumers actually need.
 pub use config::McpConfig;
 
+pub use client::events::McpStartupEvent;
 pub use client::manager::McpManager;
+pub use client::sanitize;
 pub use server::McpServerRunner;

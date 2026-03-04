@@ -14,7 +14,7 @@ const items: { key: SidebarItem; icon: typeof MessageSquare; path?: string; bott
   { key: 'OKR', icon: Target },
   { key: 'Calendar', icon: Calendar },
   { key: 'Finance', icon: Wallet, path: '/finance' },
-  { key: 'Settings', icon: Settings, bottom: true },
+  { key: 'Settings', icon: Settings, path: '/settings', bottom: true },
 ];
 
 export function Sidebar({ active, onNavigate }: SidebarProps) {

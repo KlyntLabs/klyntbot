@@ -242,7 +242,11 @@ impl IntentPipeline {
                         .iter()
                         .filter(|t| {
                             tool_def_name(t)
-                                .map(|name| allowed.contains(name))
+                                .map(|name| {
+                                    // Always include MCP tools — they are user-configured
+                                    // integrations that should bypass intent filtering
+                                    name.starts_with("mcp_") || allowed.contains(name)
+                                })
                                 .unwrap_or(true) // Keep tools with unknown format
                         })
                         .cloned()

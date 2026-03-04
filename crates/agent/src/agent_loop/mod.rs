@@ -216,6 +216,58 @@ impl AgentLoop {
         Ok(())
     }
 
+    /// Reconnect a single MCP server and re-register its tools.
+    ///
+    /// Called after OAuth completes or settings changes to inject the new
+    /// configuration into the MCP subprocess environment.
+    pub async fn reconnect_mcp_server(&self, server_def: &config::McpServerDef) {
+        let prefix = mcp::sanitize::server_prefix(&server_def.name);
+
+        let mut manager_guard = self.mcp_manager.lock().await;
+        let manager = match manager_guard.as_mut() {
+            Some(m) => m,
+            None => {
+                // No MCP manager yet — create one using the agent's actual config
+                *manager_guard =
+                    Some(mcp::McpManager::connect_all(&self.config.mcp, None).await);
+                manager_guard.as_mut().unwrap()
+            }
+        };
+
+        let new_tools = manager.reconnect_server(server_def).await;
+
+        // Clean up old tools, then register new ones
+        let mut registry = self.tool_registry.write().await;
+        registry.unregister_by_prefix(&prefix);
+        for tool in new_tools {
+            registry.register_dyn(tool as tools_core::DynTool);
+        }
+        tracing::info!(
+            server = %server_def.name,
+            "MCP tools re-registered after reconnect"
+        );
+    }
+
+    /// Disconnect a single MCP server and unregister all its tools.
+    ///
+    /// Called when a server is removed or disabled in settings.
+    pub async fn disconnect_mcp_server(&self, server_name: &str) {
+        let prefix = mcp::sanitize::server_prefix(server_name);
+
+        // Unregister tools first
+        {
+            let mut registry = self.tool_registry.write().await;
+            let removed = registry.unregister_by_prefix(&prefix);
+            tracing::info!(server = %server_name, tools_removed = removed, "MCP tools unregistered");
+        }
+
+        // Disconnect server in MCP manager
+        let mut manager_guard = self.mcp_manager.lock().await;
+        if let Some(manager) = manager_guard.as_mut() {
+            manager.disconnect_server(server_name).await;
+        }
+    }
+
     /// Process a single inbound message
     #[tracing::instrument(skip(self, msg), fields(channel = %msg.channel, sender = %msg.sender_id))]
     async fn process_message(&self, msg: InboundMessage) -> Result<()> {

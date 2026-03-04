@@ -13,7 +13,8 @@ pub use schema::{
     EmailConfig, ExtendedThinkingConfig, FinanceBudgetingConfig, FinanceCategoryConfig,
     FinanceConfig, FinanceExpectedReturnsConfig, FinanceInflationConfig, FinancePriceRefreshConfig,
     FinanceSchedulingConfig, GenericCalDavConfig, GoogleCalendarConfig, LearningConfig, McpConfig,
-    McpServerDef, McpServerSettings, McpTransport, OrchestratorConfig, PackTier, PacksConfig,
-    PermissionsConfig, ProviderManagerConfig, QQConfig, Secret, SixJarRatios, SlackConfig,
-    TelegramConfig, TodoEnrichmentConfig, TrustLevel, WhatsAppConfig,
+    McpOAuthCredentials, McpServerDef, McpServerSettings, McpTransport, OrchestratorConfig,
+    DEFAULT_STARTUP_TIMEOUT_SEC, DEFAULT_TOOL_TIMEOUT_SEC,
+    PackTier, PacksConfig, PermissionsConfig, ProviderManagerConfig, QQConfig, Secret,
+    SixJarRatios, SlackConfig, TelegramConfig, TodoEnrichmentConfig, TrustLevel, WhatsAppConfig,
 };

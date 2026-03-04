@@ -111,6 +111,8 @@ arrow = { version = "57", features = ["prettyprint"] }
 arrow-array = "57"
 arrow-schema = "57"
 dashmap = "6"
+open = "5"
+rand = "0.9"
 
 # Optional email dependencies
 async-imap = { version = "0.11.2", default-features = false, features = ["runtime-tokio"] }

@@ -2,6 +2,7 @@
 
 mod app_core;
 mod commands;
+mod oauth;
 
 use app_core::AppCore;
 use commands::window::{WINDOW_LAUNCHER, WINDOW_TRAY};
@@ -156,6 +157,15 @@ fn main() {
             commands::finance::finance_exchange_rates,
             // Calendar
             commands::calendar::calendar_events,
+            // Settings (MCP)
+            commands::settings::mcp_get_config,
+            commands::settings::mcp_add_server,
+            commands::settings::mcp_remove_server,
+            commands::settings::mcp_toggle_server,
+            commands::settings::mcp_update_server,
+            // OAuth
+            oauth::commands::mcp_oauth_start,
+            oauth::commands::mcp_oauth_disconnect,
             // Status
             commands::status::agent_status,
             // Window

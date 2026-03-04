@@ -151,6 +151,31 @@ pub fn analyze_heuristic(message: &str) -> Option<IntentAnalysis> {
 // Heuristic helpers
 // ---------------------------------------------------------------------------
 
+/// Check if the user message references MCP tools by server name.
+///
+/// Extracts server names from registered MCP tool names (e.g., `mcp_linear_list_issues`
+/// → "linear") and checks if the message mentions any of them or the word "mcp".
+/// This ensures MCP-related requests are routed to Reactive mode with tool execution.
+fn references_mcp_tools(message: &str, tool_names: &[&str]) -> bool {
+    let msg = message.trim().to_lowercase();
+
+    // Collect unique MCP server names from registered tools
+    let server_names: std::collections::HashSet<&str> = tool_names
+        .iter()
+        .filter_map(|name| {
+            name.strip_prefix("mcp_")
+                .and_then(|rest| rest.split('_').next())
+        })
+        .collect();
+
+    if server_names.is_empty() {
+        return false;
+    }
+
+    // Check if message mentions "mcp" or any server name
+    msg.contains("mcp") || server_names.iter().any(|name| msg.contains(name))
+}
+
 fn is_greeting(msg: &str) -> bool {
     const GREETINGS: &[&str] = &[
         "hi",
@@ -674,24 +699,51 @@ impl IntentAnalyzer {
             .unwrap_or_default();
 
         // Stage 1: Heuristics (0ms)
-        if let Some(mut analysis) = analyze_heuristic(message) {
+        let mut analysis = if let Some(mut analysis) = analyze_heuristic(message) {
             if analysis.confidence >= self.config.heuristic_confidence_threshold {
-                analysis.matched_skills = matched_skills;
+                analysis.matched_skills = matched_skills.clone();
                 debug!(
                     mode = ?analysis.mode,
                     confidence = analysis.confidence,
                     "Heuristic classification accepted"
                 );
-                return analysis;
+                analysis
+            } else {
+                debug!(
+                    confidence = analysis.confidence,
+                    threshold = self.config.heuristic_confidence_threshold,
+                    "Heuristic confidence below threshold, falling through to LLM"
+                );
+                self.classify_with_llm(message, tool_names, matched_skills.clone())
+                    .await
             }
-            debug!(
-                confidence = analysis.confidence,
-                threshold = self.config.heuristic_confidence_threshold,
-                "Heuristic confidence below threshold, falling through to LLM"
-            );
+        } else {
+            self.classify_with_llm(message, tool_names, matched_skills.clone())
+                .await
+        };
+
+        // Post-classification: override Direct → Reactive when MCP tools are referenced.
+        // MCP tools are user-configured integrations that always require tool execution.
+        if matches!(analysis.mode, ExecutionMode::Direct) {
+            if references_mcp_tools(message, tool_names) {
+                debug!("Overriding Direct → Reactive: message references MCP tools");
+                analysis.mode = ExecutionMode::Reactive {
+                    max_iterations: compute_iteration_budget(&analysis.signals).max(15),
+                };
+                analysis.tool_groups = vec![ToolGroup::Full];
+            }
         }
 
-        // Stage 2: LLM classifier
+        analysis
+    }
+
+    /// Run LLM classifier (Stage 2) with fallback handling.
+    async fn classify_with_llm(
+        &self,
+        message: &str,
+        tool_names: &[&str],
+        matched_skills: Vec<String>,
+    ) -> IntentAnalysis {
         let strategy_context = self.build_strategy_context().await;
         match self
             .classifier
@@ -710,15 +762,16 @@ impl IntentAnalyzer {
                         confidence = result.confidence,
                         "LLM classifier low confidence, defaulting to Reactive"
                     );
-                    return IntentAnalysis {
+                    IntentAnalysis {
                         mode: ExecutionMode::Reactive {
                             max_iterations: compute_iteration_budget(&result.signals),
                         },
                         source: AnalysisSource::LlmClassifier,
                         ..result
-                    };
+                    }
+                } else {
+                    result
                 }
-                result
             }
             Err(e) => {
                 warn!("LLM classifier error: {}, using fallback", e);
@@ -1280,5 +1333,59 @@ mod tests {
 
         let result = analyzer.analyze("hello", &[]).await;
         assert!(result.matched_skills.is_empty());
+    }
+
+    // ── MCP tool reference detection ──
+
+    #[test]
+    fn references_mcp_tools_detects_server_name() {
+        let tools = &["mcp_linear_list_issues", "mcp_linear_get_issue", "task"];
+        assert!(references_mcp_tools("show my linear issues", tools));
+        assert!(references_mcp_tools("use Linear MCP", tools));
+    }
+
+    #[test]
+    fn references_mcp_tools_detects_mcp_keyword() {
+        let tools = &["mcp_linear_list_issues"];
+        assert!(references_mcp_tools("help me use mcp to check issues", tools));
+    }
+
+    #[test]
+    fn references_mcp_tools_no_match_without_mcp_tools() {
+        let tools = &["task", "calendar", "grep"];
+        assert!(!references_mcp_tools("show my linear issues", tools));
+    }
+
+    #[test]
+    fn references_mcp_tools_no_match_unrelated_message() {
+        let tools = &["mcp_linear_list_issues"];
+        assert!(!references_mcp_tools("what is the weather today", tools));
+    }
+
+    #[tokio::test]
+    async fn analyzer_overrides_direct_to_reactive_for_mcp_requests() {
+        // Use PanickingProvider — heuristic should handle "hello" as Direct,
+        // but the MCP override should flip it to Reactive when tools reference "linear"
+        let analyzer = IntentAnalyzer::new(
+            Arc::new(PanickingProvider),
+            "model",
+            &OrchestratorConfig::default(),
+        );
+
+        // "hello" normally classifies as Direct via heuristic
+        let mcp_tools = &["mcp_linear_list_issues", "mcp_linear_get_issue"];
+        let result = analyzer.analyze("hello", mcp_tools).await;
+        // No override — "hello" doesn't mention "linear" or "mcp"
+        assert!(matches!(result.mode, ExecutionMode::Direct));
+
+        // Now with a message that references MCP
+        let result = analyzer
+            .analyze("help me check my linear issues", mcp_tools)
+            .await;
+        assert!(
+            matches!(result.mode, ExecutionMode::Reactive { .. }),
+            "Expected Reactive for MCP-referencing message, got {:?}",
+            result.mode
+        );
     }
 }
