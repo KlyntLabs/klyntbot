@@ -34,8 +34,10 @@ pub fn analyze_heuristic(message: &str) -> Option<IntentAnalysis> {
         return Some(direct_analysis("Greeting detected", 0.95));
     }
 
-    // 1b. Multi-agent sequential request → defer to LLM for orchestration
-    if detect_sequential_language(&msg) && has_multi_agent_triggers(&msg) {
+    // 1b. Multi-agent request → defer to LLM for orchestration.
+    // Triggers from 2+ agent domains is sufficient — the LLM classifier
+    // will decide whether orchestration is needed and set needs_orchestration.
+    if has_multi_agent_triggers(&msg) {
         return None;
     }
 
@@ -1246,5 +1248,33 @@ mod tests {
             "Expected Reactive for MCP-referencing message, got {:?}",
             result.mode
         );
+    }
+
+    #[test]
+    fn multi_agent_triggers_defer_to_llm() {
+        // Messages spanning 2+ agent domains should always defer to LLM classifier
+        let cases = [
+            "Help me check what transaction i already have? If not exists help me create a task",
+            "check my transactions then create a task for the missing ones",
+            "what meetings do I have today and are there any related tasks",
+            "send an email about the budget report",
+        ];
+        for msg in &cases {
+            let result = analyze_heuristic(msg);
+            assert!(
+                result.is_none(),
+                "Expected heuristic to defer multi-agent message to LLM: {msg}"
+            );
+        }
+    }
+
+    #[test]
+    fn single_agent_triggers_not_deferred() {
+        // Messages targeting a single domain should NOT defer
+        let result = analyze_heuristic("create a task to review the code");
+        assert!(result.is_some(), "Single-domain task message should not defer");
+
+        let result = analyze_heuristic("check my account balance");
+        assert!(result.is_some(), "Single-domain finance message should not defer");
     }
 }
