@@ -2882,6 +2882,7 @@ dependencies = [
  "dashmap",
  "desktop-shared",
  "dirs",
+ "feature-productivity",
  "futures-util",
  "open",
  "providers",

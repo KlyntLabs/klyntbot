@@ -9,6 +9,10 @@ use agent::{AgentLoop, PersonaManager};
 use bus::MessageBus;
 use channels::ChannelManager;
 use common::FormResponse;
+use desktop_shared::errors::ApiError;
+use feature_productivity::repos::ProductivityRepos;
+use feature_productivity::tracker::ActivityTracker;
+use feature_productivity::FocusManager;
 use scheduling::CronService;
 use storage::{Repos, StoragePool, VectorStore};
 use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
@@ -34,6 +38,12 @@ pub struct AppCore {
     /// because the ask_user tool blocks the agent loop until answered.
     pub pending_interactions:
         Arc<dashmap::DashMap<String, (String, oneshot::Sender<FormResponse>)>>,
+    /// Productivity repos (None if feature is disabled or no pool).
+    productivity_repos: Option<ProductivityRepos>,
+    /// Focus session manager (None if feature is disabled or no pool).
+    focus_manager: Option<Arc<FocusManager>>,
+    /// Activity tracker background task (macOS only, None if disabled).
+    activity_tracker: Option<Arc<Mutex<ActivityTracker>>>,
 }
 
 impl AppCore {
@@ -130,6 +140,35 @@ impl AppCore {
 
         let shutdown_token = CancellationToken::new();
 
+        // Initialize productivity feature (optional — requires enabled config).
+        let (productivity_repos, focus_manager, activity_tracker) = if config.productivity.enabled {
+            let pool = storage_pool.inner().clone();
+            // Run feature migrations before creating repos.
+            if let Err(e) = StoragePool::run_feature_migrations(
+                &pool,
+                &feature_productivity::ProductivityFeature::migrations_static(),
+            )
+            .await
+            {
+                warn!("productivity migration failed: {e}");
+            }
+            let prod_repos = ProductivityRepos::new(pool);
+            let prod_config = bridge_productivity_config(&config.productivity);
+            let mgr = Arc::new(FocusManager::new(prod_repos.clone(), prod_config.focus.clone()));
+
+            // Start activity tracker (macOS only).
+            let categories = prod_repos.categories.list_all().await.unwrap_or_default();
+            let categorizer =
+                feature_productivity::tracker::categorizer::Categorizer::new(categories);
+            let mut tracker = ActivityTracker::new(prod_config, prod_repos.clone(), categorizer);
+            tracker.start();
+            let tracker = Arc::new(Mutex::new(tracker));
+
+            (Some(prod_repos), Some(mgr), Some(tracker))
+        } else {
+            (None, None, None)
+        };
+
         let core = Self {
             repos,
             agent: Arc::clone(&agent),
@@ -141,6 +180,9 @@ impl AppCore {
             shutdown_token: shutdown_token.clone(),
             active_streams: Arc::new(dashmap::DashMap::new()),
             pending_interactions: Arc::new(dashmap::DashMap::new()),
+            productivity_repos,
+            focus_manager,
+            activity_tracker,
         };
 
         // Spawn background services immediately
@@ -182,9 +224,27 @@ impl AppCore {
         info!("background services spawned");
     }
 
+    /// Return productivity repos or a "feature disabled" error.
+    pub fn productivity_repos(&self) -> Result<&ProductivityRepos, ApiError> {
+        self.productivity_repos
+            .as_ref()
+            .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "productivity feature is not enabled"))
+    }
+
+    /// Return focus manager or a "feature disabled" error.
+    pub fn focus_manager(&self) -> Result<&Arc<FocusManager>, ApiError> {
+        self.focus_manager
+            .as_ref()
+            .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "productivity feature is not enabled"))
+    }
+
     /// Graceful shutdown.
     pub async fn shutdown(&self) {
         info!("shutting down app core");
+        // Stop activity tracker first to flush pending events.
+        if let Some(ref tracker) = self.activity_tracker {
+            tracker.lock().await.stop().await;
+        }
         if let Err(e) = self.agent.shutdown().await {
             error!("agent shutdown error: {}", e);
         }
@@ -463,6 +523,42 @@ impl AppCore {
         }
 
         Ok(())
+    }
+}
+
+/// Bridge the global config crate's `ProductivityConfig` to the feature crate's version.
+fn bridge_productivity_config(
+    src: &config::schema::ProductivityConfig,
+) -> feature_productivity::config::ProductivityConfig {
+    feature_productivity::config::ProductivityConfig {
+        enabled: src.enabled,
+        tracking: feature_productivity::config::TrackingConfig {
+            poll_interval_secs: src.tracking.poll_interval_secs,
+            idle_threshold_secs: src.tracking.idle_threshold_secs,
+            batch_write_interval_secs: src.tracking.batch_write_interval_secs,
+            retention_days: src.tracking.retention_days,
+        },
+        focus: feature_productivity::config::FocusConfig {
+            default_duration_mins: src.focus.default_duration_mins,
+            break_interval_mins: src.focus.break_interval_mins,
+            break_duration_mins: src.focus.break_duration_mins,
+            max_daily_focus_hours: src.focus.max_daily_focus_hours,
+            soft_block_enabled: src.focus.soft_block_enabled,
+        },
+        nudges: feature_productivity::config::NudgeConfig {
+            break_reminders: src.nudges.break_reminders,
+            focus_suggestions: src.nudges.focus_suggestions,
+            daily_summary: src.nudges.daily_summary,
+            burnout_alerts: src.nudges.burnout_alerts,
+            cooldown_mins: src.nudges.cooldown_mins,
+            quiet_hours_start: src.nudges.quiet_hours_start.clone(),
+            quiet_hours_end: src.nudges.quiet_hours_end.clone(),
+        },
+        privacy: feature_productivity::config::PrivacyConfig {
+            excluded_apps: src.privacy.excluded_apps.clone(),
+            exclude_window_titles: src.privacy.exclude_window_titles,
+            excluded_url_patterns: src.privacy.excluded_url_patterns.clone(),
+        },
     }
 }
 

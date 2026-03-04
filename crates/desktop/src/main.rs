@@ -155,6 +155,15 @@ fn main() {
             commands::finance::finance_liabilities,
             commands::finance::finance_net_worth,
             commands::finance::finance_exchange_rates,
+            // Productivity
+            commands::productivity::productivity_today,
+            commands::productivity::productivity_timeline,
+            commands::productivity::productivity_focus_start,
+            commands::productivity::productivity_focus_end,
+            commands::productivity::productivity_focus_status,
+            commands::productivity::productivity_sessions,
+            commands::productivity::productivity_weekly,
+            commands::productivity::productivity_categories,
             // Calendar
             commands::calendar::calendar_events,
             // Settings (MCP)

@@ -4,6 +4,7 @@ pub mod chat;
 pub mod finance;
 pub mod key_results;
 pub mod objectives;
+pub mod productivity;
 pub mod projects;
 pub mod settings;
 pub mod status;
@@ -32,6 +33,11 @@ pub fn parse_date(s: &str) -> Option<DateTime<Utc>> {
     chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d")
         .ok()
         .map(|d| d.and_hms_opt(0, 0, 0).unwrap().and_utc())
+}
+
+/// Parse a "YYYY-MM-DD" string or return a validation `ApiError`.
+pub(crate) fn parse_date_or_err(s: &str) -> Result<DateTime<Utc>, ApiError> {
+    parse_date(s).ok_or_else(|| ApiError::new("VALIDATION", format!("invalid date: {s}")))
 }
 
 /// Convert a config save error into an `ApiError`.
