@@ -2,6 +2,7 @@ pub mod aggregator;
 pub mod config;
 pub mod focus;
 pub mod nudge;
+pub mod patterns;
 pub mod repos;
 pub mod tool;
 pub mod tracker;
@@ -17,6 +18,7 @@ pub use aggregator::DailyAggregator;
 pub use config::ProductivityConfig;
 pub use focus::FocusManager;
 pub use nudge::NudgeService;
+pub use patterns::{ProductivityPatternAnalyzer, ProductivityPatterns};
 pub use tool::ProductivityTool;
 pub use types::*;
 

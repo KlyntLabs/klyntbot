@@ -33,6 +33,10 @@ const BUILTIN_SKILLS: &[(&str, &str)] = &[
         "weekly-report",
         include_str!("../../../skills/weekly-report/SKILL.md"),
     ),
+    (
+        "productivity-tracking",
+        include_str!("../../../skills/productivity-tracking/SKILL.md"),
+    ),
 ];
 
 /// Optional scope that restricts when a skill is included.
