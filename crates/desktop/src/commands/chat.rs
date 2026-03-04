@@ -555,6 +555,30 @@ pub async fn chat_send(
                                 },
                             );
                         }
+                        AgentEvent::DelegationStarted { from_agent, to_agent, query, depth } => {
+                            let _ = app.emit(
+                                events::AGENT_DELEGATION_STARTED,
+                                events::DelegationStartedPayload {
+                                    session_key: sk.clone(),
+                                    from_agent,
+                                    to_agent,
+                                    query,
+                                    depth,
+                                },
+                            );
+                        }
+                        AgentEvent::DelegationCompleted { from_agent, to_agent, success, duration_ms } => {
+                            let _ = app.emit(
+                                events::AGENT_DELEGATION_COMPLETED,
+                                events::DelegationCompletedPayload {
+                                    session_key: sk.clone(),
+                                    from_agent,
+                                    to_agent,
+                                    success,
+                                    duration_ms,
+                                },
+                            );
+                        }
                         AgentEvent::McpServerStatus { server_name, status, tool_count, error } => {
                             let _ = app.emit(
                                 events::MCP_SERVER_STATUS,

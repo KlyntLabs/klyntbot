@@ -796,7 +796,13 @@ impl AgentLoopBuilder {
         // Inject learning repos for transparency event summaries
         runtime = runtime.with_learning_repos(&repos);
 
+        // Inject tool registry for delegation support
+        runtime = runtime.with_tool_registry(Arc::clone(&tool_registry));
+
         let runtime = Arc::new(runtime);
+
+        // Two-phase init: set the self-reference for delegation after Arc wrapping
+        runtime.set_delegation_self_ref(Arc::clone(&runtime) as Arc<dyn tools::DelegationHandler>);
 
         info!("Agent runtime initialized");
 

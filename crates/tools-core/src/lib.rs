@@ -87,6 +87,8 @@ pub struct RoutingContext {
     /// (CLI or dashboard WebSocket), so the `message` tool should return
     /// content inline rather than publishing to the bus.
     pub is_direct_mode: bool,
+    /// Current delegation depth (0 = top-level, incremented per delegation).
+    pub delegation_depth: u32,
     /// Channel for tools to emit entity cards (e.g., after creating a task).
     /// The execution layer drains this and emits AgentEvent::EntityCreated.
     pub entity_tx: Option<mpsc::Sender<common::EntityCard>>,
@@ -103,6 +105,7 @@ impl RoutingContext {
             chat_id,
             interaction_tx: None,
             is_direct_mode: false,
+            delegation_depth: 0,
             entity_tx: None,
             interaction_channel: None,
         }
@@ -119,6 +122,7 @@ impl RoutingContext {
             chat_id,
             interaction_tx: Some(interaction_tx),
             is_direct_mode: true,
+            delegation_depth: 0,
             entity_tx: None,
             interaction_channel: None,
         }

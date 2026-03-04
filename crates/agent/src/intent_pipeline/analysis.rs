@@ -34,6 +34,11 @@ pub fn analyze_heuristic(message: &str) -> Option<IntentAnalysis> {
         return Some(direct_analysis("Greeting detected", 0.95));
     }
 
+    // 1b. Multi-agent sequential request → defer to LLM for orchestration
+    if detect_sequential_language(&msg) && has_multi_agent_triggers(&msg) {
+        return None;
+    }
+
     // 2. Very short non-keyword messages → Direct
     if msg.len() < 20 && word_count <= 4 && !has_any_action_keyword(&msg) {
         return Some(direct_analysis("Short message, no action keywords", 0.85));
@@ -291,6 +296,61 @@ fn detect_sequential_language(msg: &str) -> bool {
     matches >= 2 // Need at least 2 sequential indicators
 }
 
+/// Check if a message contains triggers from 2+ different agent domains.
+fn has_multi_agent_triggers(msg: &str) -> bool {
+    let agent_trigger_groups: &[&[&str]] = &[
+        // task agent triggers
+        &[
+            "todo", "task", "create a task", "my tasks", "focus", "project", "area", "objective",
+        ],
+        // finance agent triggers
+        &[
+            "transaction",
+            "budget",
+            "expense",
+            "income",
+            "balance",
+            "account",
+            "finance",
+            "spending",
+            "investment",
+        ],
+        // calendar agent triggers
+        &[
+            "calendar",
+            "schedule",
+            "meeting",
+            "event",
+            "appointment",
+            "remind",
+        ],
+        // automation agent triggers
+        &[
+            "cron",
+            "automate",
+            "schedule a",
+            "every day",
+            "recurring",
+        ],
+        // communication agent triggers
+        &[
+            "send",
+            "email",
+            "message",
+            "notify",
+            "slack",
+            "telegram",
+        ],
+    ];
+
+    let matched_groups = agent_trigger_groups
+        .iter()
+        .filter(|triggers| triggers.iter().any(|t| msg.contains(t)))
+        .count();
+
+    matched_groups >= 2
+}
+
 /// Detect keywords suggesting operations that could fail.
 fn assess_failure_risk(msg: &str) -> FailureRisk {
     let high_risk = [
@@ -380,6 +440,7 @@ fn direct_analysis(reasoning: &str, confidence: f32) -> IntentAnalysis {
         confidence,
         source: AnalysisSource::Heuristic,
         reasoning: reasoning.to_string(),
+        needs_orchestration: false,
     }
 }
 
@@ -395,6 +456,7 @@ fn reactive_analysis(
         confidence,
         source: AnalysisSource::Heuristic,
         reasoning: reasoning.to_string(),
+        needs_orchestration: false,
     }
 }
 
@@ -413,6 +475,7 @@ Respond ONLY with valid JSON:
   "requires_state_tracking": <true|false>,
   "requires_retries": <true|false>,
   "relevant_tools": ["tool1", "tool2"],
+  "needs_orchestration": <true|false>,
   "confidence": <0.0-1.0>,
   "reasoning": "<brief explanation>"
 }
@@ -420,6 +483,9 @@ Respond ONLY with valid JSON:
 Mode guide:
 - "direct": Greetings, factual Q&A, explanations — no tools needed
 - "reactive": Tasks needing tools — search, CRUD, lookups, multi-step workflows
+
+For "needs_orchestration": true if the request involves multiple distinct domains
+(e.g., "check transactions then create a task" spans finance + tasks).
 
 For "relevant_tools": list ONLY the tools from the available set that are needed.
 Use an empty array for "direct" mode (no tools needed).
@@ -507,12 +573,15 @@ impl IntentClassifier {
             },
         };
 
+        let needs_orchestration = v["needs_orchestration"].as_bool().unwrap_or(false);
+
         IntentAnalysis {
             mode,
             signals,
             confidence,
             source: AnalysisSource::LlmClassifier,
             reasoning,
+            needs_orchestration,
         }
     }
 }

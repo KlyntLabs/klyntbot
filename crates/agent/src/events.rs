@@ -109,6 +109,27 @@ pub enum AgentEvent {
     /// A subagent was spawned.
     SubagentSpawned { label: String, profile: String },
 
+    /// An agent delegation has started (agent-to-agent handoff).
+    DelegationStarted {
+        #[serde(rename = "fromAgent")]
+        from_agent: String,
+        #[serde(rename = "toAgent")]
+        to_agent: String,
+        query: String,
+        depth: u32,
+    },
+
+    /// An agent delegation has completed.
+    DelegationCompleted {
+        #[serde(rename = "fromAgent")]
+        from_agent: String,
+        #[serde(rename = "toAgent")]
+        to_agent: String,
+        success: bool,
+        #[serde(rename = "durationMs")]
+        duration_ms: u64,
+    },
+
     /// An MCP server connection status changed during startup.
     McpServerStatus {
         #[serde(rename = "serverName")]

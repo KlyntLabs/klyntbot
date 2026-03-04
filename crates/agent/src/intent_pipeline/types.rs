@@ -134,6 +134,8 @@ pub struct IntentAnalysis {
     pub confidence: f32,
     pub source: AnalysisSource,
     pub reasoning: String,
+    /// Whether this message requires orchestration across multiple agents.
+    pub needs_orchestration: bool,
 }
 
 impl IntentAnalysis {
@@ -154,6 +156,7 @@ impl IntentAnalysis {
             confidence: 0.5,
             source: AnalysisSource::Heuristic,
             reasoning: "Fallback — classification unavailable".to_string(),
+            needs_orchestration: false,
         }
     }
 }

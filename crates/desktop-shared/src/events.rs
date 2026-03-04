@@ -42,6 +42,8 @@ pub const AGENT_SKILL_LOADED: &str = "agent:skill_loaded";
 pub const AGENT_LEARNING_EVENT: &str = "agent:learning_event";
 pub const AGENT_SUBAGENT_SPAWNED: &str = "agent:subagent_spawned";
 pub const AGENT_SELECTED: &str = "agent:agent_selected";
+pub const AGENT_DELEGATION_STARTED: &str = "agent:delegation_started";
+pub const AGENT_DELEGATION_COMPLETED: &str = "agent:delegation_completed";
 pub const ENTITY_UPDATED: &str = "entity:updated";
 pub const MCP_OAUTH_COMPLETE: &str = "mcp:oauth_complete";
 pub const MCP_OAUTH_ERROR: &str = "mcp:oauth_error";
@@ -229,6 +231,26 @@ pub struct AgentSelectedPayload {
     pub session_key: String,
     pub name: String,
     pub description: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DelegationStartedPayload {
+    pub session_key: String,
+    pub from_agent: String,
+    pub to_agent: String,
+    pub query: String,
+    pub depth: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DelegationCompletedPayload {
+    pub session_key: String,
+    pub from_agent: String,
+    pub to_agent: String,
+    pub success: bool,
+    pub duration_ms: u64,
 }
 
 /// Accumulated transparency data for an assistant message.
