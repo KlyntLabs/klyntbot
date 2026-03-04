@@ -115,7 +115,6 @@ export function MainApp() {
         active={activeSidebar}
         onNavigate={(item) => {
           setActiveSidebar(item);
-          if (item === 'Finance') navigate('/finance');
           if (item !== 'Chat') setIsChatOpen(false);
         }}
       />
