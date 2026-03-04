@@ -1,24 +1,37 @@
+pub mod aggregator;
 pub mod config;
 pub mod focus;
 pub mod repos;
+pub mod tool;
 pub mod tracker;
 pub mod types;
+
+use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde_json::Value;
 use tools_core::{DynTool, FeatureMigration, FeaturePackage, HealthStatus};
 
+pub use aggregator::DailyAggregator;
 pub use config::ProductivityConfig;
 pub use focus::FocusManager;
+pub use tool::ProductivityTool;
 pub use types::*;
 
 pub struct ProductivityFeature {
-    // Will hold the tool once we create it in Phase 3
+    tool: Option<DynTool>,
 }
 
 impl ProductivityFeature {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(tool: ProductivityTool) -> Self {
+        Self {
+            tool: Some(Arc::new(tool)),
+        }
+    }
+
+    /// Create without a tool (for migration-only usage or tests).
+    pub fn migrations_only() -> Self {
+        Self { tool: None }
     }
 
     pub fn migration_sql() -> &'static str {
@@ -41,7 +54,7 @@ impl ProductivityFeature {
 
 impl Default for ProductivityFeature {
     fn default() -> Self {
-        Self::new()
+        Self::migrations_only()
     }
 }
 
@@ -52,7 +65,7 @@ impl FeaturePackage for ProductivityFeature {
     }
 
     fn tools(&self) -> Vec<DynTool> {
-        vec![] // Will be populated in Phase 3
+        self.tool.iter().cloned().collect()
     }
 
     fn migrations(&self) -> Vec<FeatureMigration> {

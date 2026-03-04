@@ -33,6 +33,7 @@ dependencies = [
  "dirs",
  "domain",
  "feature-finance",
+ "feature-productivity",
  "feature-todo",
  "futures-util",
  "mcp",
