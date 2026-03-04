@@ -285,6 +285,7 @@ async fn call_provider_streaming(
 pub struct ExecutionCore {
     pub provider: DynProvider,
     pub tool_registry: Arc<RwLock<ToolRegistry>>,
+    pub outcome_recorder: Option<Arc<crate::learning::recorder::OutcomeRecorder>>,
 }
 
 impl ExecutionCore {
@@ -292,7 +293,17 @@ impl ExecutionCore {
         Self {
             provider,
             tool_registry,
+            outcome_recorder: None,
         }
+    }
+
+    /// Set the outcome recorder for per-tool learning.
+    pub fn with_outcome_recorder(
+        mut self,
+        recorder: Arc<crate::learning::recorder::OutcomeRecorder>,
+    ) -> Self {
+        self.outcome_recorder = Some(recorder);
+        self
     }
 
     /// Run a single LLM-tool cycle:
@@ -525,6 +536,32 @@ impl ExecutionCore {
                 while let Ok(card) = entity_rx.try_recv() {
                     let _ = tx
                         .send(crate::events::AgentEvent::EntityCreated(card))
+                        .await;
+                }
+            }
+
+            // Record tool outcomes for learning (best-effort)
+            if let Some(ref recorder) = self.outcome_recorder {
+                let session_key = common::SessionKey::from_parts(
+                    routing_ctx.channel.as_str(),
+                    routing_ctx.chat_id.as_str(),
+                );
+                for r in &results {
+                    let error_cat = if r.success {
+                        None
+                    } else {
+                        Some(crate::learning::recorder::categorize_error(&r.result))
+                    };
+                    recorder
+                        .record_tool_outcome(
+                            &r.tool_name,
+                            r.success,
+                            error_cat,
+                            r.duration_ms,
+                            None,
+                            crate::learning::types::ExecutionMode::Chat,
+                            session_key.as_str(),
+                        )
                         .await;
                 }
             }

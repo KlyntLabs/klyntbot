@@ -59,6 +59,8 @@ pub struct AgentRuntime {
     confidence_evaluator: Option<Arc<crate::confidence::ConfidenceEvaluator>>,
     /// Shared with AgentContextSource — written here, read during context assembly.
     active_profile: Arc<RwLock<Option<Arc<AgentProfile>>>>,
+    /// Records interactions for behavioral pattern analysis.
+    interaction_recorder: Option<crate::learning::InteractionRecorder>,
 }
 
 impl AgentRuntime {
@@ -82,6 +84,7 @@ impl AgentRuntime {
             strategy_repo: None,
             confidence_evaluator: None,
             active_profile,
+            interaction_recorder: None,
         }
     }
 
@@ -95,6 +98,14 @@ impl AgentRuntime {
         evaluator: Arc<crate::confidence::ConfidenceEvaluator>,
     ) -> Self {
         self.confidence_evaluator = Some(evaluator);
+        self
+    }
+
+    pub fn with_interaction_recorder(
+        mut self,
+        recorder: crate::learning::InteractionRecorder,
+    ) -> Self {
+        self.interaction_recorder = Some(recorder);
         self
     }
 
@@ -309,6 +320,19 @@ impl AgentRuntime {
         .await;
         self.record_strategy(&analysis, &router_result, &validation, ctx, pipeline_start)
             .await;
+
+        // Record interaction for behavioral pattern learning
+        if let Some(ref recorder) = self.interaction_recorder {
+            let tools_used: Vec<&str> = router_result.tool_name.as_deref().into_iter().collect();
+            recorder
+                .record(
+                    &agent_name,
+                    &tools_used,
+                    ctx.channel.as_str(),
+                    pipeline_elapsed_ms,
+                )
+                .await;
+        }
 
         let final_content = std::mem::take(&mut validation.filtered_content);
 

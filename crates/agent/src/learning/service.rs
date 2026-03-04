@@ -16,6 +16,7 @@ use common::Result;
 
 use super::adaptive::AdaptiveThresholds;
 use super::analyzer::LearningAnalyzer;
+use super::pattern_analyzer::PatternAnalyzer;
 use super::recorder::OutcomeStore;
 
 /// Background service that periodically analyzes outcomes and adapts
@@ -29,6 +30,7 @@ pub struct LearningService {
     cancel_token: CancellationToken,
     analysis_trigger: Arc<Notify>,
     event_bus: Option<Arc<bus::LearningEventBus>>,
+    pattern_analyzer: Option<Arc<PatternAnalyzer>>,
 }
 
 impl LearningService {
@@ -47,6 +49,7 @@ impl LearningService {
             cancel_token: CancellationToken::new(),
             analysis_trigger: Arc::new(Notify::new()),
             event_bus: None,
+            pattern_analyzer: None,
         }
     }
 
@@ -54,6 +57,13 @@ impl LearningService {
     /// (and `ThresholdChanged`) events after each analysis cycle.
     pub fn with_event_bus(mut self, bus: Arc<bus::LearningEventBus>) -> Self {
         self.event_bus = Some(bus);
+        self
+    }
+
+    /// Attach a `PatternAnalyzer` so the service runs pattern analysis
+    /// alongside outcome analysis.
+    pub fn with_pattern_analyzer(mut self, analyzer: PatternAnalyzer) -> Self {
+        self.pattern_analyzer = Some(Arc::new(analyzer));
         self
     }
 
@@ -66,6 +76,7 @@ impl LearningService {
         let cancel = self.cancel_token.clone();
         let trigger = Arc::clone(&self.analysis_trigger);
         let event_bus = self.event_bus.clone();
+        let pattern_analyzer = self.pattern_analyzer.clone();
 
         let handle = tokio::spawn(async move {
             info!(
@@ -81,10 +92,10 @@ impl LearningService {
                     }
                     _ = trigger.notified() => {
                         info!("Learning analysis triggered manually");
-                        Self::run_analysis(&store, &adaptive, &threshold, event_bus.as_deref()).await;
+                        Self::run_analysis(&store, &adaptive, &threshold, event_bus.as_deref(), pattern_analyzer.as_deref()).await;
                     }
                     _ = tokio::time::sleep(interval) => {
-                        Self::run_analysis(&store, &adaptive, &threshold, event_bus.as_deref()).await;
+                        Self::run_analysis(&store, &adaptive, &threshold, event_bus.as_deref(), pattern_analyzer.as_deref()).await;
                     }
                 }
             }
@@ -112,6 +123,7 @@ impl LearningService {
         adaptive: &Arc<RwLock<AdaptiveThresholds>>,
         threshold: &Option<Arc<AtomicU32>>,
         event_bus: Option<&bus::LearningEventBus>,
+        pattern_analyzer: Option<&PatternAnalyzer>,
     ) {
         // Read outcomes (acquire then release lock quickly)
         let (outcomes, feedback) = {
@@ -172,6 +184,13 @@ impl LearningService {
             })
             .await;
         }
+
+        // Run behavioral pattern analysis
+        if let Some(analyzer) = pattern_analyzer {
+            if let Err(e) = analyzer.analyze().await {
+                warn!("Pattern analysis failed: {}", e);
+            }
+        }
     }
 
     /// Run analysis immediately and return the result (for CLI use).
@@ -181,6 +200,7 @@ impl LearningService {
             &self.adaptive,
             &self.confidence_threshold,
             self.event_bus.as_deref(),
+            self.pattern_analyzer.as_deref(),
         )
         .await;
         Ok(())

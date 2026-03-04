@@ -33,7 +33,6 @@ pub mod progress_handler;
 pub mod recurring_tasks;
 pub mod reminders;
 pub mod session_cleanup_service;
-pub mod skills;
 pub mod subagent;
 pub mod todo_embedding_handler;
 

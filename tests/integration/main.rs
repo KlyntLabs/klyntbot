@@ -7,4 +7,3 @@ mod finance;
 mod learning;
 mod memory;
 mod sessions;
-mod skills;

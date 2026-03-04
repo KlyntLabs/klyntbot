@@ -31,8 +31,8 @@ use tools_core::FeaturePackage;
 
 use super::super::confidence::ConfidenceEvaluator;
 use super::super::context_sources::{
-    AgentContextSource, AreaSource, BootstrapSource, ConfidenceSource, IdentitySource,
-    MemorySource, PageContextSource, PersonaContextSource, TodoSource,
+    AgentContextSource, AreaSource, BootstrapSource, IdentitySource, LearningContextSource,
+    PageContextSource, PersonaContextSource, TodoSource,
 };
 use super::super::{CalendarSyncAdapter, CronHandlerAdapter, SubagentManager};
 use super::{AgentLoop, LastActiveChannel};
@@ -142,10 +142,6 @@ impl AgentLoopBuilder {
             tokio::sync::RwLock<Option<Arc<crate::agent_profile::AgentProfile>>>,
         > = Arc::new(tokio::sync::RwLock::new(None));
 
-        // ── Context sources ───────────────────────────────────────────────
-        let confidence_source = ConfidenceSource::new(config.confidence.threshold);
-        let confidence_threshold_handle = confidence_source.threshold_handle();
-
         // ── Shared embedding engine (created early for MemoryStore + later use) ──
         let embedding_engine = Arc::new(tools::EmbeddingEngine::new());
 
@@ -164,6 +160,23 @@ impl AgentLoopBuilder {
             crate::memory::MemoryStore::new(repos.memory_notes.clone())
         };
 
+        // ── Context sources ───────────────────────────────────────────────
+        // LearningContextSource replaces MemorySource + ConfidenceSource with a
+        // single source that also provides user profile, behavioral patterns,
+        // and agent adaptations.
+        let confidence_bits = Arc::new(std::sync::atomic::AtomicU32::new(
+            config.confidence.threshold.to_bits(),
+        ));
+        let learning_source = LearningContextSource::new(
+            repos.user_profile.clone(),
+            repos.behavioral_patterns.clone(),
+            repos.agent_adaptations.clone(),
+            Arc::clone(&confidence_bits),
+            Some(memory_store),
+            Arc::clone(&active_profile),
+        );
+        let confidence_threshold_handle = learning_source.threshold_handle();
+
         // Load persona manager for PersonaContextSource
         let personas_dir = workspace.join("personas");
         let persona_manager = Arc::new(tokio::sync::RwLock::new(
@@ -176,10 +189,9 @@ impl AgentLoopBuilder {
                 config.timezone.clone(),
             )),
             Box::new(BootstrapSource::new(workspace.clone())),
-            Box::new(MemorySource::new(memory_store)),
+            Box::new(learning_source),
             Box::new(AreaSource::new(repos.areas.clone())),
             Box::new(TodoSource::new(repos.actions.clone())),
-            Box::new(confidence_source),
             Box::new(AgentContextSource::new(Arc::clone(&active_profile))),
             Box::new(PersonaContextSource::new(
                 Arc::clone(&persona_manager),
@@ -666,7 +678,7 @@ impl AgentLoopBuilder {
                 learning_handler as Arc<dyn LearningHandler>,
             )));
 
-            // Event bus: subscriber updates ConfidenceSource threshold
+            // Event bus: subscriber updates LearningContextSource threshold
             let event_bus = Arc::new(bus::LearningEventBus::new(16));
 
             let threshold_for_subscriber = confidence_threshold_handle.clone();
@@ -676,7 +688,7 @@ impl AgentLoopBuilder {
                     if let bus::LearningEvent::ThresholdChanged { new_threshold, .. } = event {
                         threshold_for_subscriber.store(new_threshold.to_bits(), Ordering::Relaxed);
                         info!(
-                            "ConfidenceSource threshold updated by LearningService: {:.3}",
+                            "LearningContextSource threshold updated by LearningService: {:.3}",
                             new_threshold
                         );
                     }
@@ -684,13 +696,18 @@ impl AgentLoopBuilder {
             });
 
             let threshold_handle = confidence_evaluator.as_ref().map(|e| e.threshold_handle());
+            let pattern_analyzer = crate::learning::PatternAnalyzer::new(
+                repos.interaction_log.clone(),
+                repos.behavioral_patterns.clone(),
+            );
             let mut service = crate::learning::LearningService::new(
                 Arc::clone(store),
                 adaptive,
                 threshold_handle,
                 Duration::from_secs(config.learning.analysis_interval_secs),
             )
-            .with_event_bus(event_bus);
+            .with_event_bus(event_bus)
+            .with_pattern_analyzer(pattern_analyzer);
             service.start();
             Some(Arc::new(RwLock::new(service)))
         } else {
@@ -702,12 +719,21 @@ impl AgentLoopBuilder {
             .take_inbound_rx()
             .expect("Inbound receiver already taken");
 
+        // ── Outcome recorder (for per-tool learning) ──────────────────────
+        let outcome_recorder = outcome_store.as_ref().map(|store| {
+            Arc::new(crate::learning::recorder::OutcomeRecorder::new(Arc::clone(
+                store,
+            )))
+        });
+
         // ── Agent Runtime ─────────────────────────────────────────────────
         let tool_registry = Arc::new(RwLock::new(tool_registry));
-        let execution_core = Arc::new(crate::execution::ExecutionCore::new(
-            provider.clone(),
-            Arc::clone(&tool_registry),
-        ));
+        let mut execution_core =
+            crate::execution::ExecutionCore::new(provider.clone(), Arc::clone(&tool_registry));
+        if let Some(ref recorder) = outcome_recorder {
+            execution_core = execution_core.with_outcome_recorder(Arc::clone(recorder));
+        }
+        let execution_core = Arc::new(execution_core);
 
         let direct_engine =
             crate::intent_pipeline::engines::direct::DirectEngine::new(Arc::clone(&execution_core));
@@ -739,6 +765,15 @@ impl AgentLoopBuilder {
             provider_name: provider.name().to_string(),
         };
 
+        // ── Interaction recorder ──────────────────────────────────────────
+        let interaction_recorder = if config.learning.enabled {
+            Some(crate::learning::InteractionRecorder::new(
+                repos.interaction_log.clone(),
+            ))
+        } else {
+            None
+        };
+
         let mut runtime = crate::agent_runtime::AgentRuntime::new(
             Arc::clone(&agent_manager),
             analyzer,
@@ -752,6 +787,10 @@ impl AgentLoopBuilder {
 
         if let Some(evaluator) = confidence_evaluator {
             runtime = runtime.with_confidence_evaluator(Arc::new(evaluator));
+        }
+
+        if let Some(recorder) = interaction_recorder {
+            runtime = runtime.with_interaction_recorder(recorder);
         }
 
         let runtime = Arc::new(runtime);

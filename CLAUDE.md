@@ -67,7 +67,8 @@ Layer 4: tools, feature-todo, feature-finance, plugin-runtime
                                self-contained feature packages (own tools, migrations, config, handler traits),
                                WASM plugin sandbox
 Layer 5: channels, agent     — Chat platform integrations (Telegram, Discord, WhatsApp, Slack, Email, QQ),
-                               agent loop, intent pipeline, execution core, memory store, skill manager, subagent manager
+                               agent loop, agent runtime, execution core, memory store, agent manager, subagent manager,
+                               unified learning system (interaction recorder, pattern analyzer, outcome recorder)
 Layer 6: cli                 — Clap-derived CLI with 4 commands: serve, init, status, plugin
 Layer 7: klyntbot            — Re-export facade (src/lib.rs) + binary entry point (src/main.rs)
 ```
@@ -78,7 +79,7 @@ Dependencies flow strictly upward. No circular dependencies — enforced by Carg
 
 **Storage stack (SQLite + LanceDB):**
 - `storage` crate (Layer 2): `StoragePool` wraps `SqlitePool`, auto-runs migrations, exposes repository pattern (`*Repo` structs)
-- All relational data in SQLite (`{data_dir}/data.db`): actions, areas, projects, objectives, key_results, sessions, cron jobs, usage, strategies, outcomes, learning state, memory notes, calendar cache, finance data (accounts, transactions, budgets, investments), agent tasks
+- All relational data in SQLite (`{data_dir}/data.db`): actions, areas, projects, objectives, key_results, sessions, cron jobs, usage, strategies, outcomes, learning state, memory notes, calendar cache, finance data (accounts, transactions, budgets, investments), agent tasks, user_profile, behavioral_patterns, agent_adaptations, interaction_log
 - Vector embeddings in LanceDB (`{data_dir}/lancedb/`): todo embeddings, conversation embeddings — replaces pgvector
 - `Repos` aggregate struct for convenient access: `Repos::from_pool(&pool)`
 - `StoragePool::connect(data_dir)` creates/opens `data.db`, enables WAL + foreign keys, runs migrations. Feature crates register additional migrations via `FeatureMigration`
@@ -112,8 +113,9 @@ Dependencies flow strictly upward. No circular dependencies — enforced by Carg
 | `EnrichmentHandler` | `feature-todo` | Dependency inversion for AI-powered task enrichment |
 | `EmbeddingHandler` | `feature-todo` | Dependency inversion for todo embedding generation |
 | `FinanceHandler` | `feature-finance` | Dependency inversion for finance price lookups |
-| `IntentPipeline` | `agent` | Full pipeline: IntentAnalyzer -> ContextEngine -> ExecutionRouter -> ResponseValidator -> CostTracker |
+| `AgentRuntime` | `agent` | Main entry point: AgentManager -> IntentAnalyzer -> ContextEngine -> ExecutionRouter -> CostTracker. Replaces IntentPipeline. |
 | `ExecutionEngine` | `agent` | Unified async trait for Direct and Reactive engines |
+| `ContextSource` | `context_engine` | `provide()` returns system prompt sections, sorted by priority. Implemented by LearningContextSource, IdentitySource, etc. |
 
 ### Conventions
 
@@ -160,15 +162,12 @@ Feature packs bundle config + skills into selectable groups chosen during `klynt
 - **Core** (always): task-management. **Recommended**: productivity, ai-intelligence. **Optional**: finance, weather, skill-creator.
 - Config: `packs.enabled` and `packs.enabledSkills` arrays in config.json.
 - Registry: `crates/cli/src/wizard/packs/registry.rs`. Config mutations: `pack_selection.rs`.
-- At startup, `SkillManager::filter_by_skills()` restricts built-in skills to enabled packs. Workspace skills (`~/.klyntbot/skills/`) are always kept.
 
-## Skills
+## Agent Profiles
 
-Built-in skills live in `skills/` as `SKILL.md` files (browser, cron, daily-planning, finance, skill-creator, summarize, todo, weather, weekly-report). Nine skills are bundled at compile time via `include_str!`. Workspace skills loaded from `~/.klyntbot/skills/*/SKILL.md` override built-in skills with the same name. YAML frontmatter provides metadata: `description`, `version`, `always` (always load full content), `triggers` (activation keywords), `requires_bins` and `requires_env` (prerequisite checks). Skills are filtered by enabled packs.
+The `agents/` directory contains domain-specific agent profile definitions. Each agent has an `AGENT.md` file with YAML frontmatter (name, tools, triggers, can_delegate_to, always_skills) and a `skills/` subfolder with skill .md files. Six built-in agents: general, task, finance, calendar, automation, communication. Parsed by `AgentProfile` and managed by `AgentManager` in `crates/agent/src/agent_profile/`. Built-in agents are compiled via `include_str!` macros.
 
-## Agent Profiles (Migration in Progress)
-
-The `agents/` directory contains agent profile definitions that will replace the old `skills/` directory. Each agent has an `AGENT.md` file with YAML frontmatter (name, tools, triggers, can_delegate_to, always_skills) and a `skills/` subfolder with simplified skill .md files. Six built-in agents: general, task, finance, calendar, automation, communication. Parsed by `AgentProfile` and managed by `AgentManager` in `crates/agent/src/agent_profile/`. Built-in agents are compiled via `include_str!` macros.
+`AgentRuntime` (in `crates/agent/src/agent_runtime/`) replaces the former `IntentPipeline` as the main message processing entry point. It matches incoming messages to agent profiles via `AgentManager`, then delegates to the intent analysis → execution pipeline. The active agent profile is shared via `Arc<RwLock<Option<Arc<AgentProfile>>>>` so context sources (AgentContextSource, LearningContextSource) can read it.
 
 ## Gotchas & Common Pitfalls
 
@@ -180,38 +179,35 @@ The `agents/` directory contains agent profile definitions that will replace the
 - **Dependency inversion gotcha**: When adding new tools that need agent context (spawn/cron handlers), inject via `Arc<dyn Trait>` at construction to avoid circular deps.
 - **SqlitePool is Clone+Send+Sync**: Unlike the old `Arc<RwLock<Store>>` pattern, `SqlitePool` (and therefore all `*Repo` structs) can be freely cloned and shared across tasks without locking. Connection pooling is handled internally by sqlx.
 
-## Intent Pipeline
+## Agent Runtime & Execution Pipeline
 
 ### Architecture
 
-The IntentPipeline replaces the former Orchestrator + EngineDispatch + AgentPipeline with a unified flow:
+`AgentRuntime` is the main entry point for message processing. Flow:
 
 ```
-IntentAnalyzer → ContextEngine → ExecutionRouter → ResponseValidator → CostTracker
+AgentManager (match agent) → IntentAnalyzer → ContextEngine → ExecutionRouter → CostTracker
 ```
 
-**Modules** in `crates/agent/src/intent_pipeline/`:
+**AgentRuntime** (`crates/agent/src/agent_runtime/runtime.rs`): Matches messages to agent profiles, classifies intent, builds context, routes execution, records strategies, records interactions. Owns `AgentManager`, `IntentAnalyzer`, `ContextEngine`, `ExecutionRouter`, `CostTracker`.
+
+**Intent pipeline modules** in `crates/agent/src/intent_pipeline/`:
 
 | Module | Purpose |
 |--------|---------|
-| `types.rs` | `ExecutionMode` (Direct/Reactive), `ComplexitySignals`, `IntentAnalysis`, `ToolGroup` |
+| `types.rs` | `ExecutionMode` (Direct/Reactive), `ComplexitySignals`, `IntentAnalysis` |
 | `analysis.rs` | `IntentAnalyzer` (two-stage: heuristic keywords -> LLM `IntentClassifier`). Strategy history from `StrategyRepo` feeds classifier context. |
 | `engines/` | `ExecutionEngine` trait + `DirectEngine`, `ReactiveEngine` |
 | `router.rs` | `ExecutionRouter` — maps mode to engine, handles escalation chain (Direct -> Reactive) with `EscalationContext` |
-| `pipeline.rs` | `IntentPipeline` struct — wires everything into `process_message()` (classify -> context -> filter tools -> route -> validate -> record) |
 
 ### Execution Modes
 
 - **Direct**: Single LLM call, no tools. For greetings, simple questions, acknowledgments.
 - **Reactive { max_iterations }**: ReAct loop with tool calls. For task CRUD, search, calendar ops, and complex multi-step workflows. Escalates at 80% of max_iterations.
 
-### Escalation Chain
-
-When an engine signals it cannot handle a request (`EngineResult::Escalate`), the router automatically escalates: Direct -> Reactive. `EscalationContext` carries messages + completed tool work across transitions. Max escalations are configurable via `config.orchestrator.max_escalations` (default: 1).
-
 ### ExecutionCore
 
-Shared by all engines. `run_cycle()` performs one LLM-tool round: call `provider.chat()`, execute tool calls in parallel via `join_all` with per-tool timeout, detect fabricated responses (LLM faking tool results in text), and track duplicate tool calls via `HashSet<String>`.
+Shared by all engines. `run_cycle()` performs one LLM-tool round: call `provider.chat()`, execute tool calls in parallel via `join_all` with per-tool timeout, detect fabricated responses (LLM faking tool results in text), track duplicate tool calls via `HashSet<String>`, and record per-tool outcomes via `OutcomeRecorder`.
 
 ### Configuration
 
@@ -225,6 +221,18 @@ Shared by all engines. `run_cycle()` performs one LLM-tool round: call `provider
 }
 ```
 
-### Task Complexity Bridge
+## Unified Learning System
 
-`feature-todo` crate provides `TaskComplexitySignals` to evaluate task complexity based on dependencies, subtasks, duration, and priority. The `exceeds_complexity_threshold()` method checks if a task's complexity score meets a threshold. Used by intent analysis to adjust iteration budgets for complex task operations.
+The learning system provides personalized context and adaptive behavior through four components:
+
+**Storage** (migration `003_learning_system.sql`): `user_profile` (key-value facts with confidence scores), `behavioral_patterns` (detected usage patterns), `agent_adaptations` (per-agent preferences), `interaction_log` (message-level telemetry).
+
+**Repos** in `crates/storage/src/repos/`: `UserProfileRepo`, `BehavioralPatternRepo`, `AgentAdaptationRepo`, `InteractionLogRepo` — standard repository pattern.
+
+**LearningContextSource** (`crates/agent/src/context_sources/learning.rs`): Unified context source (priority 60) that replaces the former `MemorySource` + `ConfidenceSource`. Provides: user profile facts, behavioral patterns, agent-specific adaptations, confidence threshold instructions, and conversation memory. Uses 60s TTL cache.
+
+**Recorders and analyzers** in `crates/agent/src/learning/`:
+- `InteractionRecorder`: Best-effort DB write after each message in `AgentRuntime`. Records agent name, tools used, channel, duration.
+- `OutcomeRecorder`: Per-tool success/failure recording in `ExecutionCore.run_cycle()`. Feeds the adaptive threshold system.
+- `PatternAnalyzer`: Runs in `LearningService` background loop. Detects day-of-week, time-of-day, and agent usage frequency patterns from interaction logs.
+- `LearningService`: Background service (`CancellationToken` + `JoinHandle`) that periodically analyzes outcomes, adapts confidence thresholds, runs pattern analysis, and publishes events via `LearningEventBus`.

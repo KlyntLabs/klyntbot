@@ -1,8 +1,10 @@
 //! Repository modules and aggregate struct.
 
 pub mod action_repo;
+pub mod agent_adaptation;
 pub mod agent_task;
 pub mod area;
+pub mod behavioral_pattern;
 pub mod calendar_event_cache;
 pub mod calendar_sync;
 pub mod cron;
@@ -13,6 +15,7 @@ pub mod finance_goal_repo;
 pub mod finance_investment_repo;
 pub mod finance_liability_repo;
 pub mod finance_transaction_repo;
+pub mod interaction_log;
 pub mod key_result;
 pub mod learning_state;
 pub mod memory_note;
@@ -23,13 +26,16 @@ pub mod session;
 pub mod session_context;
 pub mod strategy;
 pub mod usage;
+pub mod user_profile;
 
 #[cfg(test)]
 pub mod tests;
 
 pub use action_repo::{ActionFilter, ActionPatch, ActionRepo, ActionSummary};
+pub use agent_adaptation::AgentAdaptationRepo;
 pub use agent_task::AgentTaskRepo;
 pub use area::AreaRepo;
+pub use behavioral_pattern::BehavioralPatternRepo;
 pub use calendar_event_cache::CalendarEventCacheRepo;
 pub use calendar_sync::CalendarSyncRepo;
 pub use cron::CronRepo;
@@ -40,6 +46,7 @@ pub use finance_goal_repo::FinanceGoalRepo;
 pub use finance_investment_repo::FinanceInvestmentRepo;
 pub use finance_liability_repo::FinanceLiabilityRepo;
 pub use finance_transaction_repo::FinanceTransactionRepo;
+pub use interaction_log::InteractionLogRepo;
 pub use key_result::KeyResultRepo;
 pub use learning_state::LearningStateRepo;
 pub use memory_note::MemoryNoteRepo;
@@ -50,6 +57,7 @@ pub use session::SessionRepo;
 pub use session_context::SessionContextRepo;
 pub use strategy::{OverallStats, StrategyRepo, ToolStatsRow};
 pub use usage::UsageRepo;
+pub use user_profile::UserProfileRepo;
 
 /// Aggregate of all repository handles, constructed from a single `SqlitePool`.
 ///
@@ -75,6 +83,10 @@ pub struct Repos {
     pub decision_log: DecisionLogRepo,
     pub session_context: SessionContextRepo,
     pub finance: crate::FinanceStorage,
+    pub user_profile: UserProfileRepo,
+    pub behavioral_patterns: BehavioralPatternRepo,
+    pub agent_adaptations: AgentAdaptationRepo,
+    pub interaction_log: InteractionLogRepo,
 }
 
 impl Repos {
@@ -100,6 +112,10 @@ impl Repos {
             decision_log: DecisionLogRepo::new(db.clone()),
             session_context: SessionContextRepo::new(db.clone()),
             finance: crate::FinanceStorage::from_pool(&db),
+            user_profile: UserProfileRepo::new(db.clone()),
+            behavioral_patterns: BehavioralPatternRepo::new(db.clone()),
+            agent_adaptations: AgentAdaptationRepo::new(db.clone()),
+            interaction_log: InteractionLogRepo::new(db.clone()),
             pool: db,
         }
     }
