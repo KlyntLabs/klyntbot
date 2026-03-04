@@ -299,8 +299,14 @@ impl AgentRuntime {
 
         // Step 10: Record usage + strategy
         let pipeline_elapsed_ms = pipeline_start.elapsed().as_millis() as u64;
-        self.record_usage(&router_result, &mode_name, ctx, &event_tx, pipeline_elapsed_ms)
-            .await;
+        self.record_usage(
+            &router_result,
+            &mode_name,
+            ctx,
+            &event_tx,
+            pipeline_elapsed_ms,
+        )
+        .await;
         self.record_strategy(&analysis, &router_result, &validation, ctx, pipeline_start)
             .await;
 
@@ -578,9 +584,7 @@ mod tests {
         let provider = MockProvider::new(vec![text_response("should not reach")]);
         let runtime = make_runtime(provider)
             .await
-            .with_confidence_evaluator(Arc::new(
-                crate::confidence::ConfidenceEvaluator::new(0.99),
-            ));
+            .with_confidence_evaluator(Arc::new(crate::confidence::ConfidenceEvaluator::new(0.99)));
 
         let result = runtime
             .process_message("hello", vec![], &[], &[], &routing_ctx(), None, None, None)

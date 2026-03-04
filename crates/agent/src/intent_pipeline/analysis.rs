@@ -7,7 +7,6 @@
 //! 2. `IntentClassifier` — lightweight LLM call for ambiguous messages
 //! 3. `IntentAnalyzer` — two-stage orchestrator (heuristics → LLM)
 
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use common::Result;
@@ -16,9 +15,7 @@ use providers::{ChatParams, DynProvider, Message};
 use tokio::sync::Mutex;
 use tracing::{debug, warn};
 
-use super::types::{
-    AnalysisSource, ComplexitySignals, ExecutionMode, FailureRisk, IntentAnalysis, ToolGroup,
-};
+use super::types::{AnalysisSource, ComplexitySignals, ExecutionMode, FailureRisk, IntentAnalysis};
 
 // ===========================================================================
 // Heuristic classification
@@ -34,20 +31,12 @@ pub fn analyze_heuristic(message: &str) -> Option<IntentAnalysis> {
 
     // 1. Greeting pattern — fast path, zero complexity
     if is_greeting(&msg) {
-        return Some(direct_analysis(
-            "Greeting detected",
-            0.95,
-            vec![ToolGroup::None],
-        ));
+        return Some(direct_analysis("Greeting detected", 0.95));
     }
 
     // 2. Very short non-keyword messages → Direct
     if msg.len() < 20 && word_count <= 4 && !has_any_action_keyword(&msg) {
-        return Some(direct_analysis(
-            "Short message, no action keywords",
-            0.85,
-            vec![ToolGroup::None],
-        ));
+        return Some(direct_analysis("Short message, no action keywords", 0.85));
     }
 
     // 3. Task management patterns → Reactive (CRUD, low iteration budget)
@@ -67,7 +56,6 @@ pub fn analyze_heuristic(message: &str) -> Option<IntentAnalysis> {
             "Task management operation",
             0.90,
             signals,
-            vec![ToolGroup::TaskManagement, ToolGroup::Search],
         ));
     }
 
@@ -77,11 +65,7 @@ pub fn analyze_heuristic(message: &str) -> Option<IntentAnalysis> {
         if has_action_keyword(&msg) {
             return None; // "what is the best way to implement X" → ambiguous
         }
-        return Some(direct_analysis(
-            "Question/explanation pattern",
-            0.90,
-            vec![ToolGroup::None],
-        ));
+        return Some(direct_analysis("Question/explanation pattern", 0.90));
     }
 
     // 5. Complex workflow keywords → Reactive with high iteration budget
@@ -93,7 +77,6 @@ pub fn analyze_heuristic(message: &str) -> Option<IntentAnalysis> {
             "Complex workflow language detected — using high iteration budget",
             0.85,
             signals,
-            vec![ToolGroup::Full],
         ));
     }
 
@@ -108,14 +91,12 @@ pub fn analyze_heuristic(message: &str) -> Option<IntentAnalysis> {
 
     // Simple tool-assisted patterns (search, list, show)
     if has_tool_keyword(&msg) && score <= 1 {
-        let groups = infer_tool_groups(&msg);
         let budget = compute_iteration_budget(&signals);
         return Some(reactive_analysis(
             budget,
             "Simple tool-assisted operation",
             0.85,
             signals,
-            groups,
         ));
     }
 
@@ -127,7 +108,6 @@ pub fn analyze_heuristic(message: &str) -> Option<IntentAnalysis> {
             "Code/action keyword detected",
             0.80,
             signals,
-            vec![ToolGroup::Full],
         ));
     }
 
@@ -139,7 +119,6 @@ pub fn analyze_heuristic(message: &str) -> Option<IntentAnalysis> {
             "High complexity score from heuristic analysis",
             0.75,
             signals,
-            vec![ToolGroup::Full],
         ));
     }
 
@@ -388,11 +367,7 @@ pub fn compute_iteration_budget(signals: &ComplexitySignals) -> u32 {
     signals.iteration_budget()
 }
 
-fn direct_analysis(
-    reasoning: &str,
-    confidence: f32,
-    tool_groups: Vec<ToolGroup>,
-) -> IntentAnalysis {
+fn direct_analysis(reasoning: &str, confidence: f32) -> IntentAnalysis {
     IntentAnalysis {
         mode: ExecutionMode::Direct,
         signals: ComplexitySignals {
@@ -405,8 +380,6 @@ fn direct_analysis(
         confidence,
         source: AnalysisSource::Heuristic,
         reasoning: reasoning.to_string(),
-        tool_groups,
-        matched_skills: vec![],
     }
 }
 
@@ -415,7 +388,6 @@ fn reactive_analysis(
     reasoning: &str,
     confidence: f32,
     signals: ComplexitySignals,
-    tool_groups: Vec<ToolGroup>,
 ) -> IntentAnalysis {
     IntentAnalysis {
         mode: ExecutionMode::Reactive { max_iterations },
@@ -423,58 +395,7 @@ fn reactive_analysis(
         confidence,
         source: AnalysisSource::Heuristic,
         reasoning: reasoning.to_string(),
-        tool_groups,
-        matched_skills: vec![],
     }
-}
-
-/// Infer relevant tool groups from message keywords.
-fn infer_tool_groups(msg: &str) -> Vec<ToolGroup> {
-    let mut groups = Vec::new();
-
-    // Calendar keywords
-    if msg.contains("calendar")
-        || msg.contains("schedule")
-        || msg.contains("event")
-        || msg.contains("appointment")
-        || msg.contains("meeting")
-    {
-        groups.push(ToolGroup::Calendar);
-    }
-
-    // Finance keywords
-    if msg.contains("finance")
-        || msg.contains("budget")
-        || msg.contains("expense")
-        || msg.contains("investment")
-        || msg.contains("money")
-        || msg.contains("spending")
-    {
-        groups.push(ToolGroup::Finance);
-    }
-
-    // Task/todo keywords — reuse is_task_management + extra domain terms
-    if is_task_management(msg)
-        || msg.contains("task")
-        || msg.contains("todo")
-        || msg.contains("objective")
-        || msg.contains("project")
-    {
-        groups.push(ToolGroup::TaskManagement);
-    }
-
-    // Search/file keywords — reuse has_tool_keyword
-    if has_tool_keyword(msg) {
-        groups.push(ToolGroup::Search);
-    }
-
-    // Default to Search + Communication if nothing specific detected
-    if groups.is_empty() {
-        groups.push(ToolGroup::Search);
-        groups.push(ToolGroup::Communication);
-    }
-
-    groups
 }
 
 // ===========================================================================
@@ -586,65 +507,13 @@ impl IntentClassifier {
             },
         };
 
-        // Map relevant_tools from LLM response to ToolGroups
-        let tool_groups = match mode_str {
-            "direct" => vec![ToolGroup::None],
-            _ => {
-                let relevant: Vec<String> = v["relevant_tools"]
-                    .as_array()
-                    .map(|arr| {
-                        arr.iter()
-                            .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                            .collect()
-                    })
-                    .unwrap_or_default();
-
-                if relevant.is_empty() {
-                    vec![ToolGroup::Full]
-                } else {
-                    map_tool_names_to_groups(&relevant)
-                }
-            }
-        };
-
         IntentAnalysis {
             mode,
             signals,
             confidence,
             source: AnalysisSource::LlmClassifier,
             reasoning,
-            tool_groups,
-            matched_skills: vec![],
         }
-    }
-}
-
-/// Map a list of tool names to the ToolGroups they belong to.
-fn map_tool_names_to_groups(tool_names: &[String]) -> Vec<ToolGroup> {
-    let all_groups = [
-        ToolGroup::TaskManagement,
-        ToolGroup::Search,
-        ToolGroup::Calendar,
-        ToolGroup::Finance,
-        ToolGroup::Communication,
-        ToolGroup::Automation,
-    ];
-
-    let mut matched = Vec::new();
-    for group in &all_groups {
-        let group_tools = group.tool_names();
-        if tool_names
-            .iter()
-            .any(|name| group_tools.contains(&name.as_str()))
-        {
-            matched.push(group.clone());
-        }
-    }
-
-    if matched.is_empty() {
-        vec![ToolGroup::Full]
-    } else {
-        matched
     }
 }
 
@@ -660,7 +529,6 @@ pub struct IntentAnalyzer {
     classifier: IntentClassifier,
     classifier_params: ChatParams,
     strategy_repo: Option<storage::StrategyRepo>,
-    skill_manager: Option<Arc<crate::skills::SkillManager>>,
     config: OrchestratorConfig,
     /// Cached strategy context to avoid hitting DB on every ambiguous message.
     strategy_cache: Mutex<Option<(Instant, Option<String>)>>,
@@ -673,7 +541,6 @@ impl IntentAnalyzer {
             classifier: IntentClassifier::new(provider, timeout),
             classifier_params: ChatParams::new(model),
             strategy_repo: None,
-            skill_manager: None,
             config: config.clone(),
             strategy_cache: Mutex::new(None),
         }
@@ -684,24 +551,11 @@ impl IntentAnalyzer {
         self
     }
 
-    pub fn with_skill_manager(mut self, skill_manager: Arc<crate::skills::SkillManager>) -> Self {
-        self.skill_manager = Some(skill_manager);
-        self
-    }
-
     /// Analyze a user message and return the recommended execution mode.
     pub async fn analyze(&self, message: &str, tool_names: &[&str]) -> IntentAnalysis {
-        // Match skills first (zero-cost keyword scan)
-        let matched_skills = self
-            .skill_manager
-            .as_ref()
-            .map(|sm| sm.match_skills(message))
-            .unwrap_or_default();
-
         // Stage 1: Heuristics (0ms)
-        let mut analysis = if let Some(mut analysis) = analyze_heuristic(message) {
+        let mut analysis = if let Some(analysis) = analyze_heuristic(message) {
             if analysis.confidence >= self.config.heuristic_confidence_threshold {
-                analysis.matched_skills = matched_skills.clone();
                 debug!(
                     mode = ?analysis.mode,
                     confidence = analysis.confidence,
@@ -714,36 +568,28 @@ impl IntentAnalyzer {
                     threshold = self.config.heuristic_confidence_threshold,
                     "Heuristic confidence below threshold, falling through to LLM"
                 );
-                self.classify_with_llm(message, tool_names, matched_skills.clone())
-                    .await
+                self.classify_with_llm(message, tool_names).await
             }
         } else {
-            self.classify_with_llm(message, tool_names, matched_skills.clone())
-                .await
+            self.classify_with_llm(message, tool_names).await
         };
 
         // Post-classification: override Direct → Reactive when MCP tools are referenced.
         // MCP tools are user-configured integrations that always require tool execution.
-        if matches!(analysis.mode, ExecutionMode::Direct) {
-            if references_mcp_tools(message, tool_names) {
-                debug!("Overriding Direct → Reactive: message references MCP tools");
-                analysis.mode = ExecutionMode::Reactive {
-                    max_iterations: compute_iteration_budget(&analysis.signals).max(15),
-                };
-                analysis.tool_groups = vec![ToolGroup::Full];
-            }
+        if matches!(analysis.mode, ExecutionMode::Direct)
+            && references_mcp_tools(message, tool_names)
+        {
+            debug!("Overriding Direct → Reactive: message references MCP tools");
+            analysis.mode = ExecutionMode::Reactive {
+                max_iterations: compute_iteration_budget(&analysis.signals).max(15),
+            };
         }
 
         analysis
     }
 
     /// Run LLM classifier (Stage 2) with fallback handling.
-    async fn classify_with_llm(
-        &self,
-        message: &str,
-        tool_names: &[&str],
-        matched_skills: Vec<String>,
-    ) -> IntentAnalysis {
+    async fn classify_with_llm(&self, message: &str, tool_names: &[&str]) -> IntentAnalysis {
         let strategy_context = self.build_strategy_context().await;
         match self
             .classifier
@@ -755,8 +601,7 @@ impl IntentAnalyzer {
             )
             .await
         {
-            Ok(mut result) => {
-                result.matched_skills = matched_skills;
+            Ok(result) => {
                 if result.confidence < 0.5 {
                     debug!(
                         confidence = result.confidence,
@@ -775,9 +620,7 @@ impl IntentAnalyzer {
             }
             Err(e) => {
                 warn!("LLM classifier error: {}, using fallback", e);
-                let mut fallback = IntentAnalysis::fallback();
-                fallback.matched_skills = matched_skills;
-                fallback
+                IntentAnalysis::fallback()
             }
         }
     }
@@ -1038,25 +881,6 @@ mod tests {
     }
 
     #[test]
-    fn greeting_gets_no_tools() {
-        let result = analyze_heuristic("hello").unwrap();
-        assert!(result.tool_groups.contains(&ToolGroup::None));
-    }
-
-    #[test]
-    fn task_crud_gets_task_management_and_search() {
-        let result = analyze_heuristic("create a task to buy groceries").unwrap();
-        assert!(result.tool_groups.contains(&ToolGroup::TaskManagement));
-        assert!(result.tool_groups.contains(&ToolGroup::Search));
-    }
-
-    #[test]
-    fn complex_reactive_gets_full_tools() {
-        let result = analyze_heuristic("create a plan for the database refactor").unwrap();
-        assert!(result.tool_groups.contains(&ToolGroup::Full));
-    }
-
-    #[test]
     fn signals_populated_for_reactive() {
         let result = analyze_heuristic("search for tasks about database migration").unwrap();
         assert!(result.signals.estimated_tool_calls >= 1);
@@ -1298,43 +1122,6 @@ mod tests {
         assert_eq!(compute_iteration_budget(&signals), 15);
     }
 
-    // ── Skill matching in analyzer ────────────────────────────────
-
-    #[tokio::test]
-    async fn analyzer_populates_matched_skills_for_task_message() {
-        let mut skill_mgr = crate::skills::SkillManager::new();
-        skill_mgr.load_builtin_skills().unwrap();
-
-        let analyzer = IntentAnalyzer::new(
-            Arc::new(PanickingProvider),
-            "model",
-            &OrchestratorConfig::default(),
-        )
-        .with_skill_manager(Arc::new(skill_mgr));
-
-        let result = analyzer
-            .analyze("create a task to buy groceries", &[])
-            .await;
-        assert!(
-            result.matched_skills.contains(&"todo".to_string()),
-            "Expected 'todo' in matched_skills: {:?}",
-            result.matched_skills
-        );
-    }
-
-    #[tokio::test]
-    async fn analyzer_matched_skills_empty_without_skill_manager() {
-        let analyzer = IntentAnalyzer::new(
-            Arc::new(PanickingProvider),
-            "model",
-            &OrchestratorConfig::default(),
-        );
-        // No with_skill_manager() called
-
-        let result = analyzer.analyze("hello", &[]).await;
-        assert!(result.matched_skills.is_empty());
-    }
-
     // ── MCP tool reference detection ──
 
     #[test]
@@ -1347,7 +1134,10 @@ mod tests {
     #[test]
     fn references_mcp_tools_detects_mcp_keyword() {
         let tools = &["mcp_linear_list_issues"];
-        assert!(references_mcp_tools("help me use mcp to check issues", tools));
+        assert!(references_mcp_tools(
+            "help me use mcp to check issues",
+            tools
+        ));
     }
 
     #[test]

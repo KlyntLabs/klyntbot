@@ -1,3 +1,3 @@
 mod runtime;
 
-pub use runtime::AgentRuntime;
+pub use runtime::{AgentRuntime, RuntimeResult};

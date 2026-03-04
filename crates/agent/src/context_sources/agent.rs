@@ -77,8 +77,7 @@ mod tests {
             ..Default::default()
         };
 
-        let source =
-            AgentContextSource::new(Arc::new(RwLock::new(Some(Arc::new(profile)))));
+        let source = AgentContextSource::new(Arc::new(RwLock::new(Some(Arc::new(profile)))));
         let ctx = SourceContext {
             channel: "test".into(),
             chat_id: "1".into(),
@@ -112,8 +111,7 @@ mod tests {
     #[tokio::test]
     async fn test_agent_context_returns_none_when_empty_instructions() {
         let profile = AgentProfile::default();
-        let source =
-            AgentContextSource::new(Arc::new(RwLock::new(Some(Arc::new(profile)))));
+        let source = AgentContextSource::new(Arc::new(RwLock::new(Some(Arc::new(profile)))));
         let ctx = SourceContext {
             channel: "test".into(),
             chat_id: "1".into(),

@@ -197,7 +197,9 @@ pub async fn mcp_oauth_start(
 
                 // Clone OAuth creds for Google Calendar file writing (outside lock)
                 let gcal_oauth = if provider_id == "google-calendar" {
-                    cfg.mcp.servers.iter()
+                    cfg.mcp
+                        .servers
+                        .iter()
                         .find(|s| s.name == server_name)
                         .and_then(|s| s.oauth.clone())
                 } else {
@@ -210,26 +212,21 @@ pub async fn mcp_oauth_start(
                 // Google Calendar MCP: write credentials + tokens files
                 // that the @cocal/google-calendar-mcp server reads at startup.
                 if let Some(oauth_creds) = gcal_oauth {
-                    if let Err(e) = write_google_calendar_files(
-                        &client_id,
-                        &client_secret,
-                        &oauth_creds,
-                    )
-                    .await
+                    if let Err(e) =
+                        write_google_calendar_files(&client_id, &client_secret, &oauth_creds).await
                     {
                         warn!(error = %e, "Failed to write Google Calendar token files");
                     } else {
                         // Re-acquire lock briefly to set env var and save
                         let mut cfg = core.config.write().await;
-                        if let Some(server) = cfg.mcp.servers.iter_mut().find(|s| s.name == server_name) {
+                        if let Some(server) =
+                            cfg.mcp.servers.iter_mut().find(|s| s.name == server_name)
+                        {
                             let creds_path = google_calendar_credentials_path();
                             if let config::McpTransport::Stdio { ref mut env, .. } =
                                 server.transport
                             {
-                                env.insert(
-                                    "GOOGLE_OAUTH_CREDENTIALS".to_string(),
-                                    creds_path,
-                                );
+                                env.insert("GOOGLE_OAUTH_CREDENTIALS".to_string(), creds_path);
                             }
                             let _ = config::save(&cfg).await;
                         }
@@ -241,7 +238,8 @@ pub async fn mcp_oauth_start(
                 // Reconnect the MCP server so it picks up the new token
                 {
                     let cfg = core.config.read().await;
-                    if let Some(server_def) = cfg.mcp.servers.iter().find(|s| s.name == server_name) {
+                    if let Some(server_def) = cfg.mcp.servers.iter().find(|s| s.name == server_name)
+                    {
                         let def = server_def.clone();
                         drop(cfg);
                         core.agent.reconnect_mcp_server(&def).await;

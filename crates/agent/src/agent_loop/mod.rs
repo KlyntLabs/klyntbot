@@ -21,7 +21,7 @@ use session::SessionManager;
 use tokio::sync::mpsc;
 use tools::RoutingContext;
 
-use super::{AgentEvent, CalendarSyncAdapter, SkillManager};
+use super::{AgentEvent, CalendarSyncAdapter};
 
 /// Handle for consuming streaming agent output.
 pub struct StreamingHandle {
@@ -42,7 +42,6 @@ pub(crate) type LastActiveChannel = Arc<RwLock<Option<(common::ChannelName, comm
 pub struct AgentLoop {
     pub(crate) bus: Arc<MessageBus>,
     pub(crate) inbound_rx: Option<mpsc::Receiver<InboundMessage>>,
-    pub(crate) skill_manager: Arc<SkillManager>,
     pub(crate) config: Config,
     pub(crate) context_engine: Arc<context_engine::ContextEngine>,
     pub(crate) session_manager: SessionManager,
@@ -59,10 +58,8 @@ pub struct AgentLoop {
     pub(crate) conversation_embedding_handler: Option<Arc<dyn tools::ConversationEmbeddingHandler>>,
     /// Background learning service for adaptive threshold updates (None if learning disabled)
     pub(crate) learning_service: Option<Arc<RwLock<crate::learning::LearningService>>>,
-    /// Agent manager: profile loading and message-to-agent matching.
-    pub(crate) agent_manager: Arc<crate::agent_profile::AgentManager>,
-    /// Intent pipeline: classify → assemble → route → validate → record.
-    pub(crate) pipeline: Arc<crate::intent_pipeline::IntentPipeline>,
+    /// Agent runtime: agent-first pipeline replacing IntentPipeline.
+    pub(crate) runtime: Arc<crate::agent_runtime::AgentRuntime>,
     /// Strategy repo for updating satisfaction scores from reactions.
     pub(crate) strategy_repo: Option<storage::StrategyRepo>,
     /// Maximum number of history messages to load per request.
@@ -230,8 +227,7 @@ impl AgentLoop {
             Some(m) => m,
             None => {
                 // No MCP manager yet — create one using the agent's actual config
-                *manager_guard =
-                    Some(mcp::McpManager::connect_all(&self.config.mcp, None).await);
+                *manager_guard = Some(mcp::McpManager::connect_all(&self.config.mcp, None).await);
                 manager_guard.as_mut().unwrap()
             }
         };
@@ -510,7 +506,7 @@ impl AgentLoop {
         (tool_defs, tool_names)
     }
 
-    /// Run a message through the pipeline with the given routing context.
+    /// Run a message through the agent runtime with the given routing context.
     async fn run_pipeline(
         &self,
         content: &str,
@@ -533,7 +529,7 @@ impl AgentLoop {
         let tool_name_refs: Vec<&str> = tool_names.iter().map(|s| s.as_str()).collect();
 
         let result = self
-            .pipeline
+            .runtime
             .process_message(
                 content,
                 history_messages,
@@ -546,21 +542,10 @@ impl AgentLoop {
             )
             .await?;
 
-        // Emit SkillLoaded events for MATCHED skills only
-        if let Some(ref tx) = event_tx {
-            for skill_name in &result.classification.matched_skills {
-                if let Some(skill) = self.skill_manager.get(skill_name) {
-                    let _ = tx
-                        .send(AgentEvent::SkillLoaded {
-                            name: skill_name.clone(),
-                            trigger: skill.trigger_label(),
-                        })
-                        .await;
-                }
-            }
-        }
-
-        info!("Pipeline: mode={}", result.mode_used);
+        info!(
+            "AgentRuntime: agent={}, mode={}",
+            result.agent_name, result.mode_used
+        );
 
         Ok(result.content)
     }
@@ -693,11 +678,6 @@ impl AgentLoop {
             cancel_token,
             handle,
         })
-    }
-
-    /// Get a reference to the skill manager.
-    pub fn skill_manager(&self) -> &SkillManager {
-        &self.skill_manager
     }
 
     /// Get all tool definitions from the registry (for /api/status).

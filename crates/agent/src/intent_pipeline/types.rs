@@ -126,55 +126,6 @@ pub enum AnalysisSource {
     MidExecutionEscalation,
 }
 
-/// Groups of tools that can be selectively exposed based on intent classification.
-///
-/// Instead of presenting all tools to the LLM on every request, the intent pipeline
-/// narrows the action space to relevant groups. This reduces hallucinated tool calls
-/// and improves response quality.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ToolGroup {
-    /// No tools needed (greetings, factual Q&A).
-    None,
-    /// Task/area/project/OKR management.
-    TaskManagement,
-    /// File search and web retrieval.
-    Search,
-    /// Calendar operations.
-    Calendar,
-    /// Finance operations.
-    Finance,
-    /// Messaging and user interaction.
-    Communication,
-    /// Cron jobs and subagent spawning.
-    Automation,
-    /// All tools — used as fallback or for complex/ambiguous requests.
-    Full,
-}
-
-impl ToolGroup {
-    /// Returns the tool names associated with this group.
-    pub fn tool_names(&self) -> &'static [&'static str] {
-        match self {
-            Self::None => &[],
-            Self::TaskManagement => &["task", "area", "project", "okr"],
-            Self::Search => &[
-                "grep",
-                "glob",
-                "read_file",
-                "list_dir",
-                "web_search",
-                "web_fetch",
-                "memory",
-            ],
-            Self::Calendar => &["calendar", "task"],
-            Self::Finance => &["finance"],
-            Self::Communication => &["message", "ask_user"],
-            Self::Automation => &["cron", "spawn"],
-            Self::Full => &[], // Special: means all tools
-        }
-    }
-}
-
 /// Result of intent analysis — the selected execution mode with supporting data.
 #[derive(Debug, Clone)]
 pub struct IntentAnalysis {
@@ -183,12 +134,6 @@ pub struct IntentAnalysis {
     pub confidence: f32,
     pub source: AnalysisSource,
     pub reasoning: String,
-    /// Which tool groups are relevant for this intent.
-    /// Empty or contains `ToolGroup::Full` means all tools are available.
-    pub tool_groups: Vec<ToolGroup>,
-    /// Skill names matched by the skill manager for this intent.
-    /// Populated by the analyzer after skill matching; empty until then.
-    pub matched_skills: Vec<String>,
 }
 
 impl IntentAnalysis {
@@ -209,28 +154,7 @@ impl IntentAnalysis {
             confidence: 0.5,
             source: AnalysisSource::Heuristic,
             reasoning: "Fallback — classification unavailable".to_string(),
-            tool_groups: vec![ToolGroup::Full],
-            matched_skills: vec![],
         }
-    }
-
-    /// Collect the set of allowed tool names from all tool groups.
-    /// Returns `None` if all tools should be available (Full group present).
-    pub fn allowed_tool_names(&self) -> Option<std::collections::HashSet<&'static str>> {
-        if self.tool_groups.is_empty() || self.tool_groups.contains(&ToolGroup::Full) {
-            return None; // All tools allowed
-        }
-
-        let mut allowed: std::collections::HashSet<&str> = self
-            .tool_groups
-            .iter()
-            .flat_map(|g| g.tool_names().iter().copied())
-            .collect();
-
-        // ask_user is always available (clarification is always useful)
-        allowed.insert("ask_user");
-
-        Some(allowed)
     }
 }
 
@@ -308,65 +232,11 @@ mod tests {
             ExecutionMode::Reactive { max_iterations: 15 }
         ));
         assert_eq!(analysis.confidence, 0.5);
-        assert!(analysis.tool_groups.contains(&ToolGroup::Full));
     }
 
     #[test]
     fn failure_risk_ordering() {
         assert!(FailureRisk::Low < FailureRisk::Medium);
         assert!(FailureRisk::Medium < FailureRisk::High);
-    }
-
-    #[test]
-    fn tool_group_none_has_no_tools() {
-        assert!(ToolGroup::None.tool_names().is_empty());
-    }
-
-    #[test]
-    fn tool_group_task_management_has_expected_tools() {
-        let names = ToolGroup::TaskManagement.tool_names();
-        assert!(names.contains(&"task"));
-        assert!(names.contains(&"area"));
-        assert!(names.contains(&"project"));
-        assert!(names.contains(&"okr"));
-    }
-
-    #[test]
-    fn allowed_tool_names_with_full_returns_none() {
-        let analysis = IntentAnalysis::fallback();
-        assert!(analysis.allowed_tool_names().is_none());
-    }
-
-    #[test]
-    fn allowed_tool_names_with_groups_returns_set() {
-        let analysis = IntentAnalysis {
-            tool_groups: vec![ToolGroup::TaskManagement, ToolGroup::Search],
-            ..IntentAnalysis::fallback()
-        };
-        let allowed = analysis.allowed_tool_names().unwrap();
-        assert!(allowed.contains("task"));
-        assert!(allowed.contains("grep"));
-        assert!(allowed.contains("ask_user")); // always included
-        assert!(!allowed.contains("finance"));
-    }
-
-    #[test]
-    fn fallback_analysis_has_empty_matched_skills() {
-        let analysis = IntentAnalysis::fallback();
-        assert!(
-            analysis.matched_skills.is_empty(),
-            "Fallback analysis should have empty matched_skills"
-        );
-    }
-
-    #[test]
-    fn allowed_tool_names_with_none_group_only_has_ask_user() {
-        let analysis = IntentAnalysis {
-            tool_groups: vec![ToolGroup::None],
-            ..IntentAnalysis::fallback()
-        };
-        let allowed = analysis.allowed_tool_names().unwrap();
-        assert_eq!(allowed.len(), 1);
-        assert!(allowed.contains("ask_user"));
     }
 }

@@ -1,6 +1,6 @@
 //! Integration tests for the skills system.
 
-use klyntbot::agent::SkillManager;
+use klyntbot::agent::skills::SkillManager;
 use tempfile::TempDir;
 
 /// Test built-in skills loading

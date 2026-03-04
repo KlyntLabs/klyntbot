@@ -21,6 +21,7 @@ pub mod agent_task_tool;
 pub mod ask_user;
 pub mod browser;
 pub mod cron_tool;
+pub mod delegation;
 pub mod filesystem;
 pub mod glob_tool;
 pub mod grep;
@@ -62,6 +63,9 @@ pub use area_tool::AreaTool;
 
 // Calendar
 pub use calendar_tool::{CalendarHandler, CalendarTool};
+
+// Delegation
+pub use delegation::{DelegationHandler, DelegationTool};
 
 // Conversation embedding
 pub use conversation_embedding::{

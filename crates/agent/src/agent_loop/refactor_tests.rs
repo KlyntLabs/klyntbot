@@ -248,16 +248,6 @@ mod tests {
     // ── Accessor methods ──────────────────────────────────────────────────────
 
     #[tokio::test]
-    async fn skill_manager_accessor_returns_skill_manager() {
-        // AC-2.6: skill_manager() returns a reference to the SkillManager,
-        // enabling /api/skills to list available skills without additional state.
-        let (agent, _bus, _tmp) = build_test_agent("hello").await;
-        let sm = agent.skill_manager();
-        // SkillManager is always present; accessor must return a valid reference
-        let _ = sm;
-    }
-
-    #[tokio::test]
     async fn tool_names_returns_registered_tools() {
         // AC-2.6: tool_names() returns a Vec<String> of registered tool names.
         // Should include tools registered unconditionally (no pool required).

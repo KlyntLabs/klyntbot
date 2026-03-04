@@ -34,8 +34,7 @@ pub struct OAuthProviderDef {
 impl OAuthProviderDef {
     /// Resolve client ID: env var override → bundled default.
     pub fn client_id(&self) -> String {
-        std::env::var(self.client_id_env)
-            .unwrap_or_else(|_| self.default_client_id.to_string())
+        std::env::var(self.client_id_env).unwrap_or_else(|_| self.default_client_id.to_string())
     }
 
     /// Resolve client secret: env var override → bundled default.
@@ -134,7 +133,9 @@ pub static PROVIDERS: &[OAuthProviderDef] = &[
         supports_refresh: true,
         requires_offline: true,
         default_client_id: env_or_empty(option_env!("KLYNT_BUILD_GOOGLE_CALENDAR_CLIENT_ID")),
-        default_client_secret: env_or_empty(option_env!("KLYNT_BUILD_GOOGLE_CALENDAR_CLIENT_SECRET")),
+        default_client_secret: env_or_empty(option_env!(
+            "KLYNT_BUILD_GOOGLE_CALENDAR_CLIENT_SECRET"
+        )),
         client_id_env: "KLYNT_GOOGLE_CALENDAR_CLIENT_ID",
         client_secret_env: "KLYNT_GOOGLE_CALENDAR_CLIENT_SECRET",
     },

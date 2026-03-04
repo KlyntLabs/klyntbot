@@ -14,10 +14,7 @@ pub enum McpStartupEvent {
         tool_count: usize,
     },
     /// A server connection failed.
-    Failed {
-        server_name: String,
-        error: String,
-    },
+    Failed { server_name: String, error: String },
     /// A server was skipped (disabled in config).
     Skipped { server_name: String },
     /// All server connections have completed.

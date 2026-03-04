@@ -126,10 +126,9 @@ impl AgentManager {
             // Load skills from the agent's skills/ subfolder
             let skills_dir = path.join("skills");
             if skills_dir.exists() {
-                let mut skill_entries =
-                    tokio::fs::read_dir(&skills_dir).await.map_err(|e| {
-                        common::ConfigError::Invalid(format!("Reading skills dir: {e}"))
-                    })?;
+                let mut skill_entries = tokio::fs::read_dir(&skills_dir).await.map_err(|e| {
+                    common::ConfigError::Invalid(format!("Reading skills dir: {e}"))
+                })?;
                 while let Some(skill_entry) = skill_entries.next_entry().await.map_err(|e| {
                     common::ConfigError::Invalid(format!("Reading skill entry: {e}"))
                 })? {

@@ -11,7 +11,6 @@ pub mod identity;
 pub mod memory;
 pub mod page_context;
 pub mod persona;
-pub mod skills;
 pub mod todo;
 
 pub use agent::AgentContextSource;
@@ -22,5 +21,4 @@ pub use identity::IdentitySource;
 pub use memory::MemorySource;
 pub use page_context::PageContextSource;
 pub use persona::PersonaContextSource;
-pub use skills::{SkillContentSource, SkillSummarySource};
 pub use todo::TodoSource;

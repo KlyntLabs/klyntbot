@@ -1,6 +1,5 @@
 use desktop_shared::commands::{
-    McpAddServerParams, McpConfigResponse, McpRemoveParams, McpToggleParams,
-    McpUpdateServerParams,
+    McpAddServerParams, McpConfigResponse, McpRemoveParams, McpToggleParams, McpUpdateServerParams,
 };
 use desktop_shared::errors::ApiError;
 use tauri::State;
@@ -49,7 +48,9 @@ pub async fn mcp_add_server(
         };
 
         cfg.mcp.servers.push(def.clone());
-        config::save(&cfg).await.map_err(super::map_config_save_err)?;
+        config::save(&cfg)
+            .await
+            .map_err(super::map_config_save_err)?;
         let response = super::build_mcp_response(&cfg);
         // Drop config lock before calling agent
         drop(cfg);
@@ -81,7 +82,9 @@ pub async fn mcp_remove_server(
             ));
         }
 
-        config::save(&cfg).await.map_err(super::map_config_save_err)?;
+        config::save(&cfg)
+            .await
+            .map_err(super::map_config_save_err)?;
         super::build_mcp_response(&cfg)
         // Drop config lock before calling agent
     };
@@ -111,7 +114,9 @@ pub async fn mcp_toggle_server(
             None
         };
 
-        config::save(&cfg).await.map_err(super::map_config_save_err)?;
+        config::save(&cfg)
+            .await
+            .map_err(super::map_config_save_err)?;
         let response = super::build_mcp_response(&cfg);
         drop(cfg);
         (def, response)
@@ -180,7 +185,9 @@ pub async fn mcp_update_server(
             None
         };
 
-        config::save(&cfg).await.map_err(super::map_config_save_err)?;
+        config::save(&cfg)
+            .await
+            .map_err(super::map_config_save_err)?;
         let response = super::build_mcp_response(&cfg);
         drop(cfg);
         (def, response)

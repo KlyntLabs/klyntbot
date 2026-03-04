@@ -124,7 +124,6 @@ impl AgentProfile {
             .map(|s| format!("# Skill: {}\n\n{}", s.name, s.content))
             .collect()
     }
-
 }
 
 impl AgentSkill {
@@ -178,8 +177,7 @@ You are the task management agent.
 ## Behavior
 - Create tasks efficiently
 "#;
-        let profile =
-            AgentProfile::parse("task", content, PathBuf::from("builtin::task")).unwrap();
+        let profile = AgentProfile::parse("task", content, PathBuf::from("builtin::task")).unwrap();
         assert_eq!(profile.name, "task");
         assert_eq!(profile.description, "Task management specialist");
         assert_eq!(profile.tools, vec!["task", "area", "project"]);
@@ -253,11 +251,7 @@ Skill body content here.
     fn test_trigger_matching() {
         let profile = AgentProfile {
             name: "task".into(),
-            triggers: vec![
-                "todo".into(),
-                "create a task".into(),
-                "my tasks".into(),
-            ],
+            triggers: vec!["todo".into(), "create a task".into(), "my tasks".into()],
             ..Default::default()
         };
         assert!(profile.matches_message("can you create a task for me?"));

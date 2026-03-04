@@ -348,18 +348,24 @@ mod tests {
 
     #[test]
     fn test_is_tool_allowed_no_filters() {
-        let server: McpServerDef = serde_json::from_str(r#"{
+        let server: McpServerDef = serde_json::from_str(
+            r#"{
             "name": "test", "transport": "stdio", "command": "cmd"
-        }"#).unwrap();
+        }"#,
+        )
+        .unwrap();
         assert!(server.is_tool_allowed("anything"));
     }
 
     #[test]
     fn test_is_tool_allowed_with_allowlist() {
-        let server: McpServerDef = serde_json::from_str(r#"{
+        let server: McpServerDef = serde_json::from_str(
+            r#"{
             "name": "test", "transport": "stdio", "command": "cmd",
             "enabledTools": ["list_issues", "get_issue"]
-        }"#).unwrap();
+        }"#,
+        )
+        .unwrap();
         assert!(server.is_tool_allowed("list_issues"));
         assert!(server.is_tool_allowed("get_issue"));
         assert!(!server.is_tool_allowed("delete_issue"));
@@ -367,10 +373,13 @@ mod tests {
 
     #[test]
     fn test_is_tool_allowed_with_denylist() {
-        let server: McpServerDef = serde_json::from_str(r#"{
+        let server: McpServerDef = serde_json::from_str(
+            r#"{
             "name": "test", "transport": "stdio", "command": "cmd",
             "disabledTools": ["dangerous_tool"]
-        }"#).unwrap();
+        }"#,
+        )
+        .unwrap();
         assert!(server.is_tool_allowed("list_issues"));
         assert!(!server.is_tool_allowed("dangerous_tool"));
     }
@@ -378,11 +387,14 @@ mod tests {
     #[test]
     fn test_is_tool_allowed_allowlist_takes_precedence() {
         // When both are set, allowlist takes precedence
-        let server: McpServerDef = serde_json::from_str(r#"{
+        let server: McpServerDef = serde_json::from_str(
+            r#"{
             "name": "test", "transport": "stdio", "command": "cmd",
             "enabledTools": ["safe_tool"],
             "disabledTools": ["safe_tool"]
-        }"#).unwrap();
+        }"#,
+        )
+        .unwrap();
         assert!(server.is_tool_allowed("safe_tool"));
         assert!(!server.is_tool_allowed("other_tool"));
     }

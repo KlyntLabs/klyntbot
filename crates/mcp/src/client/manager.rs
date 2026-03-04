@@ -140,15 +140,18 @@ impl McpManager {
         let startup_timeout = Duration::from_secs(server_def.startup_timeout_sec);
         let tool_timeout = Duration::from_secs(server_def.tool_timeout_sec);
 
-        tokio::time::timeout(startup_timeout, Self::connect_one_inner(server_def, tool_timeout))
-            .await
-            .map_err(|_| {
-                anyhow::anyhow!(
-                    "MCP server '{}' timed out after {}s during startup",
-                    server_def.name,
-                    server_def.startup_timeout_sec
-                )
-            })?
+        tokio::time::timeout(
+            startup_timeout,
+            Self::connect_one_inner(server_def, tool_timeout),
+        )
+        .await
+        .map_err(|_| {
+            anyhow::anyhow!(
+                "MCP server '{}' timed out after {}s during startup",
+                server_def.name,
+                server_def.startup_timeout_sec
+            )
+        })?
     }
 
     /// Inner connection logic (no timeout wrapper).
@@ -393,9 +396,17 @@ mod tests {
         }
 
         // Should have: Skipped + Starting + Failed + Complete
-        assert!(events.iter().any(|e| matches!(e, McpStartupEvent::Skipped { .. })));
-        assert!(events.iter().any(|e| matches!(e, McpStartupEvent::Starting { .. })));
-        assert!(events.iter().any(|e| matches!(e, McpStartupEvent::Failed { .. })));
-        assert!(events.iter().any(|e| matches!(e, McpStartupEvent::Complete { .. })));
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, McpStartupEvent::Skipped { .. })));
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, McpStartupEvent::Starting { .. })));
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, McpStartupEvent::Failed { .. })));
+        assert!(events
+            .iter()
+            .any(|e| matches!(e, McpStartupEvent::Complete { .. })));
     }
 }

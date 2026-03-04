@@ -13,10 +13,9 @@ use super::common;
 use common::MockConversationEmbeddingHandler;
 
 use klyntbot::agent::context_sources::{
-    BootstrapSource, ConfidenceSource, IdentitySource, MemorySource, SkillContentSource,
-    SkillSummarySource,
+    BootstrapSource, ConfidenceSource, IdentitySource, MemorySource,
 };
-use klyntbot::agent::{MemoryStore, SkillManager};
+use klyntbot::agent::MemoryStore;
 use klyntbot::context_engine::{ContextEngine, ContextSource, SourceContext};
 use tempfile::TempDir;
 
@@ -93,10 +92,6 @@ fn ctx() -> RoutingContext {
 
 /// Helper: build a ContextEngine with all sources for testing.
 async fn test_context_engine(workspace: std::path::PathBuf) -> ContextEngine {
-    let mut skill_manager = SkillManager::new();
-    let _ = skill_manager.load(workspace.clone()).await;
-    let skill_manager = Arc::new(skill_manager);
-
     let memory_store = MemoryStore::new(common::test_memory_note_repo().await);
 
     let sources: Vec<Box<dyn ContextSource>> = vec![
@@ -104,8 +99,6 @@ async fn test_context_engine(workspace: std::path::PathBuf) -> ContextEngine {
         Box::new(BootstrapSource::new(workspace)),
         Box::new(MemorySource::new(memory_store)),
         Box::new(ConfidenceSource::new(0.7)),
-        Box::new(SkillSummarySource::new(Arc::clone(&skill_manager))),
-        Box::new(SkillContentSource::new(skill_manager)),
     ];
 
     ContextEngine::new().with_sources(sources)
@@ -609,12 +602,12 @@ async fn context_engine_source_ordering() {
     let engine = test_context_engine(workspace).await;
     let prompt = engine.build_system_prompt("test", "chat123", None).await;
 
-    // Identity (priority 100) should appear before skills summary (priority 40)
+    // Identity (priority 100) should appear before confidence (priority 50)
     let identity_pos = prompt.find("# Identity").unwrap();
-    let skills_pos = prompt.find("# Available Skills").unwrap();
+    let confidence_pos = prompt.find("Confidence").unwrap();
     assert!(
-        identity_pos < skills_pos,
-        "Identity should appear before skills"
+        identity_pos < confidence_pos,
+        "Identity should appear before confidence"
     );
 }
 

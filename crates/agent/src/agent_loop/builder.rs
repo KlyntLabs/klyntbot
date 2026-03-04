@@ -31,10 +31,10 @@ use tools_core::FeaturePackage;
 
 use super::super::confidence::ConfidenceEvaluator;
 use super::super::context_sources::{
-    AreaSource, BootstrapSource, ConfidenceSource, IdentitySource, MemorySource, PageContextSource,
-    PersonaContextSource, SkillContentSource, SkillSummarySource, TodoSource,
+    AgentContextSource, AreaSource, BootstrapSource, ConfidenceSource, IdentitySource,
+    MemorySource, PageContextSource, PersonaContextSource, TodoSource,
 };
-use super::super::{CalendarSyncAdapter, CronHandlerAdapter, SkillManager, SubagentManager};
+use super::super::{CalendarSyncAdapter, CronHandlerAdapter, SubagentManager};
 use super::{AgentLoop, LastActiveChannel};
 
 /// Builder for constructing an [`AgentLoop`] with all its dependencies.
@@ -126,22 +126,7 @@ impl AgentLoopBuilder {
         };
         let repos = storage::Repos::from_pool(&storage_pool);
 
-        // ── Skills (init + filter) ────────────────────────────────────────
-        let mut skill_manager = SkillManager::new();
-        skill_manager.load(workspace.clone()).await.map_err(|e| {
-            common::KlyntbotError::Config(common::ConfigError::Invalid(format!(
-                "Failed to initialize skills: {}",
-                e
-            )))
-        })?;
-
-        if !config.packs.enabled_skills.is_empty() {
-            skill_manager.filter_by_skills(&config.packs.enabled_skills);
-        }
-
-        let skill_manager = Arc::new(skill_manager);
-
-        // ── Agent profiles (new system, runs alongside SkillManager during migration) ──
+        // ── Agent profiles ─────────────────────────────────────────────────
         let mut agent_manager = crate::agent_profile::AgentManager::new();
         agent_manager.load_builtin_agents()?;
         if let Some(data_dir) = &config.data_dir {
@@ -151,6 +136,11 @@ impl AgentLoopBuilder {
                 .ok(); // non-fatal
         }
         let agent_manager = Arc::new(agent_manager);
+
+        // Shared active profile — written by AgentRuntime, read by AgentContextSource
+        let active_profile: Arc<
+            tokio::sync::RwLock<Option<Arc<crate::agent_profile::AgentProfile>>>,
+        > = Arc::new(tokio::sync::RwLock::new(None));
 
         // ── Context sources ───────────────────────────────────────────────
         let confidence_source = ConfidenceSource::new(config.confidence.threshold);
@@ -190,8 +180,7 @@ impl AgentLoopBuilder {
             Box::new(AreaSource::new(repos.areas.clone())),
             Box::new(TodoSource::new(repos.actions.clone())),
             Box::new(confidence_source),
-            Box::new(SkillSummarySource::new(Arc::clone(&skill_manager))),
-            Box::new(SkillContentSource::new(Arc::clone(&skill_manager))),
+            Box::new(AgentContextSource::new(Arc::clone(&active_profile))),
             Box::new(PersonaContextSource::new(
                 Arc::clone(&persona_manager),
                 repos.session_context.clone(),
@@ -713,14 +702,13 @@ impl AgentLoopBuilder {
             .take_inbound_rx()
             .expect("Inbound receiver already taken");
 
-        // ── Pipeline ──────────────────────────────────────────────────────
+        // ── Agent Runtime ─────────────────────────────────────────────────
         let tool_registry = Arc::new(RwLock::new(tool_registry));
         let execution_core = Arc::new(crate::execution::ExecutionCore::new(
             provider.clone(),
             Arc::clone(&tool_registry),
         ));
 
-        // Build IntentPipeline (replaces AgentPipeline + Orchestrator + EngineDispatch)
         let direct_engine =
             crate::intent_pipeline::engines::direct::DirectEngine::new(Arc::clone(&execution_core));
         let reactive_engine = crate::intent_pipeline::engines::reactive::ReactiveEngine::new(
@@ -736,14 +724,13 @@ impl AgentLoopBuilder {
             &config.agents.defaults.model,
             &config.orchestrator,
         )
-        .with_strategy_repo(repos.strategies.clone())
-        .with_skill_manager(Arc::clone(&skill_manager));
+        .with_strategy_repo(repos.strategies.clone());
 
         let cost_tracker = Arc::new(crate::output::CostTracker::from_repo(
             storage::UsageRepo::new(storage_pool.inner().clone()),
         ));
 
-        let pipeline_config = crate::intent_pipeline::pipeline::PipelineConfig {
+        let runtime_config = crate::intent_pipeline::pipeline::PipelineConfig {
             execution_model: config.agents.defaults.model.clone(),
             system_prompt: String::new(),
             context_window: provider.context_window(),
@@ -752,23 +739,24 @@ impl AgentLoopBuilder {
             provider_name: provider.name().to_string(),
         };
 
-        let mut pipeline = crate::intent_pipeline::IntentPipeline::new(
+        let mut runtime = crate::agent_runtime::AgentRuntime::new(
+            Arc::clone(&agent_manager),
             analyzer,
             Arc::clone(&context_engine),
             router,
             cost_tracker,
-            pipeline_config,
+            runtime_config,
+            Arc::clone(&active_profile),
         )
-        .with_strategy_repo(repos.strategies.clone())
-        .with_skill_manager(Arc::clone(&skill_manager));
+        .with_strategy_repo(repos.strategies.clone());
 
         if let Some(evaluator) = confidence_evaluator {
-            pipeline = pipeline.with_confidence_evaluator(Arc::new(evaluator));
+            runtime = runtime.with_confidence_evaluator(Arc::new(evaluator));
         }
 
-        let pipeline = Arc::new(pipeline);
+        let runtime = Arc::new(runtime);
 
-        info!("Intent pipeline initialized");
+        info!("Agent runtime initialized");
 
         // ── Session cleanup service ───────────────────────────────────────
         let session_cleanup_token = if self.pool.is_some() {
@@ -807,7 +795,6 @@ impl AgentLoopBuilder {
         Ok(AgentLoop {
             bus,
             inbound_rx: Some(inbound_rx),
-            skill_manager: Arc::clone(&skill_manager),
             config,
             context_engine,
             session_manager,
@@ -820,8 +807,7 @@ impl AgentLoopBuilder {
             _calendar_adapter: calendar_adapter,
             conversation_embedding_handler,
             learning_service,
-            agent_manager,
-            pipeline,
+            runtime,
             strategy_repo: Some(repos.strategies.clone()),
             history_limit,
             _session_cleanup_token: session_cleanup_token,

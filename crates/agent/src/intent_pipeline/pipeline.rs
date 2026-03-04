@@ -3,11 +3,10 @@
 //! Replaces `AgentPipeline` (Orchestrator + EngineDispatch) with a unified flow:
 //! IntentAnalyzer → ContextEngine → ExecutionRouter → ResponseValidator → CostTracker
 
-use std::borrow::Cow;
 use std::sync::Arc;
 use std::time::Instant;
 
-use common::{utils::tool_def_name, Result};
+use common::Result;
 use context_engine::{ContextEngine, ContextRequest};
 use providers::Message;
 use tools::RoutingContext;
@@ -74,7 +73,6 @@ pub struct IntentPipeline {
     config: PipelineConfig,
     strategy_repo: Option<storage::StrategyRepo>,
     confidence_evaluator: Option<Arc<crate::confidence::ConfidenceEvaluator>>,
-    skill_manager: Option<Arc<crate::skills::SkillManager>>,
 }
 
 impl IntentPipeline {
@@ -94,7 +92,6 @@ impl IntentPipeline {
             config,
             strategy_repo: None,
             confidence_evaluator: None,
-            skill_manager: None,
         }
     }
 
@@ -110,12 +107,6 @@ impl IntentPipeline {
         evaluator: Arc<crate::confidence::ConfidenceEvaluator>,
     ) -> Self {
         self.confidence_evaluator = Some(evaluator);
-        self
-    }
-
-    /// Attach a skill manager for injecting matched skill content into context.
-    pub fn with_skill_manager(mut self, skill_manager: Arc<crate::skills::SkillManager>) -> Self {
-        self.skill_manager = Some(skill_manager);
         self
     }
 
@@ -202,7 +193,7 @@ impl IntentPipeline {
             context_window: self.config.context_window,
         };
         let assemble_start = Instant::now();
-        let mut assembled = self.context_engine.assemble(context_request).await;
+        let assembled = self.context_engine.assemble(context_request).await;
         let assemble_ms = assemble_start.elapsed().as_millis() as u64;
 
         debug!(
@@ -221,48 +212,7 @@ impl IntentPipeline {
                 .await;
         }
 
-        // Step 2.5: Inject matched skill content for non-always skills
-        if let Some(ref sm) = self.skill_manager {
-            for skill_name in &analysis.matched_skills {
-                if let Some(skill) = sm.get(skill_name) {
-                    if !skill.always {
-                        if let Some(content) = skill.formatted_content() {
-                            assembled.messages.push(Message::system(content));
-                        }
-                    }
-                }
-            }
-        }
-
-        // Step 3: Filter tools based on intent classification
-        let filtered_tools: Cow<'_, [serde_json::Value]> =
-            if let Some(allowed) = analysis.allowed_tool_names() {
-                Cow::Owned(
-                    tool_definitions
-                        .iter()
-                        .filter(|t| {
-                            tool_def_name(t)
-                                .map(|name| {
-                                    // Always include MCP tools — they are user-configured
-                                    // integrations that should bypass intent filtering
-                                    name.starts_with("mcp_") || allowed.contains(name)
-                                })
-                                .unwrap_or(true) // Keep tools with unknown format
-                        })
-                        .cloned()
-                        .collect(),
-                )
-            } else {
-                Cow::Borrowed(tool_definitions)
-            };
-
-        debug!(
-            "IntentPipeline: filtered {} → {} tools",
-            tool_definitions.len(),
-            filtered_tools.len()
-        );
-
-        // Step 4: Execute via router (with automatic escalation)
+        // Step 3: Execute via router (with automatic escalation)
         if let Some(ref tx) = event_tx {
             let _ = tx
                 .send(AgentEvent::ExecutionStarted {
@@ -286,7 +236,7 @@ impl IntentPipeline {
             .execute(
                 analysis.mode.clone(),
                 assembled.messages,
-                &filtered_tools,
+                tool_definitions,
                 &params,
                 ctx,
                 event_tx.clone(),
@@ -695,7 +645,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn pipeline_result_carries_matched_skills_via_classification() {
+    async fn pipeline_processes_message_with_classification() {
         let provider = MockPipelineProvider::new(vec![text_response("Hi there!")]);
         let pipeline = make_pipeline(provider).await;
 
@@ -704,7 +654,7 @@ mod tests {
             .await
             .unwrap();
 
-        // Without SkillManager, matched_skills should be empty
-        assert!(result.classification.matched_skills.is_empty());
+        assert_eq!(result.content, "Hi there!");
+        assert_eq!(result.classification.source, AnalysisSource::Heuristic);
     }
 }
