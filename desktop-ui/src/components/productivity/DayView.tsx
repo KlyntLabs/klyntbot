@@ -8,8 +8,11 @@ import { CategoriesList } from "./CategoriesList";
 import { DistractionBanner } from "./DistractionBanner";
 import { FocusSessionsList } from "./FocusSessionsList";
 import { GoalsProgress } from "./GoalsProgress";
+import { LearnedRulesCard } from "./LearnedRulesCard";
 import { PomodoroTimer } from "./PomodoroTimer";
 import { ProductivityScoreRing } from "./ProductivityScoreRing";
+import { buildBreakdownSegments } from "./shared";
+import { TimeEntrySection } from "./TimeEntrySection";
 import { TimelineBar } from "./Timeline";
 import { TopApps } from "./TopApps";
 import { WorkHoursCard } from "./WorkHoursCard";
@@ -31,15 +34,11 @@ export function DayView({ date }: DayViewProps) {
   });
 
   const breakdownSegments = summary
-    ? [
-        { name: "Focus", value: summary.totalFocusSecs, color: "var(--brand)" },
-        {
-          name: "Active",
-          value: summary.totalActiveSecs - summary.totalFocusSecs - summary.totalBreakSecs,
-          color: "var(--purple)",
-        },
-        { name: "Breaks", value: summary.totalBreakSecs, color: "var(--info)" },
-      ]
+    ? buildBreakdownSegments(
+        summary.totalActiveSecs,
+        summary.totalFocusSecs,
+        summary.totalBreakSecs,
+      )
     : [];
 
   return (
@@ -60,13 +59,14 @@ export function DayView({ date }: DayViewProps) {
       <div className="flex flex-col gap-4">
         <FocusSessionsList date={date} />
         <TopApps apps={summary?.topApps ?? []} />
+        <TimeEntrySection date={date} />
       </div>
 
       {/* Row 2-3: Right column */}
       <div className="flex flex-col gap-4">
         <WorkHoursCard totalActiveSecs={summary?.totalActiveSecs ?? 0} />
         <div className="bg-surface-base rounded-xl p-4 flex items-center justify-center relative">
-          <ProductivityScoreRing score={summary?.productivityScore ?? 0} />
+          <ProductivityScoreRing score={summary?.productivityScore ?? 0} summary={summary} />
         </div>
         <BreakdownDonuts segments={breakdownSegments} totalSecs={summary?.totalActiveSecs ?? 0} />
         <CategoriesList
@@ -74,6 +74,7 @@ export function DayView({ date }: DayViewProps) {
           totalSecs={summary?.totalActiveSecs ?? 0}
         />
         <AiSummaryCard summary={summary?.aiSummary ?? null} />
+        <LearnedRulesCard />
       </div>
 
       {/* Row 4: Goals (spans left+center) */}

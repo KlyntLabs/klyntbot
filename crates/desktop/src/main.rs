@@ -184,6 +184,12 @@ fn main() {
             commands::productivity::productivity_goals,
             commands::productivity::productivity_pomodoro_start,
             commands::productivity::productivity_time_entries,
+            commands::productivity::productivity_goal_create,
+            commands::productivity::productivity_goal_delete,
+            commands::productivity::productivity_goal_toggle,
+            commands::productivity::productivity_time_entry_create,
+            commands::productivity::productivity_time_entry_delete,
+            commands::productivity::productivity_category_upsert,
             // Distraction
             commands::distraction::distraction_dismiss,
             commands::distraction::distraction_allow_temp,

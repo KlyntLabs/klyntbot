@@ -70,6 +70,18 @@ fn session_to_response(s: FocusSession) -> FocusSessionResponse {
     }
 }
 
+fn event_to_timeline(e: feature_productivity::types::ActivityEvent) -> ActivityTimelineResponse {
+    ActivityTimelineResponse {
+        app_name: e.app_name,
+        window_title: e.window_title,
+        site_name: e.site_name,
+        category_id: e.category_id,
+        started_at: e.started_at,
+        duration_secs: e.duration_secs,
+        is_idle: e.is_idle,
+    }
+}
+
 // ── Commands ───────────────────────────────────────────────────────────
 
 #[tauri::command]
@@ -97,18 +109,7 @@ pub async fn productivity_timeline(
         .list_range_offset(&start, &end, Some(cap), offset)
         .await
         .map_err(map_prod_err)?;
-    Ok(events
-        .into_iter()
-        .map(|e| ActivityTimelineResponse {
-            app_name: e.app_name,
-            window_title: e.window_title,
-            site_name: e.site_name,
-            category_id: e.category_id,
-            started_at: e.started_at,
-            duration_secs: e.duration_secs,
-            is_idle: e.is_idle,
-        })
-        .collect())
+    Ok(events.into_iter().map(event_to_timeline).collect())
 }
 
 #[tauri::command]
@@ -251,19 +252,7 @@ pub async fn productivity_activity_feed(
         .list_range_offset(&start, &now, Some(cap), None)
         .await
         .map_err(map_prod_err)?;
-    Ok(events
-        .into_iter()
-        .rev()
-        .map(|e| ActivityTimelineResponse {
-            app_name: e.app_name,
-            window_title: e.window_title,
-            site_name: e.site_name,
-            category_id: e.category_id,
-            started_at: e.started_at,
-            duration_secs: e.duration_secs,
-            is_idle: e.is_idle,
-        })
-        .collect())
+    Ok(events.into_iter().rev().map(event_to_timeline).collect())
 }
 
 #[tauri::command]
@@ -325,4 +314,147 @@ pub async fn productivity_time_entries(
             source: e.source,
         })
         .collect())
+}
+
+#[tauri::command]
+pub async fn productivity_goal_create(
+    state: State<'_, Arc<AppCore>>,
+    goal_type: String,
+    metric: String,
+    target_value: f64,
+) -> Result<GoalProgressResponse, ApiError> {
+    let repos = state.productivity_repos()?;
+    let gt: feature_productivity::types::GoalType = goal_type
+        .parse()
+        .map_err(|_| ApiError::new("VALIDATION", "Invalid goal_type. Use: daily, weekly"))?;
+    let gm: feature_productivity::types::GoalMetric = metric
+        .parse()
+        .map_err(|_| ApiError::new("VALIDATION", "Invalid metric. Use: productive_hours, focus_sessions, productivity_score, max_distracting_mins"))?;
+    let goal = feature_productivity::types::ProductivityGoal {
+        id: None,
+        goal_type: gt,
+        metric: gm,
+        target_value,
+        enabled: true,
+        created_at: Utc::now(),
+    };
+    let id = repos.goals.insert(&goal).await.map_err(map_prod_err)?;
+    Ok(GoalProgressResponse {
+        id,
+        goal_type: goal.goal_type.to_string(),
+        metric: goal.metric.to_string(),
+        target_value: goal.target_value,
+        current_value: 0.0,
+        met: false,
+    })
+}
+
+#[tauri::command]
+pub async fn productivity_goal_delete(
+    state: State<'_, Arc<AppCore>>,
+    id: i64,
+) -> Result<(), ApiError> {
+    let repos = state.productivity_repos()?;
+    repos.goals.delete(id).await.map_err(map_prod_err)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn productivity_goal_toggle(
+    state: State<'_, Arc<AppCore>>,
+    id: i64,
+    enabled: bool,
+) -> Result<(), ApiError> {
+    let repos = state.productivity_repos()?;
+    repos
+        .goals
+        .set_enabled(id, enabled)
+        .await
+        .map_err(map_prod_err)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn productivity_time_entry_create(
+    state: State<'_, Arc<AppCore>>,
+    description: String,
+    duration_mins: i64,
+    category_id: Option<String>,
+    project_id: Option<String>,
+) -> Result<TimeEntryResponse, ApiError> {
+    let repos = state.productivity_repos()?;
+    let now = Utc::now();
+    let started_at = now - chrono::Duration::minutes(duration_mins);
+    let duration_secs = duration_mins * 60;
+    let entry = feature_productivity::types::TimeEntry {
+        id: None,
+        description,
+        category_id,
+        project_id,
+        started_at,
+        duration_secs,
+        source: "manual".to_string(),
+        created_at: now,
+    };
+    let id = repos
+        .time_entries
+        .insert(&entry)
+        .await
+        .map_err(map_prod_err)?;
+    Ok(TimeEntryResponse {
+        id,
+        description: entry.description,
+        category_id: entry.category_id,
+        project_id: entry.project_id,
+        started_at,
+        duration_secs,
+        source: entry.source,
+    })
+}
+
+#[tauri::command]
+pub async fn productivity_time_entry_delete(
+    state: State<'_, Arc<AppCore>>,
+    id: i64,
+) -> Result<(), ApiError> {
+    let repos = state.productivity_repos()?;
+    repos
+        .time_entries
+        .delete(id)
+        .await
+        .map_err(map_prod_err)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn productivity_category_upsert(
+    state: State<'_, Arc<AppCore>>,
+    id: String,
+    name: String,
+    category_type: String,
+    color: Option<String>,
+    icon: Option<String>,
+) -> Result<ActivityCategoryResponse, ApiError> {
+    let repos = state.productivity_repos()?;
+    let ct: feature_productivity::types::CategoryType = category_type
+        .parse()
+        .map_err(|_| ApiError::new("VALIDATION", "Invalid category_type. Use: productive, neutral, distracting"))?;
+    let cat = feature_productivity::types::ActivityCategory {
+        id,
+        name,
+        category_type: ct,
+        color,
+        icon,
+        rules: None,
+        is_system: false,
+    };
+    repos.categories.upsert(&cat).await.map_err(map_prod_err)?;
+    Ok(ActivityCategoryResponse {
+        id: cat.id,
+        name: cat.name,
+        category_type: cat.category_type.to_string(),
+        color: cat.color,
+        icon: cat.icon,
+        is_system: false,
+    })
 }

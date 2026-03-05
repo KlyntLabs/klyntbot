@@ -1,6 +1,10 @@
+import { Plus, Trash2 } from "lucide-react";
+import { useState } from "react";
 import { useEvent } from "../../hooks/useEvent";
+import { useMutation } from "../../hooks/useMutation";
 import { useQuery } from "../../hooks/useQuery";
 import type { GoalProgress } from "../../lib/types";
+import { AddGoalDialog } from "./AddGoalDialog";
 
 function metricLabel(metric: string): string {
   switch (metric) {
@@ -25,52 +29,88 @@ function formatValue(metric: string, value: number): string {
 
 export function GoalsProgress() {
   const { data: goals, refetch } = useQuery<GoalProgress[]>("productivity_goals", undefined, []);
+  const [showAdd, setShowAdd] = useState(false);
+  const { mutate: createGoal } = useMutation<
+    void,
+    { goal_type: string; metric: string; target_value: number }
+  >("productivity_goal_create");
+  const { mutate: deleteGoal } = useMutation<void, { id: number }>("productivity_goal_delete");
 
   useEvent<{ entityKind: string }>("entity:updated", (payload) => {
     if (payload?.entityKind === "productivity") refetch();
   });
 
-  if (goals.length === 0) {
-    return (
-      <div className="bg-surface-base rounded-xl p-4">
-        <h2 className="text-[13px] font-medium text-secondary mb-3">Goals</h2>
-        <p className="text-[12px] font-light text-dim">No goals set</p>
-      </div>
-    );
-  }
+  const handleAdd = async (params: { goal_type: string; metric: string; target_value: number }) => {
+    await createGoal(params);
+    refetch();
+  };
+
+  const handleDelete = async (id: number) => {
+    await deleteGoal({ id });
+    refetch();
+  };
 
   return (
-    <div className="bg-surface-base rounded-xl p-4 flex flex-col gap-3">
-      <h2 className="text-[13px] font-medium text-secondary">Goals</h2>
-      <div className="flex flex-col gap-2">
-        {goals.map((g) => {
-          const pct = g.targetValue > 0 ? Math.min((g.currentValue / g.targetValue) * 100, 100) : 0;
-          return (
-            <div key={g.id} className="flex flex-col gap-1">
-              <div className="flex items-center justify-between text-[11px] font-light">
-                <div className="flex items-center gap-2">
-                  <span className={g.met ? "text-success" : "text-brand"}>
-                    {g.met ? "MET" : "IN PROGRESS"}
-                  </span>
-                  <span className="text-primary">
-                    {formatValue(g.metric, g.targetValue)} {metricLabel(g.metric)}
-                  </span>
-                  <span className="text-dim">({g.goalType})</span>
+    <>
+      <div className="bg-surface-base rounded-xl p-4 flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-[13px] font-medium text-secondary">Goals</h2>
+          <button
+            type="button"
+            onClick={() => setShowAdd(true)}
+            className="w-6 h-6 rounded-md flex items-center justify-center text-muted hover:text-brand hover:bg-surface-raised transition-colors"
+          >
+            <Plus className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        {goals.length === 0 ? (
+          <p className="text-[12px] font-light text-dim">No goals set</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {goals.map((g) => {
+              const pct =
+                g.targetValue > 0 ? Math.min((g.currentValue / g.targetValue) * 100, 100) : 0;
+              return (
+                <div key={g.id} className="group flex flex-col gap-1">
+                  <div className="flex items-center justify-between text-[11px] font-light">
+                    <div className="flex items-center gap-2">
+                      <span className={g.met ? "text-success" : "text-brand"}>
+                        {g.met ? "MET" : "IN PROGRESS"}
+                      </span>
+                      <span className="text-primary">
+                        {formatValue(g.metric, g.targetValue)} {metricLabel(g.metric)}
+                      </span>
+                      <span className="text-dim">({g.goalType})</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted tabular-nums">
+                        {formatValue(g.metric, g.currentValue)} /{" "}
+                        {formatValue(g.metric, g.targetValue)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(g.id)}
+                        className="w-5 h-5 rounded flex items-center justify-center text-transparent group-hover:text-muted hover:!text-destructive transition-colors"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="h-1.5 rounded-full bg-surface-raised overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${g.met ? "bg-success" : "bg-brand"}`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
                 </div>
-                <span className="text-muted tabular-nums">
-                  {formatValue(g.metric, g.currentValue)} / {formatValue(g.metric, g.targetValue)}
-                </span>
-              </div>
-              <div className="h-1.5 rounded-full bg-surface-raised overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all ${g.met ? "bg-success" : "bg-brand"}`}
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
-            </div>
-          );
-        })}
+              );
+            })}
+          </div>
+        )}
       </div>
-    </div>
+
+      <AddGoalDialog open={showAdd} onClose={() => setShowAdd(false)} onAdd={handleAdd} />
+    </>
   );
 }

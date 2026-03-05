@@ -523,6 +523,23 @@ export interface TimeEntry {
   source: string;
 }
 
+export interface GoalCreateParams {
+  goal_type: string;
+  metric: string;
+  target_value: number;
+}
+
+export interface LearnedRule {
+  id: number;
+  pattern: string;
+  patternType: string;
+  classification: string;
+  confidence: number;
+  hitCount: number;
+  lastUsedAt: string;
+  createdAt: string;
+}
+
 export type ProductivityPeriod = "day" | "week" | "month";
 
 export type Tab = "All" | string;

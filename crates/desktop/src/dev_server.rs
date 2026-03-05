@@ -1196,6 +1196,181 @@ async fn dispatch(
                 Err(e) => err(prod_err(e)),
             }
         }
+        "productivity_goal_create" => {
+            let goal_type = match get_str(&body, "goal_type") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let metric = match get_str(&body, "metric") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let target_value: f64 = match get(&body, "target_value") {
+                Some(v) => v,
+                None => return err(ApiError::new("VALIDATION", "missing required field: target_value")),
+            };
+            let repos = match core.productivity_repos() {
+                Ok(r) => r,
+                Err(e) => return err(e),
+            };
+            let gt: feature_productivity::types::GoalType = match goal_type.parse() {
+                Ok(v) => v,
+                Err(_) => return err(ApiError::new("VALIDATION", "Invalid goal_type. Use: daily, weekly")),
+            };
+            let gm: feature_productivity::types::GoalMetric = match metric.parse() {
+                Ok(v) => v,
+                Err(_) => return err(ApiError::new("VALIDATION", "Invalid metric. Use: productive_hours, focus_sessions, productivity_score, max_distracting_mins")),
+            };
+            let goal = feature_productivity::types::ProductivityGoal {
+                id: None,
+                goal_type: gt,
+                metric: gm,
+                target_value,
+                enabled: true,
+                created_at: Utc::now(),
+            };
+            match repos.goals.insert(&goal).await {
+                Ok(id) => ok(GoalProgressResponse {
+                    id,
+                    goal_type: goal.goal_type.to_string(),
+                    metric: goal.metric.to_string(),
+                    target_value: goal.target_value,
+                    current_value: 0.0,
+                    met: false,
+                }),
+                Err(e) => err(prod_err(e)),
+            }
+        }
+        "productivity_goal_delete" => {
+            let id: i64 = match get(&body, "id") {
+                Some(v) => v,
+                None => return err(ApiError::new("VALIDATION", "missing required field: id")),
+            };
+            let repos = match core.productivity_repos() {
+                Ok(r) => r,
+                Err(e) => return err(e),
+            };
+            match repos.goals.delete(id).await {
+                Ok(_) => ok(()),
+                Err(e) => err(prod_err(e)),
+            }
+        }
+        "productivity_goal_toggle" => {
+            let id: i64 = match get(&body, "id") {
+                Some(v) => v,
+                None => return err(ApiError::new("VALIDATION", "missing required field: id")),
+            };
+            let enabled: bool = match get(&body, "enabled") {
+                Some(v) => v,
+                None => return err(ApiError::new("VALIDATION", "missing required field: enabled")),
+            };
+            let repos = match core.productivity_repos() {
+                Ok(r) => r,
+                Err(e) => return err(e),
+            };
+            match repos.goals.set_enabled(id, enabled).await {
+                Ok(_) => ok(()),
+                Err(e) => err(prod_err(e)),
+            }
+        }
+        "productivity_time_entry_create" => {
+            let description = match get_str(&body, "description") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let duration_mins: i64 = match get(&body, "duration_mins") {
+                Some(v) => v,
+                None => return err(ApiError::new("VALIDATION", "missing required field: duration_mins")),
+            };
+            let category_id: Option<String> = get(&body, "category_id");
+            let project_id: Option<String> = get(&body, "project_id");
+            let repos = match core.productivity_repos() {
+                Ok(r) => r,
+                Err(e) => return err(e),
+            };
+            let now = Utc::now();
+            let started_at = now - chrono::Duration::minutes(duration_mins);
+            let entry = feature_productivity::types::TimeEntry {
+                id: None,
+                description: description.clone(),
+                category_id: category_id.clone(),
+                project_id: project_id.clone(),
+                started_at,
+                duration_secs: duration_mins * 60,
+                source: "manual".to_string(),
+                created_at: now,
+            };
+            match repos.time_entries.insert(&entry).await {
+                Ok(id) => ok(TimeEntryResponse {
+                    id,
+                    description,
+                    category_id,
+                    project_id,
+                    started_at,
+                    duration_secs: duration_mins * 60,
+                    source: "manual".to_string(),
+                }),
+                Err(e) => err(prod_err(e)),
+            }
+        }
+        "productivity_time_entry_delete" => {
+            let id: i64 = match get(&body, "id") {
+                Some(v) => v,
+                None => return err(ApiError::new("VALIDATION", "missing required field: id")),
+            };
+            let repos = match core.productivity_repos() {
+                Ok(r) => r,
+                Err(e) => return err(e),
+            };
+            match repos.time_entries.delete(id).await {
+                Ok(_) => ok(()),
+                Err(e) => err(prod_err(e)),
+            }
+        }
+        "productivity_category_upsert" => {
+            let id = match get_str(&body, "id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let name = match get_str(&body, "name") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let category_type_str = match get_str(&body, "category_type") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let color: Option<String> = get(&body, "color");
+            let icon: Option<String> = get(&body, "icon");
+            let repos = match core.productivity_repos() {
+                Ok(r) => r,
+                Err(e) => return err(e),
+            };
+            let ct: feature_productivity::types::CategoryType = match category_type_str.parse() {
+                Ok(v) => v,
+                Err(_) => return err(ApiError::new("VALIDATION", "Invalid category_type. Use: productive, neutral, distracting")),
+            };
+            let cat = feature_productivity::types::ActivityCategory {
+                id: id.clone(),
+                name: name.clone(),
+                category_type: ct,
+                color: color.clone(),
+                icon: icon.clone(),
+                rules: None,
+                is_system: false,
+            };
+            match repos.categories.upsert(&cat).await {
+                Ok(_) => ok(ActivityCategoryResponse {
+                    id,
+                    name,
+                    category_type: cat.category_type.to_string(),
+                    color,
+                    icon,
+                    is_system: false,
+                }),
+                Err(e) => err(prod_err(e)),
+            }
+        }
 
         // ── Settings (MCP) ────────────────────────────────────
         "mcp_get_config" => {
