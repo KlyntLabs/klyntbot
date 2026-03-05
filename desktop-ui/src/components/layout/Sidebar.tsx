@@ -69,7 +69,7 @@ export function Sidebar({ active, onNavigate }: SidebarProps) {
                 : "text-muted hover:bg-surface-base hover:text-secondary"
             }`}
           >
-            <Icon className="w-[18px] h-[18px]" strokeWidth={1.5} />
+            <Icon className="w-[18px] h-[18px]" strokeWidth={1.5} aria-hidden="true" />
           </button>
         );
       })}
@@ -92,7 +92,7 @@ export function Sidebar({ active, onNavigate }: SidebarProps) {
                 : "text-muted hover:bg-surface-base hover:text-secondary"
             }`}
           >
-            <Icon className="w-[18px] h-[18px]" strokeWidth={1.5} />
+            <Icon className="w-[18px] h-[18px]" strokeWidth={1.5} aria-hidden="true" />
           </button>
         );
       })}

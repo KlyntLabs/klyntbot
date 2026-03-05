@@ -50,7 +50,7 @@ export function ThreadButton({
             if (e.key === "Enter") onRenameConfirm();
             if (e.key === "Escape") onRenameCancel();
           }}
-          className="flex-1 min-w-0 bg-surface-highest text-primary text-[12px] font-light px-2 py-1 rounded border border-border focus:outline-none focus:border-brand"
+          className="flex-1 min-w-0 bg-surface-highest text-primary text-[12px] font-light px-2 py-1 rounded border border-border"
         />
         <button
           type="button"

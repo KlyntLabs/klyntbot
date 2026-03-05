@@ -103,7 +103,7 @@ export function AddGoalDialog({ open, onClose, onAdd }: AddGoalDialogProps) {
                 placeholder={selectedMetric.placeholder}
                 min={0}
                 step={metric === "productive_hours" ? 0.5 : 1}
-                className="w-full px-3 py-1.5 text-[13px] bg-surface-base border border-border rounded-md text-primary placeholder:text-dim focus:outline-none focus:border-brand/50"
+                className="w-full px-3 py-1.5 text-[13px] bg-surface-base border border-border rounded-md text-primary placeholder:text-dim"
               />
             </div>
           </div>

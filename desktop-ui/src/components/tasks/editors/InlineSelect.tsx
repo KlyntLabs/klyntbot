@@ -1,5 +1,5 @@
 import { Check } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useClickOutside } from "../../../hooks/useClickOutside";
 
 interface Option {
@@ -25,11 +25,7 @@ export function InlineSelect({
 }: InlineSelectProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  useClickOutside(
-    ref,
-    useCallback(() => setOpen(false), []),
-    open,
-  );
+  useClickOutside(ref, () => setOpen(false), open);
 
   return (
     <div ref={ref} className={`relative ${className ?? ""}`}>
@@ -39,18 +35,25 @@ export function InlineSelect({
           e.stopPropagation();
           setOpen(!open);
         }}
+        aria-haspopup="listbox"
+        aria-expanded={open}
         className="w-full text-left rounded px-1 -mx-1 cursor-pointer transition-colors"
       >
         {renderDisplay(value)}
       </button>
       {open && (
-        <div className="absolute z-50 top-full left-0 mt-1 min-w-[140px] glass-panel">
+        <div
+          className="absolute z-50 top-full left-0 mt-1 min-w-[140px] glass-panel"
+          role="listbox"
+        >
           {options.map((opt) => {
             const isSelected = value === opt.value;
             return (
               <button
                 type="button"
                 key={opt.value ?? "__none"}
+                role="option"
+                aria-selected={isSelected}
                 onClick={(e) => {
                   e.stopPropagation();
                   onSelect(opt.value);

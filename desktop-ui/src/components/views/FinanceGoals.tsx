@@ -51,19 +51,25 @@ export function FinanceGoals() {
             <p className="text-[10px] text-dim font-light uppercase tracking-wider mb-1">
               Total Saved
             </p>
-            <p className="text-[20px] font-light text-success">{fmtCompact(totalSaved)}đ</p>
+            <p className="text-[20px] font-light text-success tabular-nums">
+              {fmtCompact(totalSaved)}đ
+            </p>
           </Card>
           <Card className="p-4">
             <p className="text-[10px] text-dim font-light uppercase tracking-wider mb-1">
               Total Target
             </p>
-            <p className="text-[20px] font-light text-primary">{fmtCompact(totalTarget)}đ</p>
+            <p className="text-[20px] font-light text-primary tabular-nums">
+              {fmtCompact(totalTarget)}đ
+            </p>
           </Card>
           <Card className="p-4">
             <p className="text-[10px] text-dim font-light uppercase tracking-wider mb-1">
               Monthly Contributions
             </p>
-            <p className="text-[20px] font-light text-brand">{fmtCompact(monthlyTotal)}đ</p>
+            <p className="text-[20px] font-light text-brand tabular-nums">
+              {fmtCompact(monthlyTotal)}đ
+            </p>
           </Card>
         </div>
 
@@ -107,13 +113,13 @@ export function FinanceGoals() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-[14px] font-light text-primary">
+                      <p className="text-[14px] font-light text-primary tabular-nums">
                         {fmtMoney(g.currentAmount, g.currency)}{" "}
                         <span className="text-dim text-[10px]">
                           / {fmtMoney(g.targetAmount, g.currency)}
                         </span>
                       </p>
-                      <p className="text-[11px] font-light text-brand">{p}%</p>
+                      <p className="text-[11px] font-light text-brand tabular-nums">{p}%</p>
                     </div>
                   </div>
                   <Progress value={p} />

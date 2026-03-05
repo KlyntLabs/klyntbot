@@ -1,5 +1,5 @@
 import { ArrowLeft, Trash2 } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { useEvent } from "../../hooks/useEvent";
 import { useMutation } from "../../hooks/useMutation";
@@ -14,7 +14,7 @@ export function TaskDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const { data: tasks, refetch } = useQuery<Task[]>("task_list", undefined, []);
+  const { data: task, refetch } = useQuery<Task | null>("task_get", id ? { id } : null, null);
   const { data: projects } = useQuery<Project[]>("project_list", undefined, []);
   const updateTask = useMutation<Task, TaskUpdateParams>("task_update", "params");
   const deleteTask = useMutation<boolean, { id: string }>("task_delete");
@@ -28,8 +28,6 @@ export function TaskDetail() {
   useEvent<{ entityKind: string; id: string }>("entity:updated", () => {
     refetch();
   });
-
-  const task = useMemo(() => tasks.find((t) => t.id === id), [tasks, id]);
 
   const handleUpdate = useCallback(
     async (params: Partial<TaskUpdateParams>) => {
@@ -140,8 +138,11 @@ export function TaskDetail() {
           </button>
 
           {/* Due Date */}
-          <span className="text-[12px] text-muted font-light self-center">Due Date</span>
+          <label htmlFor="task-due-date" className="text-[12px] text-muted font-light self-center">
+            Due Date
+          </label>
           <input
+            id="task-due-date"
             type="date"
             value={task.dueDate ?? ""}
             onChange={(e) => handleUpdate({ dueDate: e.target.value || null })}
@@ -149,8 +150,11 @@ export function TaskDetail() {
           />
 
           {/* Project */}
-          <span className="text-[12px] text-muted font-light self-center">Project</span>
+          <label htmlFor="task-project" className="text-[12px] text-muted font-light self-center">
+            Project
+          </label>
           <select
+            id="task-project"
             value={task.projectId ?? ""}
             onChange={(e) => handleUpdate({ projectId: e.target.value || null })}
             className="bg-surface-low rounded-md px-3 py-1.5 text-[12px] font-light text-secondary border border-border-subtle outline-none w-48"

@@ -73,18 +73,32 @@ export function TaskTable({
     });
   }, [tasksByProject]);
 
-  const ctx: import("./TaskTableContext").TaskTableCtx = {
-    completedTasks,
-    expandedTasks,
-    childrenCache,
-    projects,
-    areas,
-    showArea,
-    onToggleTask,
-    onToggleExpandTask,
-    onUpdate,
-    onCreateSubtask,
-  };
+  const ctx = useMemo<import("./TaskTableContext").TaskTableCtx>(
+    () => ({
+      completedTasks,
+      expandedTasks,
+      childrenCache,
+      projects,
+      areas,
+      showArea,
+      onToggleTask,
+      onToggleExpandTask,
+      onUpdate,
+      onCreateSubtask,
+    }),
+    [
+      completedTasks,
+      expandedTasks,
+      childrenCache,
+      projects,
+      areas,
+      showArea,
+      onToggleTask,
+      onToggleExpandTask,
+      onUpdate,
+      onCreateSubtask,
+    ],
+  );
 
   return (
     <TaskTableContext value={ctx}>
@@ -198,7 +212,7 @@ function TaskWithSubtasks({ task }: { task: Task }) {
         <tr className="border-b border-border-subtle">
           <td className="px-5 py-2 w-9" />
           <td colSpan={showArea ? 7 : 6} className="px-5 py-2">
-            <span className="text-[12px] text-dim font-light pl-6">Loading...</span>
+            <span className="text-[12px] text-dim font-light pl-6">Loading\u2026</span>
           </td>
         </tr>
       )}

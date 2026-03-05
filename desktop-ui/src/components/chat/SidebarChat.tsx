@@ -1,5 +1,5 @@
 import { Pin, Send, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAutoResizeTextarea } from "../../hooks/useAutoResizeTextarea";
 import { useChatSession } from "../../hooks/useChatSession";
 import { useMutation } from "../../hooks/useMutation";
@@ -74,13 +74,13 @@ export function SidebarChat({
   const chat = useChatSession(sessionKey);
   const pinThread = useMutation<void, Record<string, unknown>>("chat_pin_thread");
 
-  const handleSend = useCallback(() => {
+  const handleSend = () => {
     chat.send(pageContext ? { context: { ...pageContext, isEphemeral: true } } : undefined);
-  }, [chat, pageContext]);
+  };
 
-  const handlePin = useCallback(async () => {
+  const handlePin = async () => {
     await pinThread.mutate({ sessionKey });
-  }, [sessionKey, pinThread]);
+  };
 
   if (!isOpen) return null;
 
@@ -180,9 +180,9 @@ function SidebarChatInput({
             }
           }}
           aria-label="Message input"
-          placeholder="Ask about this page..."
+          placeholder="Ask about this page\u2026"
           rows={1}
-          className="flex-1 bg-surface-base rounded-xl px-4 py-2.5 text-[13px] text-primary placeholder:text-muted focus:outline-none focus:bg-surface-raised font-light resize-none overflow-hidden"
+          className="flex-1 bg-surface-base rounded-xl px-4 py-2.5 text-[13px] text-primary placeholder:text-muted focus:bg-surface-raised font-light resize-none overflow-hidden"
           style={{ maxHeight: "120px" }}
         />
         <button

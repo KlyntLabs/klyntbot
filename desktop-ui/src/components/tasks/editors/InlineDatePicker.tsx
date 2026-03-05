@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useClickOutside } from "../../../hooks/useClickOutside";
 import { formatDate } from "../../../lib/dates";
 import { MiniCalendar } from "./MiniCalendar";
@@ -11,11 +11,7 @@ interface InlineDatePickerProps {
 export function InlineDatePicker({ value, onSave }: InlineDatePickerProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  useClickOutside(
-    ref,
-    useCallback(() => setOpen(false), []),
-    open,
-  );
+  useClickOutside(ref, () => setOpen(false), open);
 
   return (
     <div ref={ref} className="relative">
@@ -25,6 +21,9 @@ export function InlineDatePicker({ value, onSave }: InlineDatePickerProps) {
           e.stopPropagation();
           setOpen(!open);
         }}
+        aria-label="Select date"
+        aria-haspopup="dialog"
+        aria-expanded={open}
         className="text-[12px] text-muted font-light rounded px-1 -mx-1 cursor-pointer transition-colors"
       >
         {value ? formatDate(value) : <span className="text-dim">—</span>}

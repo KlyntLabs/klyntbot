@@ -6,7 +6,11 @@ export function TaskTableSkeleton({ showArea = false }: { showArea?: boolean }) 
   const extraCells = showArea ? EXTRA_CELLS_WITH_AREA : EXTRA_CELLS_BASE;
   return (
     <div className="mb-10 rounded-xl">
-      <table className="w-full bg-surface-low border-collapse">
+      <table
+        className="w-full bg-surface-low border-collapse"
+        aria-busy="true"
+        aria-label="Loading tasks"
+      >
         <thead>
           <tr className="border-b border-border text-[11px] text-muted font-light text-left">
             <th className="px-5 py-3 w-9 font-light" />

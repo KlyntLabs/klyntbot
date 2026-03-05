@@ -116,24 +116,28 @@
     font-size: var(--text-2xl);
     font-weight: var(--font-weight-medium);
     line-height: 1.5;
+    text-wrap: balance;
   }
 
   h2 {
     font-size: var(--text-xl);
     font-weight: var(--font-weight-medium);
     line-height: 1.5;
+    text-wrap: balance;
   }
 
   h3 {
     font-size: var(--text-lg);
     font-weight: var(--font-weight-medium);
     line-height: 1.5;
+    text-wrap: balance;
   }
 
   h4 {
     font-size: var(--text-base);
     font-weight: var(--font-weight-medium);
     line-height: 1.5;
+    text-wrap: balance;
   }
 
   label {
@@ -153,6 +157,17 @@
     font-weight: var(--font-weight-light);
     line-height: 1.5;
   }
+
+  /* Focus ring — visible on keyboard nav only */
+  button:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible,
+  [role="button"]:focus-visible,
+  [tabindex="0"]:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--brand) 50%, transparent);
+    outline-offset: 2px;
+  }
 }
 
 /* ── Glass panel ──────────────────────────────
@@ -168,6 +183,10 @@
     border-radius: var(--radius-xl);
     box-shadow: var(--glass-shadow);
     padding: var(--glass-padding);
+  }
+
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
   }
 }
 
@@ -204,5 +223,26 @@
   }
   50% {
     opacity: 0.12;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ── Reduced motion ──────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

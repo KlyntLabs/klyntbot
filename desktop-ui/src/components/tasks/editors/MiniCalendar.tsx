@@ -131,6 +131,7 @@ export function MiniCalendar({ value, onSelect, onClear }: MiniCalendarProps) {
         <button
           type="button"
           onClick={prevMonth}
+          aria-label="Previous month"
           className="w-6 h-6 flex items-center justify-center rounded-md text-muted hover:text-secondary hover:bg-surface-raised transition-colors"
         >
           <ChevronLeft className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -141,6 +142,7 @@ export function MiniCalendar({ value, onSelect, onClear }: MiniCalendarProps) {
         <button
           type="button"
           onClick={nextMonth}
+          aria-label="Next month"
           className="w-6 h-6 flex items-center justify-center rounded-md text-muted hover:text-secondary hover:bg-surface-raised transition-colors"
         >
           <ChevronRight className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -172,6 +174,7 @@ export function MiniCalendar({ value, onSelect, onClear }: MiniCalendarProps) {
               type="button"
               key={iso}
               onClick={() => onSelect(iso)}
+              aria-label={`${d.getDate()} ${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`}
               className={`h-7 w-full flex items-center justify-center text-[11px] font-light rounded-md transition-colors ${
                 isSelected
                   ? "bg-brand text-white"

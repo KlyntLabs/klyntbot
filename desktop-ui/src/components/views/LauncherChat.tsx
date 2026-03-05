@@ -211,7 +211,8 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
               e.target.style.height = `${Math.min(e.target.scrollHeight, 80)}px`;
             }}
             onKeyDown={handleKeyDown}
-            placeholder="Follow up..."
+            placeholder="Follow up\u2026"
+            aria-label="Message Klynt"
             rows={1}
             className="flex-1 bg-transparent text-primary text-[13px] placeholder:text-muted outline-none font-light resize-none max-h-[80px]"
           />

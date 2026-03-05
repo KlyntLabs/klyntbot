@@ -53,13 +53,17 @@ export function FinanceBudgets() {
             <p className="text-[10px] text-dim font-light uppercase tracking-wider mb-1">
               Total Budget
             </p>
-            <p className="text-[20px] font-light text-primary">{fmtCompact(totalBudget)}đ</p>
+            <p className="text-[20px] font-light text-primary tabular-nums">
+              {fmtCompact(totalBudget)}đ
+            </p>
           </Card>
           <Card className="p-4">
             <p className="text-[10px] text-dim font-light uppercase tracking-wider mb-1">
               Total Spent
             </p>
-            <p className="text-[20px] font-light text-destructive">{fmtCompact(totalSpent)}đ</p>
+            <p className="text-[20px] font-light text-destructive tabular-nums">
+              {fmtCompact(totalSpent)}đ
+            </p>
           </Card>
           <Card className="p-4">
             <p className="text-[10px] text-dim font-light uppercase tracking-wider mb-1">
@@ -67,7 +71,7 @@ export function FinanceBudgets() {
             </p>
             <p
               className={cn(
-                "text-[20px] font-light",
+                "text-[20px] font-light tabular-nums",
                 totalBudget - totalSpent >= 0 ? "text-success" : "text-destructive",
               )}
             >
@@ -124,12 +128,12 @@ export function FinanceBudgets() {
                       )}
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="text-[11px] text-muted font-light">
+                      <span className="text-[11px] text-muted font-light tabular-nums">
                         {fmtMoney(b.spent, b.currency)} / {fmtMoney(b.amount, b.currency)}
                       </span>
                       <span
                         className={cn(
-                          "text-[11px] font-light",
+                          "text-[11px] font-light tabular-nums",
                           p >= b.alertThreshold
                             ? "text-destructive"
                             : p >= 60

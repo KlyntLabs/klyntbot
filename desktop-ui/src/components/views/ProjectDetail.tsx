@@ -63,8 +63,9 @@ export function ProjectDetail() {
     "params",
   );
 
-  const [completedTasks, toggleTask] = useSetToggle(
-    tasks.filter((t) => t.completed).map((t) => t.id),
+  const completedTasks = useMemo(
+    () => new Set(tasks.filter((t) => t.completed).map((t) => t.id)),
+    [tasks],
   );
 
   // Inline editing state
@@ -79,10 +80,10 @@ export function ProjectDetail() {
 
   const handleToggleTask = useCallback(
     async (taskId: string) => {
-      toggleTask(taskId);
       await toggleComplete.mutate({ id: taskId });
+      refetchTasks();
     },
-    [toggleTask, toggleComplete],
+    [toggleComplete.mutate, refetchTasks],
   );
 
   useEvent<{ entityKind: string; id: string }>("entity:updated", (payload) => {
@@ -179,7 +180,7 @@ export function ProjectDetail() {
             <button
               type="button"
               onClick={() => setShowColorPicker(!showColorPicker)}
-              className="w-2.5 h-2.5 rounded-full cursor-pointer hover:ring-2 hover:ring-brand/30 transition-all"
+              className="w-2.5 h-2.5 rounded-full cursor-pointer hover:ring-2 hover:ring-brand/30 transition-shadow"
               style={{ backgroundColor: project.color }}
             />
             {showColorPicker && (
@@ -192,7 +193,7 @@ export function ProjectDetail() {
                       handleUpdateProject({ color: c });
                       setShowColorPicker(false);
                     }}
-                    className={`w-5 h-5 rounded-full hover:ring-2 hover:ring-brand/30 transition-all ${project.color === c ? "ring-2 ring-brand" : ""}`}
+                    className={`w-5 h-5 rounded-full hover:ring-2 hover:ring-brand/30 transition-shadow ${project.color === c ? "ring-2 ring-brand" : ""}`}
                     style={{ backgroundColor: c }}
                   />
                 ))}
@@ -375,7 +376,7 @@ export function ProjectDetail() {
                         setNewObjTitle("");
                       }
                     }}
-                    placeholder="Objective title..."
+                    placeholder="Objective title\u2026"
                     className="w-full bg-transparent text-[13px] font-light text-primary outline-none placeholder:text-dim"
                   />
                 </div>
@@ -428,7 +429,7 @@ export function ProjectDetail() {
                           setNewTaskTitle("");
                         }
                       }}
-                      placeholder="Task title..."
+                      placeholder="Task title\u2026"
                       className="w-full bg-transparent text-[13px] font-light text-primary outline-none placeholder:text-dim"
                     />
                   </div>

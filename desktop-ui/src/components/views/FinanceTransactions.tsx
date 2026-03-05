@@ -51,32 +51,27 @@ export function FinanceTransactions() {
     return txs;
   }, [transactions, filter, acctFilter, searchQ]);
 
-  const totalIncome = useMemo(
-    () =>
-      filtered
-        .filter((t) => t.txType === "income")
-        .reduce((s, t) => s + toVnd(t.amount, t.currency, rates), 0),
-    [filtered, rates],
-  );
-  const totalExpense = useMemo(
-    () =>
-      filtered
-        .filter((t) => t.txType === "expense")
-        .reduce((s, t) => s + toVnd(t.amount, t.currency, rates), 0),
-    [filtered, rates],
-  );
+  const { totalIncome, totalExpense, catSegs } = useMemo(() => {
+    let income = 0;
+    let expense = 0;
+    const catMap = new Map<string, number>();
 
-  const catSegs = useMemo(() => {
-    const m = new Map<string, number>();
-    filtered
-      .filter((t) => t.txType === "expense")
-      .forEach((t) => {
+    for (const t of filtered) {
+      const vnd = toVnd(t.amount, t.currency, rates);
+      if (t.txType === "income") {
+        income += vnd;
+      } else if (t.txType === "expense") {
+        expense += vnd;
         const c = t.category ?? "Other";
-        m.set(c, (m.get(c) ?? 0) + toVnd(t.amount, t.currency, rates));
-      });
-    return Array.from(m.entries())
+        catMap.set(c, (catMap.get(c) ?? 0) + vnd);
+      }
+    }
+
+    const segments = Array.from(catMap.entries())
       .sort((a, b) => b[1] - a[1])
       .map(([name, value], i) => ({ name, value, color: COLORS[i % COLORS.length] }));
+
+    return { totalIncome: income, totalExpense: expense, catSegs: segments };
   }, [filtered, rates]);
 
   const filters: { key: TxFilter; label: string }[] = [
@@ -99,19 +94,23 @@ export function FinanceTransactions() {
           </Card>
           <Card className="p-4">
             <p className="text-[10px] text-dim font-light uppercase tracking-wider mb-1">Income</p>
-            <p className="text-[20px] font-light text-success">{fmtCompact(totalIncome)}đ</p>
+            <p className="text-[20px] font-light text-success tabular-nums">
+              {fmtCompact(totalIncome)}đ
+            </p>
           </Card>
           <Card className="p-4">
             <p className="text-[10px] text-dim font-light uppercase tracking-wider mb-1">
               Expenses
             </p>
-            <p className="text-[20px] font-light text-destructive">{fmtCompact(totalExpense)}đ</p>
+            <p className="text-[20px] font-light text-destructive tabular-nums">
+              {fmtCompact(totalExpense)}đ
+            </p>
           </Card>
           <Card className="p-4">
             <p className="text-[10px] text-dim font-light uppercase tracking-wider mb-1">Net</p>
             <p
               className={cn(
-                "text-[20px] font-light",
+                "text-[20px] font-light tabular-nums",
                 totalIncome - totalExpense >= 0 ? "text-success" : "text-destructive",
               )}
             >
@@ -164,7 +163,7 @@ export function FinanceTransactions() {
               type="text"
               value={searchQ}
               onChange={(e) => setSearchQ(e.target.value)}
-              placeholder="Search..."
+              placeholder="Search\u2026"
               className="bg-surface-low border border-border rounded-md pl-6 pr-2 py-1 text-[11px] font-light text-secondary placeholder:text-dim w-48"
             />
           </div>
@@ -213,7 +212,9 @@ export function FinanceTransactions() {
                     key={tx.id}
                     className="grid grid-cols-[70px_24px_1fr_80px_100px_120px] gap-2 items-center px-4 py-2.5 hover:bg-surface-base transition-colors border-b border-border-subtle last:border-b-0"
                   >
-                    <span className="text-[10px] text-dim font-light">{tx.txDate}</span>
+                    <span className="text-[10px] text-dim font-light tabular-nums">
+                      {tx.txDate}
+                    </span>
                     <TxI className={cn("w-3.5 h-3.5", col)} strokeWidth={1.5} />
                     <div className="min-w-0">
                       <p className="text-[12px] font-light text-secondary truncate">
@@ -229,7 +230,7 @@ export function FinanceTransactions() {
                     <span className="text-[10px] text-dim font-light truncate">
                       {acct?.name ?? "—"}
                     </span>
-                    <span className={cn("text-[12px] font-light text-right", col)}>
+                    <span className={cn("text-[12px] font-light text-right tabular-nums", col)}>
                       {pre}
                       {fmtMoney(tx.amount, tx.currency)}
                     </span>

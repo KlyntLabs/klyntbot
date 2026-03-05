@@ -104,7 +104,7 @@ export function TimeEntrySection({ date }: TimeEntrySectionProps) {
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="What did you work on?"
-            className="w-full px-3 py-1.5 text-[13px] bg-surface-base border border-border rounded-md text-primary placeholder:text-dim focus:outline-none focus:border-brand/50"
+            className="w-full px-3 py-1.5 text-[13px] bg-surface-base border border-border rounded-md text-primary placeholder:text-dim"
           />
           <div className="flex gap-2">
             <input
@@ -113,12 +113,12 @@ export function TimeEntrySection({ date }: TimeEntrySectionProps) {
               onChange={(e) => setDurationMins(e.target.value)}
               placeholder="Minutes"
               min={1}
-              className="w-24 px-3 py-1.5 text-[13px] bg-surface-base border border-border rounded-md text-primary placeholder:text-dim focus:outline-none focus:border-brand/50"
+              className="w-24 px-3 py-1.5 text-[13px] bg-surface-base border border-border rounded-md text-primary placeholder:text-dim"
             />
             <select
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
-              className="flex-1 px-3 py-1.5 text-[13px] bg-surface-base border border-border rounded-md text-primary focus:outline-none focus:border-brand/50"
+              className="flex-1 px-3 py-1.5 text-[13px] bg-surface-base border border-border rounded-md text-primary"
             >
               <option value="">No category</option>
               {categories.map((c) => (

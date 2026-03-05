@@ -60,25 +60,33 @@ export function FinanceLiabilities() {
             <p className="text-[10px] text-dim font-light uppercase tracking-wider mb-1">
               Total Debt
             </p>
-            <p className="text-[20px] font-light text-destructive">{fmtCompact(totalRemaining)}đ</p>
+            <p className="text-[20px] font-light text-destructive tabular-nums">
+              {fmtCompact(totalRemaining)}đ
+            </p>
           </Card>
           <Card className="p-4">
             <p className="text-[10px] text-dim font-light uppercase tracking-wider mb-1">
               Total Paid
             </p>
-            <p className="text-[20px] font-light text-success">{fmtCompact(totalPaid)}đ</p>
+            <p className="text-[20px] font-light text-success tabular-nums">
+              {fmtCompact(totalPaid)}đ
+            </p>
           </Card>
           <Card className="p-4">
             <p className="text-[10px] text-dim font-light uppercase tracking-wider mb-1">
               Overall Progress
             </p>
-            <p className="text-[20px] font-light text-primary">{pct(totalPaid, totalPrincipal)}%</p>
+            <p className="text-[20px] font-light text-primary tabular-nums">
+              {pct(totalPaid, totalPrincipal)}%
+            </p>
           </Card>
           <Card className="p-4">
             <p className="text-[10px] text-dim font-light uppercase tracking-wider mb-1">
               Monthly Payments
             </p>
-            <p className="text-[20px] font-light text-brand">{fmtCompact(monthlyTotal)}đ</p>
+            <p className="text-[20px] font-light text-brand tabular-nums">
+              {fmtCompact(monthlyTotal)}đ
+            </p>
           </Card>
         </div>
 
@@ -116,7 +124,7 @@ export function FinanceLiabilities() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-[14px] font-light text-destructive">
+                      <p className="text-[14px] font-light text-destructive tabular-nums">
                         {fmtMoney(l.remaining, l.currency)}
                       </p>
                       <p className="text-[10px] text-dim font-light">
@@ -127,7 +135,7 @@ export function FinanceLiabilities() {
 
                   <div className="h-2 w-full bg-surface-raised rounded-full overflow-hidden mb-2">
                     <div
-                      className="h-full bg-success rounded-full transition-all"
+                      className="h-full bg-success rounded-full transition-[width]"
                       style={{ width: `${paid}%` }}
                     />
                   </div>
@@ -135,13 +143,13 @@ export function FinanceLiabilities() {
                   <div className="grid grid-cols-4 gap-3">
                     <div>
                       <p className="text-[9px] text-dim font-light">Paid</p>
-                      <p className="text-[11px] text-success font-light">
+                      <p className="text-[11px] text-success font-light tabular-nums">
                         {fmtMoney(paidAmt, l.currency)}
                       </p>
                     </div>
                     <div>
                       <p className="text-[9px] text-dim font-light">Progress</p>
-                      <p className="text-[11px] text-primary font-light">{paid}%</p>
+                      <p className="text-[11px] text-primary font-light tabular-nums">{paid}%</p>
                     </div>
                     {l.interestRate != null && (
                       <div>

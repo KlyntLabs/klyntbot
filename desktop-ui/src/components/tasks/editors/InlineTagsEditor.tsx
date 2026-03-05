@@ -63,7 +63,7 @@ export function InlineTagsEditor({ tags, onSave }: InlineTagsEditorProps) {
             setEditing(false);
           }}
           onClick={(e) => e.stopPropagation()}
-          placeholder="Add tag..."
+          placeholder="Add tag\u2026"
           className="bg-transparent text-[11px] font-light text-primary outline-none placeholder:text-dim min-w-[60px] flex-1"
         />
       </div>

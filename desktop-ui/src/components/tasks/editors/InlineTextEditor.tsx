@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useState } from "react";
 
 interface InlineTextEditorProps {
   value: string;
@@ -11,19 +11,16 @@ export function InlineTextEditor({ value, onSave, className, placeholder }: Inli
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
 
-  const startEdit = useCallback(
-    (e: React.SyntheticEvent) => {
-      e.stopPropagation();
-      setDraft(value);
-      setEditing(true);
-    },
-    [value],
-  );
+  const startEdit = (e: React.SyntheticEvent) => {
+    e.stopPropagation();
+    setDraft(value);
+    setEditing(true);
+  };
 
-  const save = useCallback(() => {
+  const save = () => {
     if (draft.trim() && draft !== value) onSave(draft.trim());
     setEditing(false);
-  }, [draft, value, onSave]);
+  };
 
   if (editing) {
     return (

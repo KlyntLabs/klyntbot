@@ -8,7 +8,7 @@ import {
   useState,
   useTransition,
 } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { useEvent } from "../../hooks/useEvent";
 import { useMutation } from "../../hooks/useMutation";
 import { useQuery } from "../../hooks/useQuery";
@@ -35,12 +35,35 @@ import { OkrView } from "./OkrView";
 
 export function MainApp() {
   const _navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<Tab>("All");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = (searchParams.get("tab") as Tab) || "All";
+  const viewMode = (searchParams.get("view") as ViewMode) || "table";
+  const setActiveTab = useCallback(
+    (tab: Tab) => {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        if (tab === "All") next.delete("tab");
+        else next.set("tab", tab);
+        return next;
+      });
+    },
+    [setSearchParams],
+  );
+  const setViewMode = useCallback(
+    (mode: ViewMode) => {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        if (mode === "table") next.delete("view");
+        else next.set("view", mode);
+        return next;
+      });
+    },
+    [setSearchParams],
+  );
   const [activeSidebar, setActiveSidebar] = useState<SidebarItem>("Tasks");
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [openSessionKey, setOpenSessionKey] = useState<string | null>(null);
   const prevSidebarRef = useRef<SidebarItem>("Tasks");
-  const [viewMode, setViewMode] = useState<ViewMode>("table");
   const [isPending, startTransition] = useTransition();
   const [collapsedProjects, toggleProject] = useSetToggle();
   const {

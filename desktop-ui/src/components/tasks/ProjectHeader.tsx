@@ -49,7 +49,9 @@ export function ProjectHeader({
                   <span className="text-[10px] text-muted font-light truncate">
                     {objective.title}
                   </span>
-                  <span className="text-[9px] text-dim font-light">{objective.progress}%</span>
+                  <span className="text-[9px] text-dim font-light tabular-nums">
+                    {objective.progress}%
+                  </span>
                   {idx < objectives.length - 1 && (
                     <span className="text-dim text-[10px] ml-1">&middot;</span>
                   )}

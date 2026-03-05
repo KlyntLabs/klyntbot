@@ -273,7 +273,7 @@ export function ObjectiveDetail() {
                       setNewKrTitle("");
                     }
                   }}
-                  placeholder="Key result title..."
+                  placeholder="Key result title\u2026"
                   className="w-full bg-transparent text-[13px] font-light text-primary outline-none placeholder:text-dim"
                 />
               </div>

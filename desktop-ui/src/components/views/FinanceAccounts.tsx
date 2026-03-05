@@ -97,7 +97,7 @@ export function FinanceAccounts() {
                       </p>
                     </div>
                   </div>
-                  <p className="text-[18px] font-light text-primary">
+                  <p className="text-[18px] font-light text-primary tabular-nums">
                     {fmtMoney(acct.balance, acct.currency)}
                   </p>
                   {acct.currency !== "VND" && (
@@ -172,9 +172,11 @@ export function FinanceAccounts() {
                         <p className="text-[11px] font-light text-secondary truncate">
                           {tx.counterparty ?? tx.notes ?? tx.txType}
                         </p>
-                        <p className="text-[9px] text-dim font-light">{tx.txDate}</p>
+                        <p className="text-[9px] text-dim font-light tabular-nums">{tx.txDate}</p>
                       </div>
-                      <span className={cn("text-[11px] font-light flex-shrink-0", col)}>
+                      <span
+                        className={cn("text-[11px] font-light flex-shrink-0 tabular-nums", col)}
+                      >
                         {pre}
                         {fmtMoney(tx.amount, tx.currency)}
                       </span>

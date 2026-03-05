@@ -46,6 +46,13 @@ export function RootTaskRow({
 
   return (
     <tr
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          navigate(`/task/${task.id}`);
+        }
+      }}
       onClick={() => navigate(`/task/${task.id}`)}
       className="hover:bg-surface-base transition-colors border-b border-border-subtle last:border-b-0 cursor-pointer whitespace-nowrap"
     >
@@ -79,7 +86,7 @@ export function RootTaskRow({
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 min-w-0">
           {task.objectiveId && (
             <Target className="w-[10px] h-[10px] text-brand flex-shrink-0" strokeWidth={1.5} />
           )}
@@ -217,6 +224,13 @@ export function SubtaskRow({ task, isCompleted, onToggle, onUpdate }: SubtaskRow
 
   return (
     <tr
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          navigate(`/task/${task.id}`);
+        }
+      }}
       onClick={() => navigate(`/task/${task.id}`)}
       className="hover:bg-surface-base transition-colors border-b border-border-subtle last:border-b-0 cursor-pointer whitespace-nowrap bg-surface-lowest relative"
       style={{ boxShadow: "inset 3px 0 0 var(--brand)" }}
@@ -236,7 +250,7 @@ export function SubtaskRow({ task, isCompleted, onToggle, onUpdate }: SubtaskRow
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-1.5 pl-6">
+        <div className="flex items-center gap-1.5 pl-6 min-w-0">
           {task.objectiveId && (
             <Target className="w-[10px] h-[10px] text-brand flex-shrink-0" strokeWidth={1.5} />
           )}

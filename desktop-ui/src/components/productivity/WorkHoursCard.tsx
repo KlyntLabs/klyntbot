@@ -35,7 +35,7 @@ export function WorkHoursCard({ totalActiveSecs, workDayHours = 8 }: WorkHoursCa
       <div className="relative">
         <div className="h-2 rounded-full bg-surface-raised overflow-hidden">
           <div
-            className="h-full rounded-full transition-all duration-700"
+            className="h-full rounded-full transition-[width] duration-700"
             style={{
               width: `${pct}%`,
               background: isComplete

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type { ApiError } from "../lib/types";
 import { parseApiError } from "../lib/utils";
 import { ipc } from "./useIpc";
@@ -45,5 +45,5 @@ export function useMutation<T = void, P = Record<string, unknown>>(
     }
   }, []);
 
-  return { mutate, loading, error };
+  return useMemo(() => ({ mutate, loading, error }), [mutate, loading, error]);
 }

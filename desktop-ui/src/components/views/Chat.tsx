@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, useSearchParams } from "react-router";
 import { useChatSession } from "../../hooks/useChatSession";
 import { ipc } from "../../hooks/useIpc";
 import { useQuery } from "../../hooks/useQuery";
@@ -21,8 +21,25 @@ interface GroupedThreads {
 
 export function Chat() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activeSidebar, setActiveSidebar] = useState<SidebarItem>("Chat");
-  const [selectedThread, setSelectedThread] = useState(() => `chat:${crypto.randomUUID()}`);
+  const [selectedThread, setSelectedThreadState] = useState(
+    () => searchParams.get("thread") || `chat:${crypto.randomUUID()}`,
+  );
+  const setSelectedThread = useCallback(
+    (key: string) => {
+      setSelectedThreadState(key);
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set("thread", key);
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
   const [expandedGroups, toggleGroup] = useSetToggle(["_general"]);
 
   // IPC data
@@ -62,15 +79,15 @@ export function Chat() {
   const activeTransparency =
     chat.isStreaming && chat.transparency ? chat.transparency : lastAssistantTransparency;
 
-  // Auto-select first thread on initial load
-  const didAutoSelect = useRef(false);
+  // Auto-select first thread on initial load (skip if URL already has a thread)
+  const didAutoSelect = useRef(!!searchParams.get("thread"));
   useEffect(() => {
     if (didAutoSelect.current) return;
     if (threads.length > 0) {
       setSelectedThread(threads[0].sessionKey);
       didAutoSelect.current = true;
     }
-  }, [threads]);
+  }, [threads, setSelectedThread]);
 
   // Group threads into PARA hierarchy, features, and general
   const grouped = useMemo<GroupedThreads>(() => {
@@ -115,17 +132,13 @@ export function Chat() {
     return { areas: Array.from(areaMap.values()), features: featureMap, general };
   }, [threads]);
 
-  const handleSend = useCallback(() => {
+  const handleSend = () => {
     chat.send();
-  }, [chat]);
+  };
 
-  const handleNewThread = useCallback(() => {
+  const handleNewThread = () => {
     setSelectedThread(`chat:${crypto.randomUUID()}`);
-  }, []);
-
-  const selectThread = useCallback((key: string) => {
-    setSelectedThread(key);
-  }, []);
+  };
 
   // ── Thread actions ─────────────────────────────────────────────────────
   const [contextMenu, setContextMenu] = useState<{
@@ -134,11 +147,15 @@ export function Chat() {
     y: number;
   } | null>(null);
   const [renaming, setRenaming] = useState<{ sessionKey: string; value: string } | null>(null);
+  const [confirmDeleteThread, setConfirmDeleteThread] = useState<string | null>(null);
   const renameRef = useRef<HTMLInputElement>(null);
 
   // Close context menu on outside mousedown or Escape
   useEffect(() => {
-    if (!contextMenu) return;
+    if (!contextMenu) {
+      setConfirmDeleteThread(null);
+      return;
+    }
     const closeOnClick = () => setContextMenu(null);
     const closeOnKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setContextMenu(null);
@@ -183,6 +200,11 @@ export function Chat() {
 
   const deleteThread = useCallback(
     async (sessionKey: string) => {
+      if (confirmDeleteThread !== sessionKey) {
+        setConfirmDeleteThread(sessionKey);
+        return;
+      }
+      setConfirmDeleteThread(null);
       setContextMenu(null);
       try {
         await ipc("chat_delete_thread", { sessionKey });
@@ -192,7 +214,7 @@ export function Chat() {
         refetchThreads();
       } catch {}
     },
-    [selectedThread, refetchThreads],
+    [selectedThread, refetchThreads, confirmDeleteThread, setSelectedThread],
   );
 
   return (
@@ -212,7 +234,7 @@ export function Chat() {
         expandedGroups={expandedGroups}
         renaming={renaming}
         renameRef={renameRef}
-        onSelectThread={selectThread}
+        onSelectThread={setSelectedThread}
         onNewThread={handleNewThread}
         onToggleGroup={toggleGroup}
         onContextMenu={openContextMenu}

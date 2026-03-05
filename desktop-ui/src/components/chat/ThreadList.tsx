@@ -1,5 +1,4 @@
 import { FolderOpen, Globe, Plus, RotateCcw, Settings, Wallet } from "lucide-react";
-import { useCallback } from "react";
 import type { ChatThread } from "../../lib/types";
 import { GroupHeader } from "./GroupHeader";
 import { ThreadButton } from "./ThreadButton";
@@ -58,32 +57,20 @@ export function ThreadList({
   onRenameConfirm,
   onRenameCancel,
 }: ThreadListProps) {
-  const renderThread = useCallback(
-    (thread: ChatThread) => (
-      <ThreadButton
-        key={thread.sessionKey}
-        thread={thread}
-        isActive={selectedThread === thread.sessionKey}
-        isRenaming={renaming?.sessionKey === thread.sessionKey}
-        renameValue={renaming?.value ?? ""}
-        onSelect={onSelectThread}
-        onContextMenu={onContextMenu}
-        onRenameChange={onRenameChange}
-        onRenameConfirm={onRenameConfirm}
-        onRenameCancel={onRenameCancel}
-        renameRef={renaming?.sessionKey === thread.sessionKey ? renameRef : undefined}
-      />
-    ),
-    [
-      selectedThread,
-      renaming,
-      renameRef,
-      onSelectThread,
-      onContextMenu,
-      onRenameChange,
-      onRenameConfirm,
-      onRenameCancel,
-    ],
+  const renderThread = (thread: ChatThread) => (
+    <ThreadButton
+      key={thread.sessionKey}
+      thread={thread}
+      isActive={selectedThread === thread.sessionKey}
+      isRenaming={renaming?.sessionKey === thread.sessionKey}
+      renameValue={renaming?.value ?? ""}
+      onSelect={onSelectThread}
+      onContextMenu={onContextMenu}
+      onRenameChange={onRenameChange}
+      onRenameConfirm={onRenameConfirm}
+      onRenameCancel={onRenameCancel}
+      renameRef={renaming?.sessionKey === thread.sessionKey ? renameRef : undefined}
+    />
   );
 
   return (

@@ -99,7 +99,7 @@ export function GoalsProgress() {
                   </div>
                   <div className="h-1.5 rounded-full bg-surface-raised overflow-hidden">
                     <div
-                      className={`h-full rounded-full transition-all ${g.met ? "bg-success" : "bg-brand"}`}
+                      className={`h-full rounded-full transition-[width] ${g.met ? "bg-success" : "bg-brand"}`}
                       style={{ width: `${pct}%` }}
                     />
                   </div>

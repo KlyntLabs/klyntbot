@@ -187,7 +187,8 @@ export function Launcher() {
                     setSelectedIndex(0);
                   }}
                   onKeyDown={handleKeyDown}
-                  placeholder="Ask Klynt anything or type a command..."
+                  placeholder="Ask Klynt anything or type a command\u2026"
+                  aria-label="Search commands"
                   className="flex-1 bg-transparent text-primary text-[13px] placeholder:text-muted outline-none font-light"
                 />
                 <div className="flex items-center gap-1.5">
@@ -209,7 +210,7 @@ export function Launcher() {
                   {query.trim() && (
                     <button
                       type="button"
-                      className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all ${
+                      className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-xl transition-colors ${
                         0 === selectedIndex ? "bg-surface-highest" : "hover:bg-surface-base"
                       }`}
                       onMouseEnter={() => setSelectedIndex(0)}
@@ -240,7 +241,7 @@ export function Launcher() {
                       <button
                         type="button"
                         key={item.id}
-                        className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all ${
+                        className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-xl transition-colors ${
                           isSelected ? "bg-surface-highest" : "hover:bg-surface-base"
                         }`}
                         onMouseEnter={() => setSelectedIndex(actualIndex)}
@@ -250,7 +251,11 @@ export function Launcher() {
                             isSelected ? "bg-brand text-white" : "bg-surface-base text-muted"
                           }`}
                         >
-                          <Icon className="w-[18px] h-[18px]" strokeWidth={1.5} />
+                          <Icon
+                            className="w-[18px] h-[18px]"
+                            strokeWidth={1.5}
+                            aria-hidden="true"
+                          />
                         </div>
                         <div className="flex-1 text-left">
                           <h3 className="text-primary text-[13px] font-light">{item.title}</h3>

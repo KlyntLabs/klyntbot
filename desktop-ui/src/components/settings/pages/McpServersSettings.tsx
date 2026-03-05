@@ -77,12 +77,19 @@ export function McpServersSettings() {
     [toggleServer, refetch],
   );
 
+  const [confirmRemoveServer, setConfirmRemoveServer] = useState<string | null>(null);
+
   const handleRemove = useCallback(
     async (name: string) => {
+      if (confirmRemoveServer !== name) {
+        setConfirmRemoveServer(name);
+        return;
+      }
+      setConfirmRemoveServer(null);
       await removeServer({ name });
       refetch();
     },
-    [removeServer, refetch],
+    [removeServer, refetch, confirmRemoveServer],
   );
 
   // One-click install: add server with defaults (no dialog for recommended servers)

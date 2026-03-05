@@ -241,8 +241,9 @@ export function SystemTray() {
                   handleChatSubmit();
                 }
               }}
-              placeholder="Ask Klynt..."
-              className="flex-1 bg-transparent text-[13px] font-light text-primary placeholder:text-muted focus:outline-none"
+              placeholder="Ask Klynt\u2026"
+              aria-label="Ask Klynt"
+              className="flex-1 bg-transparent text-[13px] font-light text-primary placeholder:text-muted"
             />
             <button
               type="button"

@@ -67,7 +67,7 @@ export function TopApps({ apps }: TopAppsProps) {
               {/* Bar */}
               <div className="flex-1 h-2 rounded-full bg-surface-raised overflow-hidden relative">
                 <div
-                  className="h-full rounded-full transition-all duration-500"
+                  className="h-full rounded-full transition-[width] duration-500"
                   style={{
                     width: `${widthPct}%`,
                     background: `linear-gradient(90deg, ${color}, ${color}dd)`,

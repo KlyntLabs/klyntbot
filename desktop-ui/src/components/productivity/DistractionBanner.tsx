@@ -82,7 +82,7 @@ export function DistractionBanner({ summary }: DistractionBannerProps) {
             <span className="text-[12px] text-muted">
               on distracting apps
               {distractingPct > 0 && (
-                <span className="text-dim"> · {distractingPct}% of active time</span>
+                <span className="text-dim tabular-nums"> · {distractingPct}% of active time</span>
               )}
             </span>
           </div>

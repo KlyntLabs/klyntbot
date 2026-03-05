@@ -83,7 +83,8 @@ export function PomodoroTimer() {
                 </span>
                 {session.qualityScore != null && (
                   <span className="text-[10px] font-light text-dim">
-                    Quality: {Math.round(session.qualityScore * 100)}%
+                    Quality:{" "}
+                    <span className="tabular-nums">{Math.round(session.qualityScore * 100)}%</span>
                   </span>
                 )}
               </div>
@@ -93,7 +94,7 @@ export function PomodoroTimer() {
           {targetSecs > 0 && (
             <div className="h-1.5 rounded-full bg-surface-raised overflow-hidden">
               <div
-                className="h-full rounded-full bg-brand transition-all"
+                className="h-full rounded-full bg-brand transition-[width]"
                 style={{ width: `${Math.min((elapsed / targetSecs) * 100, 100)}%` }}
               />
             </div>

@@ -21,7 +21,7 @@ function ScoreBar({ label, value }: { label: string; value: number }) {
       <span className="w-20 text-muted text-right">{label}</span>
       <div className="flex-1 h-1 rounded-full bg-surface-raised overflow-hidden">
         <div
-          className="h-full rounded-full bg-brand/60 transition-all"
+          className="h-full rounded-full bg-brand/60 transition-[width]"
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -80,7 +80,7 @@ export function ProductivityScoreRing({ score, size = 110, summary }: Productivi
             strokeLinecap="round"
             strokeDasharray={circumference}
             strokeDashoffset={offset}
-            className="transition-all duration-1000"
+            className="transition-[stroke-dashoffset] duration-1000"
             style={{
               filter: `drop-shadow(0 0 4px ${color}66)`,
             }}

@@ -39,13 +39,15 @@ export function FinanceLayout({ children }: FinanceLayoutProps) {
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Full-width tab bar (matches tasks page pattern) */}
         <div className="h-14 bg-background flex items-center px-2 flex-shrink-0">
-          <div className="flex-1 flex items-center gap-2">
+          <div className="flex-1 flex items-center gap-2" role="tablist">
             {subNav.map((item) => {
               const isActive = currentPath === item.path;
               return (
                 <button
                   type="button"
                   key={item.path}
+                  role="tab"
+                  aria-selected={isActive}
                   onClick={() => navigate(item.path)}
                   className={`flex-1 py-2 rounded-md text-[13px] font-light transition-colors ${
                     isActive

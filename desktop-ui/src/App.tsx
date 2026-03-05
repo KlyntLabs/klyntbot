@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
 import { createHashRouter, Navigate, RouterProvider } from "react-router";
+import { todayISO } from "./lib/dates";
 
 const MainApp = lazy(() =>
   import("./components/views/MainApp").then((m) => ({ default: m.MainApp })),
@@ -100,6 +101,10 @@ const DistractionOverlay = lazy(() =>
   })),
 );
 
+function ProductivityRedirect() {
+  return <Navigate to={`/productivity/day/${todayISO()}`} replace />;
+}
+
 const router = createHashRouter([
   { path: "/", element: <MainApp /> },
   { path: "/chat", element: <Chat /> },
@@ -108,7 +113,7 @@ const router = createHashRouter([
   { path: "/objective/:id", element: <ObjectiveDetail /> },
   {
     path: "/productivity",
-    element: <Navigate to={`/productivity/day/${new Date().toISOString().slice(0, 10)}`} replace />,
+    element: <ProductivityRedirect />,
   },
   { path: "/productivity/day/:date", element: <ProductivityDayPage /> },
   { path: "/productivity/week/:weekStart", element: <ProductivityWeekPage /> },

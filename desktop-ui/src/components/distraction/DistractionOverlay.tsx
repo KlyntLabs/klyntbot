@@ -37,14 +37,14 @@ export function DistractionOverlay() {
   if (!intervention) {
     return (
       <div className="w-screen h-screen flex items-center justify-center">
-        <div className="text-dim text-sm">Waiting...</div>
+        <div className="text-dim text-sm">Waiting\u2026</div>
       </div>
     );
   }
 
   const titleExcerpt = intervention.windowTitle
     ? intervention.windowTitle.length > 60
-      ? `${intervention.windowTitle.slice(0, 60)}...`
+      ? `${intervention.windowTitle.slice(0, 60)}\u2026`
       : intervention.windowTitle
     : null;
 

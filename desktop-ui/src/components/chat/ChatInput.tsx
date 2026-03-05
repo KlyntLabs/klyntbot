@@ -36,7 +36,7 @@ export function ChatInput({ input, isStreaming, onInputChange, onSend }: ChatInp
             aria-label="Message input"
             placeholder="Ask Klynt anything, @ to add files, / for commands"
             rows={1}
-            className="flex-1 bg-transparent py-3.5 text-[13px] text-primary placeholder:text-muted focus:outline-none font-light resize-none overflow-hidden"
+            className="flex-1 bg-transparent py-3.5 text-[13px] text-primary placeholder:text-muted font-light resize-none overflow-hidden"
             style={{ maxHeight: "200px" }}
           />
           <button

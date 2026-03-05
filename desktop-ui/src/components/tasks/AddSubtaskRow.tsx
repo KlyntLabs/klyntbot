@@ -46,7 +46,7 @@ export function AddSubtaskRow({ parentId }: AddSubtaskRowProps) {
                 }
               }}
               onBlur={save}
-              placeholder="Subtask title..."
+              placeholder="Subtask title\u2026"
               className="bg-transparent text-[12px] font-light text-primary outline-none placeholder:text-dim flex-1"
             />
           ) : (

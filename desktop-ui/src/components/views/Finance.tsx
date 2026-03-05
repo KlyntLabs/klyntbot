@@ -155,7 +155,7 @@ export function Finance() {
             <p className="text-[10px] text-dim font-light uppercase tracking-wider mb-1">
               Net Worth
             </p>
-            <p className="text-[24px] font-light text-primary tracking-tight leading-tight mb-3">
+            <p className="text-[24px] font-light text-primary tracking-tight leading-tight mb-3 tabular-nums">
               {fmtCompact(totalNet)}đ
             </p>
             <div className="space-y-1.5">
@@ -164,7 +164,7 @@ export function Finance() {
                   <TrendingUp className="w-3 h-3 text-success" strokeWidth={1.5} />
                   <span className="text-[10px] text-muted font-light">Assets</span>
                 </div>
-                <span className="text-[10px] text-success font-light">
+                <span className="text-[10px] text-success font-light tabular-nums">
                   {fmtCompact(totalAssets)}đ
                 </span>
               </div>
@@ -173,7 +173,7 @@ export function Finance() {
                   <TrendingDown className="w-3 h-3 text-destructive" strokeWidth={1.5} />
                   <span className="text-[10px] text-muted font-light">Debt</span>
                 </div>
-                <span className="text-[10px] text-destructive font-light">
+                <span className="text-[10px] text-destructive font-light tabular-nums">
                   {fmtCompact(totalDebt)}đ
                 </span>
               </div>
@@ -212,7 +212,7 @@ export function Finance() {
                       </p>
                     </div>
                   </div>
-                  <p className="text-[14px] font-light text-primary">
+                  <p className="text-[14px] font-light text-primary tabular-nums">
                     {fmtMoney(acct.balance, acct.currency)}
                   </p>
                   {acct.currency !== "VND" && (
@@ -252,15 +252,15 @@ export function Finance() {
                       />
                       <span className="text-[12px] font-light text-secondary">{b.name}</span>
                     </div>
-                    <div className="text-right text-[12px] font-light text-muted">
+                    <div className="text-right text-[12px] font-light text-muted tabular-nums">
                       {fmtMoney(b.amount, b.currency)}
                     </div>
-                    <div className="text-right text-[12px] font-light text-primary">
+                    <div className="text-right text-[12px] font-light text-primary tabular-nums">
                       {fmtMoney(b.spent, b.currency)}
                     </div>
                     <div
                       className={cn(
-                        "text-right text-[12px] font-light",
+                        "text-right text-[12px] font-light tabular-nums",
                         rem < 0 ? "text-destructive" : "text-success",
                       )}
                     >
@@ -269,7 +269,7 @@ export function Finance() {
                     </div>
                     <div
                       className={cn(
-                        "text-right text-[11px] font-light",
+                        "text-right text-[11px] font-light tabular-nums",
                         p >= b.alertThreshold
                           ? "text-destructive"
                           : p >= 60
@@ -320,7 +320,7 @@ export function Finance() {
                   key={tx.id}
                   className="flex items-center gap-3 px-4 py-2 hover:bg-surface-base transition-colors border-b border-border-subtle last:border-b-0"
                 >
-                  <span className="text-[10px] text-dim font-light w-10 flex-shrink-0">
+                  <span className="text-[10px] text-dim font-light w-10 flex-shrink-0 tabular-nums">
                     {tx.txDate.slice(5)}
                   </span>
                   <TxI className={cn("w-3 h-3 flex-shrink-0", col)} strokeWidth={1.5} />
@@ -333,7 +333,12 @@ export function Finance() {
                     </span>
                   )}
                   {acct && <span className="text-[10px] text-dim font-light">{acct.name}</span>}
-                  <span className={cn("text-[12px] font-light w-24 text-right flex-shrink-0", col)}>
+                  <span
+                    className={cn(
+                      "text-[12px] font-light w-24 text-right flex-shrink-0 tabular-nums",
+                      col,
+                    )}
+                  >
                     {pre}
                     {fmtMoney(tx.amount, tx.currency)}
                   </span>
@@ -365,7 +370,7 @@ export function Finance() {
               </div>
               <div className="border-t border-border-subtle pt-2 flex justify-between">
                 <span className="text-[10px] text-muted font-light">Savings rate</span>
-                <span className="text-[10px] text-brand font-light">
+                <span className="text-[10px] text-brand font-light tabular-nums">
                   {totalIncome > 0 ? pct(totalIncome - totalSpend, totalIncome) : 0}%
                 </span>
               </div>
@@ -469,7 +474,7 @@ export function Finance() {
                         {l.liabilityType.replace("_", " ")}
                       </span>
                     </div>
-                    <span className="text-[12px] font-light text-destructive">
+                    <span className="text-[12px] font-light text-destructive tabular-nums">
                       {fmtMoney(l.remaining, l.currency)}
                     </span>
                   </div>

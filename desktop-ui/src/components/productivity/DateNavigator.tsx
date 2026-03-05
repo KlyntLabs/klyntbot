@@ -13,6 +13,7 @@ export function DateNavigator({ label, onPrev, onNext, onToday }: DateNavigatorP
       <button
         type="button"
         onClick={onPrev}
+        aria-label="Previous period"
         className="w-7 h-7 rounded-md bg-surface-base flex items-center justify-center text-muted hover:text-secondary hover:bg-surface-raised transition-colors"
       >
         <ChevronLeft className="w-4 h-4" strokeWidth={1.5} />
@@ -20,6 +21,7 @@ export function DateNavigator({ label, onPrev, onNext, onToday }: DateNavigatorP
       <button
         type="button"
         onClick={onToday}
+        aria-label="Go to today"
         className="w-7 h-7 rounded-md bg-surface-base flex items-center justify-center text-muted hover:text-secondary hover:bg-surface-raised transition-colors"
       >
         <Calendar className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -27,6 +29,7 @@ export function DateNavigator({ label, onPrev, onNext, onToday }: DateNavigatorP
       <button
         type="button"
         onClick={onNext}
+        aria-label="Next period"
         className="w-7 h-7 rounded-md bg-surface-base flex items-center justify-center text-muted hover:text-secondary hover:bg-surface-raised transition-colors"
       >
         <ChevronRight className="w-4 h-4" strokeWidth={1.5} />

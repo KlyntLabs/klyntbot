@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   ActiveInteraction,
   ChatMessage,
@@ -39,13 +39,27 @@ export function MessageList({
   activeDelegateAgent,
 }: MessageListProps) {
   const endRef = useRef<HTMLDivElement>(null);
+  const [userScrolledUp, setUserScrolledUp] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
+  // Auto-scroll on new messages/streaming unless user scrolled up
+  const messageCount = messages.length;
+  const segmentCount = segments.length;
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (!userScrolledUp && (messageCount > 0 || segmentCount > 0 || isStreaming)) {
+      endRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [messageCount, segmentCount, isStreaming, userScrolledUp]);
+
+  const handleScroll = useCallback(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+    setUserScrolledUp(!isNearBottom);
   }, []);
 
   return (
-    <div className="space-y-6">
+    <div ref={containerRef} onScroll={handleScroll} className="space-y-6" aria-live="polite">
       {messages.map((msg) => (
         <div
           key={msg.id}
@@ -128,6 +142,22 @@ export function MessageList({
           request={activeInteraction.request}
           onSubmitted={onInteractionSubmitted}
         />
+      )}
+
+      {userScrolledUp && (
+        <div className="sticky bottom-2 flex justify-center">
+          <button
+            type="button"
+            onClick={() => {
+              endRef.current?.scrollIntoView({ behavior: "smooth" });
+              setUserScrolledUp(false);
+            }}
+            className="px-3 py-1.5 rounded-full bg-surface-raised text-[11px] text-muted font-light hover:bg-surface-highest transition-colors"
+            aria-label="Scroll to bottom"
+          >
+            Scroll to bottom
+          </button>
+        </div>
       )}
 
       <div ref={endRef} />

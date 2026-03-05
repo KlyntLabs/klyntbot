@@ -107,7 +107,9 @@ export function OkrView() {
               <span className="text-[11px] text-muted font-light">
                 {projectObjectives.length} objectives
               </span>
-              <span className="text-[11px] text-muted font-light ml-2">{avgProgress}%</span>
+              <span className="text-[11px] text-muted font-light ml-2 tabular-nums">
+                {avgProgress}%
+              </span>
             </button>
 
             {/* Objectives */}
@@ -153,7 +155,7 @@ export function OkrView() {
                           setNewTitle("");
                         }
                       }}
-                      placeholder="Objective title..."
+                      placeholder="Objective title\u2026"
                       className="w-full bg-transparent text-[13px] font-light text-primary outline-none placeholder:text-dim"
                     />
                   </div>

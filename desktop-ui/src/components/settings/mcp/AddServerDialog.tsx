@@ -57,17 +57,23 @@ export function AddServerDialog({ open, onClose, onAdd, prefill }: AddServerDial
     name.trim() !== "" && (transport === "stdio" ? command.trim() !== "" : url.trim() !== "");
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="add-server-dialog-title"
+    >
       <div className="glass-panel w-[480px] max-h-[80vh] overflow-y-auto">
         <div className="bg-surface-low rounded-[var(--glass-radius-inner)]">
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-            <h3 className="text-[14px] font-medium text-primary">
+            <h3 id="add-server-dialog-title" className="text-[14px] font-medium text-primary">
               {prefill ? `Install ${prefill.name}` : "Add MCP server"}
             </h3>
             <button
               type="button"
               onClick={onClose}
+              aria-label="Close dialog"
               className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:text-secondary hover:bg-surface-base transition-colors"
             >
               <X className="w-4 h-4" />
@@ -87,7 +93,7 @@ export function AddServerDialog({ open, onClose, onAdd, prefill }: AddServerDial
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. my-server"
-                className="w-full px-3 py-1.5 text-[13px] bg-surface-base border border-border rounded-md text-primary placeholder:text-dim focus:outline-none focus:border-brand/50"
+                className="w-full px-3 py-1.5 text-[13px] bg-surface-base border border-border rounded-md text-primary placeholder:text-dim"
               />
             </div>
 
@@ -125,7 +131,7 @@ export function AddServerDialog({ open, onClose, onAdd, prefill }: AddServerDial
                     value={command}
                     onChange={(e) => setCommand(e.target.value)}
                     placeholder="e.g. npx"
-                    className="w-full px-3 py-1.5 text-[13px] bg-surface-base border border-border rounded-md text-primary placeholder:text-dim focus:outline-none focus:border-brand/50"
+                    className="w-full px-3 py-1.5 text-[13px] bg-surface-base border border-border rounded-md text-primary placeholder:text-dim"
                   />
                 </div>
 
@@ -139,7 +145,7 @@ export function AddServerDialog({ open, onClose, onAdd, prefill }: AddServerDial
                     value={args}
                     onChange={(e) => setArgs(e.target.value)}
                     placeholder="e.g. -y, @modelcontextprotocol/server-github"
-                    className="w-full px-3 py-1.5 text-[13px] bg-surface-base border border-border rounded-md text-primary placeholder:text-dim focus:outline-none focus:border-brand/50"
+                    className="w-full px-3 py-1.5 text-[13px] bg-surface-base border border-border rounded-md text-primary placeholder:text-dim"
                   />
                 </div>
 
@@ -153,6 +159,7 @@ export function AddServerDialog({ open, onClose, onAdd, prefill }: AddServerDial
                         setEnvPairs([...envPairs, { id: envIdCounter, key: "", value: "" }]);
                         setEnvIdCounter((c) => c + 1);
                       }}
+                      aria-label="Add environment variable"
                       className="w-5 h-5 rounded flex items-center justify-center text-muted hover:text-secondary hover:bg-surface-base transition-colors"
                     >
                       <Plus className="w-3.5 h-3.5" />
@@ -170,7 +177,7 @@ export function AddServerDialog({ open, onClose, onAdd, prefill }: AddServerDial
                             setEnvPairs(next);
                           }}
                           placeholder="KEY"
-                          className="flex-1 px-2.5 py-1.5 text-[12px] font-mono bg-surface-base border border-border rounded-md text-primary placeholder:text-dim focus:outline-none focus:border-brand/50"
+                          className="flex-1 px-2.5 py-1.5 text-[12px] font-mono bg-surface-base border border-border rounded-md text-primary placeholder:text-dim"
                         />
                         <input
                           type="text"
@@ -181,11 +188,12 @@ export function AddServerDialog({ open, onClose, onAdd, prefill }: AddServerDial
                             setEnvPairs(next);
                           }}
                           placeholder="value"
-                          className="flex-1 px-2.5 py-1.5 text-[12px] font-mono bg-surface-base border border-border rounded-md text-primary placeholder:text-dim focus:outline-none focus:border-brand/50"
+                          className="flex-1 px-2.5 py-1.5 text-[12px] font-mono bg-surface-base border border-border rounded-md text-primary placeholder:text-dim"
                         />
                         <button
                           type="button"
                           onClick={() => setEnvPairs(envPairs.filter((_, j) => j !== i))}
+                          aria-label="Remove environment variable"
                           className="w-7 h-7 rounded flex items-center justify-center text-muted hover:text-destructive hover:bg-surface-base transition-colors flex-shrink-0"
                         >
                           <Minus className="w-3.5 h-3.5" />
@@ -206,11 +214,11 @@ export function AddServerDialog({ open, onClose, onAdd, prefill }: AddServerDial
                   </label>
                   <input
                     id="mcp-url"
-                    type="text"
+                    type="url"
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
                     placeholder="e.g. https://mcp.example.com/v1"
-                    className="w-full px-3 py-1.5 text-[13px] bg-surface-base border border-border rounded-md text-primary placeholder:text-dim focus:outline-none focus:border-brand/50"
+                    className="w-full px-3 py-1.5 text-[13px] bg-surface-base border border-border rounded-md text-primary placeholder:text-dim"
                   />
                 </div>
 
@@ -227,6 +235,7 @@ export function AddServerDialog({ open, onClose, onAdd, prefill }: AddServerDial
                         ]);
                         setHeaderIdCounter((c) => c + 1);
                       }}
+                      aria-label="Add header"
                       className="w-5 h-5 rounded flex items-center justify-center text-muted hover:text-secondary hover:bg-surface-base transition-colors"
                     >
                       <Plus className="w-3.5 h-3.5" />
@@ -244,7 +253,7 @@ export function AddServerDialog({ open, onClose, onAdd, prefill }: AddServerDial
                             setHeaderPairs(next);
                           }}
                           placeholder="Header-Name"
-                          className="flex-1 px-2.5 py-1.5 text-[12px] font-mono bg-surface-base border border-border rounded-md text-primary placeholder:text-dim focus:outline-none focus:border-brand/50"
+                          className="flex-1 px-2.5 py-1.5 text-[12px] font-mono bg-surface-base border border-border rounded-md text-primary placeholder:text-dim"
                         />
                         <input
                           type="text"
@@ -255,11 +264,12 @@ export function AddServerDialog({ open, onClose, onAdd, prefill }: AddServerDial
                             setHeaderPairs(next);
                           }}
                           placeholder="value"
-                          className="flex-1 px-2.5 py-1.5 text-[12px] font-mono bg-surface-base border border-border rounded-md text-primary placeholder:text-dim focus:outline-none focus:border-brand/50"
+                          className="flex-1 px-2.5 py-1.5 text-[12px] font-mono bg-surface-base border border-border rounded-md text-primary placeholder:text-dim"
                         />
                         <button
                           type="button"
                           onClick={() => setHeaderPairs(headerPairs.filter((_, j) => j !== i))}
+                          aria-label="Remove header"
                           className="w-7 h-7 rounded flex items-center justify-center text-muted hover:text-destructive hover:bg-surface-base transition-colors flex-shrink-0"
                         >
                           <Minus className="w-3.5 h-3.5" />

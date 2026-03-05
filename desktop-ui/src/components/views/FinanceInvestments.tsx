@@ -75,13 +75,17 @@ export function FinanceInvestments() {
             <p className="text-[10px] text-dim font-light uppercase tracking-wider mb-1">
               Total Value
             </p>
-            <p className="text-[20px] font-light text-primary">{fmtCompact(totalValue)}đ</p>
+            <p className="text-[20px] font-light text-primary tabular-nums">
+              {fmtCompact(totalValue)}đ
+            </p>
           </Card>
           <Card className="p-4">
             <p className="text-[10px] text-dim font-light uppercase tracking-wider mb-1">
               Cost Basis
             </p>
-            <p className="text-[20px] font-light text-muted">{fmtCompact(totalCost)}đ</p>
+            <p className="text-[20px] font-light text-muted tabular-nums">
+              {fmtCompact(totalCost)}đ
+            </p>
           </Card>
           <Card className="p-4">
             <p className="text-[10px] text-dim font-light uppercase tracking-wider mb-1">
@@ -89,7 +93,7 @@ export function FinanceInvestments() {
             </p>
             <p
               className={cn(
-                "text-[20px] font-light",
+                "text-[20px] font-light tabular-nums",
                 totalReturn >= 0 ? "text-success" : "text-destructive",
               )}
             >
@@ -146,7 +150,7 @@ export function FinanceInvestments() {
                       </span>
                     </div>
                   </div>
-                  <p className="text-[18px] font-light text-primary">
+                  <p className="text-[18px] font-light text-primary tabular-nums">
                     {fmtMoney(p.totalValue, p.currency)}
                   </p>
                   <div className="flex items-center gap-2 mt-1">
@@ -201,21 +205,21 @@ export function FinanceInvestments() {
                     </div>
                     <p className="text-[9px] text-dim font-light truncate">{inv.name}</p>
                   </div>
-                  <span className="text-right text-[11px] text-muted font-light">
+                  <span className="text-right text-[11px] text-muted font-light tabular-nums">
                     {inv.quantity}
                   </span>
-                  <span className="text-right text-[11px] text-muted font-light">
+                  <span className="text-right text-[11px] text-muted font-light tabular-nums">
                     {inv.currentPrice != null ? fmtMoney(inv.currentPrice, inv.currency) : "—"}
                   </span>
-                  <span className="text-right text-[12px] text-primary font-light">
+                  <span className="text-right text-[12px] text-primary font-light tabular-nums">
                     {inv.currentValue != null ? fmtMoney(inv.currentValue, inv.currency) : "—"}
                   </span>
-                  <span className="text-right text-[11px] text-dim font-light">
+                  <span className="text-right text-[11px] text-dim font-light tabular-nums">
                     {fmtMoney(inv.costBasis, inv.currency)}
                   </span>
                   <span
                     className={cn(
-                      "text-right text-[11px] font-light",
+                      "text-right text-[11px] font-light tabular-nums",
                       r >= 0 ? "text-success" : "text-destructive",
                     )}
                   >

@@ -38,7 +38,7 @@ export function CustomServerCard({ server, onToggle, onRemove, onEdit }: CustomS
           className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors ${
             server.enabled ? "text-success hover:bg-surface-base" : "text-dim hover:bg-surface-base"
           }`}
-          title={server.enabled ? "Disable" : "Enable"}
+          aria-label={server.enabled ? "Disable" : "Enable"}
         >
           <Power className="w-3.5 h-3.5" strokeWidth={1.5} />
         </button>
@@ -46,7 +46,7 @@ export function CustomServerCard({ server, onToggle, onRemove, onEdit }: CustomS
           type="button"
           onClick={() => onEdit(server)}
           className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:text-secondary hover:bg-surface-base transition-colors"
-          title="Edit"
+          aria-label="Edit"
         >
           <Settings2 className="w-3.5 h-3.5" strokeWidth={1.5} />
         </button>
@@ -54,7 +54,7 @@ export function CustomServerCard({ server, onToggle, onRemove, onEdit }: CustomS
           type="button"
           onClick={() => onRemove(server.name)}
           className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:text-destructive hover:bg-surface-base transition-colors"
-          title="Remove"
+          aria-label="Remove"
         >
           <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />
         </button>
@@ -131,7 +131,7 @@ export function RecommendedServerCard({
                 {oauthLoading ? (
                   <>
                     <Loader2 className="w-3 h-3 animate-spin" />
-                    Waiting...
+                    Waiting\u2026
                   </>
                 ) : (
                   "Authenticate"
@@ -172,7 +172,7 @@ export function RecommendedServerCard({
               type="button"
               onClick={() => onEdit?.(server)}
               className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:text-secondary hover:bg-surface-base transition-colors"
-              title="Configure"
+              aria-label="Configure"
             >
               <Settings2 className="w-3.5 h-3.5" strokeWidth={1.5} />
             </button>
@@ -185,7 +185,7 @@ export function RecommendedServerCard({
                 className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors ${
                   enabled ? "text-success hover:bg-surface-base" : "text-dim hover:bg-surface-base"
                 }`}
-                title={enabled ? "Disable" : "Enable"}
+                aria-label={enabled ? "Disable" : "Enable"}
               >
                 <Power className="w-3.5 h-3.5" strokeWidth={1.5} />
               </button>
