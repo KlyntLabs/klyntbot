@@ -11,7 +11,9 @@ import { FinanceBudgets } from "./components/views/FinanceBudgets";
 import { FinanceInvestments } from "./components/views/FinanceInvestments";
 import { FinanceGoals } from "./components/views/FinanceGoals";
 import { FinanceLiabilities } from "./components/views/FinanceLiabilities";
-import { Productivity } from "./components/views/Productivity";
+import { ProductivityDayPage } from "./components/productivity/pages/DayPage";
+import { ProductivityWeekPage } from "./components/productivity/pages/WeekPage";
+import { ProductivityMonthPage } from "./components/productivity/pages/MonthPage";
 import { Launcher } from "./components/views/Launcher";
 import { SystemTray } from "./components/views/SystemTray";
 import { SettingsLayout } from "./components/settings/SettingsLayout";
@@ -29,7 +31,10 @@ const router = createHashRouter([
   { path: "/project/:id", element: <ProjectDetail /> },
   { path: "/task/:id", element: <TaskDetail /> },
   { path: "/objective/:id", element: <ObjectiveDetail /> },
-  { path: "/productivity", element: <Productivity /> },
+  { path: "/productivity", element: <Navigate to={`/productivity/day/${new Date().toISOString().slice(0, 10)}`} replace /> },
+  { path: "/productivity/day/:date", element: <ProductivityDayPage /> },
+  { path: "/productivity/week/:weekStart", element: <ProductivityWeekPage /> },
+  { path: "/productivity/month/:yearMonth", element: <ProductivityMonthPage /> },
   { path: "/finance", element: <Finance /> },
   { path: "/finance/accounts", element: <FinanceAccounts /> },
   { path: "/finance/transactions", element: <FinanceTransactions /> },

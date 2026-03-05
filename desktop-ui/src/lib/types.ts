@@ -431,6 +431,7 @@ export interface ProductivitySummary {
   topApps: AppUsage[];
   topCategories: CategoryUsage[];
   aiSummary: string | null;
+  productivityScore: number | null;
 }
 
 export interface AppUsage {
@@ -476,6 +477,27 @@ export interface ActivityCategory {
   icon: string | null;
   isSystem: boolean;
 }
+
+export interface GoalProgress {
+  id: number;
+  goalType: string;
+  metric: string;
+  targetValue: number;
+  currentValue: number;
+  met: boolean;
+}
+
+export interface TimeEntry {
+  id: number;
+  description: string;
+  categoryId: string | null;
+  projectId: string | null;
+  startedAt: string;
+  durationSecs: number;
+  source: string;
+}
+
+export type ProductivityPeriod = 'day' | 'week' | 'month';
 
 export type Tab = 'All' | string;
 export type SidebarItem = 'Chat' | 'Tasks' | 'OKR' | 'Calendar' | 'Finance' | 'Productivity' | 'Settings';

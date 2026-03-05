@@ -164,6 +164,11 @@ fn main() {
             commands::productivity::productivity_sessions,
             commands::productivity::productivity_weekly,
             commands::productivity::productivity_categories,
+            commands::productivity::productivity_summary_range,
+            commands::productivity::productivity_activity_feed,
+            commands::productivity::productivity_goals,
+            commands::productivity::productivity_pomodoro_start,
+            commands::productivity::productivity_time_entries,
             // Calendar
             commands::calendar::calendar_events,
             // Settings (MCP)

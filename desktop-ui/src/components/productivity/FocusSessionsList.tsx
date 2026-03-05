@@ -29,23 +29,22 @@ export function FocusSessionsList({ date }: FocusSessionsListProps) {
   return (
     <div className="bg-surface-base rounded-xl p-4 flex flex-col gap-3">
       <h2 className="text-[13px] font-medium text-secondary">Focus Sessions</h2>
-      <div className="flex flex-col gap-1.5">
-        {sessions.map(s => {
+      <div className="flex flex-col gap-0.5">
+        {sessions.map((s) => {
           const quality = qualityBadge(s.qualityScore);
           return (
             <div
               key={s.id}
-              className="flex items-center justify-between py-1.5 border-b border-border-subtle last:border-b-0"
+              className="flex items-center gap-3 py-2 border-b border-border-subtle last:border-b-0"
             >
-              <div className="flex items-center gap-2 text-[11px] font-light">
-                <span className="text-muted tabular-nums">{formatTime(s.startedAt)}</span>
-                <span className="text-primary">
-                  {s.actualMins != null ? `${s.actualMins}m` : 'In progress'}
-                </span>
-                {s.interruptions > 0 && (
-                  <span className="text-dim">{s.interruptions} int.</span>
-                )}
-              </div>
+              <span className="text-[11px] font-light text-muted tabular-nums w-14">{formatTime(s.startedAt)}</span>
+              <span className="text-[11px] font-light text-primary flex-1 truncate">
+                {s.sessionType === 'pomodoro' ? 'Pomodoro' : 'Focus'}
+                {s.notes ? ` — ${s.notes}` : ''}
+              </span>
+              <span className="text-[11px] font-light text-muted tabular-nums">
+                {s.actualMins != null ? `${s.actualMins} min` : 'In progress'}
+              </span>
               <span className={`text-[11px] font-light tabular-nums ${quality.color}`}>
                 {quality.text}
               </span>

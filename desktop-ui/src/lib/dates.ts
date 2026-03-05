@@ -40,3 +40,84 @@ export function formatDayLabel(dateStr: string): string {
   const d = new Date(dateStr + 'T00:00:00');
   return d.toLocaleDateString('en-US', { weekday: 'short' });
 }
+
+const LONG_MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+/** Format as "Thursday, March 5, 2026" */
+export function formatFullDate(iso: string): string {
+  const d = new Date(iso + 'T00:00:00');
+  return `${WEEKDAYS[d.getDay()]}, ${LONG_MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+}
+
+/** Format as "Mar 3 - Mar 9, 2026" */
+export function formatWeekRange(weekStart: string): string {
+  const start = new Date(weekStart + 'T00:00:00');
+  const end = new Date(start);
+  end.setDate(end.getDate() + 6);
+  const sy = start.getFullYear();
+  const ey = end.getFullYear();
+  const s = `${SHORT_MONTHS[start.getMonth()]} ${start.getDate()}`;
+  const e = `${SHORT_MONTHS[end.getMonth()]} ${end.getDate()}, ${ey}`;
+  if (sy !== ey) return `${s}, ${sy} - ${e}`;
+  return `${s} - ${e}`;
+}
+
+/** Format as "March 2026" */
+export function formatMonthLabel(yearMonth: string): string {
+  const [y, m] = yearMonth.split('-').map(Number);
+  return `${LONG_MONTHS[m - 1]} ${y}`;
+}
+
+/** Get today as YYYY-MM-DD */
+export function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/** Get the Monday of the week containing the given date */
+export function weekStartISO(iso: string): string {
+  const d = new Date(iso + 'T00:00:00');
+  const day = d.getDay();
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+  d.setDate(diff);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Get YYYY-MM from a date */
+export function monthISO(iso: string): string {
+  return iso.slice(0, 7);
+}
+
+/** Navigate a date by offset: +1 day, -1 day, etc. */
+export function shiftDate(iso: string, days: number): string {
+  const d = new Date(iso + 'T00:00:00');
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Navigate a month by offset: +1 month, -1 month */
+export function shiftMonth(yearMonth: string, months: number): string {
+  const [y, m] = yearMonth.split('-').map(Number);
+  const d = new Date(y, m - 1 + months, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/** Get the last day of a month as YYYY-MM-DD */
+export function monthEndISO(yearMonth: string): string {
+  const [y, m] = yearMonth.split('-').map(Number);
+  const d = new Date(y, m, 0);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Format seconds as "Xh Ym" with large text style (e.g. "7 hr 33 min") */
+export function formatLongDuration(secs: number): string {
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  if (h > 0 && m > 0) return `${h} hr ${m} min`;
+  if (h > 0) return `${h} hr`;
+  return `${m} min`;
+}

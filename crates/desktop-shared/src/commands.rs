@@ -380,6 +380,7 @@ pub struct ProductivitySummaryResponse {
     pub top_apps: Vec<AppUsageResponse>,
     pub top_categories: Vec<CategoryUsageResponse>,
     pub ai_summary: Option<String>,
+    pub productivity_score: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -434,6 +435,29 @@ pub struct ActivityCategoryResponse {
     pub color: Option<String>,
     pub icon: Option<String>,
     pub is_system: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GoalProgressResponse {
+    pub id: i64,
+    pub goal_type: String,
+    pub metric: String,
+    pub target_value: f64,
+    pub current_value: f64,
+    pub met: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TimeEntryResponse {
+    pub id: i64,
+    pub description: String,
+    pub category_id: Option<String>,
+    pub project_id: Option<String>,
+    pub started_at: DateTime<Utc>,
+    pub duration_secs: i64,
+    pub source: String,
 }
 
 // ── Key Result Params ──────────────────────────────────────────────────
