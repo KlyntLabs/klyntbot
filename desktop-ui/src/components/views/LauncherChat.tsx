@@ -1,11 +1,11 @@
-import { useEffect, useRef, useCallback } from 'react';
-import { ArrowLeft, Sparkles, Send, ArrowUpRight } from 'lucide-react';
-import { getCurrentWindow } from '@tauri-apps/api/window';
-import { useChatSession } from '../../hooks/useChatSession';
-import { MarkdownContent } from '../chat/MarkdownContent';
-import { InteractionCard } from '../chat/InteractionCard';
-import { ActiveToolIndicator } from '../chat/SegmentedMessage';
-import { isTauri } from '../../lib/utils';
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { ArrowLeft, ArrowUpRight, Send, Sparkles } from "lucide-react";
+import { useCallback, useEffect, useRef } from "react";
+import { useChatSession } from "../../hooks/useChatSession";
+import { isTauri } from "../../lib/utils";
+import { InteractionCard } from "../chat/InteractionCard";
+import { MarkdownContent } from "../chat/MarkdownContent";
+import { ActiveToolIndicator } from "../chat/SegmentedMessage";
 
 interface LauncherChatProps {
   sessionKey: string;
@@ -28,7 +28,7 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
       needsInitialSend.current = true;
       chat.setInput(initialQuery);
     }
-  }, [initialQuery]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [initialQuery, chat.setInput]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fire send once when input state has committed with the initial query
   useEffect(() => {
@@ -36,12 +36,12 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
       needsInitialSend.current = false;
       chat.send();
     }
-  }, [chat.input]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [chat.input, chat.send]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-scroll on new content
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chat.messages.length, chat.segments.length, chat.activeInteraction]);
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, []);
 
   // Focus input after streaming completes
   useEffect(() => {
@@ -55,32 +55,40 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
     if (!isTauri) return;
     let unlisten: (() => void) | undefined;
     let cancelled = false;
-    getCurrentWindow().onFocusChanged(({ payload: focused }) => {
-      if (focused) inputRef.current?.focus();
-    }).then(fn => {
-      if (cancelled) fn();
-      else unlisten = fn;
-    });
-    return () => { cancelled = true; unlisten?.(); };
+    getCurrentWindow()
+      .onFocusChanged(({ payload: focused }) => {
+        if (focused) inputRef.current?.focus();
+      })
+      .then((fn) => {
+        if (cancelled) fn();
+        else unlisten = fn;
+      });
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
   }, []);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      chat.send();
-    }
-  }, [chat.send]);
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        chat.send();
+      }
+    },
+    [chat.send],
+  );
 
   // Handle ⌘/ to expand
   useEffect(() => {
     const handleExpand = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === '/') {
+      if ((e.metaKey || e.ctrlKey) && e.key === "/") {
         e.preventDefault();
         onExpand();
       }
     };
-    window.addEventListener('keydown', handleExpand);
-    return () => window.removeEventListener('keydown', handleExpand);
+    window.addEventListener("keydown", handleExpand);
+    return () => window.removeEventListener("keydown", handleExpand);
   }, [onExpand]);
 
   return (
@@ -107,10 +115,10 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
         {chat.messages.map((msg) => {
-          if (msg.role === 'interaction') return null;
+          if (msg.role === "interaction") return null;
           return (
             <div key={msg.id}>
-              {msg.role === 'user' ? (
+              {msg.role === "user" ? (
                 <div className="flex justify-end">
                   <div className="max-w-[85%] rounded-xl px-4 py-2.5 bg-surface-raised">
                     <p className="text-[13px] font-light whitespace-pre-wrap leading-relaxed text-primary">
@@ -130,13 +138,18 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
         {/* Streaming content */}
         {chat.segments.length > 0 && (
           <div className="max-w-full">
-            {chat.segments.map((seg, i) => (
-              seg.type === 'text' ? (
-                <div key={`text-${i}`} className={chat.isStreaming && i === chat.segments.length - 1 ? 'streaming-cursor' : ''}>
+            {chat.segments.map((seg, i) =>
+              seg.type === "text" ? (
+                <div
+                  key={`text-${i}`}
+                  className={
+                    chat.isStreaming && i === chat.segments.length - 1 ? "streaming-cursor" : ""
+                  }
+                >
                   <MarkdownContent content={seg.content} />
                 </div>
-              ) : null
-            ))}
+              ) : null,
+            )}
           </div>
         )}
 
@@ -148,9 +161,18 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
         {/* Thinking indicator */}
         {chat.isStreaming && chat.segments.length === 0 && chat.activeTools.length === 0 && (
           <div className="flex gap-1">
-            <div className="w-1.5 h-1.5 bg-muted rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-            <div className="w-1.5 h-1.5 bg-muted rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-            <div className="w-1.5 h-1.5 bg-muted rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            <div
+              className="w-1.5 h-1.5 bg-muted rounded-full animate-bounce"
+              style={{ animationDelay: "0ms" }}
+            />
+            <div
+              className="w-1.5 h-1.5 bg-muted rounded-full animate-bounce"
+              style={{ animationDelay: "150ms" }}
+            />
+            <div
+              className="w-1.5 h-1.5 bg-muted rounded-full animate-bounce"
+              style={{ animationDelay: "300ms" }}
+            />
           </div>
         )}
 
@@ -183,7 +205,7 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
             value={chat.input}
             onChange={(e) => {
               chat.setInput(e.target.value);
-              e.target.style.height = 'auto';
+              e.target.style.height = "auto";
               e.target.style.height = `${Math.min(e.target.scrollHeight, 80)}px`;
             }}
             onKeyDown={handleKeyDown}

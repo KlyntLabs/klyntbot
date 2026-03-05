@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { ChevronDown, Loader2 } from 'lucide-react';
-import { formatCost, formatDuration, formatTokens } from '../../lib/utils';
-import type { TransparencyData } from '../../lib/types';
+import { ChevronDown, Loader2 } from "lucide-react";
+import { useState } from "react";
+import type { TransparencyData } from "../../lib/types";
+import { formatCost, formatDuration, formatTokens } from "../../lib/utils";
 
 interface TokenBadgeProps {
   transparency: TransparencyData;
@@ -30,11 +30,21 @@ export function TokenBadge({ transparency, isStreaming }: TokenBadgeProps) {
         onClick={() => setExpanded(!expanded)}
         className="ml-auto flex items-center gap-1.5 text-[10px] font-light text-dim hover:text-muted transition-colors"
       >
-        <span>{'\u2191'}{formatTokens(usage.promptTokens)}</span>
-        <span>{'\u2193'}{formatTokens(usage.completionTokens)}</span>
-        {cost && <span>{'\u00b7'} {formatCost(cost.estimatedUsd)}</span>}
+        <span>
+          {"\u2191"}
+          {formatTokens(usage.promptTokens)}
+        </span>
+        <span>
+          {"\u2193"}
+          {formatTokens(usage.completionTokens)}
+        </span>
+        {cost && (
+          <span>
+            {"\u00b7"} {formatCost(cost.estimatedUsd)}
+          </span>
+        )}
         <ChevronDown
-          className={`w-2.5 h-2.5 transition-transform ${expanded ? 'rotate-180' : ''}`}
+          className={`w-2.5 h-2.5 transition-transform ${expanded ? "rotate-180" : ""}`}
           strokeWidth={1.5}
         />
       </button>

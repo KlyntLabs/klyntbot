@@ -1,7 +1,7 @@
 :root {
   /* ── Typography ────────────────────────────── */
   --font-size: 16px;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
   --font-weight-medium: 500;
   --font-weight-normal: 400;
   --font-weight-light: 300;
@@ -10,45 +10,45 @@
   --radius: 0.625rem;
 
   /* ── Background ────────────────────────────── */
-  --background: #0E0E0D;
+  --background: #0e0e0d;
 
   /* ── Surface staircase (white-alpha) ───────── */
-  --surface-lowest:  rgba(255, 255, 255, 0.02);
-  --surface-low:     rgba(255, 255, 255, 0.03);
-  --surface-base:    rgba(255, 255, 255, 0.04);
-  --surface-raised:  rgba(255, 255, 255, 0.06);
+  --surface-lowest: rgba(255, 255, 255, 0.02);
+  --surface-low: rgba(255, 255, 255, 0.03);
+  --surface-base: rgba(255, 255, 255, 0.04);
+  --surface-raised: rgba(255, 255, 255, 0.06);
   --surface-highest: rgba(255, 255, 255, 0.08);
 
   /* ── Text hierarchy ────────────────────────── */
-  --text-primary:   #E6EDF3;
-  --text-secondary: #C9D1D9;
-  --text-muted:     #8B949E;
-  --text-dim:       #6E7681;
+  --text-primary: #e6edf3;
+  --text-secondary: #c9d1d9;
+  --text-muted: #8b949e;
+  --text-dim: #6e7681;
 
   /* ── Brand ─────────────────────────────────── */
-  --brand:       #F97316;
+  --brand: #f97316;
   --brand-hover: #ea6a0f;
 
   /* ── Semantic ──────────────────────────────── */
-  --success:     #22C55E;
+  --success: #22c55e;
   --destructive: #d4183d;
-  --info:        #3B82F6;
-  --purple:      #8B5CF6;
+  --info: #3b82f6;
+  --purple: #8b5cf6;
 
   /* ── Border ────────────────────────────────── */
-  --border:        rgba(255, 255, 255, 0.08);
+  --border: rgba(255, 255, 255, 0.08);
   --border-subtle: rgba(255, 255, 255, 0.04);
 
   /* ── Overlay ───────────────────────────────── */
-  --overlay:       rgba(0, 0, 0, 0.15);
+  --overlay: rgba(0, 0, 0, 0.15);
   --overlay-heavy: rgba(0, 0, 0, 0.2);
 
   /* ── Floating / glass ─────────────────────── */
   --surface-floating: #1a1a1f;
-  --surface-glass:    rgba(14, 12, 10, 0.72);
-  --glass-border:     rgba(255, 255, 255, 0.1);
-  --glass-shadow:     0 8px 32px rgba(0, 0, 0, 0.45);
-  --glass-padding:    6px;
+  --surface-glass: rgba(14, 12, 10, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  --glass-padding: 6px;
   --glass-radius-inner: calc(var(--radius-xl) - var(--glass-padding));
 }
 
@@ -57,36 +57,36 @@
   --color-background: var(--background);
 
   /* Surface staircase */
-  --color-surface-lowest:  var(--surface-lowest);
-  --color-surface-low:     var(--surface-low);
-  --color-surface-base:    var(--surface-base);
-  --color-surface-raised:  var(--surface-raised);
+  --color-surface-lowest: var(--surface-lowest);
+  --color-surface-low: var(--surface-low);
+  --color-surface-base: var(--surface-base);
+  --color-surface-raised: var(--surface-raised);
   --color-surface-highest: var(--surface-highest);
   --color-surface-floating: var(--surface-floating);
-  --color-surface-glass:    var(--surface-glass);
+  --color-surface-glass: var(--surface-glass);
 
   /* Text hierarchy */
-  --color-primary:   var(--text-primary);
+  --color-primary: var(--text-primary);
   --color-secondary: var(--text-secondary);
-  --color-muted:     var(--text-muted);
-  --color-dim:       var(--text-dim);
+  --color-muted: var(--text-muted);
+  --color-dim: var(--text-dim);
 
   /* Brand */
-  --color-brand:       var(--brand);
+  --color-brand: var(--brand);
   --color-brand-hover: var(--brand-hover);
 
   /* Semantic */
-  --color-success:     var(--success);
+  --color-success: var(--success);
   --color-destructive: var(--destructive);
-  --color-info:        var(--info);
-  --color-purple:      var(--purple);
+  --color-info: var(--info);
+  --color-purple: var(--purple);
 
   /* Border */
-  --color-border:        var(--border);
+  --color-border: var(--border);
   --color-border-subtle: var(--border-subtle);
 
   /* Overlay */
-  --color-overlay:       var(--overlay);
+  --color-overlay: var(--overlay);
   --color-overlay-heavy: var(--overlay-heavy);
 
   /* Radius */
@@ -172,7 +172,7 @@
    Placed inline at the end of the last element
    inside a streaming text segment via ::after.  */
 .streaming-cursor > div > *:last-child::after {
-  content: '';
+  content: "";
   display: inline-block;
   width: 6px;
   height: 16px;
@@ -185,6 +185,11 @@
 }
 
 @keyframes cursor-blink {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 0; }
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0;
+  }
 }

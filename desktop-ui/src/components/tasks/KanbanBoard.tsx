@@ -1,8 +1,8 @@
-import { useMemo } from 'react';
-import { useNavigate } from 'react-router';
-import { Badge } from '../ui/Badge';
-import { formatDate } from '../../lib/dates';
-import type { Task, Project, Area } from '../../lib/types';
+import { useMemo } from "react";
+import { useNavigate } from "react-router";
+import { formatDate } from "../../lib/dates";
+import type { Area, Project, Task } from "../../lib/types";
+import { Badge } from "../ui/Badge";
 
 interface KanbanBoardProps {
   tasks: Task[];
@@ -12,9 +12,9 @@ interface KanbanBoardProps {
 }
 
 const COLUMNS = [
-  { key: 'todo', label: 'To Do', accent: 'bg-info' },
-  { key: 'doing', label: 'In Progress', accent: 'bg-brand' },
-  { key: 'done', label: 'Done', accent: 'bg-success' },
+  { key: "todo", label: "To Do", accent: "bg-info" },
+  { key: "doing", label: "In Progress", accent: "bg-brand" },
+  { key: "done", label: "Done", accent: "bg-success" },
 ] as const;
 
 export function KanbanBoard({ tasks, projectMap, areaMap, completedTasks }: KanbanBoardProps) {
@@ -23,7 +23,7 @@ export function KanbanBoard({ tasks, projectMap, areaMap, completedTasks }: Kanb
   const columns = useMemo(() => {
     const grouped: Record<string, Task[]> = { todo: [], doing: [], done: [] };
     for (const task of tasks) {
-      const status = task.status?.toLowerCase() ?? 'todo';
+      const status = task.status?.toLowerCase() ?? "todo";
       if (status in grouped) grouped[status].push(task);
       else grouped.todo.push(task);
     }
@@ -43,7 +43,7 @@ export function KanbanBoard({ tasks, projectMap, areaMap, completedTasks }: Kanb
 
           {/* Cards container */}
           <div className="flex-1 overflow-y-auto space-y-2 pr-0.5">
-            {columns[key].map(task => {
+            {columns[key].map((task) => {
               const project = task.projectId ? projectMap.get(task.projectId) : undefined;
               const area = areaMap.get(task.areaId);
               const isCompleted = completedTasks.has(task.id);
@@ -55,17 +55,17 @@ export function KanbanBoard({ tasks, projectMap, areaMap, completedTasks }: Kanb
                   className="bg-surface-low hover:bg-surface-base rounded-lg px-4 py-3 cursor-pointer transition-colors border border-border-subtle"
                 >
                   {/* Title */}
-                  <p className={`text-[13px] font-light leading-snug mb-2 ${
-                    isCompleted ? 'text-muted line-through' : 'text-secondary'
-                  }`}>
+                  <p
+                    className={`text-[13px] font-light leading-snug mb-2 ${
+                      isCompleted ? "text-muted line-through" : "text-secondary"
+                    }`}
+                  >
                     {task.title}
                   </p>
 
                   {/* Meta row */}
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    {task.priority && (
-                      <Badge variant="priority" value={task.priority} />
-                    )}
+                    {task.priority && <Badge variant="priority" value={task.priority} />}
                     {project && (
                       <div className="flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-surface-base">
                         <div
@@ -75,15 +75,13 @@ export function KanbanBoard({ tasks, projectMap, areaMap, completedTasks }: Kanb
                         <span className="text-[10px] font-light text-muted">{project.name}</span>
                       </div>
                     )}
-                    {area && (
-                      <Badge variant="area" value={area.name} />
-                    )}
+                    {area && <Badge variant="area" value={area.name} />}
                   </div>
 
                   {/* Tags */}
                   {task.tags.length > 0 && (
                     <div className="flex items-center gap-1 mt-2 flex-wrap">
-                      {task.tags.map(tag => (
+                      {task.tags.map((tag) => (
                         <Badge key={tag} variant="tag" value={tag} />
                       ))}
                     </div>
@@ -91,7 +89,9 @@ export function KanbanBoard({ tasks, projectMap, areaMap, completedTasks }: Kanb
 
                   {/* Due date */}
                   {task.dueDate && (
-                    <p className="text-[10px] text-dim font-light mt-2">{formatDate(task.dueDate)}</p>
+                    <p className="text-[10px] text-dim font-light mt-2">
+                      {formatDate(task.dueDate)}
+                    </p>
                   )}
                 </div>
               );

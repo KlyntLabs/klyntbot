@@ -1,48 +1,47 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
-import { Plus, Plug } from 'lucide-react';
-import { useQuery } from '../../../hooks/useQuery';
-import { useMutation } from '../../../hooks/useMutation';
-import { useEvent } from '../../../hooks/useEvent';
-import { CustomServerCard, RecommendedServerCard } from '../mcp/McpServerCard';
-import { AddServerDialog } from '../mcp/AddServerDialog';
-import { recommendedServers } from '../mcp/recommendedServers';
+import { Plug, Plus } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEvent } from "../../../hooks/useEvent";
+import { useMutation } from "../../../hooks/useMutation";
+import { useQuery } from "../../../hooks/useQuery";
 import type {
-  McpConfigResponse,
   McpAddServerParams,
+  McpConfigResponse,
   McpToggleServerParams,
   OAuthStartParams,
   RecommendedMcpServer,
-} from '../../../lib/types';
+} from "../../../lib/types";
+import { AddServerDialog } from "../mcp/AddServerDialog";
+import { CustomServerCard, RecommendedServerCard } from "../mcp/McpServerCard";
+import { recommendedServers } from "../mcp/recommendedServers";
 
 export function McpServersSettings() {
-  const { data: config, refetch } = useQuery<McpConfigResponse>(
-    'mcp_get_config',
-    undefined,
-    { enabled: true, servers: [] },
-  );
+  const { data: config, refetch } = useQuery<McpConfigResponse>("mcp_get_config", undefined, {
+    enabled: true,
+    servers: [],
+  });
 
   const { mutate: addServer } = useMutation<McpConfigResponse, McpAddServerParams>(
-    'mcp_add_server',
-    'params',
+    "mcp_add_server",
+    "params",
   );
   const { mutate: toggleServer } = useMutation<McpConfigResponse, McpToggleServerParams>(
-    'mcp_toggle_server',
-    'params',
+    "mcp_toggle_server",
+    "params",
   );
   const { mutate: removeServer } = useMutation<McpConfigResponse, { name: string }>(
-    'mcp_remove_server',
-    'params',
+    "mcp_remove_server",
+    "params",
   );
   const { mutate: startOAuth, error: oauthError } = useMutation<void, OAuthStartParams>(
-    'mcp_oauth_start',
-    'params',
+    "mcp_oauth_start",
+    "params",
   );
   const { mutate: disconnectOAuth } = useMutation<McpConfigResponse, { serverName: string }>(
-    'mcp_oauth_disconnect',
+    "mcp_oauth_disconnect",
   );
 
   useEffect(() => {
-    if (oauthError) console.error('[MCP OAuth] Error:', oauthError);
+    if (oauthError) console.error("[MCP OAuth] Error:", oauthError);
   }, [oauthError]);
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -50,12 +49,12 @@ export function McpServersSettings() {
   const [oauthLoadingServer, setOauthLoadingServer] = useState<string | null>(null);
 
   // Listen for OAuth completion/error events from the backend
-  useEvent<{ serverName: string; provider: string }>('mcp:oauth_complete', () => {
+  useEvent<{ serverName: string; provider: string }>("mcp:oauth_complete", () => {
     setOauthLoadingServer(null);
     refetch();
   });
 
-  useEvent<{ serverName: string; error: string }>('mcp:oauth_error', () => {
+  useEvent<{ serverName: string; error: string }>("mcp:oauth_error", () => {
     setOauthLoadingServer(null);
     refetch();
   });
@@ -111,10 +110,10 @@ export function McpServersSettings() {
   const handleOAuthConnect = useCallback(
     async (server: RecommendedMcpServer) => {
       if (!server.oauthProvider) return;
-      console.log('[MCP OAuth] Starting flow for', server.name, server.oauthProvider);
+      console.log("[MCP OAuth] Starting flow for", server.name, server.oauthProvider);
       setOauthLoadingServer(server.name);
       const result = await startOAuth({ provider: server.oauthProvider, serverName: server.name });
-      console.log('[MCP OAuth] Result:', result);
+      console.log("[MCP OAuth] Result:", result);
     },
     [startOAuth],
   );
@@ -182,16 +181,16 @@ export function McpServersSettings() {
         ) : (
           <div className="space-y-1.5">
             {customServers.map((server) => (
-                <CustomServerCard
-                  key={server.name}
-                  server={server}
-                  onToggle={handleToggle}
-                  onRemove={handleRemove}
-                  onEdit={() => {
-                    // Edit is a future enhancement — for now, remove + re-add
-                  }}
-                />
-              ))}
+              <CustomServerCard
+                key={server.name}
+                server={server}
+                onToggle={handleToggle}
+                onRemove={handleRemove}
+                onEdit={() => {
+                  // Edit is a future enhancement — for now, remove + re-add
+                }}
+              />
+            ))}
           </div>
         )}
       </div>
@@ -226,7 +225,7 @@ export function McpServersSettings() {
       </div>
 
       <AddServerDialog
-        key={prefillServer?.name ?? '__new__'}
+        key={prefillServer?.name ?? "__new__"}
         open={dialogOpen}
         onClose={() => {
           setDialogOpen(false);

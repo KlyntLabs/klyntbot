@@ -1,9 +1,9 @@
-import { useQuery } from '../../../hooks/useQuery';
-import type { AgentStatus } from '../../../lib/types';
+import { useQuery } from "../../../hooks/useQuery";
+import type { AgentStatus } from "../../../lib/types";
 
 export function GeneralSettings() {
-  const { data: status } = useQuery<AgentStatus>('agent_status', undefined, {
-    status: 'unknown',
+  const { data: status } = useQuery<AgentStatus>("agent_status", undefined, {
+    status: "unknown",
     activeTaskCount: 0,
     focusTask: null,
   });

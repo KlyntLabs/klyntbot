@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface DateNavigatorProps {
   label: string;

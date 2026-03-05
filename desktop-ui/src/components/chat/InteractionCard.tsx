@@ -1,8 +1,8 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
-import { Check, X } from 'lucide-react';
-import { cn } from '../../lib/utils';
-import { ipc } from '../../hooks/useIpc';
-import type { InteractionRequest, Question, AnswerValue, Answer } from '../../lib/types';
+import { Check, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ipc } from "../../hooks/useIpc";
+import type { Answer, AnswerValue, InteractionRequest, Question } from "../../lib/types";
+import { cn } from "../../lib/utils";
 
 interface InteractionCardProps {
   sessionKey: string;
@@ -13,22 +13,27 @@ interface InteractionCardProps {
 
 function optionButtonClass(isSelected: boolean, isFocused: boolean) {
   return cn(
-    'rounded-lg border text-[12px] font-light transition-colors',
+    "rounded-lg border text-[12px] font-light transition-colors",
     isSelected
-      ? 'border-brand bg-brand/10 text-primary'
+      ? "border-brand bg-brand/10 text-primary"
       : isFocused
-        ? 'border-border bg-surface-raised text-primary'
-        : 'border-transparent bg-surface-raised/50 text-secondary hover:bg-surface-raised',
+        ? "border-border bg-surface-raised text-primary"
+        : "border-transparent bg-surface-raised/50 text-secondary hover:bg-surface-raised",
   );
 }
 
-export function InteractionCard({ sessionKey, requestId, request, onSubmitted }: InteractionCardProps) {
+export function InteractionCard({
+  sessionKey,
+  requestId,
+  request,
+  onSubmitted,
+}: InteractionCardProps) {
   const [activeTab, setActiveTab] = useState(0);
   const [answers, setAnswers] = useState<Record<string, AnswerValue>>(() => {
     const init: Record<string, AnswerValue> = {};
     for (const q of request.questions) {
-      if (q.answer_type.type === 'yes_no' && q.answer_type.default != null) {
-        init[q.id] = { type: 'yes_no', answer: q.answer_type.default };
+      if (q.answer_type.type === "yes_no" && q.answer_type.default != null) {
+        init[q.id] = { type: "yes_no", answer: q.answer_type.default };
       }
     }
     return init;
@@ -38,35 +43,45 @@ export function InteractionCard({ sessionKey, requestId, request, onSubmitted }:
   const cardRef = useRef<HTMLDivElement>(null);
 
   const question = request.questions[activeTab];
-  const optionCount = question.answer_type.type === 'single_select' || question.answer_type.type === 'multi_select'
-    ? question.answer_type.options.length
-    : question.answer_type.type === 'yes_no' ? 2 : 0;
+  const optionCount =
+    question.answer_type.type === "single_select" || question.answer_type.type === "multi_select"
+      ? question.answer_type.options.length
+      : question.answer_type.type === "yes_no"
+        ? 2
+        : 0;
 
   // Focus the card on mount for keyboard navigation
-  useEffect(() => { cardRef.current?.focus(); }, []);
+  useEffect(() => {
+    cardRef.current?.focus();
+  }, []);
 
   // Reset focus when switching tabs
-  useEffect(() => { setFocusIndex(0); }, [activeTab]);
+  useEffect(() => {
+    setFocusIndex(0);
+  }, []);
 
   const setAnswer = useCallback((questionId: string, value: AnswerValue) => {
     setAnswers((prev) => ({ ...prev, [questionId]: value }));
   }, []);
 
-  const handleSelect = useCallback((q: Question, index: number) => {
-    if (q.answer_type.type === 'single_select') {
-      setAnswer(q.id, { type: 'selected', value: q.answer_type.options[index].value });
-    } else if (q.answer_type.type === 'multi_select') {
-      const val = q.answer_type.options[index].value;
-      setAnswers((prev) => {
-        const current = prev[q.id];
-        const values = current?.type === 'multi_selected' ? [...current.values] : [];
-        const idx = values.indexOf(val);
-        if (idx >= 0) values.splice(idx, 1);
-        else values.push(val);
-        return { ...prev, [q.id]: { type: 'multi_selected', values } };
-      });
-    }
-  }, [setAnswer]);
+  const handleSelect = useCallback(
+    (q: Question, index: number) => {
+      if (q.answer_type.type === "single_select") {
+        setAnswer(q.id, { type: "selected", value: q.answer_type.options[index].value });
+      } else if (q.answer_type.type === "multi_select") {
+        const val = q.answer_type.options[index].value;
+        setAnswers((prev) => {
+          const current = prev[q.id];
+          const values = current?.type === "multi_selected" ? [...current.values] : [];
+          const idx = values.indexOf(val);
+          if (idx >= 0) values.splice(idx, 1);
+          else values.push(val);
+          return { ...prev, [q.id]: { type: "multi_selected", values } };
+        });
+      }
+    },
+    [setAnswer],
+  );
 
   const isLastQuestion = activeTab === request.questions.length - 1;
 
@@ -74,10 +89,10 @@ export function InteractionCard({ sessionKey, requestId, request, onSubmitted }:
     setSubmitting(true);
     const answerList: Answer[] = request.questions.map((q) => ({
       question_id: q.id,
-      value: answers[q.id] ?? { type: 'skipped' as const },
+      value: answers[q.id] ?? { type: "skipped" as const },
     }));
     try {
-      await ipc('chat_respond_interaction', {
+      await ipc("chat_respond_interaction", {
         sessionKey,
         requestId,
         response: { Completed: answerList },
@@ -91,10 +106,10 @@ export function InteractionCard({ sessionKey, requestId, request, onSubmitted }:
   const handleCancel = useCallback(async () => {
     setSubmitting(true);
     try {
-      await ipc('chat_respond_interaction', {
+      await ipc("chat_respond_interaction", {
         sessionKey,
         requestId,
-        response: 'Cancelled',
+        response: "Cancelled",
       });
       onSubmitted();
     } catch {
@@ -115,68 +130,64 @@ export function InteractionCard({ sessionKey, requestId, request, onSubmitted }:
     }
   }, [isLastQuestion]);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    // Don't intercept most keys when typing in form inputs (allow Tab through for navigation)
-    const tag = (e.target as HTMLElement).tagName;
-    if ((tag === 'INPUT' || tag === 'TEXTAREA') && e.key !== 'Tab') return;
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      // Don't intercept most keys when typing in form inputs (allow Tab through for navigation)
+      const tag = (e.target as HTMLElement).tagName;
+      if ((tag === "INPUT" || tag === "TEXTAREA") && e.key !== "Tab") return;
 
-    switch (e.key) {
-      case 'ArrowDown':
-      case 'j':
-        e.preventDefault();
-        setFocusIndex((i) => Math.min(i + 1, optionCount - 1));
-        break;
-      case 'ArrowUp':
-      case 'k':
-        e.preventDefault();
-        setFocusIndex((i) => Math.max(i - 1, 0));
-        break;
-      case 'Enter':
-      case ' ':
-        e.preventDefault();
-        if (question.answer_type.type === 'single_select') {
-          handleSelect(question, focusIndex);
-          advance();
-        } else if (question.answer_type.type === 'multi_select') {
-          if (e.key === 'Enter' && answers[question.id]) {
-            // Enter with existing selection → advance
+      switch (e.key) {
+        case "ArrowDown":
+        case "j":
+          e.preventDefault();
+          setFocusIndex((i) => Math.min(i + 1, optionCount - 1));
+          break;
+        case "ArrowUp":
+        case "k":
+          e.preventDefault();
+          setFocusIndex((i) => Math.max(i - 1, 0));
+          break;
+        case "Enter":
+        case " ":
+          e.preventDefault();
+          if (question.answer_type.type === "single_select") {
+            handleSelect(question, focusIndex);
+            advance();
+          } else if (question.answer_type.type === "multi_select") {
+            if (e.key === "Enter" && answers[question.id]) {
+              // Enter with existing selection → advance
+              advance();
+            } else {
+              handleSelect(question, focusIndex);
+            }
+          } else if (question.answer_type.type === "yes_no") {
+            setAnswer(question.id, { type: "yes_no", answer: focusIndex === 0 });
+            advance();
+          }
+          break;
+        case "Tab":
+          e.preventDefault();
+          if (e.shiftKey) {
+            // Shift+Tab → go back (stop at first question)
+            setActiveTab((t) => Math.max(t - 1, 0));
+          } else if (isLastQuestion) {
+            // Tab on last question → submit
             advance();
           } else {
-            handleSelect(question, focusIndex);
+            // Tab → next question
+            setActiveTab((t) => t + 1);
           }
-        } else if (question.answer_type.type === 'yes_no') {
-          setAnswer(question.id, { type: 'yes_no', answer: focusIndex === 0 });
-          advance();
-        }
-        break;
-      case 'Tab':
-        e.preventDefault();
-        if (e.shiftKey) {
-          // Shift+Tab → go back (stop at first question)
-          setActiveTab((t) => Math.max(t - 1, 0));
-        } else if (isLastQuestion) {
-          // Tab on last question → submit
-          advance();
-        } else {
-          // Tab → next question
-          setActiveTab((t) => t + 1);
-        }
-        break;
-    }
-  }, [optionCount, question, focusIndex, handleSelect, setAnswer, request.questions, advance, answers]);
+          break;
+      }
+    },
+    [optionCount, question, focusIndex, handleSelect, setAnswer, advance, answers, isLastQuestion],
+  );
 
   return (
-    <div
-      ref={cardRef}
-      tabIndex={0}
-      onKeyDown={handleKeyDown}
-      className="flex justify-start focus:outline-none"
-    >
+    <div ref={cardRef} onKeyDown={handleKeyDown} className="flex justify-start focus:outline-none">
       <div className="w-full max-w-[85%] rounded-xl bg-surface-base border border-border overflow-hidden">
         {/* Header */}
-        <div className="px-4 pt-3 pb-2 text-[11px] font-light text-muted">
-          Klynt is asking…
-        </div>
+        <div className="px-4 pt-3 pb-2 text-[11px] font-light text-muted">Klynt is asking…</div>
 
         {/* Tabs (if >1 question) */}
         {request.questions.length > 1 && (
@@ -187,8 +198,8 @@ export function InteractionCard({ sessionKey, requestId, request, onSubmitted }:
                 onClick={() => setActiveTab(i)}
                 className={`px-3 py-1 rounded-md text-[11px] font-light transition-colors ${
                   i === activeTab
-                    ? 'bg-surface-highest text-primary'
-                    : 'text-muted hover:text-secondary hover:bg-surface-raised'
+                    ? "bg-surface-highest text-primary"
+                    : "text-muted hover:text-secondary hover:bg-surface-raised"
                 }`}
               >
                 {q.title}
@@ -202,23 +213,31 @@ export function InteractionCard({ sessionKey, requestId, request, onSubmitted }:
           <p className="text-[13px] font-light text-primary mb-3">{question.text}</p>
 
           {/* Single / Multi select */}
-          {(question.answer_type.type === 'single_select' || question.answer_type.type === 'multi_select') && (
+          {(question.answer_type.type === "single_select" ||
+            question.answer_type.type === "multi_select") && (
             <div className="space-y-1.5">
               {question.answer_type.options.map((opt, i) => {
                 const currentAnswer = answers[question.id];
-                const isSelected = question.answer_type.type === 'single_select'
-                  ? currentAnswer?.type === 'selected' && currentAnswer.value === opt.value
-                  : currentAnswer?.type === 'multi_selected' && currentAnswer.values.includes(opt.value);
+                const isSelected =
+                  question.answer_type.type === "single_select"
+                    ? currentAnswer?.type === "selected" && currentAnswer.value === opt.value
+                    : currentAnswer?.type === "multi_selected" &&
+                      currentAnswer.values.includes(opt.value);
 
                 return (
                   <button
                     key={opt.value}
                     onClick={() => handleSelect(question, i)}
-                    className={cn('w-full text-left px-3 py-2', optionButtonClass(isSelected, focusIndex === i))}
+                    className={cn(
+                      "w-full text-left px-3 py-2",
+                      optionButtonClass(isSelected, focusIndex === i),
+                    )}
                   >
                     <div className="text-[12px] font-light">{opt.label}</div>
                     {opt.description && (
-                      <div className="text-[11px] font-light text-muted mt-0.5">{opt.description}</div>
+                      <div className="text-[11px] font-light text-muted mt-0.5">
+                        {opt.description}
+                      </div>
                     )}
                   </button>
                 );
@@ -227,18 +246,18 @@ export function InteractionCard({ sessionKey, requestId, request, onSubmitted }:
           )}
 
           {/* Yes / No */}
-          {question.answer_type.type === 'yes_no' && (
+          {question.answer_type.type === "yes_no" && (
             <div className="flex gap-2">
-              {['Yes', 'No'].map((label, i) => {
+              {["Yes", "No"].map((label, i) => {
                 const val = i === 0;
                 const current = answers[question.id];
-                const isSelected = current?.type === 'yes_no' && current.answer === val;
+                const isSelected = current?.type === "yes_no" && current.answer === val;
 
                 return (
                   <button
                     key={label}
-                    onClick={() => setAnswer(question.id, { type: 'yes_no', answer: val })}
-                    className={cn('flex-1 py-2', optionButtonClass(isSelected, focusIndex === i))}
+                    onClick={() => setAnswer(question.id, { type: "yes_no", answer: val })}
+                    className={cn("flex-1 py-2", optionButtonClass(isSelected, focusIndex === i))}
                   >
                     {label}
                   </button>
@@ -248,25 +267,28 @@ export function InteractionCard({ sessionKey, requestId, request, onSubmitted }:
           )}
 
           {/* Free text */}
-          {question.answer_type.type === 'free_text' && (() => {
-            const v = answers[question.id];
-            const textContent = v?.type === 'text' ? v.content : '';
-            return (
-              <input
-                type="text"
-                value={textContent}
-                onChange={(e) => setAnswer(question.id, { type: 'text', content: e.target.value })}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    advance();
+          {question.answer_type.type === "free_text" &&
+            (() => {
+              const v = answers[question.id];
+              const textContent = v?.type === "text" ? v.content : "";
+              return (
+                <input
+                  type="text"
+                  value={textContent}
+                  onChange={(e) =>
+                    setAnswer(question.id, { type: "text", content: e.target.value })
                   }
-                }}
-                placeholder={question.answer_type.placeholder ?? ''}
-                className="w-full bg-surface-raised text-primary text-[12px] font-light px-3 py-2 rounded-lg border border-border focus:outline-none focus:border-brand"
-              />
-            );
-          })()}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      advance();
+                    }
+                  }}
+                  placeholder={question.answer_type.placeholder ?? ""}
+                  className="w-full bg-surface-raised text-primary text-[12px] font-light px-3 py-2 rounded-lg border border-border focus:outline-none focus:border-brand"
+                />
+              );
+            })()}
         </div>
 
         {/* Footer: Submit / Cancel */}

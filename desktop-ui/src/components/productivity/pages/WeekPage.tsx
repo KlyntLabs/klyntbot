@@ -1,7 +1,7 @@
-import { useParams } from 'react-router';
-import { ProductivityLayout } from '../ProductivityLayout';
-import { WeekView } from '../WeekView';
-import { todayISO, weekStartISO } from '../../../lib/dates';
+import { useParams } from "react-router";
+import { todayISO, weekStartISO } from "../../../lib/dates";
+import { ProductivityLayout } from "../ProductivityLayout";
+import { WeekView } from "../WeekView";
 
 export function ProductivityWeekPage() {
   const { weekStart } = useParams();

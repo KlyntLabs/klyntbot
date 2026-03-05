@@ -1,7 +1,7 @@
-import { useParams } from 'react-router';
-import { ProductivityLayout } from '../ProductivityLayout';
-import { DayView } from '../DayView';
-import { todayISO } from '../../../lib/dates';
+import { useParams } from "react-router";
+import { todayISO } from "../../../lib/dates";
+import { DayView } from "../DayView";
+import { ProductivityLayout } from "../ProductivityLayout";
 
 export function ProductivityDayPage() {
   const { date } = useParams();

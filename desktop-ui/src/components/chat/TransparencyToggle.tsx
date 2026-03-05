@@ -1,4 +1,4 @@
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff } from "lucide-react";
 
 interface TransparencyToggleProps {
   enabled: boolean;
@@ -13,10 +13,10 @@ export function TransparencyToggle({ enabled, onToggle }: TransparencyToggleProp
       onClick={onToggle}
       className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${
         enabled
-          ? 'bg-brand/10 text-brand hover:bg-brand/20'
-          : 'text-muted hover:bg-surface-base hover:text-secondary'
+          ? "bg-brand/10 text-brand hover:bg-brand/20"
+          : "text-muted hover:bg-surface-base hover:text-secondary"
       }`}
-      title={enabled ? 'Hide transparency data' : 'Show transparency data'}
+      title={enabled ? "Hide transparency data" : "Show transparency data"}
     >
       <Icon className="w-4 h-4" strokeWidth={1.5} />
     </button>

@@ -1,4 +1,4 @@
-import { formatLongDuration } from '../../lib/dates';
+import { formatLongDuration } from "../../lib/dates";
 
 interface WorkHoursCardProps {
   totalActiveSecs: number;
@@ -17,8 +17,12 @@ export function WorkHoursCard({ totalActiveSecs, workDayHours = 8 }: WorkHoursCa
         </span>
         <div className="flex flex-col items-end">
           <span className="text-[11px] font-light text-dim">Percent of work day</span>
-          <span className="text-[18px] font-light text-primary tabular-nums">{pct.toFixed(1)}%</span>
-          <span className="text-[10px] font-light text-dim">of {formatLongDuration(workDayHours * 3600)}</span>
+          <span className="text-[18px] font-light text-primary tabular-nums">
+            {pct.toFixed(1)}%
+          </span>
+          <span className="text-[10px] font-light text-dim">
+            of {formatLongDuration(workDayHours * 3600)}
+          </span>
         </div>
       </div>
     </div>

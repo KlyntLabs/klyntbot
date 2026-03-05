@@ -1,6 +1,6 @@
-import { ChevronDown, ChevronRight } from 'lucide-react';
-import { useNavigate } from 'react-router';
-import type { Project, Task, Objective } from '../../lib/types';
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { useNavigate } from "react-router";
+import type { Objective, Project, Task } from "../../lib/types";
 
 interface ProjectHeaderProps {
   project: Project;
@@ -10,17 +10,18 @@ interface ProjectHeaderProps {
   onToggle: () => void;
 }
 
-export function ProjectHeader({ project, tasks, objectives, isCollapsed, onToggle }: ProjectHeaderProps) {
+export function ProjectHeader({
+  project,
+  tasks,
+  objectives,
+  isCollapsed,
+  onToggle,
+}: ProjectHeaderProps) {
   const navigate = useNavigate();
 
   return (
-    <div
-      className="w-full flex items-center gap-3 px-6 py-3 bg-overlay hover:bg-overlay-heavy transition-colors text-left border-b border-border-subtle"
-    >
-      <button
-        onClick={onToggle}
-        className="flex items-center gap-3 flex-1 min-w-0"
-      >
+    <div className="w-full flex items-center gap-3 px-6 py-3 bg-overlay hover:bg-overlay-heavy transition-colors text-left border-b border-border-subtle">
+      <button onClick={onToggle} className="flex items-center gap-3 flex-1 min-w-0">
         {isCollapsed ? (
           <ChevronRight className="w-[14px] h-[14px] text-muted flex-shrink-0" strokeWidth={1.5} />
         ) : (
@@ -40,7 +41,9 @@ export function ProjectHeader({ project, tasks, objectives, isCollapsed, onToggl
             <div className="flex items-center gap-2 overflow-hidden flex-1 min-w-0">
               {objectives.map((objective, idx) => (
                 <div key={objective.id} className="flex items-center gap-1.5 flex-shrink-0">
-                  <span className="text-[10px] text-muted font-light truncate">{objective.title}</span>
+                  <span className="text-[10px] text-muted font-light truncate">
+                    {objective.title}
+                  </span>
                   <span className="text-[9px] text-dim font-light">{objective.progress}%</span>
                   {idx < objectives.length - 1 && (
                     <span className="text-dim text-[10px] ml-1">&middot;</span>

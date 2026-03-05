@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { ipc } from './useIpc';
-import { isTauri, parseApiError } from '../lib/utils';
-import type { ApiError } from '../lib/types';
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { ApiError } from "../lib/types";
+import { parseApiError } from "../lib/utils";
+import { ipc } from "./useIpc";
 
 interface QueryResult<T> {
   data: T;
@@ -11,7 +11,7 @@ interface QueryResult<T> {
 }
 
 /**
- * Fetches data from a Tauri command. Falls back to `fallback` in browser dev mode.
+ * Fetches data from a Tauri command or the dev HTTP server (in browser mode).
  *
  * Pass `null` for `args` to skip fetching (e.g. when a required param isn't ready yet).
  * Pass `undefined` for commands that take no arguments.
@@ -22,15 +22,15 @@ export function useQuery<T>(
   fallback?: T,
 ): QueryResult<T> {
   const [data, setData] = useState<T>(fallback as T);
-  const [loading, setLoading] = useState(isTauri && args !== null);
+  const [loading, setLoading] = useState(args !== null);
   const [error, setError] = useState<ApiError | null>(null);
   const argsRef = useRef(args);
   argsRef.current = args;
   const fallbackRef = useRef(fallback);
   fallbackRef.current = fallback;
 
-  const fetch = useCallback(() => {
-    if (!isTauri || argsRef.current === null) return;
+  const doFetch = useCallback(() => {
+    if (argsRef.current === null) return;
 
     setLoading(true);
     setError(null);
@@ -42,7 +42,7 @@ export function useQuery<T>(
   }, [cmd]);
 
   // Re-fetch when cmd or args change. null args = skip + reset to fallback.
-  const argsKey = args === null ? null : args === undefined ? '' : JSON.stringify(args);
+  const argsKey = args === null ? null : args === undefined ? "" : JSON.stringify(args);
 
   useEffect(() => {
     if (argsKey === null) {
@@ -50,8 +50,8 @@ export function useQuery<T>(
       setLoading(false);
       return;
     }
-    fetch();
-  }, [fetch, argsKey]);
+    doFetch();
+  }, [doFetch, argsKey]);
 
-  return { data, loading, error, refetch: fetch };
+  return { data, loading, error, refetch: doFetch };
 }

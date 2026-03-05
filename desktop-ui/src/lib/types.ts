@@ -68,12 +68,21 @@ export interface CalendarEvent {
 }
 
 export type MessageSegment =
-  | { type: 'text'; content: string }
-  | { type: 'tool'; name: string; action?: string; success: boolean; durationMs: number; result?: string; estimatedTokens?: number; agent?: string };
+  | { type: "text"; content: string }
+  | {
+      type: "tool";
+      name: string;
+      action?: string;
+      success: boolean;
+      durationMs: number;
+      result?: string;
+      estimatedTokens?: number;
+      agent?: string;
+    };
 
 export interface ChatMessage {
   id: string;
-  role: 'user' | 'assistant' | 'interaction';
+  role: "user" | "assistant" | "interaction";
   content: string;
   timestamp?: string;
   segments?: MessageSegment[];
@@ -223,17 +232,29 @@ export interface DelegationInfo {
   toAgent: string;
   query: string;
   depth: number;
-  status: 'active' | 'completed' | 'failed';
+  status: "active" | "completed" | "failed";
   durationMs?: number;
 }
 
 // ── Transparency Data (per-message) ───────────────────────────────────
 
 export interface TransparencyData {
-  usage?: { promptTokens: number; completionTokens: number; cacheReadTokens: number; cacheWriteTokens: number };
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+    cacheReadTokens: number;
+    cacheWriteTokens: number;
+  };
   cost?: { estimatedUsd: number; model: string };
   timing?: { totalMs: number; classificationMs?: number; contextAssemblyMs?: number };
-  tools?: { name: string; action?: string; success: boolean; durationMs: number; estimatedTokens?: number; agent?: string }[];
+  tools?: {
+    name: string;
+    action?: string;
+    success: boolean;
+    durationMs: number;
+    estimatedTokens?: number;
+    agent?: string;
+  }[];
   toolTokensTotal?: number;
   memoryAccesses?: { action: string; query?: string; resultsCount: number }[];
   skills?: { name: string; trigger: string; agent?: string }[];
@@ -271,10 +292,10 @@ export interface Question {
 }
 
 export type AnswerType =
-  | { type: 'single_select'; options: AnswerOption[] }
-  | { type: 'multi_select'; options: AnswerOption[] }
-  | { type: 'yes_no'; default?: boolean }
-  | { type: 'free_text'; placeholder?: string };
+  | { type: "single_select"; options: AnswerOption[] }
+  | { type: "multi_select"; options: AnswerOption[] }
+  | { type: "yes_no"; default?: boolean }
+  | { type: "free_text"; placeholder?: string };
 
 export interface AnswerOption {
   value: string;
@@ -283,20 +304,18 @@ export interface AnswerOption {
 }
 
 export type AnswerValue =
-  | { type: 'selected'; value: string }
-  | { type: 'multi_selected'; values: string[] }
-  | { type: 'yes_no'; answer: boolean }
-  | { type: 'text'; content: string }
-  | { type: 'skipped' };
+  | { type: "selected"; value: string }
+  | { type: "multi_selected"; values: string[] }
+  | { type: "yes_no"; answer: boolean }
+  | { type: "text"; content: string }
+  | { type: "skipped" };
 
 export interface Answer {
   question_id: string;
   value: AnswerValue;
 }
 
-export type FormResponse =
-  | { Completed: Answer[] }
-  | 'Cancelled';
+export type FormResponse = { Completed: Answer[] } | "Cancelled";
 
 export interface Area {
   id: string;
@@ -337,7 +356,7 @@ export interface FinanceAccount {
 export interface FinanceTransaction {
   id: string;
   accountId: string;
-  txType: 'income' | 'expense' | 'transfer';
+  txType: "income" | "expense" | "transfer";
   amount: number;
   currency: string;
   category: string | null;
@@ -410,7 +429,13 @@ export interface FinanceLiability {
 }
 
 export interface FinanceNetWorth {
-  totalsByCurrency: { currency: string; accounts: number; investments: number; liabilities: number; net: number }[];
+  totalsByCurrency: {
+    currency: string;
+    accounts: number;
+    investments: number;
+    liabilities: number;
+    net: number;
+  }[];
 }
 
 // ── Productivity ─────────────────────────────────────────────────────
@@ -497,11 +522,18 @@ export interface TimeEntry {
   source: string;
 }
 
-export type ProductivityPeriod = 'day' | 'week' | 'month';
+export type ProductivityPeriod = "day" | "week" | "month";
 
-export type Tab = 'All' | string;
-export type SidebarItem = 'Chat' | 'Tasks' | 'OKR' | 'Calendar' | 'Finance' | 'Productivity' | 'Settings';
-export type ViewMode = 'table' | 'board' | 'tree';
+export type Tab = "All" | string;
+export type SidebarItem =
+  | "Chat"
+  | "Tasks"
+  | "OKR"
+  | "Calendar"
+  | "Finance"
+  | "Productivity"
+  | "Settings";
+export type ViewMode = "table" | "board" | "tree";
 
 // ── Mutation Params ─────────────────────────────────────────────────────
 
@@ -596,7 +628,7 @@ export interface KeyResultUpdateParams {
 
 export interface McpServerConfig {
   name: string;
-  transport: 'stdio' | 'http';
+  transport: "stdio" | "http";
   enabled: boolean;
   command?: string;
   args?: string[];
@@ -614,7 +646,7 @@ export interface McpConfigResponse {
 
 export interface McpAddServerParams {
   name: string;
-  transport: 'stdio' | 'http';
+  transport: "stdio" | "http";
   command?: string;
   args?: string[];
   env?: Record<string, string>;
@@ -632,7 +664,7 @@ export interface RecommendedMcpServer {
   author: string;
   description: string;
   icon: string;
-  transport: 'stdio' | 'http';
+  transport: "stdio" | "http";
   command?: string;
   args?: string[];
   envKeys?: string[];

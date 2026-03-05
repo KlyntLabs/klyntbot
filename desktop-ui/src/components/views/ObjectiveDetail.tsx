@@ -1,45 +1,50 @@
-import { useState, useMemo, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router';
-import { ArrowLeft, Trash2, Plus } from 'lucide-react';
-import { Progress } from '../ui/Progress';
-import { useQuery } from '../../hooks/useQuery';
-import { useMutation } from '../../hooks/useMutation';
-import { useEvent } from '../../hooks/useEvent';
+import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router";
+import { useEvent } from "../../hooks/useEvent";
+import { useMutation } from "../../hooks/useMutation";
+import { useQuery } from "../../hooks/useQuery";
 import type {
-  Objective,
-  Project,
   KeyResult,
-  ObjectiveUpdateParams,
   KeyResultCreateParams,
-} from '../../lib/types';
+  Objective,
+  ObjectiveUpdateParams,
+  Project,
+} from "../../lib/types";
+import { Progress } from "../ui/Progress";
 
-const STATUSES = ['active', 'paused', 'completed', 'abandoned'] as const;
+const STATUSES = ["active", "paused", "completed", "abandoned"] as const;
 
 export function ObjectiveDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const { data: objectives, refetch } = useQuery<Objective[]>('objective_list', undefined, []);
-  const { data: projects } = useQuery<Project[]>('project_list', undefined, []);
-  const updateObjective = useMutation<Objective, ObjectiveUpdateParams>('objective_update', 'params');
-  const deleteObjective = useMutation<boolean, { id: string }>('objective_delete');
-  const createKr = useMutation<KeyResult, KeyResultCreateParams>('key_result_create', 'params');
-  const updateKrMetric = useMutation<KeyResult, { id: string; currentValue: number }>('key_result_update_metric');
-  const deleteKr = useMutation<boolean, { id: string }>('key_result_delete');
+  const { data: objectives, refetch } = useQuery<Objective[]>("objective_list", undefined, []);
+  const { data: projects } = useQuery<Project[]>("project_list", undefined, []);
+  const updateObjective = useMutation<Objective, ObjectiveUpdateParams>(
+    "objective_update",
+    "params",
+  );
+  const deleteObjective = useMutation<boolean, { id: string }>("objective_delete");
+  const createKr = useMutation<KeyResult, KeyResultCreateParams>("key_result_create", "params");
+  const updateKrMetric = useMutation<KeyResult, { id: string; currentValue: number }>(
+    "key_result_update_metric",
+  );
+  const deleteKr = useMutation<boolean, { id: string }>("key_result_delete");
 
   const [editingTitle, setEditingTitle] = useState(false);
-  const [titleDraft, setTitleDraft] = useState('');
+  const [titleDraft, setTitleDraft] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [newKrTitle, setNewKrTitle] = useState('');
+  const [newKrTitle, setNewKrTitle] = useState("");
   const [addingKr, setAddingKr] = useState(false);
 
-  useEvent<{ entityKind: string; id: string }>('entity:updated', () => {
+  useEvent<{ entityKind: string; id: string }>("entity:updated", () => {
     refetch();
   });
 
-  const objective = useMemo(() => objectives.find(o => o.id === id), [objectives, id]);
+  const objective = useMemo(() => objectives.find((o) => o.id === id), [objectives, id]);
   const project = useMemo(
-    () => (objective ? projects.find(p => p.id === objective.projectId) : undefined),
+    () => (objective ? projects.find((p) => p.id === objective.projectId) : undefined),
     [objective, projects],
   );
 
@@ -63,8 +68,13 @@ export function ObjectiveDetail() {
 
   const handleAddKr = useCallback(async () => {
     if (!id || !newKrTitle.trim()) return;
-    await createKr.mutate({ objectiveId: id, title: newKrTitle.trim(), targetValue: 100, unit: '%' });
-    setNewKrTitle('');
+    await createKr.mutate({
+      objectiveId: id,
+      title: newKrTitle.trim(),
+      targetValue: 100,
+      unit: "%",
+    });
+    setNewKrTitle("");
     setAddingKr(false);
   }, [id, newKrTitle, createKr]);
 
@@ -120,15 +130,14 @@ export function ObjectiveDetail() {
         {/* Title */}
         {editingTitle ? (
           <input
-            autoFocus
             value={titleDraft}
-            onChange={e => setTitleDraft(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter') {
+            onChange={(e) => setTitleDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
                 handleUpdate({ title: titleDraft });
                 setEditingTitle(false);
               }
-              if (e.key === 'Escape') setEditingTitle(false);
+              if (e.key === "Escape") setEditingTitle(false);
             }}
             onBlur={() => {
               if (titleDraft !== objective.title) handleUpdate({ title: titleDraft });
@@ -138,7 +147,10 @@ export function ObjectiveDetail() {
           />
         ) : (
           <h1
-            onClick={() => { setTitleDraft(objective.title); setEditingTitle(true); }}
+            onClick={() => {
+              setTitleDraft(objective.title);
+              setEditingTitle(true);
+            }}
             className="text-[22px] font-light text-primary cursor-text mb-4 hover:text-secondary transition-colors"
           >
             {objective.title}
@@ -158,14 +170,14 @@ export function ObjectiveDetail() {
         <div className="grid grid-cols-[120px_1fr] gap-y-4 gap-x-4 mb-6">
           <span className="text-[12px] text-muted font-light self-center">Status</span>
           <div className="flex gap-2">
-            {STATUSES.map(s => (
+            {STATUSES.map((s) => (
               <button
                 key={s}
                 onClick={() => handleUpdate({ status: s })}
                 className={`px-3 py-1 rounded-md text-[12px] font-light transition-colors ${
                   objective.status === s
-                    ? 'bg-brand text-white'
-                    : 'bg-surface-low text-muted hover:bg-surface-base'
+                    ? "bg-brand text-white"
+                    : "bg-surface-low text-muted hover:bg-surface-base"
                 }`}
               >
                 {s}
@@ -177,7 +189,9 @@ export function ObjectiveDetail() {
         {/* Key Results */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-[12px] text-muted font-light uppercase tracking-wider">Key Results</span>
+            <span className="text-[12px] text-muted font-light uppercase tracking-wider">
+              Key Results
+            </span>
             <button
               onClick={() => setAddingKr(true)}
               className="flex items-center gap-1 text-[12px] text-brand hover:text-brand-hover transition-colors font-light"
@@ -188,7 +202,7 @@ export function ObjectiveDetail() {
           </div>
 
           <div className="space-y-2">
-            {krs.map(kr => (
+            {krs.map((kr) => (
               <div key={kr.id} className="bg-surface-low rounded-xl px-4 py-3">
                 <div className="flex items-center gap-3 mb-2">
                   <span className="text-[13px] font-light text-secondary flex-1">{kr.title}</span>
@@ -203,11 +217,13 @@ export function ObjectiveDetail() {
                   <input
                     type="number"
                     defaultValue={kr.current}
-                    onBlur={e => {
+                    onBlur={(e) => {
                       const v = parseFloat(e.target.value) || 0;
                       if (v !== kr.current) handleUpdateMetric(kr.id, v);
                     }}
-                    onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") e.currentTarget.blur();
+                    }}
                     className="w-20 bg-surface-base rounded-md px-2 py-1 text-[12px] font-light text-primary border border-border-subtle outline-none text-center"
                   />
                   <span className="text-[11px] text-dim font-light">
@@ -216,7 +232,9 @@ export function ObjectiveDetail() {
                   <div className="flex-1">
                     <Progress value={kr.progress} />
                   </div>
-                  <span className="text-[11px] text-muted font-light w-10 text-right">{kr.progress}%</span>
+                  <span className="text-[11px] text-muted font-light w-10 text-right">
+                    {kr.progress}%
+                  </span>
                 </div>
               </div>
             ))}
@@ -224,7 +242,9 @@ export function ObjectiveDetail() {
             {krs.length === 0 && !addingKr && (
               <div className="text-center py-6">
                 <p className="text-[13px] text-muted font-light">No key results yet</p>
-                <p className="text-[11px] text-dim font-light mt-1">Add key results to track progress</p>
+                <p className="text-[11px] text-dim font-light mt-1">
+                  Add key results to track progress
+                </p>
               </div>
             )}
 
@@ -232,14 +252,21 @@ export function ObjectiveDetail() {
             {addingKr && (
               <div className="bg-surface-low rounded-xl px-4 py-3">
                 <input
-                  autoFocus
                   value={newKrTitle}
-                  onChange={e => setNewKrTitle(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') handleAddKr();
-                    if (e.key === 'Escape') { setAddingKr(false); setNewKrTitle(''); }
+                  onChange={(e) => setNewKrTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleAddKr();
+                    if (e.key === "Escape") {
+                      setAddingKr(false);
+                      setNewKrTitle("");
+                    }
                   }}
-                  onBlur={() => { if (!newKrTitle.trim()) { setAddingKr(false); setNewKrTitle(''); } }}
+                  onBlur={() => {
+                    if (!newKrTitle.trim()) {
+                      setAddingKr(false);
+                      setNewKrTitle("");
+                    }
+                  }}
                   placeholder="Key result title..."
                   className="w-full bg-transparent text-[13px] font-light text-primary outline-none placeholder:text-dim"
                 />
@@ -255,12 +282,12 @@ export function ObjectiveDetail() {
             onBlur={() => setConfirmDelete(false)}
             className={`flex items-center gap-2 px-3 py-2 rounded-md text-[12px] font-light transition-colors ${
               confirmDelete
-                ? 'bg-destructive text-white'
-                : 'text-muted hover:text-destructive hover:bg-surface-low'
+                ? "bg-destructive text-white"
+                : "text-muted hover:text-destructive hover:bg-surface-low"
             }`}
           >
             <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />
-            {confirmDelete ? 'Click again to delete' : 'Delete objective'}
+            {confirmDelete ? "Click again to delete" : "Delete objective"}
           </button>
         </div>
       </div>

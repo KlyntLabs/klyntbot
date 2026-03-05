@@ -1,9 +1,14 @@
-import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { useQuery } from './useQuery';
-import { useAgentStream } from './useAgentStream';
-import { ipc } from './useIpc';
-import { isTauri } from '../lib/utils';
-import type { ActiveInteraction, ChatMessage, MessageSegment, TransparencyData } from '../lib/types';
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type {
+  ActiveInteraction,
+  ChatMessage,
+  MessageSegment,
+  TransparencyData,
+} from "../lib/types";
+import { isTauri } from "../lib/utils";
+import { useAgentStream } from "./useAgentStream";
+import { ipc } from "./useIpc";
+import { useQuery } from "./useQuery";
 
 interface ChatSession {
   messages: ChatMessage[];
@@ -29,11 +34,11 @@ interface ChatSession {
  */
 export function useChatSession(sessionKey: string, onDone?: () => void): ChatSession {
   const { data: messages, refetch } = useQuery<ChatMessage[]>(
-    'chat_messages',
+    "chat_messages",
     sessionKey ? { sessionKey } : null,
     [],
   );
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState("");
   const [pendingUserMsg, setPendingUserMsg] = useState<string | null>(null);
 
   const stream = useAgentStream(sessionKey, () => {
@@ -51,7 +56,7 @@ export function useChatSession(sessionKey: string, onDone?: () => void): ChatSes
   const assistantCountRef = useRef(0);
 
   useEffect(() => {
-    const count = messages.filter(m => m.role === 'assistant').length;
+    const count = messages.filter((m) => m.role === "assistant").length;
     if (!isStreaming && hasSegmentsRef.current && count > assistantCountRef.current) {
       clearSegments();
       clearTransparency();
@@ -61,29 +66,32 @@ export function useChatSession(sessionKey: string, onDone?: () => void): ChatSes
 
   const displayMessages = useMemo(() => {
     if (!pendingUserMsg) return messages;
-    return [...messages, { id: 'pending', role: 'user' as const, content: pendingUserMsg }];
+    return [...messages, { id: "pending", role: "user" as const, content: pendingUserMsg }];
   }, [messages, pendingUserMsg]);
 
-  const send = useCallback(async (extraPayload?: Record<string, unknown>) => {
-    if (!input.trim() || stream.isStreaming) return;
-    const text = input;
-    setInput('');
+  const send = useCallback(
+    async (extraPayload?: Record<string, unknown>) => {
+      if (!input.trim() || stream.isStreaming) return;
+      const text = input;
+      setInput("");
 
-    setPendingUserMsg(text);
-    stream.startStreaming();
+      setPendingUserMsg(text);
+      stream.startStreaming();
 
-    if (!isTauri) return;
+      if (!isTauri) return;
 
-    try {
-      await ipc<ChatMessage>('chat_send', {
-        content: text,
-        sessionKey,
-        ...extraPayload,
-      });
-    } catch (e) {
-      stream.failStreaming(String(e));
-    }
-  }, [input, sessionKey, stream]);
+      try {
+        await ipc<ChatMessage>("chat_send", {
+          content: text,
+          sessionKey,
+          ...extraPayload,
+        });
+      } catch (e) {
+        stream.failStreaming(String(e));
+      }
+    },
+    [input, sessionKey, stream],
+  );
 
   return {
     messages: displayMessages,

@@ -1,40 +1,43 @@
-import { useState, useMemo, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router';
-import { ArrowLeft, Trash2 } from 'lucide-react';
-import { Badge } from '../ui/Badge';
-import { useQuery } from '../../hooks/useQuery';
-import { useMutation } from '../../hooks/useMutation';
-import { useEvent } from '../../hooks/useEvent';
-import type { Task, Project, TaskUpdateParams } from '../../lib/types';
+import { ArrowLeft, Trash2 } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";
+import { useNavigate, useParams } from "react-router";
+import { useEvent } from "../../hooks/useEvent";
+import { useMutation } from "../../hooks/useMutation";
+import { useQuery } from "../../hooks/useQuery";
+import type { Project, Task, TaskUpdateParams } from "../../lib/types";
+import { Badge } from "../ui/Badge";
 
-const PRIORITIES = ['P1', 'P2', 'P3', 'P4', null] as const;
-const STATUSES = ['todo', 'doing', 'done'] as const;
+const PRIORITIES = ["P1", "P2", "P3", "P4", null] as const;
+const STATUSES = ["todo", "doing", "done"] as const;
 
 export function TaskDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const { data: tasks, refetch } = useQuery<Task[]>('task_list', undefined, []);
-  const { data: projects } = useQuery<Project[]>('project_list', undefined, []);
-  const updateTask = useMutation<Task, TaskUpdateParams>('task_update', 'params');
-  const deleteTask = useMutation<boolean, { id: string }>('task_delete');
+  const { data: tasks, refetch } = useQuery<Task[]>("task_list", undefined, []);
+  const { data: projects } = useQuery<Project[]>("project_list", undefined, []);
+  const updateTask = useMutation<Task, TaskUpdateParams>("task_update", "params");
+  const deleteTask = useMutation<boolean, { id: string }>("task_delete");
 
   const [editingTitle, setEditingTitle] = useState(false);
-  const [titleDraft, setTitleDraft] = useState('');
+  const [titleDraft, setTitleDraft] = useState("");
   const [editingDesc, setEditingDesc] = useState(false);
-  const [descDraft, setDescDraft] = useState('');
+  const [descDraft, setDescDraft] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  useEvent<{ entityKind: string; id: string }>('entity:updated', () => {
+  useEvent<{ entityKind: string; id: string }>("entity:updated", () => {
     refetch();
   });
 
-  const task = useMemo(() => tasks.find(t => t.id === id), [tasks, id]);
+  const task = useMemo(() => tasks.find((t) => t.id === id), [tasks, id]);
 
-  const handleUpdate = useCallback(async (params: Partial<TaskUpdateParams>) => {
-    if (!id) return;
-    await updateTask.mutate({ id, ...params });
-  }, [id, updateTask]);
+  const handleUpdate = useCallback(
+    async (params: Partial<TaskUpdateParams>) => {
+      if (!id) return;
+      await updateTask.mutate({ id, ...params });
+    },
+    [id, updateTask],
+  );
 
   const handleDelete = useCallback(async () => {
     if (!id) return;
@@ -43,15 +46,15 @@ export function TaskDetail() {
       return;
     }
     await deleteTask.mutate({ id });
-    navigate('/');
+    navigate("/");
   }, [id, confirmDelete, deleteTask, navigate]);
 
   const cyclePriority = useCallback(() => {
     if (!task) return;
-    const currentIdx = PRIORITIES.indexOf(task.priority as typeof PRIORITIES[number]);
+    const currentIdx = PRIORITIES.indexOf(task.priority as (typeof PRIORITIES)[number]);
     const nextIdx = (currentIdx + 1) % PRIORITIES.length;
     const next = PRIORITIES[nextIdx];
-    handleUpdate({ priority: next ? parseInt(next[1]) : null });
+    handleUpdate({ priority: next ? parseInt(next[1], 10) : null });
   }, [task, handleUpdate]);
 
   if (!task) {
@@ -67,7 +70,7 @@ export function TaskDetail() {
       {/* Header */}
       <div className="h-14 flex items-center px-6 gap-3 border-b border-border flex-shrink-0">
         <button
-          onClick={() => navigate('/')}
+          onClick={() => navigate("/")}
           className="text-muted hover:text-secondary transition-colors"
         >
           <ArrowLeft className="w-4 h-4" strokeWidth={1.5} />
@@ -80,15 +83,14 @@ export function TaskDetail() {
         {/* Title */}
         {editingTitle ? (
           <input
-            autoFocus
             value={titleDraft}
-            onChange={e => setTitleDraft(e.target.value)}
-            onKeyDown={e => {
-              if (e.key === 'Enter') {
+            onChange={(e) => setTitleDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
                 handleUpdate({ title: titleDraft });
                 setEditingTitle(false);
               }
-              if (e.key === 'Escape') setEditingTitle(false);
+              if (e.key === "Escape") setEditingTitle(false);
             }}
             onBlur={() => {
               if (titleDraft !== task.title) handleUpdate({ title: titleDraft });
@@ -98,7 +100,10 @@ export function TaskDetail() {
           />
         ) : (
           <h1
-            onClick={() => { setTitleDraft(task.title); setEditingTitle(true); }}
+            onClick={() => {
+              setTitleDraft(task.title);
+              setEditingTitle(true);
+            }}
             className="text-[22px] font-light text-primary cursor-text mb-4 hover:text-secondary transition-colors"
           >
             {task.title}
@@ -110,14 +115,14 @@ export function TaskDetail() {
           {/* Status */}
           <span className="text-[12px] text-muted font-light self-center">Status</span>
           <div className="flex gap-2">
-            {STATUSES.map(s => (
+            {STATUSES.map((s) => (
               <button
                 key={s}
                 onClick={() => handleUpdate({ status: s })}
                 className={`px-3 py-1 rounded-md text-[12px] font-light transition-colors ${
                   task.status === s
-                    ? 'bg-brand text-white'
-                    : 'bg-surface-low text-muted hover:bg-surface-base'
+                    ? "bg-brand text-white"
+                    : "bg-surface-low text-muted hover:bg-surface-base"
                 }`}
               >
                 {s}
@@ -128,28 +133,30 @@ export function TaskDetail() {
           {/* Priority */}
           <span className="text-[12px] text-muted font-light self-center">Priority</span>
           <button onClick={cyclePriority} className="self-start">
-            <Badge variant="priority" value={task.priority ?? '—'} />
+            <Badge variant="priority" value={task.priority ?? "—"} />
           </button>
 
           {/* Due Date */}
           <span className="text-[12px] text-muted font-light self-center">Due Date</span>
           <input
             type="date"
-            value={task.dueDate ?? ''}
-            onChange={e => handleUpdate({ dueDate: e.target.value || null })}
+            value={task.dueDate ?? ""}
+            onChange={(e) => handleUpdate({ dueDate: e.target.value || null })}
             className="bg-surface-low rounded-md px-3 py-1.5 text-[12px] font-light text-secondary border border-border-subtle outline-none w-40"
           />
 
           {/* Project */}
           <span className="text-[12px] text-muted font-light self-center">Project</span>
           <select
-            value={task.projectId ?? ''}
-            onChange={e => handleUpdate({ projectId: e.target.value || null })}
+            value={task.projectId ?? ""}
+            onChange={(e) => handleUpdate({ projectId: e.target.value || null })}
             className="bg-surface-low rounded-md px-3 py-1.5 text-[12px] font-light text-secondary border border-border-subtle outline-none w-48"
           >
             <option value="">No project</option>
-            {projects.map(p => (
-              <option key={p.id} value={p.id}>{p.name}</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
             ))}
           </select>
 
@@ -157,7 +164,7 @@ export function TaskDetail() {
           <span className="text-[12px] text-muted font-light self-center">Tags</span>
           <div className="flex items-center gap-1.5">
             {task.tags.length > 0 ? (
-              task.tags.map(tag => <Badge key={tag} variant="tag" value={tag} />)
+              task.tags.map((tag) => <Badge key={tag} variant="tag" value={tag} />)
             ) : (
               <span className="text-[12px] text-dim font-light">None</span>
             )}
@@ -169,11 +176,10 @@ export function TaskDetail() {
           <span className="text-[12px] text-muted font-light block mb-2">Description</span>
           {editingDesc ? (
             <textarea
-              autoFocus
               value={descDraft}
-              onChange={e => setDescDraft(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Escape') setEditingDesc(false);
+              onChange={(e) => setDescDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") setEditingDesc(false);
               }}
               onBlur={() => {
                 handleUpdate({ description: descDraft || null });
@@ -184,7 +190,10 @@ export function TaskDetail() {
             />
           ) : (
             <div
-              onClick={() => { setDescDraft(task.description ?? ''); setEditingDesc(true); }}
+              onClick={() => {
+                setDescDraft(task.description ?? "");
+                setEditingDesc(true);
+              }}
               className="w-full bg-surface-low rounded-lg px-4 py-3 text-[13px] font-light text-secondary min-h-[80px] cursor-text hover:bg-surface-base transition-colors"
             >
               {task.description || <span className="text-dim">Click to add description...</span>}
@@ -199,12 +208,12 @@ export function TaskDetail() {
             onBlur={() => setConfirmDelete(false)}
             className={`flex items-center gap-2 px-3 py-2 rounded-md text-[12px] font-light transition-colors ${
               confirmDelete
-                ? 'bg-destructive text-white'
-                : 'text-muted hover:text-destructive hover:bg-surface-low'
+                ? "bg-destructive text-white"
+                : "text-muted hover:text-destructive hover:bg-surface-low"
             }`}
           >
             <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />
-            {confirmDelete ? 'Click again to delete' : 'Delete task'}
+            {confirmDelete ? "Click again to delete" : "Delete task"}
           </button>
         </div>
       </div>

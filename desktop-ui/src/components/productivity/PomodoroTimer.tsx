@@ -1,26 +1,37 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Play, Square, Timer } from 'lucide-react';
-import { useQuery } from '../../hooks/useQuery';
-import { useMutation } from '../../hooks/useMutation';
-import { useEvent } from '../../hooks/useEvent';
-import { formatElapsed } from '../../lib/dates';
-import type { FocusSession } from '../../lib/types';
+import { Play, Square, Timer } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { useEvent } from "../../hooks/useEvent";
+import { useMutation } from "../../hooks/useMutation";
+import { useQuery } from "../../hooks/useQuery";
+import { formatElapsed } from "../../lib/dates";
+import type { FocusSession } from "../../lib/types";
 
 export function PomodoroTimer() {
-  const { data: session, refetch } = useQuery<FocusSession | null>('productivity_focus_status', undefined, null);
-  const startFocus = useMutation<FocusSession, { target_mins?: number }>('productivity_focus_start');
-  const startPomodoro = useMutation<FocusSession, { work_mins?: number; break_mins?: number }>('productivity_pomodoro_start');
-  const endFocus = useMutation<FocusSession | null, { notes?: string }>('productivity_focus_end');
+  const { data: session, refetch } = useQuery<FocusSession | null>(
+    "productivity_focus_status",
+    undefined,
+    null,
+  );
+  const startFocus = useMutation<FocusSession, { target_mins?: number }>(
+    "productivity_focus_start",
+  );
+  const startPomodoro = useMutation<FocusSession, { work_mins?: number; break_mins?: number }>(
+    "productivity_pomodoro_start",
+  );
+  const endFocus = useMutation<FocusSession | null, { notes?: string }>("productivity_focus_end");
 
   const [elapsed, setElapsed] = useState(0);
 
-  useEvent<{ entityKind: string }>('entity:updated', (payload) => {
-    if (payload?.entityKind === 'focus_session') refetch();
+  useEvent<{ entityKind: string }>("entity:updated", (payload) => {
+    if (payload?.entityKind === "focus_session") refetch();
   });
 
   const startedAt = session?.startedAt;
   useEffect(() => {
-    if (!startedAt) { setElapsed(0); return; }
+    if (!startedAt) {
+      setElapsed(0);
+      return;
+    }
     const startTime = new Date(startedAt).getTime();
     const tick = () => setElapsed(Math.floor((Date.now() - startTime) / 1000));
     tick();
@@ -44,13 +55,13 @@ export function PomodoroTimer() {
   }, [endFocus, refetch]);
 
   const targetSecs = session?.targetMins ? session.targetMins * 60 : 0;
-  const isPomodoro = session?.sessionType === 'pomodoro';
+  const isPomodoro = session?.sessionType === "pomodoro";
 
   return (
     <div className="bg-surface-base rounded-xl p-4 flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <h2 className="text-[13px] font-medium text-secondary">
-          {isPomodoro ? 'Pomodoro Timer' : 'Focus Session'}
+          {isPomodoro ? "Pomodoro Timer" : "Focus Session"}
         </h2>
         {session && (
           <span className="text-[10px] font-light text-dim">

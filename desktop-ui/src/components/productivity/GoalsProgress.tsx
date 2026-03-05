@@ -1,28 +1,33 @@
-import { useQuery } from '../../hooks/useQuery';
-import { useEvent } from '../../hooks/useEvent';
-import type { GoalProgress } from '../../lib/types';
+import { useEvent } from "../../hooks/useEvent";
+import { useQuery } from "../../hooks/useQuery";
+import type { GoalProgress } from "../../lib/types";
 
 function metricLabel(metric: string): string {
   switch (metric) {
-    case 'productive_hours': return 'productive hours';
-    case 'focus_sessions': return 'focus sessions';
-    case 'productivity_score': return 'score';
-    case 'max_distracting_mins': return 'distracting mins';
-    default: return metric;
+    case "productive_hours":
+      return "productive hours";
+    case "focus_sessions":
+      return "focus sessions";
+    case "productivity_score":
+      return "score";
+    case "max_distracting_mins":
+      return "distracting mins";
+    default:
+      return metric;
   }
 }
 
 function formatValue(metric: string, value: number): string {
-  if (metric === 'productive_hours') return `${value.toFixed(1)}h`;
-  if (metric === 'max_distracting_mins') return `${Math.round(value)}m`;
+  if (metric === "productive_hours") return `${value.toFixed(1)}h`;
+  if (metric === "max_distracting_mins") return `${Math.round(value)}m`;
   return `${Math.round(value)}`;
 }
 
 export function GoalsProgress() {
-  const { data: goals, refetch } = useQuery<GoalProgress[]>('productivity_goals', undefined, []);
+  const { data: goals, refetch } = useQuery<GoalProgress[]>("productivity_goals", undefined, []);
 
-  useEvent<{ entityKind: string }>('entity:updated', (payload) => {
-    if (payload?.entityKind === 'productivity') refetch();
+  useEvent<{ entityKind: string }>("entity:updated", (payload) => {
+    if (payload?.entityKind === "productivity") refetch();
   });
 
   if (goals.length === 0) {
@@ -44,8 +49,8 @@ export function GoalsProgress() {
             <div key={g.id} className="flex flex-col gap-1">
               <div className="flex items-center justify-between text-[11px] font-light">
                 <div className="flex items-center gap-2">
-                  <span className={g.met ? 'text-success' : 'text-brand'}>
-                    {g.met ? 'MET' : 'IN PROGRESS'}
+                  <span className={g.met ? "text-success" : "text-brand"}>
+                    {g.met ? "MET" : "IN PROGRESS"}
                   </span>
                   <span className="text-primary">
                     {formatValue(g.metric, g.targetValue)} {metricLabel(g.metric)}
@@ -58,7 +63,7 @@ export function GoalsProgress() {
               </div>
               <div className="h-1.5 rounded-full bg-surface-raised overflow-hidden">
                 <div
-                  className={`h-full rounded-full transition-all ${g.met ? 'bg-success' : 'bg-brand'}`}
+                  className={`h-full rounded-full transition-all ${g.met ? "bg-success" : "bg-brand"}`}
                   style={{ width: `${pct}%` }}
                 />
               </div>

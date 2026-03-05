@@ -1,4 +1,4 @@
-import { Progress } from '../ui/Progress';
+import { Progress } from "../ui/Progress";
 
 interface SubtaskProgressProps {
   total: number;

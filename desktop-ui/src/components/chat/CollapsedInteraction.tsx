@@ -1,4 +1,4 @@
-import { MessageSquareMore } from 'lucide-react';
+import { MessageSquareMore } from "lucide-react";
 
 interface CollapsedInteractionProps {
   content: string;

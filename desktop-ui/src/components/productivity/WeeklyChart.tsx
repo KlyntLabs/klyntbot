@@ -1,6 +1,6 @@
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import { formatDayLabel } from '../../lib/dates';
-import type { ProductivitySummary } from '../../lib/types';
+import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { formatDayLabel } from "../../lib/dates";
+import type { ProductivitySummary } from "../../lib/types";
 
 interface WeeklyChartProps {
   summaries: ProductivitySummary[];
@@ -22,30 +22,40 @@ export function WeeklyChart({ summaries }: WeeklyChartProps) {
           <BarChart data={chartData} barCategoryGap="20%">
             <XAxis
               dataKey="day"
-              tick={{ fill: 'var(--text-dim)', fontSize: 11, fontWeight: 300 }}
+              tick={{ fill: "var(--text-dim)", fontSize: 11, fontWeight: 300 }}
               axisLine={false}
               tickLine={false}
             />
             <YAxis
-              tick={{ fill: 'var(--text-dim)', fontSize: 10, fontWeight: 300 }}
+              tick={{ fill: "var(--text-dim)", fontSize: 10, fontWeight: 300 }}
               axisLine={false}
               tickLine={false}
               width={30}
-              label={{ value: 'Hours', angle: -90, position: 'insideLeft', style: { fill: 'var(--text-dim)', fontSize: 10, fontWeight: 300 } }}
+              label={{
+                value: "Hours",
+                angle: -90,
+                position: "insideLeft",
+                style: { fill: "var(--text-dim)", fontSize: 10, fontWeight: 300 },
+              }}
             />
             <Tooltip
               contentStyle={{
-                background: 'var(--surface-floating)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius)',
+                background: "var(--surface-floating)",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius)",
                 fontSize: 11,
                 fontWeight: 300,
               }}
-              labelStyle={{ color: 'var(--text-primary)' }}
+              labelStyle={{ color: "var(--text-primary)" }}
             />
             <Bar dataKey="productive" stackId="a" fill="var(--success)" radius={[0, 0, 0, 0]} />
             <Bar dataKey="neutral" stackId="a" fill="var(--text-muted)" />
-            <Bar dataKey="distracting" stackId="a" fill="var(--destructive)" radius={[2, 2, 0, 0]} />
+            <Bar
+              dataKey="distracting"
+              stackId="a"
+              fill="var(--destructive)"
+              radius={[2, 2, 0, 0]}
+            />
           </BarChart>
         </ResponsiveContainer>
       </div>

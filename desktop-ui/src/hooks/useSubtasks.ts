@@ -1,7 +1,7 @@
-import { useState, useCallback, useRef } from 'react';
-import { useSetToggle } from './useSetToggle';
-import { ipc } from './useIpc';
-import type { Task } from '../lib/types';
+import { useCallback, useRef, useState } from "react";
+import type { Task } from "../lib/types";
+import { ipc } from "./useIpc";
+import { useSetToggle } from "./useSetToggle";
 
 export function useSubtasks() {
   const [childrenCache, setChildrenCache] = useState<Map<string, Task[]>>(new Map());
@@ -15,8 +15,8 @@ export function useSubtasks() {
 
     inFlightRef.current.add(parentId);
     try {
-      const children = await ipc<Task[]>('task_list_children', { parentId });
-      setChildrenCache(prev => new Map(prev).set(parentId, children));
+      const children = await ipc<Task[]>("task_list_children", { parentId });
+      setChildrenCache((prev) => new Map(prev).set(parentId, children));
     } finally {
       inFlightRef.current.delete(parentId);
     }
@@ -24,7 +24,7 @@ export function useSubtasks() {
 
   const invalidateCache = useCallback(() => {
     setChildrenCache(new Map());
-    setGeneration(g => g + 1);
+    setGeneration((g) => g + 1);
   }, []);
 
   return {

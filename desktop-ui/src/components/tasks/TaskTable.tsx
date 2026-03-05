@@ -1,9 +1,9 @@
-import { useMemo } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
-import { ProjectHeader } from './ProjectHeader';
-import { TaskRow } from './TaskRow';
-import { AddSubtaskRow } from './AddSubtaskRow';
-import type { Task, Project, Objective, Area, Tab, TaskUpdateParams } from '../../lib/types';
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { useMemo } from "react";
+import type { Area, Objective, Project, Tab, Task, TaskUpdateParams } from "../../lib/types";
+import { AddSubtaskRow } from "./AddSubtaskRow";
+import { ProjectHeader } from "./ProjectHeader";
+import { TaskRow } from "./TaskRow";
 
 interface TaskTableProps {
   tasks: Task[];
@@ -22,7 +22,7 @@ interface TaskTableProps {
   onCreateSubtask: (parentId: string, title: string) => void;
 }
 
-const UNASSIGNED = '_unassigned';
+const UNASSIGNED = "_unassigned";
 
 export function TaskTable({
   tasks,
@@ -40,24 +40,27 @@ export function TaskTable({
   onUpdate,
   onCreateSubtask,
 }: TaskTableProps) {
-  const showArea = activeTab === 'All';
+  const showArea = activeTab === "All";
 
   const projects = useMemo(() => Array.from(projectMap.values()), [projectMap]);
   const areas = useMemo(() => Array.from(areaMap.values()), [areaMap]);
 
   // Tasks are already root-only from the backend (root_only: true)
-  const tasksByProject = useMemo(() =>
-    tasks.reduce((acc, task) => {
-      const key = task.projectId ?? UNASSIGNED;
-      if (!acc[key]) acc[key] = [];
-      acc[key].push(task);
-      return acc;
-    }, {} as Record<string, Task[]>),
-  [tasks]);
+  const tasksByProject = useMemo(
+    () =>
+      tasks.reduce(
+        (acc, task) => {
+          const key = task.projectId ?? UNASSIGNED;
+          if (!acc[key]) acc[key] = [];
+          acc[key].push(task);
+          return acc;
+        },
+        {} as Record<string, Task[]>,
+      ),
+    [tasks],
+  );
 
-  const objectiveMap = useMemo(() =>
-    new Map(objectives.map(o => [o.id, o])),
-  [objectives]);
+  const objectiveMap = useMemo(() => new Map(objectives.map((o) => [o.id, o])), [objectives]);
 
   // Sort groups: assigned projects first, unassigned last
   const sortedEntries = useMemo(() => {
@@ -101,12 +104,20 @@ export function TaskTable({
                       className="w-full flex items-center gap-3 px-5 py-3 bg-overlay hover:bg-overlay-heavy transition-colors text-left"
                     >
                       {isCollapsed ? (
-                        <ChevronRight className="w-[14px] h-[14px] text-muted flex-shrink-0" strokeWidth={1.5} />
+                        <ChevronRight
+                          className="w-[14px] h-[14px] text-muted flex-shrink-0"
+                          strokeWidth={1.5}
+                        />
                       ) : (
-                        <ChevronDown className="w-[14px] h-[14px] text-muted flex-shrink-0" strokeWidth={1.5} />
+                        <ChevronDown
+                          className="w-[14px] h-[14px] text-muted flex-shrink-0"
+                          strokeWidth={1.5}
+                        />
                       )}
                       <span className="text-[12px] font-light text-muted">No Project</span>
-                      <span className="text-[11px] text-dim font-light">({projectTasks.length})</span>
+                      <span className="text-[11px] text-dim font-light">
+                        ({projectTasks.length})
+                      </span>
                     </button>
                   }
                   tasks={projectTasks}
@@ -129,7 +140,7 @@ export function TaskTable({
             if (!project) return null;
 
             const projectObjectives = project.objectiveIds
-              ? project.objectiveIds.flatMap(id => {
+              ? project.objectiveIds.flatMap((id) => {
                   const obj = objectiveMap.get(id);
                   return obj ? [obj] : [];
                 })
@@ -170,8 +181,17 @@ export function TaskTable({
 
 /** Renders a task row plus its lazily-loaded subtasks if expanded. */
 function TaskWithSubtasks({
-  task, childrenCache, projects, areas, completedTasks, expandedTasks,
-  showArea, onToggleTask, onToggleExpandTask, onUpdate, onCreateSubtask,
+  task,
+  childrenCache,
+  projects,
+  areas,
+  completedTasks,
+  expandedTasks,
+  showArea,
+  onToggleTask,
+  onToggleExpandTask,
+  onUpdate,
+  onCreateSubtask,
 }: {
   task: Task;
   childrenCache: Map<string, Task[]>;
@@ -207,29 +227,29 @@ function TaskWithSubtasks({
         <tr className="border-b border-border-subtle">
           <td className="px-5 py-2 w-9" />
           <td colSpan={showArea ? 7 : 6} className="px-5 py-2">
-            <span className="text-[12px] text-dim font-light" style={{ paddingLeft: 24 }}>Loading...</span>
+            <span className="text-[12px] text-dim font-light" style={{ paddingLeft: 24 }}>
+              Loading...
+            </span>
           </td>
         </tr>
       )}
-      {isExpanded && subtasks && subtasks.map(sub => (
-        <TaskRow
-          key={sub.id}
-          task={sub}
-          depth={1}
-          projects={projects}
-          areas={areas}
-          isCompleted={completedTasks.has(sub.id)}
-          showArea={showArea}
-          onToggle={() => onToggleTask(sub.id)}
-          onUpdate={onUpdate}
-        />
-      ))}
+      {isExpanded &&
+        subtasks &&
+        subtasks.map((sub) => (
+          <TaskRow
+            key={sub.id}
+            task={sub}
+            depth={1}
+            projects={projects}
+            areas={areas}
+            isCompleted={completedTasks.has(sub.id)}
+            showArea={showArea}
+            onToggle={() => onToggleTask(sub.id)}
+            onUpdate={onUpdate}
+          />
+        ))}
       {isExpanded && subtasks && (
-        <AddSubtaskRow
-          parentId={task.id}
-          showArea={showArea}
-          onCreate={onCreateSubtask}
-        />
+        <AddSubtaskRow parentId={task.id} showArea={showArea} onCreate={onCreateSubtask} />
       )}
     </>
   );
@@ -237,15 +257,29 @@ function TaskWithSubtasks({
 
 /** Generic task group: header row + task rows. */
 function TaskGroup({
-  header, tasks, childrenCache, projects, areas, completedTasks, expandedTasks,
-  showArea, isCollapsed,
-  onToggleTask, onToggleExpandTask, onUpdate, onCreateSubtask,
+  header,
+  tasks,
+  childrenCache,
+  projects,
+  areas,
+  completedTasks,
+  expandedTasks,
+  showArea,
+  isCollapsed,
+  onToggleTask,
+  onToggleExpandTask,
+  onUpdate,
+  onCreateSubtask,
 }: {
   header: React.ReactNode;
-  tasks: Task[]; childrenCache: Map<string, Task[]>;
-  projects: Project[]; areas: Area[];
-  completedTasks: Set<string>; expandedTasks: Set<string>;
-  showArea: boolean; isCollapsed: boolean;
+  tasks: Task[];
+  childrenCache: Map<string, Task[]>;
+  projects: Project[];
+  areas: Area[];
+  completedTasks: Set<string>;
+  expandedTasks: Set<string>;
+  showArea: boolean;
+  isCollapsed: boolean;
   onToggleTask: (id: string) => void;
   onToggleExpandTask: (id: string) => void;
   onUpdate: (params: TaskUpdateParams) => void;
@@ -259,22 +293,23 @@ function TaskGroup({
           {header}
         </td>
       </tr>
-      {!isCollapsed && tasks.map(task => (
-        <TaskWithSubtasks
-          key={task.id}
-          task={task}
-          childrenCache={childrenCache}
-          projects={projects}
-          areas={areas}
-          completedTasks={completedTasks}
-          expandedTasks={expandedTasks}
-          showArea={showArea}
-          onToggleTask={onToggleTask}
-          onToggleExpandTask={onToggleExpandTask}
-          onUpdate={onUpdate}
-          onCreateSubtask={onCreateSubtask}
-        />
-      ))}
+      {!isCollapsed &&
+        tasks.map((task) => (
+          <TaskWithSubtasks
+            key={task.id}
+            task={task}
+            childrenCache={childrenCache}
+            projects={projects}
+            areas={areas}
+            completedTasks={completedTasks}
+            expandedTasks={expandedTasks}
+            showArea={showArea}
+            onToggleTask={onToggleTask}
+            onToggleExpandTask={onToggleExpandTask}
+            onUpdate={onUpdate}
+            onCreateSubtask={onCreateSubtask}
+          />
+        ))}
     </>
   );
 }

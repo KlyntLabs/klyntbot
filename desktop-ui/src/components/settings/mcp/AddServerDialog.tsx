@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { X, Plus, Minus } from 'lucide-react';
-import type { McpAddServerParams, RecommendedMcpServer } from '../../../lib/types';
+import { Minus, Plus, X } from "lucide-react";
+import { useState } from "react";
+import type { McpAddServerParams, RecommendedMcpServer } from "../../../lib/types";
 
 interface AddServerDialogProps {
   open: boolean;
@@ -10,14 +10,14 @@ interface AddServerDialogProps {
 }
 
 export function AddServerDialog({ open, onClose, onAdd, prefill }: AddServerDialogProps) {
-  const [name, setName] = useState(prefill?.name ?? '');
-  const [transport, setTransport] = useState<'stdio' | 'http'>(prefill?.transport ?? 'stdio');
-  const [command, setCommand] = useState(prefill?.command ?? '');
-  const [args, setArgs] = useState(prefill?.args?.join(', ') ?? '');
+  const [name, setName] = useState(prefill?.name ?? "");
+  const [transport, setTransport] = useState<"stdio" | "http">(prefill?.transport ?? "stdio");
+  const [command, setCommand] = useState(prefill?.command ?? "");
+  const [args, setArgs] = useState(prefill?.args?.join(", ") ?? "");
   const [envPairs, setEnvPairs] = useState<{ key: string; value: string }[]>(
-    prefill?.envKeys?.map((k) => ({ key: k, value: '' })) ?? [],
+    prefill?.envKeys?.map((k) => ({ key: k, value: "" })) ?? [],
   );
-  const [url, setUrl] = useState('');
+  const [url, setUrl] = useState("");
   const [headerPairs, setHeaderPairs] = useState<{ key: string; value: string }[]>([]);
 
   if (!open) return null;
@@ -28,10 +28,10 @@ export function AddServerDialog({ open, onClose, onAdd, prefill }: AddServerDial
       transport,
     };
 
-    if (transport === 'stdio') {
+    if (transport === "stdio") {
       params.command = command.trim();
       params.args = args
-        .split(',')
+        .split(",")
         .map((a) => a.trim())
         .filter(Boolean);
       const env: Record<string, string> = {};
@@ -52,8 +52,7 @@ export function AddServerDialog({ open, onClose, onAdd, prefill }: AddServerDial
   };
 
   const canSubmit =
-    name.trim() !== '' &&
-    (transport === 'stdio' ? command.trim() !== '' : url.trim() !== '');
+    name.trim() !== "" && (transport === "stdio" ? command.trim() !== "" : url.trim() !== "");
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
@@ -62,7 +61,7 @@ export function AddServerDialog({ open, onClose, onAdd, prefill }: AddServerDial
           {/* Header */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-border">
             <h3 className="text-[14px] font-medium text-primary">
-              {prefill ? `Install ${prefill.name}` : 'Add MCP server'}
+              {prefill ? `Install ${prefill.name}` : "Add MCP server"}
             </h3>
             <button
               onClick={onClose}
@@ -90,24 +89,24 @@ export function AddServerDialog({ open, onClose, onAdd, prefill }: AddServerDial
             <div>
               <label className="block text-[12px] text-muted mb-1.5">Transport</label>
               <div className="flex gap-2">
-                {(['stdio', 'http'] as const).map((t) => (
+                {(["stdio", "http"] as const).map((t) => (
                   <button
                     key={t}
                     onClick={() => setTransport(t)}
                     className={`flex-1 py-1.5 text-[12px] rounded-md border transition-colors ${
                       transport === t
-                        ? 'border-brand/50 text-brand bg-brand/5'
-                        : 'border-border text-muted bg-surface-base hover:bg-surface-raised'
+                        ? "border-brand/50 text-brand bg-brand/5"
+                        : "border-border text-muted bg-surface-base hover:bg-surface-raised"
                     }`}
                   >
-                    {t === 'stdio' ? 'Stdio' : 'HTTP'}
+                    {t === "stdio" ? "Stdio" : "HTTP"}
                   </button>
                 ))}
               </div>
             </div>
 
             {/* Stdio fields */}
-            {transport === 'stdio' && (
+            {transport === "stdio" && (
               <>
                 <div>
                   <label className="block text-[12px] text-muted mb-1.5">Command</label>
@@ -138,7 +137,7 @@ export function AddServerDialog({ open, onClose, onAdd, prefill }: AddServerDial
                   <div className="flex items-center justify-between mb-1.5">
                     <label className="text-[12px] text-muted">Environment variables</label>
                     <button
-                      onClick={() => setEnvPairs([...envPairs, { key: '', value: '' }])}
+                      onClick={() => setEnvPairs([...envPairs, { key: "", value: "" }])}
                       className="w-5 h-5 rounded flex items-center justify-center text-muted hover:text-secondary hover:bg-surface-base transition-colors"
                     >
                       <Plus className="w-3.5 h-3.5" />
@@ -183,7 +182,7 @@ export function AddServerDialog({ open, onClose, onAdd, prefill }: AddServerDial
             )}
 
             {/* HTTP fields */}
-            {transport === 'http' && (
+            {transport === "http" && (
               <>
                 <div>
                   <label className="block text-[12px] text-muted mb-1.5">URL</label>
@@ -201,7 +200,7 @@ export function AddServerDialog({ open, onClose, onAdd, prefill }: AddServerDial
                   <div className="flex items-center justify-between mb-1.5">
                     <label className="text-[12px] text-muted">Headers</label>
                     <button
-                      onClick={() => setHeaderPairs([...headerPairs, { key: '', value: '' }])}
+                      onClick={() => setHeaderPairs([...headerPairs, { key: "", value: "" }])}
                       className="w-5 h-5 rounded flex items-center justify-center text-muted hover:text-secondary hover:bg-surface-base transition-colors"
                     >
                       <Plus className="w-3.5 h-3.5" />
@@ -259,7 +258,7 @@ export function AddServerDialog({ open, onClose, onAdd, prefill }: AddServerDial
               disabled={!canSubmit}
               className="px-4 py-1.5 text-[12px] rounded-md bg-brand text-white hover:bg-brand-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              {prefill ? 'Install' : 'Add server'}
+              {prefill ? "Install" : "Add server"}
             </button>
           </div>
         </div>

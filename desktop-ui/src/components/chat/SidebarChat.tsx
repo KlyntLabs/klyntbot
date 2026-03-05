@@ -1,9 +1,9 @@
-import { useCallback, useState, useEffect, useRef } from 'react';
-import { Send, Pin, X } from 'lucide-react';
-import { MessageList } from './MessageList';
-import { usePageContext } from '../../hooks/usePageContext';
-import { useMutation } from '../../hooks/useMutation';
-import { useChatSession } from '../../hooks/useChatSession';
+import { Pin, Send, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useChatSession } from "../../hooks/useChatSession";
+import { useMutation } from "../../hooks/useMutation";
+import { usePageContext } from "../../hooks/usePageContext";
+import { MessageList } from "./MessageList";
 
 interface SidebarChatProps {
   isOpen: boolean;
@@ -18,18 +18,24 @@ interface SidebarChatProps {
 
 /** Derive a stable session key from page context. */
 function sessionKeyFor(entityKind?: string, entityId?: string): string {
-  if (!entityKind) return 'desktop-panel';
-  return `sidebar:${entityKind}:${entityId || 'all'}`;
+  if (!entityKind) return "desktop-panel";
+  return `sidebar:${entityKind}:${entityId || "all"}`;
 }
 
 /** Human-readable label for the sidebar header. */
 function contextLabel(entityKind?: string): string {
-  if (!entityKind) return 'Chat';
-  const parts = entityKind.split('.');
-  return parts.map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(' › ');
+  if (!entityKind) return "Chat";
+  const parts = entityKind.split(".");
+  return parts.map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(" › ");
 }
 
-export function SidebarChat({ isOpen, onClose, viewContext, openSessionKey, onSessionKeyUsed }: SidebarChatProps) {
+export function SidebarChat({
+  isOpen,
+  onClose,
+  viewContext,
+  openSessionKey,
+  onSessionKeyUsed,
+}: SidebarChatProps) {
   const routeContext = usePageContext();
   // Route context (entity detail pages) takes priority; fall back to view context
   const pageContext = routeContext ?? viewContext ?? null;
@@ -48,23 +54,27 @@ export function SidebarChat({ isOpen, onClose, viewContext, openSessionKey, onSe
   const prevRouteRef = useRef(routeContext);
   useEffect(() => {
     const prev = prevRouteRef.current;
-    if (routeContext && (routeContext.entityKind !== prev?.entityKind || routeContext.entityId !== prev?.entityId)) {
+    if (
+      routeContext &&
+      (routeContext.entityKind !== prev?.entityKind || routeContext.entityId !== prev?.entityId)
+    ) {
       setOverrideSessionKey(null);
     }
     prevRouteRef.current = routeContext;
   }, [routeContext]);
 
   // Use override session key if set, otherwise derive from route context
-  const sessionKey = overrideSessionKey
-    ?? (routeContext ? sessionKeyFor(routeContext.entityKind, routeContext.entityId) : 'desktop-panel');
+  const sessionKey =
+    overrideSessionKey ??
+    (routeContext
+      ? sessionKeyFor(routeContext.entityKind, routeContext.entityId)
+      : "desktop-panel");
 
   const chat = useChatSession(sessionKey);
-  const pinThread = useMutation<void, Record<string, unknown>>('chat_pin_thread');
+  const pinThread = useMutation<void, Record<string, unknown>>("chat_pin_thread");
 
   const handleSend = useCallback(() => {
-    chat.send(
-      pageContext ? { context: { ...pageContext, isEphemeral: true } } : undefined,
-    );
+    chat.send(pageContext ? { context: { ...pageContext, isEphemeral: true } } : undefined);
   }, [chat, pageContext]);
 
   const handlePin = useCallback(async () => {
@@ -105,8 +115,8 @@ export function SidebarChat({ isOpen, onClose, viewContext, openSessionKey, onSe
           <div className="flex flex-col items-center justify-center py-12">
             <p className="text-muted text-[12px] font-light text-center">
               {pageContext
-                ? `Ask about this ${pageContext.entityKind?.split('.')[0] || 'item'}`
-                : 'Ask me anything'}
+                ? `Ask about this ${pageContext.entityKind?.split(".")[0] || "item"}`
+                : "Ask me anything"}
             </p>
           </div>
         ) : (
@@ -134,7 +144,7 @@ export function SidebarChat({ isOpen, onClose, viewContext, openSessionKey, onSe
             value={chat.input}
             onChange={(e) => chat.setInput(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') handleSend();
+              if (e.key === "Enter") handleSend();
             }}
             placeholder="Ask about this page..."
             className="flex-1 bg-surface-base rounded-xl px-4 py-2.5 text-[13px] text-primary placeholder:text-muted focus:outline-none focus:bg-surface-raised font-light"

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useCallback, useState } from "react";
 
 interface InlineTextEditorProps {
   value: string;
@@ -9,13 +9,16 @@ interface InlineTextEditorProps {
 
 export function InlineTextEditor({ value, onSave, className, placeholder }: InlineTextEditorProps) {
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState('');
+  const [draft, setDraft] = useState("");
 
-  const startEdit = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    setDraft(value);
-    setEditing(true);
-  }, [value]);
+  const startEdit = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setDraft(value);
+      setEditing(true);
+    },
+    [value],
+  );
 
   const save = useCallback(() => {
     if (draft.trim() && draft !== value) onSave(draft.trim());
@@ -25,17 +28,16 @@ export function InlineTextEditor({ value, onSave, className, placeholder }: Inli
   if (editing) {
     return (
       <input
-        autoFocus
         value={draft}
-        onChange={e => setDraft(e.target.value)}
-        onKeyDown={e => {
-          if (e.key === 'Enter') save();
-          if (e.key === 'Escape') setEditing(false);
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") save();
+          if (e.key === "Escape") setEditing(false);
         }}
         onBlur={save}
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
         placeholder={placeholder}
-        className={`bg-transparent border-b border-brand outline-none w-full ${className ?? 'text-[13px] font-light text-primary'}`}
+        className={`bg-transparent border-b border-brand outline-none w-full ${className ?? "text-[13px] font-light text-primary"}`}
       />
     );
   }
@@ -43,9 +45,9 @@ export function InlineTextEditor({ value, onSave, className, placeholder }: Inli
   return (
     <span
       onClick={startEdit}
-      className={`cursor-text rounded px-1 -mx-1 transition-colors ${className ?? 'text-[13px] font-light text-secondary'}`}
+      className={`cursor-text rounded px-1 -mx-1 transition-colors ${className ?? "text-[13px] font-light text-secondary"}`}
     >
-      {value || <span className="text-dim">{placeholder ?? '—'}</span>}
+      {value || <span className="text-dim">{placeholder ?? "—"}</span>}
     </span>
   );
 }

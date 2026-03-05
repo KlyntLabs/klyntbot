@@ -1,5 +1,5 @@
-import { useState, useMemo } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useMemo, useState } from "react";
 
 interface MiniCalendarProps {
   value: string | null;
@@ -7,17 +7,27 @@ interface MiniCalendarProps {
   onClear?: () => void;
 }
 
-const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+const WEEKDAYS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
 const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
 ];
 
 /** Format a Date as YYYY-MM-DD (local). */
 function toISO(d: Date): string {
   const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
 }
 
@@ -46,22 +56,26 @@ export function MiniCalendar({ value, onSelect, onClear }: MiniCalendarProps) {
 
   // The month being viewed (year + month index)
   const [viewYear, setViewYear] = useState(() => {
-    const d = value ? new Date(value + 'T00:00:00') : today;
+    const d = value ? new Date(`${value}T00:00:00`) : today;
     return d.getFullYear();
   });
   const [viewMonth, setViewMonth] = useState(() => {
-    const d = value ? new Date(value + 'T00:00:00') : today;
+    const d = value ? new Date(`${value}T00:00:00`) : today;
     return d.getMonth();
   });
 
   const prevMonth = () => {
-    if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11); }
-    else setViewMonth(m => m - 1);
+    if (viewMonth === 0) {
+      setViewYear((y) => y - 1);
+      setViewMonth(11);
+    } else setViewMonth((m) => m - 1);
   };
 
   const nextMonth = () => {
-    if (viewMonth === 11) { setViewYear(y => y + 1); setViewMonth(0); }
-    else setViewMonth(m => m + 1);
+    if (viewMonth === 11) {
+      setViewYear((y) => y + 1);
+      setViewMonth(0);
+    } else setViewMonth((m) => m + 1);
   };
 
   // Build the 42-cell grid (6 rows × 7 cols), starting from Monday
@@ -79,24 +93,27 @@ export function MiniCalendar({ value, onSelect, onClear }: MiniCalendarProps) {
   }, [viewYear, viewMonth]);
 
   // Quick-select shortcuts
-  const shortcuts = useMemo(() => [
-    { label: 'Today', iso: todayISO },
-    { label: 'Tomorrow', iso: toISO(addDays(today, 1)) },
-    { label: 'Next Mon', iso: toISO(nextWeekday(today, 1)) },
-  ], [today, todayISO]);
+  const shortcuts = useMemo(
+    () => [
+      { label: "Today", iso: todayISO },
+      { label: "Tomorrow", iso: toISO(addDays(today, 1)) },
+      { label: "Next Mon", iso: toISO(nextWeekday(today, 1)) },
+    ],
+    [today, todayISO],
+  );
 
   return (
-    <div className="w-[232px]" onClick={e => e.stopPropagation()}>
+    <div className="w-[232px]" onClick={(e) => e.stopPropagation()}>
       {/* Quick-select shortcuts */}
       <div className="flex gap-1 mb-1.5 px-0.5">
-        {shortcuts.map(s => (
+        {shortcuts.map((s) => (
           <button
             key={s.label}
             onClick={() => onSelect(s.iso)}
             className={`px-2 py-0.5 text-[11px] font-light rounded-md transition-colors ${
               value === s.iso
-                ? 'bg-brand text-white'
-                : 'bg-surface-base text-muted hover:bg-surface-raised hover:text-secondary'
+                ? "bg-brand text-white"
+                : "bg-surface-base text-muted hover:bg-surface-raised hover:text-secondary"
             }`}
           >
             {s.label}
@@ -125,8 +142,11 @@ export function MiniCalendar({ value, onSelect, onClear }: MiniCalendarProps) {
 
       {/* Weekday labels */}
       <div className="grid grid-cols-7 mb-0.5">
-        {WEEKDAYS.map(d => (
-          <div key={d} className="h-6 flex items-center justify-center text-[10px] font-light text-dim">
+        {WEEKDAYS.map((d) => (
+          <div
+            key={d}
+            className="h-6 flex items-center justify-center text-[10px] font-light text-dim"
+          >
             {d}
           </div>
         ))}
@@ -146,12 +166,12 @@ export function MiniCalendar({ value, onSelect, onClear }: MiniCalendarProps) {
               onClick={() => onSelect(iso)}
               className={`h-7 w-full flex items-center justify-center text-[11px] font-light rounded-md transition-colors ${
                 isSelected
-                  ? 'bg-brand text-white'
+                  ? "bg-brand text-white"
                   : isToday
-                    ? 'ring-1 ring-brand text-brand'
+                    ? "ring-1 ring-brand text-brand"
                     : isCurrentMonth
-                      ? 'text-secondary hover:bg-surface-raised'
-                      : 'text-dim hover:bg-surface-raised'
+                      ? "text-secondary hover:bg-surface-raised"
+                      : "text-dim hover:bg-surface-raised"
               }`}
             >
               {d.getDate()}
@@ -165,7 +185,7 @@ export function MiniCalendar({ value, onSelect, onClear }: MiniCalendarProps) {
         <button
           onClick={onClear}
           className="w-full text-left mt-1 px-2 py-1 text-[11px] font-light text-destructive hover:bg-surface-raised transition-colors"
-          style={{ borderRadius: 'var(--glass-radius-inner)' }}
+          style={{ borderRadius: "var(--glass-radius-inner)" }}
         >
           Clear date
         </button>

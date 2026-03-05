@@ -1,34 +1,90 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { emit } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
-  Search, Plus, MessageSquare, Calendar, Target, TrendingUp, Settings,
-  Sparkles, Command,
-} from 'lucide-react';
-import { emit } from '@tauri-apps/api/event';
-import { getCurrentWindow } from '@tauri-apps/api/window';
-import { KlyntLogo } from '../ui/KlyntLogo';
-import { isTauri } from '../../lib/utils';
-import { useTransparentBackground } from '../../hooks/useTransparentBackground';
-import { LauncherChat } from './LauncherChat';
-import type { LauncherItem } from '../../lib/types';
+  Calendar,
+  Command,
+  MessageSquare,
+  Plus,
+  Search,
+  Settings,
+  Sparkles,
+  Target,
+  TrendingUp,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useTransparentBackground } from "../../hooks/useTransparentBackground";
+import type { LauncherItem } from "../../lib/types";
+import { isTauri } from "../../lib/utils";
+import { KlyntLogo } from "../ui/KlyntLogo";
+import { LauncherChat } from "./LauncherChat";
 
 const launcherItems: LauncherItem[] = [
-  { id: '1', title: 'Create New Task', subtitle: 'Quick add a new task', icon: 'Plus', shortcut: '\u2318N' },
-  { id: '2', title: 'Search Tasks', subtitle: 'Find tasks across all projects', icon: 'Search', shortcut: '\u2318K' },
-  { id: '3', title: 'Open Chat', subtitle: 'Talk to AI assistant', icon: 'MessageSquare', shortcut: '\u2318/' },
-  { id: '4', title: 'View Calendar', subtitle: 'See upcoming events', icon: 'Calendar', shortcut: '\u2318C' },
-  { id: '5', title: "Today's Focus", subtitle: 'View daily priorities', icon: 'Target', shortcut: '\u2318T' },
-  { id: '6', title: 'Review OKRs', subtitle: 'Check goal progress', icon: 'TrendingUp', shortcut: '\u2318O' },
-  { id: '7', title: 'Settings', subtitle: 'App preferences', icon: 'Settings', shortcut: '\u2318,' },
+  {
+    id: "1",
+    title: "Create New Task",
+    subtitle: "Quick add a new task",
+    icon: "Plus",
+    shortcut: "\u2318N",
+  },
+  {
+    id: "2",
+    title: "Search Tasks",
+    subtitle: "Find tasks across all projects",
+    icon: "Search",
+    shortcut: "\u2318K",
+  },
+  {
+    id: "3",
+    title: "Open Chat",
+    subtitle: "Talk to AI assistant",
+    icon: "MessageSquare",
+    shortcut: "\u2318/",
+  },
+  {
+    id: "4",
+    title: "View Calendar",
+    subtitle: "See upcoming events",
+    icon: "Calendar",
+    shortcut: "\u2318C",
+  },
+  {
+    id: "5",
+    title: "Today's Focus",
+    subtitle: "View daily priorities",
+    icon: "Target",
+    shortcut: "\u2318T",
+  },
+  {
+    id: "6",
+    title: "Review OKRs",
+    subtitle: "Check goal progress",
+    icon: "TrendingUp",
+    shortcut: "\u2318O",
+  },
+  {
+    id: "7",
+    title: "Settings",
+    subtitle: "App preferences",
+    icon: "Settings",
+    shortcut: "\u2318,",
+  },
 ];
 
 const iconMap: Record<string, typeof Search> = {
-  Plus, Search, MessageSquare, Calendar, Target, TrendingUp, Settings, Sparkles,
+  Plus,
+  Search,
+  MessageSquare,
+  Calendar,
+  Target,
+  TrendingUp,
+  Settings,
+  Sparkles,
 };
 
 export function Launcher() {
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [mode, setMode] = useState<'command' | 'chat'>('command');
+  const [mode, setMode] = useState<"command" | "chat">("command");
   const [sessionKey, setSessionKey] = useState<string | null>(null);
   const [initialQuery, setInitialQuery] = useState<string | null>(null);
 
@@ -38,22 +94,22 @@ export function Launcher() {
     const key = `launcher-${Date.now()}`;
     setSessionKey(key);
     setInitialQuery(text);
-    setMode('chat');
-    setQuery('');
+    setMode("chat");
+    setQuery("");
   }, []);
 
   const exitChat = useCallback(() => {
-    setMode('command');
+    setMode("command");
     setSessionKey(null);
     setInitialQuery(null);
   }, []);
 
   const expandToMain = useCallback(async () => {
     if (!sessionKey || !isTauri) return;
-    const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow');
+    const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
     const [mainWindow] = await Promise.all([
-      WebviewWindow.getByLabel('main'),
-      emit('open-chat', { sessionKey }),
+      WebviewWindow.getByLabel("main"),
+      emit("open-chat", { sessionKey }),
     ]);
     if (mainWindow) {
       await mainWindow.show();
@@ -65,40 +121,39 @@ export function Launcher() {
 
   const filteredItems = useMemo(() => {
     const q = query.toLowerCase();
-    return launcherItems.filter(item =>
-      item.title.toLowerCase().includes(q) ||
-      item.subtitle.toLowerCase().includes(q),
+    return launcherItems.filter(
+      (item) => item.title.toLowerCase().includes(q) || item.subtitle.toLowerCase().includes(q),
     );
   }, [query]);
 
   // Escape key: mode-aware
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (mode === 'chat') {
+      if (e.key === "Escape") {
+        if (mode === "chat") {
           exitChat();
         } else if (isTauri) {
           getCurrentWindow().hide();
         }
       }
     };
-    window.addEventListener('keydown', handleGlobalKeyDown);
-    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
   }, [mode, exitChat]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'ArrowDown') {
+    if (e.key === "ArrowDown") {
       e.preventDefault();
-      setSelectedIndex(i => Math.min(i + 1, filteredItems.length - (query.trim() ? 0 : 1)));
-    } else if (e.key === 'ArrowUp') {
+      setSelectedIndex((i) => Math.min(i + 1, filteredItems.length - (query.trim() ? 0 : 1)));
+    } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setSelectedIndex(i => Math.max(i - 1, 0));
-    } else if (e.key === 'Enter') {
+      setSelectedIndex((i) => Math.max(i - 1, 0));
+    } else if (e.key === "Enter") {
       e.preventDefault();
       if (query.trim() && selectedIndex === 0) {
         enterChat(query.trim());
       }
-    } else if (e.key === 'Tab' && query.trim()) {
+    } else if (e.key === "Tab" && query.trim()) {
       e.preventDefault();
       enterChat(query.trim());
     }
@@ -107,7 +162,7 @@ export function Launcher() {
   return (
     <div className="w-screen text-primary flex justify-center pt-4 px-4">
       <div className="w-full max-w-[660px] rounded-2xl overflow-hidden bg-surface-floating shadow-2xl shadow-black/50 border border-border-subtle">
-        {mode === 'command' ? (
+        {mode === "command" ? (
           <>
             {/* Header */}
             <div className="px-5 pt-5 pb-3">
@@ -133,12 +188,15 @@ export function Launcher() {
                   }}
                   onKeyDown={handleKeyDown}
                   placeholder="Ask Klynt anything or type a command..."
-                  autoFocus
                   className="flex-1 bg-transparent text-primary text-[13px] placeholder:text-muted outline-none font-light"
                 />
                 <div className="flex items-center gap-1.5">
-                  <span className="px-1.5 py-0.5 bg-surface-highest rounded text-[11px] text-muted font-light">AI</span>
-                  <span className="px-1.5 py-0.5 bg-surface-highest rounded text-[11px] text-muted font-light">Tab</span>
+                  <span className="px-1.5 py-0.5 bg-surface-highest rounded text-[11px] text-muted font-light">
+                    AI
+                  </span>
+                  <span className="px-1.5 py-0.5 bg-surface-highest rounded text-[11px] text-muted font-light">
+                    Tab
+                  </span>
                 </div>
               </div>
             </div>
@@ -151,18 +209,22 @@ export function Launcher() {
                   {query.trim() && (
                     <button
                       className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all ${
-                        0 === selectedIndex ? 'bg-surface-highest' : 'hover:bg-surface-base'
+                        0 === selectedIndex ? "bg-surface-highest" : "hover:bg-surface-base"
                       }`}
                       onMouseEnter={() => setSelectedIndex(0)}
                       onClick={() => enterChat(query.trim())}
                     >
-                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${
-                        0 === selectedIndex ? 'bg-brand text-white' : 'bg-surface-base text-brand'
-                      }`}>
+                      <div
+                        className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${
+                          0 === selectedIndex ? "bg-brand text-white" : "bg-surface-base text-brand"
+                        }`}
+                      >
                         <Sparkles className="w-[18px] h-[18px]" strokeWidth={1.5} />
                       </div>
                       <div className="flex-1 text-left">
-                        <h3 className="text-primary text-[13px] font-light">Ask Klynt AI: {query}</h3>
+                        <h3 className="text-primary text-[13px] font-light">
+                          Ask Klynt AI: {query}
+                        </h3>
                         <p className="text-[11px] text-muted font-light">Get AI-powered response</p>
                       </div>
                     </button>
@@ -177,13 +239,15 @@ export function Launcher() {
                       <button
                         key={item.id}
                         className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all ${
-                          isSelected ? 'bg-surface-highest' : 'hover:bg-surface-base'
+                          isSelected ? "bg-surface-highest" : "hover:bg-surface-base"
                         }`}
                         onMouseEnter={() => setSelectedIndex(actualIndex)}
                       >
-                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${
-                          isSelected ? 'bg-brand text-white' : 'bg-surface-base text-muted'
-                        }`}>
+                        <div
+                          className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${
+                            isSelected ? "bg-brand text-white" : "bg-surface-base text-muted"
+                          }`}
+                        >
                           <Icon className="w-[18px] h-[18px]" strokeWidth={1.5} />
                         </div>
                         <div className="flex-1 text-left">

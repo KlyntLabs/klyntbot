@@ -4,10 +4,10 @@ interface ProductivityScoreRingProps {
 }
 
 function scoreColor(score: number): string {
-  if (score >= 80) return 'var(--success)';
-  if (score >= 60) return 'var(--brand)';
-  if (score >= 40) return 'var(--text-muted)';
-  return 'var(--destructive)';
+  if (score >= 80) return "var(--success)";
+  if (score >= 60) return "var(--brand)";
+  if (score >= 40) return "var(--text-muted)";
+  return "var(--destructive)";
 }
 
 export function ProductivityScoreRing({ score, size = 100 }: ProductivityScoreRingProps) {
@@ -42,8 +42,13 @@ export function ProductivityScoreRing({ score, size = 100 }: ProductivityScoreRi
           className="transition-all duration-700"
         />
       </svg>
-      <div className="absolute flex flex-col items-center justify-center" style={{ width: size, height: size }}>
-        <span className="text-[24px] font-light text-primary tabular-nums">{Math.round(score)}</span>
+      <div
+        className="absolute flex flex-col items-center justify-center"
+        style={{ width: size, height: size }}
+      >
+        <span className="text-[24px] font-light text-primary tabular-nums">
+          {Math.round(score)}
+        </span>
         <span className="text-[10px] font-light text-dim">/100</span>
       </div>
     </div>

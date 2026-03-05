@@ -1,29 +1,42 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router';
 import {
-  Send, ChevronDown, Plus, Settings, FolderOpen, MessageSquare,
-  RotateCcw, Mic, Shield, Server, Wallet, Globe,
-  Pencil, Trash2, X, Check,
-} from 'lucide-react';
-import { Sidebar } from '../layout/Sidebar';
-import { MessageList } from '../chat/MessageList';
-import { TransparencyToggle } from '../chat/TransparencyToggle';
-import { TransparencyPanel } from '../chat/TransparencyPanel';
-import { useSetToggle } from '../../hooks/useSetToggle';
-import { useQuery } from '../../hooks/useQuery';
-import { useChatSession } from '../../hooks/useChatSession';
-import { ipc } from '../../hooks/useIpc';
-import type { ChatThread, SidebarItem } from '../../lib/types';
+  Check,
+  ChevronDown,
+  FolderOpen,
+  Globe,
+  MessageSquare,
+  Mic,
+  Pencil,
+  Plus,
+  RotateCcw,
+  Send,
+  Server,
+  Settings,
+  Shield,
+  Trash2,
+  Wallet,
+  X,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router";
+import { useChatSession } from "../../hooks/useChatSession";
+import { ipc } from "../../hooks/useIpc";
+import { useQuery } from "../../hooks/useQuery";
+import { useSetToggle } from "../../hooks/useSetToggle";
+import type { ChatThread, SidebarItem } from "../../lib/types";
+import { MessageList } from "../chat/MessageList";
+import { TransparencyPanel } from "../chat/TransparencyPanel";
+import { TransparencyToggle } from "../chat/TransparencyToggle";
+import { Sidebar } from "../layout/Sidebar";
 
 // Known feature prefixes → display config
 const FEATURE_GROUPS: Record<string, { label: string; icon: typeof Wallet }> = {
-  finance: { label: 'Finance', icon: Wallet },
+  finance: { label: "Finance", icon: Wallet },
 };
 
 function formatRelativeTime(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'now';
+  if (mins < 1) return "now";
   if (mins < 60) return `${mins}m`;
   const hours = Math.floor(mins / 60);
   if (hours < 24) return `${hours}h`;
@@ -36,7 +49,7 @@ function formatRelativeTime(dateStr: string): string {
 /** Extract the feature prefix from an entity_kind like "finance.budgets" → "finance" */
 function featurePrefix(entityKind?: string): string | null {
   if (!entityKind) return null;
-  const dot = entityKind.indexOf('.');
+  const dot = entityKind.indexOf(".");
   const prefix = dot > 0 ? entityKind.slice(0, dot) : entityKind;
   return FEATURE_GROUPS[prefix] ? prefix : null;
 }
@@ -56,24 +69,34 @@ interface GroupedThreads {
 
 export function Chat() {
   const navigate = useNavigate();
-  const [activeSidebar, setActiveSidebar] = useState<SidebarItem>('Chat');
+  const [activeSidebar, setActiveSidebar] = useState<SidebarItem>("Chat");
   const [selectedThread, setSelectedThread] = useState(() => `chat:${crypto.randomUUID()}`);
-  const [expandedGroups, toggleGroup] = useSetToggle(['_general']);
+  const [expandedGroups, toggleGroup] = useSetToggle(["_general"]);
 
   // IPC data
-  const { data: threads, refetch: refetchThreads } = useQuery<ChatThread[]>('chat_threads', undefined, []);
+  const { data: threads, refetch: refetchThreads } = useQuery<ChatThread[]>(
+    "chat_threads",
+    undefined,
+    [],
+  );
 
   // Chat session (messages, streaming, input, send)
   // Refetch thread list when the agent finishes (new thread appears in sidebar)
   const chat = useChatSession(selectedThread, refetchThreads);
 
   const [showTransparency, setShowTransparency] = useState(() => {
-    try { return localStorage.getItem('chat:transparency') === 'true'; } catch { return false; }
+    try {
+      return localStorage.getItem("chat:transparency") === "true";
+    } catch {
+      return false;
+    }
   });
   const toggleTransparency = useCallback(() => {
     setShowTransparency((prev) => {
       const next = !prev;
-      try { localStorage.setItem('chat:transparency', String(next)); } catch {}
+      try {
+        localStorage.setItem("chat:transparency", String(next));
+      } catch {}
       return next;
     });
   }, []);
@@ -83,13 +106,14 @@ export function Chat() {
   const lastAssistantTransparency = useMemo(() => {
     for (let i = chat.messages.length - 1; i >= 0; i--) {
       const m = chat.messages[i];
-      if (m.role === 'assistant' && m.transparency) return m.transparency;
+      if (m.role === "assistant" && m.transparency) return m.transparency;
     }
     return null;
     // Only rescan when the message count changes (not on every array reference change)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chat.messages.length]);
-  const activeTransparency = (chat.isStreaming && chat.transparency) ? chat.transparency : lastAssistantTransparency;
+  }, [chat.messages.length, chat.messages]);
+  const activeTransparency =
+    chat.isStreaming && chat.transparency ? chat.transparency : lastAssistantTransparency;
 
   // Auto-select first thread only on initial page load.
   // Once this fires, further thread selection is user-driven.
@@ -167,7 +191,11 @@ export function Chat() {
   }, []);
 
   // ── Thread actions (rename / delete) ─────────────────────────────────
-  const [contextMenu, setContextMenu] = useState<{ thread: ChatThread; x: number; y: number } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    thread: ChatThread;
+    x: number;
+    y: number;
+  } | null>(null);
   const [renaming, setRenaming] = useState<{ sessionKey: string; value: string } | null>(null);
   const renameRef = useRef<HTMLInputElement>(null);
 
@@ -175,12 +203,14 @@ export function Chat() {
   useEffect(() => {
     if (!contextMenu) return;
     const closeOnClick = () => setContextMenu(null);
-    const closeOnKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setContextMenu(null); };
-    document.addEventListener('mousedown', closeOnClick);
-    document.addEventListener('keydown', closeOnKey);
+    const closeOnKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setContextMenu(null);
+    };
+    document.addEventListener("mousedown", closeOnClick);
+    document.addEventListener("keydown", closeOnKey);
     return () => {
-      document.removeEventListener('mousedown', closeOnClick);
-      document.removeEventListener('keydown', closeOnKey);
+      document.removeEventListener("mousedown", closeOnClick);
+      document.removeEventListener("keydown", closeOnKey);
     };
   }, [contextMenu]);
 
@@ -202,9 +232,14 @@ export function Chat() {
   const confirmRename = useCallback(async () => {
     if (!renaming || !renaming.value.trim()) return;
     try {
-      await ipc('chat_rename_thread', { sessionKey: renaming.sessionKey, title: renaming.value.trim() });
+      await ipc("chat_rename_thread", {
+        sessionKey: renaming.sessionKey,
+        title: renaming.value.trim(),
+      });
       refetchThreads();
-    } catch { /* IPC error — thread list stays as-is */ }
+    } catch {
+      /* IPC error — thread list stays as-is */
+    }
     setRenaming(null);
   }, [renaming, refetchThreads]);
 
@@ -212,16 +247,21 @@ export function Chat() {
     setRenaming(null);
   }, []);
 
-  const deleteThread = useCallback(async (sessionKey: string) => {
-    setContextMenu(null);
-    try {
-      await ipc('chat_delete_thread', { sessionKey });
-      if (selectedThread === sessionKey) {
-        setSelectedThread(`chat:${crypto.randomUUID()}`);
+  const deleteThread = useCallback(
+    async (sessionKey: string) => {
+      setContextMenu(null);
+      try {
+        await ipc("chat_delete_thread", { sessionKey });
+        if (selectedThread === sessionKey) {
+          setSelectedThread(`chat:${crypto.randomUUID()}`);
+        }
+        refetchThreads();
+      } catch {
+        /* IPC error — thread list stays as-is */
       }
-      refetchThreads();
-    } catch { /* IPC error — thread list stays as-is */ }
-  }, [selectedThread, refetchThreads]);
+    },
+    [selectedThread, refetchThreads],
+  );
 
   // Shared thread button renderer
   const renderThread = (thread: ChatThread) => {
@@ -236,8 +276,8 @@ export function Chat() {
             value={renaming.value}
             onChange={(e) => setRenaming({ ...renaming, value: e.target.value })}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') confirmRename();
-              if (e.key === 'Escape') cancelRename();
+              if (e.key === "Enter") confirmRename();
+              if (e.key === "Escape") cancelRename();
             }}
             className="flex-1 min-w-0 bg-surface-highest text-primary text-[12px] font-light px-2 py-1 rounded border border-border focus:outline-none focus:border-brand"
           />
@@ -258,8 +298,8 @@ export function Chat() {
         onContextMenu={(e) => openContextMenu(e, thread)}
         className={`w-full flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-[12px] font-light ${
           isActive
-            ? 'bg-surface-highest text-primary'
-            : 'text-muted hover:bg-surface-base hover:text-secondary'
+            ? "bg-surface-highest text-primary"
+            : "text-muted hover:bg-surface-base hover:text-secondary"
         }`}
       >
         <MessageSquare className="w-3 h-3 shrink-0" strokeWidth={1.5} />
@@ -279,7 +319,7 @@ export function Chat() {
       <span className="flex-1 text-left">{label}</span>
       <ChevronDown
         className={`w-3.5 h-3.5 transition-transform ${
-          expandedGroups.has(key) ? 'rotate-0' : '-rotate-90'
+          expandedGroups.has(key) ? "rotate-0" : "-rotate-90"
         }`}
         strokeWidth={1.5}
       />
@@ -292,7 +332,7 @@ export function Chat() {
         active={activeSidebar}
         onNavigate={(item) => {
           setActiveSidebar(item);
-          if (item === 'Tasks') navigate('/');
+          if (item === "Tasks") navigate("/");
         }}
       />
 
@@ -331,17 +371,13 @@ export function Chat() {
                       <div key={pid}>
                         {renderGroupHeader(`proj:${pid}`, pg.projectName, FolderOpen)}
                         {expandedGroups.has(`proj:${pid}`) && (
-                          <div className="mt-1 ml-3 space-y-1">
-                            {pg.threads.map(renderThread)}
-                          </div>
+                          <div className="mt-1 ml-3 space-y-1">{pg.threads.map(renderThread)}</div>
                         )}
                       </div>
                     ))}
                     {/* Area-level threads (no project) */}
                     {area.threads.length > 0 && (
-                      <div className="space-y-1">
-                        {area.threads.map(renderThread)}
-                      </div>
+                      <div className="space-y-1">{area.threads.map(renderThread)}</div>
                     )}
                   </div>
                 )}
@@ -355,9 +391,7 @@ export function Chat() {
                 <div key={`feat:${prefix}`}>
                   {renderGroupHeader(`feat:${prefix}`, cfg.label, cfg.icon)}
                   {expandedGroups.has(`feat:${prefix}`) && (
-                    <div className="mt-1 ml-3 space-y-1">
-                      {fThreads.map(renderThread)}
-                    </div>
+                    <div className="mt-1 ml-3 space-y-1">{fThreads.map(renderThread)}</div>
                   )}
                 </div>
               );
@@ -366,11 +400,9 @@ export function Chat() {
             {/* General threads */}
             {grouped.general.length > 0 && (
               <div>
-                {renderGroupHeader('_general', 'General', Globe)}
-                {expandedGroups.has('_general') && (
-                  <div className="mt-1 ml-3 space-y-1">
-                    {grouped.general.map(renderThread)}
-                  </div>
+                {renderGroupHeader("_general", "General", Globe)}
+                {expandedGroups.has("_general") && (
+                  <div className="mt-1 ml-3 space-y-1">{grouped.general.map(renderThread)}</div>
                 )}
               </div>
             )}
@@ -458,7 +490,7 @@ export function Chat() {
                   value={chat.input}
                   onChange={(e) => chat.setInput(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
+                    if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
                       handleSend();
                     }
@@ -466,7 +498,7 @@ export function Chat() {
                   placeholder="Ask Klynt anything, @ to add files, / for commands"
                   rows={1}
                   className="flex-1 bg-transparent py-3.5 text-[13px] text-primary placeholder:text-muted focus:outline-none font-light resize-none"
-                  style={{ maxHeight: '200px' }}
+                  style={{ maxHeight: "200px" }}
                 />
                 <button className="w-8 h-8 flex items-center justify-center text-muted hover:text-secondary transition-colors shrink-0">
                   <Mic className="w-4 h-4" strokeWidth={1.5} />

@@ -1,7 +1,7 @@
-import { useState, useCallback } from 'react';
-import { ipc } from './useIpc';
-import { isTauri, parseApiError } from '../lib/utils';
-import type { ApiError } from '../lib/types';
+import { useCallback, useState } from "react";
+import type { ApiError } from "../lib/types";
+import { parseApiError } from "../lib/utils";
+import { ipc } from "./useIpc";
 
 interface MutationResult<T, P> {
   mutate: (params: P) => Promise<T | undefined>;
@@ -10,8 +10,7 @@ interface MutationResult<T, P> {
 }
 
 /**
- * Wraps a Tauri command for write operations.
- * Returns `undefined` in browser dev mode.
+ * Wraps a Tauri command (or dev HTTP server) for write operations.
  *
  * When `wrapKey` is provided, params are nested under that key before invoking.
  * This is required for Tauri commands that accept a struct parameter (e.g.
@@ -26,14 +25,10 @@ export function useMutation<T = void, P = Record<string, unknown>>(
 
   const mutate = useCallback(
     async (params: P): Promise<T | undefined> => {
-      if (!isTauri) return undefined;
-
       setLoading(true);
       setError(null);
       try {
-        const args = wrapKey
-          ? { [wrapKey]: params }
-          : (params as Record<string, unknown>);
+        const args = wrapKey ? { [wrapKey]: params } : (params as Record<string, unknown>);
         const result = await ipc<T>(cmd, args);
         return result;
       } catch (e) {

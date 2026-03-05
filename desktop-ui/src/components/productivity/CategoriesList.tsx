@@ -1,5 +1,5 @@
-import { formatHumanDuration } from '../../lib/dates';
-import type { CategoryUsage } from '../../lib/types';
+import { formatHumanDuration } from "../../lib/dates";
+import type { CategoryUsage } from "../../lib/types";
 
 interface CategoriesListProps {
   categories: CategoryUsage[];
@@ -7,8 +7,13 @@ interface CategoriesListProps {
 }
 
 const CATEGORY_COLORS = [
-  'var(--brand)', 'var(--purple)', 'var(--info)', 'var(--success)',
-  'var(--text-muted)', 'var(--destructive)', 'var(--dim)',
+  "var(--brand)",
+  "var(--purple)",
+  "var(--info)",
+  "var(--success)",
+  "var(--text-muted)",
+  "var(--destructive)",
+  "var(--dim)",
 ];
 
 export function CategoriesList({ categories, totalSecs }: CategoriesListProps) {
@@ -25,7 +30,9 @@ export function CategoriesList({ categories, totalSecs }: CategoriesListProps) {
     <div className="bg-surface-base rounded-xl p-4 flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <h2 className="text-[13px] font-medium text-secondary">Categories</h2>
-        <span className="text-[10px] font-light text-dim">Total tracked time: {formatHumanDuration(totalSecs)}</span>
+        <span className="text-[10px] font-light text-dim">
+          Total tracked time: {formatHumanDuration(totalSecs)}
+        </span>
       </div>
       <div className="flex flex-col gap-2">
         {categories.map((cat, i) => {
@@ -33,10 +40,17 @@ export function CategoriesList({ categories, totalSecs }: CategoriesListProps) {
           const color = CATEGORY_COLORS[i % CATEGORY_COLORS.length];
           return (
             <div key={cat.category} className="flex items-center gap-3">
-              <span className="text-[11px] font-light text-muted w-8 text-right tabular-nums">{pct}%</span>
-              <span className="text-[11px] font-light text-primary flex-1 truncate">{cat.category}</span>
+              <span className="text-[11px] font-light text-muted w-8 text-right tabular-nums">
+                {pct}%
+              </span>
+              <span className="text-[11px] font-light text-primary flex-1 truncate">
+                {cat.category}
+              </span>
               <div className="w-20 h-1.5 rounded-full bg-surface-raised overflow-hidden flex-shrink-0">
-                <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
+                <div
+                  className="h-full rounded-full"
+                  style={{ width: `${pct}%`, backgroundColor: color }}
+                />
               </div>
               <span className="text-[11px] font-light text-muted tabular-nums w-16 text-right">
                 {formatHumanDuration(cat.durationSecs)}

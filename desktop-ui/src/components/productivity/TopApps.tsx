@@ -1,13 +1,16 @@
-import { useMemo } from 'react';
-import { formatHumanDuration } from '../../lib/dates';
-import type { AppUsage } from '../../lib/types';
+import { useMemo } from "react";
+import { formatHumanDuration } from "../../lib/dates";
+import type { AppUsage } from "../../lib/types";
 
 interface TopAppsProps {
   apps: AppUsage[];
 }
 
 export function TopApps({ apps }: TopAppsProps) {
-  const maxDuration = useMemo(() => apps.reduce((max, a) => Math.max(max, a.durationSecs), 1), [apps]);
+  const maxDuration = useMemo(
+    () => apps.reduce((max, a) => Math.max(max, a.durationSecs), 1),
+    [apps],
+  );
   const totalDuration = useMemo(() => apps.reduce((sum, a) => sum + a.durationSecs, 0), [apps]);
 
   if (apps.length === 0) {
@@ -27,8 +30,12 @@ export function TopApps({ apps }: TopAppsProps) {
           const pct = totalDuration > 0 ? Math.round((app.durationSecs / totalDuration) * 100) : 0;
           return (
             <div key={app.appName} className="flex items-center gap-3">
-              <span className="text-[11px] font-light text-muted w-8 text-right tabular-nums">{pct}%</span>
-              <span className="text-[11px] font-light text-primary flex-1 truncate">{app.appName}</span>
+              <span className="text-[11px] font-light text-muted w-8 text-right tabular-nums">
+                {pct}%
+              </span>
+              <span className="text-[11px] font-light text-primary flex-1 truncate">
+                {app.appName}
+              </span>
               <div className="w-20 h-1.5 rounded-full bg-surface-raised overflow-hidden flex-shrink-0">
                 <div
                   className="h-full rounded-full bg-brand"

@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
-import { PieChart, Pie, Cell } from 'recharts';
-import { formatLongDuration } from '../../lib/dates';
+import { useMemo } from "react";
+import { Cell, Pie, PieChart } from "recharts";
+import { formatLongDuration } from "../../lib/dates";
 
 interface BreakdownSegment {
   name: string;
@@ -13,12 +13,22 @@ interface BreakdownDonutsProps {
   totalSecs: number;
 }
 
-function MiniDonut({ name, value, total, color }: { name: string; value: number; total: number; color: string }) {
+function MiniDonut({
+  name,
+  value,
+  total,
+  color,
+}: {
+  name: string;
+  value: number;
+  total: number;
+  color: string;
+}) {
   const pct = total > 0 ? Math.round((value / total) * 100) : 0;
-  const data = useMemo(() => [
-    { value: value },
-    { value: Math.max(total - value, 0) },
-  ], [value, total]);
+  const data = useMemo(
+    () => [{ value: value }, { value: Math.max(total - value, 0) }],
+    [value, total],
+  );
 
   return (
     <div className="flex flex-col items-center gap-1">
@@ -44,9 +54,7 @@ function MiniDonut({ name, value, total, color }: { name: string; value: number;
         </div>
       </div>
       <span className="text-[11px] font-medium text-secondary">{name}</span>
-      <span className="text-[10px] font-light text-dim">
-        {formatLongDuration(value)}
-      </span>
+      <span className="text-[10px] font-light text-dim">{formatLongDuration(value)}</span>
     </div>
   );
 }

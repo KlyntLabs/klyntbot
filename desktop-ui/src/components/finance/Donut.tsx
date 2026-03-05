@@ -1,6 +1,13 @@
-export function Donut({ segments, label, value, size = 140 }: {
+export function Donut({
+  segments,
+  label,
+  value,
+  size = 140,
+}: {
   segments: { name: string; value: number; color: string }[];
-  label: string; value: string; size?: number;
+  label: string;
+  value: string;
+  size?: number;
 }) {
   const total = segments.reduce((s, seg) => s + seg.value, 0);
   if (total === 0) return null;
@@ -19,11 +26,38 @@ export function Donut({ segments, label, value, size = 140 }: {
           const dash = frac * circ;
           const rot = (off / total) * 360 - 90;
           off += seg.value;
-          return <circle key={i} cx={cx} cy={cy} r={r} fill="none" stroke={seg.color} strokeWidth={sw}
-            strokeDasharray={`${dash} ${circ - dash}`} transform={`rotate(${rot} ${cx} ${cy})`} />;
+          return (
+            <circle
+              key={i}
+              cx={cx}
+              cy={cy}
+              r={r}
+              fill="none"
+              stroke={seg.color}
+              strokeWidth={sw}
+              strokeDasharray={`${dash} ${circ - dash}`}
+              transform={`rotate(${rot} ${cx} ${cy})`}
+            />
+          );
         })}
-        <text x={cx} y={cy - 5} textAnchor="middle" className="fill-dim text-[9px]" style={{ fontWeight: 300 }}>{label}</text>
-        <text x={cx} y={cy + 10} textAnchor="middle" className="fill-primary text-[13px]" style={{ fontWeight: 300 }}>{value}</text>
+        <text
+          x={cx}
+          y={cy - 5}
+          textAnchor="middle"
+          className="fill-dim text-[9px]"
+          style={{ fontWeight: 300 }}
+        >
+          {label}
+        </text>
+        <text
+          x={cx}
+          y={cy + 10}
+          textAnchor="middle"
+          className="fill-primary text-[13px]"
+          style={{ fontWeight: 300 }}
+        >
+          {value}
+        </text>
       </svg>
       <div className="flex flex-wrap gap-x-3 gap-y-0.5 justify-center mt-2">
         {segments.map((seg, i) => (

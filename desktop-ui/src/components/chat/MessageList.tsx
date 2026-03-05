@@ -1,10 +1,15 @@
-import { useRef, useEffect } from 'react';
-import { MarkdownContent } from './MarkdownContent';
-import { SegmentedMessage } from './SegmentedMessage';
-import { CollapsedInteraction } from './CollapsedInteraction';
-import { InteractionCard } from './InteractionCard';
-import { TokenBadge } from './TokenBadge';
-import type { ActiveInteraction, ChatMessage, MessageSegment, TransparencyData } from '../../lib/types';
+import { useEffect, useRef } from "react";
+import type {
+  ActiveInteraction,
+  ChatMessage,
+  MessageSegment,
+  TransparencyData,
+} from "../../lib/types";
+import { CollapsedInteraction } from "./CollapsedInteraction";
+import { InteractionCard } from "./InteractionCard";
+import { MarkdownContent } from "./MarkdownContent";
+import { SegmentedMessage } from "./SegmentedMessage";
+import { TokenBadge } from "./TokenBadge";
 
 interface MessageListProps {
   messages: ChatMessage[];
@@ -36,23 +41,23 @@ export function MessageList({
   const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length, segments.length, isStreaming, activeInteraction]);
+    endRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, []);
 
   return (
     <div className="space-y-6">
       {messages.map((msg) => (
         <div
           key={msg.id}
-          className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+          className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
         >
-          {msg.role === 'user' ? (
+          {msg.role === "user" ? (
             <div className="max-w-[85%] rounded-2xl px-5 py-3.5 bg-surface-raised backdrop-blur-sm">
               <p className="text-[13px] font-light whitespace-pre-wrap leading-relaxed text-primary">
                 {msg.content}
               </p>
             </div>
-          ) : msg.role === 'interaction' ? (
+          ) : msg.role === "interaction" ? (
             <CollapsedInteraction content={msg.content} />
           ) : (
             <div className="max-w-[85%]">
@@ -92,15 +97,15 @@ export function MessageList({
           <div className="flex gap-1">
             <div
               className="w-1.5 h-1.5 bg-muted rounded-full animate-bounce"
-              style={{ animationDelay: '0ms' }}
+              style={{ animationDelay: "0ms" }}
             />
             <div
               className="w-1.5 h-1.5 bg-muted rounded-full animate-bounce"
-              style={{ animationDelay: '150ms' }}
+              style={{ animationDelay: "150ms" }}
             />
             <div
               className="w-1.5 h-1.5 bg-muted rounded-full animate-bounce"
-              style={{ animationDelay: '300ms' }}
+              style={{ animationDelay: "300ms" }}
             />
           </div>
         </div>

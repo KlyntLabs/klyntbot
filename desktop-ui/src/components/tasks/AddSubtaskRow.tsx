@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus } from "lucide-react";
+import { useCallback, useState } from "react";
 
 interface AddSubtaskRowProps {
   parentId: string;
@@ -9,14 +9,14 @@ interface AddSubtaskRowProps {
 
 export function AddSubtaskRow({ parentId, showArea, onCreate }: AddSubtaskRowProps) {
   const [editing, setEditing] = useState(false);
-  const [title, setTitle] = useState('');
+  const [title, setTitle] = useState("");
 
   const colCount = showArea ? 8 : 7;
 
   const save = useCallback(() => {
     if (title.trim()) {
       onCreate(parentId, title.trim());
-      setTitle('');
+      setTitle("");
     }
     setEditing(false);
   }, [title, parentId, onCreate]);
@@ -24,19 +24,21 @@ export function AddSubtaskRow({ parentId, showArea, onCreate }: AddSubtaskRowPro
   return (
     <tr
       className="border-b border-border-subtle last:border-b-0 bg-surface-lowest"
-      style={{ boxShadow: 'inset 3px 0 0 var(--brand)' }}
+      style={{ boxShadow: "inset 3px 0 0 var(--brand)" }}
     >
       <td className="px-5 py-1.5 w-9" />
-      <td colSpan={colCount - 1} className="px-5 py-1.5" onClick={e => e.stopPropagation()}>
+      <td colSpan={colCount - 1} className="px-5 py-1.5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center" style={{ paddingLeft: 24 }}>
           {editing ? (
             <input
-              autoFocus
               value={title}
-              onChange={e => setTitle(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') save();
-                if (e.key === 'Escape') { setEditing(false); setTitle(''); }
+              onChange={(e) => setTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") save();
+                if (e.key === "Escape") {
+                  setEditing(false);
+                  setTitle("");
+                }
               }}
               onBlur={save}
               placeholder="Subtask title..."

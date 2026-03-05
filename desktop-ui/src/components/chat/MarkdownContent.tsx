@@ -1,9 +1,9 @@
-import Markdown from 'react-markdown';
-import type { Components } from 'react-markdown';
+import type { Components } from "react-markdown";
+import Markdown from "react-markdown";
 
 /** Strip internal confidence assessment tags from agent output. */
 function stripConfidenceTags(text: string): string {
-  return text.replace(/<confidence[^>]*\/?>(?:<\/confidence>)?/g, '').trimEnd();
+  return text.replace(/<confidence[^>]*\/?>(?:<\/confidence>)?/g, "").trimEnd();
 }
 
 const components: Components = {
@@ -19,25 +19,17 @@ const components: Components = {
   ),
 
   // Paragraph
-  p: ({ children }) => (
-    <p className="mb-2.5 last:mb-0 leading-relaxed">{children}</p>
-  ),
+  p: ({ children }) => <p className="mb-2.5 last:mb-0 leading-relaxed">{children}</p>,
 
   // Bold & italic
-  strong: ({ children }) => (
-    <strong className="font-medium text-primary">{children}</strong>
-  ),
-  em: ({ children }) => (
-    <em className="italic text-secondary">{children}</em>
-  ),
+  strong: ({ children }) => <strong className="font-medium text-primary">{children}</strong>,
+  em: ({ children }) => <em className="italic text-secondary">{children}</em>,
 
   // Inline code
   code: ({ children, className }) => {
     // Fenced code blocks get a `language-*` className from react-markdown
     if (className) {
-      return (
-        <code className="block text-[12px] font-mono leading-relaxed">{children}</code>
-      );
+      return <code className="block text-[12px] font-mono leading-relaxed">{children}</code>;
     }
     return (
       <code className="text-[12px] font-mono bg-surface-raised px-1.5 py-0.5 rounded-md text-brand">
@@ -60,9 +52,7 @@ const components: Components = {
   ol: ({ children }) => (
     <ol className="list-decimal list-outside pl-5 mb-2.5 last:mb-0 space-y-1">{children}</ol>
   ),
-  li: ({ children }) => (
-    <li className="leading-relaxed">{children}</li>
-  ),
+  li: ({ children }) => <li className="leading-relaxed">{children}</li>,
 
   // Links
   a: ({ children, href }) => (
@@ -92,15 +82,11 @@ const components: Components = {
       <table className="w-full text-[12px]">{children}</table>
     </div>
   ),
-  thead: ({ children }) => (
-    <thead className="border-b border-border/50">{children}</thead>
-  ),
+  thead: ({ children }) => <thead className="border-b border-border/50">{children}</thead>,
   th: ({ children }) => (
     <th className="text-left font-medium text-primary px-2 py-1.5">{children}</th>
   ),
-  td: ({ children }) => (
-    <td className="px-2 py-1.5 border-b border-border/30">{children}</td>
-  ),
+  td: ({ children }) => <td className="px-2 py-1.5 border-b border-border/30">{children}</td>,
 };
 
 interface MarkdownContentProps {
@@ -108,7 +94,7 @@ interface MarkdownContentProps {
   className?: string;
 }
 
-export function MarkdownContent({ content, className = '' }: MarkdownContentProps) {
+export function MarkdownContent({ content, className = "" }: MarkdownContentProps) {
   const cleaned = stripConfidenceTags(content);
 
   return (

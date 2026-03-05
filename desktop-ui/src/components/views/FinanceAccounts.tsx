@@ -1,45 +1,63 @@
-import { useState } from 'react';
-import { Wallet, Plus, ArrowUpRight, ArrowDownRight, ArrowLeftRight } from 'lucide-react';
-import { useQuery } from '../../hooks/useQuery';
-import { useEvent } from '../../hooks/useEvent';
-import { cn } from '../../lib/utils';
-import { fmtMoney, toVnd, fmtVnd, ACCT_ICONS } from '../../lib/finance';
-import { FinanceLayout } from '../finance/FinanceLayout';
-import { Card, SectionLabel } from '../finance/Card';
-import type { FinanceAccount, FinanceTransaction } from '../../lib/types';
+import { ArrowDownRight, ArrowLeftRight, ArrowUpRight, Plus, Wallet } from "lucide-react";
+import { useState } from "react";
+import { useEvent } from "../../hooks/useEvent";
+import { useQuery } from "../../hooks/useQuery";
+import { ACCT_ICONS, fmtMoney, fmtVnd, toVnd } from "../../lib/finance";
+import type { FinanceAccount, FinanceTransaction } from "../../lib/types";
+import { cn } from "../../lib/utils";
+import { Card, SectionLabel } from "../finance/Card";
+import { FinanceLayout } from "../finance/FinanceLayout";
 export function FinanceAccounts() {
-  const { data: accounts, refetch: rA } = useQuery<FinanceAccount[]>('finance_accounts', undefined, []);
-  const { data: transactions, refetch: rT } = useQuery<FinanceTransaction[]>('finance_transactions', undefined, []);
-  const { data: rates } = useQuery<Record<string, number>>('finance_exchange_rates', undefined, {});
+  const { data: accounts, refetch: rA } = useQuery<FinanceAccount[]>(
+    "finance_accounts",
+    undefined,
+    [],
+  );
+  const { data: transactions, refetch: rT } = useQuery<FinanceTransaction[]>(
+    "finance_transactions",
+    undefined,
+    [],
+  );
+  const { data: rates } = useQuery<Record<string, number>>("finance_exchange_rates", undefined, {});
 
-  const refetchAll = () => { rA(); rT(); };
-  useEvent<{ entityKind: string }>('entity:updated', refetchAll);
+  const refetchAll = () => {
+    rA();
+    rT();
+  };
+  useEvent<{ entityKind: string }>("entity:updated", refetchAll);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const active = accounts.filter(a => !a.isArchived);
-  const archived = accounts.filter(a => a.isArchived);
-  const selected = accounts.find(a => a.id === selectedId);
-  const acctTxs = selectedId ? transactions.filter(t => t.accountId === selectedId) : [];
+  const active = accounts.filter((a) => !a.isArchived);
+  const archived = accounts.filter((a) => a.isArchived);
+  const selected = accounts.find((a) => a.id === selectedId);
+  const acctTxs = selectedId ? transactions.filter((t) => t.accountId === selectedId) : [];
 
   const totalVnd = active.reduce((s, a) => s + toVnd(a.balance, a.currency, rates), 0);
 
   return (
     <FinanceLayout onRefresh={refetchAll}>
       <div className="grid grid-cols-12 gap-3 auto-rows-min">
-
         {/* ── Header stats ────────────────────────────────── */}
         <div className="col-span-12 grid grid-cols-3 gap-3">
           <Card className="p-4">
-            <p className="text-[10px] text-dim font-light uppercase tracking-wider mb-1">Total Balance</p>
+            <p className="text-[10px] text-dim font-light uppercase tracking-wider mb-1">
+              Total Balance
+            </p>
             <p className="text-[20px] font-light text-primary">{fmtVnd(totalVnd)}</p>
           </Card>
           <Card className="p-4">
-            <p className="text-[10px] text-dim font-light uppercase tracking-wider mb-1">Active Accounts</p>
+            <p className="text-[10px] text-dim font-light uppercase tracking-wider mb-1">
+              Active Accounts
+            </p>
             <p className="text-[20px] font-light text-primary">{active.length}</p>
           </Card>
           <Card className="p-4">
-            <p className="text-[10px] text-dim font-light uppercase tracking-wider mb-1">Currencies</p>
-            <p className="text-[20px] font-light text-primary">{new Set(active.map(a => a.currency)).size}</p>
+            <p className="text-[10px] text-dim font-light uppercase tracking-wider mb-1">
+              Currencies
+            </p>
+            <p className="text-[20px] font-light text-primary">
+              {new Set(active.map((a) => a.currency)).size}
+            </p>
           </Card>
         </div>
 
@@ -52,14 +70,17 @@ export function FinanceAccounts() {
             </button>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            {active.map(acct => {
+            {active.map((acct) => {
               const Icon = ACCT_ICONS[acct.accountType] ?? Wallet;
               const vnd = toVnd(acct.balance, acct.currency, rates);
               const isSelected = acct.id === selectedId;
               return (
                 <Card
                   key={acct.id}
-                  className={cn('p-4 cursor-pointer transition-colors', isSelected ? 'ring-1 ring-brand bg-surface-base' : 'hover:bg-surface-base')}
+                  className={cn(
+                    "p-4 cursor-pointer transition-colors",
+                    isSelected ? "ring-1 ring-brand bg-surface-base" : "hover:bg-surface-base",
+                  )}
                   onClick={() => setSelectedId(isSelected ? null : acct.id)}
                 >
                   <div className="flex items-center gap-3 mb-3">
@@ -68,12 +89,20 @@ export function FinanceAccounts() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-[12px] font-light text-secondary truncate">{acct.name}</p>
-                      <p className="text-[9px] text-dim font-light">{acct.institution ?? acct.accountType.replace('_', ' ')}</p>
+                      <p className="text-[9px] text-dim font-light">
+                        {acct.institution ?? acct.accountType.replace("_", " ")}
+                      </p>
                     </div>
                   </div>
-                  <p className="text-[18px] font-light text-primary">{fmtMoney(acct.balance, acct.currency)}</p>
-                  {acct.currency !== 'VND' && <p className="text-[10px] text-dim font-light mt-0.5">≈ {fmtVnd(vnd)}</p>}
-                  {acct.notes && <p className="text-[9px] text-dim font-light mt-2">{acct.notes}</p>}
+                  <p className="text-[18px] font-light text-primary">
+                    {fmtMoney(acct.balance, acct.currency)}
+                  </p>
+                  {acct.currency !== "VND" && (
+                    <p className="text-[10px] text-dim font-light mt-0.5">≈ {fmtVnd(vnd)}</p>
+                  )}
+                  {acct.notes && (
+                    <p className="text-[9px] text-dim font-light mt-2">{acct.notes}</p>
+                  )}
                 </Card>
               );
             })}
@@ -83,7 +112,7 @@ export function FinanceAccounts() {
             <div className="mt-4">
               <SectionLabel>Archived</SectionLabel>
               <div className="grid grid-cols-2 gap-3">
-                {archived.map(acct => {
+                {archived.map((acct) => {
                   const Icon = ACCT_ICONS[acct.accountType] ?? Wallet;
                   return (
                     <Card key={acct.id} className="p-4 opacity-50">
@@ -91,7 +120,9 @@ export function FinanceAccounts() {
                         <Icon className="w-4 h-4 text-dim" strokeWidth={1.5} />
                         <div className="min-w-0 flex-1">
                           <p className="text-[12px] font-light text-muted truncate">{acct.name}</p>
-                          <p className="text-[10px] text-dim font-light">{fmtMoney(acct.balance, acct.currency)}</p>
+                          <p className="text-[10px] text-dim font-light">
+                            {fmtMoney(acct.balance, acct.currency)}
+                          </p>
                         </div>
                       </div>
                     </Card>
@@ -104,24 +135,46 @@ export function FinanceAccounts() {
 
         {/* ── Right sidebar: selected account transactions ── */}
         <div className="col-span-4">
-          <SectionLabel>{selected ? `${selected.name} Transactions` : 'Select an account'}</SectionLabel>
+          <SectionLabel>
+            {selected ? `${selected.name} Transactions` : "Select an account"}
+          </SectionLabel>
           {selected ? (
             <Card className="overflow-hidden">
               {acctTxs.length === 0 ? (
-                <div className="p-6 text-center text-[11px] text-dim font-light">No transactions</div>
+                <div className="p-6 text-center text-[11px] text-dim font-light">
+                  No transactions
+                </div>
               ) : (
-                acctTxs.map(tx => {
-                  const TxI = tx.txType === 'income' ? ArrowDownRight : tx.txType === 'expense' ? ArrowUpRight : ArrowLeftRight;
-                  const col = tx.txType === 'income' ? 'text-success' : tx.txType === 'expense' ? 'text-destructive' : 'text-info';
-                  const pre = tx.txType === 'income' ? '+' : tx.txType === 'expense' ? '-' : '';
+                acctTxs.map((tx) => {
+                  const TxI =
+                    tx.txType === "income"
+                      ? ArrowDownRight
+                      : tx.txType === "expense"
+                        ? ArrowUpRight
+                        : ArrowLeftRight;
+                  const col =
+                    tx.txType === "income"
+                      ? "text-success"
+                      : tx.txType === "expense"
+                        ? "text-destructive"
+                        : "text-info";
+                  const pre = tx.txType === "income" ? "+" : tx.txType === "expense" ? "-" : "";
                   return (
-                    <div key={tx.id} className="flex items-center gap-2 px-3 py-2 hover:bg-surface-base transition-colors border-b border-border-subtle last:border-b-0">
-                      <TxI className={cn('w-3 h-3 flex-shrink-0', col)} strokeWidth={1.5} />
+                    <div
+                      key={tx.id}
+                      className="flex items-center gap-2 px-3 py-2 hover:bg-surface-base transition-colors border-b border-border-subtle last:border-b-0"
+                    >
+                      <TxI className={cn("w-3 h-3 flex-shrink-0", col)} strokeWidth={1.5} />
                       <div className="min-w-0 flex-1">
-                        <p className="text-[11px] font-light text-secondary truncate">{tx.counterparty ?? tx.notes ?? tx.txType}</p>
+                        <p className="text-[11px] font-light text-secondary truncate">
+                          {tx.counterparty ?? tx.notes ?? tx.txType}
+                        </p>
                         <p className="text-[9px] text-dim font-light">{tx.txDate}</p>
                       </div>
-                      <span className={cn('text-[11px] font-light flex-shrink-0', col)}>{pre}{fmtMoney(tx.amount, tx.currency)}</span>
+                      <span className={cn("text-[11px] font-light flex-shrink-0", col)}>
+                        {pre}
+                        {fmtMoney(tx.amount, tx.currency)}
+                      </span>
                     </div>
                   );
                 })
@@ -129,11 +182,12 @@ export function FinanceAccounts() {
             </Card>
           ) : (
             <Card className="p-8 flex items-center justify-center">
-              <p className="text-[11px] text-dim font-light">Click an account to view its transactions</p>
+              <p className="text-[11px] text-dim font-light">
+                Click an account to view its transactions
+              </p>
             </Card>
           )}
         </div>
-
       </div>
     </FinanceLayout>
   );

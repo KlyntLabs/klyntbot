@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect } from "react";
 
 /**
  * Sets the document background to transparent so the window content
@@ -6,11 +6,11 @@ import { useEffect } from 'react';
  */
 export function useTransparentBackground() {
   useEffect(() => {
-    document.documentElement.style.background = 'transparent';
-    document.body.style.background = 'transparent';
+    document.documentElement.style.background = "transparent";
+    document.body.style.background = "transparent";
     return () => {
-      document.documentElement.style.background = '';
-      document.body.style.background = '';
+      document.documentElement.style.background = "";
+      document.body.style.background = "";
     };
   }, []);
 }

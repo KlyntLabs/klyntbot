@@ -1,5 +1,5 @@
-import { Filter, ChevronDown, Plus, Columns3, List, GitBranch } from 'lucide-react';
-import type { ViewMode } from '../../lib/types';
+import { ChevronDown, Columns3, Filter, GitBranch, List, Plus } from "lucide-react";
+import type { ViewMode } from "../../lib/types";
 
 interface ToolbarProps {
   viewMode: ViewMode;
@@ -35,18 +35,18 @@ export function Toolbar({ viewMode, onViewModeChange, onAddTask }: ToolbarProps)
       {/* Right: View toggles + Add task */}
       <div className="flex items-center gap-2">
         <div className="flex items-center bg-surface-low rounded-md p-0.5">
-          {([
-            { mode: 'table' as const, icon: List },
-            { mode: 'board' as const, icon: Columns3 },
-            { mode: 'tree' as const, icon: GitBranch },
-          ]).map(({ mode, icon: Icon }) => (
+          {[
+            { mode: "table" as const, icon: List },
+            { mode: "board" as const, icon: Columns3 },
+            { mode: "tree" as const, icon: GitBranch },
+          ].map(({ mode, icon: Icon }) => (
             <button
               key={mode}
               onClick={() => onViewModeChange(mode)}
               className={`p-1.5 rounded transition-colors ${
                 viewMode === mode
-                  ? 'bg-surface-highest text-brand'
-                  : 'text-muted hover:text-secondary'
+                  ? "bg-surface-highest text-brand"
+                  : "text-muted hover:text-secondary"
               }`}
             >
               <Icon className="w-[14px] h-[14px]" strokeWidth={1.5} />

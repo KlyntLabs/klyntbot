@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router';
-import { Sidebar } from '../layout/Sidebar';
-import type { SidebarItem } from '../../lib/types';
+import { useState } from "react";
+import { useLocation, useNavigate } from "react-router";
+import type { SidebarItem } from "../../lib/types";
+import { Sidebar } from "../layout/Sidebar";
 
 interface FinanceLayoutProps {
   children: React.ReactNode;
@@ -9,19 +9,19 @@ interface FinanceLayoutProps {
 }
 
 const subNav = [
-  { label: 'Dashboard', path: '/finance' },
-  { label: 'Accounts', path: '/finance/accounts' },
-  { label: 'Transactions', path: '/finance/transactions' },
-  { label: 'Budgets', path: '/finance/budgets' },
-  { label: 'Investments', path: '/finance/investments' },
-  { label: 'Goals', path: '/finance/goals' },
-  { label: 'Liabilities', path: '/finance/liabilities' },
+  { label: "Dashboard", path: "/finance" },
+  { label: "Accounts", path: "/finance/accounts" },
+  { label: "Transactions", path: "/finance/transactions" },
+  { label: "Budgets", path: "/finance/budgets" },
+  { label: "Investments", path: "/finance/investments" },
+  { label: "Goals", path: "/finance/goals" },
+  { label: "Liabilities", path: "/finance/liabilities" },
 ];
 
 export function FinanceLayout({ children }: FinanceLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
-  const [activeSidebar, setActiveSidebar] = useState<SidebarItem>('Finance');
+  const [activeSidebar, setActiveSidebar] = useState<SidebarItem>("Finance");
 
   const currentPath = location.pathname;
 
@@ -31,8 +31,8 @@ export function FinanceLayout({ children }: FinanceLayoutProps) {
         active={activeSidebar}
         onNavigate={(item) => {
           setActiveSidebar(item);
-          if (item === 'Tasks') navigate('/');
-          if (item === 'Chat') navigate('/chat');
+          if (item === "Tasks") navigate("/");
+          if (item === "Chat") navigate("/chat");
         }}
       />
 
@@ -48,8 +48,8 @@ export function FinanceLayout({ children }: FinanceLayoutProps) {
                   onClick={() => navigate(item.path)}
                   className={`flex-1 py-2 rounded-md text-[13px] font-light transition-colors ${
                     isActive
-                      ? 'bg-surface-highest text-white'
-                      : 'bg-surface-low text-muted hover:bg-surface-base hover:text-secondary'
+                      ? "bg-surface-highest text-white"
+                      : "bg-surface-low text-muted hover:bg-surface-base hover:text-secondary"
                   }`}
                 >
                   {item.label}
@@ -60,9 +60,7 @@ export function FinanceLayout({ children }: FinanceLayoutProps) {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4">
-          {children}
-        </div>
+        <div className="flex-1 overflow-y-auto p-4">{children}</div>
       </div>
     </div>
   );

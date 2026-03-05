@@ -1,4 +1,4 @@
-import { Archive } from 'lucide-react';
+import { Archive } from "lucide-react";
 
 export function ArchivedSettings() {
   return (

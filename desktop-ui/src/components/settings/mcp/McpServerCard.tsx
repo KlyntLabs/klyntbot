@@ -1,6 +1,6 @@
-import { Settings2, Trash2, Power, Check, Loader2 } from 'lucide-react';
-import { McpServerIcon } from './McpServerIcon';
-import type { McpServerConfig, RecommendedMcpServer } from '../../../lib/types';
+import { Check, Loader2, Power, Settings2, Trash2 } from "lucide-react";
+import type { McpServerConfig, RecommendedMcpServer } from "../../../lib/types";
+import { McpServerIcon } from "./McpServerIcon";
 
 interface CustomServerCardProps {
   server: McpServerConfig;
@@ -19,27 +19,25 @@ export function CustomServerCard({ server, onToggle, onRemove, onEdit }: CustomS
         <div className="min-w-0">
           <div className="text-[13px] font-medium text-primary truncate">{server.name}</div>
           <div className="text-[11px] text-dim">
-            {server.transport === 'stdio' ? server.command : server.url}
+            {server.transport === "stdio" ? server.command : server.url}
           </div>
         </div>
       </div>
 
       <div className="flex items-center gap-1.5 flex-shrink-0">
-        <span className={`text-[11px] px-1.5 py-0.5 rounded ${
-          server.transport === 'stdio'
-            ? 'bg-purple/10 text-purple'
-            : 'bg-info/10 text-info'
-        }`}>
+        <span
+          className={`text-[11px] px-1.5 py-0.5 rounded ${
+            server.transport === "stdio" ? "bg-purple/10 text-purple" : "bg-info/10 text-info"
+          }`}
+        >
           {server.transport}
         </span>
         <button
           onClick={() => onToggle(server.name, !server.enabled)}
           className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors ${
-            server.enabled
-              ? 'text-success hover:bg-surface-base'
-              : 'text-dim hover:bg-surface-base'
+            server.enabled ? "text-success hover:bg-surface-base" : "text-dim hover:bg-surface-base"
           }`}
-          title={server.enabled ? 'Disable' : 'Enable'}
+          title={server.enabled ? "Disable" : "Enable"}
         >
           <Power className="w-3.5 h-3.5" strokeWidth={1.5} />
         </button>
@@ -131,7 +129,7 @@ export function RecommendedServerCard({
                     Waiting...
                   </>
                 ) : (
-                  'Authenticate'
+                  "Authenticate"
                 )}
               </button>
             )}
@@ -154,11 +152,11 @@ export function RecommendedServerCard({
                 onClick={() => onToggle?.(server.name, !enabled)}
                 className={`text-[12px] px-3 py-1 rounded-md border transition-colors ${
                   enabled
-                    ? 'border-success/30 text-success bg-success/5 hover:bg-success/10'
-                    : 'border-border text-dim bg-surface-base hover:bg-surface-raised'
+                    ? "border-success/30 text-success bg-success/5 hover:bg-success/10"
+                    : "border-border text-dim bg-surface-base hover:bg-surface-raised"
                 }`}
               >
-                {enabled ? 'Enabled' : 'Disabled'}
+                {enabled ? "Enabled" : "Disabled"}
               </button>
             )}
 
@@ -176,11 +174,9 @@ export function RecommendedServerCard({
               <button
                 onClick={() => onToggle?.(server.name, !enabled)}
                 className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors ${
-                  enabled
-                    ? 'text-success hover:bg-surface-base'
-                    : 'text-dim hover:bg-surface-base'
+                  enabled ? "text-success hover:bg-surface-base" : "text-dim hover:bg-surface-base"
                 }`}
-                title={enabled ? 'Disable' : 'Enable'}
+                title={enabled ? "Disable" : "Enable"}
               >
                 <Power className="w-3.5 h-3.5" strokeWidth={1.5} />
               </button>

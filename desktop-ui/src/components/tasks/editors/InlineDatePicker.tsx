@@ -1,7 +1,7 @@
-import { useState, useRef, useCallback } from 'react';
-import { useClickOutside } from '../../../hooks/useClickOutside';
-import { MiniCalendar } from './MiniCalendar';
-import { formatDate } from '../../../lib/dates';
+import { useCallback, useRef, useState } from "react";
+import { useClickOutside } from "../../../hooks/useClickOutside";
+import { formatDate } from "../../../lib/dates";
+import { MiniCalendar } from "./MiniCalendar";
 
 interface InlineDatePickerProps {
   value: string | null;
@@ -11,12 +11,19 @@ interface InlineDatePickerProps {
 export function InlineDatePicker({ value, onSave }: InlineDatePickerProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  useClickOutside(ref, useCallback(() => setOpen(false), []), open);
+  useClickOutside(
+    ref,
+    useCallback(() => setOpen(false), []),
+    open,
+  );
 
   return (
     <div ref={ref} className="relative">
       <button
-        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen(!open);
+        }}
         className="text-[12px] text-muted font-light rounded px-1 -mx-1 cursor-pointer transition-colors"
       >
         {value ? formatDate(value) : <span className="text-dim">—</span>}
@@ -25,8 +32,18 @@ export function InlineDatePicker({ value, onSave }: InlineDatePickerProps) {
         <div className="absolute z-50 top-full right-0 mt-1 glass-panel">
           <MiniCalendar
             value={value}
-            onSelect={(iso) => { onSave(iso); setOpen(false); }}
-            onClear={value ? () => { onSave(null); setOpen(false); } : undefined}
+            onSelect={(iso) => {
+              onSave(iso);
+              setOpen(false);
+            }}
+            onClear={
+              value
+                ? () => {
+                    onSave(null);
+                    setOpen(false);
+                  }
+                : undefined
+            }
           />
         </div>
       )}

@@ -1,5 +1,5 @@
-import { formatHumanDuration } from '../../lib/dates';
-import type { ProductivitySummary } from '../../lib/types';
+import { formatHumanDuration } from "../../lib/dates";
+import type { ProductivitySummary } from "../../lib/types";
 
 interface WeeklyStatsProps {
   summaries: ProductivitySummary[];
@@ -11,17 +11,21 @@ export function WeeklyStats({ summaries }: WeeklyStatsProps) {
   const totalProductive = summaries.reduce((s, d) => s + d.productiveSecs, 0);
   const totalFocusSessions = summaries.reduce((s, d) => s + d.focusSessionsCount, 0);
   const scores = summaries.map((s) => s.productivityScore).filter((s): s is number => s != null);
-  const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+  const avgScore =
+    scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
   const qualities = summaries.map((s) => s.avgSessionQuality).filter((q): q is number => q != null);
-  const avgQuality = qualities.length > 0 ? Math.round(qualities.reduce((a, b) => a + b, 0) / qualities.length * 100) : 0;
+  const avgQuality =
+    qualities.length > 0
+      ? Math.round((qualities.reduce((a, b) => a + b, 0) / qualities.length) * 100)
+      : 0;
 
   const stats = [
-    { label: 'Avg Score', value: `${avgScore}/100` },
-    { label: 'Total Active', value: formatHumanDuration(totalActive) },
-    { label: 'Avg Daily', value: formatHumanDuration(Math.round(totalActive / days)) },
-    { label: 'Productive', value: formatHumanDuration(totalProductive) },
-    { label: 'Focus Sessions', value: `${totalFocusSessions}` },
-    { label: 'Avg Quality', value: `${avgQuality}%` },
+    { label: "Avg Score", value: `${avgScore}/100` },
+    { label: "Total Active", value: formatHumanDuration(totalActive) },
+    { label: "Avg Daily", value: formatHumanDuration(Math.round(totalActive / days)) },
+    { label: "Productive", value: formatHumanDuration(totalProductive) },
+    { label: "Focus Sessions", value: `${totalFocusSessions}` },
+    { label: "Avg Quality", value: `${avgQuality}%` },
   ];
 
   return (

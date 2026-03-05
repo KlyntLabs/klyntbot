@@ -1,19 +1,19 @@
-import { clsx, type ClassValue } from "clsx";
+import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
-import type { ApiError } from './types';
+import type { ApiError } from "./types";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+export const isTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
 /** Narrow an unknown catch value to a structured ApiError. */
 export function parseApiError(e: unknown): ApiError {
-  if (typeof e === 'object' && e !== null && 'code' in e && 'message' in e) {
+  if (typeof e === "object" && e !== null && "code" in e && "message" in e) {
     return e as ApiError;
   }
-  return { code: 'UNKNOWN_ERROR', message: String(e) };
+  return { code: "UNKNOWN_ERROR", message: String(e) };
 }
 
 /** Format a millisecond duration as a human-readable string (e.g. "123ms", "1.2s"). */

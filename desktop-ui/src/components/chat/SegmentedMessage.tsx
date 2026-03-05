@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react';
-import { ChevronRight, Check, X } from 'lucide-react';
-import { MarkdownContent } from './MarkdownContent';
-import { formatDuration, formatTokens, qualifiedToolName } from '../../lib/utils';
-import type { MessageSegment } from '../../lib/types';
+import { Check, ChevronRight, X } from "lucide-react";
+import { useMemo, useState } from "react";
+import type { MessageSegment } from "../../lib/types";
+import { formatDuration, formatTokens, qualifiedToolName } from "../../lib/utils";
+import { MarkdownContent } from "./MarkdownContent";
 
 interface SegmentedMessageProps {
   segments: MessageSegment[];
@@ -16,10 +16,10 @@ interface SegmentedMessageProps {
 
 // Rotate through accent colors for active tool spinners
 const TOOL_COLORS = [
-  { ring: 'border-brand/60', text: 'text-brand', dot: 'bg-brand' },         // orange
-  { ring: 'border-info/60', text: 'text-info', dot: 'bg-info' },             // blue
-  { ring: 'border-purple/60', text: 'text-purple', dot: 'bg-purple' },       // purple
-  { ring: 'border-success/60', text: 'text-success', dot: 'bg-success' },    // green
+  { ring: "border-brand/60", text: "text-brand", dot: "bg-brand" }, // orange
+  { ring: "border-info/60", text: "text-info", dot: "bg-info" }, // blue
+  { ring: "border-purple/60", text: "text-purple", dot: "bg-purple" }, // purple
+  { ring: "border-success/60", text: "text-success", dot: "bg-success" }, // green
 ] as const;
 
 function toolColor(name: string) {
@@ -31,7 +31,7 @@ function toolColor(name: string) {
 /** Try to pretty-print a JSON string; return as-is if not valid JSON. */
 function formatResult(raw: string): string {
   const trimmed = raw.trimStart();
-  if (trimmed[0] !== '{' && trimmed[0] !== '[') return raw;
+  if (trimmed[0] !== "{" && trimmed[0] !== "[") return raw;
   try {
     return JSON.stringify(JSON.parse(raw), null, 2);
   } catch {
@@ -39,28 +39,28 @@ function formatResult(raw: string): string {
   }
 }
 
-type ToolSegment = Extract<MessageSegment, { type: 'tool' }>;
+type ToolSegment = Extract<MessageSegment, { type: "tool" }>;
 
 function CompletedToolSegment({ segment, nested }: { segment: ToolSegment; nested?: boolean }) {
-  const isDelegate = segment.name === 'delegate';
+  const isDelegate = segment.name === "delegate";
   const [expanded, setExpanded] = useState(false);
   const qualifiedName = qualifiedToolName(segment.name, segment.action);
   const color = toolColor(qualifiedName);
   const formattedResult = useMemo(
-    () => (segment.result && !isDelegate) ? formatResult(segment.result) : null,
+    () => (segment.result && !isDelegate ? formatResult(segment.result) : null),
     [segment.result, isDelegate],
   );
   const canExpand = !isDelegate && (formattedResult || segment.estimatedTokens);
 
   return (
-    <div className={nested ? 'my-0.5' : 'my-1.5'}>
+    <div className={nested ? "my-0.5" : "my-1.5"}>
       <button
         onClick={() => canExpand && setExpanded(!expanded)}
-        className={`flex items-center gap-1.5 text-[11px] font-light transition-colors ${color.text} ${canExpand ? 'hover:opacity-80' : 'cursor-default'}`}
+        className={`flex items-center gap-1.5 text-[11px] font-light transition-colors ${color.text} ${canExpand ? "hover:opacity-80" : "cursor-default"}`}
       >
         {canExpand ? (
           <ChevronRight
-            className={`w-3 h-3 transition-transform ${expanded ? 'rotate-90' : ''}`}
+            className={`w-3 h-3 transition-transform ${expanded ? "rotate-90" : ""}`}
             strokeWidth={1.5}
           />
         ) : (
@@ -96,7 +96,7 @@ function CompletedToolSegment({ segment, nested }: { segment: ToolSegment; neste
 /** A completed delegate segment with its nested sub-agent tools. */
 function DelegateGroup({ delegate, children }: { delegate: ToolSegment; children: ToolSegment[] }) {
   const [expanded, setExpanded] = useState(false);
-  const color = toolColor('delegate');
+  const color = toolColor("delegate");
 
   return (
     <div className="my-1.5">
@@ -105,7 +105,7 @@ function DelegateGroup({ delegate, children }: { delegate: ToolSegment; children
         className={`flex items-center gap-1.5 text-[11px] font-light transition-colors ${color.text} hover:opacity-80`}
       >
         <ChevronRight
-          className={`w-3 h-3 transition-transform ${expanded ? 'rotate-90' : ''}`}
+          className={`w-3 h-3 transition-transform ${expanded ? "rotate-90" : ""}`}
           strokeWidth={1.5}
         />
         {delegate.success ? (
@@ -116,7 +116,9 @@ function DelegateGroup({ delegate, children }: { delegate: ToolSegment; children
         <span>delegate</span>
         <span className="text-dim">{formatDuration(delegate.durationMs)}</span>
         {children.length > 0 && (
-          <span className="text-dim">({children.length} tool{children.length !== 1 ? 's' : ''})</span>
+          <span className="text-dim">
+            ({children.length} tool{children.length !== 1 ? "s" : ""})
+          </span>
         )}
       </button>
       {expanded && (
@@ -134,8 +136,12 @@ export function ActiveToolIndicator({ name, nested }: { name: string; nested?: b
   const color = toolColor(name);
 
   return (
-    <div className={`${nested ? 'my-0.5' : 'my-1.5'} flex items-center gap-1.5 text-[11px] font-light`}>
-      <div className={`w-3 h-3 rounded-full border-[1.5px] ${color.ring} border-t-transparent animate-spin`} />
+    <div
+      className={`${nested ? "my-0.5" : "my-1.5"} flex items-center gap-1.5 text-[11px] font-light`}
+    >
+      <div
+        className={`w-3 h-3 rounded-full border-[1.5px] ${color.ring} border-t-transparent animate-spin`}
+      />
       <span className={color.text}>{name}</span>
       <span className="text-dim">&hellip;</span>
     </div>
@@ -147,9 +153,9 @@ export function ActiveToolIndicator({ name, nested }: { name: string; nested?: b
  * BEFORE a `delegate` segment are grouped as children of that delegate.
  */
 type RenderItem =
-  | { kind: 'text'; index: number; segment: Extract<MessageSegment, { type: 'text' }> }
-  | { kind: 'tool'; index: number; segment: ToolSegment }
-  | { kind: 'delegate-group'; index: number; delegate: ToolSegment; children: ToolSegment[] };
+  | { kind: "text"; index: number; segment: Extract<MessageSegment, { type: "text" }> }
+  | { kind: "tool"; index: number; segment: ToolSegment }
+  | { kind: "delegate-group"; index: number; delegate: ToolSegment; children: ToolSegment[] };
 
 function groupSegments(segments: MessageSegment[]): RenderItem[] {
   const items: RenderItem[] = [];
@@ -158,16 +164,16 @@ function groupSegments(segments: MessageSegment[]): RenderItem[] {
 
   for (let i = 0; i < segments.length; i++) {
     const seg = segments[i];
-    if (seg.type === 'text') {
+    if (seg.type === "text") {
       // Flush any pending sub-tools as standalone (no delegate followed them)
       for (const t of pendingSubTools) {
-        items.push({ kind: 'tool', index: i, segment: t });
+        items.push({ kind: "tool", index: i, segment: t });
       }
       pendingSubTools = [];
-      items.push({ kind: 'text', index: i, segment: seg });
-    } else if (seg.name === 'delegate') {
+      items.push({ kind: "text", index: i, segment: seg });
+    } else if (seg.name === "delegate") {
       // This delegate owns the preceding agent-tagged tools
-      items.push({ kind: 'delegate-group', index: i, delegate: seg, children: pendingSubTools });
+      items.push({ kind: "delegate-group", index: i, delegate: seg, children: pendingSubTools });
       pendingSubTools = [];
     } else if (seg.agent) {
       // Sub-agent tool — hold it pending for the next delegate
@@ -175,29 +181,32 @@ function groupSegments(segments: MessageSegment[]): RenderItem[] {
     } else {
       // Flush pending sub-tools, then add this regular tool
       for (const t of pendingSubTools) {
-        items.push({ kind: 'tool', index: i, segment: t });
+        items.push({ kind: "tool", index: i, segment: t });
       }
       pendingSubTools = [];
-      items.push({ kind: 'tool', index: i, segment: seg });
+      items.push({ kind: "tool", index: i, segment: seg });
     }
   }
   // Trailing sub-tools (no delegate segment yet): flush as standalone items.
   // During streaming with an active delegate, the caller extracts these for nested display.
   for (const t of pendingSubTools) {
-    items.push({ kind: 'tool', index: segments.length, segment: t });
+    items.push({ kind: "tool", index: segments.length, segment: t });
   }
   return items;
 }
 
-export function SegmentedMessage({ segments, activeTools, isStreaming, activeDelegateAgent }: SegmentedMessageProps) {
-  const lastIsText = segments.length > 0 && segments[segments.length - 1].type === 'text';
+export function SegmentedMessage({
+  segments,
+  activeTools,
+  isStreaming,
+  activeDelegateAgent,
+}: SegmentedMessageProps) {
+  const lastIsText = segments.length > 0 && segments[segments.length - 1].type === "text";
   const renderItems = useMemo(() => groupSegments(segments), [segments]);
 
   // During streaming, detect if delegate is the active parent tool
-  const isDelegateActive = activeTools?.includes('delegate') && !!activeDelegateAgent;
-  const subAgentActiveTools = isDelegateActive
-    ? activeTools!.filter((t) => t !== 'delegate')
-    : [];
+  const isDelegateActive = activeTools?.includes("delegate") && !!activeDelegateAgent;
+  const subAgentActiveTools = isDelegateActive ? activeTools?.filter((t) => t !== "delegate") : [];
 
   // During streaming with delegate active, completed sub-agent tool segments
   // (trailing items with agent set) should be shown nested under the delegate spinner
@@ -210,7 +219,7 @@ export function SegmentedMessage({ segments, activeTools, isStreaming, activeDel
     let foundNonSub = false;
     for (let i = renderItems.length - 1; i >= 0; i--) {
       const item = renderItems[i];
-      if (!foundNonSub && item.kind === 'tool' && item.segment.agent) {
+      if (!foundNonSub && item.kind === "tool" && item.segment.agent) {
         trailingSubTools.unshift(item.segment);
       } else {
         foundNonSub = true;
@@ -222,15 +231,18 @@ export function SegmentedMessage({ segments, activeTools, isStreaming, activeDel
   return (
     <div>
       {filteredItems.map((item) => {
-        if (item.kind === 'text') {
+        if (item.kind === "text") {
           const isLastText = item.index === segments.length - 1;
           return (
-            <div key={`text-${item.index}`} className={isStreaming && isLastText ? 'streaming-cursor' : ''}>
+            <div
+              key={`text-${item.index}`}
+              className={isStreaming && isLastText ? "streaming-cursor" : ""}
+            >
               <MarkdownContent content={item.segment.content} />
             </div>
           );
         }
-        if (item.kind === 'delegate-group') {
+        if (item.kind === "delegate-group") {
           return (
             <DelegateGroup
               key={`delegate-${item.index}`}
@@ -239,13 +251,18 @@ export function SegmentedMessage({ segments, activeTools, isStreaming, activeDel
             />
           );
         }
-        return <CompletedToolSegment key={`tool-${item.index}-${item.segment.name}`} segment={item.segment} />;
+        return (
+          <CompletedToolSegment
+            key={`tool-${item.index}-${item.segment.name}`}
+            segment={item.segment}
+          />
+        );
       })}
 
       {/* Active tool spinners — normal case (no delegate) */}
-      {activeTools && !isDelegateActive && activeTools.map((name) => (
-        <ActiveToolIndicator key={name} name={name} />
-      ))}
+      {activeTools &&
+        !isDelegateActive &&
+        activeTools.map((name) => <ActiveToolIndicator key={name} name={name} />)}
 
       {/* Delegate active: show delegate spinner with completed + active sub-agent tools nested */}
       {isDelegateActive && (
