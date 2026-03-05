@@ -33,6 +33,9 @@ const ORCHESTRATOR_AGENT: &str = "general";
 
 const CLARIFICATION_MODE: &str = "clarification";
 
+/// Tools allowed for the orchestrator (in addition to `delegate`, which is injected separately).
+const ORCHESTRATOR_ALLOWED_TOOLS: &[&str] = &[tools::ask_user::ASK_USER_TOOL_NAME, "memory"];
+
 /// Result of processing a message through the agent runtime.
 /// Same structure as `PipelineResult` for compatibility during migration.
 #[derive(Debug)]
@@ -215,6 +218,7 @@ impl AgentRuntime {
                     .send(AgentEvent::SkillLoaded {
                         name: skill.name.clone(),
                         trigger,
+                        agent: Some(profile.name.clone()),
                     })
                     .await;
             }
@@ -262,12 +266,23 @@ impl AgentRuntime {
                     *guard = Some(Arc::clone(profile));
                 }
 
+                // Emit updated agent selection so the UI reflects the orchestrator
+                if let Some(ref tx) = event_tx {
+                    let _ = tx
+                        .send(AgentEvent::AgentSelected {
+                            name: profile.name.clone(),
+                            description: profile.description.clone(),
+                        })
+                        .await;
+                }
+
                 // Increase iteration budget for orchestration (multiple delegations)
                 if let crate::intent_pipeline::types::ExecutionMode::Reactive {
                     ref mut max_iterations,
                 } = analysis.mode
                 {
-                    *max_iterations = (*max_iterations).max(15);
+                    *max_iterations = (*max_iterations)
+                        .max(crate::intent_pipeline::analysis::ORCHESTRATION_MIN_ITERATIONS);
                 }
             }
         }
@@ -346,7 +361,20 @@ impl AgentRuntime {
         }
 
         // Step 7: Filter tools based on agent profile (replaces ToolGroup filtering)
-        let mut filtered_tools = filter_tools_for_profile(tool_definitions, profile);
+        // When orchestrating, restrict to coordination-only tools (delegate is added in 7b).
+        let mut filtered_tools = if analysis.needs_orchestration {
+            tool_definitions
+                .iter()
+                .filter(|t| {
+                    tool_def_name(t)
+                        .map(|n| ORCHESTRATOR_ALLOWED_TOOLS.contains(&n))
+                        .unwrap_or(false)
+                })
+                .cloned()
+                .collect()
+        } else {
+            filter_tools_for_profile(tool_definitions, profile)
+        };
 
         // Step 7b: Add DelegationTool if agent can delegate and depth allows
         inject_delegation_tool(
@@ -612,6 +640,61 @@ impl AgentRuntime {
     }
 }
 
+/// Create a filtered event sender for delegation.
+///
+/// Spawns a tokio task that reads from a new channel, suppresses sub-agent
+/// reasoning (ContentChunk, IterationStart), and forwards tool/skill events
+/// with agent attribution injected.
+fn delegation_event_filter(
+    parent_tx: tokio::sync::mpsc::Sender<AgentEvent>,
+    agent_name: String,
+) -> tokio::sync::mpsc::Sender<AgentEvent> {
+    let (filtered_tx, mut filtered_rx) = tokio::sync::mpsc::channel::<AgentEvent>(64);
+
+    tokio::spawn(async move {
+        while let Some(event) = filtered_rx.recv().await {
+            let forwarded = match event {
+                // Suppress sub-agent reasoning from reaching the parent stream
+                AgentEvent::ContentChunk { .. } | AgentEvent::IterationStart { .. } => continue,
+
+                // Forward tool events with agent attribution
+                AgentEvent::ToolStart { name, args, .. } => AgentEvent::ToolStart {
+                    name,
+                    args,
+                    agent: Some(agent_name.clone()),
+                },
+                AgentEvent::ToolEnd {
+                    name,
+                    success,
+                    duration_ms,
+                    result,
+                    ..
+                } => AgentEvent::ToolEnd {
+                    name,
+                    success,
+                    duration_ms,
+                    result,
+                    agent: Some(agent_name.clone()),
+                },
+                AgentEvent::SkillLoaded { name, trigger, .. } => AgentEvent::SkillLoaded {
+                    name,
+                    trigger,
+                    agent: Some(agent_name.clone()),
+                },
+
+                // Pass through all other events unchanged
+                other => other,
+            };
+
+            if parent_tx.send(forwarded).await.is_err() {
+                break;
+            }
+        }
+    });
+
+    filtered_tx
+}
+
 /// Filter tool definitions to only those allowed by the agent profile.
 /// MCP tools (prefixed `mcp_`) bypass agent filtering.
 fn filter_tools_for_profile(
@@ -694,7 +777,7 @@ impl tools::DelegationHandler for AgentRuntime {
             caller_name, agent_name, query, depth
         );
 
-        // Emit DelegationStarted event
+        // Emit DelegationStarted event and sub-agent skills
         if let Some(tx) = self.current_event_tx.read().await.as_ref() {
             let _ = tx
                 .send(AgentEvent::DelegationStarted {
@@ -704,6 +787,22 @@ impl tools::DelegationHandler for AgentRuntime {
                     depth,
                 })
                 .await;
+
+            // Emit SkillLoaded for the delegated agent's skills
+            for skill in &profile.skills {
+                let trigger = if profile.is_always_loaded(skill) {
+                    "always".to_string()
+                } else {
+                    "on-demand".to_string()
+                };
+                let _ = tx
+                    .send(AgentEvent::SkillLoaded {
+                        name: skill.name.clone(),
+                        trigger,
+                        agent: Some(agent_name.to_string()),
+                    })
+                    .await;
+            }
         }
 
         // 2. Set the delegated agent as active profile (for AgentContextSource)
@@ -760,6 +859,13 @@ impl tools::DelegationHandler for AgentRuntime {
         let mut delegated_ctx = ctx.clone();
         delegated_ctx.delegation_depth = depth + 1;
 
+        // Use a filtered event sender that suppresses sub-agent reasoning
+        // and injects agent attribution into tool/skill events.
+        let delegation_tx = {
+            let parent_tx = self.current_event_tx.read().await.clone();
+            parent_tx.map(|tx| delegation_event_filter(tx, agent_name.to_string()))
+        };
+
         let result = self
             .router
             .execute(
@@ -768,7 +874,7 @@ impl tools::DelegationHandler for AgentRuntime {
                 &filtered_tools,
                 &params,
                 &delegated_ctx,
-                self.current_event_tx.read().await.clone(),
+                delegation_tx,
             )
             .await;
 

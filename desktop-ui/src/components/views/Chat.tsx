@@ -441,6 +441,7 @@ export function Chat() {
                   }}
                   showTransparency={showTransparency}
                   liveTransparency={chat.transparency}
+                  activeDelegateAgent={chat.activeDelegateAgent}
                 />
               )}
             </div>

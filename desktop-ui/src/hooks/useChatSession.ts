@@ -13,6 +13,7 @@ interface ChatSession {
   activeTools: string[];
   error: string | null;
   activeInteraction: ActiveInteraction | null;
+  activeDelegateAgent: string | null;
   input: string;
   setInput: (value: string) => void;
   send: (extraPayload?: Record<string, unknown>) => Promise<void>;
@@ -92,6 +93,7 @@ export function useChatSession(sessionKey: string, onDone?: () => void): ChatSes
     activeTools: stream.activeTools,
     error: stream.error,
     activeInteraction: stream.activeInteraction,
+    activeDelegateAgent: stream.activeDelegateAgent,
     input,
     setInput,
     send,

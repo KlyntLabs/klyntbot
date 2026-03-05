@@ -69,7 +69,7 @@ export interface CalendarEvent {
 
 export type MessageSegment =
   | { type: 'text'; content: string }
-  | { type: 'tool'; name: string; action?: string; success: boolean; durationMs: number; result?: string; estimatedTokens?: number };
+  | { type: 'tool'; name: string; action?: string; success: boolean; durationMs: number; result?: string; estimatedTokens?: number; agent?: string };
 
 export interface ChatMessage {
   id: string;
@@ -112,6 +112,7 @@ export interface ToolStartPayload {
   sessionKey: string;
   name: string;
   action?: string;
+  agent?: string;
 }
 
 export interface ToolEndPayload {
@@ -122,6 +123,7 @@ export interface ToolEndPayload {
   durationMs: number;
   result?: string;
   estimatedTokens?: number;
+  agent?: string;
 }
 
 export interface AgentDonePayload {
@@ -177,6 +179,7 @@ export interface SkillLoadedPayload {
   sessionKey: string;
   name: string;
   trigger: string;
+  agent?: string;
 }
 
 export interface LearningEventPayload {
@@ -197,21 +200,49 @@ export interface AgentSelectedPayload {
   description: string;
 }
 
+// ── Delegation Events ────────────────────────────────────────────────
+
+export interface DelegationStartedPayload {
+  sessionKey: string;
+  fromAgent: string;
+  toAgent: string;
+  query: string;
+  depth: number;
+}
+
+export interface DelegationCompletedPayload {
+  sessionKey: string;
+  fromAgent: string;
+  toAgent: string;
+  success: boolean;
+  durationMs: number;
+}
+
+export interface DelegationInfo {
+  fromAgent: string;
+  toAgent: string;
+  query: string;
+  depth: number;
+  status: 'active' | 'completed' | 'failed';
+  durationMs?: number;
+}
+
 // ── Transparency Data (per-message) ───────────────────────────────────
 
 export interface TransparencyData {
   usage?: { promptTokens: number; completionTokens: number; cacheReadTokens: number; cacheWriteTokens: number };
   cost?: { estimatedUsd: number; model: string };
   timing?: { totalMs: number; classificationMs?: number; contextAssemblyMs?: number };
-  tools?: { name: string; action?: string; success: boolean; durationMs: number; estimatedTokens?: number }[];
+  tools?: { name: string; action?: string; success: boolean; durationMs: number; estimatedTokens?: number; agent?: string }[];
   toolTokensTotal?: number;
   memoryAccesses?: { action: string; query?: string; resultsCount: number }[];
-  skills?: { name: string; trigger: string }[];
+  skills?: { name: string; trigger: string; agent?: string }[];
   execution?: { engine: string; iterations: number; maxIterations: number; escalations: number };
   classification?: { strategy: string; confidence: number; source: string };
   agentSelected?: { name: string; description: string };
   subagents?: { label: string; profile: string }[];
   learning?: { eventType: string; detail: string }[];
+  delegations?: DelegationInfo[];
 }
 
 // ── Interaction (ask_user) ─────────────────────────────────────────────

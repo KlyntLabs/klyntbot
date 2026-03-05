@@ -121,6 +121,7 @@ export function SidebarChat({ isOpen, onClose, viewContext, openSessionKey, onSe
             onInteractionSubmitted={() => chat.clearInteraction()}
             showTransparency={false}
             liveTransparency={null}
+            activeDelegateAgent={chat.activeDelegateAgent}
           />
         )}
       </div>

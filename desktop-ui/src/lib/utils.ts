@@ -39,3 +39,13 @@ export function formatCost(usd: number): string {
 export function qualifiedToolName(name: string, action?: string): string {
   return action ? `${name}:${action}` : name;
 }
+
+/** Group an array by a key function, preserving insertion order. */
+export function groupBy<T>(items: T[], keyFn: (item: T) => string): Record<string, T[]> {
+  const result: Record<string, T[]> = {};
+  for (const item of items) {
+    const key = keyFn(item);
+    (result[key] ??= []).push(item);
+  }
+  return result;
+}

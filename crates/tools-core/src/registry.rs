@@ -96,9 +96,28 @@ impl ToolRegistry {
 
     /// Execute a tool by name with given parameters and routing context
     pub async fn execute(&self, name: &str, params: Value, ctx: &RoutingContext) -> Result<String> {
+        let tool = self.prepare(name, &params, ctx)?;
+
+        match tool.execute(params, ctx).await {
+            Ok(result) => Ok(result),
+            Err(e) => {
+                warn!("Tool {} execution failed: {}", name, e);
+                Err(e)
+            }
+        }
+    }
+
+    /// Look up a tool, check permissions, and validate params — without executing.
+    ///
+    /// Returns the tool as a cloned `DynTool` (Arc) so the caller can drop the
+    /// registry borrow before calling `tool.execute()`. This prevents deadlocks
+    /// when a tool (e.g., `delegate`) needs write access to the same registry
+    /// during execution.
+    pub fn prepare(&self, name: &str, params: &Value, ctx: &RoutingContext) -> Result<DynTool> {
         let tool = self
             .tools
             .get(name)
+            .cloned()
             .ok_or_else(|| ToolError::NotFound(name.to_string()))?;
 
         // Check permissions if configured
@@ -115,19 +134,12 @@ impl ToolRegistry {
         }
 
         // Validate parameters
-        let errors = tool.validate_params(&params);
+        let errors = tool.validate_params(params);
         if !errors.is_empty() {
             return Err(ToolError::InvalidParams(errors.join("; ")).into());
         }
 
-        // Execute the tool
-        match tool.execute(params, ctx).await {
-            Ok(result) => Ok(result),
-            Err(e) => {
-                warn!("Tool {} execution failed: {}", name, e);
-                Err(e)
-            }
-        }
+        Ok(tool)
     }
 
     /// Get list of registered tool names

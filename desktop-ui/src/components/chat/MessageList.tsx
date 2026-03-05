@@ -17,6 +17,7 @@ interface MessageListProps {
   onInteractionSubmitted: () => void;
   showTransparency: boolean;
   liveTransparency: TransparencyData | null;
+  activeDelegateAgent?: string | null;
 }
 
 export function MessageList({
@@ -30,6 +31,7 @@ export function MessageList({
   onInteractionSubmitted,
   showTransparency,
   liveTransparency,
+  activeDelegateAgent,
 }: MessageListProps) {
   const endRef = useRef<HTMLDivElement>(null);
 
@@ -75,6 +77,7 @@ export function MessageList({
               segments={segments}
               activeTools={activeTools}
               isStreaming={isStreaming}
+              activeDelegateAgent={activeDelegateAgent}
             />
             {showTransparency && liveTransparency && (
               <TokenBadge transparency={liveTransparency} isStreaming={isStreaming} />

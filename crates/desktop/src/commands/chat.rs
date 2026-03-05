@@ -261,7 +261,7 @@ pub async fn chat_send(
                                 },
                             );
                         }
-                        AgentEvent::ToolStart { name, args } => {
+                        AgentEvent::ToolStart { name, args, agent } => {
                             flush_text(&mut current_text, &mut segments);
                             tool_names.push(name.clone());
                             let action = args.get("action").and_then(|v| v.as_str()).map(String::from);
@@ -274,10 +274,11 @@ pub async fn chat_send(
                                     session_key: sk.clone(),
                                     name,
                                     action,
+                                    agent,
                                 },
                             );
                         }
-                        AgentEvent::ToolEnd { name, success, duration_ms, result } => {
+                        AgentEvent::ToolEnd { name, success, duration_ms, result, agent } => {
                             // Pop the stashed action from ToolStart (FIFO per tool name)
                             let action = match pending_actions.entry(name.clone()) {
                                 std::collections::hash_map::Entry::Occupied(mut e) => {
@@ -297,6 +298,7 @@ pub async fn chat_send(
                                 duration_ms,
                                 result: result.clone(),
                                 estimated_tokens,
+                                agent: agent.clone(),
                             });
                             transparency.tools.push(desktop_shared::events::TransparencyTool {
                                 name: name.clone(),
@@ -304,6 +306,7 @@ pub async fn chat_send(
                                 success,
                                 duration_ms,
                                 estimated_tokens,
+                                agent: agent.clone(),
                             });
                             // Emit entity:updated so the UI refreshes affected lists
                             // (e.g. tasks page updates after a status change via chat).
@@ -323,6 +326,7 @@ pub async fn chat_send(
                                     duration_ms,
                                     result,
                                     estimated_tokens,
+                                    agent,
                                 },
                             );
                         }
@@ -499,10 +503,11 @@ pub async fn chat_send(
                                 },
                             );
                         }
-                        AgentEvent::SkillLoaded { name, trigger } => {
+                        AgentEvent::SkillLoaded { name, trigger, agent } => {
                             transparency.skills.push(desktop_shared::events::TransparencySkill {
                                 name: name.clone(),
                                 trigger: trigger.clone(),
+                                agent: agent.clone(),
                             });
                             let _ = app.emit(
                                 events::AGENT_SKILL_LOADED,
@@ -510,6 +515,7 @@ pub async fn chat_send(
                                     session_key: sk.clone(),
                                     name,
                                     trigger,
+                                    agent,
                                 },
                             );
                         }
@@ -556,6 +562,14 @@ pub async fn chat_send(
                             );
                         }
                         AgentEvent::DelegationStarted { from_agent, to_agent, query, depth } => {
+                            transparency.delegations.push(desktop_shared::events::TransparencyDelegation {
+                                from_agent: from_agent.clone(),
+                                to_agent: to_agent.clone(),
+                                query: query.clone(),
+                                depth,
+                                status: "active".to_string(),
+                                duration_ms: None,
+                            });
                             let _ = app.emit(
                                 events::AGENT_DELEGATION_STARTED,
                                 events::DelegationStartedPayload {
@@ -568,6 +582,11 @@ pub async fn chat_send(
                             );
                         }
                         AgentEvent::DelegationCompleted { from_agent, to_agent, success, duration_ms } => {
+                            // Update the matching delegation entry
+                            if let Some(d) = transparency.delegations.iter_mut().find(|d| d.to_agent == to_agent && d.status == "active") {
+                                d.status = if success { "completed".to_string() } else { "failed".to_string() };
+                                d.duration_ms = Some(duration_ms);
+                            }
                             let _ = app.emit(
                                 events::AGENT_DELEGATION_COMPLETED,
                                 events::DelegationCompletedPayload {

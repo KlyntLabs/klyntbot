@@ -20,6 +20,8 @@ import type {
   LearningEventPayload,
   SubagentSpawnedPayload,
   AgentSelectedPayload,
+  DelegationStartedPayload,
+  DelegationCompletedPayload,
 } from '../lib/types';
 
 interface AgentStream {
@@ -39,6 +41,8 @@ interface AgentStream {
   clearSegments: () => void;
   /** Clear accumulated transparency data. */
   clearTransparency: () => void;
+  /** The agent currently being delegated to (between delegation_started and delegation_completed). */
+  activeDelegateAgent: string | null;
 }
 
 /**
@@ -54,6 +58,7 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
   const [error, setError] = useState<string | null>(null);
   const [activeInteraction, setActiveInteraction] = useState<ActiveInteraction | null>(null);
   const [transparency, setTransparency] = useState<TransparencyData | null>(null);
+  const [activeDelegateAgent, setActiveDelegateAgent] = useState<string | null>(null);
 
   const onDoneRef = useRef(onDone);
   onDoneRef.current = onDone;
@@ -96,6 +101,7 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
     setError(null);
     setActiveInteraction(null);
     setTransparency(null);
+    setActiveDelegateAgent(null);
   }, [cancelRaf]);
 
   // Reset when session changes
@@ -163,6 +169,7 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
         durationMs: payload.durationMs,
         result: payload.result,
         estimatedTokens: payload.estimatedTokens,
+        agent: payload.agent,
       },
     ]);
     setTransparency((prev) => ({
@@ -175,6 +182,7 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
           success: payload.success,
           durationMs: payload.durationMs,
           estimatedTokens: payload.estimatedTokens,
+          agent: payload.agent,
         },
       ],
     }));
@@ -254,7 +262,7 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
     if (!isOurSession(payload)) return;
     setTransparency((prev) => ({
       ...prev,
-      skills: [...(prev?.skills ?? []), { name: payload.name, trigger: payload.trigger }],
+      skills: [...(prev?.skills ?? []), { name: payload.name, trigger: payload.trigger, agent: payload.agent }],
     }));
   });
 
@@ -282,6 +290,31 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
     }));
   });
 
+  useEvent<DelegationStartedPayload>('agent:delegation_started', (payload) => {
+    if (!isOurSession(payload)) return;
+    setActiveDelegateAgent(payload.toAgent);
+    setTransparency((prev) => ({
+      ...prev,
+      delegations: [
+        ...(prev?.delegations ?? []),
+        { fromAgent: payload.fromAgent, toAgent: payload.toAgent, query: payload.query, depth: payload.depth, status: 'active' },
+      ],
+    }));
+  });
+
+  useEvent<DelegationCompletedPayload>('agent:delegation_completed', (payload) => {
+    if (!isOurSession(payload)) return;
+    setActiveDelegateAgent(null);
+    setTransparency((prev) => ({
+      ...prev,
+      delegations: (prev?.delegations ?? []).map((d) =>
+        d.toAgent === payload.toAgent && d.status === 'active'
+          ? { ...d, status: payload.success ? 'completed' as const : 'failed' as const, durationMs: payload.durationMs }
+          : d,
+      ),
+    }));
+  });
+
   const clearInteraction = useCallback(() => setActiveInteraction(null), []);
   const clearSegments = useCallback(() => {
     streamTextRef.current = '';
@@ -294,5 +327,5 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
   // Cleanup rAF on unmount
   useEffect(() => cancelRaf, [cancelRaf]);
 
-  return { segments, isStreaming, activeTools, error, activeInteraction, transparency, startStreaming, failStreaming, clearInteraction, clearSegments, clearTransparency };
+  return { segments, isStreaming, activeTools, error, activeInteraction, transparency, activeDelegateAgent, startStreaming, failStreaming, clearInteraction, clearSegments, clearTransparency };
 }

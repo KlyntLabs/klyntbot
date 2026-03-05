@@ -16,6 +16,9 @@ pub enum AgentEvent {
     ToolStart {
         name: String,
         args: serde_json::Value,
+        /// Which agent initiated this tool (set during delegation).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        agent: Option<String>,
     },
 
     /// A tool execution has completed.
@@ -26,6 +29,9 @@ pub enum AgentEvent {
         duration_ms: u64,
         /// Truncated result of the tool execution (max 2KB).
         result: Option<String>,
+        /// Which agent initiated this tool (set during delegation).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        agent: Option<String>,
     },
 
     /// A new agent iteration has started.
@@ -94,7 +100,13 @@ pub enum AgentEvent {
     },
 
     /// A skill was loaded into the system prompt.
-    SkillLoaded { name: String, trigger: String },
+    SkillLoaded {
+        name: String,
+        trigger: String,
+        /// Which agent this skill belongs to (set during delegation).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        agent: Option<String>,
+    },
 
     /// A learning event occurred (threshold adjustment, pattern detection).
     LearningEvent {

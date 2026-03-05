@@ -17,6 +17,13 @@ use tracing::{debug, warn};
 
 use super::types::{AnalysisSource, ComplexitySignals, ExecutionMode, FailureRisk, IntentAnalysis};
 
+/// Minimum iteration budget for orchestration and MCP-tool overrides.
+pub const ORCHESTRATION_MIN_ITERATIONS: u32 = 15;
+
+/// Confidence floor applied when multi-agent triggers are detected post-classification.
+/// Distinct from `heuristic_confidence_threshold` (which governs LLM classifier bypass).
+const ORCHESTRATION_MIN_CONFIDENCE: f32 = 0.75;
+
 // ===========================================================================
 // Heuristic classification
 // ===========================================================================
@@ -652,8 +659,27 @@ impl IntentAnalyzer {
         {
             debug!("Overriding Direct → Reactive: message references MCP tools");
             analysis.mode = ExecutionMode::Reactive {
-                max_iterations: compute_iteration_budget(&analysis.signals).max(15),
+                max_iterations: compute_iteration_budget(&analysis.signals).max(ORCHESTRATION_MIN_ITERATIONS),
             };
+        }
+
+        // Post-classification: multi-agent trigger detection is deterministic.
+        // If 2+ agent domains are present, force orchestration regardless of
+        // whether the LLM succeeded or fell back. Also boost confidence so the
+        // confidence gate in AgentRuntime doesn't short-circuit to clarification.
+        if !analysis.needs_orchestration {
+            let msg_lower = message.trim().to_lowercase();
+            if has_multi_agent_triggers(&msg_lower) {
+                debug!("Post-classification: forcing needs_orchestration from multi-agent triggers");
+                analysis.needs_orchestration = true;
+                analysis.confidence = analysis.confidence.max(ORCHESTRATION_MIN_CONFIDENCE);
+                // Ensure Reactive mode with enough budget for orchestration
+                if matches!(analysis.mode, ExecutionMode::Direct) {
+                    analysis.mode = ExecutionMode::Reactive {
+                        max_iterations: compute_iteration_budget(&analysis.signals).max(ORCHESTRATION_MIN_ITERATIONS),
+                    };
+                }
+            }
         }
 
         analysis

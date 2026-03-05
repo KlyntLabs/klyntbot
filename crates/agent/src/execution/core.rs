@@ -469,15 +469,23 @@ impl ExecutionCore {
                                 .send(crate::events::AgentEvent::ToolStart {
                                     name: name.clone(),
                                     args: args.clone(),
+                                    agent: None,
                                 })
                                 .await;
                         }
 
                         let start = Instant::now();
                         let args_snapshot = args.clone();
+                        // Look up the tool and release the read lock BEFORE executing.
+                        // This prevents deadlocks when a tool (e.g., delegate) needs
+                        // write access to the registry during execution.
                         let exec_result = tokio::time::timeout(timeout_dur, async {
-                            let reg = registry.read().await;
-                            reg.execute(&name, args, &ctx).await
+                            let tool = {
+                                let reg = registry.read().await;
+                                reg.prepare(&name, &args, &ctx)?
+                            };
+                            // Read lock is dropped — safe for tools that re-enter the registry
+                            tool.execute(args, &ctx).await
                         })
                         .await;
                         let duration_ms = start.elapsed().as_millis() as u64;
@@ -511,6 +519,7 @@ impl ExecutionCore {
                                     success,
                                     duration_ms,
                                     result: truncated,
+                                    agent: None,
                                 })
                                 .await;
                         }

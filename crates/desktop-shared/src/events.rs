@@ -22,6 +22,8 @@ pub enum MessageSegment {
         result: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         estimated_tokens: Option<u32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        agent: Option<String>,
     },
 }
 
@@ -98,6 +100,8 @@ pub struct ToolStartPayload {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub action: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -113,6 +117,8 @@ pub struct ToolEndPayload {
     pub result: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub estimated_tokens: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -207,6 +213,8 @@ pub struct SkillLoadedPayload {
     pub session_key: String,
     pub name: String,
     pub trigger: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -282,6 +290,8 @@ pub struct TransparencyData {
     pub subagents: Vec<TransparencySubagent>,
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub learning: Vec<TransparencyLearning>,
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub delegations: Vec<TransparencyDelegation>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -318,6 +328,8 @@ pub struct TransparencyTool {
     pub duration_ms: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub estimated_tokens: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -333,6 +345,8 @@ pub struct TransparencyMemoryAccess {
 pub struct TransparencySkill {
     pub name: String,
     pub trigger: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -371,4 +385,16 @@ pub struct TransparencySubagent {
 pub struct TransparencyLearning {
     pub event_type: String,
     pub detail: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TransparencyDelegation {
+    pub from_agent: String,
+    pub to_agent: String,
+    pub query: String,
+    pub depth: u32,
+    pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub duration_ms: Option<u64>,
 }

@@ -90,11 +90,17 @@ impl Tool for DelegationTool {
     }
 
     fn description(&self) -> &str {
-        "Delegate a query to a specialist agent. Use when you need another agent's expertise."
+        "Delegate a query to a specialist agent. You MUST use this tool for any domain-specific work (tasks, finance, calendar, etc.). Each specialist has the tools needed for their domain."
     }
 
     fn permission_level(&self) -> PermissionLevel {
         PermissionLevel::Standard
+    }
+
+    /// Delegation runs a full sub-agent loop (multiple LLM calls + tool calls),
+    /// so it needs a much longer timeout than the default 30s tool timeout.
+    fn custom_timeout(&self) -> Option<std::time::Duration> {
+        Some(std::time::Duration::from_secs(120))
     }
 
     fn parameters(&self) -> Value {
