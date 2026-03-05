@@ -1,5 +1,6 @@
 import { Pin, Send, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useAutoResizeTextarea } from "../../hooks/useAutoResizeTextarea";
 import { useChatSession } from "../../hooks/useChatSession";
 import { useMutation } from "../../hooks/useMutation";
 import { usePageContext } from "../../hooks/usePageContext";
@@ -95,6 +96,7 @@ export function SidebarChat({
             <button
               type="button"
               onClick={handlePin}
+              aria-label="Pin to Chat threads"
               title="Pin to Chat threads"
               className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:text-secondary hover:bg-surface-base transition-colors"
             >
@@ -104,6 +106,7 @@ export function SidebarChat({
           <button
             type="button"
             onClick={onClose}
+            aria-label="Close chat"
             className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:text-secondary hover:bg-surface-base transition-colors"
           >
             <X className="w-4 h-4" strokeWidth={1.5} />
@@ -139,27 +142,58 @@ export function SidebarChat({
       </div>
 
       {/* Input */}
-      <div className="p-4 border-t border-border">
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={chat.input}
-            onChange={(e) => chat.setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleSend();
-            }}
-            placeholder="Ask about this page..."
-            className="flex-1 bg-surface-base rounded-xl px-4 py-2.5 text-[13px] text-primary placeholder:text-muted focus:outline-none focus:bg-surface-raised font-light"
-          />
-          <button
-            type="button"
-            onClick={handleSend}
-            disabled={!chat.input.trim() || chat.isStreaming}
-            className="w-10 h-10 rounded-xl bg-brand hover:bg-brand/90 disabled:bg-surface-base disabled:text-muted flex items-center justify-center transition-colors"
-          >
-            <Send className="w-4 h-4" strokeWidth={2} />
-          </button>
-        </div>
+      <SidebarChatInput
+        input={chat.input}
+        isStreaming={chat.isStreaming}
+        onInputChange={chat.setInput}
+        onSend={handleSend}
+      />
+    </div>
+  );
+}
+
+function SidebarChatInput({
+  input,
+  isStreaming,
+  onInputChange,
+  onSend,
+}: {
+  input: string;
+  isStreaming: boolean;
+  onInputChange: (value: string) => void;
+  onSend: () => void;
+}) {
+  const { ref: textareaRef, handleInput } = useAutoResizeTextarea(input);
+
+  return (
+    <div className="p-4 border-t border-border">
+      <div className="flex gap-2 items-end">
+        <textarea
+          ref={textareaRef}
+          value={input}
+          onChange={(e) => onInputChange(e.target.value)}
+          onInput={handleInput}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              onSend();
+            }
+          }}
+          aria-label="Message input"
+          placeholder="Ask about this page..."
+          rows={1}
+          className="flex-1 bg-surface-base rounded-xl px-4 py-2.5 text-[13px] text-primary placeholder:text-muted focus:outline-none focus:bg-surface-raised font-light resize-none overflow-hidden"
+          style={{ maxHeight: "120px" }}
+        />
+        <button
+          type="button"
+          onClick={onSend}
+          disabled={!input.trim() || isStreaming}
+          aria-label="Send message"
+          className="w-10 h-10 rounded-xl bg-brand hover:bg-brand/90 disabled:bg-surface-base disabled:text-muted flex items-center justify-center transition-colors shrink-0"
+        >
+          <Send className="w-4 h-4" strokeWidth={2} />
+        </button>
       </div>
     </div>
   );

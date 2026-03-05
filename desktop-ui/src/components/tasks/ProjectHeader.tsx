@@ -21,7 +21,12 @@ export function ProjectHeader({
 
   return (
     <div className="w-full flex items-center gap-3 px-6 py-3 bg-overlay hover:bg-overlay-heavy transition-colors text-left border-b border-border-subtle">
-      <button type="button" onClick={onToggle} className="flex items-center gap-3 flex-1 min-w-0">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={!isCollapsed}
+        className="flex items-center gap-3 flex-1 min-w-0"
+      >
         {isCollapsed ? (
           <ChevronRight className="w-[14px] h-[14px] text-muted flex-shrink-0" strokeWidth={1.5} />
         ) : (

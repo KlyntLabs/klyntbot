@@ -1,13 +1,13 @@
 import { Plus } from "lucide-react";
 import { useCallback, useState } from "react";
+import { useTaskTable } from "./TaskTableContext";
 
 interface AddSubtaskRowProps {
   parentId: string;
-  showArea: boolean;
-  onCreate: (parentId: string, title: string) => void;
 }
 
-export function AddSubtaskRow({ parentId, showArea, onCreate }: AddSubtaskRowProps) {
+export function AddSubtaskRow({ parentId }: AddSubtaskRowProps) {
+  const { showArea, onCreateSubtask } = useTaskTable();
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState("");
 
@@ -15,11 +15,11 @@ export function AddSubtaskRow({ parentId, showArea, onCreate }: AddSubtaskRowPro
 
   const save = useCallback(() => {
     if (title.trim()) {
-      onCreate(parentId, title.trim());
+      onCreateSubtask(parentId, title.trim());
       setTitle("");
     }
     setEditing(false);
-  }, [title, parentId, onCreate]);
+  }, [title, parentId, onCreateSubtask]);
 
   return (
     <tr
@@ -33,7 +33,7 @@ export function AddSubtaskRow({ parentId, showArea, onCreate }: AddSubtaskRowPro
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center" style={{ paddingLeft: 24 }}>
+        <div className="flex items-center pl-6">
           {editing ? (
             <input
               value={title}

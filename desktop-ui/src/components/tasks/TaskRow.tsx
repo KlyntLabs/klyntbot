@@ -1,6 +1,6 @@
 import { ChevronDown, ChevronRight, Target } from "lucide-react";
 import { useNavigate } from "react-router";
-import type { Area, Project, Task, TaskUpdateParams } from "../../lib/types";
+import type { Task, TaskUpdateParams } from "../../lib/types";
 import { Badge } from "../ui/Badge";
 import { Checkbox } from "../ui/Checkbox";
 import { InlineDatePicker } from "./editors/InlineDatePicker";
@@ -9,56 +9,58 @@ import { InlineTagsEditor } from "./editors/InlineTagsEditor";
 import { InlineTextEditor } from "./editors/InlineTextEditor";
 import { SubtaskProgress } from "./SubtaskProgress";
 
-interface TaskRowProps {
+const PRIORITY_OPTIONS = [
+  { value: "P1", label: "P1" },
+  { value: "P2", label: "P2" },
+  { value: "P3", label: "P3" },
+  { value: "P4", label: "P4" },
+  { value: null, label: "None" },
+] as const;
+
+const STATUS_OPTIONS = [
+  { value: "todo", label: "To Do" },
+  { value: "doing", label: "In Progress" },
+  { value: "done", label: "Done" },
+] as const;
+
+import { useTaskTable } from "./TaskTableContext";
+
+interface RootTaskRowProps {
   task: Task;
-  depth?: number;
-  isExpanded?: boolean;
-  projects: Project[];
-  areas: Area[];
+  isExpanded: boolean;
   isCompleted: boolean;
-  showArea: boolean;
   onToggle: () => void;
-  onToggleExpand?: () => void;
   onUpdate: (params: TaskUpdateParams) => void;
 }
 
-export function TaskRow({
+export function RootTaskRow({
   task,
-  depth = 0,
-  isExpanded = false,
-  projects,
-  areas,
+  isExpanded,
   isCompleted,
-  showArea,
   onToggle,
-  onToggleExpand,
   onUpdate,
-}: TaskRowProps) {
+}: RootTaskRowProps) {
+  const { projects, areas, showArea, onToggleExpandTask } = useTaskTable();
   const navigate = useNavigate();
-  const isSubtask = depth > 0;
   const hasSubtasks = task.subtaskCount > 0;
-
-  const cellPy = isSubtask ? "py-1.5" : "py-3";
 
   return (
     <tr
       onClick={() => navigate(`/task/${task.id}`)}
-      className={`hover:bg-surface-base transition-colors border-b border-border-subtle last:border-b-0 cursor-pointer whitespace-nowrap ${
-        isSubtask ? "bg-surface-lowest relative" : ""
-      }`}
-      style={isSubtask ? { boxShadow: "inset 3px 0 0 var(--brand)" } : undefined}
+      className="hover:bg-surface-base transition-colors border-b border-border-subtle last:border-b-0 cursor-pointer whitespace-nowrap"
     >
-      {/* Checkbox cell — with optional expand chevron */}
       <td
-        className={`px-5 ${cellPy} w-9`}
+        className="px-5 py-3 w-9"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-1">
-          {!isSubtask && hasSubtasks && (
+          {hasSubtasks && (
             <button
               type="button"
-              onClick={onToggleExpand}
+              onClick={() => onToggleExpandTask(task.id)}
+              aria-expanded={isExpanded}
+              aria-label="Toggle subtasks"
               className="text-muted hover:text-secondary -ml-5 mr-0.5"
             >
               {isExpanded ? (
@@ -72,105 +74,86 @@ export function TaskRow({
         </div>
       </td>
 
-      {/* Title cell */}
       <td
-        className={`px-5 ${cellPy}`}
+        className="px-5 py-3"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
       >
-        <div
-          className="flex items-center gap-1.5"
-          style={isSubtask ? { paddingLeft: 24 } : undefined}
-        >
+        <div className="flex items-center gap-1.5">
           {task.objectiveId && (
             <Target className="w-[10px] h-[10px] text-brand flex-shrink-0" strokeWidth={1.5} />
           )}
           <InlineTextEditor
             value={task.title}
             onSave={(title) => onUpdate({ id: task.id, title })}
-            className={`font-light ${isSubtask ? "text-[12px]" : "text-[13px]"} ${
-              isCompleted ? "text-dim line-through" : isSubtask ? "text-muted" : "text-secondary"
-            }`}
+            className={`font-light text-[13px] ${isCompleted ? "text-dim line-through" : "text-secondary"}`}
           />
-          {!isSubtask && hasSubtasks && (
+          {hasSubtasks && (
             <SubtaskProgress total={task.subtaskCount} completed={task.subtaskCompletedCount} />
           )}
         </div>
       </td>
 
-      {/* Project cell — hidden for subtasks (inherits from parent) */}
       <td
-        className={`px-5 ${cellPy}`}
+        className="px-5 py-3"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
       >
-        {isSubtask ? null : (
-          <InlineSelect
-            value={task.projectId}
-            options={[
-              { value: null, label: "No project" },
-              ...projects.map((p) => ({ value: p.id, label: p.name })),
-            ]}
-            onSelect={(val) => onUpdate({ id: task.id, projectId: val })}
-            renderDisplay={(val) => {
-              const proj = projects.find((p) => p.id === val);
-              if (!proj) return <span className="text-[11px] font-light text-dim">&mdash;</span>;
-              return (
-                <div className="inline-flex items-center gap-2 px-2 py-1 rounded-md bg-surface-base">
-                  <div
-                    className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                    style={{ backgroundColor: proj.color }}
-                  />
-                  <span className="text-[11px] font-light text-muted">{proj.name}</span>
-                </div>
-              );
-            }}
-          />
-        )}
+        <InlineSelect
+          value={task.projectId}
+          options={[
+            { value: null, label: "No project" },
+            ...projects.map((p) => ({ value: p.id, label: p.name })),
+          ]}
+          onSelect={(val) => onUpdate({ id: task.id, projectId: val })}
+          renderDisplay={(val) => {
+            const proj = projects.find((p) => p.id === val);
+            if (!proj) return <span className="text-[11px] font-light text-dim">&mdash;</span>;
+            return (
+              <div className="inline-flex items-center gap-2 px-2 py-1 rounded-md bg-surface-base">
+                <div
+                  className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: proj.color }}
+                />
+                <span className="text-[11px] font-light text-muted">{proj.name}</span>
+              </div>
+            );
+          }}
+        />
       </td>
 
-      {/* Area cell — hidden for subtasks (inherits from parent) */}
       {showArea && (
         <td
-          className={`px-5 ${cellPy}`}
+          className="px-5 py-3"
           onClick={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
         >
-          {isSubtask ? null : (
-            <InlineSelect
-              value={task.areaId}
-              options={areas.map((a) => ({ value: a.id, label: a.name }))}
-              onSelect={(val) => {
-                if (val) onUpdate({ id: task.id, areaId: val });
-              }}
-              renderDisplay={(val) => {
-                const a = areas.find((ar) => ar.id === val);
-                return a ? (
-                  <Badge variant="area" value={a.name} />
-                ) : (
-                  <span className="text-[11px] text-dim">&mdash;</span>
-                );
-              }}
-            />
-          )}
+          <InlineSelect
+            value={task.areaId}
+            options={areas.map((a) => ({ value: a.id, label: a.name }))}
+            onSelect={(val) => {
+              if (val) onUpdate({ id: task.id, areaId: val });
+            }}
+            renderDisplay={(val) => {
+              const a = areas.find((ar) => ar.id === val);
+              return a ? (
+                <Badge variant="area" value={a.name} />
+              ) : (
+                <span className="text-[11px] text-dim">&mdash;</span>
+              );
+            }}
+          />
         </td>
       )}
 
-      {/* Priority cell */}
       <td
-        className={`px-5 ${cellPy}`}
+        className="px-5 py-3"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
       >
         <InlineSelect
           value={task.priority}
-          options={[
-            { value: "P1", label: "P1" },
-            { value: "P2", label: "P2" },
-            { value: "P3", label: "P3" },
-            { value: "P4", label: "P4" },
-            { value: null, label: "None" },
-          ]}
+          options={PRIORITY_OPTIONS}
           onSelect={(val) =>
             onUpdate({ id: task.id, priority: val ? Number(val.replace("P", "")) : null })
           }
@@ -184,19 +167,14 @@ export function TaskRow({
         />
       </td>
 
-      {/* Status cell */}
       <td
-        className={`px-5 ${cellPy}`}
+        className="px-5 py-3"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
       >
         <InlineSelect
           value={task.status}
-          options={[
-            { value: "todo", label: "To Do" },
-            { value: "doing", label: "In Progress" },
-            { value: "done", label: "Done" },
-          ]}
+          options={STATUS_OPTIONS}
           onSelect={(val) => {
             if (val) onUpdate({ id: task.id, status: val });
           }}
@@ -204,9 +182,8 @@ export function TaskRow({
         />
       </td>
 
-      {/* Due Date cell */}
       <td
-        className={`px-5 ${cellPy}`}
+        className="px-5 py-3"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
       >
@@ -216,9 +193,116 @@ export function TaskRow({
         />
       </td>
 
-      {/* Tags cell */}
       <td
-        className={`px-5 ${cellPy}`}
+        className="px-5 py-3"
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+      >
+        <InlineTagsEditor tags={task.tags} onSave={(tags) => onUpdate({ id: task.id, tags })} />
+      </td>
+    </tr>
+  );
+}
+
+interface SubtaskRowProps {
+  task: Task;
+  isCompleted: boolean;
+  onToggle: () => void;
+  onUpdate: (params: TaskUpdateParams) => void;
+}
+
+export function SubtaskRow({ task, isCompleted, onToggle, onUpdate }: SubtaskRowProps) {
+  const { showArea } = useTaskTable();
+  const navigate = useNavigate();
+
+  return (
+    <tr
+      onClick={() => navigate(`/task/${task.id}`)}
+      className="hover:bg-surface-base transition-colors border-b border-border-subtle last:border-b-0 cursor-pointer whitespace-nowrap bg-surface-lowest relative"
+      style={{ boxShadow: "inset 3px 0 0 var(--brand)" }}
+    >
+      <td
+        className="px-5 py-1.5 w-9"
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-1">
+          <Checkbox checked={isCompleted} onCheckedChange={onToggle} />
+        </div>
+      </td>
+
+      <td
+        className="px-5 py-1.5"
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center gap-1.5 pl-6">
+          {task.objectiveId && (
+            <Target className="w-[10px] h-[10px] text-brand flex-shrink-0" strokeWidth={1.5} />
+          )}
+          <InlineTextEditor
+            value={task.title}
+            onSave={(title) => onUpdate({ id: task.id, title })}
+            className={`font-light text-[12px] ${isCompleted ? "text-dim line-through" : "text-muted"}`}
+          />
+        </div>
+      </td>
+
+      {/* Project cell — empty for subtasks (inherits from parent) */}
+      <td className="px-5 py-1.5" />
+
+      {/* Area cell — empty for subtasks */}
+      {showArea && <td className="px-5 py-1.5" />}
+
+      <td
+        className="px-5 py-1.5"
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+      >
+        <InlineSelect
+          value={task.priority}
+          options={PRIORITY_OPTIONS}
+          onSelect={(val) =>
+            onUpdate({ id: task.id, priority: val ? Number(val.replace("P", "")) : null })
+          }
+          renderDisplay={(val) =>
+            val ? (
+              <Badge variant="priority" value={val} />
+            ) : (
+              <span className="text-[11px] text-dim">&mdash;</span>
+            )
+          }
+        />
+      </td>
+
+      <td
+        className="px-5 py-1.5"
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+      >
+        <InlineSelect
+          value={task.status}
+          options={STATUS_OPTIONS}
+          onSelect={(val) => {
+            if (val) onUpdate({ id: task.id, status: val });
+          }}
+          renderDisplay={(val) => <Badge variant="status" value={val ?? "todo"} />}
+        />
+      </td>
+
+      <td
+        className="px-5 py-1.5"
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+      >
+        <InlineDatePicker
+          value={task.dueDate}
+          onSave={(val) => onUpdate({ id: task.id, dueDate: val })}
+        />
+      </td>
+
+      <td
+        className="px-5 py-1.5"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
       >

@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { ApiError } from "../lib/types";
 import { parseApiError } from "../lib/utils";
 import { ipc } from "./useIpc";
@@ -23,23 +23,27 @@ export function useMutation<T = void, P = Record<string, unknown>>(
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
 
-  const mutate = useCallback(
-    async (params: P): Promise<T | undefined> => {
-      setLoading(true);
-      setError(null);
-      try {
-        const args = wrapKey ? { [wrapKey]: params } : (params as Record<string, unknown>);
-        const result = await ipc<T>(cmd, args);
-        return result;
-      } catch (e) {
-        setError(parseApiError(e));
-        return undefined;
-      } finally {
-        setLoading(false);
-      }
-    },
-    [cmd, wrapKey],
-  );
+  const cmdRef = useRef(cmd);
+  cmdRef.current = cmd;
+  const wrapKeyRef = useRef(wrapKey);
+  wrapKeyRef.current = wrapKey;
+
+  const mutate = useCallback(async (params: P): Promise<T | undefined> => {
+    setLoading(true);
+    setError(null);
+    try {
+      const args = wrapKeyRef.current
+        ? { [wrapKeyRef.current]: params }
+        : (params as Record<string, unknown>);
+      const result = await ipc<T>(cmdRef.current, args);
+      return result;
+    } catch (e) {
+      setError(parseApiError(e));
+      return undefined;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   return { mutate, loading, error };
 }

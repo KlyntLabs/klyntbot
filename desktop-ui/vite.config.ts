@@ -3,15 +3,21 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react({
+      babel: {
+        plugins: ["babel-plugin-react-compiler"],
+      },
+    }),
+    tailwindcss(),
+  ],
   clearScreen: false,
   server: {
     port: 1420,
     strictPort: true,
     proxy: {
-      // Forward /api/* to the dev HTTP server running alongside Tauri
-      '/api': {
-        target: 'http://127.0.0.1:3456',
+      "/api": {
+        target: "http://127.0.0.1:3456",
         changeOrigin: true,
       },
     },

@@ -1,5 +1,13 @@
 import { MessageSquare } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useOptimistic,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 import { useNavigate } from "react-router";
 import { useEvent } from "../../hooks/useEvent";
 import { useMutation } from "../../hooks/useMutation";
@@ -21,6 +29,7 @@ import { SidebarChat } from "../chat/SidebarChat";
 import { Sidebar } from "../layout/Sidebar";
 import { KanbanBoard } from "../tasks/KanbanBoard";
 import { TaskTable } from "../tasks/TaskTable";
+import { TaskTableSkeleton } from "../tasks/TaskTableSkeleton";
 import { Toolbar } from "../tasks/Toolbar";
 import { OkrView } from "./OkrView";
 
@@ -32,6 +41,7 @@ export function MainApp() {
   const [openSessionKey, setOpenSessionKey] = useState<string | null>(null);
   const prevSidebarRef = useRef<SidebarItem>("Tasks");
   const [viewMode, setViewMode] = useState<ViewMode>("table");
+  const [isPending, startTransition] = useTransition();
   const [collapsedProjects, toggleProject] = useSetToggle();
   const {
     expandedTasks,
@@ -41,7 +51,12 @@ export function MainApp() {
     invalidateCache,
   } = useSubtasks();
 
-  const { data: tasks, refetch: refetchTasks } = useQuery<Task[]>("task_list", undefined, []);
+  const {
+    data: tasks,
+    loading: tasksLoading,
+    error: tasksError,
+    refetch: refetchTasks,
+  } = useQuery<Task[]>("task_list", undefined, []);
   const { data: projects, refetch: refetchProjects } = useQuery<Project[]>(
     "project_list",
     undefined,
@@ -57,8 +72,14 @@ export function MainApp() {
   const updateTask = useMutation<Task, TaskUpdateParams>("task_update", "params");
   const createTask = useMutation<Task, TaskCreateParams>("task_create", "params");
 
-  const [completedTasks, toggleTask] = useSetToggle(
-    tasks.filter((t) => t.completed).map((t) => t.id),
+  // useOptimistic derives from server state; overlay flips completion for in-flight toggles.
+  const [optimisticTasks, addOptimistic] = useOptimistic(tasks, (current, toggledId: string) =>
+    current.map((t) => (t.id === toggledId ? { ...t, completed: !t.completed } : t)),
+  );
+
+  const completedTasks = useMemo(
+    () => new Set(optimisticTasks.filter((t) => t.completed).map((t) => t.id)),
+    [optimisticTasks],
   );
 
   // Auto-fetch children for expanded tasks.
@@ -77,10 +98,11 @@ export function MainApp() {
 
   const handleToggleTask = useCallback(
     async (taskId: string) => {
-      toggleTask(taskId);
+      addOptimistic(taskId);
       await toggleComplete.mutate({ id: taskId });
+      refetchTasks();
     },
-    [toggleTask, toggleComplete],
+    [addOptimistic, toggleComplete, refetchTasks],
   );
 
   const handleUpdateTask = useCallback(
@@ -170,7 +192,7 @@ export function MainApp() {
               <button
                 type="button"
                 key={tab}
-                onClick={() => setActiveTab(tab)}
+                onClick={() => startTransition(() => setActiveTab(tab))}
                 className={`flex-1 py-2 rounded-md text-[13px] font-light transition-colors ${
                   activeTab === tab
                     ? "bg-surface-highest text-white"
@@ -191,6 +213,7 @@ export function MainApp() {
               setIsChatOpen(nextOpen);
               setActiveSidebar(nextOpen ? "Chat" : prevSidebarRef.current);
             }}
+            aria-label="Toggle chat"
             className="w-9 h-9 rounded-md flex items-center justify-center transition-colors bg-surface-low text-muted hover:bg-surface-base hover:text-secondary ml-2"
           >
             <MessageSquare className="w-[18px] h-[18px]" strokeWidth={1.5} />
@@ -198,7 +221,9 @@ export function MainApp() {
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-2">
+        <div
+          className={`flex-1 overflow-y-auto p-2${isPending ? " opacity-70 transition-opacity" : ""}`}
+        >
           {contentView === "OKR" ? (
             <OkrView />
           ) : (
@@ -234,7 +259,20 @@ export function MainApp() {
                 </div>
               )}
 
-              {viewMode === "board" ? (
+              {tasksLoading ? (
+                <TaskTableSkeleton showArea={activeTab === "All"} />
+              ) : tasksError ? (
+                <div className="flex flex-col items-center py-10 gap-2">
+                  <p className="text-muted text-sm font-light">Failed to load tasks</p>
+                  <button
+                    type="button"
+                    onClick={refetchTasks}
+                    className="text-brand text-xs font-light hover:underline"
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : viewMode === "board" ? (
                 <KanbanBoard
                   tasks={filteredTasks}
                   projectMap={projectMap}

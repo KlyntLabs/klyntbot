@@ -50,6 +50,7 @@ export function Toolbar({ viewMode, onViewModeChange, onAddTask }: ToolbarProps)
               type="button"
               key={mode}
               onClick={() => onViewModeChange(mode)}
+              aria-label={`${mode} view`}
               className={`p-1.5 rounded transition-colors ${
                 viewMode === mode
                   ? "bg-surface-highest text-brand"

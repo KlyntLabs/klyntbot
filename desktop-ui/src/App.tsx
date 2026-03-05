@@ -1,30 +1,104 @@
+import { lazy, Suspense } from "react";
 import { createHashRouter, Navigate, RouterProvider } from "react-router";
-import { DistractionOverlay } from "./components/distraction/DistractionOverlay";
-import { ProductivityDayPage } from "./components/productivity/pages/DayPage";
-import { ProductivityMonthPage } from "./components/productivity/pages/MonthPage";
-import { ProductivityWeekPage } from "./components/productivity/pages/WeekPage";
-import { ArchivedSettings } from "./components/settings/pages/ArchivedSettings";
-import { ConfigurationSettings } from "./components/settings/pages/ConfigurationSettings";
-import { EnvironmentsSettings } from "./components/settings/pages/EnvironmentsSettings";
-import { GeneralSettings } from "./components/settings/pages/GeneralSettings";
-import { GitSettings } from "./components/settings/pages/GitSettings";
-import { McpServersSettings } from "./components/settings/pages/McpServersSettings";
-import { PersonalizationSettings } from "./components/settings/pages/PersonalizationSettings";
-import { SettingsLayout } from "./components/settings/SettingsLayout";
-import { Chat } from "./components/views/Chat";
-import { Finance } from "./components/views/Finance";
-import { FinanceAccounts } from "./components/views/FinanceAccounts";
-import { FinanceBudgets } from "./components/views/FinanceBudgets";
-import { FinanceGoals } from "./components/views/FinanceGoals";
-import { FinanceInvestments } from "./components/views/FinanceInvestments";
-import { FinanceLiabilities } from "./components/views/FinanceLiabilities";
-import { FinanceTransactions } from "./components/views/FinanceTransactions";
-import { Launcher } from "./components/views/Launcher";
-import { MainApp } from "./components/views/MainApp";
-import { ObjectiveDetail } from "./components/views/ObjectiveDetail";
-import { ProjectDetail } from "./components/views/ProjectDetail";
-import { SystemTray } from "./components/views/SystemTray";
-import { TaskDetail } from "./components/views/TaskDetail";
+
+const MainApp = lazy(() =>
+  import("./components/views/MainApp").then((m) => ({ default: m.MainApp })),
+);
+const Chat = lazy(() => import("./components/views/Chat").then((m) => ({ default: m.Chat })));
+const ProjectDetail = lazy(() =>
+  import("./components/views/ProjectDetail").then((m) => ({ default: m.ProjectDetail })),
+);
+const TaskDetail = lazy(() =>
+  import("./components/views/TaskDetail").then((m) => ({ default: m.TaskDetail })),
+);
+const ObjectiveDetail = lazy(() =>
+  import("./components/views/ObjectiveDetail").then((m) => ({ default: m.ObjectiveDetail })),
+);
+const ProductivityDayPage = lazy(() =>
+  import("./components/productivity/pages/DayPage").then((m) => ({
+    default: m.ProductivityDayPage,
+  })),
+);
+const ProductivityWeekPage = lazy(() =>
+  import("./components/productivity/pages/WeekPage").then((m) => ({
+    default: m.ProductivityWeekPage,
+  })),
+);
+const ProductivityMonthPage = lazy(() =>
+  import("./components/productivity/pages/MonthPage").then((m) => ({
+    default: m.ProductivityMonthPage,
+  })),
+);
+const Finance = lazy(() =>
+  import("./components/views/Finance").then((m) => ({ default: m.Finance })),
+);
+const FinanceAccounts = lazy(() =>
+  import("./components/views/FinanceAccounts").then((m) => ({ default: m.FinanceAccounts })),
+);
+const FinanceTransactions = lazy(() =>
+  import("./components/views/FinanceTransactions").then((m) => ({
+    default: m.FinanceTransactions,
+  })),
+);
+const FinanceBudgets = lazy(() =>
+  import("./components/views/FinanceBudgets").then((m) => ({ default: m.FinanceBudgets })),
+);
+const FinanceInvestments = lazy(() =>
+  import("./components/views/FinanceInvestments").then((m) => ({ default: m.FinanceInvestments })),
+);
+const FinanceGoals = lazy(() =>
+  import("./components/views/FinanceGoals").then((m) => ({ default: m.FinanceGoals })),
+);
+const FinanceLiabilities = lazy(() =>
+  import("./components/views/FinanceLiabilities").then((m) => ({ default: m.FinanceLiabilities })),
+);
+const SettingsLayout = lazy(() =>
+  import("./components/settings/SettingsLayout").then((m) => ({ default: m.SettingsLayout })),
+);
+const GeneralSettings = lazy(() =>
+  import("./components/settings/pages/GeneralSettings").then((m) => ({
+    default: m.GeneralSettings,
+  })),
+);
+const ConfigurationSettings = lazy(() =>
+  import("./components/settings/pages/ConfigurationSettings").then((m) => ({
+    default: m.ConfigurationSettings,
+  })),
+);
+const PersonalizationSettings = lazy(() =>
+  import("./components/settings/pages/PersonalizationSettings").then((m) => ({
+    default: m.PersonalizationSettings,
+  })),
+);
+const McpServersSettings = lazy(() =>
+  import("./components/settings/pages/McpServersSettings").then((m) => ({
+    default: m.McpServersSettings,
+  })),
+);
+const GitSettings = lazy(() =>
+  import("./components/settings/pages/GitSettings").then((m) => ({ default: m.GitSettings })),
+);
+const EnvironmentsSettings = lazy(() =>
+  import("./components/settings/pages/EnvironmentsSettings").then((m) => ({
+    default: m.EnvironmentsSettings,
+  })),
+);
+const ArchivedSettings = lazy(() =>
+  import("./components/settings/pages/ArchivedSettings").then((m) => ({
+    default: m.ArchivedSettings,
+  })),
+);
+const Launcher = lazy(() =>
+  import("./components/views/Launcher").then((m) => ({ default: m.Launcher })),
+);
+const SystemTray = lazy(() =>
+  import("./components/views/SystemTray").then((m) => ({ default: m.SystemTray })),
+);
+const DistractionOverlay = lazy(() =>
+  import("./components/distraction/DistractionOverlay").then((m) => ({
+    default: m.DistractionOverlay,
+  })),
+);
 
 const router = createHashRouter([
   { path: "/", element: <MainApp /> },
@@ -110,5 +184,9 @@ const router = createHashRouter([
 ]);
 
 export default function App() {
-  return <RouterProvider router={router} />;
+  return (
+    <Suspense fallback={null}>
+      <RouterProvider router={router} />
+    </Suspense>
+  );
 }

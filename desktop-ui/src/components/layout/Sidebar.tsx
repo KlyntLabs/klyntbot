@@ -46,6 +46,7 @@ export function Sidebar({ active, onNavigate }: SidebarProps) {
         <button
           type="button"
           onClick={() => navigate("/")}
+          aria-label="Home"
           className="w-9 h-9 rounded-lg bg-white flex items-center justify-center p-0.5 hover:opacity-80 transition-opacity"
         >
           <KlyntLogo className="w-full h-full" />
@@ -61,6 +62,7 @@ export function Sidebar({ active, onNavigate }: SidebarProps) {
             type="button"
             key={item.key}
             onClick={() => handleClick(item)}
+            aria-label={item.key}
             className={`w-9 h-9 rounded-md flex items-center justify-center transition-colors ${
               isActive
                 ? "bg-surface-highest text-brand"
@@ -83,6 +85,7 @@ export function Sidebar({ active, onNavigate }: SidebarProps) {
             type="button"
             key={item.key}
             onClick={() => handleClick(item)}
+            aria-label={item.key}
             className={`w-9 h-9 rounded-md flex items-center justify-center transition-colors ${
               isActive
                 ? "bg-surface-highest text-brand"
