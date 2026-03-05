@@ -360,6 +360,82 @@ pub struct McpUpdateServerParams {
     pub headers: Option<std::collections::HashMap<String, String>>,
 }
 
+// ── Productivity ───────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProductivitySummaryResponse {
+    pub date: String,
+    pub total_active_secs: i64,
+    pub total_focus_secs: i64,
+    pub total_break_secs: i64,
+    pub total_idle_secs: i64,
+    pub productive_secs: i64,
+    pub neutral_secs: i64,
+    pub distracting_secs: i64,
+    pub focus_sessions_count: i64,
+    pub avg_session_quality: Option<f64>,
+    pub interruptions_count: i64,
+    pub context_switches: i64,
+    pub top_apps: Vec<AppUsageResponse>,
+    pub top_categories: Vec<CategoryUsageResponse>,
+    pub ai_summary: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppUsageResponse {
+    pub app_name: String,
+    pub duration_secs: i64,
+    pub category: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CategoryUsageResponse {
+    pub category: String,
+    pub duration_secs: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FocusSessionResponse {
+    pub id: String,
+    pub action_id: Option<String>,
+    pub project_id: Option<String>,
+    pub session_type: String,
+    pub target_mins: Option<i64>,
+    pub started_at: DateTime<Utc>,
+    pub ended_at: Option<DateTime<Utc>>,
+    pub actual_mins: Option<i64>,
+    pub interruptions: i64,
+    pub quality_score: Option<f64>,
+    pub completed: bool,
+    pub notes: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActivityTimelineResponse {
+    pub app_name: String,
+    pub window_title: Option<String>,
+    pub category_id: Option<String>,
+    pub started_at: DateTime<Utc>,
+    pub duration_secs: Option<i64>,
+    pub is_idle: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActivityCategoryResponse {
+    pub id: String,
+    pub name: String,
+    pub category_type: String,
+    pub color: Option<String>,
+    pub icon: Option<String>,
+    pub is_system: bool,
+}
+
 // ── Key Result Params ──────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -33,6 +33,7 @@ dependencies = [
  "dirs",
  "domain",
  "feature-finance",
+ "feature-productivity",
  "feature-todo",
  "futures-util",
  "mcp",
@@ -2881,6 +2882,7 @@ dependencies = [
  "dashmap",
  "desktop-shared",
  "dirs",
+ "feature-productivity",
  "futures-util",
  "open",
  "providers",
@@ -3463,6 +3465,30 @@ dependencies = [
  "tools-core",
  "tracing",
  "urlencoding",
+ "uuid",
+]
+
+[[package]]
+name = "feature-productivity"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "common",
+ "core-foundation 0.10.1",
+ "core-graphics",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-foundation",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "storage",
+ "tempfile",
+ "tokio",
+ "tokio-util",
+ "tools-core",
+ "tracing",
  "uuid",
 ]
 

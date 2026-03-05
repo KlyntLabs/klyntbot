@@ -413,8 +413,72 @@ export interface FinanceNetWorth {
   totalsByCurrency: { currency: string; accounts: number; investments: number; liabilities: number; net: number }[];
 }
 
+// ── Productivity ─────────────────────────────────────────────────────
+
+export interface ProductivitySummary {
+  date: string;
+  totalActiveSecs: number;
+  totalFocusSecs: number;
+  totalBreakSecs: number;
+  totalIdleSecs: number;
+  productiveSecs: number;
+  neutralSecs: number;
+  distractingSecs: number;
+  focusSessionsCount: number;
+  avgSessionQuality: number | null;
+  interruptionsCount: number;
+  contextSwitches: number;
+  topApps: AppUsage[];
+  topCategories: CategoryUsage[];
+  aiSummary: string | null;
+}
+
+export interface AppUsage {
+  appName: string;
+  durationSecs: number;
+  category: string | null;
+}
+
+export interface CategoryUsage {
+  category: string;
+  durationSecs: number;
+}
+
+export interface FocusSession {
+  id: string;
+  actionId: string | null;
+  projectId: string | null;
+  sessionType: string;
+  targetMins: number | null;
+  startedAt: string;
+  endedAt: string | null;
+  actualMins: number | null;
+  interruptions: number;
+  qualityScore: number | null;
+  completed: boolean;
+  notes: string | null;
+}
+
+export interface ActivityTimeline {
+  appName: string;
+  windowTitle: string | null;
+  categoryId: string | null;
+  startedAt: string;
+  durationSecs: number | null;
+  isIdle: boolean;
+}
+
+export interface ActivityCategory {
+  id: string;
+  name: string;
+  categoryType: string;
+  color: string | null;
+  icon: string | null;
+  isSystem: boolean;
+}
+
 export type Tab = 'All' | string;
-export type SidebarItem = 'Chat' | 'Tasks' | 'OKR' | 'Calendar' | 'Finance' | 'Settings';
+export type SidebarItem = 'Chat' | 'Tasks' | 'OKR' | 'Calendar' | 'Finance' | 'Productivity' | 'Settings';
 export type ViewMode = 'table' | 'board' | 'tree';
 
 // ── Mutation Params ─────────────────────────────────────────────────────

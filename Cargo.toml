@@ -24,6 +24,7 @@ members = [
     "crates/mcp",
     "crates/desktop-shared",
     "crates/desktop",
+    "crates/feature-productivity",
 ]
 
 [workspace.package]
@@ -52,6 +53,7 @@ tools-core = { path = "crates/tools-core" }
 tools-core-macros = { path = "crates/tools-core-macros" }
 feature-finance = { path = "crates/feature-finance" }
 feature-todo = { path = "crates/feature-todo" }
+feature-productivity = { path = "crates/feature-productivity" }
 plugin-runtime = { path = "crates/plugin-runtime" }
 desktop-shared = { path = "crates/desktop-shared" }
 desktop = { path = "crates/desktop" }

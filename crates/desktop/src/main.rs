@@ -45,10 +45,10 @@ fn main() {
                 .build(),
         )
         .setup(|app| {
-            let core = tauri::async_runtime::block_on(AppCore::init())
+            let handle = app.handle().clone();
+            let core = tauri::async_runtime::block_on(AppCore::init(handle))
                 .expect("failed to initialize app core");
 
-            // Store AppHandle in core for event emission (chat commands use it)
             app.manage(core);
 
             // Build system tray icon — click toggles the tray popup window
@@ -155,6 +155,15 @@ fn main() {
             commands::finance::finance_liabilities,
             commands::finance::finance_net_worth,
             commands::finance::finance_exchange_rates,
+            // Productivity
+            commands::productivity::productivity_today,
+            commands::productivity::productivity_timeline,
+            commands::productivity::productivity_focus_start,
+            commands::productivity::productivity_focus_end,
+            commands::productivity::productivity_focus_status,
+            commands::productivity::productivity_sessions,
+            commands::productivity::productivity_weekly,
+            commands::productivity::productivity_categories,
             // Calendar
             commands::calendar::calendar_events,
             // Settings (MCP)

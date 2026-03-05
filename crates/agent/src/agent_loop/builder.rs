@@ -32,7 +32,7 @@ use tools_core::FeaturePackage;
 use super::super::confidence::ConfidenceEvaluator;
 use super::super::context_sources::{
     AgentContextSource, AreaSource, BootstrapSource, IdentitySource, LearningContextSource,
-    PageContextSource, PersonaContextSource, TodoSource,
+    PageContextSource, PersonaContextSource, ProductivityContextSource, TodoSource,
 };
 use super::super::{CalendarSyncAdapter, CronHandlerAdapter, SubagentManager};
 use super::{AgentLoop, LastActiveChannel};
@@ -199,6 +199,19 @@ impl AgentLoopBuilder {
             )),
             Box::new(PageContextSource::new(repos.clone())),
         ];
+
+        // Productivity context source (optional — requires real pool + enabled).
+        // prod_repos is stored for reuse by the tool registration block below.
+        let prod_repos = if config.productivity.enabled {
+            self.pool.as_ref().map(|pool| {
+                feature_productivity::repos::ProductivityRepos::new(pool.clone())
+            })
+        } else {
+            None
+        };
+        if let Some(ref repos) = prod_repos {
+            sources.push(Box::new(ProductivityContextSource::new(repos.clone())));
+        }
 
         // Sort by priority (descending) — ensures correct ordering in prompt
         sources.sort_by_key(|s| std::cmp::Reverse(s.priority()));
@@ -525,6 +538,45 @@ impl AgentLoopBuilder {
 
                 tool_registry.register(finance_tool);
             }
+        }
+
+        // ── Productivity tool (reuses prod_repos from context source block) ──
+        if let Some(prod_repos) = prod_repos {
+            if let Some(pool) = &self.pool {
+                // Run feature migrations (idempotent — skips already-applied)
+                storage::StoragePool::run_feature_migrations(
+                    pool,
+                    &feature_productivity::ProductivityFeature::migrations_static(),
+                )
+                .await
+                .map_err(|e| {
+                    common::KlyntbotError::Config(common::ConfigError::Invalid(format!(
+                        "Failed to run productivity migrations: {}",
+                        e
+                    )))
+                })?;
+            }
+
+            let focus_config = feature_productivity::config::FocusConfig {
+                default_duration_mins: config.productivity.focus.default_duration_mins,
+                break_interval_mins: config.productivity.focus.break_interval_mins,
+                break_duration_mins: config.productivity.focus.break_duration_mins,
+                max_daily_focus_hours: config.productivity.focus.max_daily_focus_hours,
+                soft_block_enabled: config.productivity.focus.soft_block_enabled,
+            };
+            let focus_mgr = Arc::new(feature_productivity::FocusManager::new(
+                prod_repos.clone(),
+                focus_config,
+            ));
+            let aggregator = Arc::new(feature_productivity::DailyAggregator::new(
+                prod_repos.clone(),
+            ));
+            let productivity_tool = feature_productivity::ProductivityTool::new(
+                prod_repos,
+                focus_mgr,
+                aggregator,
+            );
+            tool_registry.register(productivity_tool);
         }
 
         // ── Plugin tools (WASM) ───────────────────────────────────────────

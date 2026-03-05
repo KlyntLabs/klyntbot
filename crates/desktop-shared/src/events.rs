@@ -51,6 +51,8 @@ pub const MCP_OAUTH_COMPLETE: &str = "mcp:oauth_complete";
 pub const MCP_OAUTH_ERROR: &str = "mcp:oauth_error";
 pub const MCP_SERVER_STATUS: &str = "mcp:server_status";
 pub const MCP_STARTUP_COMPLETE: &str = "mcp:startup_complete";
+pub const PRODUCTIVITY_DISTRACTION: &str = "productivity:distraction";
+pub const PRODUCTIVITY_NUDGE: &str = "productivity:nudge";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -259,6 +261,20 @@ pub struct DelegationCompletedPayload {
     pub to_agent: String,
     pub success: bool,
     pub duration_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DistractionPayload {
+    pub app_name: String,
+    pub session_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NudgePayload {
+    pub nudge_type: String,
+    pub message: String,
 }
 
 /// Accumulated transparency data for an assistant message.

@@ -11,6 +11,7 @@ import { FinanceBudgets } from "./components/views/FinanceBudgets";
 import { FinanceInvestments } from "./components/views/FinanceInvestments";
 import { FinanceGoals } from "./components/views/FinanceGoals";
 import { FinanceLiabilities } from "./components/views/FinanceLiabilities";
+import { Productivity } from "./components/views/Productivity";
 import { Launcher } from "./components/views/Launcher";
 import { SystemTray } from "./components/views/SystemTray";
 import { SettingsLayout } from "./components/settings/SettingsLayout";
@@ -28,6 +29,7 @@ const router = createHashRouter([
   { path: "/project/:id", element: <ProjectDetail /> },
   { path: "/task/:id", element: <TaskDetail /> },
   { path: "/objective/:id", element: <ObjectiveDetail /> },
+  { path: "/productivity", element: <Productivity /> },
   { path: "/finance", element: <Finance /> },
   { path: "/finance/accounts", element: <FinanceAccounts /> },
   { path: "/finance/transactions", element: <FinanceTransactions /> },

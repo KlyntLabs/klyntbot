@@ -52,6 +52,8 @@ pub enum EntityKind {
     Objective,
     Area,
     KeyResult,
+    FocusSession,
+    Productivity,
 }
 
 impl EntityKind {
@@ -63,6 +65,8 @@ impl EntityKind {
             "objective" => Some(Self::Objective),
             "area" => Some(Self::Area),
             "key_result" | "keyresult" => Some(Self::KeyResult),
+            "focus_session" | "focussession" => Some(Self::FocusSession),
+            "productivity" => Some(Self::Productivity),
             _ => None,
         }
     }
