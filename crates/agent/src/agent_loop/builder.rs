@@ -561,9 +561,14 @@ impl AgentLoopBuilder {
                 prod_repos.clone(),
                 config.productivity.focus.clone(),
             ));
-            let aggregator = Arc::new(feature_productivity::DailyAggregator::new(
-                prod_repos.clone(),
+            let prod_handler = Arc::new(crate::productivity_handler::ProductivityHandlerImpl::new(
+                provider.clone(),
+                config.agents.defaults.model.clone(),
             ));
+            let aggregator = Arc::new(
+                feature_productivity::DailyAggregator::new(prod_repos.clone())
+                    .with_handler(prod_handler),
+            );
             let productivity_tool = feature_productivity::ProductivityTool::new(
                 prod_repos,
                 focus_mgr,

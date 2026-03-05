@@ -6,6 +6,8 @@ use async_trait::async_trait;
 use chrono::{Duration, Utc};
 use serde_json::Value;
 
+use std::fmt::Write;
+
 use common::{Result, ToolError};
 use tools_core::{ParamExtractor, RoutingContext, Tool};
 use tracing::warn;
@@ -155,17 +157,7 @@ impl ProductivityTool {
         let total_active: i64 = summaries.iter().map(|s| s.total_active_secs).sum();
         let total_productive: i64 = summaries.iter().map(|s| s.productive_secs).sum();
         let total_focus_sessions: i64 = summaries.iter().map(|s| s.focus_sessions_count).sum();
-        let avg_quality: Option<f64> = {
-            let quals: Vec<f64> = summaries
-                .iter()
-                .filter_map(|s| s.avg_session_quality)
-                .collect();
-            if quals.is_empty() {
-                None
-            } else {
-                Some(quals.iter().sum::<f64>() / quals.len() as f64)
-            }
-        };
+        let avg_quality = avg_scores(summaries.iter().filter_map(|s| s.avg_session_quality));
 
         let quality_str = avg_quality
             .map(|q| format!("{:.0}%", q * 100.0))
@@ -180,6 +172,25 @@ impl ProductivityTool {
             format_duration(total_productive),
             total_focus_sessions,
             quality_str,
+        ))
+    }
+
+    // ── Pomodoro actions ─────────────────────────────────────────
+
+    async fn handle_pomodoro_start(&self, p: &ParamExtractor<'_>) -> Result<String> {
+        let action_id = p.optional_str("action_id")?.map(|s| s.to_string());
+        let project_id = p.optional_str("project_id")?.map(|s| s.to_string());
+        let work_mins = p.optional_i64("work_mins")?;
+        let break_mins = p.optional_i64("break_mins")?;
+
+        let session = self
+            .focus_manager
+            .start_pomodoro(action_id, project_id, work_mins, break_mins)
+            .await?;
+        let work = session.target_mins.unwrap_or(25);
+        Ok(format!(
+            "Pomodoro started ({work}min work). Session ID: {}",
+            session.id
         ))
     }
 
@@ -205,6 +216,238 @@ impl ProductivityTool {
             "Productivity score: {:.0}/100\n- Productive: {:.0}%\n- Distracting: {:.0}%\n- Focus sessions: {}\n- Context switches: {}",
             score, productive_pct, distracting_pct, summary.focus_sessions_count, summary.context_switches
         ))
+    }
+
+    // ── Comparison action ────────────────────────────────────────
+
+    async fn handle_activity_compare(&self, p: &ParamExtractor<'_>) -> Result<String> {
+        let period = p.optional_str("period")?.unwrap_or("day");
+
+        let today = Utc::now().date_naive();
+        let (current_start, previous_start, previous_end, label) = match period {
+            "day" => {
+                let yesterday = today - Duration::days(1);
+                (
+                    today.format("%Y-%m-%d").to_string(),
+                    yesterday.format("%Y-%m-%d").to_string(),
+                    yesterday.format("%Y-%m-%d").to_string(),
+                    "Today vs Yesterday",
+                )
+            }
+            "week" => {
+                let week_ago = today - Duration::days(7);
+                let two_weeks_ago = today - Duration::days(14);
+                (
+                    week_ago.format("%Y-%m-%d").to_string(),
+                    two_weeks_ago.format("%Y-%m-%d").to_string(),
+                    (week_ago - Duration::days(1)).format("%Y-%m-%d").to_string(),
+                    "This week vs Last week",
+                )
+            }
+            _ => {
+                return Err(
+                    ToolError::InvalidParams("period must be 'day' or 'week'".into()).into(),
+                )
+            }
+        };
+
+        // Ensure today is computed, then fetch both periods in parallel
+        let today_str = today.format("%Y-%m-%d").to_string();
+        let _ = self.aggregator.get_or_compute(&today_str).await;
+
+        let (current, previous) = tokio::try_join!(
+            self.repos.summaries.list_range(&current_start, &today_str),
+            self.repos.summaries.list_range(&previous_start, &previous_end),
+        )?;
+
+        let cur_productive: i64 = current.iter().map(|s| s.productive_secs).sum();
+        let prev_productive: i64 = previous.iter().map(|s| s.productive_secs).sum();
+        let cur_score = avg_scores(current.iter().filter_map(|s| s.productivity_score));
+        let prev_score = avg_scores(previous.iter().filter_map(|s| s.productivity_score));
+
+        let productive_change = if prev_productive > 0 {
+            let pct = ((cur_productive as f64 - prev_productive as f64)
+                / prev_productive as f64
+                * 100.0)
+                .round();
+            if pct >= 0.0 {
+                format!("+{:.0}%", pct)
+            } else {
+                format!("{:.0}%", pct)
+            }
+        } else {
+            "N/A".into()
+        };
+
+        let score_line = match (cur_score, prev_score) {
+            (Some(c), Some(p)) => {
+                let diff = c - p;
+                let sign = if diff >= 0.0 { "+" } else { "" };
+                format!("\n- Score: {:.0} vs {:.0} ({}{:.0})", c, p, sign, diff)
+            }
+            _ => String::new(),
+        };
+
+        Ok(format!(
+            "{label}:\n- Productive time: {} vs {} ({productive_change}){score_line}",
+            format_duration(cur_productive),
+            format_duration(prev_productive),
+        ))
+    }
+
+    // ── Goal actions ────────────────────────────────────────────
+
+    async fn handle_set_goal(&self, p: &ParamExtractor<'_>) -> Result<String> {
+        let metric_str = p.required_str("metric")?;
+        let metric: crate::types::GoalMetric = metric_str.parse()?;
+        let target = p
+            .optional_f64("target_value")?
+            .ok_or_else(|| ToolError::InvalidParams("target_value is required".into()))?;
+        let goal_type_str = p.optional_str("goal_type")?.unwrap_or("daily");
+        let goal_type: crate::types::GoalType = goal_type_str.parse()?;
+
+        let goal = crate::types::ProductivityGoal {
+            id: None,
+            goal_type,
+            metric,
+            target_value: target,
+            enabled: true,
+            created_at: Utc::now(),
+        };
+        let id = self.repos.goals.insert(&goal).await?;
+        Ok(format!(
+            "Goal set: {} {} {} ({goal_type}). ID: {id}",
+            metric,
+            metric.operator(),
+            target
+        ))
+    }
+
+    async fn handle_check_goals(&self) -> Result<String> {
+        let today = Utc::now().format("%Y-%m-%d").to_string();
+        let results = self.aggregator.check_goals(&today).await?;
+
+        if results.is_empty() {
+            return Ok("No goals set. Use set_goal to create one.".into());
+        }
+
+        let mut lines = vec!["Goal progress:".to_string()];
+        for (goal, current, met) in &results {
+            let status = if *met { "MET" } else { "IN PROGRESS" };
+            lines.push(format!(
+                "- {} {}: {:.1}/{:.1} [{}]",
+                goal.goal_type, goal.metric, current, goal.target_value, status
+            ));
+        }
+        Ok(lines.join("\n"))
+    }
+
+    async fn handle_list_goals(&self) -> Result<String> {
+        let goals = self.repos.goals.list_enabled().await?;
+        if goals.is_empty() {
+            return Ok("No goals set.".into());
+        }
+        let mut lines = vec!["Active goals:".to_string()];
+        for g in &goals {
+            lines.push(format!(
+                "- [{}] {} {} {} (id: {})",
+                g.goal_type,
+                g.metric,
+                g.metric.operator(),
+                g.target_value,
+                g.id.unwrap_or(0)
+            ));
+        }
+        Ok(lines.join("\n"))
+    }
+
+    async fn handle_remove_goal(&self, p: &ParamExtractor<'_>) -> Result<String> {
+        let id = p.required_i64("goal_id")?;
+        if self.repos.goals.delete(id).await? {
+            Ok(format!("Goal {id} removed."))
+        } else {
+            Ok(format!("Goal {id} not found."))
+        }
+    }
+
+    // ── Manual time entry action ────────────────────────────────
+
+    async fn handle_log_time(&self, p: &ParamExtractor<'_>) -> Result<String> {
+        let description = p.required_str("description")?;
+        let duration_mins = p.required_i64("duration_mins")?;
+        let category_id = p.optional_str("category_id")?.map(|s| s.to_string());
+        let project_id = p.optional_str("project_id")?.map(|s| s.to_string());
+
+        let entry = crate::types::TimeEntry {
+            id: None,
+            description: description.to_string(),
+            category_id,
+            project_id,
+            started_at: Utc::now() - Duration::minutes(duration_mins),
+            duration_secs: duration_mins * 60,
+            source: "manual".into(),
+            created_at: Utc::now(),
+        };
+
+        let id = self.repos.time_entries.insert(&entry).await?;
+        Ok(format!(
+            "Logged {}min: '{}' (id: {id})",
+            duration_mins, description
+        ))
+    }
+
+    // ── Export action ────────────────────────────────────────────
+
+    async fn handle_activity_export(&self, p: &ParamExtractor<'_>) -> Result<String> {
+        let start_date = p.required_str("start_date")?;
+        let end_date = p.required_str("end_date")?;
+        let format = p.optional_str("format")?.unwrap_or("csv");
+
+        let start = chrono::NaiveDate::parse_from_str(start_date, "%Y-%m-%d")
+            .map_err(|e| ToolError::InvalidParams(format!("invalid start_date: {e}")))?
+            .and_hms_opt(0, 0, 0)
+            .unwrap()
+            .and_utc();
+        let end = chrono::NaiveDate::parse_from_str(end_date, "%Y-%m-%d")
+            .map_err(|e| ToolError::InvalidParams(format!("invalid end_date: {e}")))?
+            .and_hms_opt(23, 59, 59)
+            .unwrap()
+            .and_utc();
+
+        let events = self.repos.events.list_range(&start, &end, Some(50_000)).await?;
+
+        match format {
+            "csv" => {
+                let mut csv = String::from(
+                    "app_name,window_title,category_id,started_at,duration_secs,is_idle\n",
+                );
+                for e in &events {
+                    let _ = writeln!(
+                        csv,
+                        "{},{},{},{},{},{}",
+                        escape_csv(&e.app_name),
+                        escape_csv(e.window_title.as_deref().unwrap_or("")),
+                        escape_csv(e.category_id.as_deref().unwrap_or("")),
+                        e.started_at,
+                        e.duration_secs.unwrap_or(0),
+                        e.is_idle,
+                    );
+                }
+                Ok(format!(
+                    "Exported {} events ({start_date} to {end_date}):\n\n{csv}",
+                    events.len()
+                ))
+            }
+            "json" => {
+                let json = serde_json::to_string_pretty(&events)
+                    .map_err(|e| ToolError::ExecutionFailed(e.to_string()))?;
+                Ok(format!(
+                    "Exported {} events ({start_date} to {end_date}):\n\n{json}",
+                    events.len()
+                ))
+            }
+            _ => Err(ToolError::InvalidParams("format must be 'csv' or 'json'".into()).into()),
+        }
     }
 
     // ── Category actions ───────────────────────────────────────────
@@ -264,7 +507,7 @@ impl Tool for ProductivityTool {
     }
 
     fn description(&self) -> &str {
-        "Track productivity, manage focus sessions, and view activity data. Actions: focus_start, focus_end, focus_status, activity_today, activity_summary, activity_week, activity_score, list_categories, set_category."
+        "Track productivity, manage focus sessions, set goals, and view activity data. Actions: focus_start, focus_end, focus_status, pomodoro_start, activity_today, activity_summary, activity_week, activity_score, activity_compare, set_goal, check_goals, list_goals, remove_goal, log_time, activity_export, list_categories, set_category."
     }
 
     fn parameters(&self) -> Value {
@@ -275,8 +518,11 @@ impl Tool for ProductivityTool {
                     "type": "string",
                     "enum": [
                         "focus_start", "focus_end", "focus_status",
+                        "pomodoro_start",
                         "activity_today", "activity_summary", "activity_week",
-                        "activity_score",
+                        "activity_score", "activity_compare",
+                        "set_goal", "check_goals", "list_goals", "remove_goal",
+                        "log_time", "activity_export",
                         "list_categories", "set_category"
                     ],
                     "description": "Action to perform"
@@ -308,7 +554,17 @@ impl Tool for ProductivityTool {
                     "type": "array",
                     "items": { "type": "string" },
                     "description": "URL patterns for category matching"
-                }
+                },
+                "work_mins": { "type": "integer", "description": "Pomodoro work duration in minutes (default: 25)" },
+                "break_mins": { "type": "integer", "description": "Pomodoro break duration in minutes (default: 5)" },
+                "period": { "type": "string", "enum": ["day", "week"], "description": "Comparison period for activity_compare" },
+                "metric": { "type": "string", "enum": ["productive_hours", "focus_sessions", "productivity_score", "max_distracting_mins"], "description": "Goal metric for set_goal" },
+                "target_value": { "type": "number", "description": "Target value for set_goal" },
+                "goal_type": { "type": "string", "enum": ["daily", "weekly"], "description": "Goal type for set_goal (default: daily)" },
+                "goal_id": { "type": "integer", "description": "Goal ID for remove_goal" },
+                "description": { "type": "string", "description": "Description for log_time" },
+                "category_id": { "type": "string", "description": "Category ID for log_time" },
+                "format": { "type": "string", "enum": ["csv", "json"], "description": "Export format (default: csv)" }
             },
             "required": ["action"]
         })
@@ -322,10 +578,18 @@ impl Tool for ProductivityTool {
             "focus_start" => self.handle_focus_start(&p).await,
             "focus_end" => self.handle_focus_end(&p).await,
             "focus_status" => self.handle_focus_status().await,
+            "pomodoro_start" => self.handle_pomodoro_start(&p).await,
             "activity_today" => self.handle_activity_today().await,
             "activity_summary" => self.handle_activity_summary(&p).await,
             "activity_week" => self.handle_activity_week().await,
             "activity_score" => self.handle_activity_score().await,
+            "activity_compare" => self.handle_activity_compare(&p).await,
+            "set_goal" => self.handle_set_goal(&p).await,
+            "check_goals" => self.handle_check_goals().await,
+            "list_goals" => self.handle_list_goals().await,
+            "remove_goal" => self.handle_remove_goal(&p).await,
+            "log_time" => self.handle_log_time(&p).await,
+            "activity_export" => self.handle_activity_export(&p).await,
             "list_categories" => self.handle_list_categories().await,
             "set_category" => self.handle_set_category(&p).await,
             _ => Err(ToolError::InvalidParams(format!("Unknown action: {action}")).into()),
@@ -340,6 +604,23 @@ fn format_duration(secs: i64) -> String {
         format!("{}h {}m", hours, mins)
     } else {
         format!("{}m", mins)
+    }
+}
+
+fn avg_scores(iter: impl Iterator<Item = f64>) -> Option<f64> {
+    let (sum, count) = iter.fold((0.0, 0usize), |(s, c), v| (s + v, c + 1));
+    if count == 0 {
+        None
+    } else {
+        Some(sum / count as f64)
+    }
+}
+
+fn escape_csv(field: &str) -> std::borrow::Cow<'_, str> {
+    if field.contains(',') || field.contains('"') || field.contains('\n') {
+        std::borrow::Cow::Owned(format!("\"{}\"", field.replace('"', "\"\"")))
+    } else {
+        std::borrow::Cow::Borrowed(field)
     }
 }
 

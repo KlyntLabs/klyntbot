@@ -5,16 +5,28 @@ use std::collections::HashMap;
 
 use chrono::{DateTime, NaiveDate, TimeZone, Utc};
 
+use std::sync::Arc;
+
+use crate::handler::ProductivityHandler;
 use crate::repos::ProductivityRepos;
 use crate::types::{AppUsage, CategoryUsage, DailySummary};
 
 pub struct DailyAggregator {
     repos: ProductivityRepos,
+    handler: Option<Arc<dyn ProductivityHandler>>,
 }
 
 impl DailyAggregator {
     pub fn new(repos: ProductivityRepos) -> Self {
-        Self { repos }
+        Self {
+            repos,
+            handler: None,
+        }
+    }
+
+    pub fn with_handler(mut self, handler: Arc<dyn ProductivityHandler>) -> Self {
+        self.handler = Some(handler);
+        self
     }
 
     /// Compute (or recompute) the daily summary for a given date string (YYYY-MM-DD).
@@ -38,6 +50,7 @@ impl DailyAggregator {
             categories,
             top_app_rows,
             sessions,
+            time_entries,
         ) = tokio::try_join!(
             self.repos.events.total_active_secs(&start, &end),
             self.repos.events.total_idle_secs(&start, &end),
@@ -46,7 +59,12 @@ impl DailyAggregator {
             self.repos.categories.list_all(),
             self.repos.events.top_apps(&start, &end, 10),
             self.repos.sessions.list_range(&start, &end, None),
+            self.repos.time_entries.list_range(&start, &end),
         )?;
+
+        // Include manual time entries in totals
+        let manual_secs: i64 = time_entries.iter().map(|e| e.duration_secs).sum();
+        let total_active_secs = total_active_secs + manual_secs;
 
         // Category breakdown — O(1) lookups via HashMap
         let cat_map: HashMap<&str, &crate::types::ActivityCategory> =
@@ -128,6 +146,34 @@ impl DailyAggregator {
         let score = compute_productivity_score(&summary);
         summary.productivity_score = Some(score);
 
+        // Preserve existing AI summary to avoid redundant LLM calls on recompute.
+        // Only generate a new one if no cached summary exists with an AI summary.
+        let existing_ai = self
+            .repos
+            .summaries
+            .get(date)
+            .await?
+            .and_then(|s| s.ai_summary);
+        if let Some(cached) = existing_ai {
+            summary.ai_summary = Some(cached);
+        } else if let Some(ref handler) = self.handler {
+            let context = format!(
+                "Date: {}. Active: {:.1}h. Productive: {:.1}h. Distracting: {:.1}h. Focus sessions: {}. Context switches: {}. Score: {:.0}/100. Top apps: {}.",
+                summary.date,
+                summary.total_active_secs as f64 / 3600.0,
+                summary.productive_secs as f64 / 3600.0,
+                summary.distracting_secs as f64 / 3600.0,
+                summary.focus_sessions_count,
+                summary.context_switches,
+                summary.productivity_score.unwrap_or(0.0),
+                summary.top_apps.iter().take(3).map(|a| format!("{} ({}m)", a.app_name, a.duration_secs / 60)).collect::<Vec<_>>().join(", "),
+            );
+            match handler.generate_daily_summary(&context).await {
+                Ok(ai_summary) => summary.ai_summary = Some(ai_summary),
+                Err(e) => tracing::warn!("AI summary generation failed: {e}"),
+            }
+        }
+
         self.repos.summaries.upsert(&summary).await?;
         Ok(summary)
     }
@@ -136,6 +182,45 @@ impl DailyAggregator {
     pub async fn compute_today(&self) -> common::Result<DailySummary> {
         let today = Utc::now().format("%Y-%m-%d").to_string();
         self.compute_for_date(&today).await
+    }
+
+    /// Check goal progress for a given date.
+    pub async fn check_goals(
+        &self,
+        date: &str,
+    ) -> common::Result<Vec<(crate::types::ProductivityGoal, f64, bool)>> {
+        let (summary, goals) = tokio::try_join!(
+            self.get_or_compute(date),
+            self.repos.goals.list_enabled(),
+        )?;
+
+        let mut results = Vec::new();
+        for goal in goals {
+            let current = match goal.metric {
+                crate::types::GoalMetric::ProductiveHours => {
+                    summary.productive_secs as f64 / 3600.0
+                }
+                crate::types::GoalMetric::FocusSessions => summary.focus_sessions_count as f64,
+                crate::types::GoalMetric::ProductivityScore => {
+                    summary.productivity_score.unwrap_or(0.0)
+                }
+                crate::types::GoalMetric::MaxDistractingMins => {
+                    summary.distracting_secs as f64 / 60.0
+                }
+            };
+            let met = match goal.metric {
+                crate::types::GoalMetric::MaxDistractingMins => current <= goal.target_value,
+                _ => current >= goal.target_value,
+            };
+            results.push((goal, current, met));
+        }
+        Ok(results)
+    }
+
+    /// Purge activity events older than retention_days.
+    pub async fn purge_old_data(&self, retention_days: u64) -> common::Result<u64> {
+        let cutoff = Utc::now() - chrono::Duration::days(retention_days as i64);
+        self.repos.events.purge_before(&cutoff).await
     }
 
     /// Get a cached summary for a date, or compute it if missing.

@@ -228,6 +228,106 @@ impl NudgeRecord {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GoalType {
+    Daily,
+    Weekly,
+}
+
+impl std::fmt::Display for GoalType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Daily => write!(f, "daily"),
+            Self::Weekly => write!(f, "weekly"),
+        }
+    }
+}
+
+impl std::str::FromStr for GoalType {
+    type Err = common::KlyntbotError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "daily" => Ok(Self::Daily),
+            "weekly" => Ok(Self::Weekly),
+            _ => Err(
+                common::ToolError::InvalidParams(format!("unknown goal type: {s}")).into(),
+            ),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum GoalMetric {
+    ProductiveHours,
+    FocusSessions,
+    ProductivityScore,
+    MaxDistractingMins,
+}
+
+impl GoalMetric {
+    /// Returns the comparison operator for display (">=" for most, "<=" for max-based metrics).
+    pub fn operator(&self) -> &'static str {
+        match self {
+            Self::MaxDistractingMins => "<=",
+            _ => ">=",
+        }
+    }
+}
+
+impl std::fmt::Display for GoalMetric {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ProductiveHours => write!(f, "productive_hours"),
+            Self::FocusSessions => write!(f, "focus_sessions"),
+            Self::ProductivityScore => write!(f, "productivity_score"),
+            Self::MaxDistractingMins => write!(f, "max_distracting_mins"),
+        }
+    }
+}
+
+impl std::str::FromStr for GoalMetric {
+    type Err = common::KlyntbotError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "productive_hours" => Ok(Self::ProductiveHours),
+            "focus_sessions" => Ok(Self::FocusSessions),
+            "productivity_score" => Ok(Self::ProductivityScore),
+            "max_distracting_mins" => Ok(Self::MaxDistractingMins),
+            _ => Err(
+                common::ToolError::InvalidParams(format!("unknown goal metric: {s}")).into(),
+            ),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProductivityGoal {
+    pub id: Option<i64>,
+    pub goal_type: GoalType,
+    pub metric: GoalMetric,
+    pub target_value: f64,
+    pub enabled: bool,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TimeEntry {
+    pub id: Option<i64>,
+    pub description: String,
+    pub category_id: Option<String>,
+    pub project_id: Option<String>,
+    pub started_at: DateTime<Utc>,
+    pub duration_secs: i64,
+    pub source: String,
+    pub created_at: DateTime<Utc>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProductivityScore {

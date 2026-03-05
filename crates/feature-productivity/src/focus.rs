@@ -85,6 +85,43 @@ impl FocusManager {
         Ok(Some(session))
     }
 
+    /// Start a Pomodoro session (work period).
+    pub async fn start_pomodoro(
+        &self,
+        action_id: Option<String>,
+        project_id: Option<String>,
+        work_mins: Option<i64>,
+        break_mins: Option<i64>,
+    ) -> common::Result<FocusSession> {
+        if let Some(active) = self.repos.sessions.get_active().await? {
+            return Err(common::ToolError::ExecutionFailed(format!(
+                "Session already active (id: {}, type: {})",
+                active.id, active.session_type
+            ))
+            .into());
+        }
+
+        let work = work_mins.unwrap_or(25);
+        let session = FocusSession {
+            id: Uuid::new_v4().to_string(),
+            action_id,
+            project_id,
+            session_type: SessionType::Pomodoro,
+            target_mins: Some(work),
+            started_at: Utc::now(),
+            ended_at: None,
+            actual_mins: None,
+            interruptions: 0,
+            distraction_events: vec![],
+            quality_score: None,
+            completed: false,
+            notes: break_mins.map(|b| format!("break_mins:{b}")),
+        };
+
+        self.repos.sessions.create(&session).await?;
+        Ok(session)
+    }
+
     /// Get the currently active focus session, if any.
     pub async fn get_active(&self) -> common::Result<Option<FocusSession>> {
         self.repos.sessions.get_active().await
