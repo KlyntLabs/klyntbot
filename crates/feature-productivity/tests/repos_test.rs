@@ -197,6 +197,7 @@ async fn test_daily_summary_upsert() {
             category: "coding".to_string(),
             duration_secs: 2400,
         }],
+        productivity_score: None,
         ai_summary: None,
     };
 

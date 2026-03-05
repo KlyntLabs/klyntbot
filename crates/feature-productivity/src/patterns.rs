@@ -302,6 +302,7 @@ mod tests {
             context_switches: 0,
             top_apps: vec![],
             top_categories: vec![],
+            productivity_score: None,
             ai_summary: None,
         }
     }

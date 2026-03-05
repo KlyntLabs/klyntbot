@@ -106,7 +106,7 @@ impl DailyAggregator {
             }
         };
 
-        let summary = DailySummary {
+        let mut summary = DailySummary {
             date: date.to_string(),
             total_active_secs,
             total_focus_secs,
@@ -121,8 +121,12 @@ impl DailyAggregator {
             context_switches,
             top_apps,
             top_categories,
+            productivity_score: None,
             ai_summary: None,
         };
+
+        let score = compute_productivity_score(&summary);
+        summary.productivity_score = Some(score);
 
         self.repos.summaries.upsert(&summary).await?;
         Ok(summary)
@@ -141,6 +145,34 @@ impl DailyAggregator {
         }
         self.compute_for_date(date).await
     }
+}
+
+/// Compute a 0-100 productivity score from daily metrics.
+///
+/// Formula:
+/// - Productive ratio (40%): productive_secs / total_active_secs
+/// - Focus quality (30%): avg_session_quality (or 0.5 if no sessions)
+/// - Low distraction (20%): 1.0 - (distracting_secs / total_active_secs)
+/// - Continuity (10%): 1.0 - (context_switches / expected_switches)
+fn compute_productivity_score(summary: &DailySummary) -> f64 {
+    let total = summary.total_active_secs as f64;
+    if total < 60.0 {
+        return 0.0;
+    }
+
+    let productive_ratio = summary.productive_secs as f64 / total;
+    let focus_quality = summary.avg_session_quality.unwrap_or(0.5);
+    let distraction_ratio = 1.0 - (summary.distracting_secs as f64 / total);
+    let expected_switches = (total / 1800.0).max(1.0);
+    let continuity =
+        (1.0 - (summary.context_switches as f64 / expected_switches)).clamp(0.0, 1.0);
+
+    let raw = (productive_ratio * 0.4)
+        + (focus_quality * 0.3)
+        + (distraction_ratio * 0.2)
+        + (continuity * 0.1);
+
+    (raw * 100.0).clamp(0.0, 100.0).round()
 }
 
 #[cfg(test)]
@@ -244,6 +276,64 @@ mod tests {
         // VS Code should be first (more time)
         assert_eq!(summary.top_apps[0].app_name, "VS Code");
         assert_eq!(summary.top_apps[0].duration_secs, 7200);
+    }
+
+    #[tokio::test]
+    async fn test_compute_productivity_score() {
+        let pool = setup_pool().await;
+        let repos = ProductivityRepos::new(pool);
+        let aggregator = DailyAggregator::new(repos.clone());
+
+        let today = Utc::now().format("%Y-%m-%d").to_string();
+        let start = Utc::now() - chrono::Duration::hours(4);
+
+        // 3h productive coding
+        repos
+            .events
+            .insert(&ActivityEvent {
+                id: None,
+                app_name: "VS Code".into(),
+                window_title: None,
+                bundle_id: None,
+                url: None,
+                category_id: Some("coding".into()),
+                started_at: start,
+                ended_at: Some(start + chrono::Duration::hours(3)),
+                duration_secs: Some(10800),
+                is_idle: false,
+                metadata: None,
+            })
+            .await
+            .unwrap();
+
+        // 1h distracting
+        repos
+            .events
+            .insert(&ActivityEvent {
+                id: None,
+                app_name: "Chrome".into(),
+                window_title: None,
+                bundle_id: None,
+                url: None,
+                category_id: Some("entertainment".into()),
+                started_at: start + chrono::Duration::hours(3),
+                ended_at: Some(start + chrono::Duration::hours(4)),
+                duration_secs: Some(3600),
+                is_idle: false,
+                metadata: None,
+            })
+            .await
+            .unwrap();
+
+        let summary = aggregator.compute_for_date(&today).await.unwrap();
+        let score = summary
+            .productivity_score
+            .expect("score should be computed");
+        assert!(score > 0.0 && score <= 100.0, "score {score} out of range");
+        assert!(
+            score > 40.0 && score < 85.0,
+            "score {score} unexpected for 75% productive"
+        );
     }
 
     #[tokio::test]

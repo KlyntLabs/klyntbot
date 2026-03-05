@@ -19,6 +19,7 @@ struct SummaryRow {
     context_switches: i64,
     top_apps: Option<String>,
     top_categories: Option<String>,
+    productivity_score: Option<f64>,
     ai_summary: Option<String>,
 }
 
@@ -61,12 +62,13 @@ impl From<SummaryRow> for DailySummary {
             context_switches: row.context_switches,
             top_apps,
             top_categories,
+            productivity_score: row.productivity_score,
             ai_summary: row.ai_summary,
         }
     }
 }
 
-const SUMMARY_COLUMNS: &str = "date, total_active_secs, total_focus_secs, total_break_secs, total_idle_secs, productive_secs, neutral_secs, distracting_secs, focus_sessions_count, avg_session_quality, interruptions_count, context_switches, top_apps, top_categories, ai_summary";
+const SUMMARY_COLUMNS: &str = "date, total_active_secs, total_focus_secs, total_break_secs, total_idle_secs, productive_secs, neutral_secs, distracting_secs, focus_sessions_count, avg_session_quality, interruptions_count, context_switches, top_apps, top_categories, productivity_score, ai_summary";
 
 #[derive(Debug, Clone)]
 pub struct DailySummaryRepo {
@@ -84,8 +86,8 @@ impl DailySummaryRepo {
         let top_categories_json = serde_json::to_string(&summary.top_categories)
             .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         sqlx::query(
-            r#"INSERT INTO daily_summaries (date, total_active_secs, total_focus_secs, total_break_secs, total_idle_secs, productive_secs, neutral_secs, distracting_secs, focus_sessions_count, avg_session_quality, interruptions_count, context_switches, top_apps, top_categories, ai_summary)
-               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
+            r#"INSERT INTO daily_summaries (date, total_active_secs, total_focus_secs, total_break_secs, total_idle_secs, productive_secs, neutral_secs, distracting_secs, focus_sessions_count, avg_session_quality, interruptions_count, context_switches, top_apps, top_categories, productivity_score, ai_summary)
+               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
                ON CONFLICT(date) DO UPDATE SET
                    total_active_secs = excluded.total_active_secs,
                    total_focus_secs = excluded.total_focus_secs,
@@ -100,6 +102,7 @@ impl DailySummaryRepo {
                    context_switches = excluded.context_switches,
                    top_apps = excluded.top_apps,
                    top_categories = excluded.top_categories,
+                   productivity_score = excluded.productivity_score,
                    ai_summary = excluded.ai_summary,
                    computed_at = datetime('now')"#,
         )
@@ -117,6 +120,7 @@ impl DailySummaryRepo {
         .bind(summary.context_switches)
         .bind(&top_apps_json)
         .bind(&top_categories_json)
+        .bind(summary.productivity_score)
         .bind(&summary.ai_summary)
         .execute(&self.pool)
         .await

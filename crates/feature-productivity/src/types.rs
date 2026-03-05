@@ -148,6 +148,7 @@ pub struct DailySummary {
     pub context_switches: i64,
     pub top_apps: Vec<AppUsage>,
     pub top_categories: Vec<CategoryUsage>,
+    pub productivity_score: Option<f64>,
     pub ai_summary: Option<String>,
 }
 

@@ -345,6 +345,7 @@ async fn test_pattern_analyzer_detects_patterns() {
             context_switches: 30,
             top_apps: vec![],
             top_categories: vec![],
+            productivity_score: None,
             ai_summary: None,
         };
         repos.summaries.upsert(&summary).await.unwrap();
