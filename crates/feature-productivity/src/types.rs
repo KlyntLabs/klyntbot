@@ -7,6 +7,7 @@ pub struct ActivityEvent {
     pub id: Option<i64>,
     pub app_name: String,
     pub window_title: Option<String>,
+    pub site_name: Option<String>,
     pub bundle_id: Option<String>,
     pub url: Option<String>,
     pub category_id: Option<String>,

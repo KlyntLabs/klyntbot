@@ -1,5 +1,6 @@
 import { useQuery } from "../../../hooks/useQuery";
 import type { AgentStatus } from "../../../lib/types";
+import { PermissionsCard } from "../PermissionsCard";
 
 export function GeneralSettings() {
   const { data: status } = useQuery<AgentStatus>("agent_status", undefined, {
@@ -37,6 +38,8 @@ export function GeneralSettings() {
             </div>
           </div>
         </div>
+
+        <PermissionsCard />
       </div>
     </div>
   );

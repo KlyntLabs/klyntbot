@@ -1,7 +1,9 @@
 pub mod areas;
 pub mod calendar;
 pub mod chat;
+pub mod distraction;
 pub mod finance;
+pub mod permissions;
 pub mod key_results;
 pub mod objectives;
 pub mod productivity;
@@ -17,6 +19,11 @@ use desktop_shared::errors::ApiError;
 use desktop_shared::events::{EntityUpdatedPayload, ENTITY_UPDATED};
 use desktop_shared::types::EntityKind;
 use tauri::Emitter;
+
+/// Convert a `KlyntbotError` into a productivity-flavored `ApiError`.
+pub(crate) fn map_prod_err(e: common::KlyntbotError) -> ApiError {
+    ApiError::new("PRODUCTIVITY_ERROR", e.to_string())
+}
 
 /// Convert a `StorageError` into an `ApiError`, preserving specific error codes
 /// for NotFound and Conflict variants.

@@ -3,6 +3,7 @@ pub mod activity_event;
 pub mod daily_summary;
 pub mod focus_session;
 pub mod goal;
+pub mod learned_rule;
 pub mod nudge;
 pub mod time_entry;
 
@@ -11,6 +12,7 @@ pub use activity_event::ActivityEventRepo;
 pub use daily_summary::DailySummaryRepo;
 pub use focus_session::FocusSessionRepo;
 pub use goal::GoalRepo;
+pub use learned_rule::LearnedRuleRepo;
 pub use nudge::NudgeRepo;
 pub use time_entry::TimeEntryRepo;
 
@@ -24,6 +26,7 @@ pub struct ProductivityRepos {
     pub nudges: NudgeRepo,
     pub goals: GoalRepo,
     pub time_entries: TimeEntryRepo,
+    pub learned_rules: LearnedRuleRepo,
 }
 
 impl ProductivityRepos {
@@ -35,7 +38,8 @@ impl ProductivityRepos {
             summaries: DailySummaryRepo::new(pool.clone()),
             nudges: NudgeRepo::new(pool.clone()),
             goals: GoalRepo::new(pool.clone()),
-            time_entries: TimeEntryRepo::new(pool),
+            time_entries: TimeEntryRepo::new(pool.clone()),
+            learned_rules: LearnedRuleRepo::new(pool),
         }
     }
 }

@@ -111,7 +111,9 @@ pub async fn finance_investments(
 }
 
 #[tauri::command]
-pub async fn finance_goals(state: State<'_, Arc<AppCore>>) -> Result<Vec<FinanceGoalRow>, ApiError> {
+pub async fn finance_goals(
+    state: State<'_, Arc<AppCore>>,
+) -> Result<Vec<FinanceGoalRow>, ApiError> {
     state
         .repos
         .finance

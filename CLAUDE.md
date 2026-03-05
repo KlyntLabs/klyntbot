@@ -30,9 +30,14 @@ cargo build --no-default-features    # Build without email channel
 cd desktop-ui && bun run dev            # Start Vite dev server (port 1420)
 cd desktop-ui && bun run build          # Production build
 cd desktop-ui && bun install            # Install dependencies
+cd desktop-ui && bun run lint           # Biome lint check
+cd desktop-ui && bun run lint:fix       # Biome auto-fix (lint + format + imports)
+cd desktop-ui && bun run format         # Biome format only
 ```
 
 **Always use `bun` (not `npm`) for the desktop-ui frontend.**
+
+**Biome (not ESLint):** Linting, formatting, and import sorting handled by Biome (`biome.json`). Config: 2-space indent, 100-char line width, Tailwind CSS directive support. Run `bun run lint:fix` to auto-fix.
 
 **Tailwind v4 (CSS-driven, no config file):** Theme tokens defined in `src/styles/theme.css` via CSS variables + `@theme inline`. No `tailwind.config.js` — all customization is in CSS.
 
@@ -50,7 +55,7 @@ cd desktop-ui && bun install            # Install dependencies
 
 Klyntbot is a Rust personal AI agent — a single binary that connects to 6+ chat platforms, calls LLMs, manages tasks/projects, syncs with Apple Calendar, and manages persistent memory. It is **not** a code execution platform — users have dedicated tools (Claude Code, Cursor, Codex) for that. All persistent state is stored in SQLite (relational data) + LanceDB (vector embeddings).
 
-### Workspace layout (19 crates in 8 dependency layers)
+### Workspace layout (24 crates in 9 dependency layers)
 
 ```
 Layer 0: common              — Error types (KlyntbotError, 15 variants), MessageRole, ChannelName, ChatId, SessionKey
@@ -61,19 +66,23 @@ Layer 2: storage, domain     — SQLite pool (sqlx + SqlitePool), auto-migration
                                OKR + PARA domain types (Area, Objective, KeyResult, Project)
 Layer 3: providers, session, scheduling, calendar, context_engine
                              — LLM HTTP clients, session persistence, cron service, CalDAV sync, token budget allocator
-Layer 4: tools, feature-todo, feature-finance, plugin-runtime
+Layer 4: tools, feature-todo, feature-finance, feature-productivity, plugin-runtime
                              — 20+ tool implementations (filesystem ×4, web ×2, grep, glob, message, spawn, cron, calendar,
                                project, okr, area, memory, learning, browser, ask_user, agent_task),
                                self-contained feature packages (own tools, migrations, config, handler traits),
+                               feature-productivity (time tracking, focus sessions, pomodoro),
                                WASM plugin sandbox
 Layer 5: channels, agent     — Chat platform integrations (Telegram, Discord, WhatsApp, Slack, Email, QQ),
                                agent loop, agent runtime, execution core, memory store, agent manager, subagent manager,
                                unified learning system (interaction recorder, pattern analyzer, outcome recorder)
-Layer 6: cli                 — Clap-derived CLI with 4 commands: serve, init, status, plugin
-Layer 7: klyntbot            — Re-export facade (src/lib.rs) + binary entry point (src/main.rs)
+Layer 6: cli, mcp            — Clap-derived CLI with 4 commands: serve, init, status, plugin; MCP server integration
+Layer 7: desktop-shared, desktop, dev-api
+                             — Shared types for Tauri IPC, Tauri desktop app (commands, OAuth, window management),
+                               development API server
+Layer 8: klyntbot            — Re-export facade (src/lib.rs) + binary entry point (src/main.rs)
 ```
 
-One additional crate (`plugin-sdk`) is excluded from the workspace.
+Two crates (`plugin-sdk`, `tests/fixtures/hello_plugin`) are excluded from the workspace.
 
 Dependencies flow strictly upward. No circular dependencies — enforced by Cargo.
 

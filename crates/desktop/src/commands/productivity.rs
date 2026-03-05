@@ -15,9 +15,7 @@ use crate::app_core::AppCore;
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
-fn map_prod_err(e: common::KlyntbotError) -> ApiError {
-    ApiError::new("PRODUCTIVITY_ERROR", e.to_string())
-}
+use super::map_prod_err;
 
 fn summary_to_response(s: DailySummary) -> ProductivitySummaryResponse {
     ProductivitySummaryResponse {
@@ -104,6 +102,7 @@ pub async fn productivity_timeline(
         .map(|e| ActivityTimelineResponse {
             app_name: e.app_name,
             window_title: e.window_title,
+            site_name: e.site_name,
             category_id: e.category_id,
             started_at: e.started_at,
             duration_secs: e.duration_secs,
@@ -134,6 +133,13 @@ pub async fn productivity_focus_end(
 ) -> Result<Option<FocusSessionResponse>, ApiError> {
     let focus_mgr = state.focus_manager()?;
     let session = focus_mgr.end_session(notes).await.map_err(map_prod_err)?;
+
+    // Clear interceptor session state (whitelist + temp passes)
+    if let Ok(interceptor) = state.distraction_interceptor() {
+        let mut guard = interceptor.lock().await;
+        guard.reset_session();
+    }
+
     Ok(session.map(session_to_response))
 }
 
@@ -251,6 +257,7 @@ pub async fn productivity_activity_feed(
         .map(|e| ActivityTimelineResponse {
             app_name: e.app_name,
             window_title: e.window_title,
+            site_name: e.site_name,
             category_id: e.category_id,
             started_at: e.started_at,
             duration_secs: e.duration_secs,

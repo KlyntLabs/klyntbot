@@ -488,6 +488,7 @@ export interface FocusSession {
 export interface ActivityTimeline {
   appName: string;
   windowTitle: string | null;
+  siteName: string | null;
   categoryId: string | null;
   startedAt: string;
   durationSecs: number | null;

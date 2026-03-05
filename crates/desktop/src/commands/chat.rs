@@ -15,7 +15,9 @@ use tokio_util::sync::CancellationToken;
 use crate::app_core::AppCore;
 
 #[tauri::command]
-pub async fn chat_threads(state: State<'_, Arc<AppCore>>) -> Result<Vec<ChatThreadResponse>, ApiError> {
+pub async fn chat_threads(
+    state: State<'_, Arc<AppCore>>,
+) -> Result<Vec<ChatThreadResponse>, ApiError> {
     // Fetch sessions, contexts, and name lookups concurrently (4 queries total)
     let default_filter = ProjectFilter::default();
     let (sessions, visible_contexts, all_areas, all_projects) = tokio::join!(
@@ -775,7 +777,10 @@ fn format_interaction_summary(response: &common::FormResponse) -> String {
 }
 
 #[tauri::command]
-pub async fn chat_cancel(state: State<'_, Arc<AppCore>>, session_key: String) -> Result<(), ApiError> {
+pub async fn chat_cancel(
+    state: State<'_, Arc<AppCore>>,
+    session_key: String,
+) -> Result<(), ApiError> {
     // Cancel stream
     if let Some((_, token)) = state.active_streams.remove(&session_key) {
         token.cancel();

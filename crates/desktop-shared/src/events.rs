@@ -277,6 +277,26 @@ pub struct NudgePayload {
     pub message: String,
 }
 
+pub const DISTRACTION_INTERVENTION: &str = "distraction:intervention";
+pub const DISTRACTION_VERDICT: &str = "distraction:verdict";
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InterventionPayload {
+    pub app_name: String,
+    pub window_title: Option<String>,
+    pub session_id: String,
+    pub needs_llm: bool,
+    pub heuristic_verdict: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VerdictPayload {
+    pub classification: String,
+    pub display_text: String,
+}
+
 /// Accumulated transparency data for an assistant message.
 /// Serialized into `SessionMessage.metadata.transparency`.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

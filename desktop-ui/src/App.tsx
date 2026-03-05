@@ -24,6 +24,7 @@ import { ObjectiveDetail } from "./components/views/ObjectiveDetail";
 import { ProjectDetail } from "./components/views/ProjectDetail";
 import { SystemTray } from "./components/views/SystemTray";
 import { TaskDetail } from "./components/views/TaskDetail";
+import { DistractionOverlay } from "./components/distraction/DistractionOverlay";
 
 const router = createHashRouter([
   { path: "/", element: <MainApp /> },
@@ -104,6 +105,7 @@ const router = createHashRouter([
   },
   { path: "/launcher", element: <Launcher /> },
   { path: "/tray", element: <SystemTray /> },
+  { path: "/distraction-overlay", element: <DistractionOverlay /> },
   { path: "*", element: <Navigate to="/" replace /> },
 ]);
 

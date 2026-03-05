@@ -1,7 +1,7 @@
-use std::sync::Arc;
 use desktop_shared::commands::{ProjectCreateParams, ProjectResponse, ProjectUpdateParams};
 use desktop_shared::errors::ApiError;
 use desktop_shared::types::EntityKind;
+use std::sync::Arc;
 use storage::{ProjectPatch, ProjectRow};
 use tauri::State;
 

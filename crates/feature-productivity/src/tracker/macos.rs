@@ -9,7 +9,14 @@ pub struct WindowInfo {
     pub window_title: Option<String>,
 }
 
-/// Get the currently focused window's app name and bundle ID.
+/// Get the currently focused window's app name, bundle ID, and window title.
+///
+/// Tries two approaches for the window title:
+/// 1. **Accessibility API** (`AXUIElement`) — works if Accessibility permission is granted.
+/// 2. **CoreGraphics** (`CGWindowListCopyWindowInfo`) — works if Screen Recording permission is granted.
+///
+/// Accessibility is preferred because Screen Recording permission resets on every
+/// recompile during development (unsigned binaries), while Accessibility persists.
 #[cfg(target_os = "macos")]
 pub fn get_frontmost_window() -> Result<Option<WindowInfo>> {
     use objc2_app_kit::NSWorkspace;
@@ -26,7 +33,9 @@ pub fn get_frontmost_window() -> Result<Option<WindowInfo>> {
             let bundle = app.bundleIdentifier().map(|b| b.to_string());
 
             let pid = app.processIdentifier();
-            let title = get_window_title_cg(pid);
+            // Try AX first (needs Accessibility), fall back to CG (needs Screen Recording).
+            let title = get_window_title_ax(pid).or_else(|| get_window_title_cg(pid));
+            tracing::debug!(app = %name, ?title, pid, "frontmost window detected");
 
             Ok(Some(WindowInfo {
                 app_name: name,
@@ -35,6 +44,72 @@ pub fn get_frontmost_window() -> Result<Option<WindowInfo>> {
             }))
         }
         None => Ok(None),
+    }
+}
+
+/// Extract the focused window title using the Accessibility API.
+///
+/// Creates an AXUIElement for the given PID, reads its focused window, and
+/// extracts the `AXTitle` attribute. Requires Accessibility permission.
+#[cfg(target_os = "macos")]
+fn get_window_title_ax(pid: i32) -> Option<String> {
+    use core_foundation::base::TCFType;
+    use core_foundation::string::CFString;
+    use std::ptr;
+
+    #[link(name = "ApplicationServices", kind = "framework")]
+    extern "C" {
+        fn AXUIElementCreateApplication(pid: i32) -> *mut std::ffi::c_void;
+        fn AXUIElementCopyAttributeValue(
+            element: *mut std::ffi::c_void,
+            attribute: *const std::ffi::c_void,
+            value: *mut *mut std::ffi::c_void,
+        ) -> i32;
+    }
+
+    const AX_ERROR_SUCCESS: i32 = 0;
+
+    unsafe {
+        let app_element = AXUIElementCreateApplication(pid);
+        if app_element.is_null() {
+            return None;
+        }
+
+        // Get the focused window
+        let focused_window_attr = CFString::new("AXFocusedWindow");
+        let mut focused_window: *mut std::ffi::c_void = ptr::null_mut();
+        let err = AXUIElementCopyAttributeValue(
+            app_element,
+            focused_window_attr.as_CFTypeRef() as *const _,
+            &mut focused_window,
+        );
+        core_foundation::base::CFRelease(app_element as _);
+
+        if err != AX_ERROR_SUCCESS || focused_window.is_null() {
+            return None;
+        }
+
+        // Get AXTitle from the focused window
+        let title_attr = CFString::new("AXTitle");
+        let mut title_value: *mut std::ffi::c_void = ptr::null_mut();
+        let err = AXUIElementCopyAttributeValue(
+            focused_window,
+            title_attr.as_CFTypeRef() as *const _,
+            &mut title_value,
+        );
+        core_foundation::base::CFRelease(focused_window as _);
+
+        if err != AX_ERROR_SUCCESS || title_value.is_null() {
+            return None;
+        }
+
+        let cf_title: CFString = CFString::wrap_under_create_rule(title_value as _);
+        let title = cf_title.to_string();
+        if title.is_empty() {
+            None
+        } else {
+            Some(title)
+        }
     }
 }
 

@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use desktop_shared::commands::{
     KeyResultResponse, ObjectiveResponse, ProjectResponse, TaskCreateParams, TaskResponse,
@@ -6,6 +5,7 @@ use desktop_shared::commands::{
 };
 use desktop_shared::errors::ApiError;
 use desktop_shared::types::EntityKind;
+use std::sync::Arc;
 use storage::{ActionFilter, ActionPatch, ActionRow, KeyResultRow, ObjectiveRow, ProjectFilter};
 use tauri::State;
 
@@ -380,7 +380,9 @@ pub async fn task_delete(
 }
 
 #[tauri::command]
-pub async fn today_tasks(state: State<'_, Arc<AppCore>>) -> Result<Vec<TodayTaskResponse>, ApiError> {
+pub async fn today_tasks(
+    state: State<'_, Arc<AppCore>>,
+) -> Result<Vec<TodayTaskResponse>, ApiError> {
     let now = chrono::Utc::now();
     let start_of_today = now.date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc();
     let start_of_tomorrow = start_of_today + chrono::Duration::days(1);

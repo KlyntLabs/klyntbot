@@ -1,6 +1,49 @@
 use crate::repos::ActivityCategoryRepo;
 use crate::types::ActivityCategory;
 
+/// Known browser app names (lowercased for comparison).
+const BROWSER_APPS: &[&str] = &[
+    "google chrome",
+    "safari",
+    "firefox",
+    "arc",
+    "brave browser",
+    "orion",
+    "vivaldi",
+    "microsoft edge",
+    "opera",
+    "chromium",
+    "zen browser",
+];
+
+/// Known browser bundle ID prefixes.
+const BROWSER_BUNDLE_PREFIXES: &[&str] = &[
+    "com.google.chrome",
+    "com.apple.safari",
+    "org.mozilla.firefox",
+    "company.thebrowser.browser", // Arc
+    "com.brave.browser",
+    "com.microsoft.edgemac",
+    "com.operasoftware.opera",
+    "com.vivaldi.vivaldi",
+];
+
+/// Browser name suffixes typically appended to window titles.
+const BROWSER_SUFFIXES: &[&str] = &[
+    " - Google Chrome",
+    " - Mozilla Firefox",
+    " - Safari",
+    " - Arc",
+    " - Brave",
+    " - Vivaldi",
+    " - Microsoft Edge",
+    " - Opera",
+    " - Chromium",
+    " — Mozilla Firefox",
+    " — Safari",
+    " - Zen Browser",
+];
+
 pub struct Categorizer {
     /// Cached categories loaded from DB
     categories: Vec<ActivityCategory>,
@@ -54,6 +97,69 @@ impl Categorizer {
             }
         }
         pattern
+    }
+
+    /// Check whether an app is a known browser by name or bundle ID.
+    pub fn is_browser(app_name: &str, bundle_id: Option<&str>) -> bool {
+        let name_lower = app_name.to_lowercase();
+        if BROWSER_APPS.iter().any(|b| name_lower == *b) {
+            return true;
+        }
+        if let Some(bid) = bundle_id {
+            let bid_lower = bid.to_lowercase();
+            if BROWSER_BUNDLE_PREFIXES
+                .iter()
+                .any(|p| bid_lower.starts_with(p))
+            {
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Extract a human-readable site name from a browser window title.
+    ///
+    /// Browser titles typically look like:
+    /// - `"Page Title - Site Name - Google Chrome"`
+    /// - `"Claude - Anthropic - Google Chrome"`
+    /// - `"r/rust - Reddit - Google Chrome"`
+    ///
+    /// Strategy:
+    /// 1. Strip the browser suffix (e.g. ` - Google Chrome`)
+    /// 2. Take the last segment after ` - ` as the site name (most browsers put
+    ///    site name last, page title first)
+    /// 3. If only one segment remains, use that as the site name
+    pub fn extract_site_name(window_title: &str) -> String {
+        let mut title = window_title;
+
+        // Strip browser suffix (case-insensitive check)
+        let title_lower = title.to_lowercase();
+        for suffix in BROWSER_SUFFIXES {
+            if let Some(pos) = title_lower.rfind(&suffix.to_lowercase()) {
+                title = &title[..pos];
+                break;
+            }
+        }
+
+        let title = title.trim();
+        if title.is_empty() {
+            return window_title.to_string();
+        }
+
+        // Split on common separators and take the last meaningful segment.
+        // "Page Title - Site Name" → "Site Name"
+        // "Site Name" → "Site Name"
+        // "r/rust - Reddit" → "Reddit"
+        for sep in &[" - ", " — ", " | "] {
+            if let Some(pos) = title.rfind(sep) {
+                let last_segment = title[pos + sep.len()..].trim();
+                if !last_segment.is_empty() {
+                    return last_segment.to_string();
+                }
+            }
+        }
+
+        title.to_string()
     }
 
     /// Match an app to a category using rules.
@@ -246,5 +352,63 @@ mod tests {
                 Some("GitHub - Where the world builds software"),
             )
             .is_none());
+    }
+
+    #[test]
+    fn test_is_browser() {
+        assert!(Categorizer::is_browser("Google Chrome", None));
+        assert!(Categorizer::is_browser("Safari", None));
+        assert!(Categorizer::is_browser("Arc", None));
+        assert!(Categorizer::is_browser("Firefox", Some("org.mozilla.firefox")));
+        assert!(!Categorizer::is_browser("Visual Studio Code", None));
+        assert!(!Categorizer::is_browser("Slack", None));
+        // Bundle ID detection
+        assert!(Categorizer::is_browser(
+            "Chrome Canary",
+            Some("com.google.chrome.canary")
+        ));
+    }
+
+    #[test]
+    fn test_extract_site_name() {
+        // Standard Chrome titles
+        assert_eq!(
+            Categorizer::extract_site_name("Some Video - YouTube - Google Chrome"),
+            "YouTube"
+        );
+        assert_eq!(
+            Categorizer::extract_site_name("r/rust - Reddit - Google Chrome"),
+            "Reddit"
+        );
+        assert_eq!(
+            Categorizer::extract_site_name(
+                "anthropics/claude-code: CLI for Claude - GitHub - Google Chrome"
+            ),
+            "GitHub"
+        );
+
+        // Single segment (no separator after stripping browser)
+        assert_eq!(
+            Categorizer::extract_site_name("YouTube - Google Chrome"),
+            "YouTube"
+        );
+
+        // Safari with em-dash
+        assert_eq!(
+            Categorizer::extract_site_name("Claude — Safari"),
+            "Claude"
+        );
+
+        // Title with pipe separator
+        assert_eq!(
+            Categorizer::extract_site_name("Dashboard | Linear - Google Chrome"),
+            "Linear"
+        );
+
+        // No browser suffix (unknown browser or stripped title)
+        assert_eq!(
+            Categorizer::extract_site_name("Some Page - Some Site"),
+            "Some Site"
+        );
     }
 }

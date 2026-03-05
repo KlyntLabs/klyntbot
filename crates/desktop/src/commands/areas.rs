@@ -1,13 +1,16 @@
-use std::sync::Arc;
 use desktop_shared::commands::{AreaCreateParams, AreaResponse, AreaUpdateParams};
 use desktop_shared::errors::ApiError;
 use desktop_shared::types::EntityKind;
+use std::sync::Arc;
 use storage::AreaRow;
 use tauri::State;
 
 use crate::app_core::AppCore;
 
-pub(crate) async fn build_area_response(state: &AppCore, row: &AreaRow) -> Result<AreaResponse, ApiError> {
+pub(crate) async fn build_area_response(
+    state: &AppCore,
+    row: &AreaRow,
+) -> Result<AreaResponse, ApiError> {
     let (project_count, task_count) = tokio::try_join!(
         state.repos.areas.count_projects(&row.id),
         state.repos.areas.count_actions(&row.id),

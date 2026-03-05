@@ -245,6 +245,11 @@ mod tests {
             break_duration_mins: 10,
             max_daily_focus_hours: 8,
             soft_block_enabled: true,
+            soft_block_cooldown_secs: 300,
+            soft_block_temp_pass_mins: 5,
+            soft_block_llm_enabled: true,
+            soft_block_llm_timeout_ms: 3000,
+            learned_rule_threshold: 3,
         }
     }
 
@@ -262,6 +267,7 @@ mod tests {
                 id: None,
                 app_name: "Code".into(),
                 window_title: None,
+                site_name: None,
                 bundle_id: None,
                 url: None,
                 category_id: Some("coding".into()),
@@ -304,6 +310,7 @@ mod tests {
                 id: None,
                 app_name: "Code".into(),
                 window_title: None,
+                site_name: None,
                 bundle_id: None,
                 url: None,
                 category_id: None,
@@ -358,6 +365,7 @@ mod tests {
                 id: None,
                 app_name: "Code".into(),
                 window_title: None,
+                site_name: None,
                 bundle_id: None,
                 url: None,
                 category_id: None,

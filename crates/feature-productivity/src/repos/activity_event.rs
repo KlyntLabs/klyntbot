@@ -8,8 +8,8 @@ pub struct ActivityEventRepo {
     pool: SqlitePool,
 }
 
-const INSERT_SQL: &str = r#"INSERT INTO activity_events (app_name, window_title, bundle_id, url, category_id, started_at, ended_at, duration_secs, is_idle, metadata)
-VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)"#;
+const INSERT_SQL: &str = r#"INSERT INTO activity_events (app_name, window_title, site_name, bundle_id, url, category_id, started_at, ended_at, duration_secs, is_idle, metadata)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)"#;
 
 fn bind_event<'a>(
     query: sqlx::query::Query<'a, sqlx::Sqlite, sqlx::sqlite::SqliteArguments<'a>>,
@@ -18,6 +18,7 @@ fn bind_event<'a>(
     query
         .bind(&event.app_name)
         .bind(&event.window_title)
+        .bind(&event.site_name)
         .bind(&event.bundle_id)
         .bind(&event.url)
         .bind(&event.category_id)
@@ -41,6 +42,7 @@ impl ActivityEventRepo {
         let row = sqlx::query_scalar::<_, i64>(&format!("{INSERT_SQL} RETURNING id"))
             .bind(&event.app_name)
             .bind(&event.window_title)
+            .bind(&event.site_name)
             .bind(&event.bundle_id)
             .bind(&event.url)
             .bind(&event.category_id)
@@ -92,7 +94,7 @@ impl ActivityEventRepo {
         let limit = limit.unwrap_or(10_000);
         let offset = offset.unwrap_or(0).max(0);
         let rows = sqlx::query_as::<_, ActivityEvent>(
-            r#"SELECT id, app_name, window_title, bundle_id, url, category_id, started_at, ended_at, duration_secs, is_idle, metadata
+            r#"SELECT id, app_name, window_title, site_name, bundle_id, url, category_id, started_at, ended_at, duration_secs, is_idle, metadata
                FROM activity_events
                WHERE started_at >= ?1 AND started_at < ?2
                ORDER BY started_at ASC
@@ -167,6 +169,9 @@ impl ActivityEventRepo {
             .collect())
     }
 
+    /// Returns top apps/sites grouped by `COALESCE(site_name, app_name)`.
+    /// For browsers this gives site-level granularity (e.g. "YouTube" instead
+    /// of "Google Chrome"); for native apps it stays as the app name.
     pub async fn top_apps(
         &self,
         start: &DateTime<Utc>,
@@ -175,14 +180,15 @@ impl ActivityEventRepo {
     ) -> common::Result<Vec<(String, i64)>> {
         #[derive(sqlx::FromRow)]
         struct Row {
-            app_name: String,
+            display_name: String,
             total_secs: i64,
         }
         let rows = sqlx::query_as::<_, Row>(
-            r#"SELECT app_name, COALESCE(SUM(duration_secs), 0) as total_secs
+            r#"SELECT COALESCE(site_name, app_name) AS display_name,
+                      COALESCE(SUM(duration_secs), 0) AS total_secs
                FROM activity_events
                WHERE started_at >= ?1 AND started_at < ?2 AND is_idle = FALSE
-               GROUP BY app_name
+               GROUP BY display_name
                ORDER BY total_secs DESC
                LIMIT ?3"#,
         )
@@ -194,7 +200,7 @@ impl ActivityEventRepo {
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         Ok(rows
             .into_iter()
-            .map(|r| (r.app_name, r.total_secs))
+            .map(|r| (r.display_name, r.total_secs))
             .collect())
     }
 

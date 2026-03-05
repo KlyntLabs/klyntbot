@@ -16,21 +16,28 @@ export function useEvent<T>(event: string, handler: (payload: T) => void) {
   handlerRef.current = handler;
 
   useEffect(() => {
-    if (!isTauri) return;
+    if (isTauri) {
+      let cancelled = false;
+      let unlisten: UnlistenFn | undefined;
 
-    let cancelled = false;
-    let unlisten: UnlistenFn | undefined;
+      listen<T>(event, (e) => {
+        if (!cancelled) handlerRef.current(e.payload);
+      }).then((fn) => {
+        if (cancelled) fn();
+        else unlisten = fn;
+      });
 
-    listen<T>(event, (e) => {
-      if (!cancelled) handlerRef.current(e.payload);
-    }).then((fn) => {
-      if (cancelled) fn();
-      else unlisten = fn;
-    });
+      return () => {
+        cancelled = true;
+        unlisten?.();
+      };
+    }
 
-    return () => {
-      cancelled = true;
-      unlisten?.();
+    // Browser dev mode: listen for CustomEvent on window
+    const onCustom = (e: Event) => {
+      handlerRef.current((e as CustomEvent).detail as T);
     };
+    window.addEventListener(event, onCustom);
+    return () => window.removeEventListener(event, onCustom);
   }, [event]);
 }

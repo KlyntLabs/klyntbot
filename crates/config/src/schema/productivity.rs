@@ -46,6 +46,16 @@ pub struct FocusConfig {
     pub max_daily_focus_hours: u64,
     #[serde(default = "default_true")]
     pub soft_block_enabled: bool,
+    #[serde(default = "default_soft_block_cooldown")]
+    pub soft_block_cooldown_secs: u64,
+    #[serde(default = "default_temp_pass_mins")]
+    pub soft_block_temp_pass_mins: u64,
+    #[serde(default = "default_true")]
+    pub soft_block_llm_enabled: bool,
+    #[serde(default = "default_llm_timeout")]
+    pub soft_block_llm_timeout_ms: u64,
+    #[serde(default = "default_learned_rule_threshold")]
+    pub learned_rule_threshold: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -105,6 +115,18 @@ fn default_max_daily_focus() -> u64 {
 fn default_cooldown() -> u64 {
     15
 }
+fn default_soft_block_cooldown() -> u64 {
+    60
+}
+fn default_temp_pass_mins() -> u64 {
+    5
+}
+fn default_llm_timeout() -> u64 {
+    3000
+}
+fn default_learned_rule_threshold() -> u64 {
+    3
+}
 
 impl Default for ProductivityConfig {
     fn default() -> Self {
@@ -137,6 +159,11 @@ impl Default for FocusConfig {
             break_duration_mins: default_break_duration(),
             max_daily_focus_hours: default_max_daily_focus(),
             soft_block_enabled: true,
+            soft_block_cooldown_secs: default_soft_block_cooldown(),
+            soft_block_temp_pass_mins: default_temp_pass_mins(),
+            soft_block_llm_enabled: true,
+            soft_block_llm_timeout_ms: default_llm_timeout(),
+            learned_rule_threshold: default_learned_rule_threshold(),
         }
     }
 }

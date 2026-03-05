@@ -420,6 +420,7 @@ pub struct FocusSessionResponse {
 pub struct ActivityTimelineResponse {
     pub app_name: String,
     pub window_title: Option<String>,
+    pub site_name: Option<String>,
     pub category_id: Option<String>,
     pub started_at: DateTime<Utc>,
     pub duration_secs: Option<i64>,
@@ -458,6 +459,21 @@ pub struct TimeEntryResponse {
     pub started_at: DateTime<Utc>,
     pub duration_secs: i64,
     pub source: String,
+}
+
+// ── Distraction ────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LearnedRuleResponse {
+    pub id: i64,
+    pub pattern: String,
+    pub pattern_type: String,
+    pub classification: String,
+    pub confidence: f64,
+    pub hit_count: i64,
+    pub last_used_at: String,
+    pub created_at: String,
 }
 
 // ── Key Result Params ──────────────────────────────────────────────────

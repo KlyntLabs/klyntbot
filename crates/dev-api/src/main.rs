@@ -16,11 +16,12 @@ use axum::{Json, Router};
 use chrono::Utc;
 use desktop_shared::commands::*;
 use desktop_shared::errors::ApiError;
+use feature_productivity::distraction::DistractionInterceptor;
 use feature_productivity::repos::ProductivityRepos;
 use feature_productivity::{DailyAggregator, FocusManager};
 use serde_json::Value;
 use storage::{ActionFilter, ActionPatch, ProjectFilter, Repos, StoragePool};
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
 use tracing::info;
 
 /// Lightweight app state — just storage, config, and productivity.
@@ -30,6 +31,7 @@ struct DevState {
     productivity_repos: Option<ProductivityRepos>,
     focus_manager: Option<Arc<FocusManager>>,
     aggregator: Option<Arc<DailyAggregator>>,
+    distraction_interceptor: Option<Arc<Mutex<DistractionInterceptor>>>,
 }
 
 impl DevState {
@@ -47,6 +49,12 @@ impl DevState {
 
     fn aggregator(&self) -> Result<&Arc<DailyAggregator>, ApiError> {
         self.aggregator
+            .as_ref()
+            .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "productivity feature is not enabled"))
+    }
+
+    fn distraction_interceptor(&self) -> Result<&Arc<Mutex<DistractionInterceptor>>, ApiError> {
+        self.distraction_interceptor
             .as_ref()
             .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "productivity feature is not enabled"))
     }
@@ -73,7 +81,7 @@ async fn main() {
     info!("storage connected");
 
     // 3. Initialize productivity (optional)
-    let (prod_repos, focus_mgr, aggregator) = if config.productivity.enabled {
+    let (prod_repos, focus_mgr, aggregator, interceptor) = if config.productivity.enabled {
         let inner = pool.inner().clone();
         match StoragePool::run_feature_migrations(
             &inner,
@@ -88,15 +96,19 @@ async fn main() {
                     config.productivity.focus.clone(),
                 ));
                 let agg = Arc::new(DailyAggregator::new(pr.clone()));
-                (Some(pr), Some(fm), Some(agg))
+                let interceptor = Arc::new(Mutex::new(DistractionInterceptor::new(
+                    config.productivity.focus.clone(),
+                    pr.learned_rules.clone(),
+                )));
+                (Some(pr), Some(fm), Some(agg), Some(interceptor))
             }
             Err(e) => {
                 tracing::warn!("productivity migrations failed: {e}");
-                (None, None, None)
+                (None, None, None, None)
             }
         }
     } else {
-        (None, None, None)
+        (None, None, None, None)
     };
 
     let state = Arc::new(DevState {
@@ -105,6 +117,7 @@ async fn main() {
         productivity_repos: prod_repos,
         focus_manager: focus_mgr,
         aggregator,
+        distraction_interceptor: interceptor,
     });
 
     // 4. Build axum router
@@ -392,12 +405,11 @@ async fn dispatch(
             }
         }
         "task_create" => {
-            let params: TaskCreateParams = match serde_json::from_value(
-                body.get("params").cloned().unwrap_or(body.clone()),
-            ) {
-                Ok(p) => p,
-                Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
-            };
+            let params: TaskCreateParams =
+                match serde_json::from_value(body.get("params").cloned().unwrap_or(body.clone())) {
+                    Ok(p) => p,
+                    Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
+                };
             let id = uuid::Uuid::new_v4().to_string();
             let now = Utc::now();
             let area_id = match (&params.area_id, &params.parent_id) {
@@ -441,12 +453,11 @@ async fn dispatch(
             }
         }
         "task_update" => {
-            let params: TaskUpdateParams = match serde_json::from_value(
-                body.get("params").cloned().unwrap_or(body.clone()),
-            ) {
-                Ok(p) => p,
-                Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
-            };
+            let params: TaskUpdateParams =
+                match serde_json::from_value(body.get("params").cloned().unwrap_or(body.clone())) {
+                    Ok(p) => p,
+                    Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
+                };
             let patch = ActionPatch {
                 id: params.id.clone(),
                 title: params.title,
@@ -469,14 +480,20 @@ async fn dispatch(
             }
         }
         "task_delete" => {
-            let id = match get_str(&body, "id") { Ok(v) => v, Err(e) => return err(e) };
+            let id = match get_str(&body, "id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
             match core.repos.actions.delete(&id).await {
                 Ok(d) => ok(d),
                 Err(e) => err(storage_err(e)),
             }
         }
         "task_toggle_complete" => {
-            let id = match get_str(&body, "id") { Ok(v) => v, Err(e) => return err(e) };
+            let id = match get_str(&body, "id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
             match core.repos.actions.get_or_err(&id).await {
                 Ok(row) => {
                     let new_status = if row.status == "done" { "todo" } else { "done" };
@@ -497,7 +514,10 @@ async fn dispatch(
             }
         }
         "task_list_children" => {
-            let pid = match get_str(&body, "parentId") { Ok(v) => v, Err(e) => return err(e) };
+            let pid = match get_str(&body, "parentId") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
             match core.repos.actions.get_children(&pid).await {
                 Ok(rows) => match rows_to_tasks(&core.repos, &rows).await {
                     Ok(t) => ok(t),
@@ -510,8 +530,15 @@ async fn dispatch(
             let now = Utc::now();
             let sot = now.date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc();
             let sot2 = sot + chrono::Duration::days(1);
-            let doing_filter = ActionFilter { status: Some("doing".to_string()), ..Default::default() };
-            let due_filter = ActionFilter { due_after: Some(sot), due_before: Some(sot2), ..Default::default() };
+            let doing_filter = ActionFilter {
+                status: Some("doing".to_string()),
+                ..Default::default()
+            };
+            let due_filter = ActionFilter {
+                due_after: Some(sot),
+                due_before: Some(sot2),
+                ..Default::default()
+            };
             match tokio::try_join!(
                 core.repos.actions.list(&doing_filter),
                 core.repos.actions.list(&due_filter),
@@ -521,25 +548,40 @@ async fn dispatch(
                     let mut seen = std::collections::HashSet::new();
                     let mut all: Vec<storage::ActionRow> = Vec::new();
                     for row in overdue.into_iter().chain(doing).chain(due) {
-                        if row.status != "done" && row.status != "archived" && seen.insert(row.id.clone()) {
+                        if row.status != "done"
+                            && row.status != "archived"
+                            && seen.insert(row.id.clone())
+                        {
                             all.push(row);
                         }
                     }
                     all.sort_by(|a, b| {
                         let ao = a.due_date.is_some_and(|d| d < now) as u8;
                         let bo = b.due_date.is_some_and(|d| d < now) as u8;
-                        bo.cmp(&ao).then(a.priority.unwrap_or(99).cmp(&b.priority.unwrap_or(99))).then(a.due_date.cmp(&b.due_date))
+                        bo.cmp(&ao)
+                            .then(a.priority.unwrap_or(99).cmp(&b.priority.unwrap_or(99)))
+                            .then(a.due_date.cmp(&b.due_date))
                     });
-                    let tasks: Vec<TodayTaskResponse> = all.iter().map(|r| {
-                        let is_overdue = r.due_date.is_some_and(|d| d < now) && r.status != "done";
-                        let is_due_today = !is_overdue && r.due_date.is_some_and(|d| d.date_naive() == now.date_naive());
-                        TodayTaskResponse {
-                            id: r.id.clone(), title: r.title.clone(),
-                            priority: priority_label(r.priority), status: r.status.clone(),
-                            completed: r.status == "done", is_overdue, is_due_today,
-                            due_display: r.due_date.map(|d| d.format("%b %-d").to_string()),
-                        }
-                    }).collect();
+                    let tasks: Vec<TodayTaskResponse> = all
+                        .iter()
+                        .map(|r| {
+                            let is_overdue =
+                                r.due_date.is_some_and(|d| d < now) && r.status != "done";
+                            let is_due_today = !is_overdue
+                                && r.due_date
+                                    .is_some_and(|d| d.date_naive() == now.date_naive());
+                            TodayTaskResponse {
+                                id: r.id.clone(),
+                                title: r.title.clone(),
+                                priority: priority_label(r.priority),
+                                status: r.status.clone(),
+                                completed: r.status == "done",
+                                is_overdue,
+                                is_due_today,
+                                due_display: r.due_date.map(|d| d.format("%b %-d").to_string()),
+                            }
+                        })
+                        .collect();
                     ok(tasks)
                 }
                 Err(e) => err(storage_err(e)),
@@ -548,32 +590,57 @@ async fn dispatch(
 
         // ── Projects ──────────────────────────────────────────
         "project_list" => {
-            let filter = ProjectFilter { area_id: get(&body, "area_id"), status: Some("active".to_string()), ..Default::default() };
+            let filter = ProjectFilter {
+                area_id: get(&body, "area_id"),
+                status: Some("active".to_string()),
+                ..Default::default()
+            };
             match core.repos.projects.list(&filter).await {
                 Ok(projects) => {
-                    let futs = projects.iter().map(|p| build_project_response(&core.repos, p));
+                    let futs = projects
+                        .iter()
+                        .map(|p| build_project_response(&core.repos, p));
                     match futures_util::future::try_join_all(futs).await {
-                        Ok(r) => ok(r), Err(e) => err(e),
+                        Ok(r) => ok(r),
+                        Err(e) => err(e),
                     }
                 }
                 Err(e) => err(storage_err(e)),
             }
         }
         "project_get" => {
-            let id = match get_str(&body, "id") { Ok(v) => v, Err(e) => return err(e) };
+            let id = match get_str(&body, "id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
             match core.repos.projects.get_or_err(&id).await {
-                Ok(row) => match build_project_response(&core.repos, &row).await { Ok(r) => ok(r), Err(e) => err(e) },
+                Ok(row) => match build_project_response(&core.repos, &row).await {
+                    Ok(r) => ok(r),
+                    Err(e) => err(e),
+                },
                 Err(e) => err(storage_err(e)),
             }
         }
         "project_delete" => {
-            let id = match get_str(&body, "id") { Ok(v) => v, Err(e) => return err(e) };
-            match core.repos.projects.delete(&id).await { Ok(d) => ok(d), Err(e) => err(storage_err(e)) }
+            let id = match get_str(&body, "id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            match core.repos.projects.delete(&id).await {
+                Ok(d) => ok(d),
+                Err(e) => err(storage_err(e)),
+            }
         }
         "project_archive" => {
-            let id = match get_str(&body, "id") { Ok(v) => v, Err(e) => return err(e) };
+            let id = match get_str(&body, "id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
             match core.repos.projects.archive(&id).await {
-                Ok(row) => match build_project_response(&core.repos, &row).await { Ok(r) => ok(r), Err(e) => err(e) },
+                Ok(row) => match build_project_response(&core.repos, &row).await {
+                    Ok(r) => ok(r),
+                    Err(e) => err(e),
+                },
                 Err(e) => err(storage_err(e)),
             }
         }
@@ -581,17 +648,27 @@ async fn dispatch(
         // ── Areas ─────────────────────────────────────────────
         "area_list" => match core.repos.areas.list(Some("active")).await {
             Ok(areas) => {
-                let mut results = Vec::with_capacity(areas.len());
-                for a in &areas {
-                    match tokio::try_join!(core.repos.areas.count_projects(&a.id), core.repos.areas.count_actions(&a.id)) {
-                        Ok((pc, tc)) => results.push(AreaResponse {
-                            id: a.id.clone(), name: a.name.clone(), color: a.color.clone(),
-                            icon: a.icon.clone(), project_count: pc, task_count: tc,
-                        }),
-                        Err(e) => return err(storage_err(e)),
+                let futs = areas.iter().map(|a| {
+                    let repos = &core.repos;
+                    async move {
+                        let (pc, tc) = tokio::try_join!(
+                            repos.areas.count_projects(&a.id),
+                            repos.areas.count_actions(&a.id)
+                        )?;
+                        Ok::<_, storage::StorageError>(AreaResponse {
+                            id: a.id.clone(),
+                            name: a.name.clone(),
+                            color: a.color.clone(),
+                            icon: a.icon.clone(),
+                            project_count: pc,
+                            task_count: tc,
+                        })
                     }
+                });
+                match futures_util::future::try_join_all(futs).await {
+                    Ok(results) => ok(results),
+                    Err(e) => err(storage_err(e)),
                 }
-                ok(results)
             }
             Err(e) => err(storage_err(e)),
         },
@@ -599,15 +676,30 @@ async fn dispatch(
         // ── Objectives ────────────────────────────────────────
         "objective_list" => {
             let project_id: Option<String> = get(&body, "project_id");
-            match core.repos.objectives.list(project_id.as_deref(), None).await {
+            match core
+                .repos
+                .objectives
+                .list(project_id.as_deref(), None)
+                .await
+            {
                 Ok(objectives) => {
-                    let futs = objectives.iter().map(|o| core.repos.key_results.list(Some(&o.id)));
+                    let futs = objectives
+                        .iter()
+                        .map(|o| core.repos.key_results.list(Some(&o.id)));
                     match futures_util::future::try_join_all(futs).await {
                         Ok(all_krs) => {
-                            let r: Vec<_> = objectives.iter().zip(all_krs).map(|(o, krs)| {
-                                let kr_resps = if krs.is_empty() { None } else { Some(krs.iter().map(kr_to_response).collect()) };
-                                objective_to_response(o, kr_resps)
-                            }).collect();
+                            let r: Vec<_> = objectives
+                                .iter()
+                                .zip(all_krs)
+                                .map(|(o, krs)| {
+                                    let kr_resps = if krs.is_empty() {
+                                        None
+                                    } else {
+                                        Some(krs.iter().map(kr_to_response).collect())
+                                    };
+                                    objective_to_response(o, kr_resps)
+                                })
+                                .collect();
                             ok(r)
                         }
                         Err(e) => err(storage_err(e)),
@@ -621,24 +713,40 @@ async fn dispatch(
         "calendar_events" => {
             let limit: i64 = get(&body, "limit").unwrap_or(10);
             match core.repos.calendar_event_cache.list_upcoming(limit).await {
-                Ok(rows) => ok(rows.iter().map(|r| CalendarEventResponse {
-                    id: r.uid.clone(), title: r.summary.clone(),
-                    start_at: r.start_at, end_at: r.end_at, color: "#3B82F6".to_string(),
-                }).collect::<Vec<_>>()),
+                Ok(rows) => ok(rows
+                    .iter()
+                    .map(|r| CalendarEventResponse {
+                        id: r.uid.clone(),
+                        title: r.summary.clone(),
+                        start_at: r.start_at,
+                        end_at: r.end_at,
+                        color: "#3B82F6".to_string(),
+                    })
+                    .collect::<Vec<_>>()),
                 Err(e) => err(storage_err(e)),
             }
         }
 
         // ── Status ────────────────────────────────────────────
         "agent_status" => {
-            match tokio::try_join!(core.repos.actions.list_focused(), core.repos.actions.summary()) {
+            match tokio::try_join!(
+                core.repos.actions.list_focused(),
+                core.repos.actions.summary()
+            ) {
                 Ok((focused, summary)) => {
                     let focus_task = if let Some(row) = focused.first() {
                         row_to_task(&core.repos, row).await.ok()
-                    } else { None };
+                    } else {
+                        None
+                    };
                     ok(AgentStatusResponse {
-                        status: if focused.is_empty() { "idle".to_string() } else { "active".to_string() },
-                        active_task_count: summary.doing, focus_task,
+                        status: if focused.is_empty() {
+                            "idle".to_string()
+                        } else {
+                            "active".to_string()
+                        },
+                        active_task_count: summary.doing,
+                        focus_task,
                     })
                 }
                 Err(e) => err(storage_err(e)),
@@ -646,29 +754,66 @@ async fn dispatch(
         }
 
         // ── Finance ───────────────────────────────────────────
-        "finance_accounts" => match core.repos.finance.accounts.list(false).await { Ok(r) => ok(r), Err(e) => err(storage_err(e)) },
+        "finance_accounts" => match core.repos.finance.accounts.list(false).await {
+            Ok(r) => ok(r),
+            Err(e) => err(storage_err(e)),
+        },
         "finance_transactions" => {
-            let filter = storage::rows::finance::FinanceTransactionFilter { limit: get(&body, "limit"), ..Default::default() };
-            match core.repos.finance.transactions.list(&filter).await { Ok(r) => ok(r), Err(e) => err(storage_err(e)) }
+            let filter = storage::rows::finance::FinanceTransactionFilter {
+                limit: get(&body, "limit"),
+                ..Default::default()
+            };
+            match core.repos.finance.transactions.list(&filter).await {
+                Ok(r) => ok(r),
+                Err(e) => err(storage_err(e)),
+            }
         }
-        "finance_budget_usage" => match core.repos.finance.budgets.all_budget_usage().await { Ok(r) => ok(r), Err(e) => err(storage_err(e)) },
+        "finance_budget_usage" => match core.repos.finance.budgets.all_budget_usage().await {
+            Ok(r) => ok(r),
+            Err(e) => err(storage_err(e)),
+        },
         "finance_portfolios" => match core.repos.finance.investments.list_portfolios().await {
             Ok(portfolios) => {
-                let futs = portfolios.iter().map(|p| core.repos.finance.investments.portfolio_summary(&p.id));
+                let futs = portfolios
+                    .iter()
+                    .map(|p| core.repos.finance.investments.portfolio_summary(&p.id));
                 match futures_util::future::try_join_all(futs).await {
-                    Ok(summaries) => ok(portfolios.iter().zip(summaries).map(|(p, s)| FinancePortfolioResponse {
-                        id: p.id.clone(), name: p.name.clone(), description: p.description.clone(),
-                        currency: p.currency.clone(), total_value: s.total_current_value,
-                        total_cost_basis: s.total_cost_basis, holding_count: s.holding_count,
-                    }).collect::<Vec<_>>()),
+                    Ok(summaries) => ok(portfolios
+                        .iter()
+                        .zip(summaries)
+                        .map(|(p, s)| FinancePortfolioResponse {
+                            id: p.id.clone(),
+                            name: p.name.clone(),
+                            description: p.description.clone(),
+                            currency: p.currency.clone(),
+                            total_value: s.total_current_value,
+                            total_cost_basis: s.total_cost_basis,
+                            holding_count: s.holding_count,
+                        })
+                        .collect::<Vec<_>>()),
                     Err(e) => err(storage_err(e)),
                 }
             }
             Err(e) => err(storage_err(e)),
         },
-        "finance_investments" => match core.repos.finance.investments.list_investments(&Default::default()).await { Ok(r) => ok(r), Err(e) => err(storage_err(e)) },
-        "finance_goals" => match core.repos.finance.goals.list_active().await { Ok(r) => ok(r), Err(e) => err(storage_err(e)) },
-        "finance_liabilities" => match core.repos.finance.liabilities.list_all().await { Ok(r) => ok(r), Err(e) => err(storage_err(e)) },
+        "finance_investments" => match core
+            .repos
+            .finance
+            .investments
+            .list_investments(&Default::default())
+            .await
+        {
+            Ok(r) => ok(r),
+            Err(e) => err(storage_err(e)),
+        },
+        "finance_goals" => match core.repos.finance.goals.list_active().await {
+            Ok(r) => ok(r),
+            Err(e) => err(storage_err(e)),
+        },
+        "finance_liabilities" => match core.repos.finance.liabilities.list_all().await {
+            Ok(r) => ok(r),
+            Err(e) => err(storage_err(e)),
+        },
         "finance_net_worth" => {
             match tokio::try_join!(
                 core.repos.finance.accounts.total_balance_by_currency(),
@@ -677,11 +822,32 @@ async fn dispatch(
             ) {
                 Ok((accts, invests, liabs)) => {
                     let mut by_currency: HashMap<&str, CurrencyNetWorth> = HashMap::new();
-                    for (c, t) in &accts { by_currency.entry(c).or_insert_with(|| CurrencyNetWorth::zero(c.clone())).accounts = *t; }
-                    for (c, t) in &invests { by_currency.entry(c).or_insert_with(|| CurrencyNetWorth::zero(c.clone())).investments = *t; }
-                    for (c, t) in &liabs { by_currency.entry(c).or_insert_with(|| CurrencyNetWorth::zero(c.clone())).liabilities = *t; }
+                    for (c, t) in &accts {
+                        by_currency
+                            .entry(c)
+                            .or_insert_with(|| CurrencyNetWorth::zero(c.clone()))
+                            .accounts = *t;
+                    }
+                    for (c, t) in &invests {
+                        by_currency
+                            .entry(c)
+                            .or_insert_with(|| CurrencyNetWorth::zero(c.clone()))
+                            .investments = *t;
+                    }
+                    for (c, t) in &liabs {
+                        by_currency
+                            .entry(c)
+                            .or_insert_with(|| CurrencyNetWorth::zero(c.clone()))
+                            .liabilities = *t;
+                    }
                     ok(FinanceNetWorthResponse {
-                        totals_by_currency: by_currency.into_values().map(|mut c| { c.net = c.accounts + c.investments - c.liabilities; c }).collect(),
+                        totals_by_currency: by_currency
+                            .into_values()
+                            .map(|mut c| {
+                                c.net = c.accounts + c.investments - c.liabilities;
+                                c
+                            })
+                            .collect(),
                     })
                 }
                 Err(e) => err(storage_err(e)),
@@ -691,41 +857,88 @@ async fn dispatch(
 
         // ── Productivity ──────────────────────────────────────
         "productivity_today" => match core.aggregator() {
-            Ok(agg) => match agg.compute_today().await { Ok(s) => ok(Some(summary_to_response(s))), Err(e) => err(prod_err(e)) },
+            Ok(agg) => match agg.compute_today().await {
+                Ok(s) => ok(Some(summary_to_response(s))),
+                Err(e) => err(prod_err(e)),
+            },
             Err(e) => err(e),
         },
         "productivity_timeline" => {
-            let date = match get_str(&body, "date") { Ok(v) => v, Err(e) => return err(e) };
-            let repos = match core.productivity_repos() { Ok(r) => r, Err(e) => return err(e) };
-            let start = match parse_date_or_err(&date) { Ok(d) => d, Err(e) => return err(e) };
+            let date = match get_str(&body, "date") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let repos = match core.productivity_repos() {
+                Ok(r) => r,
+                Err(e) => return err(e),
+            };
+            let start = match parse_date_or_err(&date) {
+                Ok(d) => d,
+                Err(e) => return err(e),
+            };
             let end = start + chrono::Duration::days(1);
             let cap: i64 = get(&body, "limit").unwrap_or(10_000);
-            match repos.events.list_range_offset(&start, &end, Some(cap.min(10_000)), get(&body, "offset")).await {
-                Ok(events) => ok(events.into_iter().map(|e| ActivityTimelineResponse {
-                    app_name: e.app_name, window_title: e.window_title, category_id: e.category_id,
-                    started_at: e.started_at, duration_secs: e.duration_secs, is_idle: e.is_idle,
-                }).collect::<Vec<_>>()),
+            match repos
+                .events
+                .list_range_offset(&start, &end, Some(cap.min(10_000)), get(&body, "offset"))
+                .await
+            {
+                Ok(events) => ok(events
+                    .into_iter()
+                    .map(|e| ActivityTimelineResponse {
+                        app_name: e.app_name,
+                        window_title: e.window_title,
+                        site_name: e.site_name,
+                        category_id: e.category_id,
+                        started_at: e.started_at,
+                        duration_secs: e.duration_secs,
+                        is_idle: e.is_idle,
+                    })
+                    .collect::<Vec<_>>()),
                 Err(e) => err(prod_err(e)),
             }
         }
         "productivity_focus_status" => match core.focus_manager() {
-            Ok(mgr) => match mgr.get_active().await { Ok(s) => ok(s.map(session_to_response)), Err(e) => err(prod_err(e)) },
+            Ok(mgr) => match mgr.get_active().await {
+                Ok(s) => ok(s.map(session_to_response)),
+                Err(e) => err(prod_err(e)),
+            },
             Err(e) => err(e),
         },
         "productivity_focus_start" => match core.focus_manager() {
-            Ok(mgr) => match mgr.start_session(get(&body, "action_id"), get(&body, "project_id"), get(&body, "target_mins")).await {
-                Ok(s) => ok(session_to_response(s)), Err(e) => err(prod_err(e)),
+            Ok(mgr) => match mgr
+                .start_session(
+                    get(&body, "action_id"),
+                    get(&body, "project_id"),
+                    get(&body, "target_mins"),
+                )
+                .await
+            {
+                Ok(s) => ok(session_to_response(s)),
+                Err(e) => err(prod_err(e)),
             },
             Err(e) => err(e),
         },
         "productivity_focus_end" => match core.focus_manager() {
-            Ok(mgr) => match mgr.end_session(get(&body, "notes")).await { Ok(s) => ok(s.map(session_to_response)), Err(e) => err(prod_err(e)) },
+            Ok(mgr) => match mgr.end_session(get(&body, "notes")).await {
+                Ok(s) => ok(s.map(session_to_response)),
+                Err(e) => err(prod_err(e)),
+            },
             Err(e) => err(e),
         },
         "productivity_sessions" => {
-            let date = match get_str(&body, "date") { Ok(v) => v, Err(e) => return err(e) };
-            let repos = match core.productivity_repos() { Ok(r) => r, Err(e) => return err(e) };
-            let start = match parse_date_or_err(&date) { Ok(d) => d, Err(e) => return err(e) };
+            let date = match get_str(&body, "date") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let repos = match core.productivity_repos() {
+                Ok(r) => r,
+                Err(e) => return err(e),
+            };
+            let start = match parse_date_or_err(&date) {
+                Ok(d) => d,
+                Err(e) => return err(e),
+            };
             let end = start + chrono::Duration::days(1);
             match repos.sessions.list_range(&start, &end, None).await {
                 Ok(s) => ok(s.into_iter().map(session_to_response).collect::<Vec<_>>()),
@@ -733,28 +946,57 @@ async fn dispatch(
             }
         }
         "productivity_weekly" => {
-            let repos = match core.productivity_repos() { Ok(r) => r, Err(e) => return err(e) };
+            let repos = match core.productivity_repos() {
+                Ok(r) => r,
+                Err(e) => return err(e),
+            };
             let today = Utc::now().date_naive();
             let ws = today - chrono::Duration::days(6);
-            match repos.summaries.list_range(&ws.format("%Y-%m-%d").to_string(), &today.format("%Y-%m-%d").to_string()).await {
+            match repos
+                .summaries
+                .list_range(
+                    &ws.format("%Y-%m-%d").to_string(),
+                    &today.format("%Y-%m-%d").to_string(),
+                )
+                .await
+            {
                 Ok(s) => ok(s.into_iter().map(summary_to_response).collect::<Vec<_>>()),
                 Err(e) => err(prod_err(e)),
             }
         }
         "productivity_categories" => {
-            let repos = match core.productivity_repos() { Ok(r) => r, Err(e) => return err(e) };
+            let repos = match core.productivity_repos() {
+                Ok(r) => r,
+                Err(e) => return err(e),
+            };
             match repos.categories.list_all().await {
-                Ok(c) => ok(c.into_iter().map(|c| ActivityCategoryResponse {
-                    id: c.id, name: c.name, category_type: c.category_type.to_string(),
-                    color: c.color, icon: c.icon, is_system: c.is_system,
-                }).collect::<Vec<_>>()),
+                Ok(c) => ok(c
+                    .into_iter()
+                    .map(|c| ActivityCategoryResponse {
+                        id: c.id,
+                        name: c.name,
+                        category_type: c.category_type.to_string(),
+                        color: c.color,
+                        icon: c.icon,
+                        is_system: c.is_system,
+                    })
+                    .collect::<Vec<_>>()),
                 Err(e) => err(prod_err(e)),
             }
         }
         "productivity_summary_range" => {
-            let sd = match get_str(&body, "start_date") { Ok(v) => v, Err(e) => return err(e) };
-            let ed = match get_str(&body, "end_date") { Ok(v) => v, Err(e) => return err(e) };
-            let repos = match core.productivity_repos() { Ok(r) => r, Err(e) => return err(e) };
+            let sd = match get_str(&body, "start_date") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let ed = match get_str(&body, "end_date") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let repos = match core.productivity_repos() {
+                Ok(r) => r,
+                Err(e) => return err(e),
+            };
             match repos.summaries.list_range(&sd, &ed).await {
                 Ok(mut summaries) => {
                     let today = Utc::now().format("%Y-%m-%d").to_string();
@@ -767,21 +1009,40 @@ async fn dispatch(
                             }
                         }
                     }
-                    ok(summaries.into_iter().map(summary_to_response).collect::<Vec<_>>())
+                    ok(summaries
+                        .into_iter()
+                        .map(summary_to_response)
+                        .collect::<Vec<_>>())
                 }
                 Err(e) => err(prod_err(e)),
             }
         }
         "productivity_activity_feed" => {
-            let repos = match core.productivity_repos() { Ok(r) => r, Err(e) => return err(e) };
+            let repos = match core.productivity_repos() {
+                Ok(r) => r,
+                Err(e) => return err(e),
+            };
             let now = Utc::now();
             let start = now - chrono::Duration::hours(24);
             let cap: i64 = get(&body, "limit").unwrap_or(50);
-            match repos.events.list_range_offset(&start, &now, Some(cap.min(200)), None).await {
-                Ok(events) => ok(events.into_iter().rev().map(|e| ActivityTimelineResponse {
-                    app_name: e.app_name, window_title: e.window_title, category_id: e.category_id,
-                    started_at: e.started_at, duration_secs: e.duration_secs, is_idle: e.is_idle,
-                }).collect::<Vec<_>>()),
+            match repos
+                .events
+                .list_range_offset(&start, &now, Some(cap.min(200)), None)
+                .await
+            {
+                Ok(events) => ok(events
+                    .into_iter()
+                    .rev()
+                    .map(|e| ActivityTimelineResponse {
+                        app_name: e.app_name,
+                        window_title: e.window_title,
+                        site_name: e.site_name,
+                        category_id: e.category_id,
+                        started_at: e.started_at,
+                        duration_secs: e.duration_secs,
+                        is_idle: e.is_idle,
+                    })
+                    .collect::<Vec<_>>()),
                 Err(e) => err(prod_err(e)),
             }
         }
@@ -789,33 +1050,64 @@ async fn dispatch(
             Ok(agg) => {
                 let today = Utc::now().format("%Y-%m-%d").to_string();
                 match agg.check_goals(&today).await {
-                    Ok(r) => ok(r.into_iter().map(|(g, cur, met)| GoalProgressResponse {
-                        id: g.id.unwrap_or(0), goal_type: g.goal_type.to_string(),
-                        metric: g.metric.to_string(), target_value: g.target_value,
-                        current_value: cur, met,
-                    }).collect::<Vec<_>>()),
+                    Ok(r) => ok(r
+                        .into_iter()
+                        .map(|(g, cur, met)| GoalProgressResponse {
+                            id: g.id.unwrap_or(0),
+                            goal_type: g.goal_type.to_string(),
+                            metric: g.metric.to_string(),
+                            target_value: g.target_value,
+                            current_value: cur,
+                            met,
+                        })
+                        .collect::<Vec<_>>()),
                     Err(e) => err(prod_err(e)),
                 }
             }
             Err(e) => err(e),
         },
         "productivity_pomodoro_start" => match core.focus_manager() {
-            Ok(mgr) => match mgr.start_pomodoro(None, None, get(&body, "work_mins"), get(&body, "break_mins")).await {
-                Ok(s) => ok(session_to_response(s)), Err(e) => err(prod_err(e)),
+            Ok(mgr) => match mgr
+                .start_pomodoro(
+                    None,
+                    None,
+                    get(&body, "work_mins"),
+                    get(&body, "break_mins"),
+                )
+                .await
+            {
+                Ok(s) => ok(session_to_response(s)),
+                Err(e) => err(prod_err(e)),
             },
             Err(e) => err(e),
         },
         "productivity_time_entries" => {
-            let date = match get_str(&body, "date") { Ok(v) => v, Err(e) => return err(e) };
-            let repos = match core.productivity_repos() { Ok(r) => r, Err(e) => return err(e) };
-            let start = match parse_date_or_err(&date) { Ok(d) => d, Err(e) => return err(e) };
+            let date = match get_str(&body, "date") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let repos = match core.productivity_repos() {
+                Ok(r) => r,
+                Err(e) => return err(e),
+            };
+            let start = match parse_date_or_err(&date) {
+                Ok(d) => d,
+                Err(e) => return err(e),
+            };
             let end = start + chrono::Duration::days(1);
             match repos.time_entries.list_range(&start, &end).await {
-                Ok(entries) => ok(entries.into_iter().map(|e| TimeEntryResponse {
-                    id: e.id.unwrap_or(0), description: e.description, category_id: e.category_id,
-                    project_id: e.project_id, started_at: e.started_at, duration_secs: e.duration_secs,
-                    source: e.source,
-                }).collect::<Vec<_>>()),
+                Ok(entries) => ok(entries
+                    .into_iter()
+                    .map(|e| TimeEntryResponse {
+                        id: e.id.unwrap_or(0),
+                        description: e.description,
+                        category_id: e.category_id,
+                        project_id: e.project_id,
+                        started_at: e.started_at,
+                        duration_secs: e.duration_secs,
+                        source: e.source,
+                    })
+                    .collect::<Vec<_>>()),
                 Err(e) => err(prod_err(e)),
             }
         }
@@ -850,29 +1142,65 @@ async fn dispatch(
             );
             match (sessions, contexts, areas, projects) {
                 (Ok(sessions), Ok(contexts), Ok(areas), Ok(projects)) => {
-                    let ctx_map: HashMap<&str, _> = contexts.iter().map(|c| (c.session_key.as_str(), c)).collect();
-                    let area_names: HashMap<&str, &str> = areas.iter().map(|a| (a.id.as_str(), a.name.as_str())).collect();
-                    let proj_names: HashMap<&str, &str> = projects.iter().map(|p| (p.id.as_str(), p.name.as_str())).collect();
-                    ok(sessions.iter().map(|s| {
-                        let title = s.metadata.get("title").and_then(|v| v.as_str()).unwrap_or(&s.key).to_string();
-                        let ctx = ctx_map.get(s.key.as_str());
-                        ChatThreadResponse {
-                            session_key: s.key.clone(), title, message_count: s.message_count, updated_at: s.updated_at,
-                            context_type: ctx.map(|c| c.context_type.clone()),
-                            entity_kind: ctx.and_then(|c| c.entity_kind.clone()),
-                            entity_id: ctx.and_then(|c| c.entity_id.clone()),
-                            area_id: ctx.and_then(|c| c.area_id.clone()),
-                            area_name: ctx.and_then(|c| c.area_id.as_deref().and_then(|id| area_names.get(id).map(|s| s.to_string()))),
-                            project_id: ctx.and_then(|c| c.project_id.clone()).or_else(|| s.metadata.get("projectId").and_then(|v| v.as_str()).map(String::from)),
-                            project_name: ctx.and_then(|c| c.project_id.as_deref().and_then(|id| proj_names.get(id).map(|s| s.to_string()))),
-                        }
-                    }).collect::<Vec<_>>())
+                    let ctx_map: HashMap<&str, _> = contexts
+                        .iter()
+                        .map(|c| (c.session_key.as_str(), c))
+                        .collect();
+                    let area_names: HashMap<&str, &str> = areas
+                        .iter()
+                        .map(|a| (a.id.as_str(), a.name.as_str()))
+                        .collect();
+                    let proj_names: HashMap<&str, &str> = projects
+                        .iter()
+                        .map(|p| (p.id.as_str(), p.name.as_str()))
+                        .collect();
+                    ok(sessions
+                        .iter()
+                        .map(|s| {
+                            let title = s
+                                .metadata
+                                .get("title")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or(&s.key)
+                                .to_string();
+                            let ctx = ctx_map.get(s.key.as_str());
+                            ChatThreadResponse {
+                                session_key: s.key.clone(),
+                                title,
+                                message_count: s.message_count,
+                                updated_at: s.updated_at,
+                                context_type: ctx.map(|c| c.context_type.clone()),
+                                entity_kind: ctx.and_then(|c| c.entity_kind.clone()),
+                                entity_id: ctx.and_then(|c| c.entity_id.clone()),
+                                area_id: ctx.and_then(|c| c.area_id.clone()),
+                                area_name: ctx.and_then(|c| {
+                                    c.area_id
+                                        .as_deref()
+                                        .and_then(|id| area_names.get(id).map(|s| s.to_string()))
+                                }),
+                                project_id: ctx.and_then(|c| c.project_id.clone()).or_else(|| {
+                                    s.metadata
+                                        .get("projectId")
+                                        .and_then(|v| v.as_str())
+                                        .map(String::from)
+                                }),
+                                project_name: ctx.and_then(|c| {
+                                    c.project_id
+                                        .as_deref()
+                                        .and_then(|id| proj_names.get(id).map(|s| s.to_string()))
+                                }),
+                            }
+                        })
+                        .collect::<Vec<_>>())
                 }
                 _ => err(ApiError::new("STORAGE_ERROR", "failed to load chat data")),
             }
         }
         "chat_messages" => {
-            let sk = match get_str(&body, "sessionKey") { Ok(v) => v, Err(e) => return err(e) };
+            let sk = match get_str(&body, "sessionKey") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
             let limit: Option<i64> = get(&body, "limit");
             let rows = if let Some(lim) = limit {
                 core.repos.sessions.get_recent_messages(&sk, lim).await
@@ -880,17 +1208,165 @@ async fn dispatch(
                 core.repos.sessions.get_messages(&sk).await
             };
             match rows {
-                Ok(msgs) => ok(msgs.iter()
-                    .filter(|m| m.role == "user" || m.role == "assistant" || m.role == "interaction")
+                Ok(msgs) => ok(msgs
+                    .iter()
+                    .filter(|m| {
+                        m.role == "user" || m.role == "assistant" || m.role == "interaction"
+                    })
                     .map(|m| {
-                        let segments = m.metadata.as_ref().and_then(|meta| meta.get("segments")).and_then(|v| serde_json::from_value(v.clone()).ok());
-                        let transparency = m.metadata.as_ref().and_then(|meta| meta.get("transparency")).and_then(|v| serde_json::from_value(v.clone()).ok());
-                        ChatMessageResponse { id: m.id.to_string(), role: m.role.clone(), content: m.content.clone(), timestamp: m.timestamp, segments, transparency }
-                    }).collect::<Vec<_>>()),
+                        let segments = m
+                            .metadata
+                            .as_ref()
+                            .and_then(|meta| meta.get("segments"))
+                            .and_then(|v| serde_json::from_value(v.clone()).ok());
+                        let transparency = m
+                            .metadata
+                            .as_ref()
+                            .and_then(|meta| meta.get("transparency"))
+                            .and_then(|v| serde_json::from_value(v.clone()).ok());
+                        ChatMessageResponse {
+                            id: m.id.to_string(),
+                            role: m.role.clone(),
+                            content: m.content.clone(),
+                            timestamp: m.timestamp,
+                            segments,
+                            transparency,
+                        }
+                    })
+                    .collect::<Vec<_>>()),
                 Err(e) => err(storage_err(e)),
             }
         }
 
-        _ => err(ApiError::new("NOT_FOUND", format!("command '{cmd}' not supported in browser dev mode"))),
+        // ── Distraction ──────────────────────────────────────
+        "distraction_dismiss" => {
+            let app_name = match get_str(&body, "appName") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            match core.focus_manager() {
+                Ok(mgr) => match mgr.record_distraction(&app_name).await {
+                    Ok(()) => ok(()),
+                    Err(e) => err(prod_err(e)),
+                },
+                Err(e) => err(e),
+            }
+        }
+        "distraction_allow_temp" => {
+            let pattern = match get_str(&body, "pattern") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            match core.distraction_interceptor() {
+                Ok(interceptor) => {
+                    let mut guard = interceptor.lock().await;
+                    guard.grant_temp_pass(&pattern);
+                    ok(())
+                }
+                Err(e) => err(e),
+            }
+        }
+        "distraction_allow_session" => {
+            let pattern = match get_str(&body, "pattern") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let classification = match get_str(&body, "classification") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let pattern_type: Option<String> = get(&body, "patternType");
+            let pt = pattern_type.as_deref().unwrap_or("title_keyword");
+            match core.distraction_interceptor() {
+                Ok(interceptor) => {
+                    let mut guard = interceptor.lock().await;
+                    guard.whitelist_for_session(&pattern);
+                    drop(guard);
+
+                    let repos = match core.productivity_repos() {
+                        Ok(r) => r,
+                        Err(e) => return err(e),
+                    };
+                    match repos
+                        .learned_rules
+                        .upsert_or_hit(&pattern.to_lowercase(), pt, &classification)
+                        .await
+                    {
+                        Ok(()) => ok(()),
+                        Err(e) => err(prod_err(e)),
+                    }
+                }
+                Err(e) => err(e),
+            }
+        }
+        "distraction_learned_rules" => {
+            let repos = match core.productivity_repos() {
+                Ok(r) => r,
+                Err(e) => return err(e),
+            };
+            match repos.learned_rules.list_all().await {
+                Ok(rules) => ok(rules
+                    .into_iter()
+                    .map(|r| LearnedRuleResponse {
+                        id: r.id.unwrap_or(0),
+                        pattern: r.pattern,
+                        pattern_type: r.pattern_type,
+                        classification: r.classification,
+                        confidence: r.confidence,
+                        hit_count: r.hit_count,
+                        last_used_at: r.last_used_at.to_rfc3339(),
+                        created_at: r.created_at.to_rfc3339(),
+                    })
+                    .collect::<Vec<_>>()),
+                Err(e) => err(prod_err(e)),
+            }
+        }
+        "distraction_delete_rule" => {
+            let id: i64 = match get(&body, "id") {
+                Some(v) => v,
+                None => return err(ApiError::new("VALIDATION", "missing required field: id")),
+            };
+            let repos = match core.productivity_repos() {
+                Ok(r) => r,
+                Err(e) => return err(e),
+            };
+            match repos.learned_rules.delete(id).await {
+                Ok(()) => ok(()),
+                Err(e) => err(prod_err(e)),
+            }
+        }
+        "distraction_evaluate" => {
+            let app_name = match get_str(&body, "appName") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let window_title: Option<String> = get(&body, "windowTitle");
+            match core.distraction_interceptor() {
+                Ok(interceptor) => {
+                    let mut guard = interceptor.lock().await;
+                    let decision = guard
+                        .evaluate(&app_name, window_title.as_deref())
+                        .await;
+                    ok(serde_json::json!({
+                        "decision": format!("{:?}", decision),
+                    }))
+                }
+                Err(e) => err(e),
+            }
+        }
+
+        // ── Permissions ──────────────────────────────────────
+        "permissions_check_accessibility" => {
+            ok(desktop_shared::permissions::check_accessibility())
+        }
+        "permissions_open_accessibility" => {
+            desktop_shared::permissions::open_accessibility_settings();
+            ok(())
+        }
+
+        _ => err(ApiError::new(
+            "NOT_FOUND",
+            format!("command '{cmd}' not supported in browser dev mode"),
+        )),
     }
 }

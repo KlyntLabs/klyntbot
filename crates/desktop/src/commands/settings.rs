@@ -1,8 +1,8 @@
-use std::sync::Arc;
 use desktop_shared::commands::{
     McpAddServerParams, McpConfigResponse, McpRemoveParams, McpToggleParams, McpUpdateServerParams,
 };
 use desktop_shared::errors::ApiError;
+use std::sync::Arc;
 use tauri::State;
 
 use crate::app_core::AppCore;

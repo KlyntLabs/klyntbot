@@ -59,7 +59,7 @@ fn main() {
             #[cfg(debug_assertions)]
             {
                 let dev_core = Arc::clone(&core);
-                tokio::spawn(async move {
+                tauri::async_runtime::spawn(async move {
                     dev_server::start(dev_core).await;
                 });
             }
@@ -184,6 +184,15 @@ fn main() {
             commands::productivity::productivity_goals,
             commands::productivity::productivity_pomodoro_start,
             commands::productivity::productivity_time_entries,
+            // Distraction
+            commands::distraction::distraction_dismiss,
+            commands::distraction::distraction_allow_temp,
+            commands::distraction::distraction_allow_session,
+            commands::distraction::distraction_learned_rules,
+            commands::distraction::distraction_delete_rule,
+            // Permissions
+            commands::permissions::permissions_check_accessibility,
+            commands::permissions::permissions_open_accessibility,
             // Calendar
             commands::calendar::calendar_events,
             // Settings (MCP)

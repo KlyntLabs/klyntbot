@@ -38,8 +38,8 @@ export function ActivityFeed() {
             <span className="text-dim tabular-nums w-14 flex-shrink-0">
               {formatTime(e.startedAt)}
             </span>
-            <span className="text-primary truncate">{e.appName}</span>
-            {e.windowTitle && <span className="text-dim truncate flex-1">{e.windowTitle}</span>}
+            <span className="text-primary truncate">{e.siteName ?? e.appName}</span>
+            {e.siteName && <span className="text-dim truncate">{e.appName}</span>}
           </div>
         ))}
       </div>

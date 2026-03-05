@@ -18,6 +18,24 @@ use crate::repos::ProductivityRepos;
 use crate::types::{ActivityEvent, CategoryType};
 use categorizer::Categorizer;
 
+/// Compute the display name for top-apps / activity feed.
+/// For browsers, extracts the site name from the window title.
+/// For native apps, returns `None` (falls back to app_name).
+fn compute_site_name(
+    app_name: &str,
+    bundle_id: Option<&str>,
+    window_title: Option<&str>,
+) -> Option<String> {
+    if !Categorizer::is_browser(app_name, bundle_id) {
+        return None;
+    }
+    let title = window_title?;
+    if title.is_empty() {
+        return None;
+    }
+    Some(Categorizer::extract_site_name(title))
+}
+
 const MAX_BUFFER_SIZE: usize = 1000;
 /// Minimum seconds between distraction alerts for the same app.
 const DISTRACTION_COOLDOWN_SECS: i64 = 60;
@@ -26,6 +44,7 @@ const DISTRACTION_COOLDOWN_SECS: i64 = 60;
 #[derive(Debug, Clone)]
 pub struct DistractionAlert {
     pub app_name: String,
+    pub window_title: Option<String>,
     pub session_id: String,
     pub timestamp: DateTime<Utc>,
 }
@@ -184,6 +203,7 @@ impl ActivityTracker {
                                                     if let Some(ref sender) = distraction_sender {
                                                         if let Err(e) = sender.try_send(DistractionAlert {
                                                             app_name: info.app_name.clone(),
+                                                            window_title: info.window_title.clone(),
                                                             session_id,
                                                             timestamp: now,
                                                         }) {
@@ -202,11 +222,28 @@ impl ActivityTracker {
                                     }
                                 }
 
-                                let same_app = !is_idle
-                                    && current_event.as_ref().map(|e| e.app_name.as_str())
-                                        == Some(&info.app_name);
+                                // Compute site_name for browsers (e.g. "YouTube" from Chrome title).
+                                let site_name = compute_site_name(
+                                    &info.app_name,
+                                    info.bundle_id.as_deref(),
+                                    raw_title,
+                                );
+                                let persisted_site = if privacy.exclude_window_titles {
+                                    None
+                                } else {
+                                    site_name
+                                };
 
-                                if same_app {
+                                // Split events when app OR site changes. This means
+                                // navigating from YouTube to GitHub within Chrome
+                                // creates a new event — giving site-level granularity.
+                                let same_context = !is_idle
+                                    && current_event.as_ref().is_some_and(|e| {
+                                        e.app_name == info.app_name
+                                            && e.site_name == persisted_site
+                                    });
+
+                                if same_context {
                                     if let Some(ref mut evt) = current_event {
                                         evt.ended_at = Some(now);
                                         evt.duration_secs = Some(
@@ -222,6 +259,7 @@ impl ActivityTracker {
                                         id: None,
                                         app_name: info.app_name,
                                         window_title: persisted_title,
+                                        site_name: persisted_site,
                                         bundle_id: info.bundle_id,
                                         url: None,
                                         category_id,

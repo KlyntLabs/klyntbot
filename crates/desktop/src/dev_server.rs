@@ -99,7 +99,8 @@ fn prod_err(e: common::KlyntbotError) -> ApiError {
 
 /// Extract a typed field from the JSON body.
 fn get<T: serde::de::DeserializeOwned>(body: &Value, key: &str) -> Option<T> {
-    body.get(key).and_then(|v| serde_json::from_value(v.clone()).ok())
+    body.get(key)
+        .and_then(|v| serde_json::from_value(v.clone()).ok())
 }
 
 /// Extract a required string field.
@@ -134,12 +135,11 @@ async fn dispatch(
             }
         }
         "task_create" => {
-            let params: TaskCreateParams = match serde_json::from_value(
-                body.get("params").cloned().unwrap_or(body.clone()),
-            ) {
-                Ok(p) => p,
-                Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
-            };
+            let params: TaskCreateParams =
+                match serde_json::from_value(body.get("params").cloned().unwrap_or(body.clone())) {
+                    Ok(p) => p,
+                    Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
+                };
             let id = uuid::Uuid::new_v4().to_string();
             let now = Utc::now();
             let area_id = match (&params.area_id, &params.parent_id) {
@@ -185,12 +185,11 @@ async fn dispatch(
             }
         }
         "task_update" => {
-            let params: TaskUpdateParams = match serde_json::from_value(
-                body.get("params").cloned().unwrap_or(body.clone()),
-            ) {
-                Ok(p) => p,
-                Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
-            };
+            let params: TaskUpdateParams =
+                match serde_json::from_value(body.get("params").cloned().unwrap_or(body.clone())) {
+                    Ok(p) => p,
+                    Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
+                };
             let patch = ActionPatch {
                 id: params.id.clone(),
                 title: params.title,
@@ -297,8 +296,10 @@ async fn dispatch(
                             .then(a.priority.unwrap_or(99).cmp(&b.priority.unwrap_or(99)))
                             .then(a.due_date.cmp(&b.due_date))
                     });
-                    let tasks: Vec<TodayTaskResponse> =
-                        all.iter().map(|row| action_to_today_task(row, now)).collect();
+                    let tasks: Vec<TodayTaskResponse> = all
+                        .iter()
+                        .map(|row| action_to_today_task(row, now))
+                        .collect();
                     ok(tasks)
                 }
                 Err(e) => err(storage_err(e)),
@@ -326,12 +327,11 @@ async fn dispatch(
             }
         }
         "project_create" => {
-            let params: ProjectCreateParams = match serde_json::from_value(
-                body.get("params").cloned().unwrap_or(body.clone()),
-            ) {
-                Ok(p) => p,
-                Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
-            };
+            let params: ProjectCreateParams =
+                match serde_json::from_value(body.get("params").cloned().unwrap_or(body.clone())) {
+                    Ok(p) => p,
+                    Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
+                };
             let id = uuid::Uuid::new_v4().to_string();
             let now = Utc::now();
             let row = storage::ProjectRow {
@@ -371,12 +371,11 @@ async fn dispatch(
             }
         }
         "project_update" => {
-            let params: ProjectUpdateParams = match serde_json::from_value(
-                body.get("params").cloned().unwrap_or(body.clone()),
-            ) {
-                Ok(p) => p,
-                Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
-            };
+            let params: ProjectUpdateParams =
+                match serde_json::from_value(body.get("params").cloned().unwrap_or(body.clone())) {
+                    Ok(p) => p,
+                    Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
+                };
             let patch = storage::ProjectPatch {
                 id: params.id.clone(),
                 name: params.name,
@@ -435,12 +434,11 @@ async fn dispatch(
             Err(e) => err(storage_err(e)),
         },
         "area_create" => {
-            let params: AreaCreateParams = match serde_json::from_value(
-                body.get("params").cloned().unwrap_or(body.clone()),
-            ) {
-                Ok(p) => p,
-                Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
-            };
+            let params: AreaCreateParams =
+                match serde_json::from_value(body.get("params").cloned().unwrap_or(body.clone())) {
+                    Ok(p) => p,
+                    Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
+                };
             let id = uuid::Uuid::new_v4().to_string();
             let now = Utc::now();
             let row = storage::AreaRow {
@@ -467,12 +465,11 @@ async fn dispatch(
             }
         }
         "area_update" => {
-            let params: AreaUpdateParams = match serde_json::from_value(
-                body.get("params").cloned().unwrap_or(body.clone()),
-            ) {
-                Ok(p) => p,
-                Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
-            };
+            let params: AreaUpdateParams =
+                match serde_json::from_value(body.get("params").cloned().unwrap_or(body.clone())) {
+                    Ok(p) => p,
+                    Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
+                };
             match core
                 .repos
                 .areas
@@ -486,12 +483,10 @@ async fn dispatch(
                 )
                 .await
             {
-                Ok(updated) => {
-                    match build_area_response(&core, &updated).await {
-                        Ok(resp) => ok(resp),
-                        Err(e) => err(e),
-                    }
-                }
+                Ok(updated) => match build_area_response(&core, &updated).await {
+                    Ok(resp) => ok(resp),
+                    Err(e) => err(e),
+                },
                 Err(e) => err(storage_err(e)),
             }
         }
@@ -556,12 +551,11 @@ async fn dispatch(
             }
         }
         "objective_create" => {
-            let params: ObjectiveCreateParams = match serde_json::from_value(
-                body.get("params").cloned().unwrap_or(body.clone()),
-            ) {
-                Ok(p) => p,
-                Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
-            };
+            let params: ObjectiveCreateParams =
+                match serde_json::from_value(body.get("params").cloned().unwrap_or(body.clone())) {
+                    Ok(p) => p,
+                    Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
+                };
             let id = uuid::Uuid::new_v4().to_string();
             let now = Utc::now();
             let due_date = params
@@ -606,12 +600,11 @@ async fn dispatch(
             }
         }
         "objective_update" => {
-            let params: ObjectiveUpdateParams = match serde_json::from_value(
-                body.get("params").cloned().unwrap_or(body.clone()),
-            ) {
-                Ok(p) => p,
-                Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
-            };
+            let params: ObjectiveUpdateParams =
+                match serde_json::from_value(body.get("params").cloned().unwrap_or(body.clone())) {
+                    Ok(p) => p,
+                    Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
+                };
             let due_date = params
                 .due_date
                 .map(|opt| opt.and_then(|d| crate::commands::parse_date(&d)));
@@ -655,12 +648,11 @@ async fn dispatch(
 
         // ── Key Results ───────────────────────────────────────
         "key_result_create" => {
-            let params: KeyResultCreateParams = match serde_json::from_value(
-                body.get("params").cloned().unwrap_or(body.clone()),
-            ) {
-                Ok(p) => p,
-                Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
-            };
+            let params: KeyResultCreateParams =
+                match serde_json::from_value(body.get("params").cloned().unwrap_or(body.clone())) {
+                    Ok(p) => p,
+                    Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
+                };
             let id = uuid::Uuid::new_v4().to_string();
             let now = Utc::now();
             let row = storage::KeyResultRow {
@@ -669,9 +661,7 @@ async fn dispatch(
                 title: params.title,
                 description: None,
                 status: "active".to_string(),
-                tracking_mode: params
-                    .tracking_mode
-                    .unwrap_or_else(|| "metric".to_string()),
+                tracking_mode: params.tracking_mode.unwrap_or_else(|| "metric".to_string()),
                 target_value: params.target_value,
                 current_value: 0.0,
                 unit: params.unit,
@@ -694,12 +684,11 @@ async fn dispatch(
             }
         }
         "key_result_update" => {
-            let params: KeyResultUpdateParams = match serde_json::from_value(
-                body.get("params").cloned().unwrap_or(body.clone()),
-            ) {
-                Ok(p) => p,
-                Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
-            };
+            let params: KeyResultUpdateParams =
+                match serde_json::from_value(body.get("params").cloned().unwrap_or(body.clone())) {
+                    Ok(p) => p,
+                    Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
+                };
             let due_date = params
                 .due_date
                 .map(|opt| opt.and_then(|d| crate::commands::parse_date(&d)));
@@ -732,7 +721,12 @@ async fn dispatch(
                 Err(e) => return err(e),
             };
             let current_value: f64 = get(&body, "currentValue").unwrap_or(0.0);
-            match core.repos.key_results.update_metric(&id, current_value).await {
+            match core
+                .repos
+                .key_results
+                .update_metric(&id, current_value)
+                .await
+            {
                 Ok(updated) => {
                     let _ = core
                         .repos
@@ -790,8 +784,10 @@ async fn dispatch(
 
         // ── Status ────────────────────────────────────────────
         "agent_status" => {
-            match tokio::try_join!(core.repos.actions.list_focused(), core.repos.actions.summary(),)
-            {
+            match tokio::try_join!(
+                core.repos.actions.list_focused(),
+                core.repos.actions.summary(),
+            ) {
                 Ok((focused, summary)) => {
                     let focus_task = if let Some(row) = focused.first() {
                         row_to_task(&core.repos, row).await.ok()
@@ -882,10 +878,7 @@ async fn dispatch(
             match tokio::try_join!(
                 core.repos.finance.accounts.total_balance_by_currency(),
                 core.repos.finance.investments.total_value_by_currency(),
-                core.repos
-                    .finance
-                    .liabilities
-                    .total_remaining_by_currency(),
+                core.repos.finance.liabilities.total_remaining_by_currency(),
             ) {
                 Ok((accts, invests, liabs)) => {
                     let mut by_currency: HashMap<&str, CurrencyNetWorth> = HashMap::new();
@@ -958,6 +951,7 @@ async fn dispatch(
                         .map(|e| ActivityTimelineResponse {
                             app_name: e.app_name,
                             window_title: e.window_title,
+                            site_name: e.site_name,
                             category_id: e.category_id,
                             started_at: e.started_at,
                             duration_secs: e.duration_secs,
@@ -1037,8 +1031,10 @@ async fn dispatch(
                 .await
             {
                 Ok(summaries) => {
-                    let resp: Vec<ProductivitySummaryResponse> =
-                        summaries.into_iter().map(summary_to_prod_response).collect();
+                    let resp: Vec<ProductivitySummaryResponse> = summaries
+                        .into_iter()
+                        .map(summary_to_prod_response)
+                        .collect();
                     ok(resp)
                 }
                 Err(e) => err(prod_err(e)),
@@ -1092,8 +1088,10 @@ async fn dispatch(
                             }
                         }
                     }
-                    let resp: Vec<ProductivitySummaryResponse> =
-                        summaries.into_iter().map(summary_to_prod_response).collect();
+                    let resp: Vec<ProductivitySummaryResponse> = summaries
+                        .into_iter()
+                        .map(summary_to_prod_response)
+                        .collect();
                     ok(resp)
                 }
                 Err(e) => err(prod_err(e)),
@@ -1119,6 +1117,7 @@ async fn dispatch(
                         .map(|e| ActivityTimelineResponse {
                             app_name: e.app_name,
                             window_title: e.window_title,
+                            site_name: e.site_name,
                             category_id: e.category_id,
                             started_at: e.started_at,
                             duration_secs: e.duration_secs,
@@ -1215,12 +1214,18 @@ async fn dispatch(
             );
             match (sessions, visible_contexts, all_areas, all_projects) {
                 (Ok(sessions), Ok(contexts), Ok(areas), Ok(projects)) => {
-                    let ctx_map: HashMap<&str, _> =
-                        contexts.iter().map(|c| (c.session_key.as_str(), c)).collect();
-                    let area_names: HashMap<&str, &str> =
-                        areas.iter().map(|a| (a.id.as_str(), a.name.as_str())).collect();
-                    let project_names: HashMap<&str, &str> =
-                        projects.iter().map(|p| (p.id.as_str(), p.name.as_str())).collect();
+                    let ctx_map: HashMap<&str, _> = contexts
+                        .iter()
+                        .map(|c| (c.session_key.as_str(), c))
+                        .collect();
+                    let area_names: HashMap<&str, &str> = areas
+                        .iter()
+                        .map(|a| (a.id.as_str(), a.name.as_str()))
+                        .collect();
+                    let project_names: HashMap<&str, &str> = projects
+                        .iter()
+                        .map(|p| (p.id.as_str(), p.name.as_str()))
+                        .collect();
                     let threads: Vec<ChatThreadResponse> = sessions
                         .iter()
                         .map(|s| {
@@ -1252,9 +1257,9 @@ async fn dispatch(
                                         .map(String::from)
                                 }),
                                 project_name: ctx.and_then(|c| {
-                                    c.project_id.as_deref().and_then(|id| {
-                                        project_names.get(id).map(|s| s.to_string())
-                                    })
+                                    c.project_id
+                                        .as_deref()
+                                        .and_then(|id| project_names.get(id).map(|s| s.to_string()))
                                 }),
                             }
                         })
@@ -1360,9 +1365,7 @@ fn summary_to_prod_response(
     }
 }
 
-fn session_to_prod_response(
-    s: feature_productivity::types::FocusSession,
-) -> FocusSessionResponse {
+fn session_to_prod_response(s: feature_productivity::types::FocusSession) -> FocusSessionResponse {
     FocusSessionResponse {
         id: s.id,
         action_id: s.action_id,
