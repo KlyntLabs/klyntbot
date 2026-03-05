@@ -13,60 +13,68 @@ interface BreakdownDonutsProps {
   totalSecs: number;
 }
 
-function MiniDonut({
-  name,
-  value,
-  total,
-  color,
-}: {
-  name: string;
-  value: number;
-  total: number;
-  color: string;
-}) {
-  const pct = total > 0 ? Math.round((value / total) * 100) : 0;
-  const data = useMemo(
-    () => [{ value: value }, { value: Math.max(total - value, 0) }],
-    [value, total],
-  );
-
-  return (
-    <div className="flex flex-col items-center gap-1">
-      <div className="relative">
-        <PieChart width={56} height={56}>
-          <Pie
-            data={data}
-            cx={27}
-            cy={27}
-            innerRadius={18}
-            outerRadius={25}
-            startAngle={90}
-            endAngle={-270}
-            dataKey="value"
-            stroke="none"
-          >
-            <Cell fill={color} />
-            <Cell fill="var(--surface-raised)" />
-          </Pie>
-        </PieChart>
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span className="text-[11px] font-light text-primary tabular-nums">{pct}%</span>
-        </div>
-      </div>
-      <span className="text-[11px] font-medium text-secondary">{name}</span>
-      <span className="text-[10px] font-light text-dim">{formatLongDuration(value)}</span>
-    </div>
-  );
-}
-
 export function BreakdownDonuts({ segments, totalSecs }: BreakdownDonutsProps) {
+  // Single unified donut with all segments
+  const pieData = useMemo(() => {
+    const filled = segments.filter((s) => s.value > 0);
+    if (filled.length === 0) return [{ name: "Empty", value: 1, color: "var(--surface-raised)" }];
+    return filled;
+  }, [segments]);
+
+  const hasData = pieData[0]?.name !== "Empty";
+
   return (
     <div className="bg-surface-base rounded-xl p-4 flex flex-col gap-3">
       <h2 className="text-[13px] font-medium text-secondary">Breakdown</h2>
-      <div className="flex items-start justify-around">
-        {segments.map((s) => (
-          <MiniDonut key={s.name} name={s.name} value={s.value} total={totalSecs} color={s.color} />
-        ))}
+
+      <div className="flex items-center gap-4">
+        {/* Central donut */}
+        <div className="relative flex-shrink-0">
+          <PieChart width={80} height={80}>
+            <Pie
+              data={pieData}
+              cx={39}
+              cy={39}
+              innerRadius={26}
+              outerRadius={36}
+              startAngle={90}
+              endAngle={-270}
+              dataKey="value"
+              stroke="none"
+              paddingAngle={hasData ? 3 : 0}
+            >
+              {pieData.map((entry) => (
+                <Cell key={entry.name} fill={entry.color} />
+              ))}
+            </Pie>
+          </PieChart>
+          {/* Center label */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-[11px] font-light text-dim tabular-nums">
+              {formatLongDuration(totalSecs)}
+            </span>
+          </div>
+        </div>
+
+        {/* Segment details */}
+        <div className="flex-1 flex flex-col gap-2">
+          {segments.map((s) => {
+            const pct = totalSecs > 0 ? Math.round((s.value / totalSecs) * 100) : 0;
+            return (
+              <div key={s.name} className="flex items-center gap-2">
+                <span
+                  className="w-2 h-2 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: s.color }}
+                />
+                <span className="text-[11px] font-light text-secondary flex-1">{s.name}</span>
+                <span className="text-[11px] font-medium text-primary tabular-nums">{pct}%</span>
+                <span className="text-[10px] font-light text-dim tabular-nums w-14 text-right">
+                  {formatLongDuration(s.value)}
+                </span>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
