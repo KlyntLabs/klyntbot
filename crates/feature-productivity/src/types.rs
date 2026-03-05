@@ -226,3 +226,14 @@ impl NudgeRecord {
         }
     }
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProductivityScore {
+    pub date: String,
+    pub overall: f64,
+    pub productive_ratio_score: f64,
+    pub focus_quality_score: f64,
+    pub distraction_score: f64,
+    pub continuity_score: f64,
+}
