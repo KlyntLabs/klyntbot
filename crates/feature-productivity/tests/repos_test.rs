@@ -42,7 +42,11 @@ async fn test_insert_and_list_activity_events() {
 
     let events = repos
         .events
-        .list_range(&(now - Duration::seconds(1)), &(now + Duration::seconds(60)), None)
+        .list_range(
+            &(now - Duration::seconds(1)),
+            &(now + Duration::seconds(60)),
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(events.len(), 3);
@@ -75,7 +79,11 @@ async fn test_batch_insert_events() {
     repos.events.insert_batch(&events).await.unwrap();
     let result = repos
         .events
-        .list_range(&(now - Duration::seconds(1)), &(now + Duration::seconds(100)), None)
+        .list_range(
+            &(now - Duration::seconds(1)),
+            &(now + Duration::seconds(100)),
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(result.len(), 10);
@@ -286,7 +294,10 @@ async fn test_context_switch_count() {
 
     let switches = repos
         .events
-        .count_context_switches(&(now - Duration::seconds(1)), &(now + Duration::seconds(100)))
+        .count_context_switches(
+            &(now - Duration::seconds(1)),
+            &(now + Duration::seconds(100)),
+        )
         .await
         .unwrap();
     assert_eq!(switches, 4); // A->B, B->A, A->B, B->C

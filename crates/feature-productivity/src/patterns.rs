@@ -159,7 +159,9 @@ impl ProductivityPatternAnalyzer {
             .max_by(|(_, (a_total, a_count)), (_, (b_total, b_count))| {
                 let a_avg = a_total / *a_count as f64;
                 let b_avg = b_total / *b_count as f64;
-                a_avg.partial_cmp(&b_avg).unwrap_or(std::cmp::Ordering::Equal)
+                a_avg
+                    .partial_cmp(&b_avg)
+                    .unwrap_or(std::cmp::Ordering::Equal)
             })
             .map(|(day, _)| WEEKDAYS[day])
     }

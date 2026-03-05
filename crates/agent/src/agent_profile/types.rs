@@ -147,10 +147,7 @@ impl AgentProfile {
                 }
                 // Match on skill-level triggers
                 if !s.triggers.is_empty() {
-                    return s
-                        .triggers
-                        .iter()
-                        .any(|t| normalized.contains(t.as_str()));
+                    return s.triggers.iter().any(|t| normalized.contains(t.as_str()));
                 }
                 // Fallback: match on skill name (hyphen-normalized)
                 normalized.contains(&normalize_for_matching(&s.name))

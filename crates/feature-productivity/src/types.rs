@@ -43,10 +43,9 @@ impl std::str::FromStr for CategoryType {
             "productive" => Ok(Self::Productive),
             "neutral" => Ok(Self::Neutral),
             "distracting" => Ok(Self::Distracting),
-            _ => Err(common::ToolError::InvalidParams(format!(
-                "unknown category type: {s}"
-            ))
-            .into()),
+            _ => {
+                Err(common::ToolError::InvalidParams(format!("unknown category type: {s}")).into())
+            }
         }
     }
 }
@@ -97,10 +96,7 @@ impl std::str::FromStr for SessionType {
             "focus" => Ok(Self::Focus),
             "pomodoro" => Ok(Self::Pomodoro),
             "break" => Ok(Self::Break),
-            _ => Err(common::ToolError::InvalidParams(format!(
-                "unknown session type: {s}"
-            ))
-            .into()),
+            _ => Err(common::ToolError::InvalidParams(format!("unknown session type: {s}")).into()),
         }
     }
 }
@@ -196,10 +192,7 @@ impl std::str::FromStr for NudgeType {
             "focus_suggestion" => Ok(Self::FocusSuggestion),
             "daily_summary" => Ok(Self::DailySummary),
             "burnout_alert" => Ok(Self::BurnoutAlert),
-            _ => Err(common::ToolError::InvalidParams(format!(
-                "unknown nudge type: {s}"
-            ))
-            .into()),
+            _ => Err(common::ToolError::InvalidParams(format!("unknown nudge type: {s}")).into()),
         }
     }
 }
@@ -251,9 +244,7 @@ impl std::str::FromStr for GoalType {
         match s {
             "daily" => Ok(Self::Daily),
             "weekly" => Ok(Self::Weekly),
-            _ => Err(
-                common::ToolError::InvalidParams(format!("unknown goal type: {s}")).into(),
-            ),
+            _ => Err(common::ToolError::InvalidParams(format!("unknown goal type: {s}")).into()),
         }
     }
 }
@@ -297,9 +288,7 @@ impl std::str::FromStr for GoalMetric {
             "focus_sessions" => Ok(Self::FocusSessions),
             "productivity_score" => Ok(Self::ProductivityScore),
             "max_distracting_mins" => Ok(Self::MaxDistractingMins),
-            _ => Err(
-                common::ToolError::InvalidParams(format!("unknown goal metric: {s}")).into(),
-            ),
+            _ => Err(common::ToolError::InvalidParams(format!("unknown goal metric: {s}")).into()),
         }
     }
 }

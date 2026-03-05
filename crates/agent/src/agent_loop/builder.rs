@@ -203,9 +203,9 @@ impl AgentLoopBuilder {
         // Productivity context source (optional — requires real pool + enabled).
         // prod_repos is stored for reuse by the tool registration block below.
         let prod_repos = if config.productivity.enabled {
-            self.pool.as_ref().map(|pool| {
-                feature_productivity::repos::ProductivityRepos::new(pool.clone())
-            })
+            self.pool
+                .as_ref()
+                .map(|pool| feature_productivity::repos::ProductivityRepos::new(pool.clone()))
         } else {
             None
         };
@@ -569,11 +569,8 @@ impl AgentLoopBuilder {
                 feature_productivity::DailyAggregator::new(prod_repos.clone())
                     .with_handler(prod_handler),
             );
-            let productivity_tool = feature_productivity::ProductivityTool::new(
-                prod_repos,
-                focus_mgr,
-                aggregator,
-            );
+            let productivity_tool =
+                feature_productivity::ProductivityTool::new(prod_repos, focus_mgr, aggregator);
             tool_registry.register(productivity_tool);
         }
 

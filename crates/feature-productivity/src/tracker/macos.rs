@@ -131,10 +131,7 @@ fn get_window_title_cg(pid: i32) -> Option<String> {
 
 #[cfg(target_os = "macos")]
 extern "C" {
-    fn CGEventSourceSecondsSinceLastEventType(
-        source_state_id: u32,
-        event_type: u32,
-    ) -> f64;
+    fn CGEventSourceSecondsSinceLastEventType(source_state_id: u32, event_type: u32) -> f64;
 }
 
 const CG_EVENT_SOURCE_COMBINED_SESSION_STATE: u32 = 0;

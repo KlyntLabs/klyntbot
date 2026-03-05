@@ -240,7 +240,9 @@ impl ProductivityTool {
                 (
                     week_ago.format("%Y-%m-%d").to_string(),
                     two_weeks_ago.format("%Y-%m-%d").to_string(),
-                    (week_ago - Duration::days(1)).format("%Y-%m-%d").to_string(),
+                    (week_ago - Duration::days(1))
+                        .format("%Y-%m-%d")
+                        .to_string(),
                     "This week vs Last week",
                 )
             }
@@ -257,7 +259,9 @@ impl ProductivityTool {
 
         let (current, previous) = tokio::try_join!(
             self.repos.summaries.list_range(&current_start, &today_str),
-            self.repos.summaries.list_range(&previous_start, &previous_end),
+            self.repos
+                .summaries
+                .list_range(&previous_start, &previous_end),
         )?;
 
         let cur_productive: i64 = current.iter().map(|s| s.productive_secs).sum();
@@ -266,8 +270,7 @@ impl ProductivityTool {
         let prev_score = avg_scores(previous.iter().filter_map(|s| s.productivity_score));
 
         let productive_change = if prev_productive > 0 {
-            let pct = ((cur_productive as f64 - prev_productive as f64)
-                / prev_productive as f64
+            let pct = ((cur_productive as f64 - prev_productive as f64) / prev_productive as f64
                 * 100.0)
                 .round();
             if pct >= 0.0 {
@@ -414,7 +417,11 @@ impl ProductivityTool {
             .unwrap()
             .and_utc();
 
-        let events = self.repos.events.list_range(&start, &end, Some(50_000)).await?;
+        let events = self
+            .repos
+            .events
+            .list_range(&start, &end, Some(50_000))
+            .await?;
 
         match format {
             "csv" => {

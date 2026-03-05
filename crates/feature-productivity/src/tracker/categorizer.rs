@@ -189,7 +189,9 @@ mod tests {
                 .id,
             "entertainment"
         );
-        assert!(cat.categorize("Safari", None, Some("https://github.com")).is_none());
+        assert!(cat
+            .categorize("Safari", None, Some("https://github.com"))
+            .is_none());
     }
 
     #[test]

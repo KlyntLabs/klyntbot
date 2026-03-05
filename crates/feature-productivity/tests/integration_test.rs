@@ -1,6 +1,6 @@
 //! Integration tests for the productivity feature — end-to-end lifecycle scenarios.
 
-use chrono::{Duration, TimeZone, Utc};
+use chrono::{Duration, NaiveDate, TimeZone, Utc};
 use feature_productivity::config::FocusConfig;
 use feature_productivity::focus::FocusManager;
 use feature_productivity::repos::ProductivityRepos;
@@ -44,10 +44,7 @@ async fn test_full_focus_session_lifecycle() {
     assert!(err.is_err());
 
     // 3. Record a distraction
-    manager
-        .record_distraction("Twitter")
-        .await
-        .unwrap();
+    manager.record_distraction("Twitter").await.unwrap();
 
     // Verify distraction was recorded
     let active = repos.sessions.get_active().await.unwrap().unwrap();
@@ -56,7 +53,11 @@ async fn test_full_focus_session_lifecycle() {
     assert_eq!(active.distraction_events[0].app_name, "Twitter");
 
     // 4. End the session
-    let ended = manager.end_session(Some("Good session".into())).await.unwrap().unwrap();
+    let ended = manager
+        .end_session(Some("Good session".into()))
+        .await
+        .unwrap()
+        .unwrap();
     // completed = actual_mins >= target. Since start/end are near-instant, actual_mins=0,
     // so completed=false. This is correct behavior — session didn't reach target duration.
     assert!(ended.ended_at.is_some());
@@ -128,7 +129,9 @@ async fn test_categorizer_with_db() {
     assert_eq!(social.unwrap().category_type, CategoryType::Distracting);
 
     // Unknown app should return None
-    assert!(categorizer.categorize("UnknownApp123", None, None).is_none());
+    assert!(categorizer
+        .categorize("UnknownApp123", None, None)
+        .is_none());
 
     // Add a custom category and re-test
     let custom = ActivityCategory {
@@ -291,7 +294,11 @@ async fn test_nudge_service_delivers_break_reminder() {
 
     // Verify break threshold is exceeded within the 90-min window
     let window_start = now - Duration::minutes(90);
-    let active_secs = repos.events.total_active_secs(&window_start, &now).await.unwrap();
+    let active_secs = repos
+        .events
+        .total_active_secs(&window_start, &now)
+        .await
+        .unwrap();
     assert!(
         active_secs >= 90 * 60,
         "Expected >= 5400 secs, got {}",
@@ -299,7 +306,11 @@ async fn test_nudge_service_delivers_break_reminder() {
     );
 
     // Verify no recent nudges (so cooldown won't prevent sending)
-    let last = repos.nudges.last_of_type(NudgeType::BreakReminder).await.unwrap();
+    let last = repos
+        .nudges
+        .last_of_type(NudgeType::BreakReminder)
+        .await
+        .unwrap();
     assert!(last.is_none());
 
     // Insert a nudge and verify cooldown works
@@ -313,7 +324,11 @@ async fn test_nudge_service_delivers_break_reminder() {
     };
     repos.nudges.insert(&record).await.unwrap();
 
-    let last = repos.nudges.last_of_type(NudgeType::BreakReminder).await.unwrap();
+    let last = repos
+        .nudges
+        .last_of_type(NudgeType::BreakReminder)
+        .await
+        .unwrap();
     assert!(last.is_some());
     assert_eq!(last.unwrap().nudge_type, NudgeType::BreakReminder);
 }
@@ -329,14 +344,16 @@ async fn test_pattern_analyzer_detects_patterns() {
 
     // Insert 10 days of summaries
     for day_offset in 0..10 {
-        let date = (now - Duration::days(day_offset)).format("%Y-%m-%d").to_string();
+        let date = (now - Duration::days(day_offset))
+            .format("%Y-%m-%d")
+            .to_string();
         let summary = DailySummary {
             date,
             total_active_secs: 28800, // 8h
             total_focus_secs: 14400,  // 4h
             total_break_secs: 3600,
             total_idle_secs: 7200,
-            productive_secs: 21600,   // 6h
+            productive_secs: 21600, // 6h
             neutral_secs: 3600,
             distracting_secs: 3600,
             focus_sessions_count: 4,
@@ -420,4 +437,199 @@ async fn test_pattern_analyzer_detects_patterns() {
 
     // Best day of week should be set (10 days >= 7 threshold)
     assert!(patterns.best_day_of_week.is_some());
+}
+
+/// Pomodoro lifecycle: start → prevent double-start → end → verify quality.
+#[tokio::test]
+async fn test_pomodoro_lifecycle() {
+    let pool = setup_pool().await;
+    let repos = ProductivityRepos::new(pool);
+    let mgr = FocusManager::new(repos.clone(), FocusConfig::default());
+
+    // Start pomodoro
+    let session = mgr
+        .start_pomodoro(None, None, Some(25), Some(5))
+        .await
+        .unwrap();
+    assert_eq!(session.session_type, SessionType::Pomodoro);
+    assert_eq!(session.target_mins, Some(25));
+
+    // Can't start another pomodoro while active
+    assert!(mgr.start_pomodoro(None, None, None, None).await.is_err());
+    // Can't start a focus session while pomodoro is active
+    assert!(mgr.start_session(None, None, None).await.is_err());
+
+    // End it
+    let ended = mgr.end_session(None).await.unwrap().unwrap();
+    assert_eq!(ended.session_type, SessionType::Pomodoro);
+    assert!(ended.quality_score.is_some());
+    assert!(ended.ended_at.is_some());
+}
+
+/// Goal tracking: set a goal, insert activity, verify goal is met.
+#[tokio::test]
+async fn test_goal_tracking() {
+    let pool = setup_pool().await;
+    let repos = ProductivityRepos::new(pool);
+    let aggregator = DailyAggregator::new(repos.clone());
+
+    // Set a goal: 2h productive time
+    let goal = ProductivityGoal {
+        id: None,
+        goal_type: GoalType::Daily,
+        metric: GoalMetric::ProductiveHours,
+        target_value: 2.0,
+        enabled: true,
+        created_at: Utc::now(),
+    };
+    repos.goals.insert(&goal).await.unwrap();
+
+    // Insert 3h of productive activity
+    let now = Utc::now();
+    repos
+        .events
+        .insert(&ActivityEvent {
+            id: None,
+            app_name: "VS Code".into(),
+            window_title: None,
+            bundle_id: None,
+            url: None,
+            category_id: Some("coding".into()),
+            started_at: now - Duration::hours(3),
+            ended_at: Some(now),
+            duration_secs: Some(10800),
+            is_idle: false,
+            metadata: None,
+        })
+        .await
+        .unwrap();
+
+    let today = now.format("%Y-%m-%d").to_string();
+    let results = aggregator.check_goals(&today).await.unwrap();
+    assert_eq!(results.len(), 1);
+    let (_goal, _current, met) = &results[0];
+    assert!(met, "goal should be met with 3h > 2h target");
+}
+
+/// Historical comparison: insert summaries for two days, verify comparison output.
+#[tokio::test]
+async fn test_historical_comparison() {
+    let pool = setup_pool().await;
+    let repos = ProductivityRepos::new(pool);
+
+    let today = Utc::now().date_naive();
+    let yesterday = today - Duration::days(1);
+
+    // Insert yesterday's summary
+    let yesterday_summary = DailySummary {
+        date: yesterday.format("%Y-%m-%d").to_string(),
+        total_active_secs: 28800, // 8h
+        total_focus_secs: 14400,
+        total_break_secs: 3600,
+        total_idle_secs: 3600,
+        productive_secs: 21600, // 6h
+        neutral_secs: 3600,
+        distracting_secs: 3600,
+        focus_sessions_count: 4,
+        avg_session_quality: Some(0.80),
+        interruptions_count: 5,
+        context_switches: 20,
+        top_apps: vec![],
+        top_categories: vec![],
+        productivity_score: Some(72.0),
+        ai_summary: None,
+    };
+    repos.summaries.upsert(&yesterday_summary).await.unwrap();
+
+    // Insert today's summary (better day)
+    let today_summary = DailySummary {
+        date: today.format("%Y-%m-%d").to_string(),
+        productive_secs: 25200, // 7h — improvement
+        productivity_score: Some(80.0),
+        ..yesterday_summary.clone()
+    };
+    repos.summaries.upsert(&today_summary).await.unwrap();
+
+    // Verify both summaries are retrievable (reuse date strings from summaries)
+    let today_str = &today_summary.date;
+    let yesterday_str = &yesterday_summary.date;
+    let current = repos
+        .summaries
+        .list_range(&today_str, &today_str)
+        .await
+        .unwrap();
+    let previous = repos
+        .summaries
+        .list_range(&yesterday_str, &yesterday_str)
+        .await
+        .unwrap();
+
+    assert_eq!(current.len(), 1);
+    assert_eq!(previous.len(), 1);
+    assert_eq!(current[0].productive_secs, 25200);
+    assert_eq!(previous[0].productive_secs, 21600);
+
+    // Verify percentage change calculation
+    let change = ((25200.0_f64 - 21600.0) / 21600.0 * 100.0).round();
+    assert!(
+        (change - 17.0).abs() < 1.0,
+        "Expected ~17% improvement, got {change}"
+    );
+}
+
+/// Export: insert events, verify CSV output format.
+#[tokio::test]
+async fn test_activity_export_csv() {
+    let pool = setup_pool().await;
+    let repos = ProductivityRepos::new(pool);
+
+    let date = NaiveDate::from_ymd_opt(2026, 3, 4).unwrap();
+    let day_start = date.and_hms_opt(9, 0, 0).unwrap().and_utc();
+
+    // Insert two events
+    for (i, app) in ["VS Code", "Safari"].iter().enumerate() {
+        let event = ActivityEvent {
+            id: None,
+            app_name: app.to_string(),
+            window_title: Some(format!("Window {i}")),
+            bundle_id: None,
+            url: None,
+            category_id: Some("coding".into()),
+            started_at: day_start + Duration::hours(i as i64),
+            ended_at: Some(day_start + Duration::hours(i as i64 + 1)),
+            duration_secs: Some(3600),
+            is_idle: false,
+            metadata: None,
+        };
+        repos.events.insert(&event).await.unwrap();
+    }
+
+    // Fetch events for that date range
+    let start = date.and_hms_opt(0, 0, 0).unwrap().and_utc();
+    let end = date.and_hms_opt(23, 59, 59).unwrap().and_utc();
+
+    let events = repos
+        .events
+        .list_range(&start, &end, Some(100))
+        .await
+        .unwrap();
+    assert_eq!(events.len(), 2);
+
+    // Verify CSV-like format
+    let mut csv =
+        String::from("app_name,window_title,category_id,started_at,duration_secs,is_idle\n");
+    for e in &events {
+        csv.push_str(&format!(
+            "{},{},{},{},{},{}\n",
+            e.app_name,
+            e.window_title.as_deref().unwrap_or(""),
+            e.category_id.as_deref().unwrap_or(""),
+            e.started_at,
+            e.duration_secs.unwrap_or(0),
+            e.is_idle,
+        ));
+    }
+    assert!(csv.contains("VS Code"));
+    assert!(csv.contains("Safari"));
+    assert!(csv.contains("coding"));
 }

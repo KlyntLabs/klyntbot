@@ -31,10 +31,10 @@ impl ProductivityHandler for ProductivityHandlerImpl {
         let params = ChatParams::new(&self.model).with_max_tokens(256);
 
         let response = self.provider.chat(&messages, None, &params).await?;
-        response
-            .content
-            .ok_or_else(|| common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(
+        response.content.ok_or_else(|| {
+            common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(
                 "Empty LLM response for productivity summary".to_string(),
-            )))
+            ))
+        })
     }
 }

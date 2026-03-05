@@ -189,10 +189,8 @@ impl DailyAggregator {
         &self,
         date: &str,
     ) -> common::Result<Vec<(crate::types::ProductivityGoal, f64, bool)>> {
-        let (summary, goals) = tokio::try_join!(
-            self.get_or_compute(date),
-            self.repos.goals.list_enabled(),
-        )?;
+        let (summary, goals) =
+            tokio::try_join!(self.get_or_compute(date), self.repos.goals.list_enabled(),)?;
 
         let mut results = Vec::new();
         for goal in goals {
@@ -249,8 +247,7 @@ fn compute_productivity_score(summary: &DailySummary) -> f64 {
     let focus_quality = summary.avg_session_quality.unwrap_or(0.5);
     let distraction_ratio = 1.0 - (summary.distracting_secs as f64 / total);
     let expected_switches = (total / 1800.0).max(1.0);
-    let continuity =
-        (1.0 - (summary.context_switches as f64 / expected_switches)).clamp(0.0, 1.0);
+    let continuity = (1.0 - (summary.context_switches as f64 / expected_switches)).clamp(0.0, 1.0);
 
     let raw = (productive_ratio * 0.4)
         + (focus_quality * 0.3)

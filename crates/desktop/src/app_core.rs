@@ -655,7 +655,6 @@ impl AppCore {
     }
 }
 
-
 /// Parse "HH:MM" to cron expression "M H * * *".
 fn parse_time_to_cron(time_str: &str) -> Option<String> {
     let parts: Vec<&str> = time_str.split(':').collect();

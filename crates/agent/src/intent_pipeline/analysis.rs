@@ -310,7 +310,14 @@ fn has_multi_agent_triggers(msg: &str) -> bool {
     let agent_trigger_groups: &[&[&str]] = &[
         // task agent triggers
         &[
-            "todo", "task", "create a task", "my tasks", "focus", "project", "area", "objective",
+            "todo",
+            "task",
+            "create a task",
+            "my tasks",
+            "focus",
+            "project",
+            "area",
+            "objective",
         ],
         // finance agent triggers
         &[
@@ -334,22 +341,9 @@ fn has_multi_agent_triggers(msg: &str) -> bool {
             "remind",
         ],
         // automation agent triggers
-        &[
-            "cron",
-            "automate",
-            "schedule a",
-            "every day",
-            "recurring",
-        ],
+        &["cron", "automate", "schedule a", "every day", "recurring"],
         // communication agent triggers
-        &[
-            "send",
-            "email",
-            "message",
-            "notify",
-            "slack",
-            "telegram",
-        ],
+        &["send", "email", "message", "notify", "slack", "telegram"],
     ];
 
     let matched_groups = agent_trigger_groups
@@ -659,7 +653,8 @@ impl IntentAnalyzer {
         {
             debug!("Overriding Direct → Reactive: message references MCP tools");
             analysis.mode = ExecutionMode::Reactive {
-                max_iterations: compute_iteration_budget(&analysis.signals).max(ORCHESTRATION_MIN_ITERATIONS),
+                max_iterations: compute_iteration_budget(&analysis.signals)
+                    .max(ORCHESTRATION_MIN_ITERATIONS),
             };
         }
 
@@ -670,13 +665,16 @@ impl IntentAnalyzer {
         if !analysis.needs_orchestration {
             let msg_lower = message.trim().to_lowercase();
             if has_multi_agent_triggers(&msg_lower) {
-                debug!("Post-classification: forcing needs_orchestration from multi-agent triggers");
+                debug!(
+                    "Post-classification: forcing needs_orchestration from multi-agent triggers"
+                );
                 analysis.needs_orchestration = true;
                 analysis.confidence = analysis.confidence.max(ORCHESTRATION_MIN_CONFIDENCE);
                 // Ensure Reactive mode with enough budget for orchestration
                 if matches!(analysis.mode, ExecutionMode::Direct) {
                     analysis.mode = ExecutionMode::Reactive {
-                        max_iterations: compute_iteration_budget(&analysis.signals).max(ORCHESTRATION_MIN_ITERATIONS),
+                        max_iterations: compute_iteration_budget(&analysis.signals)
+                            .max(ORCHESTRATION_MIN_ITERATIONS),
                     };
                 }
             }
@@ -1298,9 +1296,15 @@ mod tests {
     fn single_agent_triggers_not_deferred() {
         // Messages targeting a single domain should NOT defer
         let result = analyze_heuristic("create a task to review the code");
-        assert!(result.is_some(), "Single-domain task message should not defer");
+        assert!(
+            result.is_some(),
+            "Single-domain task message should not defer"
+        );
 
         let result = analyze_heuristic("check my account balance");
-        assert!(result.is_some(), "Single-domain finance message should not defer");
+        assert!(
+            result.is_some(),
+            "Single-domain finance message should not defer"
+        );
     }
 }

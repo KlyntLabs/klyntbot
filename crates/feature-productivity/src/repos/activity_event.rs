@@ -38,22 +38,20 @@ impl ActivityEventRepo {
     }
 
     pub async fn insert(&self, event: &ActivityEvent) -> common::Result<i64> {
-        let row = sqlx::query_scalar::<_, i64>(
-            &format!("{INSERT_SQL} RETURNING id"),
-        )
-        .bind(&event.app_name)
-        .bind(&event.window_title)
-        .bind(&event.bundle_id)
-        .bind(&event.url)
-        .bind(&event.category_id)
-        .bind(event.started_at)
-        .bind(event.ended_at)
-        .bind(event.duration_secs)
-        .bind(event.is_idle)
-        .bind(&event.metadata)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        let row = sqlx::query_scalar::<_, i64>(&format!("{INSERT_SQL} RETURNING id"))
+            .bind(&event.app_name)
+            .bind(&event.window_title)
+            .bind(&event.bundle_id)
+            .bind(&event.url)
+            .bind(&event.category_id)
+            .bind(event.started_at)
+            .bind(event.ended_at)
+            .bind(event.duration_secs)
+            .bind(event.is_idle)
+            .bind(&event.metadata)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         Ok(row)
     }
 
@@ -163,7 +161,10 @@ impl ActivityEventRepo {
         .fetch_all(&self.pool)
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
-        Ok(rows.into_iter().map(|r| (r.category_id, r.total_secs)).collect())
+        Ok(rows
+            .into_iter()
+            .map(|r| (r.category_id, r.total_secs))
+            .collect())
     }
 
     pub async fn top_apps(
@@ -191,7 +192,10 @@ impl ActivityEventRepo {
         .fetch_all(&self.pool)
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
-        Ok(rows.into_iter().map(|r| (r.app_name, r.total_secs)).collect())
+        Ok(rows
+            .into_iter()
+            .map(|r| (r.app_name, r.total_secs))
+            .collect())
     }
 
     pub async fn total_idle_secs(

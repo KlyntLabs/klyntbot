@@ -56,17 +56,16 @@ impl FocusManager {
     }
 
     /// End the active focus session, computing quality score.
-    pub async fn end_session(
-        &self,
-        notes: Option<String>,
-    ) -> common::Result<Option<FocusSession>> {
+    pub async fn end_session(&self, notes: Option<String>) -> common::Result<Option<FocusSession>> {
         let Some(mut session) = self.repos.sessions.get_active().await? else {
             return Ok(None);
         };
 
         let now = Utc::now();
         let actual_mins = (now - session.started_at).num_minutes();
-        let target = session.target_mins.unwrap_or(self.config.default_duration_mins as i64);
+        let target = session
+            .target_mins
+            .unwrap_or(self.config.default_duration_mins as i64);
 
         session.ended_at = Some(now);
         session.actual_mins = Some(actual_mins);
@@ -174,7 +173,11 @@ fn compute_on_task_ratio(session: &FocusSession) -> f64 {
 /// quality = (on_task_ratio * 0.6) + (focus_continuity * 0.3) + (completion_bonus * 0.1)
 ///
 /// `default_target_mins` is used when `session.target_mins` is `None`.
-pub fn compute_quality(session: &FocusSession, on_task_ratio: f64, default_target_mins: u64) -> f64 {
+pub fn compute_quality(
+    session: &FocusSession,
+    on_task_ratio: f64,
+    default_target_mins: u64,
+) -> f64 {
     let target = session.target_mins.unwrap_or(default_target_mins as i64) as f64;
     let actual = session.actual_mins.unwrap_or(0) as f64;
 

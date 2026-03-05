@@ -483,9 +483,11 @@ impl AgentRuntime {
         tx: &tokio::sync::mpsc::Sender<AgentEvent>,
         agent_name: &str,
     ) {
-        let (Some(ref profile_repo), Some(ref pattern_repo), Some(ref adapt_repo)) =
-            (&self.learning_user_profile, &self.learning_patterns, &self.learning_adaptations)
-        else {
+        let (Some(ref profile_repo), Some(ref pattern_repo), Some(ref adapt_repo)) = (
+            &self.learning_user_profile,
+            &self.learning_patterns,
+            &self.learning_adaptations,
+        ) else {
             return;
         };
 
@@ -1110,9 +1112,7 @@ mod tests {
     }
 
     /// Helper: build runtime with tool_registry and delegation_self_ref wired up.
-    async fn make_delegation_runtime(
-        provider: Arc<dyn LlmProvider>,
-    ) -> Arc<AgentRuntime> {
+    async fn make_delegation_runtime(provider: Arc<dyn LlmProvider>) -> Arc<AgentRuntime> {
         let (runtime, registry) = make_runtime_with_registry(provider).await;
         let runtime = Arc::new(runtime.with_tool_registry(registry));
         runtime.set_delegation_self_ref(Arc::clone(&runtime) as Arc<dyn tools::DelegationHandler>);
@@ -1125,8 +1125,9 @@ mod tests {
         // should cause the heuristic to return None (defer to LLM classifier).
         use crate::intent_pipeline::analysis::analyze_heuristic;
 
-        let result =
-            analyze_heuristic("first check my transactions then create a task for the missing ones");
+        let result = analyze_heuristic(
+            "first check my transactions then create a task for the missing ones",
+        );
         assert!(
             result.is_none(),
             "Expected heuristic to defer multi-agent message to LLM, got: {:?}",
@@ -1145,7 +1146,16 @@ mod tests {
         let (tx, mut rx) = tokio::sync::mpsc::channel(32);
 
         let result = runtime
-            .process_message("hello", vec![], &[], &[], &routing_ctx(), None, Some(tx), None)
+            .process_message(
+                "hello",
+                vec![],
+                &[],
+                &[],
+                &routing_ctx(),
+                None,
+                Some(tx),
+                None,
+            )
             .await
             .unwrap();
 
@@ -1240,9 +1250,9 @@ mod tests {
         }
 
         // Should have DelegationStarted and DelegationCompleted
-        let started = events.iter().any(|e| {
-            matches!(e, AgentEvent::DelegationStarted { to_agent, .. } if to_agent == "task")
-        });
+        let started = events.iter().any(
+            |e| matches!(e, AgentEvent::DelegationStarted { to_agent, .. } if to_agent == "task"),
+        );
         let completed = events.iter().any(|e| {
             matches!(e, AgentEvent::DelegationCompleted { to_agent, success, .. } if to_agent == "task" && *success)
         });

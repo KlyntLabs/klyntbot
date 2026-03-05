@@ -108,9 +108,9 @@ impl FocusSessionRepo {
     }
 
     pub async fn get(&self, id: &str) -> common::Result<Option<FocusSession>> {
-        let row = sqlx::query_as::<_, SessionRow>(
-            &format!("SELECT {SESSION_COLUMNS} FROM focus_sessions WHERE id = ?1"),
-        )
+        let row = sqlx::query_as::<_, SessionRow>(&format!(
+            "SELECT {SESSION_COLUMNS} FROM focus_sessions WHERE id = ?1"
+        ))
         .bind(id)
         .fetch_optional(&self.pool)
         .await

@@ -75,7 +75,12 @@ static PACKS: &[Pack] = &[
         name: "Productivity",
         description: "Calendar sync, daily planning, cron, summarize, activity tracking",
         tier: PackTier::Recommended,
-        skills: &["daily-planning", "cron", "summarize", "productivity-tracking"],
+        skills: &[
+            "daily-planning",
+            "cron",
+            "summarize",
+            "productivity-tracking",
+        ],
     },
     Pack {
         id: "ai-intelligence",

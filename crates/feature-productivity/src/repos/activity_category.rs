@@ -99,11 +99,12 @@ impl ActivityCategoryRepo {
     }
 
     pub async fn delete(&self, id: &str) -> common::Result<bool> {
-        let result = sqlx::query("DELETE FROM activity_categories WHERE id = ?1 AND is_system = FALSE")
-            .bind(id)
-            .execute(&self.pool)
-            .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        let result =
+            sqlx::query("DELETE FROM activity_categories WHERE id = ?1 AND is_system = FALSE")
+                .bind(id)
+                .execute(&self.pool)
+                .await
+                .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         Ok(result.rows_affected() > 0)
     }
 }
