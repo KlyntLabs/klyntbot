@@ -65,6 +65,8 @@ impl From<SessionRow> for FocusSession {
     }
 }
 
+const SESSION_COLUMNS: &str = "id, action_id, project_id, session_type, target_mins, started_at, ended_at, actual_mins, interruptions, distraction_events, quality_score, completed, notes";
+
 #[derive(Debug, Clone)]
 pub struct FocusSessionRepo {
     pool: SqlitePool,
@@ -107,9 +109,7 @@ impl FocusSessionRepo {
 
     pub async fn get(&self, id: &str) -> common::Result<Option<FocusSession>> {
         let row = sqlx::query_as::<_, SessionRow>(
-            r#"SELECT id, action_id, project_id, session_type, target_mins, started_at, ended_at,
-                      actual_mins, interruptions, distraction_events, quality_score, completed, notes
-               FROM focus_sessions WHERE id = ?1"#,
+            &format!("SELECT {SESSION_COLUMNS} FROM focus_sessions WHERE id = ?1"),
         )
         .bind(id)
         .fetch_optional(&self.pool)
@@ -120,9 +120,7 @@ impl FocusSessionRepo {
 
     pub async fn get_active(&self) -> common::Result<Option<FocusSession>> {
         let row = sqlx::query_as::<_, SessionRow>(
-            r#"SELECT id, action_id, project_id, session_type, target_mins, started_at, ended_at,
-                      actual_mins, interruptions, distraction_events, quality_score, completed, notes
-               FROM focus_sessions WHERE ended_at IS NULL ORDER BY started_at DESC LIMIT 1"#,
+            &format!("SELECT {SESSION_COLUMNS} FROM focus_sessions WHERE ended_at IS NULL ORDER BY started_at DESC LIMIT 1"),
         )
         .fetch_optional(&self.pool)
         .await
@@ -170,12 +168,7 @@ impl FocusSessionRepo {
     ) -> common::Result<Vec<FocusSession>> {
         let limit = limit.unwrap_or(1000);
         let rows = sqlx::query_as::<_, SessionRow>(
-            r#"SELECT id, action_id, project_id, session_type, target_mins, started_at, ended_at,
-                      actual_mins, interruptions, distraction_events, quality_score, completed, notes
-               FROM focus_sessions
-               WHERE started_at >= ?1 AND started_at < ?2
-               ORDER BY started_at DESC
-               LIMIT ?3"#,
+            &format!("SELECT {SESSION_COLUMNS} FROM focus_sessions WHERE started_at >= ?1 AND started_at < ?2 ORDER BY started_at DESC LIMIT ?3"),
         )
         .bind(start)
         .bind(end)
@@ -188,9 +181,7 @@ impl FocusSessionRepo {
 
     pub async fn list_by_action(&self, action_id: &str) -> common::Result<Vec<FocusSession>> {
         let rows = sqlx::query_as::<_, SessionRow>(
-            r#"SELECT id, action_id, project_id, session_type, target_mins, started_at, ended_at,
-                      actual_mins, interruptions, distraction_events, quality_score, completed, notes
-               FROM focus_sessions WHERE action_id = ?1 ORDER BY started_at DESC"#,
+            &format!("SELECT {SESSION_COLUMNS} FROM focus_sessions WHERE action_id = ?1 ORDER BY started_at DESC"),
         )
         .bind(action_id)
         .fetch_all(&self.pool)

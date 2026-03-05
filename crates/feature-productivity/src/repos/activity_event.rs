@@ -8,6 +8,26 @@ pub struct ActivityEventRepo {
     pool: SqlitePool,
 }
 
+const INSERT_SQL: &str = r#"INSERT INTO activity_events (app_name, window_title, bundle_id, url, category_id, started_at, ended_at, duration_secs, is_idle, metadata)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)"#;
+
+fn bind_event<'a>(
+    query: sqlx::query::Query<'a, sqlx::Sqlite, sqlx::sqlite::SqliteArguments<'a>>,
+    event: &'a ActivityEvent,
+) -> sqlx::query::Query<'a, sqlx::Sqlite, sqlx::sqlite::SqliteArguments<'a>> {
+    query
+        .bind(&event.app_name)
+        .bind(&event.window_title)
+        .bind(&event.bundle_id)
+        .bind(&event.url)
+        .bind(&event.category_id)
+        .bind(event.started_at)
+        .bind(event.ended_at)
+        .bind(event.duration_secs)
+        .bind(event.is_idle)
+        .bind(&event.metadata)
+}
+
 impl ActivityEventRepo {
     pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
@@ -19,9 +39,7 @@ impl ActivityEventRepo {
 
     pub async fn insert(&self, event: &ActivityEvent) -> common::Result<i64> {
         let row = sqlx::query_scalar::<_, i64>(
-            r#"INSERT INTO activity_events (app_name, window_title, bundle_id, url, category_id, started_at, ended_at, duration_secs, is_idle, metadata)
-               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
-               RETURNING id"#,
+            &format!("{INSERT_SQL} RETURNING id"),
         )
         .bind(&event.app_name)
         .bind(&event.window_title)
@@ -46,23 +64,10 @@ impl ActivityEventRepo {
             .await
             .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         for event in events {
-            sqlx::query(
-                r#"INSERT INTO activity_events (app_name, window_title, bundle_id, url, category_id, started_at, ended_at, duration_secs, is_idle, metadata)
-                   VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)"#,
-            )
-            .bind(&event.app_name)
-            .bind(&event.window_title)
-            .bind(&event.bundle_id)
-            .bind(&event.url)
-            .bind(&event.category_id)
-            .bind(event.started_at)
-            .bind(event.ended_at)
-            .bind(event.duration_secs)
-            .bind(event.is_idle)
-            .bind(&event.metadata)
-            .execute(&mut *tx)
-            .await
-            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            bind_event(sqlx::query(INSERT_SQL), event)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         }
         tx.commit()
             .await
@@ -76,17 +81,29 @@ impl ActivityEventRepo {
         end: &DateTime<Utc>,
         limit: Option<i64>,
     ) -> common::Result<Vec<ActivityEvent>> {
+        self.list_range_offset(start, end, limit, None).await
+    }
+
+    pub async fn list_range_offset(
+        &self,
+        start: &DateTime<Utc>,
+        end: &DateTime<Utc>,
+        limit: Option<i64>,
+        offset: Option<i64>,
+    ) -> common::Result<Vec<ActivityEvent>> {
         let limit = limit.unwrap_or(10_000);
+        let offset = offset.unwrap_or(0).max(0);
         let rows = sqlx::query_as::<_, ActivityEvent>(
             r#"SELECT id, app_name, window_title, bundle_id, url, category_id, started_at, ended_at, duration_secs, is_idle, metadata
                FROM activity_events
                WHERE started_at >= ?1 AND started_at < ?2
                ORDER BY started_at ASC
-               LIMIT ?3"#,
+               LIMIT ?3 OFFSET ?4"#,
         )
         .bind(start)
         .bind(end)
         .bind(limit)
+        .bind(offset)
         .fetch_all(&self.pool)
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;

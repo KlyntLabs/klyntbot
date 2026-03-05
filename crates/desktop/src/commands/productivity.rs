@@ -93,13 +93,11 @@ pub async fn productivity_timeline(
     let cap = limit.unwrap_or(500).min(10_000);
     let events = repos
         .events
-        .list_range(&start, &end, Some(cap))
+        .list_range_offset(&start, &end, Some(cap), offset)
         .await
         .map_err(map_prod_err)?;
-    let skip = offset.unwrap_or(0).max(0) as usize;
     Ok(events
         .into_iter()
-        .skip(skip)
         .map(|e| ActivityTimelineResponse {
             app_name: e.app_name,
             window_title: e.window_title,

@@ -161,7 +161,7 @@ impl AppCore {
                     (None, None, None, None, None)
                 } else {
                     let prod_repos = ProductivityRepos::new(pool);
-                    let prod_config = bridge_productivity_config(&config.productivity);
+                    let prod_config = &config.productivity;
                     let mgr = Arc::new(FocusManager::new(
                         prod_repos.clone(),
                         prod_config.focus.clone(),
@@ -190,8 +190,8 @@ impl AppCore {
                         mpsc::channel::<feature_productivity::types::NudgeRecord>(32);
                     let mut nudge_svc = NudgeService::new(
                         prod_repos.clone(),
-                        prod_config.nudges.clone(),
-                        prod_config.focus.clone(),
+                        config.productivity.nudges.clone(),
+                        config.productivity.focus.clone(),
                         nudge_tx,
                     );
                     nudge_svc.start();
@@ -655,41 +655,6 @@ impl AppCore {
     }
 }
 
-/// Bridge the global config crate's `ProductivityConfig` to the feature crate's version.
-fn bridge_productivity_config(
-    src: &config::schema::ProductivityConfig,
-) -> feature_productivity::config::ProductivityConfig {
-    feature_productivity::config::ProductivityConfig {
-        enabled: src.enabled,
-        tracking: feature_productivity::config::TrackingConfig {
-            poll_interval_secs: src.tracking.poll_interval_secs,
-            idle_threshold_secs: src.tracking.idle_threshold_secs,
-            batch_write_interval_secs: src.tracking.batch_write_interval_secs,
-            retention_days: src.tracking.retention_days,
-        },
-        focus: feature_productivity::config::FocusConfig {
-            default_duration_mins: src.focus.default_duration_mins,
-            break_interval_mins: src.focus.break_interval_mins,
-            break_duration_mins: src.focus.break_duration_mins,
-            max_daily_focus_hours: src.focus.max_daily_focus_hours,
-            soft_block_enabled: src.focus.soft_block_enabled,
-        },
-        nudges: feature_productivity::config::NudgeConfig {
-            break_reminders: src.nudges.break_reminders,
-            focus_suggestions: src.nudges.focus_suggestions,
-            daily_summary: src.nudges.daily_summary,
-            burnout_alerts: src.nudges.burnout_alerts,
-            cooldown_mins: src.nudges.cooldown_mins,
-            quiet_hours_start: src.nudges.quiet_hours_start.clone(),
-            quiet_hours_end: src.nudges.quiet_hours_end.clone(),
-        },
-        privacy: feature_productivity::config::PrivacyConfig {
-            excluded_apps: src.privacy.excluded_apps.clone(),
-            exclude_window_titles: src.privacy.exclude_window_titles,
-            excluded_url_patterns: src.privacy.excluded_url_patterns.clone(),
-        },
-    }
-}
 
 /// Parse "HH:MM" to cron expression "M H * * *".
 fn parse_time_to_cron(time_str: &str) -> Option<String> {

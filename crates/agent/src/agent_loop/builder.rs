@@ -557,16 +557,9 @@ impl AgentLoopBuilder {
                 })?;
             }
 
-            let focus_config = feature_productivity::config::FocusConfig {
-                default_duration_mins: config.productivity.focus.default_duration_mins,
-                break_interval_mins: config.productivity.focus.break_interval_mins,
-                break_duration_mins: config.productivity.focus.break_duration_mins,
-                max_daily_focus_hours: config.productivity.focus.max_daily_focus_hours,
-                soft_block_enabled: config.productivity.focus.soft_block_enabled,
-            };
             let focus_mgr = Arc::new(feature_productivity::FocusManager::new(
                 prod_repos.clone(),
-                focus_config,
+                config.productivity.focus.clone(),
             ));
             let aggregator = Arc::new(feature_productivity::DailyAggregator::new(
                 prod_repos.clone(),

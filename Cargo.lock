@@ -3475,6 +3475,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "common",
+ "config",
  "core-foundation 0.10.1",
  "core-graphics",
  "objc2",
