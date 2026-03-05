@@ -41,6 +41,19 @@ export function scoreColor(score: number): string {
   return "var(--destructive)";
 }
 
+/** Build the standard Focus/Active/Breaks donut segments. */
+export function buildBreakdownSegments(
+  totalActive: number,
+  totalFocus: number,
+  totalBreak: number,
+): { name: string; value: number; color: string }[] {
+  return [
+    { name: "Focus", value: totalFocus, color: "var(--brand)" },
+    { name: "Active", value: totalActive - totalFocus - totalBreak, color: "var(--purple)" },
+    { name: "Breaks", value: totalBreak, color: "var(--info)" },
+  ];
+}
+
 /** Productivity legend items for bar charts. */
 export const PRODUCTIVITY_LEGEND = [
   { label: "Productive", color: "var(--success)" },
@@ -48,10 +61,22 @@ export const PRODUCTIVITY_LEGEND = [
   { label: "Distracting", color: "var(--destructive)" },
 ] as const;
 
+interface TooltipPayloadEntry {
+  dataKey: string;
+  value: number;
+  fill: string;
+}
+
+interface ChartTooltipProps {
+  active?: boolean;
+  payload?: TooltipPayloadEntry[];
+  label?: string;
+}
+
 /** Shared tooltip for recharts bar charts. */
-export function ChartTooltip({ active, payload, label }: any) {
+export function ChartTooltip({ active, payload, label }: ChartTooltipProps) {
   if (!active || !payload?.length) return null;
-  const total = payload.reduce((s: number, p: any) => s + (p.value || 0), 0);
+  const total = payload.reduce((s: number, p: TooltipPayloadEntry) => s + (p.value || 0), 0);
   return (
     <div
       className="rounded-lg px-3 py-2 text-[11px]"
@@ -62,7 +87,7 @@ export function ChartTooltip({ active, payload, label }: any) {
       }}
     >
       <div className="font-medium text-primary mb-1">{label}</div>
-      {payload.map((p: any) => (
+      {payload.map((p: TooltipPayloadEntry) => (
         <div key={p.dataKey} className="flex items-center gap-2 text-muted font-light">
           <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: p.fill }} />
           <span className="capitalize">{p.dataKey}</span>

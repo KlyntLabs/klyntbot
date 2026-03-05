@@ -6,6 +6,7 @@ import { BreakdownDonuts } from "./BreakdownDonuts";
 import { CategoriesList } from "./CategoriesList";
 import { MonthlyChart } from "./MonthlyChart";
 import { MonthlyStats } from "./MonthlyStats";
+import { buildBreakdownSegments } from "./shared";
 
 interface MonthViewProps {
   yearMonth: string;
@@ -27,11 +28,11 @@ export function MonthView({ yearMonth }: MonthViewProps) {
     const brk = summaries.reduce((s, d) => s + d.totalBreakSecs, 0);
 
     const allCats = new Map<string, number>();
-    summaries.forEach((s) =>
-      s.topCategories.forEach((c) =>
-        allCats.set(c.category, (allCats.get(c.category) ?? 0) + c.durationSecs),
-      ),
-    );
+    for (const s of summaries) {
+      for (const c of s.topCategories) {
+        allCats.set(c.category, (allCats.get(c.category) ?? 0) + c.durationSecs);
+      }
+    }
     const cats = Array.from(allCats.entries())
       .sort((a, b) => b[1] - a[1])
       .map(([category, durationSecs]) => ({ category, durationSecs }));
@@ -40,11 +41,7 @@ export function MonthView({ yearMonth }: MonthViewProps) {
   }, [summaries]);
 
   const breakdownSegments = useMemo(
-    () => [
-      { name: "Focus", value: totalFocus, color: "var(--brand)" },
-      { name: "Active", value: totalActive - totalFocus - totalBreak, color: "var(--purple)" },
-      { name: "Breaks", value: totalBreak, color: "var(--info)" },
-    ],
+    () => buildBreakdownSegments(totalActive, totalFocus, totalBreak),
     [totalActive, totalFocus, totalBreak],
   );
 
