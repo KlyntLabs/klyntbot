@@ -128,9 +128,14 @@ impl ProductivityContextSource {
             let productive_hours = summary.productive_secs as f64 / 3600.0;
             let distracting_hours = summary.distracting_secs as f64 / 3600.0;
 
+            let score_str = summary
+                .productivity_score
+                .map(|s| format!(" Score: {:.0}/100.", s))
+                .unwrap_or_default();
+
             let mut today_line = format!(
-                "## Today\n{:.1}h active ({:.1}h productive, {:.1}h distracting).",
-                active_hours, productive_hours, distracting_hours
+                "## Today\n{:.1}h active ({:.1}h productive, {:.1}h distracting).{}",
+                active_hours, productive_hours, distracting_hours, score_str
             );
 
             if summary.focus_sessions_count > 0 {

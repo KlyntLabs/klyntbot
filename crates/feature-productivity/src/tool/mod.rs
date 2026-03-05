@@ -183,6 +183,30 @@ impl ProductivityTool {
         ))
     }
 
+    // ── Score action ─────────────────────────────────────────────
+
+    async fn handle_activity_score(&self) -> Result<String> {
+        let summary = self.aggregator.compute_today().await?;
+        let score = summary.productivity_score.unwrap_or(0.0);
+
+        let total = summary.total_active_secs as f64;
+        let productive_pct = if total > 0.0 {
+            (summary.productive_secs as f64 / total * 100.0).round()
+        } else {
+            0.0
+        };
+        let distracting_pct = if total > 0.0 {
+            (summary.distracting_secs as f64 / total * 100.0).round()
+        } else {
+            0.0
+        };
+
+        Ok(format!(
+            "Productivity score: {:.0}/100\n- Productive: {:.0}%\n- Distracting: {:.0}%\n- Focus sessions: {}\n- Context switches: {}",
+            score, productive_pct, distracting_pct, summary.focus_sessions_count, summary.context_switches
+        ))
+    }
+
     // ── Category actions ───────────────────────────────────────────
 
     async fn handle_list_categories(&self) -> Result<String> {
@@ -240,7 +264,7 @@ impl Tool for ProductivityTool {
     }
 
     fn description(&self) -> &str {
-        "Track productivity, manage focus sessions, and view activity data. Actions: focus_start, focus_end, focus_status, activity_today, activity_summary, activity_week, list_categories, set_category."
+        "Track productivity, manage focus sessions, and view activity data. Actions: focus_start, focus_end, focus_status, activity_today, activity_summary, activity_week, activity_score, list_categories, set_category."
     }
 
     fn parameters(&self) -> Value {
@@ -252,6 +276,7 @@ impl Tool for ProductivityTool {
                     "enum": [
                         "focus_start", "focus_end", "focus_status",
                         "activity_today", "activity_summary", "activity_week",
+                        "activity_score",
                         "list_categories", "set_category"
                     ],
                     "description": "Action to perform"
@@ -300,6 +325,7 @@ impl Tool for ProductivityTool {
             "activity_today" => self.handle_activity_today().await,
             "activity_summary" => self.handle_activity_summary(&p).await,
             "activity_week" => self.handle_activity_week().await,
+            "activity_score" => self.handle_activity_score().await,
             "list_categories" => self.handle_list_categories().await,
             "set_category" => self.handle_set_category(&p).await,
             _ => Err(ToolError::InvalidParams(format!("Unknown action: {action}")).into()),
@@ -349,6 +375,12 @@ fn format_summary(summary: &crate::types::DailySummary) -> String {
                 format_duration(app.duration_secs)
             ));
         }
+    }
+    if let Some(ref ai) = summary.ai_summary {
+        lines.push(format!("\n{}", ai));
+    }
+    if let Some(score) = summary.productivity_score {
+        lines.push(format!("\nProductivity score: {:.0}/100", score));
     }
     lines.join("\n")
 }

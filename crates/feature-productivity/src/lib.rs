@@ -1,6 +1,7 @@
 pub mod aggregator;
 pub mod config;
 pub mod focus;
+pub mod handler;
 pub mod nudge;
 pub mod patterns;
 pub mod repos;
@@ -17,6 +18,7 @@ use tools_core::{DynTool, FeatureMigration, FeaturePackage, HealthStatus};
 pub use aggregator::DailyAggregator;
 pub use config::ProductivityConfig;
 pub use focus::FocusManager;
+pub use handler::ProductivityHandler;
 pub use nudge::NudgeService;
 pub use patterns::{ProductivityPatternAnalyzer, ProductivityPatterns};
 pub use tool::ProductivityTool;
