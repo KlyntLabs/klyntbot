@@ -49,7 +49,7 @@ export function Timeline({ date }: TimelineProps) {
 
       return {
         startHour: startSecs / 3600,
-        widthPct: (e.durationSecs / totalSecs) * 100,
+        widthPct: ((e.durationSecs ?? 0) / totalSecs) * 100,
         color: categoryColor(cat?.categoryType, e.isIdle),
         label: e.appName,
       };

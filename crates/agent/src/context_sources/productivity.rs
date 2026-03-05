@@ -6,6 +6,7 @@ use context_engine::source::{ContextSource, SourceContext};
 use feature_productivity::repos::ProductivityRepos;
 use feature_productivity::{DailyAggregator, ProductivityPatternAnalyzer, ProductivityPatterns};
 use tokio::sync::Mutex;
+use tracing::debug;
 
 const PRODUCTIVITY_CACHE_TTL_SECS: i64 = 60;
 const PATTERN_CACHE_TTL_SECS: i64 = 600; // Patterns change slowly — 10 min cache
@@ -95,7 +96,10 @@ impl ProductivityContextSource {
                 *self.pattern_cache.lock().await = Some((patterns.clone(), expires));
                 Some(patterns)
             }
-            Err(_) => None,
+            Err(e) => {
+                debug!("pattern analysis failed: {e}");
+                None
+            }
         }
     }
 
@@ -117,9 +121,9 @@ impl ProductivityContextSource {
             sections.push(focus_line);
         }
 
-        // 2. Today's summary (use cached if available to avoid expensive recomputation)
-        let today = Utc::now().format("%Y-%m-%d").to_string();
-        if let Ok(summary) = self.aggregator.get_or_compute(&today).await {
+        // 2. Today's summary — always recompute for fresh data (cached by the
+        //    outer TTL so this runs at most once per PRODUCTIVITY_CACHE_TTL_SECS).
+        if let Ok(summary) = self.aggregator.compute_today().await {
             let active_hours = summary.total_active_secs as f64 / 3600.0;
             let productive_hours = summary.productive_secs as f64 / 3600.0;
             let distracting_hours = summary.distracting_secs as f64 / 3600.0;

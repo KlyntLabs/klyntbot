@@ -30,7 +30,13 @@ impl From<SessionRow> for FocusSession {
         let distraction_events: Vec<DistractionEvent> = row
             .distraction_events
             .as_deref()
-            .and_then(|s| serde_json::from_str(s).ok())
+            .and_then(|s| match serde_json::from_str(s) {
+                Ok(v) => Some(v),
+                Err(e) => {
+                    warn!(field = "distraction_events", %e, "failed to deserialize JSON from focus_sessions");
+                    None
+                }
+            })
             .unwrap_or_default();
         let started_at = common::utils::date::parse_datetime(&row.started_at, "UTC")
             .unwrap_or_else(|| {
@@ -71,8 +77,11 @@ impl FocusSessionRepo {
 
     pub async fn create(&self, session: &FocusSession) -> common::Result<()> {
         let session_type = session.session_type.to_string();
-        let distractions_json = serde_json::to_string(&session.distraction_events)
-            .unwrap_or_else(|_| "[]".to_string());
+        let distractions_json =
+            serde_json::to_string(&session.distraction_events).unwrap_or_else(|e| {
+                warn!(%e, "failed to serialize distraction_events");
+                "[]".to_string()
+            });
         sqlx::query(
             r#"INSERT INTO focus_sessions (id, action_id, project_id, session_type, target_mins, started_at, ended_at, actual_mins, interruptions, distraction_events, quality_score, completed, notes)
                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)"#,
@@ -123,8 +132,11 @@ impl FocusSessionRepo {
 
     pub async fn update(&self, session: &FocusSession) -> common::Result<()> {
         let session_type = session.session_type.to_string();
-        let distractions_json = serde_json::to_string(&session.distraction_events)
-            .unwrap_or_else(|_| "[]".to_string());
+        let distractions_json =
+            serde_json::to_string(&session.distraction_events).unwrap_or_else(|e| {
+                warn!(%e, "failed to serialize distraction_events");
+                "[]".to_string()
+            });
         sqlx::query(
             r#"UPDATE focus_sessions SET
                    action_id = ?2, project_id = ?3, session_type = ?4, target_mins = ?5,

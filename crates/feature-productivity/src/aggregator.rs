@@ -19,17 +19,26 @@ impl DailyAggregator {
 
     /// Compute (or recompute) the daily summary for a given date string (YYYY-MM-DD).
     pub async fn compute_for_date(&self, date: &str) -> common::Result<DailySummary> {
-        let naive = NaiveDate::parse_from_str(date, "%Y-%m-%d").map_err(|e| {
-            common::ToolError::InvalidParams(format!("invalid date '{date}': {e}"))
-        })?;
+        let naive = NaiveDate::parse_from_str(date, "%Y-%m-%d")
+            .map_err(|e| common::ToolError::InvalidParams(format!("invalid date '{date}': {e}")))?;
 
-        let start: DateTime<Utc> = Utc
-            .from_utc_datetime(&naive.and_hms_opt(0, 0, 0).unwrap());
-        let end: DateTime<Utc> = Utc
-            .from_utc_datetime(&(naive + chrono::Duration::days(1)).and_hms_opt(0, 0, 0).unwrap());
+        let start: DateTime<Utc> = Utc.from_utc_datetime(&naive.and_hms_opt(0, 0, 0).unwrap());
+        let end: DateTime<Utc> = Utc.from_utc_datetime(
+            &(naive + chrono::Duration::days(1))
+                .and_hms_opt(0, 0, 0)
+                .unwrap(),
+        );
 
         // Gather data from repos — parallelize independent queries
-        let (total_active_secs, total_idle_secs, context_switches, category_agg, categories, top_app_rows, sessions) = tokio::try_join!(
+        let (
+            total_active_secs,
+            total_idle_secs,
+            context_switches,
+            category_agg,
+            categories,
+            top_app_rows,
+            sessions,
+        ) = tokio::try_join!(
             self.repos.events.total_active_secs(&start, &end),
             self.repos.events.total_idle_secs(&start, &end),
             self.repos.events.count_context_switches(&start, &end),
@@ -78,11 +87,7 @@ impl DailyAggregator {
             })
             .collect();
         let focus_sessions_count = sessions.len() as i64;
-        let total_focus_secs: i64 = sessions
-            .iter()
-            .filter_map(|s| s.actual_mins)
-            .sum::<i64>()
-            * 60;
+        let total_focus_secs: i64 = sessions.iter().filter_map(|s| s.actual_mins).sum::<i64>() * 60;
         let total_break_secs: i64 = sessions
             .iter()
             .filter(|s| s.session_type == crate::types::SessionType::Break)
@@ -147,17 +152,15 @@ mod tests {
     use crate::types::ActivityEvent;
 
     async fn setup_pool() -> sqlx::SqlitePool {
-        let pool = sqlx::SqlitePool::connect("sqlite::memory:")
-            .await
-            .unwrap();
-        let migration_sql = include_str!("../migrations/001_productivity_tables.sql");
-        for statement in migration_sql.split(';') {
-            let trimmed = statement.trim();
-            if !trimmed.is_empty() {
-                sqlx::query(trimmed).execute(&pool).await.unwrap();
-            }
-        }
-        pool
+        let pool = storage::StoragePool::connect_in_memory().await.unwrap();
+        let inner = pool.inner().clone();
+        storage::StoragePool::run_feature_migrations(
+            &inner,
+            &crate::ProductivityFeature::migrations_static(),
+        )
+        .await
+        .unwrap();
+        inner
     }
 
     #[tokio::test]

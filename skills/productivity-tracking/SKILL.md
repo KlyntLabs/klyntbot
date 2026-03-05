@@ -14,26 +14,26 @@ metadata: '{"klyntbot":{"triggers":["productivity","focus session","time trackin
 
 **Starting a focus session:**
 ```json
-{"action": "start_focus", "targetMins": 45, "sessionType": "focus"}
+{"action": "focus_start", "duration_mins": 45}
 ```
 
-Session types: `focus` (default), `deepWork`, `meeting`, `break`
+Optional params: `action_id` (link to a task), `project_id`.
 
 **Ending a focus session:**
 ```json
-{"action": "end_focus", "notes": "Completed API refactor"}
+{"action": "focus_end", "notes": "Completed API refactor"}
 ```
 
-**Recording a distraction during focus:**
+**Checking focus status:**
 ```json
-{"action": "record_distraction", "appName": "Twitter", "durationSecs": 120}
+{"action": "focus_status"}
 ```
 
 ### Reports & Insights
 
 **Today's summary:**
 ```json
-{"action": "today_summary"}
+{"action": "activity_today"}
 ```
 
 Show the summary in a readable format:
@@ -47,14 +47,14 @@ Today's Productivity:
 
 **Weekly summary:**
 ```json
-{"action": "weekly_summary"}
+{"action": "activity_week"}
 ```
 
 Show day-by-day trends and highlight patterns.
 
-**Activity timeline:**
+**Custom date range summary:**
 ```json
-{"action": "timeline", "date": "2026-03-04"}
+{"action": "activity_summary", "start_date": "2026-03-01", "end_date": "2026-03-04"}
 ```
 
 ### Category Management
@@ -64,9 +64,9 @@ Show day-by-day trends and highlight patterns.
 {"action": "list_categories"}
 ```
 
-**Update a category:**
+**Set a category:**
 ```json
-{"action": "update_category", "id": "gaming", "name": "Gaming", "categoryType": "distracting", "rules": {"appNames": ["Steam"], "bundleIds": [], "urlPatterns": []}}
+{"action": "set_category", "id": "gaming", "name": "Gaming", "category_type": "distracting", "app_names": ["Steam"], "bundle_ids": [], "url_patterns": []}
 ```
 
 ## Behavior Guidelines

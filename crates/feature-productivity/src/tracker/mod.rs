@@ -72,9 +72,13 @@ impl ActivityTracker {
     }
 
     pub fn start(&mut self) {
+        if self.task_handle.is_some() {
+            warn!("ActivityTracker already running — ignoring duplicate start");
+            return;
+        }
         let cancel = self.cancel_token.clone();
         let poll_interval =
-            std::time::Duration::from_secs(self.config.tracking.poll_interval_secs);
+            std::time::Duration::from_secs(self.config.tracking.poll_interval_secs.max(1));
         let batch_interval =
             std::time::Duration::from_secs(self.config.tracking.batch_write_interval_secs);
         let idle_threshold = self.config.tracking.idle_threshold_secs as f64;
@@ -118,6 +122,17 @@ impl ActivityTracker {
                                 let is_idle = idle_secs >= idle_threshold;
                                 let now = Utc::now();
 
+                                // Strip window title if privacy config says so.
+                                // We still pass the raw title to the categorizer so
+                                // browser-tab-based detection works, but we never
+                                // persist it in the ActivityEvent.
+                                let raw_title = info.window_title.as_deref();
+                                let persisted_title = if privacy.exclude_window_titles {
+                                    None
+                                } else {
+                                    info.window_title.clone()
+                                };
+
                                 // Categorize using app name, bundle ID, AND window title.
                                 // Runs every tick so browsers get re-evaluated when
                                 // the user navigates to a different site (title changes).
@@ -130,7 +145,7 @@ impl ActivityTracker {
                                         &info.app_name,
                                         info.bundle_id.as_deref(),
                                         None,
-                                        info.window_title.as_deref(),
+                                        raw_title,
                                     );
                                     let cid = matched.map(|c| c.id.clone());
                                     let distracting = matched
@@ -167,11 +182,13 @@ impl ActivityTracker {
                                                         warn!("Failed to record distraction: {e}");
                                                     }
                                                     if let Some(ref sender) = distraction_sender {
-                                                        let _ = sender.try_send(DistractionAlert {
+                                                        if let Err(e) = sender.try_send(DistractionAlert {
                                                             app_name: info.app_name.clone(),
                                                             session_id,
                                                             timestamp: now,
-                                                        });
+                                                        }) {
+                                                            warn!("Failed to send distraction alert: {e}");
+                                                        }
                                                     }
                                                     last_distraction_app = Some(distraction_key);
                                                     last_distraction_time = Some(now);
@@ -195,7 +212,7 @@ impl ActivityTracker {
                                         evt.duration_secs = Some(
                                             (now - evt.started_at).num_seconds()
                                         );
-                                        evt.window_title = info.window_title;
+                                        evt.window_title = persisted_title.clone();
                                     }
                                 } else {
                                     if let Some(evt) = current_event.take() {
@@ -204,7 +221,7 @@ impl ActivityTracker {
                                     current_event = Some(ActivityEvent {
                                         id: None,
                                         app_name: info.app_name,
-                                        window_title: info.window_title,
+                                        window_title: persisted_title,
                                         bundle_id: info.bundle_id,
                                         url: None,
                                         category_id,
@@ -256,7 +273,9 @@ impl ActivityTracker {
     pub async fn stop(&mut self) {
         self.cancel_token.cancel();
         if let Some(handle) = self.task_handle.take() {
-            let _ = handle.await;
+            if let Err(e) = handle.await {
+                warn!("ActivityTracker task panicked: {e}");
+            }
         }
         info!("Activity tracker stopped");
     }

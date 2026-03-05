@@ -157,58 +157,62 @@ impl AppCore {
                 )
                 .await
                 {
-                    warn!("productivity migration failed: {e}");
+                    error!("productivity migration failed — feature disabled: {e}");
+                    (None, None, None, None, None)
+                } else {
+                    let prod_repos = ProductivityRepos::new(pool);
+                    let prod_config = bridge_productivity_config(&config.productivity);
+                    let mgr = Arc::new(FocusManager::new(
+                        prod_repos.clone(),
+                        prod_config.focus.clone(),
+                    ));
+
+                    // Daily aggregator for live summaries.
+                    let agg = Arc::new(DailyAggregator::new(prod_repos.clone()));
+
+                    // Distraction alert channel (tracker → Tauri events).
+                    let (distraction_tx, distraction_rx) =
+                        mpsc::channel::<feature_productivity::tracker::DistractionAlert>(32);
+
+                    // Start activity tracker (macOS only) with distraction detection.
+                    let categories = prod_repos.categories.list_all().await.unwrap_or_default();
+                    let categorizer =
+                        feature_productivity::tracker::categorizer::Categorizer::new(categories);
+                    let mut tracker =
+                        ActivityTracker::new(prod_config.clone(), prod_repos.clone(), categorizer);
+                    tracker.set_focus_manager(Arc::clone(&mgr));
+                    tracker.set_distraction_sender(distraction_tx);
+                    tracker.start();
+                    let tracker = Arc::new(Mutex::new(tracker));
+
+                    // Nudge service — break reminders + burnout alerts.
+                    let (nudge_tx, nudge_rx) =
+                        mpsc::channel::<feature_productivity::types::NudgeRecord>(32);
+                    let mut nudge_svc = NudgeService::new(
+                        prod_repos.clone(),
+                        prod_config.nudges.clone(),
+                        prod_config.focus.clone(),
+                        nudge_tx,
+                    );
+                    nudge_svc.start();
+                    let nudge_svc = Arc::new(Mutex::new(nudge_svc));
+
+                    // Spawn background tasks to forward alerts/nudges as Tauri events.
+                    Self::spawn_productivity_events(
+                        distraction_rx,
+                        nudge_rx,
+                        &app_handle,
+                        &shutdown_token,
+                    );
+
+                    (
+                        Some(prod_repos),
+                        Some(mgr),
+                        Some(tracker),
+                        Some(agg),
+                        Some(nudge_svc),
+                    )
                 }
-                let prod_repos = ProductivityRepos::new(pool);
-                let prod_config = bridge_productivity_config(&config.productivity);
-                let mgr =
-                    Arc::new(FocusManager::new(prod_repos.clone(), prod_config.focus.clone()));
-
-                // Daily aggregator for live summaries.
-                let agg = Arc::new(DailyAggregator::new(prod_repos.clone()));
-
-                // Distraction alert channel (tracker → Tauri events).
-                let (distraction_tx, distraction_rx) =
-                    mpsc::channel::<feature_productivity::tracker::DistractionAlert>(32);
-
-                // Start activity tracker (macOS only) with distraction detection.
-                let categories = prod_repos.categories.list_all().await.unwrap_or_default();
-                let categorizer =
-                    feature_productivity::tracker::categorizer::Categorizer::new(categories);
-                let mut tracker =
-                    ActivityTracker::new(prod_config.clone(), prod_repos.clone(), categorizer);
-                tracker.set_focus_manager(Arc::clone(&mgr));
-                tracker.set_distraction_sender(distraction_tx);
-                tracker.start();
-                let tracker = Arc::new(Mutex::new(tracker));
-
-                // Nudge service — break reminders + burnout alerts.
-                let (nudge_tx, nudge_rx) =
-                    mpsc::channel::<feature_productivity::types::NudgeRecord>(32);
-                let mut nudge_svc = NudgeService::new(
-                    prod_repos.clone(),
-                    prod_config.nudges.clone(),
-                    prod_config.focus.clone(),
-                    nudge_tx,
-                );
-                nudge_svc.start();
-                let nudge_svc = Arc::new(Mutex::new(nudge_svc));
-
-                // Spawn background tasks to forward alerts/nudges as Tauri events.
-                Self::spawn_productivity_events(
-                    distraction_rx,
-                    nudge_rx,
-                    &app_handle,
-                    &shutdown_token,
-                );
-
-                (
-                    Some(prod_repos),
-                    Some(mgr),
-                    Some(tracker),
-                    Some(agg),
-                    Some(nudge_svc),
-                )
             } else {
                 (None, None, None, None, None)
             };
@@ -299,31 +303,42 @@ impl AppCore {
         app_handle: &tauri::AppHandle,
         shutdown_token: &CancellationToken,
     ) {
-        Self::spawn_channel_forwarder(distraction_rx, app_handle, shutdown_token, |handle, alert| {
-            let _ = handle.emit(
-                events::PRODUCTIVITY_DISTRACTION,
-                events::DistractionPayload {
-                    app_name: alert.app_name,
-                    session_id: alert.session_id.clone(),
-                },
-            );
-            let _ = handle.emit(
-                events::ENTITY_UPDATED,
-                events::EntityUpdatedPayload {
-                    entity_kind: desktop_shared::types::EntityKind::FocusSession,
-                    id: alert.session_id,
-                },
-            );
-        });
+        Self::spawn_channel_forwarder(
+            distraction_rx,
+            app_handle,
+            shutdown_token,
+            |handle, alert| {
+                if let Err(e) = handle.emit(
+                    events::PRODUCTIVITY_DISTRACTION,
+                    events::DistractionPayload {
+                        app_name: alert.app_name,
+                        session_id: alert.session_id.clone(),
+                    },
+                ) {
+                    warn!("failed to emit distraction event: {e}");
+                }
+                if let Err(e) = handle.emit(
+                    events::ENTITY_UPDATED,
+                    events::EntityUpdatedPayload {
+                        entity_kind: desktop_shared::types::EntityKind::FocusSession,
+                        id: alert.session_id,
+                    },
+                ) {
+                    warn!("failed to emit entity_updated event: {e}");
+                }
+            },
+        );
 
         Self::spawn_channel_forwarder(nudge_rx, app_handle, shutdown_token, |handle, nudge| {
-            let _ = handle.emit(
+            if let Err(e) = handle.emit(
                 events::PRODUCTIVITY_NUDGE,
                 events::NudgePayload {
                     nudge_type: nudge.nudge_type.to_string(),
                     message: nudge.message,
                 },
-            );
+            ) {
+                warn!("failed to emit nudge event: {e}");
+            }
         });
     }
 

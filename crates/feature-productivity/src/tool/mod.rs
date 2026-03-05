@@ -8,6 +8,7 @@ use serde_json::Value;
 
 use common::{Result, ToolError};
 use tools_core::{ParamExtractor, RoutingContext, Tool};
+use tracing::warn;
 
 use crate::aggregator::DailyAggregator;
 use crate::focus::FocusManager;
@@ -103,7 +104,11 @@ impl ProductivityTool {
     async fn handle_activity_summary(&self, p: &ParamExtractor<'_>) -> Result<String> {
         let start_date = p.required_str("start_date")?;
         let end_date = p.required_str("end_date")?;
-        let summaries = self.repos.summaries.list_range(start_date, end_date).await?;
+        let summaries = self
+            .repos
+            .summaries
+            .list_range(start_date, end_date)
+            .await?;
 
         if summaries.is_empty() {
             return Ok(format!("No data for {start_date} to {end_date}."));
@@ -132,8 +137,10 @@ impl ProductivityTool {
         let start_date = week_ago.format("%Y-%m-%d").to_string();
         let end_date = today.format("%Y-%m-%d").to_string();
 
-        // Compute today's summary first
-        let _ = self.aggregator.compute_today().await;
+        // Compute today's summary first (best-effort — weekly still works with stale today)
+        if let Err(e) = self.aggregator.compute_today().await {
+            warn!("failed to recompute today's summary for weekly report: {e}");
+        }
 
         let summaries = self
             .repos
@@ -187,7 +194,10 @@ impl ProductivityTool {
         let mut lines = vec!["Activity categories:".to_string()];
         for cat in &categories {
             let system_tag = if cat.is_system { " (system)" } else { "" };
-            lines.push(format!("- {} [{}]{}", cat.name, cat.category_type, system_tag));
+            lines.push(format!(
+                "- {} [{}]{}",
+                cat.name, cat.category_type, system_tag
+            ));
         }
         Ok(lines.join("\n"))
     }
@@ -333,7 +343,11 @@ fn format_summary(summary: &crate::types::DailySummary) -> String {
     if !summary.top_apps.is_empty() {
         lines.push("- Top apps:".into());
         for app in summary.top_apps.iter().take(5) {
-            lines.push(format!("  - {}: {}", app.app_name, format_duration(app.duration_secs)));
+            lines.push(format!(
+                "  - {}: {}",
+                app.app_name,
+                format_duration(app.duration_secs)
+            ));
         }
     }
     lines.join("\n")

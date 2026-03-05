@@ -1,4 +1,5 @@
 use sqlx::SqlitePool;
+use tracing::warn;
 
 use crate::types::{AppUsage, CategoryUsage, DailySummary};
 
@@ -26,12 +27,24 @@ impl From<SummaryRow> for DailySummary {
         let top_apps: Vec<AppUsage> = row
             .top_apps
             .as_deref()
-            .and_then(|s| serde_json::from_str(s).ok())
+            .and_then(|s| match serde_json::from_str(s) {
+                Ok(v) => Some(v),
+                Err(e) => {
+                    warn!(field = "top_apps", %e, "failed to deserialize JSON from daily_summaries");
+                    None
+                }
+            })
             .unwrap_or_default();
         let top_categories: Vec<CategoryUsage> = row
             .top_categories
             .as_deref()
-            .and_then(|s| serde_json::from_str(s).ok())
+            .and_then(|s| match serde_json::from_str(s) {
+                Ok(v) => Some(v),
+                Err(e) => {
+                    warn!(field = "top_categories", %e, "failed to deserialize JSON from daily_summaries");
+                    None
+                }
+            })
             .unwrap_or_default();
         Self {
             date: row.date,
@@ -112,7 +125,10 @@ impl DailySummaryRepo {
     }
 
     pub async fn get(&self, date: &str) -> common::Result<Option<DailySummary>> {
-        let query = format!("SELECT {} FROM daily_summaries WHERE date = ?1", SUMMARY_COLUMNS);
+        let query = format!(
+            "SELECT {} FROM daily_summaries WHERE date = ?1",
+            SUMMARY_COLUMNS
+        );
         let row = sqlx::query_as::<_, SummaryRow>(&query)
             .bind(date)
             .fetch_optional(&self.pool)

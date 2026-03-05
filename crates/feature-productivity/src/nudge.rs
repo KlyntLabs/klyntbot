@@ -1,6 +1,6 @@
 //! NudgeService — background loop that sends break reminders and burnout alerts.
 
-use chrono::{DateTime, Duration, NaiveTime, Utc};
+use chrono::{DateTime, Duration, Local, NaiveTime, Utc};
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
@@ -40,6 +40,10 @@ impl NudgeService {
     }
 
     pub fn start(&mut self) {
+        if self.task_handle.is_some() {
+            warn!("NudgeService already running — ignoring duplicate start");
+            return;
+        }
         let cancel = self.cancel_token.clone();
         let repos = self.repos.clone();
         let nudge_config = self.nudge_config.clone();
@@ -71,7 +75,9 @@ impl NudgeService {
     pub async fn stop(&mut self) {
         self.cancel_token.cancel();
         if let Some(handle) = self.task_handle.take() {
-            let _ = handle.await;
+            if let Err(e) = handle.await {
+                warn!("NudgeService task panicked: {e}");
+            }
         }
         info!("NudgeService stopped");
     }
@@ -170,7 +176,7 @@ async fn send_nudge(
 ) -> common::Result<()> {
     repos.nudges.insert(&record).await?;
     if sender.send(record).await.is_err() {
-        debug!("NudgeService: receiver dropped, nudge not delivered");
+        warn!("NudgeService: receiver dropped, nudge not delivered");
     }
     Ok(())
 }
@@ -191,7 +197,7 @@ fn is_quiet_hours(config: &NudgeConfig) -> bool {
         return false;
     };
 
-    let now = Utc::now().time();
+    let now = Local::now().time();
 
     if start <= end {
         // Same-day range (e.g., 09:00 – 17:00)
@@ -320,8 +326,8 @@ mod tests {
 
     #[tokio::test]
     async fn quiet_hours_suppresses_nudges() {
-        // Test the quiet hours logic directly
-        let now_time = Utc::now().time();
+        // Test the quiet hours logic directly — use local time since is_quiet_hours uses Local::now()
+        let now_time = chrono::Local::now().time();
         let start = (now_time - chrono::Duration::minutes(30))
             .format("%H:%M")
             .to_string();
@@ -375,6 +381,8 @@ mod tests {
         }
 
         // Should have a burnout alert
-        assert!(nudges.iter().any(|n| n.nudge_type == NudgeType::BurnoutAlert));
+        assert!(nudges
+            .iter()
+            .any(|n| n.nudge_type == NudgeType::BurnoutAlert));
     }
 }
