@@ -1,5 +1,7 @@
 //! Finance IPC commands — read-only queries against FinanceStorage repos.
 
+use std::sync::Arc;
+
 use std::collections::HashMap;
 
 use desktop_shared::commands::{
@@ -18,7 +20,7 @@ use crate::app_core::AppCore;
 
 #[tauri::command]
 pub async fn finance_accounts(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<FinanceAccountRow>, ApiError> {
     state
         .repos
@@ -31,7 +33,7 @@ pub async fn finance_accounts(
 
 #[tauri::command]
 pub async fn finance_transactions(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     limit: Option<i64>,
 ) -> Result<Vec<FinanceTransactionRow>, ApiError> {
     let filter = FinanceTransactionFilter {
@@ -49,7 +51,7 @@ pub async fn finance_transactions(
 
 #[tauri::command]
 pub async fn finance_budget_usage(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<BudgetUsageRow>, ApiError> {
     state
         .repos
@@ -62,7 +64,7 @@ pub async fn finance_budget_usage(
 
 #[tauri::command]
 pub async fn finance_portfolios(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<FinancePortfolioResponse>, ApiError> {
     let portfolios = state
         .repos
@@ -97,7 +99,7 @@ pub async fn finance_portfolios(
 
 #[tauri::command]
 pub async fn finance_investments(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<FinanceInvestmentRow>, ApiError> {
     state
         .repos
@@ -109,7 +111,7 @@ pub async fn finance_investments(
 }
 
 #[tauri::command]
-pub async fn finance_goals(state: State<'_, AppCore>) -> Result<Vec<FinanceGoalRow>, ApiError> {
+pub async fn finance_goals(state: State<'_, Arc<AppCore>>) -> Result<Vec<FinanceGoalRow>, ApiError> {
     state
         .repos
         .finance
@@ -121,7 +123,7 @@ pub async fn finance_goals(state: State<'_, AppCore>) -> Result<Vec<FinanceGoalR
 
 #[tauri::command]
 pub async fn finance_liabilities(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<FinanceLiabilityRow>, ApiError> {
     state
         .repos
@@ -134,7 +136,7 @@ pub async fn finance_liabilities(
 
 #[tauri::command]
 pub async fn finance_net_worth(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
 ) -> Result<FinanceNetWorthResponse, ApiError> {
     let (account_totals, investment_totals, liability_totals) = tokio::try_join!(
         state.repos.finance.accounts.total_balance_by_currency(),

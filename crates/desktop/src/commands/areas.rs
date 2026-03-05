@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use desktop_shared::commands::{AreaCreateParams, AreaResponse, AreaUpdateParams};
 use desktop_shared::errors::ApiError;
 use desktop_shared::types::EntityKind;
@@ -6,7 +7,7 @@ use tauri::State;
 
 use crate::app_core::AppCore;
 
-async fn build_area_response(state: &AppCore, row: &AreaRow) -> Result<AreaResponse, ApiError> {
+pub(crate) async fn build_area_response(state: &AppCore, row: &AreaRow) -> Result<AreaResponse, ApiError> {
     let (project_count, task_count) = tokio::try_join!(
         state.repos.areas.count_projects(&row.id),
         state.repos.areas.count_actions(&row.id),
@@ -24,7 +25,7 @@ async fn build_area_response(state: &AppCore, row: &AreaRow) -> Result<AreaRespo
 }
 
 #[tauri::command]
-pub async fn area_list(state: State<'_, AppCore>) -> Result<Vec<AreaResponse>, ApiError> {
+pub async fn area_list(state: State<'_, Arc<AppCore>>) -> Result<Vec<AreaResponse>, ApiError> {
     let areas = state
         .repos
         .areas
@@ -41,7 +42,7 @@ pub async fn area_list(state: State<'_, AppCore>) -> Result<Vec<AreaResponse>, A
 
 #[tauri::command]
 pub async fn area_create(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: AreaCreateParams,
 ) -> Result<AreaResponse, ApiError> {
@@ -81,7 +82,7 @@ pub async fn area_create(
 
 #[tauri::command]
 pub async fn area_update(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: AreaUpdateParams,
 ) -> Result<AreaResponse, ApiError> {
@@ -106,7 +107,7 @@ pub async fn area_update(
 
 #[tauri::command]
 pub async fn area_delete(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
 ) -> Result<bool, ApiError> {
@@ -126,7 +127,7 @@ pub async fn area_delete(
 
 #[tauri::command]
 pub async fn area_reorder(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
     position: i32,

@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use desktop_shared::commands::{ProjectCreateParams, ProjectResponse, ProjectUpdateParams};
 use desktop_shared::errors::ApiError;
 use desktop_shared::types::EntityKind;
@@ -6,7 +7,7 @@ use tauri::State;
 
 use crate::app_core::AppCore;
 
-pub(super) fn project_to_response(
+pub(crate) fn project_to_response(
     row: &ProjectRow,
     task_count: u32,
     completed_count: u32,
@@ -27,7 +28,7 @@ pub(super) fn project_to_response(
     }
 }
 
-pub(super) async fn build_project_response(
+pub(crate) async fn build_project_response(
     state: &AppCore,
     row: &ProjectRow,
 ) -> Result<ProjectResponse, ApiError> {
@@ -58,7 +59,7 @@ pub(super) async fn build_project_response(
 
 #[tauri::command]
 pub async fn project_create(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: ProjectCreateParams,
 ) -> Result<ProjectResponse, ApiError> {
@@ -91,7 +92,7 @@ pub async fn project_create(
 
 #[tauri::command]
 pub async fn project_get(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     id: String,
 ) -> Result<ProjectResponse, ApiError> {
     let row = state
@@ -106,7 +107,7 @@ pub async fn project_get(
 
 #[tauri::command]
 pub async fn project_update(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: ProjectUpdateParams,
 ) -> Result<ProjectResponse, ApiError> {
@@ -134,7 +135,7 @@ pub async fn project_update(
 
 #[tauri::command]
 pub async fn project_delete(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
 ) -> Result<bool, ApiError> {
@@ -154,7 +155,7 @@ pub async fn project_delete(
 
 #[tauri::command]
 pub async fn project_archive(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
 ) -> Result<ProjectResponse, ApiError> {

@@ -25,6 +25,7 @@ members = [
     "crates/desktop-shared",
     "crates/desktop",
     "crates/feature-productivity",
+    "crates/dev-api",
 ]
 
 [workspace.package]

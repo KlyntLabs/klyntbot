@@ -1,5 +1,7 @@
 //! Productivity IPC commands — daily summaries, focus sessions, activity timeline.
 
+use std::sync::Arc;
+
 use chrono::Utc;
 use desktop_shared::commands::{
     ActivityCategoryResponse, ActivityTimelineResponse, AppUsageResponse, CategoryUsageResponse,
@@ -74,7 +76,7 @@ fn session_to_response(s: FocusSession) -> FocusSessionResponse {
 
 #[tauri::command]
 pub async fn productivity_today(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
 ) -> Result<Option<ProductivitySummaryResponse>, ApiError> {
     let aggregator = state.aggregator()?;
     let summary = aggregator.compute_today().await.map_err(map_prod_err)?;
@@ -83,7 +85,7 @@ pub async fn productivity_today(
 
 #[tauri::command]
 pub async fn productivity_timeline(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     date: String,
     limit: Option<i64>,
     offset: Option<i64>,
@@ -91,7 +93,7 @@ pub async fn productivity_timeline(
     let repos = state.productivity_repos()?;
     let start = super::parse_date_or_err(&date)?;
     let end = start + chrono::Duration::days(1);
-    let cap = limit.unwrap_or(500).min(10_000);
+    let cap = limit.unwrap_or(10_000).min(10_000);
     let events = repos
         .events
         .list_range_offset(&start, &end, Some(cap), offset)
@@ -112,7 +114,7 @@ pub async fn productivity_timeline(
 
 #[tauri::command]
 pub async fn productivity_focus_start(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     action_id: Option<String>,
     project_id: Option<String>,
     target_mins: Option<i64>,
@@ -127,7 +129,7 @@ pub async fn productivity_focus_start(
 
 #[tauri::command]
 pub async fn productivity_focus_end(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     notes: Option<String>,
 ) -> Result<Option<FocusSessionResponse>, ApiError> {
     let focus_mgr = state.focus_manager()?;
@@ -137,7 +139,7 @@ pub async fn productivity_focus_end(
 
 #[tauri::command]
 pub async fn productivity_focus_status(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
 ) -> Result<Option<FocusSessionResponse>, ApiError> {
     let focus_mgr = state.focus_manager()?;
     let session = focus_mgr.get_active().await.map_err(map_prod_err)?;
@@ -146,7 +148,7 @@ pub async fn productivity_focus_status(
 
 #[tauri::command]
 pub async fn productivity_sessions(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     date: String,
 ) -> Result<Vec<FocusSessionResponse>, ApiError> {
     let repos = state.productivity_repos()?;
@@ -162,7 +164,7 @@ pub async fn productivity_sessions(
 
 #[tauri::command]
 pub async fn productivity_weekly(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<ProductivitySummaryResponse>, ApiError> {
     let repos = state.productivity_repos()?;
     let today = Utc::now().date_naive();
@@ -180,7 +182,7 @@ pub async fn productivity_weekly(
 
 #[tauri::command]
 pub async fn productivity_categories(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<ActivityCategoryResponse>, ApiError> {
     let repos = state.productivity_repos()?;
     let categories = repos.categories.list_all().await.map_err(map_prod_err)?;
@@ -199,7 +201,7 @@ pub async fn productivity_categories(
 
 #[tauri::command]
 pub async fn productivity_summary_range(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     start_date: String,
     end_date: String,
 ) -> Result<Vec<ProductivitySummaryResponse>, ApiError> {
@@ -231,7 +233,7 @@ pub async fn productivity_summary_range(
 
 #[tauri::command]
 pub async fn productivity_activity_feed(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     limit: Option<i64>,
 ) -> Result<Vec<ActivityTimelineResponse>, ApiError> {
     let repos = state.productivity_repos()?;
@@ -259,7 +261,7 @@ pub async fn productivity_activity_feed(
 
 #[tauri::command]
 pub async fn productivity_goals(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<GoalProgressResponse>, ApiError> {
     let aggregator = state.aggregator()?;
     let today = Utc::now().format("%Y-%m-%d").to_string();
@@ -279,7 +281,7 @@ pub async fn productivity_goals(
 
 #[tauri::command]
 pub async fn productivity_pomodoro_start(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     work_mins: Option<i64>,
     break_mins: Option<i64>,
 ) -> Result<FocusSessionResponse, ApiError> {
@@ -293,7 +295,7 @@ pub async fn productivity_pomodoro_start(
 
 #[tauri::command]
 pub async fn productivity_time_entries(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     date: String,
 ) -> Result<Vec<TimeEntryResponse>, ApiError> {
     let repos = state.productivity_repos()?;

@@ -2900,6 +2900,7 @@ dependencies = [
  "tokio-util",
  "tools",
  "tools-core",
+ "tower-http",
  "tracing",
  "url",
  "uuid",
@@ -2912,6 +2913,27 @@ dependencies = [
  "chrono",
  "common",
  "serde",
+]
+
+[[package]]
+name = "dev-api"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "chrono",
+ "common",
+ "config",
+ "desktop-shared",
+ "feature-productivity",
+ "futures-util",
+ "serde",
+ "serde_json",
+ "storage",
+ "tokio",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]

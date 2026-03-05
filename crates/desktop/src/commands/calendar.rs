@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use desktop_shared::commands::CalendarEventResponse;
 use desktop_shared::errors::ApiError;
 use tauri::State;
@@ -6,7 +7,7 @@ use crate::app_core::AppCore;
 
 #[tauri::command]
 pub async fn calendar_events(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     limit: Option<i64>,
 ) -> Result<Vec<CalendarEventResponse>, ApiError> {
     let rows = state

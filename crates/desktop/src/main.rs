@@ -2,7 +2,11 @@
 
 mod app_core;
 mod commands;
+#[cfg(debug_assertions)]
+mod dev_server;
 mod oauth;
+
+use std::sync::Arc;
 
 use app_core::AppCore;
 use commands::window::{WINDOW_LAUNCHER, WINDOW_TRAY};
@@ -46,8 +50,19 @@ fn main() {
         )
         .setup(|app| {
             let handle = app.handle().clone();
-            let core = tauri::async_runtime::block_on(AppCore::init(handle))
-                .expect("failed to initialize app core");
+            let core = Arc::new(
+                tauri::async_runtime::block_on(AppCore::init(handle))
+                    .expect("failed to initialize app core"),
+            );
+
+            // Start dev HTTP server (debug builds only) so localhost:1420 works in Chrome
+            #[cfg(debug_assertions)]
+            {
+                let dev_core = Arc::clone(&core);
+                tokio::spawn(async move {
+                    dev_server::start(dev_core).await;
+                });
+            }
 
             app.manage(core);
 

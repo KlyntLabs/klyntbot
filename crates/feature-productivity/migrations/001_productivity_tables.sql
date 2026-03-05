@@ -31,9 +31,9 @@ CREATE TABLE IF NOT EXISTS activity_categories (
 
 -- Default categories
 INSERT OR IGNORE INTO activity_categories (id, name, category_type, rules, is_system) VALUES
-    ('coding', 'Coding', 'productive', '{"appNames":["Visual Studio Code","Code","Xcode","IntelliJ IDEA","WebStorm","Terminal","iTerm2","Warp","Alacritty","kitty"],"bundleIds":["com.microsoft.VSCode","com.apple.Terminal","com.googlecode.iterm2"],"urlPatterns":[]}', TRUE),
-    ('communication', 'Communication', 'neutral', '{"appNames":["Slack","Discord","Telegram","WhatsApp","Messages","Microsoft Teams","Zoom"],"bundleIds":["com.tinyspeck.slackmacgap","com.hnc.Discord","ru.keepcoder.Telegram"],"urlPatterns":[]}', TRUE),
-    ('browsing', 'Browsing', 'neutral', '{"appNames":["Safari","Firefox","Google Chrome","Arc","Brave Browser"],"bundleIds":["com.apple.Safari","org.mozilla.firefox","com.google.Chrome"],"urlPatterns":[]}', TRUE),
+    ('coding', 'Coding', 'productive', '{"appNames":["Visual Studio Code","Code","Xcode","IntelliJ IDEA","WebStorm","Terminal","iTerm2","Warp","Alacritty","kitty","Ghostty","Hyper","Rio","WezTerm"],"bundleIds":["com.microsoft.VSCode","com.apple.Terminal","com.googlecode.iterm2","com.mitchellh.ghostty"],"urlPatterns":[]}', TRUE),
+    ('communication', 'Communication', 'neutral', '{"appNames":["Slack","Discord","Telegram","WhatsApp","Messages","Microsoft Teams","Zoom","Signal"],"bundleIds":["com.tinyspeck.slackmacgap","com.hnc.Discord","ru.keepcoder.Telegram"],"urlPatterns":[]}', TRUE),
+    ('browsing', 'Browsing', 'neutral', '{"appNames":["Safari","Firefox","Google Chrome","Arc","Brave Browser","Orion","Vivaldi"],"bundleIds":["com.apple.Safari","org.mozilla.firefox","com.google.Chrome"],"urlPatterns":[]}', TRUE),
     ('design', 'Design', 'productive', '{"appNames":["Figma","Sketch","Adobe Photoshop","Adobe Illustrator","Affinity Designer"],"bundleIds":["com.figma.Desktop"],"urlPatterns":[]}', TRUE),
     ('documentation', 'Documentation', 'productive', '{"appNames":["Notion","Obsidian","Bear","Typora","Pages"],"bundleIds":["notion.id","md.obsidian"],"urlPatterns":["docs.google.com","notion.so"]}', TRUE),
     ('entertainment', 'Entertainment', 'distracting', '{"appNames":[],"bundleIds":[],"urlPatterns":["youtube.com","netflix.com","twitter.com","x.com","reddit.com","tiktok.com","instagram.com","facebook.com"]}', TRUE),

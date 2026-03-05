@@ -1,5 +1,7 @@
 //! Tauri commands for OAuth flows.
 
+use std::sync::Arc;
+
 use desktop_shared::commands::{McpConfigResponse, OAuthStartParams};
 use desktop_shared::errors::ApiError;
 use desktop_shared::events::{McpOAuthCompletePayload, MCP_OAUTH_COMPLETE, MCP_OAUTH_ERROR};
@@ -18,7 +20,7 @@ use super::registry;
 #[tauri::command]
 pub async fn mcp_oauth_start(
     app: AppHandle,
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     params: OAuthStartParams,
 ) -> Result<(), ApiError> {
     info!(
@@ -273,7 +275,7 @@ pub async fn mcp_oauth_start(
 /// Disconnect OAuth for a server (clear credentials).
 #[tauri::command]
 pub async fn mcp_oauth_disconnect(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     server_name: String,
 ) -> Result<McpConfigResponse, ApiError> {
     let mut cfg = state.config.write().await;

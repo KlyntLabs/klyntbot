@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use desktop_shared::commands::{ObjectiveCreateParams, ObjectiveResponse, ObjectiveUpdateParams};
 use desktop_shared::errors::ApiError;
 use desktop_shared::types::EntityKind;
@@ -29,7 +30,7 @@ async fn build_objective_response(
 
 #[tauri::command]
 pub async fn objective_create(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: ObjectiveCreateParams,
 ) -> Result<ObjectiveResponse, ApiError> {
@@ -66,7 +67,7 @@ pub async fn objective_create(
 
 #[tauri::command]
 pub async fn objective_get(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     id: String,
 ) -> Result<ObjectiveResponse, ApiError> {
     let row = state
@@ -81,7 +82,7 @@ pub async fn objective_get(
 
 #[tauri::command]
 pub async fn objective_update(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: ObjectiveUpdateParams,
 ) -> Result<ObjectiveResponse, ApiError> {
@@ -110,7 +111,7 @@ pub async fn objective_update(
 
 #[tauri::command]
 pub async fn objective_delete(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
 ) -> Result<bool, ApiError> {

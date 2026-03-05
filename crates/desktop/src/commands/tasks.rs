@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use desktop_shared::commands::{
     KeyResultResponse, ObjectiveResponse, ProjectResponse, TaskCreateParams, TaskResponse,
@@ -16,7 +17,7 @@ fn priority_label(p: Option<i16>) -> Option<String> {
     p.map(|v| format!("P{v}"))
 }
 
-pub fn action_to_task(
+pub(crate) fn action_to_task(
     row: &ActionRow,
     subtask_count: u32,
     subtask_completed_count: u32,
@@ -39,7 +40,7 @@ pub fn action_to_task(
     }
 }
 
-fn action_to_today_task(row: &ActionRow, now: DateTime<Utc>) -> TodayTaskResponse {
+pub(crate) fn action_to_today_task(row: &ActionRow, now: DateTime<Utc>) -> TodayTaskResponse {
     let is_overdue = row.due_date.is_some_and(|d| d < now) && row.status != "done";
     let is_due_today = !is_overdue
         && row
@@ -76,7 +77,7 @@ fn action_to_today_task(row: &ActionRow, now: DateTime<Utc>) -> TodayTaskRespons
     }
 }
 
-pub(super) fn objective_to_response(
+pub(crate) fn objective_to_response(
     row: &ObjectiveRow,
     key_results: Option<Vec<KeyResultResponse>>,
 ) -> ObjectiveResponse {
@@ -90,7 +91,7 @@ pub(super) fn objective_to_response(
     }
 }
 
-pub(super) fn kr_to_response(row: &KeyResultRow) -> KeyResultResponse {
+pub(crate) fn kr_to_response(row: &KeyResultRow) -> KeyResultResponse {
     KeyResultResponse {
         id: row.id.clone(),
         title: row.title.clone(),
@@ -104,7 +105,7 @@ pub(super) fn kr_to_response(row: &KeyResultRow) -> KeyResultResponse {
 // ── Helpers ─────────────────────────────────────────────────────────────
 
 /// Convert a list of ActionRows to TaskResponses, bulk-fetching subtask counts.
-pub(super) async fn rows_to_tasks(
+pub(crate) async fn rows_to_tasks(
     repos: &storage::Repos,
     rows: &[ActionRow],
 ) -> Result<Vec<TaskResponse>, ApiError> {
@@ -125,7 +126,7 @@ pub(super) async fn rows_to_tasks(
 }
 
 /// Fetch subtask counts for a single row and convert to TaskResponse.
-pub(super) async fn row_to_task(
+pub(crate) async fn row_to_task(
     repos: &storage::Repos,
     row: &ActionRow,
 ) -> Result<TaskResponse, ApiError> {
@@ -141,7 +142,7 @@ pub(super) async fn row_to_task(
 
 #[tauri::command]
 pub async fn task_list(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     area_id: Option<String>,
     project_id: Option<String>,
     status: Option<String>,
@@ -165,7 +166,7 @@ pub async fn task_list(
 
 #[tauri::command]
 pub async fn project_list(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     area_id: Option<String>,
 ) -> Result<Vec<ProjectResponse>, ApiError> {
     let filter = ProjectFilter {
@@ -190,7 +191,7 @@ pub async fn project_list(
 
 #[tauri::command]
 pub async fn objective_list(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     project_id: Option<String>,
 ) -> Result<Vec<ObjectiveResponse>, ApiError> {
     let objectives = state
@@ -225,7 +226,7 @@ pub async fn objective_list(
 
 #[tauri::command]
 pub async fn task_toggle_complete(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
 ) -> Result<TaskResponse, ApiError> {
@@ -262,7 +263,7 @@ pub async fn task_toggle_complete(
 
 #[tauri::command]
 pub async fn task_create(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: TaskCreateParams,
 ) -> Result<TaskResponse, ApiError> {
@@ -326,7 +327,7 @@ pub async fn task_create(
 
 #[tauri::command]
 pub async fn task_update(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     params: TaskUpdateParams,
 ) -> Result<TaskResponse, ApiError> {
@@ -360,7 +361,7 @@ pub async fn task_update(
 
 #[tauri::command]
 pub async fn task_delete(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
     id: String,
 ) -> Result<bool, ApiError> {
@@ -379,7 +380,7 @@ pub async fn task_delete(
 }
 
 #[tauri::command]
-pub async fn today_tasks(state: State<'_, AppCore>) -> Result<Vec<TodayTaskResponse>, ApiError> {
+pub async fn today_tasks(state: State<'_, Arc<AppCore>>) -> Result<Vec<TodayTaskResponse>, ApiError> {
     let now = chrono::Utc::now();
     let start_of_today = now.date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc();
     let start_of_tomorrow = start_of_today + chrono::Duration::days(1);
@@ -428,7 +429,7 @@ pub async fn today_tasks(state: State<'_, AppCore>) -> Result<Vec<TodayTaskRespo
 
 #[tauri::command]
 pub async fn task_list_children(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     parent_id: String,
 ) -> Result<Vec<TaskResponse>, ApiError> {
     let rows = state

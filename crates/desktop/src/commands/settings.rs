@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use desktop_shared::commands::{
     McpAddServerParams, McpConfigResponse, McpRemoveParams, McpToggleParams, McpUpdateServerParams,
 };
@@ -7,14 +8,14 @@ use tauri::State;
 use crate::app_core::AppCore;
 
 #[tauri::command]
-pub async fn mcp_get_config(state: State<'_, AppCore>) -> Result<McpConfigResponse, ApiError> {
+pub async fn mcp_get_config(state: State<'_, Arc<AppCore>>) -> Result<McpConfigResponse, ApiError> {
     let cfg = state.config.read().await;
     Ok(super::build_mcp_response(&cfg))
 }
 
 #[tauri::command]
 pub async fn mcp_add_server(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     params: McpAddServerParams,
 ) -> Result<McpConfigResponse, ApiError> {
     let server_def = {
@@ -66,7 +67,7 @@ pub async fn mcp_add_server(
 
 #[tauri::command]
 pub async fn mcp_remove_server(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     params: McpRemoveParams,
 ) -> Result<McpConfigResponse, ApiError> {
     let response = {
@@ -97,7 +98,7 @@ pub async fn mcp_remove_server(
 
 #[tauri::command]
 pub async fn mcp_toggle_server(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     params: McpToggleParams,
 ) -> Result<McpConfigResponse, ApiError> {
     let server_def = {
@@ -136,7 +137,7 @@ pub async fn mcp_toggle_server(
 
 #[tauri::command]
 pub async fn mcp_update_server(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     params: McpUpdateServerParams,
 ) -> Result<McpConfigResponse, ApiError> {
     let result = {

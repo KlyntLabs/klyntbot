@@ -58,6 +58,12 @@ impl ProductivityFeature {
                 description: "Add productivity score, goals, and time entries".to_string(),
                 sql: include_str!("../migrations/002_productivity_score.sql").to_string(),
             },
+            FeatureMigration {
+                feature_name: "productivity".to_string(),
+                version: 3,
+                description: "Expand category rules and backfill existing events".to_string(),
+                sql: include_str!("../migrations/003_expand_categories.sql").to_string(),
+            },
         ]
     }
 

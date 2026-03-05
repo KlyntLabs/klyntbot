@@ -15,7 +15,7 @@ use tokio_util::sync::CancellationToken;
 use crate::app_core::AppCore;
 
 #[tauri::command]
-pub async fn chat_threads(state: State<'_, AppCore>) -> Result<Vec<ChatThreadResponse>, ApiError> {
+pub async fn chat_threads(state: State<'_, Arc<AppCore>>) -> Result<Vec<ChatThreadResponse>, ApiError> {
     // Fetch sessions, contexts, and name lookups concurrently (4 queries total)
     let default_filter = ProjectFilter::default();
     let (sessions, visible_contexts, all_areas, all_projects) = tokio::join!(
@@ -88,7 +88,7 @@ pub async fn chat_threads(state: State<'_, AppCore>) -> Result<Vec<ChatThreadRes
 
 #[tauri::command]
 pub async fn chat_messages(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     session_key: String,
     limit: Option<i64>,
 ) -> Result<Vec<ChatMessageResponse>, ApiError> {
@@ -132,7 +132,7 @@ pub async fn chat_messages(
 #[tauri::command]
 pub async fn chat_send(
     app: tauri::AppHandle,
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     content: String,
     session_key: String,
     context: Option<SessionContextInput>,
@@ -646,7 +646,7 @@ pub async fn chat_send(
 
 #[tauri::command]
 pub async fn chat_pin_thread(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     session_key: String,
 ) -> Result<(), ApiError> {
     state
@@ -660,7 +660,7 @@ pub async fn chat_pin_thread(
 
 #[tauri::command]
 pub async fn chat_rename_thread(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     session_key: String,
     title: String,
 ) -> Result<(), ApiError> {
@@ -679,7 +679,7 @@ pub async fn chat_rename_thread(
 
 #[tauri::command]
 pub async fn chat_delete_thread(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     session_key: String,
 ) -> Result<(), ApiError> {
     // Cancel any in-flight stream before deleting to avoid dangling writes
@@ -701,7 +701,7 @@ pub async fn chat_delete_thread(
 
 #[tauri::command]
 pub async fn chat_respond_interaction(
-    state: State<'_, AppCore>,
+    state: State<'_, Arc<AppCore>>,
     session_key: String,
     request_id: String,
     response: common::FormResponse,
@@ -775,7 +775,7 @@ fn format_interaction_summary(response: &common::FormResponse) -> String {
 }
 
 #[tauri::command]
-pub async fn chat_cancel(state: State<'_, AppCore>, session_key: String) -> Result<(), ApiError> {
+pub async fn chat_cancel(state: State<'_, Arc<AppCore>>, session_key: String) -> Result<(), ApiError> {
     // Cancel stream
     if let Some((_, token)) = state.active_streams.remove(&session_key) {
         token.cancel();
