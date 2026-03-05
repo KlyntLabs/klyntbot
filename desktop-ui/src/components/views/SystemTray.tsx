@@ -245,6 +245,7 @@ export function SystemTray() {
               className="flex-1 bg-transparent text-[13px] font-light text-primary placeholder:text-muted focus:outline-none"
             />
             <button
+              type="button"
               onClick={handleChatSubmit}
               disabled={!chatInput.trim()}
               className="w-6 h-6 rounded-md flex items-center justify-center text-muted hover:text-primary transition-colors disabled:opacity-30"

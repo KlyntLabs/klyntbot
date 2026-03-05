@@ -70,6 +70,7 @@ export function TaskDetail() {
       {/* Header */}
       <div className="h-14 flex items-center px-6 gap-3 border-b border-border flex-shrink-0">
         <button
+          type="button"
           onClick={() => navigate("/")}
           className="text-muted hover:text-secondary transition-colors"
         >
@@ -99,15 +100,16 @@ export function TaskDetail() {
             className="text-[22px] font-light text-primary bg-transparent border-b border-brand outline-none w-full mb-4"
           />
         ) : (
-          <h1
+          <button
+            type="button"
             onClick={() => {
               setTitleDraft(task.title);
               setEditingTitle(true);
             }}
-            className="text-[22px] font-light text-primary cursor-text mb-4 hover:text-secondary transition-colors"
+            className="text-[22px] font-light text-primary cursor-text mb-4 hover:text-secondary transition-colors text-left"
           >
             {task.title}
-          </h1>
+          </button>
         )}
 
         {/* Metadata Grid */}
@@ -117,6 +119,7 @@ export function TaskDetail() {
           <div className="flex gap-2">
             {STATUSES.map((s) => (
               <button
+                type="button"
                 key={s}
                 onClick={() => handleUpdate({ status: s })}
                 className={`px-3 py-1 rounded-md text-[12px] font-light transition-colors ${
@@ -132,7 +135,7 @@ export function TaskDetail() {
 
           {/* Priority */}
           <span className="text-[12px] text-muted font-light self-center">Priority</span>
-          <button onClick={cyclePriority} className="self-start">
+          <button type="button" onClick={cyclePriority} className="self-start">
             <Badge variant="priority" value={task.priority ?? "—"} />
           </button>
 
@@ -189,21 +192,23 @@ export function TaskDetail() {
               className="w-full bg-surface-low rounded-lg px-4 py-3 text-[13px] font-light text-secondary border border-border-subtle outline-none resize-none"
             />
           ) : (
-            <div
+            <button
+              type="button"
               onClick={() => {
                 setDescDraft(task.description ?? "");
                 setEditingDesc(true);
               }}
-              className="w-full bg-surface-low rounded-lg px-4 py-3 text-[13px] font-light text-secondary min-h-[80px] cursor-text hover:bg-surface-base transition-colors"
+              className="w-full bg-surface-low rounded-lg px-4 py-3 text-[13px] font-light text-secondary min-h-[80px] cursor-text hover:bg-surface-base transition-colors text-left"
             >
               {task.description || <span className="text-dim">Click to add description...</span>}
-            </div>
+            </button>
           )}
         </div>
 
         {/* Delete */}
         <div className="pt-4 border-t border-border">
           <button
+            type="button"
             onClick={handleDelete}
             onBlur={() => setConfirmDelete(false)}
             className={`flex items-center gap-2 px-3 py-2 rounded-md text-[12px] font-light transition-colors ${

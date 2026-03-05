@@ -14,11 +14,13 @@ export function AddServerDialog({ open, onClose, onAdd, prefill }: AddServerDial
   const [transport, setTransport] = useState<"stdio" | "http">(prefill?.transport ?? "stdio");
   const [command, setCommand] = useState(prefill?.command ?? "");
   const [args, setArgs] = useState(prefill?.args?.join(", ") ?? "");
-  const [envPairs, setEnvPairs] = useState<{ key: string; value: string }[]>(
-    prefill?.envKeys?.map((k) => ({ key: k, value: "" })) ?? [],
+  const [envIdCounter, setEnvIdCounter] = useState(prefill?.envKeys?.length ?? 0);
+  const [envPairs, setEnvPairs] = useState<{ id: number; key: string; value: string }[]>(
+    prefill?.envKeys?.map((k, i) => ({ id: i, key: k, value: "" })) ?? [],
   );
   const [url, setUrl] = useState("");
-  const [headerPairs, setHeaderPairs] = useState<{ key: string; value: string }[]>([]);
+  const [headerIdCounter, setHeaderIdCounter] = useState(0);
+  const [headerPairs, setHeaderPairs] = useState<{ id: number; key: string; value: string }[]>([]);
 
   if (!open) return null;
 
@@ -64,6 +66,7 @@ export function AddServerDialog({ open, onClose, onAdd, prefill }: AddServerDial
               {prefill ? `Install ${prefill.name}` : "Add MCP server"}
             </h3>
             <button
+              type="button"
               onClick={onClose}
               className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:text-secondary hover:bg-surface-base transition-colors"
             >
@@ -75,8 +78,11 @@ export function AddServerDialog({ open, onClose, onAdd, prefill }: AddServerDial
           <div className="px-5 py-4 space-y-4">
             {/* Name */}
             <div>
-              <label className="block text-[12px] text-muted mb-1.5">Server name</label>
+              <label htmlFor="mcp-server-name" className="block text-[12px] text-muted mb-1.5">
+                Server name
+              </label>
               <input
+                id="mcp-server-name"
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -87,10 +93,11 @@ export function AddServerDialog({ open, onClose, onAdd, prefill }: AddServerDial
 
             {/* Transport */}
             <div>
-              <label className="block text-[12px] text-muted mb-1.5">Transport</label>
+              <span className="block text-[12px] text-muted mb-1.5">Transport</span>
               <div className="flex gap-2">
                 {(["stdio", "http"] as const).map((t) => (
                   <button
+                    type="button"
                     key={t}
                     onClick={() => setTransport(t)}
                     className={`flex-1 py-1.5 text-[12px] rounded-md border transition-colors ${
@@ -109,8 +116,11 @@ export function AddServerDialog({ open, onClose, onAdd, prefill }: AddServerDial
             {transport === "stdio" && (
               <>
                 <div>
-                  <label className="block text-[12px] text-muted mb-1.5">Command</label>
+                  <label htmlFor="mcp-command" className="block text-[12px] text-muted mb-1.5">
+                    Command
+                  </label>
                   <input
+                    id="mcp-command"
                     type="text"
                     value={command}
                     onChange={(e) => setCommand(e.target.value)}
@@ -120,10 +130,11 @@ export function AddServerDialog({ open, onClose, onAdd, prefill }: AddServerDial
                 </div>
 
                 <div>
-                  <label className="block text-[12px] text-muted mb-1.5">
+                  <label htmlFor="mcp-args" className="block text-[12px] text-muted mb-1.5">
                     Arguments <span className="text-dim">(comma-separated)</span>
                   </label>
                   <input
+                    id="mcp-args"
                     type="text"
                     value={args}
                     onChange={(e) => setArgs(e.target.value)}
@@ -135,9 +146,13 @@ export function AddServerDialog({ open, onClose, onAdd, prefill }: AddServerDial
                 {/* Env key-value pairs */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-[12px] text-muted">Environment variables</label>
+                    <span className="text-[12px] text-muted">Environment variables</span>
                     <button
-                      onClick={() => setEnvPairs([...envPairs, { key: "", value: "" }])}
+                      type="button"
+                      onClick={() => {
+                        setEnvPairs([...envPairs, { id: envIdCounter, key: "", value: "" }]);
+                        setEnvIdCounter((c) => c + 1);
+                      }}
                       className="w-5 h-5 rounded flex items-center justify-center text-muted hover:text-secondary hover:bg-surface-base transition-colors"
                     >
                       <Plus className="w-3.5 h-3.5" />
@@ -145,7 +160,7 @@ export function AddServerDialog({ open, onClose, onAdd, prefill }: AddServerDial
                   </div>
                   <div className="space-y-1.5">
                     {envPairs.map((pair, i) => (
-                      <div key={i} className="flex gap-1.5">
+                      <div key={pair.id} className="flex gap-1.5">
                         <input
                           type="text"
                           value={pair.key}
@@ -169,6 +184,7 @@ export function AddServerDialog({ open, onClose, onAdd, prefill }: AddServerDial
                           className="flex-1 px-2.5 py-1.5 text-[12px] font-mono bg-surface-base border border-border rounded-md text-primary placeholder:text-dim focus:outline-none focus:border-brand/50"
                         />
                         <button
+                          type="button"
                           onClick={() => setEnvPairs(envPairs.filter((_, j) => j !== i))}
                           className="w-7 h-7 rounded flex items-center justify-center text-muted hover:text-destructive hover:bg-surface-base transition-colors flex-shrink-0"
                         >
@@ -185,8 +201,11 @@ export function AddServerDialog({ open, onClose, onAdd, prefill }: AddServerDial
             {transport === "http" && (
               <>
                 <div>
-                  <label className="block text-[12px] text-muted mb-1.5">URL</label>
+                  <label htmlFor="mcp-url" className="block text-[12px] text-muted mb-1.5">
+                    URL
+                  </label>
                   <input
+                    id="mcp-url"
                     type="text"
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
@@ -198,9 +217,16 @@ export function AddServerDialog({ open, onClose, onAdd, prefill }: AddServerDial
                 {/* Header key-value pairs */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-[12px] text-muted">Headers</label>
+                    <span className="text-[12px] text-muted">Headers</span>
                     <button
-                      onClick={() => setHeaderPairs([...headerPairs, { key: "", value: "" }])}
+                      type="button"
+                      onClick={() => {
+                        setHeaderPairs([
+                          ...headerPairs,
+                          { id: headerIdCounter, key: "", value: "" },
+                        ]);
+                        setHeaderIdCounter((c) => c + 1);
+                      }}
                       className="w-5 h-5 rounded flex items-center justify-center text-muted hover:text-secondary hover:bg-surface-base transition-colors"
                     >
                       <Plus className="w-3.5 h-3.5" />
@@ -208,7 +234,7 @@ export function AddServerDialog({ open, onClose, onAdd, prefill }: AddServerDial
                   </div>
                   <div className="space-y-1.5">
                     {headerPairs.map((pair, i) => (
-                      <div key={i} className="flex gap-1.5">
+                      <div key={pair.id} className="flex gap-1.5">
                         <input
                           type="text"
                           value={pair.key}
@@ -232,6 +258,7 @@ export function AddServerDialog({ open, onClose, onAdd, prefill }: AddServerDial
                           className="flex-1 px-2.5 py-1.5 text-[12px] font-mono bg-surface-base border border-border rounded-md text-primary placeholder:text-dim focus:outline-none focus:border-brand/50"
                         />
                         <button
+                          type="button"
                           onClick={() => setHeaderPairs(headerPairs.filter((_, j) => j !== i))}
                           className="w-7 h-7 rounded flex items-center justify-center text-muted hover:text-destructive hover:bg-surface-base transition-colors flex-shrink-0"
                         >
@@ -248,12 +275,14 @@ export function AddServerDialog({ open, onClose, onAdd, prefill }: AddServerDial
           {/* Footer */}
           <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-border">
             <button
+              type="button"
               onClick={onClose}
               className="px-3 py-1.5 text-[12px] text-muted hover:text-secondary rounded-md hover:bg-surface-base transition-colors"
             >
               Cancel
             </button>
             <button
+              type="button"
               onClick={handleSubmit}
               disabled={!canSubmit}
               className="px-4 py-1.5 text-[12px] rounded-md bg-brand text-white hover:bg-brand-hover transition-colors disabled:opacity-40 disabled:cursor-not-allowed"

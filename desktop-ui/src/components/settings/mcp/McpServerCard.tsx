@@ -33,6 +33,7 @@ export function CustomServerCard({ server, onToggle, onRemove, onEdit }: CustomS
           {server.transport}
         </span>
         <button
+          type="button"
           onClick={() => onToggle(server.name, !server.enabled)}
           className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors ${
             server.enabled ? "text-success hover:bg-surface-base" : "text-dim hover:bg-surface-base"
@@ -42,6 +43,7 @@ export function CustomServerCard({ server, onToggle, onRemove, onEdit }: CustomS
           <Power className="w-3.5 h-3.5" strokeWidth={1.5} />
         </button>
         <button
+          type="button"
           onClick={() => onEdit(server)}
           className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:text-secondary hover:bg-surface-base transition-colors"
           title="Edit"
@@ -49,6 +51,7 @@ export function CustomServerCard({ server, onToggle, onRemove, onEdit }: CustomS
           <Settings2 className="w-3.5 h-3.5" strokeWidth={1.5} />
         </button>
         <button
+          type="button"
           onClick={() => onRemove(server.name)}
           className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:text-destructive hover:bg-surface-base transition-colors"
           title="Remove"
@@ -108,6 +111,7 @@ export function RecommendedServerCard({
         {!installed ? (
           /* State 1: Not installed → Install button */
           <button
+            type="button"
             onClick={() => onInstall(server)}
             className="text-[12px] px-3 py-1 rounded-md border border-brand/30 text-brand bg-brand/5 hover:bg-brand/10 transition-colors"
           >
@@ -119,6 +123,7 @@ export function RecommendedServerCard({
             {needsAuth && (
               /* State 2: Installed, needs auth → Authenticate button */
               <button
+                type="button"
                 onClick={() => onOAuthConnect?.(server)}
                 disabled={oauthLoading}
                 className="text-[12px] px-3 py-1 rounded-md border border-brand/30 text-brand bg-brand/5 hover:bg-brand/10 transition-colors disabled:opacity-50 flex items-center gap-1.5"
@@ -137,6 +142,7 @@ export function RecommendedServerCard({
             {isConnected && (
               /* State 3: Installed + authenticated → Connected badge */
               <button
+                type="button"
                 onClick={() => onOAuthDisconnect?.(server.name)}
                 className="text-[12px] px-3 py-1 rounded-md border border-success/30 text-success bg-success/5 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 transition-colors flex items-center gap-1"
                 title="Click to disconnect"
@@ -149,6 +155,7 @@ export function RecommendedServerCard({
             {/* No OAuth provider — show simple enabled/disabled for non-OAuth servers */}
             {!hasOAuth && (
               <button
+                type="button"
                 onClick={() => onToggle?.(server.name, !enabled)}
                 className={`text-[12px] px-3 py-1 rounded-md border transition-colors ${
                   enabled
@@ -162,6 +169,7 @@ export function RecommendedServerCard({
 
             {/* Gear icon — edit config */}
             <button
+              type="button"
               onClick={() => onEdit?.(server)}
               className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:text-secondary hover:bg-surface-base transition-colors"
               title="Configure"
@@ -172,6 +180,7 @@ export function RecommendedServerCard({
             {/* Toggle on/off (for OAuth servers too) */}
             {hasOAuth && (
               <button
+                type="button"
                 onClick={() => onToggle?.(server.name, !enabled)}
                 className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors ${
                   enabled ? "text-success hover:bg-surface-base" : "text-dim hover:bg-surface-base"

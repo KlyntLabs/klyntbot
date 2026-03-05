@@ -36,7 +36,6 @@ export function MainApp() {
   const {
     expandedTasks,
     childrenCache,
-    generation,
     toggleExpand: toggleExpandTask,
     fetchChildren,
     invalidateCache,
@@ -169,6 +168,7 @@ export function MainApp() {
           <div className="flex-1 flex items-center gap-2">
             {(["All", "Work", "Personal"] as Tab[]).map((tab) => (
               <button
+                type="button"
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 className={`flex-1 py-2 rounded-md text-[13px] font-light transition-colors ${
@@ -182,6 +182,7 @@ export function MainApp() {
             ))}
           </div>
           <button
+            type="button"
             onClick={() => {
               const nextOpen = !isChatOpen;
               if (nextOpen) {

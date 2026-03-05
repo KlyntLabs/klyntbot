@@ -100,6 +100,7 @@ export function PomodoroTimer() {
           )}
 
           <button
+            type="button"
             onClick={handleEnd}
             disabled={endFocus.loading}
             className="flex items-center justify-center gap-2 py-2 rounded-lg bg-surface-raised text-destructive text-[12px] font-light hover:bg-surface-highest transition-colors"
@@ -111,6 +112,7 @@ export function PomodoroTimer() {
       ) : (
         <div className="flex gap-2">
           <button
+            type="button"
             onClick={handleStartFocus}
             disabled={startFocus.loading}
             className="flex-1 flex items-center justify-center gap-2 py-3 rounded-lg bg-brand text-white text-[13px] font-medium hover:bg-brand-hover transition-colors"
@@ -119,6 +121,7 @@ export function PomodoroTimer() {
             Focus (25m)
           </button>
           <button
+            type="button"
             onClick={handleStartPomodoro}
             disabled={startPomodoro.loading}
             className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-surface-raised text-secondary text-[13px] font-light hover:bg-surface-highest transition-colors"

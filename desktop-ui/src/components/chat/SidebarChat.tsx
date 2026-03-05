@@ -93,6 +93,7 @@ export function SidebarChat({
         <div className="flex items-center gap-1">
           {pageContext && (
             <button
+              type="button"
               onClick={handlePin}
               title="Pin to Chat threads"
               className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:text-secondary hover:bg-surface-base transition-colors"
@@ -101,6 +102,7 @@ export function SidebarChat({
             </button>
           )}
           <button
+            type="button"
             onClick={onClose}
             className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:text-secondary hover:bg-surface-base transition-colors"
           >
@@ -150,6 +152,7 @@ export function SidebarChat({
             className="flex-1 bg-surface-base rounded-xl px-4 py-2.5 text-[13px] text-primary placeholder:text-muted focus:outline-none focus:bg-surface-raised font-light"
           />
           <button
+            type="button"
             onClick={handleSend}
             disabled={!chat.input.trim() || chat.isStreaming}
             className="w-10 h-10 rounded-xl bg-brand hover:bg-brand/90 disabled:bg-surface-base disabled:text-muted flex items-center justify-center transition-colors"

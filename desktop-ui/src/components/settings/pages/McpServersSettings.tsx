@@ -162,6 +162,7 @@ export function McpServersSettings() {
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-[13px] font-medium text-secondary">Custom servers</h3>
           <button
+            type="button"
             onClick={handleOpenAdd}
             className="flex items-center gap-1.5 text-[12px] text-brand hover:text-brand-hover transition-colors"
           >

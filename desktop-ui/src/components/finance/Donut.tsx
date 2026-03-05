@@ -20,15 +20,15 @@ export function Donut({
 
   return (
     <div className="flex flex-col items-center">
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-        {segments.map((seg, i) => {
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
+        {segments.map((seg) => {
           const frac = seg.value / total;
           const dash = frac * circ;
           const rot = (off / total) * 360 - 90;
           off += seg.value;
           return (
             <circle
-              key={i}
+              key={seg.name}
               cx={cx}
               cy={cy}
               r={r}
@@ -60,8 +60,8 @@ export function Donut({
         </text>
       </svg>
       <div className="flex flex-wrap gap-x-3 gap-y-0.5 justify-center mt-2">
-        {segments.map((seg, i) => (
-          <div key={i} className="flex items-center gap-1">
+        {segments.map((seg) => (
+          <div key={seg.name} className="flex items-center gap-1">
             <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: seg.color }} />
             <span className="text-[9px] text-dim font-light">{seg.name}</span>
           </div>

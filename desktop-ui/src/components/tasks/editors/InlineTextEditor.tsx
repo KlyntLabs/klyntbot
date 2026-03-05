@@ -12,7 +12,7 @@ export function InlineTextEditor({ value, onSave, className, placeholder }: Inli
   const [draft, setDraft] = useState("");
 
   const startEdit = useCallback(
-    (e: React.MouseEvent) => {
+    (e: React.SyntheticEvent) => {
       e.stopPropagation();
       setDraft(value);
       setEditing(true);
@@ -43,11 +43,12 @@ export function InlineTextEditor({ value, onSave, className, placeholder }: Inli
   }
 
   return (
-    <span
+    <button
+      type="button"
       onClick={startEdit}
-      className={`cursor-text rounded px-1 -mx-1 transition-colors ${className ?? "text-[13px] font-light text-secondary"}`}
+      className={`cursor-text rounded px-1 -mx-1 transition-colors text-left ${className ?? "text-[13px] font-light text-secondary"}`}
     >
       {value || <span className="text-dim">{placeholder ?? "—"}</span>}
-    </span>
+    </button>
   );
 }

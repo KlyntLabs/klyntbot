@@ -49,10 +49,11 @@ export function KanbanBoard({ tasks, projectMap, areaMap, completedTasks }: Kanb
               const isCompleted = completedTasks.has(task.id);
 
               return (
-                <div
+                <button
+                  type="button"
                   key={task.id}
                   onClick={() => navigate(`/task/${task.id}`)}
-                  className="bg-surface-low hover:bg-surface-base rounded-lg px-4 py-3 cursor-pointer transition-colors border border-border-subtle"
+                  className="bg-surface-low hover:bg-surface-base rounded-lg px-4 py-3 cursor-pointer transition-colors border border-border-subtle text-left w-full"
                 >
                   {/* Title */}
                   <p
@@ -93,7 +94,7 @@ export function KanbanBoard({ tasks, projectMap, areaMap, completedTasks }: Kanb
                       {formatDate(task.dueDate)}
                     </p>
                   )}
-                </div>
+                </button>
               );
             })}
 

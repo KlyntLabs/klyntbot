@@ -133,9 +133,9 @@ export function Finance() {
 
   const investSegs = useMemo(() => {
     const m = new Map<string, number>();
-    investments.forEach((i) =>
-      m.set(i.assetType, (m.get(i.assetType) ?? 0) + toVnd(i.currentValue ?? 0, i.currency, rates)),
-    );
+    for (const i of investments) {
+      m.set(i.assetType, (m.get(i.assetType) ?? 0) + toVnd(i.currentValue ?? 0, i.currency, rates));
+    }
     return Array.from(m.entries())
       .sort((a, b) => b[1] - a[1])
       .map(([name, value], i) => ({ name, value, color: COLORS[i % COLORS.length] }));

@@ -45,6 +45,7 @@ export function SettingsLayout({ children }: SettingsLayoutProps) {
       {/* Settings sidebar */}
       <div className="w-56 bg-background border-r border-border flex flex-col py-3">
         <button
+          type="button"
           onClick={() => navigate("/")}
           className="flex items-center gap-2 px-4 py-1.5 text-[13px] text-muted hover:text-secondary transition-colors mb-3"
         >
@@ -64,6 +65,7 @@ export function SettingsLayout({ children }: SettingsLayoutProps) {
             const isActive = currentPath === section.path;
             return (
               <button
+                type="button"
                 key={section.path}
                 onClick={() => navigate(section.path)}
                 className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[13px] font-light transition-colors text-left ${

@@ -27,7 +27,12 @@ export function AddSubtaskRow({ parentId, showArea, onCreate }: AddSubtaskRowPro
       style={{ boxShadow: "inset 3px 0 0 var(--brand)" }}
     >
       <td className="px-5 py-1.5 w-9" />
-      <td colSpan={colCount - 1} className="px-5 py-1.5" onClick={(e) => e.stopPropagation()}>
+      <td
+        colSpan={colCount - 1}
+        className="px-5 py-1.5"
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center" style={{ paddingLeft: 24 }}>
           {editing ? (
             <input
@@ -46,6 +51,7 @@ export function AddSubtaskRow({ parentId, showArea, onCreate }: AddSubtaskRowPro
             />
           ) : (
             <button
+              type="button"
               onClick={() => setEditing(true)}
               className="flex items-center gap-1 text-[12px] font-light text-dim hover:text-muted transition-colors"
             >

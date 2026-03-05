@@ -40,7 +40,7 @@ export function InteractionCard({
   });
   const [focusIndex, setFocusIndex] = useState(0);
   const [submitting, setSubmitting] = useState(false);
-  const cardRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLFieldSetElement>(null);
 
   const question = request.questions[activeTab];
   const optionCount =
@@ -184,7 +184,11 @@ export function InteractionCard({
   );
 
   return (
-    <div ref={cardRef} onKeyDown={handleKeyDown} className="flex justify-start focus:outline-none">
+    <fieldset
+      ref={cardRef}
+      onKeyDown={handleKeyDown}
+      className="flex justify-start focus:outline-none border-none p-0 m-0"
+    >
       <div className="w-full max-w-[85%] rounded-xl bg-surface-base border border-border overflow-hidden">
         {/* Header */}
         <div className="px-4 pt-3 pb-2 text-[11px] font-light text-muted">Klynt is asking…</div>
@@ -194,6 +198,7 @@ export function InteractionCard({
           <div className="flex gap-1 px-4 pb-2">
             {request.questions.map((q, i) => (
               <button
+                type="button"
                 key={q.id}
                 onClick={() => setActiveTab(i)}
                 className={`px-3 py-1 rounded-md text-[11px] font-light transition-colors ${
@@ -226,6 +231,7 @@ export function InteractionCard({
 
                 return (
                   <button
+                    type="button"
                     key={opt.value}
                     onClick={() => handleSelect(question, i)}
                     className={cn(
@@ -255,6 +261,7 @@ export function InteractionCard({
 
                 return (
                   <button
+                    type="button"
                     key={label}
                     onClick={() => setAnswer(question.id, { type: "yes_no", answer: val })}
                     className={cn("flex-1 py-2", optionButtonClass(isSelected, focusIndex === i))}
@@ -294,6 +301,7 @@ export function InteractionCard({
         {/* Footer: Submit / Cancel */}
         <div className="flex items-center justify-end gap-2 px-4 py-2 border-t border-border">
           <button
+            type="button"
             onClick={handleCancel}
             disabled={submitting}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-light text-muted hover:text-secondary hover:bg-surface-raised transition-colors disabled:opacity-50"
@@ -302,6 +310,7 @@ export function InteractionCard({
             Cancel
           </button>
           <button
+            type="button"
             onClick={handleSubmit}
             disabled={submitting}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand text-[11px] font-light hover:bg-brand/90 transition-colors disabled:opacity-50"
@@ -311,6 +320,6 @@ export function InteractionCard({
           </button>
         </div>
       </div>
-    </div>
+    </fieldset>
   );
 }

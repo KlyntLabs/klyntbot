@@ -34,6 +34,7 @@ export function InlineSelect({
   return (
     <div ref={ref} className={`relative ${className ?? ""}`}>
       <button
+        type="button"
         onClick={(e) => {
           e.stopPropagation();
           setOpen(!open);
@@ -48,6 +49,7 @@ export function InlineSelect({
             const isSelected = value === opt.value;
             return (
               <button
+                type="button"
                 key={opt.value ?? "__none"}
                 onClick={(e) => {
                   e.stopPropagation();

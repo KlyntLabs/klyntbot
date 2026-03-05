@@ -20,6 +20,7 @@ export function InlineDatePicker({ value, onSave }: InlineDatePickerProps) {
   return (
     <div ref={ref} className="relative">
       <button
+        type="button"
         onClick={(e) => {
           e.stopPropagation();
           setOpen(!open);

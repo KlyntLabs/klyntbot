@@ -93,7 +93,10 @@ export function FinanceBudgets() {
         <div className="col-span-8">
           <div className="flex items-center justify-between mb-2">
             <SectionLabel>Active Budgets</SectionLabel>
-            <button className="flex items-center gap-1 text-[10px] text-brand font-light hover:text-brand-hover transition-colors">
+            <button
+              type="button"
+              className="flex items-center gap-1 text-[10px] text-brand font-light hover:text-brand-hover transition-colors"
+            >
               <Plus className="w-3 h-3" strokeWidth={1.5} /> Add Budget
             </button>
           </div>

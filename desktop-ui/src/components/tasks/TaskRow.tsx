@@ -49,10 +49,15 @@ export function TaskRow({
       style={isSubtask ? { boxShadow: "inset 3px 0 0 var(--brand)" } : undefined}
     >
       {/* Checkbox cell — with optional expand chevron */}
-      <td className={`px-5 ${cellPy} w-9`} onClick={(e) => e.stopPropagation()}>
+      <td
+        className={`px-5 ${cellPy} w-9`}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+      >
         <div className="flex items-center gap-1">
           {!isSubtask && hasSubtasks && (
             <button
+              type="button"
               onClick={onToggleExpand}
               className="text-muted hover:text-secondary -ml-5 mr-0.5"
             >
@@ -68,7 +73,11 @@ export function TaskRow({
       </td>
 
       {/* Title cell */}
-      <td className={`px-5 ${cellPy}`} onClick={(e) => e.stopPropagation()}>
+      <td
+        className={`px-5 ${cellPy}`}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+      >
         <div
           className="flex items-center gap-1.5"
           style={isSubtask ? { paddingLeft: 24 } : undefined}
@@ -90,7 +99,11 @@ export function TaskRow({
       </td>
 
       {/* Project cell — hidden for subtasks (inherits from parent) */}
-      <td className={`px-5 ${cellPy}`} onClick={(e) => e.stopPropagation()}>
+      <td
+        className={`px-5 ${cellPy}`}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+      >
         {isSubtask ? null : (
           <InlineSelect
             value={task.projectId}
@@ -118,7 +131,11 @@ export function TaskRow({
 
       {/* Area cell — hidden for subtasks (inherits from parent) */}
       {showArea && (
-        <td className={`px-5 ${cellPy}`} onClick={(e) => e.stopPropagation()}>
+        <td
+          className={`px-5 ${cellPy}`}
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
           {isSubtask ? null : (
             <InlineSelect
               value={task.areaId}
@@ -140,7 +157,11 @@ export function TaskRow({
       )}
 
       {/* Priority cell */}
-      <td className={`px-5 ${cellPy}`} onClick={(e) => e.stopPropagation()}>
+      <td
+        className={`px-5 ${cellPy}`}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+      >
         <InlineSelect
           value={task.priority}
           options={[
@@ -164,7 +185,11 @@ export function TaskRow({
       </td>
 
       {/* Status cell */}
-      <td className={`px-5 ${cellPy}`} onClick={(e) => e.stopPropagation()}>
+      <td
+        className={`px-5 ${cellPy}`}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+      >
         <InlineSelect
           value={task.status}
           options={[
@@ -180,7 +205,11 @@ export function TaskRow({
       </td>
 
       {/* Due Date cell */}
-      <td className={`px-5 ${cellPy}`} onClick={(e) => e.stopPropagation()}>
+      <td
+        className={`px-5 ${cellPy}`}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+      >
         <InlineDatePicker
           value={task.dueDate}
           onSave={(val) => onUpdate({ id: task.id, dueDate: val })}
@@ -188,7 +217,11 @@ export function TaskRow({
       </td>
 
       {/* Tags cell */}
-      <td className={`px-5 ${cellPy}`} onClick={(e) => e.stopPropagation()}>
+      <td
+        className={`px-5 ${cellPy}`}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+      >
         <InlineTagsEditor tags={task.tags} onSave={(tags) => onUpdate({ id: task.id, tags })} />
       </td>
     </tr>

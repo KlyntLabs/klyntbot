@@ -96,6 +96,7 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle">
         <button
+          type="button"
           onClick={onBack}
           className="flex items-center gap-1.5 text-[12px] font-light text-muted hover:text-primary transition-colors"
         >
@@ -104,6 +105,7 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
         </button>
         <span className="text-[13px] font-light text-primary">Klynt AI</span>
         <button
+          type="button"
           onClick={onExpand}
           className="flex items-center gap-1.5 text-[11px] font-light text-muted hover:text-primary transition-colors"
         >
@@ -138,12 +140,12 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
         {/* Streaming content */}
         {chat.segments.length > 0 && (
           <div className="max-w-full">
-            {chat.segments.map((seg, i) =>
+            {chat.segments.map((seg, idx) =>
               seg.type === "text" ? (
                 <div
-                  key={`text-${i}`}
+                  key={`text-${seg.content.slice(0, 32)}`}
                   className={
-                    chat.isStreaming && i === chat.segments.length - 1 ? "streaming-cursor" : ""
+                    chat.isStreaming && idx === chat.segments.length - 1 ? "streaming-cursor" : ""
                   }
                 >
                   <MarkdownContent content={seg.content} />
@@ -214,6 +216,7 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
             className="flex-1 bg-transparent text-primary text-[13px] placeholder:text-muted outline-none font-light resize-none max-h-[80px]"
           />
           <button
+            type="button"
             onClick={() => chat.send()}
             disabled={!chat.input.trim() || chat.isStreaming}
             className="text-brand hover:text-brand/80 disabled:text-muted transition-colors shrink-0"

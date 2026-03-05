@@ -55,6 +55,7 @@ function CompletedToolSegment({ segment, nested }: { segment: ToolSegment; neste
   return (
     <div className={nested ? "my-0.5" : "my-1.5"}>
       <button
+        type="button"
         onClick={() => canExpand && setExpanded(!expanded)}
         className={`flex items-center gap-1.5 text-[11px] font-light transition-colors ${color.text} ${canExpand ? "hover:opacity-80" : "cursor-default"}`}
       >
@@ -94,13 +95,14 @@ function CompletedToolSegment({ segment, nested }: { segment: ToolSegment; neste
 }
 
 /** A completed delegate segment with its nested sub-agent tools. */
-function DelegateGroup({ delegate, children }: { delegate: ToolSegment; children: ToolSegment[] }) {
+function DelegateGroup({ delegate, subTools }: { delegate: ToolSegment; subTools: ToolSegment[] }) {
   const [expanded, setExpanded] = useState(false);
   const color = toolColor("delegate");
 
   return (
     <div className="my-1.5">
       <button
+        type="button"
         onClick={() => setExpanded(!expanded)}
         className={`flex items-center gap-1.5 text-[11px] font-light transition-colors ${color.text} hover:opacity-80`}
       >
@@ -115,16 +117,20 @@ function DelegateGroup({ delegate, children }: { delegate: ToolSegment; children
         )}
         <span>delegate</span>
         <span className="text-dim">{formatDuration(delegate.durationMs)}</span>
-        {children.length > 0 && (
+        {subTools.length > 0 && (
           <span className="text-dim">
-            ({children.length} tool{children.length !== 1 ? "s" : ""})
+            ({subTools.length} tool{subTools.length !== 1 ? "s" : ""})
           </span>
         )}
       </button>
       {expanded && (
         <div className="ml-5 border-l border-border/40 pl-2">
-          {children.map((child, j) => (
-            <CompletedToolSegment key={`sub-${j}-${child.name}`} segment={child} nested />
+          {subTools.map((child) => (
+            <CompletedToolSegment
+              key={`sub-${child.name}-${child.durationMs}`}
+              segment={child}
+              nested
+            />
           ))}
         </div>
       )}
@@ -247,7 +253,7 @@ export function SegmentedMessage({
             <DelegateGroup
               key={`delegate-${item.index}`}
               delegate={item.delegate}
-              children={item.children}
+              subTools={item.children}
             />
           );
         }
@@ -270,8 +276,12 @@ export function SegmentedMessage({
           <ActiveToolIndicator name="delegate" />
           {(trailingSubTools.length > 0 || subAgentActiveTools.length > 0) && (
             <div className="ml-5 border-l border-border/40 pl-2">
-              {trailingSubTools.map((seg, i) => (
-                <CompletedToolSegment key={`sub-done-${i}-${seg.name}`} segment={seg} nested />
+              {trailingSubTools.map((seg) => (
+                <CompletedToolSegment
+                  key={`sub-done-${seg.name}-${seg.durationMs}`}
+                  segment={seg}
+                  nested
+                />
               ))}
               {subAgentActiveTools.map((name) => (
                 <ActiveToolIndicator key={name} name={name} nested />

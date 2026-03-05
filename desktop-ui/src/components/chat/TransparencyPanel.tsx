@@ -16,6 +16,7 @@ function CollapsibleBox({ title, icon: Icon, children, defaultOpen = true }: Col
   return (
     <div className="rounded-lg border border-border overflow-hidden">
       <button
+        type="button"
         onClick={() => setOpen(!open)}
         className="w-full flex items-center gap-2 px-3 py-2 bg-surface-raised hover:bg-surface-highest transition-colors"
       >
@@ -70,10 +71,10 @@ function AgentSkillsPopup({ skills }: { skills: { name: string; trigger: string 
   return (
     <div className="absolute left-full top-0 ml-1 z-50 w-48 glass-panel rounded-lg p-2 space-y-0.5 text-[10px] font-light shadow-lg">
       <div className="text-dim text-[9px] font-medium uppercase tracking-wider mb-1">Skills</div>
-      {skills.map((skill, i) => {
+      {skills.map((skill) => {
         const isActive = skill.trigger === "always" || skill.trigger === "activated";
         return (
-          <div key={`sp-${i}`} className="flex items-center gap-1.5">
+          <div key={`sp-${skill.name}`} className="flex items-center gap-1.5">
             <Package
               className={`w-2.5 h-2.5 shrink-0 ${isActive ? "text-brand" : "text-muted"}`}
               strokeWidth={1.5}
@@ -117,8 +118,8 @@ function AgentWithSkills({
   const detail = delegation?.durationMs != null ? formatDuration(delegation.durationMs) : undefined;
 
   return (
-    <div
-      className="relative"
+    <fieldset
+      className="relative border-none p-0 m-0"
       onMouseEnter={() => hasSkills && setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
@@ -135,8 +136,8 @@ function AgentWithSkills({
         </span>
         {detail && <span className="ml-auto text-dim">{detail}</span>}
       </div>
-      {hovered && hasSkills && <AgentSkillsPopup skills={skills!} />}
-    </div>
+      {hovered && hasSkills && skills && <AgentSkillsPopup skills={skills} />}
+    </fieldset>
   );
 }
 
@@ -174,22 +175,25 @@ export function TransparencyPanel({ transparency }: TransparencyPanelProps) {
   const hasLearning = learning && learning.length > 0;
   const hasTools = tools && tools.length > 0;
 
-  if (!hasMemory && !hasExecution && !hasTools) return null;
-
   // Group tools by agent when delegations exist
   const toolsByAgent = useMemo(
     () =>
-      hasDelegations && hasTools
-        ? groupBy(tools!, (t) => t.agent ?? agentSelected?.name ?? "unknown")
+      hasDelegations && hasTools && tools
+        ? groupBy(tools, (t) => t.agent ?? agentSelected?.name ?? "unknown")
         : null,
     [hasDelegations, hasTools, tools, agentSelected?.name],
   );
 
   // Group skills by agent for hover popups
   const skillsByAgent = useMemo(
-    () => (hasSkills ? groupBy(skills!, (s) => s.agent ?? agentSelected?.name ?? "unknown") : {}),
+    () =>
+      hasSkills && skills
+        ? groupBy(skills, (s) => s.agent ?? agentSelected?.name ?? "unknown")
+        : {},
     [hasSkills, skills, agentSelected?.name],
   );
+
+  if (!hasMemory && !hasExecution && !hasTools) return null;
 
   return (
     <div className="w-64 border-l border-border bg-background overflow-y-auto p-3 space-y-2 shrink-0">
@@ -208,9 +212,9 @@ export function TransparencyPanel({ transparency }: TransparencyPanelProps) {
                 isMain
               />
               {hasDelegations &&
-                delegations?.map((d, i) => (
+                delegations?.map((d) => (
                   <AgentWithSkills
-                    key={`del-${i}`}
+                    key={`del-${d.toAgent}`}
                     name={d.toAgent}
                     skills={skillsByAgent[d.toAgent]}
                     delegation={d}
@@ -230,12 +234,17 @@ export function TransparencyPanel({ transparency }: TransparencyPanelProps) {
             ? Object.entries(toolsByAgent).map(([agent, agentTools]) => (
                 <div key={`tg-${agent}`}>
                   <AgentGroupLabel name={agent} />
-                  {agentTools.map((tool, i) => (
-                    <ToolRow key={`tool-${agent}-${i}`} tool={tool} />
+                  {agentTools.map((tool) => (
+                    <ToolRow key={`tool-${agent}-${tool.name}-${tool.action ?? ""}`} tool={tool} />
                   ))}
                 </div>
               ))
-            : tools?.map((tool, i) => <ToolRow key={`tool-${i}`} tool={tool} />)}
+            : tools?.map((tool) => (
+                <ToolRow
+                  key={`tool-${tool.name}-${tool.action ?? ""}-${tool.durationMs}`}
+                  tool={tool}
+                />
+              ))}
           {toolTokensTotal && toolTokensTotal > 0 && (
             <div className="pt-1 mt-1 border-t border-border flex justify-between text-dim">
               <span>Total I/O (est.)</span>
@@ -248,9 +257,9 @@ export function TransparencyPanel({ transparency }: TransparencyPanelProps) {
       {/* Memory */}
       {hasMemory && (
         <CollapsibleBox title="Memory" icon={Brain}>
-          {memoryAccesses?.map((ma, i) => (
+          {memoryAccesses?.map((ma) => (
             <Row
-              key={`mem-${i}`}
+              key={`mem-${ma.action}-${ma.query ?? ""}`}
               icon={FileText}
               label={ma.query ?? ma.action}
               detail={ma.resultsCount > 0 ? `${ma.resultsCount} hits` : undefined}
@@ -283,8 +292,13 @@ export function TransparencyPanel({ transparency }: TransparencyPanelProps) {
       {hasExecution && (
         <CollapsibleBox title="Learning" icon={Database} defaultOpen={hasLearning}>
           {hasLearning ? (
-            learning?.map((le, i) => (
-              <Row key={`le-${i}`} icon={Database} label={le.eventType} detail={le.detail} />
+            learning?.map((le) => (
+              <Row
+                key={`le-${le.eventType}-${le.detail ?? ""}`}
+                icon={Database}
+                label={le.eventType}
+                detail={le.detail}
+              />
             ))
           ) : (
             <span className="text-dim">none</span>

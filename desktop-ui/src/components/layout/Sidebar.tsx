@@ -44,6 +44,7 @@ export function Sidebar({ active, onNavigate }: SidebarProps) {
       {/* Logo */}
       <div className="h-14 flex items-center px-2">
         <button
+          type="button"
           onClick={() => navigate("/")}
           className="w-9 h-9 rounded-lg bg-white flex items-center justify-center p-0.5 hover:opacity-80 transition-opacity"
         >
@@ -57,6 +58,7 @@ export function Sidebar({ active, onNavigate }: SidebarProps) {
         const isActive = active === item.key;
         return (
           <button
+            type="button"
             key={item.key}
             onClick={() => handleClick(item)}
             className={`w-9 h-9 rounded-md flex items-center justify-center transition-colors ${
@@ -78,6 +80,7 @@ export function Sidebar({ active, onNavigate }: SidebarProps) {
         const isActive = active === item.key;
         return (
           <button
+            type="button"
             key={item.key}
             onClick={() => handleClick(item)}
             className={`w-9 h-9 rounded-md flex items-center justify-center transition-colors ${

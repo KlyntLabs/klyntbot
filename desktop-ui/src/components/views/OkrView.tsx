@@ -90,6 +90,7 @@ export function OkrView() {
           <div key={projectId} className="bg-surface-low rounded-xl overflow-hidden">
             {/* Project Header */}
             <button
+              type="button"
               onClick={() => toggleProject(projectId)}
               className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-base transition-colors text-left"
             >
@@ -114,6 +115,7 @@ export function OkrView() {
               <div className="px-4 pb-3 space-y-2">
                 {projectObjectives.map((obj) => (
                   <button
+                    type="button"
                     key={obj.id}
                     onClick={() => navigate(`/objective/${obj.id}`)}
                     className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-surface-base transition-colors text-left"
@@ -157,6 +159,7 @@ export function OkrView() {
                   </div>
                 ) : (
                   <button
+                    type="button"
                     onClick={() => setAddingTo(projectId)}
                     className="flex items-center gap-2 px-3 py-2 text-[12px] text-muted hover:text-brand transition-colors font-light"
                   >

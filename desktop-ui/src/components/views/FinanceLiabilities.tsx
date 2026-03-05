@@ -217,7 +217,7 @@ export function FinanceLiabilities() {
                   <div key={l.id} className="flex justify-between items-center">
                     <span className="text-[10px] text-muted font-light truncate">{l.name}</span>
                     <span className="text-[10px] text-secondary font-light">
-                      {fmtMoney(l.monthlyPayment!, l.currency)}/mo
+                      {fmtMoney(l.monthlyPayment ?? 0, l.currency)}/mo
                     </span>
                   </div>
                 ))}

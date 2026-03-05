@@ -1,7 +1,7 @@
-import { useState } from 'react';
-import * as tauriWindow from '@tauri-apps/api/window';
-import { useEvent } from '../../hooks/useEvent';
-import { ipc } from '../../hooks/useIpc';
+import * as tauriWindow from "@tauri-apps/api/window";
+import { useState } from "react";
+import { useEvent } from "../../hooks/useEvent";
+import { ipc } from "../../hooks/useIpc";
 
 interface InterventionPayload {
   appName: string;
@@ -21,7 +21,7 @@ export function DistractionOverlay() {
   const [verdict, setVerdict] = useState<VerdictPayload | null>(null);
   const [loading, setLoading] = useState(false);
 
-  useEvent<InterventionPayload>('distraction:intervention', (payload) => {
+  useEvent<InterventionPayload>("distraction:intervention", (payload) => {
     setIntervention(payload);
     setVerdict(null);
     if (payload.needsLlm) {
@@ -29,7 +29,7 @@ export function DistractionOverlay() {
     }
   });
 
-  useEvent<VerdictPayload>('distraction:verdict', (payload) => {
+  useEvent<VerdictPayload>("distraction:verdict", (payload) => {
     setVerdict(payload);
     setLoading(false);
   });
@@ -44,7 +44,7 @@ export function DistractionOverlay() {
 
   const titleExcerpt = intervention.windowTitle
     ? intervention.windowTitle.length > 60
-      ? intervention.windowTitle.slice(0, 60) + '...'
+      ? `${intervention.windowTitle.slice(0, 60)}...`
       : intervention.windowTitle
     : null;
 
@@ -62,22 +62,22 @@ export function DistractionOverlay() {
   const pattern = intervention.windowTitle?.toLowerCase() ?? intervention.appName.toLowerCase();
 
   const handleDismiss = async () => {
-    await ipc('distraction_dismiss', {
+    await ipc("distraction_dismiss", {
       appName: intervention.appName,
     }).catch(() => {});
     await hideWindow();
   };
 
   const handleAllowTemp = async () => {
-    await ipc('distraction_allow_temp', { pattern }).catch(() => {});
+    await ipc("distraction_allow_temp", { pattern }).catch(() => {});
     await hideWindow();
   };
 
   const handleAllowSession = async () => {
-    await ipc('distraction_allow_session', {
+    await ipc("distraction_allow_session", {
       appName: intervention.appName,
       windowTitle: intervention.windowTitle,
-      classification: verdict?.classification ?? 'work_research',
+      classification: verdict?.classification ?? "work_research",
     }).catch(() => {});
     await hideWindow();
   };
@@ -86,16 +86,16 @@ export function DistractionOverlay() {
     <div className="w-screen h-screen flex items-center justify-center p-4">
       <div className="glass-panel w-full max-w-[400px] rounded-2xl overflow-hidden">
         {/* Red accent top bar */}
-        <div className="h-[3px]" style={{ background: 'var(--destructive)' }} />
+        <div className="h-[3px]" style={{ background: "var(--destructive)" }} />
 
         <div className="p-5 flex flex-col gap-4">
           {/* Header */}
           <div className="flex items-center gap-2">
             <span
               className="w-2 h-2 rounded-full animate-pulse"
-              style={{ background: 'var(--destructive)' }}
+              style={{ background: "var(--destructive)" }}
             />
-            <span className="text-[13px] font-semibold" style={{ color: 'var(--destructive)' }}>
+            <span className="text-[13px] font-semibold" style={{ color: "var(--destructive)" }}>
               Focus Session Active
             </span>
           </div>
@@ -122,11 +122,14 @@ export function DistractionOverlay() {
                 </>
               )}
               {verdict && !loading && (
-                <span className={
-                  verdict.classification === 'educational' || verdict.classification === 'work_research'
-                    ? 'text-success'
-                    : 'text-destructive'
-                }>
+                <span
+                  className={
+                    verdict.classification === "educational" ||
+                    verdict.classification === "work_research"
+                      ? "text-success"
+                      : "text-destructive"
+                  }
+                >
                   {verdict.displayText}
                 </span>
               )}
@@ -136,22 +139,25 @@ export function DistractionOverlay() {
           {/* Action buttons */}
           <div className="flex gap-2 mt-1">
             <button
+              type="button"
               onClick={handleDismiss}
               className="flex-1 px-3 py-2 rounded-lg text-[12px] font-medium transition-colors"
               style={{
-                background: 'color-mix(in srgb, var(--destructive) 10%, transparent)',
-                color: 'var(--destructive)',
+                background: "color-mix(in srgb, var(--destructive) 10%, transparent)",
+                color: "var(--destructive)",
               }}
             >
               Back to work
             </button>
             <button
+              type="button"
               onClick={handleAllowTemp}
               className="flex-1 px-3 py-2 rounded-lg text-[12px] font-medium bg-surface-raised text-muted hover:text-primary hover:bg-surface-highest transition-colors"
             >
               Allow briefly
             </button>
             <button
+              type="button"
               onClick={handleAllowSession}
               className="flex-1 px-3 py-2 rounded-lg text-[12px] font-medium bg-surface-raised text-muted hover:text-primary hover:bg-surface-highest transition-colors"
             >

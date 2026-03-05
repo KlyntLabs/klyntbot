@@ -9,7 +9,10 @@ interface ToolbarProps {
 
 function FilterButton({ label }: { label: string }) {
   return (
-    <button className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-surface-low hover:bg-surface-base text-muted hover:text-secondary transition-colors">
+    <button
+      type="button"
+      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-surface-low hover:bg-surface-base text-muted hover:text-secondary transition-colors"
+    >
       <span className="text-[11px] font-light">{label}</span>
       <ChevronDown className="w-[12px] h-[12px]" strokeWidth={1.5} />
     </button>
@@ -21,7 +24,10 @@ export function Toolbar({ viewMode, onViewModeChange, onAddTask }: ToolbarProps)
     <div className="flex items-center justify-between mb-3.5">
       {/* Left: Filters */}
       <div className="flex items-center gap-2">
-        <button className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-surface-low hover:bg-surface-base text-muted hover:text-secondary transition-colors">
+        <button
+          type="button"
+          className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-surface-low hover:bg-surface-base text-muted hover:text-secondary transition-colors"
+        >
           <Filter className="w-[14px] h-[14px]" strokeWidth={1.5} />
           <span className="text-[12px] font-light">Filter</span>
         </button>
@@ -41,6 +47,7 @@ export function Toolbar({ viewMode, onViewModeChange, onAddTask }: ToolbarProps)
             { mode: "tree" as const, icon: GitBranch },
           ].map(({ mode, icon: Icon }) => (
             <button
+              type="button"
               key={mode}
               onClick={() => onViewModeChange(mode)}
               className={`p-1.5 rounded transition-colors ${
@@ -55,6 +62,7 @@ export function Toolbar({ viewMode, onViewModeChange, onAddTask }: ToolbarProps)
         </div>
 
         <button
+          type="button"
           onClick={onAddTask}
           className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-brand hover:bg-brand-hover text-white transition-colors"
         >

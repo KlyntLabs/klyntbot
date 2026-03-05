@@ -107,6 +107,7 @@ export function ObjectiveDetail() {
       {/* Header */}
       <div className="h-14 flex items-center px-6 gap-3 border-b border-border flex-shrink-0">
         <button
+          type="button"
           onClick={() => navigate(-1)}
           className="text-muted hover:text-secondary transition-colors"
         >
@@ -114,6 +115,7 @@ export function ObjectiveDetail() {
         </button>
         {project && (
           <button
+            type="button"
             onClick={() => navigate(`/project/${project.id}`)}
             className="flex items-center gap-2 text-muted hover:text-secondary transition-colors"
           >
@@ -146,15 +148,16 @@ export function ObjectiveDetail() {
             className="text-[22px] font-light text-primary bg-transparent border-b border-brand outline-none w-full mb-4"
           />
         ) : (
-          <h1
+          <button
+            type="button"
             onClick={() => {
               setTitleDraft(objective.title);
               setEditingTitle(true);
             }}
-            className="text-[22px] font-light text-primary cursor-text mb-4 hover:text-secondary transition-colors"
+            className="text-[22px] font-light text-primary cursor-text mb-4 hover:text-secondary transition-colors text-left"
           >
             {objective.title}
-          </h1>
+          </button>
         )}
 
         {/* Overall Progress */}
@@ -172,6 +175,7 @@ export function ObjectiveDetail() {
           <div className="flex gap-2">
             {STATUSES.map((s) => (
               <button
+                type="button"
                 key={s}
                 onClick={() => handleUpdate({ status: s })}
                 className={`px-3 py-1 rounded-md text-[12px] font-light transition-colors ${
@@ -193,6 +197,7 @@ export function ObjectiveDetail() {
               Key Results
             </span>
             <button
+              type="button"
               onClick={() => setAddingKr(true)}
               className="flex items-center gap-1 text-[12px] text-brand hover:text-brand-hover transition-colors font-light"
             >
@@ -207,6 +212,7 @@ export function ObjectiveDetail() {
                 <div className="flex items-center gap-3 mb-2">
                   <span className="text-[13px] font-light text-secondary flex-1">{kr.title}</span>
                   <button
+                    type="button"
                     onClick={() => handleDeleteKr(kr.id)}
                     className="text-muted hover:text-destructive transition-colors"
                   >
@@ -278,6 +284,7 @@ export function ObjectiveDetail() {
         {/* Delete */}
         <div className="pt-4 border-t border-border">
           <button
+            type="button"
             onClick={handleDelete}
             onBlur={() => setConfirmDelete(false)}
             className={`flex items-center gap-2 px-3 py-2 rounded-md text-[12px] font-light transition-colors ${

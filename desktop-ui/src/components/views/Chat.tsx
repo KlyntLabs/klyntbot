@@ -281,10 +281,18 @@ export function Chat() {
             }}
             className="flex-1 min-w-0 bg-surface-highest text-primary text-[12px] font-light px-2 py-1 rounded border border-border focus:outline-none focus:border-brand"
           />
-          <button onClick={confirmRename} className="text-success hover:text-success/80 shrink-0">
+          <button
+            type="button"
+            onClick={confirmRename}
+            className="text-success hover:text-success/80 shrink-0"
+          >
             <Check className="w-3.5 h-3.5" strokeWidth={2} />
           </button>
-          <button onClick={cancelRename} className="text-muted hover:text-secondary shrink-0">
+          <button
+            type="button"
+            onClick={cancelRename}
+            className="text-muted hover:text-secondary shrink-0"
+          >
             <X className="w-3.5 h-3.5" strokeWidth={2} />
           </button>
         </div>
@@ -293,6 +301,7 @@ export function Chat() {
 
     return (
       <button
+        type="button"
         key={thread.sessionKey}
         onClick={() => selectThread(thread.sessionKey)}
         onContextMenu={(e) => openContextMenu(e, thread)}
@@ -312,6 +321,7 @@ export function Chat() {
   // Collapsible group header
   const renderGroupHeader = (key: string, label: string, Icon: typeof FolderOpen) => (
     <button
+      type="button"
       onClick={() => toggleGroup(key)}
       className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-surface-base transition-colors text-[12px] font-light text-muted hover:text-secondary"
     >
@@ -341,17 +351,24 @@ export function Chat() {
         {/* Quick Links */}
         <div className="px-4 py-3 space-y-1">
           <button
+            type="button"
             onClick={handleNewThread}
             className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-surface-base transition-colors text-[12px] font-light text-muted hover:text-secondary"
           >
             <Plus className="w-[13px] h-[13px]" strokeWidth={1.5} />
             New thread
           </button>
-          <button className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-surface-base transition-colors text-[12px] font-light text-muted hover:text-secondary">
+          <button
+            type="button"
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-surface-base transition-colors text-[12px] font-light text-muted hover:text-secondary"
+          >
             <RotateCcw className="w-[13px] h-[13px]" strokeWidth={1.5} />
             Automations
           </button>
-          <button className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-surface-base transition-colors text-[12px] font-light text-muted hover:text-secondary">
+          <button
+            type="button"
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-surface-base transition-colors text-[12px] font-light text-muted hover:text-secondary"
+          >
             <Settings className="w-[13px] h-[13px]" strokeWidth={1.5} />
             Skills and Apps
           </button>
@@ -419,11 +436,13 @@ export function Chat() {
       {/* Right-click context menu (positioned at cursor) */}
       {contextMenu && (
         <div
+          role="menu"
           onMouseDown={(e) => e.stopPropagation()}
           className="fixed z-50 bg-surface-raised border border-border rounded-lg shadow-lg py-1 min-w-[140px]"
           style={{ left: contextMenu.x, top: contextMenu.y }}
         >
           <button
+            type="button"
             onClick={() => startRename(contextMenu.thread)}
             className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] font-light text-secondary hover:bg-surface-base transition-colors"
           >
@@ -431,6 +450,7 @@ export function Chat() {
             Rename
           </button>
           <button
+            type="button"
             onClick={() => deleteThread(contextMenu.thread.sessionKey)}
             className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] font-light text-destructive hover:bg-surface-base transition-colors"
           >
@@ -483,7 +503,10 @@ export function Chat() {
           <div className="p-6">
             <div className="max-w-3xl mx-auto">
               <div className="bg-surface-base rounded-2xl flex items-center px-2 gap-2">
-                <button className="w-8 h-8 flex items-center justify-center text-muted hover:text-secondary transition-colors shrink-0">
+                <button
+                  type="button"
+                  className="w-8 h-8 flex items-center justify-center text-muted hover:text-secondary transition-colors shrink-0"
+                >
                   <Plus className="w-4 h-4" strokeWidth={1.5} />
                 </button>
                 <textarea
@@ -500,10 +523,14 @@ export function Chat() {
                   className="flex-1 bg-transparent py-3.5 text-[13px] text-primary placeholder:text-muted focus:outline-none font-light resize-none"
                   style={{ maxHeight: "200px" }}
                 />
-                <button className="w-8 h-8 flex items-center justify-center text-muted hover:text-secondary transition-colors shrink-0">
+                <button
+                  type="button"
+                  className="w-8 h-8 flex items-center justify-center text-muted hover:text-secondary transition-colors shrink-0"
+                >
                   <Mic className="w-4 h-4" strokeWidth={1.5} />
                 </button>
                 <button
+                  type="button"
                   onClick={handleSend}
                   disabled={!chat.input.trim() || chat.isStreaming}
                   className="w-9 h-9 rounded-full bg-brand hover:bg-brand/90 disabled:bg-surface-base disabled:text-muted flex items-center justify-center transition-colors shrink-0"
@@ -513,18 +540,27 @@ export function Chat() {
               </div>
               <div className="flex items-center justify-between mt-2">
                 <div className="flex items-center gap-2">
-                  <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-base hover:bg-surface-raised transition-colors text-[11px] font-light text-muted">
+                  <button
+                    type="button"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-base hover:bg-surface-raised transition-colors text-[11px] font-light text-muted"
+                  >
                     <Server className="w-3.5 h-3.5" strokeWidth={1.5} />
                     <span>Local</span>
                     <ChevronDown className="w-3 h-3" strokeWidth={1.5} />
                   </button>
-                  <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-base hover:bg-surface-raised transition-colors text-[11px] font-light text-muted">
+                  <button
+                    type="button"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-base hover:bg-surface-raised transition-colors text-[11px] font-light text-muted"
+                  >
                     <Shield className="w-3.5 h-3.5" strokeWidth={1.5} />
                     <span>Default permissions</span>
                     <ChevronDown className="w-3 h-3" strokeWidth={1.5} />
                   </button>
                 </div>
-                <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-base hover:bg-surface-raised transition-colors text-[11px] font-light text-muted">
+                <button
+                  type="button"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-base hover:bg-surface-raised transition-colors text-[11px] font-light text-muted"
+                >
                   <FolderOpen className="w-3.5 h-3.5" strokeWidth={1.5} />
                   <span>KlyntBot</span>
                   <ChevronDown className="w-3 h-3" strokeWidth={1.5} />

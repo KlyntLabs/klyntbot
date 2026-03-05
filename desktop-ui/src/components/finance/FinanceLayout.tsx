@@ -44,6 +44,7 @@ export function FinanceLayout({ children }: FinanceLayoutProps) {
               const isActive = currentPath === item.path;
               return (
                 <button
+                  type="button"
                   key={item.path}
                   onClick={() => navigate(item.path)}
                   className={`flex-1 py-2 rounded-md text-[13px] font-light transition-colors ${

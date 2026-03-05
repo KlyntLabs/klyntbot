@@ -21,7 +21,7 @@ export function ProjectHeader({
 
   return (
     <div className="w-full flex items-center gap-3 px-6 py-3 bg-overlay hover:bg-overlay-heavy transition-colors text-left border-b border-border-subtle">
-      <button onClick={onToggle} className="flex items-center gap-3 flex-1 min-w-0">
+      <button type="button" onClick={onToggle} className="flex items-center gap-3 flex-1 min-w-0">
         {isCollapsed ? (
           <ChevronRight className="w-[14px] h-[14px] text-muted flex-shrink-0" strokeWidth={1.5} />
         ) : (
@@ -57,6 +57,7 @@ export function ProjectHeader({
 
       {/* Details Link */}
       <button
+        type="button"
         onClick={() => navigate(`/project/${project.id}`)}
         className="text-[11px] text-muted hover:text-brand font-light transition-colors flex-shrink-0 ml-auto"
       >

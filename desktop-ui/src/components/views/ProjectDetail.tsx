@@ -167,6 +167,7 @@ export function ProjectDetail() {
         {/* Breadcrumb Header */}
         <div className="h-14 flex items-center px-6 gap-3 border-b border-border">
           <button
+            type="button"
             onClick={() => navigate("/")}
             className="text-muted hover:text-secondary transition-colors"
           >
@@ -176,6 +177,7 @@ export function ProjectDetail() {
           {/* Color dot — clickable to open picker */}
           <div className="relative">
             <button
+              type="button"
               onClick={() => setShowColorPicker(!showColorPicker)}
               className="w-2.5 h-2.5 rounded-full cursor-pointer hover:ring-2 hover:ring-brand/30 transition-all"
               style={{ backgroundColor: project.color }}
@@ -184,6 +186,7 @@ export function ProjectDetail() {
               <div className="absolute top-6 left-0 z-50 glass-panel flex gap-1.5">
                 {PROJECT_COLORS.map((c) => (
                   <button
+                    type="button"
                     key={c}
                     onClick={() => {
                       handleUpdateProject({ color: c });
@@ -216,7 +219,8 @@ export function ProjectDetail() {
               className="text-[14px] font-light text-primary bg-transparent border-b border-brand outline-none"
             />
           ) : (
-            <span
+            <button
+              type="button"
               onClick={() => {
                 setNameDraft(project.name);
                 setEditingName(true);
@@ -224,7 +228,7 @@ export function ProjectDetail() {
               className="text-[14px] font-light text-primary cursor-text hover:text-secondary transition-colors"
             >
               {project.name}
-            </span>
+            </button>
           )}
 
           <span className="text-[12px] text-muted font-light">{tasks.length} tasks</span>
@@ -233,6 +237,7 @@ export function ProjectDetail() {
 
           {/* Archive button */}
           <button
+            type="button"
             onClick={handleArchive}
             onBlur={() => setConfirmArchive(false)}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-light transition-colors ${
@@ -266,6 +271,7 @@ export function ProjectDetail() {
                 Objectives & Key Results
               </h3>
               <button
+                type="button"
                 onClick={() => setAddingObjective(true)}
                 className="flex items-center gap-1 text-[12px] text-brand hover:text-brand-hover transition-colors font-light"
               >
@@ -281,6 +287,7 @@ export function ProjectDetail() {
                   <div key={objective.id} className="bg-surface-low rounded-xl overflow-hidden">
                     <div className="flex items-center">
                       <button
+                        type="button"
                         onClick={() => toggleOkr(objective.id)}
                         className="flex items-center gap-3 px-4 py-3.5 hover:bg-surface-lowest transition-colors text-left flex-1"
                       >
@@ -310,6 +317,7 @@ export function ProjectDetail() {
                         </div>
                       </button>
                       <button
+                        type="button"
                         onClick={() => navigate(`/objective/${objective.id}`)}
                         className="px-3 py-3.5 text-[11px] text-muted hover:text-brand transition-colors font-light"
                       >
@@ -380,6 +388,7 @@ export function ProjectDetail() {
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-[12px] font-light text-muted uppercase tracking-wider">Tasks</h3>
               <button
+                type="button"
                 onClick={() => setAddingTask(true)}
                 className="flex items-center gap-1 text-[12px] text-brand hover:text-brand-hover transition-colors font-light"
               >
@@ -434,17 +443,27 @@ export function ProjectDetail() {
               {tasks.map((task) => {
                 const isCompleted = completedTasks.has(task.id);
                 return (
+                  // biome-ignore lint/a11y/useSemanticElements: row contains interactive children (checkbox) preventing button usage
                   <div
                     key={task.id}
+                    role="button"
+                    tabIndex={0}
                     onClick={() => navigate(`/task/${task.id}`)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") navigate(`/task/${task.id}`);
+                    }}
                     className="grid grid-cols-[40px_1fr_80px_100px_120px_140px] gap-4 px-6 py-3 hover:bg-surface-base transition-colors border-b border-border-subtle last:border-b-0 cursor-pointer"
                   >
-                    <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
+                    <fieldset
+                      className="flex items-center border-none p-0 m-0"
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => e.stopPropagation()}
+                    >
                       <Checkbox
                         checked={isCompleted}
                         onCheckedChange={() => handleToggleTask(task.id)}
                       />
-                    </div>
+                    </fieldset>
                     <div className="flex items-center gap-1.5">
                       {task.objectiveId && (
                         <Target

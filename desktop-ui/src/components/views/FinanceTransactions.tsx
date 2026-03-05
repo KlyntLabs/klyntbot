@@ -126,6 +126,7 @@ export function FinanceTransactions() {
           <div className="flex items-center gap-0.5">
             {filters.map((f) => (
               <button
+                type="button"
                 key={f.key}
                 onClick={() => setFilter(f.key)}
                 className={cn(
@@ -167,7 +168,10 @@ export function FinanceTransactions() {
               className="bg-surface-low border border-border rounded-md pl-6 pr-2 py-1 text-[11px] font-light text-secondary placeholder:text-dim w-48"
             />
           </div>
-          <button className="flex items-center gap-1 text-[10px] text-brand font-light hover:text-brand-hover transition-colors">
+          <button
+            type="button"
+            className="flex items-center gap-1 text-[10px] text-brand font-light hover:text-brand-hover transition-colors"
+          >
             <Plus className="w-3 h-3" strokeWidth={1.5} /> Add
           </button>
         </div>
@@ -248,8 +252,8 @@ export function FinanceTransactions() {
                   size={140}
                 />
                 <div className="mt-3 pt-2.5 border-t border-border-subtle space-y-1.5">
-                  {catSegs.map((seg, i) => (
-                    <div key={i} className="flex justify-between items-center">
+                  {catSegs.map((seg) => (
+                    <div key={seg.name} className="flex justify-between items-center">
                       <div className="flex items-center gap-1.5">
                         <div
                           className="w-2 h-2 rounded-full"

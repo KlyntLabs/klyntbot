@@ -1,6 +1,6 @@
 export function KlyntLogo({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 595.28 595.28" className={className}>
+    <svg viewBox="0 0 595.28 595.28" className={className} aria-hidden="true">
       <polygon
         fill="#0B0C0E"
         points="181.18 308.96 181.18 414.26 234.36 361.08 181.71 308.43 181.18 308.96"

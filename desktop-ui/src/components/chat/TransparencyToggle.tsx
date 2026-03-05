@@ -10,6 +10,7 @@ export function TransparencyToggle({ enabled, onToggle }: TransparencyToggleProp
 
   return (
     <button
+      type="button"
       onClick={onToggle}
       className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${
         enabled

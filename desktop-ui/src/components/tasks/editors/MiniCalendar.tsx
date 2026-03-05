@@ -103,11 +103,16 @@ export function MiniCalendar({ value, onSelect, onClear }: MiniCalendarProps) {
   );
 
   return (
-    <div className="w-[232px]" onClick={(e) => e.stopPropagation()}>
+    <fieldset
+      className="w-[232px] border-none p-0 m-0"
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.stopPropagation()}
+    >
       {/* Quick-select shortcuts */}
       <div className="flex gap-1 mb-1.5 px-0.5">
         {shortcuts.map((s) => (
           <button
+            type="button"
             key={s.label}
             onClick={() => onSelect(s.iso)}
             className={`px-2 py-0.5 text-[11px] font-light rounded-md transition-colors ${
@@ -124,6 +129,7 @@ export function MiniCalendar({ value, onSelect, onClear }: MiniCalendarProps) {
       {/* Month navigation header */}
       <div className="flex items-center justify-between px-0.5 mb-1">
         <button
+          type="button"
           onClick={prevMonth}
           className="w-6 h-6 flex items-center justify-center rounded-md text-muted hover:text-secondary hover:bg-surface-raised transition-colors"
         >
@@ -133,6 +139,7 @@ export function MiniCalendar({ value, onSelect, onClear }: MiniCalendarProps) {
           {MONTH_NAMES[viewMonth]} {viewYear}
         </span>
         <button
+          type="button"
           onClick={nextMonth}
           className="w-6 h-6 flex items-center justify-center rounded-md text-muted hover:text-secondary hover:bg-surface-raised transition-colors"
         >
@@ -162,6 +169,7 @@ export function MiniCalendar({ value, onSelect, onClear }: MiniCalendarProps) {
 
           return (
             <button
+              type="button"
               key={iso}
               onClick={() => onSelect(iso)}
               className={`h-7 w-full flex items-center justify-center text-[11px] font-light rounded-md transition-colors ${
@@ -183,6 +191,7 @@ export function MiniCalendar({ value, onSelect, onClear }: MiniCalendarProps) {
       {/* Clear date */}
       {onClear && (
         <button
+          type="button"
           onClick={onClear}
           className="w-full text-left mt-1 px-2 py-1 text-[11px] font-light text-destructive hover:bg-surface-raised transition-colors"
           style={{ borderRadius: "var(--glass-radius-inner)" }}
@@ -190,6 +199,6 @@ export function MiniCalendar({ value, onSelect, onClear }: MiniCalendarProps) {
           Clear date
         </button>
       )}
-    </div>
+    </fieldset>
   );
 }

@@ -64,6 +64,7 @@ export function ProductivityLayout({ children, period, dateParam }: Productivity
           <div className="flex items-center gap-1">
             {periods.map((p) => (
               <button
+                type="button"
                 key={p.key}
                 onClick={() => handlePeriodChange(p.key)}
                 className={`px-3 py-1.5 rounded-md text-[13px] font-light transition-colors ${

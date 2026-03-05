@@ -127,18 +127,19 @@ export function TimelineBar({ date }: TimelineBarProps) {
 
       {/* Timeline bar */}
       <div className="relative h-9 rounded-lg bg-surface-raised overflow-hidden">
-        {blocks.map((b, i) => (
+        {blocks.map((b, idx) => (
           <div
-            key={i}
+            aria-hidden="true"
+            key={`${b.label}-${b.leftPct.toFixed(2)}`}
             className="absolute top-0 h-full transition-opacity duration-150"
             style={{
               left: `${b.leftPct}%`,
               width: `${b.widthPct}%`,
               backgroundColor: b.color,
-              opacity: hoveredIdx !== null && hoveredIdx !== i ? 0.3 : 1,
+              opacity: hoveredIdx !== null && hoveredIdx !== idx ? 0.3 : 1,
               borderRadius: b.widthPct > 1 ? "2px" : undefined,
             }}
-            onMouseEnter={() => setHoveredIdx(i)}
+            onMouseEnter={() => setHoveredIdx(idx)}
             onMouseLeave={() => setHoveredIdx(null)}
           />
         ))}

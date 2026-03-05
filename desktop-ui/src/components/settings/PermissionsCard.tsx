@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, ExternalLink, ShieldAlert, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ipc } from "../../hooks/useIpc";
 
 interface PermissionRow {
@@ -50,12 +50,9 @@ export function PermissionsCard() {
 
   return (
     <div className="bg-surface-low rounded-lg border border-border p-4">
-      <h3 className="text-[13px] font-medium text-secondary mb-1">
-        macOS Permissions
-      </h3>
+      <h3 className="text-[13px] font-medium text-secondary mb-1">macOS Permissions</h3>
       <p className="text-[11px] text-dim mb-4">
-        These permissions are required for productivity tracking and smart
-        distraction detection.
+        These permissions are required for productivity tracking and smart distraction detection.
       </p>
 
       <div className="space-y-3">
@@ -65,18 +62,14 @@ export function PermissionsCard() {
           const denied = status === false;
 
           return (
-            <div
-              key={p.label}
-              className="flex items-start gap-3 p-3 rounded-lg bg-surface-base"
-            >
+            <div key={p.label} className="flex items-start gap-3 p-3 rounded-lg bg-surface-base">
               {/* Status icon */}
               <div className="flex-shrink-0 mt-0.5">
                 {granted ? (
                   <div
                     className="w-5 h-5 rounded-full flex items-center justify-center"
                     style={{
-                      background:
-                        "color-mix(in srgb, var(--success) 15%, transparent)",
+                      background: "color-mix(in srgb, var(--success) 15%, transparent)",
                     }}
                   >
                     <Check
@@ -89,8 +82,7 @@ export function PermissionsCard() {
                   <div
                     className="w-5 h-5 rounded-full flex items-center justify-center"
                     style={{
-                      background:
-                        "color-mix(in srgb, var(--destructive) 15%, transparent)",
+                      background: "color-mix(in srgb, var(--destructive) 15%, transparent)",
                     }}
                   >
                     <X
@@ -107,26 +99,21 @@ export function PermissionsCard() {
               {/* Info */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="text-[13px] font-medium text-primary">
-                    {p.label}
-                  </span>
-                  {granted && (
-                    <span className="text-[10px] text-success">Granted</span>
-                  )}
+                  <span className="text-[13px] font-medium text-primary">{p.label}</span>
+                  {granted && <span className="text-[10px] text-success">Granted</span>}
                   {denied && (
                     <span className="text-[10px]" style={{ color: "var(--destructive)" }}>
                       Not granted
                     </span>
                   )}
                 </div>
-                <p className="text-[11px] text-dim mt-0.5 leading-relaxed">
-                  {p.description}
-                </p>
+                <p className="text-[11px] text-dim mt-0.5 leading-relaxed">{p.description}</p>
               </div>
 
               {/* Action */}
               {denied && (
                 <button
+                  type="button"
                   onClick={() => handleOpen(p)}
                   className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors bg-brand/10 text-brand hover:bg-brand/20"
                 >
@@ -136,6 +123,7 @@ export function PermissionsCard() {
               )}
               {granted && (
                 <button
+                  type="button"
                   onClick={() => handleOpen(p)}
                   className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] text-dim hover:text-muted transition-colors"
                 >
@@ -153,8 +141,7 @@ export function PermissionsCard() {
         <div
           className="mt-3 flex items-start gap-2 p-3 rounded-lg text-[12px]"
           style={{
-            background:
-              "color-mix(in srgb, var(--destructive) 5%, transparent)",
+            background: "color-mix(in srgb, var(--destructive) 5%, transparent)",
             border: "1px solid color-mix(in srgb, var(--destructive) 15%, transparent)",
           }}
         >
@@ -168,8 +155,8 @@ export function PermissionsCard() {
               Permissions needed.
             </span>{" "}
             <span className="text-muted">
-              After granting permissions in System Settings, you may need to
-              restart Klynt for changes to take effect.
+              After granting permissions in System Settings, you may need to restart Klynt for
+              changes to take effect.
             </span>
           </div>
         </div>

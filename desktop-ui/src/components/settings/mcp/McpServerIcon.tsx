@@ -10,7 +10,7 @@ export function McpServerIcon({ name, className = "w-5 h-5" }: McpServerIconProp
     return <span className="text-[11px] font-medium text-muted uppercase">{name.slice(0, 2)}</span>;
   }
   return (
-    <svg viewBox={icon.viewBox} className={className} fill="currentColor">
+    <svg viewBox={icon.viewBox} className={className} fill="currentColor" aria-hidden="true">
       {icon.path}
     </svg>
   );

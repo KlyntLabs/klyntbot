@@ -9,11 +9,18 @@ export function Card({
   className?: string;
   onClick?: () => void;
 }) {
-  return (
-    <div className={cn("bg-surface-low rounded-xl", className)} onClick={onClick}>
-      {children}
-    </div>
-  );
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        className={cn("bg-surface-low rounded-xl text-left w-full", className)}
+        onClick={onClick}
+      >
+        {children}
+      </button>
+    );
+  }
+  return <div className={cn("bg-surface-low rounded-xl", className)}>{children}</div>;
 }
 
 export function SectionLabel({ children }: { children: React.ReactNode }) {

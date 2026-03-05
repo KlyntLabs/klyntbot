@@ -208,6 +208,7 @@ export function Launcher() {
                   {/* AI Query Option */}
                   {query.trim() && (
                     <button
+                      type="button"
                       className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all ${
                         0 === selectedIndex ? "bg-surface-highest" : "hover:bg-surface-base"
                       }`}
@@ -237,6 +238,7 @@ export function Launcher() {
                     const isSelected = actualIndex === selectedIndex;
                     return (
                       <button
+                        type="button"
                         key={item.id}
                         className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-xl transition-all ${
                           isSelected ? "bg-surface-highest" : "hover:bg-surface-base"
