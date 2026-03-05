@@ -10,11 +10,13 @@ use bus::MessageBus;
 use channels::ChannelManager;
 use common::FormResponse;
 use desktop_shared::errors::ApiError;
+use desktop_shared::events;
 use feature_productivity::repos::ProductivityRepos;
 use feature_productivity::tracker::ActivityTracker;
-use feature_productivity::FocusManager;
+use feature_productivity::{DailyAggregator, FocusManager, NudgeService};
 use scheduling::CronService;
 use storage::{Repos, StoragePool, VectorStore};
+use tauri::Emitter;
 use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn};
@@ -44,6 +46,10 @@ pub struct AppCore {
     focus_manager: Option<Arc<FocusManager>>,
     /// Activity tracker background task (macOS only, None if disabled).
     activity_tracker: Option<Arc<Mutex<ActivityTracker>>>,
+    /// Daily aggregator for live productivity summaries.
+    aggregator: Option<Arc<DailyAggregator>>,
+    /// Nudge service for break reminders and burnout alerts.
+    nudge_service: Option<Arc<Mutex<NudgeService>>>,
 }
 
 impl AppCore {
@@ -51,7 +57,7 @@ impl AppCore {
     ///
     /// Mirrors the initialization order from `serve.rs`:
     /// config → storage → bus → provider → cron → persona → agent → channels
-    pub async fn init() -> Result<Self, String> {
+    pub async fn init(app_handle: tauri::AppHandle) -> Result<Self, String> {
         // 1. Load config
         let mut config = config::load_with_env_overrides()
             .await
@@ -141,33 +147,71 @@ impl AppCore {
         let shutdown_token = CancellationToken::new();
 
         // Initialize productivity feature (optional — requires enabled config).
-        let (productivity_repos, focus_manager, activity_tracker) = if config.productivity.enabled {
-            let pool = storage_pool.inner().clone();
-            // Run feature migrations before creating repos.
-            if let Err(e) = StoragePool::run_feature_migrations(
-                &pool,
-                &feature_productivity::ProductivityFeature::migrations_static(),
-            )
-            .await
-            {
-                warn!("productivity migration failed: {e}");
-            }
-            let prod_repos = ProductivityRepos::new(pool);
-            let prod_config = bridge_productivity_config(&config.productivity);
-            let mgr = Arc::new(FocusManager::new(prod_repos.clone(), prod_config.focus.clone()));
+        let (productivity_repos, focus_manager, activity_tracker, aggregator, nudge_service) =
+            if config.productivity.enabled {
+                let pool = storage_pool.inner().clone();
+                // Run feature migrations before creating repos.
+                if let Err(e) = StoragePool::run_feature_migrations(
+                    &pool,
+                    &feature_productivity::ProductivityFeature::migrations_static(),
+                )
+                .await
+                {
+                    warn!("productivity migration failed: {e}");
+                }
+                let prod_repos = ProductivityRepos::new(pool);
+                let prod_config = bridge_productivity_config(&config.productivity);
+                let mgr =
+                    Arc::new(FocusManager::new(prod_repos.clone(), prod_config.focus.clone()));
 
-            // Start activity tracker (macOS only).
-            let categories = prod_repos.categories.list_all().await.unwrap_or_default();
-            let categorizer =
-                feature_productivity::tracker::categorizer::Categorizer::new(categories);
-            let mut tracker = ActivityTracker::new(prod_config, prod_repos.clone(), categorizer);
-            tracker.start();
-            let tracker = Arc::new(Mutex::new(tracker));
+                // Daily aggregator for live summaries.
+                let agg = Arc::new(DailyAggregator::new(prod_repos.clone()));
 
-            (Some(prod_repos), Some(mgr), Some(tracker))
-        } else {
-            (None, None, None)
-        };
+                // Distraction alert channel (tracker → Tauri events).
+                let (distraction_tx, distraction_rx) =
+                    mpsc::channel::<feature_productivity::tracker::DistractionAlert>(32);
+
+                // Start activity tracker (macOS only) with distraction detection.
+                let categories = prod_repos.categories.list_all().await.unwrap_or_default();
+                let categorizer =
+                    feature_productivity::tracker::categorizer::Categorizer::new(categories);
+                let mut tracker =
+                    ActivityTracker::new(prod_config.clone(), prod_repos.clone(), categorizer);
+                tracker.set_focus_manager(Arc::clone(&mgr));
+                tracker.set_distraction_sender(distraction_tx);
+                tracker.start();
+                let tracker = Arc::new(Mutex::new(tracker));
+
+                // Nudge service — break reminders + burnout alerts.
+                let (nudge_tx, nudge_rx) =
+                    mpsc::channel::<feature_productivity::types::NudgeRecord>(32);
+                let mut nudge_svc = NudgeService::new(
+                    prod_repos.clone(),
+                    prod_config.nudges.clone(),
+                    prod_config.focus.clone(),
+                    nudge_tx,
+                );
+                nudge_svc.start();
+                let nudge_svc = Arc::new(Mutex::new(nudge_svc));
+
+                // Spawn background tasks to forward alerts/nudges as Tauri events.
+                Self::spawn_productivity_events(
+                    distraction_rx,
+                    nudge_rx,
+                    &app_handle,
+                    &shutdown_token,
+                );
+
+                (
+                    Some(prod_repos),
+                    Some(mgr),
+                    Some(tracker),
+                    Some(agg),
+                    Some(nudge_svc),
+                )
+            } else {
+                (None, None, None, None, None)
+            };
 
         let core = Self {
             repos,
@@ -183,6 +227,8 @@ impl AppCore {
             productivity_repos,
             focus_manager,
             activity_tracker,
+            aggregator,
+            nudge_service,
         };
 
         // Spawn background services immediately
@@ -224,6 +270,63 @@ impl AppCore {
         info!("background services spawned");
     }
 
+    /// Spawn a background task that receives from a channel and emits Tauri events.
+    fn spawn_channel_forwarder<T: Send + 'static>(
+        mut rx: mpsc::Receiver<T>,
+        app_handle: &tauri::AppHandle,
+        shutdown_token: &CancellationToken,
+        emit_fn: impl Fn(&tauri::AppHandle, T) + Send + 'static,
+    ) {
+        let handle = app_handle.clone();
+        let token = shutdown_token.clone();
+        tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    _ = token.cancelled() => break,
+                    msg = rx.recv() => {
+                        let Some(msg) = msg else { break };
+                        emit_fn(&handle, msg);
+                    }
+                }
+            }
+        });
+    }
+
+    /// Spawn background tasks that forward productivity alerts as Tauri events.
+    fn spawn_productivity_events(
+        distraction_rx: mpsc::Receiver<feature_productivity::tracker::DistractionAlert>,
+        nudge_rx: mpsc::Receiver<feature_productivity::types::NudgeRecord>,
+        app_handle: &tauri::AppHandle,
+        shutdown_token: &CancellationToken,
+    ) {
+        Self::spawn_channel_forwarder(distraction_rx, app_handle, shutdown_token, |handle, alert| {
+            let _ = handle.emit(
+                events::PRODUCTIVITY_DISTRACTION,
+                events::DistractionPayload {
+                    app_name: alert.app_name,
+                    session_id: alert.session_id.clone(),
+                },
+            );
+            let _ = handle.emit(
+                events::ENTITY_UPDATED,
+                events::EntityUpdatedPayload {
+                    entity_kind: desktop_shared::types::EntityKind::FocusSession,
+                    id: alert.session_id,
+                },
+            );
+        });
+
+        Self::spawn_channel_forwarder(nudge_rx, app_handle, shutdown_token, |handle, nudge| {
+            let _ = handle.emit(
+                events::PRODUCTIVITY_NUDGE,
+                events::NudgePayload {
+                    nudge_type: nudge.nudge_type.to_string(),
+                    message: nudge.message,
+                },
+            );
+        });
+    }
+
     /// Return productivity repos or a "feature disabled" error.
     pub fn productivity_repos(&self) -> Result<&ProductivityRepos, ApiError> {
         self.productivity_repos
@@ -238,12 +341,23 @@ impl AppCore {
             .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "productivity feature is not enabled"))
     }
 
+    /// Return daily aggregator or a "feature disabled" error.
+    pub fn aggregator(&self) -> Result<&Arc<DailyAggregator>, ApiError> {
+        self.aggregator
+            .as_ref()
+            .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "productivity feature is not enabled"))
+    }
+
     /// Graceful shutdown.
     pub async fn shutdown(&self) {
         info!("shutting down app core");
         // Stop activity tracker first to flush pending events.
         if let Some(ref tracker) = self.activity_tracker {
             tracker.lock().await.stop().await;
+        }
+        // Stop nudge service.
+        if let Some(ref nudge) = self.nudge_service {
+            nudge.lock().await.stop().await;
         }
         if let Err(e) = self.agent.shutdown().await {
             error!("agent shutdown error: {}", e);

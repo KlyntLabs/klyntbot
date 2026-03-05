@@ -45,10 +45,10 @@ fn main() {
                 .build(),
         )
         .setup(|app| {
-            let core = tauri::async_runtime::block_on(AppCore::init())
+            let handle = app.handle().clone();
+            let core = tauri::async_runtime::block_on(AppCore::init(handle))
                 .expect("failed to initialize app core");
 
-            // Store AppHandle in core for event emission (chat commands use it)
             app.manage(core);
 
             // Build system tray icon — click toggles the tray popup window

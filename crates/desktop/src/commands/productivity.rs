@@ -75,10 +75,9 @@ fn session_to_response(s: FocusSession) -> FocusSessionResponse {
 pub async fn productivity_today(
     state: State<'_, AppCore>,
 ) -> Result<Option<ProductivitySummaryResponse>, ApiError> {
-    let repos = state.productivity_repos()?;
-    let today = Utc::now().format("%Y-%m-%d").to_string();
-    let summary = repos.summaries.get(&today).await.map_err(map_prod_err)?;
-    Ok(summary.map(summary_to_response))
+    let aggregator = state.aggregator()?;
+    let summary = aggregator.compute_today().await.map_err(map_prod_err)?;
+    Ok(Some(summary_to_response(summary)))
 }
 
 #[tauri::command]

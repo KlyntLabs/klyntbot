@@ -5,19 +5,30 @@ pub mod categorizer;
 pub mod macos;
 
 use std::sync::Arc;
-use tokio::sync::RwLock;
+use tokio::sync::{mpsc, RwLock};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use tracing::{debug, info, warn};
 
 use crate::config::{PrivacyConfig, ProductivityConfig};
+use crate::focus::FocusManager;
 use crate::repos::ProductivityRepos;
-use crate::types::ActivityEvent;
+use crate::types::{ActivityEvent, CategoryType};
 use categorizer::Categorizer;
 
 const MAX_BUFFER_SIZE: usize = 1000;
+/// Minimum seconds between distraction alerts for the same app.
+const DISTRACTION_COOLDOWN_SECS: i64 = 60;
+
+/// Alert emitted when a distracting app is used during a focus session.
+#[derive(Debug, Clone)]
+pub struct DistractionAlert {
+    pub app_name: String,
+    pub session_id: String,
+    pub timestamp: DateTime<Utc>,
+}
 
 pub struct ActivityTracker {
     config: ProductivityConfig,
@@ -25,6 +36,8 @@ pub struct ActivityTracker {
     categorizer: Arc<RwLock<Categorizer>>,
     cancel_token: CancellationToken,
     task_handle: Option<JoinHandle<()>>,
+    focus_manager: Option<Arc<FocusManager>>,
+    distraction_sender: Option<mpsc::Sender<DistractionAlert>>,
 }
 
 impl ActivityTracker {
@@ -39,7 +52,19 @@ impl ActivityTracker {
             categorizer: Arc::new(RwLock::new(categorizer)),
             cancel_token: CancellationToken::new(),
             task_handle: None,
+            focus_manager: None,
+            distraction_sender: None,
         }
+    }
+
+    /// Set focus manager for distraction detection during focus sessions.
+    pub fn set_focus_manager(&mut self, mgr: Arc<FocusManager>) {
+        self.focus_manager = Some(mgr);
+    }
+
+    /// Set channel for emitting distraction alerts.
+    pub fn set_distraction_sender(&mut self, sender: mpsc::Sender<DistractionAlert>) {
+        self.distraction_sender = Some(sender);
     }
 
     pub fn categorizer(&self) -> &Arc<RwLock<Categorizer>> {
@@ -56,11 +81,16 @@ impl ActivityTracker {
         let categorizer = Arc::clone(&self.categorizer);
         let privacy = self.config.privacy.clone();
         let repos = self.repos.clone();
+        let focus_manager = self.focus_manager.clone();
+        let distraction_sender = self.distraction_sender.clone();
 
         let handle = tokio::spawn(async move {
             let mut buffer: Vec<ActivityEvent> = Vec::new();
             let mut current_event: Option<ActivityEvent> = None;
             let mut last_flush = tokio::time::Instant::now();
+            // Distraction cooldown tracking
+            let mut last_distraction_app: Option<String> = None;
+            let mut last_distraction_time: Option<DateTime<Utc>> = None;
 
             loop {
                 tokio::select! {
@@ -88,6 +118,73 @@ impl ActivityTracker {
                                 let is_idle = idle_secs >= idle_threshold;
                                 let now = Utc::now();
 
+                                // Categorize using app name, bundle ID, AND window title.
+                                // Runs every tick so browsers get re-evaluated when
+                                // the user navigates to a different site (title changes).
+                                // Skipped when idle — no categorization needed.
+                                let (category_id, is_distracting) = if is_idle {
+                                    (None, false)
+                                } else {
+                                    let cat = categorizer.read().await;
+                                    let matched = cat.categorize_full(
+                                        &info.app_name,
+                                        info.bundle_id.as_deref(),
+                                        None,
+                                        info.window_title.as_deref(),
+                                    );
+                                    let cid = matched.map(|c| c.id.clone());
+                                    let distracting = matched
+                                        .is_some_and(|c| c.category_type == CategoryType::Distracting);
+                                    drop(cat);
+                                    (cid, distracting)
+                                };
+
+                                // Distraction detection — runs every tick, not just on
+                                // app switch. This catches in-browser navigation (e.g.
+                                // Chrome → YouTube) where app_name stays the same but
+                                // the window title changes to a distracting site.
+                                if is_distracting {
+                                    if let Some(ref fm) = focus_manager {
+                                        let distraction_key = info
+                                            .window_title
+                                            .as_deref()
+                                            .unwrap_or(&info.app_name)
+                                            .to_string();
+
+                                        let should_alert = !matches!(
+                                            (&last_distraction_app, last_distraction_time),
+                                            (Some(prev_key), Some(prev_time))
+                                                if prev_key == &distraction_key
+                                                    && (now - prev_time).num_seconds() < DISTRACTION_COOLDOWN_SECS
+                                        );
+
+                                        if should_alert {
+                                            match fm.get_active().await {
+                                                Ok(Some(session)) => {
+                                                    let session_id = session.id.clone();
+                                                    // Record distraction using the already-fetched session.
+                                                    if let Err(e) = fm.record_distraction_for(session, &info.app_name).await {
+                                                        warn!("Failed to record distraction: {e}");
+                                                    }
+                                                    if let Some(ref sender) = distraction_sender {
+                                                        let _ = sender.try_send(DistractionAlert {
+                                                            app_name: info.app_name.clone(),
+                                                            session_id,
+                                                            timestamp: now,
+                                                        });
+                                                    }
+                                                    last_distraction_app = Some(distraction_key);
+                                                    last_distraction_time = Some(now);
+                                                }
+                                                Ok(None) => {}
+                                                Err(e) => {
+                                                    debug!("Failed to check active session: {e}");
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
                                 let same_app = !is_idle
                                     && current_event.as_ref().map(|e| e.app_name.as_str())
                                         == Some(&info.app_name);
@@ -101,14 +198,6 @@ impl ActivityTracker {
                                         evt.window_title = info.window_title;
                                     }
                                 } else {
-                                    let cat = categorizer.read().await;
-                                    let category_id = cat.categorize(
-                                        &info.app_name,
-                                        info.bundle_id.as_deref(),
-                                        None,
-                                    ).map(|c| c.id.clone());
-                                    drop(cat);
-
                                     if let Some(evt) = current_event.take() {
                                         buffer.push(evt);
                                     }

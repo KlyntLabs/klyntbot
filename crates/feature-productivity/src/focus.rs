@@ -92,10 +92,18 @@ impl FocusManager {
 
     /// Record a distraction during an active focus session.
     pub async fn record_distraction(&self, app_name: &str) -> common::Result<()> {
-        let Some(mut session) = self.repos.sessions.get_active().await? else {
+        let Some(session) = self.repos.sessions.get_active().await? else {
             return Ok(());
         };
+        self.record_distraction_for(session, app_name).await
+    }
 
+    /// Record a distraction against a known session (avoids redundant DB lookup).
+    pub async fn record_distraction_for(
+        &self,
+        mut session: FocusSession,
+        app_name: &str,
+    ) -> common::Result<()> {
         session.interruptions += 1;
         session.distraction_events.push(DistractionEvent {
             timestamp: Utc::now(),
