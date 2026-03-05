@@ -75,13 +75,13 @@ export function MonthlyStats({ yearMonth, summaries: current }: MonthlyStatsProp
   }, [current, previous]);
 
   return (
-    <div className="bg-surface-base rounded-xl p-4 flex flex-col gap-3">
+    <div className="glass-card p-4 flex flex-col gap-3">
       <h2 className="text-[13px] font-medium text-secondary">Work Hours</h2>
       <div className="flex flex-col gap-0">
         {rows.map((row, i) => (
           <div
             key={row.label}
-            className={`flex flex-col gap-1 py-3 ${i > 0 ? "border-t border-border-subtle" : ""}`}
+            className={`flex flex-col gap-1 py-3 ${i > 0 ? "border-t border-white/[0.04]" : ""}`}
           >
             <span className="text-[10px] font-light text-dim uppercase tracking-wider">
               {row.label}

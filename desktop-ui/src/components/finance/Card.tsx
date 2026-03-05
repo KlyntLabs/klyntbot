@@ -13,14 +13,14 @@ export function Card({
     return (
       <button
         type="button"
-        className={cn("bg-surface-low rounded-xl text-left w-full", className)}
+        className={cn("glass-card text-left w-full", className)}
         onClick={onClick}
       >
         {children}
       </button>
     );
   }
-  return <div className={cn("bg-surface-low rounded-xl", className)}>{children}</div>;
+  return <div className={cn("glass-card", className)}>{children}</div>;
 }
 
 export function SectionLabel({ children }: { children: React.ReactNode }) {

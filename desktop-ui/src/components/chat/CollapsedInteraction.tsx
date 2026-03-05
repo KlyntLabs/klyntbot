@@ -7,7 +7,7 @@ interface CollapsedInteractionProps {
 export function CollapsedInteraction({ content }: CollapsedInteractionProps) {
   return (
     <div className="flex justify-start">
-      <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-surface-base border border-border">
+      <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/[0.06] border border-white/[0.08]">
         <MessageSquareMore className="w-3.5 h-3.5 text-brand shrink-0" strokeWidth={1.5} />
         <span className="text-[12px] font-light text-secondary">{content}</span>
       </div>

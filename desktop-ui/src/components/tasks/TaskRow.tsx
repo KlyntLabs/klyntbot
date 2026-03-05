@@ -54,10 +54,10 @@ export function RootTaskRow({
         }
       }}
       onClick={() => navigate(`/task/${task.id}`)}
-      className="hover:bg-surface-base transition-colors border-b border-border-subtle last:border-b-0 cursor-pointer whitespace-nowrap"
+      className="hover:bg-white/[0.04] transition-colors border-b border-white/[0.04] last:border-b-0 cursor-pointer whitespace-nowrap"
     >
       <td
-        className="px-5 py-3 w-9"
+        className="px-5 py-2.5 w-9"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
       >
@@ -82,7 +82,7 @@ export function RootTaskRow({
       </td>
 
       <td
-        className="px-5 py-3"
+        className="px-5 py-2.5"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
       >
@@ -102,7 +102,7 @@ export function RootTaskRow({
       </td>
 
       <td
-        className="px-5 py-3"
+        className="px-5 py-2.5"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
       >
@@ -117,7 +117,7 @@ export function RootTaskRow({
             const proj = projects.find((p) => p.id === val);
             if (!proj) return <span className="text-[11px] font-light text-dim">&mdash;</span>;
             return (
-              <div className="inline-flex items-center gap-2 px-2 py-1 rounded-md bg-surface-base">
+              <div className="inline-flex items-center gap-2 px-2 py-1 rounded-md bg-white/[0.06]">
                 <div
                   className="w-1.5 h-1.5 rounded-full flex-shrink-0"
                   style={{ backgroundColor: proj.color }}
@@ -131,7 +131,7 @@ export function RootTaskRow({
 
       {showArea && (
         <td
-          className="px-5 py-3"
+          className="px-5 py-2.5"
           onClick={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
         >
@@ -154,7 +154,7 @@ export function RootTaskRow({
       )}
 
       <td
-        className="px-5 py-3"
+        className="px-5 py-2.5"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
       >
@@ -175,7 +175,7 @@ export function RootTaskRow({
       </td>
 
       <td
-        className="px-5 py-3"
+        className="px-5 py-2.5"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
       >
@@ -190,7 +190,7 @@ export function RootTaskRow({
       </td>
 
       <td
-        className="px-5 py-3"
+        className="px-5 py-2.5"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
       >
@@ -201,7 +201,7 @@ export function RootTaskRow({
       </td>
 
       <td
-        className="px-5 py-3"
+        className="px-5 py-2.5"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => e.stopPropagation()}
       >
@@ -232,7 +232,7 @@ export function SubtaskRow({ task, isCompleted, onToggle, onUpdate }: SubtaskRow
         }
       }}
       onClick={() => navigate(`/task/${task.id}`)}
-      className="hover:bg-surface-base transition-colors border-b border-border-subtle last:border-b-0 cursor-pointer whitespace-nowrap bg-surface-lowest relative"
+      className="hover:bg-white/[0.06] transition-colors border-b border-white/[0.04] last:border-b-0 cursor-pointer whitespace-nowrap bg-white/[0.02] relative"
       style={{ boxShadow: "inset 3px 0 0 var(--brand)" }}
     >
       <td

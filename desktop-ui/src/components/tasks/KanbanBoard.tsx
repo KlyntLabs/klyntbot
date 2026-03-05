@@ -53,7 +53,7 @@ export function KanbanBoard({ tasks, projectMap, areaMap, completedTasks }: Kanb
                   type="button"
                   key={task.id}
                   onClick={() => navigate(`/task/${task.id}`)}
-                  className="bg-surface-low hover:bg-surface-base rounded-lg px-4 py-3 cursor-pointer transition-colors border border-border-subtle text-left w-full"
+                  className="bg-white/[0.04] hover:bg-white/[0.06] rounded-lg px-4 py-3 cursor-pointer transition-colors border border-white/[0.04] text-left w-full"
                 >
                   {/* Title */}
                   <p
@@ -68,7 +68,7 @@ export function KanbanBoard({ tasks, projectMap, areaMap, completedTasks }: Kanb
                   <div className="flex items-center gap-1.5 flex-wrap">
                     {task.priority && <Badge variant="priority" value={task.priority} />}
                     {project && (
-                      <div className="flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-surface-base">
+                      <div className="flex items-center gap-1.5 px-1.5 py-0.5 rounded bg-white/[0.06]">
                         <div
                           className="w-1.5 h-1.5 rounded-full flex-shrink-0"
                           style={{ backgroundColor: project.color }}

@@ -218,7 +218,7 @@ export function Chat() {
   );
 
   return (
-    <div className="h-screen w-screen bg-background text-primary flex overflow-hidden">
+    <div className="h-screen w-screen bg-background text-primary flex gap-2 p-2 overflow-hidden">
       <Sidebar
         active={activeSidebar}
         onNavigate={(item) => {
@@ -254,53 +254,54 @@ export function Chat() {
         />
       )}
 
-      {/* Right Panel — Conversation + Transparency */}
-      <div className="flex-1 flex overflow-hidden">
-        <div className="flex-1 flex flex-col min-w-0">
-          <div className="flex items-center justify-end px-4 py-2 border-b border-border">
-            <TransparencyToggle enabled={showTransparency} onToggle={toggleTransparency} />
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-6">
-            <div className="max-w-3xl mx-auto">
-              {chat.messages.length === 0 && !chat.isStreaming ? (
-                <div className="flex flex-col items-center justify-center py-20">
-                  <p className="text-muted text-sm font-light">Start a conversation</p>
-                  <p className="text-dim text-xs font-light mt-1">
-                    Ask Klynt anything about your tasks, projects, or schedule
-                  </p>
-                </div>
-              ) : (
-                <MessageList
-                  messages={chat.messages}
-                  segments={chat.segments}
-                  isStreaming={chat.isStreaming}
-                  activeTools={chat.activeTools}
-                  error={chat.error}
-                  activeInteraction={chat.activeInteraction}
-                  sessionKey={selectedThread}
-                  onInteractionSubmitted={() => {
-                    chat.clearInteraction();
-                    refetchThreads();
-                  }}
-                  showTransparency={showTransparency}
-                  liveTransparency={chat.transparency}
-                  activeDelegateAgent={chat.activeDelegateAgent}
-                />
-              )}
-            </div>
-          </div>
-
-          <ChatInput
-            input={chat.input}
-            isStreaming={chat.isStreaming}
-            onInputChange={chat.setInput}
-            onSend={handleSend}
-          />
+      {/* Right Panel — Conversation */}
+      <div className="flex-1 flex flex-col overflow-hidden rounded-xl relative">
+        <div className="flex items-center justify-end px-4 py-2 border-b border-white/[0.06]">
+          <TransparencyToggle enabled={showTransparency} onToggle={toggleTransparency} />
         </div>
 
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="max-w-3xl mx-auto">
+            {chat.messages.length === 0 && !chat.isStreaming ? (
+              <div className="flex flex-col items-center justify-center py-20">
+                <p className="text-muted text-sm font-light">Start a conversation</p>
+                <p className="text-dim text-xs font-light mt-1">
+                  Ask Klynt anything about your tasks, projects, or schedule
+                </p>
+              </div>
+            ) : (
+              <MessageList
+                messages={chat.messages}
+                segments={chat.segments}
+                isStreaming={chat.isStreaming}
+                activeTools={chat.activeTools}
+                error={chat.error}
+                activeInteraction={chat.activeInteraction}
+                sessionKey={selectedThread}
+                onInteractionSubmitted={() => {
+                  chat.clearInteraction();
+                  refetchThreads();
+                }}
+                showTransparency={showTransparency}
+                liveTransparency={chat.transparency}
+                activeDelegateAgent={chat.activeDelegateAgent}
+              />
+            )}
+          </div>
+        </div>
+
+        <ChatInput
+          input={chat.input}
+          isStreaming={chat.isStreaming}
+          onInputChange={chat.setInput}
+          onSend={handleSend}
+        />
+
+        {/* Floating transparency overlay */}
         {showTransparency && activeTransparency && (
-          <TransparencyPanel transparency={activeTransparency} />
+          <div className="absolute top-12 right-3 z-30" style={{ animation: "fade-in 0.15s ease-out" }}>
+            <TransparencyPanel transparency={activeTransparency} />
+          </div>
         )}
       </div>
     </div>

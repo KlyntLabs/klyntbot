@@ -14,11 +14,11 @@ function CollapsibleBox({ title, icon: Icon, children, defaultOpen = true }: Col
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <div className="rounded-lg border border-border overflow-hidden">
+    <div>
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full flex items-center gap-2 px-3 py-2 bg-surface-raised hover:bg-surface-highest transition-colors"
+        className="w-full flex items-center gap-2 px-3 py-2 rounded-t-[var(--radius-2xl)] bg-white/[0.06]"
       >
         <Icon className="w-3 h-3 text-muted" strokeWidth={1.5} />
         <span className="flex-1 text-left text-[11px] font-medium text-secondary">{title}</span>
@@ -69,7 +69,7 @@ function AgentGroupLabel({ name }: { name: string }) {
 /** Skills popup shown on hover over an agent name in the Agents section. */
 function AgentSkillsPopup({ skills }: { skills: { name: string; trigger: string }[] }) {
   return (
-    <div className="absolute left-full top-0 ml-1 z-50 w-48 glass-panel rounded-lg p-2 space-y-0.5 text-[10px] font-light shadow-lg">
+    <div className="absolute left-0 top-full mt-1 z-50 w-48 rounded-xl p-2.5 space-y-0.5 text-[10px] font-light bg-[#1a1a1e] border border-white/[0.10]">
       <div className="text-dim text-[9px] font-medium uppercase tracking-wider mb-1">Skills</div>
       {skills.map((skill) => {
         const isActive = skill.trigger === "always" || skill.trigger === "activated";
@@ -196,114 +196,120 @@ export function TransparencyPanel({ transparency }: TransparencyPanelProps) {
   if (!hasMemory && !hasExecution && !hasTools) return null;
 
   return (
-    <div className="w-64 border-l border-border bg-background overflow-y-auto p-3 space-y-2 shrink-0">
-      <div className="text-[10px] font-medium text-dim uppercase tracking-wider px-1">
-        Transparency
-      </div>
-
-      {/* Agents — moved to top, with skills as hover popup */}
+    <div className="w-56 space-y-2">
+      {/* Agents */}
       {hasExecution && (
-        <CollapsibleBox title="Agents" icon={Bot} defaultOpen={hasAgent || hasDelegations}>
-          {hasAgent ? (
-            <>
-              <AgentWithSkills
-                name={agentSelected?.name}
-                skills={skillsByAgent[agentSelected?.name]}
-                isMain
-              />
-              {hasDelegations &&
-                delegations?.map((d) => (
-                  <AgentWithSkills
-                    key={`del-${d.toAgent}`}
-                    name={d.toAgent}
-                    skills={skillsByAgent[d.toAgent]}
-                    delegation={d}
-                  />
-                ))}
-            </>
-          ) : (
-            <span className="text-dim">none</span>
-          )}
-        </CollapsibleBox>
+        <div className="glass-bubble relative z-10">
+          <CollapsibleBox title="Agents" icon={Bot} defaultOpen={hasAgent || hasDelegations}>
+            {hasAgent ? (
+              <>
+                <AgentWithSkills
+                  name={agentSelected?.name}
+                  skills={skillsByAgent[agentSelected?.name]}
+                  isMain
+                />
+                {hasDelegations &&
+                  delegations?.map((d) => (
+                    <AgentWithSkills
+                      key={`del-${d.toAgent}`}
+                      name={d.toAgent}
+                      skills={skillsByAgent[d.toAgent]}
+                      delegation={d}
+                    />
+                  ))}
+              </>
+            ) : (
+              <span className="text-dim">none</span>
+            )}
+          </CollapsibleBox>
+        </div>
       )}
 
-      {/* Tools — grouped by agent when delegations exist, flat otherwise */}
+      {/* Tools */}
       {hasTools && (
-        <CollapsibleBox title="Tools" icon={Cpu}>
-          {toolsByAgent
-            ? Object.entries(toolsByAgent).map(([agent, agentTools]) => (
-                <div key={`tg-${agent}`}>
-                  <AgentGroupLabel name={agent} />
-                  {agentTools.map((tool) => (
-                    <ToolRow key={`tool-${agent}-${tool.name}-${tool.action ?? ""}`} tool={tool} />
-                  ))}
-                </div>
-              ))
-            : tools?.map((tool) => (
-                <ToolRow
-                  key={`tool-${tool.name}-${tool.action ?? ""}-${tool.durationMs}`}
-                  tool={tool}
-                />
-              ))}
-          {toolTokensTotal && toolTokensTotal > 0 && (
-            <div className="pt-1 mt-1 border-t border-border flex justify-between text-dim">
-              <span>Total I/O (est.)</span>
-              <span>~{formatTokens(toolTokensTotal)}</span>
-            </div>
-          )}
-        </CollapsibleBox>
+        <div className="glass-bubble overflow-hidden">
+          <CollapsibleBox title="Tools" icon={Cpu}>
+            {toolsByAgent
+              ? Object.entries(toolsByAgent).map(([agent, agentTools]) => (
+                  <div key={`tg-${agent}`}>
+                    <AgentGroupLabel name={agent} />
+                    {agentTools.map((tool) => (
+                      <ToolRow key={`tool-${agent}-${tool.name}-${tool.action ?? ""}`} tool={tool} />
+                    ))}
+                  </div>
+                ))
+              : tools?.map((tool) => (
+                  <ToolRow
+                    key={`tool-${tool.name}-${tool.action ?? ""}-${tool.durationMs}`}
+                    tool={tool}
+                  />
+                ))}
+            {toolTokensTotal && toolTokensTotal > 0 && (
+              <div className="pt-1 mt-1 border-t border-white/[0.08] flex justify-between text-dim">
+                <span>Total I/O (est.)</span>
+                <span>~{formatTokens(toolTokensTotal)}</span>
+              </div>
+            )}
+          </CollapsibleBox>
+        </div>
       )}
 
       {/* Memory */}
       {hasMemory && (
-        <CollapsibleBox title="Memory" icon={Brain}>
-          {memoryAccesses?.map((ma) => (
-            <Row
-              key={`mem-${ma.action}-${ma.query ?? ""}`}
-              icon={FileText}
-              label={ma.query ?? ma.action}
-              detail={ma.resultsCount > 0 ? `${ma.resultsCount} hits` : undefined}
-            />
-          ))}
-        </CollapsibleBox>
+        <div className="glass-bubble overflow-hidden">
+          <CollapsibleBox title="Memory" icon={Brain}>
+            {memoryAccesses?.map((ma) => (
+              <Row
+                key={`mem-${ma.action}-${ma.query ?? ""}`}
+                icon={FileText}
+                label={ma.query ?? ma.action}
+                detail={ma.resultsCount > 0 ? `${ma.resultsCount} hits` : undefined}
+              />
+            ))}
+          </CollapsibleBox>
+        </div>
       )}
 
       {/* Execution */}
       {hasExecution && (
-        <CollapsibleBox title="Execution" icon={Cpu}>
-          {execution && (
-            <Row
-              icon={Cpu}
-              label={`Engine: ${execution.engine}`}
-              detail={`${execution.iterations}/${execution.maxIterations} itr`}
-            />
-          )}
-          {classification && (
-            <Row
-              icon={Brain}
-              label={`Strategy: ${classification.strategy}`}
-              detail={`${Math.round(classification.confidence * 100)}%`}
-            />
-          )}
-        </CollapsibleBox>
+        <div className="glass-bubble overflow-hidden">
+          <CollapsibleBox title="Execution" icon={Cpu}>
+            {execution && (
+              <Row
+                icon={Cpu}
+                label={`Engine: ${execution.engine}`}
+                detail={`${execution.iterations}/${execution.maxIterations} itr`}
+              />
+            )}
+            {classification && (
+              <Row
+                icon={Brain}
+                label={`Strategy: ${classification.strategy}`}
+                detail={`${Math.round(classification.confidence * 100)}%`}
+              />
+            )}
+          </CollapsibleBox>
+        </div>
       )}
 
       {/* Learning */}
       {hasExecution && (
-        <CollapsibleBox title="Learning" icon={Database} defaultOpen={hasLearning}>
-          {hasLearning ? (
-            learning?.map((le) => (
-              <Row
-                key={`le-${le.eventType}-${le.detail ?? ""}`}
-                icon={Database}
-                label={le.eventType}
-                detail={le.detail}
-              />
-            ))
-          ) : (
-            <span className="text-dim">none</span>
-          )}
-        </CollapsibleBox>
+        <div className="glass-bubble overflow-hidden">
+          <CollapsibleBox title="Learning" icon={Database} defaultOpen={hasLearning}>
+            {hasLearning ? (
+              learning?.map((le) => (
+                <Row
+                  key={`le-${le.eventType}-${le.detail ?? ""}`}
+                  icon={Database}
+                  label={le.eventType}
+                  detail={le.detail}
+                />
+              ))
+            ) : (
+              <span className="text-dim">none</span>
+            )}
+          </CollapsibleBox>
+        </div>
       )}
     </div>
   );

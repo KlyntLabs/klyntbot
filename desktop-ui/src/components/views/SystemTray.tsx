@@ -48,11 +48,6 @@ export function SystemTray() {
 
   const displayStatus: DisplayStatus = agentStatusData.status === "active" ? "active" : "idle";
 
-  const statusColors: Record<DisplayStatus, string> = {
-    active: "var(--color-success)",
-    idle: "var(--color-brand)",
-  };
-
   const handleToggleTask = async (taskId: string) => {
     toggleCompletedId(taskId);
     await toggleComplete.mutate({ id: taskId });
@@ -127,132 +122,148 @@ export function SystemTray() {
     <div className="w-screen text-primary">
       <div
         ref={contentRef}
-        className="w-full rounded-2xl overflow-hidden bg-surface-floating shadow-2xl shadow-black/50 border border-border-subtle"
+        className="w-full glass-floating overflow-hidden"
+        style={{ animation: "glass-appear 0.2s ease-out" }}
       >
-        {/* Header */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
-          <div className="w-7 h-7 rounded-md bg-white flex items-center justify-center p-0.5">
-            <KlyntLogo className="w-full h-full" />
-          </div>
-          <div className="flex-1">
-            <p className="text-[13px] font-light text-primary">Klynt Agent</p>
-            <div className="flex items-center gap-1.5">
-              <div
-                className="w-1.5 h-1.5 rounded-full"
-                style={{ backgroundColor: statusColors[displayStatus] }}
-              />
-              <span className="text-[11px] text-muted font-light capitalize">{displayStatus}</span>
+        <div className="rounded-[var(--glass-radius-inner)] overflow-hidden">
+          {/* Header */}
+          <div className="flex items-center gap-3 px-4 py-3">
+            <div className="w-7 h-7 rounded-lg bg-white/90 flex items-center justify-center p-0.5 ">
+              <KlyntLogo className="w-full h-full" />
             </div>
-          </div>
-        </div>
-
-        {/* Today's Tasks */}
-        <div className="px-4 py-3 border-b border-border overflow-y-auto max-h-[240px]">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] text-muted font-light uppercase tracking-wider">
-              Today
-            </span>
-            {activeCount > 0 && (
-              <span className="text-[11px] text-muted font-light">{activeCount}</span>
-            )}
-          </div>
-          {sortedTasks.length === 0 ? (
-            <p className="text-[12px] text-dim font-light py-2">No tasks for today</p>
-          ) : (
-            <div className="space-y-0.5">
-              {sortedTasks.map((task) => {
-                const done = isTaskCompleted(task);
-                return (
-                  <div
-                    key={task.id}
-                    className={`flex items-center gap-2.5 py-1.5 px-2 rounded-md border-l-2 border-y-0 border-r-0 hover:bg-surface-base/50 transition-colors ${taskIndicatorClass(task, done)}`}
-                  >
-                    <Checkbox checked={done} onCheckedChange={() => handleToggleTask(task.id)} />
-                    <span
-                      className={`flex-1 text-[12px] font-light truncate ${
-                        done
-                          ? "text-dim line-through"
-                          : task.isOverdue
-                            ? "text-primary"
-                            : "text-secondary"
-                      }`}
-                    >
-                      {task.title}
-                    </span>
-                    {!done && task.priority && (
-                      <Badge
-                        variant="priority"
-                        value={task.priority}
-                        className="text-[10px] px-1.5 py-0"
-                      />
-                    )}
-                    {!done && task.dueDisplay && (
-                      <span
-                        className={`text-[10px] font-light flex-shrink-0 ${
-                          task.isOverdue ? "text-destructive" : "text-muted"
-                        }`}
-                      >
-                        {task.dueDisplay}
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Calendar Events */}
-        <div className="px-4 py-3 border-b border-border">
-          <span className="text-[11px] text-muted font-light uppercase tracking-wider">
-            Upcoming
-          </span>
-          <div className="mt-2 space-y-2">
-            {calendarEvents.map((event) => (
-              <div key={event.id} className="flex items-center gap-2.5">
+            <div className="flex-1">
+              <p className="text-[13px] font-light text-primary">Klynt Agent</p>
+              <div className="flex items-center gap-1.5">
                 <div
-                  className="w-1 h-6 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: event.color }}
+                  className="w-1.5 h-1.5 rounded-full"
+                  style={{
+                    backgroundColor:
+                      displayStatus === "active" ? "var(--success)" : "var(--brand)",
+                  }}
                 />
-                <div className="flex-1 min-w-0">
-                  <p className="text-[12px] font-light text-secondary truncate">{event.title}</p>
-                </div>
-                <span className="text-[11px] text-muted font-light flex-shrink-0">
-                  {new Date(event.startAt).toLocaleTimeString([], {
-                    hour: "numeric",
-                    minute: "2-digit",
-                  })}
+                <span className="text-[11px] text-muted font-light capitalize">
+                  {displayStatus}
                 </span>
               </div>
-            ))}
+            </div>
           </div>
-        </div>
 
-        {/* Chat Input */}
-        <div className="px-3 py-3">
-          <div className="flex items-center gap-2 bg-surface-base rounded-xl px-3 py-2">
-            <input
-              type="text"
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleChatSubmit();
-                }
-              }}
-              placeholder="Ask Klynt\u2026"
-              aria-label="Ask Klynt"
-              className="flex-1 bg-transparent text-[13px] font-light text-primary placeholder:text-muted"
-            />
-            <button
-              type="button"
-              onClick={handleChatSubmit}
-              disabled={!chatInput.trim()}
-              className="w-6 h-6 rounded-md flex items-center justify-center text-muted hover:text-primary transition-colors disabled:opacity-30"
-            >
-              <Send className="w-3.5 h-3.5" strokeWidth={1.5} />
-            </button>
+          <div className="mx-4 glass-divider" />
+
+          {/* Today's Tasks */}
+          <div className="px-4 py-3 overflow-y-auto max-h-[240px]">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[11px] text-muted font-light uppercase tracking-wider">
+                Today
+              </span>
+              {activeCount > 0 && (
+                <span className="glass-badge px-2 py-0.5 text-[10px] text-muted font-light">
+                  {activeCount}
+                </span>
+              )}
+            </div>
+            {sortedTasks.length === 0 ? (
+              <p className="text-[12px] text-dim font-light py-2">No tasks for today</p>
+            ) : (
+              <div className="space-y-0.5">
+                {sortedTasks.map((task) => {
+                  const done = isTaskCompleted(task);
+                  return (
+                    <div
+                      key={task.id}
+                      className={`flex items-center gap-2.5 py-1.5 px-2 rounded-lg border-l-2 border-y-0 border-r-0 hover:bg-white/[0.04] transition-colors ${taskIndicatorClass(task, done)}`}
+                    >
+                      <Checkbox checked={done} onCheckedChange={() => handleToggleTask(task.id)} />
+                      <span
+                        className={`flex-1 text-[12px] font-light truncate ${
+                          done
+                            ? "text-dim line-through"
+                            : task.isOverdue
+                              ? "text-primary"
+                              : "text-secondary"
+                        }`}
+                      >
+                        {task.title}
+                      </span>
+                      {!done && task.priority && (
+                        <Badge
+                          variant="priority"
+                          value={task.priority}
+                          className="text-[10px] px-1.5 py-0"
+                        />
+                      )}
+                      {!done && task.dueDisplay && (
+                        <span
+                          className={`text-[10px] font-light flex-shrink-0 ${
+                            task.isOverdue ? "text-destructive" : "text-muted"
+                          }`}
+                        >
+                          {task.dueDisplay}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="mx-4 glass-divider" />
+
+          {/* Calendar Events */}
+          <div className="px-4 py-3">
+            <span className="text-[11px] text-muted font-light uppercase tracking-wider">
+              Upcoming
+            </span>
+            <div className="mt-2 space-y-2">
+              {calendarEvents.map((event) => (
+                <div key={event.id} className="flex items-center gap-2.5">
+                  <div
+                    className="w-1 h-6 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: event.color }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[12px] font-light text-secondary truncate">{event.title}</p>
+                  </div>
+                  <span className="text-[11px] text-dim font-light flex-shrink-0">
+                    {new Date(event.startAt).toLocaleTimeString([], {
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mx-4 glass-divider" />
+
+          {/* Chat Input */}
+          <div className="px-3 py-3">
+            <div className="glass-input flex items-center gap-2 px-3 py-2">
+              <input
+                type="text"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleChatSubmit();
+                  }
+                }}
+                placeholder="Ask Klynt\u2026"
+                aria-label="Ask Klynt"
+                className="flex-1 bg-transparent text-[13px] font-light text-primary placeholder:text-muted outline-none"
+              />
+              <button
+                type="button"
+                onClick={handleChatSubmit}
+                disabled={!chatInput.trim()}
+                className="w-6 h-6 rounded-lg flex items-center justify-center text-muted hover:text-primary transition-all disabled:opacity-30"
+              >
+                <Send className="w-3.5 h-3.5" strokeWidth={1.5} />
+              </button>
+            </div>
           </div>
         </div>
       </div>

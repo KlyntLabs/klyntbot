@@ -17,7 +17,7 @@ export function GeneralSettings() {
       </div>
 
       <div className="space-y-4">
-        <div className="bg-surface-low rounded-lg border border-border p-4">
+        <div className="bg-white/[0.04] rounded-lg border border-white/[0.08] p-4">
           <h3 className="text-[13px] font-medium text-secondary mb-3">System</h3>
           <div className="space-y-2">
             <div className="flex justify-between text-[13px]">

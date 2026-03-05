@@ -26,7 +26,7 @@ export function FinanceLayout({ children }: FinanceLayoutProps) {
   const currentPath = location.pathname;
 
   return (
-    <div className="h-screen w-screen bg-background text-primary flex overflow-hidden">
+    <div className="h-screen w-screen bg-background text-primary flex gap-2 p-2 overflow-hidden">
       <Sidebar
         active={activeSidebar}
         onNavigate={(item) => {
@@ -36,10 +36,10 @@ export function FinanceLayout({ children }: FinanceLayoutProps) {
         }}
       />
 
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Full-width tab bar (matches tasks page pattern) */}
-        <div className="h-14 bg-background flex items-center px-2 flex-shrink-0">
-          <div className="flex-1 flex items-center gap-2" role="tablist">
+      <div className="flex-1 flex flex-col gap-2 overflow-hidden">
+        {/* Floating glass toolbar */}
+        <div className="h-12 flex items-center px-2 shrink-0">
+          <div className="flex-1 flex items-center gap-1.5" role="tablist">
             {subNav.map((item) => {
               const isActive = currentPath === item.path;
               return (
@@ -49,10 +49,10 @@ export function FinanceLayout({ children }: FinanceLayoutProps) {
                   role="tab"
                   aria-selected={isActive}
                   onClick={() => navigate(item.path)}
-                  className={`flex-1 py-2 rounded-md text-[13px] font-light transition-colors ${
+                  className={`flex-1 py-2 rounded-xl text-[13px] font-light transition-all duration-200 ${
                     isActive
-                      ? "bg-surface-highest text-white"
-                      : "bg-surface-low text-muted hover:bg-surface-base hover:text-secondary"
+                      ? "glass-button-active text-primary"
+                      : "text-muted hover:text-secondary hover:bg-white/[0.04]"
                   }`}
                 >
                   {item.label}
@@ -62,7 +62,7 @@ export function FinanceLayout({ children }: FinanceLayoutProps) {
           </div>
         </div>
 
-        {/* Content */}
+        {/* Content — no glass wrapper, cards float on background */}
         <div className="flex-1 overflow-y-auto p-4">{children}</div>
       </div>
     </div>

@@ -11,9 +11,9 @@ interface CustomServerCardProps {
 
 export function CustomServerCard({ server, onToggle, onRemove, onEdit }: CustomServerCardProps) {
   return (
-    <div className="flex items-center justify-between py-3 px-4 bg-surface-low rounded-lg border border-border">
+    <div className="flex items-center justify-between py-3 px-4 bg-white/[0.04] rounded-lg border border-white/[0.08]">
       <div className="flex items-center gap-3 min-w-0">
-        <div className="w-8 h-8 rounded-md bg-surface-highest flex items-center justify-center text-muted flex-shrink-0">
+        <div className="w-8 h-8 rounded-md bg-white/[0.12] flex items-center justify-center text-muted flex-shrink-0">
           <McpServerIcon name={server.name} className="w-4 h-4" />
         </div>
         <div className="min-w-0">
@@ -36,7 +36,7 @@ export function CustomServerCard({ server, onToggle, onRemove, onEdit }: CustomS
           type="button"
           onClick={() => onToggle(server.name, !server.enabled)}
           className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors ${
-            server.enabled ? "text-success hover:bg-surface-base" : "text-dim hover:bg-surface-base"
+            server.enabled ? "text-success hover:bg-white/[0.06]" : "text-dim hover:bg-white/[0.06]"
           }`}
           aria-label={server.enabled ? "Disable" : "Enable"}
         >
@@ -45,7 +45,7 @@ export function CustomServerCard({ server, onToggle, onRemove, onEdit }: CustomS
         <button
           type="button"
           onClick={() => onEdit(server)}
-          className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:text-secondary hover:bg-surface-base transition-colors"
+          className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:text-secondary hover:bg-white/[0.06] transition-colors"
           aria-label="Edit"
         >
           <Settings2 className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -53,7 +53,7 @@ export function CustomServerCard({ server, onToggle, onRemove, onEdit }: CustomS
         <button
           type="button"
           onClick={() => onRemove(server.name)}
-          className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:text-destructive hover:bg-surface-base transition-colors"
+          className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:text-destructive hover:bg-white/[0.06] transition-colors"
           aria-label="Remove"
         >
           <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -93,9 +93,9 @@ export function RecommendedServerCard({
   const isConnected = installed && hasOAuth && oauthConnected;
 
   return (
-    <div className="flex items-center justify-between py-3 px-4 bg-surface-low rounded-lg border border-border">
+    <div className="flex items-center justify-between py-3 px-4 bg-white/[0.04] rounded-lg border border-white/[0.08]">
       <div className="flex items-center gap-3 min-w-0">
-        <div className="w-8 h-8 rounded-md bg-surface-highest flex items-center justify-center text-secondary flex-shrink-0">
+        <div className="w-8 h-8 rounded-md bg-white/[0.12] flex items-center justify-center text-secondary flex-shrink-0">
           <McpServerIcon name={server.name} className="w-4 h-4" />
         </div>
         <div className="min-w-0">
@@ -160,7 +160,7 @@ export function RecommendedServerCard({
                 className={`text-[12px] px-3 py-1 rounded-md border transition-colors ${
                   enabled
                     ? "border-success/30 text-success bg-success/5 hover:bg-success/10"
-                    : "border-border text-dim bg-surface-base hover:bg-surface-raised"
+                    : "border-white/[0.08] text-dim bg-white/[0.06] hover:bg-white/[0.08]"
                 }`}
               >
                 {enabled ? "Enabled" : "Disabled"}
@@ -171,7 +171,7 @@ export function RecommendedServerCard({
             <button
               type="button"
               onClick={() => onEdit?.(server)}
-              className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:text-secondary hover:bg-surface-base transition-colors"
+              className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:text-secondary hover:bg-white/[0.06] transition-colors"
               aria-label="Configure"
             >
               <Settings2 className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -183,7 +183,7 @@ export function RecommendedServerCard({
                 type="button"
                 onClick={() => onToggle?.(server.name, !enabled)}
                 className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors ${
-                  enabled ? "text-success hover:bg-surface-base" : "text-dim hover:bg-surface-base"
+                  enabled ? "text-success hover:bg-white/[0.06]" : "text-dim hover:bg-white/[0.06]"
                 }`}
                 aria-label={enabled ? "Disable" : "Enable"}
               >

@@ -51,7 +51,7 @@ export function WeeklyStats({ summaries }: WeeklyStatsProps) {
   }, [summaries]);
 
   return (
-    <div className="bg-surface-base rounded-xl p-4 flex flex-col gap-3">
+    <div className="glass-card p-4 flex flex-col gap-3">
       <h2 className="text-[13px] font-medium text-secondary">Weekly Stats</h2>
       <div className="grid grid-cols-2 gap-x-4 gap-y-3">
         {stats.map((s) => (

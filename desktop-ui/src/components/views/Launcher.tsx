@@ -160,24 +160,29 @@ export function Launcher() {
   };
 
   return (
-    <div className="w-screen text-primary flex justify-center pt-4 px-4">
-      <div className="w-full max-w-[660px] rounded-2xl overflow-hidden bg-surface-floating shadow-2xl shadow-black/50 border border-border-subtle">
+    <div className="w-screen text-primary flex justify-center pt-3 px-4">
+      <div
+        className="w-full max-w-[660px] glass-floating overflow-hidden"
+        style={{ animation: "glass-appear 0.25s ease-out" }}
+      >
         {mode === "command" ? (
-          <>
+          <div className="rounded-[var(--glass-radius-inner)] overflow-hidden">
             {/* Header */}
             <div className="px-5 pt-5 pb-3">
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-7 h-7 rounded-lg bg-white flex items-center justify-center p-1">
+              <div className="flex items-center gap-2.5 mb-1">
+                <div className="w-7 h-7 rounded-lg bg-white/90 flex items-center justify-center p-1 ">
                   <KlyntLogo className="w-full h-full" />
                 </div>
-                <h1 className="text-[15px] font-normal text-primary">Klynt Launcher</h1>
+                <h1 className="text-[15px] font-medium text-primary tracking-tight">
+                  Klynt Launcher
+                </h1>
               </div>
               <p className="text-[11px] text-muted font-light">AI assistant & quick actions</p>
             </div>
 
             {/* Search Bar */}
             <div className="px-5 pb-4">
-              <div className="flex items-center gap-3 bg-surface-base rounded-xl px-4 py-3">
+              <div className="glass-input flex items-center gap-3 px-4 py-3">
                 <Sparkles className="w-[18px] h-[18px] text-brand" strokeWidth={1.5} />
                 <input
                   type="text"
@@ -192,10 +197,10 @@ export function Launcher() {
                   className="flex-1 bg-transparent text-primary text-[13px] placeholder:text-muted outline-none font-light"
                 />
                 <div className="flex items-center gap-1.5">
-                  <span className="px-1.5 py-0.5 bg-surface-highest rounded text-[11px] text-muted font-light">
+                  <span className="glass-badge px-2 py-0.5 text-[10px] text-muted font-light">
                     AI
                   </span>
-                  <span className="px-1.5 py-0.5 bg-surface-highest rounded text-[11px] text-muted font-light">
+                  <span className="glass-badge px-2 py-0.5 text-[10px] text-muted font-light">
                     Tab
                   </span>
                 </div>
@@ -210,15 +215,19 @@ export function Launcher() {
                   {query.trim() && (
                     <button
                       type="button"
-                      className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-xl transition-colors ${
-                        0 === selectedIndex ? "bg-surface-highest" : "hover:bg-surface-base"
+                      className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-150 ${
+                        0 === selectedIndex
+                          ? "bg-white/[0.08] border border-white/[0.1]"
+                          : "border border-transparent hover:bg-white/[0.04]"
                       }`}
                       onMouseEnter={() => setSelectedIndex(0)}
                       onClick={() => enterChat(query.trim())}
                     >
                       <div
-                        className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${
-                          0 === selectedIndex ? "bg-brand text-white" : "bg-surface-base text-brand"
+                        className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-150 ${
+                          0 === selectedIndex
+                            ? "bg-brand/90 text-white"
+                            : "bg-white/[0.06] text-brand"
                         }`}
                       >
                         <Sparkles className="w-[18px] h-[18px]" strokeWidth={1.5} />
@@ -241,15 +250,24 @@ export function Launcher() {
                       <button
                         type="button"
                         key={item.id}
-                        className={`w-full flex items-center gap-4 px-4 py-3.5 rounded-xl transition-colors ${
-                          isSelected ? "bg-surface-highest" : "hover:bg-surface-base"
+                        className={`w-full flex items-center gap-4 px-4 py-3 rounded-xl transition-all duration-150 ${
+                          isSelected
+                            ? "bg-black/[0.06] border border-black/[0.06]"
+                            : "border border-transparent hover:bg-black/[0.03]"
                         }`}
                         onMouseEnter={() => setSelectedIndex(actualIndex)}
                       >
                         <div
-                          className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${
-                            isSelected ? "bg-brand text-white" : "bg-surface-base text-muted"
+                          className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-150 ${
+                            isSelected
+                              ? "bg-brand/90 text-white"
+                              : "bg-white/[0.06] text-muted"
                           }`}
+                          style={
+                            isSelected
+                              ? { boxShadow: "0 4px 20px var(--brand-glow)" }
+                              : undefined
+                          }
                         >
                           <Icon
                             className="w-[18px] h-[18px]"
@@ -261,7 +279,7 @@ export function Launcher() {
                           <h3 className="text-primary text-[13px] font-light">{item.title}</h3>
                           <p className="text-[11px] text-muted font-light">{item.subtitle}</p>
                         </div>
-                        <div className="flex items-center gap-1 text-[11px] text-muted font-light">
+                        <div className="flex items-center gap-1 text-[11px] text-dim font-light">
                           {item.shortcut}
                         </div>
                       </button>
@@ -276,27 +294,32 @@ export function Launcher() {
             </div>
 
             {/* Footer */}
-            <div className="px-5 py-3 border-t border-border-subtle">
-              <div className="flex items-center justify-between text-[11px] text-muted">
+            <div className="px-5 py-3">
+              <div className="glass-divider mb-3" />
+              <div className="flex items-center justify-between text-[11px] text-dim">
                 <div className="flex items-center gap-4">
                   <span className="flex items-center gap-1.5 font-light">
-                    <kbd className="px-1.5 py-0.5 bg-surface-highest rounded">↵</kbd>
+                    <kbd className="glass-badge px-1.5 py-0.5 text-[10px]">
+                      <span className="text-muted">{"\u21B5"}</span>
+                    </kbd>
                     Open
                   </span>
                   <span className="flex items-center gap-1.5 font-light">
-                    <kbd className="px-1.5 py-0.5 bg-surface-highest rounded">Esc</kbd>
+                    <kbd className="glass-badge px-1.5 py-0.5 text-[10px] text-muted">
+                      Esc
+                    </kbd>
                     Close
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="flex items-center gap-1.5 font-light">
-                    <Command className="w-3 h-3" strokeWidth={1.5} />
+                    <Command className="w-3 h-3 text-muted" strokeWidth={1.5} />
                     Commands
                   </span>
                 </div>
               </div>
             </div>
-          </>
+          </div>
         ) : sessionKey ? (
           <LauncherChat
             sessionKey={sessionKey}

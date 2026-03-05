@@ -19,7 +19,7 @@ export function LearnedRulesCard() {
   };
 
   return (
-    <div className="bg-surface-base rounded-xl p-4 flex flex-col gap-3">
+    <div className="glass-card p-4 flex flex-col gap-3">
       <h2 className="text-[13px] font-medium text-secondary flex items-center gap-2">
         <Shield className="w-3.5 h-3.5 text-muted" />
         Learned Rules

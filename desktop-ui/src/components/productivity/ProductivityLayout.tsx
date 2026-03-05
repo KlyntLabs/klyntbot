@@ -57,20 +57,20 @@ export function ProductivityLayout({ children, period, dateParam }: Productivity
         : formatMonthLabel(dateParam);
 
   return (
-    <div className="h-screen w-screen bg-background text-primary flex overflow-hidden">
+    <div className="h-screen w-screen bg-background text-primary flex gap-2 p-2 overflow-hidden">
       <Sidebar active="Productivity" />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="h-14 bg-background flex items-center px-4 gap-4 flex-shrink-0">
+      <div className="flex-1 flex flex-col gap-2 overflow-hidden">
+        <div className="h-12 flex items-center px-4 gap-4 shrink-0">
           <div className="flex items-center gap-1">
             {periods.map((p) => (
               <button
                 type="button"
                 key={p.key}
                 onClick={() => handlePeriodChange(p.key)}
-                className={`px-3 py-1.5 rounded-md text-[13px] font-light transition-colors ${
+                className={`px-3 py-1.5 rounded-xl text-[13px] font-light transition-all duration-200 ${
                   period === p.key
-                    ? "bg-surface-highest text-white"
-                    : "bg-surface-low text-muted hover:bg-surface-base hover:text-secondary"
+                    ? "glass-button-active text-primary"
+                    : "text-muted hover:text-secondary hover:bg-white/[0.04]"
                 }`}
               >
                 {p.label}

@@ -38,13 +38,13 @@ export function AddGoalDialog({ open, onClose, onAdd }: AddGoalDialogProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="glass-panel w-[400px]">
-        <div className="bg-surface-low rounded-[var(--glass-radius-inner)]">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+        <div className="bg-white/[0.04] rounded-[var(--glass-radius-inner)]">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.08]">
             <h3 className="text-[14px] font-medium text-primary">Add Goal</h3>
             <button
               type="button"
               onClick={onClose}
-              className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:text-secondary hover:bg-surface-base transition-colors"
+              className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:text-secondary hover:bg-white/[0.06] transition-colors"
             >
               <X className="w-4 h-4" />
             </button>
@@ -62,7 +62,7 @@ export function AddGoalDialog({ open, onClose, onAdd }: AddGoalDialogProps) {
                     className={`flex-1 py-1.5 text-[12px] rounded-md border transition-colors capitalize ${
                       goalType === t
                         ? "border-brand/50 text-brand bg-brand/5"
-                        : "border-border text-muted bg-surface-base hover:bg-surface-raised"
+                        : "border-white/[0.08] text-muted bg-white/[0.06] hover:bg-white/[0.08]"
                     }`}
                   >
                     {t}
@@ -82,7 +82,7 @@ export function AddGoalDialog({ open, onClose, onAdd }: AddGoalDialogProps) {
                     className={`px-3 py-2 text-[12px] text-left rounded-md border transition-colors ${
                       metric === m.value
                         ? "border-brand/50 text-brand bg-brand/5"
-                        : "border-border text-muted bg-surface-base hover:bg-surface-raised"
+                        : "border-white/[0.08] text-muted bg-white/[0.06] hover:bg-white/[0.08]"
                     }`}
                   >
                     {m.label}
@@ -103,16 +103,16 @@ export function AddGoalDialog({ open, onClose, onAdd }: AddGoalDialogProps) {
                 placeholder={selectedMetric.placeholder}
                 min={0}
                 step={metric === "productive_hours" ? 0.5 : 1}
-                className="w-full px-3 py-1.5 text-[13px] bg-surface-base border border-border rounded-md text-primary placeholder:text-dim"
+                className="w-full px-3 py-1.5 text-[13px] bg-white/[0.06] border border-white/[0.08] rounded-md text-primary placeholder:text-dim"
               />
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-border">
+          <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-white/[0.08]">
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1.5 text-[12px] text-muted hover:text-secondary rounded-md hover:bg-surface-base transition-colors"
+              className="px-3 py-1.5 text-[12px] text-muted hover:text-secondary rounded-md hover:bg-white/[0.06] transition-colors"
             >
               Cancel
             </button>

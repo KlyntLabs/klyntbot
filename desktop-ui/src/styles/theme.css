@@ -1,58 +1,81 @@
 :root {
   /* ── Typography ────────────────────────────── */
-  --font-size: 16px;
-  font-family: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+  --font-size: 15px;
+  font-family:
+    "SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont,
+    system-ui, "Helvetica Neue", sans-serif;
+  --font-weight-semibold: 600;
   --font-weight-medium: 500;
   --font-weight-normal: 400;
   --font-weight-light: 300;
 
   /* ── Shape ─────────────────────────────────── */
-  --radius: 0.625rem;
+  --radius: 0.75rem;
 
   /* ── Background ────────────────────────────── */
-  --background: #0e0e0d;
+  --background: #000000;
 
-  /* ── Surface staircase (white-alpha) ───────── */
-  --surface-lowest: rgba(255, 255, 255, 0.02);
-  --surface-low: rgba(255, 255, 255, 0.03);
-  --surface-base: rgba(255, 255, 255, 0.04);
-  --surface-raised: rgba(255, 255, 255, 0.06);
-  --surface-highest: rgba(255, 255, 255, 0.08);
+  /* ── Surface staircase (Tahoe glass tiers) ─── */
+  --surface-lowest: rgba(255, 255, 255, 0.025);
+  --surface-low: rgba(255, 255, 255, 0.04);
+  --surface-base: rgba(255, 255, 255, 0.06);
+  --surface-raised: rgba(255, 255, 255, 0.09);
+  --surface-highest: rgba(255, 255, 255, 0.13);
 
   /* ── Text hierarchy ────────────────────────── */
-  --text-primary: #e6edf3;
-  --text-secondary: #c9d1d9;
-  --text-muted: #8b949e;
-  --text-dim: #6e7681;
+  --text-primary: #f0f2f5;
+  --text-secondary: #c8cdd4;
+  --text-muted: #7d8590;
+  --text-dim: #5a616b;
 
   /* ── Brand ─────────────────────────────────── */
   --brand: #f97316;
-  --brand-hover: #ea6a0f;
+  --brand-hover: #fb923c;
+  --brand-glow: rgba(249, 115, 22, 0.25);
 
   /* ── Semantic ──────────────────────────────── */
-  --success: #22c55e;
-  --destructive: #d4183d;
-  --info: #3b82f6;
-  --purple: #8b5cf6;
+  --success: #34d399;
+  --destructive: #f43f5e;
+  --info: #60a5fa;
+  --purple: #a78bfa;
 
   /* ── Border ────────────────────────────────── */
   --border: rgba(255, 255, 255, 0.08);
   --border-subtle: rgba(255, 255, 255, 0.04);
 
   /* ── Overlay ───────────────────────────────── */
-  --overlay: rgba(0, 0, 0, 0.15);
-  --overlay-heavy: rgba(0, 0, 0, 0.2);
+  --overlay: rgba(0, 0, 0, 0.25);
+  --overlay-heavy: rgba(0, 0, 0, 0.45);
 
   /* ── Shadows ─────────────────────────────── */
-  --shadow-tooltip: 0 4px 16px rgba(0, 0, 0, 0.3);
+  --shadow-tooltip: 0 4px 20px rgba(0, 0, 0, 0.35);
 
-  /* ── Floating / glass ─────────────────────── */
-  --surface-floating: #1a1a1f;
-  --surface-glass: rgba(14, 12, 10, 0.72);
-  --glass-border: rgba(255, 255, 255, 0.1);
-  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+  /* ── Floating / glass (Tahoe Liquid Glass) ── */
+  --surface-floating: rgba(10, 10, 10, 0.92);
+
+  /* Glass material — primary tier */
+  --surface-glass: rgba(255, 255, 255, 0.08);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-border-strong: rgba(255, 255, 255, 0.20);
+  --glass-shadow: none;
   --glass-padding: 6px;
   --glass-radius-inner: calc(var(--radius-xl) - var(--glass-padding));
+
+  /* Glass material — sidebar tier (more translucent) */
+  --surface-glass-sidebar: rgba(255, 255, 255, 0.06);
+
+  /* Glass material — subtle tier (for buttons, inputs) */
+  --surface-glass-subtle: rgba(255, 255, 255, 0.06);
+  --surface-glass-subtle-hover: rgba(255, 255, 255, 0.10);
+
+  /* Glass material — elevated tier (for active states) */
+  --surface-glass-elevated: rgba(255, 255, 255, 0.14);
+
+  /* Glass material — tint tier (for colored glass) */
+  --glass-tint-brand: rgba(249, 115, 22, 0.08);
+  --glass-tint-info: rgba(96, 165, 250, 0.06);
+  --glass-tint-success: rgba(52, 211, 153, 0.06);
+  --glass-tint-destructive: rgba(244, 63, 94, 0.06);
 }
 
 @theme inline {
@@ -92,11 +115,13 @@
   --color-overlay: var(--overlay);
   --color-overlay-heavy: var(--overlay-heavy);
 
-  /* Radius */
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
+  /* Radius — Tahoe uses larger, pill-like radii */
+  --radius-sm: calc(var(--radius) - 6px);
+  --radius-md: calc(var(--radius) - 4px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-pill: 9999px;
 }
 
 @layer base {
@@ -106,6 +131,15 @@
 
   body {
     @apply bg-background text-primary;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-image:
+      radial-gradient(ellipse 70% 50% at 5% 95%, rgba(120, 80, 220, 0.18) 0%, transparent 70%),
+      radial-gradient(ellipse 55% 45% at 95% 5%, rgba(40, 120, 200, 0.15) 0%, transparent 65%),
+      radial-gradient(ellipse 60% 50% at 50% 50%, rgba(80, 60, 160, 0.08) 0%, transparent 55%),
+      radial-gradient(ellipse 45% 35% at 80% 80%, rgba(60, 140, 180, 0.10) 0%, transparent 55%),
+      radial-gradient(ellipse 40% 30% at 20% 20%, rgba(100, 60, 180, 0.12) 0%, transparent 50%);
+    background-attachment: fixed;
   }
 
   html {
@@ -114,16 +148,18 @@
 
   h1 {
     font-size: var(--text-2xl);
-    font-weight: var(--font-weight-medium);
-    line-height: 1.5;
+    font-weight: var(--font-weight-semibold);
+    line-height: 1.4;
     text-wrap: balance;
+    letter-spacing: -0.02em;
   }
 
   h2 {
     font-size: var(--text-xl);
     font-weight: var(--font-weight-medium);
-    line-height: 1.5;
+    line-height: 1.4;
     text-wrap: balance;
+    letter-spacing: -0.015em;
   }
 
   h3 {
@@ -131,6 +167,7 @@
     font-weight: var(--font-weight-medium);
     line-height: 1.5;
     text-wrap: balance;
+    letter-spacing: -0.01em;
   }
 
   h4 {
@@ -158,31 +195,136 @@
     line-height: 1.5;
   }
 
-  /* Focus ring — visible on keyboard nav only */
+  /* Focus ring — subtle outline, no glow */
   button:focus-visible,
   input:focus-visible,
   textarea:focus-visible,
   select:focus-visible,
   [role="button"]:focus-visible,
   [tabindex="0"]:focus-visible {
-    outline: 2px solid color-mix(in srgb, var(--brand) 50%, transparent);
+    outline: 2px solid color-mix(in srgb, var(--brand) 40%, transparent);
     outline-offset: 2px;
   }
 }
 
-/* ── Glass panel ──────────────────────────────
-   Reusable glassmorphism for dropdowns, popups,
-   popovers, dialogs, and floating panels.
-   Uses @apply for backdrop-filter so Tailwind
-   composes filter functions correctly.            */
+/* ── Glass materials ─────────────────────────
+   Tahoe-inspired glassmorphism tiers.
+   Each tier increases translucency + blur.
+   Uses @apply for backdrop-filter composition. */
 @layer utilities {
+  /* Primary glass — dropdowns, popovers, dialogs */
   .glass-panel {
-    @apply backdrop-blur-[80px] backdrop-saturate-150;
+    @apply backdrop-blur-[80px] backdrop-saturate-[1.6];
     background: var(--surface-glass);
     border: 1px solid var(--glass-border);
     border-radius: var(--radius-xl);
     box-shadow: var(--glass-shadow);
     padding: var(--glass-padding);
+  }
+
+  /* Sidebar glass — standalone rounded panel */
+  .glass-sidebar {
+    @apply backdrop-blur-[100px] backdrop-saturate-[1.8];
+    background: var(--surface-glass-sidebar);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-xl);
+  }
+
+  /* Toolbar glass — standalone rounded bar */
+  .glass-toolbar {
+    @apply backdrop-blur-[60px] backdrop-saturate-150;
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-xl);
+  }
+
+  /* Input glass — subtle translucency for form elements */
+  .glass-input {
+    @apply backdrop-blur-[40px] backdrop-saturate-[1.3];
+    background: var(--surface-glass-subtle);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-xl);
+    transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .glass-input:focus-within {
+    background: var(--surface-glass-subtle-hover);
+    border-color: rgba(255, 255, 255, 0.14);
+  }
+
+  /* Button glass — interactive glass element */
+  .glass-button {
+    @apply backdrop-blur-[30px] backdrop-saturate-[1.2];
+    background: var(--surface-glass-subtle);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: var(--radius-lg);
+    transition: all 0.2s ease;
+  }
+
+  .glass-button:hover {
+    background: var(--surface-glass-subtle-hover);
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+
+  .glass-button:active,
+  .glass-button-active {
+    background: var(--surface-glass-elevated);
+    border-color: rgba(255, 255, 255, 0.18);
+  }
+
+  /* Floating glass — popover windows (launcher, tray) over desktop.
+     Dark frosted glass that matches the main app's dark theme. */
+  .glass-floating {
+    @apply backdrop-blur-[80px] backdrop-saturate-[1.8];
+    background: rgba(10, 10, 14, 0.82);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: var(--radius-xl);
+    box-shadow: none;
+    padding: var(--glass-padding);
+  }
+
+  /* Card glass — content cards with subtle depth */
+  .glass-card {
+    @apply backdrop-blur-[50px] backdrop-saturate-150;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: var(--radius-xl);
+  }
+
+  /* Message bubble glass — chat bubbles */
+  .glass-bubble {
+    @apply backdrop-blur-[40px] backdrop-saturate-[1.4];
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: var(--radius-2xl);
+  }
+
+  /* User message bubble — dark gray glass */
+  .glass-bubble-user {
+    @apply backdrop-blur-[40px] backdrop-saturate-[1.4];
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: var(--radius-2xl);
+  }
+
+  /* Badge glass — small pill elements */
+  .glass-badge {
+    @apply backdrop-blur-[20px];
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: var(--radius-pill);
+  }
+
+  /* Divider glass — horizontal separator */
+  .glass-divider {
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.08) 20%,
+      rgba(255, 255, 255, 0.08) 80%,
+      transparent 100%
+    );
   }
 
   .tabular-nums {
@@ -196,12 +338,12 @@
 .streaming-cursor > div > *:last-child::after {
   content: "";
   display: inline-block;
-  width: 6px;
+  width: 2px;
   height: 16px;
-  margin-left: 2px;
-  background: var(--text-muted);
-  opacity: 0.5;
-  border-radius: 1px;
+  margin-left: 3px;
+  background: var(--brand);
+  opacity: 0.8;
+  border-radius: 2px;
   vertical-align: text-bottom;
   animation: cursor-blink 1s ease-in-out infinite;
 }
@@ -209,10 +351,10 @@
 @keyframes cursor-blink {
   0%,
   100% {
-    opacity: 0.5;
+    opacity: 0.8;
   }
   50% {
-    opacity: 0;
+    opacity: 0.15;
   }
 }
 
@@ -229,9 +371,24 @@
 @keyframes fade-in {
   from {
     opacity: 0;
+    transform: translateY(4px);
   }
   to {
     opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes glass-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(6px);
+    backdrop-filter: blur(0px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    backdrop-filter: blur(80px);
   }
 }
 

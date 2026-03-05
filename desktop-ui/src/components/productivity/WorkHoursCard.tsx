@@ -12,7 +12,7 @@ export function WorkHoursCard({ totalActiveSecs, workDayHours = 8 }: WorkHoursCa
   const isComplete = pct >= 100;
 
   return (
-    <div className="bg-surface-base rounded-xl p-4 flex flex-col gap-3">
+    <div className="glass-card p-4 flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <h2 className="text-[13px] font-medium text-secondary">Work Hours</h2>
         <span className="text-[10px] font-light text-dim">of {workDayHours}h target</span>
@@ -33,7 +33,7 @@ export function WorkHoursCard({ totalActiveSecs, workDayHours = 8 }: WorkHoursCa
 
       {/* Progress bar */}
       <div className="relative">
-        <div className="h-2 rounded-full bg-surface-raised overflow-hidden">
+        <div className="h-2 rounded-full bg-white/[0.08] overflow-hidden">
           <div
             className="h-full rounded-full transition-[width] duration-700"
             style={{

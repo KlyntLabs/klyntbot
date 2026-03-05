@@ -94,7 +94,7 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
   return (
     <div className="flex flex-col h-full max-h-[568px]">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-white/[0.06]">
         <button
           type="button"
           onClick={onBack}
@@ -122,7 +122,7 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
             <div key={msg.id}>
               {msg.role === "user" ? (
                 <div className="flex justify-end">
-                  <div className="max-w-[85%] rounded-xl px-4 py-2.5 bg-surface-raised">
+                  <div className="max-w-[85%] glass-bubble-user">
                     <p className="text-[13px] font-light whitespace-pre-wrap leading-relaxed text-primary">
                       {msg.content}
                     </p>
@@ -200,7 +200,7 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
 
       {/* Input */}
       <div className="px-4 pb-3">
-        <div className="flex items-center gap-3 bg-surface-base rounded-xl px-4 py-2.5">
+        <div className="flex items-center gap-3 glass-input px-4 py-2.5">
           <Sparkles className="w-[16px] h-[16px] text-brand shrink-0" strokeWidth={1.5} />
           <textarea
             ref={inputRef}
@@ -228,14 +228,14 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
       </div>
 
       {/* Footer */}
-      <div className="px-5 py-2.5 border-t border-border-subtle">
+      <div className="px-5 py-2.5 border-t border-white/[0.06]">
         <div className="flex items-center justify-between text-[11px] text-muted">
           <span className="flex items-center gap-1.5 font-light">
-            <kbd className="px-1.5 py-0.5 bg-surface-highest rounded">Esc</kbd>
+            <kbd className="px-1.5 py-0.5 glass-badge">Esc</kbd>
             Back to commands
           </span>
           <span className="flex items-center gap-1.5 font-light">
-            <kbd className="px-1.5 py-0.5 bg-surface-highest rounded">⌘/</kbd>
+            <kbd className="px-1.5 py-0.5 glass-badge">⌘/</kbd>
             Open full chat
           </span>
         </div>

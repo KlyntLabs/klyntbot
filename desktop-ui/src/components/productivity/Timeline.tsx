@@ -116,7 +116,7 @@ export function TimelineBar({ date }: TimelineBarProps) {
   }, [events, categoryMap]);
 
   return (
-    <div className="bg-surface-base rounded-xl p-4 flex flex-col gap-2 col-span-3">
+    <div className="glass-card p-4 flex flex-col gap-2 col-span-3">
       <div className="flex items-center justify-between">
         <h2 className="text-[13px] font-medium text-secondary">Timeline</h2>
         {/* Current time marker label */}
@@ -126,7 +126,7 @@ export function TimelineBar({ date }: TimelineBarProps) {
       </div>
 
       {/* Timeline bar */}
-      <div className="relative h-9 rounded-lg bg-surface-raised overflow-hidden">
+      <div className="relative h-9 rounded-lg bg-white/[0.08] overflow-hidden">
         {blocks.map((b, idx) => (
           <div
             aria-hidden="true"

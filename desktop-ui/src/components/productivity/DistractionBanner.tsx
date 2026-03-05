@@ -58,7 +58,7 @@ export function DistractionBanner({ summary }: DistractionBannerProps) {
       />
 
       {/* Content */}
-      <div className="relative flex items-center gap-3 bg-surface-base/80 px-4 py-3">
+      <div className="relative flex items-center gap-3 bg-white/[0.04] px-4 py-3">
         {/* Pulsing dot */}
         <div className="relative flex-shrink-0">
           <span
@@ -111,7 +111,7 @@ export function DistractionBanner({ summary }: DistractionBannerProps) {
               () => {},
             );
           }}
-          className="flex-shrink-0 p-1 rounded-md text-dim hover:text-muted hover:bg-surface-raised transition-colors"
+          className="flex-shrink-0 p-1 rounded-md text-dim hover:text-muted hover:bg-white/[0.08] transition-colors"
           aria-label="Dismiss"
         >
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">

@@ -154,7 +154,7 @@ export function ProjectDetail() {
   ];
 
   return (
-    <div className="h-screen w-screen bg-background text-primary flex overflow-hidden">
+    <div className="h-screen w-screen bg-background text-primary flex gap-2 p-2 overflow-hidden">
       <Sidebar
         active={activeSidebar}
         onNavigate={(item) => {
@@ -164,9 +164,9 @@ export function ProjectDetail() {
         }}
       />
 
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col gap-2 overflow-hidden">
         {/* Breadcrumb Header */}
-        <div className="h-14 flex items-center px-6 gap-3 border-b border-border">
+        <div className="h-12 flex items-center px-6 gap-3 shrink-0">
           <button
             type="button"
             onClick={() => navigate("/")}
@@ -244,7 +244,7 @@ export function ProjectDetail() {
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] font-light transition-colors ${
               confirmArchive
                 ? "bg-destructive text-white"
-                : "text-muted hover:text-secondary hover:bg-surface-low"
+                : "text-muted hover:text-secondary hover:bg-white/[0.04]"
             }`}
           >
             <Archive className="w-3.5 h-3.5" strokeWidth={1.5} />
@@ -257,7 +257,7 @@ export function ProjectDetail() {
           {/* Stats Row */}
           <div className="grid grid-cols-4 gap-3">
             {stats.map((stat) => (
-              <div key={stat.label} className="bg-surface-low rounded-xl p-4">
+              <div key={stat.label} className="glass-card p-4">
                 <p className="text-[11px] text-muted font-light mb-1">{stat.label}</p>
                 <p className="text-[22px] font-light text-primary">{stat.value}</p>
                 <p className="text-[11px] text-muted font-light mt-0.5">{stat.sub}</p>
@@ -285,12 +285,12 @@ export function ProjectDetail() {
               {objectives.map((objective) => {
                 const isExpanded = expandedOkrs.has(objective.id);
                 return (
-                  <div key={objective.id} className="bg-surface-low rounded-xl overflow-hidden">
+                  <div key={objective.id} className="glass-card overflow-hidden">
                     <div className="flex items-center">
                       <button
                         type="button"
                         onClick={() => toggleOkr(objective.id)}
-                        className="flex items-center gap-3 px-4 py-3.5 hover:bg-surface-lowest transition-colors text-left flex-1"
+                        className="flex items-center gap-3 px-4 py-3.5 hover:bg-white/[0.02] transition-colors text-left flex-1"
                       >
                         {isExpanded ? (
                           <ChevronDown
@@ -359,7 +359,7 @@ export function ProjectDetail() {
 
               {/* Add Objective inline row */}
               {addingObjective && (
-                <div className="bg-surface-low rounded-xl px-4 py-3">
+                <div className="glass-card px-4 py-3">
                   <input
                     value={newObjTitle}
                     onChange={(e) => setNewObjTitle(e.target.value)}
@@ -397,9 +397,9 @@ export function ProjectDetail() {
                 New Task
               </button>
             </div>
-            <div className="bg-surface-low rounded-xl overflow-hidden">
+            <div className="glass-card overflow-hidden">
               {/* Table Header */}
-              <div className="grid grid-cols-[40px_1fr_80px_100px_120px_140px] gap-4 border-b border-border text-[11px] text-muted font-light px-6 py-3">
+              <div className="grid grid-cols-[40px_1fr_80px_100px_120px_140px] gap-4 border-b border-white/[0.08] text-[11px] text-muted font-light px-6 py-3">
                 <div></div>
                 <div>Task</div>
                 <div>Priority</div>
@@ -410,7 +410,7 @@ export function ProjectDetail() {
 
               {/* Add Task inline row */}
               {addingTask && (
-                <div className="grid grid-cols-[40px_1fr_80px_100px_120px_140px] gap-4 px-6 py-3 border-b border-border-subtle">
+                <div className="grid grid-cols-[40px_1fr_80px_100px_120px_140px] gap-4 px-6 py-3 border-b border-white/[0.04]">
                   <div />
                   <div className="flex items-center">
                     <input
@@ -453,7 +453,7 @@ export function ProjectDetail() {
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") navigate(`/task/${task.id}`);
                     }}
-                    className="grid grid-cols-[40px_1fr_80px_100px_120px_140px] gap-4 px-6 py-3 hover:bg-surface-base transition-colors border-b border-border-subtle last:border-b-0 cursor-pointer"
+                    className="grid grid-cols-[40px_1fr_80px_100px_120px_140px] gap-4 px-6 py-3 hover:bg-white/[0.06] transition-colors border-b border-white/[0.04] last:border-b-0 cursor-pointer"
                   >
                     <fieldset
                       className="flex items-center border-none p-0 m-0"

@@ -48,14 +48,14 @@ export function ThreadContextMenu({
       role="menu"
       onMouseDown={(e) => e.stopPropagation()}
       onKeyDown={handleKeyDown}
-      className="fixed z-50 bg-surface-raised border border-border rounded-lg shadow-lg py-1 min-w-[140px]"
+      className="fixed z-50 bg-white/[0.08] border border-white/[0.08] rounded-lg shadow-lg py-1 min-w-[140px]"
       style={{ left: x, top: y }}
     >
       <button
         type="button"
         role="menuitem"
         onClick={() => onRename(thread)}
-        className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] font-light text-secondary hover:bg-surface-base transition-colors"
+        className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] font-light text-secondary hover:bg-white/[0.06] transition-colors"
       >
         <Pencil className="w-3 h-3" strokeWidth={1.5} />
         Rename
@@ -64,7 +64,7 @@ export function ThreadContextMenu({
         type="button"
         role="menuitem"
         onClick={() => onDelete(thread.sessionKey)}
-        className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] font-light text-destructive hover:bg-surface-base transition-colors"
+        className="w-full flex items-center gap-2 px-3 py-1.5 text-[12px] font-light text-destructive hover:bg-white/[0.06] transition-colors"
       >
         <Trash2 className="w-3 h-3" strokeWidth={1.5} />
         Delete

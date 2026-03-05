@@ -40,14 +40,14 @@ export function Sidebar({ active, onNavigate }: SidebarProps) {
   const bottomItems = items.filter((i) => i.bottom);
 
   return (
-    <div className="w-14 bg-background backdrop-blur-xl border-r border-border flex flex-col items-center gap-1 pb-3">
+    <div className="w-[52px] glass-sidebar flex flex-col items-center gap-1 py-2">
       {/* Logo */}
-      <div className="h-14 flex items-center px-2">
+      <div className="flex items-center mb-1">
         <button
           type="button"
           onClick={() => navigate("/")}
           aria-label="Home"
-          className="w-9 h-9 rounded-lg bg-white flex items-center justify-center p-0.5 hover:opacity-80 transition-opacity"
+          className="w-8 h-8 rounded-xl bg-white/90 flex items-center justify-center p-0.5 hover:bg-white transition-all"
         >
           <KlyntLogo className="w-full h-full" />
         </button>
@@ -63,13 +63,13 @@ export function Sidebar({ active, onNavigate }: SidebarProps) {
             key={item.key}
             onClick={() => handleClick(item)}
             aria-label={item.key}
-            className={`w-9 h-9 rounded-md flex items-center justify-center transition-colors ${
+            className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-200 ${
               isActive
-                ? "bg-surface-highest text-brand"
-                : "text-muted hover:bg-surface-base hover:text-secondary"
+                ? "glass-button-active text-brand"
+                : "text-muted hover:text-secondary hover:bg-white/[0.05]"
             }`}
           >
-            <Icon className="w-[18px] h-[18px]" strokeWidth={1.5} aria-hidden="true" />
+            <Icon className="w-[17px] h-[17px]" strokeWidth={1.5} aria-hidden="true" />
           </button>
         );
       })}
@@ -86,13 +86,13 @@ export function Sidebar({ active, onNavigate }: SidebarProps) {
             key={item.key}
             onClick={() => handleClick(item)}
             aria-label={item.key}
-            className={`w-9 h-9 rounded-md flex items-center justify-center transition-colors ${
+            className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-200 ${
               isActive
-                ? "bg-surface-highest text-brand"
-                : "text-muted hover:bg-surface-base hover:text-secondary"
+                ? "glass-button-active text-brand"
+                : "text-muted hover:text-secondary hover:bg-white/[0.05]"
             }`}
           >
-            <Icon className="w-[18px] h-[18px]" strokeWidth={1.5} aria-hidden="true" />
+            <Icon className="w-[17px] h-[17px]" strokeWidth={1.5} aria-hidden="true" />
           </button>
         );
       })}

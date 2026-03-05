@@ -118,11 +118,11 @@ export function FinanceBudgets() {
                         style={{ backgroundColor: COLORS[i % COLORS.length] }}
                       />
                       <span className="text-[13px] font-light text-secondary">{b.name}</span>
-                      <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-surface-base text-dim">
+                      <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-white/[0.06] text-dim">
                         {b.period}
                       </span>
                       {b.category && (
-                        <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-surface-base text-dim">
+                        <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-white/[0.06] text-dim">
                           {b.category}
                         </span>
                       )}

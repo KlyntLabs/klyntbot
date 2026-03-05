@@ -10,7 +10,7 @@ export function Progress({ value, className }: ProgressProps) {
   return (
     <ProgressPrimitive.Root
       value={value}
-      className={cn("h-1.5 w-full bg-surface-raised rounded-full overflow-hidden", className)}
+      className={cn("h-1.5 w-full bg-white/[0.08] rounded-full overflow-hidden", className)}
     >
       <ProgressPrimitive.Indicator
         className="h-full bg-brand rounded-full transition-[width]"

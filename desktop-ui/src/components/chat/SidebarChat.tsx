@@ -27,7 +27,7 @@ function sessionKeyFor(entityKind?: string, entityId?: string): string {
 function contextLabel(entityKind?: string): string {
   if (!entityKind) return "Chat";
   const parts = entityKind.split(".");
-  return parts.map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(" › ");
+  return parts.map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join(" \u203A ");
 }
 
 export function SidebarChat({
@@ -87,9 +87,9 @@ export function SidebarChat({
   const label = contextLabel(pageContext?.entityKind);
 
   return (
-    <div className="w-96 bg-background border-l border-border flex flex-col">
+    <div className="w-96 glass-sidebar flex flex-col shrink-0">
       {/* Header */}
-      <div className="h-14 flex items-center justify-between px-5 border-b border-border">
+      <div className="h-14 flex items-center justify-between px-5">
         <span className="text-[13px] font-light text-secondary">{label}</span>
         <div className="flex items-center gap-1">
           {pageContext && (
@@ -98,7 +98,7 @@ export function SidebarChat({
               onClick={handlePin}
               aria-label="Pin to Chat threads"
               title="Pin to Chat threads"
-              className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:text-secondary hover:bg-surface-base transition-colors"
+              className="w-7 h-7 rounded-lg flex items-center justify-center text-muted hover:text-secondary hover:bg-white/[0.06] transition-all"
             >
               <Pin className="w-3.5 h-3.5" strokeWidth={1.5} />
             </button>
@@ -107,12 +107,14 @@ export function SidebarChat({
             type="button"
             onClick={onClose}
             aria-label="Close chat"
-            className="w-7 h-7 rounded-md flex items-center justify-center text-muted hover:text-secondary hover:bg-surface-base transition-colors"
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-muted hover:text-secondary hover:bg-white/[0.06] transition-all"
           >
             <X className="w-4 h-4" strokeWidth={1.5} />
           </button>
         </div>
       </div>
+
+      <div className="mx-4 glass-divider" />
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-5">
@@ -166,7 +168,7 @@ function SidebarChatInput({
   const { ref: textareaRef, handleInput } = useAutoResizeTextarea(input);
 
   return (
-    <div className="p-4 border-t border-border">
+    <div className="p-4">
       <div className="flex gap-2 items-end">
         <textarea
           ref={textareaRef}
@@ -182,7 +184,7 @@ function SidebarChatInput({
           aria-label="Message input"
           placeholder="Ask about this page\u2026"
           rows={1}
-          className="flex-1 bg-surface-base rounded-xl px-4 py-2.5 text-[13px] text-primary placeholder:text-muted focus:bg-surface-raised font-light resize-none overflow-hidden"
+          className="flex-1 glass-input px-4 py-2.5 text-[13px] text-primary placeholder:text-muted font-light resize-none overflow-hidden outline-none"
           style={{ maxHeight: "120px" }}
         />
         <button
@@ -190,7 +192,7 @@ function SidebarChatInput({
           onClick={onSend}
           disabled={!input.trim() || isStreaming}
           aria-label="Send message"
-          className="w-10 h-10 rounded-xl bg-brand hover:bg-brand/90 disabled:bg-surface-base disabled:text-muted flex items-center justify-center transition-colors shrink-0"
+          className="w-10 h-10 rounded-xl bg-brand hover:bg-brand-hover disabled:bg-white/[0.06] disabled:text-muted flex items-center justify-center transition-all shrink-0"
         >
           <Send className="w-4 h-4" strokeWidth={2} />
         </button>

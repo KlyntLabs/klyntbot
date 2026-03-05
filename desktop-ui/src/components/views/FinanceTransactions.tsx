@@ -131,8 +131,8 @@ export function FinanceTransactions() {
                 className={cn(
                   "px-2.5 py-1 rounded-md text-[11px] font-light transition-colors",
                   filter === f.key
-                    ? "bg-surface-highest text-brand"
-                    : "text-muted hover:text-secondary hover:bg-surface-base",
+                    ? "bg-white/[0.12] text-brand"
+                    : "text-muted hover:text-secondary hover:bg-white/[0.06]",
                 )}
               >
                 {f.label}
@@ -142,7 +142,7 @@ export function FinanceTransactions() {
           <select
             value={acctFilter}
             onChange={(e) => setAcctFilter(e.target.value)}
-            className="bg-surface-low border border-border rounded-md px-2 py-1 text-[11px] font-light text-secondary"
+            className="bg-white/[0.04] border border-white/[0.08] rounded-md px-2 py-1 text-[11px] font-light text-secondary"
           >
             <option value="all">All Accounts</option>
             {accounts
@@ -164,7 +164,7 @@ export function FinanceTransactions() {
               value={searchQ}
               onChange={(e) => setSearchQ(e.target.value)}
               placeholder="Search\u2026"
-              className="bg-surface-low border border-border rounded-md pl-6 pr-2 py-1 text-[11px] font-light text-secondary placeholder:text-dim w-48"
+              className="bg-white/[0.04] border border-white/[0.08] rounded-md pl-6 pr-2 py-1 text-[11px] font-light text-secondary placeholder:text-dim w-48"
             />
           </div>
           <button
@@ -179,7 +179,7 @@ export function FinanceTransactions() {
         <div className="col-span-9">
           <SectionLabel>Transactions ({filtered.length})</SectionLabel>
           <Card className="overflow-hidden">
-            <div className="grid grid-cols-[70px_24px_1fr_80px_100px_120px] gap-2 border-b border-border text-[10px] text-dim font-light px-4 py-2">
+            <div className="grid grid-cols-[70px_24px_1fr_80px_100px_120px] gap-2 border-b border-white/[0.08] text-[10px] text-dim font-light px-4 py-2">
               <div>Date</div>
               <div></div>
               <div>Description</div>
@@ -210,7 +210,7 @@ export function FinanceTransactions() {
                 return (
                   <div
                     key={tx.id}
-                    className="grid grid-cols-[70px_24px_1fr_80px_100px_120px] gap-2 items-center px-4 py-2.5 hover:bg-surface-base transition-colors border-b border-border-subtle last:border-b-0"
+                    className="grid grid-cols-[70px_24px_1fr_80px_100px_120px] gap-2 items-center px-4 py-2.5 hover:bg-white/[0.06] transition-colors border-b border-white/[0.04] last:border-b-0"
                   >
                     <span className="text-[10px] text-dim font-light tabular-nums">
                       {tx.txDate}
@@ -224,7 +224,7 @@ export function FinanceTransactions() {
                         <p className="text-[9px] text-dim font-light">{tx.subcategory}</p>
                       )}
                     </div>
-                    <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-surface-base text-dim truncate">
+                    <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-white/[0.06] text-dim truncate">
                       {tx.category ?? "—"}
                     </span>
                     <span className="text-[10px] text-dim font-light truncate">
@@ -252,7 +252,7 @@ export function FinanceTransactions() {
                   value={`${fmtCompact(totalExpense)}đ`}
                   size={140}
                 />
-                <div className="mt-3 pt-2.5 border-t border-border-subtle space-y-1.5">
+                <div className="mt-3 pt-2.5 border-t border-white/[0.04] space-y-1.5">
                   {catSegs.map((seg) => (
                     <div key={seg.name} className="flex justify-between items-center">
                       <div className="flex items-center gap-1.5">

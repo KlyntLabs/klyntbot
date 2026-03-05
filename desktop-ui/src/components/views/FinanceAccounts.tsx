@@ -82,12 +82,12 @@ export function FinanceAccounts() {
                   key={acct.id}
                   className={cn(
                     "p-4 cursor-pointer transition-colors",
-                    isSelected ? "ring-1 ring-brand bg-surface-base" : "hover:bg-surface-base",
+                    isSelected ? "ring-1 ring-brand bg-white/[0.06]" : "hover:bg-white/[0.06]",
                   )}
                   onClick={() => setSelectedId(isSelected ? null : acct.id)}
                 >
                   <div className="flex items-center gap-3 mb-3">
-                    <div className="w-9 h-9 rounded-lg bg-surface-raised flex items-center justify-center flex-shrink-0">
+                    <div className="w-9 h-9 rounded-lg bg-white/[0.08] flex items-center justify-center flex-shrink-0">
                       <Icon className="w-4 h-4 text-muted" strokeWidth={1.5} />
                     </div>
                     <div className="min-w-0 flex-1">
@@ -165,7 +165,7 @@ export function FinanceAccounts() {
                   return (
                     <div
                       key={tx.id}
-                      className="flex items-center gap-2 px-3 py-2 hover:bg-surface-base transition-colors border-b border-border-subtle last:border-b-0"
+                      className="flex items-center gap-2 px-3 py-2 hover:bg-white/[0.06] transition-colors border-b border-white/[0.04] last:border-b-0"
                     >
                       <TxI className={cn("w-3 h-3 flex-shrink-0", col)} strokeWidth={1.5} />
                       <div className="min-w-0 flex-1">

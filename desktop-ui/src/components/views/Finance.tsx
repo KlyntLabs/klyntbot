@@ -178,7 +178,7 @@ export function Finance() {
                 </span>
               </div>
             </div>
-            <div className="flex gap-3 mt-3 pt-2.5 border-t border-border-subtle">
+            <div className="flex gap-3 mt-3 pt-2.5 border-t border-white/[0.04]">
               {netWorth.totalsByCurrency.map((c) => (
                 <span key={c.currency} className="text-[9px] font-light">
                   <span className="text-dim">{c.currency}</span>{" "}
@@ -198,11 +198,11 @@ export function Finance() {
               return (
                 <Card
                   key={acct.id}
-                  className="p-3.5 cursor-pointer hover:bg-surface-base transition-colors"
+                  className="p-3.5 cursor-pointer hover:bg-white/[0.06] transition-colors"
                   onClick={() => navigate(`/finance/accounts?id=${acct.id}`)}
                 >
                   <div className="flex items-center gap-2 mb-2.5">
-                    <div className="w-7 h-7 rounded-lg bg-surface-raised flex items-center justify-center flex-shrink-0">
+                    <div className="w-7 h-7 rounded-lg bg-white/[0.08] flex items-center justify-center flex-shrink-0">
                       <Icon className="w-3.5 h-3.5 text-muted" strokeWidth={1.5} />
                     </div>
                     <div className="min-w-0">
@@ -228,7 +228,7 @@ export function Finance() {
         <div className="col-span-9 flex flex-col">
           <SectionLabel>Spending by Category</SectionLabel>
           <Card className="overflow-hidden flex-1">
-            <div className="grid grid-cols-[1fr_100px_100px_100px_50px] gap-3 border-b border-border text-[10px] text-dim font-light px-4 py-2">
+            <div className="grid grid-cols-[1fr_100px_100px_100px_50px] gap-3 border-b border-white/[0.08] text-[10px] text-dim font-light px-4 py-2">
               <div>Category</div>
               <div className="text-right">Budget</div>
               <div className="text-right">Spent</div>
@@ -243,7 +243,7 @@ export function Finance() {
                 return (
                   <div
                     key={b.id}
-                    className="grid grid-cols-[1fr_100px_100px_100px_50px] gap-3 px-4 py-2.5 hover:bg-surface-base transition-colors border-b border-border-subtle last:border-b-0"
+                    className="grid grid-cols-[1fr_100px_100px_100px_50px] gap-3 px-4 py-2.5 hover:bg-white/[0.06] transition-colors border-b border-white/[0.04] last:border-b-0"
                   >
                     <div className="flex items-center gap-2">
                       <div
@@ -318,7 +318,7 @@ export function Finance() {
               return (
                 <div
                   key={tx.id}
-                  className="flex items-center gap-3 px-4 py-2 hover:bg-surface-base transition-colors border-b border-border-subtle last:border-b-0"
+                  className="flex items-center gap-3 px-4 py-2 hover:bg-white/[0.06] transition-colors border-b border-white/[0.04] last:border-b-0"
                 >
                   <span className="text-[10px] text-dim font-light w-10 flex-shrink-0 tabular-nums">
                     {tx.txDate.slice(5)}
@@ -328,7 +328,7 @@ export function Finance() {
                     {tx.counterparty ?? tx.notes ?? tx.txType}
                   </span>
                   {tx.category && (
-                    <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-surface-base text-dim">
+                    <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-white/[0.06] text-dim">
                       {tx.category}
                     </span>
                   )}
@@ -368,7 +368,7 @@ export function Finance() {
                   {fmtCompact(totalSpend)}đ
                 </span>
               </div>
-              <div className="border-t border-border-subtle pt-2 flex justify-between">
+              <div className="border-t border-white/[0.04] pt-2 flex justify-between">
                 <span className="text-[10px] text-muted font-light">Savings rate</span>
                 <span className="text-[10px] text-brand font-light tabular-nums">
                   {totalIncome > 0 ? pct(totalIncome - totalSpend, totalIncome) : 0}%
@@ -385,7 +385,7 @@ export function Finance() {
                 value={`${fmtCompact(totalInvest)}đ`}
                 size={130}
               />
-              <div className="mt-3 pt-2.5 border-t border-border-subtle space-y-1.5">
+              <div className="mt-3 pt-2.5 border-t border-white/[0.04] space-y-1.5">
                 {portfolios.map((p) => {
                   const r = retPct(p.totalValue, p.totalCostBasis);
                   return (
@@ -416,7 +416,7 @@ export function Finance() {
               const p = pct(g.currentAmount, g.targetAmount);
               const Icon = GOAL_ICONS[g.goalType] ?? Target;
               return (
-                <div key={g.id} className="px-4 py-3 hover:bg-surface-base transition-colors">
+                <div key={g.id} className="px-4 py-3 hover:bg-white/[0.06] transition-colors">
                   <div className="flex items-center justify-between mb-1.5">
                     <div className="flex items-center gap-2">
                       <Icon
@@ -427,7 +427,7 @@ export function Finance() {
                         strokeWidth={1.5}
                       />
                       <span className="text-[12px] font-light text-secondary">{g.name}</span>
-                      <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-surface-base text-dim">
+                      <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-white/[0.06] text-dim">
                         {g.goalType}
                       </span>
                     </div>
@@ -464,13 +464,13 @@ export function Finance() {
               return (
                 <div
                   key={l.id}
-                  className="px-4 py-3 hover:bg-surface-base transition-colors border-b border-border-subtle last:border-b-0"
+                  className="px-4 py-3 hover:bg-white/[0.06] transition-colors border-b border-white/[0.04] last:border-b-0"
                 >
                   <div className="flex items-center justify-between mb-1.5">
                     <div className="flex items-center gap-2">
                       <Icon className="w-3.5 h-3.5 text-destructive/60" strokeWidth={1.5} />
                       <span className="text-[12px] font-light text-secondary">{l.name}</span>
-                      <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-surface-base text-dim">
+                      <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-white/[0.06] text-dim">
                         {l.liabilityType.replace("_", " ")}
                       </span>
                     </div>
@@ -478,7 +478,7 @@ export function Finance() {
                       {fmtMoney(l.remaining, l.currency)}
                     </span>
                   </div>
-                  <div className="h-1.5 w-full bg-surface-raised rounded-full overflow-hidden">
+                  <div className="h-1.5 w-full bg-white/[0.08] rounded-full overflow-hidden">
                     <div className="h-full bg-success rounded-full" style={{ width: `${paid}%` }} />
                   </div>
                   <div className="flex gap-3 mt-1">
@@ -495,7 +495,7 @@ export function Finance() {
                 </div>
               );
             })}
-            <div className="px-4 py-2.5 border-t border-border bg-surface-lowest flex justify-between">
+            <div className="px-4 py-2.5 border-t border-white/[0.08] bg-white/[0.02] flex justify-between">
               <span className="text-[10px] font-light text-muted">Total Debt</span>
               <span className="text-[10px] font-light text-destructive">
                 {fmtVnd(liabilities.reduce((s, l) => s + toVnd(l.remaining, l.currency, rates), 0))}

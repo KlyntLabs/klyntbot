@@ -3,7 +3,7 @@ import type { ChatThread } from "../../lib/types";
 import { GroupHeader } from "./GroupHeader";
 import { ThreadButton } from "./ThreadButton";
 
-// Known feature prefixes → display config
+// Known feature prefixes -> display config
 const FEATURE_GROUPS: Record<string, { label: string; icon: typeof Wallet }> = {
   finance: { label: "Finance", icon: Wallet },
 };
@@ -74,35 +74,37 @@ export function ThreadList({
   );
 
   return (
-    <div className="w-[250px] bg-background border-r border-border flex flex-col">
+    <div className="w-[250px] glass-sidebar flex flex-col">
       {/* Quick Links */}
       <div className="px-4 py-3 space-y-1">
         <button
           type="button"
           onClick={onNewThread}
-          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-surface-base transition-colors text-[12px] font-light text-muted hover:text-secondary"
+          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/[0.05] transition-all text-[12px] font-light text-muted hover:text-secondary"
         >
           <Plus className="w-[13px] h-[13px]" strokeWidth={1.5} />
           New thread
         </button>
         <button
           type="button"
-          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-surface-base transition-colors text-[12px] font-light text-muted hover:text-secondary"
+          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/[0.05] transition-all text-[12px] font-light text-muted hover:text-secondary"
         >
           <RotateCcw className="w-[13px] h-[13px]" strokeWidth={1.5} />
           Automations
         </button>
         <button
           type="button"
-          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-surface-base transition-colors text-[12px] font-light text-muted hover:text-secondary"
+          className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-white/[0.05] transition-all text-[12px] font-light text-muted hover:text-secondary"
         >
           <Settings className="w-[13px] h-[13px]" strokeWidth={1.5} />
           Skills and Apps
         </button>
       </div>
 
+      <div className="mx-4 glass-divider" />
+
       {/* Thread List */}
-      <div className="flex-1 overflow-y-auto px-3 pb-3">
+      <div className="flex-1 overflow-y-auto px-3 pb-3 pt-2">
         <div className="space-y-3">
           {/* PARA: Area groups */}
           {grouped.areas.map((area) => (

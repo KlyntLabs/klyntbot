@@ -20,7 +20,7 @@ export function ProjectHeader({
   const navigate = useNavigate();
 
   return (
-    <div className="w-full flex items-center gap-3 px-6 py-3 bg-overlay hover:bg-overlay-heavy transition-colors text-left border-b border-border-subtle">
+    <div className="w-full flex items-center gap-3 px-6 py-2.5 bg-white/[0.03] hover:bg-white/[0.05] transition-colors text-left">
       <button
         type="button"
         onClick={onToggle}

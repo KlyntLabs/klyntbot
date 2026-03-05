@@ -19,7 +19,7 @@ export function FocusSessionsList({ date }: FocusSessionsListProps) {
 
   if (sessions.length === 0) {
     return (
-      <div className="bg-surface-base rounded-xl p-4">
+      <div className="glass-card p-4">
         <h2 className="text-[13px] font-medium text-secondary mb-3">Focus Sessions</h2>
         <p className="text-[12px] font-light text-dim">No sessions today</p>
       </div>
@@ -27,7 +27,7 @@ export function FocusSessionsList({ date }: FocusSessionsListProps) {
   }
 
   return (
-    <div className="bg-surface-base rounded-xl p-4 flex flex-col gap-3">
+    <div className="glass-card p-4 flex flex-col gap-3">
       <h2 className="text-[13px] font-medium text-secondary">Focus Sessions</h2>
       <div className="flex flex-col gap-0.5">
         {sessions.map((s) => {
@@ -35,7 +35,7 @@ export function FocusSessionsList({ date }: FocusSessionsListProps) {
           return (
             <div
               key={s.id}
-              className="flex items-center gap-3 py-2 border-b border-border-subtle last:border-b-0"
+              className="flex items-center gap-3 py-2 border-b border-white/[0.04] last:border-b-0"
             >
               <span className="text-[11px] font-light text-muted tabular-nums w-14">
                 {formatTime(s.startedAt)}

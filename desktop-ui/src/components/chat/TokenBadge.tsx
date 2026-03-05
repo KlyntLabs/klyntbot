@@ -51,7 +51,7 @@ export function TokenBadge({ transparency, isStreaming }: TokenBadgeProps) {
       </button>
 
       {expanded && (
-        <div className="mt-1.5 p-2.5 rounded-lg bg-surface-base border border-border text-[10px] font-light space-y-1">
+        <div className="mt-1.5 p-2.5 rounded-lg bg-white/[0.06] border border-white/[0.08] text-[10px] font-light space-y-1">
           <div className="flex justify-between text-muted">
             <span>Input tokens</span>
             <span className="text-secondary">{usage.promptTokens.toLocaleString()}</span>
@@ -80,7 +80,7 @@ export function TokenBadge({ transparency, isStreaming }: TokenBadgeProps) {
           )}
           {cost && (
             <>
-              <div className="border-t border-border my-1" />
+              <div className="border-t border-white/[0.08] my-1" />
               <div className="flex justify-between text-muted">
                 <span>Model</span>
                 <span className="text-secondary">{cost.model}</span>

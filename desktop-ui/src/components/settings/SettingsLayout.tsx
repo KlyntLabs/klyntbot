@@ -31,7 +31,7 @@ export function SettingsLayout({ children }: SettingsLayoutProps) {
   const currentPath = location.pathname;
 
   return (
-    <div className="h-screen w-screen bg-background text-primary flex overflow-hidden">
+    <div className="h-screen w-screen bg-background text-primary flex gap-2 p-2 overflow-hidden">
       <Sidebar
         active="Settings"
         onNavigate={(item) => {
@@ -42,8 +42,8 @@ export function SettingsLayout({ children }: SettingsLayoutProps) {
         }}
       />
 
-      {/* Settings sidebar */}
-      <div className="w-56 bg-background border-r border-border flex flex-col py-3">
+      {/* Settings sidebar — floating glass panel */}
+      <div className="w-56 glass-sidebar flex flex-col py-3">
         <button
           type="button"
           onClick={() => navigate("/")}
@@ -68,10 +68,10 @@ export function SettingsLayout({ children }: SettingsLayoutProps) {
                 type="button"
                 key={section.path}
                 onClick={() => navigate(section.path)}
-                className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[13px] font-light transition-colors text-left ${
+                className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-[13px] font-light transition-all duration-200 text-left ${
                   isActive
-                    ? "bg-surface-highest text-primary"
-                    : "text-muted hover:bg-surface-base hover:text-secondary"
+                    ? "glass-button-active text-primary"
+                    : "text-muted hover:bg-white/[0.05] hover:text-secondary"
                 }`}
               >
                 <Icon className="w-4 h-4 flex-shrink-0" strokeWidth={1.5} />
@@ -82,7 +82,7 @@ export function SettingsLayout({ children }: SettingsLayoutProps) {
         </nav>
       </div>
 
-      {/* Content area */}
+      {/* Content area — no glass wrapper */}
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-3xl mx-auto p-8">{children}</div>
       </div>

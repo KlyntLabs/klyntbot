@@ -133,7 +133,7 @@ export function FinanceLiabilities() {
                     </div>
                   </div>
 
-                  <div className="h-2 w-full bg-surface-raised rounded-full overflow-hidden mb-2">
+                  <div className="h-2 w-full bg-white/[0.08] rounded-full overflow-hidden mb-2">
                     <div
                       className="h-full bg-success rounded-full transition-[width]"
                       style={{ width: `${paid}%` }}
@@ -167,7 +167,7 @@ export function FinanceLiabilities() {
                     )}
                   </div>
 
-                  <div className="flex items-center gap-4 mt-2 pt-2 border-t border-border-subtle">
+                  <div className="flex items-center gap-4 mt-2 pt-2 border-t border-white/[0.04]">
                     {l.dueDate && (
                       <span className="text-[9px] text-dim font-light">Due: {l.dueDate}</span>
                     )}
@@ -229,7 +229,7 @@ export function FinanceLiabilities() {
                     </span>
                   </div>
                 ))}
-              <div className="border-t border-border-subtle pt-2 flex justify-between">
+              <div className="border-t border-white/[0.04] pt-2 flex justify-between">
                 <span className="text-[10px] text-muted font-light">Total Monthly</span>
                 <span className="text-[10px] text-brand font-light">{fmtVnd(monthlyTotal)}/mo</span>
               </div>

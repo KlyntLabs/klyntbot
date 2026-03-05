@@ -118,7 +118,7 @@ export function MiniCalendar({ value, onSelect, onClear }: MiniCalendarProps) {
             className={`px-2 py-0.5 text-[11px] font-light rounded-md transition-colors ${
               value === s.iso
                 ? "bg-brand text-white"
-                : "bg-surface-base text-muted hover:bg-surface-raised hover:text-secondary"
+                : "bg-white/[0.06] text-muted hover:bg-white/[0.08] hover:text-secondary"
             }`}
           >
             {s.label}
@@ -132,7 +132,7 @@ export function MiniCalendar({ value, onSelect, onClear }: MiniCalendarProps) {
           type="button"
           onClick={prevMonth}
           aria-label="Previous month"
-          className="w-6 h-6 flex items-center justify-center rounded-md text-muted hover:text-secondary hover:bg-surface-raised transition-colors"
+          className="w-6 h-6 flex items-center justify-center rounded-md text-muted hover:text-secondary hover:bg-white/[0.08] transition-colors"
         >
           <ChevronLeft className="w-3.5 h-3.5" strokeWidth={1.5} />
         </button>
@@ -143,7 +143,7 @@ export function MiniCalendar({ value, onSelect, onClear }: MiniCalendarProps) {
           type="button"
           onClick={nextMonth}
           aria-label="Next month"
-          className="w-6 h-6 flex items-center justify-center rounded-md text-muted hover:text-secondary hover:bg-surface-raised transition-colors"
+          className="w-6 h-6 flex items-center justify-center rounded-md text-muted hover:text-secondary hover:bg-white/[0.08] transition-colors"
         >
           <ChevronRight className="w-3.5 h-3.5" strokeWidth={1.5} />
         </button>
@@ -181,8 +181,8 @@ export function MiniCalendar({ value, onSelect, onClear }: MiniCalendarProps) {
                   : isToday
                     ? "ring-1 ring-brand text-brand"
                     : isCurrentMonth
-                      ? "text-secondary hover:bg-surface-raised"
-                      : "text-dim hover:bg-surface-raised"
+                      ? "text-secondary hover:bg-white/[0.08]"
+                      : "text-dim hover:bg-white/[0.08]"
               }`}
             >
               {d.getDate()}
@@ -196,7 +196,7 @@ export function MiniCalendar({ value, onSelect, onClear }: MiniCalendarProps) {
         <button
           type="button"
           onClick={onClear}
-          className="w-full text-left mt-1 px-2 py-1 text-[11px] font-light text-destructive hover:bg-surface-raised transition-colors"
+          className="w-full text-left mt-1 px-2 py-1 text-[11px] font-light text-destructive hover:bg-white/[0.08] transition-colors"
           style={{ borderRadius: "var(--glass-radius-inner)" }}
         >
           Clear date

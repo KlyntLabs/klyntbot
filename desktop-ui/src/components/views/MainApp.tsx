@@ -106,9 +106,6 @@ export function MainApp() {
   );
 
   // Auto-fetch children for expanded tasks.
-  // Uses `generation` (bumped on invalidation) instead of `childrenCache`
-  // to avoid O(N²) re-fetches — each cache write would otherwise re-trigger
-  // the loop for all expanded tasks.
   useEffect(() => {
     for (const taskId of expandedTasks) {
       fetchChildren(taskId);
@@ -185,8 +182,7 @@ export function MainApp() {
     });
   }, [activeTab, tasks, areaMap]);
 
-  // Content view is independent of chat state — if chat is open, show the view
-  // that was active before chat opened.
+  // Content view is independent of chat state
   const contentView = activeSidebar === "Chat" ? prevSidebarRef.current : activeSidebar;
 
   // Derive sidebar chat context from the current view + tab
@@ -197,7 +193,7 @@ export function MainApp() {
   }, [contentView, activeTab]);
 
   return (
-    <div className="h-screen w-screen bg-background text-primary flex overflow-hidden">
+    <div className="h-screen w-screen bg-background text-primary flex gap-2 p-2 overflow-hidden">
       <Sidebar
         active={activeSidebar}
         onNavigate={(item) => {
@@ -207,19 +203,19 @@ export function MainApp() {
       />
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header Tabs */}
-        <div className="h-14 bg-background flex items-center px-2">
-          <div className="flex-1 flex items-center gap-2">
+      <div className="flex-1 flex flex-col gap-2 overflow-hidden">
+        {/* Header Tabs — glass toolbar */}
+        <div className="h-12 flex items-center px-2 shrink-0">
+          <div className="flex-1 flex items-center gap-1.5">
             {(["All", "Work", "Personal"] as Tab[]).map((tab) => (
               <button
                 type="button"
                 key={tab}
                 onClick={() => startTransition(() => setActiveTab(tab))}
-                className={`flex-1 py-2 rounded-md text-[13px] font-light transition-colors ${
+                className={`flex-1 py-2 rounded-xl text-[13px] font-light transition-all duration-200 ${
                   activeTab === tab
-                    ? "bg-surface-highest text-white"
-                    : "bg-surface-low text-muted hover:bg-surface-base hover:text-secondary"
+                    ? "glass-button-active text-primary"
+                    : "text-muted hover:text-secondary hover:bg-white/[0.04]"
                 }`}
               >
                 {tab}
@@ -237,15 +233,19 @@ export function MainApp() {
               setActiveSidebar(nextOpen ? "Chat" : prevSidebarRef.current);
             }}
             aria-label="Toggle chat"
-            className="w-9 h-9 rounded-md flex items-center justify-center transition-colors bg-surface-low text-muted hover:bg-surface-base hover:text-secondary ml-2"
+            className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 ml-2 ${
+              isChatOpen
+                ? "glass-button-active text-brand"
+                : "text-muted hover:text-secondary hover:bg-white/[0.04]"
+            }`}
           >
             <MessageSquare className="w-[18px] h-[18px]" strokeWidth={1.5} />
           </button>
         </div>
 
-        {/* Scrollable Content */}
+        {/* Scrollable Content — glass panel */}
         <div
-          className={`flex-1 overflow-y-auto p-2${isPending ? " opacity-70 transition-opacity" : ""}`}
+          className={`flex-1 overflow-y-auto p-3${isPending ? " opacity-70 transition-opacity" : ""}`}
         >
           {contentView === "OKR" ? (
             <OkrView />
@@ -259,7 +259,7 @@ export function MainApp() {
 
               {/* Inline Add Task Row */}
               {addingTask && (
-                <div className="mb-2 bg-surface-low rounded-xl px-5 py-3">
+                <div className="mb-2 glass-card px-5 py-3">
                   <input
                     value={newTaskTitle}
                     onChange={(e) => setNewTaskTitle(e.target.value)}

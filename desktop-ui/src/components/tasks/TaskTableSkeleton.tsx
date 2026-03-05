@@ -7,12 +7,12 @@ export function TaskTableSkeleton({ showArea = false }: { showArea?: boolean }) 
   return (
     <div className="mb-10 rounded-xl">
       <table
-        className="w-full bg-surface-low border-collapse"
+        className="w-full bg-white/[0.04] border-collapse"
         aria-busy="true"
         aria-label="Loading tasks"
       >
         <thead>
-          <tr className="border-b border-border text-[11px] text-muted font-light text-left">
+          <tr className="border-b border-white/[0.08] text-[11px] text-muted font-light text-left">
             <th className="px-5 py-3 w-9 font-light" />
             <th className="px-5 py-3 font-light">Task</th>
             <th className="px-5 py-3 font-light">Project</th>
@@ -25,19 +25,19 @@ export function TaskTableSkeleton({ showArea = false }: { showArea?: boolean }) 
         </thead>
         <tbody>
           {(["a", "b", "c", "d", "e"] as const).map((k, i) => (
-            <tr key={k} className="border-b border-border-subtle">
+            <tr key={k} className="border-b border-white/[0.04]">
               <td className="px-5 py-3 w-9">
-                <div className="w-4 h-4 rounded bg-surface-raised animate-pulse" />
+                <div className="w-4 h-4 rounded bg-white/[0.08] animate-pulse" />
               </td>
               <td className="px-5 py-3">
                 <div
-                  className="h-3 rounded bg-surface-raised animate-pulse"
+                  className="h-3 rounded bg-white/[0.08] animate-pulse"
                   style={{ width: `${SKELETON_ROW_WIDTHS[i]}%` }}
                 />
               </td>
               {extraCells.map((col) => (
                 <td key={col} className="px-5 py-3">
-                  <div className="h-3 w-16 rounded bg-surface-raised animate-pulse" />
+                  <div className="h-3 w-16 rounded bg-white/[0.08] animate-pulse" />
                 </td>
               ))}
             </tr>

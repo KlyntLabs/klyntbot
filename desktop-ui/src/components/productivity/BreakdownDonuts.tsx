@@ -24,7 +24,7 @@ export function BreakdownDonuts({ segments, totalSecs }: BreakdownDonutsProps) {
   const hasData = pieData[0]?.name !== "Empty";
 
   return (
-    <div className="bg-surface-base rounded-xl p-4 flex flex-col gap-3">
+    <div className="glass-card p-4 flex flex-col gap-3">
       <h2 className="text-[13px] font-medium text-secondary">Breakdown</h2>
 
       <div className="flex items-center gap-4">

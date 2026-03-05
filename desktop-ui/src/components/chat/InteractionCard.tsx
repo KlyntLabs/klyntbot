@@ -17,8 +17,8 @@ function optionButtonClass(isSelected: boolean, isFocused: boolean) {
     isSelected
       ? "border-brand bg-brand/10 text-primary"
       : isFocused
-        ? "border-border bg-surface-raised text-primary"
-        : "border-transparent bg-surface-raised/50 text-secondary hover:bg-surface-raised",
+        ? "border-white/[0.08] bg-white/[0.08] text-primary"
+        : "border-transparent bg-white/[0.08]/50 text-secondary hover:bg-white/[0.08]",
   );
 }
 
@@ -189,7 +189,7 @@ export function InteractionCard({
       onKeyDown={handleKeyDown}
       className="flex justify-start border-none p-0 m-0"
     >
-      <div className="w-full max-w-[85%] rounded-xl bg-surface-base border border-border overflow-hidden">
+      <div className="w-full max-w-[85%] rounded-xl bg-white/[0.06] border border-white/[0.08] overflow-hidden">
         {/* Header */}
         <div className="px-4 pt-3 pb-2 text-[11px] font-light text-muted">Klynt is asking…</div>
 
@@ -203,8 +203,8 @@ export function InteractionCard({
                 onClick={() => setActiveTab(i)}
                 className={`px-3 py-1 rounded-md text-[11px] font-light transition-colors ${
                   i === activeTab
-                    ? "bg-surface-highest text-primary"
-                    : "text-muted hover:text-secondary hover:bg-surface-raised"
+                    ? "bg-white/[0.12] text-primary"
+                    : "text-muted hover:text-secondary hover:bg-white/[0.08]"
                 }`}
               >
                 {q.title}
@@ -292,19 +292,19 @@ export function InteractionCard({
                     }
                   }}
                   placeholder={question.answer_type.placeholder ?? ""}
-                  className="w-full bg-surface-raised text-primary text-[12px] font-light px-3 py-2 rounded-lg border border-border"
+                  className="w-full bg-white/[0.08] text-primary text-[12px] font-light px-3 py-2 rounded-lg border border-white/[0.08]"
                 />
               );
             })()}
         </div>
 
         {/* Footer: Submit / Cancel */}
-        <div className="flex items-center justify-end gap-2 px-4 py-2 border-t border-border">
+        <div className="flex items-center justify-end gap-2 px-4 py-2 border-t border-white/[0.08]">
           <button
             type="button"
             onClick={handleCancel}
             disabled={submitting}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-light text-muted hover:text-secondary hover:bg-surface-raised transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-light text-muted hover:text-secondary hover:bg-white/[0.08] transition-colors disabled:opacity-50"
           >
             <X className="w-3 h-3" strokeWidth={1.5} />
             Cancel

@@ -87,12 +87,12 @@ export function OkrView() {
             : 0;
 
         return (
-          <div key={projectId} className="bg-surface-low rounded-xl overflow-hidden">
+          <div key={projectId} className="glass-card overflow-hidden">
             {/* Project Header */}
             <button
               type="button"
               onClick={() => toggleProject(projectId)}
-              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-base transition-colors text-left"
+              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/[0.06] transition-colors text-left"
             >
               {isExpanded ? (
                 <ChevronDown className="w-3.5 h-3.5 text-muted flex-shrink-0" strokeWidth={1.5} />
@@ -120,7 +120,7 @@ export function OkrView() {
                     type="button"
                     key={obj.id}
                     onClick={() => navigate(`/objective/${obj.id}`)}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-surface-base transition-colors text-left"
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/[0.06] transition-colors text-left"
                   >
                     <Target className="w-3.5 h-3.5 text-brand flex-shrink-0" strokeWidth={1.5} />
                     <span className="text-[13px] font-light text-secondary flex-1 truncate">

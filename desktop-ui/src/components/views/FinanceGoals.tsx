@@ -173,7 +173,7 @@ export function FinanceGoals() {
                 </div>
                 <Progress value={pct(totalSaved, totalTarget)} />
               </div>
-              <div className="space-y-2 pt-2 border-t border-border-subtle">
+              <div className="space-y-2 pt-2 border-t border-white/[0.04]">
                 {activeGoals.map((g, i) => {
                   const p = pct(g.currentAmount, g.targetAmount);
                   return (

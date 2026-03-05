@@ -11,7 +11,7 @@ function FilterButton({ label }: { label: string }) {
   return (
     <button
       type="button"
-      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-surface-low hover:bg-surface-base text-muted hover:text-secondary transition-colors"
+      className="glass-button flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-muted hover:text-secondary"
     >
       <span className="text-[11px] font-light">{label}</span>
       <ChevronDown className="w-[12px] h-[12px]" strokeWidth={1.5} />
@@ -26,7 +26,7 @@ export function Toolbar({ viewMode, onViewModeChange, onAddTask }: ToolbarProps)
       <div className="flex items-center gap-2">
         <button
           type="button"
-          className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-surface-low hover:bg-surface-base text-muted hover:text-secondary transition-colors"
+          className="glass-button flex items-center gap-2 px-3 py-1.5 rounded-lg text-muted hover:text-secondary"
         >
           <Filter className="w-[14px] h-[14px]" strokeWidth={1.5} />
           <span className="text-[12px] font-light">Filter</span>
@@ -40,7 +40,7 @@ export function Toolbar({ viewMode, onViewModeChange, onAddTask }: ToolbarProps)
 
       {/* Right: View toggles + Add task */}
       <div className="flex items-center gap-2">
-        <div className="flex items-center bg-surface-low rounded-md p-0.5">
+        <div className="flex items-center glass-button rounded-lg p-0.5">
           {[
             { mode: "table" as const, icon: List },
             { mode: "board" as const, icon: Columns3 },
@@ -51,9 +51,9 @@ export function Toolbar({ viewMode, onViewModeChange, onAddTask }: ToolbarProps)
               key={mode}
               onClick={() => onViewModeChange(mode)}
               aria-label={`${mode} view`}
-              className={`p-1.5 rounded transition-colors ${
+              className={`p-1.5 rounded-md transition-all ${
                 viewMode === mode
-                  ? "bg-surface-highest text-brand"
+                  ? "glass-button-active text-brand"
                   : "text-muted hover:text-secondary"
               }`}
             >
@@ -65,7 +65,7 @@ export function Toolbar({ viewMode, onViewModeChange, onAddTask }: ToolbarProps)
         <button
           type="button"
           onClick={onAddTask}
-          className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-brand hover:bg-brand-hover text-white transition-colors"
+          className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-brand hover:bg-brand-hover text-white transition-colors"
         >
           <Plus className="w-[14px] h-[14px]" strokeWidth={1.5} />
           <span className="text-[12px] font-light">Add task</span>

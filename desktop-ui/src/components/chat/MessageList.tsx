@@ -64,9 +64,10 @@ export function MessageList({
         <div
           key={msg.id}
           className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+          style={{ animation: "fade-in 0.3s ease-out" }}
         >
           {msg.role === "user" ? (
-            <div className="max-w-[85%] rounded-2xl px-5 py-3.5 bg-surface-raised backdrop-blur-sm">
+            <div className="max-w-[85%] glass-bubble-user px-5 py-3.5">
               <p className="text-[13px] font-light whitespace-pre-wrap leading-relaxed text-primary">
                 {msg.content}
               </p>
@@ -108,17 +109,17 @@ export function MessageList({
       {/* Thinking indicator (streaming but no segments yet and no tools running) */}
       {isStreaming && segments.length === 0 && activeTools.length === 0 && (
         <div className="flex justify-start">
-          <div className="flex gap-1">
+          <div className="glass-bubble px-4 py-3 flex gap-1.5">
             <div
-              className="w-1.5 h-1.5 bg-muted rounded-full animate-bounce"
+              className="w-1.5 h-1.5 bg-brand/60 rounded-full animate-bounce"
               style={{ animationDelay: "0ms" }}
             />
             <div
-              className="w-1.5 h-1.5 bg-muted rounded-full animate-bounce"
+              className="w-1.5 h-1.5 bg-brand/60 rounded-full animate-bounce"
               style={{ animationDelay: "150ms" }}
             />
             <div
-              className="w-1.5 h-1.5 bg-muted rounded-full animate-bounce"
+              className="w-1.5 h-1.5 bg-brand/60 rounded-full animate-bounce"
               style={{ animationDelay: "300ms" }}
             />
           </div>
@@ -128,7 +129,13 @@ export function MessageList({
       {/* Error display */}
       {error && (
         <div className="flex justify-start">
-          <div className="rounded-xl px-4 py-3 bg-destructive/10 border border-destructive/20">
+          <div
+            className="rounded-xl px-4 py-3"
+            style={{
+              background: "var(--glass-tint-destructive)",
+              border: "1px solid rgba(244, 63, 94, 0.15)",
+            }}
+          >
             <p className="text-[12px] font-light text-destructive">{error}</p>
           </div>
         </div>
@@ -152,7 +159,7 @@ export function MessageList({
               endRef.current?.scrollIntoView({ behavior: "smooth" });
               setUserScrolledUp(false);
             }}
-            className="px-3 py-1.5 rounded-full bg-surface-raised text-[11px] text-muted font-light hover:bg-surface-highest transition-colors"
+            className="glass-badge px-4 py-2 text-[11px] text-muted font-light hover:text-secondary hover:bg-white/[0.08] transition-all"
             aria-label="Scroll to bottom"
           >
             Scroll to bottom

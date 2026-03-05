@@ -65,7 +65,7 @@ export function DayView({ date }: DayViewProps) {
       {/* Row 2-3: Right column */}
       <div className="flex flex-col gap-4">
         <WorkHoursCard totalActiveSecs={summary?.totalActiveSecs ?? 0} />
-        <div className="bg-surface-base rounded-xl p-4 flex items-center justify-center relative">
+        <div className="glass-card p-4 flex items-center justify-center relative">
           <ProductivityScoreRing score={summary?.productivityScore ?? 0} summary={summary} />
         </div>
         <BreakdownDonuts segments={breakdownSegments} totalSecs={summary?.totalActiveSecs ?? 0} />

@@ -64,9 +64,9 @@ export function TaskDetail() {
   }
 
   return (
-    <div className="h-screen w-screen bg-background text-primary flex flex-col overflow-hidden">
+    <div className="h-screen w-screen bg-background text-primary flex flex-col gap-2 p-2 overflow-hidden">
       {/* Header */}
-      <div className="h-14 flex items-center px-6 gap-3 border-b border-border flex-shrink-0">
+      <div className="h-12 flex items-center px-6 gap-3 shrink-0">
         <button
           type="button"
           onClick={() => navigate("/")}
@@ -123,7 +123,7 @@ export function TaskDetail() {
                 className={`px-3 py-1 rounded-md text-[12px] font-light transition-colors ${
                   task.status === s
                     ? "bg-brand text-white"
-                    : "bg-surface-low text-muted hover:bg-surface-base"
+                    : "bg-white/[0.04] text-muted hover:bg-white/[0.06]"
                 }`}
               >
                 {s}
@@ -146,7 +146,7 @@ export function TaskDetail() {
             type="date"
             value={task.dueDate ?? ""}
             onChange={(e) => handleUpdate({ dueDate: e.target.value || null })}
-            className="bg-surface-low rounded-md px-3 py-1.5 text-[12px] font-light text-secondary border border-border-subtle outline-none w-40"
+            className="bg-white/[0.04] rounded-md px-3 py-1.5 text-[12px] font-light text-secondary border border-white/[0.04] outline-none w-40"
           />
 
           {/* Project */}
@@ -157,7 +157,7 @@ export function TaskDetail() {
             id="task-project"
             value={task.projectId ?? ""}
             onChange={(e) => handleUpdate({ projectId: e.target.value || null })}
-            className="bg-surface-low rounded-md px-3 py-1.5 text-[12px] font-light text-secondary border border-border-subtle outline-none w-48"
+            className="bg-white/[0.04] rounded-md px-3 py-1.5 text-[12px] font-light text-secondary border border-white/[0.04] outline-none w-48"
           >
             <option value="">No project</option>
             {projects.map((p) => (
@@ -193,7 +193,7 @@ export function TaskDetail() {
                 setEditingDesc(false);
               }}
               rows={5}
-              className="w-full bg-surface-low rounded-lg px-4 py-3 text-[13px] font-light text-secondary border border-border-subtle outline-none resize-none"
+              className="w-full bg-white/[0.04] rounded-lg px-4 py-3 text-[13px] font-light text-secondary border border-white/[0.04] outline-none resize-none"
             />
           ) : (
             <button
@@ -202,7 +202,7 @@ export function TaskDetail() {
                 setDescDraft(task.description ?? "");
                 setEditingDesc(true);
               }}
-              className="w-full bg-surface-low rounded-lg px-4 py-3 text-[13px] font-light text-secondary min-h-[80px] cursor-text hover:bg-surface-base transition-colors text-left"
+              className="w-full bg-white/[0.04] rounded-lg px-4 py-3 text-[13px] font-light text-secondary min-h-[80px] cursor-text hover:bg-white/[0.06] transition-colors text-left"
             >
               {task.description || <span className="text-dim">Click to add description...</span>}
             </button>
@@ -210,7 +210,7 @@ export function TaskDetail() {
         </div>
 
         {/* Delete */}
-        <div className="pt-4 border-t border-border">
+        <div className="pt-4 border-t border-white/[0.08]">
           <button
             type="button"
             onClick={handleDelete}
@@ -218,7 +218,7 @@ export function TaskDetail() {
             className={`flex items-center gap-2 px-3 py-2 rounded-md text-[12px] font-light transition-colors ${
               confirmDelete
                 ? "bg-destructive text-white"
-                : "text-muted hover:text-destructive hover:bg-surface-low"
+                : "text-muted hover:text-destructive hover:bg-white/[0.04]"
             }`}
           >
             <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />

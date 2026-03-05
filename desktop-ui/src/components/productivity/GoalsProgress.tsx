@@ -52,13 +52,13 @@ export function GoalsProgress() {
 
   return (
     <>
-      <div className="bg-surface-base rounded-xl p-4 flex flex-col gap-3">
+      <div className="glass-card p-4 flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <h2 className="text-[13px] font-medium text-secondary">Goals</h2>
           <button
             type="button"
             onClick={() => setShowAdd(true)}
-            className="w-6 h-6 rounded-md flex items-center justify-center text-muted hover:text-brand hover:bg-surface-raised transition-colors"
+            className="w-6 h-6 rounded-md flex items-center justify-center text-muted hover:text-brand hover:bg-white/[0.08] transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
           </button>
@@ -97,7 +97,7 @@ export function GoalsProgress() {
                       </button>
                     </div>
                   </div>
-                  <div className="h-1.5 rounded-full bg-surface-raised overflow-hidden">
+                  <div className="h-1.5 rounded-full bg-white/[0.08] overflow-hidden">
                     <div
                       className={`h-full rounded-full transition-[width] ${g.met ? "bg-success" : "bg-brand"}`}
                       style={{ width: `${pct}%` }}

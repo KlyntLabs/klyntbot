@@ -23,7 +23,7 @@ export function AddSubtaskRow({ parentId }: AddSubtaskRowProps) {
 
   return (
     <tr
-      className="border-b border-border-subtle last:border-b-0 bg-surface-lowest"
+      className="border-b border-white/[0.04] last:border-b-0 bg-white/[0.02]"
       style={{ boxShadow: "inset 3px 0 0 var(--brand)" }}
     >
       <td className="px-5 py-1.5 w-9" />

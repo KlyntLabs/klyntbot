@@ -32,7 +32,7 @@ const components: Components = {
       return <code className="block text-[12px] font-mono leading-relaxed">{children}</code>;
     }
     return (
-      <code className="text-[12px] font-mono bg-surface-raised px-1.5 py-0.5 rounded-md text-brand">
+      <code className="text-[12px] font-mono bg-white/[0.08] px-1.5 py-0.5 rounded-md text-brand">
         {children}
       </code>
     );
@@ -40,7 +40,7 @@ const components: Components = {
 
   // Code block
   pre: ({ children }) => (
-    <pre className="bg-surface-raised rounded-lg px-4 py-3 my-2.5 overflow-x-auto border border-border/50 text-secondary">
+    <pre className="bg-white/[0.08] rounded-lg px-4 py-3 my-2.5 overflow-x-auto border border-white/[0.08]/50 text-secondary">
       {children}
     </pre>
   ),
@@ -74,7 +74,7 @@ const components: Components = {
   ),
 
   // Horizontal rule
-  hr: () => <hr className="border-border/50 my-4" />,
+  hr: () => <hr className="border-white/[0.08]/50 my-4" />,
 
   // Table
   table: ({ children }) => (
@@ -82,11 +82,11 @@ const components: Components = {
       <table className="w-full text-[12px]">{children}</table>
     </div>
   ),
-  thead: ({ children }) => <thead className="border-b border-border/50">{children}</thead>,
+  thead: ({ children }) => <thead className="border-b border-white/[0.08]/50">{children}</thead>,
   th: ({ children }) => (
     <th className="text-left font-medium text-primary px-2 py-1.5">{children}</th>
   ),
-  td: ({ children }) => <td className="px-2 py-1.5 border-b border-border/30">{children}</td>,
+  td: ({ children }) => <td className="px-2 py-1.5 border-b border-white/[0.08]/30">{children}</td>,
 };
 
 interface MarkdownContentProps {

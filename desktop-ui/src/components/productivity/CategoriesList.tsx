@@ -22,7 +22,7 @@ export function CategoriesList({ categories, totalSecs }: CategoriesListProps) {
 
   if (categories.length === 0) {
     return (
-      <div className="bg-surface-base rounded-xl p-4">
+      <div className="glass-card p-4">
         <h2 className="text-[13px] font-medium text-secondary mb-3">Categories</h2>
         <p className="text-[12px] font-light text-dim">No category data</p>
       </div>
@@ -30,7 +30,7 @@ export function CategoriesList({ categories, totalSecs }: CategoriesListProps) {
   }
 
   return (
-    <div className="bg-surface-base rounded-xl p-4 flex flex-col gap-3">
+    <div className="glass-card p-4 flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <h2 className="text-[13px] font-medium text-secondary">Categories</h2>
         <span className="text-[10px] font-light text-dim tabular-nums">

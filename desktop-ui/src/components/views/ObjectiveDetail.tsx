@@ -103,9 +103,9 @@ export function ObjectiveDetail() {
   const krs = objective.keyResults ?? [];
 
   return (
-    <div className="h-screen w-screen bg-background text-primary flex flex-col overflow-hidden">
+    <div className="h-screen w-screen bg-background text-primary flex flex-col gap-2 p-2 overflow-hidden">
       {/* Header */}
-      <div className="h-14 flex items-center px-6 gap-3 border-b border-border flex-shrink-0">
+      <div className="h-12 flex items-center px-6 gap-3 shrink-0">
         <button
           type="button"
           onClick={() => navigate(-1)}
@@ -181,7 +181,7 @@ export function ObjectiveDetail() {
                 className={`px-3 py-1 rounded-md text-[12px] font-light transition-colors ${
                   objective.status === s
                     ? "bg-brand text-white"
-                    : "bg-surface-low text-muted hover:bg-surface-base"
+                    : "bg-white/[0.04] text-muted hover:bg-white/[0.06]"
                 }`}
               >
                 {s}
@@ -208,7 +208,7 @@ export function ObjectiveDetail() {
 
           <div className="space-y-2">
             {krs.map((kr) => (
-              <div key={kr.id} className="bg-surface-low rounded-xl px-4 py-3">
+              <div key={kr.id} className="glass-card px-4 py-3">
                 <div className="flex items-center gap-3 mb-2">
                   <span className="text-[13px] font-light text-secondary flex-1">{kr.title}</span>
                   <button
@@ -230,7 +230,7 @@ export function ObjectiveDetail() {
                     onKeyDown={(e) => {
                       if (e.key === "Enter") e.currentTarget.blur();
                     }}
-                    className="w-20 bg-surface-base rounded-md px-2 py-1 text-[12px] font-light text-primary border border-border-subtle outline-none text-center"
+                    className="w-20 bg-white/[0.06] rounded-md px-2 py-1 text-[12px] font-light text-primary border border-white/[0.04] outline-none text-center"
                   />
                   <span className="text-[11px] text-dim font-light">
                     / {kr.target} {kr.unit}
@@ -256,7 +256,7 @@ export function ObjectiveDetail() {
 
             {/* Add KR inline row */}
             {addingKr && (
-              <div className="bg-surface-low rounded-xl px-4 py-3">
+              <div className="glass-card px-4 py-3">
                 <input
                   value={newKrTitle}
                   onChange={(e) => setNewKrTitle(e.target.value)}
@@ -282,7 +282,7 @@ export function ObjectiveDetail() {
         </div>
 
         {/* Delete */}
-        <div className="pt-4 border-t border-border">
+        <div className="pt-4 border-t border-white/[0.08]">
           <button
             type="button"
             onClick={handleDelete}
@@ -290,7 +290,7 @@ export function ObjectiveDetail() {
             className={`flex items-center gap-2 px-3 py-2 rounded-md text-[12px] font-light transition-colors ${
               confirmDelete
                 ? "bg-destructive text-white"
-                : "text-muted hover:text-destructive hover:bg-surface-low"
+                : "text-muted hover:text-destructive hover:bg-white/[0.04]"
             }`}
           >
             <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5} />

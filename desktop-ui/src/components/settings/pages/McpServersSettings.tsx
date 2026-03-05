@@ -179,7 +179,7 @@ export function McpServersSettings() {
         </div>
 
         {customServers.length === 0 ? (
-          <div className="bg-surface-low rounded-lg border border-border p-8 flex flex-col items-center text-center">
+          <div className="bg-white/[0.04] rounded-lg border border-white/[0.08] p-8 flex flex-col items-center text-center">
             <Plug className="w-8 h-8 text-dim mb-3" strokeWidth={1.5} />
             <p className="text-[13px] text-muted">No custom MCP servers connected</p>
             <p className="text-[11px] text-dim mt-1">

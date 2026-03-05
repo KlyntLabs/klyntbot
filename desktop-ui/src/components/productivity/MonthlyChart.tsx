@@ -20,7 +20,7 @@ export function MonthlyChart({ summaries }: MonthlyChartProps) {
   );
 
   return (
-    <div className="bg-surface-base rounded-xl p-4 flex flex-col gap-3 col-span-3">
+    <div className="glass-card p-4 flex flex-col gap-3 col-span-3">
       <div className="flex items-center justify-between">
         <h2 className="text-[13px] font-medium text-secondary">Monthly Overview</h2>
         <div className="flex items-center gap-3">

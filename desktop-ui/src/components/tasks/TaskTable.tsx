@@ -102,18 +102,18 @@ export function TaskTable({
 
   return (
     <TaskTableContext value={ctx}>
-      <div className="mb-10 rounded-xl">
-        <table className="w-full bg-surface-low border-collapse">
+      <div className="mb-10 glass-card overflow-hidden">
+        <table className="w-full border-collapse">
           <thead>
-            <tr className="border-b border-border text-[11px] text-muted font-light text-left">
-              <th className="px-5 py-3 w-9 font-light" />
-              <th className="px-5 py-3 font-light">Task</th>
-              <th className="px-5 py-3 font-light">Project</th>
-              {showArea && <th className="px-5 py-3 font-light">Area</th>}
-              <th className="px-5 py-3 font-light">Priority</th>
-              <th className="px-5 py-3 font-light">Status</th>
-              <th className="px-5 py-3 font-light">Due Date</th>
-              <th className="px-5 py-3 font-light">Tags</th>
+            <tr className="border-b border-white/[0.06] text-[11px] text-muted font-light text-left bg-white/[0.03]">
+              <th className="px-5 py-2.5 w-9 font-light" />
+              <th className="px-5 py-2.5 font-light tracking-wide uppercase">Task</th>
+              <th className="px-5 py-2.5 font-light tracking-wide uppercase">Project</th>
+              {showArea && <th className="px-5 py-2.5 font-light tracking-wide uppercase">Area</th>}
+              <th className="px-5 py-2.5 font-light tracking-wide uppercase">Priority</th>
+              <th className="px-5 py-2.5 font-light tracking-wide uppercase">Status</th>
+              <th className="px-5 py-2.5 font-light tracking-wide uppercase">Due Date</th>
+              <th className="px-5 py-2.5 font-light tracking-wide uppercase">Tags</th>
             </tr>
           </thead>
           <tbody>
@@ -132,7 +132,7 @@ export function TaskTable({
                         type="button"
                         onClick={() => onToggleProject(UNASSIGNED)}
                         aria-expanded={!isCollapsed}
-                        className="w-full flex items-center gap-3 px-5 py-3 bg-overlay hover:bg-overlay-heavy transition-colors text-left"
+                        className="w-full flex items-center gap-3 px-5 py-2.5 bg-white/[0.03] hover:bg-white/[0.05] transition-colors text-left"
                       >
                         {isCollapsed ? (
                           <ChevronRight
@@ -209,7 +209,7 @@ function TaskWithSubtasks({ task }: { task: Task }) {
         onUpdate={onUpdate}
       />
       {isLoading && (
-        <tr className="border-b border-border-subtle">
+        <tr className="border-b border-white/[0.04]">
           <td className="px-5 py-2 w-9" />
           <td colSpan={showArea ? 7 : 6} className="px-5 py-2">
             <span className="text-[12px] text-dim font-light pl-6">Loading\u2026</span>
@@ -246,7 +246,7 @@ function TaskGroup({
   const colCount = showArea ? 8 : 7;
   return (
     <>
-      <tr className="border-b border-border-subtle">
+      <tr className="border-b border-white/[0.04]">
         <td colSpan={colCount} className="p-0">
           {header}
         </td>
