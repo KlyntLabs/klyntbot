@@ -1,247 +1,95 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-
-## Build & Test Commands
+## Build & Test
 
 ```bash
-cargo build --workspace              # Build all crates
-cargo build --release                # Optimized release build (LTO, stripped)
-cargo nextest run --workspace        # Run all tests (parallel, faster than cargo test)
-cargo nextest run -p agent           # Test a single crate
-cargo nextest run -p storage         # Test storage crate (uses ephemeral SQLite)
-cargo nextest run --test integration_tests  # Run a specific test file
-cargo nextest run -E 'test(session_persistence)'  # Run tests matching pattern
-cargo nextest run --nocapture        # Show test stdout (nextest captures by default)
-cargo nextest run --failure-output immediate  # Show failures as they happen
-cargo test --workspace --doc         # Run doctests (nextest doesn't support doctests, use cargo test)
+cargo build --workspace                            # Build all crates
+cargo nextest run --workspace                      # Run all tests (parallel)
+cargo nextest run -p agent                         # Test a single crate
+cargo nextest run -E 'test(session_persistence)'   # Run tests matching pattern
+cargo test --workspace --doc                       # Doctests only (nextest doesn't support these)
 cargo clippy --workspace --all-targets --all-features  # Lint (must be 0 warnings)
-cargo fmt --all --check              # Check formatting
-cargo build --no-default-features    # Build without email channel
+cargo fmt --all --check                            # Check formatting
 ```
 
-**Why nextest?** Parallel test execution (faster), better output formatting, test retries, partition support for CI. Falls back to `cargo test --doc` for doctests only.
-
-**No external database required**: All tests use ephemeral SQLite pools (`StoragePool::connect(tempdir)` or `StoragePool::connect_in_memory()`).
+All tests use ephemeral SQLite (`StoragePool::connect_in_memory()`). No external DB needed.
 
 ## Desktop UI (desktop-ui/)
 
 ```bash
-cd desktop-ui && bun run dev            # Start Vite dev server (port 1420)
+cd desktop-ui && bun install            # Install deps (always bun, never npm)
+cd desktop-ui && bun run dev            # Vite dev server (port 1420)
 cd desktop-ui && bun run build          # Production build
-cd desktop-ui && bun install            # Install dependencies
-cd desktop-ui && bun run lint           # Biome lint check
-cd desktop-ui && bun run lint:fix       # Biome auto-fix (lint + format + imports)
-cd desktop-ui && bun run format         # Biome format only
+cd desktop-ui && bun run lint:fix       # Biome 2.0 auto-fix (lint + format + imports)
 ```
 
-**Always use `bun` (not `npm`) for the desktop-ui frontend.**
+**Tailwind v4 + CSS tokens:** All theming in `src/styles/theme.css` via CSS variables + `@theme inline`. No `tailwind.config.js`. Never hardcode hex/rgba — use token utilities (`bg-surface-base`, `text-muted`, `border-border`). For new visual patterns, add a CSS variable to `:root` first, register in `@theme inline`, then use via Tailwind.
 
-**Biome (not ESLint):** Linting, formatting, and import sorting handled by Biome (`biome.json`). Config: 2-space indent, 100-char line width, Tailwind CSS directive support. Run `bun run lint:fix` to auto-fix.
+**`glass-panel`:** Glassmorphism class for dropdowns/popups/dialogs. Uses `@apply backdrop-blur-[80px] backdrop-saturate-150`.
 
-**Tailwind v4 (CSS-driven, no config file):** Theme tokens defined in `src/styles/theme.css` via CSS variables + `@theme inline`. No `tailwind.config.js` — all customization is in CSS.
+**CSS gotchas:** (1) Never write raw `backdrop-filter: blur() saturate()` — minifier breaks it. Use Tailwind's `@apply backdrop-blur-* backdrop-saturate-*`. Parent `backdrop-blur` blocks child `backdrop-filter`. (2) Never use `overflow-x-auto`/`overflow: hidden` on containers with absolute dropdown children — clips them. Use portals instead.
 
-**Color token system:** Flat, dark-mode-only tokens in `:root`. Surface staircase (`surface-lowest` through `surface-highest`), text hierarchy (`text-primary/secondary/muted/dim`), brand (`brand`, `brand-hover`), semantic (`success`, `destructive`, `info`, `purple`). Never hardcode hex/rgba in components — always use the token utilities (e.g., `bg-surface-base`, `text-muted`, `border-border`).
+## Desktop App (Tauri 2)
 
-**Semantic CSS variables rule:** All visual values (colors, shadows, borders) in components must reference CSS variables from `theme.css` — never inline raw `rgba()`, `#hex`, or hardcoded values. For new visual patterns, add a CSS variable to `:root` first, register it in `@theme inline`, then reference via Tailwind utility. This ensures global consistency and single-point theming.
+```bash
+cargo tauri dev                    # Full desktop app (auto-starts Vite)
+cargo run -p dev-api               # Lightweight dev API on :3456 (no Tauri needed)
+```
 
-**Glass panel utility:** `glass-panel` class (defined in `theme.css`) provides glassmorphism for all dropdowns, popups, popovers, and dialogs. Variables: `--surface-glass` (bg), `--glass-border`, `--glass-shadow`. Uses `@apply backdrop-blur-[80px] backdrop-saturate-150` for the blur effect.
-
-**`backdrop-filter` gotcha:** Never write raw `backdrop-filter: blur() saturate()` in custom CSS — the minifier strips the space between filter functions, producing invalid CSS. Always use Tailwind's `@apply backdrop-blur-* backdrop-saturate-*` which composes filters via internal CSS variables (`--tw-backdrop-blur`, etc.). Also: parent elements with `backdrop-blur-*` create compositing layers that block nested `backdrop-filter` from seeing through — remove blur from parent containers if child elements need their own glass effect.
-
-**`overflow` clips absolute popups:** Never use `overflow-x-auto` or `overflow: hidden` on containers that have absolutely-positioned dropdown children — it creates a scroll context that clips them. Either remove the overflow or use React portals.
+Browser-only dev: run `cargo run -p dev-api` + `cd desktop-ui && bun run dev`, open `localhost:1420`. Tauri config: `crates/desktop/tauri.conf.json`. Shared IPC types: `desktop-shared` crate.
 
 ## Architecture
 
-Klyntbot is a Rust personal AI agent — a single binary that connects to 6+ chat platforms, calls LLMs, manages tasks/projects, syncs with Apple Calendar, and manages persistent memory. It is **not** a code execution platform — users have dedicated tools (Claude Code, Cursor, Codex) for that. All persistent state is stored in SQLite (relational data) + LanceDB (vector embeddings).
+Rust personal AI agent — single binary connecting 6+ chat platforms to LLMs with task/project management, Apple Calendar sync, and persistent memory. All state in SQLite + LanceDB.
 
-### Workspace layout (24 crates in 9 dependency layers)
+### Workspace (24 crates, 9 layers)
 
 ```
-Layer 0: common              — Error types (KlyntbotError, 15 variants), MessageRole, ChannelName, ChatId, SessionKey
-Layer 1: config, bus, tools-core, tools-core-macros
-                             — Config schema (camelCase JSON serde), async message bus (tokio::mpsc),
-                               Tool trait, FeaturePackage trait, ToolRegistry, derive macros (#[derive(Tool)], #[derive(ToolParams)])
-Layer 2: storage, domain     — SQLite pool (sqlx + SqlitePool), auto-migrations, repository pattern (*Repo structs),
-                               OKR + PARA domain types (Area, Objective, KeyResult, Project)
-Layer 3: providers, session, scheduling, calendar, context_engine
-                             — LLM HTTP clients, session persistence, cron service, CalDAV sync, token budget allocator
-Layer 4: tools, feature-todo, feature-finance, feature-productivity, plugin-runtime
-                             — 20+ tool implementations (filesystem ×4, web ×2, grep, glob, message, spawn, cron, calendar,
-                               project, okr, area, memory, learning, browser, ask_user, agent_task),
-                               self-contained feature packages (own tools, migrations, config, handler traits),
-                               feature-productivity (time tracking, focus sessions, pomodoro),
-                               WASM plugin sandbox
-Layer 5: channels, agent     — Chat platform integrations (Telegram, Discord, WhatsApp, Slack, Email, QQ),
-                               agent loop, agent runtime, execution core, memory store, agent manager, subagent manager,
-                               unified learning system (interaction recorder, pattern analyzer, outcome recorder)
-Layer 6: cli, mcp            — Clap-derived CLI with 4 commands: serve, init, status, plugin; MCP server integration
-Layer 7: desktop-shared, desktop, dev-api
-                             — Shared types for Tauri IPC, Tauri desktop app (commands, OAuth, window management),
-                               development API server
-Layer 8: klyntbot            — Re-export facade (src/lib.rs) + binary entry point (src/main.rs)
+L0: common                — KlyntbotError, MessageRole, ChannelName, ChatId, SessionKey
+L1: config, bus, tools-core, tools-core-macros — Config (camelCase JSON), message bus, Tool/FeaturePackage traits, derive macros
+L2: storage, domain       — SqlitePool, migrations, *Repo structs, OKR+PARA domain types
+L3: providers, session, scheduling, calendar, context_engine — LLM clients, session persistence, cron, CalDAV, token budgets
+L4: tools, feature-todo, feature-finance, feature-productivity, plugin-runtime — 20+ tools, feature packages, WASM plugins
+L5: channels, agent       — Platform integrations (Telegram/Discord/WhatsApp/Slack/Email/QQ), agent runtime, learning system
+L6: cli, mcp              — CLI (serve/init/status/plugin), MCP server
+L7: desktop-shared, desktop, dev-api — Tauri desktop app, dev API server
+L8: klyntbot              — Re-export facade + binary entry point
 ```
 
-Two crates (`plugin-sdk`, `tests/fixtures/hello_plugin`) are excluded from the workspace.
+Dependencies flow strictly upward. `plugin-sdk` and `tests/fixtures/hello_plugin` excluded from workspace.
 
-Dependencies flow strictly upward. No circular dependencies — enforced by Cargo.
+### Storage
 
-**Storage stack (SQLite + LanceDB):**
-- `storage` crate (Layer 2): `StoragePool` wraps `SqlitePool`, auto-runs migrations, exposes repository pattern (`*Repo` structs)
-- All relational data in SQLite (`{data_dir}/data.db`): actions, areas, projects, objectives, key_results, sessions, cron jobs, usage, strategies, outcomes, learning state, memory notes, calendar cache, finance data (accounts, transactions, budgets, investments), agent tasks, user_profile, behavioral_patterns, agent_adaptations, interaction_log
-- Vector embeddings in LanceDB (`{data_dir}/lancedb/`): todo embeddings, conversation embeddings — replaces pgvector
-- `Repos` aggregate struct for convenient access: `Repos::from_pool(&pool)`
-- `StoragePool::connect(data_dir)` creates/opens `data.db`, enables WAL + foreign keys, runs migrations. Feature crates register additional migrations via `FeatureMigration`
-- `StoragePool::connect_in_memory()` for tests — runs migrations on an in-memory SQLite pool
-- Data directory defaults to `~/.klyntbot`, configurable via `data_dir` in config
+`StoragePool` wraps `SqlitePool` (Clone+Send+Sync, no `Arc<RwLock>` needed). Relational data in `{data_dir}/data.db`, vectors in `{data_dir}/lancedb/`. Data dir defaults to `~/.klyntbot`. Access via `Repos::from_pool(&pool)`. Feature crates add migrations via `FeatureMigration`.
 
 ### Key patterns
 
-- **Repository pattern**: All persistent state goes through `*Repo` structs in the `storage` crate. Repos hold a `SqlitePool` (which is `Clone + Send + Sync` internally via `Arc`), eliminating the need for `Arc<RwLock<Store>>` wrappers. The `Repos` aggregate provides convenient access: `Repos::from_pool(&pool)`.
-- **Derive-based tools**: Tools are defined via `#[derive(tools_core::Tool)]` and `#[derive(ToolParams)]` macros from `tools-core-macros`. These generate `Tool` trait impls, parameter extraction, and JSON schema. Multi-action tools use `#[tool_actions]` attribute macro with `#[derive(ActionParams)]` per-action params. New tools should use this pattern — see `crates/tools/src/filesystem.rs` for examples.
-- **Feature packages**: Self-contained features (`feature-todo`, `feature-finance`) implement the `FeaturePackage` trait (in `tools-core`), which bundles tools, migrations, config validation, and health checks. Registered at agent startup. Add new features by creating a `feature-*` crate implementing `FeaturePackage`.
-- **Dependency inversion**: Handler traits (`SpawnHandler`, `CronHandler`, `CalendarHandler`, `LearningHandler` in `tools`; `EnrichmentHandler`, `EmbeddingHandler` in `feature-todo`; `FinanceHandler` in `feature-finance`) are defined in lower layers but implemented in `agent` (Layer 5). Injected as `Arc<dyn Trait>` at construction.
-- **Re-export facade**: `src/lib.rs` re-exports all public types from workspace crates. Integration tests and external consumers use `klyntbot::AgentLoop`, `klyntbot::Config`, `klyntbot::StoragePool`, etc.
-- **Provider auto-detection**: The provider registry matches model name keywords to route to the correct LLM provider. No external routing library.
-- **Config schema**: All config structs use `#[serde(rename_all = "camelCase")]`. Config file is `~/.klyntbot/config.json`. API keys are wrapped in `Secret<String>` (redacted in Debug/Display, access via `.expose()`).
-- **Feature-gated email**: The `email` feature (on by default) gates IMAP/SMTP dependencies in the `channels` crate.
+- **Derive-based tools:** `#[derive(Tool)]` + `#[derive(ToolParams)]` from `tools-core-macros`. Multi-action: `#[tool_actions]` + `#[derive(ActionParams)]`. See `crates/tools/src/filesystem.rs`.
+- **Feature packages:** `feature-*` crates implement `FeaturePackage` (tools + migrations + config + health).
+- **Dependency inversion:** Handler traits (`SpawnHandler`, `CronHandler`, `CalendarHandler`, etc.) defined in lower layers, implemented in `agent`. Injected as `Arc<dyn Trait>`.
+- **Config:** `#[serde(rename_all = "camelCase")]`. File at `~/.klyntbot/config.json`. API keys in `Secret<String>` (access via `.expose()`). Env override: `KLYNTBOT_AGENTS__DEFAULTS__MODEL=gpt-4o`.
+- **Re-export facade:** `src/lib.rs` re-exports all public types. Use `klyntbot::AgentLoop`, `klyntbot::Config`, etc.
 
-### Extension traits
+### Agent profiles & MCP
 
-| Trait | Defined in | Purpose |
-|-------|-----------|---------|
-| `Tool`, `ToolExecute`, `ToolParams` | `tools-core` | Core tool framework — usually derived via `#[derive(Tool)]` / `#[derive(ToolParams)]` |
-| `FeaturePackage` | `tools-core` | Self-contained feature registration (tools, migrations, config, health) |
-| `InteractionChannel` | `tools-core` | Platform-native UI (Telegram buttons, Discord selects) — avoids circular deps with channels |
-| `LlmProvider` | `providers` | `async fn chat()`, `async fn chat_stream()`, `fn name()`, `fn default_model()`, etc. |
-| `Channel` | `channels` | `async fn start()`, `async fn stop()`, `async fn send()`, `fn name()`, `fn is_allowed()` |
-| `SpawnHandler` | `tools` | Dependency inversion for subagent spawning |
-| `CronHandler` | `tools` | Dependency inversion for cron job management |
-| `CalendarHandler` | `tools` | Dependency inversion for calendar sync |
-| `LearningHandler` | `tools` | Dependency inversion for adaptive threshold management |
-| `EnrichmentHandler` | `feature-todo` | Dependency inversion for AI-powered task enrichment |
-| `EmbeddingHandler` | `feature-todo` | Dependency inversion for todo embedding generation |
-| `FinanceHandler` | `feature-finance` | Dependency inversion for finance price lookups |
-| `AgentRuntime` | `agent` | Main entry point: AgentManager -> IntentAnalyzer -> ContextEngine -> ExecutionRouter -> CostTracker. Replaces IntentPipeline. |
-| `ExecutionEngine` | `agent` | Unified async trait for Direct and Reactive engines |
-| `ContextSource` | `context_engine` | `provide()` returns system prompt sections, sorted by priority. Implemented by LearningContextSource, IdentitySource, etc. |
+Six built-in agents in `agents/`: general, task, finance, calendar, automation, communication. Each has `AGENT.md` (YAML frontmatter) + `skills/` folder. Compiled via `include_str!`. MCP tool names: `mcp_{server}_{tool}` (see `mcp::sanitize`). MCP access controlled per-agent via `mcp_tools` field (`["*"]` = all, `[]` = none).
 
-### Conventions
+### Agent runtime
 
-- Error handling: Use `common::Result<T>` (alias for `Result<T, KlyntbotError>`). Domain errors auto-convert via `From` impls.
-- Imports: Use crate names directly (`use common::Result`, `use config::Config`), not `use crate::` for cross-crate refs.
-- Tests: Unit tests as `#[cfg(test)] mod tests` inline in each crate. Integration tests in `tests/` use the facade crate. Shared mock provider in `tests/mock_provider.rs`.
-- Commits: Conventional format — `feat(providers): add streaming`, `fix(channels): handle rate limits`.
-- Zero clippy warnings policy.
+`AgentRuntime` → `AgentManager` → `IntentAnalyzer` → `ContextEngine` → `ExecutionRouter` → `CostTracker`. Two execution modes: **Direct** (single LLM call, no tools) and **Reactive** (ReAct loop with tool calls, escalates at 80% of max_iterations). Code in `crates/agent/src/agent_runtime/` and `crates/agent/src/intent_pipeline/`.
 
-## CLI Subcommands
+## Conventions
 
-```bash
-klyntbot serve --port 8080       # Start gateway daemon (channels, cron, heartbeat)
-klyntbot init                    # 2-phase setup wizard (core setup + pack selection)
-klyntbot init --packs            # Jump directly to pack selection
-klyntbot init --reset            # Reset config to defaults before running wizard
-klyntbot status [--verbose]      # Show agent/config status
-```
+- Errors: `common::Result<T>` (alias for `Result<T, KlyntbotError>`). Domain errors auto-convert via `From`.
+- Imports: Use crate names directly (`use common::Result`), not `use crate::` for cross-crate refs.
+- Tests: `#[cfg(test)] mod tests` inline. Integration tests in `tests/` via facade crate.
+- Commits: Conventional format — `feat(scope): description`, `fix(scope): description`.
+- Zero clippy warnings policy. `desktop` crate has pre-existing exceptions.
 
-Task management, project management, calendar sync, cron jobs, skills, and all other features are accessible through channel integrations (Telegram, Discord, etc.) or the dashboard.
+## Gotchas
 
-## Environment Variables
-
-Config can be overridden via `KLYNTBOT_` prefix with `__` as nesting separator:
-
-```bash
-KLYNTBOT_AGENTS__DEFAULTS__MODEL=gpt-4o
-KLYNTBOT_PROVIDERS__ANTHROPIC__API_KEY=sk-...
-KLYNTBOT_TOOLS__RESTRICT_TO_WORKSPACE=true
-```
-
-No external database required. Data is stored in `~/.klyntbot/data.db` (SQLite) and `~/.klyntbot/lancedb/` (vectors) by default. Override with `data_dir` in config.
-
-## Enrichment & Semantic Search
-
-**Enrichment** (`feature-todo` crate): Auto-infers priority, duration, and due dates from task title keywords. Optionally enhanced with LLM-based inference when `use_llm` is enabled. Config: `todo.enrichment.enabled` (default: `true`), `todo.enrichment.autoApplyThreshold` (default: `0.70`). Implementation in `crates/feature-todo/src/enrichment.rs`.
-
-**Semantic search** (`feature-todo` crate): Uses fastembed (paraphrase-multilingual-MiniLM-L12-v2, 384d) + LanceDB for ANN similarity search. Three modes: `search` (keyword SQL), `search-semantic` (cosine similarity), `search-hybrid` (RRF merge). Config: `todo.search.enabled`, `todo.search.semanticThreshold` (default: `0.5`). Embeddings stored in `{data_dir}/lancedb/`.
-
-## Feature Packs
-
-Feature packs bundle config + skills into selectable groups chosen during `klyntbot init`.
-
-- **Core** (always): task-management. **Recommended**: productivity, ai-intelligence. **Optional**: finance, weather, skill-creator.
-- Config: `packs.enabled` and `packs.enabledSkills` arrays in config.json.
-- Registry: `crates/cli/src/wizard/packs/registry.rs`. Config mutations: `pack_selection.rs`.
-
-## Agent Profiles
-
-The `agents/` directory contains domain-specific agent profile definitions. Each agent has an `AGENT.md` file with YAML frontmatter (name, tools, triggers, can_delegate_to, always_skills) and a `skills/` subfolder with skill .md files. Six built-in agents: general, task, finance, calendar, automation, communication. Parsed by `AgentProfile` and managed by `AgentManager` in `crates/agent/src/agent_profile/`. Built-in agents are compiled via `include_str!` macros.
-
-`AgentRuntime` (in `crates/agent/src/agent_runtime/`) replaces the former `IntentPipeline` as the main message processing entry point. It matches incoming messages to agent profiles via `AgentManager`, then delegates to the intent analysis → execution pipeline. The active agent profile is shared via `Arc<RwLock<Option<Arc<AgentProfile>>>>` so context sources (AgentContextSource, LearningContextSource) can read it.
-
-## Gotchas & Common Pitfalls
-
-- **No external DB required**: SQLite file is created automatically at `{data_dir}/data.db` on first run. LanceDB directory is created at `{data_dir}/lancedb/` when semantic search is first used.
-- **Data directory**: Defaults to `~/.klyntbot`. Override with `data_dir` in `~/.klyntbot/config.json`.
-- **`StoragePool::from_existing()` skips migrations**: Only use for pools already migrated by `StoragePool::connect()`. For in-memory test pools, always use `StoragePool::connect_in_memory()`.
-- **CalDAV sync is async**: Calendar sync runs in background. Use `CalendarTool::sync_now()` for immediate sync, or wait for next scheduled interval.
-- **Config changes require restart**: Modifying `~/.klyntbot/config.json` requires restarting `klyntbot serve` for changes to take effect.
-- **Dependency inversion gotcha**: When adding new tools that need agent context (spawn/cron handlers), inject via `Arc<dyn Trait>` at construction to avoid circular deps.
-- **SqlitePool is Clone+Send+Sync**: Unlike the old `Arc<RwLock<Store>>` pattern, `SqlitePool` (and therefore all `*Repo` structs) can be freely cloned and shared across tasks without locking. Connection pooling is handled internally by sqlx.
-
-## Agent Runtime & Execution Pipeline
-
-### Architecture
-
-`AgentRuntime` is the main entry point for message processing. Flow:
-
-```
-AgentManager (match agent) → IntentAnalyzer → ContextEngine → ExecutionRouter → CostTracker
-```
-
-**AgentRuntime** (`crates/agent/src/agent_runtime/runtime.rs`): Matches messages to agent profiles, classifies intent, builds context, routes execution, records strategies, records interactions. Owns `AgentManager`, `IntentAnalyzer`, `ContextEngine`, `ExecutionRouter`, `CostTracker`.
-
-**Intent pipeline modules** in `crates/agent/src/intent_pipeline/`:
-
-| Module | Purpose |
-|--------|---------|
-| `types.rs` | `ExecutionMode` (Direct/Reactive), `ComplexitySignals`, `IntentAnalysis` |
-| `analysis.rs` | `IntentAnalyzer` (two-stage: heuristic keywords -> LLM `IntentClassifier`). Strategy history from `StrategyRepo` feeds classifier context. |
-| `engines/` | `ExecutionEngine` trait + `DirectEngine`, `ReactiveEngine` |
-| `router.rs` | `ExecutionRouter` — maps mode to engine, handles escalation chain (Direct -> Reactive) with `EscalationContext` |
-
-### Execution Modes
-
-- **Direct**: Single LLM call, no tools. For greetings, simple questions, acknowledgments.
-- **Reactive { max_iterations }**: ReAct loop with tool calls. For task CRUD, search, calendar ops, and complex multi-step workflows. Escalates at 80% of max_iterations.
-
-### ExecutionCore
-
-Shared by all engines. `run_cycle()` performs one LLM-tool round: call `provider.chat()`, execute tool calls in parallel via `join_all` with per-tool timeout, detect fabricated responses (LLM faking tool results in text), track duplicate tool calls via `HashSet<String>`, and record per-tool outcomes via `OutcomeRecorder`.
-
-### Configuration
-
-```json
-{
-  "orchestrator": {
-    "maxEscalations": 3,
-    "heuristicConfidenceThreshold": 0.9,
-    "llmClassifierTimeout": 5000
-  }
-}
-```
-
-## Unified Learning System
-
-The learning system provides personalized context and adaptive behavior through four components:
-
-**Storage** (migration `003_learning_system.sql`): `user_profile` (key-value facts with confidence scores), `behavioral_patterns` (detected usage patterns), `agent_adaptations` (per-agent preferences), `interaction_log` (message-level telemetry).
-
-**Repos** in `crates/storage/src/repos/`: `UserProfileRepo`, `BehavioralPatternRepo`, `AgentAdaptationRepo`, `InteractionLogRepo` — standard repository pattern.
-
-**LearningContextSource** (`crates/agent/src/context_sources/learning.rs`): Unified context source (priority 60) that replaces the former `MemorySource` + `ConfidenceSource`. Provides: user profile facts, behavioral patterns, agent-specific adaptations, confidence threshold instructions, and conversation memory. Uses 60s TTL cache.
-
-**Recorders and analyzers** in `crates/agent/src/learning/`:
-- `InteractionRecorder`: Best-effort DB write after each message in `AgentRuntime`. Records agent name, tools used, channel, duration.
-- `OutcomeRecorder`: Per-tool success/failure recording in `ExecutionCore.run_cycle()`. Feeds the adaptive threshold system.
-- `PatternAnalyzer`: Runs in `LearningService` background loop. Detects day-of-week, time-of-day, and agent usage frequency patterns from interaction logs.
-- `LearningService`: Background service (`CancellationToken` + `JoinHandle`) that periodically analyzes outcomes, adapts confidence thresholds, runs pattern analysis, and publishes events via `LearningEventBus`.
+- **`StoragePool::from_existing()` skips migrations** — only for already-migrated pools. Tests must use `connect_in_memory()`.
+- **CalDAV sync is async** — use `CalendarTool::sync_now()` for immediate sync.
+- **Config changes require restart** of `klyntbot serve`.
+- **Dependency inversion** — new tools needing agent context must inject via `Arc<dyn Trait>` to avoid circular deps.
+- **`email` feature** (on by default) gates IMAP/SMTP deps in `channels` crate.
