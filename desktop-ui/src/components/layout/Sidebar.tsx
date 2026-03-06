@@ -1,13 +1,4 @@
-import {
-  Activity,
-  Calendar,
-  CheckSquare,
-  FileText,
-  MessageSquare,
-  Settings,
-  Target,
-  Wallet,
-} from "lucide-react";
+import { Activity, CheckSquare, FileText, MessageSquare, Settings, Wallet } from "lucide-react";
 import { useNavigate } from "react-router";
 import type { SidebarItem } from "../../lib/types";
 import { KlyntLogo } from "../ui/KlyntLogo";
@@ -15,20 +6,19 @@ import { KlyntLogo } from "../ui/KlyntLogo";
 interface SidebarProps {
   active: SidebarItem;
   onNavigate?: (item: SidebarItem) => void;
+  isChatOpen?: boolean;
+  onToggleChat?: () => void;
 }
 
 const items: { key: SidebarItem; icon: typeof MessageSquare; path?: string; bottom?: boolean }[] = [
-  { key: "Chat", icon: MessageSquare, path: "/chat" },
   { key: "Tasks", icon: CheckSquare, path: "/" },
-  { key: "OKR", icon: Target },
-  { key: "Calendar", icon: Calendar },
   { key: "Notes", icon: FileText, path: "/notes" },
   { key: "Finance", icon: Wallet, path: "/finance" },
   { key: "Productivity", icon: Activity, path: "/productivity" },
   { key: "Settings", icon: Settings, path: "/settings", bottom: true },
 ];
 
-export function Sidebar({ active, onNavigate }: SidebarProps) {
+export function Sidebar({ active, onNavigate, isChatOpen, onToggleChat }: SidebarProps) {
   const navigate = useNavigate();
 
   const handleClick = (item: (typeof items)[number]) => {
@@ -77,6 +67,22 @@ export function Sidebar({ active, onNavigate }: SidebarProps) {
       })}
 
       <div className="flex-1" />
+
+      {/* Chat toggle — above Settings */}
+      {onToggleChat && (
+        <button
+          type="button"
+          onClick={onToggleChat}
+          aria-label="Toggle chat"
+          className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-200 ${
+            isChatOpen
+              ? "glass-button-active text-brand"
+              : "text-muted hover:text-secondary hover:bg-white/[0.05]"
+          }`}
+        >
+          <MessageSquare className="w-[17px] h-[17px]" strokeWidth={1.5} aria-hidden="true" />
+        </button>
+      )}
 
       {/* Bottom Items */}
       {bottomItems.map((item) => {

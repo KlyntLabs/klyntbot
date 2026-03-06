@@ -67,11 +67,7 @@ export function NoteList({
               key={tag}
               type="button"
               onClick={() => setActiveTag(activeTag === tag ? null : tag)}
-              className={`text-[10px] px-1.5 py-0.5 rounded-md transition-colors ${
-                activeTag === tag
-                  ? "bg-brand/20 text-brand"
-                  : "bg-white/[0.06] text-dim hover:text-secondary"
-              }`}
+              className={`tag-pill ${activeTag === tag ? "tag-pill-active" : ""}`}
             >
               {tag}
               {activeTag === tag && <X className="w-2.5 h-2.5 inline ml-0.5" />}
@@ -81,7 +77,10 @@ export function NoteList({
       )}
 
       {/* Note list */}
-      <div className="flex-1 overflow-y-auto flex flex-col gap-0.5 min-h-0">
+      <div
+        className="flex-1 overflow-y-auto flex flex-col gap-0.5 min-h-0"
+        style={{ contentVisibility: "auto" }}
+      >
         {sorted.map((note) => (
           <NoteCard
             key={note.id}

@@ -48,15 +48,12 @@ export function NoteTags({ tags, onChange }: NoteTagsProps) {
   return (
     <div className="flex items-center gap-1 flex-wrap">
       {tags.map((tag) => (
-        <span
-          key={tag}
-          className="inline-flex items-center gap-0.5 text-[11px] px-1.5 py-0.5 rounded-md bg-white/[0.06] text-dim group"
-        >
+        <span key={tag} className="tag-pill group">
           {tag}
           <button
             type="button"
             onClick={() => handleRemove(tag)}
-            className="opacity-0 group-hover:opacity-100 transition-opacity"
+            className="opacity-0 group-hover:opacity-100 transition-opacity ml-0.5"
             aria-label={`Remove tag ${tag}`}
           >
             <X className="w-2.5 h-2.5" />

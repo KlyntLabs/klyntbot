@@ -1,5 +1,5 @@
 import { ChevronRight, FolderPlus } from "lucide-react";
-import { useMemo, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import type { Notebook } from "../../lib/types";
 
 interface NotebookTreeProps {
@@ -69,7 +69,13 @@ interface TreeNodeProps {
   depth: number;
 }
 
-function TreeNode({ notebook, childrenMap, selectedId, onSelect, depth }: TreeNodeProps) {
+const TreeNode = memo(function TreeNode({
+  notebook,
+  childrenMap,
+  selectedId,
+  onSelect,
+  depth,
+}: TreeNodeProps) {
   const children = childrenMap.get(notebook.id) ?? [];
   const hasChildren = children.length > 0;
   const [expanded, setExpanded] = useState(true);
@@ -122,4 +128,4 @@ function TreeNode({ notebook, childrenMap, selectedId, onSelect, depth }: TreeNo
       )}
     </div>
   );
-}
+});

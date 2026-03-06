@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { ipc } from "../../hooks/useIpc";
 import type { Note, NoteUpdateParams } from "../../lib/types";
-import { EditorContentWrapper, useNoteEditor } from "./editor/EditorCore";
+import { EditorContentWrapper, useEntityResolution, useNoteEditor } from "./editor/EditorCore";
 import { EditorToolbar } from "./editor/EditorToolbar";
 import { EntityMentionMenu } from "./editor/EntityMention";
 import { SlashMenu } from "./editor/SlashCommandMenu";
@@ -88,6 +88,9 @@ export function NoteEditor({ note, onSave }: NoteEditorProps) {
     onNavigateEntity: handleNavigateEntity,
   });
 
+  // Resolve entity mentions and wiki links — grays out non-existent references
+  useEntityResolution(editor);
+
   // Flush on note change and update editor content
   useEffect(() => {
     if (lastNoteIdRef.current !== note.id) {
@@ -136,10 +139,11 @@ export function NoteEditor({ note, onSave }: NoteEditorProps) {
 
   return (
     <div className="flex-1 flex gap-2 min-w-0 min-h-0">
-      <div className="flex-1 glass-panel rounded-2xl flex flex-col min-w-0 min-h-0">
-        <div className="px-4 py-2 border-b border-border">
-          <div className="flex items-center justify-between mb-1">
-            <h1 className="text-lg font-semibold text-primary">{note.title}</h1>
+      <div className="flex-1 flex flex-col min-w-0 min-h-0">
+        {/* Editor Header */}
+        <div className="px-5 pt-4 pb-3 border-b border-white/[0.04]">
+          <div className="flex items-center justify-between mb-2">
+            <h1 className="text-xl font-semibold text-primary tracking-tight">{note.title}</h1>
             <button
               type="button"
               onClick={() => setShowHistory(!showHistory)}
@@ -154,7 +158,7 @@ export function NoteEditor({ note, onSave }: NoteEditorProps) {
             </button>
           </div>
           <NoteTags tags={note.tags} onChange={handleTagsChange} />
-          <div className="mt-2">
+          <div className="mt-3">
             <EditorToolbar editor={editor} />
           </div>
         </div>

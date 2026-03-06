@@ -1,5 +1,5 @@
 import { Pin, PinOff, Trash2 } from "lucide-react";
-import { forwardRef, useRef, useState } from "react";
+import { memo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useClickOutside } from "../../hooks/useClickOutside";
 import { formatDate } from "../../lib/dates";
@@ -13,7 +13,13 @@ interface NoteCardProps {
   onDelete: (id: string) => void;
 }
 
-export function NoteCard({ note, selected, onSelect, onPin, onDelete }: NoteCardProps) {
+export const NoteCard = memo(function NoteCard({
+  note,
+  selected,
+  onSelect,
+  onPin,
+  onDelete,
+}: NoteCardProps) {
   const preview = note.body.slice(0, 100) || "Empty note";
   const dateStr = formatDate(note.updatedAt.slice(0, 10));
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
@@ -29,8 +35,8 @@ export function NoteCard({ note, selected, onSelect, onPin, onDelete }: NoteCard
           e.preventDefault();
           setMenu({ x: e.clientX, y: e.clientY });
         }}
-        className={`w-full p-2.5 rounded-xl text-left transition-colors ${
-          selected ? "bg-white/[0.08] ring-1 ring-brand/30" : "hover:bg-white/[0.04]"
+        className={`w-full p-2.5 note-card text-left ${
+          selected ? "note-card-active ring-1 ring-brand/30" : ""
         }`}
       >
         <div className="flex items-center gap-1">
@@ -42,10 +48,7 @@ export function NoteCard({ note, selected, onSelect, onPin, onDelete }: NoteCard
         {note.tags.length > 0 && (
           <div className="flex gap-1 mt-1 flex-wrap">
             {note.tags.slice(0, 3).map((tag) => (
-              <span
-                key={tag}
-                className="text-[10px] px-1.5 py-0.5 rounded-md bg-white/[0.06] text-dim"
-              >
+              <span key={tag} className="tag-pill">
                 {tag}
               </span>
             ))}
@@ -71,7 +74,7 @@ export function NoteCard({ note, selected, onSelect, onPin, onDelete }: NoteCard
       )}
     </div>
   );
-}
+});
 
 interface NoteContextMenuProps {
   x: number;
@@ -81,32 +84,37 @@ interface NoteContextMenuProps {
   onDelete: () => void;
 }
 
-const NoteContextMenu = forwardRef<HTMLDivElement, NoteContextMenuProps>(
-  ({ x, y, pinned, onPin, onDelete }, ref) => {
-    return createPortal(
-      <div
-        ref={ref}
-        className="fixed z-50 glass-panel rounded-xl py-1 min-w-[140px] shadow-xl border border-border"
-        style={{ left: x, top: y }}
+function NoteContextMenu({
+  x,
+  y,
+  pinned,
+  onPin,
+  onDelete,
+  ref,
+}: NoteContextMenuProps & { ref: React.Ref<HTMLDivElement> }) {
+  return createPortal(
+    <div
+      ref={ref}
+      className="fixed z-50 glass-panel rounded-xl py-1 min-w-[140px] shadow-xl border border-border"
+      style={{ left: x, top: y }}
+    >
+      <button
+        type="button"
+        onClick={onPin}
+        className="w-full px-3 py-1.5 text-sm text-secondary hover:bg-white/[0.06] flex items-center gap-2 text-left"
       >
-        <button
-          type="button"
-          onClick={onPin}
-          className="w-full px-3 py-1.5 text-sm text-secondary hover:bg-white/[0.06] flex items-center gap-2 text-left"
-        >
-          {pinned ? <PinOff className="w-3.5 h-3.5" /> : <Pin className="w-3.5 h-3.5" />}
-          {pinned ? "Unpin" : "Pin"}
-        </button>
-        <button
-          type="button"
-          onClick={onDelete}
-          className="w-full px-3 py-1.5 text-sm text-red-400 hover:bg-white/[0.06] flex items-center gap-2 text-left"
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-          Delete
-        </button>
-      </div>,
-      document.body,
-    );
-  },
-);
+        {pinned ? <PinOff className="w-3.5 h-3.5" /> : <Pin className="w-3.5 h-3.5" />}
+        {pinned ? "Unpin" : "Pin"}
+      </button>
+      <button
+        type="button"
+        onClick={onDelete}
+        className="w-full px-3 py-1.5 text-sm text-red-400 hover:bg-white/[0.06] flex items-center gap-2 text-left"
+      >
+        <Trash2 className="w-3.5 h-3.5" />
+        Delete
+      </button>
+    </div>,
+    document.body,
+  );
+}

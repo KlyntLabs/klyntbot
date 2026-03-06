@@ -3,10 +3,10 @@ import type { SessionContext } from "../lib/types";
 
 /**
  * Derives a SessionContext from the current route path.
- * Returns null when no entity context applies (dashboard, /chat).
+ * Returns null when no entity context applies (/chat, /launcher, /tray).
  */
 export function usePageContext(): SessionContext | null {
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
 
   // /project/:id
   const projectMatch = pathname.match(/^\/project\/(.+)$/);
@@ -27,6 +27,20 @@ export function usePageContext(): SessionContext | null {
   // /finance (hub)
   if (pathname === "/finance") return { entityKind: "finance" };
 
-  // / (dashboard), /chat, /launcher, /tray → no entity context
+  // / (tasks dashboard)
+  if (pathname === "/") {
+    const params = new URLSearchParams(search);
+    const tab = params.get("tab");
+    if (tab) return { entityKind: `tasks.${tab.toLowerCase()}` };
+    return { entityKind: "tasks" };
+  }
+
+  // /notes
+  if (pathname === "/notes") return { entityKind: "notes" };
+
+  // /productivity/*
+  if (pathname.startsWith("/productivity")) return { entityKind: "productivity" };
+
+  // /chat, /launcher, /tray → no entity context
   return null;
 }

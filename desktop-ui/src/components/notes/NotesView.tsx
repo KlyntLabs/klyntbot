@@ -1,5 +1,5 @@
-import { GitGraph, PenLine } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { FileText, GitGraph, PenLine } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { useEvent } from "../../hooks/useEvent";
 import { useMutation } from "../../hooks/useMutation";
@@ -10,13 +10,10 @@ import type {
   NotebookCreateParams,
   NoteCreateParams,
   NoteUpdateParams,
-  SidebarItem,
 } from "../../lib/types";
-import { Sidebar } from "../layout/Sidebar";
+import { FileTree } from "./FileTree";
 import { GraphView } from "./GraphView";
-import { NotebookTree } from "./NotebookTree";
 import { NoteEditor } from "./NoteEditor";
-import { NoteList } from "./NoteList";
 import { NoteSearchBar, type NoteSearchBarHandle } from "./NoteSearchBar";
 
 type NotesViewMode = "editor" | "graph";
@@ -28,11 +25,41 @@ export default function NotesView() {
     [],
   );
   const { data: notes, refetch: refetchNotes } = useQuery<Note[]>("note_list", undefined, []);
-  const [selectedNotebookId, setSelectedNotebookId] = useState<string | null>(null);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [viewMode, setNotesViewMode] = useState<NotesViewMode>("editor");
   const [searchResults, setSearchResults] = useState<Note[] | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
+  const sidebarRef = useRef<HTMLDivElement>(null);
+  const sidebarWidthRef = useRef(260);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const onResizeStart = useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = sidebarWidthRef.current;
+    let raf = 0;
+
+    // Disable backdrop-filter during drag — it's the main perf bottleneck
+    containerRef.current?.classList.add("resizing");
+
+    const onMove = (ev: globalThis.PointerEvent) => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const newW = Math.min(480, Math.max(180, startW + ev.clientX - startX));
+        sidebarWidthRef.current = newW;
+        if (sidebarRef.current) sidebarRef.current.style.width = `${newW}px`;
+      });
+    };
+    const onUp = () => {
+      cancelAnimationFrame(raf);
+      containerRef.current?.classList.remove("resizing");
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+    };
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+  }, []);
 
   // Pre-select note from URL search params (e.g. /notes?noteId=xxx)
   useEffect(() => {
@@ -43,13 +70,17 @@ export default function NotesView() {
     }
   }, [searchParams, setSearchParams]);
 
-  const filteredNotes = selectedNotebookId
-    ? notes.filter((n) => n.notebookId === selectedNotebookId)
-    : notes;
+  // O(1) note lookup via Map
+  const noteMap = useMemo(() => {
+    const map = new Map<string, Note>();
+    for (const n of notes) map.set(n.id, n);
+    return map;
+  }, [notes]);
 
-  const displayedNotes = searchResults ?? filteredNotes;
+  const selectedNote = selectedNoteId ? noteMap.get(selectedNoteId) : undefined;
 
-  const selectedNote = notes.find((n) => n.id === selectedNoteId);
+  // When searching, display search results in a flat tree-like way
+  const displayedNotes = searchResults ?? notes;
 
   // ── Mutations ──────────────────────────────────────────────────────────
   const { mutate: createNote } = useMutation<Note, NoteCreateParams>("note_create", "params");
@@ -59,19 +90,30 @@ export default function NotesView() {
     "notebook_create",
     "params",
   );
+  const { mutate: deleteNotebook } = useMutation<boolean, { id: string }>("notebook_delete");
+  const { mutate: updateNotebook } = useMutation<
+    Notebook,
+    { id: string; title?: string; parentId?: string | null }
+  >("notebook_update", "params");
 
   // ── Handlers ───────────────────────────────────────────────────────────
-  const handleCreateNote = useCallback(async () => {
-    const result = await createNote({
-      title: "Untitled",
-      notebookId: selectedNotebookId ?? undefined,
-    });
-    if (result) setSelectedNoteId(result.id);
-  }, [createNote, selectedNotebookId]);
+  const handleCreateNote = useCallback(
+    async (notebookId?: string) => {
+      const result = await createNote({
+        title: "Untitled",
+        notebookId,
+      });
+      if (result) setSelectedNoteId(result.id);
+    },
+    [createNote],
+  );
 
-  const handleCreateNotebook = useCallback(async () => {
-    await createNotebook({ title: "New Notebook" });
-  }, [createNotebook]);
+  const handleCreateNotebook = useCallback(
+    async (parentId?: string) => {
+      await createNotebook({ title: "New Folder", parentId });
+    },
+    [createNotebook],
+  );
 
   const handlePin = useCallback(
     (id: string, pinned: boolean) => {
@@ -88,6 +130,41 @@ export default function NotesView() {
       }
     },
     [deleteNote, selectedNoteId],
+  );
+
+  const handleDeleteNotebook = useCallback(
+    async (id: string) => {
+      await deleteNotebook({ id });
+    },
+    [deleteNotebook],
+  );
+
+  const handleRenameNotebook = useCallback(
+    async (id: string, title: string) => {
+      await updateNotebook({ id, title });
+    },
+    [updateNotebook],
+  );
+
+  const handleRenameNote = useCallback(
+    async (id: string, title: string) => {
+      await updateNote({ id, title });
+    },
+    [updateNote],
+  );
+
+  const handleMoveNote = useCallback(
+    async (id: string, notebookId: string | null) => {
+      await updateNote({ id, notebookId });
+    },
+    [updateNote],
+  );
+
+  const handleMoveNotebook = useCallback(
+    async (id: string, parentId: string | null) => {
+      await updateNotebook({ id, parentId });
+    },
+    [updateNotebook],
   );
 
   const searchRef = useRef<NoteSearchBarHandle>(null);
@@ -130,36 +207,44 @@ export default function NotesView() {
   });
 
   return (
-    <div className="h-screen w-screen bg-background text-primary flex gap-2 p-2 overflow-hidden">
-      <Sidebar active={"Notes" satisfies SidebarItem} />
-
-      <div className="flex-1 flex gap-2 min-w-0">
-        <NotebookTree
-          notebooks={notebooks}
-          selectedId={selectedNotebookId}
-          onSelect={setSelectedNotebookId}
-          onCreate={handleCreateNotebook}
+    <div ref={containerRef} className="flex-1 flex min-w-0">
+      {/* File tree sidebar — resizable */}
+      <div ref={sidebarRef} className="flex flex-col gap-2 min-h-0 shrink-0" style={{ width: 260 }}>
+        <NoteSearchBar ref={searchRef} onResults={setSearchResults} />
+        <FileTree
+          notebooks={searchResults ? [] : notebooks}
+          notes={displayedNotes}
+          selectedNoteId={selectedNoteId}
+          onSelectNote={setSelectedNoteId}
+          onCreateNote={handleCreateNote}
+          onCreateNotebook={handleCreateNotebook}
+          onDeleteNote={handleDelete}
+          onPinNote={handlePin}
+          onDeleteNotebook={handleDeleteNotebook}
+          onRenameNotebook={handleRenameNotebook}
+          onRenameNote={handleRenameNote}
+          onMoveNote={handleMoveNote}
+          onMoveNotebook={handleMoveNotebook}
         />
+      </div>
 
-        <div className="w-64 flex flex-col gap-2 min-h-0">
-          <NoteSearchBar ref={searchRef} onResults={setSearchResults} />
-          <NoteList
-            notes={displayedNotes}
-            selectedId={selectedNoteId}
-            onSelect={setSelectedNoteId}
-            onCreate={handleCreateNote}
-            onPin={handlePin}
-            onDelete={handleDelete}
-          />
-        </div>
+      {/* Resize handle */}
+      <div
+        onPointerDown={onResizeStart}
+        className="w-1 shrink-0 cursor-col-resize group flex items-center justify-center"
+      >
+        <div className="w-px h-full group-hover:bg-brand/40 transition-colors" />
+      </div>
 
-        <div className="flex-1 flex flex-col gap-2 min-w-0 min-h-0">
-          {/* View mode toggle */}
-          <div className="flex justify-end gap-1 shrink-0">
+      {/* Editor area */}
+      <div className="flex-1 flex flex-col gap-2 min-w-0 min-h-0 pl-1">
+        {/* View mode toggle */}
+        <div className="flex justify-end shrink-0">
+          <div className="flex gap-0.5">
             <button
               type="button"
               onClick={() => setNotesViewMode("editor")}
-              className={`p-1.5 rounded-lg transition-colors ${
+              className={`p-1.5 rounded-lg transition-all ${
                 viewMode === "editor"
                   ? "bg-white/[0.1] text-primary"
                   : "text-dim hover:text-secondary hover:bg-white/[0.04]"
@@ -171,7 +256,7 @@ export default function NotesView() {
             <button
               type="button"
               onClick={() => setNotesViewMode("graph")}
-              className={`p-1.5 rounded-lg transition-colors ${
+              className={`p-1.5 rounded-lg transition-all ${
                 viewMode === "graph"
                   ? "bg-white/[0.1] text-primary"
                   : "text-dim hover:text-secondary hover:bg-white/[0.04]"
@@ -181,21 +266,29 @@ export default function NotesView() {
               <GitGraph className="w-4 h-4" />
             </button>
           </div>
-
-          {viewMode === "graph" ? (
-            <GraphView
-              notes={notes}
-              activeNoteId={selectedNoteId}
-              onSelectNote={setSelectedNoteId}
-            />
-          ) : selectedNote ? (
-            <NoteEditor note={selectedNote} onSave={updateNote} />
-          ) : (
-            <div className="flex-1 glass-panel rounded-2xl flex items-center justify-center">
-              <div className="text-muted text-sm">Select a note to view</div>
-            </div>
-          )}
         </div>
+
+        {viewMode === "graph" ? (
+          <GraphView notes={notes} activeNoteId={selectedNoteId} onSelectNote={setSelectedNoteId} />
+        ) : selectedNote ? (
+          <NoteEditor note={selectedNote} onSave={updateNote} />
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center gap-3">
+            <div className="w-12 h-12 rounded-2xl bg-white/[0.04] flex items-center justify-center">
+              <FileText className="w-6 h-6 text-dim" strokeWidth={1.5} />
+            </div>
+            <div className="text-center">
+              <div className="text-muted text-sm">Select a note to view</div>
+              <div className="text-dim text-xs mt-1">
+                or press{" "}
+                <kbd className="px-1.5 py-0.5 rounded bg-white/[0.06] text-[10px] font-mono">
+                  Cmd+N
+                </kbd>{" "}
+                to create one
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

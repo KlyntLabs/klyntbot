@@ -1704,6 +1704,7 @@ async fn dispatch(
                     params.body.as_deref(),
                     params.body_html.as_deref(),
                     params.pinned,
+                    params.notebook_id.as_ref().map(|o| o.as_deref()),
                 )
                 .await
             {
@@ -1815,7 +1816,7 @@ async fn dispatch(
                         };
                         let _ = core.note_repo.create_version(&snap).await;
                     }
-                    match core.note_repo.update_note(&note_id, None, Some(&version.body), None, None).await {
+                    match core.note_repo.update_note(&note_id, None, Some(&version.body), None, None, None).await {
                         Ok(updated) => {
                             let tags = core.note_repo.get_tags(&note_id).await.unwrap_or_default();
                             ok(note_row_to_resp(&updated, tags))
@@ -1910,15 +1911,16 @@ async fn dispatch(
             }
         }
         "notebook_update" => {
-            let id = match get_str(&body, "id") {
-                Ok(v) => v,
-                Err(e) => return err(e),
-            };
-            let title: Option<String> = get(&body, "title");
-            let icon: Option<String> = get(&body, "icon");
+            let params: NotebookUpdateParams =
+                match serde_json::from_value(body.get("params").cloned().unwrap_or(body.clone())) {
+                    Ok(p) => p,
+                    Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
+                };
+            let id = &params.id;
+            let parent_id_ref = params.parent_id.as_ref().map(|o| o.as_deref());
             match core
                 .note_repo
-                .update_notebook(&id, title.as_deref(), icon.as_deref(), None)
+                .update_notebook(id, params.title.as_deref(), params.icon.as_deref(), parent_id_ref)
                 .await
             {
                 Ok(updated) => {

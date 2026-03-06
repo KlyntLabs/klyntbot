@@ -538,8 +538,31 @@ pub struct NoteUpdateParams {
     pub body: Option<String>,
     pub body_html: Option<String>,
     pub pinned: Option<bool>,
-    pub notebook_id: Option<String>,
+    /// `None` = don't change, `Some(None)` = move to root, `Some(Some(id))` = move to folder
+    #[serde(default, deserialize_with = "deserialize_nullable_field")]
+    pub notebook_id: Option<Option<String>>,
     pub tags: Option<Vec<String>>,
+}
+
+/// Deserializes a field that distinguishes between absent, null, and present.
+/// - absent → `None` (don't change)
+/// - `null` → `Some(None)` (set to null / move to root)
+/// - `"value"` → `Some(Some("value"))` (set to value)
+fn deserialize_nullable_field<'de, D>(deserializer: D) -> Result<Option<Option<String>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Ok(Some(Option::deserialize(deserializer)?))
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NotebookUpdateParams {
+    pub id: String,
+    pub title: Option<String>,
+    pub icon: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_nullable_field")]
+    pub parent_id: Option<Option<String>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

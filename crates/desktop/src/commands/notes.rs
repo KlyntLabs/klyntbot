@@ -1,6 +1,6 @@
 use desktop_shared::commands::{
     NoteCreateParams, NoteLinkResponse, NoteResponse, NoteUpdateParams, NoteVersionResponse,
-    NotebookCreateParams, NotebookResponse,
+    NotebookCreateParams, NotebookResponse, NotebookUpdateParams,
 };
 use desktop_shared::errors::ApiError;
 use desktop_shared::types::EntityKind;
@@ -202,6 +202,7 @@ pub async fn note_update(
             params.body.as_deref(),
             params.body_html.as_deref(),
             params.pinned,
+            params.notebook_id.as_ref().map(|o| o.as_deref()),
         )
         .await
         .map_err(super::map_storage_err)?;
@@ -380,7 +381,7 @@ pub async fn note_version_restore(
     // Restore the version body
     let updated = state
         .note_repo
-        .update_note(&note_id, None, Some(&version.body), None, None)
+        .update_note(&note_id, None, Some(&version.body), None, None, None)
         .await
         .map_err(super::map_storage_err)?;
 
@@ -499,23 +500,22 @@ pub async fn notebook_create(
 pub async fn notebook_update(
     state: State<'_, Arc<AppCore>>,
     app: tauri::AppHandle,
-    id: String,
-    title: Option<String>,
-    icon: Option<String>,
+    params: NotebookUpdateParams,
 ) -> Result<NotebookResponse, ApiError> {
+    let parent_id_ref = params.parent_id.as_ref().map(|o| o.as_deref());
     let updated = state
         .note_repo
-        .update_notebook(&id, title.as_deref(), icon.as_deref(), None)
+        .update_notebook(&params.id, params.title.as_deref(), params.icon.as_deref(), parent_id_ref)
         .await
         .map_err(super::map_storage_err)?;
 
     let count = state
         .note_repo
-        .count_notes_in_notebook(&id)
+        .count_notes_in_notebook(&params.id)
         .await
         .map_err(super::map_storage_err)?;
 
-    super::emit_entity_updated(&app, EntityKind::Notebook, &id);
+    super::emit_entity_updated(&app, EntityKind::Notebook, &params.id);
 
     Ok(NotebookResponse {
         id: updated.id,

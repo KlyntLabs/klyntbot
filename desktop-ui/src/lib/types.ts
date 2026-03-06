@@ -368,7 +368,7 @@ export interface NoteUpdateParams {
   body?: string;
   bodyHtml?: string;
   pinned?: boolean;
-  notebookId?: string;
+  notebookId?: string | null;
   tags?: string[];
 }
 

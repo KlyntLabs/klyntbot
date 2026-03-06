@@ -47,31 +47,44 @@ export function NoteVersionHistory({ noteId, onRestore }: NoteVersionHistoryProp
 
   return (
     <div className="w-64 glass-panel rounded-2xl flex flex-col min-h-0">
-      <div className="px-3 py-2 border-b border-border">
-        <h3 className="text-xs font-medium text-secondary">Version History</h3>
+      <div className="px-3 py-2.5 border-b border-border">
+        <h3 className="text-xs font-medium text-secondary tracking-wide">Version History</h3>
       </div>
 
       <div className="flex-1 overflow-y-auto">
         {versions.length === 0 && (
-          <div className="px-3 py-6 text-center">
-            <p className="text-xs text-dim">No versions yet</p>
+          <div className="px-3 py-8 text-center">
+            <div className="text-dim text-xs">No versions yet</div>
+            <div className="text-dim/60 text-[10px] mt-1">
+              Versions are created automatically as you edit
+            </div>
           </div>
         )}
-        {versions.map((v) => (
+        {versions.map((v, i) => (
           <button
             key={v.id}
             type="button"
             onClick={() => setPreviewId(v.id === previewId ? null : v.id)}
-            className={`w-full px-3 py-2 text-left border-b border-white/[0.04] last:border-b-0 transition-colors ${
-              v.id === previewId
-                ? "bg-white/[0.08] text-primary"
-                : "text-secondary hover:bg-white/[0.04]"
+            className={`w-full flex gap-3 px-3 py-2.5 text-left transition-colors ${
+              v.id === previewId ? "bg-white/[0.06]" : "hover:bg-white/[0.03]"
             }`}
           >
-            <div className="text-xs font-light">{formatTime(v.createdAt)}</div>
-            <div className="text-[10px] text-dim mt-0.5 truncate">
-              {v.body.slice(0, 80)}
-              {v.body.length > 80 ? "..." : ""}
+            {/* Timeline dot */}
+            <div className="flex flex-col items-center pt-1.5">
+              <div className={`version-dot ${v.id === previewId ? "version-dot-active" : ""}`} />
+              {i < versions.length - 1 && <div className="version-line flex-1 min-h-[16px]" />}
+            </div>
+            {/* Content */}
+            <div className="flex-1 min-w-0">
+              <div
+                className={`text-xs ${v.id === previewId ? "text-primary font-medium" : "font-light text-secondary"}`}
+              >
+                {formatTime(v.createdAt)}
+              </div>
+              <div className="text-[10px] text-dim mt-0.5 truncate">
+                {v.body.slice(0, 80)}
+                {v.body.length > 80 ? "..." : ""}
+              </div>
             </div>
           </button>
         ))}

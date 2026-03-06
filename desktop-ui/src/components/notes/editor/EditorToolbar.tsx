@@ -177,10 +177,10 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
   if (!editor) return null;
 
   return (
-    <div className="flex items-center gap-0.5 flex-wrap">
+    <div className="glass-toolbar px-2 py-1 flex items-center gap-0.5 flex-wrap">
       {groups.map((group, gi) => (
         <div key={gi} className="flex items-center gap-0.5">
-          {gi > 0 && <div className="w-px h-4 bg-border mx-1" />}
+          {gi > 0 && <div className="w-px h-4 bg-white/[0.08] mx-1.5" />}
           {group.map((btn) => {
             const Icon = btn.icon;
             const active = btn.isActive?.(editor) ?? false;
@@ -190,10 +190,10 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
                 type="button"
                 onClick={() => btn.action(editor)}
                 title={btn.label}
-                className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors ${
+                className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
                   active
-                    ? "bg-white/[0.1] text-brand"
-                    : "text-muted hover:text-primary hover:bg-white/[0.06]"
+                    ? "bg-brand/15 text-brand shadow-[0_0_8px_rgba(249,115,22,0.12)]"
+                    : "text-muted hover:text-primary hover:bg-white/[0.08]"
                 }`}
               >
                 <Icon className="w-3.5 h-3.5" strokeWidth={1.5} />

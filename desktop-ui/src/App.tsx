@@ -2,6 +2,9 @@ import { lazy, Suspense } from "react";
 import { createHashRouter, Navigate, RouterProvider } from "react-router";
 import { todayISO } from "./lib/dates";
 
+const AppShell = lazy(() =>
+  import("./components/layout/AppShell").then((m) => ({ default: m.AppShell })),
+);
 const MainApp = lazy(() =>
   import("./components/views/MainApp").then((m) => ({ default: m.MainApp })),
 );
@@ -107,82 +110,84 @@ function ProductivityRedirect() {
 }
 
 const router = createHashRouter([
-  { path: "/", element: <MainApp /> },
-  { path: "/chat", element: <Chat /> },
-  { path: "/notes", element: <NotesView /> },
-  { path: "/project/:id", element: <ProjectDetail /> },
-  { path: "/task/:id", element: <TaskDetail /> },
-  { path: "/objective/:id", element: <ObjectiveDetail /> },
   {
-    path: "/productivity",
-    element: <ProductivityRedirect />,
-  },
-  { path: "/productivity/day/:date", element: <ProductivityDayPage /> },
-  { path: "/productivity/week/:weekStart", element: <ProductivityWeekPage /> },
-  { path: "/productivity/month/:yearMonth", element: <ProductivityMonthPage /> },
-  { path: "/finance", element: <Finance /> },
-  { path: "/finance/accounts", element: <FinanceAccounts /> },
-  { path: "/finance/transactions", element: <FinanceTransactions /> },
-  { path: "/finance/budgets", element: <FinanceBudgets /> },
-  { path: "/finance/investments", element: <FinanceInvestments /> },
-  { path: "/finance/goals", element: <FinanceGoals /> },
-  { path: "/finance/liabilities", element: <FinanceLiabilities /> },
-  { path: "/settings", element: <Navigate to="/settings/general" replace /> },
-  {
-    path: "/settings/general",
-    element: (
-      <SettingsLayout>
-        <GeneralSettings />
-      </SettingsLayout>
-    ),
-  },
-  {
-    path: "/settings/configuration",
-    element: (
-      <SettingsLayout>
-        <ConfigurationSettings />
-      </SettingsLayout>
-    ),
-  },
-  {
-    path: "/settings/personalization",
-    element: (
-      <SettingsLayout>
-        <PersonalizationSettings />
-      </SettingsLayout>
-    ),
-  },
-  {
-    path: "/settings/mcp",
-    element: (
-      <SettingsLayout>
-        <McpServersSettings />
-      </SettingsLayout>
-    ),
-  },
-  {
-    path: "/settings/git",
-    element: (
-      <SettingsLayout>
-        <GitSettings />
-      </SettingsLayout>
-    ),
-  },
-  {
-    path: "/settings/environments",
-    element: (
-      <SettingsLayout>
-        <EnvironmentsSettings />
-      </SettingsLayout>
-    ),
-  },
-  {
-    path: "/settings/archived",
-    element: (
-      <SettingsLayout>
-        <ArchivedSettings />
-      </SettingsLayout>
-    ),
+    element: <AppShell />,
+    children: [
+      { path: "/", element: <MainApp /> },
+      { path: "/chat", element: <Chat /> },
+      { path: "/notes", element: <NotesView /> },
+      { path: "/project/:id", element: <ProjectDetail /> },
+      { path: "/task/:id", element: <TaskDetail /> },
+      { path: "/objective/:id", element: <ObjectiveDetail /> },
+      { path: "/productivity", element: <ProductivityRedirect /> },
+      { path: "/productivity/day/:date", element: <ProductivityDayPage /> },
+      { path: "/productivity/week/:weekStart", element: <ProductivityWeekPage /> },
+      { path: "/productivity/month/:yearMonth", element: <ProductivityMonthPage /> },
+      { path: "/finance", element: <Finance /> },
+      { path: "/finance/accounts", element: <FinanceAccounts /> },
+      { path: "/finance/transactions", element: <FinanceTransactions /> },
+      { path: "/finance/budgets", element: <FinanceBudgets /> },
+      { path: "/finance/investments", element: <FinanceInvestments /> },
+      { path: "/finance/goals", element: <FinanceGoals /> },
+      { path: "/finance/liabilities", element: <FinanceLiabilities /> },
+      { path: "/settings", element: <Navigate to="/settings/general" replace /> },
+      {
+        path: "/settings/general",
+        element: (
+          <SettingsLayout>
+            <GeneralSettings />
+          </SettingsLayout>
+        ),
+      },
+      {
+        path: "/settings/configuration",
+        element: (
+          <SettingsLayout>
+            <ConfigurationSettings />
+          </SettingsLayout>
+        ),
+      },
+      {
+        path: "/settings/personalization",
+        element: (
+          <SettingsLayout>
+            <PersonalizationSettings />
+          </SettingsLayout>
+        ),
+      },
+      {
+        path: "/settings/mcp",
+        element: (
+          <SettingsLayout>
+            <McpServersSettings />
+          </SettingsLayout>
+        ),
+      },
+      {
+        path: "/settings/git",
+        element: (
+          <SettingsLayout>
+            <GitSettings />
+          </SettingsLayout>
+        ),
+      },
+      {
+        path: "/settings/environments",
+        element: (
+          <SettingsLayout>
+            <EnvironmentsSettings />
+          </SettingsLayout>
+        ),
+      },
+      {
+        path: "/settings/archived",
+        element: (
+          <SettingsLayout>
+            <ArchivedSettings />
+          </SettingsLayout>
+        ),
+      },
+    ],
   },
   { path: "/launcher", element: <Launcher /> },
   { path: "/tray", element: <SystemTray /> },

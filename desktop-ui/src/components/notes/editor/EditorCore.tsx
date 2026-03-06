@@ -18,6 +18,7 @@ import type { Extensions } from "@tiptap/react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { common, createLowlight } from "lowlight";
+import { useEffect } from "react";
 import { ipc } from "../../../hooks/useIpc";
 import { isTauri } from "../../../lib/utils";
 import { EntityMentionAutocomplete, EntityMentionMark } from "./EntityMention";
@@ -25,8 +26,110 @@ import { MathBlock, MathInline } from "./MathNode";
 import { SlashCommandsExtension } from "./SlashCommandMenu";
 import { WikiLinkAutocomplete, WikiLinkMark } from "./WikiLinkNode";
 
+// ── Entity Resolution Hook ──────────────────────────────────────────────
+// Checks whether entity mentions (@task, @project) and wiki links ([[note]])
+// reference entities that actually exist. Toggles CSS classes defined in
+// editor.css (.wiki-link--unresolved, .entity-mention--unresolved) to gray out
+// unresolved references.
+
+export function useEntityResolution(editor: ReturnType<typeof useEditor>) {
+  useEffect(() => {
+    if (!editor) return;
+
+    const cache = new Map<string, boolean>();
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    async function resolve() {
+      const root = editor!.view.dom;
+      const mentions = root.querySelectorAll<HTMLElement>("span[data-entity-mention]");
+      const wikiLinks = root.querySelectorAll<HTMLElement>("span[data-wiki-link]");
+
+      if (mentions.length === 0 && wikiLinks.length === 0) return;
+
+      const taskIds = new Set<string>();
+      const projectIds = new Set<string>();
+      const noteIds = new Set<string>();
+
+      for (const el of mentions) {
+        const type = el.dataset.entityType || "";
+        const id = el.dataset.entityId || "";
+        if (!id) continue;
+        if (!cache.has(`${type}:${id}`)) {
+          if (type === "task") taskIds.add(id);
+          else if (type === "project") projectIds.add(id);
+        }
+      }
+      for (const el of wikiLinks) {
+        const id = el.dataset.noteId || "";
+        if (id && !cache.has(`note:${id}`)) noteIds.add(id);
+      }
+
+      if (taskIds.size > 0 || projectIds.size > 0 || noteIds.size > 0) {
+        try {
+          const promises: Promise<void>[] = [];
+          if (taskIds.size > 0) {
+            promises.push(
+              ipc<{ id: string }[]>("task_list", undefined).then((tasks) => {
+                const idSet = new Set(tasks.map((t) => t.id));
+                for (const id of taskIds) cache.set(`task:${id}`, idSet.has(id));
+              }),
+            );
+          }
+          if (projectIds.size > 0) {
+            promises.push(
+              ipc<{ id: string }[]>("project_list", undefined).then((projects) => {
+                const idSet = new Set(projects.map((p) => p.id));
+                for (const id of projectIds) cache.set(`project:${id}`, idSet.has(id));
+              }),
+            );
+          }
+          if (noteIds.size > 0) {
+            promises.push(
+              ipc<{ id: string }[]>("note_list", undefined).then((notes) => {
+                const idSet = new Set(notes.map((n) => n.id));
+                for (const id of noteIds) cache.set(`note:${id}`, idSet.has(id));
+              }),
+            );
+          }
+          await Promise.all(promises);
+        } catch {
+          return;
+        }
+      }
+
+      // Toggle CSS classes for unresolved entities (classes defined in editor.css)
+      for (const el of wikiLinks) {
+        const id = el.dataset.noteId || "";
+        if (id) el.classList.toggle("wiki-link--unresolved", cache.get(`note:${id}`) === false);
+      }
+      for (const el of mentions) {
+        const type = el.dataset.entityType || "";
+        const id = el.dataset.entityId || "";
+        if (id)
+          el.classList.toggle("entity-mention--unresolved", cache.get(`${type}:${id}`) === false);
+      }
+    }
+
+    // Initial check
+    timer = setTimeout(resolve, 300);
+
+    // Re-check on editor updates
+    const onUpdate = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(resolve, 500);
+    };
+    editor.on("update", onUpdate);
+
+    return () => {
+      if (timer) clearTimeout(timer);
+      editor.off("update", onUpdate);
+    };
+  }, [editor]);
+}
+
 const lowlight = createLowlight(common);
 const NOOP = () => {};
+const EMPTY_EXTENSIONS: Extensions = [];
 
 interface EditorExtensionOptions {
   extra?: Extensions;
@@ -107,7 +210,7 @@ function fileToBase64(file: File): Promise<string> {
 export function useNoteEditor({
   content,
   onUpdate,
-  extensions = [],
+  extensions = EMPTY_EXTENSIONS,
   onNavigateNote,
   onNavigateEntity,
 }: UseNoteEditorOptions) {

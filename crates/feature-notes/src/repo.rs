@@ -7,6 +7,14 @@ use storage::StorageError;
 
 use crate::models::*;
 
+/// Convert a tri-state `Option<Option<&str>>` to a sentinel value for SQL:
+/// - `None` → `None`  (bind NULL → COALESCE keeps existing)
+/// - `Some(None)` → `Some("")` (bind "" → CASE sets NULL)
+/// - `Some(Some(v))` → `Some(v)` (bind v → CASE sets v)
+fn nullable_to_sentinel(v: Option<Option<&str>>) -> Option<&str> {
+    v.map(|opt| opt.unwrap_or(""))
+}
+
 /// UTC "now" as an ISO-8601 string (`YYYY-MM-DDTHH:MM:SSZ`).
 pub fn utc_now_str() -> String {
     chrono::Utc::now()
@@ -76,13 +84,20 @@ impl NoteRepo {
         body: Option<&str>,
         body_html: Option<&str>,
         pinned: Option<bool>,
+        notebook_id: Option<Option<&str>>,
     ) -> Result<NoteRow, StorageError> {
+        let nb_sentinel = nullable_to_sentinel(notebook_id);
         let row = sqlx::query_as::<_, NoteRow>(
             "UPDATE notes SET
                 title = COALESCE(?2, title),
                 body = COALESCE(?3, body),
                 body_html = COALESCE(?4, body_html),
                 pinned = COALESCE(?5, pinned),
+                notebook_id = CASE
+                    WHEN ?6 IS NULL THEN notebook_id
+                    WHEN ?6 = '' THEN NULL
+                    ELSE ?6
+                END,
                 updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
              WHERE id = ?1
              RETURNING *",
@@ -92,6 +107,7 @@ impl NoteRepo {
         .bind(body)
         .bind(body_html)
         .bind(pinned.map(|p| p as i32))
+        .bind(nb_sentinel)
         .fetch_one(&self.pool)
         .await?;
         Ok(row)
@@ -237,11 +253,16 @@ impl NoteRepo {
         icon: Option<&str>,
         parent_id: Option<Option<&str>>,
     ) -> Result<NotebookRow, StorageError> {
+        let pid_sentinel = nullable_to_sentinel(parent_id);
         let row = sqlx::query_as::<_, NotebookRow>(
             "UPDATE notebooks SET
                 title = COALESCE(?2, title),
                 icon = COALESCE(?3, icon),
-                parent_id = COALESCE(?4, parent_id),
+                parent_id = CASE
+                    WHEN ?4 IS NULL THEN parent_id
+                    WHEN ?4 = '' THEN NULL
+                    ELSE ?4
+                END,
                 updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
              WHERE id = ?1
              RETURNING *",
@@ -249,7 +270,7 @@ impl NoteRepo {
         .bind(id)
         .bind(title)
         .bind(icon)
-        .bind(parent_id.flatten())
+        .bind(pid_sentinel)
         .fetch_one(&self.pool)
         .await?;
         Ok(row)
@@ -530,7 +551,7 @@ mod tests {
             .unwrap();
 
         let updated = repo
-            .update_note("n1", Some("Updated"), None, None, Some(true))
+            .update_note("n1", Some("Updated"), None, None, Some(true), None)
             .await
             .unwrap();
         assert_eq!(updated.title, "Updated");
