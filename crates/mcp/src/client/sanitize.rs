@@ -43,6 +43,17 @@ pub fn build_tool_name(server: &str, tool: &str) -> String {
     out
 }
 
+/// Extract the server name from a namespaced MCP tool name.
+///
+/// Given `"mcp_linear_list_issues"`, returns `Some("linear")`.
+/// Returns `None` if the name doesn't start with `mcp_` or has no server segment.
+pub fn extract_server_name(tool_name: &str) -> Option<&str> {
+    tool_name
+        .strip_prefix("mcp_")
+        .and_then(|rest| rest.split('_').next())
+        .filter(|s| !s.is_empty())
+}
+
 /// Build the server prefix used for unregistering tools: `mcp_{sanitized_server}_`.
 pub fn server_prefix(server: &str) -> String {
     let mut out = String::with_capacity(4 + 1 + server.len() + 1);
@@ -134,6 +145,18 @@ mod tests {
         let name1 = build_tool_name("server", &"a".repeat(60));
         let name2 = build_tool_name("server", &"b".repeat(60));
         assert_ne!(name1, name2);
+    }
+
+    #[test]
+    fn test_extract_server_name() {
+        assert_eq!(
+            extract_server_name("mcp_linear_list_issues"),
+            Some("linear")
+        );
+        assert_eq!(extract_server_name("mcp_github_list_repos"), Some("github"));
+        assert_eq!(extract_server_name("task"), None);
+        assert_eq!(extract_server_name("mcp_"), None);
+        assert_eq!(extract_server_name(""), None);
     }
 
     #[test]

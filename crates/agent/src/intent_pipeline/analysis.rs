@@ -16,7 +16,6 @@ use tokio::sync::Mutex;
 use tracing::{debug, warn};
 
 use super::types::{AnalysisSource, ComplexitySignals, ExecutionMode, FailureRisk, IntentAnalysis};
-use crate::agent_profile::AgentProfile;
 
 /// Minimum iteration budget for orchestration and MCP-tool overrides.
 pub const ORCHESTRATION_MIN_ITERATIONS: u32 = 15;
@@ -156,10 +155,7 @@ fn references_mcp_tools(message: &str, tool_names: &[&str]) -> bool {
     // Collect unique MCP server names from registered tools
     let server_names: std::collections::HashSet<&str> = tool_names
         .iter()
-        .filter_map(|name| {
-            name.strip_prefix("mcp_")
-                .and_then(|rest| rest.split('_').next())
-        })
+        .filter_map(|name| mcp::sanitize::extract_server_name(name))
         .collect();
 
     if server_names.is_empty() {
@@ -625,36 +621,7 @@ impl IntentAnalyzer {
     }
 
     /// Analyze a user message and return the recommended execution mode.
-    /// If a profile is provided, MCP tool names are filtered to only those the agent can access.
-    pub async fn analyze(
-        &self,
-        message: &str,
-        tool_names: &[&str],
-        profile: Option<&AgentProfile>,
-    ) -> IntentAnalysis {
-        // Filter tool names to only those the matched agent can access
-        let filtered_names: Vec<&str>;
-        let effective_tool_names = if let Some(profile) = profile {
-            filtered_names = tool_names
-                .iter()
-                .filter(|name| {
-                    if name.starts_with("mcp_") {
-                        let server_name = name
-                            .strip_prefix("mcp_")
-                            .and_then(|rest| rest.split('_').next())
-                            .unwrap_or("");
-                        profile.allows_mcp_server(server_name)
-                    } else {
-                        true
-                    }
-                })
-                .copied()
-                .collect();
-            &filtered_names[..]
-        } else {
-            tool_names
-        };
-
+    pub async fn analyze(&self, message: &str, tool_names: &[&str]) -> IntentAnalysis {
         // Stage 1: Heuristics (0ms)
         let mut analysis = if let Some(analysis) = analyze_heuristic(message) {
             if analysis.confidence >= self.config.heuristic_confidence_threshold {
@@ -670,16 +637,16 @@ impl IntentAnalyzer {
                     threshold = self.config.heuristic_confidence_threshold,
                     "Heuristic confidence below threshold, falling through to LLM"
                 );
-                self.classify_with_llm(message, effective_tool_names).await
+                self.classify_with_llm(message, tool_names).await
             }
         } else {
-            self.classify_with_llm(message, effective_tool_names).await
+            self.classify_with_llm(message, tool_names).await
         };
 
         // Post-classification: override Direct → Reactive when MCP tools are referenced.
         // MCP tools are user-configured integrations that always require tool execution.
         if matches!(analysis.mode, ExecutionMode::Direct)
-            && references_mcp_tools(message, effective_tool_names)
+            && references_mcp_tools(message, tool_names)
         {
             debug!("Overriding Direct → Reactive: message references MCP tools");
             analysis.mode = ExecutionMode::Reactive {
@@ -1145,7 +1112,7 @@ mod tests {
             "model",
             &OrchestratorConfig::default(),
         );
-        let result = analyzer.analyze("hello", &[], None).await;
+        let result = analyzer.analyze("hello", &[]).await;
         assert!(matches!(result.mode, ExecutionMode::Direct));
         assert_eq!(result.source, AnalysisSource::Heuristic);
     }
@@ -1162,7 +1129,6 @@ mod tests {
             .analyze(
                 "I need help with understanding the codebase",
                 &["web_search"],
-                None,
             )
             .await;
         assert!(matches!(result.mode, ExecutionMode::Reactive { .. }));
@@ -1177,9 +1143,7 @@ mod tests {
             "model",
             &OrchestratorConfig::default(),
         );
-        let result = analyzer
-            .analyze("I need help with something", &[], None)
-            .await;
+        let result = analyzer.analyze("I need help with something", &[]).await;
         assert!(matches!(
             result.mode,
             ExecutionMode::Reactive { max_iterations: 15 }
@@ -1194,7 +1158,7 @@ mod tests {
             &OrchestratorConfig::default(),
         );
         let result = analyzer
-            .analyze("create a task to buy groceries", &[], None)
+            .analyze("create a task to buy groceries", &[])
             .await;
         assert!(matches!(result.mode, ExecutionMode::Reactive { .. }));
         assert_eq!(result.source, AnalysisSource::Heuristic);
@@ -1292,13 +1256,13 @@ mod tests {
 
         // "hello" normally classifies as Direct via heuristic
         let mcp_tools = &["mcp_linear_list_issues", "mcp_linear_get_issue"];
-        let result = analyzer.analyze("hello", mcp_tools, None).await;
+        let result = analyzer.analyze("hello", mcp_tools).await;
         // No override — "hello" doesn't mention "linear" or "mcp"
         assert!(matches!(result.mode, ExecutionMode::Direct));
 
         // Now with a message that references MCP
         let result = analyzer
-            .analyze("help me check my linear issues", mcp_tools, None)
+            .analyze("help me check my linear issues", mcp_tools)
             .await;
         assert!(
             matches!(result.mode, ExecutionMode::Reactive { .. }),

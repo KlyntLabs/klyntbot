@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use serde::Deserialize;
 
 const DEFAULT_MAX_ITERATIONS: u32 = 10;
+const MCP_WILDCARD: &str = "*";
 
 #[derive(Debug, Clone)]
 pub struct AgentProfile {
@@ -116,7 +117,9 @@ impl AgentProfile {
     /// Check if this profile allows tools from the given MCP server name.
     /// Empty `mcp_tools` denies all. `["*"]` allows all.
     pub fn allows_mcp_server(&self, server_name: &str) -> bool {
-        self.mcp_tools.iter().any(|s| s == "*" || s == server_name)
+        self.mcp_tools
+            .iter()
+            .any(|s| s == MCP_WILDCARD || s == server_name)
     }
 
     /// Check if this agent's triggers match the given message.

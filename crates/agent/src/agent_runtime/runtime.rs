@@ -230,12 +230,21 @@ impl AgentRuntime {
             *guard = Some(Arc::clone(profile));
         }
 
-        // Step 3: Classify intent
+        // Step 3: Filter MCP tool names to those the matched agent can access
+        let filtered_tool_names: Vec<&str> = tool_names
+            .iter()
+            .filter(|name| {
+                match mcp::sanitize::extract_server_name(name) {
+                    Some(server) => profile.allows_mcp_server(server),
+                    None => true, // Native tools pass through (filtered separately by profile.tools)
+                }
+            })
+            .copied()
+            .collect();
+
+        // Step 4: Classify intent
         let classify_start = Instant::now();
-        let mut analysis = self
-            .analyzer
-            .analyze(message, tool_names, Some(profile))
-            .await;
+        let mut analysis = self.analyzer.analyze(message, &filtered_tool_names).await;
         let classify_ms = classify_start.elapsed().as_millis() as u64;
         debug!(
             "AgentRuntime: classified as {:?} (source: {:?}, confidence: {:.2})",
@@ -716,11 +725,7 @@ fn filter_tools_for_profile(
                 return true;
             };
 
-            if name.starts_with("mcp_") {
-                let server_name = name
-                    .strip_prefix("mcp_")
-                    .and_then(|rest| rest.split('_').next())
-                    .unwrap_or("");
+            if let Some(server_name) = mcp::sanitize::extract_server_name(name) {
                 return profile.allows_mcp_server(server_name);
             }
 
