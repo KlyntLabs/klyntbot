@@ -10,6 +10,7 @@ pub struct AgentProfile {
     pub name: String,
     pub description: String,
     pub tools: Vec<String>,
+    pub mcp_tools: Vec<String>,
     pub triggers: Vec<String>,
     pub max_iterations: u32,
     pub can_delegate_to: Vec<String>,
@@ -25,6 +26,7 @@ impl Default for AgentProfile {
             name: String::new(),
             description: String::new(),
             tools: vec![],
+            mcp_tools: vec![],
             triggers: vec![],
             max_iterations: DEFAULT_MAX_ITERATIONS,
             can_delegate_to: vec![],
@@ -52,6 +54,8 @@ struct AgentFrontmatter {
     description: String,
     #[serde(default)]
     tools: Vec<String>,
+    #[serde(default)]
+    mcp_tools: Vec<String>,
     #[serde(default)]
     triggers: Vec<String>,
     #[serde(default = "default_max_iterations")]
@@ -87,6 +91,7 @@ impl AgentProfile {
             name: fm.name,
             description: fm.description,
             tools: fm.tools,
+            mcp_tools: fm.mcp_tools,
             triggers: fm.triggers.into_iter().map(|t| t.to_lowercase()).collect(),
             max_iterations: fm.max_iterations,
             can_delegate_to: fm.can_delegate_to,
@@ -106,6 +111,12 @@ impl AgentProfile {
         let mut set: HashSet<String> = self.tools.iter().cloned().collect();
         set.insert(tools::ask_user::ASK_USER_TOOL_NAME.to_string());
         Some(set)
+    }
+
+    /// Check if this profile allows tools from the given MCP server name.
+    /// Empty `mcp_tools` denies all. `["*"]` allows all.
+    pub fn allows_mcp_server(&self, server_name: &str) -> bool {
+        self.mcp_tools.iter().any(|s| s == "*" || s == server_name)
     }
 
     /// Check if this agent's triggers match the given message.
@@ -398,5 +409,64 @@ Review content here.
 
         let activated = profile.message_activated_skills("use task decompose");
         assert_eq!(activated.len(), 1);
+    }
+
+    #[test]
+    fn test_parse_agent_md_with_mcp_tools() {
+        let content = r#"---
+name: communication
+description: Communication agent
+tools: [message, ask_user]
+mcp_tools: [linear, slack]
+---
+
+Instructions here.
+"#;
+        let profile =
+            AgentProfile::parse("communication", content, PathBuf::from("builtin::communication"))
+                .unwrap();
+        assert_eq!(profile.mcp_tools, vec!["linear", "slack"]);
+        assert!(profile.allows_mcp_server("linear"));
+        assert!(profile.allows_mcp_server("slack"));
+        assert!(!profile.allows_mcp_server("github"));
+    }
+
+    #[test]
+    fn test_parse_agent_md_mcp_tools_defaults_empty() {
+        let content = r#"---
+name: task
+description: Task agent
+tools: [task]
+---
+
+Instructions here.
+"#;
+        let profile =
+            AgentProfile::parse("task", content, PathBuf::from("builtin::task")).unwrap();
+        assert!(profile.mcp_tools.is_empty());
+        assert!(!profile.allows_mcp_server("linear"));
+    }
+
+    #[test]
+    fn test_mcp_tools_wildcard_allows_all() {
+        let profile = AgentProfile {
+            name: "general".into(),
+            mcp_tools: vec!["*".into()],
+            ..Default::default()
+        };
+        assert!(profile.allows_mcp_server("linear"));
+        assert!(profile.allows_mcp_server("github"));
+        assert!(profile.allows_mcp_server("anything"));
+    }
+
+    #[test]
+    fn test_mcp_tools_empty_denies_all() {
+        let profile = AgentProfile {
+            name: "task".into(),
+            mcp_tools: vec![],
+            ..Default::default()
+        };
+        assert!(!profile.allows_mcp_server("linear"));
+        assert!(!profile.allows_mcp_server("github"));
     }
 }
