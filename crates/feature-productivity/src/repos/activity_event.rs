@@ -199,10 +199,7 @@ impl ActivityEventRepo {
             total_secs: i64,
         }
         let rows = sqlx::query_as::<_, Row>(
-            r#"SELECT COALESCE(
-                        CASE WHEN site_name LIKE '%.%' THEN site_name ELSE NULL END,
-                        app_name
-                      ) AS display_name,
+            r#"SELECT COALESCE(site_name, app_name) AS display_name,
                       COALESCE(SUM(duration_secs), 0) AS total_secs
                FROM activity_events
                WHERE started_at >= ?1 AND started_at < ?2 AND is_idle = FALSE

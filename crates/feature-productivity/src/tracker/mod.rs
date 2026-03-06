@@ -17,17 +17,44 @@ use crate::config::{PrivacyConfig, ProductivityConfig};
 use crate::types::ActivityTick;
 use categorizer::Categorizer;
 
-/// Compute the display name for top-apps / activity feed.
-/// For browsers, extracts the site name from the window title.
-/// For native apps, returns `None` (falls back to app_name).
+/// Extract the domain from a URL (e.g., `https://chatgpt.com/c/abc` → `chatgpt.com`).
+/// Strips protocol, path, port, and `www.` prefix.
+fn extract_domain(url: &str) -> Option<String> {
+    let after_proto = url.find("://").map(|i| &url[i + 3..]).unwrap_or(url);
+    let host = after_proto
+        .find('/')
+        .map(|i| &after_proto[..i])
+        .unwrap_or(after_proto);
+    // Strip port
+    let host = host.rfind(':').map(|i| &host[..i]).unwrap_or(host);
+    let host = host.strip_prefix("www.").unwrap_or(host);
+    if host.is_empty() {
+        None
+    } else {
+        Some(host.to_string())
+    }
+}
+
+/// Compute the display name for top-apps grouping.
+///
+/// Priority:
+/// 1. Domain from browser URL (e.g., `chatgpt.com`) — best for grouping
+/// 2. Known-site lookup from window title (e.g., `youtube.com`) — fallback
+/// 3. `None` for non-browser apps (falls back to app_name in SQL)
 fn compute_site_name(
     app_name: &str,
     bundle_id: Option<&str>,
     window_title: Option<&str>,
+    url: Option<&str>,
 ) -> Option<String> {
     if !Categorizer::is_browser(app_name, bundle_id) {
         return None;
     }
+    // Prefer domain from actual URL
+    if let Some(domain) = url.and_then(extract_domain) {
+        return Some(domain);
+    }
+    // Fall back to title-based extraction (known-sites lookup → last segment)
     let title = window_title?;
     if title.is_empty() {
         return None;
@@ -97,6 +124,18 @@ impl ActivityTracker {
 
                                 let raw_title = info.window_title.as_deref();
 
+                                // Get browser URL via AppleScript (None for non-browsers).
+                                // Run on blocking thread to avoid starving the Tokio runtime.
+                                let url = {
+                                    let app = info.app_name.clone();
+                                    let bid = info.bundle_id.clone();
+                                    tokio::task::spawn_blocking(move || {
+                                        macos::get_browser_url(&app, bid.as_deref())
+                                    })
+                                    .await
+                                    .unwrap_or(None)
+                                };
+
                                 // Categorize
                                 let (category_id, category_type) = if is_idle {
                                     (None, None)
@@ -105,7 +144,7 @@ impl ActivityTracker {
                                     let matched = cat.categorize_full(
                                         &info.app_name,
                                         info.bundle_id.as_deref(),
-                                        None,
+                                        url.as_deref(),
                                         raw_title,
                                     );
                                     let cid = matched.map(|c| c.id.clone());
@@ -118,6 +157,7 @@ impl ActivityTracker {
                                     &info.app_name,
                                     info.bundle_id.as_deref(),
                                     raw_title,
+                                    url.as_deref(),
                                 );
 
                                 // Detect context switch
@@ -132,6 +172,7 @@ impl ActivityTracker {
                                     bundle_id: info.bundle_id.clone(),
                                     window_title: info.window_title.clone(),
                                     site_name: site_name.clone(),
+                                    url,
                                     category_id,
                                     category_type,
                                     is_idle,

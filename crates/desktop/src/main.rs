@@ -190,6 +190,9 @@ fn main() {
             commands::productivity::productivity_time_entry_create,
             commands::productivity::productivity_time_entry_delete,
             commands::productivity::productivity_category_upsert,
+            commands::productivity::productivity_insights,
+            commands::productivity::productivity_insight_dismiss,
+            commands::productivity::productivity_auto_focus_confirm,
             // Distraction
             commands::distraction::distraction_dismiss,
             commands::distraction::distraction_allow_temp,

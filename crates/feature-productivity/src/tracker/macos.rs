@@ -223,6 +223,54 @@ pub fn seconds_since_last_input() -> f64 {
     }
 }
 
+/// Get the URL of the active browser tab via AppleScript.
+///
+/// Works for Chrome-family browsers (Chrome, Brave, Vivaldi, Edge, Opera, Arc)
+/// and Safari. Returns `None` for non-browser apps or if the script fails.
+#[cfg(target_os = "macos")]
+pub fn get_browser_url(app_name: &str, bundle_id: Option<&str>) -> Option<String> {
+    use super::categorizer::Categorizer;
+
+    if !Categorizer::is_browser(app_name, bundle_id) {
+        return None;
+    }
+
+    let name_lower = app_name.to_lowercase();
+
+    // Chrome-family browsers all support the same AppleScript API
+    let script = if name_lower == "safari" {
+        r#"tell application "Safari" to get URL of front document"#.to_string()
+    } else {
+        // Chrome, Brave, Vivaldi, Edge, Opera, Arc, Chromium all use Chrome's scripting API
+        format!(
+            r#"tell application "{}" to get URL of active tab of front window"#,
+            app_name
+        )
+    };
+
+    let output = std::process::Command::new("osascript")
+        .arg("-e")
+        .arg(&script)
+        .output()
+        .ok()?;
+
+    if output.status.success() {
+        let url = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        if url.is_empty() || url == "missing value" {
+            None
+        } else {
+            Some(url)
+        }
+    } else {
+        None
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn get_browser_url(_app_name: &str, _bundle_id: Option<&str>) -> Option<String> {
+    None
+}
+
 // Stubs for non-macOS (for compilation on CI/Linux)
 #[cfg(not(target_os = "macos"))]
 pub fn get_frontmost_window() -> Result<Option<WindowInfo>> {

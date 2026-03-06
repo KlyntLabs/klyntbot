@@ -94,7 +94,8 @@ export function TimelineBar({ date }: TimelineBarProps) {
         {blocks.map((b, idx) => (
           <div
             aria-hidden="true"
-            key={`${b.label}-${b.leftPct.toFixed(2)}`}
+            // biome-ignore lint/suspicious/noArrayIndexKey: index is a tiebreaker for same-app same-position blocks
+            key={`${b.label}-${b.leftPct.toFixed(2)}-${idx}`}
             className="absolute top-0 h-full transition-opacity duration-150"
             style={{
               left: `${b.leftPct}%`,

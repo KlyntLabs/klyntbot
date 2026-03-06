@@ -231,6 +231,70 @@ async fn test_daily_aggregation_accuracy() {
 
     repos.events.insert_batch(&events).await.unwrap();
 
+    // Insert bucket data matching the events (aggregator uses bucket totals)
+    use feature_productivity::ActivityBucket;
+    let buckets = vec![
+        ActivityBucket {
+            bucket_start: format!("{}T09:00:00+00:00", date_str),
+            date: date_str.to_string(),
+            dominant_app: Some("VS Code".to_string()),
+            dominant_site: None,
+            dominant_category: Some("coding".to_string()),
+            productive_secs: 7200,
+            neutral_secs: 0,
+            distracting_secs: 0,
+            idle_secs: 0,
+            context_switches: 0,
+            focus_depth: None,
+            tick_count: 120,
+        },
+        ActivityBucket {
+            bucket_start: format!("{}T11:00:00+00:00", date_str),
+            date: date_str.to_string(),
+            dominant_app: Some("Slack".to_string()),
+            dominant_site: None,
+            dominant_category: Some("communication".to_string()),
+            productive_secs: 0,
+            neutral_secs: 3600,
+            distracting_secs: 0,
+            idle_secs: 0,
+            context_switches: 1,
+            focus_depth: None,
+            tick_count: 60,
+        },
+        ActivityBucket {
+            bucket_start: format!("{}T12:00:00+00:00", date_str),
+            date: date_str.to_string(),
+            dominant_app: Some("Chrome".to_string()),
+            dominant_site: Some("YouTube".to_string()),
+            dominant_category: Some("entertainment".to_string()),
+            productive_secs: 0,
+            neutral_secs: 0,
+            distracting_secs: 1800,
+            idle_secs: 0,
+            context_switches: 1,
+            focus_depth: None,
+            tick_count: 30,
+        },
+        ActivityBucket {
+            bucket_start: format!("{}T12:30:00+00:00", date_str),
+            date: date_str.to_string(),
+            dominant_app: Some("loginwindow".to_string()),
+            dominant_site: None,
+            dominant_category: None,
+            productive_secs: 0,
+            neutral_secs: 0,
+            distracting_secs: 0,
+            idle_secs: 1800,
+            context_switches: 0,
+            focus_depth: None,
+            tick_count: 30,
+        },
+    ];
+    for bucket in &buckets {
+        repos.buckets.upsert(bucket).await.unwrap();
+    }
+
     // Also add a completed focus session
     let session = FocusSession {
         id: "fs-1".into(),

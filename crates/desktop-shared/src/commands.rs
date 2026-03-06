@@ -461,6 +461,23 @@ pub struct TimeEntryResponse {
     pub source: String,
 }
 
+// ── Insight Cards ─────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InsightCardResponse {
+    pub id: String,
+    pub insight_type: String,
+    pub title: String,
+    pub body: String,
+    pub sentiment: String,
+    pub metric_value: Option<f64>,
+    pub baseline_value: Option<f64>,
+    pub date: String,
+    pub dismissed: bool,
+    pub generated_at: DateTime<Utc>,
+}
+
 // ── Distraction ────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

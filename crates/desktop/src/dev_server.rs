@@ -23,6 +23,7 @@ use tracing::{error, info};
 
 use crate::app_core::AppCore;
 use crate::commands::areas::build_area_response;
+use crate::commands::productivity::insight_to_response;
 use crate::commands::tasks::{
     action_to_task, action_to_today_task, kr_to_response, objective_to_response, row_to_task,
     rows_to_tasks,
@@ -1103,11 +1104,7 @@ async fn dispatch(
                 Err(e) => return err(e),
             };
             let cap: i64 = get(&body, "limit").unwrap_or(50);
-            match repos
-                .events
-                .list_recent(cap.min(200))
-                .await
-            {
+            match repos.events.list_recent(cap.min(200)).await {
                 Ok(events) => {
                     let resp: Vec<ActivityTimelineResponse> = events
                         .into_iter()
@@ -1204,7 +1201,12 @@ async fn dispatch(
             };
             let target_value: f64 = match get(&body, "target_value") {
                 Some(v) => v,
-                None => return err(ApiError::new("VALIDATION", "missing required field: target_value")),
+                None => {
+                    return err(ApiError::new(
+                        "VALIDATION",
+                        "missing required field: target_value",
+                    ))
+                }
             };
             let repos = match core.productivity_repos() {
                 Ok(r) => r,
@@ -1212,7 +1214,12 @@ async fn dispatch(
             };
             let gt: feature_productivity::types::GoalType = match goal_type.parse() {
                 Ok(v) => v,
-                Err(_) => return err(ApiError::new("VALIDATION", "Invalid goal_type. Use: daily, weekly")),
+                Err(_) => {
+                    return err(ApiError::new(
+                        "VALIDATION",
+                        "Invalid goal_type. Use: daily, weekly",
+                    ))
+                }
             };
             let gm: feature_productivity::types::GoalMetric = match metric.parse() {
                 Ok(v) => v,
@@ -1259,7 +1266,12 @@ async fn dispatch(
             };
             let enabled: bool = match get(&body, "enabled") {
                 Some(v) => v,
-                None => return err(ApiError::new("VALIDATION", "missing required field: enabled")),
+                None => {
+                    return err(ApiError::new(
+                        "VALIDATION",
+                        "missing required field: enabled",
+                    ))
+                }
             };
             let repos = match core.productivity_repos() {
                 Ok(r) => r,
@@ -1277,7 +1289,12 @@ async fn dispatch(
             };
             let duration_mins: i64 = match get(&body, "duration_mins") {
                 Some(v) => v,
-                None => return err(ApiError::new("VALIDATION", "missing required field: duration_mins")),
+                None => {
+                    return err(ApiError::new(
+                        "VALIDATION",
+                        "missing required field: duration_mins",
+                    ))
+                }
             };
             let category_id: Option<String> = get(&body, "category_id");
             let project_id: Option<String> = get(&body, "project_id");
@@ -1345,7 +1362,12 @@ async fn dispatch(
             };
             let ct: feature_productivity::types::CategoryType = match category_type_str.parse() {
                 Ok(v) => v,
-                Err(_) => return err(ApiError::new("VALIDATION", "Invalid category_type. Use: productive, neutral, distracting")),
+                Err(_) => {
+                    return err(ApiError::new(
+                        "VALIDATION",
+                        "Invalid category_type. Use: productive, neutral, distracting",
+                    ))
+                }
             };
             let cat = feature_productivity::types::ActivityCategory {
                 id: id.clone(),
@@ -1369,6 +1391,41 @@ async fn dispatch(
             }
         }
 
+        // ── Insights & Auto-Focus ─────────────────────────────
+        "productivity_insights" => {
+            let repos = match core.productivity_repos() {
+                Ok(r) => r,
+                Err(e) => return err(e),
+            };
+            let date: String =
+                get(&body, "date").unwrap_or_else(|| Utc::now().format("%Y-%m-%d").to_string());
+            let engine = feature_productivity::insights::InsightEngine::new(repos.clone());
+            match engine.generate_for_date(&date).await {
+                Ok(cards) => {
+                    let resp: Vec<_> = cards.into_iter().map(insight_to_response).collect();
+                    ok(resp)
+                }
+                Err(e) => err(prod_err(e)),
+            }
+        }
+        "productivity_insight_dismiss" => {
+            let id = match get_str(&body, "id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let repos = match core.productivity_repos() {
+                Ok(r) => r,
+                Err(e) => return err(e),
+            };
+            match repos.insights.dismiss(&id).await {
+                Ok(_) => ok(()),
+                Err(e) => err(prod_err(e)),
+            }
+        }
+        "productivity_auto_focus_confirm" => {
+            // In dev mode, just acknowledge — no auto-focus detection running
+            ok(serde_json::json!(null))
+        }
         // ── Settings (MCP) ────────────────────────────────────
         "mcp_get_config" => {
             let cfg = core.config.read().await;

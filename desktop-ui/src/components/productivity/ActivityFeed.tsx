@@ -2,10 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useEvent } from "../../hooks/useEvent";
 import { useQuery } from "../../hooks/useQuery";
 import { formatTime } from "../../lib/dates";
-import type { ActivityTimeline } from "../../lib/types";
+import type { ActivitySwitchPayload, ActivityTimeline } from "../../lib/types";
 import { AppIcon, getAppColor } from "./shared";
-
-const POLL_INTERVAL = 5_000;
 
 const BROWSER_RE =
   /\s*[-–—]\s*(?:Google Chrome|Safari|Firefox|Arc|Brave Browser|Microsoft Edge|Orion|Vivaldi|Opera|Chromium|Zen Browser)(?:\s*[-–—]\s*.+)?$/i;
@@ -14,15 +12,15 @@ function stripBrowserSuffix(title: string): string {
   return title.replace(BROWSER_RE, "").trim();
 }
 
-function resolveDisplayName(e: ActivityTimeline): string {
-  if (e.isIdle) return "Idle";
+function resolveDisplayName(e: ActivityTimeline): { name: string; subtitle?: string } {
+  if (e.isIdle) return { name: "Idle" };
   if (e.siteName && e.windowTitle) {
     const pageTitle = stripBrowserSuffix(e.windowTitle);
     if (pageTitle && pageTitle.toLowerCase() !== e.siteName.toLowerCase()) {
-      return `${e.siteName} - ${pageTitle}`;
+      return { name: e.siteName, subtitle: pageTitle };
     }
   }
-  return e.siteName ?? e.appName;
+  return { name: e.siteName ?? e.appName };
 }
 
 function ageSecs(dateStr: string): number {
@@ -49,19 +47,23 @@ export function ActivityFeed() {
 
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Poll for new data (also refreshes relative time labels on each cycle)
-  useEffect(() => {
-    const id = setInterval(() => refetch(), POLL_INTERVAL);
-    return () => clearInterval(id);
-  }, [refetch]);
+  // Refetch on context switch events (replaces polling)
+  useEvent<ActivitySwitchPayload>("activity:switch", () => refetch());
 
   useEvent<{ entityKind: string }>("entity:updated", (payload) => {
     if (payload?.entityKind === "productivity") refetch();
   });
 
+  // Refresh relative time labels periodically (no data fetch, just re-render)
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
   // Detect new entries and animate them
   useEffect(() => {
-    const currentKeys = new Set(events.map((e) => `${e.startedAt}-${e.appName}`));
+    const currentKeys = new Set(events.map((e, i) => `${e.startedAt}-${e.appName}-${i}`));
     const fresh = new Set<string>();
     for (const k of currentKeys) {
       if (!prevKeysRef.current.has(k)) fresh.add(k);
@@ -98,10 +100,10 @@ export function ActivityFeed() {
       </div>
       <div ref={scrollRef} className="flex flex-col gap-0 max-h-64 overflow-y-auto">
         {events.map((e, i) => {
-          const displayName = resolveDisplayName(e);
-          const color = getAppColor(displayName, e.categoryId);
+          const { name, subtitle } = resolveDisplayName(e);
+          const color = getAppColor(name, e.categoryId);
           const isFirst = i === 0;
-          const key = `${e.startedAt}-${e.appName}`;
+          const key = `${e.startedAt}-${e.appName}-${i}`;
           const isNew = newKeys.has(key);
           const age = ageSecs(e.startedAt);
           const tag = relativeTag(age);
@@ -118,7 +120,7 @@ export function ActivityFeed() {
                 {e.isIdle ? (
                   <span className="w-3.5 h-3.5 rounded-full bg-white/[0.08] block" />
                 ) : (
-                  <AppIcon appName={displayName} color={color} />
+                  <AppIcon appName={name} color={color} />
                 )}
               </div>
 
@@ -135,14 +137,18 @@ export function ActivityFeed() {
               )}
 
               {/* App/Site name */}
-              <div className="flex-1 min-w-0 flex items-center gap-1.5">
-                <span
-                  className={`text-[11px] truncate ${e.isIdle ? "text-dim italic" : isFirst ? "font-normal text-primary" : "font-light text-secondary"}`}
-                >
-                  {displayName}
-                </span>
-                {e.siteName && !e.isIdle && (
-                  <span className="text-[10px] font-light text-dim truncate">{e.appName}</span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className={`text-[11px] truncate ${e.isIdle ? "text-dim italic" : isFirst ? "font-normal text-primary" : "font-light text-secondary"}`}
+                  >
+                    {name}
+                  </span>
+                </div>
+                {subtitle && !e.isIdle && (
+                  <p className="text-[9px] font-light text-dim truncate leading-tight">
+                    {subtitle}
+                  </p>
                 )}
               </div>
             </div>

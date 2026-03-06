@@ -1023,11 +1023,7 @@ async fn dispatch(
                 Err(e) => return err(e),
             };
             let cap: i64 = get(&body, "limit").unwrap_or(50);
-            match repos
-                .events
-                .list_recent(cap.min(200))
-                .await
-            {
+            match repos.events.list_recent(cap.min(200)).await {
                 Ok(events) => ok(events
                     .into_iter()
                     .map(|e| ActivityTimelineResponse {
@@ -1119,7 +1115,12 @@ async fn dispatch(
             };
             let target_value: f64 = match get(&body, "target_value") {
                 Some(v) => v,
-                None => return err(ApiError::new("VALIDATION", "missing required field: target_value")),
+                None => {
+                    return err(ApiError::new(
+                        "VALIDATION",
+                        "missing required field: target_value",
+                    ))
+                }
             };
             let repos = match core.productivity_repos() {
                 Ok(r) => r,
@@ -1127,7 +1128,12 @@ async fn dispatch(
             };
             let gt: feature_productivity::types::GoalType = match goal_type.parse() {
                 Ok(v) => v,
-                Err(_) => return err(ApiError::new("VALIDATION", "Invalid goal_type. Use: daily, weekly")),
+                Err(_) => {
+                    return err(ApiError::new(
+                        "VALIDATION",
+                        "Invalid goal_type. Use: daily, weekly",
+                    ))
+                }
             };
             let gm: feature_productivity::types::GoalMetric = match metric.parse() {
                 Ok(v) => v,
@@ -1174,7 +1180,12 @@ async fn dispatch(
             };
             let enabled: bool = match get(&body, "enabled") {
                 Some(v) => v,
-                None => return err(ApiError::new("VALIDATION", "missing required field: enabled")),
+                None => {
+                    return err(ApiError::new(
+                        "VALIDATION",
+                        "missing required field: enabled",
+                    ))
+                }
             };
             let repos = match core.productivity_repos() {
                 Ok(r) => r,
@@ -1192,7 +1203,12 @@ async fn dispatch(
             };
             let duration_mins: f64 = match get(&body, "duration_mins") {
                 Some(v) => v,
-                None => return err(ApiError::new("VALIDATION", "missing required field: duration_mins")),
+                None => {
+                    return err(ApiError::new(
+                        "VALIDATION",
+                        "missing required field: duration_mins",
+                    ))
+                }
             };
             let repos = match core.productivity_repos() {
                 Ok(r) => r,
@@ -1254,7 +1270,12 @@ async fn dispatch(
             };
             let ct: feature_productivity::types::CategoryType = match category_type.parse() {
                 Ok(v) => v,
-                Err(_) => return err(ApiError::new("VALIDATION", "Invalid category_type. Use: productive, neutral, distracting")),
+                Err(_) => {
+                    return err(ApiError::new(
+                        "VALIDATION",
+                        "Invalid category_type. Use: productive, neutral, distracting",
+                    ))
+                }
             };
             let cat = feature_productivity::types::ActivityCategory {
                 id: id.clone(),
@@ -1510,9 +1531,7 @@ async fn dispatch(
             match core.distraction_interceptor() {
                 Ok(interceptor) => {
                     let mut guard = interceptor.lock().await;
-                    let decision = guard
-                        .evaluate(&app_name, window_title.as_deref())
-                        .await;
+                    let decision = guard.evaluate(&app_name, window_title.as_deref()).await;
                     ok(serde_json::json!({
                         "decision": format!("{:?}", decision),
                     }))
@@ -1522,9 +1541,7 @@ async fn dispatch(
         }
 
         // ── Permissions ──────────────────────────────────────
-        "permissions_check_accessibility" => {
-            ok(desktop_shared::permissions::check_accessibility())
-        }
+        "permissions_check_accessibility" => ok(desktop_shared::permissions::check_accessibility()),
         "permissions_open_accessibility" => {
             desktop_shared::permissions::open_accessibility_settings();
             ok(())

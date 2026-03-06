@@ -11,7 +11,7 @@ use crate::app_core::AppCore;
 
 use super::map_prod_err as map_err;
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn distraction_dismiss(
     state: State<'_, Arc<AppCore>>,
     app_name: String,
@@ -35,15 +35,14 @@ pub async fn distraction_allow_temp(
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn distraction_allow_session(
     state: State<'_, Arc<AppCore>>,
     app_name: String,
     window_title: Option<String>,
     classification: String,
 ) -> Result<(), ApiError> {
-    let (key, pattern_type) =
-        DistractionInterceptor::make_key(&app_name, window_title.as_deref());
+    let (key, pattern_type) = DistractionInterceptor::make_key(&app_name, window_title.as_deref());
 
     let interceptor = state.distraction_interceptor()?;
     let mut guard = interceptor.lock().await;

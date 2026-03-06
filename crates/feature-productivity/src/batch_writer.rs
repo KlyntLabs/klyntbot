@@ -55,16 +55,12 @@ impl BatchWriter {
                             Err(broadcast::error::RecvError::Closed) => break,
                         };
 
-                        let persisted_title = if privacy.exclude_window_titles {
-                            None
-                        } else {
-                            tick.window_title.clone()
-                        };
-                        let persisted_site = if privacy.exclude_window_titles {
-                            None
-                        } else {
-                            tick.site_name.clone()
-                        };
+                        let (persisted_title, persisted_site, persisted_url) =
+                            if privacy.exclude_window_titles {
+                                (None, None, None)
+                            } else {
+                                (tick.window_title.clone(), tick.site_name.clone(), tick.url.clone())
+                            };
 
                         let same_context = !tick.is_idle
                             && !tick.is_context_switch
@@ -90,7 +86,7 @@ impl BatchWriter {
                                 window_title: persisted_title,
                                 site_name: persisted_site,
                                 bundle_id: tick.bundle_id.clone(),
-                                url: None,
+                                url: persisted_url,
                                 category_id: tick.category_id.clone(),
                                 started_at: tick.timestamp,
                                 ended_at: Some(tick.timestamp),

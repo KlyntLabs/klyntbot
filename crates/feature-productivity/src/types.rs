@@ -335,6 +335,7 @@ pub struct ActivityTick {
     pub bundle_id: Option<String>,
     pub window_title: Option<String>,
     pub site_name: Option<String>,
+    pub url: Option<String>,
     pub category_id: Option<String>,
     pub category_type: Option<CategoryType>,
     pub is_idle: bool,

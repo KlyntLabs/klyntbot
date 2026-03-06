@@ -5,10 +5,11 @@ use std::sync::Arc;
 use chrono::Utc;
 use desktop_shared::commands::{
     ActivityCategoryResponse, ActivityTimelineResponse, AppUsageResponse, CategoryUsageResponse,
-    FocusSessionResponse, GoalProgressResponse, ProductivitySummaryResponse, TimeEntryResponse,
+    FocusSessionResponse, GoalProgressResponse, InsightCardResponse, ProductivitySummaryResponse,
+    TimeEntryResponse,
 };
 use desktop_shared::errors::ApiError;
-use feature_productivity::types::{DailySummary, FocusSession};
+use feature_productivity::types::{DailySummary, FocusSession, InsightCard};
 use tauri::State;
 
 use crate::app_core::AppCore;
@@ -70,6 +71,21 @@ fn session_to_response(s: FocusSession) -> FocusSessionResponse {
     }
 }
 
+pub(crate) fn insight_to_response(c: InsightCard) -> InsightCardResponse {
+    InsightCardResponse {
+        id: c.id,
+        insight_type: c.insight_type.to_string(),
+        title: c.title,
+        body: c.body,
+        sentiment: c.sentiment.to_string(),
+        metric_value: c.metric_value,
+        baseline_value: c.baseline_value,
+        date: c.date,
+        dismissed: c.dismissed,
+        generated_at: c.generated_at,
+    }
+}
+
 fn event_to_timeline(e: feature_productivity::types::ActivityEvent) -> ActivityTimelineResponse {
     ActivityTimelineResponse {
         app_name: e.app_name,
@@ -112,7 +128,7 @@ pub async fn productivity_timeline(
     Ok(events.into_iter().map(event_to_timeline).collect())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn productivity_focus_start(
     state: State<'_, Arc<AppCore>>,
     action_id: Option<String>,
@@ -206,7 +222,7 @@ pub async fn productivity_categories(
         .collect())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn productivity_summary_range(
     state: State<'_, Arc<AppCore>>,
     start_date: String,
@@ -246,11 +262,7 @@ pub async fn productivity_activity_feed(
     let repos = state.productivity_repos()?;
     let cap = limit.unwrap_or(50).min(200);
     // list_recent returns newest-first (DESC), which is what the feed wants
-    let events = repos
-        .events
-        .list_recent(cap)
-        .await
-        .map_err(map_prod_err)?;
+    let events = repos.events.list_recent(cap).await.map_err(map_prod_err)?;
     Ok(events.into_iter().map(event_to_timeline).collect())
 }
 
@@ -274,7 +286,7 @@ pub async fn productivity_goals(
         .collect())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn productivity_pomodoro_start(
     state: State<'_, Arc<AppCore>>,
     work_mins: Option<i64>,
@@ -315,7 +327,7 @@ pub async fn productivity_time_entries(
         .collect())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn productivity_goal_create(
     state: State<'_, Arc<AppCore>>,
     goal_type: String,
@@ -373,7 +385,7 @@ pub async fn productivity_goal_toggle(
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn productivity_time_entry_create(
     state: State<'_, Arc<AppCore>>,
     description: String,
@@ -417,15 +429,11 @@ pub async fn productivity_time_entry_delete(
     id: i64,
 ) -> Result<(), ApiError> {
     let repos = state.productivity_repos()?;
-    repos
-        .time_entries
-        .delete(id)
-        .await
-        .map_err(map_prod_err)?;
+    repos.time_entries.delete(id).await.map_err(map_prod_err)?;
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(rename_all = "snake_case")]
 pub async fn productivity_category_upsert(
     state: State<'_, Arc<AppCore>>,
     id: String,
@@ -435,9 +443,12 @@ pub async fn productivity_category_upsert(
     icon: Option<String>,
 ) -> Result<ActivityCategoryResponse, ApiError> {
     let repos = state.productivity_repos()?;
-    let ct: feature_productivity::types::CategoryType = category_type
-        .parse()
-        .map_err(|_| ApiError::new("VALIDATION", "Invalid category_type. Use: productive, neutral, distracting"))?;
+    let ct: feature_productivity::types::CategoryType = category_type.parse().map_err(|_| {
+        ApiError::new(
+            "VALIDATION",
+            "Invalid category_type. Use: productive, neutral, distracting",
+        )
+    })?;
     let cat = feature_productivity::types::ActivityCategory {
         id,
         name,
@@ -456,4 +467,62 @@ pub async fn productivity_category_upsert(
         icon: cat.icon,
         is_system: false,
     })
+}
+
+// ── V2: Insights & Auto-Focus ─────────────────────────────────────────
+
+#[tauri::command]
+pub async fn productivity_insights(
+    state: State<'_, Arc<AppCore>>,
+    date: Option<String>,
+) -> Result<Vec<InsightCardResponse>, ApiError> {
+    let repos = state.productivity_repos()?;
+    let date = date.unwrap_or_else(|| Utc::now().format("%Y-%m-%d").to_string());
+    let engine = feature_productivity::insights::InsightEngine::new(repos.clone());
+    let cards = engine
+        .generate_for_date(&date)
+        .await
+        .map_err(map_prod_err)?;
+    Ok(cards.into_iter().map(insight_to_response).collect())
+}
+
+#[tauri::command]
+pub async fn productivity_insight_dismiss(
+    state: State<'_, Arc<AppCore>>,
+    id: String,
+) -> Result<(), ApiError> {
+    let repos = state.productivity_repos()?;
+    repos.insights.dismiss(&id).await.map_err(map_prod_err)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn productivity_auto_focus_confirm(
+    state: State<'_, Arc<AppCore>>,
+    session: feature_productivity::auto_focus::AutoFocusSession,
+) -> Result<FocusSessionResponse, ApiError> {
+    let repos = state.productivity_repos()?;
+    let actual_mins = session.total_secs / 60;
+    let focus_session = FocusSession {
+        id: uuid::Uuid::new_v4().to_string(),
+        action_id: None,
+        project_id: None,
+        session_type: feature_productivity::types::SessionType::Focus,
+        target_mins: None,
+        started_at: session.started_at,
+        ended_at: Some(session.ended_at),
+        actual_mins: Some(actual_mins),
+        interruptions: 0,
+        distraction_events: vec![],
+        quality_score: Some(session.productive_ratio),
+        completed: true,
+        notes: Some(format!("Auto-detected focus in {}", session.dominant_app)),
+        source: feature_productivity::types::SessionSource::AutoDetected,
+    };
+    repos
+        .sessions
+        .create(&focus_session)
+        .await
+        .map_err(map_prod_err)?;
+    Ok(session_to_response(focus_session))
 }

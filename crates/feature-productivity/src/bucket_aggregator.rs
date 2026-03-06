@@ -21,9 +21,7 @@ fn bucket_start_for(ts: &chrono::DateTime<Utc>) -> chrono::DateTime<Utc> {
 
 /// Find the key with the highest value in a HashMap.
 pub(crate) fn dominant_key(map: &HashMap<String, i64>) -> Option<String> {
-    map.iter()
-        .max_by_key(|(_, v)| *v)
-        .map(|(k, _)| k.clone())
+    map.iter().max_by_key(|(_, v)| *v).map(|(k, _)| k.clone())
 }
 
 struct PendingBucket {
@@ -233,6 +231,7 @@ mod tests {
             bundle_id: None,
             window_title: None,
             site_name: None,
+            url: None,
             category_id: Some("coding".to_string()),
             category_type: Some(CategoryType::Productive),
             is_idle: false,

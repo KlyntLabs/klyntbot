@@ -30,6 +30,9 @@ impl DailyAggregator {
     }
 
     /// Compute (or recompute) the daily summary for a given date string (YYYY-MM-DD).
+    ///
+    /// Uses pre-computed 5-minute bucket aggregation for day-level totals (fast path).
+    /// Falls back to raw event queries for the detailed per-app/per-category breakdowns.
     pub async fn compute_for_date(&self, date: &str) -> common::Result<DailySummary> {
         let naive = NaiveDate::parse_from_str(date, "%Y-%m-%d")
             .map_err(|e| common::ToolError::InvalidParams(format!("invalid date '{date}': {e}")))?;
@@ -41,32 +44,37 @@ impl DailyAggregator {
                 .unwrap(),
         );
 
-        // Gather data from repos — parallelize independent queries
+        // Gather data — bucket aggregation for totals, raw events for detail breakdowns.
+        // Include existing summary fetch in the join to parallelise the AI-summary cache lookup.
         let (
-            total_active_secs,
-            total_idle_secs,
-            context_switches,
+            bucket_agg,
             category_agg,
             categories,
             top_app_rows,
             sessions,
             time_entries,
             avg_recovery_secs,
+            existing_summary,
         ) = tokio::try_join!(
-            self.repos.events.total_active_secs(&start, &end),
-            self.repos.events.total_idle_secs(&start, &end),
-            self.repos.events.count_context_switches(&start, &end),
+            self.repos.buckets.aggregate_day(date),
             self.repos.events.aggregate_by_category(&start, &end),
             self.repos.categories.list_all(),
             self.repos.events.top_apps(&start, &end, 10),
             self.repos.sessions.list_range(&start, &end, None),
             self.repos.time_entries.list_range(&start, &end),
-            self.repos.distraction_patterns.avg_recovery_secs(date, date),
+            self.repos
+                .distraction_patterns
+                .avg_recovery_secs(date, date),
+            self.repos.summaries.get(date),
         )?;
+
+        // Bucket-based totals (pre-computed by BucketAggregator)
+        let (b_productive, b_neutral, b_distracting, total_idle_secs, context_switches) =
+            bucket_agg.unwrap_or((0, 0, 0, 0, 0));
+        let has_bucket_data = b_productive + b_neutral + b_distracting + total_idle_secs > 0;
 
         // Include manual time entries in totals
         let manual_secs: i64 = time_entries.iter().map(|e| e.duration_secs).sum();
-        let total_active_secs = total_active_secs + manual_secs;
 
         // Category breakdown — O(1) lookups via HashMap
         let cat_map: HashMap<&str, &crate::types::ActivityCategory> =
@@ -96,6 +104,16 @@ impl DailyAggregator {
                 neutral_secs += secs;
             }
         }
+
+        // Use bucket totals when available (pre-aggregated, faster); derive from
+        // per-category event breakdown otherwise (handles tests and early-day edge case).
+        if has_bucket_data {
+            productive_secs = b_productive;
+            neutral_secs = b_neutral;
+            distracting_secs = b_distracting;
+        }
+
+        let total_active_secs = productive_secs + neutral_secs + distracting_secs + manual_secs;
 
         // Top apps
         let top_apps: Vec<AppUsage> = top_app_rows
@@ -160,13 +178,7 @@ impl DailyAggregator {
         summary.productivity_score = Some(score);
 
         // Preserve existing AI summary to avoid redundant LLM calls on recompute.
-        // Only generate a new one if no cached summary exists with an AI summary.
-        let existing_ai = self
-            .repos
-            .summaries
-            .get(date)
-            .await?
-            .and_then(|s| s.ai_summary);
+        let existing_ai = existing_summary.and_then(|s| s.ai_summary);
         if let Some(cached) = existing_ai {
             summary.ai_summary = Some(cached);
         } else if let Some(ref handler) = self.handler {
@@ -259,7 +271,7 @@ impl DailyAggregator {
 /// - Focus quality (30%): avg_session_quality (or 0.5 if no sessions)
 /// - Low distraction (20%): 1.0 - (distracting_secs / total_active_secs)
 /// - Continuity (10%): 1.0 - (context_switches / expected_switches)
-fn compute_productivity_score(summary: &DailySummary) -> f64 {
+pub fn compute_productivity_score(summary: &DailySummary) -> f64 {
     let total = summary.total_active_secs as f64;
     if total < 60.0 {
         return 0.0;

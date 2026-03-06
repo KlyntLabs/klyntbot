@@ -3,6 +3,7 @@ pub mod auto_focus;
 pub mod batch_writer;
 pub mod bucket_aggregator;
 pub mod config;
+pub mod dashboard_emitter;
 pub mod distraction;
 pub mod distraction_analyzer;
 pub mod engine;

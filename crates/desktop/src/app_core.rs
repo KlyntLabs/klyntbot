@@ -11,6 +11,7 @@ use channels::ChannelManager;
 use common::FormResponse;
 use desktop_shared::errors::ApiError;
 use desktop_shared::events;
+use feature_productivity::dashboard_emitter::{DashboardEmitter, DashboardEvent};
 use feature_productivity::repos::ProductivityRepos;
 use feature_productivity::{DailyAggregator, FocusManager, NudgeService, ProductivityEngine};
 use scheduling::CronService;
@@ -217,6 +218,52 @@ impl AppCore {
                     });
                 }
 
+                // DashboardEmitter — forwards ticks as Tauri events.
+                let tick_rx = engine.subscribe();
+                let emit_handle = app_handle.clone();
+                let _dashboard_emitter = DashboardEmitter::start(
+                    tick_rx,
+                    Box::new(move |event| {
+                        let res = match event {
+                            DashboardEvent::ActivitySwitch {
+                                from_app,
+                                to_app,
+                                to_site,
+                                category_type,
+                            } => emit_handle.emit(
+                                events::ACTIVITY_SWITCH,
+                                events::ActivitySwitchPayload {
+                                    from_app,
+                                    to_app,
+                                    to_site,
+                                    category_type,
+                                },
+                            ),
+                            DashboardEvent::ScoreUpdated {
+                                score,
+                                productive_secs,
+                                distracting_secs,
+                            } => emit_handle.emit(
+                                events::SCORE_UPDATED,
+                                events::ScorePayload {
+                                    score,
+                                    productive_secs,
+                                    distracting_secs,
+                                },
+                            ),
+                            DashboardEvent::FocusStateChanged { state, since } => emit_handle.emit(
+                                events::FOCUS_STATE_CHANGED,
+                                events::FocusStatePayload { state, since },
+                            ),
+                        };
+                        if let Err(e) = res {
+                            warn!("DashboardEmitter: failed to emit event: {e}");
+                        }
+                    }),
+                    prod_config.tracking.poll_interval_secs,
+                    shutdown_token.clone(),
+                );
+
                 engine.start();
                 let engine = Arc::new(Mutex::new(engine));
 
@@ -342,7 +389,6 @@ impl AppCore {
             }
         });
     }
-
 
     /// Return productivity repos or a "feature disabled" error.
     pub fn productivity_repos(&self) -> Result<&ProductivityRepos, ApiError> {

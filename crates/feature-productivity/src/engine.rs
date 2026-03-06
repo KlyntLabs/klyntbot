@@ -104,16 +104,24 @@ impl ProductivityEngine {
         self.cancel_token.cancel();
         // Stop all background workers in parallel — they all react to the same cancel token
         let bw_fut = async {
-            if let Some(mut bw) = self.batch_writer.take() { bw.stop().await; }
+            if let Some(mut bw) = self.batch_writer.take() {
+                bw.stop().await;
+            }
         };
         let ba_fut = async {
-            if let Some(mut ba) = self.bucket_aggregator.take() { ba.stop().await; }
+            if let Some(mut ba) = self.bucket_aggregator.take() {
+                ba.stop().await;
+            }
         };
         let af_fut = async {
-            if let Some(mut af) = self.auto_focus.take() { af.stop().await; }
+            if let Some(mut af) = self.auto_focus.take() {
+                af.stop().await;
+            }
         };
         let da_fut = async {
-            if let Some(mut da) = self.distraction_analyzer.take() { da.stop().await; }
+            if let Some(mut da) = self.distraction_analyzer.take() {
+                da.stop().await;
+            }
         };
         tokio::join!(bw_fut, ba_fut, af_fut, da_fut);
     }

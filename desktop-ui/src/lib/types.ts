@@ -540,6 +540,49 @@ export interface LearnedRule {
   createdAt: string;
 }
 
+// ── Productivity V2 Real-time Payloads ───────────────────────────────
+
+export interface ActivitySwitchPayload {
+  fromApp: string | null;
+  toApp: string;
+  toSite: string | null;
+  categoryType: string | null;
+}
+
+export interface AutoFocusPayload {
+  startedAt: string;
+  endedAt: string;
+  durationMins: number;
+  dominantApp: string;
+  productiveRatio: number;
+}
+
+export interface ScorePayload {
+  score: number;
+  productiveSecs: number;
+  distractingSecs: number;
+}
+
+export interface FocusStatePayload {
+  state: string;
+  since: string;
+}
+
+export interface InsightCard {
+  id: string;
+  insightType: string;
+  title: string;
+  body: string;
+  sentiment: string;
+  metricValue: number | null;
+  baselineValue: number | null;
+  date: string;
+  dismissed: boolean;
+  generatedAt: string;
+}
+
+export type InsightPayload = Pick<InsightCard, "id" | "insightType" | "title" | "sentiment">;
+
 export type ProductivityPeriod = "day" | "week" | "month";
 
 export type Tab = "All" | string;

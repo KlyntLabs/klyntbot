@@ -1,16 +1,21 @@
+import { useMemo } from "react";
 import { useEvent } from "../../hooks/useEvent";
 import { useQuery } from "../../hooks/useQuery";
+import { todayISO } from "../../lib/dates";
 import type { ProductivitySummary } from "../../lib/types";
 import { ActivityFeed } from "./ActivityFeed";
 import { AiSummaryCard } from "./AiSummaryCard";
+import { AutoFocusToast } from "./AutoFocusToast";
 import { BreakdownDonuts } from "./BreakdownDonuts";
 import { CategoriesList } from "./CategoriesList";
 import { DistractionBanner } from "./DistractionBanner";
 import { FocusSessionsList } from "./FocusSessionsList";
+import { FocusStateIndicator } from "./FocusStateIndicator";
 import { GoalsProgress } from "./GoalsProgress";
+import { InsightCardList } from "./InsightCardList";
 import { LearnedRulesCard } from "./LearnedRulesCard";
+import { LiveScoreRing } from "./LiveScoreRing";
 import { PomodoroTimer } from "./PomodoroTimer";
-import { ProductivityScoreRing } from "./ProductivityScoreRing";
 import { buildBreakdownSegments } from "./shared";
 import { TimeEntrySection } from "./TimeEntrySection";
 import { TimelineBar } from "./Timeline";
@@ -22,11 +27,26 @@ interface DayViewProps {
 }
 
 export function DayView({ date }: DayViewProps) {
-  const { data: summary, refetch } = useQuery<ProductivitySummary | null>(
+  const isToday = date === todayISO();
+
+  // Today: use live endpoint; past dates: query range for that single day
+  const { data: todaySummary, refetch: refetchToday } = useQuery<ProductivitySummary | null>(
     "productivity_today",
-    undefined,
+    isToday ? undefined : null,
     null,
   );
+  const rangeArgs = useMemo(
+    () => (isToday ? null : { start_date: date, end_date: date }),
+    [isToday, date],
+  );
+  const { data: rangeSummaries, refetch: refetchRange } = useQuery<ProductivitySummary[]>(
+    "productivity_summary_range",
+    rangeArgs,
+    [],
+  );
+
+  const summary = isToday ? todaySummary : rangeSummaries[0] ?? null;
+  const refetch = isToday ? refetchToday : refetchRange;
 
   useEvent<{ entityKind: string }>("entity:updated", (payload) => {
     const k = payload?.entityKind;
@@ -43,8 +63,16 @@ export function DayView({ date }: DayViewProps) {
 
   return (
     <div className="grid grid-cols-3 gap-4 auto-rows-min">
-      {/* Row 1: Timeline (full width) */}
-      <TimelineBar date={date} />
+      {/* Row 1: Timeline + focus state (full width) */}
+      <div className="col-span-3 flex items-center gap-3">
+        <div className="flex-1">
+          <TimelineBar date={date} />
+        </div>
+        <FocusStateIndicator />
+      </div>
+
+      {/* Auto-focus detection toast (full width, auto-hides) */}
+      <AutoFocusToast />
 
       {/* Distraction warning — appears when distracting time detected */}
       <DistractionBanner summary={summary} />
@@ -66,7 +94,7 @@ export function DayView({ date }: DayViewProps) {
       <div className="flex flex-col gap-4">
         <WorkHoursCard totalActiveSecs={summary?.totalActiveSecs ?? 0} />
         <div className="glass-card p-4 flex items-center justify-center relative">
-          <ProductivityScoreRing score={summary?.productivityScore ?? 0} summary={summary} />
+          <LiveScoreRing summary={summary} />
         </div>
         <BreakdownDonuts segments={breakdownSegments} totalSecs={summary?.totalActiveSecs ?? 0} />
         <CategoriesList
@@ -74,6 +102,7 @@ export function DayView({ date }: DayViewProps) {
           totalSecs={summary?.totalActiveSecs ?? 0}
         />
         <AiSummaryCard summary={summary?.aiSummary ?? null} />
+        <InsightCardList date={date} />
         <LearnedRulesCard />
       </div>
 

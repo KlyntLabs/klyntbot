@@ -40,26 +40,34 @@ impl InsightEngine {
         };
         let score = today.productivity_score.unwrap_or(0.0);
 
-        // First batch: independent checks that only need the baseline
-        let (deep_work, distraction, personal_best) = tokio::try_join!(
+        // All checks are independent — run in a single try_join!
+        let (deep_work, distraction, personal_best, streak, fatigue, recovery) = tokio::try_join!(
             self.check_deep_work_trend(date, today.deep_work_blocks, &baseline),
             self.check_distraction_spike(date, today_distraction_rate, &baseline),
             self.check_new_personal_best(date, score, &baseline),
-        )?;
-
-        // Second batch: independent checks
-        let (streak, fatigue, recovery) = tokio::try_join!(
             self.check_streak(date, 60.0, &baseline.summaries_14),
             self.check_fatigue_warning(date),
-            self.check_recovery_improvement(date, &baseline),
+            self.check_recovery_improvement(date, &today, &baseline),
         )?;
 
-        let cards: Vec<InsightCard> = [deep_work, distraction, personal_best, streak, fatigue, recovery]
-            .into_iter()
-            .flatten()
-            .collect();
+        let cards: Vec<InsightCard> = [
+            deep_work,
+            distraction,
+            personal_best,
+            streak,
+            fatigue,
+            recovery,
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
 
         Ok(cards)
+    }
+
+    /// Returns true if an insight of this type already exists for the date.
+    async fn already_exists(&self, t: InsightType, date: &str) -> common::Result<bool> {
+        self.repos.insights.exists_for_date(t, date).await
     }
 
     async fn compute_baseline(&self, end_date: &str) -> common::Result<Baseline> {
@@ -130,12 +138,7 @@ impl InsightEngine {
         today_blocks: i64,
         baseline: &Baseline,
     ) -> common::Result<Option<InsightCard>> {
-        if self
-            .repos
-            .insights
-            .exists_for_date(InsightType::DeepWorkTrend, date)
-            .await?
-        {
+        if self.already_exists(InsightType::DeepWorkTrend, date).await? {
             return Ok(None);
         }
 
@@ -167,12 +170,7 @@ impl InsightEngine {
         today_rate: f64,
         baseline: &Baseline,
     ) -> common::Result<Option<InsightCard>> {
-        if self
-            .repos
-            .insights
-            .exists_for_date(InsightType::DistractionSpike, date)
-            .await?
-        {
+        if self.already_exists(InsightType::DistractionSpike, date).await? {
             return Ok(None);
         }
 
@@ -205,12 +203,7 @@ impl InsightEngine {
         today_score: f64,
         baseline: &Baseline,
     ) -> common::Result<Option<InsightCard>> {
-        if self
-            .repos
-            .insights
-            .exists_for_date(InsightType::NewPersonalBest, date)
-            .await?
-        {
+        if self.already_exists(InsightType::NewPersonalBest, date).await? {
             return Ok(None);
         }
 
@@ -242,12 +235,7 @@ impl InsightEngine {
         threshold: f64,
         summaries: &[crate::types::DailySummary],
     ) -> common::Result<Option<InsightCard>> {
-        if self
-            .repos
-            .insights
-            .exists_for_date(InsightType::StreakAchieved, date)
-            .await?
-        {
+        if self.already_exists(InsightType::StreakAchieved, date).await? {
             return Ok(None);
         }
 
@@ -284,12 +272,7 @@ impl InsightEngine {
     }
 
     async fn check_fatigue_warning(&self, date: &str) -> common::Result<Option<InsightCard>> {
-        if self
-            .repos
-            .insights
-            .exists_for_date(InsightType::FatigueWarning, date)
-            .await?
-        {
+        if self.already_exists(InsightType::FatigueWarning, date).await? {
             return Ok(None);
         }
 
@@ -336,24 +319,16 @@ impl InsightEngine {
     async fn check_recovery_improvement(
         &self,
         date: &str,
+        today: &crate::types::DailySummary,
         baseline: &Baseline,
     ) -> common::Result<Option<InsightCard>> {
-        if self
-            .repos
-            .insights
-            .exists_for_date(InsightType::RecoveryImprovement, date)
-            .await?
-        {
+        if self.already_exists(InsightType::RecoveryImprovement, date).await? {
             return Ok(None);
         }
 
-        let today_avg = self
-            .repos
-            .distraction_patterns
-            .avg_recovery_secs(date, date)
-            .await?;
-
-        if let Some(today_recovery) = today_avg {
+        // Use the pre-fetched avg_recovery_secs from the daily summary
+        // instead of issuing a duplicate DB query.
+        if let Some(today_recovery) = today.avg_recovery_secs {
             if baseline.avg_recovery_secs > 0.0 && today_recovery < baseline.avg_recovery_secs * 0.7
             {
                 let card = InsightCard {
