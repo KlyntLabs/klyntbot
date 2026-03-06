@@ -60,9 +60,7 @@ export function InlineSelect({
                   setOpen(false);
                 }}
                 className={`w-full flex items-center gap-2 px-3 py-1.5 text-[12px] font-light transition-colors ${
-                  isSelected
-                    ? "text-brand bg-white/[0.12]"
-                    : "text-secondary hover:bg-white/[0.08]"
+                  isSelected ? "text-brand bg-white/[0.12]" : "text-secondary hover:bg-white/[0.08]"
                 } ${opt.className ?? ""}`}
                 style={{ borderRadius: "var(--glass-radius-inner)" }}
               >

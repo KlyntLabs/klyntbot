@@ -16,10 +16,10 @@ import { InsightCardList } from "./InsightCardList";
 import { LearnedRulesCard } from "./LearnedRulesCard";
 import { LiveScoreRing } from "./LiveScoreRing";
 import { PomodoroTimer } from "./PomodoroTimer";
+import { ProjectsCard } from "./ProjectsCard";
 import { buildBreakdownSegments } from "./shared";
 import { TimeEntrySection } from "./TimeEntrySection";
 import { TimelineBar } from "./Timeline";
-import { ProjectsCard } from "./ProjectsCard";
 import { TopApps } from "./TopApps";
 import { WorkHoursCard } from "./WorkHoursCard";
 
@@ -46,7 +46,7 @@ export function DayView({ date }: DayViewProps) {
     [],
   );
 
-  const summary = isToday ? todaySummary : rangeSummaries[0] ?? null;
+  const summary = isToday ? todaySummary : (rangeSummaries[0] ?? null);
   const refetch = isToday ? refetchToday : refetchRange;
 
   useEvent<{ entityKind: string }>("entity:updated", (payload) => {

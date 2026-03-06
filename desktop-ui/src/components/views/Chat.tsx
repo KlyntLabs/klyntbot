@@ -299,7 +299,10 @@ export function Chat() {
 
         {/* Floating transparency overlay */}
         {showTransparency && activeTransparency && (
-          <div className="absolute top-12 right-3 z-30" style={{ animation: "fade-in 0.15s ease-out" }}>
+          <div
+            className="absolute top-12 right-3 z-30"
+            style={{ animation: "fade-in 0.15s ease-out" }}
+          >
             <TransparencyPanel transparency={activeTransparency} />
           </div>
         )}

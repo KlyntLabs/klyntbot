@@ -234,7 +234,10 @@ export function TransparencyPanel({ transparency }: TransparencyPanelProps) {
                   <div key={`tg-${agent}`}>
                     <AgentGroupLabel name={agent} />
                     {agentTools.map((tool) => (
-                      <ToolRow key={`tool-${agent}-${tool.name}-${tool.action ?? ""}`} tool={tool} />
+                      <ToolRow
+                        key={`tool-${agent}-${tool.name}-${tool.action ?? ""}`}
+                        tool={tool}
+                      />
                     ))}
                   </div>
                 ))

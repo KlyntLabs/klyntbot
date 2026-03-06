@@ -2,8 +2,8 @@
   /* ── Typography ────────────────────────────── */
   --font-size: 15px;
   font-family:
-    "SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont,
-    system-ui, "Helvetica Neue", sans-serif;
+    "SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, system-ui, "Helvetica Neue",
+    sans-serif;
   --font-weight-semibold: 600;
   --font-weight-medium: 500;
   --font-weight-normal: 400;
@@ -56,7 +56,7 @@
   /* Glass material — primary tier */
   --surface-glass: rgba(255, 255, 255, 0.08);
   --glass-border: rgba(255, 255, 255, 0.12);
-  --glass-border-strong: rgba(255, 255, 255, 0.20);
+  --glass-border-strong: rgba(255, 255, 255, 0.2);
   --glass-shadow: none;
   --glass-padding: 6px;
   --glass-radius-inner: calc(var(--radius-xl) - var(--glass-padding));
@@ -66,7 +66,7 @@
 
   /* Glass material — subtle tier (for buttons, inputs) */
   --surface-glass-subtle: rgba(255, 255, 255, 0.06);
-  --surface-glass-subtle-hover: rgba(255, 255, 255, 0.10);
+  --surface-glass-subtle-hover: rgba(255, 255, 255, 0.1);
 
   /* Glass material — elevated tier (for active states) */
   --surface-glass-elevated: rgba(255, 255, 255, 0.14);
@@ -137,7 +137,7 @@
       radial-gradient(ellipse 70% 50% at 5% 95%, rgba(120, 80, 220, 0.18) 0%, transparent 70%),
       radial-gradient(ellipse 55% 45% at 95% 5%, rgba(40, 120, 200, 0.15) 0%, transparent 65%),
       radial-gradient(ellipse 60% 50% at 50% 50%, rgba(80, 60, 160, 0.08) 0%, transparent 55%),
-      radial-gradient(ellipse 45% 35% at 80% 80%, rgba(60, 140, 180, 0.10) 0%, transparent 55%),
+      radial-gradient(ellipse 45% 35% at 80% 80%, rgba(60, 140, 180, 0.1) 0%, transparent 55%),
       radial-gradient(ellipse 40% 30% at 20% 20%, rgba(100, 60, 180, 0.12) 0%, transparent 50%);
     background-attachment: fixed;
   }
@@ -244,7 +244,10 @@
     background: var(--surface-glass-subtle);
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: var(--radius-xl);
-    transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    transition:
+      background 0.2s ease,
+      border-color 0.2s ease,
+      box-shadow 0.2s ease;
   }
 
   .glass-input:focus-within {
@@ -303,7 +306,7 @@
   .glass-bubble-user {
     @apply backdrop-blur-[40px] backdrop-saturate-[1.4];
     background: rgba(255, 255, 255, 0.08);
-    border: 1px solid rgba(255, 255, 255, 0.10);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: var(--radius-2xl);
   }
 

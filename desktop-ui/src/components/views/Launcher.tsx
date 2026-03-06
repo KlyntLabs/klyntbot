@@ -259,14 +259,10 @@ export function Launcher() {
                       >
                         <div
                           className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-150 ${
-                            isSelected
-                              ? "bg-brand/90 text-white"
-                              : "bg-white/[0.06] text-muted"
+                            isSelected ? "bg-brand/90 text-white" : "bg-white/[0.06] text-muted"
                           }`}
                           style={
-                            isSelected
-                              ? { boxShadow: "0 4px 20px var(--brand-glow)" }
-                              : undefined
+                            isSelected ? { boxShadow: "0 4px 20px var(--brand-glow)" } : undefined
                           }
                         >
                           <Icon
@@ -305,9 +301,7 @@ export function Launcher() {
                     Open
                   </span>
                   <span className="flex items-center gap-1.5 font-light">
-                    <kbd className="glass-badge px-1.5 py-0.5 text-[10px] text-muted">
-                      Esc
-                    </kbd>
+                    <kbd className="glass-badge px-1.5 py-0.5 text-[10px] text-muted">Esc</kbd>
                     Close
                   </span>
                 </div>

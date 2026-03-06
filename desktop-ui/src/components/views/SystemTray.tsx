@@ -137,8 +137,7 @@ export function SystemTray() {
                 <div
                   className="w-1.5 h-1.5 rounded-full"
                   style={{
-                    backgroundColor:
-                      displayStatus === "active" ? "var(--success)" : "var(--brand)",
+                    backgroundColor: displayStatus === "active" ? "var(--success)" : "var(--brand)",
                   }}
                 />
                 <span className="text-[11px] text-muted font-light capitalize">
