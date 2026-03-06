@@ -698,24 +698,36 @@ fn delegation_event_filter(
 }
 
 /// Filter tool definitions to only those allowed by the agent profile.
-/// MCP tools (prefixed `mcp_`) bypass agent filtering.
+/// Native tools are filtered by `profile.tools` (empty = all allowed).
+/// MCP tools are filtered by `profile.mcp_tools` (empty = none allowed, `["*"]` = all).
 fn filter_tools_for_profile(
     tool_defs: &[serde_json::Value],
     profile: &AgentProfile,
 ) -> Vec<serde_json::Value> {
-    if let Some(allowed) = profile.allowed_tool_names() {
-        tool_defs
-            .iter()
-            .filter(|t| {
-                tool_def_name(t)
-                    .map(|name| name.starts_with("mcp_") || allowed.contains(name))
-                    .unwrap_or(true)
-            })
-            .cloned()
-            .collect()
-    } else {
-        tool_defs.to_vec()
-    }
+    let native_allowlist = profile.allowed_tool_names();
+
+    tool_defs
+        .iter()
+        .filter(|t| {
+            let Some(name) = tool_def_name(t) else {
+                return true;
+            };
+
+            if name.starts_with("mcp_") {
+                let server_name = name
+                    .strip_prefix("mcp_")
+                    .and_then(|rest| rest.split('_').next())
+                    .unwrap_or("");
+                return profile.allows_mcp_server(server_name);
+            }
+
+            match &native_allowlist {
+                Some(allowed) => allowed.contains(name),
+                None => true,
+            }
+        })
+        .cloned()
+        .collect()
 }
 
 /// Inject a DelegationTool into the tool list and registry if the agent can delegate
@@ -1259,5 +1271,105 @@ mod tests {
 
         assert!(started, "Expected DelegationStarted event for 'task'");
         assert!(completed, "Expected DelegationCompleted event for 'task'");
+    }
+
+    mod filter_tests {
+        use super::*;
+        use serde_json::json;
+
+        fn make_tool_def(name: &str) -> serde_json::Value {
+            json!({
+                "type": "function",
+                "function": {
+                    "name": name,
+                    "description": "test tool",
+                    "parameters": { "type": "object", "properties": {} }
+                }
+            })
+        }
+
+        #[test]
+        fn test_filter_blocks_mcp_tools_for_restricted_agent() {
+            let profile = AgentProfile {
+                name: "task".into(),
+                tools: vec!["task".into(), "area".into()],
+                mcp_tools: vec![],
+                ..Default::default()
+            };
+
+            let tool_defs = vec![
+                make_tool_def("task"),
+                make_tool_def("area"),
+                make_tool_def("mcp_linear_create_issue"),
+                make_tool_def("mcp_linear_list_issues"),
+                make_tool_def("finance"),
+            ];
+
+            let filtered = filter_tools_for_profile(&tool_defs, &profile);
+            let names: Vec<&str> = filtered
+                .iter()
+                .filter_map(|t| tool_def_name(t))
+                .collect();
+
+            assert!(names.contains(&"task"));
+            assert!(names.contains(&"area"));
+            assert!(!names.contains(&"mcp_linear_create_issue"));
+            assert!(!names.contains(&"mcp_linear_list_issues"));
+            assert!(!names.contains(&"finance"));
+        }
+
+        #[test]
+        fn test_filter_allows_mcp_tools_for_wildcard_agent() {
+            let profile = AgentProfile {
+                name: "general".into(),
+                tools: vec![],
+                mcp_tools: vec!["*".into()],
+                ..Default::default()
+            };
+
+            let tool_defs = vec![
+                make_tool_def("task"),
+                make_tool_def("mcp_linear_create_issue"),
+                make_tool_def("mcp_github_list_repos"),
+            ];
+
+            let filtered = filter_tools_for_profile(&tool_defs, &profile);
+            let names: Vec<&str> = filtered
+                .iter()
+                .filter_map(|t| tool_def_name(t))
+                .collect();
+
+            assert!(names.contains(&"task"));
+            assert!(names.contains(&"mcp_linear_create_issue"));
+            assert!(names.contains(&"mcp_github_list_repos"));
+        }
+
+        #[test]
+        fn test_filter_allows_specific_mcp_server() {
+            let profile = AgentProfile {
+                name: "comms".into(),
+                tools: vec!["message".into()],
+                mcp_tools: vec!["linear".into()],
+                ..Default::default()
+            };
+
+            let tool_defs = vec![
+                make_tool_def("message"),
+                make_tool_def("mcp_linear_create_issue"),
+                make_tool_def("mcp_github_list_repos"),
+                make_tool_def("task"),
+            ];
+
+            let filtered = filter_tools_for_profile(&tool_defs, &profile);
+            let names: Vec<&str> = filtered
+                .iter()
+                .filter_map(|t| tool_def_name(t))
+                .collect();
+
+            assert!(names.contains(&"message"));
+            assert!(names.contains(&"mcp_linear_create_issue"));
+            assert!(!names.contains(&"mcp_github_list_repos"));
+            assert!(!names.contains(&"task"));
+        }
     }
 }
