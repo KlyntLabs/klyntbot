@@ -7,6 +7,7 @@ pub struct WindowInfo {
     pub app_name: String,
     pub bundle_id: Option<String>,
     pub window_title: Option<String>,
+    pub pid: i32,
 }
 
 /// Get the currently focused window's app name, bundle ID, and window title.
@@ -41,6 +42,7 @@ pub fn get_frontmost_window() -> Result<Option<WindowInfo>> {
                 app_name: name,
                 bundle_id: bundle,
                 window_title: title,
+                pid,
             }))
         }
         None => Ok(None),

@@ -357,6 +357,16 @@ fn summary_to_response(
                 duration_secs: c.duration_secs,
             })
             .collect(),
+        top_projects: s
+            .top_projects
+            .into_iter()
+            .map(|p| ProjectUsageResponse {
+                project_id: p.project_id,
+                display_name: p.display_name,
+                duration_secs: p.duration_secs,
+                color: p.color,
+            })
+            .collect(),
         ai_summary: s.ai_summary,
         productivity_score: s.productivity_score,
     }

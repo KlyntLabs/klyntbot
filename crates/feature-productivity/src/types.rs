@@ -16,7 +16,7 @@ pub struct ProductivityProject {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectUsage {
-    pub project_id: Option<String>,
+    pub project_id: String,
     pub display_name: String,
     pub duration_secs: i64,
     pub color: Option<String>,

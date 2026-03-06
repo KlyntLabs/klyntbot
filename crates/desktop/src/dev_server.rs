@@ -23,7 +23,9 @@ use tracing::{error, info};
 
 use crate::app_core::AppCore;
 use crate::commands::areas::build_area_response;
-use crate::commands::productivity::insight_to_response;
+use crate::commands::productivity::{
+    insight_to_response, project_to_response, session_to_response, summary_to_response,
+};
 use crate::commands::tasks::{
     action_to_task, action_to_today_task, kr_to_response, objective_to_response, row_to_task,
     rows_to_tasks,
@@ -920,7 +922,7 @@ async fn dispatch(
         // ── Productivity ──────────────────────────────────────
         "productivity_today" => match core.aggregator() {
             Ok(agg) => match agg.compute_today().await {
-                Ok(s) => ok(Some(summary_to_prod_response(s))),
+                Ok(s) => ok(Some(summary_to_response(s))),
                 Err(e) => err(prod_err(e)),
             },
             Err(e) => err(e),
@@ -970,7 +972,7 @@ async fn dispatch(
                 let project_id: Option<String> = get(&body, "project_id");
                 let target_mins: Option<i64> = get(&body, "target_mins");
                 match mgr.start_session(action_id, project_id, target_mins).await {
-                    Ok(s) => ok(session_to_prod_response(s)),
+                    Ok(s) => ok(session_to_response(s)),
                     Err(e) => err(prod_err(e)),
                 }
             }
@@ -980,7 +982,7 @@ async fn dispatch(
             Ok(mgr) => {
                 let notes: Option<String> = get(&body, "notes");
                 match mgr.end_session(notes).await {
-                    Ok(s) => ok(s.map(session_to_prod_response)),
+                    Ok(s) => ok(s.map(session_to_response)),
                     Err(e) => err(prod_err(e)),
                 }
             }
@@ -988,7 +990,7 @@ async fn dispatch(
         },
         "productivity_focus_status" => match core.focus_manager() {
             Ok(mgr) => match mgr.get_active().await {
-                Ok(s) => ok(s.map(session_to_prod_response)),
+                Ok(s) => ok(s.map(session_to_response)),
                 Err(e) => err(prod_err(e)),
             },
             Err(e) => err(e),
@@ -1010,7 +1012,7 @@ async fn dispatch(
             match repos.sessions.list_range(&start, &end, None).await {
                 Ok(sessions) => {
                     let resp: Vec<FocusSessionResponse> =
-                        sessions.into_iter().map(session_to_prod_response).collect();
+                        sessions.into_iter().map(session_to_response).collect();
                     ok(resp)
                 }
                 Err(e) => err(prod_err(e)),
@@ -1034,7 +1036,7 @@ async fn dispatch(
                 Ok(summaries) => {
                     let resp: Vec<ProductivitySummaryResponse> = summaries
                         .into_iter()
-                        .map(summary_to_prod_response)
+                        .map(summary_to_response)
                         .collect();
                     ok(resp)
                 }
@@ -1091,7 +1093,7 @@ async fn dispatch(
                     }
                     let resp: Vec<ProductivitySummaryResponse> = summaries
                         .into_iter()
-                        .map(summary_to_prod_response)
+                        .map(summary_to_response)
                         .collect();
                     ok(resp)
                 }
@@ -1151,7 +1153,7 @@ async fn dispatch(
                 let work_mins: Option<i64> = get(&body, "work_mins");
                 let break_mins: Option<i64> = get(&body, "break_mins");
                 match mgr.start_pomodoro(None, None, work_mins, break_mins).await {
-                    Ok(s) => ok(session_to_prod_response(s)),
+                    Ok(s) => ok(session_to_response(s)),
                     Err(e) => err(prod_err(e)),
                 }
             }
@@ -1427,6 +1429,70 @@ async fn dispatch(
             // In dev mode, just acknowledge — no auto-focus detection running
             ok(serde_json::json!(null))
         }
+        "productivity_projects_list" => {
+            let repos = match core.productivity_repos() {
+                Ok(r) => r,
+                Err(e) => return err(e),
+            };
+            match repos.projects.list_all().await {
+                Ok(projects) => {
+                    let resp: Vec<ProductivityProjectResponse> =
+                        projects.into_iter().map(project_to_response).collect();
+                    ok(resp)
+                }
+                Err(e) => err(prod_err(e)),
+            }
+        }
+        "productivity_project_upsert" => {
+            let id = match get_str(&body, "id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let display_name = match get_str(&body, "display_name") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let path = match get_str(&body, "path") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let url_patterns: Vec<String> = body
+                .get("url_patterns")
+                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                .unwrap_or_default();
+            let color = body.get("color").and_then(|v| v.as_str()).map(String::from);
+            let repos = match core.productivity_repos() {
+                Ok(r) => r,
+                Err(e) => return err(e),
+            };
+            let project = feature_productivity::types::ProductivityProject {
+                id,
+                display_name,
+                path,
+                url_patterns,
+                color,
+                is_auto_detected: false,
+                created_at: Utc::now(),
+            };
+            match repos.projects.upsert(&project).await {
+                Ok(_) => ok(project_to_response(project)),
+                Err(e) => err(prod_err(e)),
+            }
+        }
+        "productivity_project_delete" => {
+            let id = match get_str(&body, "id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let repos = match core.productivity_repos() {
+                Ok(r) => r,
+                Err(e) => return err(e),
+            };
+            match repos.projects.delete(&id).await {
+                Ok(_) => ok(()),
+                Err(e) => err(prod_err(e)),
+            }
+        }
         // ── Settings (MCP) ────────────────────────────────────
         "mcp_get_config" => {
             let cfg = core.config.read().await;
@@ -1557,57 +1623,5 @@ async fn dispatch(
 
 // ── Productivity response helpers ─────────────────────────────────────────
 
-fn summary_to_prod_response(
-    s: feature_productivity::types::DailySummary,
-) -> ProductivitySummaryResponse {
-    ProductivitySummaryResponse {
-        date: s.date,
-        total_active_secs: s.total_active_secs,
-        total_focus_secs: s.total_focus_secs,
-        total_break_secs: s.total_break_secs,
-        total_idle_secs: s.total_idle_secs,
-        productive_secs: s.productive_secs,
-        neutral_secs: s.neutral_secs,
-        distracting_secs: s.distracting_secs,
-        focus_sessions_count: s.focus_sessions_count,
-        avg_session_quality: s.avg_session_quality,
-        interruptions_count: s.interruptions_count,
-        context_switches: s.context_switches,
-        top_apps: s
-            .top_apps
-            .into_iter()
-            .map(|a| AppUsageResponse {
-                app_name: a.app_name,
-                duration_secs: a.duration_secs,
-                category: a.category,
-            })
-            .collect(),
-        top_categories: s
-            .top_categories
-            .into_iter()
-            .map(|c| CategoryUsageResponse {
-                category: c.category,
-                duration_secs: c.duration_secs,
-            })
-            .collect(),
-        ai_summary: s.ai_summary,
-        productivity_score: s.productivity_score,
-    }
-}
-
-fn session_to_prod_response(s: feature_productivity::types::FocusSession) -> FocusSessionResponse {
-    FocusSessionResponse {
-        id: s.id,
-        action_id: s.action_id,
-        project_id: s.project_id,
-        session_type: s.session_type.to_string(),
-        target_mins: s.target_mins,
-        started_at: s.started_at,
-        ended_at: s.ended_at,
-        actual_mins: s.actual_mins,
-        interruptions: s.interruptions,
-        quality_score: s.quality_score,
-        completed: s.completed,
-        notes: s.notes,
-    }
-}
+// summary_to_response, session_to_response, project_to_response
+// imported from crate::commands::productivity

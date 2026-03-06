@@ -228,6 +228,38 @@ impl ActivityEventRepo {
         Ok(total)
     }
 
+    pub async fn top_projects(
+        &self,
+        start: &DateTime<Utc>,
+        end: &DateTime<Utc>,
+        limit: i64,
+    ) -> common::Result<Vec<(String, i64)>> {
+        #[derive(sqlx::FromRow)]
+        struct Row {
+            project_id: Option<String>,
+            total_secs: i64,
+        }
+        let rows = sqlx::query_as::<_, Row>(
+            r#"SELECT project_id, COALESCE(SUM(duration_secs), 0) AS total_secs
+               FROM activity_events
+               WHERE started_at >= ?1 AND started_at < ?2 AND is_idle = FALSE
+                 AND project_id IS NOT NULL
+               GROUP BY project_id
+               ORDER BY total_secs DESC
+               LIMIT ?3"#,
+        )
+        .bind(start)
+        .bind(end)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        Ok(rows
+            .into_iter()
+            .filter_map(|r| r.project_id.map(|pid| (pid, r.total_secs)))
+            .collect())
+    }
+
     pub async fn total_active_secs(
         &self,
         start: &DateTime<Utc>,

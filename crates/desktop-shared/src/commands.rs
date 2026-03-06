@@ -379,6 +379,7 @@ pub struct ProductivitySummaryResponse {
     pub context_switches: i64,
     pub top_apps: Vec<AppUsageResponse>,
     pub top_categories: Vec<CategoryUsageResponse>,
+    pub top_projects: Vec<ProjectUsageResponse>,
     pub ai_summary: Option<String>,
     pub productivity_score: Option<f64>,
 }
@@ -396,6 +397,26 @@ pub struct AppUsageResponse {
 pub struct CategoryUsageResponse {
     pub category: String,
     pub duration_secs: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectUsageResponse {
+    pub project_id: String,
+    pub display_name: String,
+    pub duration_secs: i64,
+    pub color: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProductivityProjectResponse {
+    pub id: String,
+    pub display_name: String,
+    pub path: String,
+    pub url_patterns: Vec<String>,
+    pub color: Option<String>,
+    pub is_auto_detected: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

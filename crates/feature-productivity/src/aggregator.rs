@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use crate::handler::ProductivityHandler;
 use crate::repos::ProductivityRepos;
-use crate::types::{AppUsage, CategoryUsage, DailySummary};
+use crate::types::{AppUsage, CategoryUsage, DailySummary, ProjectUsage};
 
 pub struct DailyAggregator {
     repos: ProductivityRepos,
@@ -51,6 +51,8 @@ impl DailyAggregator {
             category_agg,
             categories,
             top_app_rows,
+            top_project_rows,
+            all_projects,
             sessions,
             time_entries,
             avg_recovery_secs,
@@ -60,6 +62,8 @@ impl DailyAggregator {
             self.repos.events.aggregate_by_category(&start, &end),
             self.repos.categories.list_all(),
             self.repos.events.top_apps(&start, &end, 10),
+            self.repos.events.top_projects(&start, &end, 10),
+            self.repos.projects.list_all(),
             self.repos.sessions.list_range(&start, &end, None),
             self.repos.time_entries.list_range(&start, &end),
             self.repos
@@ -124,6 +128,26 @@ impl DailyAggregator {
                 category: None,
             })
             .collect();
+
+        // Build project lookup for display names and colors
+        let project_map: HashMap<&str, &crate::types::ProductivityProject> =
+            all_projects.iter().map(|p| (p.id.as_str(), p)).collect();
+
+        let top_projects: Vec<ProjectUsage> = top_project_rows
+            .into_iter()
+            .map(|(pid, secs)| {
+                let (name, color) = project_map
+                    .get(pid.as_str())
+                    .map(|p| (p.display_name.clone(), p.color.clone()))
+                    .unwrap_or_else(|| (pid.clone(), None));
+                ProjectUsage {
+                    project_id: pid,
+                    display_name: name,
+                    duration_secs: secs,
+                    color,
+                }
+            })
+            .collect();
         let focus_sessions_count = sessions.len() as i64;
         let total_focus_secs: i64 = sessions.iter().filter_map(|s| s.actual_mins).sum::<i64>() * 60;
         let total_break_secs: i64 = sessions
@@ -167,7 +191,7 @@ impl DailyAggregator {
             context_switches,
             top_apps,
             top_categories,
-            top_projects: vec![],
+            top_projects,
             productivity_score: None,
             ai_summary: None,
             deep_work_blocks,

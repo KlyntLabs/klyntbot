@@ -193,6 +193,9 @@ fn main() {
             commands::productivity::productivity_insights,
             commands::productivity::productivity_insight_dismiss,
             commands::productivity::productivity_auto_focus_confirm,
+            commands::productivity::productivity_projects_list,
+            commands::productivity::productivity_project_upsert,
+            commands::productivity::productivity_project_delete,
             // Distraction
             commands::distraction::distraction_dismiss,
             commands::distraction::distraction_allow_temp,

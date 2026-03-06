@@ -5,8 +5,8 @@ use std::sync::Arc;
 use chrono::Utc;
 use desktop_shared::commands::{
     ActivityCategoryResponse, ActivityTimelineResponse, AppUsageResponse, CategoryUsageResponse,
-    FocusSessionResponse, GoalProgressResponse, InsightCardResponse, ProductivitySummaryResponse,
-    TimeEntryResponse,
+    FocusSessionResponse, GoalProgressResponse, InsightCardResponse, ProductivityProjectResponse,
+    ProductivitySummaryResponse, ProjectUsageResponse, TimeEntryResponse,
 };
 use desktop_shared::errors::ApiError;
 use feature_productivity::types::{DailySummary, FocusSession, InsightCard};
@@ -18,7 +18,7 @@ use crate::app_core::AppCore;
 
 use super::map_prod_err;
 
-fn summary_to_response(s: DailySummary) -> ProductivitySummaryResponse {
+pub(crate) fn summary_to_response(s: DailySummary) -> ProductivitySummaryResponse {
     ProductivitySummaryResponse {
         date: s.date,
         total_active_secs: s.total_active_secs,
@@ -49,12 +49,22 @@ fn summary_to_response(s: DailySummary) -> ProductivitySummaryResponse {
                 duration_secs: c.duration_secs,
             })
             .collect(),
+        top_projects: s
+            .top_projects
+            .into_iter()
+            .map(|p| ProjectUsageResponse {
+                project_id: p.project_id,
+                display_name: p.display_name,
+                duration_secs: p.duration_secs,
+                color: p.color,
+            })
+            .collect(),
         ai_summary: s.ai_summary,
         productivity_score: s.productivity_score,
     }
 }
 
-fn session_to_response(s: FocusSession) -> FocusSessionResponse {
+pub(crate) fn session_to_response(s: FocusSession) -> FocusSessionResponse {
     FocusSessionResponse {
         id: s.id,
         action_id: s.action_id,
@@ -68,6 +78,19 @@ fn session_to_response(s: FocusSession) -> FocusSessionResponse {
         quality_score: s.quality_score,
         completed: s.completed,
         notes: s.notes,
+    }
+}
+
+pub(crate) fn project_to_response(
+    p: feature_productivity::types::ProductivityProject,
+) -> ProductivityProjectResponse {
+    ProductivityProjectResponse {
+        id: p.id,
+        display_name: p.display_name,
+        path: p.path,
+        url_patterns: p.url_patterns,
+        color: p.color,
+        is_auto_detected: p.is_auto_detected,
     }
 }
 
@@ -526,4 +549,48 @@ pub async fn productivity_auto_focus_confirm(
         .await
         .map_err(map_prod_err)?;
     Ok(session_to_response(focus_session))
+}
+
+// ── V3: Project Tracking ─────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn productivity_projects_list(
+    state: State<'_, Arc<AppCore>>,
+) -> Result<Vec<ProductivityProjectResponse>, ApiError> {
+    let repos = state.productivity_repos()?;
+    let projects = repos.projects.list_all().await.map_err(map_prod_err)?;
+    Ok(projects.into_iter().map(project_to_response).collect())
+}
+
+#[tauri::command(rename_all = "snake_case")]
+pub async fn productivity_project_upsert(
+    state: State<'_, Arc<AppCore>>,
+    id: String,
+    display_name: String,
+    path: String,
+    url_patterns: Option<Vec<String>>,
+    color: Option<String>,
+) -> Result<ProductivityProjectResponse, ApiError> {
+    let repos = state.productivity_repos()?;
+    let project = feature_productivity::types::ProductivityProject {
+        id: id.clone(),
+        display_name,
+        path,
+        url_patterns: url_patterns.unwrap_or_default(),
+        color,
+        is_auto_detected: false,
+        created_at: Utc::now(),
+    };
+    repos.projects.upsert(&project).await.map_err(map_prod_err)?;
+    Ok(project_to_response(project))
+}
+
+#[tauri::command]
+pub async fn productivity_project_delete(
+    state: State<'_, Arc<AppCore>>,
+    id: String,
+) -> Result<(), ApiError> {
+    let repos = state.productivity_repos()?;
+    repos.projects.delete(&id).await.map_err(map_prod_err)?;
+    Ok(())
 }

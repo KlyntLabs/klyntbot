@@ -5,8 +5,9 @@
 pub mod categorizer;
 pub mod macos;
 
+use std::collections::HashSet;
 use std::sync::Arc;
-use tokio::sync::{broadcast, RwLock};
+use tokio::sync::{broadcast, Mutex, RwLock};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
@@ -14,7 +15,9 @@ use chrono::Utc;
 use tracing::{debug, info, warn};
 
 use crate::config::{PrivacyConfig, ProductivityConfig};
-use crate::types::ActivityTick;
+use crate::project_detector::{DetectionResult, ProjectDetector};
+use crate::repos::ProductivityRepos;
+use crate::types::{ActivityTick, ProductivityProject};
 use categorizer::Categorizer;
 
 /// Extract the domain from a URL (e.g., `https://chatgpt.com/c/abc` → `chatgpt.com`).
@@ -65,6 +68,8 @@ fn compute_site_name(
 pub struct ActivityTracker {
     config: ProductivityConfig,
     categorizer: Arc<RwLock<Categorizer>>,
+    detector: Arc<ProjectDetector>,
+    repos: ProductivityRepos,
     cancel_token: CancellationToken,
     task_handle: Option<JoinHandle<()>>,
     tick_sender: broadcast::Sender<ActivityTick>,
@@ -74,11 +79,15 @@ impl ActivityTracker {
     pub fn new(
         config: ProductivityConfig,
         categorizer: Categorizer,
+        detector: ProjectDetector,
+        repos: ProductivityRepos,
         tick_sender: broadcast::Sender<ActivityTick>,
     ) -> Self {
         Self {
             config,
             categorizer: Arc::new(RwLock::new(categorizer)),
+            detector: Arc::new(detector),
+            repos,
             cancel_token: CancellationToken::new(),
             task_handle: None,
             tick_sender,
@@ -99,12 +108,16 @@ impl ActivityTracker {
             std::time::Duration::from_secs(self.config.tracking.poll_interval_secs.max(1));
         let idle_threshold = self.config.tracking.idle_threshold_secs as f64;
         let categorizer = Arc::clone(&self.categorizer);
+        let detector = Arc::clone(&self.detector);
+        let repos = self.repos.clone();
         let privacy = self.config.privacy.clone();
         let tick_sender = self.tick_sender.clone();
 
         let handle = tokio::spawn(async move {
             let mut prev_app: Option<String> = None;
             let mut prev_site: Option<String> = None;
+            let pending_registrations: Arc<Mutex<HashSet<String>>> =
+                Arc::new(Mutex::new(HashSet::new()));
 
             loop {
                 tokio::select! {
@@ -166,6 +179,57 @@ impl ActivityTracker {
                                     || prev_site != site_name
                                 );
 
+                                // Detect project
+                                let project_id = if !is_idle {
+                                    match detector.detect(
+                                        &info.app_name,
+                                        info.bundle_id.as_deref(),
+                                        raw_title,
+                                        url.as_deref(),
+                                        info.pid,
+                                    ).await {
+                                        Some(DetectionResult::Known(id)) => Some(id),
+                                        Some(DetectionResult::AutoRegister { path, display_name }) => {
+                                            let id = display_name.to_lowercase().replace(' ', "-");
+                                            let pending = Arc::clone(&pending_registrations);
+                                            let already_pending = {
+                                                let guard = pending.lock().await;
+                                                guard.contains(&id)
+                                            };
+                                            if !already_pending {
+                                                {
+                                                    let mut guard = pending.lock().await;
+                                                    guard.insert(id.clone());
+                                                }
+                                                let project = ProductivityProject {
+                                                    id: id.clone(),
+                                                    display_name,
+                                                    path,
+                                                    url_patterns: vec![],
+                                                    color: None,
+                                                    is_auto_detected: true,
+                                                    created_at: Utc::now(),
+                                                };
+                                                let r = repos.clone();
+                                                let d = Arc::clone(&detector);
+                                                tokio::spawn(async move {
+                                                    if let Err(e) = r.projects.upsert(&project).await {
+                                                        warn!("auto-register project failed: {e}");
+                                                    } else {
+                                                        let _ = d.refresh(&r.projects).await;
+                                                    }
+                                                    let mut guard = pending.lock().await;
+                                                    guard.remove(&project.id);
+                                                });
+                                            }
+                                            Some(id)
+                                        }
+                                        None => None,
+                                    }
+                                } else {
+                                    None
+                                };
+
                                 let tick = ActivityTick {
                                     timestamp: now,
                                     app_name: info.app_name.clone(),
@@ -178,7 +242,7 @@ impl ActivityTracker {
                                     is_idle,
                                     idle_secs,
                                     is_context_switch,
-                                    project_id: None,
+                                    project_id,
                                 };
 
                                 // Update previous state

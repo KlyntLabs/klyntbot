@@ -9,6 +9,7 @@ use crate::batch_writer::BatchWriter;
 use crate::bucket_aggregator::BucketAggregator;
 use crate::config::ProductivityConfig;
 use crate::distraction_analyzer::DistractionAnalyzer;
+use crate::project_detector::ProjectDetector;
 use crate::repos::ProductivityRepos;
 use crate::tracker::categorizer::Categorizer;
 use crate::tracker::ActivityTracker;
@@ -36,7 +37,14 @@ impl ProductivityEngine {
         let (tick_tx, _) = broadcast::channel(BROADCAST_CAPACITY);
         let cancel = CancellationToken::new();
 
-        let tracker = ActivityTracker::new(config.clone(), categorizer, tick_tx.clone());
+        let detector = ProjectDetector::new();
+        let tracker = ActivityTracker::new(
+            config.clone(),
+            categorizer,
+            detector,
+            repos.clone(),
+            tick_tx.clone(),
+        );
 
         // BatchWriter
         let batch_writer = BatchWriter::start(
