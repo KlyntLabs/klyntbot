@@ -12,6 +12,7 @@ pub mod handler;
 pub mod insights;
 pub mod nudge;
 pub mod patterns;
+pub mod project_detector;
 pub mod repos;
 pub mod tool;
 pub mod tracker;
@@ -57,6 +58,10 @@ impl ProductivityFeature {
         include_str!("../migrations/002_productivity_v2.sql")
     }
 
+    fn migration_v3_sql() -> &'static str {
+        include_str!("../migrations/003_projects.sql")
+    }
+
     pub fn migrations_static() -> Vec<FeatureMigration> {
         vec![
             FeatureMigration {
@@ -71,6 +76,12 @@ impl ProductivityFeature {
                 description: "Add buckets, distraction patterns, insights, focus source"
                     .to_string(),
                 sql: Self::migration_v2_sql().to_string(),
+            },
+            FeatureMigration {
+                feature_name: "productivity".to_string(),
+                version: 3,
+                description: "Add project tracking tables".to_string(),
+                sql: Self::migration_v3_sql().to_string(),
             },
         ]
     }

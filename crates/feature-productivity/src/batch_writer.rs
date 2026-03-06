@@ -93,6 +93,7 @@ impl BatchWriter {
                                 duration_secs: Some(0),
                                 is_idle: tick.is_idle,
                                 metadata: None,
+                                project_id: tick.project_id.clone(),
                             });
                         }
 

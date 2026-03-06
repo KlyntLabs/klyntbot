@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use sqlx::SqlitePool;
+use sqlx::{Row, SqlitePool};
 
 use crate::types::ActivityEvent;
 
@@ -8,8 +8,8 @@ pub struct ActivityEventRepo {
     pool: SqlitePool,
 }
 
-const INSERT_SQL: &str = r#"INSERT INTO activity_events (app_name, window_title, site_name, bundle_id, url, category_id, started_at, ended_at, duration_secs, is_idle, metadata)
-VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)"#;
+const INSERT_SQL: &str = r#"INSERT INTO activity_events (app_name, window_title, site_name, bundle_id, url, category_id, started_at, ended_at, duration_secs, is_idle, metadata, project_id)
+VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)"#;
 
 fn bind_event<'a>(
     query: sqlx::query::Query<'a, sqlx::Sqlite, sqlx::sqlite::SqliteArguments<'a>>,
@@ -27,6 +27,7 @@ fn bind_event<'a>(
         .bind(event.duration_secs)
         .bind(event.is_idle)
         .bind(&event.metadata)
+        .bind(&event.project_id)
 }
 
 impl ActivityEventRepo {
@@ -39,22 +40,12 @@ impl ActivityEventRepo {
     }
 
     pub async fn insert(&self, event: &ActivityEvent) -> common::Result<i64> {
-        let row = sqlx::query_scalar::<_, i64>(&format!("{INSERT_SQL} RETURNING id"))
-            .bind(&event.app_name)
-            .bind(&event.window_title)
-            .bind(&event.site_name)
-            .bind(&event.bundle_id)
-            .bind(&event.url)
-            .bind(&event.category_id)
-            .bind(event.started_at)
-            .bind(event.ended_at)
-            .bind(event.duration_secs)
-            .bind(event.is_idle)
-            .bind(&event.metadata)
+        let insert_returning = format!("{INSERT_SQL} RETURNING id");
+        let row = bind_event(sqlx::query(&insert_returning), event)
             .fetch_one(&self.pool)
             .await
             .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
-        Ok(row)
+        Ok(row.get::<i64, _>("id"))
     }
 
     pub async fn insert_batch(&self, events: &[ActivityEvent]) -> common::Result<()> {
@@ -94,7 +85,7 @@ impl ActivityEventRepo {
         let limit = limit.unwrap_or(10_000);
         let offset = offset.unwrap_or(0).max(0);
         let rows = sqlx::query_as::<_, ActivityEvent>(
-            r#"SELECT id, app_name, window_title, site_name, bundle_id, url, category_id, started_at, ended_at, duration_secs, is_idle, metadata
+            r#"SELECT id, app_name, window_title, site_name, bundle_id, url, category_id, started_at, ended_at, duration_secs, is_idle, metadata, project_id
                FROM activity_events
                WHERE started_at >= ?1 AND started_at < ?2
                ORDER BY started_at ASC
@@ -113,7 +104,7 @@ impl ActivityEventRepo {
     /// Returns the most recent events (newest first), limited by `limit`.
     pub async fn list_recent(&self, limit: i64) -> common::Result<Vec<ActivityEvent>> {
         let rows = sqlx::query_as::<_, ActivityEvent>(
-            r#"SELECT id, app_name, window_title, site_name, bundle_id, url, category_id, started_at, ended_at, duration_secs, is_idle, metadata
+            r#"SELECT id, app_name, window_title, site_name, bundle_id, url, category_id, started_at, ended_at, duration_secs, is_idle, metadata, project_id
                FROM activity_events
                ORDER BY started_at DESC
                LIMIT ?1"#,

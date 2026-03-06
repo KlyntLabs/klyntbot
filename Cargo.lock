@@ -3500,6 +3500,7 @@ dependencies = [
  "config",
  "core-foundation 0.10.1",
  "core-graphics",
+ "dirs",
  "objc2",
  "objc2-app-kit",
  "objc2-foundation",

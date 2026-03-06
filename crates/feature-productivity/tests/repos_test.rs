@@ -37,6 +37,7 @@ async fn test_insert_and_list_activity_events() {
             duration_secs: Some(5),
             is_idle: false,
             metadata: None,
+            project_id: None,
         };
         repos.events.insert(&event).await.unwrap();
     }
@@ -75,6 +76,7 @@ async fn test_batch_insert_events() {
             duration_secs: Some(4),
             is_idle: false,
             metadata: None,
+            project_id: None,
         })
         .collect();
 
@@ -213,6 +215,7 @@ async fn test_daily_summary_upsert() {
             category: "coding".to_string(),
             duration_secs: 2400,
         }],
+        top_projects: vec![],
         productivity_score: None,
         ai_summary: None,
         deep_work_blocks: 0,
@@ -299,6 +302,7 @@ async fn test_context_switch_count() {
             duration_secs: Some(5),
             is_idle: false,
             metadata: None,
+            project_id: None,
         })
         .collect();
 
@@ -336,6 +340,7 @@ async fn test_purge_old_events() {
         duration_secs: Some(5),
         is_idle: false,
         metadata: None,
+        project_id: None,
     };
     let new_event = ActivityEvent {
         started_at: now,

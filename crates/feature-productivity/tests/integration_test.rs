@@ -90,6 +90,7 @@ async fn test_full_focus_session_lifecycle() {
             duration_secs: Some(1500),
             is_idle: false,
             metadata: None,
+            project_id: None,
         };
         repos.events.insert(&event).await.unwrap();
     }
@@ -184,6 +185,7 @@ async fn test_daily_aggregation_accuracy() {
             duration_secs: Some(7200), // 2h
             is_idle: false,
             metadata: None,
+            project_id: None,
         },
         ActivityEvent {
             id: None,
@@ -198,6 +200,7 @@ async fn test_daily_aggregation_accuracy() {
             duration_secs: Some(3600), // 1h
             is_idle: false,
             metadata: None,
+            project_id: None,
         },
         ActivityEvent {
             id: None,
@@ -212,6 +215,7 @@ async fn test_daily_aggregation_accuracy() {
             duration_secs: Some(1800), // 30m
             is_idle: false,
             metadata: None,
+            project_id: None,
         },
         ActivityEvent {
             id: None,
@@ -226,6 +230,7 @@ async fn test_daily_aggregation_accuracy() {
             duration_secs: Some(1800), // 30m
             is_idle: true,
             metadata: None,
+            project_id: None,
         },
     ];
 
@@ -247,6 +252,7 @@ async fn test_daily_aggregation_accuracy() {
             context_switches: 0,
             focus_depth: None,
             tick_count: 120,
+            dominant_project: None,
         },
         ActivityBucket {
             bucket_start: format!("{}T11:00:00+00:00", date_str),
@@ -261,6 +267,7 @@ async fn test_daily_aggregation_accuracy() {
             context_switches: 1,
             focus_depth: None,
             tick_count: 60,
+            dominant_project: None,
         },
         ActivityBucket {
             bucket_start: format!("{}T12:00:00+00:00", date_str),
@@ -275,6 +282,7 @@ async fn test_daily_aggregation_accuracy() {
             context_switches: 1,
             focus_depth: None,
             tick_count: 30,
+            dominant_project: None,
         },
         ActivityBucket {
             bucket_start: format!("{}T12:30:00+00:00", date_str),
@@ -289,6 +297,7 @@ async fn test_daily_aggregation_accuracy() {
             context_switches: 0,
             focus_depth: None,
             tick_count: 30,
+            dominant_project: None,
         },
     ];
     for bucket in &buckets {
@@ -360,6 +369,7 @@ async fn test_nudge_service_delivers_break_reminder() {
         duration_secs: Some(5400), // exactly 90 min
         is_idle: false,
         metadata: None,
+        project_id: None,
     };
     repos.events.insert(&event).await.unwrap();
 
@@ -433,6 +443,7 @@ async fn test_pattern_analyzer_detects_patterns() {
             context_switches: 30,
             top_apps: vec![],
             top_categories: vec![],
+            top_projects: vec![],
             productivity_score: None,
             ai_summary: None,
             deep_work_blocks: 0,
@@ -555,6 +566,7 @@ async fn test_goal_tracking() {
         metric: GoalMetric::ProductiveHours,
         target_value: 2.0,
         enabled: true,
+        project_id: None,
         created_at: Utc::now(),
     };
     repos.goals.insert(&goal).await.unwrap();
@@ -580,6 +592,7 @@ async fn test_goal_tracking() {
             duration_secs: Some(10800),
             is_idle: false,
             metadata: None,
+            project_id: None,
         })
         .await
         .unwrap();
@@ -616,6 +629,7 @@ async fn test_historical_comparison() {
         context_switches: 20,
         top_apps: vec![],
         top_categories: vec![],
+        top_projects: vec![],
         productivity_score: Some(72.0),
         ai_summary: None,
         deep_work_blocks: 0,
@@ -684,6 +698,7 @@ async fn test_activity_export_csv() {
             duration_secs: Some(3600),
             is_idle: false,
             metadata: None,
+            project_id: None,
         };
         repos.events.insert(&event).await.unwrap();
     }

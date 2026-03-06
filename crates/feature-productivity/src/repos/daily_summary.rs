@@ -65,6 +65,7 @@ impl From<SummaryRow> for DailySummary {
             context_switches: row.context_switches,
             top_apps,
             top_categories,
+            top_projects: vec![],
             productivity_score: row.productivity_score,
             ai_summary: row.ai_summary,
             deep_work_blocks: row.deep_work_blocks,

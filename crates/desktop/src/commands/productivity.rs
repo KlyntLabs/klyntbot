@@ -347,6 +347,7 @@ pub async fn productivity_goal_create(
         metric: gm,
         target_value,
         enabled: true,
+        project_id: None,
         created_at: Utc::now(),
     };
     let id = repos.goals.insert(&goal).await.map_err(map_prod_err)?;

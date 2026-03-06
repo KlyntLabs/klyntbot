@@ -279,6 +279,7 @@ mod tests {
                 duration_secs: Some(540), // 9 min each = 90 min total
                 is_idle: false,
                 metadata: None,
+                project_id: None,
             };
             repos.events.insert(&event).await.unwrap();
         }
@@ -322,6 +323,7 @@ mod tests {
                 duration_secs: Some(540),
                 is_idle: false,
                 metadata: None,
+                project_id: None,
             };
             repos.events.insert(&event).await.unwrap();
         }
@@ -380,6 +382,7 @@ mod tests {
                 duration_secs: Some(3600), // 1 hour each = 9 hours total
                 is_idle: false,
                 metadata: None,
+                project_id: None,
             };
             repos.events.insert(&event).await.unwrap();
         }

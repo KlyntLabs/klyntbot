@@ -11,6 +11,7 @@ struct GoalRow {
     metric: String,
     target_value: f64,
     enabled: bool,
+    project_id: Option<String>,
     created_at: String,
 }
 
@@ -35,6 +36,7 @@ impl From<GoalRow> for ProductivityGoal {
             metric,
             target_value: row.target_value,
             enabled: row.enabled,
+            project_id: row.project_id,
             created_at,
         }
     }
@@ -54,14 +56,15 @@ impl GoalRepo {
         let goal_type = goal.goal_type.to_string();
         let metric = goal.metric.to_string();
         let id = sqlx::query_scalar::<_, i64>(
-            r#"INSERT INTO productivity_goals (goal_type, metric, target_value, enabled)
-               VALUES (?1, ?2, ?3, ?4)
+            r#"INSERT INTO productivity_goals (goal_type, metric, target_value, enabled, project_id)
+               VALUES (?1, ?2, ?3, ?4, ?5)
                RETURNING id"#,
         )
         .bind(&goal_type)
         .bind(&metric)
         .bind(goal.target_value)
         .bind(goal.enabled)
+        .bind(&goal.project_id)
         .fetch_one(&self.pool)
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
@@ -70,7 +73,7 @@ impl GoalRepo {
 
     pub async fn list_enabled(&self) -> common::Result<Vec<ProductivityGoal>> {
         let rows = sqlx::query_as::<_, GoalRow>(
-            r#"SELECT id, goal_type, metric, target_value, enabled, created_at
+            r#"SELECT id, goal_type, metric, target_value, enabled, project_id, created_at
                FROM productivity_goals WHERE enabled = TRUE ORDER BY goal_type, metric"#,
         )
         .fetch_all(&self.pool)

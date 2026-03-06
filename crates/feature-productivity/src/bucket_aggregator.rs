@@ -29,6 +29,7 @@ struct PendingBucket {
     app_counts: HashMap<String, i64>,
     site_counts: HashMap<String, i64>,
     category_counts: HashMap<String, i64>,
+    project_counts: HashMap<String, i64>,
     productive_secs: i64,
     neutral_secs: i64,
     distracting_secs: i64,
@@ -45,6 +46,7 @@ impl PendingBucket {
             app_counts: HashMap::new(),
             site_counts: HashMap::new(),
             category_counts: HashMap::new(),
+            project_counts: HashMap::new(),
             productive_secs: 0,
             neutral_secs: 0,
             distracting_secs: 0,
@@ -79,6 +81,10 @@ impl PendingBucket {
             *self.category_counts.entry(cat.clone()).or_default() += secs;
         }
 
+        if let Some(ref proj) = tick.project_id {
+            *self.project_counts.entry(proj.clone()).or_default() += secs;
+        }
+
         if tick.is_context_switch {
             self.context_switches += 1;
         }
@@ -88,6 +94,7 @@ impl PendingBucket {
         let dominant_app = dominant_key(&self.app_counts);
         let dominant_site = dominant_key(&self.site_counts);
         let dominant_category = dominant_key(&self.category_counts);
+        let dominant_project = dominant_key(&self.project_counts);
 
         let total_active = self.productive_secs + self.neutral_secs + self.distracting_secs;
         let focus_depth = if total_active > 0 {
@@ -109,6 +116,7 @@ impl PendingBucket {
             context_switches: self.context_switches,
             focus_depth,
             tick_count: self.tick_count,
+            dominant_project,
         }
     }
 }
@@ -237,6 +245,7 @@ mod tests {
             is_idle: false,
             idle_secs: 0.0,
             is_context_switch: false,
+            project_id: None,
         };
         bucket.add_tick(&tick1);
         // Add a second VS Code tick so it becomes dominant over Chrome

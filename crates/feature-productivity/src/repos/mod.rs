@@ -8,6 +8,7 @@ pub mod goal;
 pub mod insight;
 pub mod learned_rule;
 pub mod nudge;
+pub mod project;
 pub mod time_entry;
 
 pub use activity_category::ActivityCategoryRepo;
@@ -20,6 +21,7 @@ pub use goal::GoalRepo;
 pub use insight::InsightRepo;
 pub use learned_rule::LearnedRuleRepo;
 pub use nudge::NudgeRepo;
+pub use project::ProjectRepo;
 pub use time_entry::TimeEntryRepo;
 
 /// Aggregate access to all productivity repos.
@@ -36,6 +38,7 @@ pub struct ProductivityRepos {
     pub buckets: BucketRepo,
     pub distraction_patterns: DistractionPatternRepo,
     pub insights: InsightRepo,
+    pub projects: ProjectRepo,
 }
 
 impl ProductivityRepos {
@@ -51,7 +54,8 @@ impl ProductivityRepos {
             learned_rules: LearnedRuleRepo::new(pool.clone()),
             buckets: BucketRepo::new(pool.clone()),
             distraction_patterns: DistractionPatternRepo::new(pool.clone()),
-            insights: InsightRepo::new(pool),
+            insights: InsightRepo::new(pool.clone()),
+            projects: ProjectRepo::new(pool),
         }
     }
 }

@@ -14,8 +14,8 @@ impl BucketRepo {
 
     pub async fn upsert(&self, bucket: &ActivityBucket) -> common::Result<()> {
         sqlx::query(
-            r#"INSERT INTO activity_buckets (bucket_start, date, dominant_app, dominant_site, dominant_category, productive_secs, neutral_secs, distracting_secs, idle_secs, context_switches, focus_depth, tick_count)
-               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+            r#"INSERT INTO activity_buckets (bucket_start, date, dominant_app, dominant_site, dominant_category, productive_secs, neutral_secs, distracting_secs, idle_secs, context_switches, focus_depth, tick_count, dominant_project)
+               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
                ON CONFLICT(bucket_start) DO UPDATE SET
                    dominant_app = excluded.dominant_app,
                    dominant_site = excluded.dominant_site,
@@ -26,7 +26,8 @@ impl BucketRepo {
                    idle_secs = excluded.idle_secs,
                    context_switches = excluded.context_switches,
                    focus_depth = excluded.focus_depth,
-                   tick_count = excluded.tick_count"#,
+                   tick_count = excluded.tick_count,
+                   dominant_project = excluded.dominant_project"#,
         )
         .bind(&bucket.bucket_start)
         .bind(&bucket.date)
@@ -40,6 +41,7 @@ impl BucketRepo {
         .bind(bucket.context_switches)
         .bind(bucket.focus_depth)
         .bind(bucket.tick_count)
+        .bind(&bucket.dominant_project)
         .execute(&self.pool)
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
@@ -54,7 +56,7 @@ impl BucketRepo {
         let rows = sqlx::query_as::<_, ActivityBucket>(
             r#"SELECT bucket_start, date, dominant_app, dominant_site, dominant_category,
                       productive_secs, neutral_secs, distracting_secs, idle_secs,
-                      context_switches, focus_depth, tick_count
+                      context_switches, focus_depth, tick_count, dominant_project
                FROM activity_buckets
                WHERE date >= ?1 AND date <= ?2
                ORDER BY bucket_start ASC"#,
@@ -139,6 +141,7 @@ mod tests {
             context_switches: 2,
             focus_depth: Some(0.8),
             tick_count: 60,
+            dominant_project: None,
         };
 
         repo.upsert(&bucket).await.unwrap();
@@ -167,6 +170,7 @@ mod tests {
             context_switches: 0,
             focus_depth: None,
             tick_count: 20,
+            dominant_project: None,
         };
 
         repo.upsert(&bucket).await.unwrap();
@@ -204,6 +208,7 @@ mod tests {
                 context_switches: 2,
                 focus_depth: None,
                 tick_count: 60,
+                dominant_project: None,
             };
             repo.upsert(&bucket).await.unwrap();
         }
@@ -235,6 +240,7 @@ mod tests {
                 context_switches: 0,
                 focus_depth: None,
                 tick_count: 20,
+                dominant_project: None,
             };
             repo.upsert(&bucket).await.unwrap();
         }

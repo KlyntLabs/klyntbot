@@ -178,6 +178,7 @@ impl ActivityTracker {
                                     is_idle,
                                     idle_secs,
                                     is_context_switch,
+                                    project_id: None,
                                 };
 
                                 // Update previous state

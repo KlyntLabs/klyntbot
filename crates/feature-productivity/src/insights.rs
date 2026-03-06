@@ -394,6 +394,7 @@ mod tests {
             context_switches: 20,
             top_apps: vec![],
             top_categories: vec![],
+            top_projects: vec![],
             productivity_score: Some(score),
             ai_summary: None,
             deep_work_blocks,

@@ -1145,6 +1145,7 @@ async fn dispatch(
                 metric: gm,
                 target_value,
                 enabled: true,
+                project_id: None,
                 created_at: Utc::now(),
             };
             match repos.goals.insert(&goal).await {

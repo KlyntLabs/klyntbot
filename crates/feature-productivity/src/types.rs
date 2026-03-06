@@ -1,6 +1,27 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProductivityProject {
+    pub id: String,
+    pub display_name: String,
+    pub path: String,
+    pub url_patterns: Vec<String>,
+    pub color: Option<String>,
+    pub is_auto_detected: bool,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectUsage {
+    pub project_id: Option<String>,
+    pub display_name: String,
+    pub duration_secs: i64,
+    pub color: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 #[serde(rename_all = "camelCase")]
 pub struct ActivityEvent {
@@ -16,6 +37,7 @@ pub struct ActivityEvent {
     pub duration_secs: Option<i64>,
     pub is_idle: bool,
     pub metadata: Option<String>,
+    pub project_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -146,6 +168,7 @@ pub struct DailySummary {
     pub context_switches: i64,
     pub top_apps: Vec<AppUsage>,
     pub top_categories: Vec<CategoryUsage>,
+    pub top_projects: Vec<ProjectUsage>,
     pub productivity_score: Option<f64>,
     pub ai_summary: Option<String>,
     pub deep_work_blocks: i64,
@@ -306,6 +329,7 @@ pub struct ProductivityGoal {
     pub metric: GoalMetric,
     pub target_value: f64,
     pub enabled: bool,
+    pub project_id: Option<String>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -341,6 +365,7 @@ pub struct ActivityTick {
     pub is_idle: bool,
     pub idle_secs: f64,
     pub is_context_switch: bool,
+    pub project_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -490,6 +515,7 @@ pub struct ActivityBucket {
     pub context_switches: i64,
     pub focus_depth: Option<f64>,
     pub tick_count: i64,
+    pub dominant_project: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

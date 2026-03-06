@@ -315,6 +315,7 @@ impl ProductivityTool {
             metric,
             target_value: target,
             enabled: true,
+            project_id: None,
             created_at: Utc::now(),
         };
         let id = self.repos.goals.insert(&goal).await?;

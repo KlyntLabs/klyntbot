@@ -87,6 +87,7 @@ impl ScoreWindow {
             context_switches: 0,
             top_apps: vec![],
             top_categories: vec![],
+            top_projects: vec![],
             productivity_score: None,
             ai_summary: None,
             deep_work_blocks: 0,

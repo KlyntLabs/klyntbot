@@ -167,6 +167,7 @@ impl DailyAggregator {
             context_switches,
             top_apps,
             top_categories,
+            top_projects: vec![],
             productivity_score: None,
             ai_summary: None,
             deep_work_blocks,
@@ -337,6 +338,7 @@ mod tests {
             duration_secs: Some(3600),
             is_idle: false,
             metadata: None,
+            project_id: None,
         };
         repos.events.insert(&event).await.unwrap();
 
@@ -389,6 +391,7 @@ mod tests {
                 duration_secs: Some(*secs),
                 is_idle: false,
                 metadata: None,
+                project_id: None,
             };
             repos.events.insert(&event).await.unwrap();
         }
@@ -427,6 +430,7 @@ mod tests {
                 duration_secs: Some(10800),
                 is_idle: false,
                 metadata: None,
+                project_id: None,
             })
             .await
             .unwrap();
@@ -447,6 +451,7 @@ mod tests {
                 duration_secs: Some(3600),
                 is_idle: false,
                 metadata: None,
+                project_id: None,
             })
             .await
             .unwrap();
