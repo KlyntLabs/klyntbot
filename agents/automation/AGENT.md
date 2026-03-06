@@ -2,6 +2,7 @@
 name: automation
 description: Automation and scheduling specialist
 tools: [cron, spawn, ask_user, memory]
+mcp_tools: []
 triggers: [cron, schedule, reminder, remind me, recurring, every day, every hour, every minute, set up recurring, automate, automation]
 max_iterations: 10
 can_delegate_to: []

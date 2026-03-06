@@ -2,6 +2,7 @@
 name: communication
 description: Cross-channel messaging specialist
 tools: [message, ask_user, memory]
+mcp_tools: []
 triggers: [message, send, notify, tell, dm, ping, broadcast, announce]
 max_iterations: 10
 can_delegate_to: []

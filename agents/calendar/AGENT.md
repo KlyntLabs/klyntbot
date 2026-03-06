@@ -2,6 +2,7 @@
 name: calendar
 description: Calendar and scheduling specialist
 tools: [calendar, task, ask_user, memory]
+mcp_tools: []
 triggers: [calendar, schedule, event, meeting, appointment, when, free time, busy, availability, reschedule, cancel event]
 max_iterations: 10
 can_delegate_to: [task]

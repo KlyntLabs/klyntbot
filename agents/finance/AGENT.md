@@ -2,6 +2,7 @@
 name: finance
 description: Personal finance management specialist
 tools: [finance, ask_user, memory, web_search, web_fetch]
+mcp_tools: []
 triggers: [finance, money, budget, spending, investment, savings, net worth, account, transaction, portfolio, goal, FIRE, net_worth, price, crypto]
 max_iterations: 10
 can_delegate_to: [task]
