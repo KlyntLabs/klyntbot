@@ -20,6 +20,16 @@ impl NotesFeature {
     pub fn migration_sql() -> &'static str {
         include_str!("../migrations/001_create_notes.sql")
     }
+
+    pub fn migrations_static() -> Vec<FeatureMigration> {
+        vec![FeatureMigration {
+            feature_name: "notes".to_string(),
+            version: 1,
+            description: "Create notes core tables (notebooks, notes, tags, links, versions)"
+                .to_string(),
+            sql: Self::migration_sql().to_string(),
+        }]
+    }
 }
 
 #[async_trait]
@@ -33,13 +43,7 @@ impl FeaturePackage for NotesFeature {
     }
 
     fn migrations(&self) -> Vec<FeatureMigration> {
-        vec![FeatureMigration {
-            feature_name: "notes".to_string(),
-            version: 1,
-            description: "Create notes core tables (notebooks, notes, tags, links, versions)"
-                .to_string(),
-            sql: Self::migration_sql().to_string(),
-        }]
+        Self::migrations_static()
     }
 
     fn config_key(&self) -> &str {

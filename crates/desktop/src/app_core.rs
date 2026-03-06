@@ -11,6 +11,7 @@ use channels::ChannelManager;
 use common::FormResponse;
 use desktop_shared::errors::ApiError;
 use desktop_shared::events;
+use feature_notes::repo::NoteRepo;
 use feature_productivity::dashboard_emitter::{DashboardEmitter, DashboardEvent};
 use feature_productivity::repos::ProductivityRepos;
 use feature_productivity::{DailyAggregator, FocusManager, NudgeService, ProductivityEngine};
@@ -40,6 +41,8 @@ pub struct AppCore {
     /// because the ask_user tool blocks the agent loop until answered.
     pub pending_interactions:
         Arc<dashmap::DashMap<String, (String, oneshot::Sender<FormResponse>)>>,
+    /// Notes repo (always available).
+    pub note_repo: NoteRepo,
     /// Productivity repos (None if feature is disabled or no pool).
     productivity_repos: Option<ProductivityRepos>,
     /// Focus session manager (None if feature is disabled or no pool).
@@ -78,6 +81,16 @@ impl AppCore {
         let repos = Repos::from_pool(&storage_pool);
         let vector_store = VectorStore::connect(&data_dir).await.ok();
         info!("storage connected");
+
+        // Run notes feature migrations and create repo.
+        let notes_pool = storage_pool.inner().clone();
+        StoragePool::run_feature_migrations(
+            &notes_pool,
+            &feature_notes::NotesFeature::migrations_static(),
+        )
+        .await
+        .map_err(|e| format!("notes migration failed: {e}"))?;
+        let note_repo = NoteRepo::new(notes_pool);
 
         // 3. Create LLM provider
         let (provider, resolved_model) = providers::create_provider(&config)
@@ -321,6 +334,7 @@ impl AppCore {
             shutdown_token: shutdown_token.clone(),
             active_streams: Arc::new(dashmap::DashMap::new()),
             pending_interactions: Arc::new(dashmap::DashMap::new()),
+            note_repo,
             productivity_repos,
             focus_manager,
             productivity_engine,

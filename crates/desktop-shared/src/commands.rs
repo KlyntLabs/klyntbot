@@ -504,6 +504,63 @@ pub struct LearnedRuleResponse {
     pub created_at: String,
 }
 
+// ── Notes ──────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteResponse {
+    pub id: String,
+    pub notebook_id: Option<String>,
+    pub title: String,
+    pub body: String,
+    pub body_html: Option<String>,
+    pub pinned: bool,
+    pub archived: bool,
+    pub tags: Vec<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteCreateParams {
+    pub title: String,
+    pub notebook_id: Option<String>,
+    pub body: Option<String>,
+    pub tags: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteUpdateParams {
+    pub id: String,
+    pub title: Option<String>,
+    pub body: Option<String>,
+    pub body_html: Option<String>,
+    pub pinned: Option<bool>,
+    pub notebook_id: Option<String>,
+    pub tags: Option<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NotebookResponse {
+    pub id: String,
+    pub parent_id: Option<String>,
+    pub title: String,
+    pub icon: Option<String>,
+    pub sort_order: i32,
+    pub note_count: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NotebookCreateParams {
+    pub title: String,
+    pub parent_id: Option<String>,
+    pub icon: Option<String>,
+}
+
 // ── Key Result Params ──────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -203,6 +203,19 @@ impl NoteRepo {
         Ok(row)
     }
 
+    pub async fn count_notes_in_notebook(
+        &self,
+        notebook_id: &str,
+    ) -> Result<i64, StorageError> {
+        let count: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM notes WHERE notebook_id = ?1 AND archived = 0",
+        )
+        .bind(notebook_id)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(count.0)
+    }
+
     pub async fn delete_notebook(&self, id: &str) -> Result<bool, StorageError> {
         let result = sqlx::query("DELETE FROM notebooks WHERE id = ?1")
             .bind(id)

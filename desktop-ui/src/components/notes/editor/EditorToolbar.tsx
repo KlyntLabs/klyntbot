@@ -1,0 +1,207 @@
+import type { Editor } from "@tiptap/react";
+import {
+  AlignCenter,
+  AlignLeft,
+  AlignRight,
+  Bold,
+  Code,
+  Heading1,
+  Heading2,
+  Heading3,
+  Highlighter,
+  ImageIcon,
+  Italic,
+  Link,
+  List,
+  ListChecks,
+  ListOrdered,
+  Minus,
+  Quote,
+  Strikethrough,
+  Table,
+  Underline as UnderlineIcon,
+} from "lucide-react";
+
+interface EditorToolbarProps {
+  editor: Editor | null;
+}
+
+interface ToolbarButton {
+  icon: typeof Bold;
+  label: string;
+  action: (editor: Editor) => void;
+  isActive?: (editor: Editor) => boolean;
+}
+
+const groups: ToolbarButton[][] = [
+  [
+    {
+      icon: Bold,
+      label: "Bold",
+      action: (e) => e.chain().focus().toggleBold().run(),
+      isActive: (e) => e.isActive("bold"),
+    },
+    {
+      icon: Italic,
+      label: "Italic",
+      action: (e) => e.chain().focus().toggleItalic().run(),
+      isActive: (e) => e.isActive("italic"),
+    },
+    {
+      icon: UnderlineIcon,
+      label: "Underline",
+      action: (e) => e.chain().focus().toggleUnderline().run(),
+      isActive: (e) => e.isActive("underline"),
+    },
+    {
+      icon: Strikethrough,
+      label: "Strikethrough",
+      action: (e) => e.chain().focus().toggleStrike().run(),
+      isActive: (e) => e.isActive("strike"),
+    },
+    {
+      icon: Code,
+      label: "Inline code",
+      action: (e) => e.chain().focus().toggleCode().run(),
+      isActive: (e) => e.isActive("code"),
+    },
+    {
+      icon: Highlighter,
+      label: "Highlight",
+      action: (e) => e.chain().focus().toggleHighlight().run(),
+      isActive: (e) => e.isActive("highlight"),
+    },
+  ],
+  [
+    {
+      icon: Heading1,
+      label: "Heading 1",
+      action: (e) => e.chain().focus().toggleHeading({ level: 1 }).run(),
+      isActive: (e) => e.isActive("heading", { level: 1 }),
+    },
+    {
+      icon: Heading2,
+      label: "Heading 2",
+      action: (e) => e.chain().focus().toggleHeading({ level: 2 }).run(),
+      isActive: (e) => e.isActive("heading", { level: 2 }),
+    },
+    {
+      icon: Heading3,
+      label: "Heading 3",
+      action: (e) => e.chain().focus().toggleHeading({ level: 3 }).run(),
+      isActive: (e) => e.isActive("heading", { level: 3 }),
+    },
+  ],
+  [
+    {
+      icon: List,
+      label: "Bullet list",
+      action: (e) => e.chain().focus().toggleBulletList().run(),
+      isActive: (e) => e.isActive("bulletList"),
+    },
+    {
+      icon: ListOrdered,
+      label: "Ordered list",
+      action: (e) => e.chain().focus().toggleOrderedList().run(),
+      isActive: (e) => e.isActive("orderedList"),
+    },
+    {
+      icon: ListChecks,
+      label: "Task list",
+      action: (e) => e.chain().focus().toggleTaskList().run(),
+      isActive: (e) => e.isActive("taskList"),
+    },
+    {
+      icon: Quote,
+      label: "Blockquote",
+      action: (e) => e.chain().focus().toggleBlockquote().run(),
+      isActive: (e) => e.isActive("blockquote"),
+    },
+    {
+      icon: Minus,
+      label: "Horizontal rule",
+      action: (e) => e.chain().focus().setHorizontalRule().run(),
+    },
+  ],
+  [
+    {
+      icon: Table,
+      label: "Insert table",
+      action: (e) => e.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
+    },
+    {
+      icon: Link,
+      label: "Link",
+      action: (e) => {
+        if (e.isActive("link")) {
+          e.chain().focus().unsetLink().run();
+          return;
+        }
+        const url = window.prompt("URL:");
+        if (url) e.chain().focus().setLink({ href: url }).run();
+      },
+      isActive: (e) => e.isActive("link"),
+    },
+    {
+      icon: ImageIcon,
+      label: "Image",
+      action: (e) => {
+        const url = window.prompt("Image URL:");
+        if (url) e.chain().focus().setImage({ src: url }).run();
+      },
+    },
+  ],
+  [
+    {
+      icon: AlignLeft,
+      label: "Align left",
+      action: (e) => e.chain().focus().setTextAlign("left").run(),
+      isActive: (e) => e.isActive({ textAlign: "left" }),
+    },
+    {
+      icon: AlignCenter,
+      label: "Align center",
+      action: (e) => e.chain().focus().setTextAlign("center").run(),
+      isActive: (e) => e.isActive({ textAlign: "center" }),
+    },
+    {
+      icon: AlignRight,
+      label: "Align right",
+      action: (e) => e.chain().focus().setTextAlign("right").run(),
+      isActive: (e) => e.isActive({ textAlign: "right" }),
+    },
+  ],
+];
+
+export function EditorToolbar({ editor }: EditorToolbarProps) {
+  if (!editor) return null;
+
+  return (
+    <div className="flex items-center gap-0.5 flex-wrap">
+      {groups.map((group, gi) => (
+        <div key={gi} className="flex items-center gap-0.5">
+          {gi > 0 && <div className="w-px h-4 bg-border mx-1" />}
+          {group.map((btn) => {
+            const Icon = btn.icon;
+            const active = btn.isActive?.(editor) ?? false;
+            return (
+              <button
+                key={btn.label}
+                type="button"
+                onClick={() => btn.action(editor)}
+                title={btn.label}
+                className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors ${
+                  active
+                    ? "bg-white/[0.1] text-brand"
+                    : "text-muted hover:text-primary hover:bg-white/[0.06]"
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" strokeWidth={1.5} />
+              </button>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}

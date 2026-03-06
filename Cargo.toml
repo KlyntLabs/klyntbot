@@ -52,6 +52,7 @@ storage = { path = "crates/storage" }
 tools-core = { path = "crates/tools-core" }
 tools-core-macros = { path = "crates/tools-core-macros" }
 feature-finance = { path = "crates/feature-finance" }
+feature-notes = { path = "crates/feature-notes" }
 feature-todo = { path = "crates/feature-todo" }
 feature-productivity = { path = "crates/feature-productivity" }
 plugin-runtime = { path = "crates/plugin-runtime" }

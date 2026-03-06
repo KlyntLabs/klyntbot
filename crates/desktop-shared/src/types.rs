@@ -53,6 +53,8 @@ pub enum EntityKind {
     KeyResult,
     FocusSession,
     Productivity,
+    Note,
+    Notebook,
 }
 
 impl EntityKind {
@@ -66,6 +68,8 @@ impl EntityKind {
             "key_result" | "keyresult" => Some(Self::KeyResult),
             "focus_session" | "focussession" => Some(Self::FocusSession),
             "productivity" => Some(Self::Productivity),
+            "note" => Some(Self::Note),
+            "notebook" => Some(Self::Notebook),
             _ => None,
         }
     }

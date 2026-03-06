@@ -30,6 +30,7 @@ const ProductivityMonthPage = lazy(() =>
     default: m.ProductivityMonthPage,
   })),
 );
+const NotesView = lazy(() => import("./components/notes/NotesView"));
 const Finance = lazy(() =>
   import("./components/views/Finance").then((m) => ({ default: m.Finance })),
 );
@@ -108,6 +109,7 @@ function ProductivityRedirect() {
 const router = createHashRouter([
   { path: "/", element: <MainApp /> },
   { path: "/chat", element: <Chat /> },
+  { path: "/notes", element: <NotesView /> },
   { path: "/project/:id", element: <ProjectDetail /> },
   { path: "/task/:id", element: <TaskDetail /> },
   { path: "/objective/:id", element: <ObjectiveDetail /> },
