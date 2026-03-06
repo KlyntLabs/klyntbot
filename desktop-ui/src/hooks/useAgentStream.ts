@@ -24,6 +24,27 @@ import type {
 import { isTauri, qualifiedToolName } from "../lib/utils";
 import { useEvent } from "./useEvent";
 
+/** All SSE event names the dev-api server emits — used to bridge SSE → CustomEvent in browser mode. */
+const SSE_AGENT_EVENTS = [
+  "agent:content_chunk",
+  "agent:tool_start",
+  "agent:tool_end",
+  "agent:done",
+  "agent:error",
+  "agent:classification_complete",
+  "agent:execution_started",
+  "agent:iteration_start",
+  "agent:usage_report",
+  "agent:memory_access",
+  "agent:skill_loaded",
+  "agent:learning_event",
+  "agent:agent_selected",
+  "agent:subagent_spawned",
+  "agent:delegation_started",
+  "agent:delegation_completed",
+  "agent:interaction_request",
+] as const;
+
 interface AgentStream {
   segments: MessageSegment[];
   isStreaming: boolean;
@@ -113,21 +134,45 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
   const isOurSession = (payload: { sessionKey: string }) =>
     sessionKeyRef.current !== "" && payload.sessionKey === sessionKeyRef.current;
 
+  // SSE EventSource ref for browser mode
+  const eventSourceRef = useRef<EventSource | null>(null);
+
   const startStreaming = useCallback(() => {
     resetStream();
     setIsStreaming(true);
 
-    // Simulate in browser dev mode (no Tauri events available)
-    if (!isTauri) {
-      setTimeout(() => {
-        setSegments([
-          { type: "text", content: "Running in browser dev mode — streaming is simulated." },
-        ]);
-      }, 500);
-      setTimeout(() => {
-        resetStream();
-        onDoneRef.current?.();
-      }, 2000);
+    // In browser dev mode, connect to SSE endpoint and dispatch as CustomEvents
+    // so the existing useEvent listeners pick them up.
+    if (!isTauri && sessionKeyRef.current) {
+      // Close any previous connection
+      eventSourceRef.current?.close();
+
+      const es = new EventSource(`/api/events/${encodeURIComponent(sessionKeyRef.current)}`);
+      eventSourceRef.current = es;
+
+      for (const eventName of SSE_AGENT_EVENTS) {
+        es.addEventListener(eventName, (e: MessageEvent) => {
+          try {
+            const payload = JSON.parse(e.data);
+            window.dispatchEvent(new CustomEvent(eventName, { detail: payload }));
+          } catch {
+            // skip malformed events
+          }
+        });
+      }
+
+      // Close on terminal events (done/error will be handled by useEvent listeners)
+      const closeOnTerminal = () => {
+        es.close();
+        eventSourceRef.current = null;
+      };
+      es.addEventListener("agent:done", closeOnTerminal);
+      es.addEventListener("agent:error", closeOnTerminal);
+
+      es.onerror = () => {
+        es.close();
+        eventSourceRef.current = null;
+      };
     }
   }, [resetStream]);
 
@@ -362,8 +407,14 @@ export function useAgentStream(sessionKey: string, onDone?: () => void): AgentSt
 
   const clearTransparency = useCallback(() => setTransparency(null), []);
 
-  // Cleanup rAF on unmount
-  useEffect(() => cancelRaf, [cancelRaf]);
+  // Cleanup rAF and SSE on unmount
+  useEffect(() => {
+    return () => {
+      cancelRaf();
+      eventSourceRef.current?.close();
+      eventSourceRef.current = null;
+    };
+  }, [cancelRaf]);
 
   return {
     segments,

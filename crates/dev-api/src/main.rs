@@ -5,33 +5,53 @@
 //! Starts an HTTP server on port 3456 that serves the same data as Tauri commands.
 //! Run `bun run dev` in desktop-ui/ separately, then open localhost:1420 in Chrome.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
+use std::convert::Infallible;
 use std::sync::Arc;
 
 use axum::extract::{Path, State};
 use axum::http::{HeaderValue, Method};
+use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::IntoResponse;
 use axum::routing::post;
 use axum::{Json, Router};
 use chrono::Utc;
 use desktop_shared::commands::*;
 use desktop_shared::errors::ApiError;
+use desktop_shared::events as ev;
 use feature_productivity::distraction::DistractionInterceptor;
 use feature_productivity::repos::ProductivityRepos;
 use feature_productivity::{DailyAggregator, FocusManager};
+use futures_util::stream::Stream;
+use futures_util::StreamExt;
 use serde_json::Value;
 use storage::{ActionFilter, ActionPatch, ProjectFilter, Repos, StoragePool};
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::{Mutex, RwLock, oneshot};
+use tokio_stream::wrappers::UnboundedReceiverStream;
+use tokio_util::sync::CancellationToken;
 use tracing::info;
 
-/// Lightweight app state — just storage, config, and productivity.
+/// App state — storage, config, agent, and productivity.
 struct DevState {
     repos: Repos,
     config: RwLock<config::Config>,
+    agent: Arc<agent::AgentLoop>,
+    /// Active SSE senders keyed by session_key.
+    sse_channels: dashmap::DashMap<String, Vec<tokio::sync::mpsc::UnboundedSender<SseEvent>>>,
+    /// Active stream cancel tokens.
+    active_streams: dashmap::DashMap<String, CancellationToken>,
+    /// Pending ask_user interaction oneshot senders keyed by session_key.
+    pending_interactions: dashmap::DashMap<String, (String, oneshot::Sender<common::FormResponse>)>,
     productivity_repos: Option<ProductivityRepos>,
     focus_manager: Option<Arc<FocusManager>>,
     aggregator: Option<Arc<DailyAggregator>>,
     distraction_interceptor: Option<Arc<Mutex<DistractionInterceptor>>>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+struct SseEvent {
+    event: String,
+    data: serde_json::Value,
 }
 
 impl DevState {
@@ -67,20 +87,52 @@ async fn main() {
     tracing_subscriber::fmt::init();
 
     // 1. Load config
-    let config = config::load_with_env_overrides()
+    let mut config = config::load_with_env_overrides()
         .await
         .expect("failed to load config");
     info!(path = ?config::config_path(), "configuration loaded");
 
     // 2. Connect storage (read/write to the same DB as the desktop app)
     let data_dir = config.data_dir_path();
+    std::fs::create_dir_all(&data_dir).expect("failed to create data dir");
     let pool = StoragePool::connect(&data_dir)
         .await
         .expect("failed to connect storage");
     let repos = Repos::from_pool(&pool);
     info!("storage connected");
 
-    // 3. Initialize productivity (optional)
+    // 3. Create LLM provider
+    let (provider, resolved_model) =
+        providers::create_provider(&config).expect("failed to create provider");
+    config.agents.defaults.model = resolved_model;
+    info!(provider = %provider.name(), "LLM provider ready");
+
+    // 4. Message bus
+    let bus = Arc::new(bus::MessageBus::new(100));
+
+    // 5. Cron service
+    let cron_service = scheduling::CronService::new(repos.cron.clone());
+    cron_service.start().await.expect("cron start failed");
+    let cron_service = Arc::new(cron_service);
+
+    // 6. Build AgentLoop
+    let vector_store = storage::VectorStore::connect(&data_dir).await.ok();
+    let mut builder = agent::AgentLoop::builder(bus.clone(), provider, config.clone())
+        .with_pool(pool.inner().clone())
+        .with_cron_service(cron_service.clone());
+
+    if let Some(vs) = vector_store {
+        builder = builder.with_vector_store(vs);
+    }
+
+    let mut agent_loop_raw = builder.build().await.expect("agent build failed");
+    let _inbound_rx = agent_loop_raw
+        .take_inbound_rx()
+        .expect("inbound rx already taken");
+    let agent = Arc::new(agent_loop_raw);
+    info!("agent loop initialized");
+
+    // 7. Initialize productivity (optional)
     let (prod_repos, focus_mgr, aggregator, interceptor) = if config.productivity.enabled {
         let inner = pool.inner().clone();
         match StoragePool::run_feature_migrations(
@@ -114,21 +166,26 @@ async fn main() {
     let state = Arc::new(DevState {
         repos,
         config: RwLock::new(config),
+        agent,
+        sse_channels: dashmap::DashMap::new(),
+        active_streams: dashmap::DashMap::new(),
+        pending_interactions: dashmap::DashMap::new(),
         productivity_repos: prod_repos,
         focus_manager: focus_mgr,
         aggregator,
         distraction_interceptor: interceptor,
     });
 
-    // 4. Build axum router
+    // 8. Build axum router
     let app = Router::new()
+        .route("/api/events/{session_key}", axum::routing::get(events_sse))
         .route("/api/{cmd}", post(dispatch))
         .with_state(state);
 
     let app = app.layer(
         tower_http::cors::CorsLayer::new()
             .allow_origin("http://localhost:1420".parse::<HeaderValue>().unwrap())
-            .allow_methods([Method::POST, Method::OPTIONS])
+            .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
             .allow_headers(tower_http::cors::Any),
     );
 
@@ -138,6 +195,30 @@ async fn main() {
     info!("dev API server listening on http://127.0.0.1:3456");
     info!("open http://localhost:1420 in Chrome to use the UI with real data");
     axum::serve(listener, app).await.unwrap();
+}
+
+// ── SSE endpoint ─────────────────────────────────────────────────────────
+
+async fn events_sse(
+    Path(session_key): Path<String>,
+    State(core): State<AppState>,
+) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+    let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<SseEvent>();
+
+    // Register this SSE sender
+    core.sse_channels
+        .entry(session_key)
+        .or_default()
+        .push(tx);
+
+    let stream = UnboundedReceiverStream::new(rx).map(|sse_event| {
+        Ok(Event::default()
+            .event(sse_event.event)
+            .json_data(sse_event.data)
+            .unwrap_or_else(|_| Event::default()))
+    });
+
+    Sse::new(stream).keep_alive(KeepAlive::default())
 }
 
 // ── Dispatch ──────────────────────────────────────────────────────────────
@@ -1315,7 +1396,497 @@ async fn dispatch(
             ok(serde_json::json!({ "enabled": cfg.mcp.enabled, "servers": servers }))
         }
 
-        // ── Chat (read-only) ──────────────────────────────────
+        // ── Chat ──────────────────────────────────────────────
+        "chat_send" => {
+            let content = match get_str(&body, "content") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let session_key = match get_str(&body, "sessionKey") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+
+            // Ensure session exists
+            let title: String = content.chars().take(60).collect::<String>().trim().to_string();
+            let metadata = serde_json::json!({ "title": title });
+            if let Err(e) = core.repos.sessions.upsert_session(&session_key, &metadata).await {
+                return err(storage_err(e));
+            }
+
+            // Start agent streaming
+            let msg_id = uuid::Uuid::new_v4();
+            let now = chrono::Utc::now();
+            let streaming_handle = match core
+                .agent
+                .process_direct_streaming(content.clone(), session_key.clone())
+                .await
+            {
+                Ok(h) => h,
+                Err(e) => return err(ApiError::new("AGENT_ERROR", e.to_string())),
+            };
+
+            // Track cancel token
+            core.active_streams
+                .insert(session_key.clone(), streaming_handle.cancel_token);
+
+            // Spawn background task to relay AgentEvents -> SSE
+            let sk = session_key.clone();
+            let state = Arc::clone(&core);
+            let mut event_rx = streaming_handle.event_rx;
+            let mut interaction_rx = streaming_handle.interaction_rx;
+
+            tokio::spawn(async move {
+                // Cleanup guard: removes active_streams AND sse_channels on drop (incl. panic)
+                struct StreamGuard {
+                    key: String,
+                    state: Arc<DevState>,
+                }
+                impl Drop for StreamGuard {
+                    fn drop(&mut self) {
+                        self.state.active_streams.remove(&self.key);
+                        self.state.sse_channels.remove(&self.key);
+                        // Cancel any pending interaction to avoid leaking the oneshot
+                        if let Some((_, (_, tx))) = self.state.pending_interactions.remove(&self.key) {
+                            let _ = tx.send(common::FormResponse::Cancelled);
+                        }
+                    }
+                }
+                let _guard = StreamGuard {
+                    key: sk.clone(),
+                    state: Arc::clone(&state),
+                };
+
+                // Segment + transparency accumulation
+                let mut segments: Vec<desktop_shared::events::MessageSegment> = Vec::new();
+                let mut transparency = desktop_shared::events::TransparencyData::default();
+                let mut current_text = String::new();
+                let mut pending_actions: HashMap<String, VecDeque<String>> = HashMap::new();
+                let mut tool_token_sum: u32 = 0;
+
+                let flush_text =
+                    |text: &mut String,
+                     segs: &mut Vec<desktop_shared::events::MessageSegment>| {
+                        if !text.is_empty() {
+                            segs.push(desktop_shared::events::MessageSegment::Text {
+                                content: std::mem::take(text),
+                            });
+                        }
+                    };
+
+                // Helper to send SSE event to all connected clients for this session.
+                // Retains only live senders.
+                let send_sse =
+                    |event_name: &str, data: serde_json::Value| {
+                        if let Some(mut senders) = state.sse_channels.get_mut(&sk) {
+                            let sse_event = SseEvent {
+                                event: event_name.to_string(),
+                                data,
+                            };
+                            senders.retain(|tx| tx.send(sse_event.clone()).is_ok());
+                        }
+                    };
+
+                loop {
+                    let event = tokio::select! {
+                        biased;
+                        Some(bundle) = interaction_rx.recv() => {
+                            let request_id = uuid::Uuid::new_v4().to_string();
+                            send_sse(ev::AGENT_INTERACTION_REQUEST, serde_json::json!({
+                                "sessionKey": sk,
+                                "requestId": request_id,
+                                "request": bundle.request,
+                            }));
+                            state.pending_interactions.insert(sk.clone(), (request_id, bundle.response_tx));
+                            continue;
+                        }
+                        Some(event) = event_rx.recv() => event,
+                        else => break,
+                    };
+                    match event {
+                        agent::AgentEvent::ContentChunk { data } => {
+                            current_text.push_str(&data);
+                            send_sse(ev::AGENT_CONTENT_CHUNK, serde_json::json!({
+                                "sessionKey": sk,
+                                "data": data,
+                            }));
+                        }
+                        agent::AgentEvent::ToolStart { name, args, agent: agent_name } => {
+                            flush_text(&mut current_text, &mut segments);
+                            let action = args
+                                .get("action")
+                                .and_then(|v| v.as_str())
+                                .map(String::from);
+                            if let Some(ref a) = action {
+                                pending_actions
+                                    .entry(name.clone())
+                                    .or_default()
+                                    .push_back(a.clone());
+                            }
+                            send_sse(ev::AGENT_TOOL_START, serde_json::json!({
+                                "sessionKey": sk,
+                                "name": name,
+                                "action": action,
+                                "agent": agent_name,
+                            }));
+                        }
+                        agent::AgentEvent::ToolEnd {
+                            name,
+                            success,
+                            duration_ms,
+                            result,
+                            agent: agent_name,
+                        } => {
+                            let action = match pending_actions.entry(name.clone()) {
+                                std::collections::hash_map::Entry::Occupied(mut e) => {
+                                    let a = e.get_mut().pop_front();
+                                    if e.get().is_empty() {
+                                        e.remove();
+                                    }
+                                    a
+                                }
+                                std::collections::hash_map::Entry::Vacant(_) => None,
+                            };
+                            let estimated_tokens = result
+                                .as_ref()
+                                .map(|r| (r.len() as u32).saturating_add(3) / 4);
+                            if let Some(t) = estimated_tokens {
+                                tool_token_sum += t;
+                            }
+                            segments.push(desktop_shared::events::MessageSegment::Tool {
+                                name: name.clone(),
+                                action: action.clone(),
+                                success,
+                                duration_ms,
+                                result: result.clone(),
+                                estimated_tokens,
+                                agent: agent_name.clone(),
+                            });
+                            transparency
+                                .tools
+                                .push(desktop_shared::events::TransparencyTool {
+                                    name: name.clone(),
+                                    action: action.clone(),
+                                    success,
+                                    duration_ms,
+                                    estimated_tokens,
+                                    agent: agent_name.clone(),
+                                });
+                            send_sse(ev::AGENT_TOOL_END, serde_json::json!({
+                                "sessionKey": sk,
+                                "name": name,
+                                "action": action,
+                                "success": success,
+                                "durationMs": duration_ms,
+                                "result": result,
+                                "estimatedTokens": estimated_tokens,
+                                "agent": agent_name,
+                            }));
+                        }
+                        agent::AgentEvent::Done { content } => {
+                            flush_text(&mut current_text, &mut segments);
+                            if tool_token_sum > 0 {
+                                transparency.tool_tokens_total = Some(tool_token_sum);
+                            }
+                            // Persist segments + transparency metadata
+                            let mut meta = serde_json::Map::new();
+                            if !segments.is_empty() {
+                                meta.insert(
+                                    "segments".into(),
+                                    serde_json::to_value(&segments).unwrap_or_default(),
+                                );
+                            }
+                            meta.insert(
+                                "transparency".into(),
+                                serde_json::to_value(&transparency).unwrap_or_default(),
+                            );
+                            let meta_value = serde_json::Value::Object(meta);
+                            let _ = state.repos
+                                .sessions
+                                .update_last_assistant_metadata(&sk, None, Some(&meta_value))
+                                .await;
+
+                            send_sse(ev::AGENT_DONE, serde_json::json!({
+                                "sessionKey": sk,
+                                "content": content,
+                            }));
+                            break;
+                        }
+                        agent::AgentEvent::Error { message } => {
+                            send_sse(ev::AGENT_ERROR, serde_json::json!({
+                                "sessionKey": sk,
+                                "message": message,
+                            }));
+                            break;
+                        }
+                        agent::AgentEvent::ClassificationComplete {
+                            strategy,
+                            confidence,
+                            source,
+                            ..
+                        } => {
+                            send_sse(
+                                ev::AGENT_CLASSIFICATION_COMPLETE,
+                                serde_json::json!({
+                                    "sessionKey": sk,
+                                    "strategy": strategy,
+                                    "confidence": confidence,
+                                    "source": source,
+                                }),
+                            );
+                        }
+                        agent::AgentEvent::ExecutionStarted {
+                            engine,
+                            max_iterations,
+                        } => {
+                            send_sse(
+                                ev::AGENT_EXECUTION_STARTED,
+                                serde_json::json!({
+                                    "sessionKey": sk,
+                                    "engine": engine,
+                                    "maxIterations": max_iterations,
+                                }),
+                            );
+                        }
+                        agent::AgentEvent::IterationStart { iteration, max } => {
+                            send_sse(
+                                ev::AGENT_ITERATION_START,
+                                serde_json::json!({
+                                    "sessionKey": sk,
+                                    "iteration": iteration,
+                                    "maxIterations": max,
+                                }),
+                            );
+                        }
+                        agent::AgentEvent::UsageReport {
+                            prompt_tokens,
+                            completion_tokens,
+                            cache_read_tokens,
+                            cache_write_tokens,
+                            estimated_cost_usd,
+                            model,
+                            response_time_ms,
+                        } => {
+                            send_sse(
+                                ev::AGENT_USAGE_REPORT,
+                                serde_json::json!({
+                                    "sessionKey": sk,
+                                    "promptTokens": prompt_tokens,
+                                    "completionTokens": completion_tokens,
+                                    "cacheReadTokens": cache_read_tokens,
+                                    "cacheWriteTokens": cache_write_tokens,
+                                    "estimatedCostUsd": estimated_cost_usd,
+                                    "model": model,
+                                    "responseTimeMs": response_time_ms,
+                                }),
+                            );
+                        }
+                        agent::AgentEvent::AgentSelected { name, description } => {
+                            send_sse(
+                                ev::AGENT_SELECTED,
+                                serde_json::json!({
+                                    "sessionKey": sk,
+                                    "name": name,
+                                    "description": description,
+                                }),
+                            );
+                        }
+                        agent::AgentEvent::SkillLoaded {
+                            name,
+                            trigger,
+                            agent: agent_name,
+                        } => {
+                            send_sse(
+                                ev::AGENT_SKILL_LOADED,
+                                serde_json::json!({
+                                    "sessionKey": sk,
+                                    "name": name,
+                                    "trigger": trigger,
+                                    "agent": agent_name,
+                                }),
+                            );
+                        }
+                        agent::AgentEvent::MemoryAccess {
+                            action,
+                            query,
+                            results_count,
+                        } => {
+                            send_sse(
+                                ev::AGENT_MEMORY_ACCESS,
+                                serde_json::json!({
+                                    "sessionKey": sk,
+                                    "action": action,
+                                    "query": query,
+                                    "resultsCount": results_count,
+                                }),
+                            );
+                        }
+                        agent::AgentEvent::SubagentSpawned { label, profile } => {
+                            send_sse(
+                                ev::AGENT_SUBAGENT_SPAWNED,
+                                serde_json::json!({
+                                    "sessionKey": sk,
+                                    "label": label,
+                                    "profile": profile,
+                                }),
+                            );
+                        }
+                        agent::AgentEvent::DelegationStarted {
+                            from_agent,
+                            to_agent,
+                            query,
+                            depth,
+                        } => {
+                            send_sse(
+                                ev::AGENT_DELEGATION_STARTED,
+                                serde_json::json!({
+                                    "sessionKey": sk,
+                                    "fromAgent": from_agent,
+                                    "toAgent": to_agent,
+                                    "query": query,
+                                    "depth": depth,
+                                }),
+                            );
+                        }
+                        agent::AgentEvent::DelegationCompleted {
+                            from_agent,
+                            to_agent,
+                            success,
+                            duration_ms,
+                        } => {
+                            send_sse(
+                                ev::AGENT_DELEGATION_COMPLETED,
+                                serde_json::json!({
+                                    "sessionKey": sk,
+                                    "fromAgent": from_agent,
+                                    "toAgent": to_agent,
+                                    "success": success,
+                                    "durationMs": duration_ms,
+                                }),
+                            );
+                        }
+                        agent::AgentEvent::LearningEvent {
+                            event_type,
+                            detail,
+                        } => {
+                            send_sse(
+                                ev::AGENT_LEARNING_EVENT,
+                                serde_json::json!({
+                                    "sessionKey": sk,
+                                    "eventType": event_type,
+                                    "detail": detail,
+                                }),
+                            );
+                        }
+                        // Skip events that have no frontend consumer
+                        _ => {}
+                    }
+                }
+
+                // StreamGuard handles sse_channels + active_streams cleanup on drop
+            });
+
+            // Return user message immediately
+            ok(ChatMessageResponse {
+                id: msg_id.to_string(),
+                role: common::MessageRole::User.to_string(),
+                content,
+                timestamp: now,
+                segments: None,
+                transparency: None,
+            })
+        }
+        "chat_cancel" => {
+            let sk = match get_str(&body, "sessionKey") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            if let Some((_, token)) = core.active_streams.remove(&sk) {
+                token.cancel();
+            }
+            if let Some((_, (_, tx))) = core.pending_interactions.remove(&sk) {
+                let _ = tx.send(common::FormResponse::Cancelled);
+            }
+            ok(())
+        }
+        "chat_respond_interaction" => {
+            let sk = match get_str(&body, "sessionKey") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let request_id = match get_str(&body, "requestId") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let response: common::FormResponse = match body
+                .get("response")
+                .cloned()
+                .ok_or_else(|| ApiError::new("VALIDATION", "missing required field: response"))
+                .and_then(|v| {
+                    serde_json::from_value(v)
+                        .map_err(|e| ApiError::new("VALIDATION", e.to_string()))
+                }) {
+                Ok(r) => r,
+                Err(e) => return err(e),
+            };
+            let (stored_id, sender) = match core.pending_interactions.remove(&sk) {
+                Some((_, pair)) => pair,
+                None => {
+                    return err(ApiError::new(
+                        "NOT_FOUND",
+                        "no pending interaction for this session",
+                    ))
+                }
+            };
+            if stored_id != request_id {
+                return err(ApiError::new(
+                    "INVALID_PARAMS",
+                    format!("request_id mismatch: expected {stored_id}, got {request_id}"),
+                ));
+            }
+            let _ = sender.send(response);
+            ok(())
+        }
+        "chat_delete_thread" => {
+            let sk = match get_str(&body, "sessionKey") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            if let Some((_, token)) = core.active_streams.remove(&sk) {
+                token.cancel();
+            }
+            if let Some((_, (_, tx))) = core.pending_interactions.remove(&sk) {
+                let _ = tx.send(common::FormResponse::Cancelled);
+            }
+            match core.repos.sessions.delete_session(&sk).await {
+                Ok(_) => ok(()),
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "chat_rename_thread" => {
+            let sk = match get_str(&body, "sessionKey") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let title = match get_str(&body, "title") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            match core.repos.sessions.rename_session(&sk, &title).await {
+                Ok(_) => ok(()),
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "chat_pin_thread" => {
+            let sk = match get_str(&body, "sessionKey") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            match core.repos.session_context.pin(&sk).await {
+                Ok(_) => ok(()),
+                Err(e) => err(storage_err(e)),
+            }
+        }
         "chat_threads" => {
             let default_filter = ProjectFilter::default();
             let (sessions, contexts, areas, projects) = tokio::join!(

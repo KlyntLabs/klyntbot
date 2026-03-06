@@ -5,7 +5,7 @@ import type {
   MessageSegment,
   TransparencyData,
 } from "../lib/types";
-import { isTauri } from "../lib/utils";
+import { parseApiError } from "../lib/utils";
 import { useAgentStream } from "./useAgentStream";
 import { ipc } from "./useIpc";
 import { useQuery } from "./useQuery";
@@ -78,16 +78,14 @@ export function useChatSession(sessionKey: string, onDone?: () => void): ChatSes
       setPendingUserMsg(text);
       stream.startStreaming();
 
-      if (!isTauri) return;
-
       try {
         await ipc<ChatMessage>("chat_send", {
           content: text,
           sessionKey,
           ...extraPayload,
         });
-      } catch (e) {
-        stream.failStreaming(String(e));
+      } catch (e: unknown) {
+        stream.failStreaming(parseApiError(e).message);
       }
     },
     [input, sessionKey, stream],
