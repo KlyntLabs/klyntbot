@@ -135,7 +135,7 @@ impl IntentPipeline {
 
         // Step 1: Classify intent
         let classify_start = Instant::now();
-        let analysis = self.analyzer.analyze(message, tool_names).await;
+        let analysis = self.analyzer.analyze(message, tool_names, None).await;
         let classify_ms = classify_start.elapsed().as_millis() as u64;
         debug!(
             "IntentPipeline: classified as {:?} (source: {:?}, confidence: {:.2})",

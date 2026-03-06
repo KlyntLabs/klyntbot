@@ -232,7 +232,7 @@ impl AgentRuntime {
 
         // Step 3: Classify intent
         let classify_start = Instant::now();
-        let mut analysis = self.analyzer.analyze(message, tool_names).await;
+        let mut analysis = self.analyzer.analyze(message, tool_names, Some(profile)).await;
         let classify_ms = classify_start.elapsed().as_millis() as u64;
         debug!(
             "AgentRuntime: classified as {:?} (source: {:?}, confidence: {:.2})",
