@@ -215,7 +215,6 @@ impl ReminderEngine {
         }
         false
     }
-
 }
 
 #[cfg(test)]
@@ -443,5 +442,4 @@ mod tests {
         // Assert
         assert!(!should_remind, "Should not nag if not overdue");
     }
-
 }

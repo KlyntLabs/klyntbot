@@ -361,5 +361,4 @@ mod tests {
             Some(("telegram".to_string(), DetectSource::Config))
         );
     }
-
 }

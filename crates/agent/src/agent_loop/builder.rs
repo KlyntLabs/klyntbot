@@ -56,6 +56,7 @@ pub struct AgentLoopBuilder {
     vector_store: Option<storage::VectorStore>,
     cron_service: Option<Arc<scheduling::CronService>>,
     notification_handle: Option<LastActiveChannel>,
+    domain_event_bus: Option<Arc<bus::DomainEventBus>>,
 }
 
 impl AgentLoopBuilder {
@@ -68,6 +69,7 @@ impl AgentLoopBuilder {
             vector_store: None,
             cron_service: None,
             notification_handle: None,
+            domain_event_bus: None,
         }
     }
 
@@ -88,6 +90,11 @@ impl AgentLoopBuilder {
 
     pub fn with_notification_handle(mut self, handle: LastActiveChannel) -> Self {
         self.notification_handle = Some(handle);
+        self
+    }
+
+    pub fn with_domain_bus(mut self, bus: Arc<bus::DomainEventBus>) -> Self {
+        self.domain_event_bus = Some(bus);
         self
     }
 
@@ -198,6 +205,53 @@ impl AgentLoopBuilder {
             )),
             Box::new(PageContextSource::new(repos.clone())),
         ];
+
+        // Cognitive context source (optional — requires real pool).
+        let cognitive_bg_service: Option<cognitive::background::BackgroundConsolidationService> =
+            if let Some(ref pool) = self.pool {
+                // Run cognitive feature migrations (idempotent)
+                storage::StoragePool::run_feature_migrations(
+                    pool,
+                    &cognitive::cognitive_migrations(),
+                )
+                .await
+                .map_err(|e| {
+                    common::KlyntbotError::Config(common::ConfigError::Invalid(format!(
+                        "Failed to run cognitive migrations: {}",
+                        e
+                    )))
+                })?;
+
+                let fact_repo = cognitive::SemanticFactRepo::new(pool.clone());
+                let rule_repo = cognitive::ProceduralRuleRepo::new(pool.clone());
+                sources.push(Box::new(cognitive::CognitiveContextSource::new(
+                    fact_repo.clone(),
+                    rule_repo,
+                )));
+
+                // Start background consolidation service if we have a DomainEventBus
+                if let Some(ref domain_bus) = self.domain_event_bus {
+                    let event_rx = domain_bus.subscribe();
+                    let extraction: Arc<dyn cognitive::ExtractionHandler> =
+                        Arc::new(crate::cognitive_handlers::HeuristicExtractionHandler);
+                    let consolidation: Arc<dyn cognitive::ConsolidationHandler> =
+                        Arc::new(crate::cognitive_handlers::HeuristicConsolidationHandler);
+                    let cancel = CancellationToken::new();
+                    let bg_service = cognitive::background::BackgroundConsolidationService::start(
+                        event_rx,
+                        extraction,
+                        consolidation,
+                        fact_repo,
+                        cancel.clone(),
+                    );
+                    info!("Cognitive background consolidation service started");
+                    Some(bg_service)
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
 
         // Productivity context source (optional — requires real pool + enabled).
         // prod_repos is stored for reuse by the tool registration block below.
@@ -417,6 +471,11 @@ impl AgentLoopBuilder {
                 ));
             todo_tool = todo_tool.with_progress_handler(Arc::clone(&progress_handler));
 
+            // Wire DomainEventBus for task lifecycle events
+            if let Some(ref domain_bus) = self.domain_event_bus {
+                todo_tool = todo_tool.with_domain_bus(Arc::clone(domain_bus));
+            }
+
             tool_registry.register(todo_tool);
 
             // ── OKR tool (needs same progress handler) ────────────────────
@@ -492,7 +551,7 @@ impl AgentLoopBuilder {
                     ));
 
                 let finance_storage = storage::FinanceStorage::from_pool(pool);
-                let finance_tool = feature_finance::FinanceTool::new(
+                let mut finance_tool = feature_finance::FinanceTool::new(
                     finance_storage,
                     price_service,
                     config.finance.default_currency.clone(),
@@ -500,6 +559,11 @@ impl AgentLoopBuilder {
                 .with_finance_handler(
                     Arc::clone(&finance_handler_impl) as Arc<dyn feature_finance::FinanceHandler>
                 );
+
+                // Wire DomainEventBus for transaction and budget events
+                if let Some(ref domain_bus) = self.domain_event_bus {
+                    finance_tool = finance_tool.with_domain_bus(Arc::clone(domain_bus));
+                }
 
                 tool_registry.register(finance_tool);
             }
@@ -530,10 +594,12 @@ impl AgentLoopBuilder {
                 provider.clone(),
                 config.agents.defaults.model.clone(),
             ));
-            let aggregator = Arc::new(
-                feature_productivity::DailyAggregator::new(prod_repos.clone())
-                    .with_handler(prod_handler),
-            );
+            let mut daily_agg = feature_productivity::DailyAggregator::new(prod_repos.clone())
+                .with_handler(prod_handler);
+            if let Some(ref domain_bus) = self.domain_event_bus {
+                daily_agg = daily_agg.with_domain_bus(Arc::clone(domain_bus));
+            }
+            let aggregator = Arc::new(daily_agg);
             let productivity_tool =
                 feature_productivity::ProductivityTool::new(prod_repos, focus_mgr, aggregator);
             tool_registry.register(productivity_tool);
@@ -868,6 +934,8 @@ impl AgentLoopBuilder {
             _session_cleanup_token: session_cleanup_token,
             _memory_maintenance_token: memory_maintenance_token,
             mcp_manager: tokio::sync::Mutex::new(mcp_manager),
+            _domain_event_bus: self.domain_event_bus,
+            cognitive_bg_service: tokio::sync::Mutex::new(cognitive_bg_service),
         })
     }
 }

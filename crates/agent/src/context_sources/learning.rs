@@ -1,5 +1,10 @@
 //! Learning context source — unified user profile, behavioral patterns, and agent adaptations.
 //!
+//! **DEPRECATED:** Being replaced by `CognitiveContextSource` from the `cognitive` crate,
+//! which provides FSRS-scored semantic facts and procedural rules. This source remains
+//! active for now because it still provides conversation memory and confidence threshold
+//! instructions that the cognitive system does not yet handle.
+//!
 //! Replaces `MemorySource` (priority 80) + `ConfidenceSource` (priority 50) with a single
 //! source that also provides structured user profile data and behavioral patterns.
 
@@ -84,7 +89,9 @@ impl ContextSource for LearningContextSource {
     }
 
     fn priority(&self) -> u8 {
-        60
+        // Lowered from 60 → 55 so CognitiveContextSource (60) takes precedence.
+        // Will be removed once cognitive handles conversation memory + confidence.
+        55
     }
 
     async fn provide(&self, ctx: &SourceContext) -> Option<String> {

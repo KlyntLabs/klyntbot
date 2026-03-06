@@ -174,7 +174,12 @@ impl FinanceTool {
                             "limit": usage.amount,
                             "percentage": percentage,
                         }));
-                        budget_typed = Some((percentage, usage.spent, usage.amount, usage.alert_threshold as i64));
+                        budget_typed = Some((
+                            percentage,
+                            usage.spent,
+                            usage.amount,
+                            usage.alert_threshold as i64,
+                        ));
                         if percentage >= usage.alert_threshold as i64 {
                             nudge = format!(
                                 "\nNote: Your \"{}\" budget is now at {}% ({} / {} {}).",

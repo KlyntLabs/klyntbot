@@ -149,11 +149,12 @@ impl TaskTool {
                 if let Some(ref bus) = self.domain_bus {
                     // Reuse te_rows from the close-open-entries step above
                     let actual_mins = {
-                        let total_secs: i64 = te_rows
-                            .iter()
-                            .filter_map(|e| e.duration_secs)
-                            .sum();
-                        if total_secs > 0 { Some(total_secs / 60) } else { None }
+                        let total_secs: i64 = te_rows.iter().filter_map(|e| e.duration_secs).sum();
+                        if total_secs > 0 {
+                            Some(total_secs / 60)
+                        } else {
+                            None
+                        }
                     };
                     let estimated_mins = action.estimated_minutes.map(|m| m as i64);
                     bus.publish(DomainEvent::TaskCompleted {

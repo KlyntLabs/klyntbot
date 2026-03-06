@@ -406,5 +406,4 @@ mod tests {
     fn test_channel_info_has_telegram() {
         assert!(CHANNEL_INFO.iter().any(|c| c.key == "telegram"));
     }
-
 }

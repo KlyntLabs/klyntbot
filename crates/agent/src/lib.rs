@@ -7,6 +7,7 @@ pub mod agent_profile;
 pub mod agent_runtime;
 pub mod agent_task_handler;
 
+pub mod cognitive_handlers;
 pub mod confidence;
 pub mod context_sources;
 pub mod conversation_embedding_handler;

@@ -109,7 +109,9 @@ pub(crate) fn insight_to_response(c: InsightCard) -> InsightCardResponse {
     }
 }
 
-pub(crate) fn event_to_timeline(e: feature_productivity::types::ActivityEvent) -> ActivityTimelineResponse {
+pub(crate) fn event_to_timeline(
+    e: feature_productivity::types::ActivityEvent,
+) -> ActivityTimelineResponse {
     ActivityTimelineResponse {
         app_name: e.app_name,
         window_title: e.window_title,

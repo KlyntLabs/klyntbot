@@ -26,7 +26,7 @@ use futures_util::stream::Stream;
 use futures_util::StreamExt;
 use serde_json::Value;
 use storage::{ActionFilter, ActionPatch, ProjectFilter, Repos, StoragePool};
-use tokio::sync::{Mutex, RwLock, oneshot};
+use tokio::sync::{oneshot, Mutex, RwLock};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tokio_util::sync::CancellationToken;
 use tracing::info;
@@ -206,10 +206,7 @@ async fn events_sse(
     let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<SseEvent>();
 
     // Register this SSE sender
-    core.sse_channels
-        .entry(session_key)
-        .or_default()
-        .push(tx);
+    core.sse_channels.entry(session_key).or_default().push(tx);
 
     let stream = UnboundedReceiverStream::new(rx).map(|sse_event| {
         Ok(Event::default()
@@ -1408,9 +1405,19 @@ async fn dispatch(
             };
 
             // Ensure session exists
-            let title: String = content.chars().take(60).collect::<String>().trim().to_string();
+            let title: String = content
+                .chars()
+                .take(60)
+                .collect::<String>()
+                .trim()
+                .to_string();
             let metadata = serde_json::json!({ "title": title });
-            if let Err(e) = core.repos.sessions.upsert_session(&session_key, &metadata).await {
+            if let Err(e) = core
+                .repos
+                .sessions
+                .upsert_session(&session_key, &metadata)
+                .await
+            {
                 return err(storage_err(e));
             }
 
@@ -1447,7 +1454,9 @@ async fn dispatch(
                         self.state.active_streams.remove(&self.key);
                         self.state.sse_channels.remove(&self.key);
                         // Cancel any pending interaction to avoid leaking the oneshot
-                        if let Some((_, (_, tx))) = self.state.pending_interactions.remove(&self.key) {
+                        if let Some((_, (_, tx))) =
+                            self.state.pending_interactions.remove(&self.key)
+                        {
                             let _ = tx.send(common::FormResponse::Cancelled);
                         }
                     }
@@ -1465,8 +1474,7 @@ async fn dispatch(
                 let mut tool_token_sum: u32 = 0;
 
                 let flush_text =
-                    |text: &mut String,
-                     segs: &mut Vec<desktop_shared::events::MessageSegment>| {
+                    |text: &mut String, segs: &mut Vec<desktop_shared::events::MessageSegment>| {
                         if !text.is_empty() {
                             segs.push(desktop_shared::events::MessageSegment::Text {
                                 content: std::mem::take(text),
@@ -1476,16 +1484,15 @@ async fn dispatch(
 
                 // Helper to send SSE event to all connected clients for this session.
                 // Retains only live senders.
-                let send_sse =
-                    |event_name: &str, data: serde_json::Value| {
-                        if let Some(mut senders) = state.sse_channels.get_mut(&sk) {
-                            let sse_event = SseEvent {
-                                event: event_name.to_string(),
-                                data,
-                            };
-                            senders.retain(|tx| tx.send(sse_event.clone()).is_ok());
-                        }
-                    };
+                let send_sse = |event_name: &str, data: serde_json::Value| {
+                    if let Some(mut senders) = state.sse_channels.get_mut(&sk) {
+                        let sse_event = SseEvent {
+                            event: event_name.to_string(),
+                            data,
+                        };
+                        senders.retain(|tx| tx.send(sse_event.clone()).is_ok());
+                    }
+                };
 
                 loop {
                     let event = tokio::select! {
@@ -1506,12 +1513,19 @@ async fn dispatch(
                     match event {
                         agent::AgentEvent::ContentChunk { data } => {
                             current_text.push_str(&data);
-                            send_sse(ev::AGENT_CONTENT_CHUNK, serde_json::json!({
-                                "sessionKey": sk,
-                                "data": data,
-                            }));
+                            send_sse(
+                                ev::AGENT_CONTENT_CHUNK,
+                                serde_json::json!({
+                                    "sessionKey": sk,
+                                    "data": data,
+                                }),
+                            );
                         }
-                        agent::AgentEvent::ToolStart { name, args, agent: agent_name } => {
+                        agent::AgentEvent::ToolStart {
+                            name,
+                            args,
+                            agent: agent_name,
+                        } => {
                             flush_text(&mut current_text, &mut segments);
                             let action = args
                                 .get("action")
@@ -1523,12 +1537,15 @@ async fn dispatch(
                                     .or_default()
                                     .push_back(a.clone());
                             }
-                            send_sse(ev::AGENT_TOOL_START, serde_json::json!({
-                                "sessionKey": sk,
-                                "name": name,
-                                "action": action,
-                                "agent": agent_name,
-                            }));
+                            send_sse(
+                                ev::AGENT_TOOL_START,
+                                serde_json::json!({
+                                    "sessionKey": sk,
+                                    "name": name,
+                                    "action": action,
+                                    "agent": agent_name,
+                                }),
+                            );
                         }
                         agent::AgentEvent::ToolEnd {
                             name,
@@ -1572,16 +1589,19 @@ async fn dispatch(
                                     estimated_tokens,
                                     agent: agent_name.clone(),
                                 });
-                            send_sse(ev::AGENT_TOOL_END, serde_json::json!({
-                                "sessionKey": sk,
-                                "name": name,
-                                "action": action,
-                                "success": success,
-                                "durationMs": duration_ms,
-                                "result": result,
-                                "estimatedTokens": estimated_tokens,
-                                "agent": agent_name,
-                            }));
+                            send_sse(
+                                ev::AGENT_TOOL_END,
+                                serde_json::json!({
+                                    "sessionKey": sk,
+                                    "name": name,
+                                    "action": action,
+                                    "success": success,
+                                    "durationMs": duration_ms,
+                                    "result": result,
+                                    "estimatedTokens": estimated_tokens,
+                                    "agent": agent_name,
+                                }),
+                            );
                         }
                         agent::AgentEvent::Done { content } => {
                             flush_text(&mut current_text, &mut segments);
@@ -1601,22 +1621,29 @@ async fn dispatch(
                                 serde_json::to_value(&transparency).unwrap_or_default(),
                             );
                             let meta_value = serde_json::Value::Object(meta);
-                            let _ = state.repos
+                            let _ = state
+                                .repos
                                 .sessions
                                 .update_last_assistant_metadata(&sk, None, Some(&meta_value))
                                 .await;
 
-                            send_sse(ev::AGENT_DONE, serde_json::json!({
-                                "sessionKey": sk,
-                                "content": content,
-                            }));
+                            send_sse(
+                                ev::AGENT_DONE,
+                                serde_json::json!({
+                                    "sessionKey": sk,
+                                    "content": content,
+                                }),
+                            );
                             break;
                         }
                         agent::AgentEvent::Error { message } => {
-                            send_sse(ev::AGENT_ERROR, serde_json::json!({
-                                "sessionKey": sk,
-                                "message": message,
-                            }));
+                            send_sse(
+                                ev::AGENT_ERROR,
+                                serde_json::json!({
+                                    "sessionKey": sk,
+                                    "message": message,
+                                }),
+                            );
                             break;
                         }
                         agent::AgentEvent::ClassificationComplete {
@@ -1765,10 +1792,7 @@ async fn dispatch(
                                 }),
                             );
                         }
-                        agent::AgentEvent::LearningEvent {
-                            event_type,
-                            detail,
-                        } => {
+                        agent::AgentEvent::LearningEvent { event_type, detail } => {
                             send_sse(
                                 ev::AGENT_LEARNING_EVENT,
                                 serde_json::json!({
