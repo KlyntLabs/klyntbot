@@ -244,15 +244,14 @@ pub async fn productivity_activity_feed(
     limit: Option<i64>,
 ) -> Result<Vec<ActivityTimelineResponse>, ApiError> {
     let repos = state.productivity_repos()?;
-    let now = Utc::now();
-    let start = now - chrono::Duration::hours(24);
     let cap = limit.unwrap_or(50).min(200);
+    // list_recent returns newest-first (DESC), which is what the feed wants
     let events = repos
         .events
-        .list_range_offset(&start, &now, Some(cap), None)
+        .list_recent(cap)
         .await
         .map_err(map_prod_err)?;
-    Ok(events.into_iter().rev().map(event_to_timeline).collect())
+    Ok(events.into_iter().map(event_to_timeline).collect())
 }
 
 #[tauri::command]

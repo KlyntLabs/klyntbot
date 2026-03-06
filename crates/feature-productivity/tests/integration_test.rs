@@ -490,8 +490,8 @@ async fn test_goal_tracking() {
     };
     repos.goals.insert(&goal).await.unwrap();
 
-    // Insert 3h of productive activity
-    let now = Utc::now();
+    // Insert 3h of productive activity (anchor at noon UTC to avoid midnight flakiness)
+    let noon = Utc::now().date_naive().and_hms_opt(12, 0, 0).unwrap().and_utc();
     repos
         .events
         .insert(&ActivityEvent {
@@ -502,8 +502,8 @@ async fn test_goal_tracking() {
             bundle_id: None,
             url: None,
             category_id: Some("coding".into()),
-            started_at: now - Duration::hours(3),
-            ended_at: Some(now),
+            started_at: noon - Duration::hours(3),
+            ended_at: Some(noon),
             duration_secs: Some(10800),
             is_idle: false,
             metadata: None,
@@ -511,7 +511,7 @@ async fn test_goal_tracking() {
         .await
         .unwrap();
 
-    let today = now.format("%Y-%m-%d").to_string();
+    let today = noon.format("%Y-%m-%d").to_string();
     let results = aggregator.check_goals(&today).await.unwrap();
     assert_eq!(results.len(), 1);
     let (_goal, _current, met) = &results[0];

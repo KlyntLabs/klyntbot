@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "../../hooks/useQuery";
-import { formatHumanDuration } from "../../lib/dates";
+import { formatHumanDuration, todayISO } from "../../lib/dates";
 import type { ActivityCategory, ActivityTimeline } from "../../lib/types";
 
 interface TimelineBarProps {
@@ -16,64 +16,29 @@ interface Block {
   duration: number;
 }
 
-const START_HOUR = 6;
-const END_HOUR = 22;
+/** Full 24-hour range: midnight to midnight. */
+const START_HOUR = 0;
+const END_HOUR = 24;
 const SPAN_HOURS = END_HOUR - START_HOUR;
 
-const PRODUCTIVE_APPS = new Set([
-  "code",
-  "visual studio code",
-  "cursor",
-  "xcode",
-  "intellij",
-  "webstorm",
-  "terminal",
-  "iterm2",
-  "warp",
-  "alacritty",
-  "kitty",
-  "ghostty",
-  "figma",
-  "sketch",
-  "linear",
-  "notion",
-  "obsidian",
-  "sublime text",
-  "github desktop",
-  "tower",
-  "postman",
-  "docker",
-  "tableplus",
-]);
-const DISTRACTING_APPS = new Set([
-  "twitter",
-  "x",
-  "facebook",
-  "instagram",
-  "tiktok",
-  "reddit",
-  "youtube",
-  "netflix",
-  "twitch",
-]);
-
-function resolveColor(categoryType: string | undefined, isIdle: boolean, appName: string): string {
+function resolveColor(categoryType: string | undefined, isIdle: boolean): string {
   if (isIdle) return "var(--surface-highest)";
   if (categoryType === "productive") return "var(--success)";
   if (categoryType === "distracting") return "var(--destructive)";
   if (categoryType === "neutral") return "var(--text-muted)";
-  const lower = appName.toLowerCase();
-  if (PRODUCTIVE_APPS.has(lower)) return "var(--success)";
-  if (DISTRACTING_APPS.has(lower)) return "var(--destructive)";
   return "var(--brand)";
 }
 
 const TICK_LABELS: { hour: number; label: string }[] = [];
-for (let h = START_HOUR; h <= END_HOUR; h += 2) {
-  TICK_LABELS.push({
-    hour: h,
-    label: h === 0 ? "12a" : h < 12 ? `${h}a` : h === 12 ? "12p" : `${h - 12}p`,
-  });
+for (let h = START_HOUR; h <= END_HOUR; h += 1) {
+  const display = h === 0 || h === 24 ? "12a" : h < 12 ? `${h}a` : h === 12 ? "12p" : `${h - 12}p`;
+  TICK_LABELS.push({ hour: h, label: display });
+}
+
+/** Fraction of the day (0–1) for the current time. */
+function nowFraction(): number {
+  const now = new Date();
+  return (now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds()) / (SPAN_HOURS * 3600);
 }
 
 export function TimelineBar({ date }: TimelineBarProps) {
@@ -90,23 +55,22 @@ export function TimelineBar({ date }: TimelineBarProps) {
   const blocks: Block[] = useMemo(() => {
     if (events.length === 0) return [];
     const spanSecs = SPAN_HOURS * 3600;
-    const startSecs = START_HOUR * 3600;
 
     return events
       .map((e) => {
         const start = new Date(e.startedAt);
         const eSecs = start.getHours() * 3600 + start.getMinutes() * 60 + start.getSeconds();
         const dur = e.durationSecs ?? 0;
-        if (eSecs + dur < startSecs || eSecs > END_HOUR * 3600) return null;
+        if (eSecs + dur < 0 || eSecs > END_HOUR * 3600) return null;
 
-        const clampedStart = Math.max(eSecs - startSecs, 0);
-        const clampedEnd = Math.min(eSecs + dur - startSecs, spanSecs);
+        const clampedStart = Math.max(eSecs, 0);
+        const clampedEnd = Math.min(eSecs + dur, spanSecs);
         const cat = e.categoryId ? categoryMap.get(e.categoryId) : undefined;
 
         return {
           leftPct: (clampedStart / spanSecs) * 100,
-          widthPct: Math.max(((clampedEnd - clampedStart) / spanSecs) * 100, 0.3),
-          color: resolveColor(cat?.categoryType, e.isIdle, e.appName),
+          widthPct: Math.max(((clampedEnd - clampedStart) / spanSecs) * 100, 0.15),
+          color: resolveColor(cat?.categoryType, e.isIdle),
           label: e.siteName ?? e.appName,
           siteName: e.siteName,
           duration: dur,
@@ -115,14 +79,14 @@ export function TimelineBar({ date }: TimelineBarProps) {
       .filter(Boolean) as Block[];
   }, [events, categoryMap]);
 
+  const isToday = date === todayISO();
+  const nowPct = isToday ? nowFraction() * 100 : null;
+
   return (
     <div className="glass-card p-4 flex flex-col gap-2 col-span-3">
       <div className="flex items-center justify-between">
         <h2 className="text-[13px] font-medium text-secondary">Timeline</h2>
-        {/* Current time marker label */}
-        <span className="text-[10px] font-light text-dim tabular-nums">
-          {START_HOUR}:00 – {END_HOUR}:00
-        </span>
+        <span className="text-[10px] font-light text-dim tabular-nums">0:00 – 23:59</span>
       </div>
 
       {/* Timeline bar */}
@@ -137,19 +101,36 @@ export function TimelineBar({ date }: TimelineBarProps) {
               width: `${b.widthPct}%`,
               backgroundColor: b.color,
               opacity: hoveredIdx !== null && hoveredIdx !== idx ? 0.3 : 1,
-              borderRadius: b.widthPct > 1 ? "2px" : undefined,
+              borderRadius: b.widthPct > 0.5 ? "2px" : undefined,
             }}
             onMouseEnter={() => setHoveredIdx(idx)}
             onMouseLeave={() => setHoveredIdx(null)}
           />
         ))}
 
+        {/* Now marker */}
+        {nowPct !== null && (
+          <div
+            className="absolute top-0 h-full w-px pointer-events-none"
+            style={{
+              left: `${nowPct}%`,
+              background: "var(--brand)",
+              boxShadow: "0 0 4px var(--brand-glow)",
+            }}
+          >
+            <div
+              className="absolute -top-0.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full"
+              style={{ background: "var(--brand)" }}
+            />
+          </div>
+        )}
+
         {/* Hover tooltip */}
         {hoveredIdx !== null && blocks[hoveredIdx] && (
           <div
             className="absolute -top-8 z-10 px-2 py-1 rounded text-[10px] font-light text-primary whitespace-nowrap pointer-events-none"
             style={{
-              left: `${Math.min(blocks[hoveredIdx].leftPct + blocks[hoveredIdx].widthPct / 2, 90)}%`,
+              left: `${Math.min(blocks[hoveredIdx].leftPct + blocks[hoveredIdx].widthPct / 2, 95)}%`,
               transform: "translateX(-50%)",
               background: "var(--surface-floating)",
               border: "1px solid var(--border)",
@@ -161,10 +142,14 @@ export function TimelineBar({ date }: TimelineBarProps) {
         )}
       </div>
 
-      {/* Time axis */}
-      <div className="flex justify-between text-[9px] font-light text-dim px-0.5">
+      {/* Time axis — every hour */}
+      <div className="relative h-4 mt-1">
         {TICK_LABELS.map(({ hour, label }) => (
-          <span key={hour} style={{ width: `${100 / TICK_LABELS.length}%` }}>
+          <span
+            key={hour}
+            className="absolute text-[9px] font-light text-dim tabular-nums -translate-x-1/2"
+            style={{ left: `${(hour / SPAN_HOURS) * 100}%` }}
+          >
             {label}
           </span>
         ))}

@@ -42,10 +42,10 @@ export function formatElapsed(secs: number): string {
 
 /** Format an ISO timestamp to locale time (e.g. "2:30 PM"). */
 export function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString("en-US", {
-    hour: "numeric",
+  return new Date(iso).toLocaleTimeString(undefined, {
+    hour: "2-digit",
     minute: "2-digit",
-    hour12: true,
+    hour12: false,
   });
 }
 
@@ -97,9 +97,17 @@ export function formatMonthLabel(yearMonth: string): string {
   return `${LONG_MONTHS[m - 1]} ${y}`;
 }
 
-/** Get today as YYYY-MM-DD */
+/** Format a Date as YYYY-MM-DD using local timezone (NOT UTC). */
+export function toLocalISO(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** Get today as YYYY-MM-DD in local timezone. */
 export function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  return toLocalISO(new Date());
 }
 
 /** Get the Monday of the week containing the given date */
@@ -108,7 +116,7 @@ export function weekStartISO(iso: string): string {
   const day = d.getDay();
   const diff = d.getDate() - day + (day === 0 ? -6 : 1);
   d.setDate(diff);
-  return d.toISOString().slice(0, 10);
+  return toLocalISO(d);
 }
 
 /** Get YYYY-MM from a date */
@@ -120,7 +128,7 @@ export function monthISO(iso: string): string {
 export function shiftDate(iso: string, days: number): string {
   const d = new Date(`${iso}T00:00:00`);
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  return toLocalISO(d);
 }
 
 /** Navigate a month by offset: +1 month, -1 month */
@@ -134,7 +142,7 @@ export function shiftMonth(yearMonth: string, months: number): string {
 export function monthEndISO(yearMonth: string): string {
   const [y, m] = yearMonth.split("-").map(Number);
   const d = new Date(y, m, 0);
-  return d.toISOString().slice(0, 10);
+  return toLocalISO(d);
 }
 
 /** Format seconds as "Xh Ym" with large text style (e.g. "7 hr 33 min") */

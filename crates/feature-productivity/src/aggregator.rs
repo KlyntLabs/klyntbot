@@ -283,10 +283,14 @@ mod tests {
         let repos = ProductivityRepos::new(pool);
         let aggregator = DailyAggregator::new(repos.clone());
 
-        // Insert activity events for today
-        let today = Utc::now().format("%Y-%m-%d").to_string();
-        let start = Utc::now() - chrono::Duration::hours(2);
-        let end = Utc::now() - chrono::Duration::hours(1);
+        // Use noon UTC today to avoid midnight-crossing flakiness
+        let now = Utc::now();
+        let noon = Utc.from_utc_datetime(
+            &now.date_naive().and_hms_opt(12, 0, 0).unwrap(),
+        );
+        let today = noon.format("%Y-%m-%d").to_string();
+        let start = noon - chrono::Duration::hours(2);
+        let end = noon - chrono::Duration::hours(1);
 
         let event = ActivityEvent {
             id: None,
@@ -333,8 +337,12 @@ mod tests {
         let repos = ProductivityRepos::new(pool);
         let aggregator = DailyAggregator::new(repos.clone());
 
-        let today = Utc::now().format("%Y-%m-%d").to_string();
-        let start = Utc::now() - chrono::Duration::hours(2);
+        let now = Utc::now();
+        let noon = Utc.from_utc_datetime(
+            &now.date_naive().and_hms_opt(12, 0, 0).unwrap(),
+        );
+        let today = noon.format("%Y-%m-%d").to_string();
+        let start = noon - chrono::Duration::hours(2);
 
         // Two different apps
         for (app, secs) in &[("VS Code", 7200), ("Safari", 1800)] {
@@ -368,8 +376,12 @@ mod tests {
         let repos = ProductivityRepos::new(pool);
         let aggregator = DailyAggregator::new(repos.clone());
 
-        let today = Utc::now().format("%Y-%m-%d").to_string();
-        let start = Utc::now() - chrono::Duration::hours(4);
+        let now = Utc::now();
+        let noon = Utc.from_utc_datetime(
+            &now.date_naive().and_hms_opt(12, 0, 0).unwrap(),
+        );
+        let today = noon.format("%Y-%m-%d").to_string();
+        let start = noon - chrono::Duration::hours(4);
 
         // 3h productive coding
         repos

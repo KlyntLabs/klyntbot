@@ -357,7 +357,9 @@ mod tests {
         let repos = ProductivityRepos::new(pool);
         let (tx, mut rx) = mpsc::channel(10);
 
-        // Insert 8+ hours of activity today
+        // Insert 9 events right after midnight UTC today, each with 1h duration.
+        // The events' started_at must be between midnight UTC and Utc::now()
+        // since check_nudges queries that range internally.
         let now = Utc::now();
         let today_start = now.date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc();
         for i in 0..9 {
@@ -369,9 +371,10 @@ mod tests {
                 bundle_id: None,
                 url: None,
                 category_id: None,
-                started_at: today_start + Duration::hours(i),
-                ended_at: Some(today_start + Duration::hours(i + 1)),
-                duration_secs: Some(3600), // 1 hour each = 9 hours
+                // Pack events close together so they all fit before now
+                started_at: today_start + Duration::seconds(i),
+                ended_at: Some(today_start + Duration::seconds(i) + Duration::hours(1)),
+                duration_secs: Some(3600), // 1 hour each = 9 hours total
                 is_idle: false,
                 metadata: None,
             };

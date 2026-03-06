@@ -108,13 +108,13 @@ async fn test_category_crud() {
 
     // Upsert a custom category
     let custom = ActivityCategory {
-        id: "gaming".to_string(),
-        name: "Gaming".to_string(),
+        id: "my_custom_cat".to_string(),
+        name: "My Custom".to_string(),
         category_type: CategoryType::Distracting,
         color: Some("#ff0000".to_string()),
         icon: None,
         rules: Some(CategoryRules {
-            app_names: vec!["Steam".to_string()],
+            app_names: vec!["SomeApp".to_string()],
             bundle_ids: vec![],
             url_patterns: vec![],
         }),
@@ -122,12 +122,12 @@ async fn test_category_crud() {
     };
     repos.categories.upsert(&custom).await.unwrap();
 
-    let fetched = repos.categories.get("gaming").await.unwrap().unwrap();
-    assert_eq!(fetched.name, "Gaming");
+    let fetched = repos.categories.get("my_custom_cat").await.unwrap().unwrap();
+    assert_eq!(fetched.name, "My Custom");
     assert_eq!(fetched.category_type, CategoryType::Distracting);
 
     // Delete custom (should work)
-    assert!(repos.categories.delete("gaming").await.unwrap());
+    assert!(repos.categories.delete("my_custom_cat").await.unwrap());
 
     // Delete system (should fail — is_system = TRUE)
     assert!(!repos.categories.delete("coding").await.unwrap());

@@ -1102,18 +1102,15 @@ async fn dispatch(
                 Ok(r) => r,
                 Err(e) => return err(e),
             };
-            let now = Utc::now();
-            let start = now - chrono::Duration::hours(24);
             let cap: i64 = get(&body, "limit").unwrap_or(50);
             match repos
                 .events
-                .list_range_offset(&start, &now, Some(cap.min(200)), None)
+                .list_recent(cap.min(200))
                 .await
             {
                 Ok(events) => {
                     let resp: Vec<ActivityTimelineResponse> = events
                         .into_iter()
-                        .rev()
                         .map(|e| ActivityTimelineResponse {
                             app_name: e.app_name,
                             window_title: e.window_title,

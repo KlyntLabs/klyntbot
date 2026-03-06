@@ -110,6 +110,21 @@ impl ActivityEventRepo {
         Ok(rows)
     }
 
+    /// Returns the most recent events (newest first), limited by `limit`.
+    pub async fn list_recent(&self, limit: i64) -> common::Result<Vec<ActivityEvent>> {
+        let rows = sqlx::query_as::<_, ActivityEvent>(
+            r#"SELECT id, app_name, window_title, site_name, bundle_id, url, category_id, started_at, ended_at, duration_secs, is_idle, metadata
+               FROM activity_events
+               ORDER BY started_at DESC
+               LIMIT ?1"#,
+        )
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        Ok(rows)
+    }
+
     pub async fn purge_before(&self, before: &DateTime<Utc>) -> common::Result<u64> {
         let result = sqlx::query("DELETE FROM activity_events WHERE started_at < ?1")
             .bind(before)
@@ -184,7 +199,10 @@ impl ActivityEventRepo {
             total_secs: i64,
         }
         let rows = sqlx::query_as::<_, Row>(
-            r#"SELECT COALESCE(site_name, app_name) AS display_name,
+            r#"SELECT COALESCE(
+                        CASE WHEN site_name LIKE '%.%' THEN site_name ELSE NULL END,
+                        app_name
+                      ) AS display_name,
                       COALESCE(SUM(duration_secs), 0) AS total_secs
                FROM activity_events
                WHERE started_at >= ?1 AND started_at < ?2 AND is_idle = FALSE
