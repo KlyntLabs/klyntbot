@@ -1,9 +1,18 @@
 //! Repository for notes, notebooks, tags, links, and version history.
 
+use std::collections::HashMap;
+
 use sqlx::SqlitePool;
 use storage::StorageError;
 
 use crate::models::*;
+
+/// UTC "now" as an ISO-8601 string (`YYYY-MM-DDTHH:MM:SSZ`).
+pub fn utc_now_str() -> String {
+    chrono::Utc::now()
+        .format("%Y-%m-%dT%H:%M:%SZ")
+        .to_string()
+}
 
 #[derive(Debug, Clone)]
 pub struct NoteRepo {
@@ -146,6 +155,35 @@ impl NoteRepo {
         Ok(rows.into_iter().map(|r| r.0).collect())
     }
 
+    /// Fetch tags for multiple notes in a single query. Returns a map of note_id → tags.
+    pub async fn get_tags_batch(
+        &self,
+        note_ids: &[String],
+    ) -> Result<HashMap<String, Vec<String>>, StorageError> {
+        if note_ids.is_empty() {
+            return Ok(HashMap::new());
+        }
+        let placeholders: Vec<String> = note_ids
+            .iter()
+            .enumerate()
+            .map(|(i, _)| format!("?{}", i + 1))
+            .collect();
+        let sql = format!(
+            "SELECT note_id, tag FROM note_tags WHERE note_id IN ({}) ORDER BY tag",
+            placeholders.join(", ")
+        );
+        let mut query = sqlx::query_as::<_, (String, String)>(&sql);
+        for id in note_ids {
+            query = query.bind(id);
+        }
+        let rows = query.fetch_all(&self.pool).await?;
+        let mut map: HashMap<String, Vec<String>> = HashMap::new();
+        for (note_id, tag) in rows {
+            map.entry(note_id).or_default().push(tag);
+        }
+        Ok(map)
+    }
+
     pub async fn set_tags(&self, note_id: &str, tags: &[String]) -> Result<(), StorageError> {
         let mut tx = self.pool.begin().await?;
         sqlx::query("DELETE FROM note_tags WHERE note_id = ?1")
@@ -230,6 +268,16 @@ impl NoteRepo {
         Ok(count.0)
     }
 
+    /// Count notes per notebook in a single query. Returns notebook_id → count.
+    pub async fn count_notes_by_notebook(&self) -> Result<HashMap<String, i64>, StorageError> {
+        let rows: Vec<(String, i64)> = sqlx::query_as(
+            "SELECT notebook_id, COUNT(*) FROM notes WHERE notebook_id IS NOT NULL AND archived = 0 GROUP BY notebook_id",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows.into_iter().collect())
+    }
+
     pub async fn delete_notebook(&self, id: &str) -> Result<bool, StorageError> {
         let result = sqlx::query("DELETE FROM notebooks WHERE id = ?1")
             .bind(id)
@@ -262,6 +310,25 @@ impl NoteRepo {
         }
         tx.commit().await?;
         Ok(())
+    }
+
+    /// Find notes that mention a specific entity (task, project, etc.).
+    pub async fn list_notes_by_entity(
+        &self,
+        entity_type: &str,
+        entity_id: &str,
+    ) -> Result<Vec<NoteRow>, StorageError> {
+        let rows = sqlx::query_as::<_, NoteRow>(
+            "SELECT n.* FROM notes n
+             INNER JOIN note_entity_mentions m ON m.note_id = n.id
+             WHERE m.entity_type = ?1 AND m.entity_id = ?2 AND n.archived = 0
+             ORDER BY n.updated_at DESC",
+        )
+        .bind(entity_type)
+        .bind(entity_id)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
     }
 
     /// Find note IDs by their titles (case-insensitive). Returns (title, id) pairs.
@@ -357,6 +424,16 @@ impl NoteRepo {
         Ok(result)
     }
 
+    pub async fn get_version(&self, id: &str) -> Result<Option<NoteVersionRow>, StorageError> {
+        let row = sqlx::query_as::<_, NoteVersionRow>(
+            "SELECT * FROM note_versions WHERE id = ?1",
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row)
+    }
+
     pub async fn list_versions(
         &self,
         note_id: &str,
@@ -393,7 +470,6 @@ impl NoteRepo {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Utc;
 
     async fn setup() -> NoteRepo {
         let pool = sqlx::SqlitePool::connect("sqlite::memory:").await.unwrap();
@@ -406,12 +482,8 @@ mod tests {
         NoteRepo::new(pool)
     }
 
-    fn now_str() -> String {
-        Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()
-    }
-
     fn sample_note(id: &str, title: &str) -> NoteRow {
-        let now = now_str();
+        let now = utc_now_str();
         NoteRow {
             id: id.to_string(),
             notebook_id: None,
@@ -526,7 +598,7 @@ mod tests {
     #[tokio::test]
     async fn test_notebooks_crud() {
         let repo = setup().await;
-        let now = now_str();
+        let now = utc_now_str();
         let nb = NotebookRow {
             id: "nb1".to_string(),
             parent_id: None,
@@ -613,9 +685,33 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_list_notes_by_entity() {
+        let repo = setup().await;
+        repo.create_note(&sample_note("n1", "Meeting notes"))
+            .await
+            .unwrap();
+        repo.create_note(&sample_note("n2", "Other note"))
+            .await
+            .unwrap();
+
+        // Link n1 to task t1
+        repo.set_entity_mentions("n1", &[("task".to_string(), "t1".to_string())])
+            .await
+            .unwrap();
+
+        let linked = repo.list_notes_by_entity("task", "t1").await.unwrap();
+        assert_eq!(linked.len(), 1);
+        assert_eq!(linked[0].id, "n1");
+
+        // No notes for unknown entity
+        let empty = repo.list_notes_by_entity("task", "t99").await.unwrap();
+        assert!(empty.is_empty());
+    }
+
+    #[tokio::test]
     async fn test_notes_filtered_by_notebook() {
         let repo = setup().await;
-        let now = now_str();
+        let now = utc_now_str();
         let nb = NotebookRow {
             id: "nb1".to_string(),
             parent_id: None,

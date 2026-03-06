@@ -1,11 +1,12 @@
 use desktop_shared::commands::{
-    NoteCreateParams, NoteLinkResponse, NoteResponse, NoteUpdateParams, NotebookCreateParams,
-    NotebookResponse,
+    NoteCreateParams, NoteLinkResponse, NoteResponse, NoteUpdateParams, NoteVersionResponse,
+    NotebookCreateParams, NotebookResponse,
 };
 use desktop_shared::errors::ApiError;
 use desktop_shared::types::EntityKind;
 use feature_notes::link_parser;
-use feature_notes::models::{NoteRow, NotebookRow};
+use feature_notes::models::{NoteRow, NoteVersionRow, NotebookRow};
+use feature_notes::repo::utc_now_str;
 use std::sync::Arc;
 use tauri::State;
 
@@ -35,6 +36,26 @@ async fn note_with_tags(core: &AppCore, row: &NoteRow) -> Result<NoteResponse, A
         .await
         .map_err(super::map_storage_err)?;
     Ok(note_row_to_response(row, tags))
+}
+
+/// Convert a list of NoteRows to NoteResponses with batch-fetched tags (single query).
+async fn notes_with_tags_batch(
+    core: &AppCore,
+    rows: &[NoteRow],
+) -> Result<Vec<NoteResponse>, ApiError> {
+    let ids: Vec<String> = rows.iter().map(|r| r.id.clone()).collect();
+    let mut tag_map = core
+        .note_repo
+        .get_tags_batch(&ids)
+        .await
+        .map_err(super::map_storage_err)?;
+    Ok(rows
+        .iter()
+        .map(|row| {
+            let tags = tag_map.remove(&row.id).unwrap_or_default();
+            note_row_to_response(row, tags)
+        })
+        .collect())
 }
 
 /// Extract wiki-links and entity mentions from note content, updating the
@@ -111,11 +132,7 @@ pub async fn note_list(
         .await
         .map_err(super::map_storage_err)?;
 
-    let mut results = Vec::with_capacity(rows.len());
-    for row in &rows {
-        results.push(note_with_tags(&state, row).await?);
-    }
-    Ok(results)
+    notes_with_tags_batch(&state, &rows).await
 }
 
 #[tauri::command]
@@ -139,9 +156,7 @@ pub async fn note_create(
     params: NoteCreateParams,
 ) -> Result<NoteResponse, ApiError> {
     let id = uuid::Uuid::new_v4().to_string();
-    let now = chrono::Utc::now()
-        .format("%Y-%m-%dT%H:%M:%SZ")
-        .to_string();
+    let now = utc_now_str();
 
     let row = NoteRow {
         id: id.clone(),
@@ -235,11 +250,7 @@ pub async fn note_search(
         .await
         .map_err(super::map_storage_err)?;
 
-    let mut results = Vec::with_capacity(rows.len());
-    for row in &rows {
-        results.push(note_with_tags(&state, row).await?);
-    }
-    Ok(results)
+    notes_with_tags_batch(&state, &rows).await
 }
 
 #[tauri::command]
@@ -261,6 +272,161 @@ pub async fn note_links_all(
         .collect())
 }
 
+#[tauri::command]
+pub async fn note_list_by_entity(
+    state: State<'_, Arc<AppCore>>,
+    entity_type: String,
+    entity_id: String,
+) -> Result<Vec<NoteResponse>, ApiError> {
+    let rows = state
+        .note_repo
+        .list_notes_by_entity(&entity_type, &entity_id)
+        .await
+        .map_err(super::map_storage_err)?;
+
+    notes_with_tags_batch(&state, &rows).await
+}
+
+// ── Version commands ────────────────────────────────────────────────────
+
+fn version_row_to_response(row: &NoteVersionRow) -> NoteVersionResponse {
+    NoteVersionResponse {
+        id: row.id.clone(),
+        note_id: row.note_id.clone(),
+        body: row.body.clone(),
+        created_at: row.created_at.clone(),
+    }
+}
+
+#[tauri::command]
+pub async fn note_version_list(
+    state: State<'_, Arc<AppCore>>,
+    note_id: String,
+) -> Result<Vec<NoteVersionResponse>, ApiError> {
+    let rows = state
+        .note_repo
+        .list_versions(&note_id)
+        .await
+        .map_err(super::map_storage_err)?;
+
+    Ok(rows.iter().map(version_row_to_response).collect())
+}
+
+#[tauri::command]
+pub async fn note_version_create(
+    state: State<'_, Arc<AppCore>>,
+    note_id: String,
+) -> Result<NoteVersionResponse, ApiError> {
+    let note = state
+        .note_repo
+        .get_note(&note_id)
+        .await
+        .map_err(super::map_storage_err)?
+        .ok_or_else(|| ApiError::new("NOT_FOUND", format!("note '{note_id}' not found")))?;
+
+    let id = uuid::Uuid::new_v4().to_string();
+    let now = utc_now_str();
+
+    let row = NoteVersionRow {
+        id,
+        note_id: note_id.clone(),
+        body: note.body,
+        created_at: now,
+    };
+
+    let created = state
+        .note_repo
+        .create_version(&row)
+        .await
+        .map_err(super::map_storage_err)?;
+
+    // Prune old versions (keep max 50)
+    let _ = state.note_repo.prune_versions(&note_id, 50).await;
+
+    Ok(version_row_to_response(&created))
+}
+
+#[tauri::command]
+pub async fn note_version_restore(
+    state: State<'_, Arc<AppCore>>,
+    app: tauri::AppHandle,
+    version_id: String,
+    note_id: String,
+) -> Result<NoteResponse, ApiError> {
+    // Find the version
+    let version = state
+        .note_repo
+        .get_version(&version_id)
+        .await
+        .map_err(super::map_storage_err)?
+        .ok_or_else(|| ApiError::new("NOT_FOUND", format!("version '{version_id}' not found")))?;
+
+    // Create a snapshot of current state before restoring
+    let current_note = state
+        .note_repo
+        .get_note(&note_id)
+        .await
+        .map_err(super::map_storage_err)?
+        .ok_or_else(|| ApiError::new("NOT_FOUND", format!("note '{note_id}' not found")))?;
+
+    let snapshot = NoteVersionRow {
+        id: uuid::Uuid::new_v4().to_string(),
+        note_id: note_id.clone(),
+        body: current_note.body,
+        created_at: utc_now_str(),
+    };
+    let _ = state.note_repo.create_version(&snapshot).await;
+
+    // Restore the version body
+    let updated = state
+        .note_repo
+        .update_note(&note_id, None, Some(&version.body), None, None)
+        .await
+        .map_err(super::map_storage_err)?;
+
+    super::emit_entity_updated(&app, EntityKind::Note, &note_id);
+    note_with_tags(&state, &updated).await
+}
+
+// ── Attachment commands ─────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn note_save_attachment(
+    state: State<'_, Arc<AppCore>>,
+    data: String,        // base64-encoded image bytes
+    filename: String,    // e.g. "paste.png"
+) -> Result<String, ApiError> {
+    let config = state.config.read().await;
+    let attachments_dir = config.data_dir_path().join("attachments");
+    drop(config);
+
+    tokio::fs::create_dir_all(&attachments_dir)
+        .await
+        .map_err(|e| ApiError::new("IO_ERROR", format!("failed to create attachments dir: {e}")))?;
+
+    // Determine extension from filename
+    let ext = std::path::Path::new(&filename)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("png");
+
+    let id = uuid::Uuid::new_v4();
+    let file_name = format!("{id}.{ext}");
+    let file_path = attachments_dir.join(&file_name);
+
+    use base64::Engine;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(&data)
+        .map_err(|e| ApiError::new("DECODE_ERROR", format!("invalid base64: {e}")))?;
+
+    tokio::fs::write(&file_path, &bytes)
+        .await
+        .map_err(|e| ApiError::new("IO_ERROR", format!("failed to write attachment: {e}")))?;
+
+    // Return the absolute path — frontend converts to asset URL
+    Ok(file_path.to_string_lossy().to_string())
+}
+
 // ── Notebook commands ───────────────────────────────────────────────────
 
 #[tauri::command]
@@ -273,23 +439,23 @@ pub async fn notebook_list(
         .await
         .map_err(super::map_storage_err)?;
 
-    let mut results = Vec::with_capacity(rows.len());
-    for row in &rows {
-        let count = state
-            .note_repo
-            .count_notes_in_notebook(&row.id)
-            .await
-            .map_err(super::map_storage_err)?;
-        results.push(NotebookResponse {
+    let counts = state
+        .note_repo
+        .count_notes_by_notebook()
+        .await
+        .map_err(super::map_storage_err)?;
+
+    Ok(rows
+        .iter()
+        .map(|row| NotebookResponse {
             id: row.id.clone(),
             parent_id: row.parent_id.clone(),
             title: row.title.clone(),
             icon: row.icon.clone(),
             sort_order: row.sort_order,
-            note_count: count,
-        });
-    }
-    Ok(results)
+            note_count: counts.get(&row.id).copied().unwrap_or(0),
+        })
+        .collect())
 }
 
 #[tauri::command]
@@ -299,9 +465,7 @@ pub async fn notebook_create(
     params: NotebookCreateParams,
 ) -> Result<NotebookResponse, ApiError> {
     let id = uuid::Uuid::new_v4().to_string();
-    let now = chrono::Utc::now()
-        .format("%Y-%m-%dT%H:%M:%SZ")
-        .to_string();
+    let now = utc_now_str();
 
     let row = NotebookRow {
         id: id.clone(),

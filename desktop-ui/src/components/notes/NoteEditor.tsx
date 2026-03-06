@@ -1,10 +1,16 @@
-import { useCallback, useEffect, useRef } from "react";
+import { History } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { ipc } from "../../hooks/useIpc";
 import type { Note, NoteUpdateParams } from "../../lib/types";
 import { EditorContentWrapper, useNoteEditor } from "./editor/EditorCore";
 import { EditorToolbar } from "./editor/EditorToolbar";
+import { EntityMentionMenu } from "./editor/EntityMention";
 import { SlashMenu } from "./editor/SlashCommandMenu";
 import { WikiLinkMenu } from "./editor/WikiLinkNode";
 import { NoteTags } from "./NoteTags";
+import { NoteVersionHistory } from "./NoteVersionHistory";
+
+const VERSION_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
 
 interface NoteEditorProps {
   note: Note;
@@ -19,6 +25,19 @@ export function NoteEditor({ note, onSave }: NoteEditorProps) {
   onSaveRef.current = onSave;
   const noteContentRef = useRef(note.bodyHtml || note.body || "");
   noteContentRef.current = note.bodyHtml || note.body || "";
+  const lastVersionTimeRef = useRef(0);
+  const [showHistory, setShowHistory] = useState(false);
+
+  const maybeCreateVersion = useCallback(async (noteId: string) => {
+    const now = Date.now();
+    if (now - lastVersionTimeRef.current < VERSION_INTERVAL_MS) return;
+    lastVersionTimeRef.current = now;
+    try {
+      await ipc("note_version_create", { noteId });
+    } catch {
+      // non-critical — version snapshot failure should not block saves
+    }
+  }, []);
 
   const flushSave = useCallback(() => {
     if (saveTimerRef.current) {
@@ -28,13 +47,15 @@ export function NoteEditor({ note, onSave }: NoteEditorProps) {
     const pending = pendingRef.current;
     if (pending) {
       pendingRef.current = null;
+      const noteId = lastNoteIdRef.current;
       onSaveRef.current({
-        id: lastNoteIdRef.current,
+        id: noteId,
         body: pending.text,
         bodyHtml: pending.html,
       });
+      maybeCreateVersion(noteId);
     }
-  }, []);
+  }, [maybeCreateVersion]);
 
   const handleUpdate = useCallback(
     (html: string, text: string) => {
@@ -55,6 +76,8 @@ export function NoteEditor({ note, onSave }: NoteEditorProps) {
     if (lastNoteIdRef.current !== note.id) {
       flushSave();
       lastNoteIdRef.current = note.id;
+      lastVersionTimeRef.current = 0;
+      setShowHistory(false);
       if (editor) {
         editor.commands.setContent(noteContentRef.current);
       }
@@ -68,23 +91,63 @@ export function NoteEditor({ note, onSave }: NoteEditorProps) {
     [note.id],
   );
 
+  const handleRestore = useCallback(
+    (restored: Note) => {
+      if (editor) {
+        editor.commands.setContent(restored.bodyHtml || restored.body || "");
+      }
+    },
+    [editor],
+  );
+
+  // Cmd+S → force save
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+        e.preventDefault();
+        flushSave();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [flushSave]);
+
   // Flush on unmount
   useEffect(() => {
     return () => flushSave();
   }, [flushSave]);
 
   return (
-    <div className="flex-1 glass-panel rounded-2xl flex flex-col min-w-0 min-h-0">
-      <div className="px-4 py-2 border-b border-border">
-        <h1 className="text-lg font-semibold text-primary mb-1">{note.title}</h1>
-        <NoteTags tags={note.tags} onChange={handleTagsChange} />
-        <div className="mt-2">
-          <EditorToolbar editor={editor} />
+    <div className="flex-1 flex gap-2 min-w-0 min-h-0">
+      <div className="flex-1 glass-panel rounded-2xl flex flex-col min-w-0 min-h-0">
+        <div className="px-4 py-2 border-b border-border">
+          <div className="flex items-center justify-between mb-1">
+            <h1 className="text-lg font-semibold text-primary">{note.title}</h1>
+            <button
+              type="button"
+              onClick={() => setShowHistory(!showHistory)}
+              className={`p-1.5 rounded-lg transition-colors ${
+                showHistory
+                  ? "bg-white/[0.1] text-primary"
+                  : "text-dim hover:text-secondary hover:bg-white/[0.04]"
+              }`}
+              aria-label="Toggle version history"
+            >
+              <History className="w-4 h-4" />
+            </button>
+          </div>
+          <NoteTags tags={note.tags} onChange={handleTagsChange} />
+          <div className="mt-2">
+            <EditorToolbar editor={editor} />
+          </div>
         </div>
+        <EditorContentWrapper editor={editor} />
+        {editor && <SlashMenu editor={editor} />}
+        {editor && <WikiLinkMenu editor={editor} />}
+        {editor && <EntityMentionMenu editor={editor} />}
       </div>
-      <EditorContentWrapper editor={editor} />
-      {editor && <SlashMenu editor={editor} />}
-      {editor && <WikiLinkMenu editor={editor} />}
+
+      {showHistory && <NoteVersionHistory noteId={note.id} onRestore={handleRestore} />}
     </div>
   );
 }

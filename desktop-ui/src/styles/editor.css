@@ -189,6 +189,32 @@
   opacity: 0.8;
 }
 
+/* Entity Mentions */
+.entity-mention {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 0.35rem;
+  border-radius: 4px;
+  font-size: 0.85em;
+  font-weight: 500;
+  cursor: pointer;
+  vertical-align: baseline;
+}
+
+.entity-mention--task {
+  background: color-mix(in srgb, var(--color-brand) 15%, transparent);
+  color: var(--color-brand);
+}
+
+.entity-mention--project {
+  background: color-mix(in srgb, var(--color-info) 15%, transparent);
+  color: var(--color-info);
+}
+
+.entity-mention:hover {
+  opacity: 0.8;
+}
+
 /* Math */
 .math-block {
   text-align: center;

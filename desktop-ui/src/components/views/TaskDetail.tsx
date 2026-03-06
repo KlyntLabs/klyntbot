@@ -5,6 +5,7 @@ import { useEvent } from "../../hooks/useEvent";
 import { useMutation } from "../../hooks/useMutation";
 import { useQuery } from "../../hooks/useQuery";
 import type { Project, Task, TaskUpdateParams } from "../../lib/types";
+import { LinkedNotes } from "../notes/LinkedNotes";
 import { Badge } from "../ui/Badge";
 
 const PRIORITIES = ["P1", "P2", "P3", "P4", null] as const;
@@ -209,8 +210,11 @@ export function TaskDetail() {
           )}
         </div>
 
+        {/* Linked Notes */}
+        {id && <LinkedNotes entityType="task" entityId={id} />}
+
         {/* Delete */}
-        <div className="pt-4 border-t border-white/[0.08]">
+        <div className="pt-4 border-t border-white/[0.08] mt-6">
           <button
             type="button"
             onClick={handleDelete}

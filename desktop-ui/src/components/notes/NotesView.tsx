@@ -1,5 +1,6 @@
 import { GitGraph, PenLine } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router";
 import { useEvent } from "../../hooks/useEvent";
 import { useMutation } from "../../hooks/useMutation";
 import { useQuery } from "../../hooks/useQuery";
@@ -16,7 +17,7 @@ import { GraphView } from "./GraphView";
 import { NotebookTree } from "./NotebookTree";
 import { NoteEditor } from "./NoteEditor";
 import { NoteList } from "./NoteList";
-import { NoteSearchBar } from "./NoteSearchBar";
+import { NoteSearchBar, type NoteSearchBarHandle } from "./NoteSearchBar";
 
 type NotesViewMode = "editor" | "graph";
 
@@ -31,6 +32,16 @@ export default function NotesView() {
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [viewMode, setNotesViewMode] = useState<NotesViewMode>("editor");
   const [searchResults, setSearchResults] = useState<Note[] | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Pre-select note from URL search params (e.g. /notes?noteId=xxx)
+  useEffect(() => {
+    const noteId = searchParams.get("noteId");
+    if (noteId) {
+      setSelectedNoteId(noteId);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const filteredNotes = selectedNotebookId
     ? notes.filter((n) => n.notebookId === selectedNotebookId)
@@ -79,6 +90,36 @@ export default function NotesView() {
     [deleteNote, selectedNoteId],
   );
 
+  const searchRef = useRef<NoteSearchBarHandle>(null);
+
+  // ── Keyboard shortcuts ─────────────────────────────────────────────────
+  const handleCreateNoteRef = useRef(handleCreateNote);
+  handleCreateNoteRef.current = handleCreateNote;
+  const handleDeleteRef = useRef(handleDelete);
+  handleDeleteRef.current = handleDelete;
+  const selectedNoteIdRef = useRef(selectedNoteId);
+  selectedNoteIdRef.current = selectedNoteId;
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey;
+      if (!mod) return;
+
+      if (e.key === "n" && !e.shiftKey) {
+        e.preventDefault();
+        handleCreateNoteRef.current();
+      } else if (e.key === "Backspace" && selectedNoteIdRef.current) {
+        e.preventDefault();
+        handleDeleteRef.current(selectedNoteIdRef.current);
+      } else if (e.key === "f" && e.shiftKey) {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, []);
+
   // ── Event refresh ──────────────────────────────────────────────────────
   useEvent<{ entityKind: string }>("entity:updated", (payload) => {
     if (payload.entityKind === "note") refetchNotes();
@@ -101,7 +142,7 @@ export default function NotesView() {
         />
 
         <div className="w-64 flex flex-col gap-2 min-h-0">
-          <NoteSearchBar onResults={setSearchResults} />
+          <NoteSearchBar ref={searchRef} onResults={setSearchResults} />
           <NoteList
             notes={displayedNotes}
             selectedId={selectedNoteId}

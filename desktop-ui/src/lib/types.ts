@@ -372,6 +372,13 @@ export interface NoteUpdateParams {
   tags?: string[];
 }
 
+export interface NoteVersion {
+  id: string;
+  noteId: string;
+  body: string;
+  createdAt: string;
+}
+
 export interface NoteLink {
   sourceId: string;
   targetId: string;

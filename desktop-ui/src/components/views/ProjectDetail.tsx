@@ -15,6 +15,7 @@ import type {
   Task,
 } from "../../lib/types";
 import { Sidebar } from "../layout/Sidebar";
+import { LinkedNotes } from "../notes/LinkedNotes";
 import { Badge } from "../ui/Badge";
 import { Checkbox } from "../ui/Checkbox";
 import { Progress } from "../ui/Progress";
@@ -505,6 +506,9 @@ export function ProjectDetail() {
               )}
             </div>
           </div>
+
+          {/* Linked Notes */}
+          {id && <LinkedNotes entityType="project" entityId={id} />}
         </div>
       </div>
     </div>

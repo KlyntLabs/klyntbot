@@ -17,7 +17,7 @@ use chrono::Utc;
 use desktop_shared::commands::*;
 use desktop_shared::errors::ApiError;
 use feature_notes::models::{NoteRow, NotebookRow};
-use feature_notes::repo::NoteRepo;
+use feature_notes::repo::{utc_now_str, NoteRepo};
 use feature_productivity::distraction::DistractionInterceptor;
 use feature_productivity::repos::ProductivityRepos;
 use feature_productivity::{DailyAggregator, FocusManager};
@@ -31,6 +31,7 @@ struct DevState {
     repos: Repos,
     note_repo: NoteRepo,
     config: RwLock<config::Config>,
+    data_dir: std::path::PathBuf,
     productivity_repos: Option<ProductivityRepos>,
     focus_manager: Option<Arc<FocusManager>>,
     aggregator: Option<Arc<DailyAggregator>>,
@@ -128,6 +129,7 @@ async fn main() {
         repos,
         note_repo,
         config: RwLock::new(config),
+        data_dir: data_dir.clone(),
         productivity_repos: prod_repos,
         focus_manager: focus_mgr,
         aggregator,
@@ -135,14 +137,21 @@ async fn main() {
     });
 
     // 4. Build axum router
+    let attachments_dir = data_dir.join("attachments");
+    std::fs::create_dir_all(&attachments_dir).ok();
+
     let app = Router::new()
         .route("/api/{cmd}", post(dispatch))
+        .nest_service(
+            "/attachments",
+            tower_http::services::ServeDir::new(&attachments_dir),
+        )
         .with_state(state);
 
     let app = app.layer(
         tower_http::cors::CorsLayer::new()
             .allow_origin("http://localhost:1420".parse::<HeaderValue>().unwrap())
-            .allow_methods([Method::POST, Method::OPTIONS])
+            .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
             .allow_headers(tower_http::cors::Any),
     );
 
@@ -227,6 +236,34 @@ fn notebook_row_to_resp(row: &NotebookRow, note_count: i64) -> NotebookResponse 
         icon: row.icon.clone(),
         sort_order: row.sort_order,
         note_count,
+    }
+}
+
+/// Convert a list of NoteRows to NoteResponses with batch-fetched tags (single query).
+async fn notes_with_tags_batch(
+    repo: &NoteRepo,
+    rows: &[NoteRow],
+) -> Result<Vec<NoteResponse>, ApiError> {
+    let ids: Vec<String> = rows.iter().map(|r| r.id.clone()).collect();
+    let mut tag_map = repo
+        .get_tags_batch(&ids)
+        .await
+        .map_err(storage_err)?;
+    Ok(rows
+        .iter()
+        .map(|row| {
+            let tags = tag_map.remove(&row.id).unwrap_or_default();
+            note_row_to_resp(row, tags)
+        })
+        .collect())
+}
+
+fn version_row_to_resp(row: &feature_notes::models::NoteVersionRow) -> NoteVersionResponse {
+    NoteVersionResponse {
+        id: row.id.clone(),
+        note_id: row.note_id.clone(),
+        body: row.body.clone(),
+        created_at: row.created_at.clone(),
     }
 }
 
@@ -1588,14 +1625,10 @@ async fn dispatch(
         "note_list" => {
             let notebook_id: Option<String> = get(&body, "notebookId");
             match core.note_repo.list_notes(notebook_id.as_deref()).await {
-                Ok(rows) => {
-                    let mut results = Vec::with_capacity(rows.len());
-                    for row in &rows {
-                        let tags = core.note_repo.get_tags(&row.id).await.unwrap_or_default();
-                        results.push(note_row_to_resp(row, tags));
-                    }
-                    ok(results)
-                }
+                Ok(rows) => match notes_with_tags_batch(&core.note_repo, &rows).await {
+                    Ok(results) => ok(results),
+                    Err(e) => err(e),
+                },
                 Err(e) => err(storage_err(e)),
             }
         }
@@ -1620,7 +1653,7 @@ async fn dispatch(
                     Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
                 };
             let id = uuid::Uuid::new_v4().to_string();
-            let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+            let now = utc_now_str();
             let row = NoteRow {
                 id: id.clone(),
                 notebook_id: params.notebook_id,
@@ -1686,14 +1719,10 @@ async fn dispatch(
                 Err(e) => return err(e),
             };
             match core.note_repo.search_notes(&query).await {
-                Ok(rows) => {
-                    let mut results = Vec::with_capacity(rows.len());
-                    for row in &rows {
-                        let tags = core.note_repo.get_tags(&row.id).await.unwrap_or_default();
-                        results.push(note_row_to_resp(row, tags));
-                    }
-                    ok(results)
-                }
+                Ok(rows) => match notes_with_tags_batch(&core.note_repo, &rows).await {
+                    Ok(results) => ok(results),
+                    Err(e) => err(e),
+                },
                 Err(e) => err(storage_err(e)),
             }
         }
@@ -1710,17 +1739,136 @@ async fn dispatch(
             }
             Err(e) => err(storage_err(e)),
         },
+        "note_version_list" => {
+            let note_id = match get_str(&body, "noteId") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            match core.note_repo.list_versions(&note_id).await {
+                Ok(rows) => {
+                    let results: Vec<NoteVersionResponse> = rows
+                        .iter()
+                        .map(version_row_to_resp)
+                        .collect();
+                    ok(results)
+                }
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "note_version_create" => {
+            let note_id = match get_str(&body, "noteId") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            match core.note_repo.get_note(&note_id).await {
+                Ok(Some(note)) => {
+                    let row = feature_notes::models::NoteVersionRow {
+                        id: uuid::Uuid::new_v4().to_string(),
+                        note_id: note_id.clone(),
+                        body: note.body,
+                        created_at: utc_now_str(),
+                    };
+                    match core.note_repo.create_version(&row).await {
+                        Ok(created) => {
+                            let _ = core.note_repo.prune_versions(&note_id, 50).await;
+                            ok(version_row_to_resp(&created))
+                        }
+                        Err(e) => err(storage_err(e)),
+                    }
+                }
+                Ok(None) => err(ApiError::new("NOT_FOUND", format!("note '{note_id}' not found"))),
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "note_version_restore" => {
+            let version_id = match get_str(&body, "versionId") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let note_id = match get_str(&body, "noteId") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            match core.note_repo.get_version(&version_id).await {
+                Ok(Some(version)) => {
+                    // Snapshot current before restoring
+                    if let Ok(Some(current)) = core.note_repo.get_note(&note_id).await {
+                        let snap = feature_notes::models::NoteVersionRow {
+                            id: uuid::Uuid::new_v4().to_string(),
+                            note_id: note_id.clone(),
+                            body: current.body,
+                            created_at: utc_now_str(),
+                        };
+                        let _ = core.note_repo.create_version(&snap).await;
+                    }
+                    match core.note_repo.update_note(&note_id, None, Some(&version.body), None, None).await {
+                        Ok(updated) => {
+                            let tags = core.note_repo.get_tags(&note_id).await.unwrap_or_default();
+                            ok(note_row_to_resp(&updated, tags))
+                        }
+                        Err(e) => err(storage_err(e)),
+                    }
+                }
+                Ok(None) => err(ApiError::new("NOT_FOUND", format!("version '{version_id}' not found"))),
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "note_list_by_entity" => {
+            let entity_type = match get_str(&body, "entityType") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let entity_id = match get_str(&body, "entityId") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            match core.note_repo.list_notes_by_entity(&entity_type, &entity_id).await {
+                Ok(rows) => match notes_with_tags_batch(&core.note_repo, &rows).await {
+                    Ok(results) => ok(results),
+                    Err(e) => err(e),
+                },
+                Err(e) => err(storage_err(e)),
+            }
+        }
+        "note_save_attachment" => {
+            let data_str = match get_str(&body, "data") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let filename = match get_str(&body, "filename") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let attachments_dir = core.data_dir.join("attachments");
+            if let Err(e) = tokio::fs::create_dir_all(&attachments_dir).await {
+                return err(ApiError::new("IO_ERROR", format!("failed to create dir: {e}")));
+            }
+            let ext = std::path::Path::new(&filename)
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or("png");
+            let id = uuid::Uuid::new_v4();
+            let file_name = format!("{id}.{ext}");
+            let file_path = attachments_dir.join(&file_name);
+
+            use base64::Engine;
+            let bytes = match base64::engine::general_purpose::STANDARD.decode(&data_str) {
+                Ok(b) => b,
+                Err(e) => return err(ApiError::new("DECODE_ERROR", format!("invalid base64: {e}"))),
+            };
+            if let Err(e) = tokio::fs::write(&file_path, &bytes).await {
+                return err(ApiError::new("IO_ERROR", format!("failed to write: {e}")));
+            }
+            // In dev mode, serve via the /attachments static route
+            ok(format!("/attachments/{file_name}"))
+        }
         "notebook_list" => match core.note_repo.list_notebooks().await {
             Ok(rows) => {
-                let mut results = Vec::with_capacity(rows.len());
-                for row in &rows {
-                    let count = core
-                        .note_repo
-                        .count_notes_in_notebook(&row.id)
-                        .await
-                        .unwrap_or(0);
-                    results.push(notebook_row_to_resp(row, count));
-                }
+                let counts = core.note_repo.count_notes_by_notebook().await.unwrap_or_default();
+                let results: Vec<_> = rows
+                    .iter()
+                    .map(|row| notebook_row_to_resp(row, counts.get(&row.id).copied().unwrap_or(0)))
+                    .collect();
                 ok(results)
             }
             Err(e) => err(storage_err(e)),
@@ -1732,7 +1880,7 @@ async fn dispatch(
                     Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
                 };
             let id = uuid::Uuid::new_v4().to_string();
-            let now = Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
+            let now = utc_now_str();
             let row = NotebookRow {
                 id: id.clone(),
                 parent_id: params.parent_id,

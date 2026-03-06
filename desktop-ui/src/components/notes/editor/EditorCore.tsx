@@ -1,3 +1,4 @@
+import { convertFileSrc } from "@tauri-apps/api/core";
 import CodeBlockLowlight from "@tiptap/extension-code-block-lowlight";
 import Color from "@tiptap/extension-color";
 import Highlight from "@tiptap/extension-highlight";
@@ -17,6 +18,9 @@ import type { Extensions } from "@tiptap/react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { common, createLowlight } from "lowlight";
+import { ipc } from "../../../hooks/useIpc";
+import { isTauri } from "../../../lib/utils";
+import { EntityMentionAutocomplete, EntityMentionMark } from "./EntityMention";
 import { MathBlock, MathInline } from "./MathNode";
 import { SlashCommandsExtension } from "./SlashCommandMenu";
 import { WikiLinkAutocomplete, WikiLinkMark } from "./WikiLinkNode";
@@ -61,6 +65,8 @@ export function getEditorExtensions(extra: Extensions = []): Extensions {
     TextAlign.configure({ types: ["heading", "paragraph"] }),
     WikiLinkMark,
     WikiLinkAutocomplete,
+    EntityMentionMark,
+    EntityMentionAutocomplete,
     MathBlock,
     MathInline,
     SlashCommandsExtension,
@@ -74,6 +80,20 @@ interface UseNoteEditorOptions {
   extensions?: Extensions;
 }
 
+/** Convert a file to base64 string. */
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      // Strip the data:...;base64, prefix
+      resolve(result.split(",")[1]);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 export function useNoteEditor({ content, onUpdate, extensions = [] }: UseNoteEditorOptions) {
   return useEditor({
     extensions: getEditorExtensions(extensions),
@@ -83,6 +103,35 @@ export function useNoteEditor({ content, onUpdate, extensions = [] }: UseNoteEdi
     },
     editorProps: {
       attributes: { class: "editor-content" },
+      handlePaste: (view, event) => {
+        const items = event.clipboardData?.files;
+        if (!items || items.length === 0) return false;
+
+        const imageFile = Array.from(items).find((f) => f.type.startsWith("image/"));
+        if (!imageFile) return false;
+
+        event.preventDefault();
+
+        // Save async — insert image once backend returns the URL
+        (async () => {
+          const base64 = await fileToBase64(imageFile);
+          const ext = imageFile.type.split("/")[1] || "png";
+          const savedPath = await ipc<string>("note_save_attachment", {
+            data: base64,
+            filename: `paste.${ext}`,
+          });
+
+          // Tauri returns absolute path → convert to asset URL
+          // Dev-api returns relative URL like /attachments/uuid.png
+          const src = isTauri ? convertFileSrc(savedPath) : savedPath;
+
+          const { tr } = view.state;
+          const imageNode = view.state.schema.nodes.image.create({ src });
+          view.dispatch(tr.replaceSelectionWith(imageNode));
+        })();
+
+        return true;
+      },
     },
   });
 }
