@@ -555,6 +555,13 @@ pub struct NotebookResponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct NoteLinkResponse {
+    pub source_id: String,
+    pub target_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct NotebookCreateParams {
     pub title: String,
     pub parent_id: Option<String>,

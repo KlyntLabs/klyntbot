@@ -4,6 +4,7 @@ import { EditorContentWrapper, useNoteEditor } from "./editor/EditorCore";
 import { EditorToolbar } from "./editor/EditorToolbar";
 import { SlashMenu } from "./editor/SlashCommandMenu";
 import { WikiLinkMenu } from "./editor/WikiLinkNode";
+import { NoteTags } from "./NoteTags";
 
 interface NoteEditorProps {
   note: Note;
@@ -60,6 +61,13 @@ export function NoteEditor({ note, onSave }: NoteEditorProps) {
     }
   }, [note.id, editor, flushSave]);
 
+  const handleTagsChange = useCallback(
+    (tags: string[]) => {
+      onSaveRef.current({ id: note.id, tags });
+    },
+    [note.id],
+  );
+
   // Flush on unmount
   useEffect(() => {
     return () => flushSave();
@@ -68,8 +76,11 @@ export function NoteEditor({ note, onSave }: NoteEditorProps) {
   return (
     <div className="flex-1 glass-panel rounded-2xl flex flex-col min-w-0 min-h-0">
       <div className="px-4 py-2 border-b border-border">
-        <h1 className="text-lg font-semibold text-primary mb-2">{note.title}</h1>
-        <EditorToolbar editor={editor} />
+        <h1 className="text-lg font-semibold text-primary mb-1">{note.title}</h1>
+        <NoteTags tags={note.tags} onChange={handleTagsChange} />
+        <div className="mt-2">
+          <EditorToolbar editor={editor} />
+        </div>
       </div>
       <EditorContentWrapper editor={editor} />
       {editor && <SlashMenu editor={editor} />}

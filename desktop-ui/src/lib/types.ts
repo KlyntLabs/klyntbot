@@ -372,6 +372,11 @@ export interface NoteUpdateParams {
   tags?: string[];
 }
 
+export interface NoteLink {
+  sourceId: string;
+  targetId: string;
+}
+
 export interface Notebook {
   id: string;
   parentId: string | null;

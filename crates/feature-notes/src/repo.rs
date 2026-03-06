@@ -111,9 +111,23 @@ impl NoteRepo {
             .replace('_', "\\_");
         let pattern = format!("%{escaped}%");
         let rows = sqlx::query_as::<_, NoteRow>(
-            "SELECT * FROM notes
-             WHERE (title LIKE ?1 ESCAPE '\\' OR body LIKE ?1 ESCAPE '\\') AND archived = 0
-             ORDER BY updated_at DESC",
+            "WITH scored AS (
+               SELECT n.id, n.notebook_id, n.title, n.body, n.body_html,
+                      n.pinned, n.archived, n.created_at, n.updated_at,
+                      (CASE WHEN n.title LIKE ?1 ESCAPE '\\' THEN 3 ELSE 0 END
+                       + CASE WHEN n.body LIKE ?1 ESCAPE '\\' THEN 1 ELSE 0 END
+                       + CASE WHEN EXISTS (
+                           SELECT 1 FROM note_tags t
+                           WHERE t.note_id = n.id AND t.tag LIKE ?1 ESCAPE '\\'
+                         ) THEN 2 ELSE 0 END) AS score
+               FROM notes n
+               WHERE n.archived = 0
+             )
+             SELECT id, notebook_id, title, body, body_html,
+                    pinned, archived, created_at, updated_at
+             FROM scored
+             WHERE score > 0
+             ORDER BY score DESC, updated_at DESC",
         )
         .bind(&pattern)
         .fetch_all(&self.pool)

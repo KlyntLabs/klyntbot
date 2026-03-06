@@ -1697,6 +1697,19 @@ async fn dispatch(
                 Err(e) => err(storage_err(e)),
             }
         }
+        "note_links_all" => match core.note_repo.get_all_links().await {
+            Ok(rows) => {
+                let results: Vec<NoteLinkResponse> = rows
+                    .into_iter()
+                    .map(|r| NoteLinkResponse {
+                        source_id: r.source_id,
+                        target_id: r.target_id,
+                    })
+                    .collect();
+                ok(results)
+            }
+            Err(e) => err(storage_err(e)),
+        },
         "notebook_list" => match core.note_repo.list_notebooks().await {
             Ok(rows) => {
                 let mut results = Vec::with_capacity(rows.len());

@@ -1,5 +1,6 @@
 use desktop_shared::commands::{
-    NoteCreateParams, NoteResponse, NoteUpdateParams, NotebookCreateParams, NotebookResponse,
+    NoteCreateParams, NoteLinkResponse, NoteResponse, NoteUpdateParams, NotebookCreateParams,
+    NotebookResponse,
 };
 use desktop_shared::errors::ApiError;
 use desktop_shared::types::EntityKind;
@@ -239,6 +240,25 @@ pub async fn note_search(
         results.push(note_with_tags(&state, row).await?);
     }
     Ok(results)
+}
+
+#[tauri::command]
+pub async fn note_links_all(
+    state: State<'_, Arc<AppCore>>,
+) -> Result<Vec<NoteLinkResponse>, ApiError> {
+    let rows = state
+        .note_repo
+        .get_all_links()
+        .await
+        .map_err(super::map_storage_err)?;
+
+    Ok(rows
+        .into_iter()
+        .map(|r| NoteLinkResponse {
+            source_id: r.source_id,
+            target_id: r.target_id,
+        })
+        .collect())
 }
 
 // ── Notebook commands ───────────────────────────────────────────────────

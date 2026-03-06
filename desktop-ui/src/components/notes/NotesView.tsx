@@ -1,3 +1,4 @@
+import { GitGraph, PenLine } from "lucide-react";
 import { useCallback, useState } from "react";
 import { useEvent } from "../../hooks/useEvent";
 import { useMutation } from "../../hooks/useMutation";
@@ -11,9 +12,13 @@ import type {
   SidebarItem,
 } from "../../lib/types";
 import { Sidebar } from "../layout/Sidebar";
+import { GraphView } from "./GraphView";
 import { NotebookTree } from "./NotebookTree";
 import { NoteEditor } from "./NoteEditor";
 import { NoteList } from "./NoteList";
+import { NoteSearchBar } from "./NoteSearchBar";
+
+type NotesViewMode = "editor" | "graph";
 
 export default function NotesView() {
   const { data: notebooks, refetch: refetchNotebooks } = useQuery<Notebook[]>(
@@ -24,10 +29,14 @@ export default function NotesView() {
   const { data: notes, refetch: refetchNotes } = useQuery<Note[]>("note_list", undefined, []);
   const [selectedNotebookId, setSelectedNotebookId] = useState<string | null>(null);
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+  const [viewMode, setNotesViewMode] = useState<NotesViewMode>("editor");
+  const [searchResults, setSearchResults] = useState<Note[] | null>(null);
 
   const filteredNotes = selectedNotebookId
     ? notes.filter((n) => n.notebookId === selectedNotebookId)
     : notes;
+
+  const displayedNotes = searchResults ?? filteredNotes;
 
   const selectedNote = notes.find((n) => n.id === selectedNoteId);
 
@@ -91,22 +100,61 @@ export default function NotesView() {
           onCreate={handleCreateNotebook}
         />
 
-        <NoteList
-          notes={filteredNotes}
-          selectedId={selectedNoteId}
-          onSelect={setSelectedNoteId}
-          onCreate={handleCreateNote}
-          onPin={handlePin}
-          onDelete={handleDelete}
-        />
+        <div className="w-64 flex flex-col gap-2 min-h-0">
+          <NoteSearchBar onResults={setSearchResults} />
+          <NoteList
+            notes={displayedNotes}
+            selectedId={selectedNoteId}
+            onSelect={setSelectedNoteId}
+            onCreate={handleCreateNote}
+            onPin={handlePin}
+            onDelete={handleDelete}
+          />
+        </div>
 
-        {selectedNote ? (
-          <NoteEditor note={selectedNote} onSave={updateNote} />
-        ) : (
-          <div className="flex-1 glass-panel rounded-2xl flex items-center justify-center">
-            <div className="text-muted text-sm">Select a note to view</div>
+        <div className="flex-1 flex flex-col gap-2 min-w-0 min-h-0">
+          {/* View mode toggle */}
+          <div className="flex justify-end gap-1 shrink-0">
+            <button
+              type="button"
+              onClick={() => setNotesViewMode("editor")}
+              className={`p-1.5 rounded-lg transition-colors ${
+                viewMode === "editor"
+                  ? "bg-white/[0.1] text-primary"
+                  : "text-dim hover:text-secondary hover:bg-white/[0.04]"
+              }`}
+              aria-label="Editor view"
+            >
+              <PenLine className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setNotesViewMode("graph")}
+              className={`p-1.5 rounded-lg transition-colors ${
+                viewMode === "graph"
+                  ? "bg-white/[0.1] text-primary"
+                  : "text-dim hover:text-secondary hover:bg-white/[0.04]"
+              }`}
+              aria-label="Graph view"
+            >
+              <GitGraph className="w-4 h-4" />
+            </button>
           </div>
-        )}
+
+          {viewMode === "graph" ? (
+            <GraphView
+              notes={notes}
+              activeNoteId={selectedNoteId}
+              onSelectNote={setSelectedNoteId}
+            />
+          ) : selectedNote ? (
+            <NoteEditor note={selectedNote} onSave={updateNote} />
+          ) : (
+            <div className="flex-1 glass-panel rounded-2xl flex items-center justify-center">
+              <div className="text-muted text-sm">Select a note to view</div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

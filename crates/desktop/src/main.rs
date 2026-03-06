@@ -136,6 +136,7 @@ fn main() {
             commands::notes::note_update,
             commands::notes::note_delete,
             commands::notes::note_search,
+            commands::notes::note_links_all,
             commands::notes::notebook_list,
             commands::notes::notebook_create,
             commands::notes::notebook_update,

@@ -37,6 +37,7 @@
     "@tiptap/react": "^3.20.1",
     "@tiptap/starter-kit": "^3.20.1",
     "clsx": "^2.1.1",
+    "d3-force": "^3.0.0",
     "katex": "^0.16.35",
     "lowlight": "^3.3.0",
     "lucide-react": "^0.487.0",
@@ -50,6 +51,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.4.5",
     "@tailwindcss/vite": "^4.1.12",
+    "@types/d3-force": "^3.0.10",
     "@types/katex": "^0.16.8",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
