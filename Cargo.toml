@@ -23,6 +23,7 @@ members = [
     "crates/mcp",
     "crates/desktop-shared",
     "crates/desktop",
+    "crates/feature-notes",
     "crates/feature-productivity",
     "crates/dev-api",
 ]

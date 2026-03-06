@@ -3466,6 +3466,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "feature-notes"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "common",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "storage",
+ "tokio",
+ "tools-core",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "feature-productivity"
 version = "0.1.0"
 dependencies = [
