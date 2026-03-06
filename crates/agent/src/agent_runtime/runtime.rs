@@ -232,7 +232,10 @@ impl AgentRuntime {
 
         // Step 3: Classify intent
         let classify_start = Instant::now();
-        let mut analysis = self.analyzer.analyze(message, tool_names, Some(profile)).await;
+        let mut analysis = self
+            .analyzer
+            .analyze(message, tool_names, Some(profile))
+            .await;
         let classify_ms = classify_start.elapsed().as_millis() as u64;
         debug!(
             "AgentRuntime: classified as {:?} (source: {:?}, confidence: {:.2})",
@@ -1306,10 +1309,7 @@ mod tests {
             ];
 
             let filtered = filter_tools_for_profile(&tool_defs, &profile);
-            let names: Vec<&str> = filtered
-                .iter()
-                .filter_map(|t| tool_def_name(t))
-                .collect();
+            let names: Vec<&str> = filtered.iter().filter_map(|t| tool_def_name(t)).collect();
 
             assert!(names.contains(&"task"));
             assert!(names.contains(&"area"));
@@ -1334,10 +1334,7 @@ mod tests {
             ];
 
             let filtered = filter_tools_for_profile(&tool_defs, &profile);
-            let names: Vec<&str> = filtered
-                .iter()
-                .filter_map(|t| tool_def_name(t))
-                .collect();
+            let names: Vec<&str> = filtered.iter().filter_map(|t| tool_def_name(t)).collect();
 
             assert!(names.contains(&"task"));
             assert!(names.contains(&"mcp_linear_create_issue"));
@@ -1361,10 +1358,7 @@ mod tests {
             ];
 
             let filtered = filter_tools_for_profile(&tool_defs, &profile);
-            let names: Vec<&str> = filtered
-                .iter()
-                .filter_map(|t| tool_def_name(t))
-                .collect();
+            let names: Vec<&str> = filtered.iter().filter_map(|t| tool_def_name(t)).collect();
 
             assert!(names.contains(&"message"));
             assert!(names.contains(&"mcp_linear_create_issue"));

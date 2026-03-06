@@ -15,8 +15,8 @@ use providers::{ChatParams, DynProvider, Message};
 use tokio::sync::Mutex;
 use tracing::{debug, warn};
 
-use crate::agent_profile::AgentProfile;
 use super::types::{AnalysisSource, ComplexitySignals, ExecutionMode, FailureRisk, IntentAnalysis};
+use crate::agent_profile::AgentProfile;
 
 /// Minimum iteration budget for orchestration and MCP-tool overrides.
 pub const ORCHESTRATION_MIN_ITERATIONS: u32 = 15;
@@ -1177,7 +1177,9 @@ mod tests {
             "model",
             &OrchestratorConfig::default(),
         );
-        let result = analyzer.analyze("I need help with something", &[], None).await;
+        let result = analyzer
+            .analyze("I need help with something", &[], None)
+            .await;
         assert!(matches!(
             result.mode,
             ExecutionMode::Reactive { max_iterations: 15 }

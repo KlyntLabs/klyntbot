@@ -422,9 +422,12 @@ mcp_tools: [linear, slack]
 
 Instructions here.
 "#;
-        let profile =
-            AgentProfile::parse("communication", content, PathBuf::from("builtin::communication"))
-                .unwrap();
+        let profile = AgentProfile::parse(
+            "communication",
+            content,
+            PathBuf::from("builtin::communication"),
+        )
+        .unwrap();
         assert_eq!(profile.mcp_tools, vec!["linear", "slack"]);
         assert!(profile.allows_mcp_server("linear"));
         assert!(profile.allows_mcp_server("slack"));
@@ -441,8 +444,7 @@ tools: [task]
 
 Instructions here.
 "#;
-        let profile =
-            AgentProfile::parse("task", content, PathBuf::from("builtin::task")).unwrap();
+        let profile = AgentProfile::parse("task", content, PathBuf::from("builtin::task")).unwrap();
         assert!(profile.mcp_tools.is_empty());
         assert!(!profile.allows_mcp_server("linear"));
     }
