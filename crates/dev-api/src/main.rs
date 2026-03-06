@@ -903,6 +903,7 @@ async fn dispatch(
                         started_at: e.started_at,
                         duration_secs: e.duration_secs,
                         is_idle: e.is_idle,
+                        project_id: e.project_id,
                     })
                     .collect::<Vec<_>>()),
                 Err(e) => err(prod_err(e)),
@@ -1044,6 +1045,7 @@ async fn dispatch(
                         started_at: e.started_at,
                         duration_secs: e.duration_secs,
                         is_idle: e.is_idle,
+                        project_id: e.project_id,
                     })
                     .collect::<Vec<_>>()),
                 Err(e) => err(prod_err(e)),

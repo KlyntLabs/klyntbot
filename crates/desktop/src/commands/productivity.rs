@@ -109,7 +109,7 @@ pub(crate) fn insight_to_response(c: InsightCard) -> InsightCardResponse {
     }
 }
 
-fn event_to_timeline(e: feature_productivity::types::ActivityEvent) -> ActivityTimelineResponse {
+pub(crate) fn event_to_timeline(e: feature_productivity::types::ActivityEvent) -> ActivityTimelineResponse {
     ActivityTimelineResponse {
         app_name: e.app_name,
         window_title: e.window_title,
@@ -118,6 +118,7 @@ fn event_to_timeline(e: feature_productivity::types::ActivityEvent) -> ActivityT
         started_at: e.started_at,
         duration_secs: e.duration_secs,
         is_idle: e.is_idle,
+        project_id: e.project_id,
     }
 }
 

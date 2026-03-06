@@ -190,10 +190,11 @@ impl ActivityEventRepo {
             total_secs: i64,
         }
         let rows = sqlx::query_as::<_, Row>(
-            r#"SELECT COALESCE(site_name, app_name) AS display_name,
-                      COALESCE(SUM(duration_secs), 0) AS total_secs
-               FROM activity_events
-               WHERE started_at >= ?1 AND started_at < ?2 AND is_idle = FALSE
+            r#"SELECT COALESCE(e.site_name, p.display_name, e.app_name) AS display_name,
+                      COALESCE(SUM(e.duration_secs), 0) AS total_secs
+               FROM activity_events e
+               LEFT JOIN productivity_projects p ON e.project_id = p.id
+               WHERE e.started_at >= ?1 AND e.started_at < ?2 AND e.is_idle = FALSE
                GROUP BY display_name
                ORDER BY total_secs DESC
                LIMIT ?3"#,

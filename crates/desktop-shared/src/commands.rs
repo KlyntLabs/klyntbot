@@ -446,6 +446,7 @@ pub struct ActivityTimelineResponse {
     pub started_at: DateTime<Utc>,
     pub duration_secs: Option<i64>,
     pub is_idle: bool,
+    pub project_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

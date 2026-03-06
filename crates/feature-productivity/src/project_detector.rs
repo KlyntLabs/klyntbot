@@ -261,27 +261,30 @@ fn get_terminal_cwd(terminal_pid: i32) -> Option<PathBuf> {
         .output()
         .ok()?;
 
+    let home = dirs::home_dir().unwrap_or_default();
+
     if !output.status.success() {
         // Try finding child processes first
-        return get_child_cwd(terminal_pid);
+        return get_child_cwd(terminal_pid, &home);
     }
 
     let stdout = String::from_utf8_lossy(&output.stdout);
     for line in stdout.lines() {
         if let Some(path) = line.strip_prefix('n') {
             let p = PathBuf::from(path);
-            if p.exists() {
+            // Skip root and home — not meaningful project paths
+            if p.exists() && p != Path::new("/") && p != home {
                 return Some(p);
             }
         }
     }
 
     // Fallback: find child shell process CWD
-    get_child_cwd(terminal_pid)
+    get_child_cwd(terminal_pid, &home)
 }
 
 #[cfg(target_os = "macos")]
-fn get_child_cwd(parent_pid: i32) -> Option<PathBuf> {
+fn get_child_cwd(parent_pid: i32, home: &Path) -> Option<PathBuf> {
     use std::process::Command;
 
     // Use pgrep to find child processes
@@ -299,7 +302,7 @@ fn get_child_cwd(parent_pid: i32) -> Option<PathBuf> {
     for line in stdout.lines() {
         let child_pid: i32 = line.trim().parse().ok()?;
         // Try grandchildren first (for tmux/shell nesting)
-        if let Some(cwd) = get_child_cwd(child_pid) {
+        if let Some(cwd) = get_child_cwd(child_pid, home) {
             return Some(cwd);
         }
         // Then try this child's CWD
@@ -312,8 +315,8 @@ fn get_child_cwd(parent_pid: i32) -> Option<PathBuf> {
             for l in out.lines() {
                 if let Some(path) = l.strip_prefix('n') {
                     let p = PathBuf::from(path);
-                    // Skip home directory (not a meaningful project path)
-                    if p.exists() && p != dirs::home_dir().unwrap_or_default() {
+                    // Skip root and home — not meaningful project paths
+                    if p.exists() && p != Path::new("/") && p != home {
                         return Some(p);
                     }
                 }

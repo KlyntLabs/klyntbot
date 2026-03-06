@@ -71,7 +71,7 @@ export function TimelineBar({ date }: TimelineBarProps) {
           leftPct: (clampedStart / spanSecs) * 100,
           widthPct: Math.max(((clampedEnd - clampedStart) / spanSecs) * 100, 0.15),
           color: resolveColor(cat?.categoryType, e.isIdle),
-          label: e.siteName ?? e.appName,
+          label: e.projectId ?? e.siteName ?? e.appName,
           siteName: e.siteName,
           duration: dur,
         };

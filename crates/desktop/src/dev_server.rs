@@ -24,7 +24,8 @@ use tracing::{error, info};
 use crate::app_core::AppCore;
 use crate::commands::areas::build_area_response;
 use crate::commands::productivity::{
-    insight_to_response, project_to_response, session_to_response, summary_to_response,
+    event_to_timeline, insight_to_response, project_to_response, session_to_response,
+    summary_to_response,
 };
 use crate::commands::tasks::{
     action_to_task, action_to_today_task, kr_to_response, objective_to_response, row_to_task,
@@ -949,18 +950,8 @@ async fn dispatch(
                 .await
             {
                 Ok(events) => {
-                    let resp: Vec<ActivityTimelineResponse> = events
-                        .into_iter()
-                        .map(|e| ActivityTimelineResponse {
-                            app_name: e.app_name,
-                            window_title: e.window_title,
-                            site_name: e.site_name,
-                            category_id: e.category_id,
-                            started_at: e.started_at,
-                            duration_secs: e.duration_secs,
-                            is_idle: e.is_idle,
-                        })
-                        .collect();
+                    let resp: Vec<ActivityTimelineResponse> =
+                        events.into_iter().map(event_to_timeline).collect();
                     ok(resp)
                 }
                 Err(e) => err(prod_err(e)),
@@ -1104,18 +1095,8 @@ async fn dispatch(
             let cap: i64 = get(&body, "limit").unwrap_or(50);
             match repos.events.list_recent(cap.min(200)).await {
                 Ok(events) => {
-                    let resp: Vec<ActivityTimelineResponse> = events
-                        .into_iter()
-                        .map(|e| ActivityTimelineResponse {
-                            app_name: e.app_name,
-                            window_title: e.window_title,
-                            site_name: e.site_name,
-                            category_id: e.category_id,
-                            started_at: e.started_at,
-                            duration_secs: e.duration_secs,
-                            is_idle: e.is_idle,
-                        })
-                        .collect();
+                    let resp: Vec<ActivityTimelineResponse> =
+                        events.into_iter().map(event_to_timeline).collect();
                     ok(resp)
                 }
                 Err(e) => err(prod_err(e)),

@@ -510,6 +510,7 @@ export interface ActivityTimeline {
   startedAt: string;
   durationSecs: number | null;
   isIdle: boolean;
+  projectId: string | null;
 }
 
 export interface ActivityCategory {
