@@ -174,3 +174,32 @@
   pointer-events: none;
   height: 0;
 }
+
+/* Wiki Links */
+.wiki-link {
+  color: var(--color-brand);
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.wiki-link:hover {
+  text-decoration-style: solid;
+  opacity: 0.8;
+}
+
+/* Math */
+.math-block {
+  text-align: center;
+  margin: 1rem 0;
+  padding: 0.75rem;
+  background: color-mix(in srgb, var(--color-primary) 3%, transparent);
+  border-radius: 0.5rem;
+  overflow-x: auto;
+}
+
+.math-inline {
+  padding: 0 2px;
+  vertical-align: baseline;
+}

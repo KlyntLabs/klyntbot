@@ -3,6 +3,7 @@ use desktop_shared::commands::{
 };
 use desktop_shared::errors::ApiError;
 use desktop_shared::types::EntityKind;
+use feature_notes::link_parser;
 use feature_notes::models::{NoteRow, NotebookRow};
 use std::sync::Arc;
 use tauri::State;
@@ -33,6 +34,67 @@ async fn note_with_tags(core: &AppCore, row: &NoteRow) -> Result<NoteResponse, A
         .await
         .map_err(super::map_storage_err)?;
     Ok(note_row_to_response(row, tags))
+}
+
+/// Extract wiki-links and entity mentions from note content, updating the
+/// `note_links` and `note_entity_mentions` tables.
+/// Skips DB writes entirely when no links or mentions are found.
+async fn extract_links_and_mentions(
+    core: &AppCore,
+    note_id: &str,
+    row: &NoteRow,
+) -> Result<(), ApiError> {
+    // 1. Extract link targets from HTML (data-note-id attributes)
+    let mut target_ids: Vec<String> = Vec::new();
+    if let Some(html) = &row.body_html {
+        target_ids.extend(link_parser::extract_wiki_link_ids(html));
+    }
+
+    // 2. Also resolve [[Title]] from plain text body
+    let titles = link_parser::extract_wiki_link_titles(&row.body);
+    if !titles.is_empty() {
+        let resolved = core
+            .note_repo
+            .resolve_titles_to_ids(&titles)
+            .await
+            .map_err(super::map_storage_err)?;
+        for (_title, id) in resolved {
+            if !target_ids.contains(&id) {
+                target_ids.push(id);
+            }
+        }
+    }
+
+    // Filter out self-links
+    target_ids.retain(|id| id != note_id);
+
+    // 3. Extract entity mentions (@task:id, @project:id)
+    let mentions = link_parser::extract_entity_mentions(&row.body);
+
+    // Skip DB writes if nothing was extracted
+    if target_ids.is_empty() && mentions.is_empty() {
+        return Ok(());
+    }
+
+    if !target_ids.is_empty() {
+        core.note_repo
+            .set_links(note_id, &target_ids)
+            .await
+            .map_err(super::map_storage_err)?;
+    }
+
+    if !mentions.is_empty() {
+        let mention_tuples: Vec<(String, String)> = mentions
+            .into_iter()
+            .map(|m| (m.entity_type, m.entity_id))
+            .collect();
+        core.note_repo
+            .set_entity_mentions(note_id, &mention_tuples)
+            .await
+            .map_err(super::map_storage_err)?;
+    }
+
+    Ok(())
 }
 
 // ── Note commands ───────────────────────────────────────────────────────
@@ -135,6 +197,9 @@ pub async fn note_update(
             .await
             .map_err(super::map_storage_err)?;
     }
+
+    // Extract wiki-links and entity mentions from content
+    extract_links_and_mentions(&state, &params.id, &updated).await?;
 
     super::emit_entity_updated(&app, EntityKind::Note, &params.id);
     note_with_tags(&state, &updated).await

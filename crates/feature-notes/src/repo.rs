@@ -224,6 +224,54 @@ impl NoteRepo {
         Ok(result.rows_affected() > 0)
     }
 
+    // ── Entity Mentions ──────────────────────────
+
+    pub async fn set_entity_mentions(
+        &self,
+        note_id: &str,
+        mentions: &[(String, String)], // (entity_type, entity_id)
+    ) -> Result<(), StorageError> {
+        let mut tx = self.pool.begin().await?;
+        sqlx::query("DELETE FROM note_entity_mentions WHERE note_id = ?1")
+            .bind(note_id)
+            .execute(&mut *tx)
+            .await?;
+        for (entity_type, entity_id) in mentions {
+            sqlx::query(
+                "INSERT INTO note_entity_mentions (note_id, entity_type, entity_id) VALUES (?1, ?2, ?3)",
+            )
+            .bind(note_id)
+            .bind(entity_type)
+            .bind(entity_id)
+            .execute(&mut *tx)
+            .await?;
+        }
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// Find note IDs by their titles (case-insensitive). Returns (title, id) pairs.
+    pub async fn resolve_titles_to_ids(
+        &self,
+        titles: &[String],
+    ) -> Result<Vec<(String, String)>, StorageError> {
+        if titles.is_empty() {
+            return Ok(vec![]);
+        }
+        // Build dynamic IN clause
+        let placeholders: Vec<String> = titles.iter().enumerate().map(|(i, _)| format!("LOWER(?{})", i + 1)).collect();
+        let sql = format!(
+            "SELECT title, id FROM notes WHERE LOWER(title) IN ({}) AND archived = 0",
+            placeholders.join(", ")
+        );
+        let mut query = sqlx::query_as::<_, (String, String)>(&sql);
+        for title in titles {
+            query = query.bind(title.to_lowercase());
+        }
+        let rows = query.fetch_all(&self.pool).await?;
+        Ok(rows)
+    }
+
     // ── Links ────────────────────────────────────────
 
     pub async fn set_links(

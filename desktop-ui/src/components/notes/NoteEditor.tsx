@@ -3,6 +3,7 @@ import type { Note, NoteUpdateParams } from "../../lib/types";
 import { EditorContentWrapper, useNoteEditor } from "./editor/EditorCore";
 import { EditorToolbar } from "./editor/EditorToolbar";
 import { SlashMenu } from "./editor/SlashCommandMenu";
+import { WikiLinkMenu } from "./editor/WikiLinkNode";
 
 interface NoteEditorProps {
   note: Note;
@@ -72,6 +73,7 @@ export function NoteEditor({ note, onSave }: NoteEditorProps) {
       </div>
       <EditorContentWrapper editor={editor} />
       {editor && <SlashMenu editor={editor} />}
+      {editor && <WikiLinkMenu editor={editor} />}
     </div>
   );
 }

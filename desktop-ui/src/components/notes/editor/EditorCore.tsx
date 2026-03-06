@@ -17,7 +17,9 @@ import type { Extensions } from "@tiptap/react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { common, createLowlight } from "lowlight";
+import { MathBlock, MathInline } from "./MathNode";
 import { SlashCommandsExtension } from "./SlashCommandMenu";
+import { WikiLinkAutocomplete, WikiLinkMark } from "./WikiLinkNode";
 
 const lowlight = createLowlight(common);
 
@@ -57,6 +59,10 @@ export function getEditorExtensions(extra: Extensions = []): Extensions {
       defaultLanguage: "text",
     }),
     TextAlign.configure({ types: ["heading", "paragraph"] }),
+    WikiLinkMark,
+    WikiLinkAutocomplete,
+    MathBlock,
+    MathInline,
     SlashCommandsExtension,
     ...extra,
   ];

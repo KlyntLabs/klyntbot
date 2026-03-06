@@ -12,6 +12,7 @@ import {
   Minus,
   Pilcrow,
   Quote,
+  Sigma,
   Table,
 } from "lucide-react";
 import { type ComponentType, useCallback, useEffect, useRef, useState } from "react";
@@ -93,6 +94,18 @@ const slashCommands: SlashCommand[] = [
     aliases: ["hr", "divider", "line", "separator"],
     icon: Minus,
     action: (e, r) => e.chain().focus().deleteRange(r).setHorizontalRule().run(),
+  },
+  {
+    label: "Math Block",
+    aliases: ["math", "equation", "latex", "katex"],
+    icon: Sigma,
+    action: (e, r) => {
+      e.chain()
+        .focus()
+        .deleteRange(r)
+        .insertContent({ type: "mathBlock", attrs: { tex: "E = mc^2" } })
+        .run();
+    },
   },
 ];
 

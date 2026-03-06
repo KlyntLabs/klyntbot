@@ -8,9 +8,18 @@ interface NoteListProps {
   selectedId: string | null;
   onSelect: (id: string) => void;
   onCreate: () => void;
+  onPin: (id: string, pinned: boolean) => void;
+  onDelete: (id: string) => void;
 }
 
-export function NoteList({ notes, selectedId, onSelect, onCreate }: NoteListProps) {
+export function NoteList({
+  notes,
+  selectedId,
+  onSelect,
+  onCreate,
+  onPin,
+  onDelete,
+}: NoteListProps) {
   const [search, setSearch] = useState("");
 
   const sorted = useMemo(() => {
@@ -62,6 +71,8 @@ export function NoteList({ notes, selectedId, onSelect, onCreate }: NoteListProp
             note={note}
             selected={note.id === selectedId}
             onSelect={onSelect}
+            onPin={onPin}
+            onDelete={onDelete}
           />
         ))}
         {sorted.length === 0 && (
