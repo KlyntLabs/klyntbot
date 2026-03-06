@@ -96,12 +96,17 @@ export function setMentionMenuCallback(
   mentionMenuCallback = cb;
 }
 
+let mentionMenuFrom: number | null = null;
+
+export function resetMentionMenu() {
+  mentionMenuFrom = null;
+  mentionMenuCallback?.(null, { x: 0, y: 0 });
+}
+
 export const EntityMentionAutocomplete = Mark.create({
   name: "entityMentionAutocomplete",
 
   addProseMirrorPlugins() {
-    let menuFrom: number | null = null;
-
     return [
       new Plugin({
         key: new PluginKey("entityMentionAutocomplete"),
@@ -113,13 +118,13 @@ export const EntityMentionAutocomplete = Mark.create({
             const charBefore = from > 0 ? view.state.doc.textBetween(from - 1, from) : "";
             if (charBefore.length > 0 && !/\s/.test(charBefore)) return false;
 
-            menuFrom = from;
+            mentionMenuFrom = from;
             // Schedule after the "@" is inserted
             setTimeout(() => {
-              if (menuFrom === null) return;
+              if (mentionMenuFrom === null) return;
               const coords = view.coordsAtPos(from);
               mentionMenuCallback?.(
-                { from: menuFrom, query: "" },
+                { from: mentionMenuFrom, query: "" },
                 { x: coords.left, y: coords.bottom },
               );
             }, 0);
@@ -127,29 +132,27 @@ export const EntityMentionAutocomplete = Mark.create({
           },
 
           handleKeyDown: (view, event) => {
-            if (menuFrom === null) return false;
+            if (mentionMenuFrom === null) return false;
 
             if (event.key === "Escape" || event.key === " ") {
-              menuFrom = null;
-              mentionMenuCallback?.(null, { x: 0, y: 0 });
+              resetMentionMenu();
               return false;
             }
 
             // Update query on typing
             if (event.key.length === 1 || event.key === "Backspace") {
               setTimeout(() => {
-                if (menuFrom === null) return;
+                if (mentionMenuFrom === null) return;
                 const state = view.state;
                 const cursorPos = state.selection.from;
-                if (cursorPos <= menuFrom) {
-                  menuFrom = null;
-                  mentionMenuCallback?.(null, { x: 0, y: 0 });
+                if (cursorPos <= mentionMenuFrom) {
+                  resetMentionMenu();
                   return;
                 }
-                const query = state.doc.textBetween(menuFrom + 1, cursorPos);
+                const query = state.doc.textBetween(mentionMenuFrom + 1, cursorPos);
                 const coords = view.coordsAtPos(cursorPos);
                 mentionMenuCallback?.(
-                  { from: menuFrom, query },
+                  { from: mentionMenuFrom, query },
                   { x: coords.left, y: coords.bottom },
                 );
               }, 0);
@@ -193,7 +196,10 @@ export function EntityMentionMenu({ editor }: EntityMentionMenuProps) {
         setSelectedIndex(0);
       }
     });
-    return () => setMentionMenuCallback(null);
+    return () => {
+      resetMentionMenu();
+      setMentionMenuCallback(null);
+    };
   }, []);
 
   // Fetch task/project lists once when the menu opens, filter locally on keystroke
@@ -274,6 +280,7 @@ export function EntityMentionMenu({ editor }: EntityMentionMenuProps) {
         })
         .insertContent(" ")
         .run();
+      resetMentionMenu();
       setState(null);
     },
     [editor, state],

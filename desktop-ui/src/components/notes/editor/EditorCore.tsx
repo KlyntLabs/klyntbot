@@ -26,8 +26,16 @@ import { SlashCommandsExtension } from "./SlashCommandMenu";
 import { WikiLinkAutocomplete, WikiLinkMark } from "./WikiLinkNode";
 
 const lowlight = createLowlight(common);
+const NOOP = () => {};
 
-export function getEditorExtensions(extra: Extensions = []): Extensions {
+interface EditorExtensionOptions {
+  extra?: Extensions;
+  onNavigateNote?: (noteId: string) => void;
+  onNavigateEntity?: (entityType: string, entityId: string) => void;
+}
+
+export function getEditorExtensions(opts: EditorExtensionOptions = {}): Extensions {
+  const { extra = [], onNavigateNote, onNavigateEntity } = opts;
   return [
     StarterKit.configure({ codeBlock: false }),
     Placeholder.configure({
@@ -63,9 +71,9 @@ export function getEditorExtensions(extra: Extensions = []): Extensions {
       defaultLanguage: "text",
     }),
     TextAlign.configure({ types: ["heading", "paragraph"] }),
-    WikiLinkMark,
+    WikiLinkMark.configure({ onNavigate: onNavigateNote ?? NOOP }),
     WikiLinkAutocomplete,
-    EntityMentionMark,
+    EntityMentionMark.configure({ onNavigate: onNavigateEntity ?? NOOP }),
     EntityMentionAutocomplete,
     MathBlock,
     MathInline,
@@ -78,6 +86,8 @@ interface UseNoteEditorOptions {
   content: string;
   onUpdate: (html: string, text: string) => void;
   extensions?: Extensions;
+  onNavigateNote?: (noteId: string) => void;
+  onNavigateEntity?: (entityType: string, entityId: string) => void;
 }
 
 /** Convert a file to base64 string. */
@@ -94,9 +104,15 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
-export function useNoteEditor({ content, onUpdate, extensions = [] }: UseNoteEditorOptions) {
+export function useNoteEditor({
+  content,
+  onUpdate,
+  extensions = [],
+  onNavigateNote,
+  onNavigateEntity,
+}: UseNoteEditorOptions) {
   return useEditor({
-    extensions: getEditorExtensions(extensions),
+    extensions: getEditorExtensions({ extra: extensions, onNavigateNote, onNavigateEntity }),
     content,
     onUpdate: ({ editor: ed }) => {
       onUpdate(ed.getHTML(), ed.getText());

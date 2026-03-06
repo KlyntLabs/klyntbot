@@ -1,5 +1,6 @@
 import { History } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router";
 import { ipc } from "../../hooks/useIpc";
 import type { Note, NoteUpdateParams } from "../../lib/types";
 import { EditorContentWrapper, useNoteEditor } from "./editor/EditorCore";
@@ -18,6 +19,7 @@ interface NoteEditorProps {
 }
 
 export function NoteEditor({ note, onSave }: NoteEditorProps) {
+  const navigate = useNavigate();
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastNoteIdRef = useRef(note.id);
   const pendingRef = useRef<{ html: string; text: string } | null>(null);
@@ -66,9 +68,24 @@ export function NoteEditor({ note, onSave }: NoteEditorProps) {
     [flushSave],
   );
 
+  const handleNavigateNote = useCallback(
+    (noteId: string) => navigate(`/notes?noteId=${noteId}`),
+    [navigate],
+  );
+
+  const handleNavigateEntity = useCallback(
+    (entityType: string, entityId: string) => {
+      if (entityType === "task") navigate(`/task/${entityId}`);
+      else if (entityType === "project") navigate(`/project/${entityId}`);
+    },
+    [navigate],
+  );
+
   const editor = useNoteEditor({
     content: note.bodyHtml || note.body || "",
     onUpdate: handleUpdate,
+    onNavigateNote: handleNavigateNote,
+    onNavigateEntity: handleNavigateEntity,
   });
 
   // Flush on note change and update editor content

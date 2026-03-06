@@ -94,12 +94,17 @@ export function setWikiLinkMenuCallback(
   wikiLinkMenuCallback = cb;
 }
 
+let wikiLinkMenuFrom: number | null = null;
+
+export function resetWikiLinkMenu() {
+  wikiLinkMenuFrom = null;
+  wikiLinkMenuCallback?.(null, { x: 0, y: 0 });
+}
+
 export const WikiLinkAutocomplete = Mark.create({
   name: "wikiLinkAutocomplete",
 
   addProseMirrorPlugins() {
-    let menuFrom: number | null = null;
-
     return [
       new Plugin({
         key: new PluginKey("wikiLinkAutocomplete"),
@@ -108,31 +113,30 @@ export const WikiLinkAutocomplete = Mark.create({
             if (text === "[") {
               const charBefore = from > 0 ? view.state.doc.textBetween(from - 1, from) : "";
               if (charBefore === "[") {
-                menuFrom = from - 1;
+                wikiLinkMenuFrom = from - 1;
                 const coords = view.coordsAtPos(from);
                 wikiLinkMenuCallback?.(
-                  { from: menuFrom, query: "" },
+                  { from: wikiLinkMenuFrom, query: "" },
                   { x: coords.left, y: coords.bottom },
                 );
                 return false;
               }
             }
 
-            if (text === "]" && menuFrom !== null) {
-              menuFrom = null;
-              wikiLinkMenuCallback?.(null, { x: 0, y: 0 });
+            if (text === "]" && wikiLinkMenuFrom !== null) {
+              resetWikiLinkMenu();
               return false;
             }
 
-            if (menuFrom !== null) {
+            if (wikiLinkMenuFrom !== null) {
               setTimeout(() => {
                 const state = view.state;
                 const cursorPos = state.selection.from;
-                if (menuFrom !== null && cursorPos > menuFrom + 2) {
-                  const query = state.doc.textBetween(menuFrom + 2, cursorPos);
+                if (wikiLinkMenuFrom !== null && cursorPos > wikiLinkMenuFrom + 2) {
+                  const query = state.doc.textBetween(wikiLinkMenuFrom + 2, cursorPos);
                   const coords = view.coordsAtPos(cursorPos);
                   wikiLinkMenuCallback?.(
-                    { from: menuFrom, query },
+                    { from: wikiLinkMenuFrom, query },
                     { x: coords.left, y: coords.bottom },
                   );
                 }
@@ -172,7 +176,10 @@ export function WikiLinkMenu({ editor }: WikiLinkMenuProps) {
         setSelectedIndex(0);
       }
     });
-    return () => setWikiLinkMenuCallback(null);
+    return () => {
+      resetWikiLinkMenu();
+      setWikiLinkMenuCallback(null);
+    };
   }, []);
 
   // Search notes as user types
@@ -208,6 +215,7 @@ export function WikiLinkMenu({ editor }: WikiLinkMenuProps) {
           marks: [{ type: "wikiLink", attrs: { noteId: note.id, title: note.title } }],
         })
         .run();
+      resetWikiLinkMenu();
       setState(null);
     },
     [editor, state],

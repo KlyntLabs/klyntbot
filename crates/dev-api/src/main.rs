@@ -475,6 +475,20 @@ async fn dispatch(
 ) -> ApiResult {
     match cmd.as_str() {
         // ── Tasks ──────────────────────────────────────────────
+        "task_get" => {
+            let id = match get_str(&body, "id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            match core.repos.actions.get(&id).await {
+                Ok(Some(row)) => match row_to_task(&core.repos, &row).await {
+                    Ok(task) => ok(task),
+                    Err(e) => err(e),
+                },
+                Ok(None) => ok(serde_json::Value::Null),
+                Err(e) => err(storage_err(e)),
+            }
+        }
         "task_list" => {
             let filter = ActionFilter {
                 area_id: get(&body, "area_id"),
