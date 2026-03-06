@@ -12,16 +12,6 @@ function stripBrowserSuffix(title: string): string {
   return title.replace(BROWSER_RE, "").trim();
 }
 
-const TERMINAL_APPS = new Set([
-  "ghostty",
-  "iterm2",
-  "terminal",
-  "warp",
-  "alacritty",
-  "kitty",
-  "hyper",
-]);
-
 function resolveDisplayName(e: ActivityTimeline): { name: string; subtitle?: string } {
   if (e.isIdle) return { name: "Idle" };
   if (e.siteName && e.windowTitle) {
@@ -30,9 +20,9 @@ function resolveDisplayName(e: ActivityTimeline): { name: string; subtitle?: str
       return { name: e.siteName, subtitle: pageTitle };
     }
   }
-  // Terminal apps: show project name as primary, app name as subtitle
-  if (e.projectId && TERMINAL_APPS.has(e.appName.toLowerCase())) {
-    return { name: e.projectId, subtitle: e.appName };
+  // Apps with a detected project: show app name primary, project as subtitle
+  if (e.projectId) {
+    return { name: e.appName, subtitle: e.projectId };
   }
   return { name: e.siteName ?? e.appName };
 }
