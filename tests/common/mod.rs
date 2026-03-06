@@ -18,7 +18,7 @@ use tools::todo_types::{Todo, TodoStatus};
 // Re-exports for convenience (not all test binaries use every mock)
 #[allow(unused_imports)]
 pub use mocks::{
-    ErrorProvider, MockCalendarHandler, MockConversationEmbeddingHandler, MockEmbeddingHandler,
+    ErrorProvider, MockConversationEmbeddingHandler, MockEmbeddingHandler,
     MockLearningHandler, MockProvider,
 };
 
@@ -238,10 +238,3 @@ pub async fn test_memory_note_repo() -> klyntbot::storage::MemoryNoteRepo {
     klyntbot::storage::MemoryNoteRepo::new(test_pool().await.inner().clone())
 }
 
-pub async fn test_calendar_sync_repo() -> klyntbot::storage::CalendarSyncRepo {
-    klyntbot::storage::CalendarSyncRepo::new(test_pool().await.inner().clone())
-}
-
-pub async fn test_event_cache_repo() -> klyntbot::storage::CalendarEventCacheRepo {
-    klyntbot::storage::CalendarEventCacheRepo::new(test_pool().await.inner().clone())
-}

@@ -5,8 +5,6 @@ pub mod agent_adaptation;
 pub mod agent_task;
 pub mod area;
 pub mod behavioral_pattern;
-pub mod calendar_event_cache;
-pub mod calendar_sync;
 pub mod cron;
 pub mod decision_log;
 pub mod finance_account_repo;
@@ -36,8 +34,6 @@ pub use agent_adaptation::AgentAdaptationRepo;
 pub use agent_task::AgentTaskRepo;
 pub use area::AreaRepo;
 pub use behavioral_pattern::BehavioralPatternRepo;
-pub use calendar_event_cache::CalendarEventCacheRepo;
-pub use calendar_sync::CalendarSyncRepo;
 pub use cron::CronRepo;
 pub use decision_log::DecisionLogRepo;
 pub use finance_account_repo::FinanceAccountRepo;
@@ -76,8 +72,6 @@ pub struct Repos {
     pub strategies: StrategyRepo,
     pub usage: UsageRepo,
     pub cron: CronRepo,
-    pub calendar_sync: CalendarSyncRepo,
-    pub calendar_event_cache: CalendarEventCacheRepo,
     pub memory_notes: MemoryNoteRepo,
     pub learning_state: LearningStateRepo,
     pub decision_log: DecisionLogRepo,
@@ -105,8 +99,6 @@ impl Repos {
             strategies: StrategyRepo::new(db.clone()),
             usage: UsageRepo::new(db.clone()),
             cron: CronRepo::new(db.clone()),
-            calendar_sync: CalendarSyncRepo::new(db.clone()),
-            calendar_event_cache: CalendarEventCacheRepo::new(db.clone()),
             memory_notes: MemoryNoteRepo::new(db.clone()),
             learning_state: LearningStateRepo::new(db.clone()),
             decision_log: DecisionLogRepo::new(db.clone()),

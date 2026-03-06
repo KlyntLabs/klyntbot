@@ -544,10 +544,6 @@ impl AppCore {
                                     "weekly_report",
                                     "Generate weekly progress report using the weekly-report skill",
                                 ),
-                                "__klyntbot_calendar_sync" => (
-                                    "calendar_sync",
-                                    "Sync calendar events with configured providers",
-                                ),
                                 "__klyntbot_daily_planning" => {
                                     ("daily_planning", "/daily-planning")
                                 }
@@ -639,18 +635,6 @@ impl AppCore {
             },
             "Generate weekly progress report"
         );
-
-        // Calendar sync
-        if config.calendar.is_any_enabled() {
-            let interval = config.calendar.min_sync_interval_secs();
-            ensure_job!(
-                "__klyntbot_calendar_sync",
-                scheduling::CronSchedule::Every {
-                    every_ms: interval * 1000,
-                },
-                "Sync calendar events"
-            );
-        }
 
         // Daily planning
         if config.todo.daily_planning.enabled {

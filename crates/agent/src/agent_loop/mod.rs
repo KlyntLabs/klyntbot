@@ -21,7 +21,7 @@ use session::SessionManager;
 use tokio::sync::mpsc;
 use tools::RoutingContext;
 
-use super::{AgentEvent, CalendarSyncAdapter};
+use super::AgentEvent;
 
 /// Handle for consuming streaming agent output.
 pub struct StreamingHandle {
@@ -50,10 +50,8 @@ pub struct AgentLoop {
     pub(crate) last_active_channel: Option<LastActiveChannel>,
     pub(crate) reminder_engine: Option<Arc<RwLock<super::ReminderEngine>>>,
     pub(crate) recurring_task_spawner: Option<Arc<RwLock<super::RecurringTaskSpawner>>>,
-    /// Held for lifetime; shared with CalendarSyncAdapter
+    /// Held for lifetime; shared with notification targets
     pub(crate) _notification_dispatcher: Option<Arc<super::NotificationDispatcher>>,
-    /// Calendar sync adapter (shared with ReminderEngine)
-    pub(crate) _calendar_adapter: Option<Arc<CalendarSyncAdapter>>,
     /// Conversation embedding handler for semantic memory (Phase 4.1)
     pub(crate) conversation_embedding_handler: Option<Arc<dyn tools::ConversationEmbeddingHandler>>,
     /// Background learning service for adaptive threshold updates (None if learning disabled)

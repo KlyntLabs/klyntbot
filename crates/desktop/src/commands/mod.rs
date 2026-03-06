@@ -1,5 +1,4 @@
 pub mod areas;
-pub mod calendar;
 pub mod chat;
 pub mod distraction;
 pub mod finance;

@@ -6,7 +6,6 @@ use async_trait::async_trait;
 use serde_json::Value;
 use std::sync::Arc;
 
-use crate::calendar_sync::CalendarSyncHandler;
 use crate::embedding::EmbeddingHandler;
 use crate::enrichment::{EnrichmentFeedbackHandler, EnrichmentHandler};
 use crate::types::{Action, Attachment, TimeEntry};
@@ -17,13 +16,12 @@ use tools_core::{ParamExtractor, RoutingContext, Tool};
 // Type alias for backward compat
 pub type TodoTool = TaskTool;
 
-/// TaskTool: full action/task management with optional enrichment, embedding, and calendar sync.
+/// TaskTool: full action/task management with optional enrichment and embedding.
 pub struct TaskTool {
     pub(crate) repo: ActionRepo,
     pub(crate) max_focus_slots: usize,
     pub(crate) focus_deadline_hours: u64,
     pub(crate) timezone: String,
-    pub(crate) calendar_handler: Option<Arc<dyn CalendarSyncHandler>>,
     pub(crate) enrichment_handler: Option<Arc<dyn EnrichmentHandler>>,
     pub(crate) embedding_handler: Option<Arc<dyn EmbeddingHandler>>,
     /// LanceDB vector store for semantic search.
@@ -50,7 +48,6 @@ impl TaskTool {
             max_focus_slots,
             focus_deadline_hours,
             timezone,
-            calendar_handler: None,
             enrichment_handler: None,
             embedding_handler: None,
             embedding_store: None,
@@ -60,12 +57,6 @@ impl TaskTool {
             enrichment_threshold: 0.70,
             progress_handler: None,
         }
-    }
-
-    /// Attach a calendar sync handler.
-    pub fn with_calendar_handler(mut self, handler: Arc<dyn CalendarSyncHandler>) -> Self {
-        self.calendar_handler = Some(handler);
-        self
     }
 
     /// Attach an enrichment handler.

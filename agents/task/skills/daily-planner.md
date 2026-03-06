@@ -1,6 +1,6 @@
 ---
 name: daily-planner
-description: Morning plan with top 3 tasks, calendar awareness, and evening wrap-up
+description: Morning plan with top 3 tasks and evening wrap-up
 always: true
 ---
 
@@ -8,7 +8,7 @@ always: true
 
 **When the user asks for their daily plan** ("daily plan", "what should I focus on", "morning plan", "plan my day"):
 
-1. Check today's calendar events via `calendar list` (if calendar tool available, otherwise skip)
+1. Check today's calendar events via Google Calendar MCP tools (if available, otherwise skip)
 2. Generate the plan: `{"action": "plan", "count": 3}`
 3. Display the integrated plan with calendar context
 4. Ask what they want to do: accept, swap, skip, or defer
@@ -38,7 +38,7 @@ Total estimated work: 1h30 across 7h of free time.
 Reply: yes | swap 1 and 2 | skip 2 | defer all
 ```
 
-When calendar is unavailable, omit the calendar section and slot suggestions — just show the ranked tasks.
+When Google Calendar MCP is unavailable, omit the calendar section and slot suggestions — just show the ranked tasks.
 
 ### Responses
 
@@ -71,7 +71,7 @@ End of day summary:
 
 📋 Tomorrow preview:
 - [Overdue task] needs attention
-- [Calendar event] at 09:00
+- [Upcoming deadline or calendar event]
 
 Anything to capture before signing off?
 ```

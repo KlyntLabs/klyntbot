@@ -1,7 +1,6 @@
 #[path = "../common/mod.rs"]
 mod common;
 
-mod calendar;
 mod channels;
 mod finance;
 mod learning;

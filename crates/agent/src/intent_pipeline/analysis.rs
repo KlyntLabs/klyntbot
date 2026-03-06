@@ -305,7 +305,7 @@ fn detect_sequential_language(msg: &str) -> bool {
 /// Check if a message contains triggers from 2+ different agent domains.
 fn has_multi_agent_triggers(msg: &str) -> bool {
     let agent_trigger_groups: &[&[&str]] = &[
-        // task agent triggers
+        // task agent triggers (includes calendar — handled via MCP)
         &[
             "todo",
             "task",
@@ -315,6 +315,12 @@ fn has_multi_agent_triggers(msg: &str) -> bool {
             "project",
             "area",
             "objective",
+            "calendar",
+            "schedule",
+            "meeting",
+            "event",
+            "appointment",
+            "remind",
         ],
         // finance agent triggers
         &[
@@ -327,15 +333,6 @@ fn has_multi_agent_triggers(msg: &str) -> bool {
             "finance",
             "spending",
             "investment",
-        ],
-        // calendar agent triggers
-        &[
-            "calendar",
-            "schedule",
-            "meeting",
-            "event",
-            "appointment",
-            "remind",
         ],
         // automation agent triggers
         &["cron", "automate", "schedule a", "every day", "recurring"],

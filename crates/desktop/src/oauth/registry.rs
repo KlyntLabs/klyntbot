@@ -124,21 +124,6 @@ pub static PROVIDERS: &[OAuthProviderDef] = &[
         client_id_env: "KLYNT_GOOGLE_DRIVE_CLIENT_ID",
         client_secret_env: "KLYNT_GOOGLE_DRIVE_CLIENT_SECRET",
     },
-    OAuthProviderDef {
-        id: "google-calendar",
-        authorize_url: "https://accounts.google.com/o/oauth2/v2/auth",
-        token_url: "https://oauth2.googleapis.com/token",
-        scopes: "https://www.googleapis.com/auth/calendar",
-        env_var: "GOOGLE_CALENDAR_ACCESS_TOKEN",
-        supports_refresh: true,
-        requires_offline: true,
-        default_client_id: env_or_empty(option_env!("KLYNT_BUILD_GOOGLE_CALENDAR_CLIENT_ID")),
-        default_client_secret: env_or_empty(option_env!(
-            "KLYNT_BUILD_GOOGLE_CALENDAR_CLIENT_SECRET"
-        )),
-        client_id_env: "KLYNT_GOOGLE_CALENDAR_CLIENT_ID",
-        client_secret_env: "KLYNT_GOOGLE_CALENDAR_CLIENT_SECRET",
-    },
 ];
 
 /// Look up an OAuth provider by its ID.

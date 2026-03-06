@@ -3,7 +3,6 @@
 //! Split into submodules by config section:
 //! - `core`: Secret, Config (root composition)
 //! - `agents`: AgentsConfig, AgentDefaults
-//! - `calendar`: CalendarConfig, provider configs
 //! - `channels`: All chat channel configuration structs
 //! - `confidence`: ConfidenceConfig
 //! - `conversation`: ConversationConfig, embedding/search
@@ -16,7 +15,6 @@
 //! - `tools`: ToolsConfig, permissions, exec, web
 
 mod agents;
-mod calendar;
 mod channels;
 mod confidence;
 mod conversation;
@@ -35,7 +33,6 @@ mod todo;
 mod tools;
 
 pub use self::agents::*;
-pub use self::calendar::*;
 pub use self::channels::*;
 pub use self::confidence::*;
 pub use self::conversation::*;
@@ -380,57 +377,6 @@ mod tests {
 
     #[test]
     fn test_config_serde_roundtrips() {
-        // CalendarConfig serialization
-        let cal_config = CalendarConfig {
-            providers: vec![
-                CalendarProviderConfig::Apple(AppleCalendarConfig {
-                    enabled: true,
-                    username: "user@apple.com".to_string(),
-                    password: Secret::new("pass".to_string()),
-                    ..AppleCalendarConfig::default()
-                }),
-                CalendarProviderConfig::Google(GoogleCalendarConfig {
-                    enabled: true,
-                    client_id: "id123".to_string(),
-                    client_secret: Secret::new("secret".to_string()),
-                    access_token: Secret::new("tok".to_string()),
-                    refresh_token: Secret::new("ref".to_string()),
-                    ..GoogleCalendarConfig::default()
-                }),
-            ],
-            conflict_resolution: "server_wins".to_string(),
-            ..CalendarConfig::default()
-        };
-
-        let json = serde_json::to_string(&cal_config).unwrap();
-        assert!(json.contains("\"providers\""));
-        assert!(json.contains("\"type\":\"apple\""));
-        assert!(json.contains("\"user@apple.com\""));
-
-        // CalendarConfig roundtrip
-        let deserialized: CalendarConfig = serde_json::from_str(&json).unwrap();
-        assert_eq!(cal_config.providers.len(), deserialized.providers.len());
-        assert_eq!(
-            cal_config.conflict_resolution,
-            deserialized.conflict_resolution
-        );
-
-        // Config-level calendar serialization
-        let mut config = Config::default();
-        config
-            .calendar
-            .providers
-            .push(CalendarProviderConfig::Apple(AppleCalendarConfig {
-                enabled: true,
-                username: "test@example.com".to_string(),
-                password: Secret::new("password123".to_string()),
-                ..AppleCalendarConfig::default()
-            }));
-        let json = serde_json::to_string_pretty(&config).unwrap();
-        assert!(json.contains("\"calendar\""));
-        assert!(json.contains("\"providers\""));
-        assert!(json.contains("\"test@example.com\""));
-
         // DailyPlanningConfig roundtrip
         let daily = DailyPlanningConfig {
             enabled: false,

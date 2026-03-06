@@ -1157,7 +1157,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_delegation_tool_injected_for_general_agent() {
-        // The general agent has can_delegate_to: [task, finance, calendar, automation, communication]
+        // The general agent has can_delegate_to: [task, finance, automation, communication]
         // When delegation_self_ref is set and depth < max, the delegate tool should be added.
         let provider = MockProvider::new(vec![text_response("Hello!")]);
         let runtime = make_delegation_runtime(provider).await;

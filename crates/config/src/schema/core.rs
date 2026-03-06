@@ -5,7 +5,7 @@ use std::fmt;
 use std::path::PathBuf;
 
 use super::agents::AgentsConfig;
-use super::calendar::CalendarConfig;
+
 use super::channels::ChannelsConfig;
 use super::confidence::ConfidenceConfig;
 use super::conversation::ConversationConfig;
@@ -101,9 +101,6 @@ pub struct Config {
 
     #[serde(default)]
     pub confidence: ConfidenceConfig,
-
-    #[serde(default)]
-    pub calendar: CalendarConfig,
 
     #[serde(default)]
     pub project: ProjectConfig,

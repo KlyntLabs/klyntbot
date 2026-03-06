@@ -29,9 +29,6 @@ pub enum KlyntbotError {
     #[error("Cron error: {0}")]
     Cron(String),
 
-    #[error("Calendar error: {0}")]
-    Calendar(String),
-
     #[error("Goal error: {0}")]
     Goal(String),
 
@@ -246,10 +243,6 @@ mod tests {
         assert_eq!(
             KlyntbotError::Cron("bad cron".into()).to_string(),
             "Cron error: bad cron"
-        );
-        assert_eq!(
-            KlyntbotError::Calendar("sync failed".into()).to_string(),
-            "Calendar error: sync failed"
         );
         assert_eq!(
             KlyntbotError::Goal("not found".into()).to_string(),

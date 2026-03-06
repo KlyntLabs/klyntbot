@@ -90,7 +90,7 @@ impl Tool for DelegationTool {
     }
 
     fn description(&self) -> &str {
-        "Delegate a query to a specialist agent. You MUST use this tool for any domain-specific work (tasks, finance, calendar, etc.). Each specialist has the tools needed for their domain."
+        "Delegate a query to a specialist agent. You MUST use this tool for any domain-specific work (tasks, finance, etc.). Each specialist has the tools needed for their domain."
     }
 
     fn permission_level(&self) -> PermissionLevel {
@@ -199,7 +199,7 @@ mod tests {
     #[tokio::test]
     async fn test_delegation_tool_without_handler_errors() {
         let tool = DelegationTool::new();
-        let args = serde_json::json!({"agent": "calendar", "query": "list events"});
+        let args = serde_json::json!({"agent": "task", "query": "list tasks"});
         let result = tool.execute(args, &test_ctx()).await;
         assert!(result.is_err());
     }
@@ -217,7 +217,7 @@ mod tests {
     #[tokio::test]
     async fn test_delegation_tool_disallowed_agent() {
         let tool = DelegationTool::with_handler(mock_handler())
-            .with_allowed_agents(vec!["task".to_string(), "calendar".to_string()]);
+            .with_allowed_agents(vec!["task".to_string()]);
         let args = serde_json::json!({"agent": "finance", "query": "show budget"});
         let result = tool.execute(args, &test_ctx()).await;
         assert!(result.is_err());

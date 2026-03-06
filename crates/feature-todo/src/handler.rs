@@ -2,30 +2,11 @@
 
 use chrono::Utc;
 use std::sync::Arc;
-use tracing::warn;
 
 use crate::enrichment::{EnrichmentFeedbackEntry, EnrichmentFeedbackHandler, EnrichmentResult};
 use crate::tool::TaskTool;
 
 impl TaskTool {
-    /// Push a single task to calendar (best-effort).
-    pub(crate) async fn push_task_to_calendar(&self, task_id: &str) {
-        if let Some(handler) = &self.calendar_handler {
-            if let Err(e) = handler.push_task(task_id).await {
-                warn!("Calendar push for task {} failed: {}", task_id, e);
-            }
-        }
-    }
-
-    /// Remove a calendar event by UID (best-effort).
-    pub(crate) async fn remove_event_from_calendar(&self, uid: &str) {
-        if let Some(handler) = &self.calendar_handler {
-            if let Err(e) = handler.remove_event(uid).await {
-                warn!("Calendar event removal for {} failed: {}", uid, e);
-            }
-        }
-    }
-
     /// Record enrichment feedback for all suggestion fields.
     ///
     /// When `accepted_override` is `Some(true)`, all fields are marked accepted.

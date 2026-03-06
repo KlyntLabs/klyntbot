@@ -40,7 +40,6 @@ pub enum SidebarItem {
     Chat,
     Tasks,
     Okr,
-    Calendar,
     Settings,
 }
 

@@ -108,7 +108,7 @@ Lessons from "Increase user retention":
 For Q2, consider:
 - Continuing objectives that scored 0.4–0.6 (adjust targets)
 - New objectives based on neglected areas
-- Objectives aligned with upcoming calendar milestones
+- Objectives aligned with upcoming milestones
 
 What are your top 2–3 objectives for Q2?
 ```

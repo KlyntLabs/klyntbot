@@ -205,8 +205,6 @@ fn main() {
             // Permissions
             commands::permissions::permissions_check_accessibility,
             commands::permissions::permissions_open_accessibility,
-            // Calendar
-            commands::calendar::calendar_events,
             // Settings (MCP)
             commands::settings::mcp_get_config,
             commands::settings::mcp_add_server,

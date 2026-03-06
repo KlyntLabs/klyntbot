@@ -57,7 +57,6 @@ impl TaskTool {
                     }
                 }
 
-                self.push_task_to_calendar(id).await;
                 Ok(format!("Updated task: {}", action.title))
             }
             Err(storage::StorageError::NotFound(msg)) => {
@@ -161,10 +160,6 @@ impl TaskTool {
             Err(e) => Err(e.into()),
         };
 
-        if result.is_ok() {
-            self.push_task_to_calendar(id).await;
-        }
-
         result
     }
 
@@ -241,7 +236,6 @@ impl TaskTool {
                 self.repo.update(&patch).await?;
                 self.record_enrichment_feedback(id, &result, Some(true))
                     .await;
-                self.push_task_to_calendar(id).await;
 
                 Ok(format!(
                     "Enriched task {} with: {}\n\nSuggestions:\n{}",
@@ -333,10 +327,6 @@ impl TaskTool {
             }
             Err(e) => Err(e.into()),
         };
-
-        if result.is_ok() {
-            self.push_task_to_calendar(id).await;
-        }
 
         result
     }

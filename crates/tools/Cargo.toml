@@ -17,7 +17,6 @@ config.workspace = true
 storage.workspace = true
 feature-todo.workspace = true
 bus.workspace = true
-calendar.workspace = true
 domain.workspace = true
 async-trait.workspace = true
 serde_json = { workspace = true }

@@ -2,7 +2,7 @@
 //!
 //! This crate provides:
 //! - Core tool implementations: filesystem (x4), web (x2), message, spawn, cron
-//! - Domain tool interfaces: calendar, learning, memory, project, area, okr
+//! - Domain tool interfaces: learning, memory, project, area, okr
 //! - Embedding infrastructure: engine (fastembed), store (LanceDB)
 //! - Tool registry and permissions
 //!
@@ -31,7 +31,6 @@ pub mod web;
 
 // ── Domain tool interfaces (handler traits + tool impls) ─────────────────────
 pub mod area_tool;
-pub mod calendar_tool;
 pub mod learning_tool;
 pub mod memory_tool;
 pub mod okr_tool;
@@ -60,9 +59,6 @@ pub use agent_task_tool::{AgentTaskHandler, AgentTaskTool};
 
 // Area
 pub use area_tool::AreaTool;
-
-// Calendar
-pub use calendar_tool::{CalendarHandler, CalendarTool};
 
 // Delegation
 pub use delegation::{DelegationHandler, DelegationTool};

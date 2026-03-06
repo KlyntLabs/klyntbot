@@ -818,7 +818,6 @@ fn tool_domain(tool_name: &str) -> Option<&'static str> {
         "area" => Some("area"),
         "okr" => Some("objective"),
         "finance" => Some("finance"),
-        "calendar" => Some("calendar"),
         _ => None,
     }
 }
@@ -925,7 +924,7 @@ async fn resolve_ancestry(
             // The entity IS the area
             (Some(id.to_string()), None)
         }
-        // finance, calendar — no PARA ancestry
+        // finance — no PARA ancestry
         _ => (None, None),
     }
 }

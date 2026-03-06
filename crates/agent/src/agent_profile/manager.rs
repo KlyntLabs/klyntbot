@@ -18,7 +18,6 @@ const BUILTIN_AGENTS: &[(&str, &str)] = &[
     include_agent!("general"),
     include_agent!("task"),
     include_agent!("finance"),
-    include_agent!("calendar"),
     include_agent!("automation"),
     include_agent!("communication"),
 ];
@@ -55,7 +54,6 @@ const BUILTIN_AGENT_SKILLS: &[(&str, &str, &str)] = &[
     include_agent_skill!("task", "retrospective"),
     include_agent_skill!("finance", "budgeting"),
     include_agent_skill!("finance", "spending-analysis"),
-    include_agent_skill!("calendar", "scheduling"),
     include_agent_skill!("automation", "cron"),
 ];
 
@@ -229,7 +227,7 @@ mod tests {
         assert!(mgr.get("general").is_some());
         assert!(mgr.get("task").is_some());
         assert!(mgr.get("finance").is_some());
-        assert!(mgr.get("calendar").is_some());
+
     }
 
     #[test]

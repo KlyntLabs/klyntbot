@@ -15,7 +15,7 @@ mod tests {
         ActionAttachmentRow, ActionDependencyRow, ActionRow, ActionTimeEntryRow,
     };
     use crate::rows::area::AreaRow;
-    use crate::rows::calendar::{CalendarEventCacheRow, CalendarSyncStateRow};
+
     use crate::rows::cron::CronJobRow;
     use crate::rows::finance::{
         BudgetUsageRow, FinanceAccountRow, FinanceBudgetRow, FinanceGoalRow, FinanceInvestmentRow,
@@ -233,31 +233,7 @@ mod tests {
                 })
                 .unwrap(),
             ),
-            (
-                "CalendarSyncStateRow",
-                serde_json::to_value(&CalendarSyncStateRow {
-                    provider_id: "g".to_string(),
-                    sync_token: None,
-                    last_sync_at: None,
-                })
-                .unwrap(),
-            ),
-            (
-                "CalendarEventCacheRow",
-                serde_json::to_value(&CalendarEventCacheRow {
-                    uid: "u".to_string(),
-                    provider_id: "g".to_string(),
-                    summary: "s".to_string(),
-                    description: None,
-                    start_at: now,
-                    end_at: now,
-                    source: "caldav".to_string(),
-                    etag: None,
-                    status: None,
-                    cached_at: now,
-                })
-                .unwrap(),
-            ),
+
             (
                 "CronJobRow",
                 serde_json::to_value(&CronJobRow {

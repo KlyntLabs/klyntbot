@@ -10,7 +10,7 @@ use std::collections::HashMap;
 pub enum PermissionLevel {
     /// Read-only tools (e.g., read_file, list_dir, web_search)
     ReadOnly = 0,
-    /// Standard tools (e.g., todo, project, calendar, memory)
+    /// Standard tools (e.g., todo, project, memory)
     Standard = 1,
     /// Elevated tools (e.g., exec, write_file, edit_file)
     Elevated = 2,

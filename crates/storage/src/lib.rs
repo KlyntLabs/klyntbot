@@ -28,8 +28,6 @@ pub use repos::project_repo::{ProjectFilter, ProjectPatch, ProjectRepo, ProjectW
 pub use repos::AgentAdaptationRepo;
 pub use repos::AgentTaskRepo;
 pub use repos::BehavioralPatternRepo;
-pub use repos::CalendarEventCacheRepo;
-pub use repos::CalendarSyncRepo;
 pub use repos::CronRepo;
 pub use repos::DecisionLogRepo;
 pub use repos::InteractionLogRepo;
@@ -54,7 +52,6 @@ pub use repos::FinanceTransactionRepo;
 pub use rows::action::{ActionAttachmentRow, ActionDependencyRow, ActionRow, ActionTimeEntryRow};
 pub use rows::agent_task::AgentTaskRow;
 pub use rows::area::AreaRow;
-pub use rows::calendar::{CalendarEventCacheRow, CalendarSyncStateRow};
 pub use rows::cron::CronJobRow;
 pub use rows::key_result::KeyResultRow;
 pub use rows::learning::{

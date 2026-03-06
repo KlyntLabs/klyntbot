@@ -7,7 +7,7 @@
 //! - `engine` — orchestrator that coordinates individual enrichment strategies
 //! - `priority` — keyword/context-based priority inference
 //! - `duration` — heuristic duration prediction from title, tags, and historical data
-//! - `scheduling` — due-date suggestion based on workload and calendar availability
+//! - `scheduling` — due-date suggestion based on workload
 
 pub mod duration;
 pub mod engine;

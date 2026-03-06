@@ -104,8 +104,6 @@ impl TaskTool {
             }
         }
 
-        self.push_task_to_calendar(&created.id).await;
-
         // Emit entity card for inline display
         if let Some(ref tx) = ctx.entity_tx {
             let subtitle = {

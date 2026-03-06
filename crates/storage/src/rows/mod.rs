@@ -3,7 +3,6 @@
 pub mod action;
 pub mod agent_task;
 pub mod area;
-pub mod calendar;
 pub mod cron;
 pub mod finance;
 pub mod key_result;

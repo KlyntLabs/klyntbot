@@ -16,7 +16,6 @@ use session::SessionManager;
 use tools::{
     area_tool::AreaTool,
     browser::BrowserTool,
-    calendar_tool::{CalendarHandler, CalendarTool},
     cron_tool::CronTool,
     filesystem::register_fs_tools,
     learning_tool::{LearningHandler, LearningTool},
@@ -34,7 +33,7 @@ use super::super::context_sources::{
     AgentContextSource, AreaSource, BootstrapSource, IdentitySource, LearningContextSource,
     PageContextSource, PersonaContextSource, ProductivityContextSource, TodoSource,
 };
-use super::super::{CalendarSyncAdapter, CronHandlerAdapter, SubagentManager};
+use super::super::{CronHandlerAdapter, SubagentManager};
 use super::{AgentLoop, LastActiveChannel};
 
 /// Builder for constructing an [`AgentLoop`] with all its dependencies.
@@ -314,29 +313,6 @@ impl AgentLoopBuilder {
             None
         };
 
-        // ── Calendar tool ─────────────────────────────────────────────────
-        let calendar_adapter = if config.calendar.is_any_enabled() {
-            let adapter = Arc::new(
-                CalendarSyncAdapter::new(
-                    repos.actions.clone(),
-                    repos.calendar_sync.clone(),
-                    repos.calendar_event_cache.clone(),
-                    &config.calendar,
-                    config.timezone.clone(),
-                    notification_dispatcher.clone(),
-                    config.calendar.bidirectional_sync,
-                )
-                .await?,
-            );
-
-            tool_registry.register(CalendarTool::new(
-                Arc::clone(&adapter) as Arc<dyn CalendarHandler>
-            ));
-            Some(adapter)
-        } else {
-            None
-        };
-
         // ── Learning: outcome store ────────────────────────────
         let outcome_store = if config.learning.enabled {
             Some(Arc::new(RwLock::new(crate::learning::OutcomeStore::new(
@@ -382,17 +358,6 @@ impl AgentLoopBuilder {
                 config.todo.focus.deadline_hours,
                 config.timezone.clone(),
             );
-
-            // Inject calendar handler
-            if let Some(ref adapter) = calendar_adapter {
-                let todo_cal_sync =
-                    Arc::new(crate::calendar_sync_adapter::TodoCalendarSyncAdapter::new(
-                        Arc::clone(adapter) as Arc<dyn CalendarHandler>,
-                    ));
-                todo_tool = todo_tool.with_calendar_handler(
-                    todo_cal_sync as Arc<dyn feature_todo::CalendarSyncHandler>,
-                );
-            }
 
             // Set enrichment threshold from config
             todo_tool =
@@ -679,12 +644,8 @@ impl AgentLoopBuilder {
 
         // ── Reminder engine ───────────────────────────────────────────────
         let reminder_engine = if let Some(ref dispatcher) = notification_dispatcher {
-            let calendar_handler_opt = calendar_adapter
-                .as_ref()
-                .map(|adapter| Arc::clone(adapter) as Arc<dyn CalendarHandler>);
             let mut engine = super::super::ReminderEngine::new(
                 repos.actions.clone(),
-                calendar_handler_opt,
                 Arc::clone(dispatcher),
                 std::time::Duration::from_secs(300),
             );
@@ -899,7 +860,6 @@ impl AgentLoopBuilder {
             reminder_engine,
             recurring_task_spawner,
             _notification_dispatcher: notification_dispatcher,
-            _calendar_adapter: calendar_adapter,
             conversation_embedding_handler,
             learning_service,
             runtime,

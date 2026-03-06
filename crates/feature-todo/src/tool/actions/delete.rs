@@ -9,26 +9,11 @@ impl TaskTool {
     pub(crate) async fn handle_delete(&self, p: &ParamExtractor<'_>) -> Result<String> {
         let id = p.required_str("id")?;
 
-        // Capture calendar UID before deletion so we can remove the event
-        let calendar_uid = self
-            .repo
-            .get(id)
-            .await?
-            .and_then(|row| row.calendar_event_uid);
-
-        let result = if self.repo.delete(id).await? {
+        if self.repo.delete(id).await? {
             Ok(format!("Deleted task: {}", id))
         } else {
             Err(ToolError::ExecutionFailed(format!("Task not found: {}", id)).into())
-        };
-
-        if result.is_ok() {
-            if let Some(uid) = calendar_uid {
-                self.remove_event_from_calendar(&uid).await;
-            }
         }
-
-        result
     }
 
     pub(crate) async fn handle_delete_recurring(&self, p: &ParamExtractor<'_>) -> Result<String> {

@@ -40,15 +40,15 @@ Browser-only dev: run `cargo run -p dev-api` + `cd desktop-ui && bun run dev`, o
 
 ## Architecture
 
-Rust personal AI agent — single binary connecting 6+ chat platforms to LLMs with task/project management, Apple Calendar sync, and persistent memory. All state in SQLite + LanceDB.
+Rust personal AI agent — single binary connecting 6+ chat platforms to LLMs with task/project management and persistent memory. All state in SQLite + LanceDB.
 
-### Workspace (24 crates, 9 layers)
+### Workspace (23 crates, 9 layers)
 
 ```
 L0: common                — KlyntbotError, MessageRole, ChannelName, ChatId, SessionKey
 L1: config, bus, tools-core, tools-core-macros — Config (camelCase JSON), message bus, Tool/FeaturePackage traits, derive macros
 L2: storage, domain       — SqlitePool, migrations, *Repo structs, OKR+PARA domain types
-L3: providers, session, scheduling, calendar, context_engine — LLM clients, session persistence, cron, CalDAV, token budgets
+L3: providers, session, scheduling, context_engine — LLM clients, session persistence, cron, token budgets
 L4: tools, feature-todo, feature-finance, feature-productivity, plugin-runtime — 20+ tools, feature packages, WASM plugins
 L5: channels, agent       — Platform integrations (Telegram/Discord/WhatsApp/Slack/Email/QQ), agent runtime, learning system
 L6: cli, mcp              — CLI (serve/init/status/plugin), MCP server
@@ -66,13 +66,13 @@ Dependencies flow strictly upward. `plugin-sdk` and `tests/fixtures/hello_plugin
 
 - **Derive-based tools:** `#[derive(Tool)]` + `#[derive(ToolParams)]` from `tools-core-macros`. Multi-action: `#[tool_actions]` + `#[derive(ActionParams)]`. See `crates/tools/src/filesystem.rs`.
 - **Feature packages:** `feature-*` crates implement `FeaturePackage` (tools + migrations + config + health).
-- **Dependency inversion:** Handler traits (`SpawnHandler`, `CronHandler`, `CalendarHandler`, etc.) defined in lower layers, implemented in `agent`. Injected as `Arc<dyn Trait>`.
+- **Dependency inversion:** Handler traits (`SpawnHandler`, `CronHandler`, etc.) defined in lower layers, implemented in `agent`. Injected as `Arc<dyn Trait>`.
 - **Config:** `#[serde(rename_all = "camelCase")]`. File at `~/.klyntbot/config.json`. API keys in `Secret<String>` (access via `.expose()`). Env override: `KLYNTBOT_AGENTS__DEFAULTS__MODEL=gpt-4o`.
 - **Re-export facade:** `src/lib.rs` re-exports all public types. Use `klyntbot::AgentLoop`, `klyntbot::Config`, etc.
 
 ### Agent profiles & MCP
 
-Six built-in agents in `agents/`: general, task, finance, calendar, automation, communication. Each has `AGENT.md` (YAML frontmatter) + `skills/` folder. Compiled via `include_str!`. MCP tool names: `mcp_{server}_{tool}` (see `mcp::sanitize`). MCP access controlled per-agent via `mcp_tools` field (`["*"]` = all, `[]` = none).
+Five built-in agents in `agents/`: general, task, finance, automation, communication. Each has `AGENT.md` (YAML frontmatter) + `skills/` folder. Compiled via `include_str!`. MCP tool names: `mcp_{server}_{tool}` (see `mcp::sanitize`). MCP access controlled per-agent via `mcp_tools` field (`["*"]` = all, `[]` = none). Task agent has `mcp_tools: ["google-calendar"]` for calendar operations via Google Calendar MCP.
 
 ### Agent runtime
 
@@ -89,7 +89,7 @@ Six built-in agents in `agents/`: general, task, finance, calendar, automation, 
 ## Gotchas
 
 - **`StoragePool::from_existing()` skips migrations** — only for already-migrated pools. Tests must use `connect_in_memory()`.
-- **CalDAV sync is async** — use `CalendarTool::sync_now()` for immediate sync.
+
 - **Config changes require restart** of `klyntbot serve`.
 - **Dependency inversion** — new tools needing agent context must inject via `Arc<dyn Trait>` to avoid circular deps.
 - **`email` feature** (on by default) gates IMAP/SMTP deps in `channels` crate.

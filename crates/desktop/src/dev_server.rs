@@ -765,27 +765,6 @@ async fn dispatch(
             }
         }
 
-        // ── Calendar ──────────────────────────────────────────
-        "calendar_events" => {
-            let limit: i64 = get(&body, "limit").unwrap_or(10);
-            match core.repos.calendar_event_cache.list_upcoming(limit).await {
-                Ok(rows) => {
-                    let events: Vec<CalendarEventResponse> = rows
-                        .iter()
-                        .map(|r| CalendarEventResponse {
-                            id: r.uid.clone(),
-                            title: r.summary.clone(),
-                            start_at: r.start_at,
-                            end_at: r.end_at,
-                            color: "#3B82F6".to_string(),
-                        })
-                        .collect();
-                    ok(events)
-                }
-                Err(e) => err(storage_err(e)),
-            }
-        }
-
         // ── Status ────────────────────────────────────────────
         "agent_status" => {
             match tokio::try_join!(

@@ -76,7 +76,6 @@ fn is_fabricated_tool_response(text: &str, tool_names: &[&str]) -> bool {
     let lower = text.to_lowercase();
     let has_todo = tool_names.contains(&"todo");
     let has_search = tool_names.iter().any(|t| t.contains("search"));
-    let has_calendar = tool_names.contains(&"calendar");
 
     // Pattern 1: Contains a fake ID pattern (hex ID like "9c4e5f3b" or "a1b2c3d4")
     let has_fake_id = {
@@ -107,12 +106,9 @@ fn is_fabricated_tool_response(text: &str, tool_names: &[&str]) -> bool {
         "here are the results",
         "i found these results",
     ];
-    let calendar_indicators = ["event created", "reminder set", "calendar event added"];
-
     let has_todo_result = has_todo && todo_indicators.iter().any(|p| lower.contains(p));
     let has_search_result = has_search && search_indicators.iter().any(|p| lower.contains(p));
-    let has_calendar_result = has_calendar && calendar_indicators.iter().any(|p| lower.contains(p));
-    let has_structured_result = has_todo_result || has_search_result || has_calendar_result;
+    let has_structured_result = has_todo_result || has_search_result;
 
     // Pattern 3: Has multiple field-like patterns (Priority:, Due Date:, Description:, Tags:)
     let field_patterns = [

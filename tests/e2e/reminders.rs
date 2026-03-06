@@ -127,38 +127,6 @@ async fn overdue_just_under_24_hours_since_nag_skips() {
     assert!(!should_remind, "Just under 24 hours should not trigger");
 }
 
-#[tokio::test]
-async fn calendar_event_exactly_30_minutes_triggers() {
-    // Boundary: exactly 30 minutes should trigger
-    use agent::reminders::CalendarEvent as ReminderCalendarEvent;
-
-    let event = ReminderCalendarEvent {
-        uid: "event-1".to_string(),
-        summary: "Meeting".to_string(),
-        start: Utc::now() + Duration::minutes(30),
-        last_reminded_at: None,
-    };
-
-    let should_remind = ReminderEngine::should_remind_calendar_event(&event);
-    assert!(should_remind, "Exactly 30 minutes should trigger");
-}
-
-#[tokio::test]
-async fn calendar_event_just_over_30_minutes_skips() {
-    // Boundary: 30 min + 1 sec should NOT trigger
-    use agent::reminders::CalendarEvent as ReminderCalendarEvent;
-
-    let event = ReminderCalendarEvent {
-        uid: "event-1".to_string(),
-        summary: "Meeting".to_string(),
-        start: Utc::now() + Duration::minutes(30) + Duration::seconds(1),
-        last_reminded_at: None,
-    };
-
-    let should_remind = ReminderEngine::should_remind_calendar_event(&event);
-    assert!(!should_remind, "Just over 30 minutes should not trigger");
-}
-
 // ── Time Tracking Edge Cases ──────────────────────────────────────
 
 #[test]
@@ -336,22 +304,6 @@ async fn last_reminded_blocks_all_rules() {
         !overdue_remind,
         "last_reminded_at within 24h should block overdue"
     );
-}
-
-#[tokio::test]
-async fn calendar_event_already_reminded_skips() {
-    use agent::reminders::CalendarEvent as ReminderCalendarEvent;
-
-    // Edge case: event already reminded, should not remind again
-    let event = ReminderCalendarEvent {
-        uid: "event-1".to_string(),
-        summary: "Meeting".to_string(),
-        start: Utc::now() + Duration::minutes(15),
-        last_reminded_at: Some(Utc::now() - Duration::minutes(5)),
-    };
-
-    let should_remind = ReminderEngine::should_remind_calendar_event(&event);
-    assert!(!should_remind, "Already reminded event should not trigger");
 }
 
 // ── Priority and Status Edge Cases ──────────────────────────────────

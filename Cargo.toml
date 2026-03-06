@@ -8,7 +8,6 @@ members = [
     "crates/providers",
     "crates/session",
     "crates/scheduling",
-    "crates/calendar",
     "crates/domain",
     "crates/tools",
     "crates/channels",
@@ -42,7 +41,6 @@ bus = { path = "crates/bus" }
 providers = { path = "crates/providers" }
 session = { path = "crates/session" }
 scheduling = { path = "crates/scheduling" }
-calendar = { path = "crates/calendar" }
 domain = { path = "crates/domain" }
 tools = { path = "crates/tools" }
 channels = { path = "crates/channels" }
@@ -146,7 +144,6 @@ bus.workspace = true
 providers.workspace = true
 session.workspace = true
 scheduling.workspace = true
-calendar.workspace = true
 domain.workspace = true
 tools.workspace = true
 channels.workspace = true

@@ -164,22 +164,6 @@ pub async fn handle_serve(port: u16) -> Result<()> {
                             })?;
                             Ok(Some("Weekly report triggered".to_string()))
                         }
-                        "__klyntbot_calendar_sync" => {
-                            // Trigger calendar sync via bus message
-                            let msg = bus::InboundMessage::new(
-                                "system",
-                                "cron",
-                                "calendar_sync",
-                                "Sync calendar events with configured providers".to_string(),
-                            );
-                            bus.publish_inbound(msg).await.map_err(|e| {
-                                common::KlyntbotError::Bus(format!(
-                                    "Failed to publish calendar sync message: {}",
-                                    e
-                                ))
-                            })?;
-                            Ok(Some("Calendar sync triggered".to_string()))
-                        }
                         "__klyntbot_daily_planning" => {
                             // Trigger daily planning skill via bus message
                             let msg = bus::InboundMessage::new(
@@ -339,27 +323,6 @@ pub async fn handle_serve(port: u16) -> Result<()> {
         None,
         false
     );
-
-    // Register calendar sync cron job if any provider is enabled
-    if config.calendar.is_any_enabled() {
-        let sync_interval_secs = config.calendar.min_sync_interval_secs();
-        ensure_job!(
-            cron_service,
-            "__klyntbot_calendar_sync",
-            scheduling::CronSchedule::Every {
-                every_ms: sync_interval_secs * 1000,
-            },
-            "Sync calendar events with configured providers",
-            false,
-            None,
-            None,
-            false
-        );
-        info!(
-            "Calendar sync cron registered (interval: {}s)",
-            sync_interval_secs
-        );
-    }
 
     // Register daily planning cron job if enabled
     if config.todo.daily_planning.enabled {

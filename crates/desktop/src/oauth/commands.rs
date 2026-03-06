@@ -197,45 +197,8 @@ pub async fn mcp_oauth_start(
 
                 info!(provider = %provider_id, server = %server_name, "OAuth tokens stored");
 
-                // Clone OAuth creds for Google Calendar file writing (outside lock)
-                let gcal_oauth = if provider_id == "google-calendar" {
-                    cfg.mcp
-                        .servers
-                        .iter()
-                        .find(|s| s.name == server_name)
-                        .and_then(|s| s.oauth.clone())
-                } else {
-                    None
-                };
-
-                // Drop the config lock before any file I/O or reconnection
+                // Drop the config lock before reconnection
                 drop(cfg);
-
-                // Google Calendar MCP: write credentials + tokens files
-                // that the @cocal/google-calendar-mcp server reads at startup.
-                if let Some(oauth_creds) = gcal_oauth {
-                    if let Err(e) =
-                        write_google_calendar_files(&client_id, &client_secret, &oauth_creds).await
-                    {
-                        warn!(error = %e, "Failed to write Google Calendar token files");
-                    } else {
-                        // Re-acquire lock briefly to set env var and save
-                        let mut cfg = core.config.write().await;
-                        if let Some(server) =
-                            cfg.mcp.servers.iter_mut().find(|s| s.name == server_name)
-                        {
-                            let creds_path = google_calendar_credentials_path();
-                            if let config::McpTransport::Stdio { ref mut env, .. } =
-                                server.transport
-                            {
-                                env.insert("GOOGLE_OAUTH_CREDENTIALS".to_string(), creds_path);
-                            }
-                            let _ = config::save(&cfg).await;
-                        }
-                        drop(cfg);
-                        info!("Google Calendar MCP files written");
-                    }
-                }
 
                 // Reconnect the MCP server so it picks up the new token
                 {
@@ -291,75 +254,3 @@ pub async fn mcp_oauth_disconnect(
     Ok(build_mcp_response(&cfg))
 }
 
-// ── Google Calendar MCP helpers ──────────────────────────────────────────
-
-/// Directory where Google Calendar MCP stores its config/tokens.
-fn google_calendar_config_dir() -> std::path::PathBuf {
-    dirs::config_dir()
-        .unwrap_or_else(|| std::path::PathBuf::from("~/.config"))
-        .join("google-calendar-mcp")
-}
-
-/// Path to the OAuth client credentials file.
-fn google_calendar_credentials_path() -> String {
-    google_calendar_config_dir()
-        .join("gcp-oauth.keys.json")
-        .to_string_lossy()
-        .into_owned()
-}
-
-/// Write the `gcp-oauth.keys.json` and `tokens.json` files that
-/// `@cocal/google-calendar-mcp` reads at startup.
-async fn write_google_calendar_files(
-    client_id: &str,
-    client_secret: &str,
-    oauth: &config::McpOAuthCredentials,
-) -> anyhow::Result<()> {
-    let dir = google_calendar_config_dir();
-    tokio::fs::create_dir_all(&dir).await?;
-
-    // 1. Write gcp-oauth.keys.json (client credentials)
-    let credentials = serde_json::json!({
-        "installed": {
-            "client_id": client_id,
-            "client_secret": client_secret,
-            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-            "token_uri": "https://oauth2.googleapis.com/token",
-            "redirect_uris": ["http://localhost"]
-        }
-    });
-    let creds_path = dir.join("gcp-oauth.keys.json");
-    tokio::fs::write(&creds_path, serde_json::to_string_pretty(&credentials)?).await?;
-
-    // 2. Write tokens.json in the format the MCP server expects
-    let expiry_date = oauth.expires_at.as_ref().and_then(|s| {
-        chrono::DateTime::parse_from_rfc3339(s)
-            .ok()
-            .map(|dt| dt.timestamp_millis())
-    });
-
-    let mut token_data = serde_json::json!({
-        "access_token": oauth.access_token.expose(),
-        "scope": "https://www.googleapis.com/auth/calendar",
-        "token_type": "Bearer",
-    });
-    if let Some(ref rt) = oauth.refresh_token {
-        token_data["refresh_token"] = serde_json::Value::String(rt.expose().clone());
-    }
-    if let Some(exp) = expiry_date {
-        token_data["expiry_date"] = serde_json::Value::Number(exp.into());
-    }
-
-    // Wrap in "normal" account key (the format @cocal/google-calendar-mcp expects)
-    let tokens = serde_json::json!({ "normal": token_data });
-
-    let tokens_path = dir.join("tokens.json");
-    tokio::fs::write(&tokens_path, serde_json::to_string_pretty(&tokens)?).await?;
-
-    info!(
-        creds = %creds_path.display(),
-        tokens = %tokens_path.display(),
-        "Wrote Google Calendar MCP files"
-    );
-    Ok(())
-}

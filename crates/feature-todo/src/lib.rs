@@ -5,11 +5,10 @@
 //! - `TaskTool` (alias: `TodoTool`): the primary tool with 25 actions
 //! - Domain types: `Action` (alias: `Todo`), `ActionStatus` (alias: `TodoStatus`), `Attachment`, `TimeEntry`
 //! - Storage: `ActionRepo`, `ActionFilter`, `ActionPatch`, `ActionSummary` + row types
-//! - Trait abstractions: `CalendarSyncHandler`, `EmbeddingHandler`, `EnrichmentHandler`, `ProgressHandler`
+//! - Trait abstractions: `EmbeddingHandler`, `EnrichmentHandler`, `ProgressHandler`
 //! - Utilities: `rrule_utils`, `search`
 //! - Config: `TodoConfig`
 
-pub mod calendar_sync;
 pub mod config;
 pub mod embedding;
 pub mod enrichment;
@@ -21,7 +20,6 @@ pub mod task_complexity;
 pub mod tool;
 pub mod types;
 
-pub use calendar_sync::CalendarSyncHandler;
 pub use config::{EnrichmentConfig, SearchConfig, TodoConfig};
 pub use embedding::EmbeddingHandler;
 pub use enrichment::{

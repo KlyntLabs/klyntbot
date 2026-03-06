@@ -102,18 +102,6 @@ pub struct AreaResponse {
     pub task_count: i64,
 }
 
-// ── Calendar ────────────────────────────────────────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CalendarEventResponse {
-    pub id: String,
-    pub title: String,
-    pub start_at: DateTime<Utc>,
-    pub end_at: DateTime<Utc>,
-    pub color: String,
-}
-
 // ── Chat ────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

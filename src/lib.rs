@@ -5,7 +5,6 @@
 // Re-export all workspace crates
 pub use agent;
 pub use bus;
-pub use calendar;
 pub use channels;
 // cli is used directly via `use cli::*` in main.rs; no re-export needed.
 pub use common;
