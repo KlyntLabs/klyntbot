@@ -69,11 +69,7 @@ impl EpisodicMemoryRepo {
     }
 
     /// Record an access event on an episodic memory.
-    pub async fn record_access(
-        &self,
-        id: &str,
-        new_stability: f64,
-    ) -> Result<(), sqlx::Error> {
+    pub async fn record_access(&self, id: &str, new_stability: f64) -> Result<(), sqlx::Error> {
         sqlx::query(
             "UPDATE episodic_memories SET access_count = access_count + 1, last_accessed = datetime('now'), stability = ?2 WHERE id = ?1",
         )
@@ -110,20 +106,7 @@ mod tests {
     use super::*;
 
     async fn setup() -> SqlitePool {
-        let pool = sqlx::SqlitePool::connect("sqlite::memory:").await.unwrap();
-        sqlx::query("PRAGMA foreign_keys=ON;")
-            .execute(&pool)
-            .await
-            .unwrap();
-        sqlx::migrate!("../storage/migrations")
-            .run(&pool)
-            .await
-            .unwrap();
-        let migrations = super::super::cognitive_migrations();
-        storage::StoragePool::run_feature_migrations(&pool, &migrations)
-            .await
-            .unwrap();
-        pool
+        crate::repos::cognitive_test_pool().await
     }
 
     fn test_memory(id: &str, domain: &str, content: &str, occurred_at: &str) -> EpisodicMemory {
@@ -146,8 +129,18 @@ mod tests {
         let pool = setup().await;
         let repo = EpisodicMemoryRepo::new(pool);
 
-        let m1 = test_memory("m1", "productivity", "High focus morning session", "2026-03-06T10:00:00");
-        let m2 = test_memory("m2", "finance", "Overspent on dining", "2026-03-06T12:00:00");
+        let m1 = test_memory(
+            "m1",
+            "productivity",
+            "High focus morning session",
+            "2026-03-06T10:00:00",
+        );
+        let m2 = test_memory(
+            "m2",
+            "finance",
+            "Overspent on dining",
+            "2026-03-06T12:00:00",
+        );
         repo.insert(&m1).await.unwrap();
         repo.insert(&m2).await.unwrap();
 
@@ -161,9 +154,24 @@ mod tests {
         let pool = setup().await;
         let repo = EpisodicMemoryRepo::new(pool);
 
-        let m1 = test_memory("m1", "productivity", "Monday session", "2026-03-02T10:00:00");
-        let m2 = test_memory("m2", "productivity", "Wednesday session", "2026-03-04T10:00:00");
-        let m3 = test_memory("m3", "productivity", "Friday session", "2026-03-06T10:00:00");
+        let m1 = test_memory(
+            "m1",
+            "productivity",
+            "Monday session",
+            "2026-03-02T10:00:00",
+        );
+        let m2 = test_memory(
+            "m2",
+            "productivity",
+            "Wednesday session",
+            "2026-03-04T10:00:00",
+        );
+        let m3 = test_memory(
+            "m3",
+            "productivity",
+            "Friday session",
+            "2026-03-06T10:00:00",
+        );
         repo.insert(&m1).await.unwrap();
         repo.insert(&m2).await.unwrap();
         repo.insert(&m3).await.unwrap();

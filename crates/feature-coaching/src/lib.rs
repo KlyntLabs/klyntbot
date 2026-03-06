@@ -1,0 +1,14 @@
+//! Proactive intelligence engine — signal accumulation, pattern detection,
+//! LLM-powered coaching, intervention routing, and closed-loop feedback.
+
+pub mod feedback;
+pub mod pattern_detector;
+pub mod reasoner;
+pub mod router;
+pub mod signal_accumulator;
+
+pub use feedback::FeedbackTracker;
+pub use pattern_detector::PatternDetector;
+pub use reasoner::{CoachingDecision, CoachingReasonerHandler};
+pub use router::{InterventionChannel, InterventionRouter};
+pub use signal_accumulator::{SignalAccumulator, TriggerCondition};

@@ -66,10 +66,12 @@ impl ProceduralRuleRepo {
 
     /// Deactivate a rule.
     pub async fn deactivate(&self, id: &str) -> Result<(), sqlx::Error> {
-        sqlx::query("UPDATE procedural_rules SET active = 0, updated_at = datetime('now') WHERE id = ?1")
-            .bind(id)
-            .execute(&self.pool)
-            .await?;
+        sqlx::query(
+            "UPDATE procedural_rules SET active = 0, updated_at = datetime('now') WHERE id = ?1",
+        )
+        .bind(id)
+        .execute(&self.pool)
+        .await?;
         Ok(())
     }
 }
@@ -79,20 +81,7 @@ mod tests {
     use super::*;
 
     async fn setup() -> SqlitePool {
-        let pool = sqlx::SqlitePool::connect("sqlite::memory:").await.unwrap();
-        sqlx::query("PRAGMA foreign_keys=ON;")
-            .execute(&pool)
-            .await
-            .unwrap();
-        sqlx::migrate!("../storage/migrations")
-            .run(&pool)
-            .await
-            .unwrap();
-        let migrations = super::super::cognitive_migrations();
-        storage::StoragePool::run_feature_migrations(&pool, &migrations)
-            .await
-            .unwrap();
-        pool
+        crate::repos::cognitive_test_pool().await
     }
 
     fn test_rule(id: &str, domain: &str, rule_text: &str) -> ProceduralRule {

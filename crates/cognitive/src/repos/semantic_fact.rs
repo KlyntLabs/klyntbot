@@ -104,11 +104,7 @@ impl SemanticFactRepo {
     }
 
     /// Record an access event: increment count, update last_accessed and stability.
-    pub async fn record_access(
-        &self,
-        id: &str,
-        new_stability: f64,
-    ) -> Result<(), sqlx::Error> {
+    pub async fn record_access(&self, id: &str, new_stability: f64) -> Result<(), sqlx::Error> {
         sqlx::query(
             "UPDATE semantic_facts SET access_count = access_count + 1, last_accessed = datetime('now'), stability = ?2 WHERE id = ?1",
         )
@@ -178,22 +174,7 @@ mod tests {
     use super::*;
 
     async fn setup() -> SqlitePool {
-        let pool = sqlx::SqlitePool::connect("sqlite::memory:").await.unwrap();
-        sqlx::query("PRAGMA foreign_keys=ON;")
-            .execute(&pool)
-            .await
-            .unwrap();
-        // Run the storage crate's core migrations first
-        sqlx::migrate!("../storage/migrations")
-            .run(&pool)
-            .await
-            .unwrap();
-        // Run cognitive migrations via feature migration system
-        let migrations = super::super::cognitive_migrations();
-        storage::StoragePool::run_feature_migrations(&pool, &migrations)
-            .await
-            .unwrap();
-        pool
+        crate::repos::cognitive_test_pool().await
     }
 
     fn test_fact(id: &str, domain: &str, predicate: &str, object: &str) -> SemanticFact {
