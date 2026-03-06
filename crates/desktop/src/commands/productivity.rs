@@ -305,6 +305,7 @@ pub async fn productivity_goals(
             target_value: goal.target_value,
             current_value: current,
             met,
+            project_id: goal.project_id.clone(),
         })
         .collect())
 }
@@ -381,6 +382,7 @@ pub async fn productivity_goal_create(
         target_value: goal.target_value,
         current_value: 0.0,
         met: false,
+        project_id: goal.project_id,
     })
 }
 
@@ -581,7 +583,11 @@ pub async fn productivity_project_upsert(
         is_auto_detected: false,
         created_at: Utc::now(),
     };
-    repos.projects.upsert(&project).await.map_err(map_prod_err)?;
+    repos
+        .projects
+        .upsert(&project)
+        .await
+        .map_err(map_prod_err)?;
     Ok(project_to_response(project))
 }
 

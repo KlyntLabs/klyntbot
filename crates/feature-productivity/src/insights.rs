@@ -138,7 +138,10 @@ impl InsightEngine {
         today_blocks: i64,
         baseline: &Baseline,
     ) -> common::Result<Option<InsightCard>> {
-        if self.already_exists(InsightType::DeepWorkTrend, date).await? {
+        if self
+            .already_exists(InsightType::DeepWorkTrend, date)
+            .await?
+        {
             return Ok(None);
         }
 
@@ -170,7 +173,10 @@ impl InsightEngine {
         today_rate: f64,
         baseline: &Baseline,
     ) -> common::Result<Option<InsightCard>> {
-        if self.already_exists(InsightType::DistractionSpike, date).await? {
+        if self
+            .already_exists(InsightType::DistractionSpike, date)
+            .await?
+        {
             return Ok(None);
         }
 
@@ -203,7 +209,10 @@ impl InsightEngine {
         today_score: f64,
         baseline: &Baseline,
     ) -> common::Result<Option<InsightCard>> {
-        if self.already_exists(InsightType::NewPersonalBest, date).await? {
+        if self
+            .already_exists(InsightType::NewPersonalBest, date)
+            .await?
+        {
             return Ok(None);
         }
 
@@ -235,7 +244,10 @@ impl InsightEngine {
         threshold: f64,
         summaries: &[crate::types::DailySummary],
     ) -> common::Result<Option<InsightCard>> {
-        if self.already_exists(InsightType::StreakAchieved, date).await? {
+        if self
+            .already_exists(InsightType::StreakAchieved, date)
+            .await?
+        {
             return Ok(None);
         }
 
@@ -272,7 +284,10 @@ impl InsightEngine {
     }
 
     async fn check_fatigue_warning(&self, date: &str) -> common::Result<Option<InsightCard>> {
-        if self.already_exists(InsightType::FatigueWarning, date).await? {
+        if self
+            .already_exists(InsightType::FatigueWarning, date)
+            .await?
+        {
             return Ok(None);
         }
 
@@ -322,7 +337,10 @@ impl InsightEngine {
         today: &crate::types::DailySummary,
         baseline: &Baseline,
     ) -> common::Result<Option<InsightCard>> {
-        if self.already_exists(InsightType::RecoveryImprovement, date).await? {
+        if self
+            .already_exists(InsightType::RecoveryImprovement, date)
+            .await?
+        {
             return Ok(None);
         }
 

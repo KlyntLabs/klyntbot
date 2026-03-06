@@ -468,6 +468,7 @@ pub struct GoalProgressResponse {
     pub target_value: f64,
     pub current_value: f64,
     pub met: bool,
+    pub project_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

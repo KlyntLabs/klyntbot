@@ -455,8 +455,25 @@ export interface ProductivitySummary {
   contextSwitches: number;
   topApps: AppUsage[];
   topCategories: CategoryUsage[];
+  topProjects: ProjectUsage[];
   aiSummary: string | null;
   productivityScore: number | null;
+}
+
+export interface ProjectUsage {
+  projectId: string;
+  displayName: string;
+  durationSecs: number;
+  color: string | null;
+}
+
+export interface ProductivityProject {
+  id: string;
+  displayName: string;
+  path: string;
+  urlPatterns: string[];
+  color: string | null;
+  isAutoDetected: boolean;
 }
 
 export interface AppUsage {
@@ -511,6 +528,7 @@ export interface GoalProgress {
   targetValue: number;
   currentValue: number;
   met: boolean;
+  projectId: string | null;
 }
 
 export interface TimeEntry {

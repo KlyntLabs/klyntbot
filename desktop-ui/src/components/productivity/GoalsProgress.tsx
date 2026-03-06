@@ -16,13 +16,15 @@ function metricLabel(metric: string): string {
       return "score";
     case "max_distracting_mins":
       return "distracting mins";
+    case "project_hours":
+      return "project hours";
     default:
       return metric;
   }
 }
 
 function formatValue(metric: string, value: number): string {
-  if (metric === "productive_hours") return `${value.toFixed(1)}h`;
+  if (metric === "productive_hours" || metric === "project_hours") return `${value.toFixed(1)}h`;
   if (metric === "max_distracting_mins") return `${Math.round(value)}m`;
   return `${Math.round(value)}`;
 }
@@ -81,6 +83,11 @@ export function GoalsProgress() {
                       <span className="text-primary">
                         {formatValue(g.metric, g.targetValue)} {metricLabel(g.metric)}
                       </span>
+                      {g.projectId && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/[0.08] text-muted">
+                          {g.projectId}
+                        </span>
+                      )}
                       <span className="text-dim">({g.goalType})</span>
                     </div>
                     <div className="flex items-center gap-2">

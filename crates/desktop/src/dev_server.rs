@@ -1034,10 +1034,8 @@ async fn dispatch(
                 .await
             {
                 Ok(summaries) => {
-                    let resp: Vec<ProductivitySummaryResponse> = summaries
-                        .into_iter()
-                        .map(summary_to_response)
-                        .collect();
+                    let resp: Vec<ProductivitySummaryResponse> =
+                        summaries.into_iter().map(summary_to_response).collect();
                     ok(resp)
                 }
                 Err(e) => err(prod_err(e)),
@@ -1091,10 +1089,8 @@ async fn dispatch(
                             }
                         }
                     }
-                    let resp: Vec<ProductivitySummaryResponse> = summaries
-                        .into_iter()
-                        .map(summary_to_response)
-                        .collect();
+                    let resp: Vec<ProductivitySummaryResponse> =
+                        summaries.into_iter().map(summary_to_response).collect();
                     ok(resp)
                 }
                 Err(e) => err(prod_err(e)),
@@ -1139,6 +1135,7 @@ async fn dispatch(
                                 target_value: goal.target_value,
                                 current_value: current,
                                 met,
+                                project_id: goal.project_id.clone(),
                             })
                             .collect();
                         ok(resp)
@@ -1244,6 +1241,7 @@ async fn dispatch(
                     target_value: goal.target_value,
                     current_value: 0.0,
                     met: false,
+                    project_id: goal.project_id,
                 }),
                 Err(e) => err(prod_err(e)),
             }

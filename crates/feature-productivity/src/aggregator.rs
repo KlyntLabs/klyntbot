@@ -255,6 +255,19 @@ impl DailyAggregator {
                 crate::types::GoalMetric::MaxDistractingMins => {
                     summary.distracting_secs as f64 / 60.0
                 }
+                crate::types::GoalMetric::ProjectHours => {
+                    // Look up project time from summary's top_projects
+                    goal.project_id
+                        .as_ref()
+                        .and_then(|pid| {
+                            summary
+                                .top_projects
+                                .iter()
+                                .find(|p| &p.project_id == pid)
+                                .map(|p| p.duration_secs as f64 / 3600.0)
+                        })
+                        .unwrap_or(0.0)
+                }
             };
             let met = match goal.metric {
                 crate::types::GoalMetric::MaxDistractingMins => current <= goal.target_value,

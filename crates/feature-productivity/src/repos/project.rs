@@ -50,8 +50,8 @@ impl ProjectRepo {
     }
 
     pub async fn upsert(&self, project: &ProductivityProject) -> common::Result<()> {
-        let url_patterns_json = serde_json::to_string(&project.url_patterns)
-            .unwrap_or_else(|_| "[]".to_string());
+        let url_patterns_json =
+            serde_json::to_string(&project.url_patterns).unwrap_or_else(|_| "[]".to_string());
         sqlx::query(
             r#"INSERT INTO productivity_projects (id, display_name, path, url_patterns, color, is_auto_detected)
                VALUES (?1, ?2, ?3, ?4, ?5, ?6)

@@ -674,6 +674,78 @@ async fn test_historical_comparison() {
     );
 }
 
+/// Project tracking: insert project + events with project_id, verify aggregation.
+#[tokio::test]
+async fn test_project_tracking_aggregation() {
+    let pool = setup_pool().await;
+    let repos = ProductivityRepos::new(pool);
+
+    let date_str = "2026-03-05";
+    let day_start = Utc.with_ymd_and_hms(2026, 3, 5, 0, 0, 0).unwrap();
+
+    // 1. Insert a project
+    let project = feature_productivity::types::ProductivityProject {
+        id: "klyntbot".into(),
+        display_name: "Klyntbot".into(),
+        path: "/Users/test/klyntbot".into(),
+        url_patterns: vec![],
+        color: Some("#7C3AED".into()),
+        is_auto_detected: false,
+        created_at: Utc::now(),
+    };
+    repos.projects.upsert(&project).await.unwrap();
+
+    // 2. Insert events WITH project_id
+    let event_with_project = ActivityEvent {
+        id: None,
+        app_name: "VS Code".into(),
+        window_title: Some("main.rs — klyntbot".into()),
+        site_name: None,
+        bundle_id: None,
+        url: None,
+        category_id: Some("coding".into()),
+        started_at: day_start + Duration::hours(9),
+        ended_at: Some(day_start + Duration::hours(11)),
+        duration_secs: Some(7200), // 2h
+        is_idle: false,
+        metadata: None,
+        project_id: Some("klyntbot".into()),
+    };
+    repos.events.insert(&event_with_project).await.unwrap();
+
+    // 3. Insert events WITHOUT project_id
+    let event_no_project = ActivityEvent {
+        id: None,
+        app_name: "Slack".into(),
+        window_title: None,
+        site_name: None,
+        bundle_id: None,
+        url: None,
+        category_id: Some("communication".into()),
+        started_at: day_start + Duration::hours(11),
+        ended_at: Some(day_start + Duration::hours(12)),
+        duration_secs: Some(3600), // 1h
+        is_idle: false,
+        metadata: None,
+        project_id: None,
+    };
+    repos.events.insert(&event_no_project).await.unwrap();
+
+    // 4. Run aggregation
+    let aggregator = DailyAggregator::new(repos.clone());
+    let summary = aggregator.compute_for_date(date_str).await.unwrap();
+
+    // 5. Verify top_projects has "klyntbot" with correct time
+    assert_eq!(summary.top_projects.len(), 1);
+    assert_eq!(summary.top_projects[0].project_id, "klyntbot");
+    assert_eq!(summary.top_projects[0].display_name, "Klyntbot");
+    assert_eq!(summary.top_projects[0].duration_secs, 7200);
+    assert_eq!(summary.top_projects[0].color, Some("#7C3AED".into()));
+
+    // 6. Total active should include both tracked and untracked
+    assert_eq!(summary.total_active_secs, 10800); // 3h
+}
+
 /// Export: insert events, verify CSV output format.
 #[tokio::test]
 async fn test_activity_export_csv() {

@@ -19,6 +19,7 @@ import { PomodoroTimer } from "./PomodoroTimer";
 import { buildBreakdownSegments } from "./shared";
 import { TimeEntrySection } from "./TimeEntrySection";
 import { TimelineBar } from "./Timeline";
+import { ProjectsCard } from "./ProjectsCard";
 import { TopApps } from "./TopApps";
 import { WorkHoursCard } from "./WorkHoursCard";
 
@@ -87,6 +88,10 @@ export function DayView({ date }: DayViewProps) {
       <div className="flex flex-col gap-4">
         <FocusSessionsList date={date} />
         <TopApps apps={summary?.topApps ?? []} />
+        <ProjectsCard
+          projects={summary?.topProjects ?? []}
+          totalSecs={summary?.totalActiveSecs ?? 0}
+        />
         <TimeEntrySection date={date} />
       </div>
 

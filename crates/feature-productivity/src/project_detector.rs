@@ -12,8 +12,13 @@ use crate::types::ProductivityProject;
 
 /// Known terminal app names (lowercased).
 const TERMINAL_APPS: &[&str] = &[
-    "ghostty", "iterm2", "terminal", "warp",
-    "alacritty", "kitty", "hyper",
+    "ghostty",
+    "iterm2",
+    "terminal",
+    "warp",
+    "alacritty",
+    "kitty",
+    "hyper",
 ];
 
 /// Known terminal bundle ID prefixes.
@@ -28,9 +33,17 @@ const TERMINAL_BUNDLE_PREFIXES: &[&str] = &[
 
 /// Known IDE app names (lowercased).
 const IDE_APPS: &[&str] = &[
-    "visual studio code", "code", "cursor", "zed",
-    "xcode", "intellij idea", "webstorm", "goland",
-    "rustrover", "pycharm", "phpstorm",
+    "visual studio code",
+    "code",
+    "cursor",
+    "zed",
+    "xcode",
+    "intellij idea",
+    "webstorm",
+    "goland",
+    "rustrover",
+    "pycharm",
+    "phpstorm",
 ];
 
 /// IDE bundle prefixes for matching.
@@ -60,7 +73,7 @@ pub struct ProjectDetector {
     /// Cached projects from DB, keyed by path.
     projects_by_path: Arc<RwLock<HashMap<String, ProductivityProject>>>,
     /// Cached projects by URL pattern for fast matching.
-    url_pattern_map: Arc<RwLock<Vec<(String, String)>>>,  // (pattern, project_id)
+    url_pattern_map: Arc<RwLock<Vec<(String, String)>>>, // (pattern, project_id)
     /// Git root cache to avoid repeated filesystem walks.
     git_root_cache: Arc<RwLock<HashMap<PathBuf, Option<PathBuf>>>>,
 }
@@ -110,7 +123,12 @@ impl ProjectDetector {
         let bid_lower = bundle_id.map(|b| b.to_lowercase());
 
         // 1. Terminal → CWD → git root
-        if matches_app_type(&name_lower, bid_lower.as_deref(), TERMINAL_APPS, TERMINAL_BUNDLE_PREFIXES) {
+        if matches_app_type(
+            &name_lower,
+            bid_lower.as_deref(),
+            TERMINAL_APPS,
+            TERMINAL_BUNDLE_PREFIXES,
+        ) {
             let cwd = {
                 let p = pid;
                 tokio::task::spawn_blocking(move || get_terminal_cwd(p))
@@ -139,7 +157,12 @@ impl ProjectDetector {
         }
 
         // 2. IDE → parse project from window title
-        if matches_app_type(&name_lower, bid_lower.as_deref(), IDE_APPS, IDE_BUNDLE_PREFIXES) {
+        if matches_app_type(
+            &name_lower,
+            bid_lower.as_deref(),
+            IDE_APPS,
+            IDE_BUNDLE_PREFIXES,
+        ) {
             if let Some(title) = window_title {
                 if let Some(project_name) = extract_ide_project(title) {
                     let by_path = self.projects_by_path.read().await;

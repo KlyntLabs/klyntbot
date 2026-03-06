@@ -1062,6 +1062,7 @@ async fn dispatch(
                             target_value: g.target_value,
                             current_value: cur,
                             met,
+                            project_id: g.project_id.clone(),
                         })
                         .collect::<Vec<_>>()),
                     Err(e) => err(prod_err(e)),
@@ -1166,6 +1167,7 @@ async fn dispatch(
                     target_value: goal.target_value,
                     current_value: 0.0,
                     met: false,
+                    project_id: goal.project_id,
                 }),
                 Err(e) => err(prod_err(e)),
             }

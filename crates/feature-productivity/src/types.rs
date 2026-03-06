@@ -284,6 +284,7 @@ pub enum GoalMetric {
     FocusSessions,
     ProductivityScore,
     MaxDistractingMins,
+    ProjectHours,
 }
 
 impl GoalMetric {
@@ -303,6 +304,7 @@ impl std::fmt::Display for GoalMetric {
             Self::FocusSessions => write!(f, "focus_sessions"),
             Self::ProductivityScore => write!(f, "productivity_score"),
             Self::MaxDistractingMins => write!(f, "max_distracting_mins"),
+            Self::ProjectHours => write!(f, "project_hours"),
         }
     }
 }
@@ -316,6 +318,7 @@ impl std::str::FromStr for GoalMetric {
             "focus_sessions" => Ok(Self::FocusSessions),
             "productivity_score" => Ok(Self::ProductivityScore),
             "max_distracting_mins" => Ok(Self::MaxDistractingMins),
+            "project_hours" => Ok(Self::ProjectHours),
             _ => Err(common::ToolError::InvalidParams(format!("unknown goal metric: {s}")).into()),
         }
     }
