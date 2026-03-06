@@ -246,6 +246,7 @@ async fn test_daily_aggregation_accuracy() {
         quality_score: Some(0.85),
         completed: true,
         notes: None,
+        source: SessionSource::Manual,
     };
     repos.sessions.create(&session).await.unwrap();
 
@@ -370,6 +371,9 @@ async fn test_pattern_analyzer_detects_patterns() {
             top_categories: vec![],
             productivity_score: None,
             ai_summary: None,
+            deep_work_blocks: 0,
+            deep_work_secs: 0,
+            avg_recovery_secs: None,
         };
         repos.summaries.upsert(&summary).await.unwrap();
     }
@@ -392,6 +396,7 @@ async fn test_pattern_analyzer_detects_patterns() {
             quality_score: Some(0.92),
             completed: true,
             notes: None,
+            source: SessionSource::Manual,
         };
         repos.sessions.create(&morning).await.unwrap();
 
@@ -491,7 +496,11 @@ async fn test_goal_tracking() {
     repos.goals.insert(&goal).await.unwrap();
 
     // Insert 3h of productive activity (anchor at noon UTC to avoid midnight flakiness)
-    let noon = Utc::now().date_naive().and_hms_opt(12, 0, 0).unwrap().and_utc();
+    let noon = Utc::now()
+        .date_naive()
+        .and_hms_opt(12, 0, 0)
+        .unwrap()
+        .and_utc();
     repos
         .events
         .insert(&ActivityEvent {
@@ -545,6 +554,9 @@ async fn test_historical_comparison() {
         top_categories: vec![],
         productivity_score: Some(72.0),
         ai_summary: None,
+        deep_work_blocks: 0,
+        deep_work_secs: 0,
+        avg_recovery_secs: None,
     };
     repos.summaries.upsert(&yesterday_summary).await.unwrap();
 

@@ -21,6 +21,9 @@ struct SummaryRow {
     top_categories: Option<String>,
     productivity_score: Option<f64>,
     ai_summary: Option<String>,
+    deep_work_blocks: i64,
+    deep_work_secs: i64,
+    avg_recovery_secs: Option<f64>,
 }
 
 impl From<SummaryRow> for DailySummary {
@@ -64,11 +67,14 @@ impl From<SummaryRow> for DailySummary {
             top_categories,
             productivity_score: row.productivity_score,
             ai_summary: row.ai_summary,
+            deep_work_blocks: row.deep_work_blocks,
+            deep_work_secs: row.deep_work_secs,
+            avg_recovery_secs: row.avg_recovery_secs,
         }
     }
 }
 
-const SUMMARY_COLUMNS: &str = "date, total_active_secs, total_focus_secs, total_break_secs, total_idle_secs, productive_secs, neutral_secs, distracting_secs, focus_sessions_count, avg_session_quality, interruptions_count, context_switches, top_apps, top_categories, productivity_score, ai_summary";
+const SUMMARY_COLUMNS: &str = "date, total_active_secs, total_focus_secs, total_break_secs, total_idle_secs, productive_secs, neutral_secs, distracting_secs, focus_sessions_count, avg_session_quality, interruptions_count, context_switches, top_apps, top_categories, productivity_score, ai_summary, deep_work_blocks, deep_work_secs, avg_recovery_secs";
 
 #[derive(Debug, Clone)]
 pub struct DailySummaryRepo {
@@ -86,8 +92,8 @@ impl DailySummaryRepo {
         let top_categories_json = serde_json::to_string(&summary.top_categories)
             .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         sqlx::query(
-            r#"INSERT INTO daily_summaries (date, total_active_secs, total_focus_secs, total_break_secs, total_idle_secs, productive_secs, neutral_secs, distracting_secs, focus_sessions_count, avg_session_quality, interruptions_count, context_switches, top_apps, top_categories, productivity_score, ai_summary)
-               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
+            r#"INSERT INTO daily_summaries (date, total_active_secs, total_focus_secs, total_break_secs, total_idle_secs, productive_secs, neutral_secs, distracting_secs, focus_sessions_count, avg_session_quality, interruptions_count, context_switches, top_apps, top_categories, productivity_score, ai_summary, deep_work_blocks, deep_work_secs, avg_recovery_secs)
+               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)
                ON CONFLICT(date) DO UPDATE SET
                    total_active_secs = excluded.total_active_secs,
                    total_focus_secs = excluded.total_focus_secs,
@@ -104,6 +110,9 @@ impl DailySummaryRepo {
                    top_categories = excluded.top_categories,
                    productivity_score = excluded.productivity_score,
                    ai_summary = excluded.ai_summary,
+                   deep_work_blocks = excluded.deep_work_blocks,
+                   deep_work_secs = excluded.deep_work_secs,
+                   avg_recovery_secs = excluded.avg_recovery_secs,
                    computed_at = datetime('now')"#,
         )
         .bind(&summary.date)
@@ -122,6 +131,9 @@ impl DailySummaryRepo {
         .bind(&top_categories_json)
         .bind(summary.productivity_score)
         .bind(&summary.ai_summary)
+        .bind(summary.deep_work_blocks)
+        .bind(summary.deep_work_secs)
+        .bind(summary.avg_recovery_secs)
         .execute(&self.pool)
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;

@@ -28,20 +28,21 @@ const BROWSER_BUNDLE_PREFIXES: &[&str] = &[
     "com.vivaldi.vivaldi",
 ];
 
-/// Browser name suffixes typically appended to window titles.
+/// Browser name suffixes typically appended to window titles (pre-lowercased
+/// to avoid allocating on every call to `extract_site_name`).
 const BROWSER_SUFFIXES: &[&str] = &[
-    " - Google Chrome",
-    " - Mozilla Firefox",
-    " - Safari",
-    " - Arc",
-    " - Brave",
-    " - Vivaldi",
-    " - Microsoft Edge",
-    " - Opera",
-    " - Chromium",
-    " — Mozilla Firefox",
-    " — Safari",
-    " - Zen Browser",
+    " - google chrome",
+    " - mozilla firefox",
+    " - safari",
+    " - arc",
+    " - brave",
+    " - vivaldi",
+    " - microsoft edge",
+    " - opera",
+    " - chromium",
+    " — mozilla firefox",
+    " — safari",
+    " - zen browser",
 ];
 
 /// Known site keywords → domain display name.
@@ -182,9 +183,7 @@ pub struct Categorizer {
 impl Categorizer {
     pub fn new(categories: Vec<ActivityCategory>) -> Self {
         let title_patterns = Self::build_title_patterns(&categories);
-        let browsing_idx = categories
-            .iter()
-            .position(|c| c.id == BROWSING_CATEGORY_ID);
+        let browsing_idx = categories.iter().position(|c| c.id == BROWSING_CATEGORY_ID);
         Self {
             categories,
             title_patterns,
@@ -270,10 +269,10 @@ impl Categorizer {
     pub fn extract_site_name(window_title: &str) -> String {
         let mut title = window_title;
 
-        // Strip browser suffix (case-insensitive check)
+        // Strip browser suffix (case-insensitive check using pre-lowercased suffixes)
         let title_lower = title.to_lowercase();
         for suffix in BROWSER_SUFFIXES {
-            if let Some(pos) = title_lower.rfind(&suffix.to_lowercase()) {
+            if let Some(pos) = title_lower.rfind(suffix) {
                 title = &title[..pos];
                 break;
             }
@@ -626,9 +625,7 @@ mod tests {
         );
 
         // Non-browser app still matches normally by app_name
-        assert!(cat
-            .categorize_full("Slack", None, None, None)
-            .is_none());
+        assert!(cat.categorize_full("Slack", None, None, None).is_none());
     }
 
     #[test]
@@ -636,7 +633,10 @@ mod tests {
         assert!(Categorizer::is_browser("Google Chrome", None));
         assert!(Categorizer::is_browser("Safari", None));
         assert!(Categorizer::is_browser("Arc", None));
-        assert!(Categorizer::is_browser("Firefox", Some("org.mozilla.firefox")));
+        assert!(Categorizer::is_browser(
+            "Firefox",
+            Some("org.mozilla.firefox")
+        ));
         assert!(!Categorizer::is_browser("Visual Studio Code", None));
         assert!(!Categorizer::is_browser("Slack", None));
         // Bundle ID detection
@@ -736,7 +736,10 @@ mod tests {
     #[test]
     fn test_lookup_known_site() {
         assert_eq!(lookup_known_site("YouTube"), Some("youtube.com"));
-        assert_eq!(lookup_known_site("something youtube something"), Some("youtube.com"));
+        assert_eq!(
+            lookup_known_site("something youtube something"),
+            Some("youtube.com")
+        );
         assert_eq!(lookup_known_site("My GitHub Profile"), Some("github.com"));
         assert_eq!(lookup_known_site("random page title"), None);
     }

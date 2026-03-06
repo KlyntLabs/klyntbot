@@ -7,6 +7,7 @@ use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, warn};
 
 use crate::config::{FocusConfig, NudgeConfig};
+use crate::distraction_analyzer::DistractionAnalyzer;
 use crate::repos::ProductivityRepos;
 use crate::types::{NudgeRecord, NudgeType};
 
@@ -148,6 +149,19 @@ async fn check_nudges(
         }
     }
 
+    // 3. Proactive break suggestion — high distraction risk window.
+    if config.focus_suggestions
+        && should_send(repos, NudgeType::FocusSuggestion, config.cooldown_mins, now).await?
+        && DistractionAnalyzer::is_high_risk_window(repos, now).await?
+    {
+        let record = NudgeRecord::new(
+            NudgeType::FocusSuggestion,
+            "You're in a historically high-distraction period. Consider a short break.".into(),
+            now,
+        );
+        send_nudge(repos, sender, record).await?;
+    }
+
     Ok(())
 }
 
@@ -239,18 +253,7 @@ mod tests {
     }
 
     fn default_focus_config() -> FocusConfig {
-        FocusConfig {
-            default_duration_mins: 45,
-            break_interval_mins: 90,
-            break_duration_mins: 10,
-            max_daily_focus_hours: 8,
-            soft_block_enabled: true,
-            soft_block_cooldown_secs: 300,
-            soft_block_temp_pass_mins: 5,
-            soft_block_llm_enabled: true,
-            soft_block_llm_timeout_ms: 3000,
-            learned_rule_threshold: 3,
-        }
+        FocusConfig::default()
     }
 
     #[tokio::test]

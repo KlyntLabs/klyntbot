@@ -1,8 +1,14 @@
 pub mod aggregator;
+pub mod auto_focus;
+pub mod batch_writer;
+pub mod bucket_aggregator;
 pub mod config;
 pub mod distraction;
+pub mod distraction_analyzer;
+pub mod engine;
 pub mod focus;
 pub mod handler;
+pub mod insights;
 pub mod nudge;
 pub mod patterns;
 pub mod repos;
@@ -18,6 +24,7 @@ use tools_core::{DynTool, FeatureMigration, FeaturePackage, HealthStatus};
 
 pub use aggregator::DailyAggregator;
 pub use config::ProductivityConfig;
+pub use engine::ProductivityEngine;
 pub use focus::FocusManager;
 pub use handler::ProductivityHandler;
 pub use nudge::NudgeService;
@@ -41,17 +48,30 @@ impl ProductivityFeature {
         Self { tool: None }
     }
 
-    pub fn migration_sql() -> &'static str {
+    fn migration_sql() -> &'static str {
         include_str!("../migrations/001_productivity_tables.sql")
     }
 
+    fn migration_v2_sql() -> &'static str {
+        include_str!("../migrations/002_productivity_v2.sql")
+    }
+
     pub fn migrations_static() -> Vec<FeatureMigration> {
-        vec![FeatureMigration {
-            feature_name: "productivity".to_string(),
-            version: 1,
-            description: "Create productivity tracking tables".to_string(),
-            sql: Self::migration_sql().to_string(),
-        }]
+        vec![
+            FeatureMigration {
+                feature_name: "productivity".to_string(),
+                version: 1,
+                description: "Create productivity tracking tables".to_string(),
+                sql: Self::migration_sql().to_string(),
+            },
+            FeatureMigration {
+                feature_name: "productivity".to_string(),
+                version: 2,
+                description: "Add buckets, distraction patterns, insights, focus source"
+                    .to_string(),
+                sql: Self::migration_v2_sql().to_string(),
+            },
+        ]
     }
 
     pub fn default_config_static() -> Value {

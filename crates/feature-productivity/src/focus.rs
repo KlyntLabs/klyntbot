@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::config::FocusConfig;
 use crate::repos::ProductivityRepos;
-use crate::types::{DistractionEvent, FocusSession, SessionType};
+use crate::types::{DistractionEvent, FocusSession, SessionSource, SessionType};
 
 pub struct FocusManager {
     repos: ProductivityRepos,
@@ -49,6 +49,7 @@ impl FocusManager {
             quality_score: None,
             completed: false,
             notes: None,
+            source: SessionSource::Manual,
         };
 
         self.repos.sessions.create(&session).await?;
@@ -115,6 +116,7 @@ impl FocusManager {
             quality_score: None,
             completed: false,
             notes: break_mins.map(|b| format!("break_mins:{b}")),
+            source: SessionSource::Pomodoro,
         };
 
         self.repos.sessions.create(&session).await?;
@@ -288,6 +290,7 @@ mod tests {
             quality_score: None,
             completed: true,
             notes: None,
+            source: SessionSource::Manual,
         };
         let quality = compute_quality(&session, 1.0, 45);
         // 1.0 * 0.6 + 1.0 * 0.3 + 1.0 * 0.1 = 1.0

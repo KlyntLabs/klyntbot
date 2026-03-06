@@ -51,6 +51,7 @@ impl DailyAggregator {
             top_app_rows,
             sessions,
             time_entries,
+            avg_recovery_secs,
         ) = tokio::try_join!(
             self.repos.events.total_active_secs(&start, &end),
             self.repos.events.total_idle_secs(&start, &end),
@@ -60,6 +61,7 @@ impl DailyAggregator {
             self.repos.events.top_apps(&start, &end, 10),
             self.repos.sessions.list_range(&start, &end, None),
             self.repos.time_entries.list_range(&start, &end),
+            self.repos.distraction_patterns.avg_recovery_secs(date, date),
         )?;
 
         // Include manual time entries in totals
@@ -124,6 +126,14 @@ impl DailyAggregator {
             }
         };
 
+        let (deep_work_blocks, deep_work_secs) = sessions
+            .iter()
+            .filter(|s| s.session_type != crate::types::SessionType::Break)
+            .filter(|s| s.actual_mins.unwrap_or(0) >= 25)
+            .fold((0i64, 0i64), |(blocks, secs), s| {
+                (blocks + 1, secs + s.actual_mins.unwrap_or(0) * 60)
+            });
+
         let mut summary = DailySummary {
             date: date.to_string(),
             total_active_secs,
@@ -141,6 +151,9 @@ impl DailyAggregator {
             top_categories,
             productivity_score: None,
             ai_summary: None,
+            deep_work_blocks,
+            deep_work_secs,
+            avg_recovery_secs,
         };
 
         let score = compute_productivity_score(&summary);
@@ -215,10 +228,19 @@ impl DailyAggregator {
         Ok(results)
     }
 
-    /// Purge activity events older than retention_days.
-    pub async fn purge_old_data(&self, retention_days: u64) -> common::Result<u64> {
-        let cutoff = Utc::now() - chrono::Duration::days(retention_days as i64);
-        self.repos.events.purge_before(&cutoff).await
+    /// Dual-tier purge: raw events after `raw_days`, buckets after `bucket_days`.
+    pub async fn purge_old_data(
+        &self,
+        raw_days: u64,
+        bucket_days: u64,
+    ) -> common::Result<(u64, u64)> {
+        let raw_cutoff = Utc::now() - chrono::Duration::days(raw_days as i64);
+        let raw_purged = self.repos.events.purge_before(&raw_cutoff).await?;
+        let bucket_cutoff = (Utc::now() - chrono::Duration::days(bucket_days as i64))
+            .format("%Y-%m-%d")
+            .to_string();
+        let bucket_purged = self.repos.buckets.purge_before(&bucket_cutoff).await?;
+        Ok((raw_purged, bucket_purged))
     }
 
     /// Get a cached summary for a date, or compute it if missing.
@@ -285,9 +307,7 @@ mod tests {
 
         // Use noon UTC today to avoid midnight-crossing flakiness
         let now = Utc::now();
-        let noon = Utc.from_utc_datetime(
-            &now.date_naive().and_hms_opt(12, 0, 0).unwrap(),
-        );
+        let noon = Utc.from_utc_datetime(&now.date_naive().and_hms_opt(12, 0, 0).unwrap());
         let today = noon.format("%Y-%m-%d").to_string();
         let start = noon - chrono::Duration::hours(2);
         let end = noon - chrono::Duration::hours(1);
@@ -338,9 +358,7 @@ mod tests {
         let aggregator = DailyAggregator::new(repos.clone());
 
         let now = Utc::now();
-        let noon = Utc.from_utc_datetime(
-            &now.date_naive().and_hms_opt(12, 0, 0).unwrap(),
-        );
+        let noon = Utc.from_utc_datetime(&now.date_naive().and_hms_opt(12, 0, 0).unwrap());
         let today = noon.format("%Y-%m-%d").to_string();
         let start = noon - chrono::Duration::hours(2);
 
@@ -377,9 +395,7 @@ mod tests {
         let aggregator = DailyAggregator::new(repos.clone());
 
         let now = Utc::now();
-        let noon = Utc.from_utc_datetime(
-            &now.date_naive().and_hms_opt(12, 0, 0).unwrap(),
-        );
+        let noon = Utc.from_utc_datetime(&now.date_naive().and_hms_opt(12, 0, 0).unwrap());
         let today = noon.format("%Y-%m-%d").to_string();
         let start = noon - chrono::Duration::hours(4);
 

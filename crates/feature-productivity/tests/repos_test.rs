@@ -122,7 +122,12 @@ async fn test_category_crud() {
     };
     repos.categories.upsert(&custom).await.unwrap();
 
-    let fetched = repos.categories.get("my_custom_cat").await.unwrap().unwrap();
+    let fetched = repos
+        .categories
+        .get("my_custom_cat")
+        .await
+        .unwrap()
+        .unwrap();
     assert_eq!(fetched.name, "My Custom");
     assert_eq!(fetched.category_type, CategoryType::Distracting);
 
@@ -153,6 +158,7 @@ async fn test_focus_session_lifecycle() {
         quality_score: None,
         completed: false,
         notes: None,
+        source: SessionSource::Manual,
     };
 
     repos.sessions.create(&session).await.unwrap();
@@ -209,6 +215,9 @@ async fn test_daily_summary_upsert() {
         }],
         productivity_score: None,
         ai_summary: None,
+        deep_work_blocks: 0,
+        deep_work_secs: 0,
+        avg_recovery_secs: None,
     };
 
     repos.summaries.upsert(&summary).await.unwrap();

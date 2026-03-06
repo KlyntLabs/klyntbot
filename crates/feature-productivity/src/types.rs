@@ -118,6 +118,7 @@ pub struct FocusSession {
     pub quality_score: Option<f64>,
     pub completed: bool,
     pub notes: Option<String>,
+    pub source: SessionSource,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -147,6 +148,9 @@ pub struct DailySummary {
     pub top_categories: Vec<CategoryUsage>,
     pub productivity_score: Option<f64>,
     pub ai_summary: Option<String>,
+    pub deep_work_blocks: i64,
+    pub deep_work_secs: i64,
+    pub avg_recovery_secs: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -318,13 +322,188 @@ pub struct TimeEntry {
     pub created_at: DateTime<Utc>,
 }
 
+/// Duration of a single activity bucket window, in seconds (5 minutes).
+/// Shared between BucketAggregator (bucket boundaries) and AutoFocusDetector (window evaluation).
+pub const BUCKET_DURATION_SECS: i64 = 300;
+
+/// Real-time tick emitted by ActivityTracker every poll interval.
+/// Consumed by all event bus subscribers.
+#[derive(Debug, Clone)]
+pub struct ActivityTick {
+    pub timestamp: DateTime<Utc>,
+    pub app_name: String,
+    pub bundle_id: Option<String>,
+    pub window_title: Option<String>,
+    pub site_name: Option<String>,
+    pub category_id: Option<String>,
+    pub category_type: Option<CategoryType>,
+    pub is_idle: bool,
+    pub idle_secs: f64,
+    pub is_context_switch: bool,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SessionSource {
+    #[default]
+    Manual,
+    AutoDetected,
+    Pomodoro,
+}
+
+impl std::fmt::Display for SessionSource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Manual => write!(f, "manual"),
+            Self::AutoDetected => write!(f, "auto_detected"),
+            Self::Pomodoro => write!(f, "pomodoro"),
+        }
+    }
+}
+
+impl std::str::FromStr for SessionSource {
+    type Err = common::KlyntbotError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "manual" => Ok(Self::Manual),
+            "auto_detected" => Ok(Self::AutoDetected),
+            "pomodoro" => Ok(Self::Pomodoro),
+            _ => {
+                Err(common::ToolError::InvalidParams(format!("unknown session source: {s}")).into())
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Sentiment {
+    Positive,
+    Neutral,
+    Warning,
+    Negative,
+}
+
+impl std::fmt::Display for Sentiment {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Positive => write!(f, "positive"),
+            Self::Neutral => write!(f, "neutral"),
+            Self::Warning => write!(f, "warning"),
+            Self::Negative => write!(f, "negative"),
+        }
+    }
+}
+
+impl std::str::FromStr for Sentiment {
+    type Err = common::KlyntbotError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "positive" => Ok(Self::Positive),
+            "neutral" => Ok(Self::Neutral),
+            "warning" => Ok(Self::Warning),
+            "negative" => Ok(Self::Negative),
+            _ => Err(common::ToolError::InvalidParams(format!("unknown sentiment: {s}")).into()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum InsightType {
+    DeepWorkTrend,
+    DistractionSpike,
+    PeakHourShift,
+    StreakAchieved,
+    FatigueWarning,
+    RecoveryImprovement,
+    CategoryShift,
+    NewPersonalBest,
+    ConsistencyNote,
+}
+
+impl std::fmt::Display for InsightType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::DeepWorkTrend => write!(f, "deep_work_trend"),
+            Self::DistractionSpike => write!(f, "distraction_spike"),
+            Self::PeakHourShift => write!(f, "peak_hour_shift"),
+            Self::StreakAchieved => write!(f, "streak_achieved"),
+            Self::FatigueWarning => write!(f, "fatigue_warning"),
+            Self::RecoveryImprovement => write!(f, "recovery_improvement"),
+            Self::CategoryShift => write!(f, "category_shift"),
+            Self::NewPersonalBest => write!(f, "new_personal_best"),
+            Self::ConsistencyNote => write!(f, "consistency_note"),
+        }
+    }
+}
+
+impl std::str::FromStr for InsightType {
+    type Err = common::KlyntbotError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "deep_work_trend" => Ok(Self::DeepWorkTrend),
+            "distraction_spike" => Ok(Self::DistractionSpike),
+            "peak_hour_shift" => Ok(Self::PeakHourShift),
+            "streak_achieved" => Ok(Self::StreakAchieved),
+            "fatigue_warning" => Ok(Self::FatigueWarning),
+            "recovery_improvement" => Ok(Self::RecoveryImprovement),
+            "category_shift" => Ok(Self::CategoryShift),
+            "new_personal_best" => Ok(Self::NewPersonalBest),
+            "consistency_note" => Ok(Self::ConsistencyNote),
+            _ => Err(common::ToolError::InvalidParams(format!("unknown insight type: {s}")).into()),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ProductivityScore {
+pub struct InsightCard {
+    pub id: String,
+    pub insight_type: InsightType,
+    pub title: String,
+    pub body: String,
+    pub sentiment: Sentiment,
+    pub metric_value: Option<f64>,
+    pub baseline_value: Option<f64>,
     pub date: String,
-    pub overall: f64,
-    pub productive_ratio_score: f64,
-    pub focus_quality_score: f64,
-    pub distraction_score: f64,
-    pub continuity_score: f64,
+    pub dismissed: bool,
+    pub generated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[serde(rename_all = "camelCase")]
+pub struct ActivityBucket {
+    pub bucket_start: String,
+    pub date: String,
+    pub dominant_app: Option<String>,
+    pub dominant_site: Option<String>,
+    pub dominant_category: Option<String>,
+    pub productive_secs: i64,
+    pub neutral_secs: i64,
+    pub distracting_secs: i64,
+    pub idle_secs: i64,
+    pub context_switches: i64,
+    pub focus_depth: Option<f64>,
+    pub tick_count: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DistractionPattern {
+    pub id: Option<i64>,
+    pub date: String,
+    pub hour_of_day: i32,
+    pub hours_active_today: f64,
+    pub mins_since_break: f64,
+    pub preceding_app: Option<String>,
+    pub preceding_category: Option<String>,
+    pub preceding_duration_mins: Option<f64>,
+    pub distraction_app: String,
+    pub distraction_category: Option<String>,
+    pub recovery_secs: Option<i64>,
+    pub created_at: DateTime<Utc>,
 }

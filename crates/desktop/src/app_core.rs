@@ -12,11 +12,10 @@ use common::FormResponse;
 use desktop_shared::errors::ApiError;
 use desktop_shared::events;
 use feature_productivity::repos::ProductivityRepos;
-use feature_productivity::tracker::ActivityTracker;
-use feature_productivity::{DailyAggregator, FocusManager, NudgeService};
+use feature_productivity::{DailyAggregator, FocusManager, NudgeService, ProductivityEngine};
 use scheduling::CronService;
 use storage::{Repos, StoragePool, VectorStore};
-use tauri::{Emitter, Manager};
+use tauri::Emitter;
 use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn};
@@ -44,8 +43,8 @@ pub struct AppCore {
     productivity_repos: Option<ProductivityRepos>,
     /// Focus session manager (None if feature is disabled or no pool).
     focus_manager: Option<Arc<FocusManager>>,
-    /// Activity tracker background task (macOS only, None if disabled).
-    activity_tracker: Option<Arc<Mutex<ActivityTracker>>>,
+    /// Productivity engine — owns tracker + all subscribers (macOS only, None if disabled).
+    productivity_engine: Option<Arc<Mutex<ProductivityEngine>>>,
     /// Daily aggregator for live productivity summaries.
     aggregator: Option<Arc<DailyAggregator>>,
     /// Nudge service for break reminders and burnout alerts.
@@ -153,7 +152,7 @@ impl AppCore {
         let (
             productivity_repos,
             focus_manager,
-            activity_tracker,
+            productivity_engine,
             aggregator,
             nudge_service,
             distraction_interceptor,
@@ -186,20 +185,40 @@ impl AppCore {
                 // Daily aggregator for live summaries.
                 let agg = Arc::new(DailyAggregator::new(prod_repos.clone()));
 
-                // Distraction alert channel (tracker → Tauri events).
-                let (distraction_tx, distraction_rx) =
-                    mpsc::channel::<feature_productivity::tracker::DistractionAlert>(32);
-
-                // Start activity tracker (macOS only) with distraction detection.
+                // Build and start the productivity engine (tracker + all subscribers).
                 let categories = prod_repos.categories.list_all().await.unwrap_or_default();
                 let categorizer =
                     feature_productivity::tracker::categorizer::Categorizer::new(categories);
-                let mut tracker =
-                    ActivityTracker::new(prod_config.clone(), prod_repos.clone(), categorizer);
-                tracker.set_focus_manager(Arc::clone(&mgr));
-                tracker.set_distraction_sender(distraction_tx);
-                tracker.start();
-                let tracker = Arc::new(Mutex::new(tracker));
+                let mut engine =
+                    ProductivityEngine::new(prod_config.clone(), prod_repos.clone(), categorizer);
+
+                // Wire auto-focus session receiver to Tauri events.
+                if let Some(mut auto_focus_rx) = engine.take_auto_focus_rx() {
+                    let handle = app_handle.clone();
+                    let cancel = shutdown_token.clone();
+                    tokio::spawn(async move {
+                        loop {
+                            tokio::select! {
+                                _ = cancel.cancelled() => break,
+                                Some(session) = auto_focus_rx.recv() => {
+                                    let payload = events::AutoFocusPayload {
+                                        started_at: session.started_at.to_rfc3339(),
+                                        ended_at: session.ended_at.to_rfc3339(),
+                                        duration_mins: session.total_secs / 60,
+                                        dominant_app: session.dominant_app,
+                                        productive_ratio: session.productive_ratio,
+                                    };
+                                    if let Err(e) = handle.emit(events::FOCUS_AUTO_DETECTED, payload) {
+                                        warn!("failed to emit auto-focus event: {e}");
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+
+                engine.start();
+                let engine = Arc::new(Mutex::new(engine));
 
                 // Nudge service — break reminders + burnout alerts.
                 let (nudge_tx, nudge_rx) =
@@ -213,19 +232,28 @@ impl AppCore {
                 nudge_svc.start();
                 let nudge_svc = Arc::new(Mutex::new(nudge_svc));
 
-                // Spawn background tasks to forward alerts/nudges as Tauri events.
-                Self::spawn_productivity_events(
-                    distraction_rx,
+                // Forward nudges as Tauri events.
+                Self::spawn_channel_forwarder(
                     nudge_rx,
                     &app_handle,
                     &shutdown_token,
-                    Some(interceptor.clone()),
+                    |handle, nudge| {
+                        if let Err(e) = handle.emit(
+                            events::PRODUCTIVITY_NUDGE,
+                            events::NudgePayload {
+                                nudge_type: nudge.nudge_type.to_string(),
+                                message: nudge.message,
+                            },
+                        ) {
+                            warn!("failed to emit nudge event: {e}");
+                        }
+                    },
                 );
 
                 (
                     Some(prod_repos),
                     Some(mgr),
-                    Some(tracker),
+                    Some(engine),
                     Some(agg),
                     Some(nudge_svc),
                     Some(interceptor),
@@ -248,7 +276,7 @@ impl AppCore {
             pending_interactions: Arc::new(dashmap::DashMap::new()),
             productivity_repos,
             focus_manager,
-            activity_tracker,
+            productivity_engine,
             aggregator,
             nudge_service,
             distraction_interceptor,
@@ -315,107 +343,6 @@ impl AppCore {
         });
     }
 
-    /// Spawn background tasks that forward productivity alerts as Tauri events.
-    fn spawn_productivity_events(
-        distraction_rx: mpsc::Receiver<feature_productivity::tracker::DistractionAlert>,
-        nudge_rx: mpsc::Receiver<feature_productivity::types::NudgeRecord>,
-        app_handle: &tauri::AppHandle,
-        shutdown_token: &CancellationToken,
-        interceptor: Option<Arc<Mutex<feature_productivity::distraction::DistractionInterceptor>>>,
-    ) {
-        // Distraction interception — uses the interceptor to evaluate alerts
-        // before showing the overlay (replaces the simple forwarder).
-        {
-            let cancel = shutdown_token.clone();
-            let handle = app_handle.clone();
-            let interceptor = interceptor.clone();
-
-            tokio::spawn(async move {
-                let mut rx = distraction_rx;
-                loop {
-                    tokio::select! {
-                        _ = cancel.cancelled() => break,
-                        Some(alert) = rx.recv() => {
-                            if let Some(ref interceptor) = interceptor {
-                                let mut guard = interceptor.lock().await;
-                                let decision = guard.evaluate(&alert.app_name, alert.window_title.as_deref()).await;
-                                drop(guard);
-
-                                match decision {
-                                    feature_productivity::distraction::InterceptDecision::Allow { reason } => {
-                                        tracing::debug!("Distraction allowed: {reason}");
-                                    }
-                                    feature_productivity::distraction::InterceptDecision::ShowOverlay { needs_llm } => {
-                                        // Show the overlay window.
-                                        if let Some(window) = handle.get_webview_window("distraction-overlay") {
-                                            let _ = window.show();
-                                            let _ = window.set_focus();
-                                        }
-                                        // Emit intervention event for the overlay UI.
-                                        let payload = events::InterventionPayload {
-                                            app_name: alert.app_name.clone(),
-                                            window_title: alert.window_title.clone(),
-                                            session_id: alert.session_id.clone(),
-                                            needs_llm,
-                                            heuristic_verdict: if needs_llm { "ambiguous".into() } else { "distracting".into() },
-                                        };
-                                        if let Err(e) = handle.emit(
-                                            events::DISTRACTION_INTERVENTION,
-                                            payload,
-                                        ) {
-                                            warn!("failed to emit distraction intervention: {e}");
-                                        }
-                                        // Also emit entity:updated so the dashboard refreshes.
-                                        if let Err(e) = handle.emit(
-                                            events::ENTITY_UPDATED,
-                                            events::EntityUpdatedPayload {
-                                                entity_kind: desktop_shared::types::EntityKind::FocusSession,
-                                                id: alert.session_id.clone(),
-                                            },
-                                        ) {
-                                            warn!("failed to emit entity_updated event: {e}");
-                                        }
-                                    }
-                                }
-                            } else {
-                                // No interceptor — fall back to simple forwarding.
-                                if let Err(e) = handle.emit(
-                                    events::PRODUCTIVITY_DISTRACTION,
-                                    events::DistractionPayload {
-                                        app_name: alert.app_name,
-                                        session_id: alert.session_id.clone(),
-                                    },
-                                ) {
-                                    warn!("failed to emit distraction event: {e}");
-                                }
-                                if let Err(e) = handle.emit(
-                                    events::ENTITY_UPDATED,
-                                    events::EntityUpdatedPayload {
-                                        entity_kind: desktop_shared::types::EntityKind::FocusSession,
-                                        id: alert.session_id,
-                                    },
-                                ) {
-                                    warn!("failed to emit entity_updated event: {e}");
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-        }
-
-        Self::spawn_channel_forwarder(nudge_rx, app_handle, shutdown_token, |handle, nudge| {
-            if let Err(e) = handle.emit(
-                events::PRODUCTIVITY_NUDGE,
-                events::NudgePayload {
-                    nudge_type: nudge.nudge_type.to_string(),
-                    message: nudge.message,
-                },
-            ) {
-                warn!("failed to emit nudge event: {e}");
-            }
-        });
-    }
 
     /// Return productivity repos or a "feature disabled" error.
     pub fn productivity_repos(&self) -> Result<&ProductivityRepos, ApiError> {
@@ -451,9 +378,9 @@ impl AppCore {
     /// Graceful shutdown.
     pub async fn shutdown(&self) {
         info!("shutting down app core");
-        // Stop activity tracker first to flush pending events.
-        if let Some(ref tracker) = self.activity_tracker {
-            tracker.lock().await.stop().await;
+        // Stop productivity engine first to flush pending events.
+        if let Some(ref engine) = self.productivity_engine {
+            engine.lock().await.stop().await;
         }
         // Stop nudge service.
         if let Some(ref nudge) = self.nudge_service {

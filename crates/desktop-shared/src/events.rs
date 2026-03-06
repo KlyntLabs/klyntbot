@@ -53,6 +53,13 @@ pub const MCP_SERVER_STATUS: &str = "mcp:server_status";
 pub const MCP_STARTUP_COMPLETE: &str = "mcp:startup_complete";
 pub const PRODUCTIVITY_DISTRACTION: &str = "productivity:distraction";
 pub const PRODUCTIVITY_NUDGE: &str = "productivity:nudge";
+pub const ACTIVITY_TICK: &str = "activity:tick";
+pub const ACTIVITY_SWITCH: &str = "activity:switch";
+pub const FOCUS_STATE_CHANGED: &str = "focus:state_changed";
+pub const FOCUS_AUTO_DETECTED: &str = "focus:auto_detected";
+pub const SCORE_UPDATED: &str = "score:updated";
+pub const BUCKET_COMPLETED: &str = "bucket:completed";
+pub const INSIGHT_GENERATED: &str = "insight:generated";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -433,4 +440,65 @@ pub struct TransparencyDelegation {
     pub status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub duration_ms: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActivityTickPayload {
+    pub app_name: String,
+    pub site_name: Option<String>,
+    pub category_type: Option<String>,
+    pub is_idle: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActivitySwitchPayload {
+    pub from_app: Option<String>,
+    pub to_app: String,
+    pub to_site: Option<String>,
+    pub category_type: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FocusStatePayload {
+    pub state: String,
+    pub since: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutoFocusPayload {
+    pub started_at: String,
+    pub ended_at: String,
+    pub duration_mins: i64,
+    pub dominant_app: String,
+    pub productive_ratio: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScorePayload {
+    pub score: f64,
+    pub productive_secs: i64,
+    pub distracting_secs: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BucketPayload {
+    pub bucket_start: String,
+    pub productive_secs: i64,
+    pub distracting_secs: i64,
+    pub dominant_app: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InsightPayload {
+    pub id: String,
+    pub insight_type: String,
+    pub title: String,
+    pub sentiment: String,
 }

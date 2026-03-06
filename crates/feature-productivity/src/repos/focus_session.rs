@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use sqlx::SqlitePool;
 use tracing::warn;
 
-use crate::types::{DistractionEvent, FocusSession, SessionType};
+use crate::types::{DistractionEvent, FocusSession, SessionSource, SessionType};
 
 #[derive(sqlx::FromRow)]
 struct SessionRow {
@@ -19,6 +19,7 @@ struct SessionRow {
     quality_score: Option<f64>,
     completed: bool,
     notes: Option<String>,
+    source: String,
 }
 
 impl From<SessionRow> for FocusSession {
@@ -47,6 +48,10 @@ impl From<SessionRow> for FocusSession {
             .ended_at
             .as_deref()
             .and_then(|s| common::utils::date::parse_datetime(s, "UTC"));
+        let source = row.source.parse::<SessionSource>().unwrap_or_else(|_| {
+            warn!(raw = %row.source, "unknown source in DB, defaulting to Manual");
+            SessionSource::Manual
+        });
         Self {
             id: row.id,
             action_id: row.action_id,
@@ -61,11 +66,12 @@ impl From<SessionRow> for FocusSession {
             quality_score: row.quality_score,
             completed: row.completed,
             notes: row.notes,
+            source,
         }
     }
 }
 
-const SESSION_COLUMNS: &str = "id, action_id, project_id, session_type, target_mins, started_at, ended_at, actual_mins, interruptions, distraction_events, quality_score, completed, notes";
+const SESSION_COLUMNS: &str = "id, action_id, project_id, session_type, target_mins, started_at, ended_at, actual_mins, interruptions, distraction_events, quality_score, completed, notes, source";
 
 #[derive(Debug, Clone)]
 pub struct FocusSessionRepo {
@@ -79,14 +85,15 @@ impl FocusSessionRepo {
 
     pub async fn create(&self, session: &FocusSession) -> common::Result<()> {
         let session_type = session.session_type.to_string();
+        let source = session.source.to_string();
         let distractions_json =
             serde_json::to_string(&session.distraction_events).unwrap_or_else(|e| {
                 warn!(%e, "failed to serialize distraction_events");
                 "[]".to_string()
             });
         sqlx::query(
-            r#"INSERT INTO focus_sessions (id, action_id, project_id, session_type, target_mins, started_at, ended_at, actual_mins, interruptions, distraction_events, quality_score, completed, notes)
-               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)"#,
+            r#"INSERT INTO focus_sessions (id, action_id, project_id, session_type, target_mins, started_at, ended_at, actual_mins, interruptions, distraction_events, quality_score, completed, notes, source)
+               VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)"#,
         )
         .bind(&session.id)
         .bind(&session.action_id)
@@ -101,6 +108,7 @@ impl FocusSessionRepo {
         .bind(session.quality_score)
         .bind(session.completed)
         .bind(&session.notes)
+        .bind(&source)
         .execute(&self.pool)
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
@@ -130,6 +138,7 @@ impl FocusSessionRepo {
 
     pub async fn update(&self, session: &FocusSession) -> common::Result<()> {
         let session_type = session.session_type.to_string();
+        let source = session.source.to_string();
         let distractions_json =
             serde_json::to_string(&session.distraction_events).unwrap_or_else(|e| {
                 warn!(%e, "failed to serialize distraction_events");
@@ -139,7 +148,8 @@ impl FocusSessionRepo {
             r#"UPDATE focus_sessions SET
                    action_id = ?2, project_id = ?3, session_type = ?4, target_mins = ?5,
                    ended_at = ?6, actual_mins = ?7, interruptions = ?8,
-                   distraction_events = ?9, quality_score = ?10, completed = ?11, notes = ?12
+                   distraction_events = ?9, quality_score = ?10, completed = ?11, notes = ?12,
+                   source = ?13
                WHERE id = ?1"#,
         )
         .bind(&session.id)
@@ -154,6 +164,7 @@ impl FocusSessionRepo {
         .bind(session.quality_score)
         .bind(session.completed)
         .bind(&session.notes)
+        .bind(&source)
         .execute(&self.pool)
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;

@@ -170,7 +170,7 @@ impl ProductivityPatternAnalyzer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::SessionType;
+    use crate::types::{SessionSource, SessionType};
 
     #[test]
     fn test_peak_hours_empty() {
@@ -208,6 +208,7 @@ mod tests {
                     quality_score: Some(quality),
                     completed: true,
                     notes: None,
+                    source: SessionSource::Manual,
                 }
             })
             .collect();
@@ -236,6 +237,7 @@ mod tests {
                 quality_score: Some(0.8),
                 completed: true,
                 notes: None,
+                source: SessionSource::Manual,
             },
             FocusSession {
                 id: "s2".to_string(),
@@ -285,6 +287,7 @@ mod tests {
             quality_score: None,
             completed: false,
             notes: None,
+            source: SessionSource::Manual,
         }
     }
 
@@ -306,6 +309,9 @@ mod tests {
             top_categories: vec![],
             productivity_score: None,
             ai_summary: None,
+            deep_work_blocks: 0,
+            deep_work_secs: 0,
+            avg_recovery_secs: None,
         }
     }
 }
