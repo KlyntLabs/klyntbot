@@ -1,8 +1,12 @@
 //! ProductivityEngine — orchestrator that owns the ActivityTracker
 //! and all broadcast subscribers. Single entry point for desktop crate.
 
+use std::sync::Arc;
+
 use tokio::sync::{broadcast, mpsc};
 use tokio_util::sync::CancellationToken;
+
+use bus::DomainEventBus;
 
 use crate::auto_focus::{AutoFocusDetector, AutoFocusSession};
 use crate::batch_writer::BatchWriter;
@@ -26,6 +30,7 @@ pub struct ProductivityEngine {
     cancel_token: CancellationToken,
     auto_focus_rx: Option<mpsc::Receiver<AutoFocusSession>>,
     tick_sender: broadcast::Sender<ActivityTick>,
+    domain_bus: Option<Arc<DomainEventBus>>,
 }
 
 impl ProductivityEngine {
@@ -33,6 +38,15 @@ impl ProductivityEngine {
         config: ProductivityConfig,
         repos: ProductivityRepos,
         categorizer: Categorizer,
+    ) -> Self {
+        Self::new_with_bus(config, repos, categorizer, None)
+    }
+
+    pub fn new_with_bus(
+        config: ProductivityConfig,
+        repos: ProductivityRepos,
+        categorizer: Categorizer,
+        domain_bus: Option<Arc<DomainEventBus>>,
     ) -> Self {
         let (tick_tx, _) = broadcast::channel(BROADCAST_CAPACITY);
         let cancel = CancellationToken::new();
@@ -78,8 +92,12 @@ impl ProductivityEngine {
         };
 
         // DistractionAnalyzer
-        let distraction_analyzer =
-            DistractionAnalyzer::start(tick_tx.subscribe(), repos.clone(), cancel.child_token());
+        let distraction_analyzer = DistractionAnalyzer::start_with_bus(
+            tick_tx.subscribe(),
+            repos.clone(),
+            domain_bus.clone(),
+            cancel.child_token(),
+        );
 
         Self {
             tracker,
@@ -90,6 +108,7 @@ impl ProductivityEngine {
             cancel_token: cancel,
             auto_focus_rx: Some(auto_focus_rx),
             tick_sender: tick_tx,
+            domain_bus,
         }
     }
 
@@ -132,6 +151,10 @@ impl ProductivityEngine {
             }
         };
         tokio::join!(bw_fut, ba_fut, af_fut, da_fut);
+    }
+
+    pub fn domain_bus(&self) -> Option<&Arc<DomainEventBus>> {
+        self.domain_bus.as_ref()
     }
 
     pub fn categorizer(&self) -> &std::sync::Arc<tokio::sync::RwLock<Categorizer>> {

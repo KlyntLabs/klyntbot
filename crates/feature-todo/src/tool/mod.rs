@@ -6,6 +6,8 @@ use async_trait::async_trait;
 use serde_json::Value;
 use std::sync::Arc;
 
+use bus::DomainEventBus;
+
 use crate::embedding::EmbeddingHandler;
 use crate::enrichment::{EnrichmentFeedbackHandler, EnrichmentHandler};
 use crate::types::{Action, Attachment, TimeEntry};
@@ -33,6 +35,8 @@ pub struct TaskTool {
     pub(crate) enrichment_threshold: f64,
     /// Optional progress handler for cascading KR progress on complete.
     pub(crate) progress_handler: Option<Arc<dyn crate::progress::ProgressHandler>>,
+    /// Optional domain event bus for cross-feature communication.
+    pub(crate) domain_bus: Option<Arc<DomainEventBus>>,
 }
 
 impl TaskTool {
@@ -56,6 +60,7 @@ impl TaskTool {
             feedback_handler: None,
             enrichment_threshold: 0.70,
             progress_handler: None,
+            domain_bus: None,
         }
     }
 
@@ -96,6 +101,12 @@ impl TaskTool {
         handler: Arc<dyn crate::progress::ProgressHandler>,
     ) -> Self {
         self.progress_handler = Some(handler);
+        self
+    }
+
+    /// Attach a domain event bus for cross-feature communication.
+    pub fn with_domain_bus(mut self, bus: Arc<DomainEventBus>) -> Self {
+        self.domain_bus = Some(bus);
         self
     }
 

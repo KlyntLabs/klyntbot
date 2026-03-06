@@ -1,11 +1,15 @@
 //! DistractionAnalyzer — tracks productive→distracting transitions,
 //! records distraction patterns, and measures recovery time.
 
+use std::sync::Arc;
+
 use chrono::{DateTime, Timelike, Utc};
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, warn};
+
+use bus::{DomainEvent, DomainEventBus};
 
 use crate::repos::ProductivityRepos;
 use crate::types::{ActivityTick, CategoryType, DistractionPattern};
@@ -20,8 +24,17 @@ pub struct DistractionAnalyzer {
 
 impl DistractionAnalyzer {
     pub fn start(
+        tick_rx: broadcast::Receiver<ActivityTick>,
+        repos: ProductivityRepos,
+        cancel: CancellationToken,
+    ) -> Self {
+        Self::start_with_bus(tick_rx, repos, None, cancel)
+    }
+
+    pub fn start_with_bus(
         mut tick_rx: broadcast::Receiver<ActivityTick>,
         repos: ProductivityRepos,
+        domain_bus: Option<Arc<DomainEventBus>>,
         cancel: CancellationToken,
     ) -> Self {
         let cancel_clone = cancel.clone();
@@ -111,6 +124,13 @@ impl DistractionAnalyzer {
                                         "DistractionAnalyzer: {} → {} (pattern #{id})",
                                         prev.app_name, tick.app_name
                                     );
+                                    if let Some(ref bus) = domain_bus {
+                                        bus.publish(DomainEvent::DistractionDetected {
+                                            app: tick.app_name.clone(),
+                                            duration_secs: None,
+                                            context: format!("after {} ({}min streak)", prev.app_name, preceding_duration_mins.unwrap_or(0.0) as i64),
+                                        });
+                                    }
                                 }
                                 Err(e) => {
                                     warn!("DistractionAnalyzer: failed to insert pattern: {e}");

@@ -1,7 +1,11 @@
 //! Focus session manager — start/end sessions, record distractions, compute quality.
 
+use std::sync::Arc;
+
 use chrono::Utc;
 use uuid::Uuid;
+
+use bus::{DomainEvent, DomainEventBus};
 
 use crate::config::FocusConfig;
 use crate::repos::ProductivityRepos;
@@ -10,11 +14,21 @@ use crate::types::{DistractionEvent, FocusSession, SessionSource, SessionType};
 pub struct FocusManager {
     repos: ProductivityRepos,
     config: FocusConfig,
+    domain_bus: Option<Arc<DomainEventBus>>,
 }
 
 impl FocusManager {
     pub fn new(repos: ProductivityRepos, config: FocusConfig) -> Self {
-        Self { repos, config }
+        Self {
+            repos,
+            config,
+            domain_bus: None,
+        }
+    }
+
+    pub fn with_domain_bus(mut self, bus: Arc<DomainEventBus>) -> Self {
+        self.domain_bus = Some(bus);
+        self
     }
 
     /// Start a new focus session. Fails if one is already active.
@@ -82,6 +96,15 @@ impl FocusManager {
         ));
 
         self.repos.sessions.update(&session).await?;
+
+        if let Some(ref bus) = self.domain_bus {
+            bus.publish(DomainEvent::FocusSessionEnded {
+                duration_secs: session.actual_mins.unwrap_or(0) * 60,
+                quality: session.quality_score.unwrap_or(0.0),
+                interruptions: session.interruptions as i32,
+            });
+        }
+
         Ok(Some(session))
     }
 

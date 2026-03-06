@@ -1415,6 +1415,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "cognitive"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "bus",
+ "chrono",
+ "common",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "storage",
+ "tokio",
+ "tools-core",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "color_quant"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3458,6 +3476,7 @@ name = "feature-finance"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "bus",
  "chrono",
  "common",
  "dashmap",
@@ -3478,6 +3497,7 @@ name = "feature-productivity"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "bus",
  "chrono",
  "common",
  "config",
@@ -3504,6 +3524,7 @@ name = "feature-todo"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "bus",
  "chrono",
  "common",
  "futures-util",

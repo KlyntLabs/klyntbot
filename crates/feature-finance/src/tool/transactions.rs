@@ -5,6 +5,8 @@
 use chrono::{Local, NaiveDate, Utc};
 use serde_json::json;
 
+use bus::DomainEvent;
+
 use crate::types::{FinanceTransaction, TransactionType};
 use common::{Result, ToolError};
 use storage::rows::finance::{
@@ -156,6 +158,7 @@ impl FinanceTool {
         // Check budget impact for expense transactions with a category.
         let mut budget_impact: Option<serde_json::Value> = None;
         let mut nudge = String::new();
+        let mut budget_typed: Option<(i64, i64, i64, i64)> = None; // (percentage, spent, limit, alert_threshold)
         if tx_type == TransactionType::Expense {
             if let Some(ref cat) = category {
                 if let Ok(Some(budget)) = self.storage.budgets.get_by_category(cat).await {
@@ -171,6 +174,7 @@ impl FinanceTool {
                             "limit": usage.amount,
                             "percentage": percentage,
                         }));
+                        budget_typed = Some((percentage, usage.spent, usage.amount, usage.alert_threshold as i64));
                         if percentage >= usage.alert_threshold as i64 {
                             nudge = format!(
                                 "\nNote: Your \"{}\" budget is now at {}% ({} / {} {}).",
@@ -178,6 +182,27 @@ impl FinanceTool {
                             );
                         }
                     }
+                }
+            }
+        }
+
+        // Emit domain events
+        if let Some(ref bus) = self.domain_bus {
+            let is_over_budget = budget_typed.map(|(p, _, _, _)| p >= 100).unwrap_or(false);
+
+            bus.publish(DomainEvent::TransactionRecorded {
+                category: category.clone().unwrap_or_default(),
+                amount: amount as f64,
+                is_over_budget,
+            });
+
+            if let Some((percentage, spent, limit, alert_threshold)) = budget_typed {
+                if percentage >= alert_threshold {
+                    bus.publish(DomainEvent::BudgetAlert {
+                        category: category.clone().unwrap_or_default(),
+                        spent: spent as f64,
+                        limit: limit as f64,
+                    });
                 }
             }
         }

@@ -24,6 +24,7 @@ members = [
     "crates/desktop-shared",
     "crates/desktop",
     "crates/feature-productivity",
+    "crates/cognitive",
     "crates/dev-api",
 ]
 
@@ -54,6 +55,7 @@ feature-finance = { path = "crates/feature-finance" }
 feature-todo = { path = "crates/feature-todo" }
 feature-productivity = { path = "crates/feature-productivity" }
 plugin-runtime = { path = "crates/plugin-runtime" }
+cognitive = { path = "crates/cognitive" }
 desktop-shared = { path = "crates/desktop-shared" }
 desktop = { path = "crates/desktop" }
 extism = "1"
