@@ -162,15 +162,25 @@ EXTRACT → CONSOLIDATE → STORE → RETRIEVE → DECAY → REFLECT
 
 **Store:** Write to SQLite (structured) + LanceDB (embedded for retrieval).
 
-**Retrieve (FSRS-scored):**
+**Retrieve (FSRS-scored, state-aware):**
 ```
 retrievability = exp(ln(0.9) * elapsed_days / stability)
-relevance = semantic_similarity * 0.4
-           + retrievability * 0.3
-           + importance * 0.2
+relevance = semantic_similarity * 0.3
+           + retrievability * 0.2
+           + importance * 0.15
            + access_frequency_score * 0.1
+           + situational_boost * 0.25
 ```
 Stability increases each time a memory is retrieved and leads to a good outcome.
+
+**State-aware retrieval (`situational_boost`):** Retrieval does not rely only on semantic similarity. The current `UserSituation` biases which memories surface:
+- If `deadline_pressure` is High/Critical → boost memories related to the at-risk tasks
+- If `energy_level` is Low/Depleted → boost memories about break patterns and recovery strategies
+- If `distraction_risk` is high → boost memories about effective focus interventions
+- If `task_avoidance_detected` → boost memories about that task type and past avoidance resolution
+- Domain-specific: if budget alert active → boost finance-related behavioral memories
+
+This ensures retrieval is contextually relevant, not just semantically similar.
 
 **Decay:** Daily background job recalculates retrievability scores. Memories below threshold are compacted (merged or archived), never deleted.
 
@@ -190,19 +200,55 @@ Stability increases each time a memory is retrieved and leads to a good outcome.
 | **Background reflection** | Weekly | Cross-domain synthesis, strategy adjustment | None |
 | **Background decay** | Daily | Recalculate retrievability, compact low-relevance | None |
 
-### Implementation guardrail: salience filtering
+### Guardrail 1: Event filtering before LLM extraction
 
-Not every DomainEvent becomes stored memory. Events must cross an importance threshold:
-- Represents a pattern (not a single occurrence)
-- Contains explicit user-stated fact
-- Crosses a statistical threshold vs baseline
-- Is a notable anomaly
+Not every DomainEvent should trigger LLM memory extraction. A lightweight heuristic **salience filter** runs before any LLM call:
 
-This prevents memory store bloat from high-frequency low-value events.
+```rust
+pub enum SalienceVerdict {
+    Extract,       // Send to LLM extraction (anomaly, user-stated fact, threshold crossing)
+    Accumulate,    // Add to signal buffer for pattern detection, skip LLM
+    Discard,       // Routine event, no action needed
+}
+```
 
-### Implementation guardrail: pattern confidence
+Criteria for `Extract`:
+- Contains explicit user-stated fact (`UserStatedFact`, `UserCorrectedAI`)
+- Crosses a statistical threshold vs personal baseline (e.g., distraction rate > 1.5x average)
+- Is a notable anomaly (first occurrence of a new pattern)
+- Represents a milestone (task completed, goal hit, budget exceeded)
 
-Reflection only updates the user model or procedural rules after multiple observations (minimum 5 signals for the same pattern). Prevents premature behavioral inferences from isolated events.
+Criteria for `Accumulate`:
+- Routine activity events (app switches, normal productivity ticks)
+- Events that might form a pattern when aggregated but are not significant alone
+
+Criteria for `Discard`:
+- Duplicate or near-duplicate of recent event
+- Below minimum duration/impact threshold
+
+This prevents the hot path from becoming an LLM bottleneck. The vast majority of events are `Accumulate` or `Discard`.
+
+### Guardrail 2: Pattern validation for reflection
+
+Reflection must not update the user model from isolated observations. Patterns are only promoted to semantic or procedural memory after statistical validation:
+
+- **Minimum signal count:** >= 5 occurrences of the same pattern type
+- **Minimum time span:** Pattern observed across >= 3 distinct days
+- **Confidence threshold:** Statistical significance >= 0.7 (computed from signal consistency)
+- **Contradiction check:** New pattern must not contradict a higher-confidence existing fact without explicit user confirmation
+
+This prevents hallucinated patterns from single anomalous days or coincidental correlations.
+
+### Guardrail 3: Memory compaction strategy
+
+Bi-temporal storage avoids hard deletion, so semantic facts grow indefinitely. A background compaction job runs weekly (after reflection):
+
+1. **Merge redundant chains:** If fact A was superseded by B, which was superseded by C, and A is older than 90 days, merge the chain — keep C as active, archive A and B to a `semantic_facts_archive` table
+2. **Archive cold facts:** Facts with `valid_until` set and `retrievability < 0.1` (effectively forgotten) are moved to archive
+3. **Compact episodic memories:** Episodic memories older than 90 days with low access count are summarized by LLM into a single consolidated memory, then archived
+4. **Size budget:** If active semantic facts exceed a configurable limit (default: 10,000), trigger aggressive compaction on lowest-retrievability facts
+
+Archive tables have identical schema — data is never lost, just moved to cold storage that is not searched during normal retrieval.
 
 ### Public API
 
@@ -228,9 +274,46 @@ pub trait MemoryLifecycle: Send + Sync {
 
 ## Layer B: Proactive Intelligence Engine (`crates/feature-coaching`)
 
+### UserSituation — Derived World Model Layer
+
+Instead of the coaching engine reasoning directly over raw memories, an intermediate **UserSituation** struct is computed from cognitive memory + real-time signals. This makes reasoning more stable and explainable:
+
+```rust
+pub struct UserSituation {
+    // Energy & focus
+    pub energy_level: EnergyLevel,        // High / Medium / Low / Depleted
+    pub focus_state: FocusState,          // DeepWork / LightWork / Distracted / Idle / Break
+    pub minutes_since_break: i64,
+    pub session_quality_trend: Trend,     // Improving / Stable / Declining
+
+    // Task pressure
+    pub deadline_pressure: PressureLevel, // None / Low / Medium / High / Critical
+    pub overdue_tasks: Vec<TaskRef>,
+    pub approaching_deadlines: Vec<(TaskRef, Duration)>,
+    pub current_task_inference: Option<TaskInference>,
+
+    // Behavioral state
+    pub distraction_risk: f64,            // 0.0-1.0, based on time-of-day patterns
+    pub context_switch_rate: f64,         // switches/hour vs personal baseline
+    pub task_avoidance_detected: Option<TaskRef>,
+
+    // Cross-domain
+    pub active_goals_at_risk: Vec<GoalRef>,
+    pub budget_alerts: Vec<BudgetAlert>,
+    pub learning_decay_alerts: Vec<LearningAlert>,
+
+    // Meta
+    pub coaching_receptivity: f64,        // 0.0-1.0, learned from feedback history
+    pub last_intervention_ago: Duration,
+    pub computed_at: DateTime<Utc>,
+}
+```
+
+The situation is recomputed every 60 seconds (or on significant DomainEvent). The coaching engine reasons over `UserSituation`, not raw memories — this provides a stable, explainable input to the LLM.
+
 ### Signal Accumulator
 
-Subscribes to DomainEvent bus. Maintains a rolling SituationBuffer. Fires triggers when heuristic conditions are met:
+Subscribes to DomainEvent bus. Maintains a rolling SituationBuffer. Fires triggers when heuristic conditions are met (evaluated against `UserSituation`):
 
 - distraction_streak >= 3 in 15min
 - productive_ratio drops below personal baseline
@@ -281,13 +364,29 @@ Routes interventions to channels based on `confidence x coaching_intensity`:
 
 Config: `coaching_intensity: "gentle" | "balanced" | "strict"`
 
-### Implementation guardrail: rate limiting
+### Guardrail 4: Rate limiting + adaptive coaching tolerance
 
+**Fixed limits (safety floor):**
 - Maximum nudges per hour (configurable, default: 3)
 - Cooldown after ignored suggestions (default: 30min for same trigger type)
 - Exponential backoff on repeatedly dismissed intervention types
 - Daily cap on total interventions (default: 10)
 - Never interrupt during active focus sessions with low-priority nudges
+
+**Adaptive tolerance (learned from `UserSituation.coaching_receptivity`):**
+
+The system learns the user's interruption tolerance over time by tracking:
+- Dismiss rate by time-of-day (user ignores nudges in the morning → reduce morning nudges)
+- Dismiss rate by intervention type (user never acts on break reminders → reduce weight)
+- Accept rate by channel (user responds to chat but ignores notifications → prefer chat)
+- Overall receptivity trend (new users may be more tolerant; long-term users want fewer, higher-quality nudges)
+
+`coaching_receptivity` (0.0-1.0) is stored as a procedural memory fact and updated during weekly reflection. It modulates the intervention router:
+- `receptivity < 0.3` → only dashboard cards regardless of coaching_intensity
+- `receptivity 0.3-0.6` → cards + occasional chat, never notifications
+- `receptivity > 0.6` → full channel routing per coaching_intensity setting
+
+This means the system naturally quiets down for users who don't engage with nudges, and becomes more active for users who find them helpful.
 
 ### Feedback Tracker
 
@@ -298,6 +397,31 @@ Three feedback channels:
 3. **Outcome:** Did the strategy improve metrics over days/weeks?
 
 All feedback emitted as `DomainEvent::CoachingFeedback` → cognitive layer stores as episodic memory → weekly reflection uses this to adjust procedural memory.
+
+### Guardrail 5: Intervention effectiveness tracking
+
+Beyond individual feedback, the system tracks **long-term strategy effectiveness**:
+
+```sql
+CREATE TABLE coaching_strategies (
+    id              TEXT PRIMARY KEY,
+    strategy_type   TEXT NOT NULL,     -- 'task_decomposition', 'break_reminder', 'schedule_shift', etc.
+    domain          TEXT NOT NULL,     -- which domain this strategy targets
+    times_used      INTEGER DEFAULT 0,
+    times_accepted  INTEGER DEFAULT 0,
+    times_led_to_improvement INTEGER DEFAULT 0,  -- behavioral change within 24h
+    avg_improvement_magnitude REAL,    -- e.g., +12% productivity score after applying
+    confidence      REAL DEFAULT 0.5,
+    last_used       TEXT,
+    created_at      TEXT NOT NULL
+);
+```
+
+During weekly reflection, the LLM reviews strategy effectiveness:
+- "Task decomposition was used 8 times, accepted 6 times, led to improvement 5 times → high effectiveness (0.83)"
+- "Break reminders were used 12 times, accepted 2 times, led to improvement 1 time → low effectiveness (0.17) → reduce usage"
+
+Effective strategies are prioritized by the coaching reasoner. Ineffective strategies are demoted or retired. This creates a natural selection of coaching approaches tailored to the individual user.
 
 ### Task-Activity Linking (hybrid infer + confirm)
 
@@ -346,6 +470,13 @@ Existing heuristic code (InsightEngine checks, NudgeService rules) is not delete
 6. **Bi-temporal facts (Zep):** Never hard-delete. Mark superseded. Preserve history of how user evolves.
 7. **FSRS decay:** Memories that are used survive; unused ones fade. Stability increases with successful retrieval.
 8. **New `cognitive` crate at L3:** Core infrastructure, not a feature. All features build on it.
+9. **Salience filtering before LLM:** Heuristic filter (Extract/Accumulate/Discard) prevents LLM bottleneck on hot path.
+10. **Pattern validation:** Minimum 5 signals across 3+ days before promoting to semantic/procedural memory.
+11. **Memory compaction:** Weekly archival of superseded chains + cold facts. Size budget prevents unbounded growth.
+12. **UserSituation world model:** Derived intermediate layer between raw memories and coaching reasoning — stable, explainable.
+13. **State-aware retrieval:** Memory retrieval biased by current situation, not just semantic similarity.
+14. **Adaptive coaching tolerance:** Learned `coaching_receptivity` modulates intervention intensity over time.
+15. **Strategy effectiveness tracking:** Long-term tracking of which coaching strategies actually improve user behavior.
 
 ## References
 
