@@ -253,4 +253,3 @@ pub async fn mcp_oauth_disconnect(
 
     Ok(build_mcp_response(&cfg))
 }
-

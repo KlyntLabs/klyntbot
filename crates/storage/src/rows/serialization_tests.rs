@@ -233,7 +233,6 @@ mod tests {
                 })
                 .unwrap(),
             ),
-
             (
                 "CronJobRow",
                 serde_json::to_value(&CronJobRow {

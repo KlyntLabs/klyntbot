@@ -16,6 +16,7 @@ use async_trait::async_trait;
 use serde_json::Value;
 use std::sync::Arc;
 
+use bus::DomainEventBus;
 use common::{Result, ToolError};
 use tools_core::{ConfigPersistence, ParamExtractor, RoutingContext, Tool};
 
@@ -37,6 +38,7 @@ pub struct FinanceTool {
     pub(crate) finance_handler: Option<Arc<dyn FinanceHandler>>,
     pub(crate) default_currency: String,
     pub(crate) config_persistence: Option<Arc<dyn ConfigPersistence>>,
+    pub(crate) domain_bus: Option<Arc<DomainEventBus>>,
 }
 
 impl FinanceTool {
@@ -52,6 +54,7 @@ impl FinanceTool {
             finance_handler: None,
             default_currency,
             config_persistence: None,
+            domain_bus: None,
         }
     }
 
@@ -64,6 +67,12 @@ impl FinanceTool {
     /// Attach an optional `ConfigPersistence` for settings actions.
     pub fn with_config_persistence(mut self, cp: Arc<dyn ConfigPersistence>) -> Self {
         self.config_persistence = Some(cp);
+        self
+    }
+
+    /// Attach a domain event bus for cross-feature communication.
+    pub fn with_domain_bus(mut self, bus: Arc<DomainEventBus>) -> Self {
+        self.domain_bus = Some(bus);
         self
     }
 

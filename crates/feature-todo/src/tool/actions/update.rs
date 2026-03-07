@@ -5,6 +5,8 @@ use common::{Result, ToolError};
 use tools_core::ParamExtractor;
 use tracing::warn;
 
+use bus::DomainEvent;
+
 use super::super::TaskTool;
 use crate::types::{Action, AttachmentType};
 use storage::ActionPatch;
@@ -141,6 +143,25 @@ impl TaskTool {
                             unblocked.join("\n  ")
                         ));
                     }
+                }
+
+                // Emit domain event for task completion
+                if let Some(ref bus) = self.domain_bus {
+                    // Reuse te_rows from the close-open-entries step above
+                    let actual_mins = {
+                        let total_secs: i64 = te_rows.iter().filter_map(|e| e.duration_secs).sum();
+                        if total_secs > 0 {
+                            Some(total_secs / 60)
+                        } else {
+                            None
+                        }
+                    };
+                    let estimated_mins = action.estimated_minutes.map(|m| m as i64);
+                    bus.publish(DomainEvent::TaskCompleted {
+                        task_id: action.id.clone(),
+                        actual_duration_mins: actual_mins,
+                        estimated_duration_mins: estimated_mins,
+                    });
                 }
 
                 // Cascade progress to KR if action is linked

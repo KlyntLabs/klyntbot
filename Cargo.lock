@@ -26,11 +26,13 @@ dependencies = [
  "bus",
  "chrono",
  "chrono-tz",
+ "cognitive",
  "common",
  "config",
  "context_engine",
  "dirs",
  "domain",
+ "feature-coaching",
  "feature-finance",
  "feature-productivity",
  "feature-todo",
@@ -1412,6 +1414,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0fa961b519f0b462e3a3b4a34b64d119eeaca1d59af726fe450bbba07a9fc0a1"
 dependencies = [
  "thiserror 2.0.18",
+]
+
+[[package]]
+name = "cognitive"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "bus",
+ "chrono",
+ "common",
+ "context_engine",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "storage",
+ "tokio",
+ "tokio-util",
+ "tools-core",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -2896,19 +2918,27 @@ dependencies = [
 name = "dev-api"
 version = "0.1.0"
 dependencies = [
+ "agent",
  "axum",
  "base64 0.22.1",
+ "bus",
  "chrono",
  "common",
  "config",
+ "context_engine",
+ "dashmap",
  "desktop-shared",
  "feature-notes",
  "feature-productivity",
  "futures-util",
+ "providers",
+ "scheduling",
  "serde",
  "serde_json",
  "storage",
  "tokio",
+ "tokio-stream",
+ "tokio-util",
  "tower-http",
  "tracing",
  "tracing-subscriber",
@@ -3450,10 +3480,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "feature-coaching"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "bus",
+ "chrono",
+ "cognitive",
+ "common",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "feature-finance"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "bus",
  "chrono",
  "common",
  "dashmap",
@@ -3491,6 +3539,7 @@ name = "feature-productivity"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "bus",
  "chrono",
  "common",
  "config",
@@ -3517,6 +3566,7 @@ name = "feature-todo"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "bus",
  "chrono",
  "common",
  "futures-util",
@@ -5323,11 +5373,13 @@ dependencies = [
  "chrono",
  "clap",
  "cli",
+ "cognitive",
  "common",
  "config",
  "context_engine",
  "domain",
  "extism",
+ "feature-coaching",
  "feature-finance",
  "feature-todo",
  "mcp",

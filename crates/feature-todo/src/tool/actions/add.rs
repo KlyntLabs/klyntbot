@@ -5,6 +5,8 @@ use common::{Result, ToolError};
 use tools_core::{ParamExtractor, RoutingContext};
 use tracing::warn;
 
+use bus::DomainEvent;
+
 use super::super::TaskTool;
 use crate::types::Action;
 use storage::ActionPatch;
@@ -131,6 +133,14 @@ impl TaskTool {
                     metadata: std::collections::HashMap::new(),
                 })
                 .await;
+        }
+
+        if let Some(ref bus) = self.domain_bus {
+            bus.publish(DomainEvent::TaskCreated {
+                task_id: created.id.clone(),
+                project: created.project_id.clone(),
+                estimate_mins: created.estimated_minutes.map(|m| m as i64),
+            });
         }
 
         Ok(format!(

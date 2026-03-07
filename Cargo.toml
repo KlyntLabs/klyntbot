@@ -25,6 +25,8 @@ members = [
     "crates/desktop",
     "crates/feature-notes",
     "crates/feature-productivity",
+    "crates/cognitive",
+    "crates/feature-coaching",
     "crates/dev-api",
 ]
 
@@ -56,6 +58,8 @@ feature-notes = { path = "crates/feature-notes" }
 feature-todo = { path = "crates/feature-todo" }
 feature-productivity = { path = "crates/feature-productivity" }
 plugin-runtime = { path = "crates/plugin-runtime" }
+cognitive = { path = "crates/cognitive" }
+feature-coaching = { path = "crates/feature-coaching" }
 desktop-shared = { path = "crates/desktop-shared" }
 desktop = { path = "crates/desktop" }
 extism = "1"
@@ -151,7 +155,9 @@ tools.workspace = true
 channels.workspace = true
 agent.workspace = true
 cli.workspace = true
+cognitive.workspace = true
 context_engine.workspace = true
+feature-coaching.workspace = true
 storage.workspace = true
 plugin-runtime.workspace = true
 mcp.workspace = true

@@ -7,6 +7,8 @@ use chrono::{DateTime, NaiveDate, TimeZone, Utc};
 
 use std::sync::Arc;
 
+use bus::{DomainEvent, DomainEventBus};
+
 use crate::handler::ProductivityHandler;
 use crate::repos::ProductivityRepos;
 use crate::types::{AppUsage, CategoryUsage, DailySummary, ProjectUsage};
@@ -14,6 +16,7 @@ use crate::types::{AppUsage, CategoryUsage, DailySummary, ProjectUsage};
 pub struct DailyAggregator {
     repos: ProductivityRepos,
     handler: Option<Arc<dyn ProductivityHandler>>,
+    domain_bus: Option<Arc<DomainEventBus>>,
 }
 
 impl DailyAggregator {
@@ -21,11 +24,17 @@ impl DailyAggregator {
         Self {
             repos,
             handler: None,
+            domain_bus: None,
         }
     }
 
     pub fn with_handler(mut self, handler: Arc<dyn ProductivityHandler>) -> Self {
         self.handler = Some(handler);
+        self
+    }
+
+    pub fn with_domain_bus(mut self, bus: Arc<DomainEventBus>) -> Self {
+        self.domain_bus = Some(bus);
         self
     }
 
@@ -225,6 +234,16 @@ impl DailyAggregator {
         }
 
         self.repos.summaries.upsert(&summary).await?;
+
+        if let Some(ref bus) = self.domain_bus {
+            if let Some(score) = summary.productivity_score {
+                bus.publish(DomainEvent::ProductivityScoreComputed {
+                    date: summary.date.clone(),
+                    score,
+                });
+            }
+        }
+
         Ok(summary)
     }
 

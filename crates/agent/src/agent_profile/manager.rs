@@ -227,7 +227,6 @@ mod tests {
         assert!(mgr.get("general").is_some());
         assert!(mgr.get("task").is_some());
         assert!(mgr.get("finance").is_some());
-
     }
 
     #[test]

@@ -6,7 +6,7 @@
 use std::sync::Arc;
 
 use agent::{AgentLoop, PersonaManager};
-use bus::MessageBus;
+use bus::{DomainEventBus, MessageBus};
 use channels::ChannelManager;
 use common::FormResponse;
 use desktop_shared::errors::ApiError;
@@ -134,11 +134,15 @@ impl AppCore {
         let persona_manager = Arc::new(RwLock::new(persona_manager));
         info!("persona manager loaded");
 
-        // 7. Build AgentLoop
+        // 7. DomainEventBus for cross-feature communication (cognitive + coaching)
+        let domain_event_bus = Arc::new(DomainEventBus::new(256));
+
+        // 8. Build AgentLoop
         let mut builder = AgentLoop::builder(bus.clone(), provider, config.clone())
             .with_pool(storage_pool.inner().clone())
             .with_cron_service(cron_service.clone())
-            .with_notification_handle(notification_dispatcher.last_active_handle());
+            .with_notification_handle(notification_dispatcher.last_active_handle())
+            .with_domain_bus(Arc::clone(&domain_event_bus));
 
         if let Some(vs) = vector_store {
             builder = builder.with_vector_store(vs);
@@ -203,8 +207,12 @@ impl AppCore {
                 let categories = prod_repos.categories.list_all().await.unwrap_or_default();
                 let categorizer =
                     feature_productivity::tracker::categorizer::Categorizer::new(categories);
-                let mut engine =
-                    ProductivityEngine::new(prod_config.clone(), prod_repos.clone(), categorizer);
+                let mut engine = ProductivityEngine::new_with_bus(
+                    prod_config.clone(),
+                    prod_repos.clone(),
+                    categorizer,
+                    Some(Arc::clone(&domain_event_bus)),
+                );
 
                 // Wire auto-focus session receiver to Tauri events.
                 if let Some(mut auto_focus_rx) = engine.take_auto_focus_rx() {

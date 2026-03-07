@@ -69,6 +69,12 @@ pub struct AgentLoop {
     /// MCP manager for external server connections (kept alive for the agent's lifetime).
     /// Wrapped in Mutex so `shutdown(&self)` can take ownership for graceful disconnect.
     pub(crate) mcp_manager: tokio::sync::Mutex<Option<mcp::McpManager>>,
+    /// Shared DomainEventBus for cross-feature communication (cognitive + coaching).
+    pub(crate) _domain_event_bus: Option<Arc<bus::DomainEventBus>>,
+    /// Background consolidation service for cognitive memory (kept alive for graceful shutdown).
+    /// Wrapped in Mutex so `shutdown(&self)` can take ownership for graceful stop.
+    pub(crate) cognitive_bg_service:
+        tokio::sync::Mutex<Option<cognitive::background::BackgroundConsolidationService>>,
 }
 
 impl AgentLoop {
@@ -203,6 +209,11 @@ impl AgentLoop {
         // Stop the memory maintenance service
         if let Some(token) = &self._memory_maintenance_token {
             token.cancel();
+        }
+
+        // Stop the cognitive background consolidation service (cancels + awaits JoinHandle)
+        if let Some(mut svc) = self.cognitive_bg_service.lock().await.take() {
+            svc.stop().await;
         }
 
         // Disconnect MCP servers (cleanly terminates child processes)

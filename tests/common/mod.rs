@@ -18,8 +18,8 @@ use tools::todo_types::{Todo, TodoStatus};
 // Re-exports for convenience (not all test binaries use every mock)
 #[allow(unused_imports)]
 pub use mocks::{
-    ErrorProvider, MockConversationEmbeddingHandler, MockEmbeddingHandler,
-    MockLearningHandler, MockProvider,
+    ErrorProvider, MockConversationEmbeddingHandler, MockEmbeddingHandler, MockLearningHandler,
+    MockProvider,
 };
 
 // ─── Config & workspace ──────────────────────────────────────
@@ -237,4 +237,3 @@ pub async fn test_strategy_repo() -> klyntbot::storage::StrategyRepo {
 pub async fn test_memory_note_repo() -> klyntbot::storage::MemoryNoteRepo {
     klyntbot::storage::MemoryNoteRepo::new(test_pool().await.inner().clone())
 }
-
