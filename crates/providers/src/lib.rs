@@ -185,6 +185,59 @@ fn create_classifier_provider(config: &Config, model: &str) -> Option<DynProvide
     try_create_from_spec(spec, config, model)
 }
 
+/// Create a provider for background cognitive tasks.
+///
+/// Uses `config.cognitive.model` and `config.cognitive.provider` if set,
+/// otherwise falls back to the main agent provider. Returns `None` if
+/// no provider can be created (no API keys configured).
+pub fn create_cognitive_provider(config: &Config) -> Result<Option<DynProvider>> {
+    let model = config
+        .cognitive
+        .model
+        .as_deref()
+        .unwrap_or(&config.agents.defaults.model);
+    let provider_name = config
+        .cognitive
+        .provider
+        .as_deref()
+        .or(config.agents.defaults.provider.as_deref());
+
+    // Try explicit provider name first, then model-based lookup
+    if let Some(name) = provider_name {
+        if let Some(spec) = ProviderRegistry::find_by_name(name) {
+            if let Some(provider) = try_create_from_spec(spec, config, model) {
+                return Ok(Some(provider));
+            }
+        }
+    }
+    if let Some(spec) = ProviderRegistry::find_by_model(model) {
+        if let Some(provider) = try_create_from_spec(spec, config, model) {
+            return Ok(Some(provider));
+        }
+    }
+
+    // Fall back to main agent provider
+    match create_provider(config) {
+        Ok((provider, _model)) => Ok(Some(provider)),
+        Err(_) => Ok(None), // No provider available — handlers will use heuristics
+    }
+}
+
+/// Build `ChatParams` for cognitive LLM calls.
+pub fn cognitive_chat_params(config: &Config, default_max_tokens: u32) -> ChatParams {
+    let model = config
+        .cognitive
+        .model
+        .as_deref()
+        .unwrap_or(&config.agents.defaults.model);
+    let temperature = config.cognitive.temperature.unwrap_or(0.2);
+    let max_tokens = config.cognitive.max_tokens.unwrap_or(default_max_tokens);
+
+    ChatParams::new(model)
+        .with_temperature(temperature)
+        .with_max_tokens(max_tokens)
+}
+
 /// Try to create a provider from a specific provider spec.
 /// When `native: true` and provider is anthropic, uses `AnthropicNativeProvider`.
 fn try_create_from_spec(spec: &ProviderSpec, config: &Config, model: &str) -> Option<DynProvider> {
@@ -235,5 +288,36 @@ fn try_create_from_spec(spec: &ProviderSpec, config: &Config, model: &str) -> Op
         }
     } else {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_create_cognitive_provider_returns_none_when_no_keys() {
+        let config = Config::default();
+        let result = create_cognitive_provider(&config);
+        assert!(result.is_ok());
+        assert!(result.unwrap().is_none());
+    }
+
+    #[test]
+    fn test_cognitive_chat_params_defaults() {
+        let config = Config::default();
+        let params = cognitive_chat_params(&config, 1024);
+        assert_eq!(params.temperature, Some(0.2));
+        assert_eq!(params.max_tokens, Some(1024));
+    }
+
+    #[test]
+    fn test_cognitive_chat_params_with_overrides() {
+        let mut config = Config::default();
+        config.cognitive.temperature = Some(0.5);
+        config.cognitive.max_tokens = Some(2048);
+        let params = cognitive_chat_params(&config, 1024);
+        assert_eq!(params.temperature, Some(0.5));
+        assert_eq!(params.max_tokens, Some(2048));
     }
 }

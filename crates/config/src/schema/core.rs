@@ -12,6 +12,7 @@ use super::conversation::ConversationConfig;
 use super::finance::FinanceConfig;
 use super::gateway::GatewayConfig;
 use super::learning::LearningConfig;
+use super::cognitive::CognitiveConfig;
 use super::mcp::McpConfig;
 use super::orchestrator::OrchestratorConfig;
 use super::packs::PacksConfig;
@@ -138,6 +139,10 @@ pub struct Config {
     /// Plugin system configuration.
     #[serde(default)]
     pub plugins: PluginsConfig,
+
+    /// Cognitive memory & coaching configuration.
+    #[serde(default)]
+    pub cognitive: CognitiveConfig,
 
     /// MCP (Model Context Protocol) server connections and server settings.
     #[serde(default)]

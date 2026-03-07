@@ -15,7 +15,7 @@ use axum::response::sse::{Event, KeepAlive, Sse};
 use axum::response::IntoResponse;
 use axum::routing::post;
 use axum::{Json, Router};
-use chrono::Utc;
+use chrono::{Local, Timelike, Utc};
 use desktop_shared::cognitive_commands::*;
 use desktop_shared::commands::*;
 use desktop_shared::errors::ApiError;
@@ -2763,12 +2763,7 @@ async fn dispatch(
             let episodic_repo = cognitive::repos::EpisodicMemoryRepo::new(pool.clone());
             let rule_repo = cognitive::repos::ProceduralRuleRepo::new(pool.clone());
             let model = cognitive::repos::load_user_model(&fact_repo).await;
-            let active_facts = model.identity.len()
-                + model.energy.len()
-                + model.work.len()
-                + model.finance.len()
-                + model.learning.len()
-                + model.preferences.len();
+            let active_facts = model.active_fact_count();
             // TODO: add a count_archived() query to SemanticFactRepo —
             // archive_superseded() is a destructive mutation and must NOT be used for reads.
             let archived = 0u64;
@@ -2789,24 +2784,51 @@ async fn dispatch(
             })
         }
         "cognitive_system_status" => {
+            let pool = core.repos.pool();
+            let fact_repo = cognitive::repos::SemanticFactRepo::new(pool.clone());
+            let model = cognitive::repos::load_user_model(&fact_repo).await;
+            let active_facts = model.active_fact_count();
+
+            let components = vec![
+                ComponentStatusResponse { name: "DomainEvent Bus".into(), status: "wired".into(), handler_type: "n/a".into(), notes: "tokio::broadcast, 256 capacity".into() },
+                ComponentStatusResponse { name: "Salience Filter".into(), status: "wired".into(), handler_type: "heuristic".into(), notes: "Rule-based classification".into() },
+                ComponentStatusResponse { name: "Extraction".into(), status: "wired".into(), handler_type: "heuristic".into(), notes: "HeuristicExtractionHandler in agent crate".into() },
+                ComponentStatusResponse { name: "Consolidation".into(), status: "wired".into(), handler_type: "heuristic".into(), notes: "HeuristicConsolidationHandler in agent crate".into() },
+                ComponentStatusResponse { name: "FSRS Decay".into(), status: "wired".into(), handler_type: "n/a".into(), notes: "R = exp(ln(0.9) * elapsed / stability)".into() },
+                ComponentStatusResponse { name: "Compaction".into(), status: "wired".into(), handler_type: "n/a".into(), notes: "Archive superseded, prune episodic, size budget".into() },
+                ComponentStatusResponse { name: "Reflection".into(), status: "built".into(), handler_type: "heuristic".into(), notes: "ReflectionHandler trait defined, needs scheduling".into() },
+                ComponentStatusResponse { name: "Context Source".into(), status: "wired".into(), handler_type: "n/a".into(), notes: "CognitiveContextSource at priority 60, 60s cache".into() },
+                ComponentStatusResponse { name: "UserSituation".into(), status: "wired".into(), handler_type: "n/a".into(), notes: "compute_situation() from SituationInputs".into() },
+                ComponentStatusResponse { name: "Signal Accumulator".into(), status: "wired".into(), handler_type: "n/a".into(), notes: "30min rolling window, 7 trigger conditions".into() },
+                ComponentStatusResponse { name: "Pattern Detector".into(), status: "wired".into(), handler_type: "n/a".into(), notes: "5 pattern types detected".into() },
+                ComponentStatusResponse { name: "Intervention Router".into(), status: "wired".into(), handler_type: "n/a".into(), notes: "Rate limits: 3/hr, 10/day, exponential backoff".into() },
+                ComponentStatusResponse { name: "Feedback Tracker".into(), status: "wired".into(), handler_type: "n/a".into(), notes: "3 channels: explicit, behavioral, outcome".into() },
+                ComponentStatusResponse { name: "LLM Extraction".into(), status: "stub".into(), handler_type: "llm".into(), notes: "Trait defined, not yet implemented".into() },
+                ComponentStatusResponse { name: "LLM Consolidation".into(), status: "stub".into(), handler_type: "llm".into(), notes: "Trait defined, not yet implemented".into() },
+                ComponentStatusResponse { name: "LLM Reflection".into(), status: "stub".into(), handler_type: "llm".into(), notes: "ReflectionHandler trait, not yet implemented".into() },
+                ComponentStatusResponse { name: "LLM Coaching Reasoner".into(), status: "stub".into(), handler_type: "llm".into(), notes: "CoachingReasonerHandler trait, heuristic fallback exists".into() },
+                ComponentStatusResponse { name: "Background Consolidation".into(), status: "wired".into(), handler_type: "n/a".into(), notes: "DomainEventBus subscriber, accumulation buffers".into() },
+            ];
+
             ok(SystemStatusResponse {
                 domain_bus_subscribers: 0,
                 domain_bus_published: 0,
                 background_service_running: false,
                 background_events_processed: 0,
-                active_facts: 0,
+                active_facts,
                 episodic_count: 0,
                 rules_count: 0,
-                components: vec![],
+                components,
             })
         }
         "coaching_situation" => {
             ok(UserSituationResponse {
-                energy_level: 0.5, focus_state: 0.5,
+                energy_level: 0.0, focus_state: 0.0,
                 deadline_pressure: 0.0, distraction_risk: 0.0,
-                coaching_receptivity: 0.5, task_avoidance_detected: false,
+                coaching_receptivity: 0.0, task_avoidance_detected: false,
                 hours_active_today: 0.0, mins_since_break: 0.0,
-                hour_of_day: 12, recent_context_switches: 0,
+                hour_of_day: Local::now().hour(),
+                recent_context_switches: 0,
             })
         }
         "coaching_signals" => {
@@ -2820,10 +2842,126 @@ async fn dispatch(
                 daily_count: 0, daily_limit: 10,
             })
         }
-        "cognitive_fact_create" | "cognitive_fact_update" | "cognitive_fact_delete"
-        | "cognitive_rule_create" | "cognitive_rule_deactivate"
-        | "cognitive_run_compaction" | "coaching_reset_dismissals"
-        | "coaching_clear_signals" => {
+        "cognitive_fact_create" => {
+            let pool = core.repos.pool();
+            let fact_repo = cognitive::repos::SemanticFactRepo::new(pool.clone());
+            let params: FactCreateParams = match serde_json::from_value(body.clone()) {
+                Ok(p) => p,
+                Err(e) => return err(ApiError::new("INVALID_PARAMS", e.to_string())),
+            };
+            let now = Utc::now().to_rfc3339();
+            let fact = cognitive::types::SemanticFact {
+                id: uuid::Uuid::new_v4().to_string(),
+                domain: params.domain,
+                subject: params.subject,
+                predicate: params.predicate,
+                object: params.object,
+                confidence: params.confidence,
+                source: "debug_dashboard".to_string(),
+                valid_from: now.clone(),
+                valid_until: None,
+                recorded_at: now,
+                superseded_at: None,
+                superseded_by: None,
+                stability: 1.0,
+                last_accessed: None,
+                access_count: 0,
+            };
+            match fact_repo.upsert(&fact).await {
+                Ok(()) => {
+                    let elapsed_days = 0.0_f64;
+                    let r = cognitive::decay::retrievability(elapsed_days, fact.stability);
+                    ok(SemanticFactResponse {
+                        id: fact.id, domain: fact.domain, subject: fact.subject,
+                        predicate: fact.predicate, object: fact.object,
+                        confidence: fact.confidence, source: fact.source,
+                        valid_from: fact.valid_from, valid_until: None,
+                        stability: fact.stability, retrievability: r,
+                        last_accessed: None, access_count: 0, status: "active".into(),
+                    })
+                }
+                Err(e) => err(ApiError::new("STORAGE_ERROR", e.to_string())),
+            }
+        }
+        "cognitive_fact_update" => {
+            let pool = core.repos.pool();
+            let fact_repo = cognitive::repos::SemanticFactRepo::new(pool.clone());
+            let id = match get_str(&body, "id") { Ok(v) => v, Err(e) => return err(e) };
+            let params: FactUpdateParams = match serde_json::from_value(body.clone()) {
+                Ok(p) => p,
+                Err(e) => return err(ApiError::new("INVALID_PARAMS", e.to_string())),
+            };
+            match fact_repo.get(&id).await {
+                Ok(Some(mut fact)) => {
+                    if let Some(obj) = params.object { fact.object = obj; }
+                    if let Some(conf) = params.confidence { fact.confidence = conf; }
+                    match fact_repo.upsert(&fact).await {
+                        Ok(()) => ok(serde_json::json!({ "ok": true })),
+                        Err(e) => err(ApiError::new("STORAGE_ERROR", e.to_string())),
+                    }
+                }
+                Ok(None) => err(ApiError::new("NOT_FOUND", format!("fact {id} not found"))),
+                Err(e) => err(ApiError::new("STORAGE_ERROR", e.to_string())),
+            }
+        }
+        "cognitive_fact_delete" => {
+            let pool = core.repos.pool();
+            let fact_repo = cognitive::repos::SemanticFactRepo::new(pool.clone());
+            let id = match get_str(&body, "id") { Ok(v) => v, Err(e) => return err(e) };
+            match fact_repo.supersede(&id, "deleted_by_debug_dashboard").await {
+                Ok(()) => ok(true),
+                Err(e) => err(ApiError::new("STORAGE_ERROR", e.to_string())),
+            }
+        }
+        "cognitive_rule_create" => {
+            let pool = core.repos.pool();
+            let repo = cognitive::repos::ProceduralRuleRepo::new(pool.clone());
+            let params: RuleCreateParams = match serde_json::from_value(body.clone()) {
+                Ok(p) => p,
+                Err(e) => return err(ApiError::new("INVALID_PARAMS", e.to_string())),
+            };
+            let now = Utc::now().to_rfc3339();
+            let rule = cognitive::types::ProceduralRule {
+                id: uuid::Uuid::new_v4().to_string(),
+                domain: params.domain,
+                rule_text: params.rule_text,
+                confidence: params.confidence,
+                source: "debug_dashboard".to_string(),
+                signal_count: 0,
+                created_at: now.clone(),
+                updated_at: now,
+                active: true,
+            };
+            match repo.upsert(&rule).await {
+                Ok(()) => ok(ProceduralRuleResponse {
+                    id: rule.id, domain: rule.domain, rule_text: rule.rule_text,
+                    confidence: rule.confidence, source: rule.source,
+                    signal_count: rule.signal_count, active: true,
+                    created_at: rule.created_at, updated_at: rule.updated_at,
+                }),
+                Err(e) => err(ApiError::new("STORAGE_ERROR", e.to_string())),
+            }
+        }
+        "cognitive_rule_deactivate" => {
+            let pool = core.repos.pool();
+            let repo = cognitive::repos::ProceduralRuleRepo::new(pool.clone());
+            let id = match get_str(&body, "id") { Ok(v) => v, Err(e) => return err(e) };
+            match repo.deactivate(&id).await {
+                Ok(()) => ok(true),
+                Err(e) => err(ApiError::new("STORAGE_ERROR", e.to_string())),
+            }
+        }
+        "cognitive_run_compaction" => {
+            let pool = core.repos.pool();
+            let fact_repo = cognitive::repos::SemanticFactRepo::new(pool.clone());
+            let episodic_repo = cognitive::repos::EpisodicMemoryRepo::new(pool.clone());
+            let (archived, deleted_episodic) = tokio::join!(
+                async { fact_repo.archive_superseded(90).await.unwrap_or(0) },
+                async { episodic_repo.delete_old(90, 2).await.unwrap_or(0) },
+            );
+            ok(CompactionResultResponse { archived_count: archived, deleted_episodic })
+        }
+        "coaching_reset_dismissals" | "coaching_clear_signals" => {
             ok(serde_json::json!({ "ok": true }))
         }
 

@@ -8,6 +8,7 @@ use async_trait::async_trait;
 
 use cognitive::extraction::ExtractedFact;
 use cognitive::types::{MemoryOp, Observation, SemanticFact};
+use cognitive::reflection::{ReflectionHandler, ReflectionInput, ReflectionOutput};
 use cognitive::{ConsolidationHandler, ExtractionHandler};
 
 /// Heuristic fact extraction — parses observations into SPO triples
@@ -82,6 +83,31 @@ impl ConsolidationHandler for HeuristicConsolidationHandler {
     }
 }
 
+/// Heuristic reflection — generates a statistical summary without LLM.
+/// Returns empty fact/rule updates but provides a useful summary.
+pub struct HeuristicReflectionHandler;
+
+#[async_trait]
+impl ReflectionHandler for HeuristicReflectionHandler {
+    async fn reflect(&self, input: &ReflectionInput) -> common::Result<ReflectionOutput> {
+        let mem_count = input.episodic_memories.len();
+        let rule_count = input.procedural_rules.len();
+        let domain_count = input.user_model.non_empty_domain_count();
+
+        let summary = format!(
+            "Heuristic reflection ({} to {}): {} episodic memories, {} active rules, {} domains tracked. \
+             No LLM available for cross-domain synthesis.",
+            input.period_start, input.period_end, mem_count, rule_count, domain_count
+        );
+
+        Ok(ReflectionOutput {
+            fact_updates: vec![],
+            rule_updates: vec![],
+            summary,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -115,6 +141,36 @@ mod tests {
             last_accessed: None,
             access_count: 0,
         }
+    }
+
+    #[tokio::test]
+    async fn test_heuristic_reflection_returns_summary() {
+        use cognitive::types::UserModel;
+
+        let handler = HeuristicReflectionHandler;
+        let input = ReflectionInput {
+            episodic_memories: vec![cognitive::types::EpisodicMemory {
+                id: "e1".into(),
+                domain: "productivity".into(),
+                content: "Had a productive morning".into(),
+                summary: Some("Productive morning".into()),
+                importance: 0.7,
+                occurred_at: "2026-03-01T10:00:00".into(),
+                recorded_at: "2026-03-01T10:00:00".into(),
+                stability: 1.0,
+                last_accessed: None,
+                access_count: 0,
+            }],
+            user_model: UserModel::default(),
+            procedural_rules: vec![],
+            period_start: "2026-03-01T00:00:00".into(),
+            period_end: "2026-03-07T23:59:59".into(),
+        };
+
+        let output = handler.reflect(&input).await.unwrap();
+        assert!(!output.summary.is_empty());
+        assert!(output.fact_updates.is_empty());
+        assert!(output.rule_updates.is_empty());
     }
 
     #[tokio::test]

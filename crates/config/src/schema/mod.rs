@@ -16,6 +16,7 @@
 
 mod agents;
 mod channels;
+mod cognitive;
 mod confidence;
 mod conversation;
 mod core;
@@ -34,6 +35,7 @@ mod tools;
 
 pub use self::agents::*;
 pub use self::channels::*;
+pub use self::cognitive::*;
 pub use self::confidence::*;
 pub use self::conversation::*;
 pub use self::core::*;

@@ -65,12 +65,7 @@ fn rule_to_response(r: &ProceduralRule) -> ProceduralRuleResponse {
 }
 
 fn active_fact_count(model: &cognitive::types::UserModel) -> usize {
-    model.identity.len()
-        + model.energy.len()
-        + model.work.len()
-        + model.finance.len()
-        + model.learning.len()
-        + model.preferences.len()
+    model.active_fact_count()
 }
 
 fn fact_preview(fact: &SemanticFact) -> String {
