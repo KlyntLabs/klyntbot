@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useOptimistic, useState, useTransition } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { useEvent } from "../../hooks/useEvent";
+import { useGroups } from "../../hooks/useGroups";
 import { useMutation } from "../../hooks/useMutation";
 import { useQuery } from "../../hooks/useQuery";
 import { useSetToggle } from "../../hooks/useSetToggle";
@@ -50,6 +51,7 @@ export function MainApp() {
   );
   const [isPending, startTransition] = useTransition();
   const [collapsedProjects, toggleProject] = useSetToggle();
+  const [collapsedGroups, toggleGroup] = useSetToggle();
   const {
     expandedTasks,
     childrenCache,
@@ -72,6 +74,7 @@ export function MainApp() {
   const { data: objectives } = useQuery<Objective[]>("objective_list", undefined, []);
   const { data: areas, refetch: refetchAreas } = useQuery<Area[]>("area_list", undefined, []);
   const { data: statusLabels } = useEffectiveLabels(null);
+  const { data: groups } = useGroups(null);
 
   const areaMap = useMemo(() => new Map(areas.map((a) => [a.id, a])), [areas]);
   const projectMap = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
@@ -235,6 +238,8 @@ export function MainApp() {
             areaMap={areaMap}
             completedTasks={completedTasks}
             statusLabels={statusLabels}
+            onUpdateTask={handleUpdateTask}
+            onRefetch={refetchTasks}
           />
         ) : (
           <TaskTable
@@ -253,6 +258,9 @@ export function MainApp() {
             onUpdate={handleUpdateTask}
             onCreateSubtask={handleCreateSubtask}
             statusLabels={statusLabels}
+            groups={groups}
+            collapsedGroups={collapsedGroups}
+            onToggleGroup={toggleGroup}
           />
         )}
         {filteredTasks.length === 0 && !addingTask && (

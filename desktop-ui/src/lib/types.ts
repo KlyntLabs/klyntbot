@@ -41,6 +41,7 @@ export interface Task {
   subtaskCompletedCount: number;
   statusLabelId: string | null;
   statusLabel: StatusLabel | null;
+  groupId: string | null;
 }
 
 export interface TodayTask {
@@ -52,6 +53,15 @@ export interface TodayTask {
   isOverdue: boolean;
   isDueToday: boolean;
   dueDisplay: string | null;
+}
+
+export interface TaskGroup {
+  id: string;
+  projectId: string | null;
+  name: string;
+  color: string | null;
+  position: number;
+  taskCount: number;
 }
 
 export interface Project {
@@ -713,6 +723,8 @@ export interface TaskUpdateParams {
   tags?: string[];
   keyResultId?: string | null;
   statusLabelId?: string | null;
+  position?: number;
+  groupId?: string | null;
 }
 
 export interface TaskCreateParams {
@@ -723,6 +735,7 @@ export interface TaskCreateParams {
   dueDate?: string;
   tags?: string[];
   parentId?: string;
+  groupId?: string;
 }
 
 export interface AreaCreateParams {
