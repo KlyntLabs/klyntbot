@@ -1,5 +1,5 @@
 import { Check, Download } from "lucide-react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useOutletContext } from "react-router";
 import { useMutation } from "../../../hooks/useMutation";
 import { useQuery } from "../../../hooks/useQuery";
@@ -12,7 +12,7 @@ import { recommendedServers } from "../../settings/mcp/recommendedServers";
 import type { SetupContext } from "../steps";
 
 export function McpStep() {
-  const { next } = useOutletContext<SetupContext>();
+  const { forwardRef, setDirty } = useOutletContext<SetupContext>();
 
   const { data: config, refetch } = useQuery<McpConfigResponse>("mcp_get_config", undefined, {
     enabled: true,
@@ -31,6 +31,16 @@ export function McpStep() {
     [config.servers],
   );
 
+  // Register forward handler — no save needed, installs are immediate
+  useEffect(() => {
+    forwardRef.current = async () => true;
+  }, [forwardRef]);
+
+  // Mark dirty when servers are installed (so button shows "Continue" instead of "Skip")
+  useEffect(() => {
+    if (config.servers.length > 0) setDirty(true);
+  }, [config.servers.length, setDirty]);
+
   const handleInstall = useCallback(
     async (server: RecommendedMcpServer) => {
       if (!server.command) return;
@@ -44,13 +54,14 @@ export function McpStep() {
           env: {},
         });
         refetch();
+        setDirty(true);
       } catch (e) {
         console.error("Failed to install MCP server:", e);
       } finally {
         setInstalling(null);
       }
     },
-    [addServer, refetch],
+    [addServer, refetch, setDirty],
   );
 
   return (
@@ -98,16 +109,6 @@ export function McpStep() {
             </div>
           );
         })}
-      </div>
-
-      <div className="mt-6 flex justify-end">
-        <button
-          type="button"
-          onClick={next}
-          className="px-5 py-2 text-[13px] font-medium text-white bg-brand hover:bg-brand-hover rounded-xl transition-colors"
-        >
-          Continue
-        </button>
       </div>
     </div>
   );

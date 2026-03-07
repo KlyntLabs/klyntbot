@@ -1,5 +1,5 @@
 import { Plus, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ipc } from "../../../hooks/useIpc";
 
 const GOAL_TYPES = ["savings", "debt_payoff", "investment", "purchase", "other"] as const;
@@ -18,13 +18,12 @@ interface GoalEntry {
 }
 
 interface GoalsFormProps {
-  onDone: () => void;
-  onBack: () => void;
+  registerSave: (fn: () => Promise<void>) => void;
+  onDirty: () => void;
 }
 
-export function GoalsForm({ onDone, onBack }: GoalsFormProps) {
+export function GoalsForm({ registerSave, onDirty }: GoalsFormProps) {
   const [goals, setGoals] = useState<GoalEntry[]>([]);
-  const [saving, setSaving] = useState(false);
 
   const addGoal = () => {
     setGoals([
@@ -38,22 +37,28 @@ export function GoalsForm({ onDone, onBack }: GoalsFormProps) {
         monthlyContribution: "",
       },
     ]);
+    onDirty();
   };
 
   const removeGoal = (key: string) => {
     setGoals(goals.filter((g) => g.key !== key));
+    onDirty();
   };
 
   const updateGoal = (key: string, update: Partial<GoalEntry>) => {
     setGoals(goals.map((g) => (g.key === key ? { ...g, ...update } : g)));
+    onDirty();
   };
 
-  const handleSave = async () => {
-    const valid = goals.filter((g) => g.name.trim() && g.targetAmount);
-    if (valid.length > 0) {
-      setSaving(true);
-      try {
-        await Promise.all(
+  const savedKeysRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    registerSave(async () => {
+      const valid = goals.filter(
+        (g) => g.name.trim() && g.targetAmount && !savedKeysRef.current.has(g.key),
+      );
+      if (valid.length > 0) {
+        const results = await Promise.allSettled(
           valid.map((goal) =>
             ipc("finance_goal_create", {
               params: {
@@ -71,14 +76,13 @@ export function GoalsForm({ onDone, onBack }: GoalsFormProps) {
             }),
           ),
         );
-      } catch (e) {
-        console.error("Failed to save goals:", e);
-      } finally {
-        setSaving(false);
+        for (let i = 0; i < results.length; i++) {
+          if (results[i].status === "fulfilled") savedKeysRef.current.add(valid[i].key);
+          else console.error("Failed to save goal:", (results[i] as PromiseRejectedResult).reason);
+        }
       }
-    }
-    onDone();
-  };
+    });
+  }, [goals, registerSave]);
 
   return (
     <div>
@@ -158,24 +162,6 @@ export function GoalsForm({ onDone, onBack }: GoalsFormProps) {
         <Plus className="w-3.5 h-3.5" />
         Add goal
       </button>
-
-      <div className="mt-5 flex justify-between">
-        <button
-          type="button"
-          onClick={onBack}
-          className="px-4 py-2 text-[13px] text-muted hover:text-secondary transition-colors"
-        >
-          Back
-        </button>
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saving}
-          className="px-5 py-2 text-[13px] font-medium text-white bg-brand hover:bg-brand-hover rounded-xl transition-colors disabled:opacity-50"
-        >
-          {saving ? "Saving..." : "Finish"}
-        </button>
-      </div>
     </div>
   );
 }

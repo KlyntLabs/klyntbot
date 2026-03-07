@@ -166,7 +166,7 @@ export function MainApp() {
       {/* Header Tabs — glass toolbar */}
       <div className="h-12 flex items-center px-2 shrink-0">
         <div className="flex-1 flex items-center gap-1.5">
-          {(["All", "Work", "Personal"] as Tab[]).map((tab) => (
+          {["All" as Tab, ...areas.map((a) => a.name as Tab)].map((tab) => (
             <button
               type="button"
               key={tab}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ipc } from "../../../hooks/useIpc";
 
 const CURRENCIES = [
@@ -25,28 +25,26 @@ const PROACTIVITY_LEVELS = [
 ] as const;
 
 interface FinanceBasicsFormProps {
-  onNext: () => void;
+  registerSave: (fn: () => Promise<void>) => void;
+  onDirty: () => void;
 }
 
-export function FinanceBasicsForm({ onNext }: FinanceBasicsFormProps) {
+export function FinanceBasicsForm({ registerSave, onDirty }: FinanceBasicsFormProps) {
   const [currency, setCurrency] = useState("USD");
   const [proactivity, setProactivity] = useState("full");
-  const [saving, setSaving] = useState(false);
 
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      await ipc("config_update_section", {
-        section: "finance",
-        patch: { defaultCurrency: currency, proactivityLevel: proactivity },
-      });
-    } catch (e) {
-      console.error("Failed to save finance basics:", e);
-    } finally {
-      setSaving(false);
-    }
-    onNext();
-  };
+  useEffect(() => {
+    registerSave(async () => {
+      try {
+        await ipc("config_update_section", {
+          section: "finance",
+          patch: { defaultCurrency: currency, proactivityLevel: proactivity },
+        });
+      } catch (e) {
+        console.error("Failed to save finance basics:", e);
+      }
+    });
+  }, [currency, proactivity, registerSave]);
 
   return (
     <div>
@@ -63,7 +61,10 @@ export function FinanceBasicsForm({ onNext }: FinanceBasicsFormProps) {
           <select
             id="fin-currency"
             value={currency}
-            onChange={(e) => setCurrency(e.target.value)}
+            onChange={(e) => {
+              setCurrency(e.target.value);
+              onDirty();
+            }}
             className="w-full px-3 py-2 text-[13px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-lg focus:outline-none focus:border-brand/50 transition-colors"
           >
             {CURRENCIES.map((c) => (
@@ -93,7 +94,10 @@ export function FinanceBasicsForm({ onNext }: FinanceBasicsFormProps) {
                   name="proactivity"
                   value={level.value}
                   checked={proactivity === level.value}
-                  onChange={() => setProactivity(level.value)}
+                  onChange={() => {
+                    setProactivity(level.value);
+                    onDirty();
+                  }}
                   className="mt-0.5 accent-brand"
                 />
                 <div>
@@ -104,17 +108,6 @@ export function FinanceBasicsForm({ onNext }: FinanceBasicsFormProps) {
             ))}
           </div>
         </div>
-      </div>
-
-      <div className="mt-5 flex justify-end">
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saving}
-          className="px-5 py-2 text-[13px] font-medium text-white bg-brand hover:bg-brand-hover rounded-xl transition-colors disabled:opacity-50"
-        >
-          {saving ? "Saving..." : "Next"}
-        </button>
       </div>
     </div>
   );

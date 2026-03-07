@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useOutletContext } from "react-router";
 import { AccountsForm } from "../finance/AccountsForm";
 import { FinanceBasicsForm } from "../finance/FinanceBasicsForm";
@@ -29,20 +29,54 @@ const SUB_STEP_LABELS: Record<(typeof SUB_STEPS)[number], string> = {
 };
 
 export function FinanceStep() {
-  const { next } = useOutletContext<SetupContext>();
+  const { forwardRef, backRef, setDirty } = useOutletContext<SetupContext>();
   const [subStep, setSubStep] = useState(0);
 
-  const goNext = () => {
-    if (subStep < SUB_STEPS.length - 1) {
-      setSubStep(subStep + 1);
-    } else {
-      next();
-    }
-  };
+  // Map of sub-step index → save function (all sub-forms are mounted, each registers here)
+  const subSaveMap = useRef<Map<number, () => Promise<void>>>(new Map());
 
-  const goBack = () => {
-    if (subStep > 0) setSubStep(subStep - 1);
-  };
+  const makeRegisterSave = useCallback(
+    (index: number) => (fn: () => Promise<void>) => {
+      subSaveMap.current.set(index, fn);
+    },
+    [],
+  );
+
+  // Memoize per-sub-step registerSave functions so child useEffects don't re-fire on every render
+  const registerSaves = useMemo(
+    () => SUB_STEPS.map((_, i) => makeRegisterSave(i)),
+    [makeRegisterSave],
+  );
+
+  const markDirty = useCallback(() => setDirty(true), [setDirty]);
+
+  // Register forward handler — advances through sub-steps
+  useEffect(() => {
+    forwardRef.current = async (isSkip: boolean) => {
+      if (!isSkip) {
+        const save = subSaveMap.current.get(subStep);
+        await save?.();
+      }
+      if (subStep < SUB_STEPS.length - 1) {
+        setSubStep((s) => s + 1);
+        setDirty(false);
+        return false; // don't navigate to next main step
+      }
+      return true; // last sub-step, navigate to MCP
+    };
+  }, [forwardRef, setDirty, subStep]);
+
+  // Register back handler — goes to previous sub-step or back to Productivity
+  useEffect(() => {
+    backRef.current = () => {
+      if (subStep > 0) {
+        setSubStep((s) => s - 1);
+        setDirty(false);
+        return false; // don't navigate to previous main step
+      }
+      return true; // first sub-step, navigate to Productivity
+    };
+  }, [backRef, setDirty, subStep]);
 
   return (
     <div>
@@ -72,14 +106,28 @@ export function FinanceStep() {
         ))}
       </div>
 
-      {/* Sub-step content */}
-      {subStep === 0 && <FinanceBasicsForm onNext={goNext} />}
-      {subStep === 1 && <AccountsForm onNext={goNext} onBack={goBack} />}
-      {subStep === 2 && <IncomeForm onNext={goNext} onBack={goBack} />}
-      {subStep === 3 && <FireForm onNext={goNext} onBack={goBack} />}
-      {subStep === 4 && <InvestmentsForm onNext={goNext} onBack={goBack} />}
-      {subStep === 5 && <LiabilitiesForm onNext={goNext} onBack={goBack} />}
-      {subStep === 6 && <GoalsForm onDone={goNext} onBack={goBack} />}
+      {/* All sub-forms rendered, hidden when inactive — preserves state across navigation */}
+      <div className={subStep !== 0 ? "hidden" : undefined}>
+        <FinanceBasicsForm registerSave={registerSaves[0]} onDirty={markDirty} />
+      </div>
+      <div className={subStep !== 1 ? "hidden" : undefined}>
+        <AccountsForm registerSave={registerSaves[1]} onDirty={markDirty} />
+      </div>
+      <div className={subStep !== 2 ? "hidden" : undefined}>
+        <IncomeForm registerSave={registerSaves[2]} onDirty={markDirty} />
+      </div>
+      <div className={subStep !== 3 ? "hidden" : undefined}>
+        <FireForm registerSave={registerSaves[3]} onDirty={markDirty} />
+      </div>
+      <div className={subStep !== 4 ? "hidden" : undefined}>
+        <InvestmentsForm registerSave={registerSaves[4]} onDirty={markDirty} />
+      </div>
+      <div className={subStep !== 5 ? "hidden" : undefined}>
+        <LiabilitiesForm registerSave={registerSaves[5]} onDirty={markDirty} />
+      </div>
+      <div className={subStep !== 6 ? "hidden" : undefined}>
+        <GoalsForm registerSave={registerSaves[6]} onDirty={markDirty} />
+      </div>
     </div>
   );
 }

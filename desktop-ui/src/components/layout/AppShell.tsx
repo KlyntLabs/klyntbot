@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Outlet, useLocation } from "react-router";
+import { Navigate, Outlet, useLocation } from "react-router";
 import { useEvent } from "../../hooks/useEvent";
-import type { SidebarItem } from "../../lib/types";
+import { ipc } from "../../hooks/useIpc";
+import type { AppInfoResponse, SidebarItem } from "../../lib/types";
 import { SidebarChat } from "../chat/SidebarChat";
 import { Sidebar } from "./Sidebar";
 
@@ -9,8 +10,23 @@ export function AppShell() {
   const location = useLocation();
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [openSessionKey, setOpenSessionKey] = useState<string | null>(null);
+  const [setupState, setSetupState] = useState<"loading" | "needed" | "ready">("loading");
 
   const isOnChatPage = location.pathname.startsWith("/chat");
+
+  useEffect(() => {
+    let cancelled = false;
+    ipc<AppInfoResponse>("app_info")
+      .then((info) => {
+        if (!cancelled) setSetupState(info.setupCompleted ? "ready" : "needed");
+      })
+      .catch(() => {
+        if (!cancelled) setSetupState("ready");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Auto-close sidebar chat when navigating to the full /chat page
   useEffect(() => {
@@ -53,6 +69,10 @@ export function AppShell() {
     setIsChatOpen(true);
     setOpenSessionKey(payload?.sessionKey ?? null);
   });
+
+  // Gate: redirect to setup wizard if setup not completed
+  if (setupState === "loading") return null;
+  if (setupState === "needed") return <Navigate to="/setup/welcome" replace />;
 
   return (
     <div className="h-screen w-screen bg-background text-primary flex gap-2 p-2 overflow-hidden">

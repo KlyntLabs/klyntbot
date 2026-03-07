@@ -72,11 +72,19 @@ impl AppCore {
         .map_err(|e| format!("notes migration failed: {e}"))?;
         let note_repo = NoteRepo::new(notes_pool);
 
-        // 3. Create LLM provider
-        let (provider, resolved_model) = providers::create_provider(&config)
-            .map_err(|e| format!("provider init failed: {e}"))?;
+        // 3. Create LLM provider (graceful — falls back to noop for setup wizard)
+        let (provider, resolved_model) = match providers::create_provider(&config) {
+            Ok((p, m)) => {
+                info!(provider = %p.name(), "provider ready");
+                (p, m)
+            }
+            Err(e) => {
+                warn!("No LLM provider configured ({e}), using noop — setup wizard will handle configuration");
+                let noop: providers::DynProvider = Arc::new(providers::NoopProvider);
+                (noop, config.agents.defaults.model.clone())
+            }
+        };
         config.agents.defaults.model = resolved_model;
-        info!(provider = %provider.name(), "provider ready");
 
         // 4. Message bus
         let bus = Arc::new(MessageBus::new(100));

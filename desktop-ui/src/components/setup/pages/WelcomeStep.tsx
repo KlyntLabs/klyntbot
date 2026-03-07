@@ -1,9 +1,8 @@
 import { Sparkles } from "lucide-react";
-import { useOutletContext } from "react-router";
-import type { SetupContext } from "../steps";
+import { useSetupNavigation } from "../useSetupNavigation";
 
 export function WelcomeStep() {
-  const { next } = useOutletContext<SetupContext>();
+  const { next } = useSetupNavigation();
 
   return (
     <div className="text-center py-4">

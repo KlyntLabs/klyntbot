@@ -1,5 +1,5 @@
 import { Plus, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ipc } from "../../../hooks/useIpc";
 
 const ACCOUNT_TYPES = ["checking", "savings", "credit", "investment", "cash", "other"] as const;
@@ -17,35 +17,39 @@ interface AccountEntry {
 }
 
 interface AccountsFormProps {
-  onNext: () => void;
-  onBack: () => void;
+  registerSave: (fn: () => Promise<void>) => void;
+  onDirty: () => void;
 }
 
-export function AccountsForm({ onNext, onBack }: AccountsFormProps) {
+export function AccountsForm({ registerSave, onDirty }: AccountsFormProps) {
   const [accounts, setAccounts] = useState<AccountEntry[]>([]);
-  const [saving, setSaving] = useState(false);
 
   const addAccount = () => {
     setAccounts([
       ...accounts,
       { key: crypto.randomUUID(), name: "", accountType: "checking", balance: "", institution: "" },
     ]);
+    onDirty();
   };
 
   const removeAccount = (key: string) => {
     setAccounts(accounts.filter((a) => a.key !== key));
+    onDirty();
   };
 
   const updateAccount = (key: string, update: Partial<AccountEntry>) => {
     setAccounts(accounts.map((a) => (a.key === key ? { ...a, ...update } : a)));
+    onDirty();
   };
 
-  const handleSave = async () => {
-    const valid = accounts.filter((a) => a.name.trim());
-    if (valid.length > 0) {
-      setSaving(true);
-      try {
-        await Promise.all(
+  // Track which entries have already been saved to prevent duplicates
+  const savedKeysRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    registerSave(async () => {
+      const valid = accounts.filter((a) => a.name.trim() && !savedKeysRef.current.has(a.key));
+      if (valid.length > 0) {
+        const results = await Promise.allSettled(
           valid.map((acc) =>
             ipc("finance_account_create", {
               params: {
@@ -59,14 +63,14 @@ export function AccountsForm({ onNext, onBack }: AccountsFormProps) {
             }),
           ),
         );
-      } catch (e) {
-        console.error("Failed to save accounts:", e);
-      } finally {
-        setSaving(false);
+        for (let i = 0; i < results.length; i++) {
+          if (results[i].status === "fulfilled") savedKeysRef.current.add(valid[i].key);
+          else
+            console.error("Failed to save account:", (results[i] as PromiseRejectedResult).reason);
+        }
       }
-    }
-    onNext();
-  };
+    });
+  }, [accounts, registerSave]);
 
   return (
     <div>
@@ -135,24 +139,6 @@ export function AccountsForm({ onNext, onBack }: AccountsFormProps) {
         <Plus className="w-3.5 h-3.5" />
         Add account
       </button>
-
-      <div className="mt-5 flex justify-between">
-        <button
-          type="button"
-          onClick={onBack}
-          className="px-4 py-2 text-[13px] text-muted hover:text-secondary transition-colors"
-        >
-          Back
-        </button>
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saving}
-          className="px-5 py-2 text-[13px] font-medium text-white bg-brand hover:bg-brand-hover rounded-xl transition-colors disabled:opacity-50"
-        >
-          {saving ? "Saving..." : "Next"}
-        </button>
-      </div>
     </div>
   );
 }

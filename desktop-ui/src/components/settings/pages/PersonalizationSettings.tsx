@@ -23,6 +23,30 @@ const PROVIDERS = [
   { value: "aihubmix", label: "AIHubMix" },
 ] as const;
 
+// Recommended cognitive models per provider — fast & cheap models ideal for
+// extraction, consolidation, reflection, and coaching reasoning tasks.
+const COGNITIVE_MODELS: Record<string, { value: string; label: string; recommended?: boolean }[]> =
+  {
+    anthropic: [
+      { value: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5", recommended: true },
+      { value: "claude-sonnet-4-20250514", label: "Claude Sonnet 4" },
+    ],
+    openai: [
+      { value: "gpt-4o-mini", label: "GPT-4o Mini", recommended: true },
+      { value: "gpt-4o", label: "GPT-4o" },
+    ],
+    deepseek: [{ value: "deepseek-chat", label: "DeepSeek Chat", recommended: true }],
+    gemini: [
+      { value: "gemini-2.0-flash", label: "Gemini 2.0 Flash", recommended: true },
+      { value: "gemini-2.0-pro", label: "Gemini 2.0 Pro" },
+    ],
+    groq: [{ value: "llama-3.3-70b-versatile", label: "Llama 3.3 70B", recommended: true }],
+    zhipu: [{ value: "glm-4-flash", label: "GLM-4 Flash", recommended: true }],
+    dashscope: [{ value: "qwen-plus", label: "Qwen Plus", recommended: true }],
+    moonshot: [{ value: "moonshot-v1-8k", label: "Moonshot V1 8K", recommended: true }],
+    minimax: [{ value: "abab6.5s-chat", label: "ABAB 6.5s", recommended: true }],
+  };
+
 // ── Types ────────────────────────────────────────────────────────────
 
 interface ProvidersData {
@@ -31,6 +55,14 @@ interface ProvidersData {
 
 interface AgentsData {
   defaults?: { provider?: string; model?: string };
+}
+
+interface CognitiveData {
+  provider?: string;
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
+  reflectionMaxTokens?: number;
 }
 
 interface LearningData {
@@ -60,6 +92,12 @@ export function PersonalizationSettings() {
     "config_get_section",
     { section: "learning" },
     { enabled: true },
+  );
+
+  const { data: cognitive, refetch: refetchCognitive } = useQuery<CognitiveData>(
+    "config_get_section",
+    { section: "cognitive" },
+    {},
   );
 
   // ── Provider state ───────────────────────────────────────────────
@@ -159,6 +197,42 @@ export function PersonalizationSettings() {
     }
   };
 
+  // ── Cognitive state ──────────────────────────────────────────────
+
+  const [cognitiveEdits, setCognitiveEdits] = useState<Record<string, unknown>>({});
+  const [savingCognitive, setSavingCognitive] = useState(false);
+
+  const cogProvider = (
+    "provider" in cognitiveEdits ? cognitiveEdits.provider : (cognitive.provider ?? "")
+  ) as string;
+  const cogModel = (
+    "model" in cognitiveEdits ? cognitiveEdits.model : (cognitive.model ?? "")
+  ) as string;
+
+  // Resolve which provider to show models for: explicit cognitive provider, or fall back to main agent provider
+  const effectiveCogProvider = cogProvider || editedProvider;
+  const cogModelOptions = COGNITIVE_MODELS[effectiveCogProvider] ?? [];
+
+  const hasCognitiveChanges = Object.keys(cognitiveEdits).length > 0;
+
+  const saveCognitive = async () => {
+    setSavingCognitive(true);
+    try {
+      const patch: Record<string, unknown> = {};
+      if ("provider" in cognitiveEdits) patch.provider = cognitiveEdits.provider || null;
+      if ("model" in cognitiveEdits) patch.model = cognitiveEdits.model || null;
+      if ("temperature" in cognitiveEdits) patch.temperature = cognitiveEdits.temperature;
+      if ("maxTokens" in cognitiveEdits) patch.maxTokens = cognitiveEdits.maxTokens;
+      await ipc("config_update_section", { section: "cognitive", patch });
+      refetchCognitive();
+      setCognitiveEdits({});
+    } catch (e) {
+      console.error("Failed to save cognitive config:", e);
+    } finally {
+      setSavingCognitive(false);
+    }
+  };
+
   return (
     <div>
       <div className="mb-8">
@@ -228,6 +302,82 @@ export function PersonalizationSettings() {
             </label>
 
             {hasProviderChanges && <SaveButton onClick={saveProvider} saving={savingProvider} />}
+          </div>
+        </SettingsCard>
+
+        {/* ── Cognitive AI ──────────────────────────────────────── */}
+        <SettingsCard title="Cognitive AI">
+          <div className="space-y-3">
+            <p className="text-[11px] text-dim -mt-1">
+              Background AI for memory extraction, consolidation, reflection, and coaching.
+              Lightweight tasks — fast, cheaper models recommended.
+            </p>
+
+            <label className="block">
+              <span className="block text-[11px] text-muted mb-1">Provider override</span>
+              <select
+                value={cogProvider}
+                onChange={(e) =>
+                  setCognitiveEdits((prev) => ({
+                    ...prev,
+                    provider: e.target.value,
+                    // Reset model when switching provider
+                    model: "",
+                  }))
+                }
+                className="w-full px-3 py-1.5 text-[12px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+              >
+                <option value="" className="bg-[#1a1a1a]">
+                  Same as main ({PROVIDERS.find((p) => p.value === editedProvider)?.label || "auto"}
+                  )
+                </option>
+                {PROVIDERS.map((p) => (
+                  <option key={p.value} value={p.value} className="bg-[#1a1a1a]">
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div>
+              <span className="block text-[11px] text-muted mb-1">Model</span>
+              {cogModelOptions.length > 0 ? (
+                <select
+                  value={cogModel}
+                  onChange={(e) =>
+                    setCognitiveEdits((prev) => ({ ...prev, model: e.target.value }))
+                  }
+                  className="w-full px-3 py-1.5 text-[12px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                >
+                  <option value="" className="bg-[#1a1a1a]">
+                    Same as main agent model
+                  </option>
+                  {cogModelOptions.map((m) => (
+                    <option key={m.value} value={m.value} className="bg-[#1a1a1a]">
+                      {m.label}
+                      {m.recommended ? " ★ recommended" : ""}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={cogModel}
+                  onChange={(e) =>
+                    setCognitiveEdits((prev) => ({ ...prev, model: e.target.value }))
+                  }
+                  placeholder="Leave blank to use main agent model"
+                  className="w-full px-3 py-1.5 text-[12px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                />
+              )}
+            </div>
+
+            {hasCognitiveChanges && (
+              <>
+                <p className="text-[10px] text-amber-400/80">Changes take effect after restart</p>
+                <SaveButton onClick={saveCognitive} saving={savingCognitive} />
+              </>
+            )}
           </div>
         </SettingsCard>
 

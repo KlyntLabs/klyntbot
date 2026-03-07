@@ -1,3 +1,5 @@
+import type { MutableRefObject } from "react";
+
 export type SetupStepId =
   | "welcome"
   | "provider"
@@ -16,9 +18,12 @@ export interface SetupStep {
 }
 
 export interface SetupContext {
-  next: () => void;
-  back: () => void;
-  skip: () => void;
+  /** Ref for forward handler. Receives isSkip flag. Return true → layout navigates to next main step. */
+  forwardRef: MutableRefObject<((isSkip: boolean) => Promise<boolean>) | null>;
+  /** Ref for back handler. Return true → layout navigates to previous main step. */
+  backRef: MutableRefObject<(() => boolean) | null>;
+  /** Mark step as having user modifications (toggles Skip → Continue for optional steps). */
+  setDirty: (dirty: boolean) => void;
 }
 
 export const SETUP_STEPS: SetupStep[] = [

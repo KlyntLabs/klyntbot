@@ -1,7 +1,7 @@
-import { Eye, EyeOff } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useOutletContext } from "react-router";
 import { ipc } from "../../../hooks/useIpc";
+import { SecretInput } from "../../shared/SecretInput";
 import { Toggle } from "../../shared/Toggle";
 import type { SetupContext } from "../steps";
 
@@ -48,47 +48,65 @@ const CHANNELS: ChannelDef[] = [
 interface ChannelState {
   enabled: boolean;
   token: string;
-  showToken: boolean;
 }
 
 export function ChannelsStep() {
-  const { next } = useOutletContext<SetupContext>();
-  const [saving, setSaving] = useState(false);
+  const { forwardRef, setDirty } = useOutletContext<SetupContext>();
 
   const [channels, setChannels] = useState<Record<string, ChannelState>>(() =>
-    Object.fromEntries(
-      CHANNELS.map((ch) => [ch.key, { enabled: false, token: "", showToken: false }]),
-    ),
+    Object.fromEntries(CHANNELS.map((ch) => [ch.key, { enabled: false, token: "" }])),
   );
+
+  // Load saved channel config on mount
+  useEffect(() => {
+    ipc<Record<string, { enabled?: boolean; token?: string }>>("config_get_section", {
+      section: "channels",
+    })
+      .then((saved) => {
+        if (!saved || typeof saved !== "object") return;
+        const loaded: Record<string, ChannelState> = {};
+        let hasSaved = false;
+        for (const ch of CHANNELS) {
+          const cfg = saved[ch.key];
+          if (cfg?.enabled) {
+            loaded[ch.key] = { enabled: true, token: cfg.token ?? "" };
+            hasSaved = true;
+          } else {
+            loaded[ch.key] = { enabled: false, token: "" };
+          }
+        }
+        if (hasSaved) {
+          setChannels(loaded);
+          setDirty(true);
+        }
+      })
+      .catch(() => {});
+  }, [setDirty]);
+
+  // Register save handler with layout
+  useEffect(() => {
+    forwardRef.current = async (isSkip: boolean) => {
+      if (isSkip) return true;
+      const patch: Record<string, unknown> = {};
+      for (const ch of CHANNELS) {
+        const state = channels[ch.key];
+        if (state.enabled && state.token.trim()) {
+          patch[ch.key] = { enabled: true, token: state.token.trim() };
+        }
+      }
+      if (Object.keys(patch).length > 0) {
+        await ipc("config_update_section", { section: "channels", patch });
+      }
+      return true;
+    };
+  }, [forwardRef, channels]);
 
   const updateChannel = (key: string, update: Partial<ChannelState>) => {
     setChannels((prev) => ({
       ...prev,
       [key]: { ...prev[key], ...update },
     }));
-  };
-
-  const handleContinue = async () => {
-    const patch: Record<string, unknown> = {};
-    for (const ch of CHANNELS) {
-      const state = channels[ch.key];
-      if (state.enabled && state.token.trim()) {
-        patch[ch.key] = { enabled: true, token: state.token.trim() };
-      }
-    }
-
-    if (Object.keys(patch).length > 0) {
-      setSaving(true);
-      try {
-        await ipc("config_update_section", { section: "channels", patch });
-      } catch {
-        // Non-blocking — user can configure later
-      } finally {
-        setSaving(false);
-      }
-    }
-
-    next();
+    if ("enabled" in update) setDirty(true);
   };
 
   return (
@@ -114,42 +132,19 @@ export function ChannelsStep() {
               {state.enabled && (
                 <label className="block">
                   <span className="block text-[11px] text-muted mb-1">{ch.tokenLabel}</span>
-                  <div className="relative">
-                    <input
-                      type={state.showToken ? "text" : "password"}
-                      value={state.token}
-                      onChange={(e) => updateChannel(ch.key, { token: e.target.value })}
-                      placeholder={ch.tokenPlaceholder}
-                      className="w-full px-3 py-1.5 pr-9 text-[12px] text-primary bg-surface-base border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => updateChannel(ch.key, { showToken: !state.showToken })}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-secondary transition-colors"
-                    >
-                      {state.showToken ? (
-                        <EyeOff className="w-3 h-3" />
-                      ) : (
-                        <Eye className="w-3 h-3" />
-                      )}
-                    </button>
-                  </div>
+                  <SecretInput
+                    value={state.token}
+                    onChange={(v) => {
+                      updateChannel(ch.key, { token: v });
+                      setDirty(true);
+                    }}
+                    placeholder={ch.tokenPlaceholder}
+                  />
                 </label>
               )}
             </div>
           );
         })}
-      </div>
-
-      <div className="mt-6 flex justify-end">
-        <button
-          type="button"
-          onClick={handleContinue}
-          disabled={saving}
-          className="px-5 py-2 text-[13px] font-medium text-white bg-brand hover:bg-brand-hover rounded-xl transition-colors disabled:opacity-50"
-        >
-          {saving ? "Saving..." : "Continue"}
-        </button>
       </div>
     </div>
   );

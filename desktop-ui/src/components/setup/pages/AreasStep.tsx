@@ -1,11 +1,12 @@
 import { Plus, X } from "lucide-react";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useOutletContext } from "react-router";
 import { ipc } from "../../../hooks/useIpc";
 import type { SetupContext } from "../steps";
 
 interface AreaEntry {
   key: string;
+  id?: string; // database id — set when loaded from DB
   name: string;
   color: string;
 }
@@ -31,42 +32,59 @@ function makeDefaultAreas(): AreaEntry[] {
 }
 
 export function AreasStep() {
-  const { next } = useOutletContext<SetupContext>();
+  const { forwardRef, setDirty } = useOutletContext<SetupContext>();
   const [areas, setAreas] = useState<AreaEntry[]>(makeDefaultAreas);
-  const [saving, setSaving] = useState(false);
   const id = useId();
+
+  // Load existing areas from DB on mount
+  useEffect(() => {
+    ipc<{ id: string; name: string; color?: string }[]>("area_list")
+      .then((saved) => {
+        if (saved && saved.length > 0) {
+          setAreas(
+            saved.map((a) => ({
+              key: crypto.randomUUID(),
+              id: a.id,
+              name: a.name,
+              color: a.color ?? "#3b82f6",
+            })),
+          );
+          setDirty(true);
+        }
+      })
+      .catch(() => {});
+  }, [setDirty]);
+
+  // Register save handler with layout
+  useEffect(() => {
+    forwardRef.current = async (isSkip: boolean) => {
+      if (isSkip) return true;
+      // Only create new areas (ones without a database id)
+      const newAreas = areas.filter((a) => !a.id && a.name.trim());
+      if (newAreas.length > 0) {
+        await Promise.all(
+          newAreas.map((area) => ipc("area_create", { name: area.name.trim(), color: area.color })),
+        );
+      }
+      return true;
+    };
+  }, [forwardRef, areas]);
 
   const addArea = () => {
     const usedColors = new Set(areas.map((a) => a.color));
     const nextColor = AREA_COLORS.find((c) => !usedColors.has(c)) ?? AREA_COLORS[0];
     setAreas([...areas, { key: crypto.randomUUID(), name: "", color: nextColor }]);
+    setDirty(true);
   };
 
   const removeArea = (key: string) => {
     setAreas(areas.filter((a) => a.key !== key));
+    setDirty(true);
   };
 
   const updateArea = (key: string, update: Partial<AreaEntry>) => {
     setAreas(areas.map((a) => (a.key === key ? { ...a, ...update } : a)));
-  };
-
-  const handleContinue = async () => {
-    const validAreas = areas.filter((a) => a.name.trim());
-    if (validAreas.length > 0) {
-      setSaving(true);
-      try {
-        await Promise.all(
-          validAreas.map((area) =>
-            ipc("area_create", { name: area.name.trim(), color: area.color }),
-          ),
-        );
-      } catch {
-        // Non-blocking
-      } finally {
-        setSaving(false);
-      }
-    }
-    next();
+    setDirty(true);
   };
 
   return (
@@ -118,17 +136,6 @@ export function AreasStep() {
         <Plus className="w-3.5 h-3.5" />
         Add area
       </button>
-
-      <div className="mt-6 flex justify-end">
-        <button
-          type="button"
-          onClick={handleContinue}
-          disabled={saving}
-          className="px-5 py-2 text-[13px] font-medium text-white bg-brand hover:bg-brand-hover rounded-xl transition-colors disabled:opacity-50"
-        >
-          {saving ? "Creating..." : "Continue"}
-        </button>
-      </div>
     </div>
   );
 }

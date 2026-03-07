@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ipc } from "../../../hooks/useIpc";
 
 const BUDGET_METHODS = [
@@ -38,14 +38,13 @@ const JAR_LABELS: Record<keyof SixJarRatios, string> = {
 };
 
 interface IncomeFormProps {
-  onNext: () => void;
-  onBack: () => void;
+  registerSave: (fn: () => Promise<void>) => void;
+  onDirty: () => void;
 }
 
-export function IncomeForm({ onNext, onBack }: IncomeFormProps) {
+export function IncomeForm({ registerSave, onDirty }: IncomeFormProps) {
   const [method, setMethod] = useState("standard");
   const [ratios, setRatios] = useState<SixJarRatios>(DEFAULT_RATIOS);
-  const [saving, setSaving] = useState(false);
 
   const total = Object.values(ratios).reduce((a, b) => a + b, 0);
 
@@ -53,23 +52,21 @@ export function IncomeForm({ onNext, onBack }: IncomeFormProps) {
     setRatios((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      const patch: Record<string, unknown> = {
-        budgeting: {
-          defaultMethod: method,
-          ...(method === "six_jar" ? { sixJarRatios: ratios } : {}),
-        },
-      };
-      await ipc("config_update_section", { section: "finance", patch });
-    } catch (e) {
-      console.error("Failed to save budgeting config:", e);
-    } finally {
-      setSaving(false);
-    }
-    onNext();
-  };
+  useEffect(() => {
+    registerSave(async () => {
+      try {
+        const patch: Record<string, unknown> = {
+          budgeting: {
+            defaultMethod: method,
+            ...(method === "six_jar" ? { sixJarRatios: ratios } : {}),
+          },
+        };
+        await ipc("config_update_section", { section: "finance", patch });
+      } catch (e) {
+        console.error("Failed to save budgeting config:", e);
+      }
+    });
+  }, [method, ratios, registerSave]);
 
   return (
     <div>
@@ -92,7 +89,10 @@ export function IncomeForm({ onNext, onBack }: IncomeFormProps) {
                 name="budget-method"
                 value={m.value}
                 checked={method === m.value}
-                onChange={() => setMethod(m.value)}
+                onChange={() => {
+                  setMethod(m.value);
+                  onDirty();
+                }}
                 className="mt-0.5 accent-brand"
               />
               <div>
@@ -122,7 +122,10 @@ export function IncomeForm({ onNext, onBack }: IncomeFormProps) {
                   max={100}
                   step={5}
                   value={ratios[key]}
-                  onChange={(e) => updateRatio(key, Number(e.target.value))}
+                  onChange={(e) => {
+                    updateRatio(key, Number(e.target.value));
+                    onDirty();
+                  }}
                   className="flex-1 accent-brand"
                 />
                 <span className="text-[12px] text-secondary font-mono w-10 text-right">
@@ -132,24 +135,6 @@ export function IncomeForm({ onNext, onBack }: IncomeFormProps) {
             ))}
           </div>
         )}
-      </div>
-
-      <div className="mt-5 flex justify-between">
-        <button
-          type="button"
-          onClick={onBack}
-          className="px-4 py-2 text-[13px] text-muted hover:text-secondary transition-colors"
-        >
-          Back
-        </button>
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saving}
-          className="px-5 py-2 text-[13px] font-medium text-white bg-brand hover:bg-brand-hover rounded-xl transition-colors disabled:opacity-50"
-        >
-          {saving ? "Saving..." : "Next"}
-        </button>
       </div>
     </div>
   );

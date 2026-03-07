@@ -1,5 +1,5 @@
 import { Plus, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ipc } from "../../../hooks/useIpc";
 
 const LIABILITY_TYPES = [
@@ -25,13 +25,12 @@ interface LiabilityEntry {
 }
 
 interface LiabilitiesFormProps {
-  onNext: () => void;
-  onBack: () => void;
+  registerSave: (fn: () => Promise<void>) => void;
+  onDirty: () => void;
 }
 
-export function LiabilitiesForm({ onNext, onBack }: LiabilitiesFormProps) {
+export function LiabilitiesForm({ registerSave, onDirty }: LiabilitiesFormProps) {
   const [liabilities, setLiabilities] = useState<LiabilityEntry[]>([]);
-  const [saving, setSaving] = useState(false);
 
   const addLiability = () => {
     setLiabilities([
@@ -45,22 +44,28 @@ export function LiabilitiesForm({ onNext, onBack }: LiabilitiesFormProps) {
         monthlyPayment: "",
       },
     ]);
+    onDirty();
   };
 
   const removeLiability = (key: string) => {
     setLiabilities(liabilities.filter((l) => l.key !== key));
+    onDirty();
   };
 
   const updateLiability = (key: string, update: Partial<LiabilityEntry>) => {
     setLiabilities(liabilities.map((l) => (l.key === key ? { ...l, ...update } : l)));
+    onDirty();
   };
 
-  const handleSave = async () => {
-    const valid = liabilities.filter((l) => l.name.trim() && l.principal);
-    if (valid.length > 0) {
-      setSaving(true);
-      try {
-        await Promise.all(
+  const savedKeysRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    registerSave(async () => {
+      const valid = liabilities.filter(
+        (l) => l.name.trim() && l.principal && !savedKeysRef.current.has(l.key),
+      );
+      if (valid.length > 0) {
+        const results = await Promise.allSettled(
           valid.map((lia) =>
             ipc("finance_liability_create", {
               params: {
@@ -79,14 +84,17 @@ export function LiabilitiesForm({ onNext, onBack }: LiabilitiesFormProps) {
             }),
           ),
         );
-      } catch (e) {
-        console.error("Failed to save liabilities:", e);
-      } finally {
-        setSaving(false);
+        for (let i = 0; i < results.length; i++) {
+          if (results[i].status === "fulfilled") savedKeysRef.current.add(valid[i].key);
+          else
+            console.error(
+              "Failed to save liability:",
+              (results[i] as PromiseRejectedResult).reason,
+            );
+        }
       }
-    }
-    onNext();
-  };
+    });
+  }, [liabilities, registerSave]);
 
   return (
     <div>
@@ -168,24 +176,6 @@ export function LiabilitiesForm({ onNext, onBack }: LiabilitiesFormProps) {
         <Plus className="w-3.5 h-3.5" />
         Add liability
       </button>
-
-      <div className="mt-5 flex justify-between">
-        <button
-          type="button"
-          onClick={onBack}
-          className="px-4 py-2 text-[13px] text-muted hover:text-secondary transition-colors"
-        >
-          Back
-        </button>
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saving}
-          className="px-5 py-2 text-[13px] font-medium text-white bg-brand hover:bg-brand-hover rounded-xl transition-colors disabled:opacity-50"
-        >
-          {saving ? "Saving..." : "Next"}
-        </button>
-      </div>
     </div>
   );
 }

@@ -21,11 +21,15 @@ pub use types::{
     DEFAULT_CONTEXT_WINDOW,
 };
 
+mod noop;
+
 use std::sync::Arc;
 use tracing::info;
 
 use common::{ConfigError, Result};
 use config::Config;
+
+pub use noop::NoopProvider;
 
 /// Initialize the LLM provider from configuration.
 ///

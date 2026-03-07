@@ -1,5 +1,5 @@
 import { Plus, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ipc } from "../../../hooks/useIpc";
 
 const ASSET_TYPES = [
@@ -26,14 +26,13 @@ interface InvestmentEntry {
 }
 
 interface InvestmentsFormProps {
-  onNext: () => void;
-  onBack: () => void;
+  registerSave: (fn: () => Promise<void>) => void;
+  onDirty: () => void;
 }
 
-export function InvestmentsForm({ onNext, onBack }: InvestmentsFormProps) {
+export function InvestmentsForm({ registerSave, onDirty }: InvestmentsFormProps) {
   const [portfolioName, setPortfolioName] = useState("My Portfolio");
   const [investments, setInvestments] = useState<InvestmentEntry[]>([]);
-  const [saving, setSaving] = useState(false);
 
   const addInvestment = () => {
     setInvestments([
@@ -47,55 +46,84 @@ export function InvestmentsForm({ onNext, onBack }: InvestmentsFormProps) {
         costBasis: "",
       },
     ]);
+    onDirty();
   };
 
   const removeInvestment = (key: string) => {
     setInvestments(investments.filter((i) => i.key !== key));
+    onDirty();
   };
 
   const updateInvestment = (key: string, update: Partial<InvestmentEntry>) => {
     setInvestments(investments.map((i) => (i.key === key ? { ...i, ...update } : i)));
+    onDirty();
   };
 
-  const handleSave = async () => {
-    const validInvestments = investments.filter((i) => i.symbol.trim() || i.name.trim());
-    if (validInvestments.length > 0 && portfolioName.trim()) {
-      setSaving(true);
-      try {
-        const portfolio = await ipc<{ id: string }>("finance_portfolio_create", {
-          params: {
-            name: portfolioName.trim(),
-            description: null,
-            currency: null,
-          },
-        });
-        if (portfolio?.id) {
-          await Promise.all(
-            validInvestments.map((inv) =>
-              ipc("finance_investment_create", {
-                params: {
-                  portfolioId: portfolio.id,
-                  assetType: inv.assetType,
-                  symbol: inv.symbol.trim() || null,
-                  name: inv.name.trim() || null,
-                  quantity: Number.parseFloat(inv.quantity) || 0,
-                  costBasis: inv.costBasis ? Math.round(Number.parseFloat(inv.costBasis) * 100) : 0,
-                  currency: null,
-                  purchaseDate: null,
-                  notes: null,
-                },
-              }),
-            ),
-          );
+  // Track which entries have already been saved to prevent duplicates
+  const savedKeysRef = useRef<Set<string>>(new Set());
+  const portfolioIdRef = useRef<string | null>(null);
+  const prevPortfolioNameRef = useRef(portfolioName);
+
+  // Clear stale portfolio ref when name changes after a partial save
+  if (prevPortfolioNameRef.current !== portfolioName) {
+    prevPortfolioNameRef.current = portfolioName;
+    portfolioIdRef.current = null;
+  }
+
+  useEffect(() => {
+    registerSave(async () => {
+      const validInvestments = investments.filter(
+        (i) => (i.symbol.trim() || i.name.trim()) && !savedKeysRef.current.has(i.key),
+      );
+      if (validInvestments.length > 0 && portfolioName.trim()) {
+        try {
+          // Reuse existing portfolio if already created
+          if (!portfolioIdRef.current) {
+            const portfolio = await ipc<{ id: string }>("finance_portfolio_create", {
+              params: {
+                name: portfolioName.trim(),
+                description: null,
+                currency: null,
+              },
+            });
+            portfolioIdRef.current = portfolio?.id ?? null;
+          }
+          if (portfolioIdRef.current) {
+            const results = await Promise.allSettled(
+              validInvestments.map((inv) =>
+                ipc("finance_investment_create", {
+                  params: {
+                    portfolioId: portfolioIdRef.current,
+                    assetType: inv.assetType,
+                    symbol: inv.symbol.trim() || null,
+                    name: inv.name.trim() || null,
+                    quantity: Number.parseFloat(inv.quantity) || 0,
+                    costBasis: inv.costBasis
+                      ? Math.round(Number.parseFloat(inv.costBasis) * 100)
+                      : 0,
+                    currency: null,
+                    purchaseDate: null,
+                    notes: null,
+                  },
+                }),
+              ),
+            );
+            for (let i = 0; i < results.length; i++) {
+              if (results[i].status === "fulfilled")
+                savedKeysRef.current.add(validInvestments[i].key);
+              else
+                console.error(
+                  "Failed to save investment:",
+                  (results[i] as PromiseRejectedResult).reason,
+                );
+            }
+          }
+        } catch (e) {
+          console.error("Failed to save investments:", e);
         }
-      } catch (e) {
-        console.error("Failed to save investments:", e);
-      } finally {
-        setSaving(false);
       }
-    }
-    onNext();
-  };
+    });
+  }, [portfolioName, investments, registerSave]);
 
   return (
     <div>
@@ -112,7 +140,10 @@ export function InvestmentsForm({ onNext, onBack }: InvestmentsFormProps) {
           <input
             type="text"
             value={portfolioName}
-            onChange={(e) => setPortfolioName(e.target.value)}
+            onChange={(e) => {
+              setPortfolioName(e.target.value);
+              onDirty();
+            }}
             className="w-full px-3 py-2 text-[13px] text-primary bg-white/[0.06] border border-white/[0.08] rounded-lg focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
           />
         </label>
@@ -179,24 +210,6 @@ export function InvestmentsForm({ onNext, onBack }: InvestmentsFormProps) {
         >
           <Plus className="w-3.5 h-3.5" />
           Add investment
-        </button>
-      </div>
-
-      <div className="mt-5 flex justify-between">
-        <button
-          type="button"
-          onClick={onBack}
-          className="px-4 py-2 text-[13px] text-muted hover:text-secondary transition-colors"
-        >
-          Back
-        </button>
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saving}
-          className="px-5 py-2 text-[13px] font-medium text-white bg-brand hover:bg-brand-hover rounded-xl transition-colors disabled:opacity-50"
-        >
-          {saving ? "Saving..." : "Next"}
         </button>
       </div>
     </div>
