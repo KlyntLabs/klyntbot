@@ -37,6 +37,8 @@ pub(crate) fn action_to_task(
         parent_id: row.parent_id.clone(),
         subtask_count,
         subtask_completed_count,
+        status_label_id: row.status_label_id.clone(),
+        status_label: None,
     }
 }
 

@@ -22,6 +22,8 @@ pub struct TaskResponse {
     pub parent_id: Option<String>,
     pub subtask_count: u32,
     pub subtask_completed_count: u32,
+    pub status_label_id: Option<String>,
+    pub status_label: Option<StatusLabelResponse>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -34,6 +36,7 @@ pub struct TaskCreateParams {
     pub due_date: Option<String>,
     pub tags: Option<Vec<String>>,
     pub parent_id: Option<String>,
+    pub status_label_id: Option<String>,
 }
 
 // ── Today Task (tray view) ──────────────────────────────────────────────
@@ -63,6 +66,7 @@ pub struct ProjectResponse {
     pub task_count: u32,
     pub completed_count: u32,
     pub objective_ids: Option<Vec<String>>,
+    pub workflow_id: Option<String>,
 }
 
 // ── Objective / Key Result ──────────────────────────────────────────────
@@ -87,6 +91,64 @@ pub struct KeyResultResponse {
     pub current: f64,
     pub target: f64,
     pub unit: String,
+}
+
+// ── Status Workflows ──────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatusWorkflowResponse {
+    pub id: String,
+    pub name: String,
+    pub is_template: bool,
+    pub is_global_default: bool,
+    pub labels: Vec<StatusLabelResponse>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StatusLabelResponse {
+    pub id: String,
+    pub workflow_id: String,
+    pub name: String,
+    pub color: String,
+    pub status_group: String,
+    pub position: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkflowCreateParams {
+    pub name: String,
+    pub is_template: Option<bool>,
+    pub source_workflow_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LabelCreateParams {
+    pub workflow_id: String,
+    pub name: String,
+    pub color: String,
+    pub status_group: String,
+    pub position: Option<i32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LabelUpdateParams {
+    pub id: String,
+    pub name: Option<String>,
+    pub color: Option<String>,
+    pub status_group: Option<String>,
+    pub position: Option<i32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LabelReorderParams {
+    pub workflow_id: String,
+    pub label_ids: Vec<String>,
 }
 
 // ── Area ────────────────────────────────────────────────────────────────
@@ -211,6 +273,8 @@ pub struct TaskUpdateParams {
     pub area_id: Option<String>,
     pub tags: Option<Vec<String>>,
     pub key_result_id: Option<Option<String>>,
+    pub status_label_id: Option<Option<String>>,
+    pub position: Option<i32>,
 }
 
 // ── Area Params ────────────────────────────────────────────────────────
@@ -254,6 +318,7 @@ pub struct ProjectUpdateParams {
     pub description: Option<Option<String>>,
     pub tags: Option<Vec<String>>,
     pub status: Option<String>,
+    pub workflow_id: Option<Option<String>>,
 }
 
 // ── Objective Params ───────────────────────────────────────────────────

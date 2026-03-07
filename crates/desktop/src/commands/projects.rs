@@ -25,6 +25,7 @@ pub(crate) fn project_to_response(
         } else {
             Some(objective_ids)
         },
+        workflow_id: None, // TODO: populate when ProjectRow gains workflow_id
     }
 }
 
