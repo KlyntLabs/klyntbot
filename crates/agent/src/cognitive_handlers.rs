@@ -17,83 +17,29 @@ pub struct HeuristicExtractionHandler;
 #[async_trait]
 impl ExtractionHandler for HeuristicExtractionHandler {
     async fn extract_facts(&self, observation: &Observation) -> common::Result<Vec<ExtractedFact>> {
-        let mut facts = Vec::new();
+        let fact = |domain: &str, predicate: &str, confidence: f64, source: &str| ExtractedFact {
+            domain: domain.into(),
+            subject: "user".into(),
+            predicate: predicate.into(),
+            object: observation.content.clone(),
+            confidence,
+            source: source.into(),
+        };
+        let od = observation.domain.as_str();
 
-        match observation.source_event.as_str() {
-            // User-stated facts are high confidence direct extractions
-            "UserStatedFact" => {
-                facts.push(ExtractedFact {
-                    domain: observation.domain.clone(),
-                    subject: "user".into(),
-                    predicate: "stated".into(),
-                    object: observation.content.clone(),
-                    confidence: 1.0,
-                    source: "user_stated".into(),
-                });
-            }
-
-            // User corrections override existing beliefs
-            "UserCorrectedAI" => {
-                facts.push(ExtractedFact {
-                    domain: observation.domain.clone(),
-                    subject: "user".into(),
-                    predicate: "corrected".into(),
-                    object: observation.content.clone(),
-                    confidence: 1.0,
-                    source: "user_stated".into(),
-                });
-            }
-
-            // Budget alerts indicate spending patterns
-            "BudgetAlert" => {
-                facts.push(ExtractedFact {
-                    domain: "finance".into(),
-                    subject: "user".into(),
-                    predicate: "budget_pressure".into(),
-                    object: observation.content.clone(),
-                    confidence: 0.9,
-                    source: "observed".into(),
-                });
-            }
-
-            // Coaching feedback reveals user preferences
-            "CoachingFeedback" => {
-                facts.push(ExtractedFact {
-                    domain: "coaching".into(),
-                    subject: "user".into(),
-                    predicate: "coaching_response".into(),
-                    object: observation.content.clone(),
-                    confidence: 0.9,
-                    source: "observed".into(),
-                });
-            }
-
-            // Accumulated patterns become observed facts
+        let facts = match observation.source_event.as_str() {
+            "UserStatedFact" => vec![fact(od, "stated", 1.0, "user_stated")],
+            "UserCorrectedAI" => vec![fact(od, "corrected", 1.0, "user_stated")],
+            "BudgetAlert" => vec![fact("finance", "budget_pressure", 0.9, "observed")],
+            "CoachingFeedback" => vec![fact("coaching", "coaching_response", 0.9, "observed")],
             source if source.starts_with("accumulated:") => {
-                facts.push(ExtractedFact {
-                    domain: observation.domain.clone(),
-                    subject: "user".into(),
-                    predicate: "pattern".into(),
-                    object: observation.content.clone(),
-                    confidence: 0.7,
-                    source: "inferred".into(),
-                });
+                vec![fact(od, "pattern", 0.7, "inferred")]
             }
-
-            // Other events with high importance get extracted
-            _ => {
-                if observation.importance >= 0.7 {
-                    facts.push(ExtractedFact {
-                        domain: observation.domain.clone(),
-                        subject: "user".into(),
-                        predicate: "observation".into(),
-                        object: observation.content.clone(),
-                        confidence: observation.importance * 0.8,
-                        source: "observed".into(),
-                    });
-                }
+            _ if observation.importance >= 0.7 => {
+                vec![fact(od, "observation", observation.importance * 0.8, "observed")]
             }
-        }
+            _ => vec![],
+        };
 
         Ok(facts)
     }
@@ -110,30 +56,26 @@ impl ConsolidationHandler for HeuristicConsolidationHandler {
         candidate: &SemanticFact,
         existing: &[SemanticFact],
     ) -> common::Result<MemoryOp> {
-        if existing.is_empty() {
-            return Ok(MemoryOp::Add {
+        // Single pass: find exact duplicate or predicate-only match
+        let mut update_from: Option<&SemanticFact> = None;
+        for fact in existing {
+            if fact.predicate == candidate.predicate {
+                if fact.object == candidate.object {
+                    return Ok(MemoryOp::Noop);
+                }
+                if update_from.is_none() {
+                    update_from = Some(fact);
+                }
+            }
+        }
+
+        if let Some(old) = update_from {
+            return Ok(MemoryOp::Update {
                 id: candidate.id.clone(),
+                old_id: old.id.clone(),
             });
         }
 
-        // Check for exact duplicate (same predicate + same object)
-        for fact in existing {
-            if fact.predicate == candidate.predicate && fact.object == candidate.object {
-                return Ok(MemoryOp::Noop);
-            }
-        }
-
-        // Check for update (same predicate, different object)
-        for fact in existing {
-            if fact.predicate == candidate.predicate {
-                return Ok(MemoryOp::Update {
-                    id: candidate.id.clone(),
-                    old_id: fact.id.clone(),
-                });
-            }
-        }
-
-        // No conflict — add as new fact
         Ok(MemoryOp::Add {
             id: candidate.id.clone(),
         })
