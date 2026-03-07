@@ -3,6 +3,27 @@ export interface ApiError {
   message: string;
 }
 
+// ── Status Workflows ──────────────────────────────────
+
+export type StatusGroup = "not_started" | "active" | "done" | "stuck";
+
+export interface StatusLabel {
+  id: string;
+  workflowId: string;
+  name: string;
+  color: string;
+  statusGroup: StatusGroup;
+  position: number;
+}
+
+export interface StatusWorkflow {
+  id: string;
+  name: string;
+  isTemplate: boolean;
+  isGlobalDefault: boolean;
+  labels: StatusLabel[];
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -18,6 +39,8 @@ export interface Task {
   parentId: string | null;
   subtaskCount: number;
   subtaskCompletedCount: number;
+  statusLabelId: string | null;
+  statusLabel: StatusLabel | null;
 }
 
 export interface TodayTask {
@@ -39,6 +62,7 @@ export interface Project {
   taskCount: number;
   completedCount: number;
   objectiveIds?: string[];
+  workflowId?: string;
 }
 
 export interface Objective {
