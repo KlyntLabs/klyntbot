@@ -306,6 +306,18 @@ fn main() {
             commands::cognitive::coaching_reset_dismissals,
             commands::cognitive::coaching_clear_signals,
             commands::cognitive::cognitive_inject_event,
+            // Session Tracker
+            commands::session_tracker::get_tracked_sessions,
+            commands::session_tracker::get_session_messages,
+            commands::session_tracker::sync_sessions,
+            commands::session_tracker::pin_session_message,
+            commands::session_tracker::unpin_session_message,
+            commands::session_tracker::get_pinned_messages,
+            commands::session_tracker::send_to_claude_code,
+            commands::session_tracker::create_brainstorm,
+            commands::session_tracker::list_brainstorms,
+            commands::session_tracker::get_brainstorm_messages,
+            commands::session_tracker::get_session_context,
             // Status
             commands::status::agent_status,
             // Window

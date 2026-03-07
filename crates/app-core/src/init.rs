@@ -6,6 +6,7 @@ use channels::ChannelManager;
 use cognitive::situation::UserSituation;
 use feature_coaching::{FeedbackTracker, InterventionRouter, PatternDetector, SignalAccumulator};
 use feature_notes::repo::NoteRepo;
+use feature_session_tracker::repos::SessionTrackerRepos;
 use feature_productivity::auto_focus::AutoFocusSession;
 use feature_productivity::repos::ProductivityRepos;
 use feature_productivity::tracker::categorizer::Categorizer;
@@ -71,6 +72,16 @@ impl AppCore {
         .await
         .map_err(|e| format!("notes migration failed: {e}"))?;
         let note_repo = NoteRepo::new(notes_pool);
+
+        // Run session tracker migrations.
+        let st_pool = storage_pool.inner().clone();
+        StoragePool::run_feature_migrations(
+            &st_pool,
+            &feature_session_tracker::SessionTrackerFeature::migrations_static(),
+        )
+        .await
+        .map_err(|e| format!("session tracker migration failed: {e}"))?;
+        let session_tracker_repos = SessionTrackerRepos::new(st_pool);
 
         // 3. Create LLM provider (graceful — falls back to noop for setup wizard)
         let (provider, resolved_model) = match providers::create_provider(&config) {
@@ -319,6 +330,7 @@ impl AppCore {
             feedback_tracker: Some(feedback_tracker),
             user_situation: Some(user_situation),
             coaching_service: Some(Arc::new(Mutex::new(coaching_service))),
+            session_tracker_repos,
             has_cognitive_provider: cognitive_provider.is_some(),
         };
 

@@ -9,6 +9,7 @@ use desktop_shared::errors::ApiError;
 use desktop_shared::types::EntityKind;
 use feature_coaching::{FeedbackTracker, InterventionRouter, PatternDetector, SignalAccumulator};
 use feature_notes::repo::NoteRepo;
+use feature_session_tracker::repos::SessionTrackerRepos;
 use feature_productivity::repos::ProductivityRepos;
 use feature_productivity::{DailyAggregator, FocusManager, NudgeService, ProductivityEngine};
 use scheduling::CronService;
@@ -64,6 +65,8 @@ pub struct AppCore {
     pub feedback_tracker: Option<Arc<Mutex<FeedbackTracker>>>,
     pub user_situation: Option<Arc<Mutex<UserSituation>>>,
     pub coaching_service: Option<Arc<Mutex<feature_coaching::CoachingService>>>,
+    /// Session tracker repos (always available).
+    pub session_tracker_repos: SessionTrackerRepos,
     /// Whether a cognitive LLM provider is active (affects component status reporting).
     pub has_cognitive_provider: bool,
 }

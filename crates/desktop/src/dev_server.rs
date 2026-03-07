@@ -1098,6 +1098,98 @@ async fn dispatch(
             .await),
         "coaching_clear_signals" => r(core.coaching_clear_signals().await),
 
+        // ── Session Tracker ──────────────────────────────────
+        "get_tracked_sessions" => r(core.get_tracked_sessions().await),
+        "get_session_messages" => {
+            let session_id = match get_str(&body, "session_id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            r(core.get_session_messages(&session_id, get(&body, "limit")).await)
+        }
+        "sync_sessions" => r(core.sync_sessions().await),
+        "pin_session_message" => {
+            let session_id = match get_str(&body, "session_id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let message_uuid = match get_str(&body, "message_uuid") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let message_content = match get_str(&body, "message_content") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let message_role = match get_str(&body, "message_role") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            r(core
+                .pin_session_message(session_id, message_uuid, message_content, message_role)
+                .await)
+        }
+        "unpin_session_message" => {
+            let pin_id: i64 = match require(&body, "pin_id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            r(core.unpin_session_message(pin_id).await)
+        }
+        "get_pinned_messages" => {
+            let session_id = match get_str(&body, "session_id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            r(core.get_pinned_messages(&session_id).await)
+        }
+        "send_to_claude_code" => {
+            let session_id = match get_str(&body, "session_id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let content = match get_str(&body, "content") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            r(core.send_to_claude_code(&session_id, &content).await)
+        }
+        "create_brainstorm" => {
+            let session_id = match get_str(&body, "session_id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let mode: feature_session_tracker::types::BrainstormMode =
+                match require(&body, "mode") {
+                    Ok(v) => v,
+                    Err(e) => return err(e),
+                };
+            r(core
+                .create_brainstorm(session_id, mode, get(&body, "model_key"), get(&body, "agent_profile"), get(&body, "title"))
+                .await)
+        }
+        "list_brainstorms" => {
+            let session_id = match get_str(&body, "session_id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            r(core.list_brainstorms(&session_id).await)
+        }
+        "get_brainstorm_messages" => {
+            let conversation_id = match get_str(&body, "conversation_id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            r(core.get_brainstorm_messages(&conversation_id).await)
+        }
+        "get_session_context" => {
+            let session_id = match get_str(&body, "session_id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            r(core.get_session_context(&session_id).await)
+        }
+
         // ── Unsupported ───────────────────────────────────────
         _ => err(ApiError::new(
             "NOT_FOUND",

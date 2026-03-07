@@ -11,6 +11,7 @@ pub mod notes;
 pub mod objectives;
 pub mod productivity;
 pub mod projects;
+pub mod session_tracker;
 pub mod settings;
 pub mod status;
 pub mod tasks;
