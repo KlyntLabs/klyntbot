@@ -33,10 +33,7 @@ pub enum PipelineEvent {
         facts_extracted: usize,
     },
     /// A consolidation operation was performed.
-    Consolidation {
-        operation: String,
-        fact: String,
-    },
+    Consolidation { operation: String, fact: String },
 }
 
 /// Minimum occurrences of an accumulated event type before promoting to extraction.

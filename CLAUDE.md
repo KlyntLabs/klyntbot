@@ -32,27 +32,26 @@ cd desktop-ui && bun run lint:fix       # Biome 2.0 auto-fix (lint + format + im
 ## Desktop App (Tauri 2)
 
 ```bash
-cargo tauri dev                    # Full desktop app (auto-starts Vite)
-cargo run -p dev-api               # Lightweight dev API on :3456 (no Tauri needed)
+cargo tauri dev                    # Full desktop app (auto-starts Vite + dev HTTP server on :3456)
 ```
 
-Browser-only dev: run `cargo run -p dev-api` + `cd desktop-ui && bun run dev`, open `localhost:1420`. Tauri config: `crates/desktop/tauri.conf.json`. Shared IPC types: `desktop-shared` crate.
+Browser-only dev: run `cargo run -p dev-api` + `cd desktop-ui && bun run dev` in two terminals, open `localhost:1420`. In debug builds, `cargo tauri dev` also starts an embedded HTTP server on `:3456`. Business logic lives in the `app-core` crate; `desktop` is a thin Tauri adapter. Tauri config: `crates/desktop/tauri.conf.json`. Shared IPC types: `desktop-shared` crate.
 
 ## Architecture
 
 Rust personal AI agent — single binary connecting 6+ chat platforms to LLMs with task/project management and persistent memory. All state in SQLite + LanceDB.
 
-### Workspace (23 crates, 9 layers)
+### Workspace (27 crates, 9 layers)
 
 ```
 L0: common                — KlyntbotError, MessageRole, ChannelName, ChatId, SessionKey
 L1: config, bus, tools-core, tools-core-macros — Config (camelCase JSON), message bus, Tool/FeaturePackage traits, derive macros
 L2: storage, domain       — SqlitePool, migrations, *Repo structs, OKR+PARA domain types
 L3: providers, session, scheduling, context_engine — LLM clients, session persistence, cron, token budgets
-L4: tools, feature-todo, feature-finance, feature-productivity, plugin-runtime — 20+ tools, feature packages, WASM plugins
-L5: channels, agent       — Platform integrations (Telegram/Discord/WhatsApp/Slack/Email/QQ), agent runtime, learning system
+L4: tools, feature-todo, feature-finance, feature-notes, feature-productivity, feature-coaching, plugin-runtime — 20+ tools, feature packages, WASM plugins
+L5: channels, agent, cognitive — Platform integrations (Telegram/Discord/WhatsApp/Slack/Email/QQ), agent runtime, cognitive memory system
 L6: cli, mcp              — CLI (serve/init/status/plugin), MCP server
-L7: desktop-shared, desktop, dev-api — Tauri desktop app, dev API server
+L7: app-core, desktop-shared, desktop — Application core (shared handlers), Tauri desktop app
 L8: klyntbot              — Re-export facade + binary entry point
 ```
 
@@ -64,6 +63,7 @@ Dependencies flow strictly upward. `plugin-sdk` and `tests/fixtures/hello_plugin
 
 ### Key patterns
 
+- **App-core + thin adapters:** `app-core` crate holds all shared business logic (handlers). Desktop `commands/*.rs` files are thin Tauri adapters that delegate to `AppCore` methods. Mutations use `emit_updates(&app, &updates)` for UI events. Dev server (`dev_server.rs`) delegates identically but discards entity updates.
 - **Derive-based tools:** `#[derive(Tool)]` + `#[derive(ToolParams)]` from `tools-core-macros`. Multi-action: `#[tool_actions]` + `#[derive(ActionParams)]`. See `crates/tools/src/filesystem.rs`.
 - **Feature packages:** `feature-*` crates implement `FeaturePackage` (tools + migrations + config + health).
 - **Dependency inversion:** Handler traits (`SpawnHandler`, `CronHandler`, etc.) defined in lower layers, implemented in `agent`. Injected as `Arc<dyn Trait>`.
@@ -93,3 +93,4 @@ Five built-in agents in `agents/`: general, task, finance, automation, communica
 - **Config changes require restart** of `klyntbot serve`.
 - **Dependency inversion** — new tools needing agent context must inject via `Arc<dyn Trait>` to avoid circular deps.
 - **`email` feature** (on by default) gates IMAP/SMTP deps in `channels` crate.
+- **`tauri.conf.json` uses `npm` in `beforeDevCommand`** but project requires `bun`. `cargo tauri dev` may fail with ENOENT. Workaround: start Vite manually (`cd desktop-ui && bun run dev`) then run `cargo tauri dev`, or use browser-only dev mode.

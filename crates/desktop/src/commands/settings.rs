@@ -1,6 +1,5 @@
 use desktop_shared::commands::{
-    McpAddServerParams, McpConfigResponse, McpRemoveParams, McpToggleParams,
-    McpUpdateServerParams,
+    McpAddServerParams, McpConfigResponse, McpRemoveParams, McpToggleParams, McpUpdateServerParams,
 };
 use desktop_shared::errors::ApiError;
 use std::sync::Arc;
@@ -9,9 +8,7 @@ use tauri::State;
 use crate::app_core::AppCore;
 
 #[tauri::command]
-pub async fn mcp_get_config(
-    state: State<'_, Arc<AppCore>>,
-) -> Result<McpConfigResponse, ApiError> {
+pub async fn mcp_get_config(state: State<'_, Arc<AppCore>>) -> Result<McpConfigResponse, ApiError> {
     state.mcp_get_config().await
 }
 

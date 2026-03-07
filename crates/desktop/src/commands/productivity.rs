@@ -109,7 +109,9 @@ pub async fn productivity_pomodoro_start(
     work_mins: Option<i64>,
     break_mins: Option<i64>,
 ) -> Result<FocusSessionResponse, ApiError> {
-    state.productivity_pomodoro_start(work_mins, break_mins).await
+    state
+        .productivity_pomodoro_start(work_mins, break_mins)
+        .await
 }
 
 #[tauri::command]

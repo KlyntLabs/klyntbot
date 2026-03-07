@@ -18,10 +18,6 @@ use desktop_shared::events::{EntityUpdatedPayload, ENTITY_UPDATED};
 use desktop_shared::types::EntityKind;
 use tauri::Emitter;
 
-pub(crate) use ::app_core::errors::{
-    map_cognitive_err, map_storage_err, parse_date, parse_date_or_err,
-};
-
 pub fn emit_updates(app: &tauri::AppHandle, updates: &[::app_core::EntityUpdate]) {
     for u in updates {
         emit_entity_updated(app, u.kind.clone(), &u.id);

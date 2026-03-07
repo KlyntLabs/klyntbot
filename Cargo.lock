@@ -2950,39 +2950,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dev-api"
-version = "0.1.0"
-dependencies = [
- "agent",
- "axum",
- "base64 0.22.1",
- "bus",
- "chrono",
- "cognitive",
- "common",
- "config",
- "context_engine",
- "dashmap",
- "desktop-shared",
- "feature-coaching",
- "feature-notes",
- "feature-productivity",
- "futures-util",
- "providers",
- "scheduling",
- "serde",
- "serde_json",
- "storage",
- "tokio",
- "tokio-stream",
- "tokio-util",
- "tower-http",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
 name = "difflib"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -27,7 +27,6 @@ members = [
     "crates/feature-productivity",
     "crates/cognitive",
     "crates/feature-coaching",
-    "crates/dev-api",
     "crates/app-core",
 ]
 
