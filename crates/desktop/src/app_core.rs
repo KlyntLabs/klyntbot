@@ -523,39 +523,39 @@ impl AppCore {
     }
 
     pub fn signal_accumulator(&self) -> Result<&Arc<Mutex<SignalAccumulator>>, ApiError> {
-        self.signal_accumulator.as_ref().ok_or_else(|| {
-            ApiError::new("FEATURE_DISABLED", "coaching engine is not available")
-        })
+        self.signal_accumulator
+            .as_ref()
+            .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "coaching engine is not available"))
     }
 
     pub fn pattern_detector(&self) -> Result<&Arc<Mutex<PatternDetector>>, ApiError> {
-        self.pattern_detector.as_ref().ok_or_else(|| {
-            ApiError::new("FEATURE_DISABLED", "coaching engine is not available")
-        })
+        self.pattern_detector
+            .as_ref()
+            .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "coaching engine is not available"))
     }
 
     pub fn intervention_router(&self) -> Result<&Arc<Mutex<InterventionRouter>>, ApiError> {
-        self.intervention_router.as_ref().ok_or_else(|| {
-            ApiError::new("FEATURE_DISABLED", "coaching engine is not available")
-        })
+        self.intervention_router
+            .as_ref()
+            .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "coaching engine is not available"))
     }
 
     pub fn feedback_tracker(&self) -> Result<&Arc<Mutex<FeedbackTracker>>, ApiError> {
-        self.feedback_tracker.as_ref().ok_or_else(|| {
-            ApiError::new("FEATURE_DISABLED", "coaching engine is not available")
-        })
+        self.feedback_tracker
+            .as_ref()
+            .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "coaching engine is not available"))
     }
 
     pub fn user_situation(&self) -> Result<&Arc<Mutex<UserSituation>>, ApiError> {
-        self.user_situation.as_ref().ok_or_else(|| {
-            ApiError::new("FEATURE_DISABLED", "coaching engine is not available")
-        })
+        self.user_situation
+            .as_ref()
+            .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "coaching engine is not available"))
     }
 
     pub fn domain_event_bus(&self) -> Result<&Arc<DomainEventBus>, ApiError> {
-        self.domain_event_bus.as_ref().ok_or_else(|| {
-            ApiError::new("FEATURE_DISABLED", "domain event bus is not available")
-        })
+        self.domain_event_bus
+            .as_ref()
+            .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "domain event bus is not available"))
     }
 
     /// Graceful shutdown.

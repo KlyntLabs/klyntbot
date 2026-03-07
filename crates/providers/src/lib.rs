@@ -196,11 +196,11 @@ pub fn create_cognitive_provider(config: &Config) -> Result<Option<DynProvider>>
         .model
         .as_deref()
         .unwrap_or(&config.agents.defaults.model);
-    let provider_name = config
-        .cognitive
+    let provider_name = config.cognitive.provider.as_deref().or(config
+        .agents
+        .defaults
         .provider
-        .as_deref()
-        .or(config.agents.defaults.provider.as_deref());
+        .as_deref());
 
     // Try explicit provider name first, then model-based lookup
     if let Some(name) = provider_name {

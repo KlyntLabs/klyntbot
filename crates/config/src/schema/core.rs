@@ -7,12 +7,12 @@ use std::path::PathBuf;
 use super::agents::AgentsConfig;
 
 use super::channels::ChannelsConfig;
+use super::cognitive::CognitiveConfig;
 use super::confidence::ConfidenceConfig;
 use super::conversation::ConversationConfig;
 use super::finance::FinanceConfig;
 use super::gateway::GatewayConfig;
 use super::learning::LearningConfig;
-use super::cognitive::CognitiveConfig;
 use super::mcp::McpConfig;
 use super::orchestrator::OrchestratorConfig;
 use super::packs::PacksConfig;

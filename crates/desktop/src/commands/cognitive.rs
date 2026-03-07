@@ -219,11 +219,7 @@ pub async fn cognitive_memory_stats(
 
     let mut rules_count = 0;
     for d in RULE_DOMAINS {
-        rules_count += rule_repo
-            .list_active(d)
-            .await
-            .map(|v| v.len())
-            .unwrap_or(0);
+        rules_count += rule_repo.list_active(d).await.map(|v| v.len()).unwrap_or(0);
     }
 
     Ok(MemoryStatsResponse {
@@ -561,9 +557,7 @@ pub async fn cognitive_rule_create(
         active: true,
     };
 
-    repo.upsert(&rule)
-        .await
-        .map_err(super::map_cognitive_err)?;
+    repo.upsert(&rule).await.map_err(super::map_cognitive_err)?;
 
     Ok(rule_to_response(&rule))
 }
@@ -624,9 +618,7 @@ pub async fn coaching_reset_dismissals(
 }
 
 #[tauri::command]
-pub async fn coaching_clear_signals(
-    state: State<'_, Arc<AppCore>>,
-) -> Result<bool, ApiError> {
+pub async fn coaching_clear_signals(state: State<'_, Arc<AppCore>>) -> Result<bool, ApiError> {
     let mut acc = state.signal_accumulator()?.lock().await;
     *acc = feature_coaching::SignalAccumulator::new();
     Ok(true)

@@ -1,0 +1,346 @@
+/*
+ * Shared prose/content styles — used by both the TipTap notes editor
+ * (.editor-content) and the chat markdown renderer (.prose-content).
+ *
+ * Keeps the visual language consistent across the entire platform.
+ * Editor-only styles (caret, placeholder, vim, entity mentions, wiki links)
+ * remain in editor.css.
+ */
+
+/* ── Base ──────────────────────────────────────────────────────────────── */
+
+.prose-content {
+  color: var(--color-primary);
+  font-size: 0.8125rem; /* 13px — chat-appropriate */
+  line-height: 1.75;
+}
+
+.prose-content > *:first-child {
+  margin-top: 0;
+}
+
+/* ── Headings ──────────────────────────────────────────────────────────── */
+
+.prose-content h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 1.25rem 0 0.5rem;
+  color: var(--color-primary);
+  letter-spacing: -0.025em;
+  padding-bottom: 0.35rem;
+  border-bottom: 2px solid transparent;
+  border-image: linear-gradient(
+      90deg,
+      var(--color-brand) 0%,
+      rgba(167, 139, 250, 0.6) 40%,
+      transparent 80%
+    )
+    1;
+}
+
+.prose-content h2 {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  margin: 1rem 0 0.4rem;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-info) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.prose-content h3 {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  margin: 0.75rem 0 0.35rem;
+  letter-spacing: -0.015em;
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-purple) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.prose-content h4,
+.prose-content h5,
+.prose-content h6 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0.625rem 0 0.25rem;
+  color: var(--color-primary);
+}
+
+/* ── Strong & emphasis ─────────────────────────────────────────────────── */
+
+.prose-content strong {
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.prose-content em {
+  color: var(--color-secondary);
+  font-style: italic;
+}
+
+/* ── Paragraphs ────────────────────────────────────────────────────────── */
+
+.prose-content p {
+  margin: 0.4rem 0;
+}
+
+.prose-content p:last-child {
+  margin-bottom: 0;
+}
+
+/* ── Lists ─────────────────────────────────────────────────────────────── */
+
+.prose-content ul {
+  list-style-type: disc;
+  padding-left: 1.5rem;
+  margin: 0.4rem 0;
+}
+
+.prose-content ol {
+  list-style-type: decimal;
+  padding-left: 1.5rem;
+  margin: 0.4rem 0;
+}
+
+.prose-content li {
+  margin: 0.15rem 0;
+}
+
+.prose-content ul ul {
+  list-style-type: circle;
+}
+
+.prose-content ul ul ul {
+  list-style-type: square;
+}
+
+.prose-content li::marker {
+  color: color-mix(in srgb, var(--brand) 50%, var(--color-muted));
+}
+
+/* ── Blockquote ────────────────────────────────────────────────────────── */
+
+.prose-content blockquote {
+  border-left: 3px solid var(--color-brand);
+  margin: 0.625rem 0;
+  color: var(--color-secondary);
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.06) 0%, rgba(249, 115, 22, 0.02) 100%);
+  border-radius: 0 0.625rem 0.625rem 0;
+  padding: 0.625rem 1rem;
+}
+
+.prose-content blockquote p {
+  margin: 0.15rem 0;
+}
+
+/* ── Inline code ───────────────────────────────────────────────────────── */
+
+.prose-content code {
+  background: color-mix(in srgb, var(--brand) 8%, rgba(255, 255, 255, 0.06));
+  border: 1px solid color-mix(in srgb, var(--brand) 12%, transparent);
+  border-radius: 5px;
+  padding: 0.1rem 0.4rem;
+  font-size: 0.84em;
+  font-family: var(--font-mono, ui-monospace, monospace);
+  color: var(--color-brand-hover);
+}
+
+/* ── Code blocks ───────────────────────────────────────────────────────── */
+
+.prose-content pre {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 0.75rem;
+  padding: 0.875rem 1rem;
+  margin: 0.625rem 0;
+  overflow-x: auto;
+  position: relative;
+}
+
+.prose-content pre::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--brand) 20%, transparent),
+    transparent
+  );
+}
+
+.prose-content pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  border-radius: 0;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--color-secondary);
+}
+
+/* ── Tables ────────────────────────────────────────────────────────────── */
+
+.prose-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.625rem 0;
+  border-radius: 0.625rem;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.prose-content th,
+.prose-content td {
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 0.4rem 0.625rem;
+  text-align: left;
+  font-size: 0.8125rem;
+}
+
+.prose-content th {
+  background: color-mix(in srgb, var(--brand) 6%, rgba(255, 255, 255, 0.03));
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-brand-hover);
+}
+
+.prose-content tr:hover td {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* ── Horizontal rule ───────────────────────────────────────────────────── */
+
+.prose-content hr {
+  border: none;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--brand) 25%, rgba(255, 255, 255, 0.08)) 30%,
+    color-mix(in srgb, var(--brand) 25%, rgba(255, 255, 255, 0.08)) 70%,
+    transparent 100%
+  );
+  margin: 1.25rem 0;
+}
+
+/* ── Links ─────────────────────────────────────────────────────────────── */
+
+.prose-content a {
+  color: var(--color-brand);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--color-brand) 40%, transparent);
+  text-underline-offset: 3px;
+  transition:
+    text-decoration-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.prose-content a:hover {
+  color: var(--color-brand-hover);
+  text-decoration-color: var(--color-brand-hover);
+}
+
+/* ── Strikethrough (GFM) ───────────────────────────────────────────────── */
+
+.prose-content del {
+  color: var(--color-muted);
+  text-decoration-color: var(--color-muted);
+}
+
+/* ── Images ────────────────────────────────────────────────────────────── */
+
+.prose-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.75rem;
+  margin: 0.5rem 0;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* ── Highlight / mark ──────────────────────────────────────────────────── */
+
+.prose-content mark {
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.3) 0%, rgba(251, 146, 60, 0.2) 100%);
+  border-radius: 3px;
+  padding: 1px 4px;
+  color: var(--color-primary);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+/* ── Syntax highlighting tokens (lowlight / highlight.js) ──────────────── */
+
+.prose-content .hljs-comment,
+.prose-content .hljs-quote {
+  color: color-mix(in srgb, var(--color-muted) 80%, transparent);
+  font-style: italic;
+}
+
+.prose-content .hljs-keyword,
+.prose-content .hljs-selector-tag,
+.prose-content .hljs-type {
+  color: var(--color-purple, #c084fc);
+}
+
+.prose-content .hljs-string,
+.prose-content .hljs-addition {
+  color: var(--color-success, #4ade80);
+}
+
+.prose-content .hljs-number,
+.prose-content .hljs-literal,
+.prose-content .hljs-symbol,
+.prose-content .hljs-bullet {
+  color: var(--color-brand, #f97316);
+}
+
+.prose-content .hljs-title,
+.prose-content .hljs-section,
+.prose-content .hljs-built_in {
+  color: var(--color-info, #60a5fa);
+}
+
+.prose-content .hljs-attr,
+.prose-content .hljs-attribute {
+  color: var(--color-brand-hover, #fb923c);
+}
+
+.prose-content .hljs-name,
+.prose-content .hljs-tag {
+  color: var(--color-info, #60a5fa);
+}
+
+.prose-content .hljs-variable,
+.prose-content .hljs-template-variable {
+  color: var(--color-primary);
+}
+
+.prose-content .hljs-regexp,
+.prose-content .hljs-link {
+  color: var(--color-brand, #f97316);
+}
+
+.prose-content .hljs-deletion {
+  color: var(--color-destructive, #f43f5e);
+}
+
+.prose-content .hljs-meta {
+  color: var(--color-muted);
+}
+
+.prose-content .hljs-emphasis {
+  font-style: italic;
+}
+
+.prose-content .hljs-strong {
+  font-weight: 700;
+}

@@ -145,7 +145,13 @@ pub async fn task_get(
     state: State<'_, Arc<AppCore>>,
     id: String,
 ) -> Result<Option<TaskResponse>, ApiError> {
-    match state.repos.actions.get(&id).await.map_err(super::map_storage_err)? {
+    match state
+        .repos
+        .actions
+        .get(&id)
+        .await
+        .map_err(super::map_storage_err)?
+    {
         Some(row) => Ok(Some(row_to_task(&state.repos, &row).await?)),
         None => Ok(None),
     }

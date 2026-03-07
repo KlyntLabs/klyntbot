@@ -176,7 +176,7 @@ pub struct DomainEventPayload {
 #[serde(rename_all = "camelCase")]
 pub struct ComponentStatusResponse {
     pub name: String,
-    pub status: String, // "wired" | "built" | "stub"
+    pub status: String,       // "wired" | "built" | "stub"
     pub handler_type: String, // "heuristic" | "llm" | "n/a"
     pub notes: String,
 }

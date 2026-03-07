@@ -275,7 +275,10 @@ fn ok(v: impl serde::Serialize) -> ApiResult {
         Ok(val) => ApiResult::Ok(val),
         Err(e) => {
             tracing::error!(error = %e, "response serialization failed");
-            ApiResult::Err(ApiError::new("INTERNAL", format!("serialization error: {e}")))
+            ApiResult::Err(ApiError::new(
+                "INTERNAL",
+                format!("serialization error: {e}"),
+            ))
         }
     }
 }
@@ -297,15 +300,14 @@ fn prod_err(e: common::KlyntbotError) -> ApiError {
 }
 
 fn get<T: serde::de::DeserializeOwned>(body: &Value, key: &str) -> Option<T> {
-    body.get(key).and_then(|v| {
-        match serde_json::from_value(v.clone()) {
+    body.get(key)
+        .and_then(|v| match serde_json::from_value(v.clone()) {
             Ok(val) => Some(val),
             Err(e) => {
                 tracing::warn!(field = key, error = %e, "ignoring malformed optional field");
                 None
             }
-        }
-    })
+        })
 }
 
 fn note_row_to_resp(row: &NoteRow, tags: Vec<String>) -> NoteResponse {
@@ -340,10 +342,7 @@ async fn notes_with_tags_batch(
     rows: &[NoteRow],
 ) -> Result<Vec<NoteResponse>, ApiError> {
     let ids: Vec<String> = rows.iter().map(|r| r.id.clone()).collect();
-    let mut tag_map = repo
-        .get_tags_batch(&ids)
-        .await
-        .map_err(storage_err)?;
+    let mut tag_map = repo.get_tags_batch(&ids).await.map_err(storage_err)?;
     Ok(rows
         .iter()
         .map(|row| {
@@ -2366,7 +2365,11 @@ async fn dispatch(
                         .into_iter()
                         .map(|m| (m.entity_type, m.entity_id))
                         .collect();
-                    if let Err(e) = core.note_repo.set_entity_mentions(&updated.id, &mention_tuples).await {
+                    if let Err(e) = core
+                        .note_repo
+                        .set_entity_mentions(&updated.id, &mention_tuples)
+                        .await
+                    {
                         return err(storage_err(e));
                     }
 
@@ -2422,10 +2425,8 @@ async fn dispatch(
             };
             match core.note_repo.list_versions(&note_id).await {
                 Ok(rows) => {
-                    let results: Vec<NoteVersionResponse> = rows
-                        .iter()
-                        .map(version_row_to_resp)
-                        .collect();
+                    let results: Vec<NoteVersionResponse> =
+                        rows.iter().map(version_row_to_resp).collect();
                     ok(results)
                 }
                 Err(e) => err(storage_err(e)),
@@ -2454,7 +2455,10 @@ async fn dispatch(
                         Err(e) => err(storage_err(e)),
                     }
                 }
-                Ok(None) => err(ApiError::new("NOT_FOUND", format!("note '{note_id}' not found"))),
+                Ok(None) => err(ApiError::new(
+                    "NOT_FOUND",
+                    format!("note '{note_id}' not found"),
+                )),
                 Err(e) => err(storage_err(e)),
             }
         }
@@ -2481,7 +2485,11 @@ async fn dispatch(
                             return err(storage_err(e));
                         }
                     }
-                    match core.note_repo.update_note(&note_id, None, Some(&version.body), None, None, None).await {
+                    match core
+                        .note_repo
+                        .update_note(&note_id, None, Some(&version.body), None, None, None)
+                        .await
+                    {
                         Ok(updated) => {
                             let tags = match core.note_repo.get_tags(&note_id).await {
                                 Ok(t) => t,
@@ -2492,7 +2500,10 @@ async fn dispatch(
                         Err(e) => err(storage_err(e)),
                     }
                 }
-                Ok(None) => err(ApiError::new("NOT_FOUND", format!("version '{version_id}' not found"))),
+                Ok(None) => err(ApiError::new(
+                    "NOT_FOUND",
+                    format!("version '{version_id}' not found"),
+                )),
                 Err(e) => err(storage_err(e)),
             }
         }
@@ -2505,7 +2516,11 @@ async fn dispatch(
                 Ok(v) => v,
                 Err(e) => return err(e),
             };
-            match core.note_repo.list_notes_by_entity(&entity_type, &entity_id).await {
+            match core
+                .note_repo
+                .list_notes_by_entity(&entity_type, &entity_id)
+                .await
+            {
                 Ok(rows) => match notes_with_tags_batch(&core.note_repo, &rows).await {
                     Ok(results) => ok(results),
                     Err(e) => err(e),
@@ -2524,14 +2539,22 @@ async fn dispatch(
             };
             let attachments_dir = core.data_dir.join("attachments");
             if let Err(e) = tokio::fs::create_dir_all(&attachments_dir).await {
-                return err(ApiError::new("IO_ERROR", format!("failed to create dir: {e}")));
+                return err(ApiError::new(
+                    "IO_ERROR",
+                    format!("failed to create dir: {e}"),
+                ));
             }
-            const ALLOWED_EXTENSIONS: &[&str] = &["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp"];
+            const ALLOWED_EXTENSIONS: &[&str] =
+                &["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp"];
             let ext = std::path::Path::new(&filename)
                 .extension()
                 .and_then(|e| e.to_str())
                 .unwrap_or("png");
-            let ext = if ALLOWED_EXTENSIONS.contains(&ext) { ext } else { "png" };
+            let ext = if ALLOWED_EXTENSIONS.contains(&ext) {
+                ext
+            } else {
+                "png"
+            };
             let id = uuid::Uuid::new_v4();
             let file_name = format!("{id}.{ext}");
             let file_path = attachments_dir.join(&file_name);
@@ -2539,7 +2562,12 @@ async fn dispatch(
             use base64::Engine;
             let bytes = match base64::engine::general_purpose::STANDARD.decode(&data_str) {
                 Ok(b) => b,
-                Err(e) => return err(ApiError::new("DECODE_ERROR", format!("invalid base64: {e}"))),
+                Err(e) => {
+                    return err(ApiError::new(
+                        "DECODE_ERROR",
+                        format!("invalid base64: {e}"),
+                    ))
+                }
             };
             if let Err(e) = tokio::fs::write(&file_path, &bytes).await {
                 return err(ApiError::new("IO_ERROR", format!("failed to write: {e}")));
@@ -2568,7 +2596,10 @@ async fn dispatch(
                     Err(e) => return err(ApiError::new("VALIDATION", e.to_string())),
                 };
             if params.title.trim().is_empty() {
-                return err(ApiError::new("VALIDATION", "notebook title must not be empty"));
+                return err(ApiError::new(
+                    "VALIDATION",
+                    "notebook title must not be empty",
+                ));
             }
             let id = uuid::Uuid::new_v4().to_string();
             let now = utc_now_str();
@@ -2594,7 +2625,11 @@ async fn dispatch(
                 };
             // Check for cycles when changing parent
             if let Some(Some(new_parent_id)) = &params.parent_id {
-                match core.note_repo.would_create_cycle(&params.id, new_parent_id).await {
+                match core
+                    .note_repo
+                    .would_create_cycle(&params.id, new_parent_id)
+                    .await
+                {
                     Ok(true) => {
                         return err(ApiError::new(
                             "VALIDATION",
@@ -2609,7 +2644,12 @@ async fn dispatch(
             let parent_id_ref = params.parent_id.as_ref().map(|o| o.as_deref());
             match core
                 .note_repo
-                .update_notebook(id, params.title.as_deref(), params.icon.as_deref(), parent_id_ref)
+                .update_notebook(
+                    id,
+                    params.title.as_deref(),
+                    params.icon.as_deref(),
+                    parent_id_ref,
+                )
                 .await
             {
                 Ok(updated) => {
@@ -2639,7 +2679,8 @@ async fn dispatch(
             let pool = core.repos.pool();
             let fact_repo = cognitive::repos::SemanticFactRepo::new(pool.clone());
             let model = cognitive::repos::load_user_model(&fact_repo).await;
-            let preview = |f: &cognitive::types::SemanticFact| format!("{} = {}", f.predicate, f.object);
+            let preview =
+                |f: &cognitive::types::SemanticFact| format!("{} = {}", f.predicate, f.object);
             let resp = UserModelSummaryResponse {
                 identity_count: model.identity.len(),
                 energy_count: model.energy.len(),
@@ -2672,28 +2713,46 @@ async fn dispatch(
                 }
             }
             let now = chrono::Utc::now();
-            let resp: Vec<SemanticFactResponse> = all.into_iter().map(|f| {
-                let last_ts = f.last_accessed.as_deref()
-                    .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
-                    .map(|dt| dt.with_timezone(&chrono::Utc))
-                    .unwrap_or_else(|| {
-                        chrono::DateTime::parse_from_rfc3339(&f.recorded_at)
-                            .map(|dt| dt.with_timezone(&chrono::Utc))
-                            .unwrap_or(now)
-                    });
-                let elapsed_days = now.signed_duration_since(last_ts).num_seconds() as f64 / 86400.0;
-                let retrievability = cognitive::decay::retrievability(elapsed_days, f.stability);
-                let status = if f.superseded_at.is_some() { "superseded".into() } else { "active".into() };
-                SemanticFactResponse {
-                    id: f.id, domain: f.domain, subject: f.subject,
-                    predicate: f.predicate, object: f.object,
-                    confidence: f.confidence, source: f.source,
-                    valid_from: f.valid_from, valid_until: f.valid_until,
-                    stability: f.stability, retrievability,
-                    last_accessed: f.last_accessed, access_count: f.access_count,
-                    status,
-                }
-            }).collect();
+            let resp: Vec<SemanticFactResponse> = all
+                .into_iter()
+                .map(|f| {
+                    let last_ts = f
+                        .last_accessed
+                        .as_deref()
+                        .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+                        .map(|dt| dt.with_timezone(&chrono::Utc))
+                        .unwrap_or_else(|| {
+                            chrono::DateTime::parse_from_rfc3339(&f.recorded_at)
+                                .map(|dt| dt.with_timezone(&chrono::Utc))
+                                .unwrap_or(now)
+                        });
+                    let elapsed_days =
+                        now.signed_duration_since(last_ts).num_seconds() as f64 / 86400.0;
+                    let retrievability =
+                        cognitive::decay::retrievability(elapsed_days, f.stability);
+                    let status = if f.superseded_at.is_some() {
+                        "superseded".into()
+                    } else {
+                        "active".into()
+                    };
+                    SemanticFactResponse {
+                        id: f.id,
+                        domain: f.domain,
+                        subject: f.subject,
+                        predicate: f.predicate,
+                        object: f.object,
+                        confidence: f.confidence,
+                        source: f.source,
+                        valid_from: f.valid_from,
+                        valid_until: f.valid_until,
+                        stability: f.stability,
+                        retrievability,
+                        last_accessed: f.last_accessed,
+                        access_count: f.access_count,
+                        status,
+                    }
+                })
+                .collect();
             ok(resp)
         }
         "cognitive_episodic_list" => {
@@ -2702,7 +2761,9 @@ async fn dispatch(
             let domain: Option<String> = get(&body, "domain");
             let limit: i64 = get(&body, "limit").unwrap_or(50);
             let memories = match domain.as_deref() {
-                Some(d) => repo.list_by_domain(d, limit).await
+                Some(d) => repo
+                    .list_by_domain(d, limit)
+                    .await
                     .map_err(|e| ApiError::new("STORAGE_ERROR", e.to_string())),
                 None => {
                     let mut all = Vec::new();
@@ -2717,17 +2778,20 @@ async fn dispatch(
             };
             match memories {
                 Ok(mems) => {
-                    let resp: Vec<EpisodicMemoryResponse> = mems.into_iter().map(|m| EpisodicMemoryResponse {
-                        id: m.id,
-                        domain: m.domain,
-                        content: m.content,
-                        summary: m.summary,
-                        importance: m.importance,
-                        occurred_at: m.occurred_at,
-                        recorded_at: m.recorded_at,
-                        stability: m.stability,
-                        access_count: m.access_count,
-                    }).collect();
+                    let resp: Vec<EpisodicMemoryResponse> = mems
+                        .into_iter()
+                        .map(|m| EpisodicMemoryResponse {
+                            id: m.id,
+                            domain: m.domain,
+                            content: m.content,
+                            summary: m.summary,
+                            importance: m.importance,
+                            occurred_at: m.occurred_at,
+                            recorded_at: m.recorded_at,
+                            stability: m.stability,
+                            access_count: m.access_count,
+                        })
+                        .collect();
                     ok(resp)
                 }
                 Err(e) => err(e),
@@ -2748,13 +2812,20 @@ async fn dispatch(
                     Err(e) => return err(ApiError::new("STORAGE_ERROR", e.to_string())),
                 }
             }
-            let resp: Vec<ProceduralRuleResponse> = all.into_iter().map(|r| ProceduralRuleResponse {
-                id: r.id, domain: r.domain,
-                rule_text: r.rule_text, confidence: r.confidence,
-                source: r.source, signal_count: r.signal_count,
-                active: r.active, created_at: r.created_at,
-                updated_at: r.updated_at,
-            }).collect();
+            let resp: Vec<ProceduralRuleResponse> = all
+                .into_iter()
+                .map(|r| ProceduralRuleResponse {
+                    id: r.id,
+                    domain: r.domain,
+                    rule_text: r.rule_text,
+                    confidence: r.confidence,
+                    source: r.source,
+                    signal_count: r.signal_count,
+                    active: r.active,
+                    created_at: r.created_at,
+                    updated_at: r.updated_at,
+                })
+                .collect();
             ok(resp)
         }
         "cognitive_memory_stats" => {
@@ -2769,7 +2840,11 @@ async fn dispatch(
             let archived = 0u64;
             let mut episodic_count = 0;
             for d in cognitive::repos::USER_MODEL_DOMAINS {
-                episodic_count += episodic_repo.list_by_domain(d, 10000).await.map(|v| v.len()).unwrap_or(0);
+                episodic_count += episodic_repo
+                    .list_by_domain(d, 10000)
+                    .await
+                    .map(|v| v.len())
+                    .unwrap_or(0);
             }
             let mut rules_count = 0;
             for d in cognitive::repos::RULE_DOMAINS {
@@ -2790,24 +2865,114 @@ async fn dispatch(
             let active_facts = model.active_fact_count();
 
             let components = vec![
-                ComponentStatusResponse { name: "DomainEvent Bus".into(), status: "wired".into(), handler_type: "n/a".into(), notes: "tokio::broadcast, 256 capacity".into() },
-                ComponentStatusResponse { name: "Salience Filter".into(), status: "wired".into(), handler_type: "heuristic".into(), notes: "Rule-based classification".into() },
-                ComponentStatusResponse { name: "Extraction".into(), status: "wired".into(), handler_type: "heuristic".into(), notes: "HeuristicExtractionHandler in agent crate".into() },
-                ComponentStatusResponse { name: "Consolidation".into(), status: "wired".into(), handler_type: "heuristic".into(), notes: "HeuristicConsolidationHandler in agent crate".into() },
-                ComponentStatusResponse { name: "FSRS Decay".into(), status: "wired".into(), handler_type: "n/a".into(), notes: "R = exp(ln(0.9) * elapsed / stability)".into() },
-                ComponentStatusResponse { name: "Compaction".into(), status: "wired".into(), handler_type: "n/a".into(), notes: "Archive superseded, prune episodic, size budget".into() },
-                ComponentStatusResponse { name: "Reflection".into(), status: "built".into(), handler_type: "heuristic".into(), notes: "ReflectionHandler trait defined, needs scheduling".into() },
-                ComponentStatusResponse { name: "Context Source".into(), status: "wired".into(), handler_type: "n/a".into(), notes: "CognitiveContextSource at priority 60, 60s cache".into() },
-                ComponentStatusResponse { name: "UserSituation".into(), status: "wired".into(), handler_type: "n/a".into(), notes: "compute_situation() from SituationInputs".into() },
-                ComponentStatusResponse { name: "Signal Accumulator".into(), status: "wired".into(), handler_type: "n/a".into(), notes: "30min rolling window, 7 trigger conditions".into() },
-                ComponentStatusResponse { name: "Pattern Detector".into(), status: "wired".into(), handler_type: "n/a".into(), notes: "5 pattern types detected".into() },
-                ComponentStatusResponse { name: "Intervention Router".into(), status: "wired".into(), handler_type: "n/a".into(), notes: "Rate limits: 3/hr, 10/day, exponential backoff".into() },
-                ComponentStatusResponse { name: "Feedback Tracker".into(), status: "wired".into(), handler_type: "n/a".into(), notes: "3 channels: explicit, behavioral, outcome".into() },
-                ComponentStatusResponse { name: "LLM Extraction".into(), status: "stub".into(), handler_type: "llm".into(), notes: "Trait defined, not yet implemented".into() },
-                ComponentStatusResponse { name: "LLM Consolidation".into(), status: "stub".into(), handler_type: "llm".into(), notes: "Trait defined, not yet implemented".into() },
-                ComponentStatusResponse { name: "LLM Reflection".into(), status: "stub".into(), handler_type: "llm".into(), notes: "ReflectionHandler trait, not yet implemented".into() },
-                ComponentStatusResponse { name: "LLM Coaching Reasoner".into(), status: "stub".into(), handler_type: "llm".into(), notes: "CoachingReasonerHandler trait, heuristic fallback exists".into() },
-                ComponentStatusResponse { name: "Background Consolidation".into(), status: "wired".into(), handler_type: "n/a".into(), notes: "DomainEventBus subscriber, accumulation buffers".into() },
+                ComponentStatusResponse {
+                    name: "DomainEvent Bus".into(),
+                    status: "wired".into(),
+                    handler_type: "n/a".into(),
+                    notes: "tokio::broadcast, 256 capacity".into(),
+                },
+                ComponentStatusResponse {
+                    name: "Salience Filter".into(),
+                    status: "wired".into(),
+                    handler_type: "heuristic".into(),
+                    notes: "Rule-based classification".into(),
+                },
+                ComponentStatusResponse {
+                    name: "Extraction".into(),
+                    status: "wired".into(),
+                    handler_type: "heuristic".into(),
+                    notes: "HeuristicExtractionHandler in agent crate".into(),
+                },
+                ComponentStatusResponse {
+                    name: "Consolidation".into(),
+                    status: "wired".into(),
+                    handler_type: "heuristic".into(),
+                    notes: "HeuristicConsolidationHandler in agent crate".into(),
+                },
+                ComponentStatusResponse {
+                    name: "FSRS Decay".into(),
+                    status: "wired".into(),
+                    handler_type: "n/a".into(),
+                    notes: "R = exp(ln(0.9) * elapsed / stability)".into(),
+                },
+                ComponentStatusResponse {
+                    name: "Compaction".into(),
+                    status: "wired".into(),
+                    handler_type: "n/a".into(),
+                    notes: "Archive superseded, prune episodic, size budget".into(),
+                },
+                ComponentStatusResponse {
+                    name: "Reflection".into(),
+                    status: "built".into(),
+                    handler_type: "heuristic".into(),
+                    notes: "ReflectionHandler trait defined, needs scheduling".into(),
+                },
+                ComponentStatusResponse {
+                    name: "Context Source".into(),
+                    status: "wired".into(),
+                    handler_type: "n/a".into(),
+                    notes: "CognitiveContextSource at priority 60, 60s cache".into(),
+                },
+                ComponentStatusResponse {
+                    name: "UserSituation".into(),
+                    status: "wired".into(),
+                    handler_type: "n/a".into(),
+                    notes: "compute_situation() from SituationInputs".into(),
+                },
+                ComponentStatusResponse {
+                    name: "Signal Accumulator".into(),
+                    status: "wired".into(),
+                    handler_type: "n/a".into(),
+                    notes: "30min rolling window, 7 trigger conditions".into(),
+                },
+                ComponentStatusResponse {
+                    name: "Pattern Detector".into(),
+                    status: "wired".into(),
+                    handler_type: "n/a".into(),
+                    notes: "5 pattern types detected".into(),
+                },
+                ComponentStatusResponse {
+                    name: "Intervention Router".into(),
+                    status: "wired".into(),
+                    handler_type: "n/a".into(),
+                    notes: "Rate limits: 3/hr, 10/day, exponential backoff".into(),
+                },
+                ComponentStatusResponse {
+                    name: "Feedback Tracker".into(),
+                    status: "wired".into(),
+                    handler_type: "n/a".into(),
+                    notes: "3 channels: explicit, behavioral, outcome".into(),
+                },
+                ComponentStatusResponse {
+                    name: "LLM Extraction".into(),
+                    status: "stub".into(),
+                    handler_type: "llm".into(),
+                    notes: "Trait defined, not yet implemented".into(),
+                },
+                ComponentStatusResponse {
+                    name: "LLM Consolidation".into(),
+                    status: "stub".into(),
+                    handler_type: "llm".into(),
+                    notes: "Trait defined, not yet implemented".into(),
+                },
+                ComponentStatusResponse {
+                    name: "LLM Reflection".into(),
+                    status: "stub".into(),
+                    handler_type: "llm".into(),
+                    notes: "ReflectionHandler trait, not yet implemented".into(),
+                },
+                ComponentStatusResponse {
+                    name: "LLM Coaching Reasoner".into(),
+                    status: "stub".into(),
+                    handler_type: "llm".into(),
+                    notes: "CoachingReasonerHandler trait, heuristic fallback exists".into(),
+                },
+                ComponentStatusResponse {
+                    name: "Background Consolidation".into(),
+                    status: "wired".into(),
+                    handler_type: "n/a".into(),
+                    notes: "DomainEventBus subscriber, accumulation buffers".into(),
+                },
             ];
 
             ok(SystemStatusResponse {
@@ -2821,27 +2986,31 @@ async fn dispatch(
                 components,
             })
         }
-        "coaching_situation" => {
-            ok(UserSituationResponse {
-                energy_level: 0.0, focus_state: 0.0,
-                deadline_pressure: 0.0, distraction_risk: 0.0,
-                coaching_receptivity: 0.0, task_avoidance_detected: false,
-                hours_active_today: 0.0, mins_since_break: 0.0,
-                hour_of_day: Local::now().hour(),
-                recent_context_switches: 0,
-            })
-        }
-        "coaching_signals" => {
-            ok(SignalWindowResponse { window_size: 0, signals: vec![], triggers: vec![] })
-        }
-        "coaching_patterns" => { ok(Vec::<DetectedPatternResponse>::new()) }
-        "coaching_feedback_stats" => { ok(Vec::<StrategyFeedbackResponse>::new()) }
-        "coaching_router_status" => {
-            ok(RouterStatusResponse {
-                hourly_count: 0, hourly_limit: 3,
-                daily_count: 0, daily_limit: 10,
-            })
-        }
+        "coaching_situation" => ok(UserSituationResponse {
+            energy_level: 0.0,
+            focus_state: 0.0,
+            deadline_pressure: 0.0,
+            distraction_risk: 0.0,
+            coaching_receptivity: 0.0,
+            task_avoidance_detected: false,
+            hours_active_today: 0.0,
+            mins_since_break: 0.0,
+            hour_of_day: Local::now().hour(),
+            recent_context_switches: 0,
+        }),
+        "coaching_signals" => ok(SignalWindowResponse {
+            window_size: 0,
+            signals: vec![],
+            triggers: vec![],
+        }),
+        "coaching_patterns" => ok(Vec::<DetectedPatternResponse>::new()),
+        "coaching_feedback_stats" => ok(Vec::<StrategyFeedbackResponse>::new()),
+        "coaching_router_status" => ok(RouterStatusResponse {
+            hourly_count: 0,
+            hourly_limit: 3,
+            daily_count: 0,
+            daily_limit: 10,
+        }),
         "cognitive_fact_create" => {
             let pool = core.repos.pool();
             let fact_repo = cognitive::repos::SemanticFactRepo::new(pool.clone());
@@ -2872,12 +3041,20 @@ async fn dispatch(
                     let elapsed_days = 0.0_f64;
                     let r = cognitive::decay::retrievability(elapsed_days, fact.stability);
                     ok(SemanticFactResponse {
-                        id: fact.id, domain: fact.domain, subject: fact.subject,
-                        predicate: fact.predicate, object: fact.object,
-                        confidence: fact.confidence, source: fact.source,
-                        valid_from: fact.valid_from, valid_until: None,
-                        stability: fact.stability, retrievability: r,
-                        last_accessed: None, access_count: 0, status: "active".into(),
+                        id: fact.id,
+                        domain: fact.domain,
+                        subject: fact.subject,
+                        predicate: fact.predicate,
+                        object: fact.object,
+                        confidence: fact.confidence,
+                        source: fact.source,
+                        valid_from: fact.valid_from,
+                        valid_until: None,
+                        stability: fact.stability,
+                        retrievability: r,
+                        last_accessed: None,
+                        access_count: 0,
+                        status: "active".into(),
                     })
                 }
                 Err(e) => err(ApiError::new("STORAGE_ERROR", e.to_string())),
@@ -2886,15 +3063,22 @@ async fn dispatch(
         "cognitive_fact_update" => {
             let pool = core.repos.pool();
             let fact_repo = cognitive::repos::SemanticFactRepo::new(pool.clone());
-            let id = match get_str(&body, "id") { Ok(v) => v, Err(e) => return err(e) };
+            let id = match get_str(&body, "id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
             let params: FactUpdateParams = match serde_json::from_value(body.clone()) {
                 Ok(p) => p,
                 Err(e) => return err(ApiError::new("INVALID_PARAMS", e.to_string())),
             };
             match fact_repo.get(&id).await {
                 Ok(Some(mut fact)) => {
-                    if let Some(obj) = params.object { fact.object = obj; }
-                    if let Some(conf) = params.confidence { fact.confidence = conf; }
+                    if let Some(obj) = params.object {
+                        fact.object = obj;
+                    }
+                    if let Some(conf) = params.confidence {
+                        fact.confidence = conf;
+                    }
                     match fact_repo.upsert(&fact).await {
                         Ok(()) => ok(serde_json::json!({ "ok": true })),
                         Err(e) => err(ApiError::new("STORAGE_ERROR", e.to_string())),
@@ -2907,7 +3091,10 @@ async fn dispatch(
         "cognitive_fact_delete" => {
             let pool = core.repos.pool();
             let fact_repo = cognitive::repos::SemanticFactRepo::new(pool.clone());
-            let id = match get_str(&body, "id") { Ok(v) => v, Err(e) => return err(e) };
+            let id = match get_str(&body, "id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
             match fact_repo.supersede(&id, "deleted_by_debug_dashboard").await {
                 Ok(()) => ok(true),
                 Err(e) => err(ApiError::new("STORAGE_ERROR", e.to_string())),
@@ -2934,10 +3121,15 @@ async fn dispatch(
             };
             match repo.upsert(&rule).await {
                 Ok(()) => ok(ProceduralRuleResponse {
-                    id: rule.id, domain: rule.domain, rule_text: rule.rule_text,
-                    confidence: rule.confidence, source: rule.source,
-                    signal_count: rule.signal_count, active: true,
-                    created_at: rule.created_at, updated_at: rule.updated_at,
+                    id: rule.id,
+                    domain: rule.domain,
+                    rule_text: rule.rule_text,
+                    confidence: rule.confidence,
+                    source: rule.source,
+                    signal_count: rule.signal_count,
+                    active: true,
+                    created_at: rule.created_at,
+                    updated_at: rule.updated_at,
                 }),
                 Err(e) => err(ApiError::new("STORAGE_ERROR", e.to_string())),
             }
@@ -2945,7 +3137,10 @@ async fn dispatch(
         "cognitive_rule_deactivate" => {
             let pool = core.repos.pool();
             let repo = cognitive::repos::ProceduralRuleRepo::new(pool.clone());
-            let id = match get_str(&body, "id") { Ok(v) => v, Err(e) => return err(e) };
+            let id = match get_str(&body, "id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
             match repo.deactivate(&id).await {
                 Ok(()) => ok(true),
                 Err(e) => err(ApiError::new("STORAGE_ERROR", e.to_string())),
@@ -2959,7 +3154,10 @@ async fn dispatch(
                 async { fact_repo.archive_superseded(90).await.unwrap_or(0) },
                 async { episodic_repo.delete_old(90, 2).await.unwrap_or(0) },
             );
-            ok(CompactionResultResponse { archived_count: archived, deleted_episodic })
+            ok(CompactionResultResponse {
+                archived_count: archived,
+                deleted_episodic,
+            })
         }
         "coaching_reset_dismissals" | "coaching_clear_signals" => {
             ok(serde_json::json!({ "ok": true }))

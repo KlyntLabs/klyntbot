@@ -3,6 +3,7 @@ import {
   Bug,
   CheckSquare,
   FileText,
+  MessageCircle,
   MessageSquare,
   Settings,
   Wallet,
@@ -19,6 +20,7 @@ interface SidebarProps {
 }
 
 const items: { key: SidebarItem; icon: typeof MessageSquare; path?: string; bottom?: boolean }[] = [
+  { key: "Chat", icon: MessageSquare, path: "/chat" },
   { key: "Tasks", icon: CheckSquare, path: "/" },
   { key: "Notes", icon: FileText, path: "/notes" },
   { key: "Finance", icon: Wallet, path: "/finance" },
@@ -77,19 +79,20 @@ export function Sidebar({ active, onNavigate, isChatOpen, onToggleChat }: Sideba
 
       <div className="flex-1" />
 
-      {/* Chat toggle — above Settings */}
+      {/* Quick chat panel toggle — slide-out contextual chat */}
       {onToggleChat && (
         <button
           type="button"
           onClick={onToggleChat}
-          aria-label="Toggle chat"
+          aria-label="Quick chat panel"
+          title="Quick chat"
           className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-200 ${
             isChatOpen
               ? "glass-button-active text-brand"
               : "text-muted hover:text-secondary hover:bg-white/[0.05]"
           }`}
         >
-          <MessageSquare className="w-[17px] h-[17px]" strokeWidth={1.5} aria-hidden="true" />
+          <MessageCircle className="w-[17px] h-[17px]" strokeWidth={1.5} aria-hidden="true" />
         </button>
       )}
 
