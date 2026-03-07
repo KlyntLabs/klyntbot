@@ -18,12 +18,11 @@ impl StatusWorkflowRepo {
 
     /// Fetch a single workflow by ID.
     pub async fn get(&self, id: &str) -> Result<Option<StatusWorkflowRow>, StorageError> {
-        let row = sqlx::query_as::<_, StatusWorkflowRow>(
-            "SELECT * FROM status_workflows WHERE id = ?1",
-        )
-        .bind(id)
-        .fetch_optional(&self.pool)
-        .await?;
+        let row =
+            sqlx::query_as::<_, StatusWorkflowRow>("SELECT * FROM status_workflows WHERE id = ?1")
+                .bind(id)
+                .fetch_optional(&self.pool)
+                .await?;
         Ok(row)
     }
 
@@ -104,12 +103,11 @@ impl StatusWorkflowRepo {
     /// Delete a workflow. Returns false if not found.
     /// MUST NOT delete the global default.
     pub async fn delete(&self, id: &str) -> Result<bool, StorageError> {
-        let result = sqlx::query(
-            "DELETE FROM status_workflows WHERE id = ?1 AND is_global_default = 0",
-        )
-        .bind(id)
-        .execute(&self.pool)
-        .await?;
+        let result =
+            sqlx::query("DELETE FROM status_workflows WHERE id = ?1 AND is_global_default = 0")
+                .bind(id)
+                .execute(&self.pool)
+                .await?;
         Ok(result.rows_affected() > 0)
     }
 
@@ -145,19 +143,15 @@ impl StatusWorkflowRepo {
 
     /// Fetch a single label by ID.
     pub async fn get_label(&self, id: &str) -> Result<Option<StatusLabelRow>, StorageError> {
-        let row =
-            sqlx::query_as::<_, StatusLabelRow>("SELECT * FROM status_labels WHERE id = ?1")
-                .bind(id)
-                .fetch_optional(&self.pool)
-                .await?;
+        let row = sqlx::query_as::<_, StatusLabelRow>("SELECT * FROM status_labels WHERE id = ?1")
+            .bind(id)
+            .fetch_optional(&self.pool)
+            .await?;
         Ok(row)
     }
 
     /// Fetch all labels for a workflow, ordered by position.
-    pub async fn get_labels(
-        &self,
-        workflow_id: &str,
-    ) -> Result<Vec<StatusLabelRow>, StorageError> {
+    pub async fn get_labels(&self, workflow_id: &str) -> Result<Vec<StatusLabelRow>, StorageError> {
         let rows = sqlx::query_as::<_, StatusLabelRow>(
             "SELECT * FROM status_labels WHERE workflow_id = ?1 ORDER BY position",
         )
@@ -416,5 +410,171 @@ mod tests {
         let repo = setup().await;
         let label = repo.get_label("sl_done").await.unwrap().unwrap();
         assert_eq!(label.status_group, "done");
+    }
+
+    #[tokio::test]
+    async fn test_full_workflow_lifecycle() {
+        let pool = crate::StoragePool::connect_in_memory().await.unwrap();
+        let repos = crate::Repos::from_pool(&pool);
+
+        // 1. Global default exists with 6 labels
+        let default = repos
+            .status_workflows
+            .get_global_default()
+            .await
+            .unwrap()
+            .unwrap();
+        let labels = repos
+            .status_workflows
+            .get_labels(&default.id)
+            .await
+            .unwrap();
+        assert_eq!(labels.len(), 6);
+        assert_eq!(labels[0].name, "Backlog");
+        assert_eq!(labels[5].name, "Blocked");
+
+        // 2. Templates exist
+        let templates = repos.status_workflows.list_templates().await.unwrap();
+        assert_eq!(templates.len(), 3);
+
+        // 3. Duplicate the global default as a custom workflow
+        let custom = repos
+            .status_workflows
+            .duplicate(&default.id, "My Project")
+            .await
+            .unwrap();
+        assert_ne!(custom.id, default.id);
+        assert_eq!(custom.name, "My Project");
+        let custom_labels = repos.status_workflows.get_labels(&custom.id).await.unwrap();
+        assert_eq!(custom_labels.len(), 6);
+
+        // 4. Add a custom label to the custom workflow
+        let testing_label = repos
+            .status_workflows
+            .add_label(&custom.id, "Testing", "#8b5cf6", "active", 4)
+            .await
+            .unwrap();
+        assert_eq!(testing_label.name, "Testing");
+        assert_eq!(testing_label.status_group, "active");
+        let updated_labels = repos.status_workflows.get_labels(&custom.id).await.unwrap();
+        assert_eq!(updated_labels.len(), 7);
+
+        // 5. Update a label
+        let updated_label = repos
+            .status_workflows
+            .update_label(
+                &custom_labels[1].id,
+                Some("To Do"),
+                Some("#60a5fa"),
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+        assert_eq!(updated_label.name, "To Do");
+        assert_eq!(updated_label.color, "#60a5fa");
+
+        // 6. Delete a label
+        let deleted = repos
+            .status_workflows
+            .delete_label(&custom_labels[0].id)
+            .await
+            .unwrap();
+        assert!(deleted);
+        let labels_after_delete = repos.status_workflows.get_labels(&custom.id).await.unwrap();
+        assert_eq!(labels_after_delete.len(), 6);
+
+        // 7. Reorder labels
+        let label_ids: Vec<String> = labels_after_delete.iter().map(|l| l.id.clone()).collect();
+        let mut reversed = label_ids.clone();
+        reversed.reverse();
+        repos
+            .status_workflows
+            .reorder_labels(&custom.id, &reversed)
+            .await
+            .unwrap();
+        let reordered = repos.status_workflows.get_labels(&custom.id).await.unwrap();
+        assert_eq!(reordered[0].id, reversed[0]);
+
+        // 8. Create a task with status_label_id
+        let todo_label = &custom_labels[1]; // "Todo" label
+
+        // Create the area row needed for the action's foreign key
+        let now = chrono::Utc::now();
+        let area_row = crate::AreaRow {
+            id: "default".into(),
+            name: "Default".into(),
+            description: None,
+            color: "#888888".into(),
+            icon: None,
+            position: 0,
+            status: "active".into(),
+            created_at: now,
+            updated_at: now,
+        };
+        repos.areas.create(&area_row).await.ok();
+
+        let action_row = crate::ActionRow {
+            id: "task-wf-test".into(),
+            title: "Test task".into(),
+            description: None,
+            area_id: "default".into(),
+            project_id: None,
+            key_result_id: None,
+            parent_id: None,
+            priority: None,
+            due_date: None,
+            tags: vec![],
+            status: "todo".into(),
+            focused_at: None,
+            focus_deadline: None,
+            focus_expired_count: 0,
+            created_at: now,
+            updated_at: now,
+            completed_at: None,
+            total_tracked_secs: 0,
+            estimated_minutes: None,
+            calendar_event_uid: None,
+            last_reminded_at: None,
+            recurrence_rule: None,
+            recurrence_parent_id: None,
+            is_template: false,
+            next_instance_date: None,
+            status_label_id: Some(todo_label.id.clone()),
+            position: 0,
+        };
+        let inserted = repos.actions.add(&action_row).await.unwrap();
+        assert_eq!(inserted.status_label_id, Some(todo_label.id.clone()));
+
+        // 9. Summary by group should work
+        let group_summary = repos.actions.summary_by_group().await.unwrap();
+        assert_eq!(*group_summary.get("not_started").unwrap_or(&0), 1);
+
+        // 10. Effective labels with None falls back to global default
+        let effective = repos
+            .status_workflows
+            .get_effective_labels(None)
+            .await
+            .unwrap();
+        assert_eq!(effective.len(), 6);
+
+        // 11. Find label by group
+        let done_label = repos
+            .status_workflows
+            .find_label_by_group(&custom.id, "done")
+            .await
+            .unwrap();
+        assert!(done_label.is_some());
+        assert_eq!(done_label.unwrap().status_group, "done");
+
+        // 12. Cannot delete global default
+        let cannot_delete = repos.status_workflows.delete(&default.id).await.unwrap();
+        assert!(!cannot_delete);
+
+        // 13. Delete custom workflow cascades labels
+        let deleted_wf = repos.status_workflows.delete(&custom.id).await.unwrap();
+        assert!(deleted_wf);
+        let orphaned_labels = repos.status_workflows.get_labels(&custom.id).await.unwrap();
+        assert!(orphaned_labels.is_empty());
     }
 }
