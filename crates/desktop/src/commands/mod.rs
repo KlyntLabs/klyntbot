@@ -1,5 +1,6 @@
 pub mod areas;
 pub mod chat;
+pub mod cognitive;
 pub mod distraction;
 pub mod finance;
 pub mod key_results;
@@ -23,6 +24,11 @@ use tauri::Emitter;
 /// Convert a `KlyntbotError` into a productivity-flavored `ApiError`.
 pub(crate) fn map_prod_err(e: common::KlyntbotError) -> ApiError {
     ApiError::new("PRODUCTIVITY_ERROR", e.to_string())
+}
+
+/// Convert a cognitive/sqlx error into an `ApiError`.
+pub(crate) fn map_cognitive_err(e: impl std::fmt::Display) -> ApiError {
+    ApiError::new("STORAGE_ERROR", e.to_string())
 }
 
 /// Convert a `StorageError` into an `ApiError`, preserving specific error codes

@@ -8,9 +8,11 @@ use std::sync::Arc;
 use agent::{AgentLoop, PersonaManager};
 use bus::{DomainEventBus, MessageBus};
 use channels::ChannelManager;
+use cognitive::situation::UserSituation;
 use common::FormResponse;
 use desktop_shared::errors::ApiError;
 use desktop_shared::events;
+use feature_coaching::{FeedbackTracker, InterventionRouter, PatternDetector, SignalAccumulator};
 use feature_notes::repo::NoteRepo;
 use feature_productivity::dashboard_emitter::{DashboardEmitter, DashboardEvent};
 use feature_productivity::repos::ProductivityRepos;
@@ -56,6 +58,18 @@ pub struct AppCore {
     /// Distraction interceptor for overlay decisions.
     distraction_interceptor:
         Option<Arc<Mutex<feature_productivity::distraction::DistractionInterceptor>>>,
+    /// Cognitive domain event bus.
+    pub domain_event_bus: Option<Arc<DomainEventBus>>,
+    /// Coaching signal accumulator.
+    signal_accumulator: Option<Arc<Mutex<SignalAccumulator>>>,
+    /// Coaching pattern detector.
+    pattern_detector: Option<Arc<Mutex<PatternDetector>>>,
+    /// Coaching intervention router.
+    intervention_router: Option<Arc<Mutex<InterventionRouter>>>,
+    /// Coaching feedback tracker.
+    feedback_tracker: Option<Arc<Mutex<FeedbackTracker>>>,
+    /// Cached user situation.
+    user_situation: Option<Arc<Mutex<UserSituation>>>,
 }
 
 impl AppCore {
@@ -331,6 +345,13 @@ impl AppCore {
             (None, None, None, None, None, None)
         };
 
+        // Initialize coaching engine state.
+        let signal_accumulator = Arc::new(Mutex::new(SignalAccumulator::new()));
+        let pattern_detector = Arc::new(Mutex::new(PatternDetector::new()));
+        let intervention_router = Arc::new(Mutex::new(InterventionRouter::new(Default::default())));
+        let feedback_tracker = Arc::new(Mutex::new(FeedbackTracker::new()));
+        let user_situation = Arc::new(Mutex::new(UserSituation::default()));
+
         let core = Self {
             repos,
             agent: Arc::clone(&agent),
@@ -349,6 +370,12 @@ impl AppCore {
             aggregator,
             nudge_service,
             distraction_interceptor,
+            domain_event_bus: Some(Arc::clone(&domain_event_bus)),
+            signal_accumulator: Some(signal_accumulator),
+            pattern_detector: Some(pattern_detector),
+            intervention_router: Some(intervention_router),
+            feedback_tracker: Some(feedback_tracker),
+            user_situation: Some(user_situation),
         };
 
         // Spawn background services immediately
@@ -440,6 +467,42 @@ impl AppCore {
     {
         self.distraction_interceptor.as_ref().ok_or_else(|| {
             ApiError::new("NOT_AVAILABLE", "Distraction interceptor not initialized")
+        })
+    }
+
+    pub fn signal_accumulator(&self) -> Result<&Arc<Mutex<SignalAccumulator>>, ApiError> {
+        self.signal_accumulator.as_ref().ok_or_else(|| {
+            ApiError::new("FEATURE_DISABLED", "coaching engine is not available")
+        })
+    }
+
+    pub fn pattern_detector(&self) -> Result<&Arc<Mutex<PatternDetector>>, ApiError> {
+        self.pattern_detector.as_ref().ok_or_else(|| {
+            ApiError::new("FEATURE_DISABLED", "coaching engine is not available")
+        })
+    }
+
+    pub fn intervention_router(&self) -> Result<&Arc<Mutex<InterventionRouter>>, ApiError> {
+        self.intervention_router.as_ref().ok_or_else(|| {
+            ApiError::new("FEATURE_DISABLED", "coaching engine is not available")
+        })
+    }
+
+    pub fn feedback_tracker(&self) -> Result<&Arc<Mutex<FeedbackTracker>>, ApiError> {
+        self.feedback_tracker.as_ref().ok_or_else(|| {
+            ApiError::new("FEATURE_DISABLED", "coaching engine is not available")
+        })
+    }
+
+    pub fn user_situation(&self) -> Result<&Arc<Mutex<UserSituation>>, ApiError> {
+        self.user_situation.as_ref().ok_or_else(|| {
+            ApiError::new("FEATURE_DISABLED", "coaching engine is not available")
+        })
+    }
+
+    pub fn domain_event_bus(&self) -> Result<&Arc<DomainEventBus>, ApiError> {
+        self.domain_event_bus.as_ref().ok_or_else(|| {
+            ApiError::new("FEATURE_DISABLED", "domain event bus is not available")
         })
     }
 

@@ -2874,12 +2874,14 @@ dependencies = [
  "bus",
  "channels",
  "chrono",
+ "cognitive",
  "common",
  "config",
  "context_engine",
  "dashmap",
  "desktop-shared",
  "dirs",
+ "feature-coaching",
  "feature-notes",
  "feature-productivity",
  "futures-util",
@@ -2912,6 +2914,7 @@ dependencies = [
  "chrono",
  "common",
  "serde",
+ "serde_json",
 ]
 
 [[package]]

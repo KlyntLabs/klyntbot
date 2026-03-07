@@ -11,8 +11,10 @@ desktop-shared = { workspace = true }
 agent = { workspace = true }
 bus = { workspace = true }
 channels = { workspace = true }
+cognitive = { workspace = true }
 common = { workspace = true }
 config = { workspace = true }
+feature-coaching = { workspace = true }
 dashmap = { workspace = true }
 context_engine = { workspace = true }
 feature-notes = { workspace = true }
