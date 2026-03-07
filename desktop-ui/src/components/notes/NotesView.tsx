@@ -237,57 +237,82 @@ export default function NotesView() {
       </div>
 
       {/* Editor area */}
-      <div className="flex-1 flex flex-col gap-2 min-w-0 min-h-0 pl-1">
-        {/* View mode toggle */}
-        <div className="flex justify-end shrink-0">
-          <div className="flex gap-0.5">
-            <button
-              type="button"
-              onClick={() => setNotesViewMode("editor")}
-              className={`p-1.5 rounded-lg transition-all ${
-                viewMode === "editor"
-                  ? "bg-white/[0.1] text-primary"
-                  : "text-dim hover:text-secondary hover:bg-white/[0.04]"
-              }`}
-              aria-label="Editor view"
-            >
-              <PenLine className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setNotesViewMode("graph")}
-              className={`p-1.5 rounded-lg transition-all ${
-                viewMode === "graph"
-                  ? "bg-white/[0.1] text-primary"
-                  : "text-dim hover:text-secondary hover:bg-white/[0.04]"
-              }`}
-              aria-label="Graph view"
-            >
-              <GitGraph className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
+      <div className="flex-1 flex flex-col min-w-0 min-h-0 pl-1">
         {viewMode === "graph" ? (
-          <GraphView notes={notes} activeNoteId={selectedNoteId} onSelectNote={setSelectedNoteId} />
-        ) : selectedNote ? (
-          <NoteEditor note={selectedNote} onSave={updateNote} />
-        ) : (
-          <div className="flex-1 flex flex-col items-center justify-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-white/[0.04] flex items-center justify-center">
-              <FileText className="w-6 h-6 text-dim" strokeWidth={1.5} />
-            </div>
-            <div className="text-center">
-              <div className="text-muted text-sm">Select a note to view</div>
-              <div className="text-dim text-xs mt-1">
-                or press{" "}
-                <kbd className="px-1.5 py-0.5 rounded bg-white/[0.06] text-[10px] font-mono">
-                  Cmd+N
-                </kbd>{" "}
-                to create one
+          <>
+            {/* Minimal toggle bar for graph/empty views */}
+            <div className="flex justify-end shrink-0 px-3 pt-3">
+              <div className="flex gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => setNotesViewMode("editor")}
+                  className="p-1.5 rounded-lg transition-all text-dim hover:text-secondary hover:bg-white/[0.04]"
+                  aria-label="Editor view"
+                >
+                  <PenLine className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNotesViewMode("graph")}
+                  className="p-1.5 rounded-lg transition-all bg-white/[0.1] text-primary"
+                  aria-label="Graph view"
+                >
+                  <GitGraph className="w-4 h-4" />
+                </button>
               </div>
             </div>
-          </div>
+            <GraphView
+              notes={notes}
+              activeNoteId={selectedNoteId}
+              onSelectNote={setSelectedNoteId}
+            />
+          </>
+        ) : selectedNote ? (
+          <NoteEditor
+            note={selectedNote}
+            onSave={updateNote}
+            viewMode={viewMode}
+            onViewModeChange={setNotesViewMode}
+          />
+        ) : (
+          <>
+            {/* Minimal toggle bar for empty state */}
+            <div className="flex justify-end shrink-0 px-3 pt-3">
+              <div className="flex gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => setNotesViewMode("editor")}
+                  className="p-1.5 rounded-lg transition-all bg-white/[0.1] text-primary"
+                  aria-label="Editor view"
+                >
+                  <PenLine className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNotesViewMode("graph")}
+                  className="p-1.5 rounded-lg transition-all text-dim hover:text-secondary hover:bg-white/[0.04]"
+                  aria-label="Graph view"
+                >
+                  <GitGraph className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 flex flex-col items-center justify-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-white/[0.04] flex items-center justify-center">
+                <FileText className="w-6 h-6 text-dim" strokeWidth={1.5} />
+              </div>
+              <div className="text-center">
+                <div className="text-muted text-sm">Select a note to view</div>
+                <div className="text-dim text-xs mt-1">
+                  or press{" "}
+                  <kbd className="px-1.5 py-0.5 rounded bg-white/[0.06] text-[10px] font-mono">
+                    Cmd+N
+                  </kbd>{" "}
+                  to create one
+                </div>
+              </div>
+            </div>
+          </>
         )}
       </div>
     </div>

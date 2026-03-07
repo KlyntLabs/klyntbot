@@ -177,7 +177,7 @@ export function EditorToolbar({ editor }: EditorToolbarProps) {
   if (!editor) return null;
 
   return (
-    <div className="glass-toolbar px-2 py-1 flex items-center gap-0.5 flex-wrap">
+    <div className="glass-toolbar rounded-lg px-2 py-1 flex items-center gap-0.5 flex-wrap">
       {groups.map((group, gi) => (
         <div key={gi} className="flex items-center gap-0.5">
           {gi > 0 && <div className="w-px h-4 bg-white/[0.08] mx-1.5" />}

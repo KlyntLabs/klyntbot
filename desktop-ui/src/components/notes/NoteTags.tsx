@@ -1,15 +1,26 @@
-import { Plus, X } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { X } from "lucide-react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 
 interface NoteTagsProps {
   tags: string[];
   onChange: (tags: string[]) => void;
 }
 
-export function NoteTags({ tags, onChange }: NoteTagsProps) {
+export interface NoteTagsHandle {
+  startAdding: () => void;
+}
+
+export const NoteTags = forwardRef<NoteTagsHandle, NoteTagsProps>(function NoteTags(
+  { tags, onChange },
+  ref,
+) {
   const [adding, setAdding] = useState(false);
   const [input, setInput] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    startAdding: () => setAdding(true),
+  }));
 
   const handleAdd = useCallback(() => {
     const tag = input.trim().toLowerCase();
@@ -40,7 +51,6 @@ export function NoteTags({ tags, onChange }: NoteTagsProps) {
     [handleAdd],
   );
 
-  // Focus input when entering add mode
   useEffect(() => {
     if (adding) inputRef.current?.focus();
   }, [adding]);
@@ -61,7 +71,7 @@ export function NoteTags({ tags, onChange }: NoteTagsProps) {
         </span>
       ))}
 
-      {adding ? (
+      {adding && (
         <input
           ref={inputRef}
           type="text"
@@ -72,16 +82,7 @@ export function NoteTags({ tags, onChange }: NoteTagsProps) {
           placeholder="tag..."
           className="text-[11px] bg-transparent border-b border-brand/30 text-primary outline-none w-16 py-0.5"
         />
-      ) : (
-        <button
-          type="button"
-          onClick={() => setAdding(true)}
-          className="w-4 h-4 rounded flex items-center justify-center text-dim hover:text-secondary hover:bg-white/[0.06] transition-colors"
-          aria-label="Add tag"
-        >
-          <Plus className="w-3 h-3" />
-        </button>
       )}
     </div>
   );
-}
+});
