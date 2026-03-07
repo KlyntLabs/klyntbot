@@ -3,12 +3,13 @@
 use std::collections::HashMap;
 
 use desktop_shared::commands::{
-    McpAddServerParams, McpConfigResponse, McpRemoveParams, McpServerResponse, McpToggleParams,
-    McpUpdateServerParams,
+    AppInfoResponse, McpAddServerParams, McpConfigResponse, McpRemoveParams, McpServerResponse,
+    McpToggleParams, McpUpdateServerParams,
 };
 use desktop_shared::errors::ApiError;
+use serde_json::Value;
 
-use crate::errors::map_config_save_err;
+use crate::errors::{map_config_save_err, map_serialization_err};
 use crate::state::AppCore;
 
 // ── Helper functions ──────────────────────────────────────────────────
@@ -97,6 +98,24 @@ pub fn build_transport(
             "VALIDATION",
             format!("unknown transport type: {other}"),
         )),
+    }
+}
+
+/// Recursively merge `patch` into `base`. Objects merge keys;
+/// arrays and scalars replace entirely; explicit `null` removes a key.
+fn deep_merge(base: &mut Value, patch: Value) {
+    match (base, patch) {
+        (Value::Object(base_map), Value::Object(patch_map)) => {
+            for (key, value) in patch_map {
+                if value.is_null() {
+                    base_map.remove(&key);
+                } else {
+                    let entry = base_map.entry(key).or_insert(Value::Null);
+                    deep_merge(entry, value);
+                }
+            }
+        }
+        (base, patch) => *base = patch,
     }
 }
 
@@ -285,5 +304,68 @@ impl AppCore {
         }
 
         Ok(response)
+    }
+
+    // ── Generic config commands ──────────────────────────────────────
+
+    pub async fn app_info(&self) -> Result<AppInfoResponse, ApiError> {
+        let cfg = self.config.read().await;
+        Ok(AppInfoResponse {
+            version: env!("CARGO_PKG_VERSION").to_string(),
+            data_dir: cfg.data_dir_path().to_string_lossy().to_string(),
+            setup_completed: cfg.setup_completed,
+        })
+    }
+
+    pub async fn config_get_section(&self, section: String) -> Result<Value, ApiError> {
+        let cfg = self.config.read().await;
+        let full = serde_json::to_value(&*cfg)
+            .map_err(map_serialization_err)?;
+        match full.get(&section) {
+            Some(val) => Ok(val.clone()),
+            None => Err(ApiError::new(
+                "NOT_FOUND",
+                format!("config section '{section}' not found"),
+            )),
+        }
+    }
+
+    pub async fn config_update_section(
+        &self,
+        section: String,
+        patch: Value,
+    ) -> Result<Value, ApiError> {
+        let mut cfg = self.config.write().await;
+
+        let mut full = serde_json::to_value(&*cfg)
+            .map_err(map_serialization_err)?;
+
+        {
+            let section_val = full.get_mut(&section).ok_or_else(|| {
+                ApiError::new("NOT_FOUND", format!("config section '{section}' not found"))
+            })?;
+            deep_merge(section_val, patch);
+        }
+
+        // Extract the merged section before from_value consumes `full`
+        let section_result = full.get(&section).cloned().unwrap_or(Value::Null);
+
+        let updated: config::Config = serde_json::from_value(full)
+            .map_err(|e| ApiError::new("VALIDATION", format!("invalid config: {e}")))?;
+
+        config::save(&updated)
+            .await
+            .map_err(map_config_save_err)?;
+
+        *cfg = updated;
+
+        Ok(section_result)
+    }
+
+    pub async fn config_mark_setup_completed(&self) -> Result<(), ApiError> {
+        let mut cfg = self.config.write().await;
+        cfg.setup_completed = true;
+        config::save(&cfg).await.map_err(map_config_save_err)?;
+        Ok(())
     }
 }

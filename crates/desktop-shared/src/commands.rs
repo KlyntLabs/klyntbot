@@ -954,6 +954,16 @@ pub struct ColumnValueSetParams {
     pub value: serde_json::Value,
 }
 
+// ── App Info ──────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppInfoResponse {
+    pub version: String,
+    pub data_dir: String,
+    pub setup_completed: bool,
+}
+
 // ── Key Result Params ──────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

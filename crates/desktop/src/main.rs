@@ -252,6 +252,11 @@ fn main() {
             commands::settings::mcp_remove_server,
             commands::settings::mcp_toggle_server,
             commands::settings::mcp_update_server,
+            // Settings (generic config)
+            commands::settings::app_info,
+            commands::settings::config_get_section,
+            commands::settings::config_update_section,
+            commands::settings::config_mark_setup_completed,
             // OAuth
             oauth::commands::mcp_oauth_start,
             oauth::commands::mcp_oauth_disconnect,

@@ -31,6 +31,8 @@ pub struct FinanceConfig {
     pub scheduling: FinanceSchedulingConfig,
     #[serde(default)]
     pub categories: FinanceCategoryConfig,
+    #[serde(default)]
+    pub fire: FireConfig,
     /// Manual exchange rates mapping currency codes to their VND equivalent.
     /// E.g. `{"USD": 25500, "USDT": 25500}`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -49,6 +51,7 @@ impl Default for FinanceConfig {
             price_refresh: Default::default(),
             scheduling: Default::default(),
             categories: Default::default(),
+            fire: Default::default(),
             exchange_rates: None,
         }
     }
@@ -304,4 +307,116 @@ impl Default for FinanceCategoryConfig {
 
 fn default_finance_category_threshold() -> f64 {
     0.8
+}
+
+/// FIRE (Financial Independence, Retire Early) configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FireConfig {
+    #[serde(default)]
+    pub enabled: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current_age: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_retirement_age: Option<u32>,
+    /// Annual expenses in cents.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub annual_expenses: Option<i64>,
+    /// Safe withdrawal rate as percentage (default: 4.0).
+    #[serde(default = "default_swr")]
+    pub safe_withdrawal_rate: f64,
+    /// FIRE type: "lean", "regular", "fat", or "coast".
+    #[serde(default = "default_fire_type")]
+    pub fire_type: String,
+    /// Target FIRE number in cents (auto-calculated or manual override).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_number: Option<i64>,
+    /// Monthly savings rate in cents.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub monthly_savings_rate: Option<i64>,
+    /// Snapshot of current net worth in cents.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current_net_worth: Option<i64>,
+}
+
+impl Default for FireConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            current_age: None,
+            target_retirement_age: None,
+            annual_expenses: None,
+            safe_withdrawal_rate: default_swr(),
+            fire_type: default_fire_type(),
+            target_number: None,
+            monthly_savings_rate: None,
+            current_net_worth: None,
+        }
+    }
+}
+
+fn default_swr() -> f64 {
+    4.0
+}
+
+fn default_fire_type() -> String {
+    "regular".to_string()
+}
+
+/// Default finance transaction/budget categories.
+pub fn default_finance_categories() -> Vec<FinanceDefaultCategory> {
+    vec![
+        // Income
+        FinanceDefaultCategory::new("income", "Salary", "income"),
+        FinanceDefaultCategory::new("income", "Freelance", "income"),
+        FinanceDefaultCategory::new("income", "Investments", "income"),
+        FinanceDefaultCategory::new("income", "Rental", "income"),
+        FinanceDefaultCategory::new("income", "Side Business", "income"),
+        FinanceDefaultCategory::new("income", "Gifts", "income"),
+        FinanceDefaultCategory::new("income", "Refunds", "income"),
+        // Essential
+        FinanceDefaultCategory::new("essential", "Housing", "expense"),
+        FinanceDefaultCategory::new("essential", "Utilities", "expense"),
+        FinanceDefaultCategory::new("essential", "Groceries", "expense"),
+        FinanceDefaultCategory::new("essential", "Transportation", "expense"),
+        FinanceDefaultCategory::new("essential", "Insurance", "expense"),
+        FinanceDefaultCategory::new("essential", "Healthcare", "expense"),
+        FinanceDefaultCategory::new("essential", "Debt Payments", "expense"),
+        // Lifestyle
+        FinanceDefaultCategory::new("lifestyle", "Dining Out", "expense"),
+        FinanceDefaultCategory::new("lifestyle", "Entertainment", "expense"),
+        FinanceDefaultCategory::new("lifestyle", "Shopping", "expense"),
+        FinanceDefaultCategory::new("lifestyle", "Personal Care", "expense"),
+        FinanceDefaultCategory::new("lifestyle", "Subscriptions", "expense"),
+        FinanceDefaultCategory::new("lifestyle", "Travel", "expense"),
+        FinanceDefaultCategory::new("lifestyle", "Fitness", "expense"),
+        // Savings
+        FinanceDefaultCategory::new("savings", "Emergency Fund", "transfer"),
+        FinanceDefaultCategory::new("savings", "Retirement", "transfer"),
+        FinanceDefaultCategory::new("savings", "Investments", "transfer"),
+        FinanceDefaultCategory::new("savings", "Education Fund", "transfer"),
+        // Giving
+        FinanceDefaultCategory::new("giving", "Charity", "expense"),
+        FinanceDefaultCategory::new("giving", "Gifts", "expense"),
+        FinanceDefaultCategory::new("giving", "Family Support", "expense"),
+    ]
+}
+
+/// A default category entry used by the wizard.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FinanceDefaultCategory {
+    pub group: String,
+    pub name: String,
+    pub tx_type: String,
+}
+
+impl FinanceDefaultCategory {
+    pub fn new(group: &str, name: &str, tx_type: &str) -> Self {
+        Self {
+            group: group.to_string(),
+            name: name.to_string(),
+            tx_type: tx_type.to_string(),
+        }
+    }
 }

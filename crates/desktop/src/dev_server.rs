@@ -809,6 +809,28 @@ async fn dispatch(
             })
             .await),
 
+        // ── Settings (generic config) ────────────────────────
+        "app_info" => r(core.app_info().await),
+        "config_get_section" => {
+            let section = match get_str(&body, "section") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            r(core.config_get_section(section).await)
+        }
+        "config_update_section" => {
+            let section = match get_str(&body, "section") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let patch = body
+                .get("patch")
+                .cloned()
+                .unwrap_or(serde_json::Value::Object(Default::default()));
+            r(core.config_update_section(section, patch).await)
+        }
+        "config_mark_setup_completed" => r(core.config_mark_setup_completed().await),
+
         // ── Chat ──────────────────────────────────────────────
         "chat_threads" => r(core.chat_threads().await),
         "chat_messages" => {

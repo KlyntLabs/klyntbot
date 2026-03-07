@@ -10,10 +10,11 @@ pub use loader::{
 };
 pub use schema::{
     Config, DiscordConfig, EmailConfig, ExtendedThinkingConfig, FinanceBudgetingConfig,
-    FinanceCategoryConfig, FinanceConfig, FinanceExpectedReturnsConfig, FinanceInflationConfig,
-    FinancePriceRefreshConfig, FinanceSchedulingConfig, LearningConfig, McpConfig,
-    McpOAuthCredentials, McpServerDef, McpServerSettings, McpTransport, OrchestratorConfig,
-    PackTier, PacksConfig, PermissionsConfig, ProviderManagerConfig, QQConfig, Secret,
-    SixJarRatios, SlackConfig, TelegramConfig, TodoEnrichmentConfig, TrustLevel, WhatsAppConfig,
-    DEFAULT_STARTUP_TIMEOUT_SEC, DEFAULT_TOOL_TIMEOUT_SEC,
+    FinanceCategoryConfig, FinanceConfig, FinanceDefaultCategory, FinanceExpectedReturnsConfig,
+    FinanceInflationConfig, FinancePriceRefreshConfig, FinanceSchedulingConfig, FireConfig,
+    LearningConfig, McpConfig, McpOAuthCredentials, McpServerDef, McpServerSettings, McpTransport,
+    OrchestratorConfig, PackTier, PacksConfig, PermissionsConfig, ProviderManagerConfig, QQConfig,
+    Secret, SixJarRatios, SlackConfig, TelegramConfig, TodoEnrichmentConfig, TrustLevel,
+    WhatsAppConfig, DEFAULT_STARTUP_TIMEOUT_SEC, DEFAULT_TOOL_TIMEOUT_SEC,
+    default_finance_categories,
 };

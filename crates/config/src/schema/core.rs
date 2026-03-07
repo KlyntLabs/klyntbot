@@ -147,6 +147,10 @@ pub struct Config {
     /// MCP (Model Context Protocol) server connections and server settings.
     #[serde(default)]
     pub mcp: McpConfig,
+
+    /// Whether the first-run setup wizard has been completed.
+    #[serde(default)]
+    pub setup_completed: bool,
 }
 
 impl Config {

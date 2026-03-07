@@ -42,3 +42,8 @@ pub fn parse_naive_date(s: &str) -> Option<NaiveDate> {
 pub fn map_config_save_err(e: impl std::fmt::Display) -> ApiError {
     ApiError::new("CONFIG_SAVE", e.to_string())
 }
+
+/// Convert a serialization error into an `ApiError`.
+pub fn map_serialization_err(e: impl std::fmt::Display) -> ApiError {
+    ApiError::new("SERIALIZATION", e.to_string())
+}
