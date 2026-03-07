@@ -104,13 +104,6 @@ pub async fn custom_column_update(
     state: State<'_, Arc<AppCore>>,
     params: ColumnUpdateParams,
 ) -> Result<CustomColumnResponse, ApiError> {
-    let options_json: Option<Option<&str>> = match &params.options {
-        None => None,
-        Some(None) => Some(None),
-        Some(Some(_opts)) => None, // handled below
-    };
-
-    // We need a temp string for the serialized options
     let serialized;
     let options_json = match &params.options {
         None => None,
