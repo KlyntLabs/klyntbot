@@ -113,6 +113,25 @@ impl TaskTool {
     }
 
     pub(crate) async fn handle_summary(&self) -> Result<String> {
+        // Try group-based summary first (uses status_label workflow)
+        if let Ok(group_counts) = self.repo.summary_by_group().await {
+            if !group_counts.is_empty() {
+                let total: i64 = group_counts.values().sum();
+                let mut output = format!("Total tasks: {}\n\n", total);
+                output.push_str("By status group:\n");
+                for group in &["not_started", "active", "done", "stuck"] {
+                    let count = group_counts.get(*group).unwrap_or(&0);
+                    output.push_str(&format!("  {}: {}\n", group, count));
+                }
+                let overdue = self.repo.overdue().await?;
+                if !overdue.is_empty() {
+                    output.push_str(&format!("\nOverdue: {} tasks\n", overdue.len()));
+                }
+                return Ok(output);
+            }
+        }
+
+        // Fallback: legacy status-based summary
         let summary = self.repo.summary().await?;
         let mut output = format!("Total tasks: {}\n\n", summary.total);
         output.push_str("By status:\n");
