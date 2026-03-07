@@ -1,5 +1,6 @@
 import { Check } from "lucide-react";
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useClickOutside } from "../../../hooks/useClickOutside";
 
 interface Option {
@@ -24,12 +25,26 @@ export function InlineSelect({
   className,
 }: InlineSelectProps) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useClickOutside(ref, () => setOpen(false), open);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+
+  useClickOutside(dropdownRef, () => setOpen(false), open);
+
+  const updatePosition = useCallback(() => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    setPos({ top: rect.bottom + 4, left: rect.left });
+  }, []);
+
+  useEffect(() => {
+    if (open) updatePosition();
+  }, [open, updatePosition]);
 
   return (
-    <div ref={ref} className={`relative ${className ?? ""}`}>
+    <div className={className ?? ""}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={(e) => {
           e.stopPropagation();
@@ -41,38 +56,44 @@ export function InlineSelect({
       >
         {renderDisplay(value)}
       </button>
-      {open && (
-        <div
-          className="absolute z-50 top-full left-0 mt-1 min-w-[140px] glass-panel"
-          role="listbox"
-        >
-          {options.map((opt) => {
-            const isSelected = value === opt.value;
-            return (
-              <button
-                type="button"
-                key={opt.value ?? "__none"}
-                role="option"
-                aria-selected={isSelected}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSelect(opt.value);
-                  setOpen(false);
-                }}
-                className={`w-full flex items-center gap-2 px-3 py-1.5 text-[12px] font-light transition-colors ${
-                  isSelected ? "text-brand bg-white/[0.12]" : "text-secondary hover:bg-white/[0.08]"
-                } ${opt.className ?? ""}`}
-                style={{ borderRadius: "var(--glass-radius-inner)" }}
-              >
-                <span className="w-3.5 flex-shrink-0">
-                  {isSelected && <Check className="w-3.5 h-3.5" strokeWidth={2} />}
-                </span>
-                {opt.label}
-              </button>
-            );
-          })}
-        </div>
-      )}
+      {open &&
+        createPortal(
+          <div
+            ref={dropdownRef}
+            className="fixed z-[9999] min-w-[140px] glass-panel"
+            style={{ top: pos.top, left: pos.left }}
+            role="listbox"
+          >
+            {options.map((opt) => {
+              const isSelected = value === opt.value;
+              return (
+                <button
+                  type="button"
+                  key={opt.value ?? "__none"}
+                  role="option"
+                  aria-selected={isSelected}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSelect(opt.value);
+                    setOpen(false);
+                  }}
+                  className={`w-full flex items-center gap-2 px-3 py-1.5 text-[12px] font-light transition-colors ${
+                    isSelected
+                      ? "text-brand bg-white/[0.12]"
+                      : "text-secondary hover:bg-white/[0.08]"
+                  } ${opt.className ?? ""}`}
+                  style={{ borderRadius: "var(--glass-radius-inner)" }}
+                >
+                  <span className="w-3.5 flex-shrink-0">
+                    {isSelected && <Check className="w-3.5 h-3.5" strokeWidth={2} />}
+                  </span>
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

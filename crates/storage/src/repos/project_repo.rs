@@ -45,8 +45,8 @@ impl ProjectRepo {
     pub async fn create(&self, row: &ProjectRow) -> Result<ProjectRow, StorageError> {
         let inserted = sqlx::query_as::<_, ProjectRow>(
             r#"
-            INSERT INTO projects (id, area_id, name, description, color, tags, status, created_at, updated_at)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+            INSERT INTO projects (id, area_id, name, description, color, tags, status, created_at, updated_at, workflow_id)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
             RETURNING *
             "#,
         )
@@ -59,6 +59,7 @@ impl ProjectRepo {
         .bind(&row.status)
         .bind(row.created_at)
         .bind(row.updated_at)
+        .bind(&row.workflow_id)
         .fetch_one(&self.pool)
         .await?;
         Ok(inserted)
@@ -91,6 +92,7 @@ impl ProjectRepo {
                 color       = COALESCE(?6, color),
                 tags        = COALESCE(?7, tags),
                 status      = COALESCE(?8, status),
+                workflow_id = CASE WHEN ?9 THEN ?10 ELSE workflow_id END,
                 updated_at  = datetime('now')
             WHERE id = ?1
             RETURNING *
@@ -110,6 +112,8 @@ impl ProjectRepo {
         .bind(&patch.color)
         .bind(patch.tags.as_ref().map(sqlx::types::Json))
         .bind(&patch.status)
+        .bind(patch.workflow_id.is_some())
+        .bind(patch.workflow_id.as_ref().and_then(|w| w.as_deref()))
         .fetch_optional(&self.pool)
         .await?
         .ok_or_not_found(&format!("project {}", patch.id))?;
@@ -244,4 +248,5 @@ pub struct ProjectPatch {
     pub color: Option<String>,
     pub tags: Option<Vec<String>>,
     pub status: Option<String>,
+    pub workflow_id: Option<Option<String>>,
 }

@@ -868,6 +868,141 @@ async fn dispatch(
                 .await)
         }
 
+        // ── Task Groups ──────────────────────────────────────
+        "group_list" => r(core.group_list(get(&body, "projectId")).await),
+        "group_create" => r(core
+            .group_create(match parse_params(&body) {
+                Ok(p) => p,
+                Err(e) => return err(e),
+            })
+            .await),
+        "group_update" => r(core
+            .group_update(match parse_params(&body) {
+                Ok(p) => p,
+                Err(e) => return err(e),
+            })
+            .await),
+        "group_delete" => {
+            let id = match get_str(&body, "id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            r(core.group_delete(id).await)
+        }
+        "group_reorder" => r(core
+            .group_reorder(match parse_params(&body) {
+                Ok(p) => p,
+                Err(e) => return err(e),
+            })
+            .await),
+
+        // ── Workflows ────────────────────────────────────────
+        "workflow_list" => r(core.workflow_list().await),
+        "workflow_get" => {
+            let id = match get_str(&body, "id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            r(core.workflow_get(id).await)
+        }
+        "workflow_get_effective" => r(core.workflow_get_effective(get(&body, "projectId")).await),
+        "workflow_create" => r(core
+            .workflow_create(match parse_params(&body) {
+                Ok(p) => p,
+                Err(e) => return err(e),
+            })
+            .await),
+        "workflow_delete" => {
+            let id = match get_str(&body, "id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            r(core.workflow_delete(id).await)
+        }
+        "label_create" => r(core
+            .label_create(match parse_params(&body) {
+                Ok(p) => p,
+                Err(e) => return err(e),
+            })
+            .await),
+        "label_update" => r(core
+            .label_update(match parse_params(&body) {
+                Ok(p) => p,
+                Err(e) => return err(e),
+            })
+            .await),
+        "label_delete" => {
+            let id = match get_str(&body, "id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            r(core.label_delete(id).await)
+        }
+        "label_reorder" => r(core
+            .label_reorder(match parse_params(&body) {
+                Ok(p) => p,
+                Err(e) => return err(e),
+            })
+            .await),
+
+        // ── Custom Columns ───────────────────────────────────
+        "custom_column_list" => {
+            let project_id = match get_str(&body, "projectId") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            r(core.custom_column_list(project_id).await)
+        }
+        "custom_column_create" => r(core
+            .custom_column_create(match parse_params(&body) {
+                Ok(p) => p,
+                Err(e) => return err(e),
+            })
+            .await),
+        "custom_column_update" => r(core
+            .custom_column_update(match parse_params(&body) {
+                Ok(p) => p,
+                Err(e) => return err(e),
+            })
+            .await),
+        "custom_column_delete" => {
+            let id = match get_str(&body, "id") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            r(core.custom_column_delete(id).await)
+        }
+        "custom_column_reorder" => r(core
+            .custom_column_reorder(match parse_params(&body) {
+                Ok(p) => p,
+                Err(e) => return err(e),
+            })
+            .await),
+        "custom_column_values" => {
+            let task_id = match get_str(&body, "taskId") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            r(core.custom_column_values(task_id).await)
+        }
+        "custom_column_value_set" => r(core
+            .custom_column_value_set(match parse_params(&body) {
+                Ok(p) => p,
+                Err(e) => return err(e),
+            })
+            .await),
+        "custom_column_value_delete" => {
+            let task_id = match get_str(&body, "taskId") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            let column_id = match get_str(&body, "columnId") {
+                Ok(v) => v,
+                Err(e) => return err(e),
+            };
+            r(core.custom_column_value_delete(task_id, column_id).await)
+        }
+
         // ── Cognitive ─────────────────────────────────────────
         "cognitive_user_model" => r(core.cognitive_user_model().await),
         "cognitive_facts_list" => r(core.cognitive_facts_list(get(&body, "domain")).await),

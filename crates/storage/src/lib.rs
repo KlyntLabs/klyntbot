@@ -63,4 +63,12 @@ pub use rows::memory::MemoryNoteRow;
 pub use rows::objective::ObjectiveRow;
 pub use rows::project::ProjectRow;
 pub use rows::session::{SessionListRow, SessionMessageRow, SessionRow};
+pub use rows::task_group::TaskGroupRow;
 pub use rows::usage::UsageRecordRow;
+
+// Re-export task group repo.
+pub use repos::task_group::TaskGroupRepo;
+
+// Re-export custom column types.
+pub use repos::custom_column::CustomColumnRepo;
+pub use rows::custom_column::{CustomColumnRow, CustomColumnValueRow};

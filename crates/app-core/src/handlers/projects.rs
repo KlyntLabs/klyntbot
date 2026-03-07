@@ -24,6 +24,7 @@ pub fn project_to_response(
         } else {
             Some(objective_ids)
         },
+        workflow_id: row.workflow_id.clone(),
     }
 }
 
@@ -74,6 +75,7 @@ impl AppCore {
             status: "active".to_string(),
             created_at: now,
             updated_at: now,
+            workflow_id: None,
         };
 
         let created = self
@@ -114,6 +116,7 @@ impl AppCore {
             description: params.description,
             tags: params.tags,
             status: params.status,
+            workflow_id: params.workflow_id,
         };
 
         let updated = self

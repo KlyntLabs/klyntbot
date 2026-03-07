@@ -255,6 +255,31 @@ fn main() {
             // OAuth
             oauth::commands::mcp_oauth_start,
             oauth::commands::mcp_oauth_disconnect,
+            // Workflows
+            commands::workflows::workflow_list,
+            commands::workflows::workflow_get,
+            commands::workflows::workflow_get_effective,
+            commands::workflows::workflow_create,
+            commands::workflows::workflow_delete,
+            commands::workflows::label_create,
+            commands::workflows::label_update,
+            commands::workflows::label_delete,
+            commands::workflows::label_reorder,
+            // Groups
+            commands::groups::group_list,
+            commands::groups::group_create,
+            commands::groups::group_update,
+            commands::groups::group_delete,
+            commands::groups::group_reorder,
+            // Custom Columns
+            commands::columns::custom_column_list,
+            commands::columns::custom_column_create,
+            commands::columns::custom_column_update,
+            commands::columns::custom_column_delete,
+            commands::columns::custom_column_reorder,
+            commands::columns::custom_column_values,
+            commands::columns::custom_column_value_set,
+            commands::columns::custom_column_value_delete,
             // Cognitive Debug
             commands::cognitive::cognitive_user_model,
             commands::cognitive::cognitive_facts_list,

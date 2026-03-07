@@ -224,6 +224,7 @@ mod tests {
                 status: "active".into(),
                 created_at: chrono::Utc::now(),
                 updated_at: chrono::Utc::now(),
+                workflow_id: None,
             })
             .await
             .unwrap();

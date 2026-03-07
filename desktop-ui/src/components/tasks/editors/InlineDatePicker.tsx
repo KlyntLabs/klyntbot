@@ -1,4 +1,5 @@
-import { useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useClickOutside } from "../../../hooks/useClickOutside";
 import { formatDate } from "../../../lib/dates";
 import { MiniCalendar } from "./MiniCalendar";
@@ -10,12 +11,26 @@ interface InlineDatePickerProps {
 
 export function InlineDatePicker({ value, onSave }: InlineDatePickerProps) {
   const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useClickOutside(ref, () => setOpen(false), open);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: 0, right: 0 });
+
+  useClickOutside(dropdownRef, () => setOpen(false), open);
+
+  const updatePosition = useCallback(() => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    setPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
+  }, []);
+
+  useEffect(() => {
+    if (open) updatePosition();
+  }, [open, updatePosition]);
 
   return (
-    <div ref={ref} className="relative">
+    <div>
       <button
+        ref={triggerRef}
         type="button"
         onClick={(e) => {
           e.stopPropagation();
@@ -28,25 +43,31 @@ export function InlineDatePicker({ value, onSave }: InlineDatePickerProps) {
       >
         {value ? formatDate(value) : <span className="text-dim">—</span>}
       </button>
-      {open && (
-        <div className="absolute z-50 top-full right-0 mt-1 glass-panel">
-          <MiniCalendar
-            value={value}
-            onSelect={(iso) => {
-              onSave(iso);
-              setOpen(false);
-            }}
-            onClear={
-              value
-                ? () => {
-                    onSave(null);
-                    setOpen(false);
-                  }
-                : undefined
-            }
-          />
-        </div>
-      )}
+      {open &&
+        createPortal(
+          <div
+            ref={dropdownRef}
+            className="fixed z-[9999] glass-panel"
+            style={{ top: pos.top, right: pos.right }}
+          >
+            <MiniCalendar
+              value={value}
+              onSelect={(iso) => {
+                onSave(iso);
+                setOpen(false);
+              }}
+              onClear={
+                value
+                  ? () => {
+                      onSave(null);
+                      setOpen(false);
+                    }
+                  : undefined
+              }
+            />
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

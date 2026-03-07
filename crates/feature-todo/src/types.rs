@@ -59,6 +59,12 @@ pub struct Action {
     pub blocked_by: Vec<String>,
     #[serde(default)]
     pub blocks: Vec<String>,
+    #[serde(default)]
+    pub status_label_id: Option<String>,
+    #[serde(default)]
+    pub position: i32,
+    #[serde(default)]
+    pub group_id: Option<String>,
 }
 
 impl Action {
@@ -100,6 +106,9 @@ impl Action {
             next_instance_date: None,
             blocked_by: Vec::new(),
             blocks: Vec::new(),
+            status_label_id: None,
+            position: 0,
+            group_id: None,
         }
     }
 }
@@ -131,6 +140,16 @@ impl ActionStatus {
             Self::Doing => "doing",
             Self::Done => "done",
             Self::Archived => "archived",
+        }
+    }
+
+    /// Map legacy status to status_group for AI queries.
+    pub fn to_group(&self) -> &'static str {
+        match self {
+            Self::Todo => "not_started",
+            Self::Doing => "active",
+            Self::Done => "done",
+            Self::Archived => "done",
         }
     }
 
@@ -246,6 +265,9 @@ impl From<ActionRow> for Action {
             next_instance_date: row.next_instance_date,
             blocked_by: Vec::new(),
             blocks: Vec::new(),
+            status_label_id: row.status_label_id,
+            position: row.position,
+            group_id: row.group_id,
         }
     }
 }
@@ -278,6 +300,9 @@ impl From<&Action> for ActionRow {
             recurrence_parent_id: action.recurrence_parent_id.clone(),
             is_template: action.is_template,
             next_instance_date: action.next_instance_date,
+            status_label_id: action.status_label_id.clone(),
+            position: action.position,
+            group_id: action.group_id.clone(),
         }
     }
 }

@@ -1,5 +1,12 @@
 import { createContext, use } from "react";
-import type { Area, Project, Task, TaskUpdateParams } from "../../lib/types";
+import type {
+  Area,
+  Project,
+  StatusLabel,
+  Task,
+  TaskGroup,
+  TaskUpdateParams,
+} from "../../lib/types";
 
 export interface TaskTableCtx {
   completedTasks: Set<string>;
@@ -7,9 +14,13 @@ export interface TaskTableCtx {
   childrenCache: Map<string, Task[]>;
   projects: Project[];
   areas: Area[];
+  statusLabels: StatusLabel[];
+  groups: TaskGroup[];
+  collapsedGroups: Set<string>;
   showArea: boolean;
   onToggleTask: (id: string) => void;
   onToggleExpandTask: (id: string) => void;
+  onToggleGroup: (groupId: string) => void;
   onUpdate: (params: TaskUpdateParams) => void;
   onCreateSubtask: (parentId: string, title: string) => void;
 }

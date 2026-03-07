@@ -25,6 +25,8 @@ pub struct ActionFilter {
     pub due_before: Option<DateTime<Utc>>,
     pub limit: Option<i64>,
     pub templates_only: bool,
+    pub status_group: Option<String>,
+    pub group_id: Option<String>,
 }
 
 /// Aggregate counts by status.
@@ -63,7 +65,8 @@ impl ActionRepo {
                 created_at, updated_at, completed_at,
                 total_tracked_secs, estimated_minutes,
                 calendar_event_uid, last_reminded_at,
-                recurrence_rule, recurrence_parent_id, is_template, next_instance_date
+                recurrence_rule, recurrence_parent_id, is_template, next_instance_date,
+                status_label_id, position, group_id
             ) VALUES (
                 ?1, ?2, ?3, ?4, ?5, ?6,
                 ?7, ?8, ?9, ?10, ?11,
@@ -71,7 +74,8 @@ impl ActionRepo {
                 ?15, ?16, ?17,
                 ?18, ?19,
                 ?20, ?21,
-                ?22, ?23, ?24, ?25
+                ?22, ?23, ?24, ?25,
+                ?26, ?27, ?28
             )
             RETURNING *
             "#,
@@ -101,6 +105,9 @@ impl ActionRepo {
         .bind(&row.recurrence_parent_id)
         .bind(row.is_template)
         .bind(row.next_instance_date)
+        .bind(&row.status_label_id)
+        .bind(row.position)
+        .bind(&row.group_id)
         .fetch_one(&self.pool)
         .await?;
 
@@ -163,6 +170,9 @@ impl ActionRepo {
                 area_id            = COALESCE(?21, area_id),
                 project_id         = CASE WHEN ?22 THEN ?23 ELSE project_id END,
                 key_result_id      = CASE WHEN ?24 THEN ?25 ELSE key_result_id END,
+                status_label_id    = CASE WHEN ?26 THEN ?27 ELSE status_label_id END,
+                position           = COALESCE(?28, position),
+                group_id           = CASE WHEN ?29 THEN ?30 ELSE group_id END,
                 updated_at         = datetime('now')
             WHERE id = ?1
             RETURNING *
@@ -193,6 +203,11 @@ impl ActionRepo {
         .bind(patch.project_id.as_ref().and_then(|v| v.as_deref()))
         .bind(patch.key_result_id.is_some())
         .bind(patch.key_result_id.as_ref().and_then(|v| v.as_deref()))
+        .bind(patch.status_label_id.is_some())
+        .bind(patch.status_label_id.as_ref().and_then(|v| v.as_deref()))
+        .bind(patch.position)
+        .bind(patch.group_id.is_some())
+        .bind(patch.group_id.as_ref().and_then(|v| v.as_deref()))
         .fetch_optional(&self.pool)
         .await?
         .ok_or_not_found(&format!("action {}", patch.id))?;
@@ -272,6 +287,17 @@ impl ActionRepo {
         if let Some(ref before) = filter.due_before {
             qb.push(" AND due_date < ");
             qb.push_bind(before);
+        }
+
+        if let Some(ref group) = filter.status_group {
+            qb.push(" AND status_label_id IN (SELECT id FROM status_labels WHERE status_group = ");
+            qb.push_bind(group);
+            qb.push(")");
+        }
+
+        if let Some(ref gid) = filter.group_id {
+            qb.push(" AND group_id = ");
+            qb.push_bind(gid);
         }
 
         qb.push(" ORDER BY created_at DESC");
@@ -852,6 +878,24 @@ impl ActionRepo {
         Ok(summary)
     }
 
+    /// Aggregate task counts by status group (via status_labels JOIN).
+    pub async fn summary_by_group(
+        &self,
+    ) -> Result<std::collections::HashMap<String, i64>, StorageError> {
+        let rows: Vec<(String, i64)> = sqlx::query_as(
+            r#"
+            SELECT sl.status_group, COUNT(*) as cnt
+            FROM actions a
+            JOIN status_labels sl ON a.status_label_id = sl.id
+            WHERE a.is_template = 0
+            GROUP BY sl.status_group
+            "#,
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows.into_iter().collect())
+    }
+
     /// Get overdue actions.
     pub async fn overdue(&self) -> Result<Vec<ActionRow>, StorageError> {
         let rows = sqlx::query_as::<_, ActionRow>(
@@ -980,4 +1024,7 @@ pub struct ActionPatch {
     pub area_id: Option<String>,
     pub project_id: Option<Option<String>>,
     pub key_result_id: Option<Option<String>>,
+    pub status_label_id: Option<Option<String>>,
+    pub position: Option<i32>,
+    pub group_id: Option<Option<String>>,
 }

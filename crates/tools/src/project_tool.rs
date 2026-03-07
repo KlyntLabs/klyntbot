@@ -110,6 +110,7 @@ impl Tool for ProjectTool {
                     status: "active".to_string(),
                     created_at: now,
                     updated_at: now,
+                    workflow_id: None,
                 };
 
                 let created = self.project_repo.create(&row).await?;
@@ -216,6 +217,7 @@ impl Tool for ProjectTool {
                         None
                     },
                     status: p.optional_str("status")?.map(String::from),
+                    workflow_id: None,
                 };
 
                 let updated = self.project_repo.update(&patch).await?;

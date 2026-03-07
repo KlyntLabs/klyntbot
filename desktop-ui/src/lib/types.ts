@@ -3,6 +3,27 @@ export interface ApiError {
   message: string;
 }
 
+// ── Status Workflows ──────────────────────────────────
+
+export type StatusGroup = "not_started" | "active" | "done" | "stuck";
+
+export interface StatusLabel {
+  id: string;
+  workflowId: string;
+  name: string;
+  color: string;
+  statusGroup: StatusGroup;
+  position: number;
+}
+
+export interface StatusWorkflow {
+  id: string;
+  name: string;
+  isTemplate: boolean;
+  isGlobalDefault: boolean;
+  labels: StatusLabel[];
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -18,6 +39,9 @@ export interface Task {
   parentId: string | null;
   subtaskCount: number;
   subtaskCompletedCount: number;
+  statusLabelId: string | null;
+  statusLabel: StatusLabel | null;
+  groupId: string | null;
 }
 
 export interface TodayTask {
@@ -31,6 +55,15 @@ export interface TodayTask {
   dueDisplay: string | null;
 }
 
+export interface TaskGroup {
+  id: string;
+  projectId: string | null;
+  name: string;
+  color: string | null;
+  position: number;
+  taskCount: number;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -39,6 +72,7 @@ export interface Project {
   taskCount: number;
   completedCount: number;
   objectiveIds?: string[];
+  workflowId?: string;
 }
 
 export interface Objective {
@@ -747,6 +781,64 @@ export type InsightPayload = Pick<InsightCard, "id" | "insightType" | "title" | 
 
 export type ProductivityPeriod = "day" | "week" | "month";
 
+// ── Custom Columns ──────────────────────────────────────────────────────
+
+export type ColumnType =
+  | "text"
+  | "number"
+  | "date"
+  | "dropdown"
+  | "multi_select"
+  | "checkbox"
+  | "tags"
+  | "link"
+  | "rating"
+  | "progress"
+  | "duration"
+  | "currency";
+
+export interface CustomColumn {
+  id: string;
+  projectId: string;
+  name: string;
+  columnType: ColumnType;
+  options: string[] | null;
+  position: number;
+  width: number;
+}
+
+export interface CustomColumnValue {
+  taskId: string;
+  columnId: string;
+  value: unknown;
+}
+
+export interface ColumnCreateParams {
+  projectId: string;
+  name: string;
+  columnType: ColumnType;
+  options?: string[];
+  width?: number;
+}
+
+export interface ColumnUpdateParams {
+  id: string;
+  name?: string;
+  options?: string[] | null;
+  width?: number;
+}
+
+export interface ColumnReorderParams {
+  projectId: string;
+  ids: string[];
+}
+
+export interface ColumnValueSetParams {
+  taskId: string;
+  columnId: string;
+  value: unknown;
+}
+
 export type Tab = "All" | string;
 export type SidebarItem =
   | "Chat"
@@ -773,6 +865,9 @@ export interface TaskUpdateParams {
   areaId?: string;
   tags?: string[];
   keyResultId?: string | null;
+  statusLabelId?: string | null;
+  position?: number;
+  groupId?: string | null;
 }
 
 export interface TaskCreateParams {
@@ -783,6 +878,7 @@ export interface TaskCreateParams {
   dueDate?: string;
   tags?: string[];
   parentId?: string;
+  groupId?: string;
 }
 
 export interface AreaCreateParams {

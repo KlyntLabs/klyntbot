@@ -6,6 +6,7 @@ pub mod agent_task;
 pub mod area;
 pub mod behavioral_pattern;
 pub mod cron;
+pub mod custom_column;
 pub mod decision_log;
 pub mod finance_account_repo;
 pub mod finance_budget_repo;
@@ -22,7 +23,9 @@ pub mod outcome;
 pub mod project_repo;
 pub mod session;
 pub mod session_context;
+pub mod status_workflow;
 pub mod strategy;
+pub mod task_group;
 pub mod usage;
 pub mod user_profile;
 
@@ -35,6 +38,7 @@ pub use agent_task::AgentTaskRepo;
 pub use area::AreaRepo;
 pub use behavioral_pattern::BehavioralPatternRepo;
 pub use cron::CronRepo;
+pub use custom_column::CustomColumnRepo;
 pub use decision_log::DecisionLogRepo;
 pub use finance_account_repo::FinanceAccountRepo;
 pub use finance_budget_repo::FinanceBudgetRepo;
@@ -51,7 +55,9 @@ pub use outcome::OutcomeRepo;
 pub use project_repo::{ProjectFilter, ProjectPatch, ProjectRepo, ProjectWithStats};
 pub use session::SessionRepo;
 pub use session_context::SessionContextRepo;
+pub use status_workflow::StatusWorkflowRepo;
 pub use strategy::{OverallStats, StrategyRepo, ToolStatsRow};
+pub use task_group::TaskGroupRepo;
 pub use usage::UsageRepo;
 pub use user_profile::UserProfileRepo;
 
@@ -81,6 +87,9 @@ pub struct Repos {
     pub behavioral_patterns: BehavioralPatternRepo,
     pub agent_adaptations: AgentAdaptationRepo,
     pub interaction_log: InteractionLogRepo,
+    pub status_workflows: StatusWorkflowRepo,
+    pub task_groups: TaskGroupRepo,
+    pub custom_columns: CustomColumnRepo,
 }
 
 impl Repos {
@@ -108,6 +117,9 @@ impl Repos {
             behavioral_patterns: BehavioralPatternRepo::new(db.clone()),
             agent_adaptations: AgentAdaptationRepo::new(db.clone()),
             interaction_log: InteractionLogRepo::new(db.clone()),
+            status_workflows: StatusWorkflowRepo::new(db.clone()),
+            task_groups: TaskGroupRepo::new(db.clone()),
+            custom_columns: CustomColumnRepo::new(db.clone()),
             pool: db,
         }
     }

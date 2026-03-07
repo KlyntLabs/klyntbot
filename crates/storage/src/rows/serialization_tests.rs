@@ -78,6 +78,9 @@ mod tests {
             recurrence_parent_id: None,
             is_template: false,
             next_instance_date: None,
+            status_label_id: None,
+            position: 0,
+            group_id: None,
         }
     }
 
@@ -92,6 +95,7 @@ mod tests {
             status: "active".to_string(),
             created_at: Utc::now(),
             updated_at: Utc::now(),
+            workflow_id: None,
         }
     }
 

@@ -1,15 +1,21 @@
 import { ArrowLeft, Trash2 } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router";
+import {
+  useColumnMutations,
+  useColumnValues,
+  useCustomColumns,
+} from "../../hooks/useCustomColumns";
 import { useEvent } from "../../hooks/useEvent";
 import { useMutation } from "../../hooks/useMutation";
 import { useQuery } from "../../hooks/useQuery";
-import type { Project, Task, TaskUpdateParams } from "../../lib/types";
+import { useEffectiveLabels } from "../../hooks/useWorkflows";
+import type { Project, StatusLabel, Task, TaskUpdateParams } from "../../lib/types";
 import { LinkedNotes } from "../notes/LinkedNotes";
+import { CustomColumnCell } from "../tasks/CustomColumnCell";
 import { Badge } from "../ui/Badge";
 
 const PRIORITIES = ["P1", "P2", "P3", "P4", null] as const;
-const STATUSES = ["todo", "doing", "done"] as const;
 
 export function TaskDetail() {
   const { id } = useParams<{ id: string }>();
@@ -17,6 +23,7 @@ export function TaskDetail() {
 
   const { data: task, refetch } = useQuery<Task | null>("task_get", id ? { id } : null, null);
   const { data: projects } = useQuery<Project[]>("project_list", undefined, []);
+  const { data: statusLabels } = useEffectiveLabels(null);
   const updateTask = useMutation<Task, TaskUpdateParams>("task_update", "params");
   const deleteTask = useMutation<boolean, { id: string }>("task_delete");
 
@@ -25,6 +32,18 @@ export function TaskDetail() {
   const [editingDesc, setEditingDesc] = useState(false);
   const [descDraft, setDescDraft] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const { data: customColumns } = useCustomColumns(task?.projectId ?? null);
+  const { data: columnValues } = useColumnValues(task?.id ?? null);
+  const { setValue: setColumnValue } = useColumnMutations();
+
+  const columnValueMap = useMemo(() => {
+    const map = new Map<string, unknown>();
+    for (const cv of columnValues) {
+      map.set(cv.columnId, cv.value);
+    }
+    return map;
+  }, [columnValues]);
 
   useEvent<{ entityKind: string; id: string }>("entity:updated", () => {
     refetch();
@@ -115,19 +134,20 @@ export function TaskDetail() {
         <div className="grid grid-cols-[120px_1fr] gap-y-4 gap-x-4 mb-6">
           {/* Status */}
           <span className="text-[12px] text-muted font-light self-center">Status</span>
-          <div className="flex gap-2">
-            {STATUSES.map((s) => (
+          <div className="flex gap-2 flex-wrap">
+            {statusLabels.map((sl: StatusLabel) => (
               <button
                 type="button"
-                key={s}
-                onClick={() => handleUpdate({ status: s })}
+                key={sl.id}
+                onClick={() => handleUpdate({ statusLabelId: sl.id })}
                 className={`px-3 py-1 rounded-md text-[12px] font-light transition-colors ${
-                  task.status === s
-                    ? "bg-brand text-white"
+                  task.statusLabelId === sl.id
+                    ? "text-white"
                     : "bg-white/[0.04] text-muted hover:bg-white/[0.06]"
                 }`}
+                style={task.statusLabelId === sl.id ? { backgroundColor: sl.color } : undefined}
               >
-                {s}
+                {sl.name}
               </button>
             ))}
           </div>
@@ -209,6 +229,28 @@ export function TaskDetail() {
             </button>
           )}
         </div>
+
+        {/* Custom Fields */}
+        {customColumns.length > 0 && (
+          <div className="mb-6">
+            <span className="text-[12px] text-muted font-light block mb-3">Custom Fields</span>
+            <div className="grid grid-cols-[120px_1fr] gap-y-3 gap-x-4">
+              {customColumns.map((col) => (
+                <div key={col.id} className="contents">
+                  <span className="text-[12px] text-muted font-light self-center">{col.name}</span>
+                  <div className="self-center">
+                    <CustomColumnCell
+                      taskId={task.id}
+                      column={col}
+                      value={columnValueMap.get(col.id) ?? null}
+                      onSetValue={(params) => setColumnValue.mutate(params)}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Linked Notes */}
         {id && <LinkedNotes entityType="task" entityId={id} />}

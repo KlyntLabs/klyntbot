@@ -18,4 +18,5 @@ pub struct ProjectRow {
     pub status: String,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+    pub workflow_id: Option<String>,
 }

@@ -1,11 +1,12 @@
 use chrono::{DateTime, Utc};
 use desktop_shared::commands::{
-    KeyResultResponse, ObjectiveResponse, ProjectResponse, TaskCreateParams, TaskResponse,
-    TaskUpdateParams, TodayTaskResponse,
+    KeyResultResponse, ObjectiveResponse, ProjectResponse, StatusLabelResponse, TaskCreateParams,
+    TaskResponse, TaskUpdateParams, TodayTaskResponse,
 };
 use desktop_shared::errors::ApiError;
 use desktop_shared::types::EntityKind;
 use storage::{ActionFilter, ActionPatch, ActionRow, KeyResultRow, ObjectiveRow, ProjectFilter};
+use tracing::warn;
 
 use crate::errors::{map_storage_err, parse_date};
 use crate::state::{AppCore, EntityUpdate, HandlerResult};
@@ -36,6 +37,9 @@ pub fn action_to_task(
         parent_id: row.parent_id.clone(),
         subtask_count,
         subtask_completed_count,
+        status_label_id: row.status_label_id.clone(),
+        status_label: None,
+        group_id: row.group_id.clone(),
     }
 }
 
@@ -103,7 +107,7 @@ pub fn kr_to_response(row: &KeyResultRow) -> KeyResultResponse {
 
 // ── Helpers ─────────────────────────────────────────────────────────────
 
-/// Convert a list of ActionRows to TaskResponses, bulk-fetching subtask counts.
+/// Convert a list of ActionRows to TaskResponses, bulk-fetching subtask counts and status labels.
 pub async fn rows_to_tasks(
     repos: &storage::Repos,
     rows: &[ActionRow],
@@ -115,13 +119,65 @@ pub async fn rows_to_tasks(
         .await
         .map_err(map_storage_err)?;
 
-    Ok(rows
+    // Batch-load all unique status labels to avoid N+1
+    let label_ids: Vec<&str> = rows
         .iter()
-        .map(|row| {
-            let (total, completed) = counts.get(&row.id).copied().unwrap_or((0, 0));
-            action_to_task(row, total as u32, completed as u32)
-        })
-        .collect())
+        .filter_map(|r| r.status_label_id.as_deref())
+        .collect::<std::collections::HashSet<&str>>()
+        .into_iter()
+        .collect();
+    let labels = repos
+        .status_workflows
+        .get_labels_by_ids(&label_ids)
+        .await
+        .map_err(map_storage_err)?;
+    let label_map: std::collections::HashMap<&str, _> =
+        labels.iter().map(|l| (l.id.as_str(), l)).collect();
+
+    let mut tasks = Vec::with_capacity(rows.len());
+    for row in rows {
+        let (total, completed) = counts.get(&row.id).copied().unwrap_or((0, 0));
+        let mut task = action_to_task(row, total as u32, completed as u32);
+        task.status_label = row
+            .status_label_id
+            .as_deref()
+            .and_then(|id| label_map.get(id))
+            .map(|l| StatusLabelResponse {
+                id: l.id.clone(),
+                workflow_id: l.workflow_id.clone(),
+                name: l.name.clone(),
+                color: l.color.clone(),
+                status_group: l.status_group.clone(),
+                position: l.position,
+            });
+        tasks.push(task);
+    }
+    Ok(tasks)
+}
+
+/// Look up the status label for an action row, if it has one.
+async fn resolve_status_label(
+    repos: &storage::Repos,
+    row: &ActionRow,
+) -> Result<Option<StatusLabelResponse>, ApiError> {
+    match &row.status_label_id {
+        Some(label_id) => {
+            let label = repos
+                .status_workflows
+                .get_label(label_id)
+                .await
+                .map_err(map_storage_err)?;
+            Ok(label.map(|l| StatusLabelResponse {
+                id: l.id,
+                workflow_id: l.workflow_id,
+                name: l.name,
+                color: l.color,
+                status_group: l.status_group,
+                position: l.position,
+            }))
+        }
+        None => Ok(None),
+    }
 }
 
 /// Fetch subtask counts for a single row and convert to TaskResponse.
@@ -134,7 +190,9 @@ pub async fn row_to_task(
         .count_children(&row.id)
         .await
         .map_err(map_storage_err)?;
-    Ok(action_to_task(row, total as u32, completed as u32))
+    let mut task = action_to_task(row, total as u32, completed as u32);
+    task.status_label = resolve_status_label(repos, row).await?;
+    Ok(task)
 }
 
 // ── Handler methods ─────────────────────────────────────────────────────
@@ -188,6 +246,40 @@ impl AppCore {
             (None, None) => "default".to_string(),
         };
 
+        // Auto-assign status_label_id if not provided
+        let status_label_id = match params.status_label_id {
+            Some(id) => Some(id),
+            None => {
+                let wf = self
+                    .repos
+                    .status_workflows
+                    .get_global_default()
+                    .await
+                    .map_err(|e| {
+                        warn!(error = %e, "failed to fetch global default workflow during task creation");
+                        e
+                    })
+                    .ok()
+                    .flatten();
+
+                match wf {
+                    Some(wf) => self
+                        .repos
+                        .status_workflows
+                        .find_label_by_group(&wf.id, "not_started")
+                        .await
+                        .map_err(|e| {
+                            warn!(workflow_id = %wf.id, error = %e, "failed to find not_started label");
+                            e
+                        })
+                        .ok()
+                        .flatten()
+                        .map(|l| l.id),
+                    None => None,
+                }
+            }
+        };
+
         let row = ActionRow {
             id: id.clone(),
             title: params.title,
@@ -214,6 +306,9 @@ impl AppCore {
             recurrence_parent_id: None,
             is_template: false,
             next_instance_date: None,
+            status_label_id,
+            position: 0,
+            group_id: params.group_id,
         };
 
         let created = self
@@ -228,8 +323,10 @@ impl AppCore {
             id: id.clone(),
         }];
 
-        // Newly created task has no subtasks yet
-        Ok((action_to_task(&created, 0, 0), updates))
+        // Newly created task has no subtasks yet; resolve status label for the response
+        let mut task = action_to_task(&created, 0, 0);
+        task.status_label = resolve_status_label(&self.repos, &created).await?;
+        Ok((task, updates))
     }
 
     pub async fn task_update(&self, params: TaskUpdateParams) -> HandlerResult<TaskResponse> {
@@ -244,6 +341,8 @@ impl AppCore {
             area_id: params.area_id,
             project_id: params.project_id,
             key_result_id: params.key_result_id,
+            status_label_id: params.status_label_id,
+            group_id: params.group_id,
             ..Default::default()
         };
 
