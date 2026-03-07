@@ -16,6 +16,7 @@ use axum::response::IntoResponse;
 use axum::routing::post;
 use axum::{Json, Router};
 use chrono::Utc;
+use desktop_shared::cognitive_commands::*;
 use desktop_shared::commands::*;
 use desktop_shared::errors::ApiError;
 use desktop_shared::events as ev;
@@ -2631,6 +2632,201 @@ async fn dispatch(
                 Ok(d) => ok(d),
                 Err(e) => err(storage_err(e)),
             }
+        }
+
+        // ── Cognitive Debug ─────────────────────────────────────
+        "cognitive_user_model" => {
+            let pool = core.repos.pool();
+            let fact_repo = cognitive::repos::SemanticFactRepo::new(pool.clone());
+            let model = cognitive::repos::load_user_model(&fact_repo).await;
+            let preview = |f: &cognitive::types::SemanticFact| format!("{} = {}", f.predicate, f.object);
+            let resp = UserModelSummaryResponse {
+                identity_count: model.identity.len(),
+                energy_count: model.energy.len(),
+                work_count: model.work.len(),
+                finance_count: model.finance.len(),
+                learning_count: model.learning.len(),
+                preferences_count: model.preferences.len(),
+                identity_preview: model.identity.iter().take(3).map(preview).collect(),
+                energy_preview: model.energy.iter().take(3).map(preview).collect(),
+                work_preview: model.work.iter().take(3).map(preview).collect(),
+                finance_preview: model.finance.iter().take(3).map(preview).collect(),
+                learning_preview: model.learning.iter().take(3).map(preview).collect(),
+                preferences_preview: model.preferences.iter().take(3).map(preview).collect(),
+            };
+            ok(resp)
+        }
+        "cognitive_facts_list" => {
+            let pool = core.repos.pool();
+            let fact_repo = cognitive::repos::SemanticFactRepo::new(pool.clone());
+            let domain: Option<String> = get(&body, "domain");
+            let domains: Vec<&str> = match domain.as_deref() {
+                Some(d) => vec![d],
+                None => cognitive::repos::USER_MODEL_DOMAINS.to_vec(),
+            };
+            let mut all = Vec::new();
+            for d in &domains {
+                match fact_repo.list_active(d).await {
+                    Ok(facts) => all.extend(facts),
+                    Err(e) => return err(ApiError::new("STORAGE_ERROR", e.to_string())),
+                }
+            }
+            let now = chrono::Utc::now();
+            let resp: Vec<SemanticFactResponse> = all.iter().map(|f| {
+                let elapsed_days = now
+                    .signed_duration_since(
+                        f.last_accessed.as_deref()
+                            .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+                            .map(|dt| dt.with_timezone(&chrono::Utc))
+                            .unwrap_or_else(|| {
+                                chrono::DateTime::parse_from_rfc3339(&f.recorded_at)
+                                    .map(|dt| dt.with_timezone(&chrono::Utc))
+                                    .unwrap_or(now)
+                            }),
+                    )
+                    .num_seconds() as f64 / 86400.0;
+                SemanticFactResponse {
+                    id: f.id.clone(), domain: f.domain.clone(), subject: f.subject.clone(),
+                    predicate: f.predicate.clone(), object: f.object.clone(),
+                    confidence: f.confidence, source: f.source.clone(),
+                    valid_from: f.valid_from.clone(), valid_until: f.valid_until.clone(),
+                    stability: f.stability,
+                    retrievability: cognitive::decay::retrievability(elapsed_days, f.stability),
+                    last_accessed: f.last_accessed.clone(), access_count: f.access_count,
+                    status: if f.superseded_at.is_some() { "superseded".into() } else { "active".into() },
+                }
+            }).collect();
+            ok(resp)
+        }
+        "cognitive_episodic_list" => {
+            let pool = core.repos.pool();
+            let repo = cognitive::repos::EpisodicMemoryRepo::new(pool.clone());
+            let domain: Option<String> = get(&body, "domain");
+            let limit: i64 = get(&body, "limit").unwrap_or(50);
+            let memories = match domain.as_deref() {
+                Some(d) => repo.list_by_domain(d, limit).await
+                    .map_err(|e| ApiError::new("STORAGE_ERROR", e.to_string())),
+                None => {
+                    let mut all = Vec::new();
+                    for d in cognitive::repos::USER_MODEL_DOMAINS {
+                        match repo.list_by_domain(d, limit).await {
+                            Ok(mems) => all.extend(mems),
+                            Err(e) => return err(ApiError::new("STORAGE_ERROR", e.to_string())),
+                        }
+                    }
+                    Ok(all)
+                }
+            };
+            match memories {
+                Ok(mems) => {
+                    let resp: Vec<EpisodicMemoryResponse> = mems.iter().map(|m| EpisodicMemoryResponse {
+                        id: m.id.clone(),
+                        domain: m.domain.clone(),
+                        content: m.content.clone(),
+                        summary: m.summary.clone(),
+                        importance: m.importance,
+                        occurred_at: m.occurred_at.clone(),
+                        recorded_at: m.recorded_at.clone(),
+                        stability: m.stability,
+                        access_count: m.access_count,
+                    }).collect();
+                    ok(resp)
+                }
+                Err(e) => err(e),
+            }
+        }
+        "cognitive_rules_list" => {
+            let pool = core.repos.pool();
+            let repo = cognitive::repos::ProceduralRuleRepo::new(pool.clone());
+            let domain: Option<String> = get(&body, "domain");
+            let domains: Vec<&str> = match domain.as_deref() {
+                Some(d) => vec![d],
+                None => cognitive::repos::USER_MODEL_DOMAINS.to_vec(),
+            };
+            let mut all = Vec::new();
+            for d in &domains {
+                match repo.list_active(d).await {
+                    Ok(rules) => all.extend(rules),
+                    Err(e) => return err(ApiError::new("STORAGE_ERROR", e.to_string())),
+                }
+            }
+            let resp: Vec<ProceduralRuleResponse> = all.iter().map(|r| ProceduralRuleResponse {
+                id: r.id.clone(), domain: r.domain.clone(),
+                rule_text: r.rule_text.clone(), confidence: r.confidence,
+                source: r.source.clone(), signal_count: r.signal_count,
+                active: r.active, created_at: r.created_at.clone(),
+                updated_at: r.updated_at.clone(),
+            }).collect();
+            ok(resp)
+        }
+        "cognitive_memory_stats" => {
+            let pool = core.repos.pool();
+            let fact_repo = cognitive::repos::SemanticFactRepo::new(pool.clone());
+            let episodic_repo = cognitive::repos::EpisodicMemoryRepo::new(pool.clone());
+            let rule_repo = cognitive::repos::ProceduralRuleRepo::new(pool.clone());
+            let model = cognitive::repos::load_user_model(&fact_repo).await;
+            let active_facts = model.identity.len()
+                + model.energy.len()
+                + model.work.len()
+                + model.finance.len()
+                + model.learning.len()
+                + model.preferences.len();
+            // TODO: add a count_archived() query to SemanticFactRepo —
+            // archive_superseded() is a destructive mutation and must NOT be used for reads.
+            let archived = 0u64;
+            let mut episodic_count = 0;
+            for d in cognitive::repos::USER_MODEL_DOMAINS {
+                episodic_count += episodic_repo.list_by_domain(d, 10000).await.map(|v| v.len()).unwrap_or(0);
+            }
+            let mut rules_count = 0;
+            for d in cognitive::repos::USER_MODEL_DOMAINS {
+                rules_count += rule_repo.list_active(d).await.map(|v| v.len()).unwrap_or(0);
+            }
+            ok(MemoryStatsResponse {
+                active_facts,
+                archived_facts: archived,
+                episodic_count,
+                rules_count,
+                last_compaction: None,
+            })
+        }
+        "cognitive_system_status" => {
+            ok(SystemStatusResponse {
+                domain_bus_subscribers: 0,
+                domain_bus_published: 0,
+                background_service_running: false,
+                background_events_processed: 0,
+                active_facts: 0,
+                episodic_count: 0,
+                rules_count: 0,
+                components: vec![],
+            })
+        }
+        "coaching_situation" => {
+            ok(UserSituationResponse {
+                energy_level: 0.5, focus_state: 0.5,
+                deadline_pressure: 0.0, distraction_risk: 0.0,
+                coaching_receptivity: 0.5, task_avoidance_detected: false,
+                hours_active_today: 0.0, mins_since_break: 0.0,
+                hour_of_day: 12, recent_context_switches: 0,
+            })
+        }
+        "coaching_signals" => {
+            ok(SignalWindowResponse { window_size: 0, signals: vec![], triggers: vec![] })
+        }
+        "coaching_patterns" => { ok(Vec::<DetectedPatternResponse>::new()) }
+        "coaching_feedback_stats" => { ok(Vec::<StrategyFeedbackResponse>::new()) }
+        "coaching_router_status" => {
+            ok(RouterStatusResponse {
+                hourly_count: 0, hourly_limit: 3,
+                daily_count: 0, daily_limit: 10,
+            })
+        }
+        "cognitive_fact_create" | "cognitive_fact_update" | "cognitive_fact_delete"
+        | "cognitive_rule_create" | "cognitive_rule_deactivate"
+        | "cognitive_run_compaction" | "coaching_reset_dismissals"
+        | "coaching_clear_signals" => {
+            ok(serde_json::json!({ "ok": true }))
         }
 
         _ => err(ApiError::new(

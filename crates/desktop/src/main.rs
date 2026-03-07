@@ -232,6 +232,26 @@ fn main() {
             // OAuth
             oauth::commands::mcp_oauth_start,
             oauth::commands::mcp_oauth_disconnect,
+            // Cognitive Debug
+            commands::cognitive::cognitive_user_model,
+            commands::cognitive::cognitive_facts_list,
+            commands::cognitive::cognitive_episodic_list,
+            commands::cognitive::cognitive_rules_list,
+            commands::cognitive::cognitive_memory_stats,
+            commands::cognitive::coaching_situation,
+            commands::cognitive::coaching_signals,
+            commands::cognitive::coaching_patterns,
+            commands::cognitive::coaching_feedback_stats,
+            commands::cognitive::coaching_router_status,
+            commands::cognitive::cognitive_system_status,
+            commands::cognitive::cognitive_fact_create,
+            commands::cognitive::cognitive_fact_update,
+            commands::cognitive::cognitive_fact_delete,
+            commands::cognitive::cognitive_rule_create,
+            commands::cognitive::cognitive_rule_deactivate,
+            commands::cognitive::cognitive_run_compaction,
+            commands::cognitive::coaching_reset_dismissals,
+            commands::cognitive::coaching_clear_signals,
             // Status
             commands::status::agent_status,
             // Window

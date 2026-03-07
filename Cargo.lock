@@ -2926,6 +2926,7 @@ dependencies = [
  "base64 0.22.1",
  "bus",
  "chrono",
+ "cognitive",
  "common",
  "config",
  "context_engine",
